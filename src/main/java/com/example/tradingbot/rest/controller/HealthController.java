@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class HealthController {
+
     @GetMapping(value = "/api/health", produces = MediaType.TEXT_PLAIN_VALUE)
     public String health() {
         return "OK";
