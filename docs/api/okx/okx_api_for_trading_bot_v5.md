@@ -47,6 +47,19 @@
 
 ---
 
+## 1.1) Реализация в коде (Stage 02)
+
+В рамках Stage 02 добавлен proxy-слой для REST эндпоинтов из таблицы:
+
+* OKX client + подпись: `com.example.tradingbot.client.okx` (`OkxRestClient`, `OkxAuthSigner`)
+* Client DTO: `com.example.tradingbot.client.okx.dto`
+* Domain models: `com.example.tradingbot.domain.model`
+* REST models: `com.example.tradingbot.rest.model`
+* MapStruct mappers: `com.example.tradingbot.mapping`
+* REST контроллеры proxy: `com.example.tradingbot.rest.controller.okxproxy`
+
+---
+
 ## 2) Лимиты по каналам общения
 
 ### WebSocket (WS)
