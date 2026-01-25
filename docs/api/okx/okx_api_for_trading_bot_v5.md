@@ -47,6 +47,17 @@
 
 ---
 
+## 1.1) Реализация в коде (Stage 02)
+
+* OKX REST клиент: `com.example.tradingbot.client.okx`
+* Клиентские DTO: `com.example.tradingbot.client.okx.dto`
+* Доменные модели: `com.example.tradingbot.domain.model`
+* REST модели: `com.example.tradingbot.rest.model`
+* MapStruct мапперы: `com.example.tradingbot.mapping`
+* REST прокси-контроллеры: `com.example.tradingbot.rest.controller.okxproxy`
+
+---
+
 ## 2) Лимиты по каналам общения
 
 ### WebSocket (WS)
