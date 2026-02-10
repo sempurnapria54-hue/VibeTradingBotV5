@@ -1,0 +1,50 @@
+package com.example.tradingbot.persistence.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@Entity
+@Table(name = "instrument", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_instrument_exchange_name", columnNames = {"exchange_id", "name"})
+})
+public class InstrumentEntity extends AuditableEntity {
+
+    public static final int NAME_LENGTH = 100;
+    public static final int POSITION_MODE_LENGTH = 20;
+    public static final int STATUS_LENGTH = 50;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
+    private Long id;
+
+    @Column(name = "exchange_id", nullable = false, updatable = false, insertable = false)
+    private Long exchangeId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "exchange_id", nullable = false)
+    private ExchangeEntity exchange;
+
+    @Column(name = "name", nullable = false, length = NAME_LENGTH)
+    private String name;
+
+    @Column(name = "position_mode", nullable = false, length = POSITION_MODE_LENGTH)
+    private String positionMode;
+
+    @Column(name = "status", nullable = false, length = STATUS_LENGTH)
+    private String status;
+}
