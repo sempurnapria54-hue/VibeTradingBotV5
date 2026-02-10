@@ -56,6 +56,7 @@
 * OKX: работаем со SWAP (например, `ETH-USDT-SWAP`), режим **isolated**, плечо ≤ x10 (как рамка риск‑параметров).
 * Время: **UTC**.
 * Таймфреймы: только `OkxTimeframes`.
+* Вместо RestTemplate надо использовать RestClient
 
 ---
 
