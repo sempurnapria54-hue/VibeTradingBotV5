@@ -1,0 +1,34 @@
+package com.example.tradingbot.mapping.okxproxy;
+
+import com.example.tradingbot.client.okx.dto.PositionDto;
+import com.example.tradingbot.domain.model.okxproxy.Position;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+@Mapper(componentModel = "spring")
+public interface PositionMapper {
+
+    @Mapping(source = "instId", target = "instrumentId")
+    @Mapping(source = "instType", target = "instrumentType")
+    @Mapping(source = "posSide", target = "positionSide")
+    @Mapping(source = "pos", target = "positionSize")
+    @Mapping(source = "avgPx", target = "averagePrice")
+    @Mapping(source = "upl", target = "unrealizedProfit")
+    @Mapping(source = "lever", target = "leverage")
+    @Mapping(source = "mgnMode", target = "marginMode")
+    Position clientToDomain(PositionDto source);
+
+    @Mapping(source = "instrumentId", target = "instId")
+    @Mapping(source = "instrumentType", target = "instType")
+    @Mapping(source = "positionSide", target = "posSide")
+    @Mapping(source = "positionSize", target = "pos")
+    @Mapping(source = "averagePrice", target = "avgPx")
+    @Mapping(source = "unrealizedProfit", target = "upl")
+    @Mapping(source = "leverage", target = "lever")
+    @Mapping(source = "marginMode", target = "mgnMode")
+    PositionDto domainToClient(Position source);
+
+    com.example.tradingbot.rest.model.okxproxy.Position domainToRest(Position source);
+
+    Position restToDomain(com.example.tradingbot.rest.model.okxproxy.Position source);
+}

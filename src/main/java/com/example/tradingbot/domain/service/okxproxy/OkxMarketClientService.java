@@ -1,0 +1,39 @@
+package com.example.tradingbot.domain.service.okxproxy;
+
+import com.example.tradingbot.client.okx.OkxRestClient;
+import com.example.tradingbot.domain.model.okxproxy.*;
+import com.example.tradingbot.mapping.okxproxy.CandleMapper;
+import com.example.tradingbot.mapping.okxproxy.InstrumentMapper;
+import com.example.tradingbot.mapping.okxproxy.OkxProxyRequestMapper;
+import com.example.tradingbot.mapping.okxproxy.PriceTickerMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class OkxMarketClientService {
+
+    private final OkxRestClient okxRestClient;
+    private final OkxProxyRequestMapper requestMapper;
+    private final CandleMapper candleMapper;
+    private final InstrumentMapper instrumentMapper;
+    private final PriceTickerMapper priceTickerMapper;
+
+    public List<Candle> getCandles(CandlesRequest request) {
+        return okxRestClient.getCandles(requestMapper.domainToClient(request)).getData().stream().map(candleMapper::clientToDomain).toList();
+    }
+
+    public List<Candle> getHistoryCandles(CandlesRequest request) {
+        return okxRestClient.getHistoryCandles(requestMapper.domainToClient(request)).getData().stream().map(candleMapper::clientToDomain).toList();
+    }
+
+    public List<Instrument> getInstruments(InstrumentsRequest request) {
+        return okxRestClient.getInstruments(requestMapper.domainToClient(request)).getData().stream().map(instrumentMapper::clientToDomain).toList();
+    }
+
+    public List<PriceTicker> getTicker(TickerRequest request) {
+        return okxRestClient.getTicker(requestMapper.domainToClient(request)).getData().stream().map(priceTickerMapper::clientToDomain).toList();
+    }
+}
