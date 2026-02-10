@@ -8,6 +8,10 @@
 
 * Java 21, Spring Boot 3.x.
 * Код пишем читаемо, без «магии», придерживаемся Clean Code.
+* Между объявлением класса и его первой строкой должен быть интервал - 1 пустая строка.
+* Импорты не схлопываем.
+* Аннотацию @Data не используем, вместо неё указывай отдельные нужные.
+* Никаких magic number - всё в константы с осмысленным названием
 
 ---
 
@@ -79,7 +83,7 @@ if (nonNull(data)) {
 a.equals(b);
 ```
 
-✅ Нужно:
+✅ Обязательно:
 
 ```java
 Objects.equals(a, b);
@@ -97,17 +101,13 @@ collection != null  && !collection.isEmpty();
 использовать CollectionUtils.isNotEmpty(collection) из Apache Commons Collections
 ```
 
-❌ Нельзя:
+❌ Запрещено:
+!"0".equals(x)
+!"0".equals(response.getCode())
+любой вариант “литерал слева + equals” для OKX code
 
-```java
-boolean a = x > y;
-boolean b = !a;
-!Objects.equals("0", response.getCode())
-```
-
-✅ Нужно:
-isFalse / isTrue — использовать из Apache Commons BooleanUtils
-
+✅ Обязательно:
+использовать isFalse() / isTrue() из Apache Commons BooleanUtils
 
 ### 2.3. Lombok вместо ручных конструкторов/геттеров/сеттеров
 
@@ -185,47 +185,43 @@ isFalse / isTrue — использовать из Apache Commons BooleanUtils
 ## 9) Нейминг
 * Не нужно сокращать названия в доменном слое, надо использовать названия из описания доменных моделей. Если описания такой модели ещё нет, то всё равно надо полные слова, без сокращений.
   Например: Вместо private String bal; нужно private String balance;
+* Вот пример моделей и нейминга по слоям. OrderRequest(REST) -> Order (Domain) -> OkxClientOrder (ClientService) -> OkxRestClient -> OkxClientOrder (
 
 ---
 
-## 10) Комментарии к документации
-* Если требуется добавить комментарии или пояснения в .md файлы, нужно делать в отдельных файлах и положить их в tasks/comments/
-
----
-
-## 11) Зоны ответственности
-# Controller 
+## 10) Зоны ответственности
+### Controller 
 * REST → Domain
 * вызывает Service
 * Domain → REST
 * никогда не видит client DTO и не вызывает OkxRestClient
 
-# Service (application/service)
+### Service (application/service)
 * принимает Domain
 * вызывает ClientService
 * добавляет прикладную логику
 
-# ClientService (domain-in / domain-out)
+### ClientService (domain-in / domain-out)
 * Domain → client DTO
 * вызывает OkxRestClient
 * client DTO → Domain
 * возвращает Domain наверх
 
-# DataService
+### DataService
 * Domain → Persistence
 * вызывает Repository
 * Persistence → Domain
 
-# OkxRestClient
+### OkxRestClient
 * чистый HTTP + подпись + DTO
 
-# Repository
+### Repository
 * Просто интерфейсы с методами - запросами в бд
 * Могут содержать нативные запросы через аннотации над методами
 
 ---
 
-## 12) Документация рядом с кодом
+## 11) Документация рядом с кодом
 
 Если меняется поведение/контракт — обновляем соответствующий файл в:
 
