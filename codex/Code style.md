@@ -42,27 +42,35 @@ if (x > 0) return;
 
 ```java
 if (x > 0) {
-        return;
-        }
+    return;
+}
 ```
 
 ❌ Нельзя:
 
 ```java
-data == null;
+if (data == null) {
+    ... 
+};
 ```
 ```java
-data != null;
+if (data != null) {
+        ...
+};
 ```
 
 ✅ Нужно:
 
 ```java
-isNull(data);
+if (isNull(data)) {
+    ... 
+};
 ```
 
 ```java
-nonNull(data);
+if (nonNull(data)) {
+        ...
+};
 ```
 
 ❌ Нельзя:
@@ -86,7 +94,7 @@ collection != null  && !collection.isEmpty();
 ✅ Нужно:
 
 ```java
-isNotEmpty(collection);
+использовать CollectionUtils.isNotEmpty(collection) из Apache Commons Collections
 ```
 
 ❌ Нельзя:
@@ -98,12 +106,7 @@ boolean b = !a;
 ```
 
 ✅ Нужно:
-
-```java
-boolean a = x > y;
-boolean b = isFalse(a);
-isFalse(Objects.equals(value, response.getCode()))
-```
+isFalse / isTrue — использовать из Apache Commons BooleanUtils
 
 
 ### 2.3. Lombok вместо ручных конструкторов/геттеров/сеттеров
@@ -191,31 +194,38 @@ isFalse(Objects.equals(value, response.getCode()))
 ---
 
 ## 11) Зоны ответственности
-# Контроллер 
-* Получает реквесты, отдаёт респонсы
-* Маппит REST-модель реквеста в доменную модель
-* Передаёт доменную модель в сервис для обработки
-* Ответ от сервиса маппит в REST-модель респонса и возвращает респонс.
+# Controller 
+* REST → Domain
+* вызывает Service
+* Domain → REST
+* никогда не видит client DTO и не вызывает OkxRestClient
 
-# Сервис
-* Выполняет доменную логику с доменными моделями
-* Ничего не маппит между слоями
+# Service (application/service)
+* принимает Domain
+* вызывает ClientService
+* добавляет прикладную логику
 
-# Клиентский сервис
-* Методы принимают на вход доменную модель
-* Методы возвращают доменную модель
-* Методы содержат маппинг домен -> клиент  и после обработки клиент -> домен
-* Может помимо маппинга содержать логику для агрегации клиентских моделей, если требуется.
+# ClientService (domain-in / domain-out)
+* Domain → client DTO
+* вызывает OkxRestClient
+* client DTO → Domain
+* возвращает Domain наверх
 
-# Дата сервис
-* Методы принимают на вход доменную модель
-* Методы возвращают доменную модель
-* Методы содержат маппинг домен -> persistence  и после обработки persistence -> домен
-* Может помимо маппинга содержать логику, если требуется.
+# DataService
+* Domain → Persistence
+* вызывает Repository
+* Persistence → Domain
+
+# OkxRestClient
+* чистый HTTP + подпись + DTO
+
+# Repository
+* Просто интерфейсы с методами - запросами в бд
+* Могут содержать нативные запросы через аннотации над методами
 
 ---
 
-## 9) Документация рядом с кодом
+## 12) Документация рядом с кодом
 
 Если меняется поведение/контракт — обновляем соответствующий файл в:
 
