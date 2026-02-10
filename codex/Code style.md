@@ -109,6 +109,57 @@ collection != null  && !collection.isEmpty();
 ✅ Обязательно:
 использовать isFalse() / isTrue() из Apache Commons BooleanUtils
 
+### 2.2.1. Null-check policy (строго)
+
+Для null-проверок в Java используем только:
+- `Objects.isNull(x)`
+- `Objects.nonNull(x)`
+
+Запрещено использовать `== null` и `!= null` в любых выражениях, не только в `if`:
+- в `if/else`
+- в тернарных выражениях
+- в присваиваниях
+- в составных boolean-условиях
+
+❌ Нельзя:
+
+```java
+if (data == null) {
+    ...
+}
+```
+
+```java
+if (data != null) {
+    ...
+}
+```
+
+```java
+String body = bodyObject == null ? "" : toJson(bodyObject);
+```
+
+✅ Нужно:
+
+```java
+if (Objects.isNull(data)) {
+    ...
+}
+```
+
+```java
+if (Objects.nonNull(data)) {
+    ...
+}
+```
+
+```java
+String body = "";
+if (Objects.nonNull(bodyObject)) {
+    body = toJson(bodyObject);
+}
+```
+
 ### 2.3. Lombok вместо ручных конструкторов/геттеров/сеттеров
 
 Вместо ручной генерации **конструкторов/геттеров/сеттеров/equals/hashCode/toString** предпочтительно использовать Lombok.

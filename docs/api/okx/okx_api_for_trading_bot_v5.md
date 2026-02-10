@@ -78,3 +78,15 @@
 - `GET /trade/fills-archive` — 5 req / 2s (по User ID)
 
 ---
+
+## Реализация в коде (Stage 02)
+
+- Низкоуровневый OKX клиент и подпись: `com.example.tradingbot.client.okx`.
+- DTO клиента OKX: `com.example.tradingbot.client.okx.dto`.
+- Доменные модели прокси: `com.example.tradingbot.domain.model.okxproxy`.
+- Client services (domain in/out): `com.example.tradingbot.domain.service.okxproxy`.
+- Прикладные proxy services: `com.example.tradingbot.domain.service`.
+- REST модели: `com.example.tradingbot.rest.model.okxproxy`.
+- MapStruct маппинг: `com.example.tradingbot.mapping.okxproxy`.
+- REST контроллеры proxy: `com.example.tradingbot.rest.controller.okxproxy`.
+- Единая обработка ошибок: `com.example.tradingbot.rest.error`.
