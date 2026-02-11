@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ReconcileProperties {
 
     private boolean enabled = false;
+    private final CancelFlow cancelFlow = new CancelFlow();
 
     public boolean isEnabled() {
         return enabled;
@@ -13,5 +14,22 @@ public class ReconcileProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public CancelFlow getCancelFlow() {
+        return cancelFlow;
+    }
+
+    public static class CancelFlow {
+
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
     }
 }

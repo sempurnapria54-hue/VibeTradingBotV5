@@ -115,6 +115,20 @@ collection != null  && !collection.isEmpty();
 - `Objects.isNull(x)`
 - `Objects.nonNull(x)`
 
+### 2.2.2. Policy по отрицаниям (строго)
+
+Избегаем прямого отрицания в условиях для boolean/equals-проверок.
+
+Запрещено:
+- `!flag`
+- `!Objects.equals(a, b)`
+- `!"CONST".equals(value)`
+
+Нужно:
+- `BooleanUtils.isFalse(flag)` / `BooleanUtils.isTrue(flag)`
+- `BooleanUtils.isFalse(Objects.equals(a, b))`
+- для сравнения строк: сначала `Objects.equals(...)`, затем при необходимости оборачивать в `BooleanUtils.isFalse(...)`
+
 Запрещено использовать `== null` и `!= null` в любых выражениях, не только в `if`:
 - в `if/else`
 - в тернарных выражениях
