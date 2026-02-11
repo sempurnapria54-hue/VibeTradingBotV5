@@ -37,6 +37,10 @@ reconcile:
   cancel-flow:
     enabled: false
 
+synchronize-execution-environment:
+  reports:
+    retention-days: 14
+
 okx:
   api-key: ${OKX_API_KEY:}
   secret-key: ${OKX_SECRET_KEY:}
