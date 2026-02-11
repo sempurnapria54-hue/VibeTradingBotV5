@@ -53,6 +53,25 @@ public class SynchronizeExecutionEnvironmentReportService {
         );
     }
 
+
+
+    public void finalizeReport(
+        Long reportId,
+        DatabaseSnapshot databaseAfter,
+        ExchangeSnapshot exchangeAfter,
+        String maxSeverity,
+        boolean hasAnomalies
+    ) {
+        reportDataService.finalizeReport(
+            reportId,
+            toJson(databaseAfter),
+            toJson(exchangeAfter),
+            Instant.now(),
+            hasAnomalies,
+            maxSeverity
+        );
+    }
+
     private String toJson(Object source) {
 
         try {

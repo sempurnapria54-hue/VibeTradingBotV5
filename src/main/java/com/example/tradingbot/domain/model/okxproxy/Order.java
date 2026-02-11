@@ -19,6 +19,7 @@ public class Order {
     private String state;
     private String averagePrice;
     private String accumulatedFillSize;
+    private String fee;
     private String createTime;
     private String updateTime;
     private String statusCode;

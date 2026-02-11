@@ -47,4 +47,28 @@ public class PositionEntity extends AuditableEntity {
 
     @Column(name = "status", nullable = false, length = STATUS_LENGTH)
     private String status;
+
+    @Column(name = "pos", length = 64)
+    private String pos;
+
+    @Column(name = "avg_px", length = 64)
+    private String avgPx;
+
+    @Column(name = "mark_px", length = 64)
+    private String markPx;
+
+    @Column(name = "liq_px", length = 64)
+    private String liqPx;
+
+    @Column(name = "lever", length = 32)
+    private String lever;
+
+    @Column(name = "mgn_mode", length = 16)
+    private String mgnMode;
+
+    @Column(name = "upl", length = 64)
+    private String upl;
+
+    @Column(name = "u_time")
+    private Long uTime;
 }

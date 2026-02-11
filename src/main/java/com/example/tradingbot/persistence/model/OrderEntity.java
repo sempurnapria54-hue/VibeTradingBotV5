@@ -65,4 +65,31 @@ public class OrderEntity extends AuditableEntity {
 
     @Column(name = "side", length = SIDE_LENGTH)
     private String side;
+
+    @Column(name = "state", length = 32)
+    private String state;
+
+    @Column(name = "ord_type", length = 32)
+    private String ordType;
+
+    @Column(name = "px", length = 64)
+    private String px;
+
+    @Column(name = "sz", length = 64)
+    private String sz;
+
+    @Column(name = "fill_sz", length = 64)
+    private String fillSz;
+
+    @Column(name = "avg_px", length = 64)
+    private String avgPx;
+
+    @Column(name = "fee", length = 64)
+    private String fee;
+
+    @Column(name = "c_time")
+    private Long cTime;
+
+    @Column(name = "u_time")
+    private Long uTime;
 }

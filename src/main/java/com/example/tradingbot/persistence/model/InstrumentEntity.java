@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -47,4 +48,16 @@ public class InstrumentEntity extends AuditableEntity {
 
     @Column(name = "status", nullable = false, length = STATUS_LENGTH)
     private String status;
+
+    @Column(name = "last_price", length = 64)
+    private String lastPrice;
+
+    @Column(name = "mark_price", length = 64)
+    private String markPrice;
+
+    @Column(name = "index_price", length = 64)
+    private String indexPrice;
+
+    @Column(name = "price_updated_at")
+    private Instant priceUpdatedAt;
 }

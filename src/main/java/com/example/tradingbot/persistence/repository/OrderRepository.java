@@ -14,4 +14,9 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
         Long instrumentId,
         String clientOrderId
     );
+    List<OrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(
+        Long exchangeId,
+        Long instrumentId,
+        String exchangeOrderId
+    );
 }

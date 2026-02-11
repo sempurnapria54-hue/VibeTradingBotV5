@@ -28,6 +28,16 @@ public class AlgoOrderDataService {
         return algoOrderRepository.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
     }
 
+
+
+    public List<AlgoOrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(
+        Long exchangeId,
+        Long instrumentId,
+        String exchangeAlgoOrderId
+    ) {
+        return algoOrderRepository.findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(exchangeId, instrumentId, exchangeAlgoOrderId);
+    }
+
     public Optional<AlgoOrderEntity> findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(
         Long exchangeId,
         Long instrumentId,
