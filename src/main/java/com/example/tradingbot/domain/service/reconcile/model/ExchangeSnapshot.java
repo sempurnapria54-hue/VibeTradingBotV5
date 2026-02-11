@@ -1,9 +1,8 @@
 package com.example.tradingbot.domain.service.reconcile.model;
 
+import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
-
-import java.util.List;
 
 @Getter
 @Builder
@@ -11,7 +10,17 @@ public class ExchangeSnapshot {
 
     private final String exchangeName;
     private final long capturedAtUtcMillis;
-    private final List<ExternalPosition> positions;
-    private final List<ExternalOrder> orders;
-    private final List<ExternalAlgoOrder> algoOrders;
+    private final List<ExchangeInstrumentSnapshot> instruments;
+
+    public List<ExternalPosition> getPositions() {
+        return instruments.stream().flatMap(instrument -> instrument.getPositions().stream()).toList();
+    }
+
+    public List<ExternalOrder> getOrders() {
+        return instruments.stream().flatMap(instrument -> instrument.getOrders().stream()).toList();
+    }
+
+    public List<ExternalAlgoOrder> getAlgoOrders() {
+        return instruments.stream().flatMap(instrument -> instrument.getAlgoOrders().stream()).toList();
+    }
 }

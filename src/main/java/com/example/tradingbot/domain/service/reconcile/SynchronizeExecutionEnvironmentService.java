@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.config.ReconcileProperties;
 import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
+import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
 import com.example.tradingbot.domain.service.reconcile.model.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
@@ -19,17 +20,15 @@ import com.example.tradingbot.persistence.service.PositionDataService;
 import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.BooleanUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -40,7 +39,9 @@ public class SynchronizeExecutionEnvironmentService {
 
     private final ReconcileProperties reconcileProperties;
     private final OkxExchangeSnapshotProvider snapshotProvider;
+    private final DatabaseSnapshotBuilder databaseSnapshotBuilder;
     private final InstrumentBucketBuilder bucketBuilder;
+    private final SynchronizeExecutionEnvironmentReportService reportService;
     private final CountsOnlySyncEngine countsOnlySyncEngine;
     private final AnomalyEngine anomalyEngine;
     private final CancelExchangeFlow cancelExchangeFlow;
@@ -64,16 +65,57 @@ public class SynchronizeExecutionEnvironmentService {
 
         log.info("Reconcile dry-run started: exchangeName={}, capturedAt={}", snapshot.getExchangeName(), Instant.ofEpochMilli(snapshot.getCapturedAtUtcMillis()));
         log.info("Reconcile dry-run totals: Positions.count={}, Orders.count={}, AlgoOrders.count={}",
-                snapshot.getPositions().size(),
-                snapshot.getOrders().size(),
-                snapshot.getAlgoOrders().size());
+            snapshot.getPositions().size(),
+            snapshot.getOrders().size(),
+            snapshot.getAlgoOrders().size());
 
         for (InstrumentBucket bucket : buckets) {
             log.info("Reconcile dry-run bucket: instId={}, Positions.count={}, Orders.count={}, AlgoOrders.count={}",
-                    bucket.getInstrumentName(),
-                    bucket.getPositionsCount(),
-                    bucket.getOrdersCount(),
-                    bucket.getAlgoOrdersCount());
+                bucket.getInstrumentName(),
+                bucket.getPositionsCount(),
+                bucket.getOrdersCount(),
+                bucket.getAlgoOrdersCount());
+        }
+    }
+
+    @Transactional
+    public void runSafe() {
+        if (BooleanUtils.isFalse(reconcileProperties.isEnabled())) {
+            log.info("Reconcile safe run skipped: reconcile.enabled=false");
+            return;
+        }
+
+        ExchangeEntity exchange = exchangeDataService.findByName("OKX")
+            .orElseThrow(() -> new IllegalStateException("Reconcile safe run failed: exchange not found, name=OKX"));
+
+        List<InstrumentEntity> managedInstruments = instrumentDataService.findAllByExchangeId(exchange.getId());
+        DatabaseSnapshot databaseBefore = databaseSnapshotBuilder.captureDatabaseSnapshot(exchange, managedInstruments);
+        ExchangeSnapshot exchangeBefore = snapshotProvider.captureSnapshot();
+
+        reportService.createStartedReport(exchange, "SCHEDULED", databaseBefore, exchangeBefore);
+
+        List<InstrumentBucket> buckets = bucketBuilder.buildBuckets(databaseBefore, exchangeBefore);
+
+        log.info("Reconcile safe run started: exchangeName={}, dbCapturedAt={}, exCapturedAt={}, managedInstruments={}",
+            exchange.getName(),
+            Instant.ofEpochMilli(databaseBefore.getCapturedAtUtcMillis()),
+            Instant.ofEpochMilli(exchangeBefore.getCapturedAtUtcMillis()),
+            databaseBefore.getInstruments().size());
+        log.info("Reconcile safe run totals: db(Positions.count={}, Orders.count={}, AlgoOrders.count={}), ex(Positions.count={}, Orders.count={}, AlgoOrders.count={}), buckets={}",
+            databaseBefore.getInstruments().stream().mapToInt(item -> item.getPositionsCount()).sum(),
+            databaseBefore.getInstruments().stream().mapToInt(item -> item.getOrdersCount()).sum(),
+            databaseBefore.getInstruments().stream().mapToInt(item -> item.getAlgoOrdersCount()).sum(),
+            exchangeBefore.getPositions().size(),
+            exchangeBefore.getOrders().size(),
+            exchangeBefore.getAlgoOrders().size(),
+            buckets.size());
+
+        for (InstrumentBucket bucket : buckets) {
+            log.info("Reconcile safe run bucket: instId={}, Positions.count={}, Orders.count={}, AlgoOrders.count={}",
+                bucket.getInstrumentName(),
+                bucket.getPositionsCount(),
+                bucket.getOrdersCount(),
+                bucket.getAlgoOrdersCount());
         }
     }
 
