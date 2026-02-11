@@ -10,6 +10,7 @@ import java.util.List;
 public class InstrumentBucket {
 
     private final String instrumentName;
+    private final DbInstrumentState dbState;
     private final List<ExternalPosition> positions;
     private final List<ExternalOrder> orders;
     private final List<ExternalAlgoOrder> algoOrders;

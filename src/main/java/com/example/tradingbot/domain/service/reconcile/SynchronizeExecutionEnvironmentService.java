@@ -4,6 +4,7 @@ import com.example.tradingbot.config.ReconcileProperties;
 import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
+import com.example.tradingbot.domain.service.reconcile.model.ExchangeInstrumentSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
@@ -149,7 +150,23 @@ public class SynchronizeExecutionEnvironmentService {
             DbInstrumentState dbState = loadDbInstrumentState(exchange.getId(), instrumentOptional.orElse(null));
 
             if (instrumentOptional.isPresent()) {
-                countsOnlySyncEngine.syncInstrumentBucket(exchange.getId(), instrumentOptional.get().getId(), snapshot, bucket);
+                InstrumentBucket syncBucket = InstrumentBucket.builder()
+                    .instrumentName(bucket.getInstrumentName())
+                    .dbState(dbState)
+                    .positions(bucket.getPositions())
+                    .orders(bucket.getOrders())
+                    .algoOrders(bucket.getAlgoOrders())
+                    .build();
+                ExchangeInstrumentSnapshot exchangeState = ExchangeInstrumentSnapshot.builder()
+                    .instId(bucket.getInstrumentName())
+                    .positionsCount(bucket.getPositionsCount())
+                    .ordersCount(bucket.getOrdersCount())
+                    .algoOrdersCount(bucket.getAlgoOrdersCount())
+                    .positions(bucket.getPositions())
+                    .orders(bucket.getOrders())
+                    .algoOrders(bucket.getAlgoOrders())
+                    .build();
+                countsOnlySyncEngine.syncPresence(syncBucket, exchangeState);
                 dbState = loadDbInstrumentState(exchange.getId(), instrumentOptional.get());
             }
 

@@ -1,113 +1,118 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.service.reconcile.model.ExternalAlgoOrder;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalOrder;
+import com.example.tradingbot.domain.service.reconcile.model.CreateUnknownAction;
+import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
+import com.example.tradingbot.domain.service.reconcile.model.ExchangeInstrumentSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
+import com.example.tradingbot.domain.service.reconcile.model.MarkAnomalyAction;
+import com.example.tradingbot.domain.service.reconcile.model.MarkClosedAction;
+import com.example.tradingbot.domain.service.reconcile.model.ReconcileEntityType;
 import com.example.tradingbot.domain.service.reconcile.model.ReconcilePlan;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
 import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.persistence.model.PositionEntity;
-import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
 
 @Service
 public class ReconcilePlanBuilder {
 
-    public ReconcilePlan buildPlan(
-        InstrumentBucket bucket,
-        List<PositionEntity> activePositions,
-        List<OrderEntity> activeOrders,
-        List<AlgoOrderEntity> activeAlgoOrders
-    ) {
-        List<ReconcilePlan.ReconcileAction> createMissing = new ArrayList<>();
-        List<ReconcilePlan.ReconcileAction> markUnknown = new ArrayList<>();
-        List<ReconcilePlan.ReconcileAction> markClosed = new ArrayList<>();
+    public ReconcilePlan buildPlan(InstrumentBucket bucket, ExchangeInstrumentSnapshot exchangeState) {
+        DbInstrumentState dbState = Objects.requireNonNull(bucket.getDbState(), "bucket.dbState is required for SYNC planning");
 
-        int exchangePositionCount = bucket.getPositionsCount();
-        int exchangeOrderCount = bucket.getOrdersCount();
-        int exchangeAlgoCount = bucket.getAlgoOrdersCount();
+        List<CreateUnknownAction> createUnknown = new ArrayList<>();
+        List<MarkClosedAction> markClosed = new ArrayList<>();
+        List<MarkAnomalyAction> markAnomaly = new ArrayList<>();
 
-        int dbPositionCount = activePositions.size();
-        int dbOrderCount = activeOrders.size();
-        int dbAlgoCount = activeAlgoOrders.size();
-
-        if (dbPositionCount > exchangePositionCount) {
-            int surplus = dbPositionCount - exchangePositionCount;
-            activePositions.stream()
-                .limit(surplus)
-                .map(PositionEntity::getId)
-                .map(id -> ReconcilePlan.ReconcileAction.mark(ReconcilePlan.EntityType.POSITION, id))
-                .forEach(markUnknown::add);
-        } else if (dbPositionCount < exchangePositionCount) {
-            int missing = exchangePositionCount - dbPositionCount;
-            for (int i = 0; i < missing; i++) {
-                createMissing.add(ReconcilePlan.ReconcileAction.create(ReconcilePlan.EntityType.POSITION, null, null));
+        int dbPositions = dbState.getActivePositions().size();
+        int exPositions = exchangeState.getPositions().size();
+        if (dbPositions < exPositions) {
+            for (int i = 0; i < exPositions - dbPositions; i++) {
+                createUnknown.add(CreateUnknownAction.builder().entityType(ReconcileEntityType.POSITION).build());
             }
+        } else if (dbPositions > exPositions) {
+            dbState.getActivePositions().forEach(position -> markClosed.add(markClosed(position)));
+            dbState.getActiveOrders().forEach(order -> markClosed.add(markClosed(order)));
+            dbState.getActiveAlgoOrders().forEach(algoOrder -> markClosed.add(markClosed(algoOrder)));
         }
 
-        if (exchangeOrderCount == 0 && dbOrderCount > 0) {
-            activeOrders.stream()
-                .map(OrderEntity::getId)
-                .map(id -> ReconcilePlan.ReconcileAction.mark(ReconcilePlan.EntityType.ORDER, id))
-                .forEach(markClosed::add);
-        } else if (dbOrderCount > exchangeOrderCount) {
-            int surplus = dbOrderCount - exchangeOrderCount;
-            activeOrders.stream()
-                .limit(surplus)
-                .map(OrderEntity::getId)
-                .map(id -> ReconcilePlan.ReconcileAction.mark(ReconcilePlan.EntityType.ORDER, id))
-                .forEach(markUnknown::add);
-        } else if (dbOrderCount < exchangeOrderCount) {
-            Set<String> existingClientIds = activeOrders.stream().map(OrderEntity::getClientOrderId).collect(LinkedHashSet::new, Set::add, Set::addAll);
-            List<ExternalOrder> missingOrders = bucket.getOrders().stream()
-                .filter(order -> !existingClientIds.contains(order.getClOrdId()))
-                .toList();
-            for (ExternalOrder missingOrder : missingOrders) {
-                createMissing.add(ReconcilePlan.ReconcileAction.create(
-                    ReconcilePlan.EntityType.ORDER,
-                    missingOrder.getOrdId(),
-                    missingOrder.getClOrdId()
-                ));
+        Set<String> dbOrderClientIds = new HashSet<>(
+            dbState.getActiveOrders().stream().map(OrderEntity::getClientOrderId).filter(StringUtils::isNotBlank).toList()
+        );
+        Set<String> exOrderClientIds = new HashSet<>(
+            exchangeState.getOrders().stream().map(item -> item.getClOrdId()).filter(StringUtils::isNotBlank).toList()
+        );
+
+        for (OrderEntity dbOrder : dbState.getActiveOrders()) {
+            if (StringUtils.isNotBlank(dbOrder.getClientOrderId()) && !exOrderClientIds.contains(dbOrder.getClientOrderId())) {
+                markClosed.add(markClosed(dbOrder));
             }
         }
+        exchangeState.getOrders().stream()
+            .filter(item -> StringUtils.isBlank(item.getClOrdId()) || !dbOrderClientIds.contains(item.getClOrdId()))
+            .forEach(item -> createUnknown.add(CreateUnknownAction.builder()
+                .entityType(ReconcileEntityType.ORDER)
+                .clientId(item.getClOrdId())
+                .exchangeId(item.getOrdId())
+                .build()));
 
-        if (exchangeAlgoCount == 0 && dbAlgoCount > 0) {
-            activeAlgoOrders.stream()
-                .map(AlgoOrderEntity::getId)
-                .map(id -> ReconcilePlan.ReconcileAction.mark(ReconcilePlan.EntityType.ALGO_ORDER, id))
-                .forEach(markClosed::add);
-        } else if (dbAlgoCount > exchangeAlgoCount) {
-            int surplus = dbAlgoCount - exchangeAlgoCount;
-            activeAlgoOrders.stream()
-                .limit(surplus)
-                .map(AlgoOrderEntity::getId)
-                .map(id -> ReconcilePlan.ReconcileAction.mark(ReconcilePlan.EntityType.ALGO_ORDER, id))
-                .forEach(markUnknown::add);
-        } else if (dbAlgoCount < exchangeAlgoCount) {
-            Set<String> existingClientIds = activeAlgoOrders.stream().map(AlgoOrderEntity::getClientAlgoOrderId).collect(LinkedHashSet::new, Set::add, Set::addAll);
-            List<ExternalAlgoOrder> missingAlgoOrders = bucket.getAlgoOrders().stream()
-                .filter(algoOrder -> !existingClientIds.contains(algoOrder.getAlgoClOrdId()))
-                .toList();
-            for (ExternalAlgoOrder missingAlgoOrder : missingAlgoOrders) {
-                createMissing.add(ReconcilePlan.ReconcileAction.create(
-                    ReconcilePlan.EntityType.ALGO_ORDER,
-                    missingAlgoOrder.getAlgoId(),
-                    missingAlgoOrder.getAlgoClOrdId()
-                ));
+        Set<String> dbAlgoClientIds = new HashSet<>(
+            dbState.getActiveAlgoOrders().stream().map(AlgoOrderEntity::getClientAlgoOrderId).filter(StringUtils::isNotBlank).toList()
+        );
+        Set<String> exAlgoClientIds = new HashSet<>(
+            exchangeState.getAlgoOrders().stream().map(item -> item.getAlgoClOrdId()).filter(StringUtils::isNotBlank).toList()
+        );
+
+        for (AlgoOrderEntity dbAlgoOrder : dbState.getActiveAlgoOrders()) {
+            if (StringUtils.isNotBlank(dbAlgoOrder.getClientAlgoOrderId())
+                && !exAlgoClientIds.contains(dbAlgoOrder.getClientAlgoOrderId())) {
+                markClosed.add(markClosed(dbAlgoOrder));
             }
+        }
+        exchangeState.getAlgoOrders().stream()
+            .filter(item -> StringUtils.isBlank(item.getAlgoClOrdId()) || !dbAlgoClientIds.contains(item.getAlgoClOrdId()))
+            .forEach(item -> createUnknown.add(CreateUnknownAction.builder()
+                .entityType(ReconcileEntityType.ALGO_ORDER)
+                .clientId(item.getAlgoClOrdId())
+                .exchangeId(item.getAlgoId())
+                .build()));
+
+        if (dbState.getActivePositions().size() > exchangeState.getPositions().size()
+            && (exchangeState.getOrders().size() != dbState.getActiveOrders().size()
+            || exchangeState.getAlgoOrders().size() != dbState.getActiveAlgoOrders().size())) {
+            dbState.getActiveOrders().stream().map(this::markAnomaly).forEach(markAnomaly::add);
+            dbState.getActiveAlgoOrders().stream().map(this::markAnomaly).forEach(markAnomaly::add);
         }
 
         return ReconcilePlan.builder()
-            .targetPositionsCount(exchangePositionCount)
-            .targetOrdersCount(exchangeOrderCount)
-            .targetAlgoOrdersCount(exchangeAlgoCount)
-            .createMissing(createMissing)
-            .markUnknown(markUnknown)
+            .createUnknown(createUnknown)
             .markClosed(markClosed)
+            .markAnomaly(markAnomaly)
             .build();
+    }
+
+    private MarkClosedAction markClosed(PositionEntity entity) {
+        return MarkClosedAction.builder().entityType(ReconcileEntityType.POSITION).entityId(entity.getId()).build();
+    }
+
+    private MarkClosedAction markClosed(OrderEntity entity) {
+        return MarkClosedAction.builder().entityType(ReconcileEntityType.ORDER).entityId(entity.getId()).build();
+    }
+
+    private MarkClosedAction markClosed(AlgoOrderEntity entity) {
+        return MarkClosedAction.builder().entityType(ReconcileEntityType.ALGO_ORDER).entityId(entity.getId()).build();
+    }
+
+    private MarkAnomalyAction markAnomaly(OrderEntity entity) {
+        return MarkAnomalyAction.builder().entityType(ReconcileEntityType.ORDER).entityId(entity.getId()).build();
+    }
+
+    private MarkAnomalyAction markAnomaly(AlgoOrderEntity entity) {
+        return MarkAnomalyAction.builder().entityType(ReconcileEntityType.ALGO_ORDER).entityId(entity.getId()).build();
     }
 }

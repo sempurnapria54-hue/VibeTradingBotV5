@@ -1,31 +1,27 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.service.reconcile.model.ExchangeSnapshot;
+import com.example.tradingbot.domain.service.reconcile.model.CreateUnknownAction;
+import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
+import com.example.tradingbot.domain.service.reconcile.model.ExchangeInstrumentSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
+import com.example.tradingbot.domain.service.reconcile.model.MarkAnomalyAction;
+import com.example.tradingbot.domain.service.reconcile.model.MarkClosedAction;
+import com.example.tradingbot.domain.service.reconcile.model.ReconcileEntityType;
 import com.example.tradingbot.domain.service.reconcile.model.ReconcilePlan;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.persistence.model.PositionEntity;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
-import com.example.tradingbot.persistence.service.ExchangeDataService;
-import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
-import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.BooleanUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -36,172 +32,119 @@ public class CountsOnlySyncEngine {
     private static final String STATUS_ANOMALY = "ANOMALY";
 
     private final ReconcilePlanBuilder reconcilePlanBuilder;
-    private final ExchangeDataService exchangeDataService;
-    private final InstrumentDataService instrumentDataService;
     private final PositionDataService positionDataService;
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
 
     @Transactional
-    public void syncInstrumentBucket(Long exchangeId, Long instrumentId, ExchangeSnapshot snapshot, InstrumentBucket bucket) {
-        ExchangeEntity exchange = exchangeDataService.findById(exchangeId)
-            .orElseThrow(() -> new EntityNotFoundException("Exchange not found: id=" + exchangeId));
-        InstrumentEntity instrument = instrumentDataService.findById(instrumentId)
-            .orElseThrow(() -> new EntityNotFoundException("Instrument not found: id=" + instrumentId));
-
-        List<PositionEntity> positions = positionDataService.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
-        List<OrderEntity> orders = orderDataService.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
-        List<AlgoOrderEntity> algoOrders = algoOrderDataService.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
-
-        List<PositionEntity> activePositions = positions.stream().filter(this::isActive).toList();
-        List<OrderEntity> activeOrders = orders.stream().filter(this::isActive).toList();
-        List<AlgoOrderEntity> activeAlgoOrders = algoOrders.stream().filter(this::isActive).toList();
-
-        ReconcilePlan plan = reconcilePlanBuilder.buildPlan(bucket, activePositions, activeOrders, activeAlgoOrders);
-
-        Map<Long, PositionEntity> positionById = positions.stream().collect(Collectors.toMap(PositionEntity::getId, Function.identity()));
-        Map<Long, OrderEntity> orderById = orders.stream().collect(Collectors.toMap(OrderEntity::getId, Function.identity()));
-        Map<Long, AlgoOrderEntity> algoOrderById = algoOrders.stream().collect(Collectors.toMap(AlgoOrderEntity::getId, Function.identity()));
-
-        for (ReconcilePlan.ReconcileAction action : plan.getMarkClosed()) {
-            if (action.getEntityType() == ReconcilePlan.EntityType.ORDER) {
-                OrderEntity order = orderById.get(action.getEntityId());
-                if (Objects.nonNull(order) && isActive(order)) {
-                    order.setStatus(STATUS_CLOSED);
-                    orderDataService.save(order);
-                }
-            }
-            if (action.getEntityType() == ReconcilePlan.EntityType.ALGO_ORDER) {
-                AlgoOrderEntity algoOrder = algoOrderById.get(action.getEntityId());
-                if (Objects.nonNull(algoOrder) && isActive(algoOrder)) {
-                    algoOrder.setStatus(STATUS_CLOSED);
-                    algoOrderDataService.save(algoOrder);
-                }
-            }
-            if (action.getEntityType() == ReconcilePlan.EntityType.POSITION) {
-                PositionEntity position = positionById.get(action.getEntityId());
-                if (Objects.nonNull(position) && isActive(position)) {
-                    position.setStatus(STATUS_CLOSED);
-                    positionDataService.save(position);
-                }
-            }
-        }
-
-        for (ReconcilePlan.ReconcileAction action : plan.getMarkUnknown()) {
-            if (action.getEntityType() == ReconcilePlan.EntityType.POSITION) {
-                PositionEntity position = positionById.get(action.getEntityId());
-                if (Objects.nonNull(position) && isActive(position)) {
-                    position.setStatus(STATUS_UNKNOWN);
-                    positionDataService.save(position);
-                }
-            }
-            if (action.getEntityType() == ReconcilePlan.EntityType.ORDER) {
-                OrderEntity order = orderById.get(action.getEntityId());
-                if (Objects.nonNull(order) && isActive(order)) {
-                    order.setStatus(STATUS_ANOMALY);
-                    orderDataService.save(order);
-                }
-            }
-            if (action.getEntityType() == ReconcilePlan.EntityType.ALGO_ORDER) {
-                AlgoOrderEntity algoOrder = algoOrderById.get(action.getEntityId());
-                if (Objects.nonNull(algoOrder) && isActive(algoOrder)) {
-                    algoOrder.setStatus(STATUS_ANOMALY);
-                    algoOrderDataService.save(algoOrder);
-                }
-            }
-        }
-
-        int unknownPositionToCreate = Math.max(0, plan.getTargetPositionsCount() - activePositions.size());
-        for (int i = 0; i < unknownPositionToCreate; i++) {
-            PositionEntity position = new PositionEntity();
-            position.setExchange(exchange);
-            position.setInstrument(instrument);
-            position.setStatus(STATUS_UNKNOWN);
-            positionDataService.save(position);
-        }
-
-        plan.getCreateMissing().stream()
-            .filter(action -> action.getEntityType() == ReconcilePlan.EntityType.ORDER)
-            .forEach(action -> createUnknownOrderIfMissing(exchangeId, instrumentId, exchange, instrument, action));
-
-        plan.getCreateMissing().stream()
-            .filter(action -> action.getEntityType() == ReconcilePlan.EntityType.ALGO_ORDER)
-            .forEach(action -> createUnknownAlgoOrderIfMissing(exchangeId, instrumentId, exchange, instrument, action));
-    }
-
-    private void createUnknownOrderIfMissing(
-        Long exchangeId,
-        Long instrumentId,
-        ExchangeEntity exchange,
-        InstrumentEntity instrument,
-        ReconcilePlan.ReconcileAction action
-    ) {
-        String clientOrderId = resolveOrderClientId(action.getClientId(), action.getExternalId());
-        if (orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, clientOrderId).isPresent()) {
+    public void syncPresence(InstrumentBucket bucket, ExchangeInstrumentSnapshot exchangeState) {
+        if (bucket.getDbState() == null || bucket.getDbState().getInstrument() == null) {
             return;
         }
-        OrderEntity order = new OrderEntity();
-        order.setExchange(exchange);
-        order.setInstrument(instrument);
-        order.setClientOrderId(clientOrderId);
-        order.setExchangeOrderId(action.getExternalId());
-        order.setStatus(STATUS_UNKNOWN);
-        orderDataService.save(order);
+
+        DbInstrumentState dbState = bucket.getDbState();
+        ReconcilePlan plan = reconcilePlanBuilder.buildPlan(bucket, exchangeState);
+
+        Map<Long, PositionEntity> positionsById = dbState.getActivePositions().stream()
+            .collect(Collectors.toMap(PositionEntity::getId, Function.identity()));
+        Map<Long, OrderEntity> ordersById = dbState.getActiveOrders().stream()
+            .collect(Collectors.toMap(OrderEntity::getId, Function.identity()));
+        Map<Long, AlgoOrderEntity> algoOrdersById = dbState.getActiveAlgoOrders().stream()
+            .collect(Collectors.toMap(AlgoOrderEntity::getId, Function.identity()));
+
+        for (MarkClosedAction action : plan.getMarkClosed()) {
+            if (action.getEntityType() == ReconcileEntityType.POSITION && positionsById.containsKey(action.getEntityId())) {
+                PositionEntity entity = positionsById.get(action.getEntityId());
+                entity.setStatus(STATUS_CLOSED);
+                positionDataService.save(entity);
+            }
+            if (action.getEntityType() == ReconcileEntityType.ORDER && ordersById.containsKey(action.getEntityId())) {
+                OrderEntity entity = ordersById.get(action.getEntityId());
+                entity.setStatus(STATUS_CLOSED);
+                orderDataService.save(entity);
+            }
+            if (action.getEntityType() == ReconcileEntityType.ALGO_ORDER && algoOrdersById.containsKey(action.getEntityId())) {
+                AlgoOrderEntity entity = algoOrdersById.get(action.getEntityId());
+                entity.setStatus(STATUS_CLOSED);
+                algoOrderDataService.save(entity);
+            }
+        }
+
+        for (MarkAnomalyAction action : plan.getMarkAnomaly()) {
+            if (action.getEntityType() == ReconcileEntityType.ORDER && ordersById.containsKey(action.getEntityId())) {
+                OrderEntity entity = ordersById.get(action.getEntityId());
+                entity.setStatus(STATUS_ANOMALY);
+                orderDataService.save(entity);
+            }
+            if (action.getEntityType() == ReconcileEntityType.ALGO_ORDER && algoOrdersById.containsKey(action.getEntityId())) {
+                AlgoOrderEntity entity = algoOrdersById.get(action.getEntityId());
+                entity.setStatus(STATUS_ANOMALY);
+                algoOrderDataService.save(entity);
+            }
+        }
+
+        for (CreateUnknownAction action : plan.getCreateUnknown()) {
+            if (action.getEntityType() == ReconcileEntityType.POSITION) {
+                PositionEntity entity = new PositionEntity();
+                entity.setExchange(dbState.getInstrument().getExchange());
+                entity.setInstrument(dbState.getInstrument());
+                entity.setStatus(STATUS_UNKNOWN);
+                positionDataService.save(entity);
+            }
+            if (action.getEntityType() == ReconcileEntityType.ORDER) {
+                upsertUnknownOrder(dbState, action);
+            }
+            if (action.getEntityType() == ReconcileEntityType.ALGO_ORDER) {
+                upsertUnknownAlgoOrder(dbState, action);
+            }
+        }
     }
 
-    private void createUnknownAlgoOrderIfMissing(
-        Long exchangeId,
-        Long instrumentId,
-        ExchangeEntity exchange,
-        InstrumentEntity instrument,
-        ReconcilePlan.ReconcileAction action
-    ) {
-        String clientAlgoOrderId = resolveAlgoClientId(action.getClientId(), action.getExternalId());
-        if (algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchangeId, instrumentId, clientAlgoOrderId).isPresent()) {
+    private void upsertUnknownOrder(DbInstrumentState dbState, CreateUnknownAction action) {
+        String clientOrderId = resolveClientId(action.getClientId(), action.getExchangeId(), "unknown-order");
+        if (orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(
+            dbState.getInstrument().getExchangeId(),
+            dbState.getInstrument().getId(),
+            clientOrderId
+        ).isPresent()) {
             return;
         }
-        AlgoOrderEntity algoOrder = new AlgoOrderEntity();
-        algoOrder.setExchange(exchange);
-        algoOrder.setInstrument(instrument);
-        algoOrder.setClientAlgoOrderId(clientAlgoOrderId);
-        algoOrder.setExchangeAlgoOrderId(action.getExternalId());
-        algoOrder.setStatus(STATUS_UNKNOWN);
-        algoOrderDataService.save(algoOrder);
+
+        OrderEntity entity = new OrderEntity();
+        entity.setExchange(dbState.getInstrument().getExchange());
+        entity.setInstrument(dbState.getInstrument());
+        entity.setClientOrderId(clientOrderId);
+        entity.setExchangeOrderId(action.getExchangeId());
+        entity.setStatus(STATUS_UNKNOWN);
+        orderDataService.save(entity);
     }
 
-    private String resolveOrderClientId(String clOrdId, String ordId) {
-        if (StringUtils.isNotBlank(clOrdId)) {
-            return clOrdId;
+    private void upsertUnknownAlgoOrder(DbInstrumentState dbState, CreateUnknownAction action) {
+        String clientAlgoOrderId = resolveClientId(action.getClientId(), action.getExchangeId(), "unknown-algo");
+        if (algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(
+            dbState.getInstrument().getExchangeId(),
+            dbState.getInstrument().getId(),
+            clientAlgoOrderId
+        ).isPresent()) {
+            return;
         }
-        if (StringUtils.isNotBlank(ordId)) {
-            return "unknown-ord-" + ordId;
+
+        AlgoOrderEntity entity = new AlgoOrderEntity();
+        entity.setExchange(dbState.getInstrument().getExchange());
+        entity.setInstrument(dbState.getInstrument());
+        entity.setClientAlgoOrderId(clientAlgoOrderId);
+        entity.setExchangeAlgoOrderId(action.getExchangeId());
+        entity.setStatus(STATUS_UNKNOWN);
+        algoOrderDataService.save(entity);
+    }
+
+    private String resolveClientId(String clientId, String exchangeId, String prefix) {
+        if (StringUtils.isNotBlank(clientId)) {
+            return clientId;
         }
-        return "unknown-ord-no-id";
-    }
-
-    private String resolveAlgoClientId(String algoClOrdId, String algoId) {
-        if (StringUtils.isNotBlank(algoClOrdId)) {
-            return algoClOrdId;
+        if (StringUtils.isNotBlank(exchangeId)) {
+            return prefix + "-" + exchangeId;
         }
-        if (StringUtils.isNotBlank(algoId)) {
-            return "unknown-algo-" + algoId;
-        }
-        return "unknown-algo-no-id";
-    }
-
-    private boolean isActive(PositionEntity entity) {
-        return BooleanUtils.isFalse(isClosed(entity.getStatus()));
-    }
-
-    private boolean isActive(OrderEntity entity) {
-        return BooleanUtils.isFalse(isClosed(entity.getStatus()));
-    }
-
-    private boolean isActive(AlgoOrderEntity entity) {
-        return BooleanUtils.isFalse(isClosed(entity.getStatus()));
-    }
-
-    private boolean isClosed(String status) {
-        return Objects.equals(STATUS_CLOSED, status);
+        return prefix + "-" + UUID.randomUUID();
     }
 }
