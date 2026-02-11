@@ -1,25 +1,18 @@
-# Stage 05 — Synchronize Execution Environment (Reconcile) v2
+# Stage 05 — Synchronize Execution Environment (Reconcile) v3
 
-Источник требований: `docs/scenario/01 - synchronize_execution_environment.md`.
+> Цель: безопасно и воспроизводимо синхронизировать «execution environment» между OKX и БД, с обязательным репортом по каждому запуску.
 
-## 0) Цель
+## 0) Ключевая идея v3
 
-Сделать безопасный и воспроизводимый процесс синхронизации «execution environment» между:
+1. **Каждый запуск** сохраняет единый отчёт `SynchronizeExecutionEnvironmentReport`.
+2. Отчёт содержит **4 снапшота**:
 
-* **Биржей OKX** (фактическое состояние: positions/orders/algoOrders)
-* **Локальной БД** (наши сущности и их статусы)
-
-Процесс должен:
-
-1. снять snapshot биржи
-2. разложить данные по инструментам (buckets)
-3. выполнить **counts-only** синхронизацию (presence)
-4. выявить аномалии по правилам B1–B8
-5. при включённом флаге и необходимости выполнить **Cancel/Close flow** (C1–C7)
-6. выполнить перенос атрибутов (п.10 сценария)
-7. сформировать `AnomalyReport`
-
-> В этом этапе нет торговой стратегии и нет исполнения «новых трейдов». Это ops/reconcile.
+  * `database_before`
+  * `exchange_before`
+  * `database_after`
+  * `exchange_after`
+3. `AnomalyReport` больше не используется (удаляем сущность/таблицу).
+4. `Cancel Exchange Flow` остаётся частью job и выполняется **под флагом**.
 
 ---
 
@@ -28,30 +21,32 @@
 ### Включено
 
 * Orchestrator job/service
-* Snapshot provider (OKX)
-* Bucketing по `instId`
-* Counts-only sync (SYNC-1..SYNC-4)
-* AnomalyEngine (B1–B8) + отчёты
-* CancelExchangeFlow (C1–C7) **под флагом**
-* Transfer (п.10)
-* Persistence сущности, репозитории и DataService для reconcile
+* Снятие снапшотов: БД и биржа (до/после)
+* Buckets по `instId` (инструменты)
+* Anomaly checks (B1–B8)
+* Cancel Exchange Flow (C1–C7) под флагом
+* SYNC (counts-only) presence: positions/orders/algoOrders
+* Transfer (A4): обновление атрибутов сущностей и инструментов (цены и т.п.)
+* Финализация статусов Exchange/Instrument
+* Cleanup job отчётов (retention)
 
-### Исключено (запрещено)
+### Исключено
 
-* торговая логика (кворум, стратегия, риск)
-* новые REST endpoints (ручной запуск можно добавить отдельным этапом)
-* изменение OKX proxy контрактов
+* торговая логика/стратегия/кворум/риск
+* создание новых торговых действий
+* новые REST endpoints (можно отдельным этапом)
 
 ---
 
-## 2) Пакеты (ориентир)
+## 2) Пакеты
 
-### Reconcile (application/ops слой)
+### Reconcile (application/ops)
 
 * `com.example.tradingbot.domain.job.*`
 * `com.example.tradingbot.domain.service.reconcile.*`
+* `com.example.tradingbot.domain.service.reconcile.model.*`
 
-### Persistence слой
+### Persistence
 
 * `com.example.tradingbot.persistence.model.*`
 * `com.example.tradingbot.persistence.repository.*`
@@ -59,121 +54,99 @@
 
 ---
 
-## 3) Конфигурация и переключатели (обязательно)
+## 3) Конфигурация и переключатели
 
-### 3.1 Основной запуск
+### 3.1 Запуск job
 
 * `reconcile.enabled` (boolean)
-
-    * `true`: job/service может выполняться
-    * `false`: job не запускается
 
 ### 3.2 Переключатель опасных действий
 
 * `reconcile.cancel-flow.enabled` (boolean, default `false`)
 
-    * `false`: **никогда** не выполнять Cancel/Close запросы на OKX
-    * `true`: CancelFlow разрешён, но запускается только если `AnomalyEngine` вернул `shouldCancelFlow=true`
+  * `false`: cancel/close запросы на OKX запрещены
+  * `true`: cancel-flow разрешён, но выполняется только при решении AnomalyEngine
 
-> Даже при `enabled=true` CancelFlow не выполняется без явного решения `AnomalyEngine`.
+### 3.3 Retention отчётов
+
+* `synchronize-execution-environment.reports.retention-days` (int, default 14)
 
 ---
 
-## 4) Компоненты (точный список)
+## 4) Основные компоненты (точный список)
 
 ### 4.1 Orchestrator
 
 * `SynchronizeExecutionEnvironmentJob`
 
-    * расписание/триггер (в рамках stage достаточно сервиса; расписание можно включить)
-    * single-instance lock (DB)
+  * single-instance lock (DB)
+  * запускает `SynchronizeExecutionEnvironmentService.run()`
 
 * `SynchronizeExecutionEnvironmentService`
 
-    * `runDryRun()` — безопасный сбор + логирование
-    * `run()` — полный pipeline stage
+  * `run()` — полный pipeline
 
-### 4.2 Snapshot
+### 4.2 Snapshot providers
 
 * `OkxExchangeSnapshotProvider`
 
-    * `captureSnapshot()` → `ExchangeSnapshot`
+  * `ExchangeSnapshot captureExchangeSnapshot()`
+  * (опционально) `ExchangeInstrumentSnapshot refreshInstrumentSnapshot(String instId)` — для актуализации после cancel-flow
 
-Модели:
+* `DatabaseSnapshotBuilder`
 
-* `ExchangeSnapshot`
+  * `DatabaseSnapshot captureDatabaseSnapshot(Long exchangeId, List<InstrumentEntity> managed)`
 
-    * `exchangeName`
-    * `capturedAtUtcMillis`
-    * `List<ExternalPosition>`
-    * `List<ExternalOrder>`
-    * `List<ExternalAlgoOrder>`
-
-* `ExternalPosition` / `ExternalOrder` / `ExternalAlgoOrder`
-
-    * минимальные поля: `instId`, внешние id (ordId/algoId), client ids (clOrdId/algoClOrdId), статус/side/type если доступно
-
-### 4.3 Bucketing
+### 4.3 Buckets
 
 * `InstrumentBucketBuilder`
 
-    * `buildBuckets(snapshot)` → `List<InstrumentBucket>`
+  * `List<InstrumentBucket> buildBuckets(DatabaseSnapshot dbBefore, ExchangeSnapshot exBefore)`
 
 * `InstrumentBucket`
 
-    * `instrumentName` (instId)
-    * `positions/orders/algoOrders` списки + counts
+  * `String instId`
+  * `DbInstrumentState dbState` (instrument + active P/O/A)
+  * `ExchangeInstrumentState exchangeState` (P/O/A из exchange_before)
 
-### 4.4 Counts-only sync
+### 4.4 Report
 
-* `CountsOnlySyncEngine`
+* `SynchronizeExecutionEnvironmentReportService`
 
-    * `syncInstrumentBucket(snapshot, bucket)`
+  * `ReportEntity createStartedReport(trigger, dbBefore, exBefore)`
+  * `void appendAnomaly(reportId, anomalyItem)`
+  * `void finalizeReport(reportId, dbAfter, exAfter, maxSeverity, hasAnomalies)`
 
-* `ReconcilePlanBuilder`
-
-    * вычисляет план действий counts-only для bucket
-
-### 4.5 Anomaly
+### 4.5 Engines/flows
 
 * `AnomalyEngine`
 
-    * `evaluate(snapshot, bucket, dbState)` → `Optional<AnomalyDecision>`
-
-* `AnomalyDecision`
-
-    * `category` (B1..B8)
-    * `severity` (INFO|WARN|CRITICAL)
-    * `shouldHold` (bool)
-    * `shouldCancelFlow` (bool)
-    * `summary`
-    * `detailsJson`
-
-### 4.6 Cancel/Close flow
+  * `Optional<AnomalyDecision> evaluate(InstrumentBucket bucket)`
 
 * `CancelExchangeFlow`
 
-    * `execute(instId, snapshot, bucket, decision)`
-    * реализует C1–C7, идемпотентно
+  * `CancelFlowResult execute(InstrumentBucket bucket, AnomalyDecision decision)`
+  * при необходимости использует refresh snapshot по инструменту
 
-### 4.7 Transfer (п.10)
+* `CountsOnlySyncEngine`
+
+  * `void syncPresence(InstrumentBucket bucket, ExchangeInstrumentState currentExchangeState)`
 
 * `ExchangeToDbTransferService`
 
-    * переносит атрибуты внешних сущностей в БД (ordId/algoId/side/type и т.д. — минимально)
+  * `void transferAttributes(InstrumentBucket bucket, ExchangeInstrumentState currentExchangeState)`
+  * `void transferInstrumentPrices(String instId, ExchangeSnapshot exchangeBeforeOrCurrent)`
 
 ---
 
 ## 5) Persistence (минимальные поля)
 
-> Поля статусов и их смысл — описываем позже в доменном слое. Здесь фиксируем только наличие полей.
+### 5.1 Уже существующие
 
-### 5.1 Используемые базовые сущности
+* `ExchangeEntity`
+* `InstrumentEntity`
 
-* `ExchangeEntity` (из Stage 03)
-* `InstrumentEntity` (из Stage 03)
-
-### 5.2 Новые сущности reconcile
+### 5.2 Reconcile сущности
 
 #### PositionEntity (минимум)
 
@@ -189,91 +162,143 @@
 * `id`
 * `exchangeId` (FK)
 * `instrumentId` (FK)
-* `clientOrderId` (clOrdId)
+* `internalId` (наш id, он же clOrdId)
 * `exchangeOrderId` (ordId, nullable)
 * `status`
-* `type` (nullable)
-* `side` (nullable)
 * audit
 
-UNIQUE: `(exchange_id, instrument_id, client_order_id)`
+UNIQUE: `(exchange_id, instrument_id, internal_id)`
 
 #### AlgoOrderEntity (минимум)
 
 * `id`
 * `exchangeId` (FK)
 * `instrumentId` (FK)
-* `clientAlgoOrderId` (algoClOrdId)
+* `internalId` (наш id, он же algoClOrdId)
 * `exchangeAlgoOrderId` (algoId, nullable)
 * `status`
-* `algoType` (nullable)
 * audit
 
-UNIQUE: `(exchange_id, instrument_id, client_algo_order_id)`
+UNIQUE: `(exchange_id, instrument_id, internal_id)`
 
-#### AnomalyReportEntity
+### 5.3 Report сущности (новые)
+
+#### SynchronizeExecutionEnvironmentReportEntity
 
 * `id`
 * `exchangeId` (FK)
-* `instrumentId` (nullable)
-* `severity`
-* `category`
+* `startedAt`
+* `finishedAt` (nullable)
+* `trigger` (SCHEDULED|MANUAL)
+* `hasAnomalies` (bool)
+* `maxSeverity` (NONE|NON_CRITICAL|CRITICAL)
+* `databaseBeforeJson` (jsonb/text)
+* `exchangeBeforeJson` (jsonb/text)
+* `databaseAfterJson` (jsonb/text, nullable)
+* `exchangeAfterJson` (jsonb/text, nullable)
+
+#### SynchronizeExecutionEnvironmentReportAnomalyEntity
+
+* `id`
+* `reportId` (FK)
+* `instId` (nullable для глобальных)
+* `type` (например B1..B8, либо именованный тип)
+* `severity` (NON_CRITICAL|CRITICAL)
 * `summary`
 * `detailsJson`
-* `createdAt/createdBy`
+* `createdAt`
 
 ---
 
-## 6) Pipeline (порядок выполнения)
+## 6) Формат снапшотов (рекомендованный)
 
-### 6.1 DRY-RUN (`runDryRun`)
+### 6.1 exchange_* (биржа)
 
-1. capture snapshot
-2. build buckets
-3. log counts per bucket + totals
+По каждому `instId`:
 
-### 6.2 FULL (`run`)
+* `Positions.count`, `Orders.count`, `AlgoOrders.count`
+* списки ids (если доступны):
+
+  * orders: `ordId`, `clOrdId`
+  * algoOrders: `algoId`, `algoClOrdId`
+
+### 6.2 database_* (БД)
+
+По каждому `instId`:
+
+* `Instrument.mode/status/positionMode`
+* `activePositions.count`
+* `activeOrders.count` + ids: `order.internalId`, `order.exchangeOrderId`
+* `activeAlgoOrders.count` + ids: `algo.internalId`, `algo.exchangeAlgoOrderId`
+
+> Снапшоты — для аудита/дебага. SYNC остаётся counts-only.
+
+---
+
+## 7) Pipeline (порядок выполнения)
+
+### Шаги до bucket
 
 1. single-instance lock
-2. capture snapshot
-3. build buckets
-4. для каждого bucket:
+2. global HOLD runtime (останавливаем торговые механизмы на время reconcile)
+3. прочитать managed instruments из БД
+4. `database_before` = capture DB snapshot
+5. `exchange_before` = capture Exchange snapshot
+6. создать `SynchronizeExecutionEnvironmentReport` (startedAt + trigger + before снапшоты)
+7. `Exchange.status = SYNC` (DB)
+8. build buckets (dbBefore + exchangeBefore)
 
-    * `CountsOnlySyncEngine.syncInstrumentBucket(...)`
-    * `decision = AnomalyEngine.evaluate(...)`
-    * если decision есть:
+### По каждому bucket
 
-        * сохранить `AnomalyReport`
-        * если `shouldHold` → перевести инструмент в HOLD (через persistence.service)
-        * если `cancelFlowEnabled && shouldCancelFlow` → `CancelExchangeFlow.execute(...)`
-    * `ExchangeToDbTransferService.transfer(...)`
+A1) `Instrument.status = SYNC` (DB)
+A2) anomaly checks B1..B8
+
+* если аномалия:
+
+  * append anomaly item в report
+  * если CRITICAL: `Instrument.mode=HOLD`, `Instrument.status=HOLD`, (опционально cancel-flow), завершить bucket
+  * если NON_CRITICAL: выполнить cancel-flow (если нужно), вернуть `Instrument.mode=OPEN`, продолжить
+
+A2.1) если выполняли cancel/close на бирже:
+
+* refresh exchange facts по этому `instId` для дальнейших шагов (внутренний refresh, не заменяет `exchange_before` в отчёте)
+
+A3) SYNC (counts-only): привести presence в БД к текущим exchange фактам
+A4) Transfer: обновить атрибуты сущностей и инструмента по текущим exchange фактам (цены, размеры, статусы)
+A5) финализация bucket:
+
+* `Instrument.positionMode = OPEN|NONE` по фактам
+* `Instrument.status = ACTIVE`
+
+### Шаги после bucket
+
+9. `exchange_after` = capture Exchange snapshot (после всех bucket и cancel/close)
+10. `database_after` = capture DB snapshot
+11. finalize report (finishedAt + after снапшоты + maxSeverity/hasAnomalies)
+12. `Exchange.status = ACTIVE`
+13. снять global HOLD
+14. release lock
 
 ---
 
-## 7) Идемпотентность и безопасность
+## 8) Набор задач Stage 05
 
-* Counts-only sync использует UNIQUE ключи и не создаёт дублей.
-* CancelFlow должен быть идемпотентным:
-
-    * повторный запуск не ломает состояние и не плодит UNKNOWN
-* При `reconcile.cancel-flow.enabled=false` гарантируется отсутствие cancel/close запросов.
-
----
-
-## 8) Набор задач (как будем реализовывать)
-
-* **Task 050A**: Orchestrator + Snapshot + Buckets (DRY-RUN)
-* **Task 050B**: Persistence для reconcile (V2 миграции + Entity/Repo/DataService)
-* **Task 050C**: Counts-only sync engine (SYNC-1..SYNC-4)
-* **Task 050D**: AnomalyEngine (B1–B8) + CancelFlow (C1–C7) + Transfer (п.10) + переключатель
+* **05A(v3)**: report foundation (db_before/ex_before + первичная запись) + buckets + логирование (без изменений presence)
+* **05B(v3)**: миграции и persistence для report (замена AnomalyReport)
+* **05C(v3)**: counts-only sync engine (SYNC)
+* **05D(v3)**: anomaly engine + cancel flow + запись аномалий в report
+* **05E(v3)**: transfer (цены + расширенные поля) + after snapshots + finalize report
+* **05F(v3)**: cleanup job отчётов
 
 ---
 
-## 9) DoD (Stage 05)
+## 9) DoD Stage 05
 
-1. DRY-RUN собирает snapshot и логирует buckets.
-2. Persistence сущности reconcile добавлены, миграции применяются.
-3. Counts-only sync приводит БД к «presence» состоянию биржи.
-4. AnomalyEngine пишет отчёты.
-5. CancelFlow выполняется только при включённом флаге и решении engine.
-6. Transfer переносит атрибуты из snapshot в БД идемпотентно.
+* Каждый запуск сохраняет отчёт с before/after снапшотами.
+* При cancel-flow последующие шаги используют актуальные exchange факты (refresh по инструменту).
+* SYNC остаётся counts-only.
+* После reconcile:
+
+  * Exchange.status=ACTIVE
+  * каждый Instrument.status=ACTIVE или HOLD (при CRITICAL)
+* Cleanup job удаляет только отчёты без аномалий по TTL.
