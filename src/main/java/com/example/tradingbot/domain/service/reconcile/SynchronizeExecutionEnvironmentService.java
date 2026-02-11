@@ -6,17 +6,19 @@ import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
 import com.example.tradingbot.domain.service.reconcile.model.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import com.example.tradingbot.persistence.model.AnomalyReportEntity;
 import com.example.tradingbot.persistence.model.ExchangeEntity;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.persistence.model.SynchronizeExecutionEnvironmentReportEntity;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
-import com.example.tradingbot.persistence.service.AnomalyReportDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
+import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,7 +50,8 @@ public class SynchronizeExecutionEnvironmentService {
     private final PositionDataService positionDataService;
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
-    private final AnomalyReportDataService anomalyReportDataService;
+    private final SynchronizeExecutionEnvironmentReportDataService reportDataService;
+    private final ObjectMapper objectMapper;
 
     public void runDryRun() {
         if (BooleanUtils.isFalse(reconcileProperties.isEnabled())) {
@@ -89,6 +92,15 @@ public class SynchronizeExecutionEnvironmentService {
             return;
         }
         ExchangeEntity exchange = exchangeOptional.get();
+        SynchronizeExecutionEnvironmentReportEntity report = reportDataService.createStarted(
+            exchange,
+            "SCHEDULED",
+            serializeSnapshot(List.of()),
+            serializeSnapshot(snapshot),
+            Instant.now()
+        );
+        boolean hasAnomalies = false;
+        String maxSeverity = "NONE";
 
         for (InstrumentBucket bucket : buckets) {
             Optional<InstrumentEntity> instrumentOptional = instrumentDataService.findByExchangeIdAndName(exchange.getId(), bucket.getInstrumentName());
@@ -102,7 +114,17 @@ public class SynchronizeExecutionEnvironmentService {
             Optional<AnomalyDecision> decisionOptional = anomalyEngine.evaluate(snapshot, bucket, dbState);
             if (decisionOptional.isPresent()) {
                 AnomalyDecision decision = decisionOptional.get();
-                persistReport(exchange, instrumentOptional.orElse(null), decision);
+                reportDataService.appendAnomaly(
+                    report.getId(),
+                    bucket.getInstrumentName(),
+                    decision.getCategory(),
+                    decision.getSeverity(),
+                    decision.getSummary(),
+                    decision.getDetailsJson(),
+                    Instant.now()
+                );
+                hasAnomalies = true;
+                maxSeverity = resolveMaxSeverity(maxSeverity, decision.getSeverity());
 
                 if (decision.isShouldHold() && instrumentOptional.isPresent()) {
                     InstrumentEntity instrument = instrumentOptional.get();
@@ -119,6 +141,15 @@ public class SynchronizeExecutionEnvironmentService {
 
             instrumentOptional.ifPresent(instrument -> exchangeToDbTransferService.transfer(exchange.getId(), instrument.getId(), bucket));
         }
+
+        reportDataService.finalizeReport(
+            report.getId(),
+            serializeSnapshot(List.of()),
+            serializeSnapshot(snapshotProvider.captureSnapshot()),
+            Instant.now(),
+            hasAnomalies,
+            maxSeverity
+        );
     }
 
     private DbInstrumentState loadDbInstrumentState(Long exchangeId, InstrumentEntity instrument) {
@@ -149,14 +180,21 @@ public class SynchronizeExecutionEnvironmentService {
             .build();
     }
 
-    private void persistReport(ExchangeEntity exchange, InstrumentEntity instrument, AnomalyDecision decision) {
-        AnomalyReportEntity entity = new AnomalyReportEntity();
-        entity.setExchange(exchange);
-        entity.setInstrument(instrument);
-        entity.setSeverity(decision.getSeverity());
-        entity.setCategory(decision.getCategory());
-        entity.setSummary(decision.getSummary());
-        entity.setDetailsJson(decision.getDetailsJson());
-        anomalyReportDataService.save(entity);
+    private String resolveMaxSeverity(String currentMaxSeverity, String severity) {
+        if ("CRITICAL".equalsIgnoreCase(currentMaxSeverity) || "CRITICAL".equalsIgnoreCase(severity)) {
+            return "CRITICAL";
+        }
+        if ("NON_CRITICAL".equalsIgnoreCase(currentMaxSeverity) || "NON_CRITICAL".equalsIgnoreCase(severity)) {
+            return "NON_CRITICAL";
+        }
+        return "NONE";
+    }
+
+    private String serializeSnapshot(Object source) {
+        try {
+            return objectMapper.writeValueAsString(source);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Unable to serialize reconcile snapshot", exception);
+        }
     }
 }
