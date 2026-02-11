@@ -8,6 +8,7 @@ import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmen
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +34,27 @@ public class SynchronizeExecutionEnvironmentReportService {
         );
     }
 
+    public void appendAnomaly(
+        Long reportId,
+        String instId,
+        String type,
+        String severity,
+        String summary,
+        String detailsJson
+    ) {
+        reportDataService.appendAnomaly(
+            reportId,
+            instId,
+            type,
+            severity,
+            summary,
+            detailsJson,
+            Instant.now()
+        );
+    }
+
     private String toJson(Object source) {
+
         try {
             return objectMapper.writeValueAsString(source);
         } catch (JsonProcessingException exception) {

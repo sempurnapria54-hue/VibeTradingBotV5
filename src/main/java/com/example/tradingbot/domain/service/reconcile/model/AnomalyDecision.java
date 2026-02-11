@@ -7,7 +7,7 @@ import lombok.Getter;
 @Builder
 public class AnomalyDecision {
 
-    private final String category;
+    private final String type;
     private final String severity;
     private final boolean shouldHold;
     private final boolean shouldCancelFlow;

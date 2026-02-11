@@ -12,4 +12,6 @@ public class CancelFlowResult {
     private final int canceledAlgoOrders;
     private final int unknownCreated;
     private final boolean emptyAfterFlow;
+    private final boolean flowExecuted;
+    private final ExchangeInstrumentSnapshot currentExchangeState;
 }
