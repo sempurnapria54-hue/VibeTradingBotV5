@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: tradingbot
+  config:
+    import:
+      - vault://secret/tradingbot/okx
+      - vault://secret/tradingbot/postgres
+  cloud:
+    vault:
+      enabled: true
+      scheme: http
+      host: localhost
+      port: 8200
+      authentication: TOKEN
+      token: ${VAULT_TOKEN}
+      kv:
+        enabled: true
+        backend: secret
+        application-name: tradingbot
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+okx:
+  api-key: ${OKX_API_KEY:}
+  secret-key: ${OKX_SECRET_KEY:}
+  passphrase: ${OKX_PASSPHRASE:}
+  base-url: ${OKX_BASE_URL:https://www.okx.com}
+
+# Справочник ожидаемых ключей в Vault (без прямых vault:// ссылок).
+vault-secret-keys:
+  okx:
+    api-key: '{OKX_API_KEY}'
+    secret-key: '{OKX_SECRET_KEY}'
+    passphrase: '{OKX_PASSPHRASE}'
+    base-url: '{OKX_BASE_URL}'
+  postgres:
+    url: '{SPRING_DATASOURCE_URL}'
+    username: '{SPRING_DATASOURCE_USERNAME}'
+    password: '{SPRING_DATASOURCE_PASSWORD}'
+
+server:
+  port: 8080
