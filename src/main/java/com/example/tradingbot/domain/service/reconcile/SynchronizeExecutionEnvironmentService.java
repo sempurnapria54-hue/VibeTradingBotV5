@@ -19,9 +19,6 @@ import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
-import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class SynchronizeExecutionEnvironmentService {
 
     private static final String STATUS_HOLD = "HOLD";
+    private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_SYNC = "SYNC";
 
     private final ReconcileProperties reconcileProperties;
     private final OkxExchangeSnapshotProvider snapshotProvider;
@@ -48,13 +47,12 @@ public class SynchronizeExecutionEnvironmentService {
     private final AnomalyEngine anomalyEngine;
     private final CancelExchangeFlow cancelExchangeFlow;
     private final ExchangeToDbTransferService exchangeToDbTransferService;
+    private final ExchangeToDbExtendedTransferService exchangeToDbExtendedTransferService;
     private final ExchangeDataService exchangeDataService;
     private final InstrumentDataService instrumentDataService;
     private final PositionDataService positionDataService;
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
-    private final SynchronizeExecutionEnvironmentReportDataService reportDataService;
-    private final ObjectMapper objectMapper;
 
     public void runDryRun() {
         if (BooleanUtils.isFalse(reconcileProperties.isEnabled())) {
@@ -82,43 +80,7 @@ public class SynchronizeExecutionEnvironmentService {
 
     @Transactional
     public void runSafe() {
-        if (BooleanUtils.isFalse(reconcileProperties.isEnabled())) {
-            log.info("Reconcile safe run skipped: reconcile.enabled=false");
-            return;
-        }
-
-        ExchangeEntity exchange = exchangeDataService.findByName("OKX")
-            .orElseThrow(() -> new IllegalStateException("Reconcile safe run failed: exchange not found, name=OKX"));
-
-        List<InstrumentEntity> managedInstruments = instrumentDataService.findAllByExchangeId(exchange.getId());
-        DatabaseSnapshot databaseBefore = databaseSnapshotBuilder.captureDatabaseSnapshot(exchange, managedInstruments);
-        ExchangeSnapshot exchangeBefore = snapshotProvider.captureSnapshot();
-
-        reportService.createStartedReport(exchange, "SCHEDULED", databaseBefore, exchangeBefore);
-
-        List<InstrumentBucket> buckets = bucketBuilder.buildBuckets(databaseBefore, exchangeBefore);
-
-        log.info("Reconcile safe run started: exchangeName={}, dbCapturedAt={}, exCapturedAt={}, managedInstruments={}",
-            exchange.getName(),
-            Instant.ofEpochMilli(databaseBefore.getCapturedAtUtcMillis()),
-            Instant.ofEpochMilli(exchangeBefore.getCapturedAtUtcMillis()),
-            databaseBefore.getInstruments().size());
-        log.info("Reconcile safe run totals: db(Positions.count={}, Orders.count={}, AlgoOrders.count={}), ex(Positions.count={}, Orders.count={}, AlgoOrders.count={}), buckets={}",
-            databaseBefore.getInstruments().stream().mapToInt(item -> item.getPositionsCount()).sum(),
-            databaseBefore.getInstruments().stream().mapToInt(item -> item.getOrdersCount()).sum(),
-            databaseBefore.getInstruments().stream().mapToInt(item -> item.getAlgoOrdersCount()).sum(),
-            exchangeBefore.getPositions().size(),
-            exchangeBefore.getOrders().size(),
-            exchangeBefore.getAlgoOrders().size(),
-            buckets.size());
-
-        for (InstrumentBucket bucket : buckets) {
-            log.info("Reconcile safe run bucket: instId={}, Positions.count={}, Orders.count={}, AlgoOrders.count={}",
-                bucket.getInstrumentName(),
-                bucket.getPositionsCount(),
-                bucket.getOrdersCount(),
-                bucket.getAlgoOrdersCount());
-        }
+        run();
     }
 
     @Transactional
@@ -128,21 +90,20 @@ public class SynchronizeExecutionEnvironmentService {
             return;
         }
 
-        ExchangeSnapshot snapshot = snapshotProvider.captureSnapshot();
-        List<InstrumentBucket> buckets = bucketBuilder.buildBuckets(snapshot);
-        Optional<ExchangeEntity> exchangeOptional = exchangeDataService.findByName(snapshot.getExchangeName());
-        if (exchangeOptional.isEmpty()) {
-            log.warn("Reconcile run skipped: exchange not found in DB, exchangeName={}", snapshot.getExchangeName());
-            return;
-        }
-        ExchangeEntity exchange = exchangeOptional.get();
-        SynchronizeExecutionEnvironmentReportEntity report = reportDataService.createStarted(
-            exchange,
-            "SCHEDULED",
-            serializeSnapshot(List.of()),
-            serializeSnapshot(snapshot),
-            Instant.now()
-        );
+        ExchangeEntity exchange = exchangeDataService.findByName("OKX")
+            .orElseThrow(() -> new IllegalStateException("Reconcile run failed: exchange not found, name=OKX"));
+
+        List<InstrumentEntity> managedInstruments = instrumentDataService.findAllByExchangeId(exchange.getId());
+        List<String> managedInstIds = managedInstruments.stream().map(InstrumentEntity::getName).toList();
+
+        DatabaseSnapshot databaseBefore = databaseSnapshotBuilder.captureDatabaseSnapshot(exchange, managedInstruments);
+        ExchangeSnapshot exchangeBefore = snapshotProvider.captureExchangeSnapshot(managedInstIds);
+        SynchronizeExecutionEnvironmentReportEntity report = reportService.createStartedReport(exchange, "SCHEDULED", databaseBefore, exchangeBefore);
+
+        exchange.setStatus(STATUS_SYNC);
+        exchangeDataService.save(exchange);
+
+        List<InstrumentBucket> buckets = bucketBuilder.buildBuckets(databaseBefore, exchangeBefore);
         boolean hasAnomalies = false;
         String maxSeverity = "NONE";
 
@@ -195,6 +156,7 @@ public class SynchronizeExecutionEnvironmentService {
             }
 
             if (instrumentOptional.isPresent()) {
+                InstrumentEntity instrument = instrumentOptional.get();
                 InstrumentBucket syncBucket = InstrumentBucket.builder()
                     .instrumentName(bucket.getInstrumentName())
                     .dbState(dbState)
@@ -203,20 +165,21 @@ public class SynchronizeExecutionEnvironmentService {
                     .algoOrders(currentExchangeState.getAlgoOrders())
                     .build();
                 countsOnlySyncEngine.syncPresence(syncBucket, currentExchangeState);
-                exchangeToDbTransferService.transfer(exchange.getId(), instrumentOptional.get().getId(), syncBucket);
+                exchangeToDbTransferService.transfer(exchange.getId(), instrument.getId(), syncBucket);
+                exchangeToDbExtendedTransferService.transfer(exchange.getId(), syncBucket, currentExchangeState, exchangeBefore);
+
+                instrument.setStatus(STATUS_ACTIVE);
+                instrumentDataService.save(instrument);
             }
         }
 
-        reportDataService.finalizeReport(
-            report.getId(),
-            serializeSnapshot(List.of()),
-            serializeSnapshot(snapshotProvider.captureSnapshot()),
-            Instant.now(),
-            hasAnomalies,
-            maxSeverity
-        );
-    }
+        ExchangeSnapshot exchangeAfter = snapshotProvider.captureExchangeSnapshot(managedInstIds);
+        DatabaseSnapshot databaseAfter = databaseSnapshotBuilder.captureDatabaseSnapshot(exchange, managedInstruments);
+        reportService.finalizeReport(report.getId(), databaseAfter, exchangeAfter, maxSeverity, hasAnomalies);
 
+        exchange.setStatus(STATUS_ACTIVE);
+        exchangeDataService.save(exchange);
+    }
 
     private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
         return ExchangeInstrumentSnapshot.builder()
@@ -266,13 +229,5 @@ public class SynchronizeExecutionEnvironmentService {
             return "NON_CRITICAL";
         }
         return "NONE";
-    }
-
-    private String serializeSnapshot(Object source) {
-        try {
-            return objectMapper.writeValueAsString(source);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Unable to serialize reconcile snapshot", exception);
-        }
     }
 }

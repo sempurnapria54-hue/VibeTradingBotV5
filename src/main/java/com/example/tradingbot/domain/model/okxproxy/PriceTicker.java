@@ -9,6 +9,8 @@ public class PriceTicker {
 
     private String instrumentId;
     private String lastPrice;
+    private String markPrice;
+    private String indexPrice;
     private String askPrice;
     private String bidPrice;
     private String timestamp;

@@ -9,6 +9,8 @@ public class PriceTickerDto {
 
     private String instId;
     private String last;
+    private String markPx;
+    private String idxPx;
     private String askPx;
     private String bidPx;
     private String ts;

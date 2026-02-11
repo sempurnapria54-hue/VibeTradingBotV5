@@ -12,7 +12,10 @@ public class Position {
     private String positionSide;
     private String positionSize;
     private String averagePrice;
+    private String markPrice;
+    private String liquidationPrice;
     private String unrealizedProfit;
     private String leverage;
     private String marginMode;
+    private String updateTime;
 }

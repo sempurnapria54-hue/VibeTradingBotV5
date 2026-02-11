@@ -14,4 +14,9 @@ public interface AlgoOrderRepository extends JpaRepository<AlgoOrderEntity, Long
         Long instrumentId,
         String clientAlgoOrderId
     );
+    List<AlgoOrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(
+        Long exchangeId,
+        Long instrumentId,
+        String exchangeAlgoOrderId
+    );
 }

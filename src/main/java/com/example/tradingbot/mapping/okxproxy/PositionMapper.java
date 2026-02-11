@@ -13,9 +13,12 @@ public interface PositionMapper {
     @Mapping(source = "posSide", target = "positionSide")
     @Mapping(source = "pos", target = "positionSize")
     @Mapping(source = "avgPx", target = "averagePrice")
+    @Mapping(source = "markPx", target = "markPrice")
+    @Mapping(source = "liqPx", target = "liquidationPrice")
     @Mapping(source = "upl", target = "unrealizedProfit")
     @Mapping(source = "lever", target = "leverage")
     @Mapping(source = "mgnMode", target = "marginMode")
+    @Mapping(source = "uTime", target = "updateTime")
     Position clientToDomain(PositionDto source);
 
     @Mapping(source = "instrumentId", target = "instId")
@@ -23,9 +26,12 @@ public interface PositionMapper {
     @Mapping(source = "positionSide", target = "posSide")
     @Mapping(source = "positionSize", target = "pos")
     @Mapping(source = "averagePrice", target = "avgPx")
+    @Mapping(source = "markPrice", target = "markPx")
+    @Mapping(source = "liquidationPrice", target = "liqPx")
     @Mapping(source = "unrealizedProfit", target = "upl")
     @Mapping(source = "leverage", target = "lever")
     @Mapping(source = "marginMode", target = "mgnMode")
+    @Mapping(source = "updateTime", target = "uTime")
     PositionDto domainToClient(Position source);
 
     com.example.tradingbot.rest.model.okxproxy.Position domainToRest(Position source);

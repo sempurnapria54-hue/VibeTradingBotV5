@@ -28,6 +28,16 @@ public class OrderDataService {
         return orderRepository.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
     }
 
+
+
+    public List<OrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(
+        Long exchangeId,
+        Long instrumentId,
+        String exchangeOrderId
+    ) {
+        return orderRepository.findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(exchangeId, instrumentId, exchangeOrderId);
+    }
+
     public Optional<OrderEntity> findByExchangeIdAndInstrumentIdAndClientOrderId(
         Long exchangeId,
         Long instrumentId,

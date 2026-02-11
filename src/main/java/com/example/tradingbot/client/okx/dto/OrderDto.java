@@ -19,6 +19,7 @@ public class OrderDto {
     private String state;
     private String avgPx;
     private String accFillSz;
+    private String fee;
     private String cTime;
     private String uTime;
     private String sCode;

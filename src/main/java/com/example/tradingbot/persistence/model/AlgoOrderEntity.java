@@ -61,4 +61,40 @@ public class AlgoOrderEntity extends AuditableEntity {
 
     @Column(name = "algo_type", length = ALGO_TYPE_LENGTH)
     private String algoType;
+
+    @Column(name = "state", length = 32)
+    private String state;
+
+    @Column(name = "sz", length = 64)
+    private String sz;
+
+    @Column(name = "trigger_px", length = 64)
+    private String triggerPx;
+
+    @Column(name = "ord_px", length = 64)
+    private String ordPx;
+
+    @Column(name = "tp_trigger_px", length = 64)
+    private String tpTriggerPx;
+
+    @Column(name = "tp_ord_px", length = 64)
+    private String tpOrdPx;
+
+    @Column(name = "sl_trigger_px", length = 64)
+    private String slTriggerPx;
+
+    @Column(name = "sl_ord_px", length = 64)
+    private String slOrdPx;
+
+    @Column(name = "callback_ratio", length = 64)
+    private String callbackRatio;
+
+    @Column(name = "callback_spread", length = 64)
+    private String callbackSpread;
+
+    @Column(name = "c_time")
+    private Long cTime;
+
+    @Column(name = "u_time")
+    private Long uTime;
 }

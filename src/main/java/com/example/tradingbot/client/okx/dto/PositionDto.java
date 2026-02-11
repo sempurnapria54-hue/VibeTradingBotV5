@@ -12,7 +12,10 @@ public class PositionDto {
     private String posSide;
     private String pos;
     private String avgPx;
+    private String markPx;
+    private String liqPx;
     private String upl;
     private String lever;
     private String mgnMode;
+    private String uTime;
 }
