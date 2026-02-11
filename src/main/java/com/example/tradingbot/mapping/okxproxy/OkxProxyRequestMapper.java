@@ -13,6 +13,11 @@ public interface OkxProxyRequestMapper {
 
     com.example.tradingbot.client.okx.dto.OrdersPendingRequest domainToClient(com.example.tradingbot.domain.model.okxproxy.OrdersPendingRequest source);
 
+
+    com.example.tradingbot.domain.model.okxproxy.OrdersAlgoPendingRequest restToDomain(com.example.tradingbot.rest.model.okxproxy.OrdersAlgoPendingRequest source);
+
+    com.example.tradingbot.client.okx.dto.OrdersAlgoPendingRequest domainToClient(com.example.tradingbot.domain.model.okxproxy.OrdersAlgoPendingRequest source);
+
     com.example.tradingbot.domain.model.okxproxy.OrderDetailsRequest restToDomain(com.example.tradingbot.rest.model.okxproxy.OrderDetailsRequest source);
 
     com.example.tradingbot.client.okx.dto.OrderDetailsRequest domainToClient(com.example.tradingbot.domain.model.okxproxy.OrderDetailsRequest source);

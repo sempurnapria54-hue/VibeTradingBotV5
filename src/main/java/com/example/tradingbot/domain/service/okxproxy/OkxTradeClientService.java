@@ -22,6 +22,7 @@ public class OkxTradeClientService {
 
     public List<Order> getOrdersPending(OrdersPendingRequest request) { return okxRestClient.getOrdersPending(requestMapper.domainToClient(request)).getData().stream().map(orderMapper::clientToDomain).toList(); }
     public List<Order> getOrderDetails(OrderDetailsRequest request) { return okxRestClient.getOrderDetails(requestMapper.domainToClient(request)).getData().stream().map(orderMapper::clientToDomain).toList(); }
+    public List<AlgoOrder> getOrdersAlgoPending(OrdersAlgoPendingRequest request) { return okxRestClient.getOrdersAlgoPending(requestMapper.domainToClient(request)).getData().stream().map(algoOrderMapper::clientToDomain).toList(); }
     public List<Order> getOrdersHistory(OrdersHistoryRequest request) { return okxRestClient.getOrdersHistory(requestMapper.domainToClient(request)).getData().stream().map(orderMapper::clientToDomain).toList(); }
     public List<Order> getOrdersHistoryArchive(OrdersHistoryRequest request) { return okxRestClient.getOrdersHistoryArchive(requestMapper.domainToClient(request)).getData().stream().map(orderMapper::clientToDomain).toList(); }
     public List<TradeFill> getFills(FillsRequest request) { return okxRestClient.getFills(requestMapper.domainToClient(request)).getData().stream().map(tradeFillMapper::clientToDomain).toList(); }

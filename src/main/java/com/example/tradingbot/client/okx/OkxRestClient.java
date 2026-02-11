@@ -19,6 +19,7 @@ import com.example.tradingbot.client.okx.dto.InstrumentsRequest;
 import com.example.tradingbot.client.okx.dto.OkxEnvelope;
 import com.example.tradingbot.client.okx.dto.OrderDetailsRequest;
 import com.example.tradingbot.client.okx.dto.OrderDto;
+import com.example.tradingbot.client.okx.dto.OrdersAlgoPendingRequest;
 import com.example.tradingbot.client.okx.dto.OrdersHistoryRequest;
 import com.example.tradingbot.client.okx.dto.OrdersPendingRequest;
 import com.example.tradingbot.client.okx.dto.PositionDto;
@@ -79,6 +80,12 @@ public class OkxRestClient {
 
     public OkxEnvelope<OrderDto> getOrderDetails(OrderDetailsRequest request) {
         return getPrivate("/api/v5/trade/order", orderDetailsParams(request), new ParameterizedTypeReference<>() {
+        });
+    }
+
+
+    public OkxEnvelope<AlgoOrderDto> getOrdersAlgoPending(OrdersAlgoPendingRequest request) {
+        return getPrivate("/api/v5/trade/orders-algo-pending", ordersAlgoPendingParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
@@ -191,6 +198,15 @@ public class OkxRestClient {
         addIfPresent(params, "instId", request.getInstrumentId());
         addIfPresent(params, "ordId", request.getOrderId());
         addIfPresent(params, "clOrdId", request.getClientOrderId());
+        return params;
+    }
+
+
+    private MultiValueMap<String, String> ordersAlgoPendingParams(OrdersAlgoPendingRequest request) {
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        addIfPresent(params, "ordType", request.getOrderType());
+        addIfPresent(params, "instId", request.getInstrumentId());
+        addIfPresent(params, "instType", request.getInstrumentType());
         return params;
     }
 

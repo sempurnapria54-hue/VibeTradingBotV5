@@ -31,6 +31,10 @@ spring:
   flyway:
     enabled: true
 
+reconcile:
+  enabled: false
+  dry-run-on-startup: false
+
 okx:
   api-key: ${OKX_API_KEY:}
   secret-key: ${OKX_SECRET_KEY:}
