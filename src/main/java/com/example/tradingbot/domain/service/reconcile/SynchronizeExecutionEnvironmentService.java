@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.config.ReconcileProperties;
 import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
+import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
 import com.example.tradingbot.domain.service.reconcile.model.ExchangeInstrumentSnapshot;
@@ -145,60 +146,65 @@ public class SynchronizeExecutionEnvironmentService {
         boolean hasAnomalies = false;
         String maxSeverity = "NONE";
 
-        for (InstrumentBucket bucket : buckets) {
-            Optional<InstrumentEntity> instrumentOptional = instrumentDataService.findByExchangeIdAndName(exchange.getId(), bucket.getInstrumentName());
+        for (InstrumentBucket sourceBucket : buckets) {
+            Optional<InstrumentEntity> instrumentOptional = instrumentDataService.findByExchangeIdAndName(exchange.getId(), sourceBucket.getInstrumentName());
             DbInstrumentState dbState = loadDbInstrumentState(exchange.getId(), instrumentOptional.orElse(null));
+            InstrumentBucket bucket = InstrumentBucket.builder()
+                .instrumentName(sourceBucket.getInstrumentName())
+                .dbState(dbState)
+                .positions(sourceBucket.getPositions())
+                .orders(sourceBucket.getOrders())
+                .algoOrders(sourceBucket.getAlgoOrders())
+                .build();
+            ExchangeInstrumentSnapshot currentExchangeState = toExchangeState(bucket);
+
+            Optional<AnomalyDecision> decisionOptional = anomalyEngine.evaluate(bucket);
+            if (decisionOptional.isPresent()) {
+                AnomalyDecision decision = decisionOptional.get();
+                reportService.appendAnomaly(
+                    report.getId(),
+                    bucket.getInstrumentName(),
+                    decision.getType(),
+                    decision.getSeverity(),
+                    decision.getSummary(),
+                    decision.getDetailsJson()
+                );
+                hasAnomalies = true;
+                maxSeverity = resolveMaxSeverity(maxSeverity, decision.getSeverity());
+
+                if (instrumentOptional.isPresent()) {
+                    InstrumentEntity instrument = instrumentOptional.get();
+                    if ("CRITICAL".equalsIgnoreCase(decision.getSeverity())) {
+                        instrument.setStatus(STATUS_HOLD);
+                        instrumentDataService.save(instrument);
+
+                        CancelFlowResult cancelResult = cancelExchangeFlow.execute(bucket, decision);
+                        if (cancelResult.isFlowExecuted()) {
+                            currentExchangeState = cancelResult.getCurrentExchangeState();
+                        }
+                        continue;
+                    }
+
+                    CancelFlowResult cancelResult = cancelExchangeFlow.execute(bucket, decision);
+                    if (cancelResult.isFlowExecuted()) {
+                        currentExchangeState = cancelResult.getCurrentExchangeState();
+                    }
+                    instrument.setStatus("OPEN");
+                    instrumentDataService.save(instrument);
+                }
+            }
 
             if (instrumentOptional.isPresent()) {
                 InstrumentBucket syncBucket = InstrumentBucket.builder()
                     .instrumentName(bucket.getInstrumentName())
                     .dbState(dbState)
-                    .positions(bucket.getPositions())
-                    .orders(bucket.getOrders())
-                    .algoOrders(bucket.getAlgoOrders())
+                    .positions(currentExchangeState.getPositions())
+                    .orders(currentExchangeState.getOrders())
+                    .algoOrders(currentExchangeState.getAlgoOrders())
                     .build();
-                ExchangeInstrumentSnapshot exchangeState = ExchangeInstrumentSnapshot.builder()
-                    .instId(bucket.getInstrumentName())
-                    .positionsCount(bucket.getPositionsCount())
-                    .ordersCount(bucket.getOrdersCount())
-                    .algoOrdersCount(bucket.getAlgoOrdersCount())
-                    .positions(bucket.getPositions())
-                    .orders(bucket.getOrders())
-                    .algoOrders(bucket.getAlgoOrders())
-                    .build();
-                countsOnlySyncEngine.syncPresence(syncBucket, exchangeState);
-                dbState = loadDbInstrumentState(exchange.getId(), instrumentOptional.get());
+                countsOnlySyncEngine.syncPresence(syncBucket, currentExchangeState);
+                exchangeToDbTransferService.transfer(exchange.getId(), instrumentOptional.get().getId(), syncBucket);
             }
-
-            Optional<AnomalyDecision> decisionOptional = anomalyEngine.evaluate(snapshot, bucket, dbState);
-            if (decisionOptional.isPresent()) {
-                AnomalyDecision decision = decisionOptional.get();
-                reportDataService.appendAnomaly(
-                    report.getId(),
-                    bucket.getInstrumentName(),
-                    decision.getCategory(),
-                    decision.getSeverity(),
-                    decision.getSummary(),
-                    decision.getDetailsJson(),
-                    Instant.now()
-                );
-                hasAnomalies = true;
-                maxSeverity = resolveMaxSeverity(maxSeverity, decision.getSeverity());
-
-                if (decision.isShouldHold() && instrumentOptional.isPresent()) {
-                    InstrumentEntity instrument = instrumentOptional.get();
-                    instrument.setStatus(STATUS_HOLD);
-                    instrumentDataService.save(instrument);
-                }
-
-                if (instrumentOptional.isPresent()
-                    && reconcileProperties.getCancelFlow().isEnabled()
-                    && decision.isShouldCancelFlow()) {
-                    cancelExchangeFlow.execute(exchange.getId(), instrumentOptional.get().getId(), snapshot, bucket, decision);
-                }
-            }
-
-            instrumentOptional.ifPresent(instrument -> exchangeToDbTransferService.transfer(exchange.getId(), instrument.getId(), bucket));
         }
 
         reportDataService.finalizeReport(
@@ -209,6 +215,19 @@ public class SynchronizeExecutionEnvironmentService {
             hasAnomalies,
             maxSeverity
         );
+    }
+
+
+    private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
+        return ExchangeInstrumentSnapshot.builder()
+            .instId(bucket.getInstrumentName())
+            .positionsCount(bucket.getPositionsCount())
+            .ordersCount(bucket.getOrdersCount())
+            .algoOrdersCount(bucket.getAlgoOrdersCount())
+            .positions(bucket.getPositions())
+            .orders(bucket.getOrders())
+            .algoOrders(bucket.getAlgoOrders())
+            .build();
     }
 
     private DbInstrumentState loadDbInstrumentState(Long exchangeId, InstrumentEntity instrument) {

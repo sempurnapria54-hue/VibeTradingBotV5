@@ -89,6 +89,22 @@ public class OkxExchangeSnapshotProvider {
             .build();
     }
 
+
+    public ExchangeInstrumentSnapshot refreshInstrumentSnapshot(String instId) {
+        ExchangeSnapshot snapshot = captureSnapshot();
+        return snapshot.getInstruments().stream()
+            .filter(item -> instId.equals(item.getInstId()))
+            .findFirst()
+            .orElse(ExchangeInstrumentSnapshot.builder()
+                .instId(instId)
+                .positionsCount(0)
+                .ordersCount(0)
+                .algoOrdersCount(0)
+                .positions(List.of())
+                .orders(List.of())
+                .algoOrders(List.of())
+                .build());
+    }
     private List<Position> capturePositions() {
         try {
             return okxAccountClientService.getPositions(new PositionsRequest());
