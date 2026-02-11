@@ -34,6 +34,8 @@ spring:
 reconcile:
   enabled: false
   dry-run-on-startup: false
+  cancel-flow:
+    enabled: false
 
 okx:
   api-key: ${OKX_API_KEY:}

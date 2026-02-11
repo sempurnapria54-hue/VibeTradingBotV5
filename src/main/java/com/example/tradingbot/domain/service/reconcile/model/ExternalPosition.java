@@ -8,4 +8,5 @@ import lombok.Getter;
 public class ExternalPosition {
 
     private final String instId;
+    private final String side;
 }
