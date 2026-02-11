@@ -37,6 +37,15 @@
 
 ---
 
+
+### 5) Уточнение по конфигу (обязательно)
+
+Чтобы не было неоднозначности в следующих реализациях:
+
+* В `application.yaml` не использовать значения вида `vault://...#...` для бизнес-свойств (`okx.*`, `spring.datasource.*`).
+* Для наглядности в документационном блоке указывать плейсхолдеры формата `{OKX_API_KEY}`, `{OKX_SECRET_KEY}`, `{OKX_PASSPHRASE}`, `{OKX_BASE_URL}`, `{SPRING_DATASOURCE_URL}`, `{SPRING_DATASOURCE_USERNAME}`, `{SPRING_DATASOURCE_PASSWORD}`.
+* В коде приложение должно читать стандартные Spring config properties (`okx.*`, `spring.datasource.*`), а не прямые Vault URI.
+
 ## Definition of Done
 
 1. `docker compose up -d` поднимает Vault и Postgres.

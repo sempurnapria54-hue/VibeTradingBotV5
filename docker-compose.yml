@@ -10,5 +10,27 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  vault:
+    image: hashicorp/vault:1.15
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        ui = true
+        storage "file" {
+          path = "/vault/file"
+        }
+        listener "tcp" {
+          address = "0.0.0.0:8200"
+          tls_disable = 1
+        }
+        disable_mlock = true
+    command: vault server
+    volumes:
+      - vaultdata:/vault/file
+
 volumes:
   pgdata:
+  vaultdata:
