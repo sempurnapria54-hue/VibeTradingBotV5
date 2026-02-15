@@ -49,6 +49,7 @@ candle-groups:
     max-groups-per-run: 10
     lease-duration-sec: 60
     max-attempts-before-error: 5
+    batch-limit: 300
     tail-overlap-bars:
       1m: 300
       5m: 300
