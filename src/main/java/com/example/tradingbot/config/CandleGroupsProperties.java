@@ -1,5 +1,7 @@
 package com.example.tradingbot.config;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "candle-groups.job")
@@ -10,6 +12,7 @@ public class CandleGroupsProperties {
     private int leaseDurationSec = 60;
     private int maxAttemptsBeforeError = 5;
     private long fixedDelayMs = 10_000L;
+    private Map<String, Integer> tailOverlapBars = new HashMap<>();
 
     public boolean isEnabled() {
         return enabled;
@@ -49,5 +52,13 @@ public class CandleGroupsProperties {
 
     public void setFixedDelayMs(long fixedDelayMs) {
         this.fixedDelayMs = fixedDelayMs;
+    }
+
+    public Map<String, Integer> getTailOverlapBars() {
+        return tailOverlapBars;
+    }
+
+    public void setTailOverlapBars(Map<String, Integer> tailOverlapBars) {
+        this.tailOverlapBars = tailOverlapBars;
     }
 }

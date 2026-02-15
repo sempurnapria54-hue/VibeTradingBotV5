@@ -19,6 +19,7 @@ public class CandleGroupWorker {
     private final CandleGroupRunContextFactory runContextFactory;
     private final CandleGroupLeaseService candleGroupLeaseService;
     private final CandleGroupsProperties candleGroupsProperties;
+    private final TailSyncService tailSyncService;
     private final java.time.Clock clock;
 
     public void processGroup(Long candleGroupId) {
@@ -51,27 +52,39 @@ public class CandleGroupWorker {
             candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.BACKFILL_RUNNING);
             group.setStatus(CandleGroupStatus.BACKFILL_RUNNING);
             log.info("CandleGroup S1 skeleton: groupId={}, nowClosedTs={}, action=NEW->BACKFILL_RUNNING", group.getId(), context.nowClosedTs());
-            log.info("CandleGroup S2 skeleton: groupId={}, nowClosedTs={}, action=tail-sync-placeholder", group.getId(), context.nowClosedTs());
+            runTailSync(group, context);
             log.info("CandleGroup S3 skeleton: groupId={}, nowClosedTs={}, action=backfill-placeholder", group.getId(), context.nowClosedTs());
             return;
         }
 
         if (group.getStatus() == CandleGroupStatus.BACKFILL_RUNNING) {
+            runTailSync(group, context);
             log.info("CandleGroup S3 skeleton: groupId={}, nowClosedTs={}, action=continue-backfill-placeholder", group.getId(), context.nowClosedTs());
             return;
         }
 
         if (group.getStatus() == CandleGroupStatus.REPAIR_RUNNING) {
+            runTailSync(group, context);
             log.info("CandleGroup S6 skeleton: groupId={}, nowClosedTs={}, action=integrity-repair-placeholder", group.getId(), context.nowClosedTs());
             return;
         }
 
         if (group.getStatus() == CandleGroupStatus.SYNC) {
-            log.info("CandleGroup S2 skeleton: groupId={}, nowClosedTs={}, action=tail-sync-placeholder", group.getId(), context.nowClosedTs());
+            runTailSync(group, context);
             return;
         }
 
         throw new IllegalStateException("Unsupported candle group status for worker: " + group.getStatus());
+    }
+
+    private void runTailSync(CandleGroupEntity group, CandleGroupRunContext context) {
+        TailSyncResult result = tailSyncService.syncTail(group, context);
+        log.info("CandleGroup S2 tail sync: groupId={}, timeframe={}, fetched={}, saved={}, updatedLastTailSyncTs={}",
+            group.getId(),
+            group.getTimeframe(),
+            result.fetched(),
+            result.saved(),
+            result.updatedLastTailSyncTs());
     }
 
     private void handleFailure(Long groupId, Exception ex) {
