@@ -20,12 +20,10 @@ import lombok.Setter;
 @NoArgsConstructor
 @Entity
 @Table(name = "candle", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_candle_instr_tf_ts", columnNames = {"instrument_id", "timeframe", "timestamp"})
+    @UniqueConstraint(name = "uk_candle_group_ts", columnNames = {"candle_group_id", "timestamp"})
 })
 public class CandleEntity extends AuditableEntity {
 
-    public static final int TIMEFRAME_LENGTH = 10;
-    public static final int STATUS_LENGTH = 50;
     public static final int PRICE_PRECISION = 50;
     public static final int PRICE_SCALE = 30;
 
@@ -34,15 +32,12 @@ public class CandleEntity extends AuditableEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
-    private Long instrumentId;
+    @Column(name = "candle_group_id", nullable = false, updatable = false, insertable = false)
+    private Long candleGroupId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "instrument_id", nullable = false)
-    private InstrumentEntity instrument;
-
-    @Column(name = "timeframe", nullable = false, length = TIMEFRAME_LENGTH)
-    private String timeframe;
+    @JoinColumn(name = "candle_group_id", nullable = false)
+    private CandleGroupEntity candleGroup;
 
     @Column(name = "timestamp", nullable = false)
     private Long timestamp;
@@ -61,7 +56,4 @@ public class CandleEntity extends AuditableEntity {
 
     @Column(name = "volume", precision = PRICE_PRECISION, scale = PRICE_SCALE)
     private BigDecimal volume;
-
-    @Column(name = "status", length = STATUS_LENGTH)
-    private String status;
 }
