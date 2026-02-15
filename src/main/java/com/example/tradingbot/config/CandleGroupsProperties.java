@@ -7,6 +7,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "candle-groups.job")
 public class CandleGroupsProperties {
 
+    public enum IntegrityCheckMode {
+        NONE,
+        COUNT_ONLY,
+        COUNT_PLUS_REPAIR
+    }
+
     private boolean enabled = false;
     private int maxGroupsPerRun = 10;
     private int leaseDurationSec = 60;
@@ -14,6 +20,8 @@ public class CandleGroupsProperties {
     private int batchLimit = 300;
     private long fixedDelayMs = 10_000L;
     private Map<String, Integer> tailOverlapBars = new HashMap<>();
+    private IntegrityCheckMode integrityCheckMode = IntegrityCheckMode.NONE;
+    private int syncIntegrityEveryNRuns = 0;
 
     public boolean isEnabled() {
         return enabled;
@@ -69,5 +77,21 @@ public class CandleGroupsProperties {
 
     public void setTailOverlapBars(Map<String, Integer> tailOverlapBars) {
         this.tailOverlapBars = tailOverlapBars;
+    }
+
+    public IntegrityCheckMode getIntegrityCheckMode() {
+        return integrityCheckMode;
+    }
+
+    public void setIntegrityCheckMode(IntegrityCheckMode integrityCheckMode) {
+        this.integrityCheckMode = integrityCheckMode;
+    }
+
+    public int getSyncIntegrityEveryNRuns() {
+        return syncIntegrityEveryNRuns;
+    }
+
+    public void setSyncIntegrityEveryNRuns(int syncIntegrityEveryNRuns) {
+        this.syncIntegrityEveryNRuns = syncIntegrityEveryNRuns;
     }
 }

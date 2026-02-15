@@ -50,6 +50,8 @@ candle-groups:
     lease-duration-sec: 60
     max-attempts-before-error: 5
     batch-limit: 300
+    integrity-check-mode: NONE
+    sync-integrity-every-n-runs: 0
     tail-overlap-bars:
       1m: 300
       5m: 300

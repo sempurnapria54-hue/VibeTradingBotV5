@@ -1,11 +1,15 @@
 package com.example.tradingbot.domain.service.candlegroup;
 
 import com.example.tradingbot.config.CandleGroupsProperties;
+import com.example.tradingbot.domain.service.candlegroup.integrity.CandleIntegrityService;
+import com.example.tradingbot.domain.service.candlegroup.integrity.IntegrityResult;
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.persistence.model.CandleGroupStatus;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import java.time.OffsetDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +25,9 @@ public class CandleGroupWorker {
     private final CandleGroupsProperties candleGroupsProperties;
     private final TailSyncService tailSyncService;
     private final BackfillService backfillService;
+    private final CandleIntegrityService candleIntegrityService;
     private final java.time.Clock clock;
+    private final ConcurrentMap<Long, Integer> syncRunCounters = new ConcurrentHashMap<>();
 
     public void processGroup(Long candleGroupId) {
         CandleGroupEntity group = candleGroupDataService.getById(candleGroupId)
@@ -65,12 +71,15 @@ public class CandleGroupWorker {
 
         if (group.getStatus() == CandleGroupStatus.REPAIR_RUNNING) {
             runTailSync(group, context);
-            log.info("CandleGroup S6 skeleton: groupId={}, nowClosedTs={}, action=integrity-repair-placeholder", group.getId(), context.nowClosedTs());
+            runIntegrity(group, context, "S6");
             return;
         }
 
         if (group.getStatus() == CandleGroupStatus.SYNC) {
             runTailSync(group, context);
+            if (shouldRunSyncIntegrityCheck(group.getId())) {
+                runIntegrity(group, context, "S2");
+            }
             return;
         }
 
@@ -98,12 +107,67 @@ public class CandleGroupWorker {
             result.saved());
 
         if (result.completed()) {
-            candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
-            group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
+            runIntegrity(group, context, "S1");
             return;
         }
 
         candleGroupDataService.incrementAttemptCount(group.getId());
+    }
+
+    private void runIntegrity(CandleGroupEntity group, CandleGroupRunContext context, String scenario) {
+        CandleGroupsProperties.IntegrityCheckMode mode = candleGroupsProperties.getIntegrityCheckMode();
+        if (mode == CandleGroupsProperties.IntegrityCheckMode.NONE) {
+            log.debug("CandleGroup integrity skipped: groupId={}, status={}, mode=NONE, scenario={}",
+                group.getId(),
+                group.getStatus(),
+                scenario);
+            return;
+        }
+
+        IntegrityResult result = candleIntegrityService.checkCountOnly(group, context);
+        log.info("CandleGroup integrity count: groupId={}, timeframe={}, status={}, scenario={}, startTs={}, endTs={}, expected={}, actual={}, ok={}, mode={}",
+            group.getId(),
+            group.getTimeframe(),
+            group.getStatus(),
+            scenario,
+            result.startTs(),
+            result.endTs(),
+            result.expected(),
+            result.actual(),
+            result.ok(),
+            mode);
+
+        if (result.ok()) {
+            if (group.getStatus() == CandleGroupStatus.REPAIR_RUNNING || group.getStatus() == CandleGroupStatus.BACKFILL_RUNNING) {
+                candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.SYNC);
+                group.setStatus(CandleGroupStatus.SYNC);
+            }
+            return;
+        }
+
+        candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
+        group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
+
+        if (mode == CandleGroupsProperties.IntegrityCheckMode.COUNT_PLUS_REPAIR) {
+            log.info("CandleGroup integrity mismatch: groupId={}, action=repair-pending-task-06G", group.getId());
+            return;
+        }
+
+        log.info("CandleGroup integrity mismatch: groupId={}, action=COUNT_ONLY-stop", group.getId());
+    }
+
+    private boolean shouldRunSyncIntegrityCheck(Long groupId) {
+        int everyNRuns = candleGroupsProperties.getSyncIntegrityEveryNRuns();
+        if (everyNRuns <= 0) {
+            return false;
+        }
+
+        int current = syncRunCounters.merge(groupId, 1, Integer::sum);
+        if (current >= everyNRuns) {
+            syncRunCounters.put(groupId, 0);
+            return true;
+        }
+        return false;
     }
 
     private void handleFailure(Long groupId, Exception ex) {
