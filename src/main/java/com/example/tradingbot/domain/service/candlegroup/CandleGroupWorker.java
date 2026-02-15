@@ -4,6 +4,8 @@ import com.example.tradingbot.config.CandleGroupsProperties;
 import com.example.tradingbot.domain.service.candlegroup.integrity.CandleIntegrityService;
 import com.example.tradingbot.domain.service.candlegroup.integrity.IntegrityResult;
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;
+import com.example.tradingbot.domain.service.candlegroup.repair.CandleRepairService;
+import com.example.tradingbot.domain.service.candlegroup.repair.RepairResult;
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.persistence.model.CandleGroupStatus;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
@@ -26,6 +28,7 @@ public class CandleGroupWorker {
     private final TailSyncService tailSyncService;
     private final BackfillService backfillService;
     private final CandleIntegrityService candleIntegrityService;
+    private final CandleRepairService candleRepairService;
     private final java.time.Clock clock;
     private final ConcurrentMap<Long, Integer> syncRunCounters = new ConcurrentHashMap<>();
 
@@ -149,7 +152,14 @@ public class CandleGroupWorker {
         group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
 
         if (mode == CandleGroupsProperties.IntegrityCheckMode.COUNT_PLUS_REPAIR) {
-            log.info("CandleGroup integrity mismatch: groupId={}, action=repair-pending-task-06G", group.getId());
+            RepairResult repairResult = candleRepairService.repair(group, context);
+            log.info("CandleGroup repair run: groupId={}, countOkBefore={}, countOkAfter={}, leafWindows={}, gapWindows={}, repairedGaps={}",
+                group.getId(),
+                repairResult.countOkBeforeRepair(),
+                repairResult.countOkAfterRepair(),
+                repairResult.leafWindows().size(),
+                repairResult.gapWindows().size(),
+                repairResult.repairedGaps().stream().filter(gap -> gap.repaired()).count());
             return;
         }
 

@@ -52,6 +52,7 @@ candle-groups:
     batch-limit: 300
     integrity-check-mode: NONE
     sync-integrity-every-n-runs: 0
+    repair-leaf-bars: 64
     tail-overlap-bars:
       1m: 300
       5m: 300
