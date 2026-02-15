@@ -16,9 +16,9 @@ public class CandleDataService {
     private final CandleRepository candleRepository;
 
     @Transactional
-    public void upsertBatch(Long groupId, List<CandleEntity> candles) {
+    public int upsertBatch(Long groupId, List<CandleEntity> candles) {
         if (candles == null || candles.isEmpty()) {
-            return;
+            return 0;
         }
 
         long minTs = candles.stream().mapToLong(CandleEntity::getTimestamp).min().orElseThrow();
@@ -35,6 +35,8 @@ public class CandleDataService {
         if (!toInsert.isEmpty()) {
             candleRepository.saveAll(toInsert);
         }
+
+        return toInsert.size();
     }
 
     public long countBetween(Long groupId, long from, long to) {
