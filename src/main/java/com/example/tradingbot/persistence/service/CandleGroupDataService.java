@@ -6,6 +6,7 @@ import com.example.tradingbot.persistence.repository.CandleGroupRepository;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,10 @@ public class CandleGroupDataService {
                                                       Collection<CandleGroupStatus> statuses,
                                                       int maxGroups) {
         return candleGroupRepository.findEligibleForRun(nowMillis, statuses, PageRequest.of(0, maxGroups));
+    }
+
+    public Optional<CandleGroupEntity> getById(Long groupId) {
+        return candleGroupRepository.findById(groupId);
     }
 
     @Transactional
