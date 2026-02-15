@@ -41,6 +41,15 @@ synchronize-execution-environment:
   reports:
     retention-days: 14
 
+
+candle-groups:
+  job:
+    enabled: false
+    fixed-delay-ms: 10000
+    max-groups-per-run: 10
+    lease-duration-sec: 60
+    max-attempts-before-error: 5
+
 okx:
   api-key: ${OKX_API_KEY:}
   secret-key: ${OKX_SECRET_KEY:}
