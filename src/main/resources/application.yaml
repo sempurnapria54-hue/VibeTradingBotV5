@@ -53,6 +53,7 @@ candle-groups:
     integrity-check-mode: NONE
     sync-integrity-every-n-runs: 0
     repair-leaf-bars: 64
+    lease-extend-every-batches: 1
     tail-overlap-bars:
       1m: 300
       5m: 300

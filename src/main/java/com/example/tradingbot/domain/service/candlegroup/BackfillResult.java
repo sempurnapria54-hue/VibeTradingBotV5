@@ -4,6 +4,7 @@ public record BackfillResult(
     boolean completed,
     long newCursorTs,
     int fetched,
-    int saved
+    int saved,
+    int batchesProcessed
 ) {
 }

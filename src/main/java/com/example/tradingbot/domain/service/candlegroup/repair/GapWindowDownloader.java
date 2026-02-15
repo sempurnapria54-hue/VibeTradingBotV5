@@ -35,6 +35,8 @@ public class GapWindowDownloader {
 
         long cursor = gap.toTs() + ctx.tfMillis();
         int batchLimit = resolveBatchLimit();
+        int batchesProcessed = 0;
+        int leaseExtendEveryBatches = resolveLeaseExtendEveryBatches();
 
         while (cursor >= gap.fromTs()) {
             List<ClientCandle> batch = okxCandleFetcher.fetchHistoryBackward(
@@ -43,10 +45,11 @@ public class GapWindowDownloader {
                 batchLimit,
                 cursor
             );
+            batchesProcessed++;
 
             if (batch.isEmpty()) {
-                log.warn("CandleGroup repair stopped by empty batch: groupId={}, gapStart={}, gapEnd={}, cursor={}",
-                    group.getId(), gap.fromTs(), gap.toTs(), cursor);
+                log.warn("CandleGroup repair stopped by empty batch: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, gapStart={}, gapEnd={}, cursor={}, batchesProcessed={}",
+                    group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), ctx.nowClosedTs(), gap.fromTs(), gap.toTs(), cursor, batchesProcessed);
                 break;
             }
 
@@ -65,13 +68,30 @@ public class GapWindowDownloader {
             candleDataService.upsertBatch(group.getId(), mapped);
 
             if (minTs >= cursor) {
-                log.warn("CandleGroup repair stopped by monotonic guard: groupId={}, gapStart={}, gapEnd={}, cursor={}, minTs={}",
-                    group.getId(), gap.fromTs(), gap.toTs(), cursor, minTs);
+                log.warn("CandleGroup repair stopped by monotonic guard: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, gapStart={}, gapEnd={}, cursor={}, minTs={}, batchesProcessed={}",
+                    group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), ctx.nowClosedTs(), gap.fromTs(), gap.toTs(), cursor, minTs, batchesProcessed);
                 break;
             }
 
+            long previousCursor = cursor;
             cursor = minTs;
-            candleGroupLeaseService.extendLease(group.getId());
+            if (batchesProcessed % leaseExtendEveryBatches == 0) {
+                candleGroupLeaseService.extendLease(group.getId());
+            }
+
+            log.info("CandleGroup repair batch: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, gapStart={}, gapEnd={}, previousCursor={}, nextCursor={}, fetchedBatch={}, savedBatch={}, batchesProcessed={}",
+                group.getId(),
+                group.getInstrumentId(),
+                group.getTimeframe(),
+                group.getStatus(),
+                ctx.nowClosedTs(),
+                gap.fromTs(),
+                gap.toTs(),
+                previousCursor,
+                cursor,
+                batch.size(),
+                mapped.size(),
+                batchesProcessed);
         }
 
         long expectedWindow = ((gap.toTs() - gap.fromTs()) / ctx.tfMillis()) + 1;
@@ -82,6 +102,11 @@ public class GapWindowDownloader {
     private int resolveBatchLimit() {
         int configured = candleGroupsProperties.getBatchLimit();
         return configured > 0 ? configured : DEFAULT_BATCH_LIMIT;
+    }
+
+    private int resolveLeaseExtendEveryBatches() {
+        int configured = candleGroupsProperties.getLeaseExtendEveryBatches();
+        return configured > 0 ? configured : 1;
     }
 
     private CandleEntity mapToEntity(CandleGroupEntity group, ClientCandle source) {

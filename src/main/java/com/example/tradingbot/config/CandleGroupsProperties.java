@@ -23,6 +23,7 @@ public class CandleGroupsProperties {
     private IntegrityCheckMode integrityCheckMode = IntegrityCheckMode.NONE;
     private int syncIntegrityEveryNRuns = 0;
     private int repairLeafBars = 64;
+    private int leaseExtendEveryBatches = 1;
 
     public boolean isEnabled() {
         return enabled;
@@ -102,5 +103,13 @@ public class CandleGroupsProperties {
 
     public void setRepairLeafBars(int repairLeafBars) {
         this.repairLeafBars = repairLeafBars;
+    }
+
+    public int getLeaseExtendEveryBatches() {
+        return leaseExtendEveryBatches;
+    }
+
+    public void setLeaseExtendEveryBatches(int leaseExtendEveryBatches) {
+        this.leaseExtendEveryBatches = leaseExtendEveryBatches;
     }
 }
