@@ -22,6 +22,7 @@ public class CandleGroupsProperties {
     private Map<String, Integer> tailOverlapBars = new HashMap<>();
     private IntegrityCheckMode integrityCheckMode = IntegrityCheckMode.NONE;
     private int syncIntegrityEveryNRuns = 0;
+    private int repairLeafBars = 64;
 
     public boolean isEnabled() {
         return enabled;
@@ -93,5 +94,13 @@ public class CandleGroupsProperties {
 
     public void setSyncIntegrityEveryNRuns(int syncIntegrityEveryNRuns) {
         this.syncIntegrityEveryNRuns = syncIntegrityEveryNRuns;
+    }
+
+    public int getRepairLeafBars() {
+        return repairLeafBars;
+    }
+
+    public void setRepairLeafBars(int repairLeafBars) {
+        this.repairLeafBars = repairLeafBars;
     }
 }
