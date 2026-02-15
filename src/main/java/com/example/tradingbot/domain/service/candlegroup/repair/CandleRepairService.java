@@ -50,22 +50,23 @@ public class CandleRepairService {
         for (TimeWindow gap : gapWindows) {
             GapRepairResult repaired = gapWindowDownloader.repairWindow(group, ctx, gap);
             repairResults.add(repaired);
-            if (!repaired.repaired()) {
-                candleGroupDataService.incrementAttemptCount(group.getId());
-            }
         }
 
         IntegrityResult after = candleIntegrityService.checkCountOnly(group, ctx);
         if (after.ok()) {
             moveToSync(group);
         } else {
-            candleGroupDataService.incrementAttemptCount(group.getId());
             candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
             group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
         }
 
-        log.info("CandleGroup repair pass: groupId={}, startTs={}, endTs={}, beforeExpected={}, beforeActual={}, afterExpected={}, afterActual={}, leafWindows={}, gapWindows={}, repairedGaps={}",
+        log.info("CandleGroup repair pass: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, startTs={}, endTs={}, beforeExpected={}, beforeActual={}, afterExpected={}, afterActual={}, leafWindows={}, gapWindows={}, repairedGaps={}",
             group.getId(),
+            group.getInstrumentId(),
+            group.getTimeframe(),
+            group.getStatus(),
+            ctx.nowClosedTs(),
+            group.getCoverageStartTs(),
             before.startTs(),
             before.endTs(),
             before.expected(),

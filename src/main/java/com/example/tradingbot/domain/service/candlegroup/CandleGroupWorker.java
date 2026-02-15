@@ -37,22 +37,24 @@ public class CandleGroupWorker {
             .orElseThrow(() -> new IllegalStateException("Candle group not found, id=" + candleGroupId));
 
         CandleGroupRunContext context = runContextFactory.create(group);
-        log.info("CandleGroup run start: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, instanceId={}",
+        log.info("CandleGroup run start: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, instanceId={}",
             group.getId(),
             group.getInstrumentId(),
             group.getTimeframe(),
             group.getStatus(),
             context.nowClosedTs(),
+            group.getCoverageStartTs(),
+            group.getBackfillCursorTs(),
             context.instanceId());
 
         try {
             candleGroupLeaseService.extendLease(group.getId());
             runSkeleton(group, context);
             candleGroupDataService.markSuccess(group.getId(), nowUtc());
-            log.info("CandleGroup run success: groupId={}, status={}, nowClosedTs={}",
-                group.getId(), group.getStatus(), context.nowClosedTs());
+            log.info("CandleGroup run success: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, attemptsReset=true",
+                group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), group.getCoverageStartTs(), group.getBackfillCursorTs());
         } catch (Exception ex) {
-            handleFailure(group.getId(), ex);
+            handleFailure(group, context, ex);
             throw ex;
         }
     }
@@ -61,7 +63,8 @@ public class CandleGroupWorker {
         if (group.getStatus() == CandleGroupStatus.NEW) {
             candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.BACKFILL_RUNNING);
             group.setStatus(CandleGroupStatus.BACKFILL_RUNNING);
-            log.info("CandleGroup S1 skeleton: groupId={}, nowClosedTs={}, action=NEW->BACKFILL_RUNNING", group.getId(), context.nowClosedTs());
+            log.info("CandleGroup status transition: groupId={}, instrumentId={}, timeframe={}, fromStatus=NEW, toStatus=BACKFILL_RUNNING, nowClosedTs={}, coverageStartTs={}, cursor={}",
+                group.getId(), group.getInstrumentId(), group.getTimeframe(), context.nowClosedTs(), group.getCoverageStartTs(), group.getBackfillCursorTs());
             runTailSync(group, context);
             runBackfill(group, context);
             return;
@@ -91,9 +94,14 @@ public class CandleGroupWorker {
 
     private void runTailSync(CandleGroupEntity group, CandleGroupRunContext context) {
         TailSyncResult result = tailSyncService.syncTail(group, context);
-        log.info("CandleGroup S2 tail sync: groupId={}, timeframe={}, fetched={}, saved={}, updatedLastTailSyncTs={}",
+        log.info("CandleGroup S2 tail sync: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, fetched={}, saved={}, updatedLastTailSyncTs={}",
             group.getId(),
+            group.getInstrumentId(),
             group.getTimeframe(),
+            group.getStatus(),
+            context.nowClosedTs(),
+            group.getCoverageStartTs(),
+            group.getBackfillCursorTs(),
             result.fetched(),
             result.saved(),
             result.updatedLastTailSyncTs());
@@ -101,38 +109,54 @@ public class CandleGroupWorker {
 
     private void runBackfill(CandleGroupEntity group, CandleGroupRunContext context) {
         BackfillResult result = backfillService.backfillToCoverage(group, context);
-        log.info("CandleGroup S3 backfill: groupId={}, timeframe={}, completed={}, newCursorTs={}, fetched={}, saved={}",
+        group.setBackfillCursorTs(result.newCursorTs());
+        log.info("CandleGroup S3 backfill: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, completed={}, batchesProcessed={}, newCursorTs={}, fetched={}, saved={}",
             group.getId(),
+            group.getInstrumentId(),
             group.getTimeframe(),
+            group.getStatus(),
+            context.nowClosedTs(),
+            group.getCoverageStartTs(),
             result.completed(),
+            result.batchesProcessed(),
             result.newCursorTs(),
             result.fetched(),
             result.saved());
 
         if (result.completed()) {
+            candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
+            group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
+            log.info("CandleGroup status transition: groupId={}, instrumentId={}, timeframe={}, fromStatus=BACKFILL_RUNNING, toStatus=REPAIR_RUNNING, nowClosedTs={}, coverageStartTs={}, cursor={}",
+                group.getId(), group.getInstrumentId(), group.getTimeframe(), context.nowClosedTs(), group.getCoverageStartTs(), group.getBackfillCursorTs());
             runIntegrity(group, context, "S1");
-            return;
         }
-
-        candleGroupDataService.incrementAttemptCount(group.getId());
     }
 
     private void runIntegrity(CandleGroupEntity group, CandleGroupRunContext context, String scenario) {
         CandleGroupsProperties.IntegrityCheckMode mode = candleGroupsProperties.getIntegrityCheckMode();
         if (mode == CandleGroupsProperties.IntegrityCheckMode.NONE) {
-            log.debug("CandleGroup integrity skipped: groupId={}, status={}, mode=NONE, scenario={}",
+            log.debug("CandleGroup integrity skipped: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, mode=NONE, scenario={}",
                 group.getId(),
+                group.getInstrumentId(),
+                group.getTimeframe(),
                 group.getStatus(),
+                context.nowClosedTs(),
+                group.getCoverageStartTs(),
+                group.getBackfillCursorTs(),
                 scenario);
             return;
         }
 
         IntegrityResult result = candleIntegrityService.checkCountOnly(group, context);
-        log.info("CandleGroup integrity count: groupId={}, timeframe={}, status={}, scenario={}, startTs={}, endTs={}, expected={}, actual={}, ok={}, mode={}",
+        log.info("CandleGroup integrity count: groupId={}, instrumentId={}, timeframe={}, status={}, scenario={}, nowClosedTs={}, coverageStartTs={}, cursor={}, startTs={}, endTs={}, expected={}, actual={}, ok={}, mode={}",
             group.getId(),
+            group.getInstrumentId(),
             group.getTimeframe(),
             group.getStatus(),
             scenario,
+            context.nowClosedTs(),
+            group.getCoverageStartTs(),
+            group.getBackfillCursorTs(),
             result.startTs(),
             result.endTs(),
             result.expected(),
@@ -142,19 +166,33 @@ public class CandleGroupWorker {
 
         if (result.ok()) {
             if (group.getStatus() == CandleGroupStatus.REPAIR_RUNNING || group.getStatus() == CandleGroupStatus.BACKFILL_RUNNING) {
+                CandleGroupStatus fromStatus = group.getStatus();
                 candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.SYNC);
                 group.setStatus(CandleGroupStatus.SYNC);
+                log.info("CandleGroup status transition: groupId={}, instrumentId={}, timeframe={}, fromStatus={}, toStatus=SYNC, nowClosedTs={}, coverageStartTs={}, cursor={}",
+                    group.getId(), group.getInstrumentId(), group.getTimeframe(), fromStatus, context.nowClosedTs(), group.getCoverageStartTs(), group.getBackfillCursorTs());
             }
             return;
         }
 
-        candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
-        group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
+        if (group.getStatus() != CandleGroupStatus.REPAIR_RUNNING) {
+            CandleGroupStatus fromStatus = group.getStatus();
+            candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
+            group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
+            log.info("CandleGroup status transition: groupId={}, instrumentId={}, timeframe={}, fromStatus={}, toStatus=REPAIR_RUNNING, nowClosedTs={}, coverageStartTs={}, cursor={}, reason=integrity-mismatch",
+                group.getId(), group.getInstrumentId(), group.getTimeframe(), fromStatus, context.nowClosedTs(), group.getCoverageStartTs(), group.getBackfillCursorTs());
+        }
 
         if (mode == CandleGroupsProperties.IntegrityCheckMode.COUNT_PLUS_REPAIR) {
             RepairResult repairResult = candleRepairService.repair(group, context);
-            log.info("CandleGroup repair run: groupId={}, countOkBefore={}, countOkAfter={}, leafWindows={}, gapWindows={}, repairedGaps={}",
+            log.info("CandleGroup repair run: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, countOkBefore={}, countOkAfter={}, leafWindows={}, gapWindows={}, repairedGaps={}",
                 group.getId(),
+                group.getInstrumentId(),
+                group.getTimeframe(),
+                group.getStatus(),
+                context.nowClosedTs(),
+                group.getCoverageStartTs(),
+                group.getBackfillCursorTs(),
                 repairResult.countOkBeforeRepair(),
                 repairResult.countOkAfterRepair(),
                 repairResult.leafWindows().size(),
@@ -163,7 +201,8 @@ public class CandleGroupWorker {
             return;
         }
 
-        log.info("CandleGroup integrity mismatch: groupId={}, action=COUNT_ONLY-stop", group.getId());
+        log.info("CandleGroup integrity mismatch: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, action=COUNT_ONLY-stop",
+            group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), group.getCoverageStartTs(), group.getBackfillCursorTs());
     }
 
     private boolean shouldRunSyncIntegrityCheck(Long groupId) {
@@ -180,20 +219,28 @@ public class CandleGroupWorker {
         return false;
     }
 
-    private void handleFailure(Long groupId, Exception ex) {
-        CandleGroupEntity current = candleGroupDataService.getById(groupId)
-            .orElseThrow(() -> new IllegalStateException("Candle group not found during error handling, id=" + groupId));
+    private void handleFailure(CandleGroupEntity group, CandleGroupRunContext context, Exception ex) {
+        CandleGroupEntity current = candleGroupDataService.getById(group.getId())
+            .orElseThrow(() -> new IllegalStateException("Candle group not found during error handling, id=" + group.getId()));
 
-        int nextAttempt = current.getAttemptCount() == null ? 1 : current.getAttemptCount() + 1;
+        int nextAttempt = (current.getAttemptCount() == null ? 0 : current.getAttemptCount()) + 1;
         String errorCode = ex.getClass().getSimpleName();
         String errorMessage = trimErrorMessage(ex.getMessage());
 
-        candleGroupDataService.markError(groupId, errorCode, errorMessage, nowUtc(), nextAttempt);
+        candleGroupDataService.markError(group.getId(), errorCode, errorMessage, nowUtc(), nextAttempt);
 
         if (nextAttempt >= candleGroupsProperties.getMaxAttemptsBeforeError()) {
-            candleGroupDataService.updateStatus(groupId, CandleGroupStatus.ERROR);
-            log.error("CandleGroup run failed: groupId={}, attemptCount={}, threshold={}, action=ERROR, errorCode={}, message={}",
-                groupId,
+            CandleGroupStatus fromStatus = current.getStatus();
+            candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.ERROR);
+            current.setStatus(CandleGroupStatus.ERROR);
+            log.error("CandleGroup run failed: groupId={}, instrumentId={}, timeframe={}, fromStatus={}, toStatus=ERROR, nowClosedTs={}, coverageStartTs={}, cursor={}, attemptCount={}, threshold={}, errorCode={}, message={}",
+                group.getId(),
+                current.getInstrumentId(),
+                current.getTimeframe(),
+                fromStatus,
+                context.nowClosedTs(),
+                current.getCoverageStartTs(),
+                current.getBackfillCursorTs(),
                 nextAttempt,
                 candleGroupsProperties.getMaxAttemptsBeforeError(),
                 errorCode,
@@ -201,8 +248,14 @@ public class CandleGroupWorker {
             return;
         }
 
-        log.warn("CandleGroup run failed: groupId={}, attemptCount={}, threshold={}, action=RETRY, errorCode={}, message={}",
-            groupId,
+        log.warn("CandleGroup run failed: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, attemptCount={}, threshold={}, action=RETRY, errorCode={}, message={}",
+            group.getId(),
+            current.getInstrumentId(),
+            current.getTimeframe(),
+            current.getStatus(),
+            context.nowClosedTs(),
+            current.getCoverageStartTs(),
+            current.getBackfillCursorTs(),
             nextAttempt,
             candleGroupsProperties.getMaxAttemptsBeforeError(),
             errorCode,
