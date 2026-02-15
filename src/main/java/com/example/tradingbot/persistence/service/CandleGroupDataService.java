@@ -67,4 +67,9 @@ public class CandleGroupDataService {
     public void updateLastTailSync(Long groupId, Long nowClosedTs) {
         candleGroupRepository.updateLastTailSync(groupId, nowClosedTs);
     }
+
+    @Transactional
+    public void incrementAttemptCount(Long groupId) {
+        candleGroupRepository.incrementAttemptCount(groupId);
+    }
 }

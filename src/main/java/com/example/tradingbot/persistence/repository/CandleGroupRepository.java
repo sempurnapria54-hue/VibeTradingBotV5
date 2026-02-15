@@ -117,4 +117,12 @@ public interface CandleGroupRepository extends JpaRepository<CandleGroupEntity, 
         where cg.id = :groupId
         """)
     int updateLastTailSync(@Param("groupId") Long groupId, @Param("nowClosedTs") Long nowClosedTs);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update CandleGroupEntity cg
+        set cg.attemptCount = cg.attemptCount + 1
+        where cg.id = :groupId
+        """)
+    int incrementAttemptCount(@Param("groupId") Long groupId);
 }

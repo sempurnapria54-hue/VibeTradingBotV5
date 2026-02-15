@@ -20,6 +20,7 @@ public class CandleGroupWorker {
     private final CandleGroupLeaseService candleGroupLeaseService;
     private final CandleGroupsProperties candleGroupsProperties;
     private final TailSyncService tailSyncService;
+    private final BackfillService backfillService;
     private final java.time.Clock clock;
 
     public void processGroup(Long candleGroupId) {
@@ -53,13 +54,12 @@ public class CandleGroupWorker {
             group.setStatus(CandleGroupStatus.BACKFILL_RUNNING);
             log.info("CandleGroup S1 skeleton: groupId={}, nowClosedTs={}, action=NEW->BACKFILL_RUNNING", group.getId(), context.nowClosedTs());
             runTailSync(group, context);
-            log.info("CandleGroup S3 skeleton: groupId={}, nowClosedTs={}, action=backfill-placeholder", group.getId(), context.nowClosedTs());
+            runBackfill(group, context);
             return;
         }
 
         if (group.getStatus() == CandleGroupStatus.BACKFILL_RUNNING) {
-            runTailSync(group, context);
-            log.info("CandleGroup S3 skeleton: groupId={}, nowClosedTs={}, action=continue-backfill-placeholder", group.getId(), context.nowClosedTs());
+            runBackfill(group, context);
             return;
         }
 
@@ -85,6 +85,25 @@ public class CandleGroupWorker {
             result.fetched(),
             result.saved(),
             result.updatedLastTailSyncTs());
+    }
+
+    private void runBackfill(CandleGroupEntity group, CandleGroupRunContext context) {
+        BackfillResult result = backfillService.backfillToCoverage(group, context);
+        log.info("CandleGroup S3 backfill: groupId={}, timeframe={}, completed={}, newCursorTs={}, fetched={}, saved={}",
+            group.getId(),
+            group.getTimeframe(),
+            result.completed(),
+            result.newCursorTs(),
+            result.fetched(),
+            result.saved());
+
+        if (result.completed()) {
+            candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
+            group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
+            return;
+        }
+
+        candleGroupDataService.incrementAttemptCount(group.getId());
     }
 
     private void handleFailure(Long groupId, Exception ex) {

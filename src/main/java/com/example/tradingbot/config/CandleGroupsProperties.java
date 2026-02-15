@@ -11,6 +11,7 @@ public class CandleGroupsProperties {
     private int maxGroupsPerRun = 10;
     private int leaseDurationSec = 60;
     private int maxAttemptsBeforeError = 5;
+    private int batchLimit = 300;
     private long fixedDelayMs = 10_000L;
     private Map<String, Integer> tailOverlapBars = new HashMap<>();
 
@@ -44,6 +45,14 @@ public class CandleGroupsProperties {
 
     public void setMaxAttemptsBeforeError(int maxAttemptsBeforeError) {
         this.maxAttemptsBeforeError = maxAttemptsBeforeError;
+    }
+
+    public int getBatchLimit() {
+        return batchLimit;
+    }
+
+    public void setBatchLimit(int batchLimit) {
+        this.batchLimit = batchLimit;
     }
 
     public long getFixedDelayMs() {
