@@ -20,6 +20,11 @@ public class ExchangeDataService {
     }
 
     @Transactional
+    public ExchangeEntity create(ExchangeEntity exchangeEntity) {
+        return exchangeRepository.save(exchangeEntity);
+    }
+
+    @Transactional
     public List<ExchangeEntity> saveAll(List<ExchangeEntity> exchangeEntities) {
         return exchangeRepository.saveAll(exchangeEntities);
     }
@@ -30,6 +35,10 @@ public class ExchangeDataService {
 
     public Optional<ExchangeEntity> findByName(String name) {
         return exchangeRepository.findByName(name);
+    }
+
+    public List<ExchangeEntity> findAll() {
+        return exchangeRepository.findAll();
     }
 
     public boolean existsById(Long id) {

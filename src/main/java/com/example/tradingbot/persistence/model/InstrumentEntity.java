@@ -20,11 +20,14 @@ import lombok.Setter;
 @NoArgsConstructor
 @Entity
 @Table(name = "instrument", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_instrument_exchange_name", columnNames = {"exchange_id", "name"})
+    @UniqueConstraint(name = "uk_instrument_exchange_name", columnNames = {"exchange_id", "name"}),
+    @UniqueConstraint(name = "uk_instrument_exchange_inst_id", columnNames = {"exchange_id", "inst_id"})
 })
 public class InstrumentEntity extends AuditableEntity {
 
     public static final int NAME_LENGTH = 100;
+    public static final int INST_ID_LENGTH = 100;
+    public static final int INST_TYPE_LENGTH = 50;
     public static final int POSITION_MODE_LENGTH = 20;
     public static final int STATUS_LENGTH = 50;
 
@@ -42,6 +45,12 @@ public class InstrumentEntity extends AuditableEntity {
 
     @Column(name = "name", nullable = false, length = NAME_LENGTH)
     private String name;
+
+    @Column(name = "inst_id", nullable = false, length = INST_ID_LENGTH)
+    private String instId;
+
+    @Column(name = "inst_type", nullable = false, length = INST_TYPE_LENGTH)
+    private String instType;
 
     @Column(name = "position_mode", nullable = false, length = POSITION_MODE_LENGTH)
     private String positionMode;
