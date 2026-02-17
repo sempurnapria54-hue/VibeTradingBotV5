@@ -153,7 +153,11 @@ public class OkxRestClient {
     }
 
     public OkxEnvelope<AlgoOrderDto> cancelAlgoOrder(CancelAlgoOrderRequest request) {
-        Map<String, Object> algoOrder = Collections.singletonMap("algoId", request.getAlgoOrderId());
+        Map<String, Object> algoOrder = new java.util.LinkedHashMap<>();
+        putIfPresentObject(algoOrder, "instId", request.getInstrumentId());
+        putIfPresentObject(algoOrder, "algoId", request.getAlgoOrderId());
+        putIfPresentObject(algoOrder, "algoClOrdId", request.getClientOrderId());
+
         Map<String, Object> body = Collections.singletonMap("algoOrders", List.of(algoOrder));
         return postPrivate("/api/v5/trade/cancel-algos", body, new ParameterizedTypeReference<>() {
         });
@@ -283,6 +287,7 @@ public class OkxRestClient {
         putIfPresent(body, "sz", request.getSize());
         putIfPresent(body, "triggerPx", request.getTriggerPrice());
         putIfPresent(body, "orderPx", request.getOrderPrice());
+        putIfPresent(body, "algoClOrdId", request.getClientOrderId());
         return body;
     }
 
@@ -297,13 +302,20 @@ public class OkxRestClient {
     }
 
     private void addIfPresent(MultiValueMap<String, String> params, String key, String value) {
-        if (Objects.nonNull(value) && !value.isBlank()) {
+        if (Objects.nonNull(value) && BooleanUtils.isFalse(value.isBlank())) {
             params.add(key, value);
         }
     }
 
     private void putIfPresent(Map<String, String> body, String key, String value) {
-        if (Objects.nonNull(value) && !value.isBlank()) {
+        if (Objects.nonNull(value) && BooleanUtils.isFalse(value.isBlank())) {
+            body.put(key, value);
+        }
+    }
+
+
+    private void putIfPresentObject(Map<String, Object> body, String key, String value) {
+        if (Objects.nonNull(value) && BooleanUtils.isFalse(value.isBlank())) {
             body.put(key, value);
         }
     }
