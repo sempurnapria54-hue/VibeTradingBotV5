@@ -6,6 +6,7 @@ import com.example.tradingbot.domain.service.candlegroup.integrity.IntegrityResu
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;
 import com.example.tradingbot.domain.service.candlegroup.repair.CandleRepairService;
 import com.example.tradingbot.domain.service.candlegroup.repair.RepairResult;
+import com.example.tradingbot.domain.service.ops.InstrumentDataReadinessService;
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.persistence.model.CandleGroupStatus;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
@@ -29,6 +30,7 @@ public class CandleGroupWorker {
     private final BackfillService backfillService;
     private final CandleIntegrityService candleIntegrityService;
     private final CandleRepairService candleRepairService;
+    private final InstrumentDataReadinessService instrumentDataReadinessService;
     private final java.time.Clock clock;
     private final ConcurrentMap<Long, Integer> syncRunCounters = new ConcurrentHashMap<>();
 
@@ -56,6 +58,19 @@ public class CandleGroupWorker {
         } catch (Exception ex) {
             handleFailure(group, context, ex);
             throw ex;
+        } finally {
+            recomputeInstrumentStatus(group);
+        }
+    }
+
+    private void recomputeInstrumentStatus(CandleGroupEntity group) {
+        try {
+            instrumentDataReadinessService.recomputeInstrumentStatusFromCandleGroups(group.getInstrumentId());
+        } catch (Exception ex) {
+            log.error("Failed to recompute instrument readiness status: instrumentId={}, groupId={}",
+                group.getInstrumentId(),
+                group.getId(),
+                ex);
         }
     }
 
