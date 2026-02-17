@@ -4,6 +4,7 @@ import com.example.tradingbot.domain.model.admin.CandleGroupBootstrapRequest;
 import com.example.tradingbot.domain.model.admin.CandleGroupView;
 import com.example.tradingbot.domain.service.candlegroup.CandleGroupLeaseService;
 import com.example.tradingbot.domain.service.candlegroup.CandleGroupWorker;
+import com.example.tradingbot.domain.service.ops.InstrumentDataReadinessService;
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.persistence.model.CandleGroupStatus;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
@@ -30,6 +31,7 @@ public class CandleGroupOpsService {
     private final CandleGroupDataService candleGroupDataService;
     private final CandleGroupLeaseService candleGroupLeaseService;
     private final CandleGroupWorker candleGroupWorker;
+    private final InstrumentDataReadinessService instrumentDataReadinessService;
 
     @Transactional
     public List<CandleGroupView> bootstrap(Long instrumentId, CandleGroupBootstrapRequest request) {
@@ -56,6 +58,8 @@ public class CandleGroupOpsService {
             CandleGroupEntity created = candleGroupDataService.create(candleGroupEntity);
             createdGroups.add(toView(created));
         }
+
+        instrumentDataReadinessService.recomputeInstrumentStatusFromCandleGroups(instrumentId);
 
         return createdGroups;
     }
