@@ -15,4 +15,5 @@ public class CreateAlgoOrderRequest {
     private String size;
     private String triggerPrice;
     private String orderPrice;
+    private String clientOrderId;
 }

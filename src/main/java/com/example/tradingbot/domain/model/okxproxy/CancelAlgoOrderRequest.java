@@ -9,4 +9,5 @@ public class CancelAlgoOrderRequest {
 
     private String instrumentId;
     private String algoOrderId;
+    private String clientOrderId;
 }

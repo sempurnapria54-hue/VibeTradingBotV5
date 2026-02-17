@@ -1,6 +1,7 @@
 package com.example.tradingbot.rest.error;
 
 import com.example.tradingbot.client.okx.OkxApiException;
+import com.example.tradingbot.domain.service.trading.TradingCommandException;
 import java.util.Objects;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,6 +13,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(OkxApiException.class)
     public ResponseEntity<ApiErrorResponse> handleOkxApiException(OkxApiException exception) {
+        ApiErrorResponse body = new ApiErrorResponse(exception.getCode(), exception.getMessage());
+        return ResponseEntity.status(exception.getHttpStatus()).body(body);
+    }
+
+
+    @ExceptionHandler(TradingCommandException.class)
+    public ResponseEntity<ApiErrorResponse> handleTradingCommandException(TradingCommandException exception) {
         ApiErrorResponse body = new ApiErrorResponse(exception.getCode(), exception.getMessage());
         return ResponseEntity.status(exception.getHttpStatus()).body(body);
     }
