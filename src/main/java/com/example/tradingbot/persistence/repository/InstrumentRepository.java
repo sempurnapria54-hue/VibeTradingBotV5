@@ -9,5 +9,7 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
 
     Optional<InstrumentEntity> findByExchangeIdAndName(Long exchangeId, String name);
 
+    Optional<InstrumentEntity> findByExchangeIdAndInstId(Long exchangeId, String instId);
+
     List<InstrumentEntity> findAllByExchangeId(Long exchangeId);
 }

@@ -20,6 +20,11 @@ public class InstrumentDataService {
     }
 
     @Transactional
+    public InstrumentEntity create(InstrumentEntity instrumentEntity) {
+        return instrumentRepository.save(instrumentEntity);
+    }
+
+    @Transactional
     public List<InstrumentEntity> saveAll(List<InstrumentEntity> instrumentEntities) {
         return instrumentRepository.saveAll(instrumentEntities);
     }
@@ -30,6 +35,14 @@ public class InstrumentDataService {
 
     public Optional<InstrumentEntity> findByExchangeIdAndName(Long exchangeId, String name) {
         return instrumentRepository.findByExchangeIdAndName(exchangeId, name);
+    }
+
+    public Optional<InstrumentEntity> findByExchangeIdAndInstId(Long exchangeId, String instId) {
+        return instrumentRepository.findByExchangeIdAndInstId(exchangeId, instId);
+    }
+
+    public List<InstrumentEntity> findAll() {
+        return instrumentRepository.findAll();
     }
 
     public List<InstrumentEntity> findAllByExchangeId(Long exchangeId) {
