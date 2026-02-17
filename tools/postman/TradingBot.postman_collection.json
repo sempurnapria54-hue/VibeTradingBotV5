@@ -1,0 +1,566 @@
+{
+  "info": {
+    "_postman_id": "6c5d5fd2-3475-48fb-a745-2331d5637e26",
+    "name": "TradingBot Stage 07 E2E",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Stage 07 e2e: Admin + CandleGroups + Trading + Reconcile"
+  },
+  "item": [
+    {
+      "name": "00 - Admin",
+      "item": [
+        {
+          "name": "Create Exchange",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"OKX\",\n  \"status\": \"ACTIVE\",\n  \"baseUrl\": \"https://www.okx.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/exchanges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "exchanges"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var responseJson = pm.response.json();",
+                  "if (responseJson && responseJson.id) {",
+                  "    pm.environment.set('exchangeId', String(responseJson.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Exchanges",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/exchanges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "exchanges"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Instrument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchangeId\": {{exchangeId}},\n  \"instId\": \"{{instId}}\",\n  \"instType\": \"{{instType}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/instruments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "instruments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var responseJson = pm.response.json();",
+                  "if (responseJson && responseJson.id) {",
+                  "    pm.environment.set('instrumentId', String(responseJson.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/instruments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "instruments"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Instrument By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/instruments/{{instrumentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "instruments",
+                "{{instrumentId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - CandleGroups",
+      "item": [
+        {
+          "name": "Bootstrap CandleGroups",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timeframes\": [\"1m\", \"5m\"],\n  \"coverageStartTs\": 1700000000000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/instruments/{{instrumentId}}/candle-groups/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "instruments",
+                "{{instrumentId}}",
+                "candle-groups",
+                "bootstrap"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List CandleGroups",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/instruments/{{instrumentId}}/candle-groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "instruments",
+                "{{instrumentId}}",
+                "candle-groups"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var currentGroupId = pm.environment.get('groupId');",
+                  "if (!currentGroupId) {",
+                  "    var responseJson = pm.response.json();",
+                  "    if (Array.isArray(responseJson) && responseJson.length > 0 && responseJson[0].id) {",
+                  "        pm.environment.set('groupId', String(responseJson[0].id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run CandleGroup Once",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/candle-groups/{{groupId}}/run-once",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "candle-groups",
+                "{{groupId}}",
+                "run-once"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Trading",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchangeId\": {{exchangeId}},\n  \"instrumentId\": {{instrumentId}},\n  \"side\": \"buy\",\n  \"ordType\": \"market\",\n  \"sz\": \"1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trading/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trading",
+                "orders"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var responseJson = pm.response.json();",
+                  "if (responseJson && responseJson.internalId) {",
+                  "    pm.environment.set('internalOrderId', String(responseJson.internalId));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchangeId\": {{exchangeId}},\n  \"instrumentId\": {{instrumentId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trading/orders/{{internalOrderId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trading",
+                "orders",
+                "{{internalOrderId}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Algo Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchangeId\": {{exchangeId}},\n  \"instrumentId\": {{instrumentId}},\n  \"side\": \"sell\",\n  \"ordType\": \"conditional\",\n  \"sz\": \"1\",\n  \"triggerPx\": \"2500\",\n  \"ordPx\": \"-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trading/algo-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trading",
+                "algo-orders"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Algo Orders (batch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchangeId\": {{exchangeId}},\n  \"instrumentId\": {{instrumentId}},\n  \"internalIds\": [\"{{internalOrderId}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trading/algo-orders/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trading",
+                "algo-orders",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Close Position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchangeId\": {{exchangeId}},\n  \"instrumentId\": {{instrumentId}},\n  \"positionSide\": \"net\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trading/positions/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trading",
+                "positions",
+                "close"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Reconcile",
+      "item": [
+        {
+          "name": "Run Reconcile SAFE",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ops/reconcile/run?mode=SAFE&exchangeId={{exchangeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ops",
+                "reconcile",
+                "run"
+              ],
+              "query": [
+                {
+                  "key": "mode",
+                  "value": "SAFE"
+                },
+                {
+                  "key": "exchangeId",
+                  "value": "{{exchangeId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var responseJson = pm.response.json();",
+                  "if (responseJson && responseJson.reportId) {",
+                  "    pm.environment.set('reportId', String(responseJson.reportId));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run Reconcile FULL",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ops/reconcile/run?mode=FULL&exchangeId={{exchangeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ops",
+                "reconcile",
+                "run"
+              ],
+              "query": [
+                {
+                  "key": "mode",
+                  "value": "FULL"
+                },
+                {
+                  "key": "exchangeId",
+                  "value": "{{exchangeId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var responseJson = pm.response.json();",
+                  "if (responseJson && responseJson.reportId) {",
+                  "    pm.environment.set('reportId', String(responseJson.reportId));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Reports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ops/reconcile/reports?exchangeId={{exchangeId}}&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ops",
+                "reconcile",
+                "reports"
+              ],
+              "query": [
+                {
+                  "key": "exchangeId",
+                  "value": "{{exchangeId}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Report By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ops/reconcile/reports/{{reportId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ops",
+                "reconcile",
+                "reports",
+                "{{reportId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
