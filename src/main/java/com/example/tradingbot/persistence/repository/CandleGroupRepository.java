@@ -16,6 +16,8 @@ public interface CandleGroupRepository extends JpaRepository<CandleGroupEntity, 
 
     Optional<CandleGroupEntity> findByInstrumentIdAndTimeframe(Long instrumentId, String timeframe);
 
+    List<CandleGroupEntity> findAllByInstrumentIdOrderByIdAsc(Long instrumentId);
+
     @Query("""
         select cg
         from CandleGroupEntity cg

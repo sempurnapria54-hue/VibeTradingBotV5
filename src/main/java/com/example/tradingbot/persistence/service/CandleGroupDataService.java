@@ -28,6 +28,19 @@ public class CandleGroupDataService {
         return candleGroupRepository.findById(groupId);
     }
 
+    public Optional<CandleGroupEntity> findByInstrumentIdAndTimeframe(Long instrumentId, String timeframe) {
+        return candleGroupRepository.findByInstrumentIdAndTimeframe(instrumentId, timeframe);
+    }
+
+    public List<CandleGroupEntity> findAllByInstrumentId(Long instrumentId) {
+        return candleGroupRepository.findAllByInstrumentIdOrderByIdAsc(instrumentId);
+    }
+
+    @Transactional
+    public CandleGroupEntity create(CandleGroupEntity candleGroupEntity) {
+        return candleGroupRepository.save(candleGroupEntity);
+    }
+
     @Transactional
     public boolean tryAcquireLease(Long groupId, String owner, long nowMillis, long leaseUntilMillis) {
         return candleGroupRepository.tryAcquireLease(groupId, owner, nowMillis, leaseUntilMillis) > 0;
