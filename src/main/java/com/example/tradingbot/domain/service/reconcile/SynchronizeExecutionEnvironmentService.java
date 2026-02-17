@@ -79,19 +79,18 @@ public class SynchronizeExecutionEnvironmentService {
     }
 
     @Transactional
-    public void runSafe() {
-        run();
+    public Long runSafe(Long exchangeId) {
+        return run(exchangeId);
     }
 
     @Transactional
-    public void run() {
+    public Long run(Long exchangeId) {
         if (BooleanUtils.isFalse(reconcileProperties.isEnabled())) {
-            log.info("Reconcile run skipped: reconcile.enabled=false");
-            return;
+            throw new IllegalStateException("Reconcile run skipped: reconcile.enabled=false");
         }
 
-        ExchangeEntity exchange = exchangeDataService.findByName("OKX")
-            .orElseThrow(() -> new IllegalStateException("Reconcile run failed: exchange not found, name=OKX"));
+        ExchangeEntity exchange = exchangeDataService.findById(exchangeId)
+            .orElseThrow(() -> new IllegalStateException("Reconcile run failed: exchange not found, id=" + exchangeId));
 
         List<InstrumentEntity> managedInstruments = instrumentDataService.findAllByExchangeId(exchange.getId());
         List<String> managedInstIds = managedInstruments.stream().map(InstrumentEntity::getName).toList();
@@ -179,6 +178,20 @@ public class SynchronizeExecutionEnvironmentService {
 
         exchange.setStatus(STATUS_ACTIVE);
         exchangeDataService.save(exchange);
+
+        return report.getId();
+    }
+
+    @Transactional
+    public Long runSafe() {
+        return run();
+    }
+
+    @Transactional
+    public Long run() {
+        ExchangeEntity exchange = exchangeDataService.findByName("OKX")
+            .orElseThrow(() -> new IllegalStateException("Reconcile run failed: exchange not found, name=OKX"));
+        return run(exchange.getId());
     }
 
     private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {

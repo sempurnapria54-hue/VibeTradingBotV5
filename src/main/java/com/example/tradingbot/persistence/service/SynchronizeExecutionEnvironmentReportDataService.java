@@ -7,7 +7,10 @@ import com.example.tradingbot.persistence.repository.SynchronizeExecutionEnviron
 import com.example.tradingbot.persistence.repository.SynchronizeExecutionEnvironmentReportRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,5 +87,17 @@ public class SynchronizeExecutionEnvironmentReportDataService {
     @Transactional
     public int deleteFinishedNoAnomaliesBefore(Instant threshold) {
         return Math.toIntExact(reportRepository.deleteAllByHasAnomaliesFalseAndFinishedAtBefore(threshold));
+    }
+
+    public List<SynchronizeExecutionEnvironmentReportEntity> findByExchangeId(Long exchangeId, int limit) {
+        return reportRepository.findAllByExchangeIdOrderByStartedAtDesc(exchangeId, PageRequest.of(0, limit)).getContent();
+    }
+
+    public Optional<SynchronizeExecutionEnvironmentReportEntity> findById(Long id) {
+        return reportRepository.findById(id);
+    }
+
+    public List<SynchronizeExecutionEnvironmentReportAnomalyEntity> findAnomaliesByReportId(Long reportId) {
+        return anomalyRepository.findAllByReportIdOrderByCreatedAtAsc(reportId);
     }
 }
