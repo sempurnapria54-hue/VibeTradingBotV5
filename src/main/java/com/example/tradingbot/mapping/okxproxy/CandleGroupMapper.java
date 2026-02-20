@@ -1,17 +1,17 @@
 package com.example.tradingbot.mapping.okxproxy;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.rest.model.CandleGroup;
-import org.mapstruct.Mapper;
-
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.rest.model.request.candlegroup.CandleGroupCreateRequest;
+import com.example.tradingbot.rest.model.response.candlegroup.CandleGroupResponse;
 import java.util.List;
+import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
 public interface CandleGroupMapper {
 
-    List<CandleGroup> domainToRest(List<CandleGroupEntity> source);
+    List<CandleGroupResponse> domainToRest(List<CandleGroupEntity> source);
 
-    CandleGroup domainToRest(CandleGroupEntity source);
+    CandleGroupResponse domainToRest(CandleGroupEntity source);
 
-    CandleGroupEntity restToDomain(CandleGroup source);
+    CandleGroupEntity restToDomain(CandleGroupCreateRequest source);
 }

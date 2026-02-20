@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.persistence.repository.AlgoOrderRepository;
 
 import java.util.List;

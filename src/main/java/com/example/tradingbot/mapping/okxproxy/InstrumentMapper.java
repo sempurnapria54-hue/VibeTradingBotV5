@@ -1,13 +1,13 @@
 package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.client.okx.dto.InstrumentDto;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.okxproxy.Instrument;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.rest.model.request.instrument.InstrumentCreateRq;
+import com.example.tradingbot.rest.model.response.instrument.InstrumentResponse;
+import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-
-import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface InstrumentMapper {
@@ -36,11 +36,11 @@ public interface InstrumentMapper {
     @Mapping(source = "tickSize", target = "tickSz")
     InstrumentDto domainToClient(Instrument source);
 
-    com.example.tradingbot.rest.model.Instrument domainToRest(InstrumentEntity source);
+    @Mapping(source = "externalName", target = "instId")
+    @Mapping(source = "type", target = "instType")
+    InstrumentResponse domainToRest(InstrumentEntity source);
 
-    List<com.example.tradingbot.rest.model.Instrument> domainToRest(List<InstrumentEntity> source);
-
-    InstrumentEntity restToDomain(com.example.tradingbot.rest.model.Instrument source);
+    List<InstrumentResponse> domainToRest(List<InstrumentEntity> source);
 
     InstrumentEntity restToDomain(InstrumentCreateRq request);
 }

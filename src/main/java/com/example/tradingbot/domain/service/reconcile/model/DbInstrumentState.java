@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.reconcile.model;
 
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
-import com.example.tradingbot.persistence.model.OrderEntity;
-import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
+import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.domain.model.entity.PositionEntity;
 import lombok.Builder;
 import lombok.Getter;
 

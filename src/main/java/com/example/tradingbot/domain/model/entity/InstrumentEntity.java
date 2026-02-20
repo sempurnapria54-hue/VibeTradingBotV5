@@ -1,4 +1,4 @@
-package com.example.tradingbot.persistence.model;
+package com.example.tradingbot.domain.model.entity;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;

@@ -1,8 +1,8 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.SynchronizeExecutionEnvironmentReportAnomalyEntity;
-import com.example.tradingbot.persistence.model.SynchronizeExecutionEnvironmentReportEntity;
+import com.example.tradingbot.domain.model.entity.ExchangeEntity;
+import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportAnomalyEntity;
+import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
 import com.example.tradingbot.persistence.repository.SynchronizeExecutionEnvironmentReportAnomalyRepository;
 import com.example.tradingbot.persistence.repository.SynchronizeExecutionEnvironmentReportRepository;
 import jakarta.persistence.EntityNotFoundException;

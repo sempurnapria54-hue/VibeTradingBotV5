@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import com.example.tradingbot.persistence.repository.CandleGroupRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;

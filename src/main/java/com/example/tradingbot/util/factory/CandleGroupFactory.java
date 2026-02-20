@@ -1,7 +1,7 @@
 package com.example.tradingbot.util.factory;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import lombok.experimental.UtilityClass;
 
 @UtilityClass

@@ -5,8 +5,8 @@ import com.example.tradingbot.domain.service.candlegroup.CandleGroupLeaseService
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;
 import com.example.tradingbot.domain.service.candles.okx.ClientCandle;
 import com.example.tradingbot.domain.service.candles.okx.OkxCandleFetcher;
-import com.example.tradingbot.persistence.model.CandleEntity;
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.CandleEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import com.example.tradingbot.persistence.service.CandleDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import java.util.List;

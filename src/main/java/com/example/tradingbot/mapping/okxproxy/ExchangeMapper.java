@@ -1,17 +1,17 @@
 package com.example.tradingbot.mapping.okxproxy;
 
-import com.example.tradingbot.rest.model.Exchange;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import org.mapstruct.Mapper;
-
+import com.example.tradingbot.domain.model.entity.ExchangeEntity;
+import com.example.tradingbot.rest.model.request.exchange.ExchangeCreateRequest;
+import com.example.tradingbot.rest.model.response.exchange.ExchangeResponse;
 import java.util.List;
+import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
 public interface ExchangeMapper {
 
-    ExchangeEntity restToDomain(Exchange exchange);
+    ExchangeEntity restToDomain(ExchangeCreateRequest exchange);
 
-    Exchange domainToRest(ExchangeEntity source);
+    ExchangeResponse domainToRest(ExchangeEntity source);
 
-    List<Exchange> domainToRest(List<ExchangeEntity> source);
+    List<ExchangeResponse> domainToRest(List<ExchangeEntity> source);
 }

@@ -1,14 +1,13 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.ExchangeEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.CANDLE_GROUP_ALREADY_EXISTS;
 
@@ -35,6 +34,5 @@ public class CandleGroupService {
         }
         candleGroup.initOnCreate(instrument);
         return candleGroupDataService.save(candleGroup);
-
     }
 }

@@ -1,11 +1,10 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor

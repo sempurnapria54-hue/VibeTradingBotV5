@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.ops;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import lombok.RequiredArgsConstructor;
