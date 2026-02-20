@@ -1,6 +1,6 @@
 package com.example.tradingbot.mapping.okxproxy;
 
-import com.example.tradingbot.client.okx.dto.PositionDto;
+import com.example.tradingbot.client.model.okx.PositionResponse;
 import com.example.tradingbot.domain.model.okxproxy.Position;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -19,7 +19,7 @@ public interface PositionMapper {
     @Mapping(source = "lever", target = "leverage")
     @Mapping(source = "mgnMode", target = "marginMode")
     @Mapping(source = "uTime", target = "updateTime")
-    Position clientToDomain(PositionDto source);
+    Position clientToDomain(PositionResponse source);
 
     @Mapping(source = "instrumentId", target = "instId")
     @Mapping(source = "instrumentType", target = "instType")
@@ -32,9 +32,7 @@ public interface PositionMapper {
     @Mapping(source = "leverage", target = "lever")
     @Mapping(source = "marginMode", target = "mgnMode")
     @Mapping(source = "updateTime", target = "uTime")
-    PositionDto domainToClient(Position source);
+    PositionResponse domainToClient(Position source);
 
-    com.example.tradingbot.rest.model.okxproxy.Position domainToRest(Position source);
 
-    Position restToDomain(com.example.tradingbot.rest.model.okxproxy.Position source);
 }

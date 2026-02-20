@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.trading;
 
-import com.example.tradingbot.domain.model.okxproxy.ClosePositionRequest;
-import com.example.tradingbot.domain.model.okxproxy.Position;
+import com.example.tradingbot.client.model.okx.ClosePositionRequest;
+import com.example.tradingbot.client.model.okx.PositionResponse;
 import com.example.tradingbot.domain.model.trading.ClosePositionCommand;
 import com.example.tradingbot.domain.model.trading.ClosePositionResult;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
@@ -45,27 +45,27 @@ public class PositionCommandService {
         request.setMarginMode(DEFAULT_MARGIN_MODE);
         request.setPositionSide(command.getPositionSide());
 
-        Position position = extractFirstPosition(okxTradeProxyService.closePosition(request));
+        PositionResponse position = extractFirstPosition(okxTradeProxyService.closePosition(request));
 
         PositionEntity positionEntity = new PositionEntity();
         positionEntity.setExchange(exchange);
         positionEntity.setInstrument(instrument);
         positionEntity.setStatus(POSITION_STATUS_UPDATED);
-        positionEntity.setSide(position.getPositionSide());
-        positionEntity.setPos(position.getPositionSize());
-        positionEntity.setAvgPx(position.getAveragePrice());
-        positionEntity.setMarkPx(position.getMarkPrice());
-        positionEntity.setLiqPx(position.getLiquidationPrice());
-        positionEntity.setLever(position.getLeverage());
-        positionEntity.setMgnMode(position.getMarginMode());
-        positionEntity.setUpl(position.getUnrealizedProfit());
-        positionEntity.setUTime(parseLongSafe(position.getUpdateTime()));
+        positionEntity.setSide(position.getPosSide());
+        positionEntity.setPos(position.getPos());
+        positionEntity.setAvgPx(position.getAvgPx());
+        positionEntity.setMarkPx(position.getMarkPx());
+        positionEntity.setLiqPx(position.getLiqPx());
+        positionEntity.setLever(position.getLever());
+        positionEntity.setMgnMode(position.getMgnMode());
+        positionEntity.setUpl(position.getUpl());
+        positionEntity.setUTime(parseLongSafe(position.getUTime()));
         positionDataService.save(positionEntity);
 
-        return new ClosePositionResult(position.getInstrumentId(), position.getPositionSide(), position.getUpdateTime());
+        return new ClosePositionResult(position.getInstId(), position.getPosSide(), position.getUTime());
     }
 
-    private Position extractFirstPosition(List<Position> positions) {
+    private PositionResponse extractFirstPosition(List<PositionResponse> positions) {
         if (positions.isEmpty()) {
             throw new TradingCommandException(HttpStatus.BAD_GATEWAY, "OKX_EMPTY_RESPONSE", "OKX returned empty close-position response");
         }

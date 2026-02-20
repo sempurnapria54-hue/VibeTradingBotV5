@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.model.entity;
 
-import com.example.tradingbot.domain.model.okxproxy.Order;
+import com.example.tradingbot.client.model.okx.OrderResponse;
 import com.example.tradingbot.domain.model.trading.CreateOrderRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -104,18 +104,18 @@ public class OrderEntity extends AuditableEntity {
         setPx(request.getPx());
     }
 
-    public void applyOrderResponse(Order responseOrder) {
-        setExchangeOrderId(responseOrder.getOrderId());
+    public void applyOrderResponse(OrderResponse responseOrder) {
+        setExchangeOrderId(responseOrder.getOrdId());
         setState(responseOrder.getState());
         setStatus(ORDER_STATUS_IN_PROGRESS);
         setSide(responseOrder.getSide());
-        setOrdType(responseOrder.getOrderType());
-        setPx(responseOrder.getPrice());
-        setSz(responseOrder.getSize());
-        setFillSz(responseOrder.getAccumulatedFillSize());
-        setAvgPx(responseOrder.getAveragePrice());
+        setOrdType(responseOrder.getOrdType());
+        setPx(responseOrder.getPx());
+        setSz(responseOrder.getSz());
+        setFillSz(responseOrder.getAccFillSz());
+        setAvgPx(responseOrder.getAvgPx());
         setFee(responseOrder.getFee());
-        setCTime(parseLongSafe(responseOrder.getCreateTime()));
-        setUTime(parseLongSafe(responseOrder.getUpdateTime()));
+        setCTime(parseLongSafe(responseOrder.getCTime()));
+        setUTime(parseLongSafe(responseOrder.getUTime()));
     }
 }

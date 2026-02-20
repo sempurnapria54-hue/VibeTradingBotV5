@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.candles.okx;
 
-import com.example.tradingbot.client.okx.dto.CandleDto;
+import com.example.tradingbot.client.model.okx.CandleResponse;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
@@ -12,7 +12,7 @@ public class OkxCandleDataParser {
 
     private static final int EXPECTED_FIELDS_COUNT = 9;
 
-    public List<ClientCandle> parse(List<CandleDto> source) {
+    public List<ClientCandle> parse(List<CandleResponse> source) {
         if (Objects.isNull(source) || source.isEmpty()) {
             return List.of();
         }
@@ -23,7 +23,7 @@ public class OkxCandleDataParser {
             .toList();
     }
 
-    private ClientCandle parseSingle(CandleDto source) {
+    private ClientCandle parseSingle(CandleResponse source) {
         validateExpectedShape(source);
         return ClientCandle.builder()
             .timestampMillis(parseLong(source.getTs(), "timestamp"))
@@ -37,7 +37,7 @@ public class OkxCandleDataParser {
             .build();
     }
 
-    private void validateExpectedShape(CandleDto source) {
+    private void validateExpectedShape(CandleResponse source) {
         if (Objects.isNull(source)) {
             throw new IllegalArgumentException("OKX candle item cannot be null");
         }

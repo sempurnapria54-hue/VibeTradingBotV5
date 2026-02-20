@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.trading;
 
-import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
+import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
 import com.example.tradingbot.domain.model.trading.CreateAlgoOrderRequest;
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
@@ -37,7 +37,7 @@ public class AlgoOrderService {
         algoOrderEntity.initOnCreate(instrument, request);
         algoOrderDataService.save(algoOrderEntity);
 
-        AlgoOrder responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.createAlgoOrder(algoOrderEntity));
+        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.createAlgoOrder(algoOrderEntity));
         algoOrderEntity.applyAlgoOrderResponse(algoOrderEntity, responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }
@@ -50,12 +50,12 @@ public class AlgoOrderService {
         AlgoOrderEntity algoOrderEntity =
                 algoOrderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchange.getId(), instrument.getId(), orderId);
 
-        AlgoOrder responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.cancelAlgoOrder(algoOrderEntity));
+        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.cancelAlgoOrder(algoOrderEntity));
         algoOrderEntity.applyAlgoOrderResponse(algoOrderEntity, responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }
 
-    private AlgoOrder extractFirstAlgoOrder(List<AlgoOrder> orders) {
+    private AlgoOrderResponse extractFirstAlgoOrder(List<AlgoOrderResponse> orders) {
         if (orders.isEmpty()) {
             throw new TradingCommandException(HttpStatus.BAD_GATEWAY, "OKX_EMPTY_RESPONSE", "OKX returned empty algo order response");
         }

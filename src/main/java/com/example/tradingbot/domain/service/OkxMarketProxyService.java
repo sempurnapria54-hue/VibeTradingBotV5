@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.domain.model.okxproxy.*;
-import com.example.tradingbot.domain.service.okxproxy.OkxMarketClientService;
+import com.example.tradingbot.client.model.okx.*;
+import com.example.tradingbot.client.okx.OkxRestClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -11,10 +11,21 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OkxMarketProxyService {
 
-    private final OkxMarketClientService okxMarketClientService;
+    private final OkxRestClient okxRestClient;
 
-    public List<Candle> getCandles(CandlesRequest request) { return okxMarketClientService.getCandles(request); }
-    public List<Candle> getHistoryCandles(CandlesRequest request) { return okxMarketClientService.getHistoryCandles(request); }
-    public List<Instrument> getInstruments(InstrumentsRequest request) { return okxMarketClientService.getInstruments(request); }
-    public List<PriceTicker> getTicker(TickerRequest request) { return okxMarketClientService.getTicker(request); }
+    public List<CandleResponse> getCandles(CandlesRequest request) {
+        return okxRestClient.getCandles(request).getData();
+    }
+
+    public List<CandleResponse> getHistoryCandles(CandlesRequest request) {
+        return okxRestClient.getHistoryCandles(request).getData();
+    }
+
+    public List<InstrumentResponse> getInstruments(InstrumentsRequest request) {
+        return okxRestClient.getInstruments(request).getData();
+    }
+
+    public List<PriceTickerResponse> getTicker(TickerRequest request) {
+        return okxRestClient.getTicker(request).getData();
+    }
 }
