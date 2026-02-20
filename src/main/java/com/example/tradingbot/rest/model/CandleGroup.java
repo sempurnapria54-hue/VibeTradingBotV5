@@ -1,6 +1,5 @@
-package com.example.tradingbot.domain.model.admin;
+package com.example.tradingbot.rest.model;
 
-import com.example.tradingbot.persistence.model.CandleGroupStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,12 +9,12 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CandleGroupView {
+public class CandleGroup {
 
     private Long id;
     private Long instrumentId;
     private String timeframe;
-    private CandleGroupStatus status;
+    private String status;
     private Long coverageStartTs;
     private Long backfillCursorTs;
     private Long lastTailSyncTs;

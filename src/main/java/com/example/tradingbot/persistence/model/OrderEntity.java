@@ -1,5 +1,7 @@
 package com.example.tradingbot.persistence.model;
 
+import com.example.tradingbot.domain.model.okxproxy.Order;
+import com.example.tradingbot.domain.model.trading.CreateOrderRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,6 +15,12 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.UUID;
+
+import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_CREATED;
+import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_IN_PROGRESS;
+import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
 
 @Getter
 @Setter
@@ -36,13 +44,6 @@ public class OrderEntity extends AuditableEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
-
-    @Column(name = "exchange_id", nullable = false, updatable = false, insertable = false)
-    private Long exchangeId;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "exchange_id", nullable = false)
-    private ExchangeEntity exchange;
 
     @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
     private Long instrumentId;
@@ -92,4 +93,29 @@ public class OrderEntity extends AuditableEntity {
 
     @Column(name = "u_time")
     private Long uTime;
+
+    public void initOnCreate(InstrumentEntity instrument, CreateOrderRequest request) {
+        setInstrument(instrument);
+        setClientOrderId(UUID.randomUUID().toString());
+        setStatus(ORDER_STATUS_CREATED);
+        setSide(request.getSide());
+        setOrdType(request.getType());
+        setSz(request.getSz());
+        setPx(request.getPx());
+    }
+
+    public void applyOrderResponse(Order responseOrder) {
+        setExchangeOrderId(responseOrder.getOrderId());
+        setState(responseOrder.getState());
+        setStatus(ORDER_STATUS_IN_PROGRESS);
+        setSide(responseOrder.getSide());
+        setOrdType(responseOrder.getOrderType());
+        setPx(responseOrder.getPrice());
+        setSz(responseOrder.getSize());
+        setFillSz(responseOrder.getAccumulatedFillSize());
+        setAvgPx(responseOrder.getAveragePrice());
+        setFee(responseOrder.getFee());
+        setCTime(parseLongSafe(responseOrder.getCreateTime()));
+        setUTime(parseLongSafe(responseOrder.getUpdateTime()));
+    }
 }

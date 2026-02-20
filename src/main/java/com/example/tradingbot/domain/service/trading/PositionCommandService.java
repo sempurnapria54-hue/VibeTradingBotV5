@@ -41,7 +41,7 @@ public class PositionCommandService {
             .orElseThrow(() -> new TradingCommandException(HttpStatus.NOT_FOUND, "INSTRUMENT_NOT_FOUND", "Instrument not found"));
 
         ClosePositionRequest request = new ClosePositionRequest();
-        request.setInstrumentId(instrument.getInstId());
+        request.setInstrumentId(instrument.getExternalName());
         request.setMarginMode(DEFAULT_MARGIN_MODE);
         request.setPositionSide(command.getPositionSide());
 

@@ -2,6 +2,8 @@ package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.client.okx.dto.OrderDto;
 import com.example.tradingbot.domain.model.okxproxy.Order;
+import com.example.tradingbot.domain.model.trading.CreateOrderRequest;
+import com.example.tradingbot.persistence.model.OrderEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -45,4 +47,8 @@ public interface OrderMapper {
     com.example.tradingbot.rest.model.okxproxy.Order domainToRest(Order source);
 
     Order restToDomain(com.example.tradingbot.rest.model.okxproxy.Order source);
+
+    CreateOrderRequest restToDomain(com.example.tradingbot.rest.model.request.order.CreateOrderRequest source);
+
+    com.example.tradingbot.rest.model.response.Order domainToRest(OrderEntity source);
 }

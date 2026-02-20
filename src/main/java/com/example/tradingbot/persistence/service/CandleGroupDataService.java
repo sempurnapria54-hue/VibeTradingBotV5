@@ -1,16 +1,16 @@
 package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.CandleGroupStatus;
 import com.example.tradingbot.persistence.repository.CandleGroupRepository;
-import java.time.OffsetDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -19,7 +19,7 @@ public class CandleGroupDataService {
     private final CandleGroupRepository candleGroupRepository;
 
     public List<CandleGroupEntity> findEligibleForRun(long nowMillis,
-                                                      Collection<CandleGroupStatus> statuses,
+                                                      Collection<String> statuses,
                                                       int maxGroups) {
         return candleGroupRepository.findEligibleForRun(nowMillis, statuses, PageRequest.of(0, maxGroups));
     }
@@ -67,7 +67,7 @@ public class CandleGroupDataService {
     }
 
     @Transactional
-    public void updateStatus(Long groupId, CandleGroupStatus status) {
+    public void updateStatus(Long groupId, String status) {
         candleGroupRepository.updateStatus(groupId, status);
     }
 
@@ -84,5 +84,9 @@ public class CandleGroupDataService {
     @Transactional
     public void incrementAttemptCount(Long groupId) {
         candleGroupRepository.incrementAttemptCount(groupId);
+    }
+
+    public CandleGroupEntity save(CandleGroupEntity candleGroup) {
+        return candleGroupRepository.save(candleGroup);
     }
 }

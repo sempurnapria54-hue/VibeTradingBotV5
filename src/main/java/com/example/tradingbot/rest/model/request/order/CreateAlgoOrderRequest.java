@@ -1,14 +1,12 @@
-package com.example.tradingbot.domain.model.trading;
+package com.example.tradingbot.rest.model.request.order;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class CreateAlgoOrderCommand {
+public class CreateAlgoOrderRequest {
 
-    private Long exchangeId;
-    private Long instrumentId;
     private String side;
     private String ordType;
     private String sz;

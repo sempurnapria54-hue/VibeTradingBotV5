@@ -27,8 +27,8 @@ public class OkxAccountProxyController {
 
     @GetMapping("/balance")
     public RestResponse<Balance> getBalance(BalanceRequest request) {
-        List<Balance> data = service.getBalance(requestMapper.restToDomain(request)).stream().map(balanceMapper::domainToRest).toList();
-        return success(data);
+        var balance = service.getBalance(balanceMapper.restToDomain(request));
+        return success(balanceMapper.domainToRest(balance));
     }
 
     @GetMapping("/positions")

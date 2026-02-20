@@ -2,11 +2,14 @@ package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.persistence.model.ExchangeEntity;
 import com.example.tradingbot.persistence.repository.ExchangeRepository;
-import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+import static com.example.tradingbot.util.Constant.ErrorCode.EXCHANGE_NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
@@ -16,11 +19,6 @@ public class ExchangeDataService {
 
     @Transactional
     public ExchangeEntity save(ExchangeEntity exchangeEntity) {
-        return exchangeRepository.save(exchangeEntity);
-    }
-
-    @Transactional
-    public ExchangeEntity create(ExchangeEntity exchangeEntity) {
         return exchangeRepository.save(exchangeEntity);
     }
 
@@ -35,6 +33,11 @@ public class ExchangeDataService {
 
     public Optional<ExchangeEntity> findByName(String name) {
         return exchangeRepository.findByName(name);
+    }
+
+    public ExchangeEntity findRequiredByName(String name) {
+        return exchangeRepository.findByName(name)
+                .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
     }
 
     public List<ExchangeEntity> findAll() {

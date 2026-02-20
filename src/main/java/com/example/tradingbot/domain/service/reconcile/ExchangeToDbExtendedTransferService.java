@@ -51,7 +51,7 @@ public class ExchangeToDbExtendedTransferService {
     }
 
     private void transferInstrumentPrices(InstrumentEntity instrument, ExchangeSnapshot snapshot) {
-        ExternalTicker ticker = snapshot.getTickersByInstId() == null ? null : snapshot.getTickersByInstId().get(instrument.getName());
+        ExternalTicker ticker = snapshot.getTickersByInstId() == null ? null : snapshot.getTickersByInstId().get(instrument.getExternalName());
         if (ticker == null) {
             return;
         }

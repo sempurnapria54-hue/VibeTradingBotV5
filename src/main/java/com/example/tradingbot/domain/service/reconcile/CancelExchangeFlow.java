@@ -132,7 +132,6 @@ public class CancelExchangeFlow {
             OrderEntity entity = orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(instrument.getExchangeId(), instrument.getId(), clientOrderId).orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new OrderEntity();
-                entity.setExchange(instrument.getExchange());
                 entity.setInstrument(instrument);
                 entity.setClientOrderId(clientOrderId);
                 entity.setExchangeOrderId(externalOrder.getOrdId());
@@ -157,7 +156,6 @@ public class CancelExchangeFlow {
             AlgoOrderEntity entity = algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(instrument.getExchangeId(), instrument.getId(), clientAlgoOrderId).orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new AlgoOrderEntity();
-                entity.setExchange(instrument.getExchange());
                 entity.setInstrument(instrument);
                 entity.setClientAlgoOrderId(clientAlgoOrderId);
                 entity.setExchangeAlgoOrderId(externalAlgoOrder.getAlgoId());

@@ -30,7 +30,7 @@ public class DatabaseSnapshotBuilder {
 
     public DatabaseSnapshot captureDatabaseSnapshot(ExchangeEntity exchange, List<InstrumentEntity> managedInstruments) {
         List<DatabaseInstrumentSnapshot> instruments = managedInstruments.stream()
-            .sorted(Comparator.comparing(InstrumentEntity::getName))
+            .sorted(Comparator.comparing(InstrumentEntity::getExternalName))
             .map(instrument -> {
                 List<PositionEntity> positions = positionDataService.findAllByExchangeIdAndInstrumentId(exchange.getId(), instrument.getId()).stream()
                     .filter(position -> !STATUS_CLOSED.equalsIgnoreCase(position.getStatus()))
@@ -43,7 +43,7 @@ public class DatabaseSnapshotBuilder {
                     .toList();
 
                 return DatabaseInstrumentSnapshot.builder()
-                    .instId(instrument.getName())
+                    .instId(instrument.getExternalName())
                     .instrumentMode(exchange.getStatus())
                     .instrumentStatus(instrument.getStatus())
                     .positionMode(instrument.getPositionMode())
@@ -52,14 +52,14 @@ public class DatabaseSnapshotBuilder {
                     .algoOrdersCount(algoOrders.size())
                     .orders(orders.stream()
                         .map(order -> ExternalOrder.builder()
-                            .instId(instrument.getName())
+                            .instId(instrument.getExternalName())
                             .ordId(order.getExchangeOrderId())
                             .clOrdId(order.getClientOrderId())
                             .build())
                         .toList())
                     .algoOrders(algoOrders.stream()
                         .map(algoOrder -> ExternalAlgoOrder.builder()
-                            .instId(instrument.getName())
+                            .instId(instrument.getExternalName())
                             .algoId(algoOrder.getExchangeAlgoOrderId())
                             .algoClOrdId(algoOrder.getClientAlgoOrderId())
                             .build())

@@ -1,5 +1,7 @@
 package com.example.tradingbot.persistence.model;
 
+import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
+import com.example.tradingbot.domain.model.trading.CreateAlgoOrderRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,6 +15,13 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.Objects;
+import java.util.UUID;
+
+import static com.example.tradingbot.util.Constant.Status.AlgoOrder.ALGO_ORDER_STATUS_CREATED;
+import static com.example.tradingbot.util.Constant.Status.AlgoOrder.ALGO_ORDER_STATUS_IN_PROGRESS;
+import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
 
 @Getter
 @Setter
@@ -35,13 +44,6 @@ public class AlgoOrderEntity extends AuditableEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
-
-    @Column(name = "exchange_id", nullable = false, updatable = false, insertable = false)
-    private Long exchangeId;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "exchange_id", nullable = false)
-    private ExchangeEntity exchange;
 
     @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
     private Long instrumentId;
@@ -97,4 +99,35 @@ public class AlgoOrderEntity extends AuditableEntity {
 
     @Column(name = "u_time")
     private Long uTime;
+
+    public void initOnCreate(InstrumentEntity instrument, CreateAlgoOrderRequest request) {
+        setInstrument(instrument);
+        setClientAlgoOrderId(UUID.randomUUID().toString());
+        setStatus(ALGO_ORDER_STATUS_CREATED);
+        setAlgoType(request.getOrdType());
+        setSz(request.getSz());
+        setTriggerPx(request.getTriggerPx());
+        setOrdPx(request.getOrdPx());
+    }
+
+    public void applyAlgoOrderResponse(AlgoOrderEntity entity, AlgoOrder responseOrder) {
+        entity.setExchangeAlgoOrderId(responseOrder.getAlgoOrderId());
+        if (Objects.nonNull(responseOrder.getClientOrderId())) {
+            entity.setClientAlgoOrderId(responseOrder.getClientOrderId());
+        }
+        entity.setState(responseOrder.getState());
+        entity.setStatus(ALGO_ORDER_STATUS_IN_PROGRESS);
+        entity.setAlgoType(responseOrder.getOrderType());
+        entity.setSz(responseOrder.getSize());
+        entity.setTriggerPx(responseOrder.getTriggerPrice());
+        entity.setOrdPx(responseOrder.getOrderPrice());
+        entity.setTpTriggerPx(responseOrder.getTakeProfitTriggerPrice());
+        entity.setTpOrdPx(responseOrder.getTakeProfitOrderPrice());
+        entity.setSlTriggerPx(responseOrder.getStopLossTriggerPrice());
+        entity.setSlOrdPx(responseOrder.getStopLossOrderPrice());
+        entity.setCallbackRatio(responseOrder.getCallbackRatio());
+        entity.setCallbackSpread(responseOrder.getCallbackSpread());
+        entity.setCTime(parseLongSafe(responseOrder.getCreateTime()));
+        entity.setUTime(parseLongSafe(responseOrder.getUpdateTime()));
+    }
 }

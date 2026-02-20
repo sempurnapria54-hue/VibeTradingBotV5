@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.model.admin;
+package com.example.tradingbot.rest.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,10 +9,11 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Exchange {
+public class Instrument {
 
     private Long id;
-    private String name;
+    private Long exchangeId;
+    private String instId;
+    private String instType;
     private String status;
-    private String baseUrl;
 }

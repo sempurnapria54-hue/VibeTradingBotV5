@@ -14,14 +14,15 @@ import com.example.tradingbot.persistence.model.PositionEntity;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
-import java.util.Map;
-import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -111,7 +112,6 @@ public class CountsOnlySyncEngine {
         }
 
         OrderEntity entity = new OrderEntity();
-        entity.setExchange(dbState.getInstrument().getExchange());
         entity.setInstrument(dbState.getInstrument());
         entity.setClientOrderId(clientOrderId);
         entity.setExchangeOrderId(action.getExchangeId());
@@ -130,7 +130,6 @@ public class CountsOnlySyncEngine {
         }
 
         AlgoOrderEntity entity = new AlgoOrderEntity();
-        entity.setExchange(dbState.getInstrument().getExchange());
         entity.setInstrument(dbState.getInstrument());
         entity.setClientAlgoOrderId(clientAlgoOrderId);
         entity.setExchangeAlgoOrderId(action.getExchangeId());

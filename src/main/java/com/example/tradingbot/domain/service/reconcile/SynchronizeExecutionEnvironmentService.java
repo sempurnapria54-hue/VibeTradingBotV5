@@ -93,7 +93,7 @@ public class SynchronizeExecutionEnvironmentService {
             .orElseThrow(() -> new IllegalStateException("Reconcile run failed: exchange not found, id=" + exchangeId));
 
         List<InstrumentEntity> managedInstruments = instrumentDataService.findAllByExchangeId(exchange.getId());
-        List<String> managedInstIds = managedInstruments.stream().map(InstrumentEntity::getName).toList();
+        List<String> managedInstIds = managedInstruments.stream().map(InstrumentEntity::getExternalName).toList();
 
         DatabaseSnapshot databaseBefore = databaseSnapshotBuilder.captureDatabaseSnapshot(exchange, managedInstruments);
         ExchangeSnapshot exchangeBefore = snapshotProvider.captureExchangeSnapshot(managedInstIds);

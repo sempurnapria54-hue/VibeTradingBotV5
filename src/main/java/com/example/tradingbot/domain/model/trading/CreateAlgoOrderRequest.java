@@ -5,12 +5,11 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class CreateOrderCommand {
+public class CreateAlgoOrderRequest {
 
-    private Long exchangeId;
-    private Long instrumentId;
     private String side;
     private String ordType;
     private String sz;
-    private String px;
+    private String triggerPx;
+    private String ordPx;
 }

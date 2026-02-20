@@ -1,16 +1,16 @@
 package com.example.tradingbot.persistence.repository;
 
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.CandleGroupStatus;
-import java.time.OffsetDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface CandleGroupRepository extends JpaRepository<CandleGroupEntity, Long> {
 
@@ -27,7 +27,7 @@ public interface CandleGroupRepository extends JpaRepository<CandleGroupEntity, 
         """)
     List<CandleGroupEntity> findEligibleForRun(
         @Param("nowMillis") long nowMillis,
-        @Param("statuses") Collection<CandleGroupStatus> statuses,
+        @Param("statuses") Collection<String> statuses,
         Pageable pageable
     );
 
@@ -102,7 +102,7 @@ public interface CandleGroupRepository extends JpaRepository<CandleGroupEntity, 
         set cg.status = :status
         where cg.id = :groupId
         """)
-    int updateStatus(@Param("groupId") Long groupId, @Param("status") CandleGroupStatus status);
+    int updateStatus(@Param("groupId") Long groupId, @Param("status") String status);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

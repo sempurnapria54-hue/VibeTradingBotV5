@@ -12,10 +12,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.OffsetDateTime;
+
+import static com.example.tradingbot.util.Constant.Status.CandleGroup.CANDLE_GROUP_STATUS_CREATED;
 
 @Getter
 @Setter
@@ -49,7 +52,7 @@ public class CandleGroupEntity extends AuditableEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = STATUS_LENGTH)
-    private CandleGroupStatus status;
+    private String status;
 
     @Column(name = "coverage_start_ts", nullable = false)
     private Long coverageStartTs;
@@ -80,4 +83,9 @@ public class CandleGroupEntity extends AuditableEntity {
 
     @Column(name = "lease_until")
     private Long leaseUntil;
+
+    public void initOnCreate(InstrumentEntity instrument) {
+        setStatus(CANDLE_GROUP_STATUS_CREATED);
+        setInstrument(instrument);
+    }
 }

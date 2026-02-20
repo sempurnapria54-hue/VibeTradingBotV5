@@ -1,18 +1,20 @@
 package com.example.tradingbot.domain.service.ops;
 
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.CandleGroupStatus;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
-import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Objects;
+
+import static com.example.tradingbot.util.Constant.Status.CandleGroup.CANDLE_GROUP_STATUS_SYNC;
 
 @Service
 @RequiredArgsConstructor
@@ -50,7 +52,7 @@ public class InstrumentDataReadinessService {
 
         boolean allGroupsSynced = candleGroups.stream()
             .map(CandleGroupEntity::getStatus)
-            .allMatch(status -> status == CandleGroupStatus.SYNC);
+            .allMatch(status -> Objects.equals(status, CANDLE_GROUP_STATUS_SYNC));
 
         if (allGroupsSynced) {
             return STATUS_ACTIVE;

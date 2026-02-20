@@ -1,7 +1,10 @@
 package com.example.tradingbot.domain.service.okxproxy;
 
 import com.example.tradingbot.client.okx.OkxRestClient;
-import com.example.tradingbot.domain.model.okxproxy.*;
+import com.example.tradingbot.domain.model.okxproxy.Balance;
+import com.example.tradingbot.domain.model.okxproxy.BalanceRequest;
+import com.example.tradingbot.domain.model.okxproxy.Position;
+import com.example.tradingbot.domain.model.okxproxy.PositionsRequest;
 import com.example.tradingbot.mapping.okxproxy.BalanceMapper;
 import com.example.tradingbot.mapping.okxproxy.OkxProxyRequestMapper;
 import com.example.tradingbot.mapping.okxproxy.PositionMapper;
@@ -20,7 +23,8 @@ public class OkxAccountClientService {
     private final PositionMapper positionMapper;
 
     public List<Balance> getBalance(BalanceRequest request) {
-        return okxRestClient.getBalance(requestMapper.domainToClient(request)).getData().stream().map(balanceMapper::clientToDomain).toList();
+        var balance = okxRestClient.getBalance(balanceMapper.domainToClient(request));
+        return balanceMapper.clientToDomain(balance.getData());
     }
 
     public List<Position> getPositions(PositionsRequest request) {

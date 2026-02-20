@@ -10,6 +10,8 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 @Service
 @RequiredArgsConstructor
 public class TradingGuardService {
@@ -31,7 +33,7 @@ public class TradingGuardService {
         ExchangeEntity exchange = exchangeDataService.findById(exchangeId)
             .orElseThrow(() -> new TradingCommandException(HttpStatus.NOT_FOUND, "EXCHANGE_NOT_FOUND", "Exchange not found"));
 
-        if (BooleanUtils.isFalse(Objects.equals(exchange.getStatus(), EXCHANGE_STATUS_ACTIVE))) {
+        if (isFalse(Objects.equals(exchange.getStatus(), EXCHANGE_STATUS_ACTIVE))) {
             throw new TradingCommandException(HttpStatus.CONFLICT, EXCHANGE_NOT_ACTIVE, "Exchange is not ACTIVE");
         }
 
@@ -39,6 +41,19 @@ public class TradingGuardService {
             .orElseThrow(() -> new TradingCommandException(HttpStatus.NOT_FOUND, "INSTRUMENT_NOT_FOUND", "Instrument not found"));
 
         if (BooleanUtils.isTrue(Objects.equals(instrument.getExchangeId(), exchangeId))) {
+            assertInstrumentIsActive(instrument);
+            return;
+        }
+
+        throw new TradingCommandException(HttpStatus.CONFLICT, INSTRUMENT_NOT_READY, "Instrument does not belong to exchange");
+    }
+
+    public void assertTradingAllowed(ExchangeEntity exchange, InstrumentEntity instrument) {
+        if (isFalse(Objects.equals(exchange.getStatus(), EXCHANGE_STATUS_ACTIVE))) {
+            throw new TradingCommandException(HttpStatus.CONFLICT, EXCHANGE_NOT_ACTIVE, "Exchange is not ACTIVE");
+        }
+
+        if (Objects.equals(instrument.getExchangeId(), exchange.getId())) {
             assertInstrumentIsActive(instrument);
             return;
         }

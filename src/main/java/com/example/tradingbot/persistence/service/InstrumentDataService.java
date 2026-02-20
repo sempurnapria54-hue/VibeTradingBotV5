@@ -2,11 +2,14 @@ package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.repository.InstrumentRepository;
-import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
@@ -16,11 +19,6 @@ public class InstrumentDataService {
 
     @Transactional
     public InstrumentEntity save(InstrumentEntity instrumentEntity) {
-        return instrumentRepository.save(instrumentEntity);
-    }
-
-    @Transactional
-    public InstrumentEntity create(InstrumentEntity instrumentEntity) {
         return instrumentRepository.save(instrumentEntity);
     }
 
@@ -37,13 +35,18 @@ public class InstrumentDataService {
         return instrumentRepository.findByExchangeIdAndName(exchangeId, name);
     }
 
+    public InstrumentEntity findRequiredByExchangeIdAndName(Long exchangeId, String name) {
+        return instrumentRepository.findByExchangeIdAndName(exchangeId, name)
+                .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
+    }
+
     public Optional<InstrumentEntity> findByExchangeIdAndInstId(Long exchangeId, String instId) {
         return instrumentRepository.findByExchangeIdAndInstId(exchangeId, instId);
     }
 
-    public List<InstrumentEntity> findAll() {
-        return instrumentRepository.findAll();
-    }
+//    public List<InstrumentEntity> findAll() {
+//        return instrumentRepository.findAll();
+//    }
 
     public List<InstrumentEntity> findAllByExchangeId(Long exchangeId) {
         return instrumentRepository.findAllByExchangeId(exchangeId);

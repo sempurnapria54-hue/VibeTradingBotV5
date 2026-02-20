@@ -2,9 +2,11 @@ package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.client.okx.dto.BalanceDto;
 import com.example.tradingbot.domain.model.okxproxy.Balance;
-import com.example.tradingbot.rest.model.okxproxy.BalanceRequest;
+import com.example.tradingbot.domain.model.okxproxy.BalanceRequest;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface BalanceMapper {
@@ -29,5 +31,11 @@ public interface BalanceMapper {
 
     Balance restToDomain(com.example.tradingbot.rest.model.okxproxy.Balance source);
 
-    com.example.tradingbot.domain.model.okxproxy.BalanceRequest restToDomain(BalanceRequest source);
+    BalanceRequest restToDomain(com.example.tradingbot.rest.model.okxproxy.BalanceRequest source);
+
+    List<com.example.tradingbot.rest.model.okxproxy.Balance> domainToRest(List<Balance> source);
+
+    com.example.tradingbot.client.okx.dto.BalanceRequest domainToClient(BalanceRequest request);
+
+    List<Balance> clientToDomain(List<com.example.tradingbot.client.okx.dto.BalanceDto> source);
 }
