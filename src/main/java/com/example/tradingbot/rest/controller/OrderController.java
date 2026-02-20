@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.model.trading.OrderCommandResult;
+import com.example.tradingbot.rest.model.response.order.OrderCommandResponse;
 import com.example.tradingbot.domain.service.trading.AlgoOrderService;
 import com.example.tradingbot.domain.service.trading.OrderService;
 import com.example.tradingbot.mapping.okxproxy.AlgoOrderMapper;
@@ -28,11 +28,10 @@ public class OrderController {
     private final AlgoOrderMapper algoOrderMapper;
 
     @PostMapping()
-    public OrderCommandResult createOrder(@PathVariable(name = "exchangeName") String exchangeName,
+    public OrderCommandResponse createOrder(@PathVariable(name = "exchangeName") String exchangeName,
                                           @PathVariable(name = "instrumentName") String instrumentName,
                                           @RequestBody CreateOrderRequest request) {
-        var domainRq = orderMapper.restToDomain(request);
-        return orderService.createOrder(exchangeName, instrumentName, domainRq);
+        return orderService.createOrder(exchangeName, instrumentName, request);
     }
 
     @DeleteMapping("{orderId}/cancel")
@@ -47,8 +46,7 @@ public class OrderController {
     public AlgoOrder createAlgoOrder(@PathVariable(name = "exchangeName") String exchangeName,
                                      @PathVariable(name = "instrumentName") String instrumentName,
                                      @RequestBody CreateAlgoOrderRequest request) {
-        var domainRq = algoOrderMapper.restToDomain(request);
-        var algoOrder = algoOrderService.createAlgoOrder(exchangeName, instrumentName, domainRq);
+        var algoOrder = algoOrderService.createAlgoOrder(exchangeName, instrumentName, request);
         return algoOrderMapper.domainToRest(algoOrder);
     }
 

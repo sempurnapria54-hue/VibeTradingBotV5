@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.service.trading;
 
 import com.example.tradingbot.client.model.okx.OrderResponse;
-import com.example.tradingbot.domain.model.trading.CreateOrderRequest;
-import com.example.tradingbot.domain.model.trading.OrderCommandResult;
+import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
+import com.example.tradingbot.rest.model.response.order.OrderCommandResponse;
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
@@ -28,7 +28,7 @@ public class OrderService {
     private final InstrumentService instrumentService;
 
     @Transactional
-    public OrderCommandResult createOrder(String exchangeName, String instrumentName, CreateOrderRequest request) {
+    public OrderCommandResponse createOrder(String exchangeName, String instrumentName, CreateOrderRequest request) {
         ExchangeEntity exchange = exchangeService.getRequiredByName(exchangeName);
         InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndName(exchange.getId(), instrumentName);
         tradingGuardService.assertTradingAllowed(exchange, instrument);
@@ -41,7 +41,7 @@ public class OrderService {
         orderEntity.applyOrderResponse(response);
         orderDataService.save(orderEntity);
 
-        return new OrderCommandResult(orderEntity.getClientOrderId(), orderEntity.getExchangeOrderId(), orderEntity.getState());
+        return new OrderCommandResponse(orderEntity.getClientOrderId(), orderEntity.getExchangeOrderId(), orderEntity.getState());
     }
 
     public OrderEntity cancelOrder(String exchangeName, String instrumentName, String orderId) {

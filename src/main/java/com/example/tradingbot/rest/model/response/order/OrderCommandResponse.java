@@ -1,13 +1,13 @@
-package com.example.tradingbot.domain.model.trading;
+package com.example.tradingbot.rest.model.response.order;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class AlgoOrderCommandResult {
+public class OrderCommandResponse {
 
     private String internalId;
-    private String algoId;
+    private String ordId;
     private String state;
 }
