@@ -1,6 +1,6 @@
 package com.example.tradingbot.mapping.okxproxy;
 
-import com.example.tradingbot.client.okx.dto.OrderDto;
+import com.example.tradingbot.client.model.okx.OrderResponse;
 import com.example.tradingbot.domain.model.okxproxy.Order;
 import com.example.tradingbot.domain.model.trading.CreateOrderRequest;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
@@ -25,7 +25,7 @@ public interface OrderMapper {
     @Mapping(source = "uTime", target = "updateTime")
     @Mapping(source = "sCode", target = "statusCode")
     @Mapping(source = "sMsg", target = "statusMessage")
-    Order clientToDomain(OrderDto source);
+    Order clientToDomain(OrderResponse source);
 
     @Mapping(source = "orderId", target = "ordId")
     @Mapping(source = "clientOrderId", target = "clOrdId")
@@ -42,11 +42,9 @@ public interface OrderMapper {
     @Mapping(source = "updateTime", target = "uTime")
     @Mapping(source = "statusCode", target = "sCode")
     @Mapping(source = "statusMessage", target = "sMsg")
-    OrderDto domainToClient(Order source);
+    OrderResponse domainToClient(Order source);
 
-    com.example.tradingbot.rest.model.okxproxy.Order domainToRest(Order source);
 
-    Order restToDomain(com.example.tradingbot.rest.model.okxproxy.Order source);
 
     CreateOrderRequest restToDomain(com.example.tradingbot.rest.model.request.order.CreateOrderRequest source);
 

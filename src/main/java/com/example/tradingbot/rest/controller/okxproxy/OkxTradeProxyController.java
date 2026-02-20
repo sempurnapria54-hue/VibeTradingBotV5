@@ -1,8 +1,8 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
+import com.example.tradingbot.client.model.okx.*;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
-import com.example.tradingbot.mapping.okxproxy.*;
-import com.example.tradingbot.rest.model.okxproxy.*;
+import com.example.tradingbot.rest.model.okxproxy.RestResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,61 +14,55 @@ import java.util.List;
 public class OkxTradeProxyController {
 
     private final OkxTradeProxyService service;
-    private final OkxProxyRequestMapper requestMapper;
-    private final OrderMapper orderMapper;
-    private final TradeFillMapper tradeFillMapper;
-    private final TradeFillsArchiveMapper archiveMapper;
-    private final AlgoOrderMapper algoOrderMapper;
-    private final PositionMapper positionMapper;
 
     @GetMapping("/orders-pending")
-    public RestResponse<Order> getOrdersPending(OrdersPendingRequest request) {
-        return success(service.getOrdersPending(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public RestResponse<OrderResponse> getOrdersPending(OrdersPendingRequest request) {
+        return success(service.getOrdersPending(request));
     }
 
     @GetMapping("/order")
-    public RestResponse<Order> getOrderDetails(OrderDetailsRequest request) {
-        return success(service.getOrderDetails(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public RestResponse<OrderResponse> getOrderDetails(OrderDetailsRequest request) {
+        return success(service.getOrderDetails(request));
     }
 
     @GetMapping("/orders-history")
-    public RestResponse<Order> getOrdersHistory(OrdersHistoryRequest request) {
-        return success(service.getOrdersHistory(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public RestResponse<OrderResponse> getOrdersHistory(OrdersHistoryRequest request) {
+        return success(service.getOrdersHistory(request));
     }
 
     @GetMapping("/orders-history-archive")
-    public RestResponse<Order> getOrdersHistoryArchive(OrdersHistoryRequest request) {
-        return success(service.getOrdersHistoryArchive(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public RestResponse<OrderResponse> getOrdersHistoryArchive(OrdersHistoryRequest request) {
+        return success(service.getOrdersHistoryArchive(request));
     }
 
     @GetMapping("/fills")
-    public RestResponse<TradeFill> getFills(FillsRequest request) {
-        return success(service.getFills(requestMapper.restToDomain(request)).stream().map(tradeFillMapper::domainToRest).toList());
+    public RestResponse<TradeFillResponse> getFills(FillsRequest request) {
+        return success(service.getFills(request));
     }
 
     @GetMapping("/fills-history")
-    public RestResponse<TradeFill> getFillsHistory(FillsRequest request) {
-        return success(service.getFillsHistory(requestMapper.restToDomain(request)).stream().map(tradeFillMapper::domainToRest).toList());
+    public RestResponse<TradeFillResponse> getFillsHistory(FillsRequest request) {
+        return success(service.getFillsHistory(request));
     }
 
     @PostMapping("/fills-archive")
-    public RestResponse<TradeFillsArchive> requestFillsArchive(@RequestBody FillsArchiveRequest request) {
-        return success(service.requestFillsArchive(requestMapper.restToDomain(request)).stream().map(archiveMapper::domainToRest).toList());
+    public RestResponse<TradeFillsArchiveResponse> requestFillsArchive(@RequestBody FillsArchiveRequest request) {
+        return success(service.requestFillsArchive(request));
     }
 
     @GetMapping("/fills-archive")
-    public RestResponse<TradeFillsArchive> getFillsArchiveLink(FillsArchiveLinkRequest request) {
-        return success(service.getFillsArchiveLink(requestMapper.restToDomain(request)).stream().map(archiveMapper::domainToRest).toList());
+    public RestResponse<TradeFillsArchiveResponse> getFillsArchiveLink(FillsArchiveLinkRequest request) {
+        return success(service.getFillsArchiveLink(request));
     }
 
     @PostMapping("/amend-order")
-    public RestResponse<Order> amendOrder(@RequestBody AmendOrderRequest request) {
-        return success(service.amendOrder(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public RestResponse<OrderResponse> amendOrder(@RequestBody AmendOrderRequest request) {
+        return success(service.amendOrder(request));
     }
 
     @PostMapping("/close-position")
-    public RestResponse<Position> closePosition(@RequestBody ClosePositionRequest request) {
-        return success(service.closePosition(requestMapper.restToDomain(request)).stream().map(positionMapper::domainToRest).toList());
+    public RestResponse<PositionResponse> closePosition(@RequestBody ClosePositionRequest request) {
+        return success(service.closePosition(request));
     }
 
     private <T> RestResponse<T> success(List<T> data) {

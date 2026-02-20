@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.candles.okx;
 
 import com.example.tradingbot.client.okx.OkxRestClient;
-import com.example.tradingbot.client.okx.dto.CandlesRequest;
+import com.example.tradingbot.client.model.okx.CandlesRequest;
 import com.example.tradingbot.util.OkxTimeframes;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

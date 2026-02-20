@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.model.entity;
 
-import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
+import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
 import com.example.tradingbot.domain.model.trading.CreateAlgoOrderRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -110,24 +110,24 @@ public class AlgoOrderEntity extends AuditableEntity {
         setOrdPx(request.getOrdPx());
     }
 
-    public void applyAlgoOrderResponse(AlgoOrderEntity entity, AlgoOrder responseOrder) {
-        entity.setExchangeAlgoOrderId(responseOrder.getAlgoOrderId());
-        if (Objects.nonNull(responseOrder.getClientOrderId())) {
-            entity.setClientAlgoOrderId(responseOrder.getClientOrderId());
+    public void applyAlgoOrderResponse(AlgoOrderEntity entity, AlgoOrderResponse responseOrder) {
+        entity.setExchangeAlgoOrderId(responseOrder.getAlgoId());
+        if (Objects.nonNull(responseOrder.getClOrdId())) {
+            entity.setClientAlgoOrderId(responseOrder.getClOrdId());
         }
         entity.setState(responseOrder.getState());
         entity.setStatus(ALGO_ORDER_STATUS_IN_PROGRESS);
-        entity.setAlgoType(responseOrder.getOrderType());
-        entity.setSz(responseOrder.getSize());
-        entity.setTriggerPx(responseOrder.getTriggerPrice());
-        entity.setOrdPx(responseOrder.getOrderPrice());
-        entity.setTpTriggerPx(responseOrder.getTakeProfitTriggerPrice());
-        entity.setTpOrdPx(responseOrder.getTakeProfitOrderPrice());
-        entity.setSlTriggerPx(responseOrder.getStopLossTriggerPrice());
-        entity.setSlOrdPx(responseOrder.getStopLossOrderPrice());
+        entity.setAlgoType(responseOrder.getOrdType());
+        entity.setSz(responseOrder.getSz());
+        entity.setTriggerPx(responseOrder.getTriggerPx());
+        entity.setOrdPx(responseOrder.getOrdPx());
+        entity.setTpTriggerPx(responseOrder.getTpTriggerPx());
+        entity.setTpOrdPx(responseOrder.getTpOrdPx());
+        entity.setSlTriggerPx(responseOrder.getSlTriggerPx());
+        entity.setSlOrdPx(responseOrder.getSlOrdPx());
         entity.setCallbackRatio(responseOrder.getCallbackRatio());
         entity.setCallbackSpread(responseOrder.getCallbackSpread());
-        entity.setCTime(parseLongSafe(responseOrder.getCreateTime()));
-        entity.setUTime(parseLongSafe(responseOrder.getUpdateTime()));
+        entity.setCTime(parseLongSafe(responseOrder.getCTime()));
+        entity.setUTime(parseLongSafe(responseOrder.getUTime()));
     }
 }

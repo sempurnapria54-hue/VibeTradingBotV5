@@ -1,16 +1,13 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
+import com.example.tradingbot.client.model.okx.CandleResponse;
+import com.example.tradingbot.client.model.okx.CandlesRequest;
+import com.example.tradingbot.client.model.okx.InstrumentResponse;
+import com.example.tradingbot.client.model.okx.InstrumentsRequest;
+import com.example.tradingbot.client.model.okx.PriceTickerResponse;
+import com.example.tradingbot.client.model.okx.TickerRequest;
 import com.example.tradingbot.domain.service.OkxMarketProxyService;
-import com.example.tradingbot.mapping.okxproxy.CandleMapper;
-import com.example.tradingbot.mapping.okxproxy.InstrumentMapper;
-import com.example.tradingbot.mapping.okxproxy.OkxProxyRequestMapper;
-import com.example.tradingbot.mapping.okxproxy.PriceTickerMapper;
-import com.example.tradingbot.rest.model.okxproxy.Candle;
-import com.example.tradingbot.rest.model.okxproxy.CandlesRequest;
-import com.example.tradingbot.rest.model.okxproxy.InstrumentsRequest;
-import com.example.tradingbot.rest.model.okxproxy.PriceTicker;
 import com.example.tradingbot.rest.model.okxproxy.RestResponse;
-import com.example.tradingbot.rest.model.okxproxy.TickerRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,30 +21,25 @@ import java.util.List;
 public class OkxMarketProxyController {
 
     private final OkxMarketProxyService service;
-    private final OkxProxyRequestMapper requestMapper;
-    private final CandleMapper candleMapper;
-    private final InstrumentMapper instrumentMapper;
-    private final PriceTickerMapper priceTickerMapper;
 
     @GetMapping("/market/candles")
-    public RestResponse<Candle> getCandles(CandlesRequest request) {
-        return success(service.getCandles(requestMapper.restToDomain(request)).stream().map(candleMapper::domainToRest).toList());
+    public RestResponse<CandleResponse> getCandles(CandlesRequest request) {
+        return success(service.getCandles(request));
     }
 
     @GetMapping("/market/history-candles")
-    public RestResponse<Candle> getHistoryCandles(CandlesRequest request) {
-        return success(service.getHistoryCandles(requestMapper.restToDomain(request)).stream().map(candleMapper::domainToRest).toList());
+    public RestResponse<CandleResponse> getHistoryCandles(CandlesRequest request) {
+        return success(service.getHistoryCandles(request));
     }
 
     @GetMapping("/public/instruments")
-    public RestResponse<com.example.tradingbot.domain.model.okxproxy.Instrument> getInstruments(InstrumentsRequest request) {
-        var instruments = service.getInstruments(requestMapper.restToDomain(request));
-        return success(instruments);
+    public RestResponse<InstrumentResponse> getInstruments(InstrumentsRequest request) {
+        return success(service.getInstruments(request));
     }
 
     @GetMapping("/market/ticker")
-    public RestResponse<PriceTicker> getTicker(TickerRequest request) {
-        return success(service.getTicker(requestMapper.restToDomain(request)).stream().map(priceTickerMapper::domainToRest).toList());
+    public RestResponse<PriceTickerResponse> getTicker(TickerRequest request) {
+        return success(service.getTicker(request));
     }
 
     private <T> RestResponse<T> success(List<T> data) {
