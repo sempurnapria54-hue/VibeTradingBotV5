@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class PositionDto {
+public class PositionResponse {
 
     private String instId;
     private String instType;

@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class AlgoOrderDto {
+public class AlgoOrderResponse {
 
     private String algoId;
     private String clOrdId;

@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class InstrumentDto {
+public class InstrumentResponse {
 
     private String instId;
     private String instType;

@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class TradeFillsArchiveDto {
+public class TradeFillsArchiveResponse {
 
     private String fileHref;
     private String state;

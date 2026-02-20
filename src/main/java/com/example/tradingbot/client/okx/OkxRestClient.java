@@ -1,12 +1,12 @@
 package com.example.tradingbot.client.okx;
 
-import com.example.tradingbot.client.okx.dto.AlgoOrderDto;
+import com.example.tradingbot.client.okx.dto.AlgoOrderResponse;
 import com.example.tradingbot.client.okx.dto.AmendOrderRequest;
-import com.example.tradingbot.client.okx.dto.BalanceDto;
+import com.example.tradingbot.client.okx.dto.BalanceResponse;
 import com.example.tradingbot.client.okx.dto.BalanceRequest;
 import com.example.tradingbot.client.okx.dto.CancelAlgoOrderRequest;
 import com.example.tradingbot.client.okx.dto.CancelOrderRequest;
-import com.example.tradingbot.client.okx.dto.CandleDto;
+import com.example.tradingbot.client.okx.dto.CandleResponse;
 import com.example.tradingbot.client.okx.dto.CandlesRequest;
 import com.example.tradingbot.client.okx.dto.ClosePositionRequest;
 import com.example.tradingbot.client.okx.dto.CreateAlgoOrderRequest;
@@ -14,20 +14,20 @@ import com.example.tradingbot.client.okx.dto.CreateOrderRequest;
 import com.example.tradingbot.client.okx.dto.FillsArchiveLinkRequest;
 import com.example.tradingbot.client.okx.dto.FillsArchiveRequest;
 import com.example.tradingbot.client.okx.dto.FillsRequest;
-import com.example.tradingbot.client.okx.dto.InstrumentDto;
+import com.example.tradingbot.client.okx.dto.InstrumentResponse;
 import com.example.tradingbot.client.okx.dto.InstrumentsRequest;
 import com.example.tradingbot.client.okx.dto.OkxEnvelope;
 import com.example.tradingbot.client.okx.dto.OrderDetailsRequest;
-import com.example.tradingbot.client.okx.dto.OrderDto;
+import com.example.tradingbot.client.okx.dto.OrderResponse;
 import com.example.tradingbot.client.okx.dto.OrdersAlgoPendingRequest;
 import com.example.tradingbot.client.okx.dto.OrdersHistoryRequest;
 import com.example.tradingbot.client.okx.dto.OrdersPendingRequest;
-import com.example.tradingbot.client.okx.dto.PositionDto;
+import com.example.tradingbot.client.okx.dto.PositionResponse;
 import com.example.tradingbot.client.okx.dto.PositionsRequest;
-import com.example.tradingbot.client.okx.dto.PriceTickerDto;
+import com.example.tradingbot.client.okx.dto.PriceTickerResponse;
 import com.example.tradingbot.client.okx.dto.TickerRequest;
-import com.example.tradingbot.client.okx.dto.TradeFillDto;
-import com.example.tradingbot.client.okx.dto.TradeFillsArchiveDto;
+import com.example.tradingbot.client.okx.dto.TradeFillResponse;
+import com.example.tradingbot.client.okx.dto.TradeFillsArchiveResponse;
 import com.example.tradingbot.config.OkxConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -61,98 +61,98 @@ public class OkxRestClient {
     private final OkxAuthSigner signer;
     private final ObjectMapper objectMapper;
 
-    public OkxEnvelope<BalanceDto> getBalance(BalanceRequest request) {
+    public OkxEnvelope<BalanceResponse> getBalance(BalanceRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         addIfPresent(params, "ccy", request.getCurrency());
         return getPrivate("/api/v5/account/balance", params, new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<PositionDto> getPositions(PositionsRequest request) {
+    public OkxEnvelope<PositionResponse> getPositions(PositionsRequest request) {
         return getPrivate("/api/v5/account/positions", positionsParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<OrderDto> getOrdersPending(OrdersPendingRequest request) {
+    public OkxEnvelope<OrderResponse> getOrdersPending(OrdersPendingRequest request) {
         return getPrivate("/api/v5/trade/orders-pending", ordersPendingParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<OrderDto> getOrderDetails(OrderDetailsRequest request) {
+    public OkxEnvelope<OrderResponse> getOrderDetails(OrderDetailsRequest request) {
         return getPrivate("/api/v5/trade/order", orderDetailsParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
 
-    public OkxEnvelope<AlgoOrderDto> getOrdersAlgoPending(OrdersAlgoPendingRequest request) {
+    public OkxEnvelope<AlgoOrderResponse> getOrdersAlgoPending(OrdersAlgoPendingRequest request) {
         return getPrivate("/api/v5/trade/orders-algo-pending", ordersAlgoPendingParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<OrderDto> getOrdersHistory(OrdersHistoryRequest request) {
+    public OkxEnvelope<OrderResponse> getOrdersHistory(OrdersHistoryRequest request) {
         return getPrivate("/api/v5/trade/orders-history", ordersHistoryParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<OrderDto> getOrdersHistoryArchive(OrdersHistoryRequest request) {
+    public OkxEnvelope<OrderResponse> getOrdersHistoryArchive(OrdersHistoryRequest request) {
         return getPrivate("/api/v5/trade/orders-history-archive", ordersHistoryParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<TradeFillDto> getFills(FillsRequest request) {
+    public OkxEnvelope<TradeFillResponse> getFills(FillsRequest request) {
         return getPrivate("/api/v5/trade/fills", fillsParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<TradeFillDto> getFillsHistory(FillsRequest request) {
+    public OkxEnvelope<TradeFillResponse> getFillsHistory(FillsRequest request) {
         return getPrivate("/api/v5/trade/fills-history", fillsParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<TradeFillsArchiveDto> requestFillsArchive(FillsArchiveRequest request) {
+    public OkxEnvelope<TradeFillsArchiveResponse> requestFillsArchive(FillsArchiveRequest request) {
         Map<String, String> body = Collections.singletonMap("instType", request.getInstrumentType());
         return postPrivate("/api/v5/trade/fills-archive", body, new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<TradeFillsArchiveDto> getFillsArchiveLink(FillsArchiveLinkRequest request) {
+    public OkxEnvelope<TradeFillsArchiveResponse> getFillsArchiveLink(FillsArchiveLinkRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         addIfPresent(params, "instType", request.getInstrumentType());
         return getPrivate("/api/v5/trade/fills-archive", params, new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<CandleDto> getCandles(CandlesRequest request) {
+    public OkxEnvelope<CandleResponse> getCandles(CandlesRequest request) {
         return getPublic("/api/v5/market/candles", candlesParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<CandleDto> getHistoryCandles(CandlesRequest request) {
+    public OkxEnvelope<CandleResponse> getHistoryCandles(CandlesRequest request) {
         return getPublic("/api/v5/market/history-candles", candlesParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<OrderDto> createOrder(CreateOrderRequest request) {
+    public OkxEnvelope<OrderResponse> createOrder(CreateOrderRequest request) {
         return postPrivate("/api/v5/trade/order", createOrderBody(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<OrderDto> amendOrder(AmendOrderRequest request) {
+    public OkxEnvelope<OrderResponse> amendOrder(AmendOrderRequest request) {
         return postPrivate("/api/v5/trade/amend-order", amendOrderBody(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<OrderDto> cancelOrder(CancelOrderRequest request) {
+    public OkxEnvelope<OrderResponse> cancelOrder(CancelOrderRequest request) {
         return postPrivate("/api/v5/trade/cancel-order", cancelOrderBody(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<AlgoOrderDto> createAlgoOrder(CreateAlgoOrderRequest request) {
+    public OkxEnvelope<AlgoOrderResponse> createAlgoOrder(CreateAlgoOrderRequest request) {
         return postPrivate("/api/v5/trade/order-algo", createAlgoOrderBody(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<AlgoOrderDto> cancelAlgoOrder(CancelAlgoOrderRequest request) {
+    public OkxEnvelope<AlgoOrderResponse> cancelAlgoOrder(CancelAlgoOrderRequest request) {
         Map<String, Object> algoOrder = new java.util.LinkedHashMap<>();
         putIfPresentObject(algoOrder, "instId", request.getInstrumentId());
         putIfPresentObject(algoOrder, "algoId", request.getAlgoOrderId());
@@ -163,12 +163,12 @@ public class OkxRestClient {
         });
     }
 
-    public OkxEnvelope<PositionDto> closePosition(ClosePositionRequest request) {
+    public OkxEnvelope<PositionResponse> closePosition(ClosePositionRequest request) {
         return postPrivate("/api/v5/trade/close-position", closePositionBody(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxEnvelope<InstrumentDto> getInstruments(InstrumentsRequest request) {
+    public OkxEnvelope<InstrumentResponse> getInstruments(InstrumentsRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         addIfPresent(params, "instType", request.getInstrumentType());
         addIfPresent(params, "instId", request.getInstrumentId());
@@ -176,7 +176,7 @@ public class OkxRestClient {
         });
     }
 
-    public OkxEnvelope<PriceTickerDto> getTicker(TickerRequest request) {
+    public OkxEnvelope<PriceTickerResponse> getTicker(TickerRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         addIfPresent(params, "instId", request.getInstrumentId());
         return getPublic("/api/v5/market/ticker", params, new ParameterizedTypeReference<>() {

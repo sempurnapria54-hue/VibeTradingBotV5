@@ -1,6 +1,6 @@
 package com.example.tradingbot.mapping.okxproxy;
 
-import com.example.tradingbot.client.okx.dto.BalanceDto;
+import com.example.tradingbot.client.okx.dto.BalanceResponse;
 import com.example.tradingbot.domain.model.okxproxy.Balance;
 import com.example.tradingbot.domain.model.okxproxy.BalanceRequest;
 import org.mapstruct.Mapper;
@@ -17,7 +17,7 @@ public interface BalanceMapper {
     @Mapping(source = "eq", target = "equity")
     @Mapping(source = "frozenBal", target = "frozenBalance")
     @Mapping(source = "upl", target = "unrealizedProfit")
-    Balance clientToDomain(BalanceDto source);
+    Balance clientToDomain(BalanceResponse source);
 
     @Mapping(source = "currency", target = "ccy")
     @Mapping(source = "cashBalance", target = "cashBal")
@@ -25,7 +25,7 @@ public interface BalanceMapper {
     @Mapping(source = "equity", target = "eq")
     @Mapping(source = "frozenBalance", target = "frozenBal")
     @Mapping(source = "unrealizedProfit", target = "upl")
-    BalanceDto domainToClient(Balance source);
+    BalanceResponse domainToClient(Balance source);
 
     com.example.tradingbot.rest.model.okxproxy.Balance domainToRest(Balance source);
 
@@ -37,5 +37,5 @@ public interface BalanceMapper {
 
     com.example.tradingbot.client.okx.dto.BalanceRequest domainToClient(BalanceRequest request);
 
-    List<Balance> clientToDomain(List<com.example.tradingbot.client.okx.dto.BalanceDto> source);
+    List<Balance> clientToDomain(List<com.example.tradingbot.client.okx.dto.BalanceResponse> source);
 }

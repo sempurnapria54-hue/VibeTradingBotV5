@@ -1,10 +1,10 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.domain.model.okxproxy.Balance;
-import com.example.tradingbot.domain.model.okxproxy.BalanceRequest;
-import com.example.tradingbot.domain.model.okxproxy.Position;
-import com.example.tradingbot.domain.model.okxproxy.PositionsRequest;
-import com.example.tradingbot.domain.service.okxproxy.OkxAccountClientService;
+import com.example.tradingbot.client.okx.OkxRestClient;
+import com.example.tradingbot.client.okx.dto.BalanceRequest;
+import com.example.tradingbot.client.okx.dto.BalanceResponse;
+import com.example.tradingbot.client.okx.dto.PositionResponse;
+import com.example.tradingbot.client.okx.dto.PositionsRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,13 +14,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OkxAccountProxyService {
 
-    private final OkxAccountClientService okxAccountClientService;
+    private final OkxRestClient okxRestClient;
 
-    public List<Balance> getBalance(BalanceRequest request) {
-        return okxAccountClientService.getBalance(request);
+    public List<BalanceResponse> getBalance(BalanceRequest request) {
+        return okxRestClient.getBalance(request).getData();
     }
 
-    public List<Position> getPositions(PositionsRequest request) {
-        return okxAccountClientService.getPositions(request);
+    public List<PositionResponse> getPositions(PositionsRequest request) {
+        return okxRestClient.getPositions(request).getData();
     }
 }

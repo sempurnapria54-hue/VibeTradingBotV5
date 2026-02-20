@@ -1,6 +1,6 @@
 package com.example.tradingbot.mapping.okxproxy;
 
-import com.example.tradingbot.client.okx.dto.InstrumentDto;
+import com.example.tradingbot.client.okx.dto.InstrumentResponse;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.okxproxy.Instrument;
 import com.example.tradingbot.rest.model.request.instrument.InstrumentCreateRq;
@@ -22,7 +22,7 @@ public interface InstrumentMapper {
     @Mapping(source = "ctVal", target = "contractValue")
     @Mapping(source = "ctMult", target = "contractMultiplier")
     @Mapping(source = "tickSz", target = "tickSize")
-    Instrument clientToDomain(InstrumentDto source);
+    Instrument clientToDomain(InstrumentResponse source);
 
     @Mapping(source = "instrumentId", target = "instId")
     @Mapping(source = "instrumentType", target = "instType")
@@ -34,7 +34,7 @@ public interface InstrumentMapper {
     @Mapping(source = "contractValue", target = "ctVal")
     @Mapping(source = "contractMultiplier", target = "ctMult")
     @Mapping(source = "tickSize", target = "tickSz")
-    InstrumentDto domainToClient(Instrument source);
+    InstrumentResponse domainToClient(Instrument source);
 
     @Mapping(source = "externalName", target = "instId")
     @Mapping(source = "type", target = "instType")

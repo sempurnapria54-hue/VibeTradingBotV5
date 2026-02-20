@@ -1,13 +1,10 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
+import com.example.tradingbot.client.okx.dto.BalanceRequest;
+import com.example.tradingbot.client.okx.dto.BalanceResponse;
+import com.example.tradingbot.client.okx.dto.PositionResponse;
+import com.example.tradingbot.client.okx.dto.PositionsRequest;
 import com.example.tradingbot.domain.service.OkxAccountProxyService;
-import com.example.tradingbot.mapping.okxproxy.BalanceMapper;
-import com.example.tradingbot.mapping.okxproxy.OkxProxyRequestMapper;
-import com.example.tradingbot.mapping.okxproxy.PositionMapper;
-import com.example.tradingbot.rest.model.okxproxy.Balance;
-import com.example.tradingbot.rest.model.okxproxy.BalanceRequest;
-import com.example.tradingbot.rest.model.okxproxy.PositionsRequest;
-import com.example.tradingbot.rest.model.okxproxy.RestResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,29 +18,14 @@ import java.util.List;
 public class OkxAccountProxyController {
 
     private final OkxAccountProxyService service;
-    private final OkxProxyRequestMapper requestMapper;
-    private final BalanceMapper balanceMapper;
-    private final PositionMapper positionMapper;
 
     @GetMapping("/balance")
-    public RestResponse<Balance> getBalance(BalanceRequest request) {
-        var balance = service.getBalance(balanceMapper.restToDomain(request));
-        return success(balanceMapper.domainToRest(balance));
+    public List<BalanceResponse> getBalance(BalanceRequest request) {
+        return service.getBalance(request);
     }
 
     @GetMapping("/positions")
-    public RestResponse<com.example.tradingbot.rest.model.okxproxy.Position> getPositions(PositionsRequest request) {
-        List<com.example.tradingbot.rest.model.okxproxy.Position> data = service.getPositions(requestMapper.restToDomain(request)).stream()
-                .map(positionMapper::domainToRest)
-                .toList();
-        return success(data);
-    }
-
-    private <T> RestResponse<T> success(List<T> data) {
-        RestResponse<T> response = new RestResponse<>();
-        response.setCode("0");
-        response.setMessage("success");
-        response.setData(data);
-        return response;
+    public List<PositionResponse> getPositions(PositionsRequest request) {
+        return service.getPositions(request);
     }
 }

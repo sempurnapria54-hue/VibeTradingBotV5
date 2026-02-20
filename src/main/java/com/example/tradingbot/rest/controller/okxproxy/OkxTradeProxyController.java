@@ -1,10 +1,24 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
+import com.example.tradingbot.client.okx.dto.AmendOrderRequest;
+import com.example.tradingbot.client.okx.dto.ClosePositionRequest;
+import com.example.tradingbot.client.okx.dto.FillsArchiveLinkRequest;
+import com.example.tradingbot.client.okx.dto.FillsArchiveRequest;
+import com.example.tradingbot.client.okx.dto.FillsRequest;
+import com.example.tradingbot.client.okx.dto.OrderDetailsRequest;
+import com.example.tradingbot.client.okx.dto.OrderResponse;
+import com.example.tradingbot.client.okx.dto.OrdersHistoryRequest;
+import com.example.tradingbot.client.okx.dto.OrdersPendingRequest;
+import com.example.tradingbot.client.okx.dto.PositionResponse;
+import com.example.tradingbot.client.okx.dto.TradeFillResponse;
+import com.example.tradingbot.client.okx.dto.TradeFillsArchiveResponse;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
-import com.example.tradingbot.mapping.okxproxy.*;
-import com.example.tradingbot.rest.model.okxproxy.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -14,68 +28,54 @@ import java.util.List;
 public class OkxTradeProxyController {
 
     private final OkxTradeProxyService service;
-    private final OkxProxyRequestMapper requestMapper;
-    private final OrderMapper orderMapper;
-    private final TradeFillMapper tradeFillMapper;
-    private final TradeFillsArchiveMapper archiveMapper;
-    private final AlgoOrderMapper algoOrderMapper;
-    private final PositionMapper positionMapper;
 
     @GetMapping("/orders-pending")
-    public RestResponse<Order> getOrdersPending(OrdersPendingRequest request) {
-        return success(service.getOrdersPending(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public List<OrderResponse> getOrdersPending(OrdersPendingRequest request) {
+        return service.getOrdersPending(request);
     }
 
     @GetMapping("/order")
-    public RestResponse<Order> getOrderDetails(OrderDetailsRequest request) {
-        return success(service.getOrderDetails(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public List<OrderResponse> getOrderDetails(OrderDetailsRequest request) {
+        return service.getOrderDetails(request);
     }
 
     @GetMapping("/orders-history")
-    public RestResponse<Order> getOrdersHistory(OrdersHistoryRequest request) {
-        return success(service.getOrdersHistory(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public List<OrderResponse> getOrdersHistory(OrdersHistoryRequest request) {
+        return service.getOrdersHistory(request);
     }
 
     @GetMapping("/orders-history-archive")
-    public RestResponse<Order> getOrdersHistoryArchive(OrdersHistoryRequest request) {
-        return success(service.getOrdersHistoryArchive(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public List<OrderResponse> getOrdersHistoryArchive(OrdersHistoryRequest request) {
+        return service.getOrdersHistoryArchive(request);
     }
 
     @GetMapping("/fills")
-    public RestResponse<TradeFill> getFills(FillsRequest request) {
-        return success(service.getFills(requestMapper.restToDomain(request)).stream().map(tradeFillMapper::domainToRest).toList());
+    public List<TradeFillResponse> getFills(FillsRequest request) {
+        return service.getFills(request);
     }
 
     @GetMapping("/fills-history")
-    public RestResponse<TradeFill> getFillsHistory(FillsRequest request) {
-        return success(service.getFillsHistory(requestMapper.restToDomain(request)).stream().map(tradeFillMapper::domainToRest).toList());
+    public List<TradeFillResponse> getFillsHistory(FillsRequest request) {
+        return service.getFillsHistory(request);
     }
 
     @PostMapping("/fills-archive")
-    public RestResponse<TradeFillsArchive> requestFillsArchive(@RequestBody FillsArchiveRequest request) {
-        return success(service.requestFillsArchive(requestMapper.restToDomain(request)).stream().map(archiveMapper::domainToRest).toList());
+    public List<TradeFillsArchiveResponse> requestFillsArchive(@RequestBody FillsArchiveRequest request) {
+        return service.requestFillsArchive(request);
     }
 
     @GetMapping("/fills-archive")
-    public RestResponse<TradeFillsArchive> getFillsArchiveLink(FillsArchiveLinkRequest request) {
-        return success(service.getFillsArchiveLink(requestMapper.restToDomain(request)).stream().map(archiveMapper::domainToRest).toList());
+    public List<TradeFillsArchiveResponse> getFillsArchiveLink(FillsArchiveLinkRequest request) {
+        return service.getFillsArchiveLink(request);
     }
 
     @PostMapping("/amend-order")
-    public RestResponse<Order> amendOrder(@RequestBody AmendOrderRequest request) {
-        return success(service.amendOrder(requestMapper.restToDomain(request)).stream().map(orderMapper::domainToRest).toList());
+    public List<OrderResponse> amendOrder(@RequestBody AmendOrderRequest request) {
+        return service.amendOrder(request);
     }
 
     @PostMapping("/close-position")
-    public RestResponse<Position> closePosition(@RequestBody ClosePositionRequest request) {
-        return success(service.closePosition(requestMapper.restToDomain(request)).stream().map(positionMapper::domainToRest).toList());
-    }
-
-    private <T> RestResponse<T> success(List<T> data) {
-        RestResponse<T> response = new RestResponse<>();
-        response.setCode("0");
-        response.setMessage("success");
-        response.setData(data);
-        return response;
+    public List<PositionResponse> closePosition(@RequestBody ClosePositionRequest request) {
+        return service.closePosition(request);
     }
 }

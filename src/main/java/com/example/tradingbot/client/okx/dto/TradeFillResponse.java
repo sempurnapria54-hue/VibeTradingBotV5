@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class TradeFillDto {
+public class TradeFillResponse {
 
     private String billId;
     private String tradeId;

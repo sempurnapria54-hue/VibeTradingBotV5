@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class BalanceDto {
+public class BalanceResponse {
 
     private String ccy;
     private String cashBal;

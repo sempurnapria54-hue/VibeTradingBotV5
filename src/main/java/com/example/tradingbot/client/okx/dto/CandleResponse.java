@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class CandleDto {
+public class CandleResponse {
 
     private String ts;
     private String open;

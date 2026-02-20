@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class PriceTickerDto {
+public class PriceTickerResponse {
 
     private String instId;
     private String last;
