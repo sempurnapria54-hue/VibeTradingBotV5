@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.service.reconcile.model;
 
+import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
 import lombok.Builder;
 import lombok.Getter;
 

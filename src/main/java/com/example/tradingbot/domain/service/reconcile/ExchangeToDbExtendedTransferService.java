@@ -1,11 +1,11 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.service.reconcile.model.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.ExchangeSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalAlgoOrder;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalOrder;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalPosition;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalTicker;
+import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExternalOrder;
+import com.example.tradingbot.domain.model.exchange.ExternalPosition;
+import com.example.tradingbot.domain.model.exchange.ExternalTicker;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;

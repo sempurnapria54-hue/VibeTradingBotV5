@@ -1,9 +1,11 @@
 package com.example.tradingbot.domain.service.reconcile.model;
 
+import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExternalOrder;
+import com.example.tradingbot.domain.model.exchange.ExternalPosition;
+import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
-
-import java.util.List;
 
 @Getter
 @Builder
