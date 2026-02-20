@@ -2,8 +2,8 @@ package com.example.tradingbot.domain.service.trading;
 
 import com.example.tradingbot.client.model.okx.ClosePositionRequest;
 import com.example.tradingbot.client.model.okx.PositionResponse;
-import com.example.tradingbot.domain.model.trading.ClosePositionCommand;
-import com.example.tradingbot.domain.model.trading.ClosePositionResult;
+import com.example.tradingbot.rest.model.request.trading.ClosePositionCommandRequest;
+import com.example.tradingbot.rest.model.response.trading.ClosePositionResponse;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
@@ -32,7 +32,7 @@ public class PositionCommandService {
     private final OkxTradeProxyService okxTradeProxyService;
 
     @Transactional
-    public ClosePositionResult closePosition(ClosePositionCommand command) {
+    public ClosePositionResponse closePosition(ClosePositionCommandRequest command) {
         tradingGuardService.assertTradingAllowed(command.getExchangeId(), command.getInstrumentId());
 
         ExchangeEntity exchange = exchangeDataService.findById(command.getExchangeId())
@@ -62,7 +62,7 @@ public class PositionCommandService {
         positionEntity.setUTime(parseLongSafe(position.getUTime()));
         positionDataService.save(positionEntity);
 
-        return new ClosePositionResult(position.getInstId(), position.getPosSide(), position.getUTime());
+        return new ClosePositionResponse(position.getInstId(), position.getPosSide(), position.getUTime());
     }
 
     private PositionResponse extractFirstPosition(List<PositionResponse> positions) {

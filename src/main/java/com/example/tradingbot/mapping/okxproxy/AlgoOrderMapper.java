@@ -2,7 +2,6 @@ package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
 import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
-import com.example.tradingbot.domain.model.trading.CreateAlgoOrderRequest;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -49,9 +48,6 @@ public interface AlgoOrderMapper {
     @Mapping(source = "statusCode", target = "sCode")
     @Mapping(source = "statusMessage", target = "sMsg")
     AlgoOrderResponse domainToClient(AlgoOrder source);
-
-
-    CreateAlgoOrderRequest restToDomain(com.example.tradingbot.rest.model.request.order.CreateAlgoOrderRequest source);
 
     com.example.tradingbot.rest.model.response.AlgoOrder domainToRest(AlgoOrderEntity source);
 }
