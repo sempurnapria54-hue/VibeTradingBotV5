@@ -1,10 +1,10 @@
 package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.ExchangeSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalAlgoOrder;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalOrder;
-import com.example.tradingbot.domain.service.reconcile.model.ExternalPosition;
+import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExternalOrder;
+import com.example.tradingbot.domain.model.exchange.ExternalPosition;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import java.util.ArrayList;
 import java.util.Comparator;

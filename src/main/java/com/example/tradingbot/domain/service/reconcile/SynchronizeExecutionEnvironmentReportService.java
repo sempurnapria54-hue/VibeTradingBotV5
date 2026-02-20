@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.ExchangeSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
 import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;

@@ -2,7 +2,7 @@ package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.domain.service.reconcile.model.CreateUnknownAction;
 import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
-import com.example.tradingbot.domain.service.reconcile.model.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.domain.service.reconcile.model.MarkAnomalyAction;
 import com.example.tradingbot.domain.service.reconcile.model.MarkClosedAction;
