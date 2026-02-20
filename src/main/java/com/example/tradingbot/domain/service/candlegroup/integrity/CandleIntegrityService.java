@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.candlegroup.integrity;
 
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import com.example.tradingbot.persistence.service.CandleDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

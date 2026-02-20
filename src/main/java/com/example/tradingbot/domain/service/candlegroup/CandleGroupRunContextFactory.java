@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.candlegroup;
 
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import com.example.tradingbot.util.TimeframeMillis;
 import java.time.Clock;
 import lombok.RequiredArgsConstructor;

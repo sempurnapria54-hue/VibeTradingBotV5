@@ -1,8 +1,9 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.mapping.okxproxy.CandleGroupMapper;
-import com.example.tradingbot.rest.model.CandleGroup;
 import com.example.tradingbot.domain.service.CandleGroupService;
+import com.example.tradingbot.mapping.okxproxy.CandleGroupMapper;
+import com.example.tradingbot.rest.model.request.candlegroup.CandleGroupCreateRequest;
+import com.example.tradingbot.rest.model.response.candlegroup.CandleGroupResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,14 +16,14 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/{exchangeName}instruments/{instrumentName}/candle-groups")
+@RequestMapping("/api/{exchangeName}/instruments/{instrumentName}/candle-groups")
 public class CandleGroupController {
 
     private final CandleGroupService candleGroupService;
     private final CandleGroupMapper candleGroupMapper;
 
     @GetMapping
-    public List<CandleGroup> getByInstrument(@PathVariable(name = "exchangeName") String exchangeName,
+    public List<CandleGroupResponse> getByInstrument(@PathVariable(name = "exchangeName") String exchangeName,
                                              @PathVariable(name = "instrumentName") String instrumentName) {
         var candleGroups = candleGroupService.listByInstrument(exchangeName, instrumentName);
         return candleGroupMapper.domainToRest(candleGroups);
@@ -31,7 +32,7 @@ public class CandleGroupController {
     @PostMapping
     public void createGroup(@PathVariable(name = "exchangeName") String exchangeName,
                             @PathVariable(name = "instrumentName") String instrumentName,
-                            @RequestBody CandleGroup candleGroup) {
+                            @RequestBody CandleGroupCreateRequest candleGroup) {
         candleGroupService.create(exchangeName, instrumentName, candleGroupMapper.restToDomain(candleGroup));
     }
 }

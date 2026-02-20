@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.persistence.model.CandleEntity;
+import com.example.tradingbot.domain.model.entity.CandleEntity;
 import com.example.tradingbot.persistence.repository.CandleRepository;
 import java.util.HashSet;
 import java.util.List;

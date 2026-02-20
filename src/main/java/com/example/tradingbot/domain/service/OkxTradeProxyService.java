@@ -2,8 +2,8 @@ package com.example.tradingbot.domain.service;
 
 import com.example.tradingbot.domain.model.okxproxy.*;
 import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.entity.OrderEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

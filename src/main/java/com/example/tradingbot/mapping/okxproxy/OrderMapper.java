@@ -3,7 +3,7 @@ package com.example.tradingbot.mapping.okxproxy;
 import com.example.tradingbot.client.okx.dto.OrderDto;
 import com.example.tradingbot.domain.model.okxproxy.Order;
 import com.example.tradingbot.domain.model.trading.CreateOrderRequest;
-import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.domain.model.entity.OrderEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

@@ -4,11 +4,11 @@ import com.example.tradingbot.domain.service.reconcile.model.DatabaseInstrumentS
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.ExternalAlgoOrder;
 import com.example.tradingbot.domain.service.reconcile.model.ExternalOrder;
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
-import com.example.tradingbot.persistence.model.OrderEntity;
-import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.entity.ExchangeEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
+import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.domain.model.entity.PositionEntity;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;

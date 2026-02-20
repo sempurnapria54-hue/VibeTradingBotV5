@@ -1,13 +1,12 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.domain.model.entity.ExchangeEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_ALREADY_EXISTS;
 
@@ -17,7 +16,6 @@ public class InstrumentService {
 
     private final InstrumentDataService instrumentDataService;
     private final ExchangeService exchangeService;
-
 
     public InstrumentEntity createInstrument(String exchangeName, InstrumentEntity instrument, Set<String> timeFrames) {
         ExchangeEntity exchangeEntity = exchangeService.getRequiredByName(exchangeName);
@@ -40,7 +38,5 @@ public class InstrumentService {
 
     public InstrumentEntity getRequiredByExchangeIdAndName(Long exchangeId, String name) {
         return instrumentDataService.findRequiredByExchangeIdAndName(exchangeId, name);
-
     }
-
 }

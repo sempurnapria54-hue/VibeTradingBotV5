@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.persistence.model.SynchronizeExecutionEnvironmentReportEntity;
+import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Page;

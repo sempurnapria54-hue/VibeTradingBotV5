@@ -3,7 +3,7 @@ package com.example.tradingbot.mapping.okxproxy;
 import com.example.tradingbot.client.okx.dto.AlgoOrderDto;
 import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
 import com.example.tradingbot.domain.model.trading.CreateAlgoOrderRequest;
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

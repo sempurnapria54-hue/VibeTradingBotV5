@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

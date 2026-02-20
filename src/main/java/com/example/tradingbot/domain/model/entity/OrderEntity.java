@@ -1,4 +1,4 @@
-package com.example.tradingbot.persistence.model;
+package com.example.tradingbot.domain.model.entity;
 
 import com.example.tradingbot.domain.model.okxproxy.Order;
 import com.example.tradingbot.domain.model.trading.CreateOrderRequest;

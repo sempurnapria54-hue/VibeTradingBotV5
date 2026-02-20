@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.persistence.repository.InstrumentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
