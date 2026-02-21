@@ -1,23 +1,27 @@
 package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.client.okx.OkxApiException;
-import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
-import com.example.tradingbot.domain.model.okxproxy.Order;
-import com.example.tradingbot.domain.model.okxproxy.OrdersAlgoPendingRequest;
-import com.example.tradingbot.domain.model.okxproxy.OrdersPendingRequest;
-import com.example.tradingbot.domain.model.okxproxy.Position;
-import com.example.tradingbot.domain.model.okxproxy.PositionsRequest;
-import com.example.tradingbot.domain.model.okxproxy.PriceTicker;
-import com.example.tradingbot.domain.model.okxproxy.TickerRequest;
-import com.example.tradingbot.domain.service.okxproxy.OkxAccountClientService;
-import com.example.tradingbot.domain.service.okxproxy.OkxMarketClientService;
-import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
 import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
 import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
 import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
 import com.example.tradingbot.domain.model.exchange.ExternalOrder;
 import com.example.tradingbot.domain.model.exchange.ExternalPosition;
 import com.example.tradingbot.domain.model.exchange.ExternalTicker;
+import com.example.tradingbot.client.model.okx.OrdersAlgoPendingRequest;
+import com.example.tradingbot.client.model.okx.OrdersPendingRequest;
+import com.example.tradingbot.client.model.okx.PositionsRequest;
+import com.example.tradingbot.client.model.okx.TickerRequest;
+import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
+import com.example.tradingbot.domain.model.okxproxy.Order;
+import com.example.tradingbot.domain.model.okxproxy.Position;
+import com.example.tradingbot.domain.model.okxproxy.PriceTicker;
+import com.example.tradingbot.domain.service.okxproxy.OkxAccountClientService;
+import com.example.tradingbot.domain.service.okxproxy.OkxMarketClientService;
+import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,9 +29,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
