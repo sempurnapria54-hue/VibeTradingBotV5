@@ -3,7 +3,7 @@ package com.example.tradingbot.domain.service.trading;
 import com.example.tradingbot.client.model.okx.PositionResponse;
 import com.example.tradingbot.rest.model.request.ClosePositionRequest;
 import com.example.tradingbot.rest.model.response.ClosePositionResponse;
-import com.example.tradingbot.domain.service.OkxTradeProxyService;
+import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.PositionEntity;
@@ -20,7 +20,7 @@ import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMil
 
 @Service
 @RequiredArgsConstructor
-public class PositionCommandService {
+public class PositionService {
 
     private static final String POSITION_STATUS_UPDATED = "UPDATED";
     private static final String DEFAULT_MARGIN_MODE = "cross";
@@ -29,7 +29,7 @@ public class PositionCommandService {
     private final ExchangeDataService exchangeDataService;
     private final InstrumentDataService instrumentDataService;
     private final PositionDataService positionDataService;
-    private final OkxTradeProxyService okxTradeProxyService;
+    private final OkxProxyService okxProxyService;
 
     @Transactional
     public ClosePositionResponse closePosition(ClosePositionRequest command) {
@@ -45,7 +45,7 @@ public class PositionCommandService {
         request.setMarginMode(DEFAULT_MARGIN_MODE);
         request.setPositionSide(command.getPositionSide());
 
-        PositionResponse position = extractFirstPosition(okxTradeProxyService.closePosition(request));
+        PositionResponse position = extractFirstPosition(okxProxyService.closePosition(request));
 
         PositionEntity positionEntity = new PositionEntity();
         positionEntity.setExchange(exchange);

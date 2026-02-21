@@ -44,6 +44,10 @@ public class Constant {
         @UtilityClass
         public class Instrument {
             public static final String INSTRUMENT_STATUS_CREATED = "CREATED";
+            public static final String INSTRUMENT_STATUS_SYNC = "SYNC";
+            public static final String INSTRUMENT_STATUS_HOLD = "HOLD";
+            public static final String INSTRUMENT_STATUS_ACTIVE = "ACTIVE";
+            public static final String INSTRUMENT_STATUS_CANDLES_LOADING = "CANDLES_LOADING";
 
         }
 

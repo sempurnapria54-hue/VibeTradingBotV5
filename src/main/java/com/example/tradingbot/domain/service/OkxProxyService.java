@@ -20,7 +20,7 @@ import static com.example.tradingbot.util.Constant.Service.DEFAULT_TRADE_MODE;
 
 @Service
 @RequiredArgsConstructor
-public class OkxTradeProxyService {
+public class OkxProxyService {
 
     private final OkxRestClient okxRestClient;
 

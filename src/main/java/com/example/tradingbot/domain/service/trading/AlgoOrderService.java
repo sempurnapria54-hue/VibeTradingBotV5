@@ -6,7 +6,7 @@ import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.domain.service.OkxTradeProxyService;
+import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ public class AlgoOrderService {
 
     private final TradingGuardService tradingGuardService;
     private final AlgoOrderDataService algoOrderDataService;
-    private final OkxTradeProxyService okxTradeProxyService;
+    private final OkxProxyService okxProxyService;
     private final ExchangeService exchangeService;
     private final InstrumentService instrumentService;
 
@@ -36,7 +36,7 @@ public class AlgoOrderService {
         algoOrderEntity.initOnCreate(instrument, request);
         algoOrderDataService.save(algoOrderEntity);
 
-        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.createAlgoOrder(algoOrderEntity));
+        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.createAlgoOrder(algoOrderEntity));
         algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }
@@ -49,7 +49,7 @@ public class AlgoOrderService {
         AlgoOrderEntity algoOrderEntity =
                 algoOrderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchange.getId(), instrument.getId(), orderId);
 
-        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.cancelAlgoOrder(algoOrderEntity));
+        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.cancelAlgoOrder(algoOrderEntity));
         algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }

@@ -6,7 +6,7 @@ import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.domain.service.OkxTradeProxyService;
+import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.rest.model.request.CreateOrderRequest;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ public class OrderService {
 
     private final TradingGuardService tradingGuardService;
     private final OrderDataService orderDataService;
-    private final OkxTradeProxyService okxTradeProxyService;
+    private final OkxProxyService okxProxyService;
     private final ExchangeService exchangeService;
     private final InstrumentService instrumentService;
 
@@ -36,7 +36,7 @@ public class OrderService {
         orderEntity.initOnCreate(instrument, request);
         orderDataService.save(orderEntity);
 
-        OrderResponse response = extractFirstOrder(okxTradeProxyService.createOrder(orderEntity));
+        OrderResponse response = extractFirstOrder(okxProxyService.createOrder(orderEntity));
         orderEntity.applyOrderResponse(response);
         orderDataService.save(orderEntity);
 
@@ -47,7 +47,7 @@ public class OrderService {
         Long exchangeId = exchangeService.getRequiredByInternalId(exchangeInternalId).getId();
         Long instrumentId = instrumentService.getRequiredIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId);
         OrderEntity orderEntity = orderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, orderId);
-        OrderResponse response = extractFirstOrder(okxTradeProxyService.cancelOrder(orderEntity));
+        OrderResponse response = extractFirstOrder(okxProxyService.cancelOrder(orderEntity));
         orderEntity.applyOrderResponse(response);
         return orderDataService.save(orderEntity);
     }

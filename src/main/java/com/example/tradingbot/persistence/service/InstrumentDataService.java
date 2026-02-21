@@ -32,6 +32,11 @@ public class InstrumentDataService {
         return instrumentRepository.findById(id);
     }
 
+    public InstrumentEntity findRequiredById(Long id) {
+        return instrumentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
+    }
+
     public Optional<InstrumentEntity> findByExchangeIdAndName(Long exchangeId, String name) {
         return instrumentRepository.findByExchangeIdAndName(exchangeId, name);
     }
