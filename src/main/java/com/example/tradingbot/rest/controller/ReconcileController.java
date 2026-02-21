@@ -22,19 +22,19 @@ public class ReconcileController {
     private final ReconcileReportMapper reconcileReportMapper;
 
     @PostMapping
-    public ReconcileRunResponse run(@RequestParam String mode, @PathVariable(name = "exchangeId") Long exchangeId) {
+    public ReconcileRunResponse run(@RequestParam String mode, @PathVariable(name = "exchangeId") String exchangeId) {
         Long reportId = reconcileOpsService.run(mode, exchangeId);
         return new ReconcileRunResponse(reportId);
     }
 
     @GetMapping("/reports")
     public List<ReconcileReportResponse> getByExchange(@RequestParam(required = false) Integer limit,
-                                                       @PathVariable(name = "exchangeId") Long exchangeId) {
+                                                       @PathVariable(name = "exchangeId") String exchangeId) {
         return reconcileReportMapper.domainToRest(reconcileOpsService.listReports(exchangeId, limit));
     }
 
     @GetMapping("/reports/instruments/{instrumentId}")
-    public List<ReconcileReportResponse> getByInstrument(@PathVariable(name = "exchangeId") Long exchangeId,
+    public List<ReconcileReportResponse> getByInstrument(@PathVariable(name = "exchangeId") String exchangeId,
                                                          @PathVariable(name = "instrumentId") String instrumentId,
                                                          @RequestParam(required = false) Integer limit) {
         return reconcileReportMapper.domainToRest(reconcileOpsService.listReportsByInstrument(exchangeId, instrumentId, limit));

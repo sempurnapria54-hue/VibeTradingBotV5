@@ -35,6 +35,14 @@ public class ExchangeDataService {
         return exchangeRepository.findByName(name);
     }
 
+    public Optional<ExchangeEntity> findByInternalId(String internalId) {
+        return exchangeRepository.findByInternalId(internalId);
+    }
+
+    public Optional<Long> findIdByInternalId(String internalId) {
+        return exchangeRepository.findIdByInternalId(internalId);
+    }
+
     public ExchangeEntity findRequiredByName(String name) {
         return exchangeRepository.findByName(name)
                 .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));

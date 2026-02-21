@@ -19,6 +19,7 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.example.tradingbot.util.Constant.Service.DEFAULT_POSITION_MODE;
 import static com.example.tradingbot.util.Constant.Status.Instrument.INSTRUMENT_STATUS_CREATED;
@@ -30,6 +31,7 @@ import static java.util.stream.Collectors.toList;
 @NoArgsConstructor
 @Entity
 @Table(name = "instrument", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_instrument_internal_id", columnNames = "internal_id"),
         @UniqueConstraint(name = "uk_instrument_exchange_name", columnNames = {"exchange_id", "name"}),
         @UniqueConstraint(name = "uk_instrument_exchange_inst_id", columnNames = {"exchange_id", "inst_id"})
 })
@@ -46,7 +48,7 @@ public class InstrumentEntity extends AuditableEntity {
     /**
      * Межсервисный идентификатор инструмента.
      */
-    @Column(name = "internal_id", nullable = false)
+    @Column(name = "internal_id", nullable = false, updatable = false, length = 36)
     private String internalId;
 
     /**
@@ -107,6 +109,7 @@ public class InstrumentEntity extends AuditableEntity {
     private List<CandleGroupEntity> candleGroups;
 
     public void initOnCreate(ExchangeEntity exchange, Set<String> timeFrames) {
+        setInternalId(UUID.randomUUID().toString());
         setExchange(exchange);
         setPositionMode(DEFAULT_POSITION_MODE);
         setStatus(INSTRUMENT_STATUS_CREATED);

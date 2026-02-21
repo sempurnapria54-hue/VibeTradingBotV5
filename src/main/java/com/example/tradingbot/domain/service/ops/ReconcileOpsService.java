@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.service.ops;
 import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportAnomalyEntity;
 import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
 import com.example.tradingbot.domain.service.reconcile.SynchronizeExecutionEnvironmentService;
+import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;
 import java.util.List;
@@ -21,10 +22,13 @@ public class ReconcileOpsService {
 
     private final SynchronizeExecutionEnvironmentService synchronizeExecutionEnvironmentService;
     private final SynchronizeExecutionEnvironmentReportDataService reportDataService;
+    private final ExchangeDataService exchangeDataService;
     private final InstrumentDataService instrumentDataService;
 
-    public Long run(String mode, Long exchangeId) {
-        validateRunRequest(mode, exchangeId);
+    public Long run(String mode, String exchangeInternalId) {
+        validateRunRequest(mode);
+
+        Long exchangeId = resolveExchangeId(exchangeInternalId);
 
         if (Objects.equals("SAFE", mode)) {
             return synchronizeExecutionEnvironmentService.runSafe(exchangeId);
@@ -37,8 +41,8 @@ public class ReconcileOpsService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported mode: " + mode);
     }
 
-    public List<SynchronizeExecutionEnvironmentReportEntity> listReports(Long exchangeId, Integer limit) {
-        validateExchangeId(exchangeId);
+    public List<SynchronizeExecutionEnvironmentReportEntity> listReports(String exchangeInternalId, Integer limit) {
+        Long exchangeId = resolveExchangeId(exchangeInternalId);
         int resolvedLimit = resolveLimit(limit);
 
         return reportDataService.findByExchangeId(exchangeId, resolvedLimit)
@@ -47,14 +51,12 @@ public class ReconcileOpsService {
             .toList();
     }
 
-    public List<SynchronizeExecutionEnvironmentReportEntity> listReportsByInstrument(Long exchangeId, String instrumentId, Integer limit) {
-        validateExchangeId(exchangeId);
-        validateInstrumentId(instrumentId);
+    public List<SynchronizeExecutionEnvironmentReportEntity> listReportsByInstrument(String exchangeInternalId, String instrumentInternalId, Integer limit) {
+        Long exchangeId = resolveExchangeId(exchangeInternalId);
         int resolvedLimit = resolveLimit(limit);
 
         String exchangeInstId = instrumentDataService
-            .findByExchangeIdAndInternalId(exchangeId, instrumentId)
-            .map(instrument -> instrument.getExternalId())
+            .findExternalIdByExchangeIdAndInternalId(exchangeId, instrumentInternalId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Instrument not found"));
 
         return reportDataService.findByExchangeIdAndInstId(exchangeId, exchangeInstId, resolvedLimit)
@@ -79,24 +81,15 @@ public class ReconcileOpsService {
         return toReportEntity(report, anomalies);
     }
 
-    private void validateRunRequest(String mode, Long exchangeId) {
-        validateExchangeId(exchangeId);
-
+    private void validateRunRequest(String mode) {
         if (Objects.isNull(mode) || BooleanUtils.isTrue(mode.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "mode is required");
         }
     }
 
-    private void validateExchangeId(Long exchangeId) {
-        if (Objects.isNull(exchangeId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "exchangeId is required");
-        }
-    }
-
-    private void validateInstrumentId(String instrumentId) {
-        if (Objects.isNull(instrumentId) || BooleanUtils.isTrue(instrumentId.isBlank())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "instrumentId is required");
-        }
+    private Long resolveExchangeId(String exchangeInternalId) {
+        return exchangeDataService.findIdByInternalId(exchangeInternalId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Exchange not found"));
     }
 
     private int resolveLimit(Integer limit) {
