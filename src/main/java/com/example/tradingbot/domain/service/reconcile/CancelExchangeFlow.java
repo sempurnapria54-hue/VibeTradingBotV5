@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.config.ReconcileProperties;
-import com.example.tradingbot.domain.model.okxproxy.CancelAlgoOrderRequest;
-import com.example.tradingbot.domain.model.okxproxy.CancelOrderRequest;
-import com.example.tradingbot.domain.model.okxproxy.ClosePositionRequest;
+import com.example.tradingbot.client.model.okx.CancelAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.CancelOrderRequest;
+import com.example.tradingbot.client.model.okx.ClosePositionRequest;
 import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
 import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
 import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
