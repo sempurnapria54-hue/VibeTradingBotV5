@@ -42,19 +42,19 @@ public class SynchronizeExecutionEnvironmentReportAnomalyEntity {
     private SynchronizeExecutionEnvironmentReportEntity report;
 
     /** Идентификатор инструмента (instId), если аномалия относится к инструменту. */
-    @Column(name = "inst_id", length = INST_ID_LENGTH)
+    @Column(name = "inst_id")
     private String instId;
 
     /** Тип аномалии. */
-    @Column(name = "type", nullable = false, length = TYPE_LENGTH)
+    @Column(name = "type", nullable = false)
     private String type;
 
     /** Уровень серьёзности аномалии. */
-    @Column(name = "severity", nullable = false, length = SEVERITY_LENGTH)
+    @Column(name = "severity", nullable = false)
     private String severity;
 
     /** Краткое текстовое описание аномалии. */
-    @Column(name = "summary", nullable = false, length = SUMMARY_LENGTH)
+    @Column(name = "summary", nullable = false)
     private String summary;
 
     /** Детали аномалии в формате JSON. */

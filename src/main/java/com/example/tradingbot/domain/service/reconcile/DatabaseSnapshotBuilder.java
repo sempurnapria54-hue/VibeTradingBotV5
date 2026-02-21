@@ -30,7 +30,7 @@ public class DatabaseSnapshotBuilder {
 
     public DatabaseSnapshot captureDatabaseSnapshot(ExchangeEntity exchange, List<InstrumentEntity> managedInstruments) {
         List<DatabaseInstrumentSnapshot> instruments = managedInstruments.stream()
-            .sorted(Comparator.comparing(InstrumentEntity::getExternalName))
+            .sorted(Comparator.comparing(InstrumentEntity::getExternalId))
             .map(instrument -> {
                 List<PositionEntity> positions = positionDataService.findAllByExchangeIdAndInstrumentId(exchange.getId(), instrument.getId()).stream()
                     .filter(position -> !STATUS_CLOSED.equalsIgnoreCase(position.getStatus()))
@@ -43,7 +43,7 @@ public class DatabaseSnapshotBuilder {
                     .toList();
 
                 return DatabaseInstrumentSnapshot.builder()
-                    .instId(instrument.getExternalName())
+                    .instId(instrument.getExternalId())
                     .instrumentMode(exchange.getStatus())
                     .instrumentStatus(instrument.getStatus())
                     .positionMode(instrument.getPositionMode())
@@ -52,16 +52,16 @@ public class DatabaseSnapshotBuilder {
                     .algoOrdersCount(algoOrders.size())
                     .orders(orders.stream()
                         .map(order -> ExchangeOrder.builder()
-                            .externalInstrumentId(instrument.getExternalName())
-                            .externalId(order.getExchangeOrderId())
-                            .internalId(order.getClientOrderId())
+                            .externalInstrumentId(instrument.getExternalId())
+                            .externalId(order.getExternalId())
+                            .internalId(order.getInternalId())
                             .build())
                         .toList())
                     .algoOrders(algoOrders.stream()
                         .map(algoOrder -> ExchangeAlgoOrder.builder()
-                            .externalInstrumentId(instrument.getExternalName())
-                            .externalId(algoOrder.getExchangeAlgoOrderId())
-                            .internalOrderId(algoOrder.getClientAlgoOrderId())
+                            .externalInstrumentId(instrument.getExternalId())
+                            .externalId(algoOrder.getExternalId())
+                            .internalOrderId(algoOrder.getInternalOrderId())
                             .build())
                         .toList())
                     .build();

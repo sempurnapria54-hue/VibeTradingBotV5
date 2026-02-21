@@ -51,7 +51,7 @@ public class ExchangeToDbExtendedTransferService {
     }
 
     private void transferInstrumentPrices(InstrumentEntity instrument, ExchangeSnapshot snapshot) {
-        ExchangePriceTicker ticker = snapshot.getTickersByInstId() == null ? null : snapshot.getTickersByInstId().get(instrument.getExternalName());
+        ExchangePriceTicker ticker = snapshot.getTickersByInstId() == null ? null : snapshot.getTickersByInstId().get(instrument.getExternalId());
         if (ticker == null) {
             return;
         }
@@ -85,18 +85,18 @@ public class ExchangeToDbExtendedTransferService {
         }
         PositionEntity position = positions.get(0);
         boolean changed = false;
-        changed |= setIfChanged(position.getPos(), external.getPositionSize(), position::setPos);
-        changed |= setIfChanged(position.getAvgPx(), external.getAveragePrice(), position::setAvgPx);
-        changed |= setIfChanged(position.getMarkPx(), external.getMarkPrice(), position::setMarkPx);
-        changed |= setIfChanged(position.getLiqPx(), external.getLiquidationPrice(), position::setLiqPx);
-        changed |= setIfChanged(position.getLever(), external.getLeverage(), position::setLever);
-        changed |= setIfChanged(position.getMgnMode(), external.getMarginMode(), position::setMgnMode);
-        changed |= setIfChanged(position.getUpl(), external.getUnrealizedProfit(), position::setUpl);
-        changed |= setIfChanged(position.getSide(), external.getPositionSide(), position::setSide);
+        changed |= setIfChanged(position.getPositionSize(), external.getPositionSize(), position::setPositionSize);
+        changed |= setIfChanged(position.getAveragePrice(), external.getAveragePrice(), position::setAveragePrice);
+        changed |= setIfChanged(position.getMarkPrice(), external.getMarkPrice(), position::setMarkPrice);
+        changed |= setIfChanged(position.getLiquidationPrice(), external.getLiquidationPrice(), position::setLiquidationPrice);
+        changed |= setIfChanged(position.getLeverage(), external.getLeverage(), position::setLeverage);
+        changed |= setIfChanged(position.getMarginMode(), external.getMarginMode(), position::setMarginMode);
+        changed |= setIfChanged(position.getUnrealizedProfit(), external.getUnrealizedProfit(), position::setUnrealizedProfit);
+        changed |= setIfChanged(position.getPositionSide(), external.getPositionSide(), position::setPositionSide);
 
         Long externalUTime = parseLong(external.getUpdateTime());
-        if (!Objects.equals(position.getUTime(), externalUTime)) {
-            position.setUTime(externalUTime);
+        if (!Objects.equals(position.getUpdateTime(), externalUTime)) {
+            position.setUpdateTime(externalUTime);
             changed = true;
         }
 
@@ -112,23 +112,23 @@ public class ExchangeToDbExtendedTransferService {
                 continue;
             }
             boolean changed = false;
-            changed |= setIfChanged(target.getExchangeOrderId(), externalOrder.getExternalId(), target::setExchangeOrderId);
-            changed |= setIfChanged(target.getState(), externalOrder.getStatus(), target::setState);
-            changed |= setIfChanged(target.getOrdType(), externalOrder.getType(), target::setOrdType);
-            changed |= setIfChanged(target.getPx(), externalOrder.getPrice(), target::setPx);
-            changed |= setIfChanged(target.getSz(), externalOrder.getSize(), target::setSz);
-            changed |= setIfChanged(target.getFillSz(), externalOrder.getAccumulatedFillSize(), target::setFillSz);
-            changed |= setIfChanged(target.getAvgPx(), externalOrder.getAveragePrice(), target::setAvgPx);
+            changed |= setIfChanged(target.getExternalId(), externalOrder.getExternalId(), target::setExternalId);
+            changed |= setIfChanged(target.getExternalStatus(), externalOrder.getStatus(), target::setExternalStatus);
+            changed |= setIfChanged(target.getType(), externalOrder.getType(), target::setType);
+            changed |= setIfChanged(target.getPrice(), externalOrder.getPrice(), target::setPrice);
+            changed |= setIfChanged(target.getSize(), externalOrder.getSize(), target::setSize);
+            changed |= setIfChanged(target.getAccumulatedFillSize(), externalOrder.getAccumulatedFillSize(), target::setAccumulatedFillSize);
+            changed |= setIfChanged(target.getAveragePrice(), externalOrder.getAveragePrice(), target::setAveragePrice);
             changed |= setIfChanged(target.getFee(), externalOrder.getFee(), target::setFee);
 
             Long cTime = parseLong(externalOrder.getCreateTime());
-            if (!Objects.equals(target.getCTime(), cTime)) {
-                target.setCTime(cTime);
+            if (!Objects.equals(target.getCreateTime(), cTime)) {
+                target.setCreateTime(cTime);
                 changed = true;
             }
             Long uTime = parseLong(externalOrder.getUpdateTime());
-            if (!Objects.equals(target.getUTime(), uTime)) {
-                target.setUTime(uTime);
+            if (!Objects.equals(target.getUpdateTime(), uTime)) {
+                target.setUpdateTime(uTime);
                 changed = true;
             }
 
@@ -146,27 +146,27 @@ public class ExchangeToDbExtendedTransferService {
             }
 
             boolean changed = false;
-            changed |= setIfChanged(target.getExchangeAlgoOrderId(), externalAlgoOrder.getExternalId(), target::setExchangeAlgoOrderId);
-            changed |= setIfChanged(target.getState(), externalAlgoOrder.getStatus(), target::setState);
-            changed |= setIfChanged(target.getAlgoType(), externalAlgoOrder.getType(), target::setAlgoType);
-            changed |= setIfChanged(target.getSz(), externalAlgoOrder.getSize(), target::setSz);
-            changed |= setIfChanged(target.getTriggerPx(), externalAlgoOrder.getTriggerPrice(), target::setTriggerPx);
-            changed |= setIfChanged(target.getOrdPx(), externalAlgoOrder.getOrderPrice(), target::setOrdPx);
-            changed |= setIfChanged(target.getTpTriggerPx(), externalAlgoOrder.getTakeProfitTriggerPrice(), target::setTpTriggerPx);
-            changed |= setIfChanged(target.getTpOrdPx(), externalAlgoOrder.getTakeProfitOrderPrice(), target::setTpOrdPx);
-            changed |= setIfChanged(target.getSlTriggerPx(), externalAlgoOrder.getStopLossTriggerPrice(), target::setSlTriggerPx);
-            changed |= setIfChanged(target.getSlOrdPx(), externalAlgoOrder.getStopLossOrderPrice(), target::setSlOrdPx);
+            changed |= setIfChanged(target.getExternalId(), externalAlgoOrder.getExternalId(), target::setExternalId);
+            changed |= setIfChanged(target.getExternalStatus(), externalAlgoOrder.getStatus(), target::setExternalStatus);
+            changed |= setIfChanged(target.getType(), externalAlgoOrder.getType(), target::setType);
+            changed |= setIfChanged(target.getSize(), externalAlgoOrder.getSize(), target::setSize);
+            changed |= setIfChanged(target.getTriggerPrice(), externalAlgoOrder.getTriggerPrice(), target::setTriggerPrice);
+            changed |= setIfChanged(target.getOrderPrice(), externalAlgoOrder.getOrderPrice(), target::setOrderPrice);
+            changed |= setIfChanged(target.getTakeProfitTriggerPrice(), externalAlgoOrder.getTakeProfitTriggerPrice(), target::setTakeProfitTriggerPrice);
+            changed |= setIfChanged(target.getTakeProfitOrderPrice(), externalAlgoOrder.getTakeProfitOrderPrice(), target::setTakeProfitOrderPrice);
+            changed |= setIfChanged(target.getStopLossTriggerPrice(), externalAlgoOrder.getStopLossTriggerPrice(), target::setStopLossTriggerPrice);
+            changed |= setIfChanged(target.getStopLossOrderPrice(), externalAlgoOrder.getStopLossOrderPrice(), target::setStopLossOrderPrice);
             changed |= setIfChanged(target.getCallbackRatio(), externalAlgoOrder.getCallbackRatio(), target::setCallbackRatio);
-            changed |= setIfChanged(target.getCallbackSpread(), externalAlgoOrder.getCallbackStep(), target::setCallbackSpread);
+            changed |= setIfChanged(target.getCallbackStep(), externalAlgoOrder.getCallbackStep(), target::setCallbackStep);
 
             Long cTime = parseLong(externalAlgoOrder.getCreateTime());
-            if (!Objects.equals(target.getCTime(), cTime)) {
-                target.setCTime(cTime);
+            if (!Objects.equals(target.getCreateTime(), cTime)) {
+                target.setCreateTime(cTime);
                 changed = true;
             }
             Long uTime = parseLong(externalAlgoOrder.getUpdateTime());
-            if (!Objects.equals(target.getUTime(), uTime)) {
-                target.setUTime(uTime);
+            if (!Objects.equals(target.getUpdateTime(), uTime)) {
+                target.setUpdateTime(uTime);
                 changed = true;
             }
 

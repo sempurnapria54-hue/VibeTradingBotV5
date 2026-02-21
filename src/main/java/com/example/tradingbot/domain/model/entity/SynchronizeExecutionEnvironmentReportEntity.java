@@ -52,7 +52,7 @@ public class SynchronizeExecutionEnvironmentReportEntity {
     private Instant finishedAt;
 
     /** Триггер запуска синхронизации (manual/scheduler и т.д.). */
-    @Column(name = "trigger", nullable = false, length = TRIGGER_LENGTH)
+    @Column(name = "trigger", nullable = false)
     private String trigger;
 
     /** Признак наличия аномалий в процессе синхронизации. */
@@ -60,7 +60,7 @@ public class SynchronizeExecutionEnvironmentReportEntity {
     private boolean hasAnomalies;
 
     /** Максимальный уровень серьёзности обнаруженных аномалий. */
-    @Column(name = "max_severity", nullable = false, length = SEVERITY_LENGTH)
+    @Column(name = "max_severity", nullable = false)
     private String maxSeverity;
 
     /** JSON-снимок базы данных до синхронизации. */

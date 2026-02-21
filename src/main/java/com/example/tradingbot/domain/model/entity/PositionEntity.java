@@ -20,9 +20,6 @@ import lombok.Setter;
 @Table(name = "position")
 public class PositionEntity extends AuditableEntity {
 
-    public static final int SIDE_LENGTH = 20;
-    public static final int STATUS_LENGTH = 50;
-
     /** Внутренний идентификатор позиции. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,42 +45,42 @@ public class PositionEntity extends AuditableEntity {
     private InstrumentEntity instrument;
 
     /** Сторона позиции (long/short/net). */
-    @Column(name = "side", length = SIDE_LENGTH)
-    private String side;
+    @Column(name = "side")
+    private String positionSide;
 
     /** Текущий внутренний статус позиции. */
-    @Column(name = "status", nullable = false, length = STATUS_LENGTH)
+    @Column(name = "status", nullable = false)
     private String status;
 
     /** Размер позиции. */
-    @Column(name = "pos", length = 64)
-    private String pos;
+    @Column(name = "pos")
+    private String positionSize;
 
     /** Средняя цена входа в позицию. */
-    @Column(name = "avg_px", length = 64)
-    private String avgPx;
+    @Column(name = "avg_px")
+    private String averagePrice;
 
     /** Текущая mark price позиции. */
-    @Column(name = "mark_px", length = 64)
-    private String markPx;
+    @Column(name = "mark_px")
+    private String markPrice;
 
     /** Оценочная цена ликвидации позиции. */
-    @Column(name = "liq_px", length = 64)
-    private String liqPx;
+    @Column(name = "liq_px")
+    private String liquidationPrice;
 
     /** Плечо позиции. */
-    @Column(name = "lever", length = 32)
-    private String lever;
+    @Column(name = "lever")
+    private String leverage;
 
     /** Режим маржи (cross/isolated). */
-    @Column(name = "mgn_mode", length = 16)
-    private String mgnMode;
+    @Column(name = "mgn_mode")
+    private String marginMode;
 
     /** Нереализованный PnL по позиции. */
-    @Column(name = "upl", length = 64)
-    private String upl;
+    @Column(name = "upl")
+    private String unrealizedProfit;
 
     /** Время обновления позиции на бирже в UTC миллисекундах. */
     @Column(name = "u_time")
-    private Long uTime;
+    private Long updateTime;
 }

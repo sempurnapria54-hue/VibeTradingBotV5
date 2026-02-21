@@ -41,7 +41,7 @@ public class PositionCommandService {
             .orElseThrow(() -> new TradingCommandException(HttpStatus.NOT_FOUND, "INSTRUMENT_NOT_FOUND", "Instrument not found"));
 
         ClosePositionRequest request = new ClosePositionRequest();
-        request.setInstrumentId(instrument.getExternalName());
+        request.setInstrumentId(instrument.getExternalId());
         request.setMarginMode(DEFAULT_MARGIN_MODE);
         request.setPositionSide(command.getPositionSide());
 
@@ -51,18 +51,18 @@ public class PositionCommandService {
         positionEntity.setExchange(exchange);
         positionEntity.setInstrument(instrument);
         positionEntity.setStatus(POSITION_STATUS_UPDATED);
-        positionEntity.setSide(position.getPositionSide());
-        positionEntity.setPos(position.getPositionSize());
-        positionEntity.setAvgPx(position.getAveragePrice());
-        positionEntity.setMarkPx(position.getMarkPrice());
-        positionEntity.setLiqPx(position.getLiquidationPrice());
-        positionEntity.setLever(position.getLeverage());
-        positionEntity.setMgnMode(position.getMarginMode());
-        positionEntity.setUpl(position.getUnrealizedProfit());
-        positionEntity.setUTime(parseLongSafe(position.getUpdateTime()));
+        positionEntity.setPositionSide(position.getPosSide());
+        positionEntity.setPositionSize(position.getPos());
+        positionEntity.setAveragePrice(position.getAvgPx());
+        positionEntity.setMarkPrice(position.getMarkPx());
+        positionEntity.setLiquidationPrice(position.getLiqPx());
+        positionEntity.setLeverage(position.getLever());
+        positionEntity.setMarginMode(position.getMgnMode());
+        positionEntity.setUnrealizedProfit(position.getUpl());
+        positionEntity.setUpdateTime(parseLongSafe(position.getUTime()));
         positionDataService.save(positionEntity);
 
-        return new ClosePositionResponse(position.getInstrumentId(), position.getPositionSide(), position.getUpdateTime());
+        return new ClosePositionResponse(position.getInstId(), position.getPosSide(), position.getUTime());
     }
 
     private PositionResponse extractFirstPosition(List<PositionResponse> positions) {

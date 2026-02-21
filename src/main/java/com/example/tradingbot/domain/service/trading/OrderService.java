@@ -41,7 +41,7 @@ public class OrderService {
         orderEntity.applyOrderResponse(response);
         orderDataService.save(orderEntity);
 
-        return new OrderCommandResponse(orderEntity.getClientOrderId(), orderEntity.getExchangeOrderId(), orderEntity.getState());
+        return new OrderCommandResponse(orderEntity.getInternalId(), orderEntity.getExternalId(), orderEntity.getExternalStatus());
     }
 
     public OrderEntity cancelOrder(String exchangeName, String instrumentName, String orderId) {

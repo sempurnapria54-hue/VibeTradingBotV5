@@ -19,7 +19,7 @@ public class InstrumentService {
 
     public InstrumentEntity createInstrument(String exchangeName, InstrumentEntity instrument, Set<String> timeFrames) {
         ExchangeEntity exchangeEntity = exchangeService.getRequiredByName(exchangeName);
-        if (instrumentDataService.findByExchangeIdAndInstId(exchangeEntity.getId(), instrument.getExternalName()).isPresent()) {
+        if (instrumentDataService.findByExchangeIdAndInstId(exchangeEntity.getId(), instrument.getExternalId()).isPresent()) {
             throw new RuntimeException(INSTRUMENT_ALREADY_EXISTS);
         }
         instrument.initOnCreate(exchangeEntity, timeFrames);

@@ -8,7 +8,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface PositionMapper {
 
-    @Mapping(source = "instId", target = "instrumentId")
+    @Mapping(source = "instId", target = "externalInstrumentId")
     @Mapping(source = "instType", target = "instrumentType")
     @Mapping(source = "posSide", target = "positionSide")
     @Mapping(source = "pos", target = "positionSize")
@@ -21,7 +21,7 @@ public interface PositionMapper {
     @Mapping(source = "uTime", target = "updateTime")
     ExchangePosition clientToDomain(PositionResponse source);
 
-    @Mapping(source = "instrumentId", target = "instId")
+    @Mapping(source = "externalInstrumentId", target = "instId")
     @Mapping(source = "instrumentType", target = "instType")
     @Mapping(source = "positionSide", target = "posSide")
     @Mapping(source = "positionSize", target = "pos")
@@ -33,6 +33,4 @@ public interface PositionMapper {
     @Mapping(source = "marginMode", target = "mgnMode")
     @Mapping(source = "updateTime", target = "uTime")
     PositionResponse domainToClient(ExchangePosition source);
-
-
 }

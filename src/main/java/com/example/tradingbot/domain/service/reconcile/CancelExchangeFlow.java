@@ -101,14 +101,14 @@ public class CancelExchangeFlow {
             }
 
             PositionEntity entity = dbPositions.stream()
-                .filter(item -> StringUtils.equalsIgnoreCase(item.getSide(), externalPosition.getPositionSide()))
+                .filter(item -> StringUtils.equalsIgnoreCase(item.getPositionSide(), externalPosition.getPositionSide()))
                 .findFirst()
                 .orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new PositionEntity();
                 entity.setExchange(instrument.getExchange());
                 entity.setInstrument(instrument);
-                entity.setSide(externalPosition.getPositionSide());
+                entity.setPositionSide(externalPosition.getPositionSide());
                 unknownCreated++;
                 dbPositions.add(entity);
             }
@@ -133,8 +133,8 @@ public class CancelExchangeFlow {
             if (Objects.isNull(entity)) {
                 entity = new OrderEntity();
                 entity.setInstrument(instrument);
-                entity.setClientOrderId(clientOrderId);
-                entity.setExchangeOrderId(externalOrder.getExternalId());
+                entity.setInternalId(clientOrderId);
+                entity.setExternalId(externalOrder.getExternalId());
                 unknownCreated++;
             }
             entity.setStatus(STATUS_ANOMALY);
@@ -157,8 +157,8 @@ public class CancelExchangeFlow {
             if (Objects.isNull(entity)) {
                 entity = new AlgoOrderEntity();
                 entity.setInstrument(instrument);
-                entity.setClientAlgoOrderId(clientAlgoOrderId);
-                entity.setExchangeAlgoOrderId(externalAlgoOrder.getExternalId());
+                entity.setInternalOrderId(clientAlgoOrderId);
+                entity.setExternalId(externalAlgoOrder.getExternalId());
                 unknownCreated++;
             }
             entity.setStatus(STATUS_ANOMALY);

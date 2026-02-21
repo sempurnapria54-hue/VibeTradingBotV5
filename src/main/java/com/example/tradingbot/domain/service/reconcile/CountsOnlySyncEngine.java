@@ -113,8 +113,8 @@ public class CountsOnlySyncEngine {
 
         OrderEntity entity = new OrderEntity();
         entity.setInstrument(dbState.getInstrument());
-        entity.setClientOrderId(clientOrderId);
-        entity.setExchangeOrderId(action.getExchangeId());
+        entity.setInternalId(clientOrderId);
+        entity.setExternalId(action.getExchangeId());
         entity.setStatus(STATUS_UNKNOWN);
         orderDataService.save(entity);
     }
@@ -131,8 +131,8 @@ public class CountsOnlySyncEngine {
 
         AlgoOrderEntity entity = new AlgoOrderEntity();
         entity.setInstrument(dbState.getInstrument());
-        entity.setClientAlgoOrderId(clientAlgoOrderId);
-        entity.setExchangeAlgoOrderId(action.getExchangeId());
+        entity.setInternalOrderId(clientAlgoOrderId);
+        entity.setExternalId(action.getExchangeId());
         entity.setStatus(STATUS_UNKNOWN);
         algoOrderDataService.save(entity);
     }
