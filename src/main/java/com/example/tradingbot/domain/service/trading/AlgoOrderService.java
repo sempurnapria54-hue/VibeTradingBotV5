@@ -38,7 +38,7 @@ public class AlgoOrderService {
         algoOrderDataService.save(algoOrderEntity);
 
         AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.createAlgoOrder(algoOrderEntity));
-        algoOrderEntity.applyAlgoOrderResponse(algoOrderEntity, responseAlgoOrder);
+        algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }
 
@@ -51,7 +51,7 @@ public class AlgoOrderService {
                 algoOrderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchange.getId(), instrument.getId(), orderId);
 
         AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxTradeProxyService.cancelAlgoOrder(algoOrderEntity));
-        algoOrderEntity.applyAlgoOrderResponse(algoOrderEntity, responseAlgoOrder);
+        algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }
 
