@@ -16,11 +16,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static com.example.tradingbot.util.Constant.Status.AlgoOrder.ALGO_ORDER_STATUS_CREATED;
 import static com.example.tradingbot.util.Constant.Status.AlgoOrder.ALGO_ORDER_STATUS_IN_PROGRESS;
-import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
+import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMillisSafe;
 
 @Getter
 @Setter
@@ -143,13 +144,13 @@ public class AlgoOrderEntity extends AuditableEntity {
      * Время создания algo-ордера на бирже в UTC миллисекундах.
      */
     @Column(name = "c_time")
-    private Long createTime;
+    private OffsetDateTime exchangeCreatedAt;
 
     /**
      * Время обновления algo-ордера на бирже в UTC миллисекундах.
      */
     @Column(name = "u_time")
-    private Long updateTime;
+    private OffsetDateTime exchangeModifiedAt;
 
     public void initOnCreate(InstrumentEntity instrument, CreateAlgoOrderRequest request) {
         setInstrument(instrument);
@@ -175,7 +176,7 @@ public class AlgoOrderEntity extends AuditableEntity {
         setStopLossOrderPrice(responseOrder.getSlOrdPx());
         setCallbackRatio(responseOrder.getCallbackRatio());
         setCallbackStep(responseOrder.getCallbackSpread());
-        setCreateTime(parseLongSafe(responseOrder.getCTime()));
-        setUpdateTime(parseLongSafe(responseOrder.getUTime()));
+        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getCTime()));
+        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getUTime()));
     }
 }

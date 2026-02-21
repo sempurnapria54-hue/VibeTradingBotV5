@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CandleGroupResponse {
+public class CandleGroupResponse extends Auditable {
 
     private String instrumentInternalId;
     private String timeframe;

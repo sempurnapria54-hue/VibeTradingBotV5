@@ -16,7 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
+import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMillisSafe;
 
 @Service
 @RequiredArgsConstructor
@@ -59,7 +59,7 @@ public class PositionCommandService {
         positionEntity.setLeverage(position.getLever());
         positionEntity.setMarginMode(position.getMgnMode());
         positionEntity.setUnrealizedProfit(position.getUpl());
-        positionEntity.setUpdateTime(parseLongSafe(position.getUTime()));
+        positionEntity.setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(position.getUTime()));
         positionDataService.save(positionEntity);
 
         return new ClosePositionResponse(position.getInstId(), position.getPosSide(), position.getUTime());

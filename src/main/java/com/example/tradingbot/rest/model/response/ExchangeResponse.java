@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ExchangeResponse {
+public class ExchangeResponse extends Auditable {
 
     private String internalId;
     private String name;

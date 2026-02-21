@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -82,5 +83,5 @@ public class PositionEntity extends AuditableEntity {
 
     /** Время обновления позиции на бирже в UTC миллисекундах. */
     @Column(name = "u_time")
-    private Long updateTime;
+    private OffsetDateTime exchangeModifiedAt;
 }
