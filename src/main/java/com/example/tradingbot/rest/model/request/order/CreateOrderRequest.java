@@ -9,6 +9,6 @@ public class CreateOrderRequest {
 
     private String side;
     private String type;
-    private String sz;
-    private String px;
+    private String size;
+    private String price;
 }
