@@ -7,10 +7,16 @@ import lombok.Setter;
 @Setter
 public class ExchangeBalance {
 
+    /** Валюта баланса (например USDT). */
     private String currency;
+    /** Общий денежный баланс по валюте. */
     private String cashBalance;
+    /** Доступный для операций баланс. */
     private String availableBalance;
+    /** Текущая стоимость активов (equity). */
     private String equity;
+    /** Замороженная часть баланса. */
     private String frozenBalance;
+    /** Нереализованный PnL по валюте. */
     private String unrealizedProfit;
 }

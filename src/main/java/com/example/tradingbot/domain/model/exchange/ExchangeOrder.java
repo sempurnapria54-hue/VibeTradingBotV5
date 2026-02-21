@@ -9,21 +9,38 @@ import lombok.Setter;
 @Builder
 public class ExchangeOrder {
 
+    /** Идентификатор ордера на бирже. */
     private String orderId;
+    /** Клиентский идентификатор ордера. */
     private String clientOrderId;
+    /** Идентификатор инструмента (instId). */
     private String instrumentId;
+    /** Тип инструмента ордера. */
     private String instrumentType;
+    /** Сторона ордера: buy/sell. */
     private String side;
+    /** Направление позиции для ордера. */
     private String positionSide;
+    /** Тип ордера (limit/market и т.д.). */
     private String orderType;
+    /** Цена ордера. */
     private String price;
+    /** Объём ордера. */
     private String size;
+    /** Текущее состояние ордера. */
     private String state;
+    /** Средняя цена исполнения ордера. */
     private String averagePrice;
+    /** Накопленный исполненный объём. */
     private String accumulatedFillSize;
+    /** Комиссия по ордеру. */
     private String fee;
+    /** Время создания ордера на бирже. */
     private String createTime;
+    /** Время последнего обновления ордера. */
     private String updateTime;
+    /** Код статуса ответа биржи. */
     private String statusCode;
+    /** Текст статуса/ошибки ответа биржи. */
     private String statusMessage;
 }
