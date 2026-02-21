@@ -24,7 +24,7 @@ public class InstrumentController {
 
     @PostMapping
     public InstrumentResponse createInstrument(@PathVariable(name = "exchangeId") String exchangeId,
-                                       @RequestBody CreateInstrumentRequest request) {
+                                               @RequestBody CreateInstrumentRequest request) {
         var domainInstrument = instrumentService.createInstrument(exchangeId, instrumentMapper.restToDomain(request), request.getTimeFrames());
         return instrumentMapper.domainToRest(domainInstrument);
     }
@@ -37,7 +37,7 @@ public class InstrumentController {
 
     @GetMapping("/{instrumentId}")
     public InstrumentResponse getByName(@PathVariable(name = "exchangeId") String exchangeId,
-                                @PathVariable(name = "instrumentId") String instrumentId) {
+                                        @PathVariable(name = "instrumentId") String instrumentId) {
         var domainInstrument = instrumentService.getRequiredByExchangeInternalIdAndInstrumentInternalId(exchangeId, instrumentId);
         return instrumentMapper.domainToRest(domainInstrument);
     }

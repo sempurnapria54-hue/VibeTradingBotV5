@@ -14,6 +14,7 @@ public class Constant {
         public static final String ALGO_ORDER_NOT_FOUND = "algo.order.not.found";
         public static final String INSTRUMENT_ALREADY_EXISTS = "instrument.already.exists";
         public static final String CANDLE_GROUP_ALREADY_EXISTS = "candle.group.already.exists";
+        public static final String CANDLE_GROUP_NOT_FOUND = "candle.group.not.found";
 
     }
 

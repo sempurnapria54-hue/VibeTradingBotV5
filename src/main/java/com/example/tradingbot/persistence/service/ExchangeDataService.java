@@ -22,25 +22,12 @@ public class ExchangeDataService {
         return exchangeRepository.save(exchangeEntity);
     }
 
-    @Transactional
-    public List<ExchangeEntity> saveAll(List<ExchangeEntity> exchangeEntities) {
-        return exchangeRepository.saveAll(exchangeEntities);
-    }
-
     public Optional<ExchangeEntity> findById(Long id) {
         return exchangeRepository.findById(id);
     }
 
     public Optional<ExchangeEntity> findByName(String name) {
         return exchangeRepository.findByName(name);
-    }
-
-    public Optional<ExchangeEntity> findByInternalId(String internalId) {
-        return exchangeRepository.findByInternalId(internalId);
-    }
-
-    public Optional<Long> findIdByInternalId(String internalId) {
-        return exchangeRepository.findIdByInternalId(internalId);
     }
 
     public ExchangeEntity findRequiredByName(String name) {
@@ -50,6 +37,11 @@ public class ExchangeDataService {
 
     public ExchangeEntity findRequiredByInternalId(String internalId) {
         return exchangeRepository.findByInternalId(internalId)
+                .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
+    }
+
+    public Long getRequiredIdByInternalId(String internalId) {
+        return exchangeRepository.findIdByInternalId(internalId)
                 .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
     }
 

@@ -9,7 +9,7 @@ public class CandleGroupFactory {
 
     public static CandleGroupEntity createCandleGroup(InstrumentEntity instrument, String timeFrame) {
         var candleGroupEntity = new CandleGroupEntity();
-        candleGroupEntity.initOnCreate(instrument);
+        candleGroupEntity.initOnCreate(instrument, request);
         candleGroupEntity.setTimeframe(timeFrame);
         return candleGroupEntity;
     }

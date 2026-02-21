@@ -23,16 +23,17 @@ public class CandleGroupController {
     private final CandleGroupMapper candleGroupMapper;
 
     @GetMapping
-    public List<CandleGroupResponse> getByInstrument(@PathVariable(name = "exchangeId") String exchangeId,
-                                             @PathVariable(name = "instrumentId") String instrumentId) {
-        var candleGroups = candleGroupService.listByInstrument(exchangeId, instrumentId);
+    public List<CandleGroupResponse> getByInstrument(@PathVariable(name = "exchangeId") String exchangeInternalId,
+                                                     @PathVariable(name = "instrumentId") String instrumentInternalId) {
+        var candleGroups = candleGroupService.getByInstrument(exchangeInternalId, instrumentInternalId);
         return candleGroupMapper.domainToRest(candleGroups);
     }
 
     @PostMapping
-    public void createGroup(@PathVariable(name = "exchangeId") String exchangeId,
-                            @PathVariable(name = "instrumentId") String instrumentId,
-                            @RequestBody CreateCandleGroupRequest candleGroup) {
-        candleGroupService.create(exchangeId, instrumentId, candleGroupMapper.restToDomain(candleGroup));
+    public CandleGroupResponse createGroup(@PathVariable(name = "exchangeId") String exchangeInternalId,
+                                           @PathVariable(name = "instrumentId") String instrumentInternalId,
+                                           @RequestBody CreateCandleGroupRequest request) {
+        var candleGroupEntity = candleGroupService.create(exchangeInternalId, instrumentInternalId, request);
+        return candleGroupMapper.domainToRest(candleGroupEntity);
     }
 }

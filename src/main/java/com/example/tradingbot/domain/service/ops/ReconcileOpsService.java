@@ -6,13 +6,14 @@ import com.example.tradingbot.domain.service.reconcile.SynchronizeExecutionEnvir
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;
-import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +29,7 @@ public class ReconcileOpsService {
     public Long run(String mode, String exchangeInternalId) {
         validateRunRequest(mode);
 
-        Long exchangeId = resolveExchangeId(exchangeInternalId);
+        Long exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
 
         if (Objects.equals("SAFE", mode)) {
             return synchronizeExecutionEnvironmentService.runSafe(exchangeId);
@@ -42,37 +43,37 @@ public class ReconcileOpsService {
     }
 
     public List<SynchronizeExecutionEnvironmentReportEntity> listReports(String exchangeInternalId, Integer limit) {
-        Long exchangeId = resolveExchangeId(exchangeInternalId);
+        Long exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
         int resolvedLimit = resolveLimit(limit);
 
         return reportDataService.findByExchangeId(exchangeId, resolvedLimit)
-            .stream()
-            .map(this::toReportWithoutAnomalies)
-            .toList();
+                .stream()
+                .map(this::toReportWithoutAnomalies)
+                .toList();
     }
 
     public List<SynchronizeExecutionEnvironmentReportEntity> listReportsByInstrument(String exchangeInternalId, String instrumentInternalId, Integer limit) {
-        Long exchangeId = resolveExchangeId(exchangeInternalId);
+        Long exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
         int resolvedLimit = resolveLimit(limit);
 
         String exchangeInstId = instrumentDataService
-            .findExternalIdByExchangeIdAndInternalId(exchangeId, instrumentInternalId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Instrument not found"));
+                .findExternalIdByExchangeIdAndInternalId(exchangeId, instrumentInternalId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Instrument not found"));
 
         return reportDataService.findByExchangeIdAndInstId(exchangeId, exchangeInstId, resolvedLimit)
-            .stream()
-            .map(this::toReportWithoutAnomalies)
-            .toList();
+                .stream()
+                .map(this::toReportWithoutAnomalies)
+                .toList();
     }
 
     public SynchronizeExecutionEnvironmentReportEntity getReport(Long id) {
         SynchronizeExecutionEnvironmentReportEntity report = reportDataService.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reconcile report not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reconcile report not found"));
 
         List<SynchronizeExecutionEnvironmentReportAnomalyEntity> anomalies = reportDataService.findAnomaliesByReportId(id)
-            .stream()
-            .map(this::toAnomalyEntity)
-            .toList();
+                .stream()
+                .map(this::toAnomalyEntity)
+                .toList();
 
         return toReportEntity(report, anomalies);
     }
@@ -81,11 +82,6 @@ public class ReconcileOpsService {
         if (Objects.isNull(mode) || BooleanUtils.isTrue(mode.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "mode is required");
         }
-    }
-
-    private Long resolveExchangeId(String exchangeInternalId) {
-        return exchangeDataService.findIdByInternalId(exchangeInternalId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Exchange not found"));
     }
 
     private int resolveLimit(Integer limit) {
@@ -105,8 +101,8 @@ public class ReconcileOpsService {
     }
 
     private SynchronizeExecutionEnvironmentReportEntity toReportEntity(
-        SynchronizeExecutionEnvironmentReportEntity source,
-        List<SynchronizeExecutionEnvironmentReportAnomalyEntity> anomalies
+            SynchronizeExecutionEnvironmentReportEntity source,
+            List<SynchronizeExecutionEnvironmentReportAnomalyEntity> anomalies
     ) {
         SynchronizeExecutionEnvironmentReportEntity target = new SynchronizeExecutionEnvironmentReportEntity();
         target.setId(source.getId());

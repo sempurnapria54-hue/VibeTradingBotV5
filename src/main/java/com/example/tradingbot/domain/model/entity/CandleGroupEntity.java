@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.model.entity;
 
+import com.example.tradingbot.rest.model.request.candlegroup.CreateCandleGroupRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -99,7 +100,9 @@ public class CandleGroupEntity extends AuditableEntity {
     @Column(name = "lease_until")
     private Long leaseUntil;
 
-    public void initOnCreate(InstrumentEntity instrument) {
+    public void initOnCreate(InstrumentEntity instrument, CreateCandleGroupRequest request) {
+        setTimeframe(request.getTimeframe());
+        setCoverageStartTs(request.getCoverageStartTs());
         setStatus(CANDLE_GROUP_STATUS_CREATED);
         setInstrument(instrument);
     }

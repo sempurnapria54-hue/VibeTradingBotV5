@@ -12,6 +12,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import static com.example.tradingbot.util.Constant.ErrorCode.CANDLE_GROUP_ALREADY_EXISTS;
+import static com.example.tradingbot.util.Constant.ErrorCode.CANDLE_GROUP_NOT_FOUND;
+
 @Service
 @RequiredArgsConstructor
 public class CandleGroupDataService {
@@ -28,8 +31,10 @@ public class CandleGroupDataService {
         return candleGroupRepository.findById(groupId);
     }
 
-    public Optional<CandleGroupEntity> findByInstrumentIdAndTimeframe(Long instrumentId, String timeframe) {
-        return candleGroupRepository.findByInstrumentIdAndTimeframe(instrumentId, timeframe);
+    public void checkNotExists(Long instrumentId, String timeframe) {
+        if (candleGroupRepository.existsByInstrumentIdAndTimeframe(instrumentId, timeframe)) {
+            throw new RuntimeException(CANDLE_GROUP_ALREADY_EXISTS);
+        }
     }
 
     public List<CandleGroupEntity> findAllByInstrumentId(Long instrumentId) {
