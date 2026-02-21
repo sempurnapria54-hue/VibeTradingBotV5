@@ -10,11 +10,11 @@ import lombok.Setter;
 public class ExchangeOrder {
 
     /** Идентификатор ордера на бирже. */
-    private String orderId;
+    private String externalId;
     /** Клиентский идентификатор ордера. */
-    private String clientOrderId;
+    private String internalId;
     /** Идентификатор инструмента (instId). */
-    private String instrumentId;
+    private String externalInstrumentId;
     /** Тип инструмента ордера. */
     private String instrumentType;
     /** Сторона ордера: buy/sell. */
@@ -22,13 +22,13 @@ public class ExchangeOrder {
     /** Направление позиции для ордера. */
     private String positionSide;
     /** Тип ордера (limit/market и т.д.). */
-    private String orderType;
+    private String type;
     /** Цена ордера. */
     private String price;
     /** Объём ордера. */
     private String size;
     /** Текущее состояние ордера. */
-    private String state;
+    private String status;
     /** Средняя цена исполнения ордера. */
     private String averagePrice;
     /** Накопленный исполненный объём. */
@@ -40,7 +40,7 @@ public class ExchangeOrder {
     /** Время последнего обновления ордера. */
     private String updateTime;
     /** Код статуса ответа биржи. */
-    private String statusCode;
+    private String externalStatusCode;
     /** Текст статуса/ошибки ответа биржи. */
-    private String statusMessage;
+    private String externalStatusMessage;
 }

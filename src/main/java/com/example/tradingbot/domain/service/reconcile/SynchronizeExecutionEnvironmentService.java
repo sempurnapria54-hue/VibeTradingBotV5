@@ -196,7 +196,7 @@ public class SynchronizeExecutionEnvironmentService {
 
     private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
         return ExchangeInstrumentSnapshot.builder()
-            .instId(bucket.getInstrumentName())
+            .externalId(bucket.getInstrumentName())
             .positionsCount(bucket.getPositionsCount())
             .ordersCount(bucket.getOrdersCount())
             .algoOrdersCount(bucket.getAlgoOrdersCount())

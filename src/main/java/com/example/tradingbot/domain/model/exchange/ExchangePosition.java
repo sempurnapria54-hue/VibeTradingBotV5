@@ -10,7 +10,7 @@ import lombok.Setter;
 public class ExchangePosition {
 
     /** Идентификатор инструмента (instId). */
-    private String instrumentId;
+    private String externalInstrumentId;
     /** Тип инструмента позиции. */
     private String instrumentType;
     /** Сторона позиции (long/short/net). */

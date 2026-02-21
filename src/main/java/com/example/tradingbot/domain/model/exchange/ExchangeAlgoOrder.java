@@ -10,15 +10,15 @@ import lombok.Setter;
 public class ExchangeAlgoOrder {
 
     /** Идентификатор algo-заявки на бирже. */
-    private String algoOrderId;
+    private String externalId;
     /** Клиентский идентификатор заявки. */
-    private String clientOrderId;
+    private String internalOrderId;
     /** Идентификатор инструмента (instId). */
-    private String instrumentId;
+    private String externalInstrumentId;
     /** Тип algo-заявки. */
-    private String orderType;
+    private String type;
     /** Текущее состояние algo-заявки. */
-    private String state;
+    private String status;
     /** Объём заявки. */
     private String size;
     /** Триггерная цена активации заявки. */
@@ -36,13 +36,13 @@ public class ExchangeAlgoOrder {
     /** Коэффициент callback для trailing-механики. */
     private String callbackRatio;
     /** Шаг callback в абсолютном выражении. */
-    private String callbackSpread;
+    private String callbackStep;
     /** Время создания заявки на бирже. */
     private String createTime;
     /** Время последнего обновления заявки на бирже. */
     private String updateTime;
     /** Код статуса ответа биржи. */
-    private String statusCode;
+    private String externalStatusCode;
     /** Текст статуса/ошибки ответа биржи. */
-    private String statusMessage;
+    private String externalStatusMessage;
 }

@@ -8,7 +8,7 @@ import lombok.Setter;
 public class ExchangePriceTicker {
 
     /** Идентификатор инструмента (instId). */
-    private String instrumentId;
+    private String externalInstrumentId;
     /** Последняя цена сделки. */
     private String lastPrice;
     /** Mark price инструмента. */

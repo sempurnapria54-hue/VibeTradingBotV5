@@ -32,11 +32,11 @@ public class ExchangeToDbTransferService {
 
         bucket.getOrders().forEach(externalOrder -> {
             dbOrders.stream()
-                .filter(order -> Objects.equals(order.getClientOrderId(), resolveOrderClientId(externalOrder.getClientOrderId(), externalOrder.getOrderId())))
+                .filter(order -> Objects.equals(order.getClientOrderId(), resolveOrderClientId(externalOrder.getInternalId(), externalOrder.getExternalId())))
                 .findFirst()
                 .ifPresent(order -> {
-                    if (BooleanUtils.isFalse(Objects.equals(order.getExchangeOrderId(), externalOrder.getOrderId()))) {
-                        order.setExchangeOrderId(externalOrder.getOrderId());
+                    if (BooleanUtils.isFalse(Objects.equals(order.getExchangeOrderId(), externalOrder.getExternalId()))) {
+                        order.setExchangeOrderId(externalOrder.getExternalId());
                         orderDataService.save(order);
                     }
                 });
@@ -44,11 +44,11 @@ public class ExchangeToDbTransferService {
 
         bucket.getAlgoOrders().forEach(externalAlgoOrder -> {
             dbAlgoOrders.stream()
-                .filter(algoOrder -> Objects.equals(algoOrder.getClientAlgoOrderId(), resolveAlgoClientId(externalAlgoOrder.getClientOrderId(), externalAlgoOrder.getAlgoOrderId())))
+                .filter(algoOrder -> Objects.equals(algoOrder.getClientAlgoOrderId(), resolveAlgoClientId(externalAlgoOrder.getInternalOrderId(), externalAlgoOrder.getExternalId())))
                 .findFirst()
                 .ifPresent(algoOrder -> {
-                    if (BooleanUtils.isFalse(Objects.equals(algoOrder.getExchangeAlgoOrderId(), externalAlgoOrder.getAlgoOrderId()))) {
-                        algoOrder.setExchangeAlgoOrderId(externalAlgoOrder.getAlgoOrderId());
+                    if (BooleanUtils.isFalse(Objects.equals(algoOrder.getExchangeAlgoOrderId(), externalAlgoOrder.getExternalId()))) {
+                        algoOrder.setExchangeAlgoOrderId(externalAlgoOrder.getExternalId());
                         algoOrderDataService.save(algoOrder);
                     }
                 });

@@ -9,7 +9,7 @@ import lombok.Getter;
 public class ExchangeInstrumentSnapshot {
 
     /** Идентификатор инструмента (instId), для которого снят срез. */
-    private final String instId;
+    private final String externalId;
     /** Количество открытых позиций по инструменту. */
     private final int positionsCount;
     /** Количество активных обычных ордеров по инструменту. */

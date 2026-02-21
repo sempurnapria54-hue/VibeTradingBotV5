@@ -29,7 +29,7 @@ public class InstrumentBucketBuilder {
     public List<InstrumentBucket> buildBuckets(DatabaseSnapshot dbBefore, ExchangeSnapshot exBefore) {
         LinkedHashSet<String> instIds = new LinkedHashSet<>();
         dbBefore.getInstruments().stream().map(instrument -> instrument.getInstId()).forEach(instIds::add);
-        exBefore.getInstruments().stream().map(instrument -> instrument.getInstId()).forEach(instIds::add);
+        exBefore.getInstruments().stream().map(instrument -> instrument.getExternalId()).forEach(instIds::add);
 
         List<ExchangePosition> positions = exBefore.getPositions();
         List<ExchangeOrder> orders = exBefore.getOrders();
@@ -42,9 +42,9 @@ public class InstrumentBucketBuilder {
             }
             buckets.add(InstrumentBucket.builder()
                 .instrumentName(instId)
-                .positions(positions.stream().filter(it -> instId.equals(it.getInstrumentId())).toList())
-                .orders(orders.stream().filter(it -> instId.equals(it.getInstrumentId())).toList())
-                .algoOrders(algoOrders.stream().filter(it -> instId.equals(it.getInstrumentId())).toList())
+                .positions(positions.stream().filter(it -> instId.equals(it.getExternalInstrumentId())).toList())
+                .orders(orders.stream().filter(it -> instId.equals(it.getExternalInstrumentId())).toList())
+                .algoOrders(algoOrders.stream().filter(it -> instId.equals(it.getExternalInstrumentId())).toList())
                 .build());
         }
         buckets.sort(Comparator.comparing(InstrumentBucket::getInstrumentName));

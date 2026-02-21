@@ -14,7 +14,7 @@ public class ExchangeTradeFillsArchive {
     /** Временная метка ответа биржи. */
     private String timestamp;
     /** Код статуса ответа биржи. */
-    private String code;
+    private String externalStatusCode;
     /** Текст сообщения/ошибки ответа биржи. */
-    private String message;
+    private String externalStatusMessage;
 }

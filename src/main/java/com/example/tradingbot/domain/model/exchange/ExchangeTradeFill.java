@@ -8,13 +8,13 @@ import lombok.Setter;
 public class ExchangeTradeFill {
 
     /** Идентификатор записи в биллинге биржи. */
-    private String billId;
+    private String externalBillId;
     /** Идентификатор сделки. */
-    private String tradeId;
+    private String externalTradeId;
     /** Идентификатор ордера, породившего исполнение. */
-    private String orderId;
+    private String externalOrderId;
     /** Идентификатор инструмента (instId). */
-    private String instrumentId;
+    private String externalInstrumentId;
     /** Сторона исполнения: buy/sell. */
     private String side;
     /** Размер исполненной части сделки. */

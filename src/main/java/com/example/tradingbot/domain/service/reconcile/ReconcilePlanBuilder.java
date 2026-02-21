@@ -45,7 +45,7 @@ public class ReconcilePlanBuilder {
             dbState.getActiveOrders().stream().map(OrderEntity::getClientOrderId).filter(StringUtils::isNotBlank).toList()
         );
         Set<String> exOrderClientIds = new HashSet<>(
-            exchangeState.getOrders().stream().map(item -> item.getClientOrderId()).filter(StringUtils::isNotBlank).toList()
+            exchangeState.getOrders().stream().map(item -> item.getInternalId()).filter(StringUtils::isNotBlank).toList()
         );
 
         for (OrderEntity dbOrder : dbState.getActiveOrders()) {
@@ -54,18 +54,18 @@ public class ReconcilePlanBuilder {
             }
         }
         exchangeState.getOrders().stream()
-            .filter(item -> StringUtils.isBlank(item.getClientOrderId()) || !dbOrderClientIds.contains(item.getClientOrderId()))
+            .filter(item -> StringUtils.isBlank(item.getInternalId()) || !dbOrderClientIds.contains(item.getInternalId()))
             .forEach(item -> createUnknown.add(CreateUnknownAction.builder()
                 .entityType(ReconcileEntityType.ORDER)
-                .clientId(item.getClientOrderId())
-                .exchangeId(item.getOrderId())
+                .clientId(item.getInternalId())
+                .exchangeId(item.getExternalId())
                 .build()));
 
         Set<String> dbAlgoClientIds = new HashSet<>(
             dbState.getActiveAlgoOrders().stream().map(AlgoOrderEntity::getClientAlgoOrderId).filter(StringUtils::isNotBlank).toList()
         );
         Set<String> exAlgoClientIds = new HashSet<>(
-            exchangeState.getAlgoOrders().stream().map(item -> item.getClientOrderId()).filter(StringUtils::isNotBlank).toList()
+            exchangeState.getAlgoOrders().stream().map(item -> item.getInternalOrderId()).filter(StringUtils::isNotBlank).toList()
         );
 
         for (AlgoOrderEntity dbAlgoOrder : dbState.getActiveAlgoOrders()) {
@@ -75,11 +75,11 @@ public class ReconcilePlanBuilder {
             }
         }
         exchangeState.getAlgoOrders().stream()
-            .filter(item -> StringUtils.isBlank(item.getClientOrderId()) || !dbAlgoClientIds.contains(item.getClientOrderId()))
+            .filter(item -> StringUtils.isBlank(item.getInternalOrderId()) || !dbAlgoClientIds.contains(item.getInternalOrderId()))
             .forEach(item -> createUnknown.add(CreateUnknownAction.builder()
                 .entityType(ReconcileEntityType.ALGO_ORDER)
-                .clientId(item.getClientOrderId())
-                .exchangeId(item.getAlgoOrderId())
+                .clientId(item.getInternalOrderId())
+                .exchangeId(item.getExternalId())
                 .build()));
 
         if (dbState.getActivePositions().size() > exchangeState.getPositions().size()

@@ -42,19 +42,19 @@ public class OkxExchangeSnapshotProvider {
         List<ExchangeAlgoOrder> algoOrders = captureAlgoOrdersPending();
 
         LinkedHashSet<String> instIds = new LinkedHashSet<>();
-        positions.stream().map(ExchangePosition::getInstrumentId).forEach(instIds::add);
-        orders.stream().map(ExchangeOrder::getInstrumentId).forEach(instIds::add);
-        algoOrders.stream().map(ExchangeAlgoOrder::getInstrumentId).forEach(instIds::add);
+        positions.stream().map(ExchangePosition::getExternalInstrumentId).forEach(instIds::add);
+        orders.stream().map(ExchangeOrder::getExternalInstrumentId).forEach(instIds::add);
+        algoOrders.stream().map(ExchangeAlgoOrder::getExternalInstrumentId).forEach(instIds::add);
         managedInstIds.stream().filter(StringUtils::isNotBlank).forEach(instIds::add);
 
         List<ExchangeInstrumentSnapshot> instruments = instIds.stream()
             .filter(StringUtils::isNotBlank)
             .map(instId -> {
-                List<ExchangePosition> instrumentPositions = positions.stream().filter(position -> instId.equals(position.getInstrumentId())).toList();
-                List<ExchangeOrder> instrumentOrders = orders.stream().filter(order -> instId.equals(order.getInstrumentId())).toList();
-                List<ExchangeAlgoOrder> instrumentAlgoOrders = algoOrders.stream().filter(order -> instId.equals(order.getInstrumentId())).toList();
+                List<ExchangePosition> instrumentPositions = positions.stream().filter(position -> instId.equals(position.getExternalInstrumentId())).toList();
+                List<ExchangeOrder> instrumentOrders = orders.stream().filter(order -> instId.equals(order.getExternalInstrumentId())).toList();
+                List<ExchangeAlgoOrder> instrumentAlgoOrders = algoOrders.stream().filter(order -> instId.equals(order.getExternalInstrumentId())).toList();
                 return ExchangeInstrumentSnapshot.builder()
-                    .instId(instId)
+                    .externalId(instId)
                     .positionsCount(instrumentPositions.size())
                     .ordersCount(instrumentOrders.size())
                     .algoOrdersCount(instrumentAlgoOrders.size())
@@ -63,7 +63,7 @@ public class OkxExchangeSnapshotProvider {
                     .algoOrders(instrumentAlgoOrders)
                     .build();
             })
-            .sorted(Comparator.comparing(ExchangeInstrumentSnapshot::getInstId))
+            .sorted(Comparator.comparing(ExchangeInstrumentSnapshot::getExternalId))
             .toList();
 
         Map<String, ExchangePriceTicker> tickersByInstId = new LinkedHashMap<>();
@@ -93,10 +93,10 @@ public class OkxExchangeSnapshotProvider {
     public ExchangeInstrumentSnapshot refreshInstrumentSnapshot(String instId) {
         ExchangeSnapshot snapshot = captureExchangeSnapshot(List.of(instId));
         return snapshot.getInstruments().stream()
-            .filter(item -> instId.equals(item.getInstId()))
+            .filter(item -> instId.equals(item.getExternalId()))
             .findFirst()
             .orElse(ExchangeInstrumentSnapshot.builder()
-                .instId(instId)
+                .externalId(instId)
                 .positionsCount(0)
                 .ordersCount(0)
                 .algoOrdersCount(0)

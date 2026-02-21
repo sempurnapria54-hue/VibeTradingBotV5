@@ -112,9 +112,9 @@ public class ExchangeToDbExtendedTransferService {
                 continue;
             }
             boolean changed = false;
-            changed |= setIfChanged(target.getExchangeOrderId(), externalOrder.getOrderId(), target::setExchangeOrderId);
-            changed |= setIfChanged(target.getState(), externalOrder.getState(), target::setState);
-            changed |= setIfChanged(target.getOrdType(), externalOrder.getOrderType(), target::setOrdType);
+            changed |= setIfChanged(target.getExchangeOrderId(), externalOrder.getExternalId(), target::setExchangeOrderId);
+            changed |= setIfChanged(target.getState(), externalOrder.getStatus(), target::setState);
+            changed |= setIfChanged(target.getOrdType(), externalOrder.getType(), target::setOrdType);
             changed |= setIfChanged(target.getPx(), externalOrder.getPrice(), target::setPx);
             changed |= setIfChanged(target.getSz(), externalOrder.getSize(), target::setSz);
             changed |= setIfChanged(target.getFillSz(), externalOrder.getAccumulatedFillSize(), target::setFillSz);
@@ -146,9 +146,9 @@ public class ExchangeToDbExtendedTransferService {
             }
 
             boolean changed = false;
-            changed |= setIfChanged(target.getExchangeAlgoOrderId(), externalAlgoOrder.getAlgoOrderId(), target::setExchangeAlgoOrderId);
-            changed |= setIfChanged(target.getState(), externalAlgoOrder.getState(), target::setState);
-            changed |= setIfChanged(target.getAlgoType(), externalAlgoOrder.getOrderType(), target::setAlgoType);
+            changed |= setIfChanged(target.getExchangeAlgoOrderId(), externalAlgoOrder.getExternalId(), target::setExchangeAlgoOrderId);
+            changed |= setIfChanged(target.getState(), externalAlgoOrder.getStatus(), target::setState);
+            changed |= setIfChanged(target.getAlgoType(), externalAlgoOrder.getType(), target::setAlgoType);
             changed |= setIfChanged(target.getSz(), externalAlgoOrder.getSize(), target::setSz);
             changed |= setIfChanged(target.getTriggerPx(), externalAlgoOrder.getTriggerPrice(), target::setTriggerPx);
             changed |= setIfChanged(target.getOrdPx(), externalAlgoOrder.getOrderPrice(), target::setOrdPx);
@@ -157,7 +157,7 @@ public class ExchangeToDbExtendedTransferService {
             changed |= setIfChanged(target.getSlTriggerPx(), externalAlgoOrder.getStopLossTriggerPrice(), target::setSlTriggerPx);
             changed |= setIfChanged(target.getSlOrdPx(), externalAlgoOrder.getStopLossOrderPrice(), target::setSlOrdPx);
             changed |= setIfChanged(target.getCallbackRatio(), externalAlgoOrder.getCallbackRatio(), target::setCallbackRatio);
-            changed |= setIfChanged(target.getCallbackSpread(), externalAlgoOrder.getCallbackSpread(), target::setCallbackSpread);
+            changed |= setIfChanged(target.getCallbackSpread(), externalAlgoOrder.getCallbackStep(), target::setCallbackSpread);
 
             Long cTime = parseLong(externalAlgoOrder.getCreateTime());
             if (!Objects.equals(target.getCTime(), cTime)) {
@@ -177,26 +177,26 @@ public class ExchangeToDbExtendedTransferService {
     }
 
     private OrderEntity resolveOrder(Long exchangeId, Long instrumentId, ExchangeOrder externalOrder) {
-        if (StringUtils.isNotBlank(externalOrder.getClientOrderId())) {
-            return orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, externalOrder.getClientOrderId())
+        if (StringUtils.isNotBlank(externalOrder.getInternalId())) {
+            return orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, externalOrder.getInternalId())
                 .orElse(null);
         }
-        if (StringUtils.isBlank(externalOrder.getOrderId())) {
+        if (StringUtils.isBlank(externalOrder.getExternalId())) {
             return null;
         }
-        List<OrderEntity> matches = orderDataService.findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(exchangeId, instrumentId, externalOrder.getOrderId());
+        List<OrderEntity> matches = orderDataService.findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(exchangeId, instrumentId, externalOrder.getExternalId());
         return matches.size() == 1 ? matches.get(0) : null;
     }
 
     private AlgoOrderEntity resolveAlgoOrder(Long exchangeId, Long instrumentId, ExchangeAlgoOrder externalAlgoOrder) {
-        if (StringUtils.isNotBlank(externalAlgoOrder.getClientOrderId())) {
-            return algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchangeId, instrumentId, externalAlgoOrder.getClientOrderId())
+        if (StringUtils.isNotBlank(externalAlgoOrder.getInternalOrderId())) {
+            return algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchangeId, instrumentId, externalAlgoOrder.getInternalOrderId())
                 .orElse(null);
         }
-        if (StringUtils.isBlank(externalAlgoOrder.getAlgoOrderId())) {
+        if (StringUtils.isBlank(externalAlgoOrder.getExternalId())) {
             return null;
         }
-        List<AlgoOrderEntity> matches = algoOrderDataService.findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(exchangeId, instrumentId, externalAlgoOrder.getAlgoOrderId());
+        List<AlgoOrderEntity> matches = algoOrderDataService.findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(exchangeId, instrumentId, externalAlgoOrder.getExternalId());
         return matches.size() == 1 ? matches.get(0) : null;
     }
 

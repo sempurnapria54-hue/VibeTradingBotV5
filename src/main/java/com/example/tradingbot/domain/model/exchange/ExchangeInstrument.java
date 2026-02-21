@@ -8,9 +8,9 @@ import lombok.Setter;
 public class ExchangeInstrument {
 
     /** Идентификатор инструмента на бирже (instId). */
-    private String instrumentId;
+    private String externalId;
     /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
-    private String instrumentType;
+    private String type;
     /** Базовая валюта инструмента. */
     private String baseCurrency;
     /** Валюта котировки инструмента. */
@@ -18,7 +18,7 @@ public class ExchangeInstrument {
     /** Валюта расчётов по инструменту. */
     private String settleCurrency;
     /** Шаг изменения размера позиции/ордера. */
-    private String lotSize;
+    private String stepSize;
     /** Минимально допустимый размер заявки. */
     private String minimumSize;
     /** Номинальная стоимость одного контракта. */
@@ -26,5 +26,5 @@ public class ExchangeInstrument {
     /** Мультипликатор контракта. */
     private String contractMultiplier;
     /** Минимальный шаг изменения цены. */
-    private String tickSize;
+    private String minPriceStep;
 }
