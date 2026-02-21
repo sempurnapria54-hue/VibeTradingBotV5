@@ -48,6 +48,14 @@ public class InstrumentDataService {
         return instrumentRepository.findByExchangeIdAndInternalId(exchangeId, internalId);
     }
 
+    public Optional<String> findExternalIdByExchangeIdAndInternalId(Long exchangeId, String internalId) {
+        return instrumentRepository.findExternalIdByExchangeIdAndInternalId(exchangeId, internalId);
+    }
+
+    public Optional<Long> findIdByExchangeInternalIdAndInstrumentInternalId(String exchangeInternalId, String instrumentInternalId) {
+        return instrumentRepository.findIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId);
+    }
+
 //    public List<InstrumentEntity> findAll() {
 //        return instrumentRepository.findAll();
 //    }

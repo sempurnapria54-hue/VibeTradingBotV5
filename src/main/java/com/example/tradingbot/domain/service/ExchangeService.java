@@ -17,6 +17,7 @@ public class ExchangeService {
     }
 
     public ExchangeEntity createExchange(ExchangeEntity exchangeEntity) {
+        exchangeEntity.initOnCreate();
         return exchangeDataService.save(exchangeEntity);
     }
 
