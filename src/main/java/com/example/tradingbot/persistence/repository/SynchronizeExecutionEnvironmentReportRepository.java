@@ -11,6 +11,12 @@ public interface SynchronizeExecutionEnvironmentReportRepository extends JpaRepo
 
     Page<SynchronizeExecutionEnvironmentReportEntity> findAllByExchangeIdOrderByStartedAtDesc(Long exchangeId, Pageable pageable);
 
+    Page<SynchronizeExecutionEnvironmentReportEntity> findDistinctByExchangeIdAndAnomaliesInstIdOrderByStartedAtDesc(
+        Long exchangeId,
+        String instId,
+        Pageable pageable
+    );
+
     List<SynchronizeExecutionEnvironmentReportEntity> findAllByHasAnomaliesFalseAndFinishedAtBefore(Instant threshold);
 
     long deleteAllByHasAnomaliesFalseAndFinishedAtBefore(Instant threshold);

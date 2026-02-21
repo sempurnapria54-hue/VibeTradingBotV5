@@ -93,6 +93,12 @@ public class SynchronizeExecutionEnvironmentReportDataService {
         return reportRepository.findAllByExchangeIdOrderByStartedAtDesc(exchangeId, PageRequest.of(0, limit)).getContent();
     }
 
+    public List<SynchronizeExecutionEnvironmentReportEntity> findByExchangeIdAndInstId(Long exchangeId, String instId, int limit) {
+        return reportRepository
+            .findDistinctByExchangeIdAndAnomaliesInstIdOrderByStartedAtDesc(exchangeId, instId, PageRequest.of(0, limit))
+            .getContent();
+    }
+
     public Optional<SynchronizeExecutionEnvironmentReportEntity> findById(Long id) {
         return reportRepository.findById(id);
     }

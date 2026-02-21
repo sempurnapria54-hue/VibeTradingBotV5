@@ -44,6 +44,10 @@ public class InstrumentDataService {
         return instrumentRepository.findByExchangeIdAndInstId(exchangeId, instId);
     }
 
+    public Optional<InstrumentEntity> findByExchangeIdAndInternalId(Long exchangeId, String internalId) {
+        return instrumentRepository.findByExchangeIdAndInternalId(exchangeId, internalId);
+    }
+
 //    public List<InstrumentEntity> findAll() {
 //        return instrumentRepository.findAll();
 //    }
