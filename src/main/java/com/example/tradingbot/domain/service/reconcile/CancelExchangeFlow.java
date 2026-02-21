@@ -8,9 +8,9 @@ import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
 import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
 import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
 import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExternalOrder;
-import com.example.tradingbot.domain.model.exchange.ExternalPosition;
+import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangePosition;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
@@ -77,7 +77,7 @@ public class CancelExchangeFlow {
         }
 
         InstrumentEntity instrument = instrumentDataService.findById(bucket.getDbState().getInstrument().getId())
-            .orElseThrow(() -> new EntityNotFoundException("Instrument not found: id=" + bucket.getDbState().getInstrument().getId()));
+            .orElseThrow(() -> new EntityNotFoundException("ExchangeInstrument not found: id=" + bucket.getDbState().getInstrument().getId()));
 
         instrument.setStatus(STATUS_HOLD);
         instrumentDataService.save(instrument);
@@ -89,26 +89,26 @@ public class CancelExchangeFlow {
 
         List<PositionEntity> dbPositions = positionDataService.findAllByExchangeIdAndInstrumentId(instrument.getExchangeId(), instrument.getId());
 
-        for (ExternalPosition externalPosition : bucket.getPositions()) {
+        for (ExchangePosition externalPosition : bucket.getPositions()) {
             ClosePositionRequest request = new ClosePositionRequest();
-            request.setInstrumentId(externalPosition.getInstId());
-            request.setPositionSide(externalPosition.getSide());
+            request.setInstrumentId(externalPosition.getInstrumentId());
+            request.setPositionSide(externalPosition.getPositionSide());
             try {
                 okxTradeClientService.closePosition(request);
                 closedPositions++;
             } catch (Exception exception) {
-                log.warn("CancelFlow closePosition failed: instId={}, reason={}", externalPosition.getInstId(), exception.getMessage());
+                log.warn("CancelFlow closePosition failed: instId={}, reason={}", externalPosition.getInstrumentId(), exception.getMessage());
             }
 
             PositionEntity entity = dbPositions.stream()
-                .filter(item -> StringUtils.equalsIgnoreCase(item.getSide(), externalPosition.getSide()))
+                .filter(item -> StringUtils.equalsIgnoreCase(item.getSide(), externalPosition.getPositionSide()))
                 .findFirst()
                 .orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new PositionEntity();
                 entity.setExchange(instrument.getExchange());
                 entity.setInstrument(instrument);
-                entity.setSide(externalPosition.getSide());
+                entity.setSide(externalPosition.getPositionSide());
                 unknownCreated++;
                 dbPositions.add(entity);
             }
@@ -116,49 +116,49 @@ public class CancelExchangeFlow {
             positionDataService.save(entity);
         }
 
-        for (ExternalOrder externalOrder : bucket.getOrders()) {
+        for (ExchangeOrder externalOrder : bucket.getOrders()) {
             CancelOrderRequest request = new CancelOrderRequest();
-            request.setInstrumentId(externalOrder.getInstId());
-            request.setOrderId(externalOrder.getOrdId());
-            request.setClientOrderId(externalOrder.getClOrdId());
+            request.setInstrumentId(externalOrder.getInstrumentId());
+            request.setOrderId(externalOrder.getOrderId());
+            request.setClientOrderId(externalOrder.getClientOrderId());
             try {
                 okxTradeClientService.cancelOrder(request);
                 canceledOrders++;
             } catch (Exception exception) {
-                log.warn("CancelFlow cancelOrder failed: instId={}, ordId={}, reason={}", externalOrder.getInstId(), externalOrder.getOrdId(), exception.getMessage());
+                log.warn("CancelFlow cancelOrder failed: instId={}, ordId={}, reason={}", externalOrder.getInstrumentId(), externalOrder.getOrderId(), exception.getMessage());
             }
 
-            String clientOrderId = resolveOrderClientId(externalOrder.getClOrdId(), externalOrder.getOrdId());
+            String clientOrderId = resolveOrderClientId(externalOrder.getClientOrderId(), externalOrder.getOrderId());
             OrderEntity entity = orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(instrument.getExchangeId(), instrument.getId(), clientOrderId).orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new OrderEntity();
                 entity.setInstrument(instrument);
                 entity.setClientOrderId(clientOrderId);
-                entity.setExchangeOrderId(externalOrder.getOrdId());
+                entity.setExchangeOrderId(externalOrder.getOrderId());
                 unknownCreated++;
             }
             entity.setStatus(STATUS_ANOMALY);
             orderDataService.save(entity);
         }
 
-        for (ExternalAlgoOrder externalAlgoOrder : bucket.getAlgoOrders()) {
+        for (ExchangeAlgoOrder externalAlgoOrder : bucket.getAlgoOrders()) {
             CancelAlgoOrderRequest request = new CancelAlgoOrderRequest();
-            request.setInstrumentId(externalAlgoOrder.getInstId());
-            request.setAlgoOrderId(externalAlgoOrder.getAlgoId());
+            request.setInstrumentId(externalAlgoOrder.getInstrumentId());
+            request.setAlgoOrderId(externalAlgoOrder.getAlgoOrderId());
             try {
                 okxTradeClientService.cancelAlgoOrder(request);
                 canceledAlgoOrders++;
             } catch (Exception exception) {
-                log.warn("CancelFlow cancelAlgoOrder failed: instId={}, algoId={}, reason={}", externalAlgoOrder.getInstId(), externalAlgoOrder.getAlgoId(), exception.getMessage());
+                log.warn("CancelFlow cancelAlgoOrder failed: instId={}, algoId={}, reason={}", externalAlgoOrder.getInstrumentId(), externalAlgoOrder.getAlgoOrderId(), exception.getMessage());
             }
 
-            String clientAlgoOrderId = resolveAlgoClientId(externalAlgoOrder.getAlgoClOrdId(), externalAlgoOrder.getAlgoId());
+            String clientAlgoOrderId = resolveAlgoClientId(externalAlgoOrder.getClientOrderId(), externalAlgoOrder.getAlgoOrderId());
             AlgoOrderEntity entity = algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(instrument.getExchangeId(), instrument.getId(), clientAlgoOrderId).orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new AlgoOrderEntity();
                 entity.setInstrument(instrument);
                 entity.setClientAlgoOrderId(clientAlgoOrderId);
-                entity.setExchangeAlgoOrderId(externalAlgoOrder.getAlgoId());
+                entity.setExchangeAlgoOrderId(externalAlgoOrder.getAlgoOrderId());
                 unknownCreated++;
             }
             entity.setStatus(STATUS_ANOMALY);

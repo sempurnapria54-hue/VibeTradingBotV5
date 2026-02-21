@@ -1,11 +1,13 @@
-package com.example.tradingbot.domain.model.okxproxy;
+package com.example.tradingbot.domain.model.exchange;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class AlgoOrder {
+@Builder
+public class ExchangeAlgoOrder {
 
     private String algoOrderId;
     private String clientOrderId;

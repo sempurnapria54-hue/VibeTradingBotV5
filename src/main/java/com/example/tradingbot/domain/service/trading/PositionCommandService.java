@@ -51,18 +51,18 @@ public class PositionCommandService {
         positionEntity.setExchange(exchange);
         positionEntity.setInstrument(instrument);
         positionEntity.setStatus(POSITION_STATUS_UPDATED);
-        positionEntity.setSide(position.getPosSide());
-        positionEntity.setPos(position.getPos());
-        positionEntity.setAvgPx(position.getAvgPx());
-        positionEntity.setMarkPx(position.getMarkPx());
-        positionEntity.setLiqPx(position.getLiqPx());
-        positionEntity.setLever(position.getLever());
-        positionEntity.setMgnMode(position.getMgnMode());
-        positionEntity.setUpl(position.getUpl());
-        positionEntity.setUTime(parseLongSafe(position.getUTime()));
+        positionEntity.setSide(position.getPositionSide());
+        positionEntity.setPos(position.getPositionSize());
+        positionEntity.setAvgPx(position.getAveragePrice());
+        positionEntity.setMarkPx(position.getMarkPrice());
+        positionEntity.setLiqPx(position.getLiquidationPrice());
+        positionEntity.setLever(position.getLeverage());
+        positionEntity.setMgnMode(position.getMarginMode());
+        positionEntity.setUpl(position.getUnrealizedProfit());
+        positionEntity.setUTime(parseLongSafe(position.getUpdateTime()));
         positionDataService.save(positionEntity);
 
-        return new ClosePositionResponse(position.getInstId(), position.getPosSide(), position.getUTime());
+        return new ClosePositionResponse(position.getInstrumentId(), position.getPositionSide(), position.getUpdateTime());
     }
 
     private PositionResponse extractFirstPosition(List<PositionResponse> positions) {

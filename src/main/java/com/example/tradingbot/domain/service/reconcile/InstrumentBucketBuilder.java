@@ -1,10 +1,10 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangePosition;
 import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExternalOrder;
-import com.example.tradingbot.domain.model.exchange.ExternalPosition;
+import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,9 +31,9 @@ public class InstrumentBucketBuilder {
         dbBefore.getInstruments().stream().map(instrument -> instrument.getInstId()).forEach(instIds::add);
         exBefore.getInstruments().stream().map(instrument -> instrument.getInstId()).forEach(instIds::add);
 
-        List<ExternalPosition> positions = exBefore.getPositions();
-        List<ExternalOrder> orders = exBefore.getOrders();
-        List<ExternalAlgoOrder> algoOrders = exBefore.getAlgoOrders();
+        List<ExchangePosition> positions = exBefore.getPositions();
+        List<ExchangeOrder> orders = exBefore.getOrders();
+        List<ExchangeAlgoOrder> algoOrders = exBefore.getAlgoOrders();
 
         List<InstrumentBucket> buckets = new ArrayList<>();
         for (String instId : instIds) {
@@ -42,9 +42,9 @@ public class InstrumentBucketBuilder {
             }
             buckets.add(InstrumentBucket.builder()
                 .instrumentName(instId)
-                .positions(positions.stream().filter(it -> instId.equals(it.getInstId())).toList())
-                .orders(orders.stream().filter(it -> instId.equals(it.getInstId())).toList())
-                .algoOrders(algoOrders.stream().filter(it -> instId.equals(it.getInstId())).toList())
+                .positions(positions.stream().filter(it -> instId.equals(it.getInstrumentId())).toList())
+                .orders(orders.stream().filter(it -> instId.equals(it.getInstrumentId())).toList())
+                .algoOrders(algoOrders.stream().filter(it -> instId.equals(it.getInstrumentId())).toList())
                 .build());
         }
         buckets.sort(Comparator.comparing(InstrumentBucket::getInstrumentName));

@@ -1,11 +1,11 @@
-package com.example.tradingbot.domain.model.okxproxy;
+package com.example.tradingbot.domain.model.exchange;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class TradeFill {
+public class ExchangeTradeFill {
 
     private String billId;
     private String tradeId;

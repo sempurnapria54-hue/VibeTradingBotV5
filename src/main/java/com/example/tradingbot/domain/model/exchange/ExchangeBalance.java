@@ -1,11 +1,11 @@
-package com.example.tradingbot.domain.model.okxproxy;
+package com.example.tradingbot.domain.model.exchange;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class Balance {
+public class ExchangeBalance {
 
     private String currency;
     private String cashBalance;
