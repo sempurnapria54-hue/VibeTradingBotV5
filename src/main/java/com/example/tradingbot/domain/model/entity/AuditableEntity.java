@@ -18,8 +18,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @EntityListeners(AuditingEntityListener.class)
 public abstract class AuditableEntity {
 
-    public static final int AUDIT_NAME_LENGTH = 255;
-
     /** Дата и время создания записи. */
     @CreatedDate
     @Column(name = "created_at", nullable = false)
