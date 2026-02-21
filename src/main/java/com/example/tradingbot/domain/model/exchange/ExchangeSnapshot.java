@@ -9,9 +9,13 @@ import lombok.Getter;
 @Builder
 public class ExchangeSnapshot {
 
+    /** Имя биржи, для которой сформирован снимок. */
     private final String exchangeName;
+    /** Время снятия снимка в UTC миллисекундах. */
     private final long capturedAtUtcMillis;
+    /** Срезы данных по инструментам биржи. */
     private final List<ExchangeInstrumentSnapshot> instruments;
+    /** Карта тикеров по ключу instId. */
     private final Map<String, ExchangePriceTicker> tickersByInstId;
 
     public List<ExchangePosition> getPositions() {
