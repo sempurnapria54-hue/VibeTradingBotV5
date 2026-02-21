@@ -14,11 +14,11 @@ import com.example.tradingbot.client.model.okx.OrdersAlgoPendingRequest;
 import com.example.tradingbot.client.model.okx.OrdersHistoryRequest;
 import com.example.tradingbot.client.model.okx.OrdersPendingRequest;
 import com.example.tradingbot.client.okx.OkxRestClient;
-import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
-import com.example.tradingbot.domain.model.okxproxy.Order;
-import com.example.tradingbot.domain.model.okxproxy.Position;
-import com.example.tradingbot.domain.model.okxproxy.TradeFill;
-import com.example.tradingbot.domain.model.okxproxy.TradeFillsArchive;
+import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangePosition;
+import com.example.tradingbot.domain.model.exchange.ExchangeTradeFill;
+import com.example.tradingbot.domain.model.exchange.ExchangeTradeFillsArchive;
 import com.example.tradingbot.mapping.okxproxy.AlgoOrderMapper;
 import com.example.tradingbot.mapping.okxproxy.OrderMapper;
 import com.example.tradingbot.mapping.okxproxy.PositionMapper;
@@ -40,63 +40,63 @@ public class OkxTradeClientService {
     private final AlgoOrderMapper algoOrderMapper;
     private final PositionMapper positionMapper;
 
-    public List<Order> getOrdersPending(OrdersPendingRequest request) {
+    public List<ExchangeOrder> getOrdersPending(OrdersPendingRequest request) {
         return okxRestClient.getOrdersPending(request).getData().stream().map(orderMapper::clientToDomain).toList();
     }
 
-    public List<Order> getOrderDetails(OrderDetailsRequest request) {
+    public List<ExchangeOrder> getOrderDetails(OrderDetailsRequest request) {
         return okxRestClient.getOrderDetails(request).getData().stream().map(orderMapper::clientToDomain).toList();
     }
 
-    public List<AlgoOrder> getOrdersAlgoPending(OrdersAlgoPendingRequest request) {
+    public List<ExchangeAlgoOrder> getOrdersAlgoPending(OrdersAlgoPendingRequest request) {
         return okxRestClient.getOrdersAlgoPending(request).getData().stream().map(algoOrderMapper::clientToDomain).toList();
     }
 
-    public List<Order> getOrdersHistory(OrdersHistoryRequest request) {
+    public List<ExchangeOrder> getOrdersHistory(OrdersHistoryRequest request) {
         return okxRestClient.getOrdersHistory(request).getData().stream().map(orderMapper::clientToDomain).toList();
     }
 
-    public List<Order> getOrdersHistoryArchive(OrdersHistoryRequest request) {
+    public List<ExchangeOrder> getOrdersHistoryArchive(OrdersHistoryRequest request) {
         return okxRestClient.getOrdersHistoryArchive(request).getData().stream().map(orderMapper::clientToDomain).toList();
     }
 
-    public List<TradeFill> getFills(FillsRequest request) {
+    public List<ExchangeTradeFill> getFills(FillsRequest request) {
         return okxRestClient.getFills(request).getData().stream().map(tradeFillMapper::clientToDomain).toList();
     }
 
-    public List<TradeFill> getFillsHistory(FillsRequest request) {
+    public List<ExchangeTradeFill> getFillsHistory(FillsRequest request) {
         return okxRestClient.getFillsHistory(request).getData().stream().map(tradeFillMapper::clientToDomain).toList();
     }
 
-    public List<TradeFillsArchive> requestFillsArchive(FillsArchiveRequest request) {
+    public List<ExchangeTradeFillsArchive> requestFillsArchive(FillsArchiveRequest request) {
         return okxRestClient.requestFillsArchive(request).getData().stream().map(tradeFillsArchiveMapper::clientToDomain).toList();
     }
 
-    public List<TradeFillsArchive> getFillsArchiveLink(FillsArchiveLinkRequest request) {
+    public List<ExchangeTradeFillsArchive> getFillsArchiveLink(FillsArchiveLinkRequest request) {
         return okxRestClient.getFillsArchiveLink(request).getData().stream().map(tradeFillsArchiveMapper::clientToDomain).toList();
     }
 
-    public List<Order> createOrder(CreateOrderRequest request) {
+    public List<ExchangeOrder> createOrder(CreateOrderRequest request) {
         return okxRestClient.createOrder(request).getData().stream().map(orderMapper::clientToDomain).toList();
     }
 
-    public List<Order> amendOrder(AmendOrderRequest request) {
+    public List<ExchangeOrder> amendOrder(AmendOrderRequest request) {
         return okxRestClient.amendOrder(request).getData().stream().map(orderMapper::clientToDomain).toList();
     }
 
-    public List<Order> cancelOrder(CancelOrderRequest request) {
+    public List<ExchangeOrder> cancelOrder(CancelOrderRequest request) {
         return okxRestClient.cancelOrder(request).getData().stream().map(orderMapper::clientToDomain).toList();
     }
 
-    public List<AlgoOrder> createAlgoOrder(CreateAlgoOrderRequest request) {
+    public List<ExchangeAlgoOrder> createAlgoOrder(CreateAlgoOrderRequest request) {
         return okxRestClient.createAlgoOrder(request).getData().stream().map(algoOrderMapper::clientToDomain).toList();
     }
 
-    public List<AlgoOrder> cancelAlgoOrder(CancelAlgoOrderRequest request) {
+    public List<ExchangeAlgoOrder> cancelAlgoOrder(CancelAlgoOrderRequest request) {
         return okxRestClient.cancelAlgoOrder(request).getData().stream().map(algoOrderMapper::clientToDomain).toList();
     }
 
-    public List<Position> closePosition(ClosePositionRequest request) {
+    public List<ExchangePosition> closePosition(ClosePositionRequest request) {
         return okxRestClient.closePosition(request).getData().stream().map(positionMapper::clientToDomain).toList();
     }
 }

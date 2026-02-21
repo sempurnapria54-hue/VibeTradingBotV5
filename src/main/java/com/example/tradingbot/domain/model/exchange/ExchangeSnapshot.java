@@ -12,17 +12,17 @@ public class ExchangeSnapshot {
     private final String exchangeName;
     private final long capturedAtUtcMillis;
     private final List<ExchangeInstrumentSnapshot> instruments;
-    private final Map<String, ExternalTicker> tickersByInstId;
+    private final Map<String, ExchangePriceTicker> tickersByInstId;
 
-    public List<ExternalPosition> getPositions() {
+    public List<ExchangePosition> getPositions() {
         return instruments.stream().flatMap(instrument -> instrument.getPositions().stream()).toList();
     }
 
-    public List<ExternalOrder> getOrders() {
+    public List<ExchangeOrder> getOrders() {
         return instruments.stream().flatMap(instrument -> instrument.getOrders().stream()).toList();
     }
 
-    public List<ExternalAlgoOrder> getAlgoOrders() {
+    public List<ExchangeAlgoOrder> getAlgoOrders() {
         return instruments.stream().flatMap(instrument -> instrument.getAlgoOrders().stream()).toList();
     }
 }

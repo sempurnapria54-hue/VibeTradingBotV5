@@ -37,7 +37,7 @@ public class AnomalyEngine {
         }
 
         if (instrumentOnHold && (exPositions + exOrders + exAlgoOrders > 0)) {
-            return Optional.of(build("B2", SEVERITY_CRITICAL, true, true, "Instrument is HOLD but exchange has active entities", bucket,
+            return Optional.of(build("B2", SEVERITY_CRITICAL, true, true, "ExchangeInstrument is HOLD but exchange has active entities", bucket,
                 exPositions, exOrders, exAlgoOrders, dbPositions, dbOrders, dbAlgoOrders));
         }
 
@@ -68,7 +68,7 @@ public class AnomalyEngine {
             && exOrders == 0
             && exAlgoOrders == 0
             && (dbPositions + dbOrders + dbAlgoOrders > 0)) {
-            return Optional.of(build("B7", SEVERITY_NON_CRITICAL, false, false, "Instrument HOLD with empty exchange but stale DB entities", bucket,
+            return Optional.of(build("B7", SEVERITY_NON_CRITICAL, false, false, "ExchangeInstrument HOLD with empty exchange but stale DB entities", bucket,
                 exPositions, exOrders, exAlgoOrders, dbPositions, dbOrders, dbAlgoOrders));
         }
 

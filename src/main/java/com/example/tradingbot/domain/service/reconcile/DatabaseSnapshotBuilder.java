@@ -1,14 +1,14 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.service.reconcile.model.DatabaseInstrumentSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExternalOrder;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
 import com.example.tradingbot.domain.model.entity.PositionEntity;
+import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.service.reconcile.model.DatabaseInstrumentSnapshot;
+import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
@@ -51,17 +51,17 @@ public class DatabaseSnapshotBuilder {
                     .ordersCount(orders.size())
                     .algoOrdersCount(algoOrders.size())
                     .orders(orders.stream()
-                        .map(order -> ExternalOrder.builder()
-                            .instId(instrument.getExternalName())
-                            .ordId(order.getExchangeOrderId())
-                            .clOrdId(order.getClientOrderId())
+                        .map(order -> ExchangeOrder.builder()
+                            .instrumentId(instrument.getExternalName())
+                            .orderId(order.getExchangeOrderId())
+                            .clientOrderId(order.getClientOrderId())
                             .build())
                         .toList())
                     .algoOrders(algoOrders.stream()
-                        .map(algoOrder -> ExternalAlgoOrder.builder()
-                            .instId(instrument.getExternalName())
-                            .algoId(algoOrder.getExchangeAlgoOrderId())
-                            .algoClOrdId(algoOrder.getClientAlgoOrderId())
+                        .map(algoOrder -> ExchangeAlgoOrder.builder()
+                            .instrumentId(instrument.getExternalName())
+                            .algoOrderId(algoOrder.getExchangeAlgoOrderId())
+                            .clientOrderId(algoOrder.getClientAlgoOrderId())
                             .build())
                         .toList())
                     .build();

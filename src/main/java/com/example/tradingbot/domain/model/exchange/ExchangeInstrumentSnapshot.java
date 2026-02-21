@@ -12,7 +12,7 @@ public class ExchangeInstrumentSnapshot {
     private final int positionsCount;
     private final int ordersCount;
     private final int algoOrdersCount;
-    private final List<ExternalPosition> positions;
-    private final List<ExternalOrder> orders;
-    private final List<ExternalAlgoOrder> algoOrders;
+    private final List<ExchangePosition> positions;
+    private final List<ExchangeOrder> orders;
+    private final List<ExchangeAlgoOrder> algoOrders;
 }

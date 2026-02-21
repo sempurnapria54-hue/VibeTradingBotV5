@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.client.model.okx.CandleResponse;
-import com.example.tradingbot.domain.model.okxproxy.Candle;
+import com.example.tradingbot.domain.model.exchange.ExchangeCandle;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -10,11 +10,11 @@ public interface CandleMapper {
 
     @Mapping(source = "ts", target = "timestamp")
     @Mapping(source = "confirm", target = "confirmed")
-    Candle clientToDomain(CandleResponse source);
+    ExchangeCandle clientToDomain(CandleResponse source);
 
     @Mapping(source = "timestamp", target = "ts")
     @Mapping(source = "confirmed", target = "confirm")
-    CandleResponse domainToClient(Candle source);
+    CandleResponse domainToClient(ExchangeCandle source);
 
 
 }

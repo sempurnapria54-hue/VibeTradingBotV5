@@ -32,11 +32,11 @@ public class ExchangeToDbTransferService {
 
         bucket.getOrders().forEach(externalOrder -> {
             dbOrders.stream()
-                .filter(order -> Objects.equals(order.getClientOrderId(), resolveOrderClientId(externalOrder.getClOrdId(), externalOrder.getOrdId())))
+                .filter(order -> Objects.equals(order.getClientOrderId(), resolveOrderClientId(externalOrder.getClientOrderId(), externalOrder.getOrderId())))
                 .findFirst()
                 .ifPresent(order -> {
-                    if (BooleanUtils.isFalse(Objects.equals(order.getExchangeOrderId(), externalOrder.getOrdId()))) {
-                        order.setExchangeOrderId(externalOrder.getOrdId());
+                    if (BooleanUtils.isFalse(Objects.equals(order.getExchangeOrderId(), externalOrder.getOrderId()))) {
+                        order.setExchangeOrderId(externalOrder.getOrderId());
                         orderDataService.save(order);
                     }
                 });
@@ -44,18 +44,18 @@ public class ExchangeToDbTransferService {
 
         bucket.getAlgoOrders().forEach(externalAlgoOrder -> {
             dbAlgoOrders.stream()
-                .filter(algoOrder -> Objects.equals(algoOrder.getClientAlgoOrderId(), resolveAlgoClientId(externalAlgoOrder.getAlgoClOrdId(), externalAlgoOrder.getAlgoId())))
+                .filter(algoOrder -> Objects.equals(algoOrder.getClientAlgoOrderId(), resolveAlgoClientId(externalAlgoOrder.getClientOrderId(), externalAlgoOrder.getAlgoOrderId())))
                 .findFirst()
                 .ifPresent(algoOrder -> {
-                    if (BooleanUtils.isFalse(Objects.equals(algoOrder.getExchangeAlgoOrderId(), externalAlgoOrder.getAlgoId()))) {
-                        algoOrder.setExchangeAlgoOrderId(externalAlgoOrder.getAlgoId());
+                    if (BooleanUtils.isFalse(Objects.equals(algoOrder.getExchangeAlgoOrderId(), externalAlgoOrder.getAlgoOrderId()))) {
+                        algoOrder.setExchangeAlgoOrderId(externalAlgoOrder.getAlgoOrderId());
                         algoOrderDataService.save(algoOrder);
                     }
                 });
         });
 
         if (!bucket.getPositions().isEmpty()) {
-            String side = bucket.getPositions().get(0).getSide();
+            String side = bucket.getPositions().get(0).getPositionSide();
             if (StringUtils.isNotBlank(side)) {
                 dbPositions.stream().findFirst().ifPresent(position -> {
                     if (BooleanUtils.isFalse(Objects.equals(position.getSide(), side))) {

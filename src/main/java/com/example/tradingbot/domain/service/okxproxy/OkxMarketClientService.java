@@ -4,9 +4,9 @@ import com.example.tradingbot.client.model.okx.CandlesRequest;
 import com.example.tradingbot.client.model.okx.InstrumentsRequest;
 import com.example.tradingbot.client.model.okx.TickerRequest;
 import com.example.tradingbot.client.okx.OkxRestClient;
-import com.example.tradingbot.domain.model.okxproxy.Candle;
-import com.example.tradingbot.domain.model.okxproxy.Instrument;
-import com.example.tradingbot.domain.model.okxproxy.PriceTicker;
+import com.example.tradingbot.domain.model.exchange.ExchangeCandle;
+import com.example.tradingbot.domain.model.exchange.ExchangeInstrument;
+import com.example.tradingbot.domain.model.exchange.ExchangePriceTicker;
 import com.example.tradingbot.mapping.okxproxy.CandleMapper;
 import com.example.tradingbot.mapping.okxproxy.InstrumentMapper;
 import com.example.tradingbot.mapping.okxproxy.PriceTickerMapper;
@@ -24,19 +24,19 @@ public class OkxMarketClientService {
     private final InstrumentMapper instrumentMapper;
     private final PriceTickerMapper priceTickerMapper;
 
-    public List<Candle> getCandles(CandlesRequest request) {
+    public List<ExchangeCandle> getCandles(CandlesRequest request) {
         return okxRestClient.getCandles(request).getData().stream().map(candleMapper::clientToDomain).toList();
     }
 
-    public List<Candle> getHistoryCandles(CandlesRequest request) {
+    public List<ExchangeCandle> getHistoryCandles(CandlesRequest request) {
         return okxRestClient.getHistoryCandles(request).getData().stream().map(candleMapper::clientToDomain).toList();
     }
 
-    public List<Instrument> getInstruments(InstrumentsRequest request) {
+    public List<ExchangeInstrument> getInstruments(InstrumentsRequest request) {
         return okxRestClient.getInstruments(request).getData().stream().map(instrumentMapper::clientToDomain).toList();
     }
 
-    public List<PriceTicker> getTicker(TickerRequest request) {
+    public List<ExchangePriceTicker> getTicker(TickerRequest request) {
         return okxRestClient.getTicker(request).getData().stream().map(priceTickerMapper::clientToDomain).toList();
     }
 }

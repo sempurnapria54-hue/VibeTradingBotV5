@@ -1,27 +1,19 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.client.okx.OkxApiException;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExternalAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExternalOrder;
-import com.example.tradingbot.domain.model.exchange.ExternalPosition;
-import com.example.tradingbot.domain.model.exchange.ExternalTicker;
 import com.example.tradingbot.client.model.okx.OrdersAlgoPendingRequest;
 import com.example.tradingbot.client.model.okx.OrdersPendingRequest;
 import com.example.tradingbot.client.model.okx.PositionsRequest;
 import com.example.tradingbot.client.model.okx.TickerRequest;
-import com.example.tradingbot.domain.model.okxproxy.AlgoOrder;
-import com.example.tradingbot.domain.model.okxproxy.Order;
-import com.example.tradingbot.domain.model.okxproxy.Position;
-import com.example.tradingbot.domain.model.okxproxy.PriceTicker;
+import com.example.tradingbot.client.okx.OkxApiException;
+import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangePosition;
+import com.example.tradingbot.domain.model.exchange.ExchangePriceTicker;
+import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.okxproxy.OkxAccountClientService;
 import com.example.tradingbot.domain.service.okxproxy.OkxMarketClientService;
 import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
-import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,6 +21,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -42,73 +37,22 @@ public class OkxExchangeSnapshotProvider {
     private final OkxMarketClientService okxMarketClientService;
 
     public ExchangeSnapshot captureExchangeSnapshot(List<String> managedInstIds) {
-        List<Position> positions = capturePositions();
-        List<Order> orders = captureOrdersPending();
-        List<AlgoOrder> algoOrders = captureAlgoOrdersPending();
-
-        List<ExternalPosition> externalPositions = positions.stream()
-            .map(position -> ExternalPosition.builder()
-                .instId(position.getInstrumentId())
-                .side(position.getPositionSide())
-                .pos(position.getPositionSize())
-                .avgPx(position.getAveragePrice())
-                .markPx(position.getMarkPrice())
-                .liqPx(position.getLiquidationPrice())
-                .lever(position.getLeverage())
-                .mgnMode(position.getMarginMode())
-                .upl(position.getUnrealizedProfit())
-                .uTime(position.getUpdateTime())
-                .build())
-            .toList();
-        List<ExternalOrder> externalOrders = orders.stream()
-            .map(order -> ExternalOrder.builder()
-                .instId(order.getInstrumentId())
-                .ordId(order.getOrderId())
-                .clOrdId(order.getClientOrderId())
-                .state(order.getState())
-                .ordType(order.getOrderType())
-                .px(order.getPrice())
-                .sz(order.getSize())
-                .fillSz(order.getAccumulatedFillSize())
-                .avgPx(order.getAveragePrice())
-                .fee(order.getFee())
-                .cTime(order.getCreateTime())
-                .uTime(order.getUpdateTime())
-                .build())
-            .toList();
-        List<ExternalAlgoOrder> externalAlgoOrders = algoOrders.stream()
-            .map(order -> ExternalAlgoOrder.builder()
-                .instId(order.getInstrumentId())
-                .algoId(order.getAlgoOrderId())
-                .algoClOrdId(order.getClientOrderId())
-                .state(order.getState())
-                .algoType(order.getOrderType())
-                .sz(order.getSize())
-                .triggerPx(order.getTriggerPrice())
-                .ordPx(order.getOrderPrice())
-                .tpTriggerPx(order.getTakeProfitTriggerPrice())
-                .tpOrdPx(order.getTakeProfitOrderPrice())
-                .slTriggerPx(order.getStopLossTriggerPrice())
-                .slOrdPx(order.getStopLossOrderPrice())
-                .callbackRatio(order.getCallbackRatio())
-                .callbackSpread(order.getCallbackSpread())
-                .cTime(order.getCreateTime())
-                .uTime(order.getUpdateTime())
-                .build())
-            .toList();
+        List<ExchangePosition> positions = capturePositions();
+        List<ExchangeOrder> orders = captureOrdersPending();
+        List<ExchangeAlgoOrder> algoOrders = captureAlgoOrdersPending();
 
         LinkedHashSet<String> instIds = new LinkedHashSet<>();
-        externalPositions.stream().map(ExternalPosition::getInstId).forEach(instIds::add);
-        externalOrders.stream().map(ExternalOrder::getInstId).forEach(instIds::add);
-        externalAlgoOrders.stream().map(ExternalAlgoOrder::getInstId).forEach(instIds::add);
+        positions.stream().map(ExchangePosition::getInstrumentId).forEach(instIds::add);
+        orders.stream().map(ExchangeOrder::getInstrumentId).forEach(instIds::add);
+        algoOrders.stream().map(ExchangeAlgoOrder::getInstrumentId).forEach(instIds::add);
         managedInstIds.stream().filter(StringUtils::isNotBlank).forEach(instIds::add);
 
         List<ExchangeInstrumentSnapshot> instruments = instIds.stream()
             .filter(StringUtils::isNotBlank)
             .map(instId -> {
-                List<ExternalPosition> instrumentPositions = externalPositions.stream().filter(position -> instId.equals(position.getInstId())).toList();
-                List<ExternalOrder> instrumentOrders = externalOrders.stream().filter(order -> instId.equals(order.getInstId())).toList();
-                List<ExternalAlgoOrder> instrumentAlgoOrders = externalAlgoOrders.stream().filter(order -> instId.equals(order.getInstId())).toList();
+                List<ExchangePosition> instrumentPositions = positions.stream().filter(position -> instId.equals(position.getInstrumentId())).toList();
+                List<ExchangeOrder> instrumentOrders = orders.stream().filter(order -> instId.equals(order.getInstrumentId())).toList();
+                List<ExchangeAlgoOrder> instrumentAlgoOrders = algoOrders.stream().filter(order -> instId.equals(order.getInstrumentId())).toList();
                 return ExchangeInstrumentSnapshot.builder()
                     .instId(instId)
                     .positionsCount(instrumentPositions.size())
@@ -122,22 +66,16 @@ public class OkxExchangeSnapshotProvider {
             .sorted(Comparator.comparing(ExchangeInstrumentSnapshot::getInstId))
             .toList();
 
-        Map<String, ExternalTicker> tickersByInstId = new LinkedHashMap<>();
+        Map<String, ExchangePriceTicker> tickersByInstId = new LinkedHashMap<>();
         for (String instId : managedInstIds) {
             if (StringUtils.isBlank(instId)) {
                 continue;
             }
-            PriceTicker ticker = captureTicker(instId);
+            ExchangePriceTicker ticker = captureTicker(instId);
             if (ticker == null) {
                 continue;
             }
-            tickersByInstId.put(instId, ExternalTicker.builder()
-                .instId(instId)
-                .last(ticker.getLastPrice())
-                .markPx(ticker.getMarkPrice())
-                .idxPx(ticker.getIndexPrice())
-                .ts(ticker.getTimestamp())
-                .build());
+            tickersByInstId.put(instId, ticker);
         }
 
         return ExchangeSnapshot.builder()
@@ -168,7 +106,7 @@ public class OkxExchangeSnapshotProvider {
                 .build());
     }
 
-    private List<Position> capturePositions() {
+    private List<ExchangePosition> capturePositions() {
         try {
             return okxAccountClientService.getPositions(new PositionsRequest());
         } catch (OkxApiException exception) {
@@ -176,7 +114,7 @@ public class OkxExchangeSnapshotProvider {
         }
     }
 
-    private List<Order> captureOrdersPending() {
+    private List<ExchangeOrder> captureOrdersPending() {
         try {
             return okxTradeClientService.getOrdersPending(new OrdersPendingRequest());
         } catch (OkxApiException exception) {
@@ -184,8 +122,8 @@ public class OkxExchangeSnapshotProvider {
         }
     }
 
-    private List<AlgoOrder> captureAlgoOrdersPending() {
-        List<AlgoOrder> orders = new ArrayList<>();
+    private List<ExchangeAlgoOrder> captureAlgoOrdersPending() {
+        List<ExchangeAlgoOrder> orders = new ArrayList<>();
         for (String orderType : ALGO_ORDER_TYPES) {
             OrdersAlgoPendingRequest request = new OrdersAlgoPendingRequest();
             request.setOrderType(orderType);
@@ -198,7 +136,7 @@ public class OkxExchangeSnapshotProvider {
         return orders;
     }
 
-    private PriceTicker captureTicker(String instId) {
+    private ExchangePriceTicker captureTicker(String instId) {
         TickerRequest request = new TickerRequest();
         request.setInstrumentId(instId);
         try {

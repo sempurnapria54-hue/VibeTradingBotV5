@@ -3,8 +3,8 @@ package com.example.tradingbot.domain.service.okxproxy;
 import com.example.tradingbot.client.model.okx.BalanceRequest;
 import com.example.tradingbot.client.model.okx.PositionsRequest;
 import com.example.tradingbot.client.okx.OkxRestClient;
-import com.example.tradingbot.domain.model.okxproxy.Balance;
-import com.example.tradingbot.domain.model.okxproxy.Position;
+import com.example.tradingbot.domain.model.exchange.ExchangeBalance;
+import com.example.tradingbot.domain.model.exchange.ExchangePosition;
 import com.example.tradingbot.mapping.okxproxy.BalanceMapper;
 import com.example.tradingbot.mapping.okxproxy.PositionMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,12 +20,12 @@ public class OkxAccountClientService {
     private final BalanceMapper balanceMapper;
     private final PositionMapper positionMapper;
 
-    public List<Balance> getBalance(BalanceRequest request) {
+    public List<ExchangeBalance> getBalance(BalanceRequest request) {
         var balance = okxRestClient.getBalance(request);
         return balanceMapper.clientToDomain(balance.getData());
     }
 
-    public List<Position> getPositions(PositionsRequest request) {
+    public List<ExchangePosition> getPositions(PositionsRequest request) {
         return okxRestClient.getPositions(request).getData().stream().map(positionMapper::clientToDomain).toList();
     }
 }
