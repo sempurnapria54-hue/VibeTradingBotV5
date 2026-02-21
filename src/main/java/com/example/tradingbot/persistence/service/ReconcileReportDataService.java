@@ -75,6 +75,7 @@ public class ReconcileReportDataService {
 
     private ReconcileReportEntity createStarted(Long exchangeId, String trigger, String databaseBeforeJson, String exchangeBeforeJson, Instant startedAt) {
         ReconcileReportEntity entity = new ReconcileReportEntity();
+        entity.initOnCreate();
         entity.setExchangeId(exchangeId);
         entity.setTrigger(trigger);
         entity.setStartedAt(startedAt);

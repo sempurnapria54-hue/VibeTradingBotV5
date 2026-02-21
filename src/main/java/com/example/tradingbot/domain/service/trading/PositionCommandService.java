@@ -11,11 +11,12 @@ import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
 
 @Service
 @RequiredArgsConstructor
@@ -69,12 +70,5 @@ public class PositionCommandService {
             throw new TradingCommandException(HttpStatus.BAD_GATEWAY, "OKX_EMPTY_RESPONSE", "OKX returned empty close-position response");
         }
         return positions.getFirst();
-    }
-
-    private Long parseLongSafe(String source) {
-        if (Objects.isNull(source) || source.isBlank()) {
-            return null;
-        }
-        return Long.parseLong(source);
     }
 }
