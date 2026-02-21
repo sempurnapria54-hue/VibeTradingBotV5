@@ -1,4 +1,4 @@
-package com.example.tradingbot.rest.model.request.instrument;
+package com.example.tradingbot.rest.model.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -14,7 +14,7 @@ import java.util.Set;
 public class CreateInstrumentRequest {
 
     private String name;
-    private String externalName;
+    private String externalId;
     private String type;
     private Set<String> timeFrames;
 }

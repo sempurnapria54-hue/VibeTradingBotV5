@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+import static com.example.tradingbot.util.Constant.ErrorCode.EXCHANGE_ALREADY_EXISTS;
 import static com.example.tradingbot.util.Constant.ErrorCode.EXCHANGE_NOT_FOUND;
 
 @Service
@@ -30,11 +31,6 @@ public class ExchangeDataService {
         return exchangeRepository.findByName(name);
     }
 
-    public ExchangeEntity findRequiredByName(String name) {
-        return exchangeRepository.findByName(name)
-                .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
-    }
-
     public ExchangeEntity findRequiredByInternalId(String internalId) {
         return exchangeRepository.findByInternalId(internalId)
                 .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
@@ -49,7 +45,9 @@ public class ExchangeDataService {
         return exchangeRepository.findAll();
     }
 
-    public boolean existsById(Long id) {
-        return exchangeRepository.existsById(id);
+    public void checkNotExists(String name) {
+        if (exchangeRepository.existsByName(name)) {
+            throw new RuntimeException(EXCHANGE_ALREADY_EXISTS);
+        }
     }
 }

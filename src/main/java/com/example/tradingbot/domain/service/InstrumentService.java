@@ -1,14 +1,14 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
+import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
-import java.util.List;
-import java.util.Set;
+import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_ALREADY_EXISTS;
+import java.util.List;
+
 import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
 
 @Service
@@ -16,20 +16,19 @@ import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUN
 public class InstrumentService {
 
     private final InstrumentDataService instrumentDataService;
-    private final ExchangeService exchangeService;
+    private final ExchangeDataService exchangeDataService;
 
-    public InstrumentEntity createInstrument(String exchangeInternalId, InstrumentEntity instrument, Set<String> timeFrames) {
-        ExchangeEntity exchangeEntity = exchangeService.getRequiredByInternalId(exchangeInternalId);
-        if (instrumentDataService.findByExchangeIdAndInstId(exchangeEntity.getId(), instrument.getExternalId()).isPresent()) {
-            throw new RuntimeException(INSTRUMENT_ALREADY_EXISTS);
-        }
-        instrument.initOnCreate(exchangeEntity, timeFrames);
-        return instrumentDataService.save(instrument);
+    public InstrumentEntity createInstrument(String exchangeInternalId, CreateInstrumentRequest request) {
+        var exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
+        checkExistence(exchangeId, request.getExternalId());
+        var instrumentEntity = new InstrumentEntity();
+        instrumentEntity.initOnCreate(exchangeId, request);
+        return instrumentDataService.save(instrumentEntity);
     }
 
     public List<InstrumentEntity> getAllByExchange(String exchangeInternalId) {
-        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
-        return instrumentDataService.findAllByExchangeId(exchange.getId());
+        var exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
+        return instrumentDataService.findAllByExchangeId(exchangeId);
     }
 
     public InstrumentEntity getRequiredByExchangeIdAndName(Long exchangeId, String name) {
@@ -42,11 +41,16 @@ public class InstrumentService {
 
     public Long getRequiredIdByExchangeInternalIdAndInstrumentInternalId(String exchangeInternalId, String instrumentInternalId) {
         return instrumentDataService.findIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId)
-            .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
+                .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
     }
 
     public InstrumentEntity getRequiredByExchangeInternalIdAndInstrumentInternalId(String exchangeInternalId, String instrumentInternalId) {
-        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
-        return instrumentDataService.findRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
+        var exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
+        return instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeId, instrumentInternalId);
     }
+
+    private void checkExistence(Long exchangeId, String externalId) {
+        instrumentDataService.checkNotExists(exchangeId, externalId);
+    }
+
 }

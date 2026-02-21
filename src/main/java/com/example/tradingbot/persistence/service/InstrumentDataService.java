@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_ALREADY_EXISTS;
 import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
 
 @Service
@@ -38,6 +39,12 @@ public class InstrumentDataService {
     public InstrumentEntity findRequiredByExchangeIdAndName(Long exchangeId, String name) {
         return instrumentRepository.findByExchangeIdAndName(exchangeId, name)
                 .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
+    }
+
+    public void checkNotExists(Long exchangeId, String externalId) {
+        if (instrumentRepository.existsByExchangeIdAndExternalId(exchangeId, externalId)) {
+            throw new RuntimeException(INSTRUMENT_ALREADY_EXISTS);
+        }
     }
 
     public Optional<InstrumentEntity> findByExchangeIdAndInstId(Long exchangeId, String instId) {

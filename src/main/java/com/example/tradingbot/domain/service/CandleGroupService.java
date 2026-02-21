@@ -4,7 +4,7 @@ import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
-import com.example.tradingbot.rest.model.request.candlegroup.CreateCandleGroupRequest;
+import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

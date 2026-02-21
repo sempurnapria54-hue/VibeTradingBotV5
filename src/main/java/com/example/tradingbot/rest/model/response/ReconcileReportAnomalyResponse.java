@@ -1,4 +1,4 @@
-package com.example.tradingbot.rest.model.response.reconcile;
+package com.example.tradingbot.rest.model.response;
 
 import java.time.Instant;
 import lombok.Getter;

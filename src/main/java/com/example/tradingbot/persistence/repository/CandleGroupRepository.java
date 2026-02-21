@@ -14,8 +14,6 @@ import java.util.Optional;
 
 public interface CandleGroupRepository extends JpaRepository<CandleGroupEntity, Long> {
 
-    Optional<CandleGroupEntity> findByInstrumentIdAndTimeframe(Long instrumentId, String timeframe);
-
     boolean existsByInstrumentIdAndTimeframe(Long instrumentId, String timeframe);
 
     List<CandleGroupEntity> findAllByInstrumentIdOrderByIdAsc(Long instrumentId);

@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.trading;
 
 import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
-import com.example.tradingbot.rest.model.request.order.CreateAlgoOrderRequest;
+import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;

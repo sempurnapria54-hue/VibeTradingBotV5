@@ -2,8 +2,8 @@ package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.CandleGroupService;
 import com.example.tradingbot.mapping.okxproxy.CandleGroupMapper;
-import com.example.tradingbot.rest.model.request.candlegroup.CreateCandleGroupRequest;
-import com.example.tradingbot.rest.model.response.candlegroup.CandleGroupResponse;
+import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
+import com.example.tradingbot.rest.model.response.CandleGroupResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.job;
 
-import com.example.tradingbot.domain.service.reconcile.CleanupSynchronizeExecutionEnvironmentReportsService;
+import com.example.tradingbot.domain.service.reconcile.CleanupReconcileReportsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CleanupSynchronizeExecutionEnvironmentReportsJob {
 
-    private final CleanupSynchronizeExecutionEnvironmentReportsService cleanupService;
+    private final CleanupReconcileReportsService cleanupService;
 
     @Scheduled(cron = "0 0 3 * * *", zone = "UTC")
     public void run() {

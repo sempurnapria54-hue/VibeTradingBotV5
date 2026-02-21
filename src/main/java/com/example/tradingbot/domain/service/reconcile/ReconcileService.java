@@ -1,38 +1,40 @@
 package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.config.ReconcileProperties;
-import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
-import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
-import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
-import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
 import com.example.tradingbot.domain.model.entity.PositionEntity;
-import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
+import com.example.tradingbot.domain.model.entity.ReconcileReportEntity;
+import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
+import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
+import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
+import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
+import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
-import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import com.example.tradingbot.persistence.service.ReconcileReportDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SynchronizeExecutionEnvironmentService {
+public class ReconcileService {
 
     private static final String STATUS_HOLD = "HOLD";
     private static final String STATUS_ACTIVE = "ACTIVE";
@@ -42,7 +44,7 @@ public class SynchronizeExecutionEnvironmentService {
     private final OkxExchangeSnapshotProvider snapshotProvider;
     private final DatabaseSnapshotBuilder databaseSnapshotBuilder;
     private final InstrumentBucketBuilder bucketBuilder;
-    private final SynchronizeExecutionEnvironmentReportService reportService;
+    private final ReconcileReportDataService reportDataService;
     private final CountsOnlySyncEngine countsOnlySyncEngine;
     private final AnomalyEngine anomalyEngine;
     private final CancelExchangeFlow cancelExchangeFlow;
@@ -65,69 +67,61 @@ public class SynchronizeExecutionEnvironmentService {
 
         log.info("Reconcile dry-run started: exchangeName={}, capturedAt={}", snapshot.getExchangeName(), Instant.ofEpochMilli(snapshot.getCapturedAtUtcMillis()));
         log.info("Reconcile dry-run totals: Positions.count={}, Orders.count={}, AlgoOrders.count={}",
-            snapshot.getPositions().size(),
-            snapshot.getOrders().size(),
-            snapshot.getAlgoOrders().size());
+                snapshot.getPositions().size(),
+                snapshot.getOrders().size(),
+                snapshot.getAlgoOrders().size());
 
         for (InstrumentBucket bucket : buckets) {
             log.info("Reconcile dry-run bucket: instId={}, Positions.count={}, Orders.count={}, AlgoOrders.count={}",
-                bucket.getInstrumentName(),
-                bucket.getPositionsCount(),
-                bucket.getOrdersCount(),
-                bucket.getAlgoOrdersCount());
+                    bucket.getInstrumentName(),
+                    bucket.getPositionsCount(),
+                    bucket.getOrdersCount(),
+                    bucket.getAlgoOrdersCount());
         }
     }
 
     @Transactional
-    public Long runSafe(Long exchangeId) {
-        return run(exchangeId);
-    }
-
-    @Transactional
-    public Long run(Long exchangeId) {
+    public ReconcileReportEntity run(ExchangeEntity exchangeEntity) {
         if (BooleanUtils.isFalse(reconcileProperties.isEnabled())) {
             throw new IllegalStateException("Reconcile run skipped: reconcile.enabled=false");
         }
 
-        ExchangeEntity exchange = exchangeDataService.findById(exchangeId)
-            .orElseThrow(() -> new IllegalStateException("Reconcile run failed: exchange not found, id=" + exchangeId));
+        List<InstrumentEntity> managedInstruments = instrumentDataService.findAllByExchangeId(exchangeEntity.getId());
+        List<String> managedInstIds = managedInstruments.stream().map(InstrumentEntity::getExternalId).toList();
 
-        List<InstrumentEntity> managedInstruments = instrumentDataService.findAllByExchangeId(exchange.getId());
-        List<String> managedInstIds = managedInstruments.stream().map(InstrumentEntity::getExternalName).toList();
-
-        DatabaseSnapshot databaseBefore = databaseSnapshotBuilder.captureDatabaseSnapshot(exchange, managedInstruments);
+        DatabaseSnapshot databaseBefore = databaseSnapshotBuilder.captureDatabaseSnapshot(exchangeEntity, managedInstruments);
         ExchangeSnapshot exchangeBefore = snapshotProvider.captureExchangeSnapshot(managedInstIds);
-        SynchronizeExecutionEnvironmentReportEntity report = reportService.createStartedReport(exchange, "SCHEDULED", databaseBefore, exchangeBefore);
+        ReconcileReportEntity report = reportDataService.createStartedReport(exchangeEntity.getId(), "SCHEDULED", databaseBefore, exchangeBefore);
 
-        exchange.setStatus(STATUS_SYNC);
-        exchangeDataService.save(exchange);
+        exchangeEntity.setStatus(STATUS_SYNC);
+        exchangeDataService.save(exchangeEntity);
 
         List<InstrumentBucket> buckets = bucketBuilder.buildBuckets(databaseBefore, exchangeBefore);
         boolean hasAnomalies = false;
         String maxSeverity = "NONE";
 
         for (InstrumentBucket sourceBucket : buckets) {
-            Optional<InstrumentEntity> instrumentOptional = instrumentDataService.findByExchangeIdAndName(exchange.getId(), sourceBucket.getInstrumentName());
-            DbInstrumentState dbState = loadDbInstrumentState(exchange.getId(), instrumentOptional.orElse(null));
+            Optional<InstrumentEntity> instrumentOptional = instrumentDataService.findByExchangeIdAndName(exchangeEntity.getId(), sourceBucket.getInstrumentName());
+            DbInstrumentState dbState = loadDbInstrumentState(exchangeEntity.getId(), instrumentOptional.orElse(null));
             InstrumentBucket bucket = InstrumentBucket.builder()
-                .instrumentName(sourceBucket.getInstrumentName())
-                .dbState(dbState)
-                .positions(sourceBucket.getPositions())
-                .orders(sourceBucket.getOrders())
-                .algoOrders(sourceBucket.getAlgoOrders())
-                .build();
+                    .instrumentName(sourceBucket.getInstrumentName())
+                    .dbState(dbState)
+                    .positions(sourceBucket.getPositions())
+                    .orders(sourceBucket.getOrders())
+                    .algoOrders(sourceBucket.getAlgoOrders())
+                    .build();
             ExchangeInstrumentSnapshot currentExchangeState = toExchangeState(bucket);
 
             Optional<AnomalyDecision> decisionOptional = anomalyEngine.evaluate(bucket);
             if (decisionOptional.isPresent()) {
                 AnomalyDecision decision = decisionOptional.get();
-                reportService.appendAnomaly(
-                    report.getId(),
-                    bucket.getInstrumentName(),
-                    decision.getType(),
-                    decision.getSeverity(),
-                    decision.getSummary(),
-                    decision.getDetailsJson()
+                reportDataService.appendAnomaly(
+                        report.getId(),
+                        bucket.getInstrumentName(),
+                        decision.getType(),
+                        decision.getSeverity(),
+                        decision.getSummary(),
+                        decision.getDetailsJson()
                 );
                 hasAnomalies = true;
                 maxSeverity = resolveMaxSeverity(maxSeverity, decision.getSeverity());
@@ -157,15 +151,15 @@ public class SynchronizeExecutionEnvironmentService {
             if (instrumentOptional.isPresent()) {
                 InstrumentEntity instrument = instrumentOptional.get();
                 InstrumentBucket syncBucket = InstrumentBucket.builder()
-                    .instrumentName(bucket.getInstrumentName())
-                    .dbState(dbState)
-                    .positions(currentExchangeState.getPositions())
-                    .orders(currentExchangeState.getOrders())
-                    .algoOrders(currentExchangeState.getAlgoOrders())
-                    .build();
+                        .instrumentName(bucket.getInstrumentName())
+                        .dbState(dbState)
+                        .positions(currentExchangeState.getPositions())
+                        .orders(currentExchangeState.getOrders())
+                        .algoOrders(currentExchangeState.getAlgoOrders())
+                        .build();
                 countsOnlySyncEngine.syncPresence(syncBucket, currentExchangeState);
-                exchangeToDbTransferService.transfer(exchange.getId(), instrument.getId(), syncBucket);
-                exchangeToDbExtendedTransferService.transfer(exchange.getId(), syncBucket, currentExchangeState, exchangeBefore);
+                exchangeToDbTransferService.transfer(exchangeEntity.getId(), instrument.getId(), syncBucket);
+                exchangeToDbExtendedTransferService.transfer(exchangeEntity.getId(), syncBucket, currentExchangeState, exchangeBefore);
 
                 instrument.setStatus(STATUS_ACTIVE);
                 instrumentDataService.save(instrument);
@@ -173,65 +167,53 @@ public class SynchronizeExecutionEnvironmentService {
         }
 
         ExchangeSnapshot exchangeAfter = snapshotProvider.captureExchangeSnapshot(managedInstIds);
-        DatabaseSnapshot databaseAfter = databaseSnapshotBuilder.captureDatabaseSnapshot(exchange, managedInstruments);
-        reportService.finalizeReport(report.getId(), databaseAfter, exchangeAfter, maxSeverity, hasAnomalies);
+        DatabaseSnapshot databaseAfter = databaseSnapshotBuilder.captureDatabaseSnapshot(exchangeEntity, managedInstruments);
+        reportDataService.finalizeReport(report.getId(), databaseAfter, exchangeAfter, maxSeverity, hasAnomalies);
 
-        exchange.setStatus(STATUS_ACTIVE);
-        exchangeDataService.save(exchange);
+        exchangeEntity.setStatus(STATUS_ACTIVE);
+        exchangeDataService.save(exchangeEntity);
 
-        return report.getId();
-    }
-
-    @Transactional
-    public Long runSafe() {
-        return run();
-    }
-
-    @Transactional
-    public Long run() {
-        ExchangeEntity exchange = exchangeDataService.findByName("OKX")
-            .orElseThrow(() -> new IllegalStateException("Reconcile run failed: exchange not found, name=OKX"));
-        return run(exchange.getId());
+        return report;
     }
 
     private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
         return ExchangeInstrumentSnapshot.builder()
-            .externalId(bucket.getInstrumentName())
-            .positionsCount(bucket.getPositionsCount())
-            .ordersCount(bucket.getOrdersCount())
-            .algoOrdersCount(bucket.getAlgoOrdersCount())
-            .positions(bucket.getPositions())
-            .orders(bucket.getOrders())
-            .algoOrders(bucket.getAlgoOrders())
-            .build();
+                .externalId(bucket.getInstrumentName())
+                .positionsCount(bucket.getPositionsCount())
+                .ordersCount(bucket.getOrdersCount())
+                .algoOrdersCount(bucket.getAlgoOrdersCount())
+                .positions(bucket.getPositions())
+                .orders(bucket.getOrders())
+                .algoOrders(bucket.getAlgoOrders())
+                .build();
     }
 
     private DbInstrumentState loadDbInstrumentState(Long exchangeId, InstrumentEntity instrument) {
         if (Objects.isNull(instrument)) {
             return DbInstrumentState.builder()
-                .instrument(null)
-                .activePositions(List.of())
-                .activeOrders(List.of())
-                .activeAlgoOrders(List.of())
-                .build();
+                    .instrument(null)
+                    .activePositions(List.of())
+                    .activeOrders(List.of())
+                    .activeAlgoOrders(List.of())
+                    .build();
         }
 
         List<PositionEntity> positions = positionDataService.findAllByExchangeIdAndInstrumentId(exchangeId, instrument.getId()).stream()
-            .filter(entity -> BooleanUtils.isFalse("CLOSED".equalsIgnoreCase(entity.getStatus())))
-            .toList();
+                .filter(entity -> BooleanUtils.isFalse("CLOSED".equalsIgnoreCase(entity.getStatus())))
+                .toList();
         List<OrderEntity> orders = orderDataService.findAllByExchangeIdAndInstrumentId(exchangeId, instrument.getId()).stream()
-            .filter(entity -> BooleanUtils.isFalse("CLOSED".equalsIgnoreCase(entity.getStatus())))
-            .toList();
+                .filter(entity -> BooleanUtils.isFalse("CLOSED".equalsIgnoreCase(entity.getStatus())))
+                .toList();
         List<AlgoOrderEntity> algoOrders = algoOrderDataService.findAllByExchangeIdAndInstrumentId(exchangeId, instrument.getId()).stream()
-            .filter(entity -> BooleanUtils.isFalse("CLOSED".equalsIgnoreCase(entity.getStatus())))
-            .toList();
+                .filter(entity -> BooleanUtils.isFalse("CLOSED".equalsIgnoreCase(entity.getStatus())))
+                .toList();
 
         return DbInstrumentState.builder()
-            .instrument(instrument)
-            .activePositions(positions)
-            .activeOrders(orders)
-            .activeAlgoOrders(algoOrders)
-            .build();
+                .instrument(instrument)
+                .activePositions(positions)
+                .activeOrders(orders)
+                .activeAlgoOrders(algoOrders)
+                .build();
     }
 
     private String resolveMaxSeverity(String currentMaxSeverity, String severity) {

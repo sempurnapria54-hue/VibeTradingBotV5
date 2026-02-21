@@ -15,11 +15,19 @@ public class Constant {
         public static final String INSTRUMENT_ALREADY_EXISTS = "instrument.already.exists";
         public static final String CANDLE_GROUP_ALREADY_EXISTS = "candle.group.already.exists";
         public static final String CANDLE_GROUP_NOT_FOUND = "candle.group.not.found";
+        public static final String EXCHANGE_ALREADY_EXISTS = "exchange.already.exists";
+        public static final String RECONCILE_REPORT_NOT_FOUND = "reconcile.report.not.found";
 
     }
 
     @UtilityClass
     public class Status {
+
+        @UtilityClass
+        public class Exchange {
+            public static final String EXCHANGE_STATUS_CREATED = "CREATED";
+        }
+
 
         @UtilityClass
         public class Order {

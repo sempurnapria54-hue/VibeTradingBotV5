@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.model.entity;
 
-import com.example.tradingbot.rest.model.request.candlegroup.CreateCandleGroupRequest;
+import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

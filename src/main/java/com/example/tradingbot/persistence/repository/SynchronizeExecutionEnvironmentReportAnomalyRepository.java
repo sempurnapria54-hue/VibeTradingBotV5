@@ -1,10 +1,10 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportAnomalyEntity;
+import com.example.tradingbot.domain.model.entity.ReconcileAnomalyEntity;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface SynchronizeExecutionEnvironmentReportAnomalyRepository extends JpaRepository<SynchronizeExecutionEnvironmentReportAnomalyEntity, Long> {
+public interface SynchronizeExecutionEnvironmentReportAnomalyRepository extends JpaRepository<ReconcileAnomalyEntity, Long> {
 
-    List<SynchronizeExecutionEnvironmentReportAnomalyEntity> findAllByReportIdOrderByCreatedAtAsc(Long reportId);
+    List<ReconcileAnomalyEntity> findAllByReportIdOrderByCreatedAtAsc(Long reportId);
 }

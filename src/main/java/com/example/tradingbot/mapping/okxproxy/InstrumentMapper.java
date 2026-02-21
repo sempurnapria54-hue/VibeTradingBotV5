@@ -2,8 +2,8 @@ package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.exchange.ExchangeInstrument;
-import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;
-import com.example.tradingbot.rest.model.response.instrument.InstrumentResponse;
+import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
+import com.example.tradingbot.rest.model.response.InstrumentResponse;
 import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

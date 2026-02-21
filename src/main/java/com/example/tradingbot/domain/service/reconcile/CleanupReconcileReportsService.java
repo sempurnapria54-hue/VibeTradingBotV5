@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.config.SynchronizeExecutionEnvironmentProperties;
-import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;
+import com.example.tradingbot.persistence.service.ReconcileReportDataService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -12,9 +12,9 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CleanupSynchronizeExecutionEnvironmentReportsService {
+public class CleanupReconcileReportsService {
 
-    private final SynchronizeExecutionEnvironmentReportDataService reportDataService;
+    private final ReconcileReportDataService reportDataService;
     private final SynchronizeExecutionEnvironmentProperties properties;
     private final Clock clock;
 

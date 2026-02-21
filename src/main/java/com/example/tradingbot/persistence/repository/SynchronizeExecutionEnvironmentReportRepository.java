@@ -1,23 +1,27 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
-import java.time.Instant;
-import java.util.List;
+import com.example.tradingbot.domain.model.entity.ReconcileReportEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface SynchronizeExecutionEnvironmentReportRepository extends JpaRepository<SynchronizeExecutionEnvironmentReportEntity, Long> {
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
-    Page<SynchronizeExecutionEnvironmentReportEntity> findAllByExchangeIdOrderByStartedAtDesc(Long exchangeId, Pageable pageable);
+public interface SynchronizeExecutionEnvironmentReportRepository extends JpaRepository<ReconcileReportEntity, Long> {
 
-    Page<SynchronizeExecutionEnvironmentReportEntity> findDistinctByExchangeIdAndAnomaliesInstIdOrderByStartedAtDesc(
-        Long exchangeId,
-        String instId,
-        Pageable pageable
+    Page<ReconcileReportEntity> findAllByExchangeIdOrderByStartedAtDesc(Long exchangeId, Pageable pageable);
+
+    Page<ReconcileReportEntity> findDistinctByExchangeIdAndAnomaliesInstIdOrderByStartedAtDesc(
+            Long exchangeId,
+            String instId,
+            Pageable pageable
     );
 
-    List<SynchronizeExecutionEnvironmentReportEntity> findAllByHasAnomaliesFalseAndFinishedAtBefore(Instant threshold);
+    List<ReconcileReportEntity> findAllByHasAnomaliesFalseAndFinishedAtBefore(Instant threshold);
 
     long deleteAllByHasAnomaliesFalseAndFinishedAtBefore(Instant threshold);
+
+    Optional<ReconcileReportEntity> findByInternalId(String internalId);
 }

@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.service.trading;
 
 import com.example.tradingbot.client.model.okx.PositionResponse;
-import com.example.tradingbot.rest.model.request.trading.ClosePositionRequest;
-import com.example.tradingbot.rest.model.response.trading.ClosePositionResponse;
+import com.example.tradingbot.rest.model.request.ClosePositionRequest;
+import com.example.tradingbot.rest.model.response.ClosePositionResponse;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;

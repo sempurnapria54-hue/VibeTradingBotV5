@@ -2,8 +2,8 @@ package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.mapping.okxproxy.InstrumentMapper;
-import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;
-import com.example.tradingbot.rest.model.response.instrument.InstrumentResponse;
+import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
+import com.example.tradingbot.rest.model.response.InstrumentResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,22 +23,22 @@ public class InstrumentController {
     private final InstrumentMapper instrumentMapper;
 
     @PostMapping
-    public InstrumentResponse createInstrument(@PathVariable(name = "exchangeId") String exchangeId,
+    public InstrumentResponse createInstrument(@PathVariable(name = "exchangeId") String exchangeInternalId,
                                                @RequestBody CreateInstrumentRequest request) {
-        var domainInstrument = instrumentService.createInstrument(exchangeId, instrumentMapper.restToDomain(request), request.getTimeFrames());
+        var domainInstrument = instrumentService.createInstrument(exchangeInternalId, request);
         return instrumentMapper.domainToRest(domainInstrument);
     }
 
     @GetMapping
-    public List<InstrumentResponse> getAllByExchange(@PathVariable(name = "exchangeId") String exchangeId) {
-        var domainInstruments = instrumentService.getAllByExchange(exchangeId);
+    public List<InstrumentResponse> getAllByExchange(@PathVariable(name = "exchangeId") String exchangeInternalId) {
+        var domainInstruments = instrumentService.getAllByExchange(exchangeInternalId);
         return instrumentMapper.domainToRest(domainInstruments);
     }
 
     @GetMapping("/{instrumentId}")
-    public InstrumentResponse getByName(@PathVariable(name = "exchangeId") String exchangeId,
-                                        @PathVariable(name = "instrumentId") String instrumentId) {
-        var domainInstrument = instrumentService.getRequiredByExchangeInternalIdAndInstrumentInternalId(exchangeId, instrumentId);
+    public InstrumentResponse getByName(@PathVariable(name = "exchangeId") String exchangeInternalId,
+                                        @PathVariable(name = "instrumentId") String instrumentInternalId) {
+        var domainInstrument = instrumentService.getRequiredByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId);
         return instrumentMapper.domainToRest(domainInstrument);
     }
 }

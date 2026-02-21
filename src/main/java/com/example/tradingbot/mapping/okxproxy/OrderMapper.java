@@ -2,7 +2,7 @@ package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.rest.model.response.order.OrderResponse;
+import com.example.tradingbot.rest.model.response.OrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

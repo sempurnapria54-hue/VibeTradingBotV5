@@ -8,7 +8,7 @@ import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.persistence.service.OrderDataService;
-import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
+import com.example.tradingbot.rest.model.request.CreateOrderRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

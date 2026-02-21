@@ -1,4 +1,4 @@
-package com.example.tradingbot.rest.model.response.candlegroup;
+package com.example.tradingbot.rest.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

@@ -35,4 +35,6 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     );
 
     List<InstrumentEntity> findAllByExchangeId(Long exchangeId);
+
+    boolean existsByExchangeIdAndExternalId(Long exchangeId, String externalId);
 }

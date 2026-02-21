@@ -14,4 +14,6 @@ public interface ExchangeRepository extends JpaRepository<ExchangeEntity, Long> 
 
     @Query("select e.id from ExchangeEntity e where e.internalId = :internalId")
     Optional<Long> findIdByInternalId(@Param("internalId") String internalId);
+
+    boolean existsByName(String name);
 }

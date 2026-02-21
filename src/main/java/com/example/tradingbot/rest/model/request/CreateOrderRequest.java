@@ -1,4 +1,4 @@
-package com.example.tradingbot.rest.model.request.order;
+package com.example.tradingbot.rest.model.request;
 
 import lombok.Getter;
 import lombok.Setter;

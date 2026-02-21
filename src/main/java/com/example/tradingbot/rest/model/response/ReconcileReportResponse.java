@@ -1,7 +1,8 @@
-package com.example.tradingbot.rest.model.response.reconcile;
+package com.example.tradingbot.rest.model.response;
 
 import java.time.Instant;
 import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 

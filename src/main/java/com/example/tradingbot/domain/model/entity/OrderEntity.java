@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.model.entity;
 
 import com.example.tradingbot.client.model.okx.OrderResponse;
-import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
+import com.example.tradingbot.rest.model.request.CreateOrderRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

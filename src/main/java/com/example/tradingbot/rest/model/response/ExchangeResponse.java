@@ -1,4 +1,4 @@
-package com.example.tradingbot.rest.model.request.exchange;
+package com.example.tradingbot.rest.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,8 +9,9 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateExchangeRequest {
+public class ExchangeResponse {
 
+    private String internalId;
     private String name;
     private String status;
     private String baseUrl;
