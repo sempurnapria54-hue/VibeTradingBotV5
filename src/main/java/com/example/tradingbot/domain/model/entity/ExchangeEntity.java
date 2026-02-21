@@ -31,14 +31,14 @@ public class ExchangeEntity extends AuditableEntity {
     private Long id;
 
     /** Уникальное имя биржи (например OKX). */
-    @Column(name = "name", nullable = false, length = NAME_LENGTH)
+    @Column(name = "name", nullable = false)
     private String name;
 
     /** Базовый URL для API биржи. */
-    @Column(name = "base_url", nullable = false, length = BASE_URL_LENGTH)
+    @Column(name = "base_url", nullable = false)
     private String baseUrl;
 
     /** Текущий статус подключения/использования биржи. */
-    @Column(name = "status", nullable = false, length = STATUS_LENGTH)
+    @Column(name = "status", nullable = false)
     private String status;
 }

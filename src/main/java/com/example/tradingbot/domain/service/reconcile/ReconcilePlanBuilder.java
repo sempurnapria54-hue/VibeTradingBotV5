@@ -49,7 +49,7 @@ public class ReconcilePlanBuilder {
         );
 
         for (OrderEntity dbOrder : dbState.getActiveOrders()) {
-            if (StringUtils.isNotBlank(dbOrder.getClientOrderId()) && !exOrderClientIds.contains(dbOrder.getClientOrderId())) {
+            if (StringUtils.isNotBlank(dbOrder.getInternalId()) && !exOrderClientIds.contains(dbOrder.getInternalId())) {
                 markClosed.add(markClosed(dbOrder));
             }
         }
@@ -69,8 +69,8 @@ public class ReconcilePlanBuilder {
         );
 
         for (AlgoOrderEntity dbAlgoOrder : dbState.getActiveAlgoOrders()) {
-            if (StringUtils.isNotBlank(dbAlgoOrder.getClientAlgoOrderId())
-                && !exAlgoClientIds.contains(dbAlgoOrder.getClientAlgoOrderId())) {
+            if (StringUtils.isNotBlank(dbAlgoOrder.getInternalOrderId())
+                && !exAlgoClientIds.contains(dbAlgoOrder.getInternalOrderId())) {
                 markClosed.add(markClosed(dbAlgoOrder));
             }
         }

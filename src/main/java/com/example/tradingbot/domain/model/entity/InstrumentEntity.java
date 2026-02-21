@@ -66,7 +66,7 @@ public class InstrumentEntity extends AuditableEntity {
      * Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP.
      */
     @Column(name = "external_name", nullable = false)
-    private String externalName;
+    private String externalId;
 
     /**
      * Тип инструмента на бирже: SPOT/MARGIN/SWAP/FUTURES/OPTION.

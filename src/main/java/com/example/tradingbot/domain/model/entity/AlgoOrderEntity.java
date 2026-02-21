@@ -35,11 +35,6 @@ import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
 })
 public class AlgoOrderEntity extends AuditableEntity {
 
-    public static final int CLIENT_ALGO_ORDER_ID_LENGTH = 128;
-    public static final int EXCHANGE_ALGO_ORDER_ID_LENGTH = 128;
-    public static final int STATUS_LENGTH = 50;
-    public static final int ALGO_TYPE_LENGTH = 50;
-
     /** Внутренний идентификатор algo-ордера. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,97 +51,97 @@ public class AlgoOrderEntity extends AuditableEntity {
     private InstrumentEntity instrument;
 
     /** Клиентский идентификатор algo-ордера. */
-    @Column(name = "client_algo_order_id", nullable = false, length = CLIENT_ALGO_ORDER_ID_LENGTH)
-    private String clientAlgoOrderId;
+    @Column(name = "client_algo_order_id", nullable = false)
+    private String internalOrderId;
 
     /** Идентификатор algo-ордера на бирже. */
-    @Column(name = "exchange_algo_order_id", length = EXCHANGE_ALGO_ORDER_ID_LENGTH)
-    private String exchangeAlgoOrderId;
+    @Column(name = "exchange_algo_order_id")
+    private String externalId;
 
     /** Текущий внутренний статус algo-ордера. */
-    @Column(name = "status", nullable = false, length = STATUS_LENGTH)
+    @Column(name = "status", nullable = false)
     private String status;
 
     /** Тип algo-ордера. */
-    @Column(name = "algo_type", length = ALGO_TYPE_LENGTH)
-    private String algoType;
+    @Column(name = "algo_type")
+    private String type;
 
     /** Состояние algo-ордера на стороне биржи. */
-    @Column(name = "state", length = 32)
-    private String state;
+    @Column(name = "state")
+    private String externalStatus;
 
     /** Объём algo-ордера. */
-    @Column(name = "sz", length = 64)
-    private String sz;
+    @Column(name = "sz")
+    private String size;
 
     /** Триггерная цена активации algo-ордера. */
-    @Column(name = "trigger_px", length = 64)
-    private String triggerPx;
+    @Column(name = "trigger_px")
+    private String triggerPrice;
 
     /** Цена выставляемого ордера после срабатывания триггера. */
-    @Column(name = "ord_px", length = 64)
-    private String ordPx;
+    @Column(name = "ord_px")
+    private String orderPrice;
 
     /** Триггерная цена take-profit. */
-    @Column(name = "tp_trigger_px", length = 64)
-    private String tpTriggerPx;
+    @Column(name = "tp_trigger_px")
+    private String takeProfitTriggerPrice;
 
     /** Цена ордера для take-profit. */
-    @Column(name = "tp_ord_px", length = 64)
-    private String tpOrdPx;
+    @Column(name = "tp_ord_px")
+    private String takeProfitOrderPrice;
 
     /** Триггерная цена stop-loss. */
-    @Column(name = "sl_trigger_px", length = 64)
-    private String slTriggerPx;
+    @Column(name = "sl_trigger_px")
+    private String stopLossTriggerPrice;
 
     /** Цена ордера для stop-loss. */
-    @Column(name = "sl_ord_px", length = 64)
-    private String slOrdPx;
+    @Column(name = "sl_ord_px")
+    private String stopLossOrderPrice;
 
     /** Коэффициент callback для trailing-механики. */
-    @Column(name = "callback_ratio", length = 64)
+    @Column(name = "callback_ratio")
     private String callbackRatio;
 
     /** Абсолютный шаг callback для trailing-механики. */
-    @Column(name = "callback_spread", length = 64)
-    private String callbackSpread;
+    @Column(name = "callback_spread")
+    private String callbackStep;
 
     /** Время создания algo-ордера на бирже в UTC миллисекундах. */
     @Column(name = "c_time")
-    private Long cTime;
+    private Long createTime;
 
     /** Время обновления algo-ордера на бирже в UTC миллисекундах. */
     @Column(name = "u_time")
-    private Long uTime;
+    private Long updateTime;
 
     public void initOnCreate(InstrumentEntity instrument, CreateAlgoOrderRequest request) {
         setInstrument(instrument);
-        setClientAlgoOrderId(UUID.randomUUID().toString());
+        setInternalOrderId(UUID.randomUUID().toString());
         setStatus(ALGO_ORDER_STATUS_CREATED);
-        setAlgoType(request.getOrdType());
-        setSz(request.getSz());
-        setTriggerPx(request.getTriggerPx());
-        setOrdPx(request.getOrdPx());
+        setType(request.getType());
+        setSize(request.getSize());
+        setTriggerPrice(request.getTriggerPrice());
+        setOrderPrice(request.getOrderPrice());
     }
 
     public void applyAlgoOrderResponse(AlgoOrderEntity entity, AlgoOrderResponse responseOrder) {
-        entity.setExchangeAlgoOrderId(responseOrder.getAlgoId());
+        entity.setExternalId(responseOrder.getAlgoId());
         if (Objects.nonNull(responseOrder.getClOrdId())) {
-            entity.setClientAlgoOrderId(responseOrder.getClOrdId());
+            entity.setInternalOrderId(responseOrder.getClOrdId());
         }
-        entity.setState(responseOrder.getState());
+        entity.setExternalStatus(responseOrder.getState());
         entity.setStatus(ALGO_ORDER_STATUS_IN_PROGRESS);
-        entity.setAlgoType(responseOrder.getOrdType());
-        entity.setSz(responseOrder.getSz());
-        entity.setTriggerPx(responseOrder.getTriggerPx());
-        entity.setOrdPx(responseOrder.getOrdPx());
-        entity.setTpTriggerPx(responseOrder.getTpTriggerPx());
-        entity.setTpOrdPx(responseOrder.getTpOrdPx());
-        entity.setSlTriggerPx(responseOrder.getSlTriggerPx());
-        entity.setSlOrdPx(responseOrder.getSlOrdPx());
+        entity.setType(responseOrder.getType());
+        entity.setSize(responseOrder.getSize());
+        entity.setTriggerPrice(responseOrder.getTriggerPrice());
+        entity.setOrderPrice(responseOrder.getOrderPrice());
+        entity.setTakeProfitTriggerPrice(responseOrder.getTakeProfitTriggerPrice());
+        entity.setTakeProfitOrderPrice(responseOrder.getTakeProfitOrderPrice());
+        entity.setStopLossTriggerPrice(responseOrder.getStopLossTriggerPrice());
+        entity.setStopLossOrderPrice(responseOrder.getStopLossOrderPrice());
         entity.setCallbackRatio(responseOrder.getCallbackRatio());
-        entity.setCallbackSpread(responseOrder.getCallbackSpread());
-        entity.setCTime(parseLongSafe(responseOrder.getCTime()));
-        entity.setUTime(parseLongSafe(responseOrder.getUTime()));
+        entity.setCallbackStep(responseOrder.getCallbackStep());
+        entity.setCreateTime(parseLongSafe(responseOrder.getCreateTime()));
+        entity.setUpdateTime(parseLongSafe(responseOrder.getUpdateTime()));
     }
 }

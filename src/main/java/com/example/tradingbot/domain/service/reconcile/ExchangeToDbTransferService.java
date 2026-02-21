@@ -32,11 +32,11 @@ public class ExchangeToDbTransferService {
 
         bucket.getOrders().forEach(externalOrder -> {
             dbOrders.stream()
-                .filter(order -> Objects.equals(order.getClientOrderId(), resolveOrderClientId(externalOrder.getInternalId(), externalOrder.getExternalId())))
+                .filter(order -> Objects.equals(order.getInternalId(), resolveOrderClientId(externalOrder.getInternalId(), externalOrder.getExternalId())))
                 .findFirst()
                 .ifPresent(order -> {
-                    if (BooleanUtils.isFalse(Objects.equals(order.getExchangeOrderId(), externalOrder.getExternalId()))) {
-                        order.setExchangeOrderId(externalOrder.getExternalId());
+                    if (BooleanUtils.isFalse(Objects.equals(order.getExternalId(), externalOrder.getExternalId()))) {
+                        order.setExternalId(externalOrder.getExternalId());
                         orderDataService.save(order);
                     }
                 });
@@ -44,11 +44,11 @@ public class ExchangeToDbTransferService {
 
         bucket.getAlgoOrders().forEach(externalAlgoOrder -> {
             dbAlgoOrders.stream()
-                .filter(algoOrder -> Objects.equals(algoOrder.getClientAlgoOrderId(), resolveAlgoClientId(externalAlgoOrder.getInternalOrderId(), externalAlgoOrder.getExternalId())))
+                .filter(algoOrder -> Objects.equals(algoOrder.getInternalOrderId(), resolveAlgoClientId(externalAlgoOrder.getInternalOrderId(), externalAlgoOrder.getExternalId())))
                 .findFirst()
                 .ifPresent(algoOrder -> {
-                    if (BooleanUtils.isFalse(Objects.equals(algoOrder.getExchangeAlgoOrderId(), externalAlgoOrder.getExternalId()))) {
-                        algoOrder.setExchangeAlgoOrderId(externalAlgoOrder.getExternalId());
+                    if (BooleanUtils.isFalse(Objects.equals(algoOrder.getExternalId(), externalAlgoOrder.getExternalId()))) {
+                        algoOrder.setExternalId(externalAlgoOrder.getExternalId());
                         algoOrderDataService.save(algoOrder);
                     }
                 });
@@ -58,8 +58,8 @@ public class ExchangeToDbTransferService {
             String side = bucket.getPositions().get(0).getPositionSide();
             if (StringUtils.isNotBlank(side)) {
                 dbPositions.stream().findFirst().ifPresent(position -> {
-                    if (BooleanUtils.isFalse(Objects.equals(position.getSide(), side))) {
-                        position.setSide(side);
+                    if (BooleanUtils.isFalse(Objects.equals(position.getPositionSide(), side))) {
+                        position.setPositionSide(side);
                         positionDataService.save(position);
                     }
                 });

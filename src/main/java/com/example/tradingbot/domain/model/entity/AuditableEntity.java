@@ -27,7 +27,7 @@ public abstract class AuditableEntity {
 
     /** Пользователь/сервис, создавший запись. */
     @CreatedBy
-    @Column(name = "created_by", length = AUDIT_NAME_LENGTH)
+    @Column(name = "created_by")
     private String createdBy;
 
     /** Дата и время последнего изменения записи. */
@@ -37,6 +37,6 @@ public abstract class AuditableEntity {
 
     /** Пользователь/сервис, выполнивший последнее изменение. */
     @LastModifiedBy
-    @Column(name = "modified_by", length = AUDIT_NAME_LENGTH)
+    @Column(name = "modified_by")
     private String modifiedBy;
 }

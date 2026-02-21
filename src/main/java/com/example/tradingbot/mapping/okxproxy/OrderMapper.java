@@ -3,45 +3,55 @@ package com.example.tradingbot.mapping.okxproxy;
 import com.example.tradingbot.client.model.okx.OrderResponse;
 import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.rest.model.response.Order;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface OrderMapper {
 
-    @Mapping(source = "ordId", target = "orderId")
-    @Mapping(source = "clOrdId", target = "clientOrderId")
-    @Mapping(source = "instId", target = "instrumentId")
+    @Mapping(source = "ordId", target = "externalId")
+    @Mapping(source = "clOrdId", target = "internalId")
+    @Mapping(source = "instId", target = "externalInstrumentId")
     @Mapping(source = "instType", target = "instrumentType")
     @Mapping(source = "posSide", target = "positionSide")
-    @Mapping(source = "ordType", target = "orderType")
+    @Mapping(source = "ordType", target = "type")
+    @Mapping(source = "state", target = "status")
     @Mapping(source = "px", target = "price")
     @Mapping(source = "sz", target = "size")
     @Mapping(source = "avgPx", target = "averagePrice")
     @Mapping(source = "accFillSz", target = "accumulatedFillSize")
-    @Mapping(source = "fee", target = "fee")
     @Mapping(source = "cTime", target = "createTime")
     @Mapping(source = "uTime", target = "updateTime")
-    @Mapping(source = "sCode", target = "statusCode")
-    @Mapping(source = "sMsg", target = "statusMessage")
+    @Mapping(source = "sCode", target = "externalStatusCode")
+    @Mapping(source = "sMsg", target = "externalStatusMessage")
     ExchangeOrder clientToDomain(OrderResponse source);
 
-    @Mapping(source = "orderId", target = "ordId")
-    @Mapping(source = "clientOrderId", target = "clOrdId")
-    @Mapping(source = "instrumentId", target = "instId")
+    @Mapping(source = "externalId", target = "ordId")
+    @Mapping(source = "internalId", target = "clOrdId")
+    @Mapping(source = "externalInstrumentId", target = "instId")
     @Mapping(source = "instrumentType", target = "instType")
     @Mapping(source = "positionSide", target = "posSide")
-    @Mapping(source = "orderType", target = "ordType")
+    @Mapping(source = "type", target = "ordType")
+    @Mapping(source = "status", target = "state")
     @Mapping(source = "price", target = "px")
     @Mapping(source = "size", target = "sz")
     @Mapping(source = "averagePrice", target = "avgPx")
     @Mapping(source = "accumulatedFillSize", target = "accFillSz")
-    @Mapping(source = "fee", target = "fee")
     @Mapping(source = "createTime", target = "cTime")
     @Mapping(source = "updateTime", target = "uTime")
-    @Mapping(source = "statusCode", target = "sCode")
-    @Mapping(source = "statusMessage", target = "sMsg")
+    @Mapping(source = "externalStatusCode", target = "sCode")
+    @Mapping(source = "externalStatusMessage", target = "sMsg")
     OrderResponse domainToClient(ExchangeOrder source);
 
-    com.example.tradingbot.rest.model.response.Order domainToRest(OrderEntity source);
+    @Mapping(source = "internalId", target = "clientOrderId")
+    @Mapping(source = "externalId", target = "exchangeOrderId")
+    @Mapping(source = "externalStatus", target = "state")
+    @Mapping(source = "price", target = "px")
+    @Mapping(source = "size", target = "sz")
+    @Mapping(source = "accumulatedFillSize", target = "fillSz")
+    @Mapping(source = "averagePrice", target = "avgPx")
+    @Mapping(source = "createTime", target = "cTime")
+    @Mapping(source = "updateTime", target = "uTime")
+    Order domainToRest(OrderEntity source);
 }

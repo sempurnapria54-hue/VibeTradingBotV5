@@ -3,17 +3,18 @@ package com.example.tradingbot.mapping.okxproxy;
 import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
 import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
+import com.example.tradingbot.rest.model.response.AlgoOrder;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface AlgoOrderMapper {
 
-    @Mapping(source = "algoId", target = "algoOrderId")
-    @Mapping(source = "clOrdId", target = "clientOrderId")
-    @Mapping(source = "instId", target = "instrumentId")
-    @Mapping(source = "ordType", target = "orderType")
-    @Mapping(source = "state", target = "state")
+    @Mapping(source = "algoId", target = "externalId")
+    @Mapping(source = "clOrdId", target = "internalOrderId")
+    @Mapping(source = "instId", target = "externalInstrumentId")
+    @Mapping(source = "ordType", target = "type")
+    @Mapping(source = "state", target = "status")
     @Mapping(source = "sz", target = "size")
     @Mapping(source = "triggerPx", target = "triggerPrice")
     @Mapping(source = "ordPx", target = "orderPrice")
@@ -21,19 +22,18 @@ public interface AlgoOrderMapper {
     @Mapping(source = "tpOrdPx", target = "takeProfitOrderPrice")
     @Mapping(source = "slTriggerPx", target = "stopLossTriggerPrice")
     @Mapping(source = "slOrdPx", target = "stopLossOrderPrice")
-    @Mapping(source = "callbackRatio", target = "callbackRatio")
-    @Mapping(source = "callbackSpread", target = "callbackSpread")
+    @Mapping(source = "callbackSpread", target = "callbackStep")
     @Mapping(source = "cTime", target = "createTime")
     @Mapping(source = "uTime", target = "updateTime")
-    @Mapping(source = "sCode", target = "statusCode")
-    @Mapping(source = "sMsg", target = "statusMessage")
+    @Mapping(source = "sCode", target = "externalStatusCode")
+    @Mapping(source = "sMsg", target = "externalStatusMessage")
     ExchangeAlgoOrder clientToDomain(AlgoOrderResponse source);
 
-    @Mapping(source = "algoOrderId", target = "algoId")
-    @Mapping(source = "clientOrderId", target = "clOrdId")
-    @Mapping(source = "instrumentId", target = "instId")
-    @Mapping(source = "orderType", target = "ordType")
-    @Mapping(source = "state", target = "state")
+    @Mapping(source = "externalId", target = "algoId")
+    @Mapping(source = "internalOrderId", target = "clOrdId")
+    @Mapping(source = "externalInstrumentId", target = "instId")
+    @Mapping(source = "type", target = "ordType")
+    @Mapping(source = "status", target = "state")
     @Mapping(source = "size", target = "sz")
     @Mapping(source = "triggerPrice", target = "triggerPx")
     @Mapping(source = "orderPrice", target = "ordPx")
@@ -41,13 +41,26 @@ public interface AlgoOrderMapper {
     @Mapping(source = "takeProfitOrderPrice", target = "tpOrdPx")
     @Mapping(source = "stopLossTriggerPrice", target = "slTriggerPx")
     @Mapping(source = "stopLossOrderPrice", target = "slOrdPx")
-    @Mapping(source = "callbackRatio", target = "callbackRatio")
-    @Mapping(source = "callbackSpread", target = "callbackSpread")
+    @Mapping(source = "callbackStep", target = "callbackSpread")
     @Mapping(source = "createTime", target = "cTime")
     @Mapping(source = "updateTime", target = "uTime")
-    @Mapping(source = "statusCode", target = "sCode")
-    @Mapping(source = "statusMessage", target = "sMsg")
+    @Mapping(source = "externalStatusCode", target = "sCode")
+    @Mapping(source = "externalStatusMessage", target = "sMsg")
     AlgoOrderResponse domainToClient(ExchangeAlgoOrder source);
 
-    com.example.tradingbot.rest.model.response.AlgoOrder domainToRest(AlgoOrderEntity source);
+    @Mapping(source = "internalOrderId", target = "clientAlgoOrderId")
+    @Mapping(source = "externalId", target = "exchangeAlgoOrderId")
+    @Mapping(source = "type", target = "algoType")
+    @Mapping(source = "externalStatus", target = "state")
+    @Mapping(source = "size", target = "sz")
+    @Mapping(source = "triggerPrice", target = "triggerPx")
+    @Mapping(source = "orderPrice", target = "ordPx")
+    @Mapping(source = "takeProfitTriggerPrice", target = "tpTriggerPx")
+    @Mapping(source = "takeProfitOrderPrice", target = "tpOrdPx")
+    @Mapping(source = "stopLossTriggerPrice", target = "slTriggerPx")
+    @Mapping(source = "stopLossOrderPrice", target = "slOrdPx")
+    @Mapping(source = "callbackStep", target = "callbackSpread")
+    @Mapping(source = "createTime", target = "cTime")
+    @Mapping(source = "updateTime", target = "uTime")
+    AlgoOrder domainToRest(AlgoOrderEntity source);
 }

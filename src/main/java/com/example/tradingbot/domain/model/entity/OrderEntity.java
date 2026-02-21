@@ -34,12 +34,6 @@ import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
 })
 public class OrderEntity extends AuditableEntity {
 
-    public static final int CLIENT_ORDER_ID_LENGTH = 128;
-    public static final int EXCHANGE_ORDER_ID_LENGTH = 128;
-    public static final int STATUS_LENGTH = 50;
-    public static final int TYPE_LENGTH = 50;
-    public static final int SIDE_LENGTH = 20;
-
     /** Внутренний идентификатор ордера. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,83 +50,79 @@ public class OrderEntity extends AuditableEntity {
     private InstrumentEntity instrument;
 
     /** Клиентский идентификатор ордера. */
-    @Column(name = "client_order_id", nullable = false, length = CLIENT_ORDER_ID_LENGTH)
-    private String clientOrderId;
+    @Column(name = "client_order_id", nullable = false)
+    private String internalId;
 
     /** Идентификатор ордера на бирже. */
-    @Column(name = "exchange_order_id", length = EXCHANGE_ORDER_ID_LENGTH)
-    private String exchangeOrderId;
+    @Column(name = "exchange_order_id")
+    private String externalId;
 
     /** Текущий внутренний статус ордера. */
-    @Column(name = "status", nullable = false, length = STATUS_LENGTH)
+    @Column(name = "status", nullable = false)
     private String status;
 
     /** Тип ордера в бизнес-терминах. */
-    @Column(name = "type", length = TYPE_LENGTH)
+    @Column(name = "type")
     private String type;
 
     /** Сторона ордера (buy/sell). */
-    @Column(name = "side", length = SIDE_LENGTH)
+    @Column(name = "side")
     private String side;
 
     /** Состояние ордера на стороне биржи. */
-    @Column(name = "state", length = 32)
-    private String state;
-
-    /** Тип ордера на бирже (ordType). */
-    @Column(name = "ord_type", length = 32)
-    private String ordType;
+    @Column(name = "state")
+    private String externalStatus;
 
     /** Цена ордера. */
-    @Column(name = "px", length = 64)
-    private String px;
+    @Column(name = "px")
+    private String price;
 
     /** Объём ордера. */
-    @Column(name = "sz", length = 64)
-    private String sz;
+    @Column(name = "sz")
+    private String size;
 
     /** Накопленный исполненный объём. */
-    @Column(name = "fill_sz", length = 64)
-    private String fillSz;
+    @Column(name = "fill_sz")
+    private String accumulatedFillSize;
 
     /** Средняя цена исполнения. */
-    @Column(name = "avg_px", length = 64)
-    private String avgPx;
+    @Column(name = "avg_px")
+    private String averagePrice;
 
     /** Комиссия по ордеру. */
-    @Column(name = "fee", length = 64)
+    @Column(name = "fee")
     private String fee;
 
     /** Время создания ордера на бирже в UTC миллисекундах. */
     @Column(name = "c_time")
-    private Long cTime;
+    private Long createTime;
 
     /** Время последнего обновления ордера на бирже в UTC миллисекундах. */
     @Column(name = "u_time")
-    private Long uTime;
+    private Long updateTime;
 
     public void initOnCreate(InstrumentEntity instrument, CreateOrderRequest request) {
         setInstrument(instrument);
-        setClientOrderId(UUID.randomUUID().toString());
+        setInternalId(UUID.randomUUID().toString());
         setStatus(ORDER_STATUS_CREATED);
         setSide(request.getSide());
-        setOrdType(request.getType());
-        setSz(request.getSz());
-        setPx(request.getPx());
+        setType(request.getType());
+        setSize(request.getSize());
+        setPrice(request.getPrice());
     }
 
     public void applyOrderResponse(OrderResponse responseOrder) {
-        setExchangeOrderId(responseOrder.getOrdId());
-        setState(responseOrder.getState());
+        setExternalId(responseOrder.getOrdId());
+        setExternalStatus(responseOrder.getState());
         setStatus(ORDER_STATUS_IN_PROGRESS);
         setSide(responseOrder.getSide());
-        setOrdType(responseOrder.getOrdType());
-        setPx(responseOrder.getPx());
-        setSz(responseOrder.getSz());
-        setFillSz(responseOrder.getAccFillSz());
-        setAvgPx(responseOrder.getAvgPx());
+        setType(responseOrder.getType());
+        setPrice(responseOrder.getPrice());
+        setSize(responseOrder.getSize());
+        setAccumulatedFillSize(responseOrder.getAccFillSz());
+        setAveragePrice(responseOrder.getAveragePrice());
         setFee(responseOrder.getFee());
-        setCTime(parseLongSafe(responseOrder.getCTime()));
-        setUTime(parseLongSafe(responseOrder.getUTime()));
+        setCreateTime(parseLongSafe(responseOrder.getCreateTime()));
+        setUpdateTime(parseLongSafe(responseOrder.getUpdateTime()));
     }
 }

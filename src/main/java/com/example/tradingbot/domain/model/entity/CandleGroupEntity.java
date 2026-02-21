@@ -51,12 +51,12 @@ public class CandleGroupEntity extends AuditableEntity {
     private InstrumentEntity instrument;
 
     /** Таймфрейм группы (например 1m/5m/1H). */
-    @Column(name = "timeframe", nullable = false, length = TIMEFRAME_LENGTH)
+    @Column(name = "timeframe", nullable = false)
     private String timeframe;
 
     /** Текущий статус жизненного цикла загрузки свечей. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = STATUS_LENGTH)
+    @Column(name = "status", nullable = false)
     private String status;
 
     /** Начальная граница исторического покрытия в UTC миллисекундах. */
@@ -84,15 +84,15 @@ public class CandleGroupEntity extends AuditableEntity {
     private OffsetDateTime lastErrorAt;
 
     /** Код последней ошибки синхронизации. */
-    @Column(name = "last_error_code", length = ERROR_CODE_LENGTH)
+    @Column(name = "last_error_code")
     private String lastErrorCode;
 
     /** Текст последней ошибки синхронизации. */
-    @Column(name = "last_error_message", length = ERROR_MESSAGE_LENGTH)
+    @Column(name = "last_error_message")
     private String lastErrorMessage;
 
     /** Владелец lease для распределённой синхронизации. */
-    @Column(name = "lease_owner", length = LEASE_OWNER_LENGTH)
+    @Column(name = "lease_owner")
     private String leaseOwner;
 
     /** Время окончания lease в UTC миллисекундах. */

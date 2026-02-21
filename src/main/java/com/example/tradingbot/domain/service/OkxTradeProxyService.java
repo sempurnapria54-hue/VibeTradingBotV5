@@ -51,13 +51,13 @@ public class OkxTradeProxyService {
 
     public List<OrderResponse> createOrder(OrderEntity orderEntity) {
         CreateOrderRequest request = new CreateOrderRequest();
-        request.setInstrumentId(orderEntity.getInstrument().getExternalName());
+        request.setInstrumentId(orderEntity.getInstrument().getExternalId());
         request.setTradeMode(DEFAULT_TRADE_MODE);
         request.setSide(orderEntity.getSide());
         request.setOrderType(orderEntity.getType());
-        request.setSize(orderEntity.getSz());
-        request.setPrice(orderEntity.getPx());
-        request.setClientOrderId(orderEntity.getClientOrderId());
+        request.setSize(orderEntity.getSize());
+        request.setPrice(orderEntity.getPrice());
+        request.setClientOrderId(orderEntity.getInternalId());
         return okxRestClient.createOrder(request).getData();
     }
 
@@ -67,30 +67,30 @@ public class OkxTradeProxyService {
 
     public List<OrderResponse> cancelOrder(OrderEntity orderEntity) {
         CancelOrderRequest request = new CancelOrderRequest();
-        request.setInstrumentId(orderEntity.getInstrument().getExternalName());
-        request.setOrderId(orderEntity.getExchangeOrderId());
-        request.setClientOrderId(orderEntity.getClientOrderId());
+        request.setInstrumentId(orderEntity.getInstrument().getExternalId());
+        request.setOrderId(orderEntity.getExternalId());
+        request.setClientOrderId(orderEntity.getInternalId());
         return okxRestClient.cancelOrder(request).getData();
     }
 
     public List<AlgoOrderResponse> createAlgoOrder(AlgoOrderEntity algoOrderEntity) {
         var request = new CreateAlgoOrderRequest();
-        request.setInstrumentId(algoOrderEntity.getInstrument().getExternalName());
+        request.setInstrumentId(algoOrderEntity.getInstrument().getExternalId());
         request.setTradeMode(DEFAULT_TRADE_MODE);
         request.setSide(request.getSide());
-        request.setOrderType(algoOrderEntity.getAlgoType());
-        request.setSize(algoOrderEntity.getSz());
-        request.setTriggerPrice(algoOrderEntity.getTriggerPx());
-        request.setOrderPrice(algoOrderEntity.getOrdPx());
-        request.setClientOrderId(algoOrderEntity.getClientAlgoOrderId());
+        request.setOrderType(algoOrderEntity.getType());
+        request.setSize(algoOrderEntity.getSize());
+        request.setTriggerPrice(algoOrderEntity.getTriggerPrice());
+        request.setOrderPrice(algoOrderEntity.getOrderPrice());
+        request.setClientOrderId(algoOrderEntity.getInternalOrderId());
         return okxRestClient.createAlgoOrder(request).getData();
     }
 
     public List<AlgoOrderResponse> cancelAlgoOrder(AlgoOrderEntity algoOrderEntity) {
         CancelAlgoOrderRequest request = new CancelAlgoOrderRequest();
-        request.setInstrumentId(algoOrderEntity.getInstrument().getExternalName());
-        request.setAlgoOrderId(algoOrderEntity.getExchangeAlgoOrderId());
-        request.setClientOrderId(algoOrderEntity.getClientAlgoOrderId());
+        request.setInstrumentId(algoOrderEntity.getInstrument().getExternalId());
+        request.setAlgoOrderId(algoOrderEntity.getExternalId());
+        request.setClientOrderId(algoOrderEntity.getInternalOrderId());
         return okxRestClient.cancelAlgoOrder(request).getData();
     }
 
