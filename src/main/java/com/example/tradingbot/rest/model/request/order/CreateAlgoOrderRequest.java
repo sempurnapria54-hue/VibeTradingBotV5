@@ -8,8 +8,8 @@ import lombok.Setter;
 public class CreateAlgoOrderRequest {
 
     private String side;
-    private String ordType;
-    private String sz;
-    private String triggerPx;
-    private String ordPx;
+    private String type;
+    private String size;
+    private String triggerPrice;
+    private String orderPrice;
 }

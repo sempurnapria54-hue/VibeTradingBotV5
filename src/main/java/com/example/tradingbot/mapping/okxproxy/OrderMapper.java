@@ -44,14 +44,5 @@ public interface OrderMapper {
     @Mapping(source = "externalStatusMessage", target = "sMsg")
     OrderResponse domainToClient(ExchangeOrder source);
 
-    @Mapping(source = "internalId", target = "clientOrderId")
-    @Mapping(source = "externalId", target = "exchangeOrderId")
-    @Mapping(source = "externalStatus", target = "state")
-    @Mapping(source = "price", target = "px")
-    @Mapping(source = "size", target = "sz")
-    @Mapping(source = "accumulatedFillSize", target = "fillSz")
-    @Mapping(source = "averagePrice", target = "avgPx")
-    @Mapping(source = "createTime", target = "cTime")
-    @Mapping(source = "updateTime", target = "uTime")
     Order domainToRest(OrderEntity source);
 }

@@ -48,19 +48,5 @@ public interface AlgoOrderMapper {
     @Mapping(source = "externalStatusMessage", target = "sMsg")
     AlgoOrderResponse domainToClient(ExchangeAlgoOrder source);
 
-    @Mapping(source = "internalOrderId", target = "clientAlgoOrderId")
-    @Mapping(source = "externalId", target = "exchangeAlgoOrderId")
-    @Mapping(source = "type", target = "algoType")
-    @Mapping(source = "externalStatus", target = "state")
-    @Mapping(source = "size", target = "sz")
-    @Mapping(source = "triggerPrice", target = "triggerPx")
-    @Mapping(source = "orderPrice", target = "ordPx")
-    @Mapping(source = "takeProfitTriggerPrice", target = "tpTriggerPx")
-    @Mapping(source = "takeProfitOrderPrice", target = "tpOrdPx")
-    @Mapping(source = "stopLossTriggerPrice", target = "slTriggerPx")
-    @Mapping(source = "stopLossOrderPrice", target = "slOrdPx")
-    @Mapping(source = "callbackStep", target = "callbackSpread")
-    @Mapping(source = "createTime", target = "cTime")
-    @Mapping(source = "updateTime", target = "uTime")
     AlgoOrder domainToRest(AlgoOrderEntity source);
 }
