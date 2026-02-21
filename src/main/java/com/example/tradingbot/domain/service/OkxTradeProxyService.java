@@ -1,6 +1,13 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.client.model.okx.*;
+import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
+import com.example.tradingbot.client.model.okx.CancelAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.CancelOrderRequest;
+import com.example.tradingbot.client.model.okx.ClosePositionRequest;
+import com.example.tradingbot.client.model.okx.CreateAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.CreateOrderRequest;
+import com.example.tradingbot.client.model.okx.OrderResponse;
+import com.example.tradingbot.client.model.okx.PositionResponse;
 import com.example.tradingbot.client.okx.OkxRestClient;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
@@ -17,38 +24,6 @@ public class OkxTradeProxyService {
 
     private final OkxRestClient okxRestClient;
 
-    public List<OrderResponse> getOrdersPending(OrdersPendingRequest request) {
-        return okxRestClient.getOrdersPending(request).getData();
-    }
-
-    public List<OrderResponse> getOrderDetails(OrderDetailsRequest request) {
-        return okxRestClient.getOrderDetails(request).getData();
-    }
-
-    public List<OrderResponse> getOrdersHistory(OrdersHistoryRequest request) {
-        return okxRestClient.getOrdersHistory(request).getData();
-    }
-
-    public List<OrderResponse> getOrdersHistoryArchive(OrdersHistoryRequest request) {
-        return okxRestClient.getOrdersHistoryArchive(request).getData();
-    }
-
-    public List<TradeFillResponse> getFills(FillsRequest request) {
-        return okxRestClient.getFills(request).getData();
-    }
-
-    public List<TradeFillResponse> getFillsHistory(FillsRequest request) {
-        return okxRestClient.getFillsHistory(request).getData();
-    }
-
-    public List<TradeFillsArchiveResponse> requestFillsArchive(FillsArchiveRequest request) {
-        return okxRestClient.requestFillsArchive(request).getData();
-    }
-
-    public List<TradeFillsArchiveResponse> getFillsArchiveLink(FillsArchiveLinkRequest request) {
-        return okxRestClient.getFillsArchiveLink(request).getData();
-    }
-
     public List<OrderResponse> createOrder(OrderEntity orderEntity) {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setInstrumentId(orderEntity.getInstrument().getExternalId());
@@ -59,10 +34,6 @@ public class OkxTradeProxyService {
         request.setPrice(orderEntity.getPrice());
         request.setClientOrderId(orderEntity.getInternalId());
         return okxRestClient.createOrder(request).getData();
-    }
-
-    public List<OrderResponse> amendOrder(AmendOrderRequest request) {
-        return okxRestClient.amendOrder(request).getData();
     }
 
     public List<OrderResponse> cancelOrder(OrderEntity orderEntity) {
