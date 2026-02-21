@@ -48,6 +48,11 @@ public class InstrumentDataService {
         return instrumentRepository.findByExchangeIdAndInternalId(exchangeId, internalId);
     }
 
+    public InstrumentEntity findRequiredByExchangeIdAndInternalId(Long exchangeId, String internalId) {
+        return instrumentRepository.findByExchangeIdAndInternalId(exchangeId, internalId)
+                .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
+    }
+
     public Optional<String> findExternalIdByExchangeIdAndInternalId(Long exchangeId, String internalId) {
         return instrumentRepository.findExternalIdByExchangeIdAndInternalId(exchangeId, internalId);
     }

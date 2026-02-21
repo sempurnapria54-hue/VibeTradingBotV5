@@ -10,7 +10,7 @@ import lombok.Setter;
 public class ReconcileReportResponse {
 
     private Long id;
-    private Long exchangeId;
+    private String exchangeInternalId;
     private Instant startedAt;
     private Instant finishedAt;
     private String trigger;

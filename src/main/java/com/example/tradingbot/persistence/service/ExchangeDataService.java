@@ -48,6 +48,11 @@ public class ExchangeDataService {
                 .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
     }
 
+    public ExchangeEntity findRequiredByInternalId(String internalId) {
+        return exchangeRepository.findByInternalId(internalId)
+                .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
+    }
+
     public List<ExchangeEntity> findAll() {
         return exchangeRepository.findAll();
     }

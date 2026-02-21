@@ -11,8 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class CandleGroupResponse {
 
-    private Long id;
-    private Long instrumentId;
+    private String instrumentInternalId;
     private String timeframe;
     private String status;
     private Long coverageStartTs;

@@ -16,6 +16,10 @@ public class ExchangeService {
         return exchangeDataService.findRequiredByName(name);
     }
 
+    public ExchangeEntity getRequiredByInternalId(String internalId) {
+        return exchangeDataService.findRequiredByInternalId(internalId);
+    }
+
     public ExchangeEntity createExchange(ExchangeEntity exchangeEntity) {
         exchangeEntity.initOnCreate();
         return exchangeDataService.save(exchangeEntity);

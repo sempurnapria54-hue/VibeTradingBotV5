@@ -11,7 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ExchangeResponse {
 
-    private Long id;
+    private String internalId;
     private String name;
     private String status;
     private String baseUrl;

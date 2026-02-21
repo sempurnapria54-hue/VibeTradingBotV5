@@ -16,29 +16,29 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/{exchangeName}/instruments")
+@RequestMapping("/api/{exchangeId}/instruments")
 public class InstrumentController {
 
     private final InstrumentService instrumentService;
     private final InstrumentMapper instrumentMapper;
 
     @PostMapping
-    public InstrumentResponse createInstrument(@PathVariable(name = "exchangeName") String exchangeName,
+    public InstrumentResponse createInstrument(@PathVariable(name = "exchangeId") String exchangeId,
                                        @RequestBody CreateInstrumentRequest request) {
-        var domainInstrument = instrumentService.createInstrument(exchangeName, instrumentMapper.restToDomain(request), request.getTimeFrames());
+        var domainInstrument = instrumentService.createInstrument(exchangeId, instrumentMapper.restToDomain(request), request.getTimeFrames());
         return instrumentMapper.domainToRest(domainInstrument);
     }
 
     @GetMapping
-    public List<InstrumentResponse> getAllByExchange(@PathVariable(name = "exchangeName") String exchangeName) {
-        var domainInstruments = instrumentService.getAllByExchange(exchangeName);
+    public List<InstrumentResponse> getAllByExchange(@PathVariable(name = "exchangeId") String exchangeId) {
+        var domainInstruments = instrumentService.getAllByExchange(exchangeId);
         return instrumentMapper.domainToRest(domainInstruments);
     }
 
-    @GetMapping("/{instrumentName}")
-    public InstrumentResponse getByName(@PathVariable(name = "exchangeName") String exchangeName,
-                                @PathVariable(name = "instrumentName") String instrumentName) {
-        var domainInstrument = instrumentService.getRequiredByExchangeNameAndName(exchangeName, instrumentName);
+    @GetMapping("/{instrumentId}")
+    public InstrumentResponse getByName(@PathVariable(name = "exchangeId") String exchangeId,
+                                @PathVariable(name = "instrumentId") String instrumentId) {
+        var domainInstrument = instrumentService.getRequiredByExchangeInternalIdAndInstrumentInternalId(exchangeId, instrumentId);
         return instrumentMapper.domainToRest(domainInstrument);
     }
 }

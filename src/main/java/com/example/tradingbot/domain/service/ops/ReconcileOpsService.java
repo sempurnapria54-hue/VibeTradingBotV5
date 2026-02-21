@@ -66,10 +66,6 @@ public class ReconcileOpsService {
     }
 
     public SynchronizeExecutionEnvironmentReportEntity getReport(Long id) {
-        if (Objects.isNull(id)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "id is required");
-        }
-
         SynchronizeExecutionEnvironmentReportEntity report = reportDataService.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reconcile report not found"));
 

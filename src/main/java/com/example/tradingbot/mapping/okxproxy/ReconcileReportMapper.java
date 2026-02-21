@@ -6,10 +6,12 @@ import com.example.tradingbot.rest.model.response.reconcile.ReconcileReportAnoma
 import com.example.tradingbot.rest.model.response.reconcile.ReconcileReportResponse;
 import java.util.List;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface ReconcileReportMapper {
 
+    @Mapping(source = "exchange.internalId", target = "exchangeInternalId")
     ReconcileReportResponse domainToRest(SynchronizeExecutionEnvironmentReportEntity source);
 
     List<ReconcileReportResponse> domainToRest(List<SynchronizeExecutionEnvironmentReportEntity> source);
