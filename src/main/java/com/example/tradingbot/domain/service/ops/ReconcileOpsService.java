@@ -1,8 +1,9 @@
 package com.example.tradingbot.domain.service.ops;
 
-import com.example.tradingbot.domain.service.reconcile.SynchronizeExecutionEnvironmentService;
 import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportAnomalyEntity;
 import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
+import com.example.tradingbot.domain.service.reconcile.SynchronizeExecutionEnvironmentService;
+import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.SynchronizeExecutionEnvironmentReportDataService;
 import java.util.List;
 import java.util.Objects;
@@ -20,6 +21,7 @@ public class ReconcileOpsService {
 
     private final SynchronizeExecutionEnvironmentService synchronizeExecutionEnvironmentService;
     private final SynchronizeExecutionEnvironmentReportDataService reportDataService;
+    private final InstrumentDataService instrumentDataService;
 
     public Long run(String mode, Long exchangeId) {
         validateRunRequest(mode, exchangeId);
@@ -36,20 +38,26 @@ public class ReconcileOpsService {
     }
 
     public List<SynchronizeExecutionEnvironmentReportEntity> listReports(Long exchangeId, Integer limit) {
-        if (Objects.isNull(exchangeId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "exchangeId is required");
-        }
-
-        int resolvedLimit = DEFAULT_LIMIT;
-        if (Objects.nonNull(limit)) {
-            resolvedLimit = limit;
-        }
-
-        if (resolvedLimit <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be greater than zero");
-        }
+        validateExchangeId(exchangeId);
+        int resolvedLimit = resolveLimit(limit);
 
         return reportDataService.findByExchangeId(exchangeId, resolvedLimit)
+            .stream()
+            .map(this::toReportWithoutAnomalies)
+            .toList();
+    }
+
+    public List<SynchronizeExecutionEnvironmentReportEntity> listReportsByInstrument(Long exchangeId, String instrumentId, Integer limit) {
+        validateExchangeId(exchangeId);
+        validateInstrumentId(instrumentId);
+        int resolvedLimit = resolveLimit(limit);
+
+        String exchangeInstId = instrumentDataService
+            .findByExchangeIdAndInternalId(exchangeId, instrumentId)
+            .map(instrument -> instrument.getExternalId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Instrument not found"));
+
+        return reportDataService.findByExchangeIdAndInstId(exchangeId, exchangeInstId, resolvedLimit)
             .stream()
             .map(this::toReportWithoutAnomalies)
             .toList();
@@ -72,13 +80,35 @@ public class ReconcileOpsService {
     }
 
     private void validateRunRequest(String mode, Long exchangeId) {
-        if (Objects.isNull(exchangeId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "exchangeId is required");
-        }
+        validateExchangeId(exchangeId);
 
         if (Objects.isNull(mode) || BooleanUtils.isTrue(mode.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "mode is required");
         }
+    }
+
+    private void validateExchangeId(Long exchangeId) {
+        if (Objects.isNull(exchangeId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "exchangeId is required");
+        }
+    }
+
+    private void validateInstrumentId(String instrumentId) {
+        if (Objects.isNull(instrumentId) || BooleanUtils.isTrue(instrumentId.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "instrumentId is required");
+        }
+    }
+
+    private int resolveLimit(Integer limit) {
+        int resolvedLimit = DEFAULT_LIMIT;
+        if (Objects.nonNull(limit)) {
+            resolvedLimit = limit;
+        }
+
+        if (resolvedLimit <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be greater than zero");
+        }
+        return resolvedLimit;
     }
 
     private SynchronizeExecutionEnvironmentReportEntity toReportWithoutAnomalies(SynchronizeExecutionEnvironmentReportEntity source) {
