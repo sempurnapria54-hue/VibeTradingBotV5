@@ -19,15 +19,15 @@ public class CandleGroupService {
     private final InstrumentService instrumentService;
     private final ExchangeService exchangeService;
 
-    public List<CandleGroupEntity> listByInstrument(String exchangeName, String instrumentName) {
-        var instrumentEntity = instrumentService.getRequiredByExchangeNameAndName(exchangeName, instrumentName);
-        return candleGroupDataService.findAllByInstrumentId(instrumentEntity.getId());
+    public List<CandleGroupEntity> listByInstrument(String exchangeInternalId, String instrumentInternalId) {
+        Long instrumentId = instrumentService.getRequiredIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId);
+        return candleGroupDataService.findAllByInstrumentId(instrumentId);
     }
 
     @Transactional
-    public CandleGroupEntity create(String exchangeName, String instrumentName, CandleGroupEntity candleGroup) {
-        ExchangeEntity exchange = exchangeService.getRequiredByName(exchangeName);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndName(exchange.getId(), instrumentName);
+    public CandleGroupEntity create(String exchangeInternalId, String instrumentInternalId, CandleGroupEntity candleGroup) {
+        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
+        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
 
         if (candleGroupDataService.findByInstrumentIdAndTimeframe(instrument.getId(), candleGroup.getTimeframe()).isPresent()) {
             throw new RuntimeException(CANDLE_GROUP_ALREADY_EXISTS);

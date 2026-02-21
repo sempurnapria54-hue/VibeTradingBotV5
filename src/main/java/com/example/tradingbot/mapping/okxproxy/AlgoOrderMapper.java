@@ -47,5 +47,6 @@ public interface AlgoOrderMapper {
     @Mapping(source = "externalStatusMessage", target = "sMsg")
     com.example.tradingbot.client.model.okx.AlgoOrderResponse domainToClient(ExchangeAlgoOrder source);
 
+    @Mapping(source = "instrument.internalId", target = "instrumentInternalId")
     AlgoOrderResponse domainToRest(AlgoOrderEntity source);
 }

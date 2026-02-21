@@ -28,9 +28,9 @@ public class AlgoOrderService {
     private final InstrumentService instrumentService;
 
     @Transactional
-    public AlgoOrderEntity createAlgoOrder(String exchangeName, String instrumentName, CreateAlgoOrderRequest request) {
-        ExchangeEntity exchange = exchangeService.getRequiredByName(exchangeName);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndName(exchange.getId(), instrumentName);
+    public AlgoOrderEntity createAlgoOrder(String exchangeInternalId, String instrumentInternalId, CreateAlgoOrderRequest request) {
+        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
+        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
         tradingGuardService.assertTradingAllowed(exchange, instrument);
 
         AlgoOrderEntity algoOrderEntity = new AlgoOrderEntity();
@@ -42,9 +42,9 @@ public class AlgoOrderService {
         return algoOrderDataService.save(algoOrderEntity);
     }
 
-    public AlgoOrderEntity cancelAlgoOrder(String exchangeName, String instrumentName, String orderId) {
-        ExchangeEntity exchange = exchangeService.getRequiredByName(exchangeName);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndName(exchange.getId(), instrumentName);
+    public AlgoOrderEntity cancelAlgoOrder(String exchangeInternalId, String instrumentInternalId, String orderId) {
+        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
+        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
         tradingGuardService.assertTradingAllowed(exchange, instrument);
 
         AlgoOrderEntity algoOrderEntity =

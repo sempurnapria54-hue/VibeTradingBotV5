@@ -43,5 +43,6 @@ public interface OrderMapper {
     @Mapping(source = "externalStatusMessage", target = "sMsg")
     com.example.tradingbot.client.model.okx.OrderResponse domainToClient(ExchangeOrder source);
 
+    @Mapping(source = "instrument.internalId", target = "instrumentInternalId")
     OrderResponse domainToRest(OrderEntity source);
 }

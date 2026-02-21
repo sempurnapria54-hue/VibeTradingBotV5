@@ -11,8 +11,8 @@ import lombok.Setter;
 @AllArgsConstructor
 public class InstrumentResponse {
 
-    private Long id;
-    private Long exchangeId;
+    private String internalId;
+    private String exchangeInternalId;
     private String instId;
     private String instType;
     private String status;

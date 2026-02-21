@@ -27,9 +27,9 @@ public class OrderService {
     private final InstrumentService instrumentService;
 
     @Transactional
-    public OrderEntity createOrder(String exchangeName, String instrumentName, CreateOrderRequest request) {
-        ExchangeEntity exchange = exchangeService.getRequiredByName(exchangeName);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndName(exchange.getId(), instrumentName);
+    public OrderEntity createOrder(String exchangeInternalId, String instrumentInternalId, CreateOrderRequest request) {
+        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
+        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
         tradingGuardService.assertTradingAllowed(exchange, instrument);
 
         OrderEntity orderEntity = new OrderEntity();
@@ -43,10 +43,10 @@ public class OrderService {
         return orderEntity;
     }
 
-    public OrderEntity cancelOrder(String exchangeName, String instrumentName, String orderId) {
-        ExchangeEntity exchange = exchangeService.getRequiredByName(exchangeName);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndName(exchange.getId(), instrumentName);
-        OrderEntity orderEntity = orderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientOrderId(exchange.getId(), instrument.getId(), orderId);
+    public OrderEntity cancelOrder(String exchangeInternalId, String instrumentInternalId, String orderId) {
+        Long exchangeId = exchangeService.getRequiredByInternalId(exchangeInternalId).getId();
+        Long instrumentId = instrumentService.getRequiredIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId);
+        OrderEntity orderEntity = orderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, orderId);
         OrderResponse response = extractFirstOrder(okxTradeProxyService.cancelOrder(orderEntity));
         orderEntity.applyOrderResponse(response);
         return orderDataService.save(orderEntity);

@@ -16,23 +16,23 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/{exchangeName}/instruments/{instrumentName}/candle-groups")
+@RequestMapping("/api/{exchangeId}/instruments/{instrumentId}/candle-groups")
 public class CandleGroupController {
 
     private final CandleGroupService candleGroupService;
     private final CandleGroupMapper candleGroupMapper;
 
     @GetMapping
-    public List<CandleGroupResponse> getByInstrument(@PathVariable(name = "exchangeName") String exchangeName,
-                                             @PathVariable(name = "instrumentName") String instrumentName) {
-        var candleGroups = candleGroupService.listByInstrument(exchangeName, instrumentName);
+    public List<CandleGroupResponse> getByInstrument(@PathVariable(name = "exchangeId") String exchangeId,
+                                             @PathVariable(name = "instrumentId") String instrumentId) {
+        var candleGroups = candleGroupService.listByInstrument(exchangeId, instrumentId);
         return candleGroupMapper.domainToRest(candleGroups);
     }
 
     @PostMapping
-    public void createGroup(@PathVariable(name = "exchangeName") String exchangeName,
-                            @PathVariable(name = "instrumentName") String instrumentName,
+    public void createGroup(@PathVariable(name = "exchangeId") String exchangeId,
+                            @PathVariable(name = "instrumentId") String instrumentId,
                             @RequestBody CreateCandleGroupRequest candleGroup) {
-        candleGroupService.create(exchangeName, instrumentName, candleGroupMapper.restToDomain(candleGroup));
+        candleGroupService.create(exchangeId, instrumentId, candleGroupMapper.restToDomain(candleGroup));
     }
 }

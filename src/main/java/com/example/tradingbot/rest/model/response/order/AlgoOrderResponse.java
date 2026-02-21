@@ -9,8 +9,7 @@ import java.time.OffsetDateTime;
 @Setter
 public class AlgoOrderResponse {
 
-    private Long id;
-    private Long instrumentId;
+    private String instrumentInternalId;
     private String internalOrderId;
     private String externalId;
     private String status;
