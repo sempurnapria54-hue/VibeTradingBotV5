@@ -35,52 +35,67 @@ public class CandleGroupEntity extends AuditableEntity {
     public static final int ERROR_MESSAGE_LENGTH = 1024;
     public static final int LEASE_OWNER_LENGTH = 128;
 
+    /** Внутренний идентификатор группы свечей. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 
+    /** Идентификатор инструмента-владельца группы свечей. */
     @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
     private Long instrumentId;
 
+    /** Ссылка на инструмент, для которого ведутся свечи. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "instrument_id", nullable = false)
     private InstrumentEntity instrument;
 
+    /** Таймфрейм группы (например 1m/5m/1H). */
     @Column(name = "timeframe", nullable = false, length = TIMEFRAME_LENGTH)
     private String timeframe;
 
+    /** Текущий статус жизненного цикла загрузки свечей. */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = STATUS_LENGTH)
     private String status;
 
+    /** Начальная граница исторического покрытия в UTC миллисекундах. */
     @Column(name = "coverage_start_ts", nullable = false)
     private Long coverageStartTs;
 
+    /** Курсор backfill-синхронизации в UTC миллисекундах. */
     @Column(name = "backfill_cursor_ts")
     private Long backfillCursorTs;
 
+    /** Время последней tail-синхронизации в UTC миллисекундах. */
     @Column(name = "last_tail_sync_ts")
     private Long lastTailSyncTs;
 
+    /** Количество попыток синхронизации подряд. */
     @Column(name = "attempt_count", nullable = false)
     private Integer attemptCount;
 
+    /** Время последней успешной синхронизации. */
     @Column(name = "last_success_at")
     private OffsetDateTime lastSuccessAt;
 
+    /** Время последней ошибки синхронизации. */
     @Column(name = "last_error_at")
     private OffsetDateTime lastErrorAt;
 
+    /** Код последней ошибки синхронизации. */
     @Column(name = "last_error_code", length = ERROR_CODE_LENGTH)
     private String lastErrorCode;
 
+    /** Текст последней ошибки синхронизации. */
     @Column(name = "last_error_message", length = ERROR_MESSAGE_LENGTH)
     private String lastErrorMessage;
 
+    /** Владелец lease для распределённой синхронизации. */
     @Column(name = "lease_owner", length = LEASE_OWNER_LENGTH)
     private String leaseOwner;
 
+    /** Время окончания lease в UTC миллисекундах. */
     @Column(name = "lease_until")
     private Long leaseUntil;
 

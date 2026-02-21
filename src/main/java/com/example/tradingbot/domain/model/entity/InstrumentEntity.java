@@ -86,18 +86,23 @@ public class InstrumentEntity extends AuditableEntity {
     @Column(name = "status", nullable = false)
     private String status;
 
+    /** Последняя торговая цена по инструменту. */
     @Column(name = "last_price")
     private String lastPrice;
 
+    /** Текущая mark price инструмента. */
     @Column(name = "mark_price")
     private String markPrice;
 
+    /** Текущая индексная цена инструмента. */
     @Column(name = "index_price")
     private String indexPrice;
 
+    /** Время последнего обновления ценовых полей. */
     @Column(name = "price_updated_at")
     private Instant priceUpdatedAt;
 
+    /** Набор групп свечей для разных таймфреймов инструмента. */
     @OneToMany(mappedBy = "instrument", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CandleGroupEntity> candleGroups;
 

@@ -40,57 +40,74 @@ public class OrderEntity extends AuditableEntity {
     public static final int TYPE_LENGTH = 50;
     public static final int SIDE_LENGTH = 20;
 
+    /** Внутренний идентификатор ордера. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 
+    /** Идентификатор инструмента ордера. */
     @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
     private Long instrumentId;
 
+    /** Ссылка на инструмент, к которому относится ордер. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "instrument_id", nullable = false)
     private InstrumentEntity instrument;
 
+    /** Клиентский идентификатор ордера. */
     @Column(name = "client_order_id", nullable = false, length = CLIENT_ORDER_ID_LENGTH)
     private String clientOrderId;
 
+    /** Идентификатор ордера на бирже. */
     @Column(name = "exchange_order_id", length = EXCHANGE_ORDER_ID_LENGTH)
     private String exchangeOrderId;
 
+    /** Текущий внутренний статус ордера. */
     @Column(name = "status", nullable = false, length = STATUS_LENGTH)
     private String status;
 
+    /** Тип ордера в бизнес-терминах. */
     @Column(name = "type", length = TYPE_LENGTH)
     private String type;
 
+    /** Сторона ордера (buy/sell). */
     @Column(name = "side", length = SIDE_LENGTH)
     private String side;
 
+    /** Состояние ордера на стороне биржи. */
     @Column(name = "state", length = 32)
     private String state;
 
+    /** Тип ордера на бирже (ordType). */
     @Column(name = "ord_type", length = 32)
     private String ordType;
 
+    /** Цена ордера. */
     @Column(name = "px", length = 64)
     private String px;
 
+    /** Объём ордера. */
     @Column(name = "sz", length = 64)
     private String sz;
 
+    /** Накопленный исполненный объём. */
     @Column(name = "fill_sz", length = 64)
     private String fillSz;
 
+    /** Средняя цена исполнения. */
     @Column(name = "avg_px", length = 64)
     private String avgPx;
 
+    /** Комиссия по ордеру. */
     @Column(name = "fee", length = 64)
     private String fee;
 
+    /** Время создания ордера на бирже в UTC миллисекундах. */
     @Column(name = "c_time")
     private Long cTime;
 
+    /** Время последнего обновления ордера на бирже в UTC миллисекундах. */
     @Column(name = "u_time")
     private Long uTime;
 

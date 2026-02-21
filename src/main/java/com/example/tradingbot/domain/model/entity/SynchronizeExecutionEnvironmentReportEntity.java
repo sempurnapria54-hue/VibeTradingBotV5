@@ -28,45 +28,58 @@ public class SynchronizeExecutionEnvironmentReportEntity {
     public static final int TRIGGER_LENGTH = 16;
     public static final int SEVERITY_LENGTH = 16;
 
+    /** Внутренний идентификатор отчёта синхронизации. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 
+    /** Идентификатор биржи, для которой сформирован отчёт. */
     @Column(name = "exchange_id", nullable = false, updatable = false, insertable = false)
     private Long exchangeId;
 
+    /** Ссылка на биржу отчёта. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "exchange_id", nullable = false)
     private ExchangeEntity exchange;
 
+    /** Время начала процесса синхронизации. */
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
 
+    /** Время завершения процесса синхронизации. */
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    /** Триггер запуска синхронизации (manual/scheduler и т.д.). */
     @Column(name = "trigger", nullable = false, length = TRIGGER_LENGTH)
     private String trigger;
 
+    /** Признак наличия аномалий в процессе синхронизации. */
     @Column(name = "has_anomalies", nullable = false)
     private boolean hasAnomalies;
 
+    /** Максимальный уровень серьёзности обнаруженных аномалий. */
     @Column(name = "max_severity", nullable = false, length = SEVERITY_LENGTH)
     private String maxSeverity;
 
+    /** JSON-снимок базы данных до синхронизации. */
     @Column(name = "database_before_json", nullable = false, columnDefinition = "jsonb")
     private String databaseBeforeJson;
 
+    /** JSON-снимок биржи до синхронизации. */
     @Column(name = "exchange_before_json", nullable = false, columnDefinition = "jsonb")
     private String exchangeBeforeJson;
 
+    /** JSON-снимок базы данных после синхронизации. */
     @Column(name = "database_after_json", columnDefinition = "jsonb")
     private String databaseAfterJson;
 
+    /** JSON-снимок биржи после синхронизации. */
     @Column(name = "exchange_after_json", columnDefinition = "jsonb")
     private String exchangeAfterJson;
 
+    /** Список зафиксированных аномалий по отчёту. */
     @OneToMany(mappedBy = "report", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SynchronizeExecutionEnvironmentReportAnomalyEntity> anomalies = new ArrayList<>();
 }
