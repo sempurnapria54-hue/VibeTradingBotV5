@@ -2,12 +2,11 @@ package com.example.tradingbot.rest.model.response;
 
 import lombok.Getter;
 import lombok.Setter;
-
 import java.time.OffsetDateTime;
 
 @Getter
 @Setter
-public class OrderResponse {
+public class OrderResponse extends Auditable {
 
     private String instrumentInternalId;
     private String internalId;
@@ -21,10 +20,6 @@ public class OrderResponse {
     private String accumulatedFillSize;
     private String averagePrice;
     private String fee;
-    private Long createTime;
-    private Long updateTime;
-    private OffsetDateTime createdAt;
-    private String createdBy;
-    private OffsetDateTime modifiedAt;
-    private String modifiedBy;
+    private OffsetDateTime exchangeCreatedAt;
+    private OffsetDateTime exchangeModifiedAt;
 }

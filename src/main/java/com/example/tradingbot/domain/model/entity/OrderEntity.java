@@ -16,11 +16,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_CREATED;
 import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_IN_PROGRESS;
-import static com.example.tradingbot.util.NumberUtils.parseLongSafe;
+import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMillisSafe;
 
 @Getter
 @Setter
@@ -95,11 +96,11 @@ public class OrderEntity extends AuditableEntity {
 
     /** Время создания ордера на бирже в UTC миллисекундах. */
     @Column(name = "c_time")
-    private Long createTime;
+    private OffsetDateTime exchangeCreatedAt;
 
     /** Время последнего обновления ордера на бирже в UTC миллисекундах. */
     @Column(name = "u_time")
-    private Long updateTime;
+    private OffsetDateTime exchangeModifiedAt;
 
     public void initOnCreate(InstrumentEntity instrument, CreateOrderRequest request) {
         setInstrument(instrument);
@@ -122,7 +123,7 @@ public class OrderEntity extends AuditableEntity {
         setAccumulatedFillSize(responseOrder.getAccFillSz());
         setAveragePrice(responseOrder.getAveragePrice());
         setFee(responseOrder.getFee());
-        setCreateTime(parseLongSafe(responseOrder.getCreateTime()));
-        setUpdateTime(parseLongSafe(responseOrder.getUpdateTime()));
+        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getCreateTime()));
+        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getUpdateTime()));
     }
 }

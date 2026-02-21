@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 
 @Getter
 @Setter
-public class AlgoOrderResponse {
+public class AlgoOrderResponse extends Auditable {
 
     private String instrumentInternalId;
     private String internalOrderId;
@@ -24,10 +24,6 @@ public class AlgoOrderResponse {
     private String stopLossOrderPrice;
     private String callbackRatio;
     private String callbackStep;
-    private Long createTime;
-    private Long updateTime;
-    private OffsetDateTime createdAt;
-    private String createdBy;
-    private OffsetDateTime modifiedAt;
-    private String modifiedBy;
+    private OffsetDateTime exchangeCreatedAt;
+    private OffsetDateTime exchangeModifiedAt;
 }

@@ -16,6 +16,8 @@ import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -94,9 +96,9 @@ public class ExchangeToDbExtendedTransferService {
         changed |= setIfChanged(position.getUnrealizedProfit(), external.getUnrealizedProfit(), position::setUnrealizedProfit);
         changed |= setIfChanged(position.getPositionSide(), external.getPositionSide(), position::setPositionSide);
 
-        Long externalUTime = parseLong(external.getUpdateTime());
-        if (!Objects.equals(position.getUpdateTime(), externalUTime)) {
-            position.setUpdateTime(externalUTime);
+        OffsetDateTime externalUTime = parseOffsetDateTimeMillis(external.getUpdateTime());
+        if (!Objects.equals(position.getExchangeModifiedAt(), externalUTime)) {
+            position.setExchangeModifiedAt(externalUTime);
             changed = true;
         }
 
@@ -121,14 +123,14 @@ public class ExchangeToDbExtendedTransferService {
             changed |= setIfChanged(target.getAveragePrice(), externalOrder.getAveragePrice(), target::setAveragePrice);
             changed |= setIfChanged(target.getFee(), externalOrder.getFee(), target::setFee);
 
-            Long cTime = parseLong(externalOrder.getCreateTime());
-            if (!Objects.equals(target.getCreateTime(), cTime)) {
-                target.setCreateTime(cTime);
+            OffsetDateTime cTime = parseOffsetDateTimeMillis(externalOrder.getCreateTime());
+            if (!Objects.equals(target.getExchangeCreatedAt(), cTime)) {
+                target.setExchangeCreatedAt(cTime);
                 changed = true;
             }
-            Long uTime = parseLong(externalOrder.getUpdateTime());
-            if (!Objects.equals(target.getUpdateTime(), uTime)) {
-                target.setUpdateTime(uTime);
+            OffsetDateTime uTime = parseOffsetDateTimeMillis(externalOrder.getUpdateTime());
+            if (!Objects.equals(target.getExchangeModifiedAt(), uTime)) {
+                target.setExchangeModifiedAt(uTime);
                 changed = true;
             }
 
@@ -159,14 +161,14 @@ public class ExchangeToDbExtendedTransferService {
             changed |= setIfChanged(target.getCallbackRatio(), externalAlgoOrder.getCallbackRatio(), target::setCallbackRatio);
             changed |= setIfChanged(target.getCallbackStep(), externalAlgoOrder.getCallbackStep(), target::setCallbackStep);
 
-            Long cTime = parseLong(externalAlgoOrder.getCreateTime());
-            if (!Objects.equals(target.getCreateTime(), cTime)) {
-                target.setCreateTime(cTime);
+            OffsetDateTime cTime = parseOffsetDateTimeMillis(externalAlgoOrder.getCreateTime());
+            if (!Objects.equals(target.getExchangeCreatedAt(), cTime)) {
+                target.setExchangeCreatedAt(cTime);
                 changed = true;
             }
-            Long uTime = parseLong(externalAlgoOrder.getUpdateTime());
-            if (!Objects.equals(target.getUpdateTime(), uTime)) {
-                target.setUpdateTime(uTime);
+            OffsetDateTime uTime = parseOffsetDateTimeMillis(externalAlgoOrder.getUpdateTime());
+            if (!Objects.equals(target.getExchangeModifiedAt(), uTime)) {
+                target.setExchangeModifiedAt(uTime);
                 changed = true;
             }
 
@@ -222,5 +224,10 @@ public class ExchangeToDbExtendedTransferService {
     private Instant parseInstantMillis(String value) {
         Long epochMillis = parseLong(value);
         return epochMillis == null ? null : Instant.ofEpochMilli(epochMillis);
+    }
+
+    private OffsetDateTime parseOffsetDateTimeMillis(String value) {
+        Long epochMillis = parseLong(value);
+        return epochMillis == null ? null : OffsetDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneOffset.UTC);
     }
 }
