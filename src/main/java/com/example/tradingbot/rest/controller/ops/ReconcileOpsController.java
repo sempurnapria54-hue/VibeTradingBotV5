@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller.ops;
 
-import com.example.tradingbot.domain.model.ops.ReconcileReportView;
+import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
 import com.example.tradingbot.domain.service.ops.ReconcileOpsService;
 import com.example.tradingbot.rest.dto.ops.ReconcileRunResponse;
 import java.util.List;
@@ -29,7 +29,7 @@ public class ReconcileOpsController {
     }
 
     @GetMapping("/reports")
-    public List<ReconcileReportView> listReports(
+    public List<SynchronizeExecutionEnvironmentReportEntity> listReports(
         @RequestParam Long exchangeId,
         @RequestParam(required = false) Integer limit
     ) {
@@ -37,7 +37,7 @@ public class ReconcileOpsController {
     }
 
     @GetMapping("/reports/{id}")
-    public ReconcileReportView getReport(@PathVariable Long id) {
+    public SynchronizeExecutionEnvironmentReportEntity getReport(@PathVariable Long id) {
         return reconcileOpsService.getReport(id);
     }
 }

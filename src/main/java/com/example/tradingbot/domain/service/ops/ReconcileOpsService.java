@@ -1,7 +1,5 @@
 package com.example.tradingbot.domain.service.ops;
 
-import com.example.tradingbot.domain.model.ops.ReconcileReportAnomalyView;
-import com.example.tradingbot.domain.model.ops.ReconcileReportView;
 import com.example.tradingbot.domain.service.reconcile.SynchronizeExecutionEnvironmentService;
 import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportAnomalyEntity;
 import com.example.tradingbot.domain.model.entity.SynchronizeExecutionEnvironmentReportEntity;
@@ -37,7 +35,7 @@ public class ReconcileOpsService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported mode: " + mode);
     }
 
-    public List<ReconcileReportView> listReports(Long exchangeId, Integer limit) {
+    public List<SynchronizeExecutionEnvironmentReportEntity> listReports(Long exchangeId, Integer limit) {
         if (Objects.isNull(exchangeId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "exchangeId is required");
         }
@@ -53,11 +51,11 @@ public class ReconcileOpsService {
 
         return reportDataService.findByExchangeId(exchangeId, resolvedLimit)
             .stream()
-            .map(report -> toView(report, List.of()))
+            .map(this::toReportWithoutAnomalies)
             .toList();
     }
 
-    public ReconcileReportView getReport(Long id) {
+    public SynchronizeExecutionEnvironmentReportEntity getReport(Long id) {
         if (Objects.isNull(id)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "id is required");
         }
@@ -65,12 +63,12 @@ public class ReconcileOpsService {
         SynchronizeExecutionEnvironmentReportEntity report = reportDataService.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reconcile report not found"));
 
-        List<ReconcileReportAnomalyView> anomalies = reportDataService.findAnomaliesByReportId(id)
+        List<SynchronizeExecutionEnvironmentReportAnomalyEntity> anomalies = reportDataService.findAnomaliesByReportId(id)
             .stream()
-            .map(this::toAnomalyView)
+            .map(this::toAnomalyEntity)
             .toList();
 
-        return toView(report, anomalies);
+        return toReportEntity(report, anomalies);
     }
 
     private void validateRunRequest(String mode, Long exchangeId) {
@@ -83,32 +81,40 @@ public class ReconcileOpsService {
         }
     }
 
-    private ReconcileReportView toView(SynchronizeExecutionEnvironmentReportEntity source, List<ReconcileReportAnomalyView> anomalies) {
-        return new ReconcileReportView(
-            source.getId(),
-            source.getExchangeId(),
-            source.getStartedAt(),
-            source.getFinishedAt(),
-            source.getTrigger(),
-            source.isHasAnomalies(),
-            source.getMaxSeverity(),
-            source.getDatabaseBeforeJson(),
-            source.getExchangeBeforeJson(),
-            source.getDatabaseAfterJson(),
-            source.getExchangeAfterJson(),
-            anomalies
-        );
+    private SynchronizeExecutionEnvironmentReportEntity toReportWithoutAnomalies(SynchronizeExecutionEnvironmentReportEntity source) {
+        return toReportEntity(source, List.of());
     }
 
-    private ReconcileReportAnomalyView toAnomalyView(SynchronizeExecutionEnvironmentReportAnomalyEntity source) {
-        return new ReconcileReportAnomalyView(
-            source.getId(),
-            source.getInstId(),
-            source.getType(),
-            source.getSeverity(),
-            source.getSummary(),
-            source.getDetailsJson(),
-            source.getCreatedAt()
-        );
+    private SynchronizeExecutionEnvironmentReportEntity toReportEntity(
+        SynchronizeExecutionEnvironmentReportEntity source,
+        List<SynchronizeExecutionEnvironmentReportAnomalyEntity> anomalies
+    ) {
+        SynchronizeExecutionEnvironmentReportEntity target = new SynchronizeExecutionEnvironmentReportEntity();
+        target.setId(source.getId());
+        target.setExchangeId(source.getExchangeId());
+        target.setStartedAt(source.getStartedAt());
+        target.setFinishedAt(source.getFinishedAt());
+        target.setTrigger(source.getTrigger());
+        target.setHasAnomalies(source.isHasAnomalies());
+        target.setMaxSeverity(source.getMaxSeverity());
+        target.setDatabaseBeforeJson(source.getDatabaseBeforeJson());
+        target.setExchangeBeforeJson(source.getExchangeBeforeJson());
+        target.setDatabaseAfterJson(source.getDatabaseAfterJson());
+        target.setExchangeAfterJson(source.getExchangeAfterJson());
+        target.setAnomalies(anomalies);
+        return target;
+    }
+
+    private SynchronizeExecutionEnvironmentReportAnomalyEntity toAnomalyEntity(SynchronizeExecutionEnvironmentReportAnomalyEntity source) {
+        SynchronizeExecutionEnvironmentReportAnomalyEntity target = new SynchronizeExecutionEnvironmentReportAnomalyEntity();
+        target.setId(source.getId());
+        target.setReportId(source.getReportId());
+        target.setInstId(source.getInstId());
+        target.setType(source.getType());
+        target.setSeverity(source.getSeverity());
+        target.setSummary(source.getSummary());
+        target.setDetailsJson(source.getDetailsJson());
+        target.setCreatedAt(source.getCreatedAt());
+        return target;
     }
 }
