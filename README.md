@@ -20,16 +20,6 @@ Vault UI будет доступен по адресу: <http://localhost:8200>
 export VAULT_TOKEN=<ROOT_TOKEN>
 ```
 
-## Настройка Maven для закрытого окружения (HTTP 403 из Maven Central)
-
-В проект добавлены локальные настройки Maven (`.mvn/maven.config` + `.mvn/settings.xml`), чтобы Maven всегда запускался с прокси `proxy:8080` как для `http`, так и для `https`.
-
-Если в вашем окружении есть корпоративный Nexus/Artifactory, можно переопределить настройки так:
-
-```bash
-mvn -s /path/to/your/settings.xml test
-```
-
 ## Запуск сервиса
 
 ```bash
