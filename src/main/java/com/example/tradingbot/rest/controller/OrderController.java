@@ -1,14 +1,13 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.rest.model.response.order.OrderCommandResponse;
 import com.example.tradingbot.domain.service.trading.AlgoOrderService;
 import com.example.tradingbot.domain.service.trading.OrderService;
 import com.example.tradingbot.mapping.okxproxy.AlgoOrderMapper;
 import com.example.tradingbot.mapping.okxproxy.OrderMapper;
 import com.example.tradingbot.rest.model.request.order.CreateAlgoOrderRequest;
 import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
-import com.example.tradingbot.rest.model.response.AlgoOrder;
-import com.example.tradingbot.rest.model.response.Order;
+import com.example.tradingbot.rest.model.response.order.AlgoOrderResponse;
+import com.example.tradingbot.rest.model.response.order.OrderResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,32 +27,33 @@ public class OrderController {
     private final AlgoOrderMapper algoOrderMapper;
 
     @PostMapping()
-    public OrderCommandResponse createOrder(@PathVariable(name = "exchangeName") String exchangeName,
+    public OrderResponse createOrder(@PathVariable(name = "exchangeName") String exchangeName,
                                           @PathVariable(name = "instrumentName") String instrumentName,
                                           @RequestBody CreateOrderRequest request) {
-        return orderService.createOrder(exchangeName, instrumentName, request);
+        var order = orderService.createOrder(exchangeName, instrumentName, request);
+        return orderMapper.domainToRest(order);
     }
 
     @DeleteMapping("{orderId}/cancel")
-    public Order cancelOrders(@PathVariable(name = "exchangeName") String exchangeName,
-                              @PathVariable(name = "instrumentName") String instrumentName,
-                              @PathVariable(name = "orderId") String orderId) {
+    public OrderResponse cancelOrders(@PathVariable(name = "exchangeName") String exchangeName,
+                                      @PathVariable(name = "instrumentName") String instrumentName,
+                                      @PathVariable(name = "orderId") String orderId) {
         var order = orderService.cancelOrder(exchangeName, instrumentName, orderId);
         return orderMapper.domainToRest(order);
     }
 
     @PostMapping("/algo")
-    public AlgoOrder createAlgoOrder(@PathVariable(name = "exchangeName") String exchangeName,
-                                     @PathVariable(name = "instrumentName") String instrumentName,
-                                     @RequestBody CreateAlgoOrderRequest request) {
+    public AlgoOrderResponse createAlgoOrder(@PathVariable(name = "exchangeName") String exchangeName,
+                                             @PathVariable(name = "instrumentName") String instrumentName,
+                                             @RequestBody CreateAlgoOrderRequest request) {
         var algoOrder = algoOrderService.createAlgoOrder(exchangeName, instrumentName, request);
         return algoOrderMapper.domainToRest(algoOrder);
     }
 
     @DeleteMapping("/algo/{orderId}/cancel")
-    public AlgoOrder cancelAlgoOrder(@PathVariable(name = "exchangeName") String exchangeName,
-                                     @PathVariable(name = "instrumentName") String instrumentName,
-                                     @PathVariable(name = "orderId") String orderId) {
+    public AlgoOrderResponse cancelAlgoOrder(@PathVariable(name = "exchangeName") String exchangeName,
+                                             @PathVariable(name = "instrumentName") String instrumentName,
+                                             @PathVariable(name = "orderId") String orderId) {
         var algoOrder = algoOrderService.cancelAlgoOrder(exchangeName, instrumentName, orderId);
         return algoOrderMapper.domainToRest(algoOrder);
     }

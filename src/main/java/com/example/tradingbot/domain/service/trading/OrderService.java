@@ -1,15 +1,14 @@
 package com.example.tradingbot.domain.service.trading;
 
 import com.example.tradingbot.client.model.okx.OrderResponse;
-import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
-import com.example.tradingbot.rest.model.response.order.OrderCommandResponse;
-import com.example.tradingbot.domain.service.ExchangeService;
-import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.domain.service.ExchangeService;
+import com.example.tradingbot.domain.service.InstrumentService;
+import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.persistence.service.OrderDataService;
+import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,7 +27,7 @@ public class OrderService {
     private final InstrumentService instrumentService;
 
     @Transactional
-    public OrderCommandResponse createOrder(String exchangeName, String instrumentName, CreateOrderRequest request) {
+    public OrderEntity createOrder(String exchangeName, String instrumentName, CreateOrderRequest request) {
         ExchangeEntity exchange = exchangeService.getRequiredByName(exchangeName);
         InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndName(exchange.getId(), instrumentName);
         tradingGuardService.assertTradingAllowed(exchange, instrument);
@@ -41,7 +40,7 @@ public class OrderService {
         orderEntity.applyOrderResponse(response);
         orderDataService.save(orderEntity);
 
-        return new OrderCommandResponse(orderEntity.getInternalId(), orderEntity.getExternalId(), orderEntity.getExternalStatus());
+        return orderEntity;
     }
 
     public OrderEntity cancelOrder(String exchangeName, String instrumentName, String orderId) {

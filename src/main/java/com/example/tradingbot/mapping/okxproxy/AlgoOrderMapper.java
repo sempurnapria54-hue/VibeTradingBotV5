@@ -1,9 +1,8 @@
 package com.example.tradingbot.mapping.okxproxy;
 
-import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
 import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.rest.model.response.AlgoOrder;
+import com.example.tradingbot.rest.model.response.order.AlgoOrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -27,7 +26,7 @@ public interface AlgoOrderMapper {
     @Mapping(source = "uTime", target = "updateTime")
     @Mapping(source = "sCode", target = "externalStatusCode")
     @Mapping(source = "sMsg", target = "externalStatusMessage")
-    ExchangeAlgoOrder clientToDomain(AlgoOrderResponse source);
+    ExchangeAlgoOrder clientToDomain(com.example.tradingbot.client.model.okx.AlgoOrderResponse source);
 
     @Mapping(source = "externalId", target = "algoId")
     @Mapping(source = "internalOrderId", target = "clOrdId")
@@ -46,7 +45,7 @@ public interface AlgoOrderMapper {
     @Mapping(source = "updateTime", target = "uTime")
     @Mapping(source = "externalStatusCode", target = "sCode")
     @Mapping(source = "externalStatusMessage", target = "sMsg")
-    AlgoOrderResponse domainToClient(ExchangeAlgoOrder source);
+    com.example.tradingbot.client.model.okx.AlgoOrderResponse domainToClient(ExchangeAlgoOrder source);
 
-    AlgoOrder domainToRest(AlgoOrderEntity source);
+    AlgoOrderResponse domainToRest(AlgoOrderEntity source);
 }
