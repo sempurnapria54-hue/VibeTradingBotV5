@@ -124,24 +124,24 @@ public class AlgoOrderEntity extends AuditableEntity {
         setOrderPrice(request.getOrderPrice());
     }
 
-    public void applyAlgoOrderResponse(AlgoOrderEntity entity, AlgoOrderResponse responseOrder) {
-        entity.setExternalId(responseOrder.getAlgoId());
+    public void applyAlgoOrderResponse(AlgoOrderResponse responseOrder) {
+        setExternalId(responseOrder.getAlgoId());
         if (Objects.nonNull(responseOrder.getClOrdId())) {
-            entity.setInternalOrderId(responseOrder.getClOrdId());
+            setInternalOrderId(responseOrder.getClOrdId());
         }
-        entity.setExternalStatus(responseOrder.getState());
-        entity.setStatus(ALGO_ORDER_STATUS_IN_PROGRESS);
-        entity.setType(responseOrder.getType());
-        entity.setSize(responseOrder.getSize());
-        entity.setTriggerPrice(responseOrder.getTriggerPrice());
-        entity.setOrderPrice(responseOrder.getOrderPrice());
-        entity.setTakeProfitTriggerPrice(responseOrder.getTakeProfitTriggerPrice());
-        entity.setTakeProfitOrderPrice(responseOrder.getTakeProfitOrderPrice());
-        entity.setStopLossTriggerPrice(responseOrder.getStopLossTriggerPrice());
-        entity.setStopLossOrderPrice(responseOrder.getStopLossOrderPrice());
-        entity.setCallbackRatio(responseOrder.getCallbackRatio());
-        entity.setCallbackStep(responseOrder.getCallbackStep());
-        entity.setCreateTime(parseLongSafe(responseOrder.getCreateTime()));
-        entity.setUpdateTime(parseLongSafe(responseOrder.getUpdateTime()));
+        setExternalStatus(responseOrder.getState());
+        setStatus(ALGO_ORDER_STATUS_IN_PROGRESS);
+        setType(responseOrder.getOrdType());
+        setSize(responseOrder.getSz());
+        setTriggerPrice(responseOrder.getTriggerPx());
+        setOrderPrice(responseOrder.getOrdPx());
+        setTakeProfitTriggerPrice(responseOrder.getTpTriggerPx());
+        setTakeProfitOrderPrice(responseOrder.getTpOrdPx());
+        setStopLossTriggerPrice(responseOrder.getSlTriggerPx());
+        setStopLossOrderPrice(responseOrder.getSlOrdPx());
+        setCallbackRatio(responseOrder.getCallbackRatio());
+        setCallbackStep(responseOrder.getCallbackSpread());
+        setCreateTime(parseLongSafe(responseOrder.getCTime()));
+        setUpdateTime(parseLongSafe(responseOrder.getUTime()));
     }
 }
