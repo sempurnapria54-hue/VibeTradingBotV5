@@ -40,63 +40,82 @@ public class AlgoOrderEntity extends AuditableEntity {
     public static final int STATUS_LENGTH = 50;
     public static final int ALGO_TYPE_LENGTH = 50;
 
+    /** Внутренний идентификатор algo-ордера. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 
+    /** Идентификатор инструмента algo-ордера. */
     @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
     private Long instrumentId;
 
+    /** Ссылка на инструмент, к которому относится algo-ордер. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "instrument_id", nullable = false)
     private InstrumentEntity instrument;
 
+    /** Клиентский идентификатор algo-ордера. */
     @Column(name = "client_algo_order_id", nullable = false, length = CLIENT_ALGO_ORDER_ID_LENGTH)
     private String clientAlgoOrderId;
 
+    /** Идентификатор algo-ордера на бирже. */
     @Column(name = "exchange_algo_order_id", length = EXCHANGE_ALGO_ORDER_ID_LENGTH)
     private String exchangeAlgoOrderId;
 
+    /** Текущий внутренний статус algo-ордера. */
     @Column(name = "status", nullable = false, length = STATUS_LENGTH)
     private String status;
 
+    /** Тип algo-ордера. */
     @Column(name = "algo_type", length = ALGO_TYPE_LENGTH)
     private String algoType;
 
+    /** Состояние algo-ордера на стороне биржи. */
     @Column(name = "state", length = 32)
     private String state;
 
+    /** Объём algo-ордера. */
     @Column(name = "sz", length = 64)
     private String sz;
 
+    /** Триггерная цена активации algo-ордера. */
     @Column(name = "trigger_px", length = 64)
     private String triggerPx;
 
+    /** Цена выставляемого ордера после срабатывания триггера. */
     @Column(name = "ord_px", length = 64)
     private String ordPx;
 
+    /** Триггерная цена take-profit. */
     @Column(name = "tp_trigger_px", length = 64)
     private String tpTriggerPx;
 
+    /** Цена ордера для take-profit. */
     @Column(name = "tp_ord_px", length = 64)
     private String tpOrdPx;
 
+    /** Триггерная цена stop-loss. */
     @Column(name = "sl_trigger_px", length = 64)
     private String slTriggerPx;
 
+    /** Цена ордера для stop-loss. */
     @Column(name = "sl_ord_px", length = 64)
     private String slOrdPx;
 
+    /** Коэффициент callback для trailing-механики. */
     @Column(name = "callback_ratio", length = 64)
     private String callbackRatio;
 
+    /** Абсолютный шаг callback для trailing-механики. */
     @Column(name = "callback_spread", length = 64)
     private String callbackSpread;
 
+    /** Время создания algo-ордера на бирже в UTC миллисекундах. */
     @Column(name = "c_time")
     private Long cTime;
 
+    /** Время обновления algo-ордера на бирже в UTC миллисекундах. */
     @Column(name = "u_time")
     private Long uTime;
 

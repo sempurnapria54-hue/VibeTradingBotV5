@@ -24,17 +24,21 @@ public class ExchangeEntity extends AuditableEntity {
     public static final int BASE_URL_LENGTH = 512;
     public static final int STATUS_LENGTH = 50;
 
+    /** Внутренний идентификатор биржи. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 
+    /** Уникальное имя биржи (например OKX). */
     @Column(name = "name", nullable = false, length = NAME_LENGTH)
     private String name;
 
+    /** Базовый URL для API биржи. */
     @Column(name = "base_url", nullable = false, length = BASE_URL_LENGTH)
     private String baseUrl;
 
+    /** Текущий статус подключения/использования биржи. */
     @Column(name = "status", nullable = false, length = STATUS_LENGTH)
     private String status;
 }

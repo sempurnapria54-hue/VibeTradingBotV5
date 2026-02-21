@@ -20,18 +20,22 @@ public abstract class AuditableEntity {
 
     public static final int AUDIT_NAME_LENGTH = 255;
 
+    /** Дата и время создания записи. */
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    /** Пользователь/сервис, создавший запись. */
     @CreatedBy
     @Column(name = "created_by", length = AUDIT_NAME_LENGTH)
     private String createdBy;
 
+    /** Дата и время последнего изменения записи. */
     @LastModifiedDate
     @Column(name = "modified_at")
     private OffsetDateTime modifiedAt;
 
+    /** Пользователь/сервис, выполнивший последнее изменение. */
     @LastModifiedBy
     @Column(name = "modified_by", length = AUDIT_NAME_LENGTH)
     private String modifiedBy;
