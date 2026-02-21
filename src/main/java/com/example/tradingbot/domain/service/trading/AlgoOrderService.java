@@ -1,14 +1,14 @@
 package com.example.tradingbot.domain.service.trading;
 
 import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
-import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
-import com.example.tradingbot.domain.service.ExchangeService;
-import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
+import com.example.tradingbot.domain.service.ExchangeService;
+import com.example.tradingbot.domain.service.InstrumentService;
+import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
+import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class AlgoOrderService {
-    private static final String DEFAULT_TRADE_MODE = "cross";
 
     private final TradingGuardService tradingGuardService;
     private final AlgoOrderDataService algoOrderDataService;
