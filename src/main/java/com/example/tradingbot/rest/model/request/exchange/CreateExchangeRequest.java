@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ExchangeCreateRequest {
+public class CreateExchangeRequest {
 
     private String name;
     private String status;

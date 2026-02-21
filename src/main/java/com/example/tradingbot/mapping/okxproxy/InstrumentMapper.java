@@ -2,7 +2,7 @@ package com.example.tradingbot.mapping.okxproxy;
 
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.exchange.ExchangeInstrument;
-import com.example.tradingbot.rest.model.request.instrument.InstrumentCreateRq;
+import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;
 import com.example.tradingbot.rest.model.response.instrument.InstrumentResponse;
 import java.util.List;
 import org.mapstruct.Mapper;
@@ -42,5 +42,5 @@ public interface InstrumentMapper {
     List<InstrumentResponse> domainToRest(List<InstrumentEntity> source);
 
     @Mapping(source = "externalName", target = "externalId")
-    InstrumentEntity restToDomain(InstrumentCreateRq request);
+    InstrumentEntity restToDomain(CreateInstrumentRequest request);
 }

@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class ClosePositionCommandRequest {
+public class ClosePositionRequest {
 
     private Long exchangeId;
     private Long instrumentId;

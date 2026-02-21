@@ -2,7 +2,7 @@ package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.CandleGroupService;
 import com.example.tradingbot.mapping.okxproxy.CandleGroupMapper;
-import com.example.tradingbot.rest.model.request.candlegroup.CandleGroupCreateRequest;
+import com.example.tradingbot.rest.model.request.candlegroup.CreateCandleGroupRequest;
 import com.example.tradingbot.rest.model.response.candlegroup.CandleGroupResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +32,7 @@ public class CandleGroupController {
     @PostMapping
     public void createGroup(@PathVariable(name = "exchangeName") String exchangeName,
                             @PathVariable(name = "instrumentName") String instrumentName,
-                            @RequestBody CandleGroupCreateRequest candleGroup) {
+                            @RequestBody CreateCandleGroupRequest candleGroup) {
         candleGroupService.create(exchangeName, instrumentName, candleGroupMapper.restToDomain(candleGroup));
     }
 }

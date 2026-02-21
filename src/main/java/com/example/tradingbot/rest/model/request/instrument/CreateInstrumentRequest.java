@@ -11,7 +11,7 @@ import java.util.Set;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class InstrumentCreateRq {
+public class CreateInstrumentRequest {
 
     private String name;
     private String externalName;

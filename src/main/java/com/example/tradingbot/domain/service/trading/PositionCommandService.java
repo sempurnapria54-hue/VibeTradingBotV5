@@ -1,8 +1,7 @@
 package com.example.tradingbot.domain.service.trading;
 
-import com.example.tradingbot.client.model.okx.ClosePositionRequest;
 import com.example.tradingbot.client.model.okx.PositionResponse;
-import com.example.tradingbot.rest.model.request.trading.ClosePositionCommandRequest;
+import com.example.tradingbot.rest.model.request.trading.ClosePositionRequest;
 import com.example.tradingbot.rest.model.response.trading.ClosePositionResponse;
 import com.example.tradingbot.domain.service.OkxTradeProxyService;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
@@ -32,7 +31,7 @@ public class PositionCommandService {
     private final OkxTradeProxyService okxTradeProxyService;
 
     @Transactional
-    public ClosePositionResponse closePosition(ClosePositionCommandRequest command) {
+    public ClosePositionResponse closePosition(ClosePositionRequest command) {
         tradingGuardService.assertTradingAllowed(command.getExchangeId(), command.getInstrumentId());
 
         ExchangeEntity exchange = exchangeDataService.findById(command.getExchangeId())
@@ -40,7 +39,7 @@ public class PositionCommandService {
         InstrumentEntity instrument = instrumentDataService.findById(command.getInstrumentId())
             .orElseThrow(() -> new TradingCommandException(HttpStatus.NOT_FOUND, "INSTRUMENT_NOT_FOUND", "Instrument not found"));
 
-        ClosePositionRequest request = new ClosePositionRequest();
+        com.example.tradingbot.client.model.okx.ClosePositionRequest request = new com.example.tradingbot.client.model.okx.ClosePositionRequest();
         request.setInstrumentId(instrument.getExternalId());
         request.setMarginMode(DEFAULT_MARGIN_MODE);
         request.setPositionSide(command.getPositionSide());
