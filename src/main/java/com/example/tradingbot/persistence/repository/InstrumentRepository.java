@@ -27,7 +27,11 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
         select i.id
         from InstrumentEntity i
         where i.internalId = :instrumentInternalId
-          and i.exchange.internalId = :exchangeInternalId
+          and i.exchangeId = (
+              select e.id
+              from ExchangeEntity e
+              where e.internalId = :exchangeInternalId
+          )
         """)
     Optional<Long> findIdByExchangeInternalIdAndInstrumentInternalId(
         @Param("exchangeInternalId") String exchangeInternalId,
