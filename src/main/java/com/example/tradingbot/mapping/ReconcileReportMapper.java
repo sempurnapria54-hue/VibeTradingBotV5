@@ -11,7 +11,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface ReconcileReportMapper {
 
-    @Mapping(source = "exchange.internalId", target = "exchangeInternalId")
+    @Mapping(source = "exchangeId", target = "exchangeInternalId")
     ReconcileReportResponse domainToRest(ReconcileReportEntity source);
 
     List<ReconcileReportResponse> domainToRest(List<ReconcileReportEntity> source);
