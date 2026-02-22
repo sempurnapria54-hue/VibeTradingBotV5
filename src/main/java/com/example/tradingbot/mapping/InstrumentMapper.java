@@ -35,6 +35,8 @@ public interface InstrumentMapper {
     @Mapping(source = "minPriceStep", target = "tickSz")
     com.example.tradingbot.client.model.okx.response.InstrumentResponse domainToClient(Instrument source);
 
+    List<Instrument> clientToDomain(List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
+
     @Mapping(source = "internalId", target = "internalId")
     @Mapping(source = "exchangeId", target = "exchangeInternalId")
     @Mapping(source = "externalId", target = "instId")
