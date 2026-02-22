@@ -27,6 +27,10 @@ public class ExchangeDataService {
         return exchangeRepository.findById(id);
     }
 
+    public Optional<ExchangeEntity> findRequiredById(Long id) {
+        return exchangeRepository.findById(id);
+    }
+
     public Optional<ExchangeEntity> findByName(String name) {
         return exchangeRepository.findByName(name);
     }

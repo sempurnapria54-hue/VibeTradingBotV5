@@ -1,21 +1,23 @@
 package com.example.tradingbot.domain.service.trading;
 
 import com.example.tradingbot.client.model.okx.PositionResponse;
-import com.example.tradingbot.rest.model.request.ClosePositionRequest;
-import com.example.tradingbot.rest.model.response.ClosePositionResponse;
-import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.PositionEntity;
+import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
-import java.util.List;
+import com.example.tradingbot.rest.model.request.ClosePositionRequest;
+import com.example.tradingbot.rest.model.response.ClosePositionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
+import static com.example.tradingbot.util.Constant.Service.DEFAULT_TRADE_MODE;
 import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMillisSafe;
 
 @Service
@@ -23,7 +25,6 @@ import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMil
 public class PositionService {
 
     private static final String POSITION_STATUS_UPDATED = "UPDATED";
-    private static final String DEFAULT_MARGIN_MODE = "cross";
 
     private final TradingGuardService tradingGuardService;
     private final ExchangeDataService exchangeDataService;
@@ -33,23 +34,20 @@ public class PositionService {
 
     @Transactional
     public ClosePositionResponse closePosition(ClosePositionRequest command) {
-        tradingGuardService.assertTradingAllowed(command.getExchangeId(), command.getInstrumentId());
-
-        ExchangeEntity exchange = exchangeDataService.findById(command.getExchangeId())
-            .orElseThrow(() -> new TradingCommandException(HttpStatus.NOT_FOUND, "EXCHANGE_NOT_FOUND", "Exchange not found"));
-        InstrumentEntity instrument = instrumentDataService.findById(command.getInstrumentId())
-            .orElseThrow(() -> new TradingCommandException(HttpStatus.NOT_FOUND, "INSTRUMENT_NOT_FOUND", "Instrument not found"));
+        ExchangeEntity exchangeEntity = exchangeDataService.findRequiredByInternalId(command.getExchangeId());
+        InstrumentEntity instrumentEntity = instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), command.getInstrumentId());
+        tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
 
         com.example.tradingbot.client.model.okx.ClosePositionRequest request = new com.example.tradingbot.client.model.okx.ClosePositionRequest();
-        request.setInstrumentId(instrument.getExternalId());
-        request.setMarginMode(DEFAULT_MARGIN_MODE);
+        request.setInstrumentId(instrumentEntity.getExternalId());
+        request.setMarginMode(DEFAULT_TRADE_MODE);
         request.setPositionSide(command.getPositionSide());
 
         PositionResponse position = extractFirstPosition(okxProxyService.closePosition(request));
 
         PositionEntity positionEntity = new PositionEntity();
-        positionEntity.setExchange(exchange);
-        positionEntity.setInstrument(instrument);
+        positionEntity.setExchangeId(exchangeEntity.getId());
+        positionEntity.setInstrumentId(instrumentEntity.getId());
         positionEntity.setStatus(POSITION_STATUS_UPDATED);
         positionEntity.setPositionSide(position.getPosSide());
         positionEntity.setPositionSize(position.getPos());
@@ -59,10 +57,10 @@ public class PositionService {
         positionEntity.setLeverage(position.getLever());
         positionEntity.setMarginMode(position.getMgnMode());
         positionEntity.setUnrealizedProfit(position.getUpl());
-        positionEntity.setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(position.getUTime()));
+        positionEntity.setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(position.getuTime()));
         positionDataService.save(positionEntity);
 
-        return new ClosePositionResponse(position.getInstId(), position.getPosSide(), position.getUTime());
+        return new ClosePositionResponse(position.getInstId(), position.getPosSide(), position.getuTime());
     }
 
     private PositionResponse extractFirstPosition(List<PositionResponse> positions) {

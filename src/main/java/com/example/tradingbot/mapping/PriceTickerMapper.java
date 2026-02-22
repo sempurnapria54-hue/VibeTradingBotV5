@@ -8,7 +8,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface PriceTickerMapper {
 
-    @Mapping(source = "instId", target = "instrumentId")
+    @Mapping(source = "instId", target = "externalInstrumentId")
     @Mapping(source = "last", target = "lastPrice")
     @Mapping(source = "markPx", target = "markPrice")
     @Mapping(source = "idxPx", target = "indexPrice")
@@ -17,7 +17,7 @@ public interface PriceTickerMapper {
     @Mapping(source = "ts", target = "timestamp")
     ExchangePriceTicker clientToDomain(PriceTickerResponse source);
 
-    @Mapping(source = "instrumentId", target = "instId")
+    @Mapping(source = "externalInstrumentId", target = "instId")
     @Mapping(source = "lastPrice", target = "last")
     @Mapping(source = "markPrice", target = "markPx")
     @Mapping(source = "indexPrice", target = "idxPx")

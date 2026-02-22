@@ -40,7 +40,7 @@ public class ReconcileReportEntity {
     /**
      * Идентификатор биржи, для которой сформирован отчёт.
      */
-    @Column(name = "exchange_id", nullable = false, updatable = false, insertable = false)
+    @Column(name = "exchange_id", nullable = false, updatable = false)
     private Long exchangeId;
 
     /**

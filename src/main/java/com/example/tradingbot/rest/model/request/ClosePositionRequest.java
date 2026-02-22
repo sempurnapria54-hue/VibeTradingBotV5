@@ -7,7 +7,7 @@ import lombok.Setter;
 @Setter
 public class ClosePositionRequest {
 
-    private Long exchangeId;
-    private Long instrumentId;
+    private String exchangeId;
+    private String instrumentId;
     private String positionSide;
 }

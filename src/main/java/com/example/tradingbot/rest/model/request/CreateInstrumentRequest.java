@@ -16,5 +16,5 @@ public class CreateInstrumentRequest {
     private String name;
     private String externalId;
     private String type;
-    private Set<String> timeFrames;
+    private Set<CreateCandleGroupRequest> candleGroups;
 }

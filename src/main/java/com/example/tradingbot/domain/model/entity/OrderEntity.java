@@ -2,16 +2,7 @@ package com.example.tradingbot.domain.model.entity;
 
 import com.example.tradingbot.client.model.okx.OrderResponse;
 import com.example.tradingbot.rest.model.request.CreateOrderRequest;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,82 +19,107 @@ import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMil
 @NoArgsConstructor
 @Entity
 @Table(name = "\"order\"", uniqueConstraints = {
-    @UniqueConstraint(
-        name = "uk_order_exchange_instr_client_order",
-        columnNames = {"exchange_id", "instrument_id", "client_order_id"}
-    )
+        @UniqueConstraint(
+                name = "uk_order_exchange_instr_client_order",
+                columnNames = {"exchange_id", "instrument_id", "client_order_id"}
+        )
 })
 public class OrderEntity extends AuditableEntity {
 
-    /** Внутренний идентификатор ордера. */
+    /**
+     * Внутренний идентификатор ордера.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 
-    /** Идентификатор инструмента ордера. */
-    @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
+    /**
+     * Идентификатор инструмента ордера.
+     */
+    @Column(name = "instrument_id", nullable = false, updatable = false)
     private Long instrumentId;
 
-    /** Ссылка на инструмент, к которому относится ордер. */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "instrument_id", nullable = false)
-    private InstrumentEntity instrument;
-
-    /** Клиентский идентификатор ордера. */
+    /**
+     * Клиентский идентификатор ордера.
+     */
     @Column(name = "client_order_id", nullable = false)
     private String internalId;
 
-    /** Идентификатор ордера на бирже. */
+    /**
+     * Идентификатор ордера на бирже.
+     */
     @Column(name = "exchange_order_id")
     private String externalId;
 
-    /** Текущий внутренний статус ордера. */
+    /**
+     * Текущий внутренний статус ордера.
+     */
     @Column(name = "status", nullable = false)
     private String status;
 
-    /** Тип ордера в бизнес-терминах. */
+    /**
+     * Тип ордера в бизнес-терминах.
+     */
     @Column(name = "type")
     private String type;
 
-    /** Сторона ордера (buy/sell). */
+    /**
+     * Сторона ордера (buy/sell).
+     */
     @Column(name = "side")
     private String side;
 
-    /** Состояние ордера на стороне биржи. */
+    /**
+     * Состояние ордера на стороне биржи.
+     */
     @Column(name = "state")
     private String externalStatus;
 
-    /** Цена ордера. */
+    /**
+     * Цена ордера.
+     */
     @Column(name = "px")
     private String price;
 
-    /** Объём ордера. */
+    /**
+     * Объём ордера.
+     */
     @Column(name = "sz")
     private String size;
 
-    /** Накопленный исполненный объём. */
+    /**
+     * Накопленный исполненный объём.
+     */
     @Column(name = "fill_sz")
     private String accumulatedFillSize;
 
-    /** Средняя цена исполнения. */
+    /**
+     * Средняя цена исполнения.
+     */
     @Column(name = "avg_px")
     private String averagePrice;
 
-    /** Комиссия по ордеру. */
+    /**
+     * Комиссия по ордеру.
+     */
     @Column(name = "fee")
     private String fee;
 
-    /** Время создания ордера на бирже в UTC миллисекундах. */
+    /**
+     * Время создания ордера на бирже в UTC миллисекундах.
+     */
     @Column(name = "c_time")
     private OffsetDateTime exchangeCreatedAt;
 
-    /** Время последнего обновления ордера на бирже в UTC миллисекундах. */
+    /**
+     * Время последнего обновления ордера на бирже в UTC миллисекундах.
+     */
     @Column(name = "u_time")
     private OffsetDateTime exchangeModifiedAt;
 
     public void initOnCreate(InstrumentEntity instrument, CreateOrderRequest request) {
-        setInstrument(instrument);
+        setInstrumentId(instrument.getId());
         setInternalId(UUID.randomUUID().toString());
         setStatus(ORDER_STATUS_CREATED);
         setSide(request.getSide());
@@ -113,24 +129,17 @@ public class OrderEntity extends AuditableEntity {
     }
 
     public void applyOrderResponse(OrderResponse responseOrder) {
-        // Exchange identifiers and statuses
         setExternalId(responseOrder.getOrdId());
         setExternalStatus(responseOrder.getState());
         setStatus(ORDER_STATUS_IN_PROGRESS);
-
-        // Order details
         setSide(responseOrder.getSide());
         setType(responseOrder.getOrdType());
         setPrice(responseOrder.getPx());
         setSize(responseOrder.getSz());
-
-        // Execution details
         setAccumulatedFillSize(responseOrder.getAccFillSz());
         setAveragePrice(responseOrder.getAvgPx());
         setFee(responseOrder.getFee());
-
-        // Exchange timestamps
-        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getCTime()));
-        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getUTime()));
+        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getcTime()));
+        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getuTime()));
     }
 }

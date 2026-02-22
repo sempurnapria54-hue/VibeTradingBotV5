@@ -1,26 +1,25 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.config.ReconcileProperties;
 import com.example.tradingbot.client.model.okx.CancelAlgoOrderRequest;
 import com.example.tradingbot.client.model.okx.CancelOrderRequest;
 import com.example.tradingbot.client.model.okx.ClosePositionRequest;
-import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
-import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
-import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangePosition;
-import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
+import com.example.tradingbot.config.ReconcileProperties;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
 import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
 import com.example.tradingbot.domain.model.entity.PositionEntity;
+import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.exchange.ExchangePosition;
+import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
+import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
+import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
+import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -54,40 +53,39 @@ public class CancelExchangeFlow {
     public CancelFlowResult execute(InstrumentBucket bucket, AnomalyDecision decision) {
         if (!reconcileProperties.getCancelFlow().isEnabled() || !decision.isShouldCancelFlow()) {
             return CancelFlowResult.builder()
-                .closedPositions(0)
-                .canceledOrders(0)
-                .canceledAlgoOrders(0)
-                .unknownCreated(0)
-                .emptyAfterFlow(false)
-                .flowExecuted(false)
-                .currentExchangeState(toExchangeState(bucket))
-                .build();
+                    .closedPositions(0)
+                    .canceledOrders(0)
+                    .canceledAlgoOrders(0)
+                    .unknownCreated(0)
+                    .emptyAfterFlow(false)
+                    .flowExecuted(false)
+                    .currentExchangeState(toExchangeState(bucket))
+                    .build();
         }
 
         if (Objects.isNull(bucket.getDbState()) || Objects.isNull(bucket.getDbState().getInstrument())) {
             return CancelFlowResult.builder()
-                .closedPositions(0)
-                .canceledOrders(0)
-                .canceledAlgoOrders(0)
-                .unknownCreated(0)
-                .emptyAfterFlow(false)
-                .flowExecuted(false)
-                .currentExchangeState(toExchangeState(bucket))
-                .build();
+                    .closedPositions(0)
+                    .canceledOrders(0)
+                    .canceledAlgoOrders(0)
+                    .unknownCreated(0)
+                    .emptyAfterFlow(false)
+                    .flowExecuted(false)
+                    .currentExchangeState(toExchangeState(bucket))
+                    .build();
         }
 
-        InstrumentEntity instrument = instrumentDataService.findById(bucket.getDbState().getInstrument().getId())
-            .orElseThrow(() -> new EntityNotFoundException("ExchangeInstrument not found: id=" + bucket.getDbState().getInstrument().getId()));
+        InstrumentEntity instrumentEntity = instrumentDataService.findRequiredById(bucket.getDbState().getInstrument().getId());
 
-        instrument.setStatus(STATUS_HOLD);
-        instrumentDataService.save(instrument);
+        instrumentEntity.setStatus(STATUS_HOLD);
+        instrumentDataService.save(instrumentEntity);
 
         int unknownCreated = 0;
         int closedPositions = 0;
         int canceledOrders = 0;
         int canceledAlgoOrders = 0;
 
-        List<PositionEntity> dbPositions = positionDataService.findAllByExchangeIdAndInstrumentId(instrument.getExchangeId(), instrument.getId());
+        List<PositionEntity> dbPositions = positionDataService.findAllByExchangeIdAndInstrumentId(instrumentEntity.getExchangeId(), instrumentEntity.getId());
 
         for (ExchangePosition externalPosition : bucket.getPositions()) {
             ClosePositionRequest request = new ClosePositionRequest();
@@ -101,13 +99,13 @@ public class CancelExchangeFlow {
             }
 
             PositionEntity entity = dbPositions.stream()
-                .filter(item -> StringUtils.equalsIgnoreCase(item.getPositionSide(), externalPosition.getPositionSide()))
-                .findFirst()
-                .orElse(null);
+                    .filter(item -> StringUtils.equalsIgnoreCase(item.getPositionSide(), externalPosition.getPositionSide()))
+                    .findFirst()
+                    .orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new PositionEntity();
-                entity.setExchange(instrument.getExchange());
-                entity.setInstrument(instrument);
+                entity.setExchangeId(instrumentEntity.getExchangeId());
+                entity.setInstrumentId(instrumentEntity.getId());
                 entity.setPositionSide(externalPosition.getPositionSide());
                 unknownCreated++;
                 dbPositions.add(entity);
@@ -129,10 +127,10 @@ public class CancelExchangeFlow {
             }
 
             String clientOrderId = resolveOrderClientId(externalOrder.getInternalId(), externalOrder.getExternalId());
-            OrderEntity entity = orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(instrument.getExchangeId(), instrument.getId(), clientOrderId).orElse(null);
+            OrderEntity entity = orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(instrumentEntity.getExchangeId(), instrumentEntity.getId(), clientOrderId).orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new OrderEntity();
-                entity.setInstrument(instrument);
+                entity.setInstrumentId(instrumentEntity.getId());
                 entity.setInternalId(clientOrderId);
                 entity.setExternalId(externalOrder.getExternalId());
                 unknownCreated++;
@@ -153,10 +151,10 @@ public class CancelExchangeFlow {
             }
 
             String clientAlgoOrderId = resolveAlgoClientId(externalAlgoOrder.getInternalOrderId(), externalAlgoOrder.getExternalId());
-            AlgoOrderEntity entity = algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(instrument.getExchangeId(), instrument.getId(), clientAlgoOrderId).orElse(null);
+            AlgoOrderEntity entity = algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(instrumentEntity.getExchangeId(), instrumentEntity.getId(), clientAlgoOrderId).orElse(null);
             if (Objects.isNull(entity)) {
                 entity = new AlgoOrderEntity();
-                entity.setInstrument(instrument);
+                entity.setInstrumentId(instrumentEntity.getId());
                 entity.setInternalOrderId(clientAlgoOrderId);
                 entity.setExternalId(externalAlgoOrder.getExternalId());
                 unknownCreated++;
@@ -167,36 +165,36 @@ public class CancelExchangeFlow {
 
         ExchangeInstrumentSnapshot refreshed = snapshotProvider.refreshInstrumentSnapshot(bucket.getInstrumentName());
         boolean emptyAfterFlow = refreshed.getPositionsCount() == 0
-            && refreshed.getOrdersCount() == 0
-            && refreshed.getAlgoOrdersCount() == 0;
+                && refreshed.getOrdersCount() == 0
+                && refreshed.getAlgoOrdersCount() == 0;
 
-        instrument.setPositionMode(refreshed.getPositionsCount() > 0 ? POSITION_MODE_OPEN : POSITION_MODE_NONE);
+        instrumentEntity.setPositionMode(refreshed.getPositionsCount() > 0 ? POSITION_MODE_OPEN : POSITION_MODE_NONE);
         if ("NON_CRITICAL".equalsIgnoreCase(decision.getSeverity())) {
-            instrument.setStatus(STATUS_OPEN);
+            instrumentEntity.setStatus(STATUS_OPEN);
         }
-        instrumentDataService.save(instrument);
+        instrumentDataService.save(instrumentEntity);
 
         return CancelFlowResult.builder()
-            .closedPositions(closedPositions)
-            .canceledOrders(canceledOrders)
-            .canceledAlgoOrders(canceledAlgoOrders)
-            .unknownCreated(unknownCreated)
-            .emptyAfterFlow(emptyAfterFlow)
-            .flowExecuted(true)
-            .currentExchangeState(refreshed)
-            .build();
+                .closedPositions(closedPositions)
+                .canceledOrders(canceledOrders)
+                .canceledAlgoOrders(canceledAlgoOrders)
+                .unknownCreated(unknownCreated)
+                .emptyAfterFlow(emptyAfterFlow)
+                .flowExecuted(true)
+                .currentExchangeState(refreshed)
+                .build();
     }
 
     private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
         return ExchangeInstrumentSnapshot.builder()
-            .externalId(bucket.getInstrumentName())
-            .positionsCount(bucket.getPositionsCount())
-            .ordersCount(bucket.getOrdersCount())
-            .algoOrdersCount(bucket.getAlgoOrdersCount())
-            .positions(bucket.getPositions())
-            .orders(bucket.getOrders())
-            .algoOrders(bucket.getAlgoOrders())
-            .build();
+                .externalId(bucket.getInstrumentName())
+                .positionsCount(bucket.getPositionsCount())
+                .ordersCount(bucket.getOrdersCount())
+                .algoOrdersCount(bucket.getAlgoOrdersCount())
+                .positions(bucket.getPositions())
+                .orders(bucket.getOrders())
+                .algoOrders(bucket.getAlgoOrders())
+                .build();
     }
 
     private String resolveOrderClientId(String clOrdId, String ordId) {

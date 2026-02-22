@@ -42,7 +42,7 @@ public class ReconcilePlanBuilder {
         }
 
         Set<String> dbOrderClientIds = new HashSet<>(
-            dbState.getActiveOrders().stream().map(OrderEntity::getClientOrderId).filter(StringUtils::isNotBlank).toList()
+            dbState.getActiveOrders().stream().map(OrderEntity::getExternalId).filter(StringUtils::isNotBlank).toList()
         );
         Set<String> exOrderClientIds = new HashSet<>(
             exchangeState.getOrders().stream().map(item -> item.getInternalId()).filter(StringUtils::isNotBlank).toList()
@@ -62,7 +62,7 @@ public class ReconcilePlanBuilder {
                 .build()));
 
         Set<String> dbAlgoClientIds = new HashSet<>(
-            dbState.getActiveAlgoOrders().stream().map(AlgoOrderEntity::getClientAlgoOrderId).filter(StringUtils::isNotBlank).toList()
+            dbState.getActiveAlgoOrders().stream().map(AlgoOrderEntity::getExternalId).filter(StringUtils::isNotBlank).toList()
         );
         Set<String> exAlgoClientIds = new HashSet<>(
             exchangeState.getAlgoOrders().stream().map(item -> item.getInternalOrderId()).filter(StringUtils::isNotBlank).toList()

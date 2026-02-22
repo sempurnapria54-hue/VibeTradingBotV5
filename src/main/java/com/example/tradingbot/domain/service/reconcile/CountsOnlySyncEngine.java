@@ -87,8 +87,8 @@ public class CountsOnlySyncEngine {
         for (CreateUnknownAction action : plan.getCreateUnknown()) {
             if (action.getEntityType() == ReconcileEntityType.POSITION) {
                 PositionEntity entity = new PositionEntity();
-                entity.setExchange(dbState.getInstrument().getExchange());
-                entity.setInstrument(dbState.getInstrument());
+                entity.setExchangeId(dbState.getInstrument().getExchangeId());
+                entity.setInstrumentId(dbState.getInstrument().getId());
                 entity.setStatus(STATUS_UNKNOWN);
                 positionDataService.save(entity);
             }
@@ -112,7 +112,7 @@ public class CountsOnlySyncEngine {
         }
 
         OrderEntity entity = new OrderEntity();
-        entity.setInstrument(dbState.getInstrument());
+        entity.setInstrumentId(dbState.getInstrument().getId());
         entity.setInternalId(clientOrderId);
         entity.setExternalId(action.getExchangeId());
         entity.setStatus(STATUS_UNKNOWN);
@@ -130,7 +130,7 @@ public class CountsOnlySyncEngine {
         }
 
         AlgoOrderEntity entity = new AlgoOrderEntity();
-        entity.setInstrument(dbState.getInstrument());
+        entity.setInstrumentId(dbState.getInstrument().getId());
         entity.setInternalOrderId(clientAlgoOrderId);
         entity.setExternalId(action.getExchangeId());
         entity.setStatus(STATUS_UNKNOWN);

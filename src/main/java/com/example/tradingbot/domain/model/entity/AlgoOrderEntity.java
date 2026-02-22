@@ -46,15 +46,8 @@ public class AlgoOrderEntity extends AuditableEntity {
     /**
      * Идентификатор инструмента algo-ордера.
      */
-    @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
+    @Column(name = "instrument_id", nullable = false, updatable = false)
     private Long instrumentId;
-
-    /**
-     * Ссылка на инструмент, к которому относится algo-ордер.
-     */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "instrument_id", nullable = false)
-    private InstrumentEntity instrument;
 
     /**
      * Клиентский идентификатор algo-ордера.
@@ -153,7 +146,7 @@ public class AlgoOrderEntity extends AuditableEntity {
     private OffsetDateTime exchangeModifiedAt;
 
     public void initOnCreate(InstrumentEntity instrument, CreateAlgoOrderRequest request) {
-        setInstrument(instrument);
+        setInstrumentId(instrument.getId());
         setInternalOrderId(UUID.randomUUID().toString());
         setStatus(ALGO_ORDER_STATUS_CREATED);
         setType(request.getType());
@@ -176,7 +169,7 @@ public class AlgoOrderEntity extends AuditableEntity {
         setStopLossOrderPrice(responseOrder.getSlOrdPx());
         setCallbackRatio(responseOrder.getCallbackRatio());
         setCallbackStep(responseOrder.getCallbackSpread());
-        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getCTime()));
-        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getUTime()));
+        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getcTime()));
+        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getuTime()));
     }
 }

@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
 import com.example.tradingbot.rest.model.response.OrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -43,23 +43,5 @@ public interface OrderMapper {
     @Mapping(source = "externalStatusMessage", target = "sMsg")
     com.example.tradingbot.client.model.okx.OrderResponse domainToClient(ExchangeOrder source);
 
-    @Mapping(source = "instrument.internalId", target = "instrumentInternalId")
-    @Mapping(source = "internalId", target = "internalId")
-    @Mapping(source = "externalId", target = "externalId")
-    @Mapping(source = "status", target = "status")
-    @Mapping(source = "type", target = "type")
-    @Mapping(source = "side", target = "side")
-    @Mapping(source = "externalStatus", target = "externalStatus")
-    @Mapping(source = "price", target = "price")
-    @Mapping(source = "size", target = "size")
-    @Mapping(source = "accumulatedFillSize", target = "accumulatedFillSize")
-    @Mapping(source = "averagePrice", target = "averagePrice")
-    @Mapping(source = "fee", target = "fee")
-    @Mapping(source = "exchangeCreatedAt", target = "exchangeCreatedAt")
-    @Mapping(source = "exchangeModifiedAt", target = "exchangeModifiedAt")
-    @Mapping(source = "createdAt", target = "createdAt")
-    @Mapping(source = "createdBy", target = "createdBy")
-    @Mapping(source = "modifiedAt", target = "modifiedAt")
-    @Mapping(source = "modifiedBy", target = "modifiedBy")
     OrderResponse domainToRest(OrderEntity source);
 }

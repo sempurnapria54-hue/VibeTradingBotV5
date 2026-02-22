@@ -8,8 +8,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -48,13 +46,13 @@ public class InstrumentEntity extends AuditableEntity {
     /**
      * Межсервисный идентификатор инструмента.
      */
-    @Column(name = "internal_id", nullable = false, updatable = false, length = 36)
+    @Column(name = "internal_id", nullable = false, updatable = false)
     private String internalId;
 
     /**
      * Внутренний идентификатор биржи.
      */
-    @Column(name = "exchange_id", nullable = false, updatable = false, insertable = false)
+    @Column(name = "exchange_id", nullable = false, updatable = false)
     private Long exchangeId;
 
     /**
@@ -125,8 +123,8 @@ public class InstrumentEntity extends AuditableEntity {
         setExchangeId(exchangeId);
         setPositionMode(DEFAULT_POSITION_MODE);
         setStatus(INSTRUMENT_STATUS_CREATED);
-        List<CandleGroupEntity> groupEntities = request.getTimeFrames().stream()
-                .map(timeFrame -> createCandleGroup(this, timeFrame))
+        List<CandleGroupEntity> groupEntities = request.getCandleGroups().stream()
+                .map(candleGroupRequest -> createCandleGroup(this, candleGroupRequest))
                 .collect(toList());
 
         setCandleGroups(groupEntities);

@@ -43,13 +43,8 @@ public class CandleGroupEntity extends AuditableEntity {
     private Long id;
 
     /** Идентификатор инструмента-владельца группы свечей. */
-    @Column(name = "instrument_id", nullable = false, updatable = false, insertable = false)
+    @Column(name = "instrument_id", nullable = false, updatable = false)
     private Long instrumentId;
-
-    /** Ссылка на инструмент, для которого ведутся свечи. */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "instrument_id", nullable = false)
-    private InstrumentEntity instrument;
 
     /** Таймфрейм группы (например 1m/5m/1H). */
     @Column(name = "timeframe", nullable = false)
@@ -104,6 +99,6 @@ public class CandleGroupEntity extends AuditableEntity {
         setTimeframe(request.getTimeframe());
         setCoverageStartTs(request.getCoverageStartTs());
         setStatus(CANDLE_GROUP_STATUS_CREATED);
-        setInstrument(instrument);
+        setInstrumentId(instrument.getId());
     }
 }

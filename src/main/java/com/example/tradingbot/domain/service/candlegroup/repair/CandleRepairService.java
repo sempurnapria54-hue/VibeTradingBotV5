@@ -1,17 +1,20 @@
 package com.example.tradingbot.domain.service.candlegroup.repair;
 
 import com.example.tradingbot.config.CandleGroupsProperties;
+import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import com.example.tradingbot.domain.service.candlegroup.integrity.CandleIntegrityService;
 import com.example.tradingbot.domain.service.candlegroup.integrity.IntegrityResult;
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;
-import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
-import com.example.tradingbot.domain.model.entity.CandleGroupStatus;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static com.example.tradingbot.util.Constant.Status.CandleGroup.CANDLE_GROUP_STATUS_REPAIR;
+import static com.example.tradingbot.util.Constant.Status.CandleGroup.CANDLE_GROUP_STATUS_SYNC;
 
 @Slf4j
 @Service
@@ -56,8 +59,8 @@ public class CandleRepairService {
         if (after.ok()) {
             moveToSync(group);
         } else {
-            candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.REPAIR_RUNNING);
-            group.setStatus(CandleGroupStatus.REPAIR_RUNNING);
+            candleGroupDataService.updateStatus(group.getId(), CANDLE_GROUP_STATUS_REPAIR);
+            group.setStatus(CANDLE_GROUP_STATUS_REPAIR);
         }
 
         log.info("CandleGroup repair pass: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, startTs={}, endTs={}, beforeExpected={}, beforeActual={}, afterExpected={}, afterActual={}, leafWindows={}, gapWindows={}, repairedGaps={}",
@@ -81,7 +84,7 @@ public class CandleRepairService {
     }
 
     private void moveToSync(CandleGroupEntity group) {
-        candleGroupDataService.updateStatus(group.getId(), CandleGroupStatus.SYNC);
-        group.setStatus(CandleGroupStatus.SYNC);
+        candleGroupDataService.updateStatus(group.getId(), CANDLE_GROUP_STATUS_SYNC);
+        group.setStatus(CANDLE_GROUP_STATUS_SYNC);
     }
 }
