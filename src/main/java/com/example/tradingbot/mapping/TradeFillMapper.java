@@ -5,6 +5,8 @@ import com.example.tradingbot.domain.model.TradeFill;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring")
 public interface TradeFillMapper {
 
@@ -29,5 +31,8 @@ public interface TradeFillMapper {
     @Mapping(source = "fillPnl", target = "fillPnl")
     @Mapping(source = "timestamp", target = "ts")
     TradeFillResponse domainToClient(TradeFill source);
+
+    List<TradeFill> clientToDomain(List<TradeFillResponse> source);
+
 
 }

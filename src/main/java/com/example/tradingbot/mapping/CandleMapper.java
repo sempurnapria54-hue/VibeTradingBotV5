@@ -5,6 +5,8 @@ import com.example.tradingbot.domain.model.Candle;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring")
 public interface CandleMapper {
 
@@ -15,6 +17,9 @@ public interface CandleMapper {
     @Mapping(source = "timestamp", target = "ts")
     @Mapping(source = "confirmed", target = "confirm")
     CandleResponse domainToClient(Candle source);
+
+
+    List<Candle> clientToDomain(List<CandleResponse> source);
 
 
 }
