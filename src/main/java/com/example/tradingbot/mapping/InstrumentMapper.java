@@ -36,13 +36,13 @@ public interface InstrumentMapper {
     com.example.tradingbot.client.model.okx.InstrumentResponse domainToClient(ExchangeInstrument source);
 
     @Mapping(source = "internalId", target = "internalId")
-    @Mapping(source = "exchange.internalId", target = "exchangeInternalId")
+    @Mapping(source = "exchangeId", target = "exchangeInternalId")
     @Mapping(source = "externalId", target = "instId")
     @Mapping(source = "type", target = "instType")
     InstrumentResponse domainToRest(InstrumentEntity source);
 
     List<InstrumentResponse> domainToRest(List<InstrumentEntity> source);
 
-    @Mapping(source = "externalName", target = "externalId")
+    @Mapping(source = "externalId", target = "externalId")
     InstrumentEntity restToDomain(CreateInstrumentRequest request);
 }
