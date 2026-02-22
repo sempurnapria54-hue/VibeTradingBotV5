@@ -2,15 +2,15 @@ package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.domain.service.reconcile.model.CreateUnknownAction;
 import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.domain.service.reconcile.model.MarkAnomalyAction;
 import com.example.tradingbot.domain.service.reconcile.model.MarkClosedAction;
 import com.example.tradingbot.domain.service.reconcile.model.ReconcileEntityType;
 import com.example.tradingbot.domain.service.reconcile.model.ReconcilePlan;
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.domain.model.entity.PositionEntity;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.PositionEntity;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
@@ -38,7 +38,7 @@ public class CountsOnlySyncEngine {
     private final AlgoOrderDataService algoOrderDataService;
 
     @Transactional
-    public void syncPresence(InstrumentBucket bucket, ExchangeInstrumentSnapshot exchangeState) {
+    public void syncPresence(InstrumentBucket bucket, InstrumentSnapshot exchangeState) {
         if (bucket.getDbState() == null || bucket.getDbState().getInstrument() == null) {
             return;
         }

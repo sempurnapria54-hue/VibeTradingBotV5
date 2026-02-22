@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;

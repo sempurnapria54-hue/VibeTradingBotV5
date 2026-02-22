@@ -1,17 +1,17 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.client.model.okx.CancelAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.CancelOrderRequest;
-import com.example.tradingbot.client.model.okx.ClosePositionRequest;
+import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
+import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
 import com.example.tradingbot.config.ReconcileProperties;
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.domain.model.entity.PositionEntity;
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangePosition;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.domain.model.AlgoOrder;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.Position;
 import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
 import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
 import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
@@ -87,7 +87,7 @@ public class CancelExchangeFlow {
 
         List<PositionEntity> dbPositions = positionDataService.findAllByExchangeIdAndInstrumentId(instrumentEntity.getExchangeId(), instrumentEntity.getId());
 
-        for (ExchangePosition externalPosition : bucket.getPositions()) {
+        for (Position externalPosition : bucket.getPositions()) {
             ClosePositionRequest request = new ClosePositionRequest();
             request.setInstrumentId(externalPosition.getExternalInstrumentId());
             request.setPositionSide(externalPosition.getPositionSide());
@@ -114,7 +114,7 @@ public class CancelExchangeFlow {
             positionDataService.save(entity);
         }
 
-        for (ExchangeOrder externalOrder : bucket.getOrders()) {
+        for (Order externalOrder : bucket.getOrders()) {
             CancelOrderRequest request = new CancelOrderRequest();
             request.setInstrumentId(externalOrder.getExternalInstrumentId());
             request.setOrderId(externalOrder.getExternalId());
@@ -139,7 +139,7 @@ public class CancelExchangeFlow {
             orderDataService.save(entity);
         }
 
-        for (ExchangeAlgoOrder externalAlgoOrder : bucket.getAlgoOrders()) {
+        for (AlgoOrder externalAlgoOrder : bucket.getAlgoOrders()) {
             CancelAlgoOrderRequest request = new CancelAlgoOrderRequest();
             request.setInstrumentId(externalAlgoOrder.getExternalInstrumentId());
             request.setAlgoOrderId(externalAlgoOrder.getExternalId());
@@ -163,7 +163,7 @@ public class CancelExchangeFlow {
             algoOrderDataService.save(entity);
         }
 
-        ExchangeInstrumentSnapshot refreshed = snapshotProvider.refreshInstrumentSnapshot(bucket.getInstrumentName());
+        InstrumentSnapshot refreshed = snapshotProvider.refreshInstrumentSnapshot(bucket.getInstrumentName());
         boolean emptyAfterFlow = refreshed.getPositionsCount() == 0
                 && refreshed.getOrdersCount() == 0
                 && refreshed.getAlgoOrdersCount() == 0;
@@ -185,8 +185,8 @@ public class CancelExchangeFlow {
                 .build();
     }
 
-    private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
-        return ExchangeInstrumentSnapshot.builder()
+    private InstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
+        return InstrumentSnapshot.builder()
                 .externalId(bucket.getInstrumentName())
                 .positionsCount(bucket.getPositionsCount())
                 .ordersCount(bucket.getOrdersCount())

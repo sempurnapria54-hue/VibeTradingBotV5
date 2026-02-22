@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.candlegroup;
 
 import com.example.tradingbot.config.CandleGroupsProperties;
-import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

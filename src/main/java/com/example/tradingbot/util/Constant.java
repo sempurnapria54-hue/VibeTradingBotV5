@@ -5,6 +5,10 @@ import lombok.experimental.UtilityClass;
 import java.util.Set;
 
 public class Constant {
+    @UtilityClass
+    public class ExchangeNames {
+        public static final String EXCHANGE_NAME_OKX = "OKX";
+    }
 
     @UtilityClass
     public class ErrorCode {
@@ -17,6 +21,7 @@ public class Constant {
         public static final String CANDLE_GROUP_NOT_FOUND = "candle.group.not.found";
         public static final String EXCHANGE_ALREADY_EXISTS = "exchange.already.exists";
         public static final String RECONCILE_REPORT_NOT_FOUND = "reconcile.report.not.found";
+        public static final String CLIENT_SERVICE_NOT_FOUND = "client.service.not.found";
 
     }
 

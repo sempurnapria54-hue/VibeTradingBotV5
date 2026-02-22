@@ -1,8 +1,8 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.entity.ReconcileReportEntity;
-import com.example.tradingbot.domain.model.entity.ReconcileAnomalyEntity;
-import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.persistence.model.ReconcileReportEntity;
+import com.example.tradingbot.persistence.model.ReconcileAnomalyEntity;
+import com.example.tradingbot.domain.model.snapshot.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.persistence.repository.SynchronizeExecutionEnvironmentReportAnomalyRepository;
 import com.example.tradingbot.persistence.repository.SynchronizeExecutionEnvironmentReportRepository;

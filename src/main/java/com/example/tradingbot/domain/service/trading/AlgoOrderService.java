@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.trading;
 
-import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.ExchangeEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
+import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.OkxProxyService;

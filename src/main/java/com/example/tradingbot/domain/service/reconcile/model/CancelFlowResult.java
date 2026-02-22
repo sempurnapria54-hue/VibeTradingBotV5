@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.reconcile.model;
 
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -14,5 +14,5 @@ public class CancelFlowResult {
     private final int unknownCreated;
     private final boolean emptyAfterFlow;
     private final boolean flowExecuted;
-    private final ExchangeInstrumentSnapshot currentExchangeState;
+    private final InstrumentSnapshot currentExchangeState;
 }

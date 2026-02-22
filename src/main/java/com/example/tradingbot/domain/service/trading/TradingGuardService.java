@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.trading;
 
-import com.example.tradingbot.domain.model.entity.ExchangeEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
+import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import java.util.Objects;

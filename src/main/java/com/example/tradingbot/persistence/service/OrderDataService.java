@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.persistence.repository.OrderRepository;
 
 import java.util.List;
@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
 import static com.example.tradingbot.util.Constant.ErrorCode.ORDER_NOT_FOUND;
 
 @Service

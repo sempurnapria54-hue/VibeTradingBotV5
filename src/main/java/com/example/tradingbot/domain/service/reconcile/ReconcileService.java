@@ -1,14 +1,14 @@
 package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.config.ReconcileProperties;
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.ExchangeEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.domain.model.entity.PositionEntity;
-import com.example.tradingbot.domain.model.entity.ReconcileReportEntity;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.persistence.model.ReconcileReportEntity;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
+import com.example.tradingbot.domain.model.snapshot.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
 import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
@@ -110,7 +110,7 @@ public class ReconcileService {
                     .orders(sourceBucket.getOrders())
                     .algoOrders(sourceBucket.getAlgoOrders())
                     .build();
-            ExchangeInstrumentSnapshot currentExchangeState = toExchangeState(bucket);
+            InstrumentSnapshot currentExchangeState = toExchangeState(bucket);
 
             Optional<AnomalyDecision> decisionOptional = anomalyEngine.evaluate(bucket);
             if (decisionOptional.isPresent()) {
@@ -176,8 +176,8 @@ public class ReconcileService {
         return report;
     }
 
-    private ExchangeInstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
-        return ExchangeInstrumentSnapshot.builder()
+    private InstrumentSnapshot toExchangeState(InstrumentBucket bucket) {
+        return InstrumentSnapshot.builder()
                 .externalId(bucket.getInstrumentName())
                 .positionsCount(bucket.getPositionsCount())
                 .ordersCount(bucket.getOrdersCount())

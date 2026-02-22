@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.client.model.okx.TradeFillResponse;
-import com.example.tradingbot.domain.model.exchange.ExchangeTradeFill;
+import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
+import com.example.tradingbot.domain.model.TradeFill;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -17,7 +17,7 @@ public interface TradeFillMapper {
     @Mapping(source = "fillPx", target = "fillPrice")
     @Mapping(source = "fillPnl", target = "fillPnl")
     @Mapping(source = "ts", target = "timestamp")
-    ExchangeTradeFill clientToDomain(TradeFillResponse source);
+    TradeFill clientToDomain(TradeFillResponse source);
 
     @Mapping(source = "externalBillId", target = "billId")
     @Mapping(source = "externalTradeId", target = "tradeId")
@@ -28,6 +28,6 @@ public interface TradeFillMapper {
     @Mapping(source = "fillPrice", target = "fillPx")
     @Mapping(source = "fillPnl", target = "fillPnl")
     @Mapping(source = "timestamp", target = "ts")
-    TradeFillResponse domainToClient(ExchangeTradeFill source);
+    TradeFillResponse domainToClient(TradeFill source);
 
 }

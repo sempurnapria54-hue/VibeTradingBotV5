@@ -1,0 +1,15 @@
+package com.example.tradingbot.client.model.okx.response;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class TradeFillsArchiveResponse {
+
+    private String fileHref;
+    private String state;
+    private String ts;
+    private String code;
+    private String msg;
+}

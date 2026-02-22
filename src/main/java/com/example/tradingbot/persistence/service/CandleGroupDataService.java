@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.persistence.repository.CandleGroupRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.CANDLE_GROUP_ALREADY_EXISTS;
-import static com.example.tradingbot.util.Constant.ErrorCode.CANDLE_GROUP_NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor

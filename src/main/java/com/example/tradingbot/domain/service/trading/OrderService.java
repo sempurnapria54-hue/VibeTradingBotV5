@@ -1,9 +1,10 @@
 package com.example.tradingbot.domain.service.trading;
 
-import com.example.tradingbot.client.model.okx.OrderResponse;
-import com.example.tradingbot.domain.model.entity.ExchangeEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.client.model.okx.response.OrderResponse;
+import com.example.tradingbot.client.service.ClientManager;
+import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.OkxProxyService;
@@ -25,6 +26,7 @@ public class OrderService {
     private final OkxProxyService okxProxyService;
     private final ExchangeService exchangeService;
     private final InstrumentService instrumentService;
+    private final ClientManager clientManager;
 
     @Transactional
     public OrderEntity createOrder(String exchangeInternalId, String instrumentInternalId, CreateOrderRequest request) {
@@ -35,6 +37,8 @@ public class OrderService {
         OrderEntity orderEntity = new OrderEntity();
         orderEntity.initOnCreate(instrumentEntity, request);
         orderDataService.save(orderEntity);
+
+        clientManager.getClientService("OKX").createOrder(exchangeEntity, orderEntity);
 
         OrderResponse response = extractFirstOrder(okxProxyService.createOrder(orderEntity, instrumentEntity));
         orderEntity.applyOrderResponse(response);

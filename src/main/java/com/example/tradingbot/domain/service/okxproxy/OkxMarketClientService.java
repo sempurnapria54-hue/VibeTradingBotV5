@@ -1,12 +1,12 @@
 package com.example.tradingbot.domain.service.okxproxy;
 
-import com.example.tradingbot.client.model.okx.CandlesRequest;
-import com.example.tradingbot.client.model.okx.InstrumentsRequest;
-import com.example.tradingbot.client.model.okx.TickerRequest;
-import com.example.tradingbot.client.okx.OkxRestClient;
-import com.example.tradingbot.domain.model.exchange.ExchangeCandle;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrument;
-import com.example.tradingbot.domain.model.exchange.ExchangePriceTicker;
+import com.example.tradingbot.client.model.okx.request.CandlesRequest;
+import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
+import com.example.tradingbot.client.model.okx.response.TickerRequest;
+import com.example.tradingbot.client.service.okx.OkxRestClient;
+import com.example.tradingbot.domain.model.Candle;
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.PriceTicker;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.mapping.PriceTickerMapper;
@@ -24,19 +24,19 @@ public class OkxMarketClientService {
     private final InstrumentMapper instrumentMapper;
     private final PriceTickerMapper priceTickerMapper;
 
-    public List<ExchangeCandle> getCandles(CandlesRequest request) {
+    public List<Candle> getCandles(CandlesRequest request) {
         return okxRestClient.getCandles(request).getData().stream().map(candleMapper::clientToDomain).toList();
     }
 
-    public List<ExchangeCandle> getHistoryCandles(CandlesRequest request) {
+    public List<Candle> getHistoryCandles(CandlesRequest request) {
         return okxRestClient.getHistoryCandles(request).getData().stream().map(candleMapper::clientToDomain).toList();
     }
 
-    public List<ExchangeInstrument> getInstruments(InstrumentsRequest request) {
+    public List<Instrument> getInstruments(InstrumentsRequest request) {
         return okxRestClient.getInstruments(request).getData().stream().map(instrumentMapper::clientToDomain).toList();
     }
 
-    public List<ExchangePriceTicker> getTicker(TickerRequest request) {
+    public List<PriceTicker> getTicker(TickerRequest request) {
         return okxRestClient.getTicker(request).getData().stream().map(priceTickerMapper::clientToDomain).toList();
     }
 }

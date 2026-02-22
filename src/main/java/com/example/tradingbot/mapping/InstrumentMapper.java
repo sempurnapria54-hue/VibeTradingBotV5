@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrument;
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
 import com.example.tradingbot.rest.model.response.InstrumentResponse;
 import java.util.List;
@@ -21,7 +21,7 @@ public interface InstrumentMapper {
     @Mapping(source = "ctVal", target = "contractValue")
     @Mapping(source = "ctMult", target = "contractMultiplier")
     @Mapping(source = "tickSz", target = "minPriceStep")
-    ExchangeInstrument clientToDomain(com.example.tradingbot.client.model.okx.InstrumentResponse source);
+    Instrument clientToDomain(com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
 
     @Mapping(source = "externalId", target = "instId")
     @Mapping(source = "type", target = "instType")
@@ -33,7 +33,7 @@ public interface InstrumentMapper {
     @Mapping(source = "contractValue", target = "ctVal")
     @Mapping(source = "contractMultiplier", target = "ctMult")
     @Mapping(source = "minPriceStep", target = "tickSz")
-    com.example.tradingbot.client.model.okx.InstrumentResponse domainToClient(ExchangeInstrument source);
+    com.example.tradingbot.client.model.okx.response.InstrumentResponse domainToClient(Instrument source);
 
     @Mapping(source = "internalId", target = "internalId")
     @Mapping(source = "exchangeId", target = "exchangeInternalId")

@@ -17,3 +17,21 @@ public class ClientCandle {
     BigDecimal volumeCurrency;
     BigDecimal volumeCurrencyQuote;
 }
+//TODO: Для хранимых
+//Request
+//Controller         -> domain.Facade/Service -> proxy.service        -> exchange.client
+//rest.model.request -> domain.model.entity   -> client.model.request -> exchange.model
+
+//Response
+//exchange.client -> proxy.service           -> domain.Facade/Service                                  -> Controller
+//exchange.model  -> client.model.response   -> domain.model.exchange -> обновляем domain.model.entity -> rest.model.response
+
+
+//TODO: Для пока что не хранимых
+//Request
+//Controller         -> domain.Facade/Service -> proxy.service        -> exchange.client
+//rest.model.request -> rest.model.request    -> client.model.request -> exchange.model
+
+//Response
+//exchange.client -> proxy.service           -> domain.Facade/Service -> Controller
+//exchange.model  -> client.model.response   -> domain.model.exchange -> rest.model.response

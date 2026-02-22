@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangePosition;
-import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.domain.model.AlgoOrder;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.Position;
+import com.example.tradingbot.domain.model.snapshot.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import java.util.ArrayList;
@@ -31,9 +31,9 @@ public class InstrumentBucketBuilder {
         dbBefore.getInstruments().stream().map(instrument -> instrument.getInstId()).forEach(instIds::add);
         exBefore.getInstruments().stream().map(instrument -> instrument.getExternalId()).forEach(instIds::add);
 
-        List<ExchangePosition> positions = exBefore.getPositions();
-        List<ExchangeOrder> orders = exBefore.getOrders();
-        List<ExchangeAlgoOrder> algoOrders = exBefore.getAlgoOrders();
+        List<Position> positions = exBefore.getPositions();
+        List<Order> orders = exBefore.getOrders();
+        List<AlgoOrder> algoOrders = exBefore.getAlgoOrders();
 
         List<InstrumentBucket> buckets = new ArrayList<>();
         for (String instId : instIds) {

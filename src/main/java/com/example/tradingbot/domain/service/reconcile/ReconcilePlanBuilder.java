@@ -2,15 +2,15 @@ package com.example.tradingbot.domain.service.reconcile;
 
 import com.example.tradingbot.domain.service.reconcile.model.CreateUnknownAction;
 import com.example.tradingbot.domain.service.reconcile.model.DbInstrumentState;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.domain.service.reconcile.model.MarkAnomalyAction;
 import com.example.tradingbot.domain.service.reconcile.model.MarkClosedAction;
 import com.example.tradingbot.domain.service.reconcile.model.ReconcileEntityType;
 import com.example.tradingbot.domain.service.reconcile.model.ReconcilePlan;
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.domain.model.entity.PositionEntity;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.PositionEntity;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ReconcilePlanBuilder {
 
-    public ReconcilePlan buildPlan(InstrumentBucket bucket, ExchangeInstrumentSnapshot exchangeState) {
+    public ReconcilePlan buildPlan(InstrumentBucket bucket, InstrumentSnapshot exchangeState) {
         DbInstrumentState dbState = Objects.requireNonNull(bucket.getDbState(), "bucket.dbState is required for SYNC planning");
 
         List<CreateUnknownAction> createUnknown = new ArrayList<>();

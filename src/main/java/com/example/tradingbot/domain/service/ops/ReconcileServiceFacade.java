@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.ops;
 
-import com.example.tradingbot.domain.model.entity.ReconcileAnomalyEntity;
-import com.example.tradingbot.domain.model.entity.ReconcileReportEntity;
+import com.example.tradingbot.persistence.model.ReconcileAnomalyEntity;
+import com.example.tradingbot.persistence.model.ReconcileReportEntity;
 import com.example.tradingbot.domain.service.reconcile.ReconcileService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;

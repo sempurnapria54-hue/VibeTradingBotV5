@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
 import com.example.tradingbot.persistence.repository.AlgoOrderRepository;
 
 import java.util.List;
@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.ALGO_ORDER_NOT_FOUND;
-import static com.example.tradingbot.util.Constant.ErrorCode.EXCHANGE_NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor

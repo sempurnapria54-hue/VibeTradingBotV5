@@ -3,7 +3,7 @@ package com.example.tradingbot.domain.job;
 import com.example.tradingbot.config.CandleGroupsProperties;
 import com.example.tradingbot.domain.service.candlegroup.CandleGroupLeaseService;
 import com.example.tradingbot.domain.service.candlegroup.CandleGroupWorker;
-import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import java.time.Clock;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

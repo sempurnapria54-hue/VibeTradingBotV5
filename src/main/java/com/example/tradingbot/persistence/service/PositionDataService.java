@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.entity.PositionEntity;
+import com.example.tradingbot.persistence.model.PositionEntity;
 import com.example.tradingbot.persistence.repository.PositionRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

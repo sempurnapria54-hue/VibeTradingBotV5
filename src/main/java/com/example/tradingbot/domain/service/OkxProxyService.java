@@ -1,10 +1,13 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.client.model.okx.*;
-import com.example.tradingbot.client.okx.OkxRestClient;
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
+import com.example.tradingbot.client.model.okx.request.*;
+import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
+import com.example.tradingbot.client.model.okx.response.OrderResponse;
+import com.example.tradingbot.client.model.okx.response.PositionResponse;
+import com.example.tradingbot.client.service.okx.OkxRestClient;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

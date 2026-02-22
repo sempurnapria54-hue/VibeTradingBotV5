@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.entity.ReconcileAnomalyEntity;
-import com.example.tradingbot.domain.model.entity.ReconcileReportEntity;
+import com.example.tradingbot.persistence.model.ReconcileAnomalyEntity;
+import com.example.tradingbot.persistence.model.ReconcileReportEntity;
 import com.example.tradingbot.rest.model.response.ReconcileReportAnomalyResponse;
 import com.example.tradingbot.rest.model.response.ReconcileReportResponse;
 import java.util.List;

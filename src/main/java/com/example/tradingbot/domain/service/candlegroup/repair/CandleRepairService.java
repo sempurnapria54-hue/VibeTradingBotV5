@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.candlegroup.repair;
 
 import com.example.tradingbot.config.CandleGroupsProperties;
-import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.domain.service.candlegroup.integrity.CandleIntegrityService;
 import com.example.tradingbot.domain.service.candlegroup.integrity.IntegrityResult;
 import com.example.tradingbot.domain.service.candlegroup.model.CandleGroupRunContext;

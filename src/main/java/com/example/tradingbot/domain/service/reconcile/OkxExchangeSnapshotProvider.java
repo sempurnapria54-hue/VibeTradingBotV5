@@ -1,16 +1,14 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.client.model.okx.OrdersAlgoPendingRequest;
-import com.example.tradingbot.client.model.okx.OrdersPendingRequest;
-import com.example.tradingbot.client.model.okx.PositionsRequest;
-import com.example.tradingbot.client.model.okx.TickerRequest;
-import com.example.tradingbot.client.okx.OkxApiException;
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangePosition;
-import com.example.tradingbot.domain.model.exchange.ExchangePriceTicker;
-import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.client.model.okx.request.OrdersAlgoPendingRequest;
+import com.example.tradingbot.client.model.okx.request.OrdersPendingRequest;
+import com.example.tradingbot.client.model.okx.request.PositionsRequest;
+import com.example.tradingbot.client.model.okx.response.TickerRequest;
+import com.example.tradingbot.client.exception.ExternalApiException;
+import com.example.tradingbot.domain.model.*;
+import com.example.tradingbot.domain.model.AlgoOrder;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
+import com.example.tradingbot.domain.model.snapshot.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.okxproxy.OkxAccountClientService;
 import com.example.tradingbot.domain.service.okxproxy.OkxMarketClientService;
 import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
@@ -37,23 +35,23 @@ public class OkxExchangeSnapshotProvider {
     private final OkxMarketClientService okxMarketClientService;
 
     public ExchangeSnapshot captureExchangeSnapshot(List<String> managedInstIds) {
-        List<ExchangePosition> positions = capturePositions();
-        List<ExchangeOrder> orders = captureOrdersPending();
-        List<ExchangeAlgoOrder> algoOrders = captureAlgoOrdersPending();
+        List<Position> positions = capturePositions();
+        List<Order> orders = captureOrdersPending();
+        List<AlgoOrder> algoOrders = captureAlgoOrdersPending();
 
         LinkedHashSet<String> instIds = new LinkedHashSet<>();
-        positions.stream().map(ExchangePosition::getExternalInstrumentId).forEach(instIds::add);
-        orders.stream().map(ExchangeOrder::getExternalInstrumentId).forEach(instIds::add);
-        algoOrders.stream().map(ExchangeAlgoOrder::getExternalInstrumentId).forEach(instIds::add);
+        positions.stream().map(Position::getExternalInstrumentId).forEach(instIds::add);
+        orders.stream().map(Order::getExternalInstrumentId).forEach(instIds::add);
+        algoOrders.stream().map(AlgoOrder::getExternalInstrumentId).forEach(instIds::add);
         managedInstIds.stream().filter(StringUtils::isNotBlank).forEach(instIds::add);
 
-        List<ExchangeInstrumentSnapshot> instruments = instIds.stream()
+        List<InstrumentSnapshot> instruments = instIds.stream()
             .filter(StringUtils::isNotBlank)
             .map(instId -> {
-                List<ExchangePosition> instrumentPositions = positions.stream().filter(position -> instId.equals(position.getExternalInstrumentId())).toList();
-                List<ExchangeOrder> instrumentOrders = orders.stream().filter(order -> instId.equals(order.getExternalInstrumentId())).toList();
-                List<ExchangeAlgoOrder> instrumentAlgoOrders = algoOrders.stream().filter(order -> instId.equals(order.getExternalInstrumentId())).toList();
-                return ExchangeInstrumentSnapshot.builder()
+                List<Position> instrumentPositions = positions.stream().filter(position -> instId.equals(position.getExternalInstrumentId())).toList();
+                List<Order> instrumentOrders = orders.stream().filter(order -> instId.equals(order.getExternalInstrumentId())).toList();
+                List<AlgoOrder> instrumentAlgoOrders = algoOrders.stream().filter(order -> instId.equals(order.getExternalInstrumentId())).toList();
+                return InstrumentSnapshot.builder()
                     .externalId(instId)
                     .positionsCount(instrumentPositions.size())
                     .ordersCount(instrumentOrders.size())
@@ -63,15 +61,15 @@ public class OkxExchangeSnapshotProvider {
                     .algoOrders(instrumentAlgoOrders)
                     .build();
             })
-            .sorted(Comparator.comparing(ExchangeInstrumentSnapshot::getExternalId))
+            .sorted(Comparator.comparing(InstrumentSnapshot::getExternalId))
             .toList();
 
-        Map<String, ExchangePriceTicker> tickersByInstId = new LinkedHashMap<>();
+        Map<String, PriceTicker> tickersByInstId = new LinkedHashMap<>();
         for (String instId : managedInstIds) {
             if (StringUtils.isBlank(instId)) {
                 continue;
             }
-            ExchangePriceTicker ticker = captureTicker(instId);
+            PriceTicker ticker = captureTicker(instId);
             if (ticker == null) {
                 continue;
             }
@@ -90,12 +88,12 @@ public class OkxExchangeSnapshotProvider {
         return captureExchangeSnapshot(List.of());
     }
 
-    public ExchangeInstrumentSnapshot refreshInstrumentSnapshot(String instId) {
+    public InstrumentSnapshot refreshInstrumentSnapshot(String instId) {
         ExchangeSnapshot snapshot = captureExchangeSnapshot(List.of(instId));
         return snapshot.getInstruments().stream()
             .filter(item -> instId.equals(item.getExternalId()))
             .findFirst()
-            .orElse(ExchangeInstrumentSnapshot.builder()
+            .orElse(InstrumentSnapshot.builder()
                 .externalId(instId)
                 .positionsCount(0)
                 .ordersCount(0)
@@ -106,42 +104,42 @@ public class OkxExchangeSnapshotProvider {
                 .build());
     }
 
-    private List<ExchangePosition> capturePositions() {
+    private List<Position> capturePositions() {
         try {
             return okxAccountClientService.getPositions(new PositionsRequest());
-        } catch (OkxApiException exception) {
+        } catch (ExternalApiException exception) {
             throw new ReconcileExchangeSnapshotException("Failed to capture OKX positions", exception);
         }
     }
 
-    private List<ExchangeOrder> captureOrdersPending() {
+    private List<Order> captureOrdersPending() {
         try {
             return okxTradeClientService.getOrdersPending(new OrdersPendingRequest());
-        } catch (OkxApiException exception) {
+        } catch (ExternalApiException exception) {
             throw new ReconcileExchangeSnapshotException("Failed to capture OKX pending orders", exception);
         }
     }
 
-    private List<ExchangeAlgoOrder> captureAlgoOrdersPending() {
-        List<ExchangeAlgoOrder> orders = new ArrayList<>();
+    private List<AlgoOrder> captureAlgoOrdersPending() {
+        List<AlgoOrder> orders = new ArrayList<>();
         for (String orderType : ALGO_ORDER_TYPES) {
             OrdersAlgoPendingRequest request = new OrdersAlgoPendingRequest();
             request.setOrderType(orderType);
             try {
                 orders.addAll(okxTradeClientService.getOrdersAlgoPending(request));
-            } catch (OkxApiException exception) {
+            } catch (ExternalApiException exception) {
                 throw new ReconcileExchangeSnapshotException("Failed to capture OKX pending algo orders", exception);
             }
         }
         return orders;
     }
 
-    private ExchangePriceTicker captureTicker(String instId) {
+    private PriceTicker captureTicker(String instId) {
         TickerRequest request = new TickerRequest();
         request.setInstrumentId(instId);
         try {
             return okxMarketClientService.getTicker(request).stream().findFirst().orElse(null);
-        } catch (OkxApiException exception) {
+        } catch (ExternalApiException exception) {
             throw new ReconcileExchangeSnapshotException("Failed to capture OKX ticker, instId=" + instId, exception);
         }
     }

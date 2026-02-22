@@ -1,11 +1,11 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
-import com.example.tradingbot.client.model.okx.BalanceRequest;
-import com.example.tradingbot.client.model.okx.BalanceResponse;
-import com.example.tradingbot.client.model.okx.PositionResponse;
-import com.example.tradingbot.client.model.okx.PositionsRequest;
-import com.example.tradingbot.client.model.okx.OkxApiResponse;
-import com.example.tradingbot.client.okx.OkxRestClient;
+import com.example.tradingbot.client.model.okx.request.BalanceRequest;
+import com.example.tradingbot.client.model.okx.response.BalanceResponse;
+import com.example.tradingbot.client.model.okx.response.PositionResponse;
+import com.example.tradingbot.client.model.okx.request.PositionsRequest;
+import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
+import com.example.tradingbot.client.service.okx.OkxRestClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

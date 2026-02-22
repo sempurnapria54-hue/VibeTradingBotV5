@@ -1,12 +1,12 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.ExchangeEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.domain.model.entity.PositionEntity;
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.AlgoOrder;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseInstrumentSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.DatabaseSnapshot;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
@@ -51,14 +51,14 @@ public class DatabaseSnapshotBuilder {
                     .ordersCount(orders.size())
                     .algoOrdersCount(algoOrders.size())
                     .orders(orders.stream()
-                        .map(order -> ExchangeOrder.builder()
+                        .map(order -> Order.builder()
                             .externalInstrumentId(instrument.getExternalId())
                             .externalId(order.getExternalId())
                             .internalId(order.getInternalId())
                             .build())
                         .toList())
                     .algoOrders(algoOrders.stream()
-                        .map(algoOrder -> ExchangeAlgoOrder.builder()
+                        .map(algoOrder -> AlgoOrder.builder()
                             .externalInstrumentId(instrument.getExternalId())
                             .externalId(algoOrder.getExternalId())
                             .internalOrderId(algoOrder.getInternalOrderId())

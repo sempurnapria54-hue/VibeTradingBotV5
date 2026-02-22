@@ -1,15 +1,15 @@
 package com.example.tradingbot.domain.service.reconcile;
 
-import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
-import com.example.tradingbot.domain.model.entity.InstrumentEntity;
-import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.domain.model.entity.PositionEntity;
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangeInstrumentSnapshot;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangePosition;
-import com.example.tradingbot.domain.model.exchange.ExchangePriceTicker;
-import com.example.tradingbot.domain.model.exchange.ExchangeSnapshot;
+import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.domain.model.AlgoOrder;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.Position;
+import com.example.tradingbot.domain.model.PriceTicker;
+import com.example.tradingbot.domain.model.snapshot.ExchangeSnapshot;
 import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
@@ -38,7 +38,7 @@ public class ExchangeToDbExtendedTransferService {
     public void transfer(
         Long exchangeId,
         InstrumentBucket bucket,
-        ExchangeInstrumentSnapshot currentExchangeState,
+        InstrumentSnapshot currentExchangeState,
         ExchangeSnapshot exchangeBeforeOrCurrent
     ) {
         InstrumentEntity instrument = bucket.getDbState() == null ? null : bucket.getDbState().getInstrument();
@@ -53,7 +53,7 @@ public class ExchangeToDbExtendedTransferService {
     }
 
     private void transferInstrumentPrices(InstrumentEntity instrument, ExchangeSnapshot snapshot) {
-        ExchangePriceTicker ticker = snapshot.getTickersByInstId() == null ? null : snapshot.getTickersByInstId().get(instrument.getExternalId());
+        PriceTicker ticker = snapshot.getTickersByInstId() == null ? null : snapshot.getTickersByInstId().get(instrument.getExternalId());
         if (ticker == null) {
             return;
         }
@@ -74,11 +74,11 @@ public class ExchangeToDbExtendedTransferService {
         }
     }
 
-    private void transferPositionFields(Long exchangeId, Long instrumentId, ExchangeInstrumentSnapshot currentExchangeState) {
+    private void transferPositionFields(Long exchangeId, Long instrumentId, InstrumentSnapshot currentExchangeState) {
         if (currentExchangeState.getPositions().isEmpty()) {
             return;
         }
-        ExchangePosition external = currentExchangeState.getPositions().get(0);
+        Position external = currentExchangeState.getPositions().get(0);
         List<PositionEntity> positions = positionDataService.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId).stream()
             .filter(entity -> !"CLOSED".equalsIgnoreCase(entity.getStatus()))
             .toList();
@@ -107,8 +107,8 @@ public class ExchangeToDbExtendedTransferService {
         }
     }
 
-    private void transferOrderFields(Long exchangeId, Long instrumentId, List<ExchangeOrder> externalOrders) {
-        for (ExchangeOrder externalOrder : externalOrders) {
+    private void transferOrderFields(Long exchangeId, Long instrumentId, List<Order> externalOrders) {
+        for (Order externalOrder : externalOrders) {
             OrderEntity target = resolveOrder(exchangeId, instrumentId, externalOrder);
             if (target == null) {
                 continue;
@@ -140,8 +140,8 @@ public class ExchangeToDbExtendedTransferService {
         }
     }
 
-    private void transferAlgoOrderFields(Long exchangeId, Long instrumentId, List<ExchangeAlgoOrder> externalAlgoOrders) {
-        for (ExchangeAlgoOrder externalAlgoOrder : externalAlgoOrders) {
+    private void transferAlgoOrderFields(Long exchangeId, Long instrumentId, List<AlgoOrder> externalAlgoOrders) {
+        for (AlgoOrder externalAlgoOrder : externalAlgoOrders) {
             AlgoOrderEntity target = resolveAlgoOrder(exchangeId, instrumentId, externalAlgoOrder);
             if (target == null) {
                 continue;
@@ -178,7 +178,7 @@ public class ExchangeToDbExtendedTransferService {
         }
     }
 
-    private OrderEntity resolveOrder(Long exchangeId, Long instrumentId, ExchangeOrder externalOrder) {
+    private OrderEntity resolveOrder(Long exchangeId, Long instrumentId, Order externalOrder) {
         if (StringUtils.isNotBlank(externalOrder.getInternalId())) {
             return orderDataService.findByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, externalOrder.getInternalId())
                 .orElse(null);
@@ -190,7 +190,7 @@ public class ExchangeToDbExtendedTransferService {
         return matches.size() == 1 ? matches.get(0) : null;
     }
 
-    private AlgoOrderEntity resolveAlgoOrder(Long exchangeId, Long instrumentId, ExchangeAlgoOrder externalAlgoOrder) {
+    private AlgoOrderEntity resolveAlgoOrder(Long exchangeId, Long instrumentId, AlgoOrder externalAlgoOrder) {
         if (StringUtils.isNotBlank(externalAlgoOrder.getInternalOrderId())) {
             return algoOrderDataService.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchangeId, instrumentId, externalAlgoOrder.getInternalOrderId())
                 .orElse(null);

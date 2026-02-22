@@ -1,6 +1,6 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
+import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
 import com.example.tradingbot.rest.model.response.CandleGroupResponse;
 import org.mapstruct.Mapper;

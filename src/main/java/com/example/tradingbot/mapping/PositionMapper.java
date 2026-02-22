@@ -1,9 +1,11 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.client.model.okx.PositionResponse;
-import com.example.tradingbot.domain.model.exchange.ExchangePosition;
+import com.example.tradingbot.client.model.okx.response.PositionResponse;
+import com.example.tradingbot.domain.model.Position;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface PositionMapper {
@@ -19,7 +21,7 @@ public interface PositionMapper {
     @Mapping(source = "lever", target = "leverage")
     @Mapping(source = "mgnMode", target = "marginMode")
     @Mapping(source = "uTime", target = "updateTime")
-    ExchangePosition clientToDomain(PositionResponse source);
+    Position clientToDomain(PositionResponse source);
 
     @Mapping(source = "externalInstrumentId", target = "instId")
     @Mapping(source = "instrumentType", target = "instType")
@@ -32,5 +34,7 @@ public interface PositionMapper {
     @Mapping(source = "leverage", target = "lever")
     @Mapping(source = "marginMode", target = "mgnMode")
     @Mapping(source = "updateTime", target = "uTime")
-    PositionResponse domainToClient(ExchangePosition source);
+    PositionResponse domainToClient(Position source);
+
+    List<Position> clientToDomain(List<PositionResponse> source);
 }

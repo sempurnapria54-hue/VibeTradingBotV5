@@ -1,13 +1,13 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
-import com.example.tradingbot.client.model.okx.CandleResponse;
-import com.example.tradingbot.client.model.okx.CandlesRequest;
-import com.example.tradingbot.client.model.okx.InstrumentResponse;
-import com.example.tradingbot.client.model.okx.InstrumentsRequest;
-import com.example.tradingbot.client.model.okx.PriceTickerResponse;
-import com.example.tradingbot.client.model.okx.TickerRequest;
-import com.example.tradingbot.client.model.okx.OkxApiResponse;
-import com.example.tradingbot.client.okx.OkxRestClient;
+import com.example.tradingbot.client.model.okx.response.CandleResponse;
+import com.example.tradingbot.client.model.okx.request.CandlesRequest;
+import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
+import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
+import com.example.tradingbot.client.model.okx.response.PriceTickerResponse;
+import com.example.tradingbot.client.model.okx.response.TickerRequest;
+import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
+import com.example.tradingbot.client.service.okx.OkxRestClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

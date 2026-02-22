@@ -1,7 +1,8 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
-import com.example.tradingbot.client.model.okx.*;
-import com.example.tradingbot.client.okx.OkxRestClient;
+import com.example.tradingbot.client.model.okx.request.*;
+import com.example.tradingbot.client.model.okx.response.*;
+import com.example.tradingbot.client.service.okx.OkxRestClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

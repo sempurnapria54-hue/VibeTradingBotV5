@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.reconcile.model;
 
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.AlgoOrder;
+import com.example.tradingbot.domain.model.Order;
 import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,6 +17,6 @@ public class DatabaseInstrumentSnapshot {
     private final int positionsCount;
     private final int ordersCount;
     private final int algoOrdersCount;
-    private final List<ExchangeOrder> orders;
-    private final List<ExchangeAlgoOrder> algoOrders;
+    private final List<Order> orders;
+    private final List<AlgoOrder> algoOrders;
 }

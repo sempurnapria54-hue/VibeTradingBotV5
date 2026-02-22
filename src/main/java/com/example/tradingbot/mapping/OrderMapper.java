@@ -1,10 +1,12 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.entity.OrderEntity;
-import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.rest.model.response.OrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface OrderMapper {
@@ -24,7 +26,7 @@ public interface OrderMapper {
     @Mapping(source = "uTime", target = "updateTime")
     @Mapping(source = "sCode", target = "externalStatusCode")
     @Mapping(source = "sMsg", target = "externalStatusMessage")
-    ExchangeOrder clientToDomain(com.example.tradingbot.client.model.okx.OrderResponse source);
+    Order clientToDomain(com.example.tradingbot.client.model.okx.response.OrderResponse source);
 
     @Mapping(source = "externalId", target = "ordId")
     @Mapping(source = "internalId", target = "clOrdId")
@@ -41,7 +43,9 @@ public interface OrderMapper {
     @Mapping(source = "updateTime", target = "uTime")
     @Mapping(source = "externalStatusCode", target = "sCode")
     @Mapping(source = "externalStatusMessage", target = "sMsg")
-    com.example.tradingbot.client.model.okx.OrderResponse domainToClient(ExchangeOrder source);
+    com.example.tradingbot.client.model.okx.response.OrderResponse domainToClient(Order source);
 
     OrderResponse domainToRest(OrderEntity source);
+
+    List<Order> clientToDomain(List<com.example.tradingbot.client.model.okx.response.OrderResponse> source);
 }

@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.candles.okx;
 
-import com.example.tradingbot.client.model.okx.CandleResponse;
+import com.example.tradingbot.client.model.okx.response.CandleResponse;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
