@@ -1,15 +1,9 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.client.model.okx.AlgoOrderResponse;
-import com.example.tradingbot.client.model.okx.CancelAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.CancelOrderRequest;
-import com.example.tradingbot.client.model.okx.ClosePositionRequest;
-import com.example.tradingbot.client.model.okx.CreateAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.CreateOrderRequest;
-import com.example.tradingbot.client.model.okx.OrderResponse;
-import com.example.tradingbot.client.model.okx.PositionResponse;
+import com.example.tradingbot.client.model.okx.*;
 import com.example.tradingbot.client.okx.OkxRestClient;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.entity.InstrumentEntity;
 import com.example.tradingbot.domain.model.entity.OrderEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,9 +18,9 @@ public class OkxProxyService {
 
     private final OkxRestClient okxRestClient;
 
-    public List<OrderResponse> createOrder(OrderEntity orderEntity) {
+    public List<OrderResponse> createOrder(OrderEntity orderEntity, InstrumentEntity instrumentEntity) {
         CreateOrderRequest request = new CreateOrderRequest();
-        request.setInstrumentId(orderEntity.getInstrument().getExternalId());
+        request.setInstrumentId(instrumentEntity.getExternalId());
         request.setTradeMode(DEFAULT_TRADE_MODE);
         request.setSide(orderEntity.getSide());
         request.setOrderType(orderEntity.getType());
@@ -36,17 +30,17 @@ public class OkxProxyService {
         return okxRestClient.createOrder(request).getData();
     }
 
-    public List<OrderResponse> cancelOrder(OrderEntity orderEntity) {
+    public List<OrderResponse> cancelOrder(OrderEntity orderEntity, InstrumentEntity instrumentEntity) {
         CancelOrderRequest request = new CancelOrderRequest();
-        request.setInstrumentId(orderEntity.getInstrument().getExternalId());
+        request.setInstrumentId(instrumentEntity.getExternalId());
         request.setOrderId(orderEntity.getExternalId());
         request.setClientOrderId(orderEntity.getInternalId());
         return okxRestClient.cancelOrder(request).getData();
     }
 
-    public List<AlgoOrderResponse> createAlgoOrder(AlgoOrderEntity algoOrderEntity) {
+    public List<AlgoOrderResponse> createAlgoOrder(AlgoOrderEntity algoOrderEntity, InstrumentEntity instrumentEntity) {
         var request = new CreateAlgoOrderRequest();
-        request.setInstrumentId(algoOrderEntity.getInstrument().getExternalId());
+        request.setInstrumentId(instrumentEntity.getExternalId());
         request.setTradeMode(DEFAULT_TRADE_MODE);
         request.setSide(request.getSide());
         request.setOrderType(algoOrderEntity.getType());
@@ -57,9 +51,9 @@ public class OkxProxyService {
         return okxRestClient.createAlgoOrder(request).getData();
     }
 
-    public List<AlgoOrderResponse> cancelAlgoOrder(AlgoOrderEntity algoOrderEntity) {
+    public List<AlgoOrderResponse> cancelAlgoOrder(AlgoOrderEntity algoOrderEntity, InstrumentEntity instrumentEntity) {
         CancelAlgoOrderRequest request = new CancelAlgoOrderRequest();
-        request.setInstrumentId(algoOrderEntity.getInstrument().getExternalId());
+        request.setInstrumentId(instrumentEntity.getExternalId());
         request.setAlgoOrderId(algoOrderEntity.getExternalId());
         request.setClientOrderId(algoOrderEntity.getInternalOrderId());
         return okxRestClient.cancelAlgoOrder(request).getData();

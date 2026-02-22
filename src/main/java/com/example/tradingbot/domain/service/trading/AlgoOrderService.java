@@ -8,6 +8,8 @@ import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
+import com.example.tradingbot.persistence.service.ExchangeDataService;
+import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,31 +27,33 @@ public class AlgoOrderService {
     private final OkxProxyService okxProxyService;
     private final ExchangeService exchangeService;
     private final InstrumentService instrumentService;
+    private final ExchangeDataService exchangeDataService;
+    private final InstrumentDataService instrumentDataService;
 
     @Transactional
     public AlgoOrderEntity createAlgoOrder(String exchangeInternalId, String instrumentInternalId, CreateAlgoOrderRequest request) {
-        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
-        tradingGuardService.assertTradingAllowed(exchange, instrument);
+        ExchangeEntity exchangeEntity = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
+        InstrumentEntity instrumentEntity = instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), instrumentInternalId);
+        tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
 
         AlgoOrderEntity algoOrderEntity = new AlgoOrderEntity();
-        algoOrderEntity.initOnCreate(instrument, request);
+        algoOrderEntity.initOnCreate(instrumentEntity, request);
         algoOrderDataService.save(algoOrderEntity);
 
-        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.createAlgoOrder(algoOrderEntity));
+        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.createAlgoOrder(algoOrderEntity, instrumentEntity));
         algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }
 
     public AlgoOrderEntity cancelAlgoOrder(String exchangeInternalId, String instrumentInternalId, String orderId) {
-        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
-        tradingGuardService.assertTradingAllowed(exchange, instrument);
+        ExchangeEntity exchangeEntity = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
+        InstrumentEntity instrumentEntity = instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), instrumentInternalId);
+        tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
 
         AlgoOrderEntity algoOrderEntity =
-                algoOrderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchange.getId(), instrument.getId(), orderId);
+                algoOrderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchangeEntity.getId(), instrumentEntity.getId(), orderId);
 
-        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.cancelAlgoOrder(algoOrderEntity));
+        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.cancelAlgoOrder(algoOrderEntity, instrumentEntity));
         algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
         return algoOrderDataService.save(algoOrderEntity);
     }

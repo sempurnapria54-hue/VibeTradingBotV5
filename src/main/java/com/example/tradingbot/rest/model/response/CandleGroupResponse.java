@@ -11,7 +11,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class CandleGroupResponse extends Auditable {
 
-    private String instrumentInternalId;
     private String timeframe;
     private String status;
     private Long coverageStartTs;

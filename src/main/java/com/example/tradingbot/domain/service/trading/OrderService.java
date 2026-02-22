@@ -28,15 +28,15 @@ public class OrderService {
 
     @Transactional
     public OrderEntity createOrder(String exchangeInternalId, String instrumentInternalId, CreateOrderRequest request) {
-        ExchangeEntity exchange = exchangeService.getRequiredByInternalId(exchangeInternalId);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchange.getId(), instrumentInternalId);
-        tradingGuardService.assertTradingAllowed(exchange, instrument);
+        ExchangeEntity exchangeEntity = exchangeService.getRequiredByInternalId(exchangeInternalId);
+        InstrumentEntity instrumentEntity = instrumentService.getRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), instrumentInternalId);
+        tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
 
         OrderEntity orderEntity = new OrderEntity();
-        orderEntity.initOnCreate(instrument, request);
+        orderEntity.initOnCreate(instrumentEntity, request);
         orderDataService.save(orderEntity);
 
-        OrderResponse response = extractFirstOrder(okxProxyService.createOrder(orderEntity));
+        OrderResponse response = extractFirstOrder(okxProxyService.createOrder(orderEntity, instrumentEntity));
         orderEntity.applyOrderResponse(response);
         orderDataService.save(orderEntity);
 
@@ -45,9 +45,9 @@ public class OrderService {
 
     public OrderEntity cancelOrder(String exchangeInternalId, String instrumentInternalId, String orderId) {
         Long exchangeId = exchangeService.getRequiredByInternalId(exchangeInternalId).getId();
-        Long instrumentId = instrumentService.getRequiredIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId);
-        OrderEntity orderEntity = orderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, orderId);
-        OrderResponse response = extractFirstOrder(okxProxyService.cancelOrder(orderEntity));
+        InstrumentEntity instrumentEntity = instrumentService.getRequiredByExchangeIdAndInternalId(exchangeId, instrumentInternalId);
+        OrderEntity orderEntity = orderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentEntity.getId(), orderId);
+        OrderResponse response = extractFirstOrder(okxProxyService.cancelOrder(orderEntity, instrumentEntity));
         orderEntity.applyOrderResponse(response);
         return orderDataService.save(orderEntity);
     }

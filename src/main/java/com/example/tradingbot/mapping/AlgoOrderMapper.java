@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
 import com.example.tradingbot.domain.model.entity.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.exchange.ExchangeAlgoOrder;
 import com.example.tradingbot.rest.model.response.AlgoOrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -47,6 +47,5 @@ public interface AlgoOrderMapper {
     @Mapping(source = "externalStatusMessage", target = "sMsg")
     com.example.tradingbot.client.model.okx.AlgoOrderResponse domainToClient(ExchangeAlgoOrder source);
 
-    @Mapping(source = "instrument.internalId", target = "instrumentInternalId")
     AlgoOrderResponse domainToRest(AlgoOrderEntity source);
 }
