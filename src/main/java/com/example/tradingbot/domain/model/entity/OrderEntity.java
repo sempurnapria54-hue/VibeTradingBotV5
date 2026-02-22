@@ -113,17 +113,24 @@ public class OrderEntity extends AuditableEntity {
     }
 
     public void applyOrderResponse(OrderResponse responseOrder) {
+        // Exchange identifiers and statuses
         setExternalId(responseOrder.getOrdId());
         setExternalStatus(responseOrder.getState());
         setStatus(ORDER_STATUS_IN_PROGRESS);
+
+        // Order details
         setSide(responseOrder.getSide());
-        setType(responseOrder.getType());
-        setPrice(responseOrder.getPrice());
-        setSize(responseOrder.getSize());
+        setType(responseOrder.getOrdType());
+        setPrice(responseOrder.getPx());
+        setSize(responseOrder.getSz());
+
+        // Execution details
         setAccumulatedFillSize(responseOrder.getAccFillSz());
-        setAveragePrice(responseOrder.getAveragePrice());
+        setAveragePrice(responseOrder.getAvgPx());
         setFee(responseOrder.getFee());
-        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getCreateTime()));
-        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getUpdateTime()));
+
+        // Exchange timestamps
+        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getCTime()));
+        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getUTime()));
     }
 }
