@@ -1,10 +1,13 @@
 package com.example.tradingbot.mapping;
 
+import com.example.tradingbot.client.model.okx.response.PositionResponse;
 import com.example.tradingbot.domain.model.AlgoOrder;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
 import com.example.tradingbot.rest.model.response.AlgoOrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface AlgoOrderMapper {
@@ -48,4 +51,13 @@ public interface AlgoOrderMapper {
     com.example.tradingbot.client.model.okx.response.AlgoOrderResponse domainToClient(AlgoOrder source);
 
     AlgoOrderResponse domainToRest(AlgoOrderEntity source);
+
+    @Mapping(source = "instId", target = "externalInstrumentId")
+    @Mapping(source = "pos", target = "size")
+    AlgoOrder closePositionToDomain(PositionResponse source);
+
+    List<AlgoOrder> clientToDomain(List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
+
+    List<AlgoOrder> closePositionToDomain(List<PositionResponse> source);
+
 }

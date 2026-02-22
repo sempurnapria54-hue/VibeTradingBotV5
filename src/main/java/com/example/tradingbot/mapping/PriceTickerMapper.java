@@ -5,6 +5,8 @@ import com.example.tradingbot.domain.model.PriceTicker;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring")
 public interface PriceTickerMapper {
 
@@ -25,6 +27,9 @@ public interface PriceTickerMapper {
     @Mapping(source = "bidPrice", target = "bidPx")
     @Mapping(source = "timestamp", target = "ts")
     PriceTickerResponse domainToClient(PriceTicker source);
+
+
+    List<PriceTicker> clientToDomain(List<PriceTickerResponse> source);
 
 
 }

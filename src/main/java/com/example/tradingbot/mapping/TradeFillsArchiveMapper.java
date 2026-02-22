@@ -5,6 +5,8 @@ import com.example.tradingbot.domain.model.TradeFillsArchive;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring")
 public interface TradeFillsArchiveMapper {
 
@@ -17,5 +19,8 @@ public interface TradeFillsArchiveMapper {
     @Mapping(source = "externalStatusCode", target = "code")
     @Mapping(source = "externalStatusMessage", target = "msg")
     TradeFillsArchiveResponse domainToClient(TradeFillsArchive source);
+
+    List<TradeFillsArchive> clientToDomain(List<TradeFillsArchiveResponse> source);
+
 
 }
