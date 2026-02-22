@@ -3,19 +3,19 @@ package com.example.tradingbot.domain.service.reconcile;
 import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
 import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
+import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.config.ReconcileProperties;
+import com.example.tradingbot.domain.model.AlgoOrder;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.Position;
+import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
+import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
+import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
+import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.persistence.model.PositionEntity;
-import com.example.tradingbot.domain.model.AlgoOrder;
-import com.example.tradingbot.domain.model.snapshot.InstrumentSnapshot;
-import com.example.tradingbot.domain.model.Order;
-import com.example.tradingbot.domain.model.Position;
-import com.example.tradingbot.domain.service.okxproxy.OkxTradeClientService;
-import com.example.tradingbot.domain.service.reconcile.model.AnomalyDecision;
-import com.example.tradingbot.domain.service.reconcile.model.CancelFlowResult;
-import com.example.tradingbot.domain.service.reconcile.model.InstrumentBucket;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
@@ -42,15 +42,15 @@ public class CancelExchangeFlow {
     private static final String STATUS_ANOMALY = "ANOMALY";
 
     private final ReconcileProperties reconcileProperties;
-    private final OkxTradeClientService okxTradeClientService;
     private final OkxExchangeSnapshotProvider snapshotProvider;
     private final InstrumentDataService instrumentDataService;
     private final PositionDataService positionDataService;
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
+    private final ClientManager clientManager;
 
     @Transactional
-    public CancelFlowResult execute(InstrumentBucket bucket, AnomalyDecision decision) {
+    public CancelFlowResult execute(String exchangeName, InstrumentBucket bucket, AnomalyDecision decision) {
         if (!reconcileProperties.getCancelFlow().isEnabled() || !decision.isShouldCancelFlow()) {
             return CancelFlowResult.builder()
                     .closedPositions(0)
@@ -92,7 +92,7 @@ public class CancelExchangeFlow {
             request.setInstrumentId(externalPosition.getExternalInstrumentId());
             request.setPositionSide(externalPosition.getPositionSide());
             try {
-                okxTradeClientService.closePosition(request);
+                clientManager.getClientService(exchangeName).closePosition(request);
                 closedPositions++;
             } catch (Exception exception) {
                 log.warn("CancelFlow closePosition failed: instId={}, reason={}", externalPosition.getExternalInstrumentId(), exception.getMessage());
@@ -120,7 +120,7 @@ public class CancelExchangeFlow {
             request.setOrderId(externalOrder.getExternalId());
             request.setClientOrderId(externalOrder.getInternalId());
             try {
-                okxTradeClientService.cancelOrder(request);
+                clientManager.getClientService(exchangeName).cancelOrder(request);
                 canceledOrders++;
             } catch (Exception exception) {
                 log.warn("CancelFlow cancelOrder failed: instId={}, ordId={}, reason={}", externalOrder.getExternalInstrumentId(), externalOrder.getExternalId(), exception.getMessage());
@@ -144,7 +144,7 @@ public class CancelExchangeFlow {
             request.setInstrumentId(externalAlgoOrder.getExternalInstrumentId());
             request.setAlgoOrderId(externalAlgoOrder.getExternalId());
             try {
-                okxTradeClientService.cancelAlgoOrder(request);
+                clientManager.getClientService(exchangeName).cancelAlgoOrder(request);
                 canceledAlgoOrders++;
             } catch (Exception exception) {
                 log.warn("CancelFlow cancelAlgoOrder failed: instId={}, algoId={}, reason={}", externalAlgoOrder.getExternalInstrumentId(), externalAlgoOrder.getExternalId(), exception.getMessage());
@@ -163,7 +163,7 @@ public class CancelExchangeFlow {
             algoOrderDataService.save(entity);
         }
 
-        InstrumentSnapshot refreshed = snapshotProvider.refreshInstrumentSnapshot(bucket.getInstrumentName());
+        InstrumentSnapshot refreshed = snapshotProvider.refreshInstrumentSnapshot(exchangeName, bucket.getInstrumentName());
         boolean emptyAfterFlow = refreshed.getPositionsCount() == 0
                 && refreshed.getOrdersCount() == 0
                 && refreshed.getAlgoOrdersCount() == 0;

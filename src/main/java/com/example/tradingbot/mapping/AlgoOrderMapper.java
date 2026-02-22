@@ -58,6 +58,4 @@ public interface AlgoOrderMapper {
 
     List<AlgoOrder> clientToDomain(List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
 
-    List<AlgoOrder> closePositionToDomain(List<PositionResponse> source);
-
 }

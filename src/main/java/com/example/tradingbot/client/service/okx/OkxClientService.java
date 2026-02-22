@@ -1,44 +1,10 @@
 package com.example.tradingbot.client.service.okx;
 
-import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
-import com.example.tradingbot.client.model.okx.request.BalanceRequest;
-import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CandlesRequest;
-import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
-import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
-import com.example.tradingbot.client.model.okx.request.FillsArchiveLinkRequest;
-import com.example.tradingbot.client.model.okx.request.FillsArchiveRequest;
-import com.example.tradingbot.client.model.okx.request.FillsRequest;
-import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
-import com.example.tradingbot.client.model.okx.request.OrderDetailsRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersAlgoPendingRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersHistoryRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersPendingRequest;
-import com.example.tradingbot.client.model.okx.request.PositionsRequest;
-import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
-import com.example.tradingbot.client.model.okx.response.BalanceResponse;
-import com.example.tradingbot.client.model.okx.response.CandleResponse;
-import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
-import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
-import com.example.tradingbot.client.model.okx.response.OrderResponse;
-import com.example.tradingbot.client.model.okx.response.PositionResponse;
-import com.example.tradingbot.client.model.okx.response.PriceTickerResponse;
-import com.example.tradingbot.client.model.okx.response.TickerRequest;
-import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
-import com.example.tradingbot.client.model.okx.response.TradeFillsArchiveResponse;
+import com.example.tradingbot.client.model.okx.request.*;
+import com.example.tradingbot.client.model.okx.response.*;
 import com.example.tradingbot.client.service.ClientService;
 import com.example.tradingbot.domain.model.*;
-import com.example.tradingbot.mapping.AlgoOrderMapper;
-import com.example.tradingbot.mapping.BalanceMapper;
-import com.example.tradingbot.mapping.CandleMapper;
-import com.example.tradingbot.mapping.InstrumentMapper;
-import com.example.tradingbot.mapping.OrderMapper;
-import com.example.tradingbot.mapping.PriceTickerMapper;
-import com.example.tradingbot.mapping.PositionMapper;
-import com.example.tradingbot.mapping.TradeFillMapper;
-import com.example.tradingbot.mapping.TradeFillsArchiveMapper;
+import com.example.tradingbot.mapping.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -193,10 +159,10 @@ public class OkxClientService implements ClientService {
     }
 
     @Override
-    public List<AlgoOrder> closePosition(Object... args) {
+    public List<Position> closePosition(Object... args) {
         ClosePositionRequest request = (ClosePositionRequest) args[0];
         OkxApiResponse<PositionResponse> response = okxRestClient.closePosition(request);
-        return algoOrderMapper.closePositionToDomain(response.getData());
+        return positionMapper.clientToDomain(response.getData());
     }
 
     @Override

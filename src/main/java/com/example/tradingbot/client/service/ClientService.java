@@ -44,7 +44,7 @@ public interface ClientService {
 
     List<AlgoOrder> cancelAlgoOrder(Object... args);
 
-    List<AlgoOrder> closePosition(Object... args);
+    List<Position> closePosition(Object... args);
 
     List<Instrument> getInstruments(Object... args);
 

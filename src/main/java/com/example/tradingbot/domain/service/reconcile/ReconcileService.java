@@ -56,13 +56,13 @@ public class ReconcileService {
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
 
-    public void runDryRun() {
+    public void runDryRun(String exchangeName) {
         if (BooleanUtils.isFalse(reconcileProperties.isEnabled())) {
             log.info("Reconcile dry-run skipped: reconcile.enabled=false");
             return;
         }
 
-        ExchangeSnapshot snapshot = snapshotProvider.captureSnapshot();
+        ExchangeSnapshot snapshot = snapshotProvider.captureSnapshot(exchangeName);
         List<InstrumentBucket> buckets = bucketBuilder.buildBuckets(snapshot);
 
         log.info("Reconcile dry-run started: exchangeName={}, capturedAt={}", snapshot.getExchangeName(), Instant.ofEpochMilli(snapshot.getCapturedAtUtcMillis()));
@@ -90,7 +90,7 @@ public class ReconcileService {
         List<String> managedInstIds = managedInstruments.stream().map(InstrumentEntity::getExternalId).toList();
 
         DatabaseSnapshot databaseBefore = databaseSnapshotBuilder.captureDatabaseSnapshot(exchangeEntity, managedInstruments);
-        ExchangeSnapshot exchangeBefore = snapshotProvider.captureExchangeSnapshot(managedInstIds);
+        ExchangeSnapshot exchangeBefore = snapshotProvider.captureExchangeSnapshot(exchangeEntity.getName(), managedInstIds);
         ReconcileReportEntity report = reportDataService.createStartedReport(exchangeEntity.getId(), "SCHEDULED", databaseBefore, exchangeBefore);
 
         exchangeEntity.setStatus(STATUS_SYNC);
@@ -132,14 +132,14 @@ public class ReconcileService {
                         instrument.setStatus(STATUS_HOLD);
                         instrumentDataService.save(instrument);
 
-                        CancelFlowResult cancelResult = cancelExchangeFlow.execute(bucket, decision);
+                        CancelFlowResult cancelResult = cancelExchangeFlow.execute(exchangeEntity.getName(), bucket, decision);
                         if (cancelResult.isFlowExecuted()) {
                             currentExchangeState = cancelResult.getCurrentExchangeState();
                         }
                         continue;
                     }
 
-                    CancelFlowResult cancelResult = cancelExchangeFlow.execute(bucket, decision);
+                    CancelFlowResult cancelResult = cancelExchangeFlow.execute(exchangeEntity.getName(), bucket, decision);
                     if (cancelResult.isFlowExecuted()) {
                         currentExchangeState = cancelResult.getCurrentExchangeState();
                     }
@@ -166,7 +166,7 @@ public class ReconcileService {
             }
         }
 
-        ExchangeSnapshot exchangeAfter = snapshotProvider.captureExchangeSnapshot(managedInstIds);
+        ExchangeSnapshot exchangeAfter = snapshotProvider.captureExchangeSnapshot(exchangeEntity.getName(), managedInstIds);
         DatabaseSnapshot databaseAfter = databaseSnapshotBuilder.captureDatabaseSnapshot(exchangeEntity, managedInstruments);
         reportDataService.finalizeReport(report.getId(), databaseAfter, exchangeAfter, maxSeverity, hasAnomalies);
 
