@@ -1,4 +1,4 @@
-package com.example.tradingbot.mapping.okxproxy;
+package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.TradeFillsArchiveResponse;
 import com.example.tradingbot.domain.model.exchange.ExchangeTradeFillsArchive;

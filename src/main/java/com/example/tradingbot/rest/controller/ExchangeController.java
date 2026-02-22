@@ -1,7 +1,7 @@
 package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.ExchangeService;
-import com.example.tradingbot.mapping.okxproxy.ExchangeMapper;
+import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.rest.model.request.CreateExchangeRequest;
 import com.example.tradingbot.rest.model.response.ExchangeResponse;
 import lombok.RequiredArgsConstructor;

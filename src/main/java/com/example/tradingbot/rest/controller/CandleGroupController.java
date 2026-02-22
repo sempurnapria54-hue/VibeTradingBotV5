@@ -1,7 +1,7 @@
 package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.CandleGroupService;
-import com.example.tradingbot.mapping.okxproxy.CandleGroupMapper;
+import com.example.tradingbot.mapping.CandleGroupMapper;
 import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
 import com.example.tradingbot.rest.model.response.CandleGroupResponse;
 import lombok.RequiredArgsConstructor;

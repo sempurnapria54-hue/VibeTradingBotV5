@@ -19,11 +19,11 @@ import com.example.tradingbot.domain.model.exchange.ExchangeOrder;
 import com.example.tradingbot.domain.model.exchange.ExchangePosition;
 import com.example.tradingbot.domain.model.exchange.ExchangeTradeFill;
 import com.example.tradingbot.domain.model.exchange.ExchangeTradeFillsArchive;
-import com.example.tradingbot.mapping.okxproxy.AlgoOrderMapper;
-import com.example.tradingbot.mapping.okxproxy.OrderMapper;
-import com.example.tradingbot.mapping.okxproxy.PositionMapper;
-import com.example.tradingbot.mapping.okxproxy.TradeFillMapper;
-import com.example.tradingbot.mapping.okxproxy.TradeFillsArchiveMapper;
+import com.example.tradingbot.mapping.AlgoOrderMapper;
+import com.example.tradingbot.mapping.OrderMapper;
+import com.example.tradingbot.mapping.PositionMapper;
+import com.example.tradingbot.mapping.TradeFillMapper;
+import com.example.tradingbot.mapping.TradeFillsArchiveMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

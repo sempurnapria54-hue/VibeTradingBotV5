@@ -7,9 +7,9 @@ import com.example.tradingbot.client.okx.OkxRestClient;
 import com.example.tradingbot.domain.model.exchange.ExchangeCandle;
 import com.example.tradingbot.domain.model.exchange.ExchangeInstrument;
 import com.example.tradingbot.domain.model.exchange.ExchangePriceTicker;
-import com.example.tradingbot.mapping.okxproxy.CandleMapper;
-import com.example.tradingbot.mapping.okxproxy.InstrumentMapper;
-import com.example.tradingbot.mapping.okxproxy.PriceTickerMapper;
+import com.example.tradingbot.mapping.CandleMapper;
+import com.example.tradingbot.mapping.InstrumentMapper;
+import com.example.tradingbot.mapping.PriceTickerMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

@@ -1,4 +1,4 @@
-package com.example.tradingbot.mapping.okxproxy;
+package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.entity.CandleGroupEntity;
 import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;

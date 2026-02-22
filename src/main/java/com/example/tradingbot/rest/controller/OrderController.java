@@ -2,8 +2,8 @@ package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.trading.AlgoOrderService;
 import com.example.tradingbot.domain.service.trading.OrderService;
-import com.example.tradingbot.mapping.okxproxy.AlgoOrderMapper;
-import com.example.tradingbot.mapping.okxproxy.OrderMapper;
+import com.example.tradingbot.mapping.AlgoOrderMapper;
+import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
 import com.example.tradingbot.rest.model.request.CreateOrderRequest;
 import com.example.tradingbot.rest.model.response.AlgoOrderResponse;

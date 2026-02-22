@@ -1,7 +1,7 @@
 package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.mapping.okxproxy.InstrumentMapper;
+import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
 import com.example.tradingbot.rest.model.response.InstrumentResponse;
 import lombok.RequiredArgsConstructor;

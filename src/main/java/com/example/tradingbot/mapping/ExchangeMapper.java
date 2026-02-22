@@ -1,4 +1,4 @@
-package com.example.tradingbot.mapping.okxproxy;
+package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.entity.ExchangeEntity;
 import com.example.tradingbot.rest.model.request.CreateExchangeRequest;

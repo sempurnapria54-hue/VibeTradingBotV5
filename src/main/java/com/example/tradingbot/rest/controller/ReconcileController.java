@@ -1,7 +1,7 @@
 package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.ops.ReconcileServiceFacade;
-import com.example.tradingbot.mapping.okxproxy.ReconcileReportMapper;
+import com.example.tradingbot.mapping.ReconcileReportMapper;
 import com.example.tradingbot.rest.model.response.ReconcileReportResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
