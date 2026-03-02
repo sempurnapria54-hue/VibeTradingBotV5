@@ -1,15 +1,7 @@
 package com.example.tradingbot.persistence.model;
 
 import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -27,11 +19,7 @@ import static com.example.tradingbot.util.Constant.Status.CandleGroup.CANDLE_GRO
 })
 public class CandleGroupEntity extends AuditableEntity {
 
-    public static final int TIMEFRAME_LENGTH = 16;
-    public static final int STATUS_LENGTH = 32;
-    public static final int ERROR_CODE_LENGTH = 32;
     public static final int ERROR_MESSAGE_LENGTH = 1024;
-    public static final int LEASE_OWNER_LENGTH = 128;
 
     /** Внутренний идентификатор группы свечей. */
     @Id
@@ -39,16 +27,16 @@ public class CandleGroupEntity extends AuditableEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    /** Идентификатор инструмента-владельца группы свечей. */
-    @Column(name = "instrument_id", nullable = false, updatable = false)
-    private Long instrumentId;
+    /** Инструмент-владелец группы свечей. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "instrument_id", nullable = false, updatable = false)
+    private InstrumentEntity instrument;
 
     /** Таймфрейм группы (например 1m/5m/1H). */
     @Column(name = "timeframe", nullable = false)
     private String timeframe;
 
     /** Текущий статус жизненного цикла загрузки свечей. */
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private String status;
 
@@ -96,6 +84,6 @@ public class CandleGroupEntity extends AuditableEntity {
         setTimeframe(request.getTimeframe());
         setCoverageStartTs(request.getCoverageStartTs());
         setStatus(CANDLE_GROUP_STATUS_CREATED);
-        setInstrumentId(instrument.getId());
+        setInstrument(instrument);
     }
 }

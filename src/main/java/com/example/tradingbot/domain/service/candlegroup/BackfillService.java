@@ -29,7 +29,7 @@ public class BackfillService {
     private final CandleGroupsProperties candleGroupsProperties;
 
     public BackfillResult backfillToCoverage(CandleGroupEntity group, CandleGroupRunContext context) {
-        String instrumentName = instrumentDataService.findById(group.getInstrumentId())
+        String instrumentName = instrumentDataService.findById(group.getInstrument().getId())
             .map(instrument -> instrument.getName())
             .filter(name -> !name.isBlank())
             .orElseThrow(() -> new IllegalStateException("Candle group instrument name is missing, groupId=" + group.getId()));
@@ -55,7 +55,7 @@ public class BackfillService {
 
             if (batch.isEmpty()) {
                 log.warn("CandleGroup backfill stopped by empty batch: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, batchesProcessed={}",
-                    group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), coverageStartTs, cursor, batchesProcessed);
+                    group.getId(), group.getInstrument().getId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), coverageStartTs, cursor, batchesProcessed);
                 break;
             }
 
@@ -75,7 +75,7 @@ public class BackfillService {
 
             if (minTs >= cursor) {
                 log.warn("CandleGroup backfill stopped by monotonic guard: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, minTs={}, batchesProcessed={}",
-                    group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), coverageStartTs, cursor, minTs, batchesProcessed);
+                    group.getId(), group.getInstrument().getId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), coverageStartTs, cursor, minTs, batchesProcessed);
                 break;
             }
 
@@ -89,7 +89,7 @@ public class BackfillService {
 
             log.info("CandleGroup backfill batch: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, previousCursor={}, nextCursor={}, fetchedBatch={}, savedBatch={}, batchesProcessed={}",
                 group.getId(),
-                group.getInstrumentId(),
+                group.getInstrument().getId(),
                 group.getTimeframe(),
                 group.getStatus(),
                 context.nowClosedTs(),
@@ -114,7 +114,7 @@ public class BackfillService {
         candleGroupDataService.updateBackfillCursor(group.getId(), initializedCursor);
         group.setBackfillCursorTs(initializedCursor);
         log.info("CandleGroup backfill cursor initialized: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, cursor={}, tfMillis={}",
-            group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), group.getCoverageStartTs(), initializedCursor, context.tfMillis());
+            group.getId(), group.getInstrument().getId(), group.getTimeframe(), group.getStatus(), context.nowClosedTs(), group.getCoverageStartTs(), initializedCursor, context.tfMillis());
         return initializedCursor;
     }
 

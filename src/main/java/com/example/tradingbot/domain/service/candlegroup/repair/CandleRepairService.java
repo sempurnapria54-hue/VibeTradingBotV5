@@ -65,7 +65,7 @@ public class CandleRepairService {
 
         log.info("CandleGroup repair pass: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, coverageStartTs={}, startTs={}, endTs={}, beforeExpected={}, beforeActual={}, afterExpected={}, afterActual={}, leafWindows={}, gapWindows={}, repairedGaps={}",
             group.getId(),
-            group.getInstrumentId(),
+            group.getInstrument().getId(),
             group.getTimeframe(),
             group.getStatus(),
             ctx.nowClosedTs(),

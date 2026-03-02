@@ -28,7 +28,7 @@ public class TailSyncService {
     private final CandleGroupsProperties candleGroupsProperties;
 
     public TailSyncResult syncTail(CandleGroupEntity group, CandleGroupRunContext context) {
-        String instrumentName = instrumentDataService.findById(group.getInstrumentId())
+        String instrumentName = instrumentDataService.findById(group.getInstrument().getId())
             .map(instrument -> instrument.getName())
             .filter(name -> !name.isBlank())
             .orElseThrow(() -> new IllegalStateException("Candle group instrument name is missing, groupId=" + group.getId()));

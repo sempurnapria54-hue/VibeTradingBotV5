@@ -28,7 +28,7 @@ public class GapWindowDownloader {
     private final CandleGroupsProperties candleGroupsProperties;
 
     public GapRepairResult repairWindow(CandleGroupEntity group, CandleGroupRunContext ctx, TimeWindow gap) {
-        String instrumentName = instrumentDataService.findById(group.getInstrumentId())
+        String instrumentName = instrumentDataService.findById(group.getInstrument().getId())
             .map(instrument -> instrument.getName())
             .filter(name -> !name.isBlank())
             .orElseThrow(() -> new IllegalStateException("Candle group instrument name is missing, groupId=" + group.getId()));
@@ -49,7 +49,7 @@ public class GapWindowDownloader {
 
             if (batch.isEmpty()) {
                 log.warn("CandleGroup repair stopped by empty batch: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, gapStart={}, gapEnd={}, cursor={}, batchesProcessed={}",
-                    group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), ctx.nowClosedTs(), gap.fromTs(), gap.toTs(), cursor, batchesProcessed);
+                    group.getId(), group.getInstrument().getId(), group.getTimeframe(), group.getStatus(), ctx.nowClosedTs(), gap.fromTs(), gap.toTs(), cursor, batchesProcessed);
                 break;
             }
 
@@ -69,7 +69,7 @@ public class GapWindowDownloader {
 
             if (minTs >= cursor) {
                 log.warn("CandleGroup repair stopped by monotonic guard: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, gapStart={}, gapEnd={}, cursor={}, minTs={}, batchesProcessed={}",
-                    group.getId(), group.getInstrumentId(), group.getTimeframe(), group.getStatus(), ctx.nowClosedTs(), gap.fromTs(), gap.toTs(), cursor, minTs, batchesProcessed);
+                    group.getId(), group.getInstrument().getId(), group.getTimeframe(), group.getStatus(), ctx.nowClosedTs(), gap.fromTs(), gap.toTs(), cursor, minTs, batchesProcessed);
                 break;
             }
 
@@ -81,7 +81,7 @@ public class GapWindowDownloader {
 
             log.info("CandleGroup repair batch: groupId={}, instrumentId={}, timeframe={}, status={}, nowClosedTs={}, gapStart={}, gapEnd={}, previousCursor={}, nextCursor={}, fetchedBatch={}, savedBatch={}, batchesProcessed={}",
                 group.getId(),
-                group.getInstrumentId(),
+                group.getInstrument().getId(),
                 group.getTimeframe(),
                 group.getStatus(),
                 ctx.nowClosedTs(),

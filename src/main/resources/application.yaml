@@ -6,21 +6,21 @@ spring:
       - vault://secret/tradingbot/okx
       - vault://secret/tradingbot/postgres
   cloud:
+    bootstrap:
+      enabled: false
     vault:
       enabled: true
-      scheme: http
-      host: localhost
-      port: 8200
+      uri: http://localhost:8200
       authentication: TOKEN
-      token: ${VAULT_TOKEN}
+      token: ${VAULT_TOKEN:}
       kv:
         enabled: true
         backend: secret
         application-name: tradingbot
   datasource:
-    url: ${SPRING_DATASOURCE_URL:}
-    username: ${SPRING_DATASOURCE_USERNAME:}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
+    url: ${DATASOURCE_URL}
+    username: ${DATASOURCE_USERNAME}
+    password: ${DATASOURCE_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -29,7 +29,7 @@ spring:
         jdbc:
           time_zone: UTC
   flyway:
-    enabled: true
+    enabled: false
 
 reconcile:
   enabled: false
@@ -61,9 +61,9 @@ candle-groups:
       1Dutc: 120
 
 okx:
-  api-key: ${OKX_API_KEY:}
-  secret-key: ${OKX_SECRET_KEY:}
-  passphrase: ${OKX_PASSPHRASE:}
+  api-key: ${OKX_API_KEY}
+  secret-key: ${OKX_SECRET_KEY}
+  passphrase: ${OKX_PASSPHRASE}
   base-url: ${OKX_BASE_URL:https://www.okx.com}
 
 # Справочник ожидаемых ключей в Vault (без прямых vault:// ссылок).
@@ -74,9 +74,9 @@ vault-secret-keys:
     passphrase: '{OKX_PASSPHRASE}'
     base-url: '{OKX_BASE_URL}'
   postgres:
-    url: '{SPRING_DATASOURCE_URL}'
-    username: '{SPRING_DATASOURCE_USERNAME}'
-    password: '{SPRING_DATASOURCE_PASSWORD}'
+    url: '{DATASOURCE_URL}'
+    username: '{DATASOURCE_USERNAME}'
+    password: '{DATASOURCE_PASSWORD}'
 
 server:
   port: 8080
