@@ -37,11 +37,6 @@ public class CandleEntity extends AuditableEntity {
     @Column(name = "candle_group_id", nullable = false, updatable = false, insertable = false)
     private Long candleGroupId;
 
-    /** Ссылка на группу свечей (инструмент + таймфрейм). */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "candle_group_id", nullable = false)
-    private CandleGroupEntity candleGroup;
-
     /** Метка времени свечи в UTC миллисекундах. */
     @Column(name = "timestamp", nullable = false)
     private Long timestamp;
