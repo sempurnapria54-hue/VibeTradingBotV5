@@ -1,5 +1,6 @@
 package com.example.tradingbot.mapping;
 
+import com.example.tradingbot.client.model.okx.request.BalanceRequest;
 import com.example.tradingbot.client.model.okx.response.BalanceResponse;
 import com.example.tradingbot.domain.model.Balance;
 import org.mapstruct.Mapper;
@@ -27,4 +28,6 @@ public interface BalanceMapper {
     BalanceResponse domainToClient(Balance source);
 
     List<Balance> clientOkxResponseToDomain(List<BalanceResponse> source);
+
+    BalanceRequest domainToClientOkxRequest(Balance source);
 }

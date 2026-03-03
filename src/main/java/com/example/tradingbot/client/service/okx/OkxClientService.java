@@ -34,7 +34,8 @@ public class OkxClientService implements ClientService {
 
     @Override
     public List<Balance> getBalance(Object... args) {
-        BalanceRequest request = (BalanceRequest) args[0];
+        Balance balance = (Balance) args[0];
+        BalanceRequest request = balanceMapper.domainToClientOkxRequest(balance);
         OkxApiResponse<BalanceResponse> response = okxRestClient.getBalance(request);
         return balanceMapper.clientOkxResponseToDomain(response.getData());
     }
