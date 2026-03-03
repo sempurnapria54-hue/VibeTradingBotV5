@@ -13,49 +13,31 @@ import java.util.List;
 public interface AlgoOrderMapper {
 
     @Mapping(source = "algoId", target = "externalId")
-    @Mapping(source = "clOrdId", target = "internalOrderId")
-    @Mapping(source = "instId", target = "externalInstrumentId")
-    @Mapping(source = "ordType", target = "type")
-    @Mapping(source = "state", target = "status")
+    @Mapping(source = "clOrdId", target = "internalId")
+    @Mapping(source = "state", target = "externalStatus")
+    @Mapping(source = "ordType", target = "externalType")
     @Mapping(source = "sz", target = "size")
-    @Mapping(source = "triggerPx", target = "triggerPrice")
-    @Mapping(source = "ordPx", target = "orderPrice")
     @Mapping(source = "tpTriggerPx", target = "takeProfitTriggerPrice")
-    @Mapping(source = "tpOrdPx", target = "takeProfitOrderPrice")
     @Mapping(source = "slTriggerPx", target = "stopLossTriggerPrice")
-    @Mapping(source = "slOrdPx", target = "stopLossOrderPrice")
-    @Mapping(source = "callbackSpread", target = "callbackStep")
-    @Mapping(source = "cTime", target = "createTime")
-    @Mapping(source = "uTime", target = "updateTime")
-    @Mapping(source = "sCode", target = "externalStatusCode")
-    @Mapping(source = "sMsg", target = "externalStatusMessage")
+    @Mapping(source = "callbackRatio", target = "trailingFallenPercents")
+    @Mapping(source = "callbackSpread", target = "trailingFallenAbsoluteValue")
     AlgoOrder clientToDomain(com.example.tradingbot.client.model.okx.response.AlgoOrderResponse source);
 
     @Mapping(source = "externalId", target = "algoId")
-    @Mapping(source = "internalOrderId", target = "clOrdId")
-    @Mapping(source = "externalInstrumentId", target = "instId")
-    @Mapping(source = "type", target = "ordType")
-    @Mapping(source = "status", target = "state")
+    @Mapping(source = "internalId", target = "clOrdId")
+    @Mapping(source = "externalStatus", target = "state")
+    @Mapping(source = "externalType", target = "ordType")
     @Mapping(source = "size", target = "sz")
-    @Mapping(source = "triggerPrice", target = "triggerPx")
-    @Mapping(source = "orderPrice", target = "ordPx")
     @Mapping(source = "takeProfitTriggerPrice", target = "tpTriggerPx")
-    @Mapping(source = "takeProfitOrderPrice", target = "tpOrdPx")
     @Mapping(source = "stopLossTriggerPrice", target = "slTriggerPx")
-    @Mapping(source = "stopLossOrderPrice", target = "slOrdPx")
-    @Mapping(source = "callbackStep", target = "callbackSpread")
-    @Mapping(source = "createTime", target = "cTime")
-    @Mapping(source = "updateTime", target = "uTime")
-    @Mapping(source = "externalStatusCode", target = "sCode")
-    @Mapping(source = "externalStatusMessage", target = "sMsg")
+    @Mapping(source = "trailingFallenPercents", target = "callbackRatio")
+    @Mapping(source = "trailingFallenAbsoluteValue", target = "callbackSpread")
     com.example.tradingbot.client.model.okx.response.AlgoOrderResponse domainToClient(AlgoOrder source);
 
     AlgoOrderResponse domainToRest(AlgoOrderEntity source);
 
-    @Mapping(source = "instId", target = "externalInstrumentId")
     @Mapping(source = "pos", target = "size")
     AlgoOrder closePositionToDomain(PositionResponse source);
 
     List<AlgoOrder> clientToDomain(List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
-
 }

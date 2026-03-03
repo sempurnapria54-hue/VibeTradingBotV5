@@ -1,48 +1,145 @@
 package com.example.tradingbot.domain.model;
 
-import lombok.Builder;
+import com.example.tradingbot.rest.model.response.Auditable;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
-@Builder
-public class AlgoOrder {
+public class AlgoOrder extends Auditable {
 
-    /** Идентификатор algo-заявки на бирже. */
+    /**
+     * Внутренний идентификатор algo-ордера.
+     */
+    private Long id;
+
+    /**
+     * Идентификатор сделки.
+     */
+    private Long dealId;
+
+    /**
+     * Межсервисный идентификатор algo-ордера.
+     */
+    private String internalId;
+
+    /**
+     * Идентификатор algo-ордера на бирже.
+     */
     private String externalId;
-    /** Клиентский идентификатор заявки. */
-    private String internalOrderId;
-    /** Идентификатор инструмента (instId). */
-    private String externalInstrumentId;
-    /** Тип algo-заявки. */
-    private String type;
-    /** Текущее состояние algo-заявки. */
-    private String status;
-    /** Объём заявки. */
-    private String size;
-    /** Триггерная цена активации заявки. */
-    private String triggerPrice;
-    /** Цена выставления ордера после срабатывания триггера. */
-    private String orderPrice;
-    /** Триггерная цена для take-profit. */
-    private String takeProfitTriggerPrice;
-    /** Цена ордера для take-profit. */
-    private String takeProfitOrderPrice;
-    /** Триггерная цена для stop-loss. */
-    private String stopLossTriggerPrice;
-    /** Цена ордера для stop-loss. */
-    private String stopLossOrderPrice;
-    /** Коэффициент callback для trailing-механики. */
-    private String callbackRatio;
-    /** Шаг callback в абсолютном выражении. */
-    private String callbackStep;
-    /** Время создания заявки на бирже. */
-    private String createTime;
-    /** Время последнего обновления заявки на бирже. */
-    private String updateTime;
-    /** Код статуса ответа биржи. */
-    private String externalStatusCode;
-    /** Текст статуса/ошибки ответа биржи. */
-    private String externalStatusMessage;
+
+    /**
+     * Текущий внутренний статус.
+     */
+    private Status status;
+
+    /**
+     * Внутренний тип algo-ордера.
+     */
+    private Type type;
+
+    /**
+     * Состояние algo-ордера на стороне биржи.
+     */
+    private String externalStatus;
+
+    /**
+     * Биржевой тип algo-ордера.
+     */
+    private String externalType;
+
+    /**
+     * Объём algo-ордера.
+     */
+    private BigDecimal size;
+
+    /**
+     * Для Type.CONDITIONAL_MARKET_TP, CONDITIONAL_MARKET_FULL
+     * Триггерная цена take-profit.
+     */
+    private BigDecimal takeProfitTriggerPrice;
+
+    /**
+     * Для Type.CONDITIONAL_MARKET_SL, CONDITIONAL_MARKET_FULL
+     * Триггерная цена stop-loss.
+     */
+    private BigDecimal stopLossTriggerPrice;
+
+    /**
+     * Для Type.TRAILING_MARKET_PERCENTS,
+     * Коэффициент callback для trailing-механики.
+     * Процент “отката” от экстремума. (Пример: 0.01 = 1%)
+     */
+    private BigDecimal trailingFallenPercents;
+
+    /**
+     * Для Type.TRAILING_MARKET_VALUE
+     * Абсолютный шаг callback для trailing-механики.
+     */
+    private BigDecimal trailingFallenAbsoluteValue;
+
+    public enum Type {
+        /**
+         * Conditional SL (stop-loss) — срабатывает по slTriggerPrice.
+         * После срабатывания закрываем позицию по рынку (slOrdPx = -1).
+         * Используем только поле slTriggerPrice, takeProfitTriggerPrice = null, callback* = null.
+         */
+        CONDITIONAL_MARKET_SL,
+
+        /**
+         * Conditional TP (take-profit) — срабатывает по takeProfitTriggerPrice.
+         * После срабатывания закрываем позицию по рынку (tpOrdPx = -1).
+         * Используем только поле takeProfitTriggerPrice, stopLossTriggerPrice = null, callback* = null.
+         */
+        CONDITIONAL_MARKET_TP,
+
+        /**
+         * Conditional FULL (TP + SL одновременно) — один algo-ордер содержит и TP, и SL,
+         * оба исполняются по рынку после срабатывания соответствующего триггера (tp/sl OrdPx = -1).
+         * Используем takeProfitTriggerPrice + stopLossTriggerPrice, callback* = null.
+         * <p>
+         * Примечание: поддержка TP+SL в одном conditional зависит от режима/ограничений биржи.
+         * Если на бирже есть ограничения — проще хранить как 2 отдельных algo-ордера (TP и SL).
+         */
+        CONDITIONAL_MARKET_FULL,
+
+        /**
+         * Trailing stop по проценту — ордер следует за экстремумом, срабатывает при откате на callbackRatio.
+         * После срабатывания закрываем позицию по рынку.
+         * Используем callbackRatio, callbackStep = null, tp/sl триггеры = null.
+         */
+        TRAILING_MARKET_PERCENTS,
+
+        /**
+         * Trailing stop по абсолютному шагу — ордер следует за экстремумом, срабатывает при откате на callbackStep.
+         * После срабатывания закрываем позицию по рынку.
+         * Используем callbackStep, callbackRatio = null, tp/sl триггеры = null.
+         */
+        TRAILING_MARKET_VALUE
+    }
+
+    public enum Status {
+        /**
+         * Запись создана локально, ещё не отправляли
+         */
+        CREATED,
+        /**
+         * Отправили, но ещё не активен
+         */
+        PENDING,
+        /**
+         * Реально активен на бирже (после fill)
+         */
+        ACTIVE,
+        /**
+         * Отменён/сработал
+         */
+        CLOSED,
+        /**
+         * Не удалось создать/обновить
+         */
+        FAILED
+    }
 }

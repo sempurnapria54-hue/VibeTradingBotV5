@@ -1,28 +1,52 @@
 package com.example.tradingbot.domain.model;
 
+import com.example.tradingbot.rest.model.response.Auditable;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
-public class Candle {
+public class Candle extends Auditable {
 
-    /** Временная метка свечи в миллисекундах UTC. */
-    private String timestamp;
-    /** Цена открытия свечи. */
-    private String open;
-    /** Максимальная цена свечи. */
-    private String high;
-    /** Минимальная цена свечи. */
-    private String low;
-    /** Цена закрытия свечи. */
-    private String close;
-    /** Объём торгов в базовой валюте. */
-    private String volume;
-    /** Объём торгов в валюте контракта/базы. */
-    private String volumeCurrency;
-    /** Объём торгов в валюте котировки. */
-    private String volumeCurrencyQuote;
-    /** Признак закрытой (подтверждённой) свечи. */
-    private String confirmed;
+    /**
+     * Внутренний идентификатор свечи.
+     */
+    private Long id;
+
+    /**
+     * Идентификатор группы свечей, к которой относится свеча.
+     */
+    private Long candleGroupId;
+
+    /**
+     * Время открытия свечи в UTC миллисекундах.
+     */
+    private Long openTimestamp;
+
+    /**
+     * Цена открытия свечи.
+     */
+    private BigDecimal open;
+
+    /**
+     * Максимальная цена за интервал свечи.
+     */
+    private BigDecimal high;
+
+    /**
+     * Минимальная цена за интервал свечи.
+     */
+    private BigDecimal low;
+
+    /**
+     * Цена закрытия свечи.
+     */
+    private BigDecimal close;
+
+    /**
+     * Объём торгов за интервал свечи.
+     */
+    private BigDecimal volume;
 }

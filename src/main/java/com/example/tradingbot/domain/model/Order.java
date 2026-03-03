@@ -1,46 +1,108 @@
 package com.example.tradingbot.domain.model;
 
-import lombok.Builder;
+import com.example.tradingbot.rest.model.response.Auditable;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
-@Builder
-public class Order {
+public class Order extends Auditable {
 
-    /** Идентификатор ордера на бирже. */
-    private String externalId;
-    /** Клиентский идентификатор ордера. */
+    /**
+     * Внутренний идентификатор ордера.
+     */
+    private Long id;
+
+    /**
+     * Идентификатор сделки.
+     */
+    private Long dealId;
+
+    /**
+     * Межсервисный идентификатор ордера.
+     */
     private String internalId;
-    /** Идентификатор инструмента (instId). */
-    private String externalInstrumentId;
-    /** Тип инструмента ордера. */
-    private String instrumentType;
-    /** Сторона ордера: buy/sell. */
-    private String side;
-    /** Направление позиции для ордера. */
-    private String positionSide;
-    /** Тип ордера (limit/market и т.д.). */
+
+    /**
+     * Идентификатор ордера на бирже.
+     */
+    private String externalId;
+
+    /**
+     * Текущий внутренний статус ордера.
+     */
+    private Status status;
+
+    /**
+     * Тип ордера в бизнес-терминах.
+     */
     private String type;
-    /** Цена ордера. */
-    private String price;
-    /** Объём ордера. */
-    private String size;
-    /** Текущее состояние ордера. */
-    private String status;
-    /** Средняя цена исполнения ордера. */
-    private String averagePrice;
-    /** Накопленный исполненный объём. */
-    private String accumulatedFillSize;
-    /** Комиссия по ордеру. */
-    private String fee;
-    /** Время создания ордера на бирже. */
-    private String createTime;
-    /** Время последнего обновления ордера. */
-    private String updateTime;
-    /** Код статуса ответа биржи. */
-    private String externalStatusCode;
-    /** Текст статуса/ошибки ответа биржи. */
-    private String externalStatusMessage;
+
+    /**
+     * Сторона ордера (buy/sell).
+     */
+    private String side;
+
+    /**
+     * Состояние ордера на стороне биржи.
+     */
+    private String externalStatus;
+
+    /**
+     * Цена ордера.
+     */
+    private BigDecimal price;
+
+    /**
+     * Объём ордера.
+     */
+    private BigDecimal size;
+
+    /**
+     * Накопленный исполненный объём.
+     */
+    private BigDecimal accumulatedFillSize;
+
+    /**
+     * Средняя цена исполнения.
+     */
+    private BigDecimal averagePrice;
+
+    /**
+     * Комиссия по ордеру.
+     */
+    private BigDecimal fee;
+
+    public enum Status {
+        /**
+         * Запись создана локально, ещё не отправляли
+         */
+        CREATED,
+        /**
+         * Отправили, но ещё не активен
+         */
+        PENDING,
+        /**
+         * Реально активен на бирже (после fill)
+         */
+        ACTIVE,
+        /**
+         * Полностью выполнен на бирже
+         */
+        COMPLETED,
+        /**
+         * Частично выполнен на бирже
+         */
+        PARTIALLY_COMPLETED,
+        /**
+         * Отменён
+         */
+        CLOSED,
+        /**
+         * Не удалось создать/обновить
+         */
+        FAILED
+    }
 }

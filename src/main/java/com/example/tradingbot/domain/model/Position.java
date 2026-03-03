@@ -1,34 +1,83 @@
 package com.example.tradingbot.domain.model;
 
-import lombok.Builder;
+import com.example.tradingbot.rest.model.response.Auditable;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
-@Builder
-public class Position {
+public class Position extends Auditable {
 
-    /** Идентификатор инструмента (instId). */
-    private String externalInstrumentId;
-    /** Тип инструмента позиции. */
-    private String instrumentType;
-    /** Сторона позиции (long/short/net). */
-    private String positionSide;
-    /** Размер открытой позиции. */
-    private String positionSize;
-    /** Средняя цена входа в позицию. */
-    private String averagePrice;
-    /** Текущая mark price позиции. */
-    private String markPrice;
-    /** Оценочная цена ликвидации. */
-    private String liquidationPrice;
-    /** Нереализованный PnL позиции. */
-    private String unrealizedProfit;
-    /** Плечо, применённое к позиции. */
-    private String leverage;
-    /** Режим маржи (cross/isolated). */
+    /**
+     * Внутренний идентификатор.
+     */
+    private Long id;
+
+    /**
+     * Идентификатор сделки.
+     */
+    private Long dealId;
+
+    /**
+     * Межсервисный идентификатор.
+     */
+    private String internalId;
+
+    /**
+     * Идентификатор позиции на бирже.
+     */
+    private String externalId;
+
+    /**
+     * Текущий внутренний статус позиции.
+     */
+    private Status status;
+
+    /**
+     * Сторона позиции (long/short/net).
+     */
+    private String side;
+
+    /**
+     * Размер позиции.
+     */
+    private BigDecimal size;
+
+    /**
+     * Средняя цена входа.
+     */
+    private BigDecimal averagePrice;
+
+    /**
+     * Текущая рыночная цена позиции.
+     */
+    private BigDecimal markPrice;
+
+    /**
+     * Оценочная цена ликвидации позиции.
+     */
+    private BigDecimal liquidationPrice;
+
+    /**
+     * Плечо позиции.
+     */
+    private Integer leverage;
+
+    /**
+     * Биржевой режим маржи (cross/isolated).
+     */
     private String marginMode;
-    /** Время последнего обновления позиции. */
-    private String updateTime;
+
+    /**
+     * Нереализованный PnL по позиции.
+     */
+    private BigDecimal unrealizedProfit;
+
+    public enum Status {
+        ACTIVE,
+        CLOSED,
+        ERROR
+    }
 }
