@@ -10,30 +10,26 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface PositionMapper {
 
-    @Mapping(source = "instId", target = "externalInstrumentId")
-    @Mapping(source = "instType", target = "instrumentType")
-    @Mapping(source = "posSide", target = "positionSide")
-    @Mapping(source = "pos", target = "positionSize")
+    @Mapping(source = "posId", target = "externalId")
+    @Mapping(source = "posSide", target = "side")
+    @Mapping(source = "pos", target = "size")
     @Mapping(source = "avgPx", target = "averagePrice")
     @Mapping(source = "markPx", target = "markPrice")
     @Mapping(source = "liqPx", target = "liquidationPrice")
     @Mapping(source = "upl", target = "unrealizedProfit")
     @Mapping(source = "lever", target = "leverage")
     @Mapping(source = "mgnMode", target = "marginMode")
-    @Mapping(source = "uTime", target = "updateTime")
     Position clientToDomain(PositionResponse source);
 
-    @Mapping(source = "externalInstrumentId", target = "instId")
-    @Mapping(source = "instrumentType", target = "instType")
-    @Mapping(source = "positionSide", target = "posSide")
-    @Mapping(source = "positionSize", target = "pos")
+    @Mapping(source = "externalId", target = "posId")
+    @Mapping(source = "side", target = "posSide")
+    @Mapping(source = "size", target = "pos")
     @Mapping(source = "averagePrice", target = "avgPx")
     @Mapping(source = "markPrice", target = "markPx")
     @Mapping(source = "liquidationPrice", target = "liqPx")
     @Mapping(source = "unrealizedProfit", target = "upl")
     @Mapping(source = "leverage", target = "lever")
     @Mapping(source = "marginMode", target = "mgnMode")
-    @Mapping(source = "updateTime", target = "uTime")
     PositionResponse domainToClient(Position source);
 
     List<Position> clientToDomain(List<PositionResponse> source);

@@ -10,16 +10,12 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface CandleMapper {
 
-    @Mapping(source = "ts", target = "timestamp")
-    @Mapping(source = "confirm", target = "confirmed")
+    @Mapping(source = "ts", target = "openTimestamp")
     Candle clientToDomain(CandleResponse source);
 
-    @Mapping(source = "timestamp", target = "ts")
-    @Mapping(source = "confirmed", target = "confirm")
+    @Mapping(source = "openTimestamp", target = "ts")
     CandleResponse domainToClient(Candle source);
 
 
     List<Candle> clientToDomain(List<CandleResponse> source);
-
-
 }

@@ -1,30 +1,55 @@
 package com.example.tradingbot.domain.model;
 
+import com.example.tradingbot.rest.model.response.Auditable;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class Instrument {
+public class Instrument extends Auditable {
 
-    /** Идентификатор инструмента на бирже (instId). */
+    /**
+     * Внутренний идентификатор инструмента.
+     */
+    private Long id;
+
+    /**
+     * Межсервисный идентификатор инструмента.
+     */
+    private String internalId;
+
+    /**
+     * Внутренний идентификатор биржи.
+     */
+    private Long exchangeId;
+
+    /**
+     * Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP.
+     */
     private String externalId;
-    /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
+
+    /**
+     * Тип инструмента на бирже: SPOT/MARGIN/SWAP/FUTURES/OPTION.
+     */
     private String type;
-    /** Базовая валюта инструмента. */
-    private String baseCurrency;
-    /** Валюта котировки инструмента. */
-    private String quoteCurrency;
-    /** Валюта расчётов по инструменту. */
-    private String settleCurrency;
-    /** Шаг изменения размера позиции/ордера. */
-    private String stepSize;
-    /** Минимально допустимый размер заявки. */
-    private String minimumSize;
-    /** Номинальная стоимость одного контракта. */
-    private String contractValue;
-    /** Мультипликатор контракта. */
-    private String contractMultiplier;
-    /** Минимальный шаг изменения цены. */
-    private String minPriceStep;
+
+    /**
+     * Статус: CREATED/HOLD/SYNC/CANDLES_LOADING/ACTIVE.
+     */
+    private String status;
+
+    /**
+     * Режим маржи (cross/isolated).
+     */
+    private MarginMode marginMode;
+
+    /**
+     * Плечо.
+     */
+    private Integer leverage;
+
+    public enum MarginMode {
+        ISOLATED,
+        CROSS
+    }
 }
