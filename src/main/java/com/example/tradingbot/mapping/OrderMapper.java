@@ -1,8 +1,12 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
+import com.example.tradingbot.client.model.okx.request.OrderDetailsRequest;
+import com.example.tradingbot.client.model.okx.request.OrdersHistoryRequest;
+import com.example.tradingbot.client.model.okx.request.OrdersPendingRequest;
 import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.rest.model.response.OrderResponse;
 import org.mapstruct.Mapper;
@@ -46,6 +50,21 @@ public interface OrderMapper {
     @Mapping(source = "externalId", target = "orderId")
     @Mapping(source = "internalId", target = "clientOrderId")
     CancelOrderRequest domainToClientOkxCancelRequest(Order source);
+
+    @Mapping(source = "externalId", target = "orderId")
+    @Mapping(source = "internalId", target = "clientOrderId")
+    @Mapping(source = "size", target = "newSize")
+    @Mapping(source = "price", target = "newPrice")
+    AmendOrderRequest domainToClientOkxAmendRequest(Order source);
+
+    @Mapping(source = "externalId", target = "orderId")
+    @Mapping(source = "internalId", target = "clientOrderId")
+    OrderDetailsRequest domainToClientOkxOrderDetailsRequest(Order source);
+
+    @Mapping(source = "externalStatus", target = "state")
+    OrdersHistoryRequest domainToClientOkxOrdersHistoryRequest(Order source);
+
+    OrdersPendingRequest domainToClientOkxOrdersPendingRequest(Order source);
 
     OrderResponse domainToRest(OrderEntity source);
 
