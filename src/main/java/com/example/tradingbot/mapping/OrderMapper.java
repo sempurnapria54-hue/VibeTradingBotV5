@@ -1,8 +1,9 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
 import com.example.tradingbot.persistence.model.OrderEntity;
-import com.example.tradingbot.rest.model.request.CreateOrderRequest;
 import com.example.tradingbot.rest.model.response.OrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -22,7 +23,7 @@ public interface OrderMapper {
     @Mapping(source = "avgPx", target = "averagePrice")
     @Mapping(source = "accFillSz", target = "accumulatedFillSize")
     @Mapping(source = "fee", target = "fee")
-    Order clientToDomain(com.example.tradingbot.client.model.okx.response.OrderResponse source);
+    Order clientOkxResponseToDomain(com.example.tradingbot.client.model.okx.response.OrderResponse source);
 
     @Mapping(source = "externalId", target = "ordId")
     @Mapping(source = "internalId", target = "clOrdId")
@@ -35,11 +36,22 @@ public interface OrderMapper {
     @Mapping(source = "fee", target = "fee")
     com.example.tradingbot.client.model.okx.response.OrderResponse domainToClient(Order source);
 
+    @Mapping(source = "internalId", target = "clientOrderId")
+    @Mapping(source = "side", target = "side")
+    @Mapping(source = "type", target = "orderType")
+    @Mapping(source = "size", target = "size")
+    @Mapping(source = "price", target = "price")
+    CreateOrderRequest domainToClientOkxRequest(Order source);
+
+    @Mapping(source = "externalId", target = "orderId")
+    @Mapping(source = "internalId", target = "clientOrderId")
+    CancelOrderRequest domainToClientOkxCancelRequest(Order source);
+
     OrderResponse domainToRest(OrderEntity source);
 
-    List<Order> clientToDomain(List<com.example.tradingbot.client.model.okx.response.OrderResponse> source);
+    List<Order> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.OrderResponse> source);
 
-    Order restRequestToDomain(CreateOrderRequest source);
+    Order restRequestToDomain(com.example.tradingbot.rest.model.request.CreateOrderRequest source);
 
     @Mapping(target = "id", ignore = true)
     void domainToEntityOnCreate(Order source, @MappingTarget OrderEntity target);

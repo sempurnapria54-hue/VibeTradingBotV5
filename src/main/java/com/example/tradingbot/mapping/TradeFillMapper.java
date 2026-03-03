@@ -19,7 +19,7 @@ public interface TradeFillMapper {
     @Mapping(source = "fillPx", target = "fillPrice")
     @Mapping(source = "fillPnl", target = "fillPnl")
     @Mapping(source = "ts", target = "timestamp")
-    TradeFill clientToDomain(TradeFillResponse source);
+    TradeFill clientOkxResponseToDomain(TradeFillResponse source);
 
     @Mapping(source = "externalBillId", target = "billId")
     @Mapping(source = "externalTradeId", target = "tradeId")
@@ -32,7 +32,5 @@ public interface TradeFillMapper {
     @Mapping(source = "timestamp", target = "ts")
     TradeFillResponse domainToClient(TradeFill source);
 
-    List<TradeFill> clientToDomain(List<TradeFillResponse> source);
-
-
+    List<TradeFill> clientOkxResponseToDomain(List<TradeFillResponse> source);
 }

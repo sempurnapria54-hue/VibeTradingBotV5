@@ -1,5 +1,7 @@
 package com.example.tradingbot.mapping;
 
+import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
 import com.example.tradingbot.domain.model.AlgoOrder;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
@@ -21,7 +23,7 @@ public interface AlgoOrderMapper {
     @Mapping(source = "slTriggerPx", target = "stopLossTriggerPrice")
     @Mapping(source = "callbackRatio", target = "trailingFallenPercents")
     @Mapping(source = "callbackSpread", target = "trailingFallenAbsoluteValue")
-    AlgoOrder clientToDomain(com.example.tradingbot.client.model.okx.response.AlgoOrderResponse source);
+    AlgoOrder clientOkxResponseToDomain(com.example.tradingbot.client.model.okx.response.AlgoOrderResponse source);
 
     @Mapping(source = "externalId", target = "algoId")
     @Mapping(source = "internalId", target = "clOrdId")
@@ -34,10 +36,21 @@ public interface AlgoOrderMapper {
     @Mapping(source = "trailingFallenAbsoluteValue", target = "callbackSpread")
     com.example.tradingbot.client.model.okx.response.AlgoOrderResponse domainToClient(AlgoOrder source);
 
+    @Mapping(source = "internalId", target = "clientOrderId")
+    @Mapping(source = "externalType", target = "orderType")
+    @Mapping(source = "size", target = "size")
+    @Mapping(source = "takeProfitTriggerPrice", target = "triggerPrice")
+    @Mapping(source = "stopLossTriggerPrice", target = "orderPrice")
+    CreateAlgoOrderRequest domainToClientOkxRequest(AlgoOrder source);
+
+    @Mapping(source = "externalId", target = "algoOrderId")
+    @Mapping(source = "internalId", target = "clientOrderId")
+    CancelAlgoOrderRequest domainToClientOkxCancelRequest(AlgoOrder source);
+
     AlgoOrderResponse domainToRest(AlgoOrderEntity source);
 
     @Mapping(source = "pos", target = "size")
     AlgoOrder closePositionToDomain(PositionResponse source);
 
-    List<AlgoOrder> clientToDomain(List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
+    List<AlgoOrder> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
 }

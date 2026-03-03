@@ -36,146 +36,146 @@ public class OkxClientService implements ClientService {
     public List<Balance> getBalance(Object... args) {
         BalanceRequest request = (BalanceRequest) args[0];
         OkxApiResponse<BalanceResponse> response = okxRestClient.getBalance(request);
-        return balanceMapper.clientToDomain(response.getData());
+        return balanceMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Position> getPositions(Object... args) {
         PositionsRequest request = (PositionsRequest) args[0];
         OkxApiResponse<PositionResponse> response = okxRestClient.getPositions(request);
-        return positionMapper.clientToDomain(response.getData());
+        return positionMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Order> getOrdersPending(Object... args) {
         OrdersPendingRequest request = (OrdersPendingRequest) args[0];
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(request);
-        return orderMapper.clientToDomain(response.getData());
+        return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Order> getOrderDetails(Object... args) {
         OrderDetailsRequest request = (OrderDetailsRequest) args[0];
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrderDetails(request);
-        return orderMapper.clientToDomain(response.getData());
+        return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<AlgoOrder> getOrdersAlgoPending(Object... args) {
         OrdersAlgoPendingRequest request = (OrdersAlgoPendingRequest) args[0];
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.getOrdersAlgoPending(request);
-        return algoOrderMapper.clientToDomain(response.getData());
+        return algoOrderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Order> getOrdersHistory(Object... args) {
         OrdersHistoryRequest request = (OrdersHistoryRequest) args[0];
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistory(request);
-        return orderMapper.clientToDomain(response.getData());
+        return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Order> getOrdersHistoryArchive(Object... args) {
         OrdersHistoryRequest request = (OrdersHistoryRequest) args[0];
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistoryArchive(request);
-        return orderMapper.clientToDomain(response.getData());
+        return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<TradeFill> getFills(Object... args) {
         FillsRequest request = (FillsRequest) args[0];
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFills(request);
-        return tradeFillMapper.clientToDomain(response.getData());
+        return tradeFillMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<TradeFill> getFillsHistory(Object... args) {
         FillsRequest request = (FillsRequest) args[0];
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFillsHistory(request);
-        return tradeFillMapper.clientToDomain(response.getData());
+        return tradeFillMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<TradeFillsArchive> requestFillsArchive(Object... args) {
         FillsArchiveRequest request = (FillsArchiveRequest) args[0];
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.requestFillsArchive(request);
-        return tradeFillsArchiveMapper.clientToDomain(response.getData());
+        return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<TradeFillsArchive> getFillsArchiveLink(Object... args) {
         FillsArchiveLinkRequest request = (FillsArchiveLinkRequest) args[0];
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.getFillsArchiveLink(request);
-        return tradeFillsArchiveMapper.clientToDomain(response.getData());
+        return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Candle> getCandles(Object... args) {
         CandlesRequest request = (CandlesRequest) args[0];
         OkxApiResponse<CandleResponse> response = okxRestClient.getCandles(request);
-        return candleMapper.clientToDomain(response.getData());
+        return candleMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Candle> getHistoryCandles(Object... args) {
         CandlesRequest request = (CandlesRequest) args[0];
         OkxApiResponse<CandleResponse> response = okxRestClient.getHistoryCandles(request);
-        return candleMapper.clientToDomain(response.getData());
+        return candleMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Order> createOrder(Object... args) {
         CreateOrderRequest request = (CreateOrderRequest) args[0];
         OkxApiResponse<OrderResponse> response = okxRestClient.createOrder(request);
-        return orderMapper.clientToDomain(response.getData());
+        return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Order> amendOrder(Object... args) {
         AmendOrderRequest request = (AmendOrderRequest) args[0];
         OkxApiResponse<OrderResponse> response = okxRestClient.amendOrder(request);
-        return orderMapper.clientToDomain(response.getData());
+        return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Order> cancelOrder(Object... args) {
         CancelOrderRequest request = (CancelOrderRequest) args[0];
         OkxApiResponse<OrderResponse> response = okxRestClient.cancelOrder(request);
-        return orderMapper.clientToDomain(response.getData());
+        return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<AlgoOrder> createAlgoOrder(Object... args) {
         CreateAlgoOrderRequest request = (CreateAlgoOrderRequest) args[0];
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.createAlgoOrder(request);
-        return algoOrderMapper.clientToDomain(response.getData());
+        return algoOrderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<AlgoOrder> cancelAlgoOrder(Object... args) {
         CancelAlgoOrderRequest request = (CancelAlgoOrderRequest) args[0];
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.cancelAlgoOrder(request);
-        return algoOrderMapper.clientToDomain(response.getData());
+        return algoOrderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Position> closePosition(Object... args) {
         ClosePositionRequest request = (ClosePositionRequest) args[0];
         OkxApiResponse<PositionResponse> response = okxRestClient.closePosition(request);
-        return positionMapper.clientToDomain(response.getData());
+        return positionMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Instrument> getInstruments(Object... args) {
         InstrumentsRequest request = (InstrumentsRequest) args[0];
         OkxApiResponse<InstrumentResponse> response = okxRestClient.getInstruments(request);
-        return instrumentMapper.clientToDomain(response.getData());
+        return instrumentMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<PriceTicker> getTicker(Object... args) {
         TickerRequest request = (TickerRequest) args[0];
         OkxApiResponse<PriceTickerResponse> response = okxRestClient.getTicker(request);
-        return priceTickerMapper.clientToDomain(response.getData());
+        return priceTickerMapper.clientOkxResponseToDomain(response.getData());
     }
 }
