@@ -1,13 +1,12 @@
-package com.example.tradingbot.domain.service.trading;
+package com.example.tradingbot.domain.service;
 
 import com.example.tradingbot.client.model.okx.response.OrderResponse;
 import com.example.tradingbot.client.service.ClientManager;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.persistence.model.ExchangeEntity;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.model.OrderEntity;
-import com.example.tradingbot.domain.service.ExchangeService;
-import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.rest.model.request.CreateOrderRequest;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static com.example.tradingbot.util.factory.OrderFactory.createOrderEntity;
 
 @Service
 @RequiredArgsConstructor
@@ -27,15 +28,16 @@ public class OrderService {
     private final ExchangeService exchangeService;
     private final InstrumentService instrumentService;
     private final ClientManager clientManager;
+    private final OrderMapper orderMapper;
 
     @Transactional
-    public OrderEntity createOrder(String exchangeInternalId, String instrumentInternalId, CreateOrderRequest request) {
+    public OrderEntity createOrder(String exchangeInternalId, String instrumentInternalId, Order orderRequest) {
         ExchangeEntity exchangeEntity = exchangeService.getRequiredByInternalId(exchangeInternalId);
         InstrumentEntity instrumentEntity = instrumentService.getRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), instrumentInternalId);
         tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
 
         OrderEntity orderEntity = new OrderEntity();
-        orderEntity.initOnCreate(instrumentEntity, request);
+        orderMapper.domainToEntityOnCreate(orderRequest, orderEntity);
         orderDataService.save(orderEntity);
 
         clientManager.getClientService("OKX").createOrder(exchangeEntity, orderEntity);

@@ -1,12 +1,9 @@
-package com.example.tradingbot.domain.service.trading;
+package com.example.tradingbot.domain.service;
 
 import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
 import com.example.tradingbot.persistence.model.ExchangeEntity;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
-import com.example.tradingbot.domain.service.ExchangeService;
-import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
@@ -17,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static com.example.tradingbot.util.factory.AlgoOrderFactory.createAlgoOrderEntity;
 
 @Service
 @RequiredArgsConstructor
@@ -36,8 +35,7 @@ public class AlgoOrderService {
         InstrumentEntity instrumentEntity = instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), instrumentInternalId);
         tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
 
-        AlgoOrderEntity algoOrderEntity = new AlgoOrderEntity();
-        algoOrderEntity.initOnCreate(instrumentEntity, request);
+        AlgoOrderEntity algoOrderEntity = createAlgoOrderEntity(instrumentEntity, request);
         algoOrderDataService.save(algoOrderEntity);
 
         AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.createAlgoOrder(algoOrderEntity, instrumentEntity));

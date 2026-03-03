@@ -49,8 +49,8 @@ public class OkxProxyService {
         request.setOrderType(algoOrderEntity.getType());
         request.setSize(algoOrderEntity.getSize());
         request.setTriggerPrice(algoOrderEntity.getTriggerPrice());
-        request.setOrderPrice(algoOrderEntity.getOrderPrice());
-        request.setClientOrderId(algoOrderEntity.getInternalOrderId());
+        request.setOrderPrice(algoOrderEntity.getTriggerExecutionPrice());
+        request.setClientOrderId(algoOrderEntity.getInternalId());
         return okxRestClient.createAlgoOrder(request).getData();
     }
 
@@ -58,7 +58,7 @@ public class OkxProxyService {
         CancelAlgoOrderRequest request = new CancelAlgoOrderRequest();
         request.setInstrumentId(instrumentEntity.getExternalId());
         request.setAlgoOrderId(algoOrderEntity.getExternalId());
-        request.setClientOrderId(algoOrderEntity.getInternalOrderId());
+        request.setClientOrderId(algoOrderEntity.getInternalId());
         return okxRestClient.cancelAlgoOrder(request).getData();
     }
 

@@ -20,7 +20,7 @@ import static com.example.tradingbot.util.Constant.Status.Exchange.EXCHANGE_STAT
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "exchange", uniqueConstraints = {
+@Table(name = "exchanges", uniqueConstraints = {
         @UniqueConstraint(name = "uk_exchange_internal_id", columnNames = "internal_id"),
         @UniqueConstraint(name = "uk_exchange_name", columnNames = "name")
 })
@@ -57,11 +57,4 @@ public class ExchangeEntity extends AuditableEntity {
      */
     @Column(name = "status", nullable = false)
     private String status;
-
-    public void initOnCreate(CreateExchangeRequest request) {
-        setInternalId(UUID.randomUUID().toString());
-        setName(request.getName());
-        setBaseUrl(request.getBaseUrl());
-        setStatus(EXCHANGE_STATUS_CREATED);
-    }
 }

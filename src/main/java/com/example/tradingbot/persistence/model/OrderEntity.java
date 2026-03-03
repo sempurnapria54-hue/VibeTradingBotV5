@@ -7,9 +7,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
+import static com.example.tradingbot.util.Constant.Service.PRICE_PRECISION;
+import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
 import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_CREATED;
 import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_IN_PROGRESS;
 import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMillisSafe;
@@ -18,10 +22,10 @@ import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMil
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "\"order\"", uniqueConstraints = {
+@Table(name = "orders", uniqueConstraints = {
         @UniqueConstraint(
-                name = "uk_order_exchange_instr_client_order",
-                columnNames = {"exchange_id", "instrument_id", "client_order_id"}
+                name = "uk_internal_id",
+                columnNames = {"internal_id"}
         )
 })
 public class OrderEntity extends AuditableEntity {
@@ -31,32 +35,34 @@ public class OrderEntity extends AuditableEntity {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
+    @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
     /**
-     * Идентификатор инструмента ордера.
+     * Идентификатор сделки.
      */
-    @Column(name = "instrument_id", nullable = false, updatable = false)
-    private Long instrumentId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "deal_id", nullable = false, updatable = false)
+    private DealEntity deal;
 
     /**
-     * Клиентский идентификатор ордера.
+     * Межсервисный идентификатор ордера.
      */
-    @Column(name = "client_order_id", nullable = false)
+    @Column(name = "internal_id", nullable = false, updatable = false)
     private String internalId;
 
     /**
      * Идентификатор ордера на бирже.
      */
-    @Column(name = "exchange_order_id")
+    @Column(name = "external_id")
     private String externalId;
 
     /**
      * Текущий внутренний статус ордера.
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private String status;
+    private Status status;
 
     /**
      * Тип ордера в бизнес-терминах.
@@ -73,73 +79,86 @@ public class OrderEntity extends AuditableEntity {
     /**
      * Состояние ордера на стороне биржи.
      */
-    @Column(name = "state")
+    @Column(name = "external_status")
     private String externalStatus;
 
     /**
      * Цена ордера.
      */
-    @Column(name = "px")
-    private String price;
+    @Column(name = "price", precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    private BigDecimal price;
 
     /**
      * Объём ордера.
      */
-    @Column(name = "sz")
-    private String size;
+    @Column(name = "size", nullable = false, precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    private BigDecimal size;
 
     /**
      * Накопленный исполненный объём.
      */
-    @Column(name = "fill_sz")
-    private String accumulatedFillSize;
+    @Column(name = "accumulated_fill_size", precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    private BigDecimal accumulatedFillSize;
 
     /**
      * Средняя цена исполнения.
      */
-    @Column(name = "avg_px")
-    private String averagePrice;
+    @Column(name = "average_price", precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    private BigDecimal averagePrice;
 
     /**
      * Комиссия по ордеру.
      */
-    @Column(name = "fee")
-    private String fee;
+    @Column(name = "fee", precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    private BigDecimal fee;
 
     /**
-     * Время создания ордера на бирже в UTC миллисекундах.
+     * Прикреплённый SL при создании.
      */
-    @Column(name = "c_time")
-    private OffsetDateTime exchangeCreatedAt;
-
-    /**
-     * Время последнего обновления ордера на бирже в UTC миллисекундах.
-     */
-    @Column(name = "u_time")
-    private OffsetDateTime exchangeModifiedAt;
-
-    public void initOnCreate(InstrumentEntity instrument, CreateOrderRequest request) {
-        setInstrumentId(instrument.getId());
-        setInternalId(UUID.randomUUID().toString());
-        setStatus(ORDER_STATUS_CREATED);
-        setSide(request.getSide());
-        setType(request.getType());
-        setSize(request.getSize());
-        setPrice(request.getPrice());
-    }
+    @OneToMany(mappedBy = "order", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private List<AttachedStopLossEntity>attachedStopLossEntities;
 
     public void applyOrderResponse(OrderResponse responseOrder) {
         setExternalId(responseOrder.getOrdId());
         setExternalStatus(responseOrder.getState());
-        setStatus(ORDER_STATUS_IN_PROGRESS);
+//        setStatus(ORDER_STATUS_IN_PROGRESS);
         setSide(responseOrder.getSide());
         setType(responseOrder.getOrdType());
-        setPrice(responseOrder.getPx());
-        setSize(responseOrder.getSz());
-        setAccumulatedFillSize(responseOrder.getAccFillSz());
-        setAveragePrice(responseOrder.getAvgPx());
-        setFee(responseOrder.getFee());
-        setExchangeCreatedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getcTime()));
-        setExchangeModifiedAt(parseOffsetDateTimeFromMillisSafe(responseOrder.getuTime()));
+//        setPrice(responseOrder.getPx());
+//        setSize(responseOrder.getSz());
+//        setAccumulatedFillSize(responseOrder.getAccFillSz());
+//        setAveragePrice(responseOrder.getAvgPx());
+//        setFee(responseOrder.getFee());
+    }
+
+    public enum Status {
+        /**
+         * Запись создана локально, ещё не отправляли
+         */
+        CREATED,
+        /**
+         * Отправили, но ещё не активен
+         */
+        PENDING,
+        /**
+         * Реально активен на бирже (после fill)
+         */
+        ACTIVE,
+        /**
+         * Полностью выполнен на бирже
+         */
+        COMPLETED,
+        /**
+         * Частично выполнен на бирже
+         */
+        PARTIALLY_COMPLETED,
+        /**
+         * Отменён
+         */
+        CLOSED,
+        /**
+         * Не удалось создать/обновить
+         */
+        FAILED
     }
 }

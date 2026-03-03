@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
+import static com.example.tradingbot.util.factory.InstrumentFactory.createInstrumentEntity;
 
 @Service
 @RequiredArgsConstructor
@@ -21,8 +22,7 @@ public class InstrumentService {
     public InstrumentEntity createInstrument(String exchangeInternalId, CreateInstrumentRequest request) {
         var exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
         checkExistence(exchangeId, request.getExternalId());
-        var instrumentEntity = new InstrumentEntity();
-        instrumentEntity.initOnCreate(exchangeId, request);
+        var instrumentEntity = createInstrumentEntity(exchangeId, request);
         return instrumentDataService.save(instrumentEntity);
     }
 

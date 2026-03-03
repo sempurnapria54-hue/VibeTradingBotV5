@@ -1,10 +1,9 @@
-package com.example.tradingbot.domain.service.trading;
+package com.example.tradingbot.domain.service;
 
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
 import com.example.tradingbot.persistence.model.ExchangeEntity;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.model.PositionEntity;
-import com.example.tradingbot.domain.service.OkxProxyService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
@@ -46,7 +45,6 @@ public class PositionService {
         PositionResponse position = extractFirstPosition(okxProxyService.closePosition(request));
 
         PositionEntity positionEntity = new PositionEntity();
-        positionEntity.setExchangeId(exchangeEntity.getId());
         positionEntity.setInstrumentId(instrumentEntity.getId());
         positionEntity.setStatus(POSITION_STATUS_UPDATED);
         positionEntity.setPositionSide(position.getPosSide());

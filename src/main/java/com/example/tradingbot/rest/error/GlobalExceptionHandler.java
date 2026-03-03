@@ -1,7 +1,7 @@
 package com.example.tradingbot.rest.error;
 
 import com.example.tradingbot.client.exception.ExternalApiException;
-import com.example.tradingbot.domain.service.trading.TradingCommandException;
+import com.example.tradingbot.domain.service.TradingCommandException;
 import java.util.Objects;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

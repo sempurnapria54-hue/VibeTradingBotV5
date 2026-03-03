@@ -13,7 +13,6 @@ import java.util.Set;
 @AllArgsConstructor
 public class CreateInstrumentRequest {
 
-    private String name;
     private String externalId;
     private String type;
     private Set<CreateCandleGroupRequest> candleGroups;

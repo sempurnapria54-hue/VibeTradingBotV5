@@ -21,15 +21,15 @@ public class CandleDataService {
             return 0;
         }
 
-        long minTs = candles.stream().mapToLong(CandleEntity::getTimestamp).min().orElseThrow();
-        long maxTs = candles.stream().mapToLong(CandleEntity::getTimestamp).max().orElseThrow();
+        long minTs = candles.stream().mapToLong(CandleEntity::getOpenTimestamp).min().orElseThrow();
+        long maxTs = candles.stream().mapToLong(CandleEntity::getOpenTimestamp).max().orElseThrow();
 
         Set<Long> existingTimestamps = new HashSet<>(
             candleRepository.findTimestampsByCandleGroupIdAndTimestampBetweenOrderByTimestampAsc(groupId, minTs, maxTs)
         );
 
         List<CandleEntity> toInsert = candles.stream()
-            .filter(candle -> !existingTimestamps.contains(candle.getTimestamp()))
+            .filter(candle -> !existingTimestamps.contains(candle.getOpenTimestamp()))
             .toList();
 
         if (!toInsert.isEmpty()) {

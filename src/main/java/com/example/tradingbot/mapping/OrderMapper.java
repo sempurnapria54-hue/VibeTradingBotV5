@@ -2,9 +2,11 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.rest.model.request.CreateOrderRequest;
 import com.example.tradingbot.rest.model.response.OrderResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -48,4 +50,9 @@ public interface OrderMapper {
     OrderResponse domainToRest(OrderEntity source);
 
     List<Order> clientToDomain(List<com.example.tradingbot.client.model.okx.response.OrderResponse> source);
+
+    Order restRequestToDomain(CreateOrderRequest source);
+
+    @Mapping(target = "id", ignore = true)
+    void domainToEntityOnCreate(Order source, @MappingTarget OrderEntity target);
 }

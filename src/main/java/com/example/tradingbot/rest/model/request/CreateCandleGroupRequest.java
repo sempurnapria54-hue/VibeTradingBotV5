@@ -12,5 +12,4 @@ import lombok.Setter;
 public class CreateCandleGroupRequest {
 
     private String timeframe;
-    private Long coverageStartTs;
 }

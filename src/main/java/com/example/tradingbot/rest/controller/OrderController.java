@@ -1,7 +1,8 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.service.trading.AlgoOrderService;
-import com.example.tradingbot.domain.service.trading.OrderService;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.service.AlgoOrderService;
+import com.example.tradingbot.domain.service.OrderService;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
@@ -30,7 +31,8 @@ public class OrderController {
     public OrderResponse createOrder(@PathVariable(name = "exchangeId") String exchangeInternalId,
                                      @PathVariable(name = "instrumentId") String instrumentInternalId,
                                      @RequestBody CreateOrderRequest request) {
-        var order = orderService.createOrder(exchangeInternalId, instrumentInternalId, request);
+        Order domainRequest = orderMapper.restRequestToDomain(request);
+        var order = orderService.createOrder(exchangeInternalId, instrumentInternalId, domainRequest);
         return orderMapper.domainToRest(order);
     }
 

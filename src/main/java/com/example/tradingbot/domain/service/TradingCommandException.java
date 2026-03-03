@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.service.trading;
+package com.example.tradingbot.domain.service;
 
 import lombok.Getter;
 import org.springframework.http.HttpStatus;

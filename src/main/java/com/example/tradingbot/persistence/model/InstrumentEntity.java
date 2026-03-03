@@ -1,37 +1,19 @@
 package com.example.tradingbot.persistence.model;
 
-import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
-
-import static com.example.tradingbot.util.Constant.Service.DEFAULT_POSITION_MODE;
-import static com.example.tradingbot.util.Constant.Status.Instrument.INSTRUMENT_STATUS_CREATED;
-import static com.example.tradingbot.util.factory.CandleGroupFactory.createCandleGroup;
-import static java.util.stream.Collectors.toList;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "instrument", uniqueConstraints = {
+@Table(name = "instruments", uniqueConstraints = {
         @UniqueConstraint(name = "uk_instrument_internal_id", columnNames = "internal_id"),
-        @UniqueConstraint(name = "uk_instrument_exchange_name", columnNames = {"exchange_id", "name"}),
-        @UniqueConstraint(name = "uk_instrument_exchange_inst_id", columnNames = {"exchange_id", "inst_id"})
+        @UniqueConstraint(name = "uk_instrument_exchange_id_external_id", columnNames = {"exchange_id", "external_id"})
 })
 public class InstrumentEntity extends AuditableEntity {
 
@@ -58,14 +40,8 @@ public class InstrumentEntity extends AuditableEntity {
     /**
      * Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP.
      */
-    @Column(name = "external_name", nullable = false)
+    @Column(name = "external_id", nullable = false)
     private String externalId;
-
-    /**
-     * Внутреннее имя инструмента.
-     */
-    @Column(name = "name", nullable = false)
-    private String name;
 
     /**
      * Тип инструмента на бирже: SPOT/MARGIN/SWAP/FUTURES/OPTION.
@@ -74,40 +50,23 @@ public class InstrumentEntity extends AuditableEntity {
     private String type;
 
     /**
-     * Признак наличия позиций: OPEN/NONE.
-     */
-    @Column(name = "position_mode", nullable = false)
-    private String positionMode;
-
-    /**
      * Статус: CREATED/HOLD/SYNC/CANDLES_LOADING/ACTIVE.
      */
     @Column(name = "status", nullable = false)
     private String status;
 
     /**
-     * Последняя торговая цена по инструменту.
+     * Режим маржи (cross/isolated).
      */
-    @Column(name = "last_price")
-    private String lastPrice;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "margin_mode", nullable = false, updatable = false)
+    private MarginMode marginMode;
 
     /**
-     * Текущая mark price инструмента.
+     * Плечо.
      */
-    @Column(name = "mark_price")
-    private String markPrice;
-
-    /**
-     * Текущая индексная цена инструмента.
-     */
-    @Column(name = "index_price")
-    private String indexPrice;
-
-    /**
-     * Время последнего обновления ценовых полей.
-     */
-    @Column(name = "price_updated_at")
-    private Instant priceUpdatedAt;
+    @Column(name = "leverage", nullable = false)
+    private Integer leverage;
 
     /**
      * Набор групп свечей для разных таймфреймов инструмента.
@@ -115,18 +74,9 @@ public class InstrumentEntity extends AuditableEntity {
     @OneToMany(mappedBy = "instrument", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CandleGroupEntity> candleGroups;
 
-    public void initOnCreate(Long exchangeId, CreateInstrumentRequest request) {
-        setInternalId(UUID.randomUUID().toString());
-        setType(request.getType());
-        setExternalId(request.getExternalId());
-        setName(request.getName());
-        setExchangeId(exchangeId);
-        setPositionMode(DEFAULT_POSITION_MODE);
-        setStatus(INSTRUMENT_STATUS_CREATED);
-        List<CandleGroupEntity> groupEntities = request.getCandleGroups().stream()
-                .map(candleGroupRequest -> createCandleGroup(this, candleGroupRequest))
-                .collect(toList());
-
-        setCandleGroups(groupEntities);
+    public enum MarginMode {
+        ISOLATED,
+        CROSS
     }
+
 }

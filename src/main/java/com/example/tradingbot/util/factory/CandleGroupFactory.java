@@ -5,12 +5,16 @@ import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
 import lombok.experimental.UtilityClass;
 
+import static com.example.tradingbot.util.Constant.Status.CandleGroup.CANDLE_GROUP_STATUS_CREATED;
+
 @UtilityClass
 public class CandleGroupFactory {
 
-    public static CandleGroupEntity createCandleGroup(InstrumentEntity instrument, CreateCandleGroupRequest request) {
+    public static CandleGroupEntity createCandleGroupEntity(InstrumentEntity instrument, CreateCandleGroupRequest request) {
         var candleGroupEntity = new CandleGroupEntity();
-        candleGroupEntity.initOnCreate(instrument, request);
+        candleGroupEntity.setTimeframe(request.getTimeframe());
+        candleGroupEntity.setStatus(CANDLE_GROUP_STATUS_CREATED);
+        candleGroupEntity.setInstrument(instrument);
         return candleGroupEntity;
     }
 }

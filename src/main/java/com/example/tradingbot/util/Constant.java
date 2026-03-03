@@ -78,6 +78,8 @@ public class Constant {
     public class Service {
         public static final String DEFAULT_TRADE_MODE = "isolated";
         public static final String DEFAULT_POSITION_MODE = "NONE";
+        public static final int PRICE_PRECISION = 50;
+        public static final int PRICE_SCALE = 30;
     }
 
 }

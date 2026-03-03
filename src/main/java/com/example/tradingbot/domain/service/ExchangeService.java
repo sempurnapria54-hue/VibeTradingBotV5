@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+import static com.example.tradingbot.util.factory.ExchangeFactory.createExchangeEntity;
+
 @Service
 @RequiredArgsConstructor
 public class ExchangeService {
@@ -20,8 +22,7 @@ public class ExchangeService {
 
     public ExchangeEntity createExchange(CreateExchangeRequest request) {
         checkExistence(request.getName());
-        var exchangeEntity = new ExchangeEntity();
-        exchangeEntity.initOnCreate(request);
+        var exchangeEntity = createExchangeEntity(request);
         return exchangeDataService.save(exchangeEntity);
     }
 

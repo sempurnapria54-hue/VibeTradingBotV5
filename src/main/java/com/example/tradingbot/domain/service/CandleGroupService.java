@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static com.example.tradingbot.util.factory.CandleGroupFactory.createCandleGroupEntity;
+
 @Service
 @RequiredArgsConstructor
 public class CandleGroupService {
@@ -31,8 +33,7 @@ public class CandleGroupService {
 
         checkExistence(instrument.getId(), request.getTimeframe());
 
-        var candleGroupEntity = new CandleGroupEntity();
-        candleGroupEntity.initOnCreate(instrument, request);
+        var candleGroupEntity = createCandleGroupEntity(instrument, request);
         return candleGroupDataService.save(candleGroupEntity);
     }
 
