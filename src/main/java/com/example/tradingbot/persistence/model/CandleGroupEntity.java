@@ -14,8 +14,6 @@ import lombok.Setter;
 })
 public class CandleGroupEntity extends AuditableEntity {
 
-    public static final int ERROR_MESSAGE_LENGTH = 1024;
-
     /**
      * Внутренний идентификатор группы свечей.
      */
