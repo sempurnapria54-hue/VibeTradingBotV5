@@ -13,13 +13,13 @@ public interface InstrumentMapper {
 
     @Mapping(source = "instId", target = "externalId")
     @Mapping(source = "instType", target = "type")
-    Instrument clientToDomain(com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
+    Instrument clientOkxResponseToDomain(com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
 
     @Mapping(source = "externalId", target = "instId")
     @Mapping(source = "type", target = "instType")
     com.example.tradingbot.client.model.okx.response.InstrumentResponse domainToClient(Instrument source);
 
-    List<Instrument> clientToDomain(List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
+    List<Instrument> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
 
     @Mapping(source = "internalId", target = "internalId")
     @Mapping(source = "exchangeId", target = "exchangeInternalId")

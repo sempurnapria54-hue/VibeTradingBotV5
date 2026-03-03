@@ -11,11 +11,10 @@ import java.util.List;
 public interface CandleMapper {
 
     @Mapping(source = "ts", target = "openTimestamp")
-    Candle clientToDomain(CandleResponse source);
+    Candle clientOkxResponseToDomain(CandleResponse source);
 
     @Mapping(source = "openTimestamp", target = "ts")
     CandleResponse domainToClient(Candle source);
 
-
-    List<Candle> clientToDomain(List<CandleResponse> source);
+    List<Candle> clientOkxResponseToDomain(List<CandleResponse> source);
 }

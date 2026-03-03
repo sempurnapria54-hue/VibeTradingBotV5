@@ -1,5 +1,6 @@
 package com.example.tradingbot.mapping;
 
+import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
 import com.example.tradingbot.domain.model.Position;
 import org.mapstruct.Mapper;
@@ -19,7 +20,7 @@ public interface PositionMapper {
     @Mapping(source = "upl", target = "unrealizedProfit")
     @Mapping(source = "lever", target = "leverage")
     @Mapping(source = "mgnMode", target = "marginMode")
-    Position clientToDomain(PositionResponse source);
+    Position clientOkxResponseToDomain(PositionResponse source);
 
     @Mapping(source = "externalId", target = "posId")
     @Mapping(source = "side", target = "posSide")
@@ -32,5 +33,9 @@ public interface PositionMapper {
     @Mapping(source = "marginMode", target = "mgnMode")
     PositionResponse domainToClient(Position source);
 
-    List<Position> clientToDomain(List<PositionResponse> source);
+    @Mapping(source = "marginMode", target = "marginMode")
+    @Mapping(source = "side", target = "positionSide")
+    ClosePositionRequest domainToClientOkxRequest(Position source);
+
+    List<Position> clientOkxResponseToDomain(List<PositionResponse> source);
 }

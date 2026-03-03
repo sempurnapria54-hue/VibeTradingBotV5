@@ -17,7 +17,7 @@ public interface PriceTickerMapper {
     @Mapping(source = "askPx", target = "askPrice")
     @Mapping(source = "bidPx", target = "bidPrice")
     @Mapping(source = "ts", target = "timestamp")
-    PriceTicker clientToDomain(PriceTickerResponse source);
+    PriceTicker clientOkxResponseToDomain(PriceTickerResponse source);
 
     @Mapping(source = "externalInstrumentId", target = "instId")
     @Mapping(source = "lastPrice", target = "last")
@@ -28,8 +28,5 @@ public interface PriceTickerMapper {
     @Mapping(source = "timestamp", target = "ts")
     PriceTickerResponse domainToClient(PriceTicker source);
 
-
-    List<PriceTicker> clientToDomain(List<PriceTickerResponse> source);
-
-
+    List<PriceTicker> clientOkxResponseToDomain(List<PriceTickerResponse> source);
 }

@@ -16,7 +16,7 @@ public interface BalanceMapper {
     @Mapping(source = "eq", target = "equity")
     @Mapping(source = "frozenBal", target = "frozenBalance")
     @Mapping(source = "upl", target = "unrealizedProfit")
-    Balance clientToDomain(BalanceResponse source);
+    Balance clientOkxResponseToDomain(BalanceResponse source);
 
     @Mapping(source = "currency", target = "ccy")
     @Mapping(source = "cashBalance", target = "cashBal")
@@ -26,5 +26,5 @@ public interface BalanceMapper {
     @Mapping(source = "unrealizedProfit", target = "upl")
     BalanceResponse domainToClient(Balance source);
 
-    List<Balance> clientToDomain(List<com.example.tradingbot.client.model.okx.response.BalanceResponse> source);
+    List<Balance> clientOkxResponseToDomain(List<BalanceResponse> source);
 }
