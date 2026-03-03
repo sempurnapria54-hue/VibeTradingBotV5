@@ -1,6 +1,7 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.response.PriceTickerResponse;
+import com.example.tradingbot.client.model.okx.response.TickerRequest;
 import com.example.tradingbot.domain.model.PriceTicker;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -27,6 +28,9 @@ public interface PriceTickerMapper {
     @Mapping(source = "bidPrice", target = "bidPx")
     @Mapping(source = "timestamp", target = "ts")
     PriceTickerResponse domainToClient(PriceTicker source);
+
+    @Mapping(source = "externalInstrumentId", target = "instrumentId")
+    TickerRequest domainToClientOkxRequest(PriceTicker source);
 
     List<PriceTicker> clientOkxResponseToDomain(List<PriceTickerResponse> source);
 }

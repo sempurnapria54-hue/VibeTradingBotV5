@@ -2,6 +2,7 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.request.OrdersAlgoPendingRequest;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
 import com.example.tradingbot.domain.model.AlgoOrder;
 import com.example.tradingbot.persistence.model.AlgoOrderEntity;
@@ -46,6 +47,9 @@ public interface AlgoOrderMapper {
     @Mapping(source = "externalId", target = "algoOrderId")
     @Mapping(source = "internalId", target = "clientOrderId")
     CancelAlgoOrderRequest domainToClientOkxCancelRequest(AlgoOrder source);
+
+    @Mapping(source = "externalType", target = "orderType")
+    OrdersAlgoPendingRequest domainToClientOkxOrdersAlgoPendingRequest(AlgoOrder source);
 
     AlgoOrderResponse domainToRest(AlgoOrderEntity source);
 

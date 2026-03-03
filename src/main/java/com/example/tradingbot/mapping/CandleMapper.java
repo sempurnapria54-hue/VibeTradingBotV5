@@ -1,5 +1,6 @@
 package com.example.tradingbot.mapping;
 
+import com.example.tradingbot.client.model.okx.request.CandlesRequest;
 import com.example.tradingbot.client.model.okx.response.CandleResponse;
 import com.example.tradingbot.domain.model.Candle;
 import org.mapstruct.Mapper;
@@ -15,6 +16,8 @@ public interface CandleMapper {
 
     @Mapping(source = "openTimestamp", target = "ts")
     CandleResponse domainToClient(Candle source);
+
+    CandlesRequest domainToClientOkxRequest(Candle source);
 
     List<Candle> clientOkxResponseToDomain(List<CandleResponse> source);
 }

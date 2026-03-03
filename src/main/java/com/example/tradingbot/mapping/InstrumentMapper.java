@@ -1,5 +1,6 @@
 package com.example.tradingbot.mapping;
 
+import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
 import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
@@ -18,6 +19,10 @@ public interface InstrumentMapper {
     @Mapping(source = "externalId", target = "instId")
     @Mapping(source = "type", target = "instType")
     com.example.tradingbot.client.model.okx.response.InstrumentResponse domainToClient(Instrument source);
+
+    @Mapping(source = "type", target = "instrumentType")
+    @Mapping(source = "externalId", target = "instrumentId")
+    InstrumentsRequest domainToClientOkxRequest(Instrument source);
 
     List<Instrument> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
 
