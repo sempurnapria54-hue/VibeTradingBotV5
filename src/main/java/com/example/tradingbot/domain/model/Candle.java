@@ -1,6 +1,5 @@
 package com.example.tradingbot.domain.model;
 
-import com.example.tradingbot.rest.model.response.Auditable;
 import lombok.Getter;
 import lombok.Setter;
 

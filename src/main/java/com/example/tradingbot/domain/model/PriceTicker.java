@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class PriceTicker {
+public class PriceTicker extends Auditable {
 
     /** Идентификатор инструмента (instId). */
     private String externalInstrumentId;

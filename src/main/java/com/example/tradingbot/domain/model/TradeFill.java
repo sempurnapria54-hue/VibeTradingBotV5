@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class TradeFill {
+public class TradeFill extends Auditable {
 
     /** Идентификатор записи в биллинге биржи. */
     private String externalBillId;

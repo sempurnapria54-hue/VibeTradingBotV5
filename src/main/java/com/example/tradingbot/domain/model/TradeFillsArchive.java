@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class TradeFillsArchive {
+public class TradeFillsArchive extends Auditable {
 
     /** Ссылка на файл архива исполнений. */
     private String fileHref;
