@@ -43,7 +43,13 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Position> getPositions(Object... args) {
         Position position = (Position) args[0];
+        String instrumentExternalId = (String) args[1];
+        String instrumentType = (String) args[2];
+
         PositionsRequest request = positionMapper.domainToClientOkxPositionsRequest(position);
+        request.setInstrumentId(instrumentExternalId);
+        request.setInstrumentType(instrumentType);
+
         OkxApiResponse<PositionResponse> response = okxRestClient.getPositions(request);
         return positionMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -51,7 +57,13 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> getOrdersPending(Object... args) {
         Order order = (Order) args[0];
+        String instrumentExternalId = (String) args[1];
+        String instrumentType = (String) args[2];
+
         OrdersPendingRequest request = orderMapper.domainToClientOkxOrdersPendingRequest(order);
+        request.setInstrumentId(instrumentExternalId);
+        request.setInstrumentType(instrumentType);
+
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -59,7 +71,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> getOrderDetails(Object... args) {
         Order order = (Order) args[0];
+        String instrumentExternalId = (String) args[1];
+
         OrderDetailsRequest request = orderMapper.domainToClientOkxOrderDetailsRequest(order);
+        request.setInstrumentId(instrumentExternalId);
+
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrderDetails(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -75,7 +91,19 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> getOrdersHistory(Object... args) {
         Order order = (Order) args[0];
+        String instrumentExternalId = (String) args[1];
+        String instrumentType = (String) args[2];
+        String orderHistoryAfter = (String) args[3];
+        String orderHistoryBefore = (String) args[4];
+        String orderHistoryLimit = (String) args[5];
+
         OrdersHistoryRequest request = orderMapper.domainToClientOkxOrdersHistoryRequest(order);
+        request.setInstrumentId(instrumentExternalId);
+        request.setInstrumentType(instrumentType);
+        request.setAfter(orderHistoryAfter);
+        request.setBefore(orderHistoryBefore);
+        request.setLimit(orderHistoryLimit);
+
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistory(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -83,7 +111,19 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> getOrdersHistoryArchive(Object... args) {
         Order order = (Order) args[0];
+        String instrumentExternalId = (String) args[1];
+        String instrumentType = (String) args[2];
+        String orderHistoryAfter = (String) args[3];
+        String orderHistoryBefore = (String) args[4];
+        String orderHistoryLimit = (String) args[5];
+
         OrdersHistoryRequest request = orderMapper.domainToClientOkxOrdersHistoryRequest(order);
+        request.setInstrumentId(instrumentExternalId);
+        request.setInstrumentType(instrumentType);
+        request.setAfter(orderHistoryAfter);
+        request.setBefore(orderHistoryBefore);
+        request.setLimit(orderHistoryLimit);
+
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistoryArchive(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -139,7 +179,15 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> createOrder(Object... args) {
         Order order = (Order) args[0];
+        String instrumentExternalId = (String) args[1];
+        String tradeMode = (String) args[2];
+        String positionSide = (String) args[3];
+
         CreateOrderRequest request = orderMapper.domainToClientOkxRequest(order);
+        request.setInstrumentId(instrumentExternalId);
+        request.setTradeMode(tradeMode);
+        request.setPositionSide(positionSide);
+
         OkxApiResponse<OrderResponse> response = okxRestClient.createOrder(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -147,7 +195,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> amendOrder(Object... args) {
         Order order = (Order) args[0];
+        String instrumentExternalId = (String) args[1];
+
         AmendOrderRequest request = orderMapper.domainToClientOkxAmendRequest(order);
+        request.setInstrumentId(instrumentExternalId);
+
         OkxApiResponse<OrderResponse> response = okxRestClient.amendOrder(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -155,7 +207,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> cancelOrder(Object... args) {
         Order order = (Order) args[0];
+        String instrumentExternalId = (String) args[1];
+
         CancelOrderRequest request = orderMapper.domainToClientOkxCancelRequest(order);
+        request.setInstrumentId(instrumentExternalId);
+
         OkxApiResponse<OrderResponse> response = okxRestClient.cancelOrder(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -163,7 +219,17 @@ public class OkxClientService implements ClientService {
     @Override
     public List<AlgoOrder> createAlgoOrder(Object... args) {
         AlgoOrder algoOrder = (AlgoOrder) args[0];
+        String instrumentExternalId = (String) args[1];
+        String tradeMode = (String) args[2];
+        String positionSide = (String) args[3];
+        String orderSide = (String) args[4];
+
         CreateAlgoOrderRequest request = algoOrderMapper.domainToClientOkxRequest(algoOrder);
+        request.setInstrumentId(instrumentExternalId);
+        request.setTradeMode(tradeMode);
+        request.setPositionSide(positionSide);
+        request.setSide(orderSide);
+
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.createAlgoOrder(request);
         return algoOrderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -171,7 +237,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<AlgoOrder> cancelAlgoOrder(Object... args) {
         AlgoOrder algoOrder = (AlgoOrder) args[0];
+        String instrumentExternalId = (String) args[1];
+
         CancelAlgoOrderRequest request = algoOrderMapper.domainToClientOkxCancelRequest(algoOrder);
+        request.setInstrumentId(instrumentExternalId);
+
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.cancelAlgoOrder(request);
         return algoOrderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -179,7 +249,15 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Position> closePosition(Object... args) {
         Position position = (Position) args[0];
+        String instrumentExternalId = (String) args[1];
+        String marginCurrency = (String) args[2];
+        String autoCancel = (String) args[3];
+
         ClosePositionRequest request = positionMapper.domainToClientOkxRequest(position);
+        request.setInstrumentId(instrumentExternalId);
+        request.setCurrency(marginCurrency);
+        request.setAutoCancel(autoCancel);
+
         OkxApiResponse<PositionResponse> response = okxRestClient.closePosition(request);
         return positionMapper.clientOkxResponseToDomain(response.getData());
     }
