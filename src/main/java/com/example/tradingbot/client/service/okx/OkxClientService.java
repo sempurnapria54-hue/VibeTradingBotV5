@@ -43,12 +43,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Position> getPositions(Object... args) {
         Position position = (Position) args[0];
-        String instrumentExternalId = (String) args[1];
-        String instrumentType = (String) args[2];
+        Instrument instrument = (Instrument) args[1];
 
         PositionsRequest request = positionMapper.domainToClientOkxPositionsRequest(position);
-        request.setInstrumentId(instrumentExternalId);
-        request.setInstrumentType(instrumentType);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setInstrumentType(instrument.getType());
 
         OkxApiResponse<PositionResponse> response = okxRestClient.getPositions(request);
         return positionMapper.clientOkxResponseToDomain(response.getData());
@@ -57,12 +56,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> getOrdersPending(Object... args) {
         Order order = (Order) args[0];
-        String instrumentExternalId = (String) args[1];
-        String instrumentType = (String) args[2];
+        Instrument instrument = (Instrument) args[1];
 
         OrdersPendingRequest request = orderMapper.domainToClientOkxOrdersPendingRequest(order);
-        request.setInstrumentId(instrumentExternalId);
-        request.setInstrumentType(instrumentType);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setInstrumentType(instrument.getType());
 
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(request);
         return orderMapper.clientOkxResponseToDomain(response.getData());
@@ -83,7 +81,12 @@ public class OkxClientService implements ClientService {
     @Override
     public List<AlgoOrder> getOrdersAlgoPending(Object... args) {
         AlgoOrder algoOrder = (AlgoOrder) args[0];
+        Instrument instrument = (Instrument) args[1];
+
         OrdersAlgoPendingRequest request = algoOrderMapper.domainToClientOkxOrdersAlgoPendingRequest(algoOrder);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setInstrumentType(instrument.getType());
+
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.getOrdersAlgoPending(request);
         return algoOrderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -91,15 +94,14 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> getOrdersHistory(Object... args) {
         Order order = (Order) args[0];
-        String instrumentExternalId = (String) args[1];
-        String instrumentType = (String) args[2];
-        String orderHistoryAfter = (String) args[3];
-        String orderHistoryBefore = (String) args[4];
-        String orderHistoryLimit = (String) args[5];
+        Instrument instrument = (Instrument) args[1];
+        String orderHistoryAfter = (String) args[2];
+        String orderHistoryBefore = (String) args[3];
+        String orderHistoryLimit = (String) args[4];
 
         OrdersHistoryRequest request = orderMapper.domainToClientOkxOrdersHistoryRequest(order);
-        request.setInstrumentId(instrumentExternalId);
-        request.setInstrumentType(instrumentType);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setInstrumentType(instrument.getType());
         request.setAfter(orderHistoryAfter);
         request.setBefore(orderHistoryBefore);
         request.setLimit(orderHistoryLimit);
@@ -111,15 +113,14 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Order> getOrdersHistoryArchive(Object... args) {
         Order order = (Order) args[0];
-        String instrumentExternalId = (String) args[1];
-        String instrumentType = (String) args[2];
-        String orderHistoryAfter = (String) args[3];
-        String orderHistoryBefore = (String) args[4];
-        String orderHistoryLimit = (String) args[5];
+        Instrument instrument = (Instrument) args[1];
+        String orderHistoryAfter = (String) args[2];
+        String orderHistoryBefore = (String) args[3];
+        String orderHistoryLimit = (String) args[4];
 
         OrdersHistoryRequest request = orderMapper.domainToClientOkxOrdersHistoryRequest(order);
-        request.setInstrumentId(instrumentExternalId);
-        request.setInstrumentType(instrumentType);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setInstrumentType(instrument.getType());
         request.setAfter(orderHistoryAfter);
         request.setBefore(orderHistoryBefore);
         request.setLimit(orderHistoryLimit);
@@ -131,7 +132,18 @@ public class OkxClientService implements ClientService {
     @Override
     public List<TradeFill> getFills(Object... args) {
         TradeFill tradeFill = (TradeFill) args[0];
+        Instrument instrument = (Instrument) args[1];
+        String fillsAfter = (String) args[2];
+        String fillsBefore = (String) args[3];
+        String fillsLimit = (String) args[4];
+
         FillsRequest request = tradeFillMapper.domainToClientOkxRequest(tradeFill);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setInstrumentType(instrument.getType());
+        request.setAfter(fillsAfter);
+        request.setBefore(fillsBefore);
+        request.setLimit(fillsLimit);
+
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFills(request);
         return tradeFillMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -139,7 +151,18 @@ public class OkxClientService implements ClientService {
     @Override
     public List<TradeFill> getFillsHistory(Object... args) {
         TradeFill tradeFill = (TradeFill) args[0];
+        Instrument instrument = (Instrument) args[1];
+        String fillsAfter = (String) args[2];
+        String fillsBefore = (String) args[3];
+        String fillsLimit = (String) args[4];
+
         FillsRequest request = tradeFillMapper.domainToClientOkxRequest(tradeFill);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setInstrumentType(instrument.getType());
+        request.setAfter(fillsAfter);
+        request.setBefore(fillsBefore);
+        request.setLimit(fillsLimit);
+
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFillsHistory(request);
         return tradeFillMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -147,7 +170,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<TradeFillsArchive> requestFillsArchive(Object... args) {
         TradeFillsArchive tradeFillsArchive = (TradeFillsArchive) args[0];
+        Instrument instrument = (Instrument) args[1];
+
         FillsArchiveRequest request = tradeFillsArchiveMapper.domainToClientOkxRequest(tradeFillsArchive);
+        request.setInstrumentType(instrument.getType());
+
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.requestFillsArchive(request);
         return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -155,7 +182,11 @@ public class OkxClientService implements ClientService {
     @Override
     public List<TradeFillsArchive> getFillsArchiveLink(Object... args) {
         TradeFillsArchive tradeFillsArchive = (TradeFillsArchive) args[0];
+        Instrument instrument = (Instrument) args[1];
+
         FillsArchiveLinkRequest request = tradeFillsArchiveMapper.domainToClientOkxLinkRequest(tradeFillsArchive);
+        request.setInstrumentType(instrument.getType());
+
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.getFillsArchiveLink(request);
         return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -163,7 +194,19 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Candle> getCandles(Object... args) {
         Candle candle = (Candle) args[0];
+        Instrument instrument = (Instrument) args[1];
+        String candleBar = (String) args[2];
+        String candleAfter = (String) args[3];
+        String candleBefore = (String) args[4];
+        String candleLimit = (String) args[5];
+
         CandlesRequest request = candleMapper.domainToClientOkxRequest(candle);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setBar(candleBar);
+        request.setAfter(candleAfter);
+        request.setBefore(candleBefore);
+        request.setLimit(candleLimit);
+
         OkxApiResponse<CandleResponse> response = okxRestClient.getCandles(request);
         return candleMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -171,7 +214,19 @@ public class OkxClientService implements ClientService {
     @Override
     public List<Candle> getHistoryCandles(Object... args) {
         Candle candle = (Candle) args[0];
+        Instrument instrument = (Instrument) args[1];
+        String candleBar = (String) args[2];
+        String candleAfter = (String) args[3];
+        String candleBefore = (String) args[4];
+        String candleLimit = (String) args[5];
+
         CandlesRequest request = candleMapper.domainToClientOkxRequest(candle);
+        request.setInstrumentId(instrument.getExternalId());
+        request.setBar(candleBar);
+        request.setAfter(candleAfter);
+        request.setBefore(candleBefore);
+        request.setLimit(candleLimit);
+
         OkxApiResponse<CandleResponse> response = okxRestClient.getHistoryCandles(request);
         return candleMapper.clientOkxResponseToDomain(response.getData());
     }
