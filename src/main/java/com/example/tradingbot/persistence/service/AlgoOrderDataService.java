@@ -1,12 +1,13 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
+import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
+import com.example.tradingbot.mapping.AlgoOrderMapper;
+import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
 import com.example.tradingbot.persistence.repository.AlgoOrderRepository;
-
-import java.util.List;
-import java.util.Optional;
-
+import com.example.tradingbot.persistence.specification.AlgoOrderSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,46 +18,27 @@ import static com.example.tradingbot.util.Constant.ErrorCode.ALGO_ORDER_NOT_FOUN
 public class AlgoOrderDataService {
 
     private final AlgoOrderRepository algoOrderRepository;
+    private final AlgoOrderMapper mapper;
 
     @Transactional
-    public AlgoOrderEntity save(AlgoOrderEntity algoOrderEntity) {
-        return algoOrderRepository.save(algoOrderEntity);
+    public AlgoOrder save(AlgoOrder algoOrder) {
+        AlgoOrderEntity data = mapper.domainToData(algoOrder);
+        AlgoOrderEntity saved = algoOrderRepository.save(data);
+        return mapper.dataToDomain(saved);
     }
 
-    @Transactional
-    public List<AlgoOrderEntity> saveAll(List<AlgoOrderEntity> algoOrderEntities) {
-        return algoOrderRepository.saveAll(algoOrderEntities);
+    public AlgoOrder findRequiredByInternalId(String internalId) {
+        return algoOrderRepository.findByInternalId(internalId)
+                                  .map(mapper::dataToDomain)
+                                  .orElseThrow(() -> new RuntimeException(ALGO_ORDER_NOT_FOUND));
     }
 
-    public List<AlgoOrderEntity> findAllByExchangeIdAndInstrumentId(Long exchangeId, Long instrumentId) {
-        return algoOrderRepository.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
-    }
-
-
-    public List<AlgoOrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(
-            Long exchangeId,
-            Long instrumentId,
-            String exchangeAlgoOrderId
-    ) {
-        return algoOrderRepository.findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(exchangeId, instrumentId, exchangeAlgoOrderId);
-    }
-
-    public Optional<AlgoOrderEntity> findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(
-            Long exchangeId,
-            Long instrumentId,
-            String clientAlgoOrderId
-    ) {
-        return algoOrderRepository.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(
-                exchangeId,
-                instrumentId,
-                clientAlgoOrderId
+    public Page<AlgoOrder> search(AlgoOrderSearchParams params, Pageable pageable) {
+        Page<AlgoOrderEntity> data = algoOrderRepository.findAll(
+                AlgoOrderSpecification.bySearchParams(params),
+                pageable
         );
+        return mapper.dataToDomain(data);
     }
 
-    public AlgoOrderEntity findRequiredByExchangeIdAndInstrumentIdAndClientAlgoOrderId(Long exchangeId,
-                                                                                       Long instrumentId,
-                                                                                       String clientAlgoOrderId) {
-        return algoOrderRepository.findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchangeId, instrumentId, clientAlgoOrderId)
-                .orElseThrow(() -> new RuntimeException(ALGO_ORDER_NOT_FOUND));
-    }
 }

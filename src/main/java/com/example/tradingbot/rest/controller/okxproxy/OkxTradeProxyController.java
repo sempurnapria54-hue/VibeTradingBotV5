@@ -1,10 +1,26 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
-import com.example.tradingbot.client.model.okx.request.*;
-import com.example.tradingbot.client.model.okx.response.*;
+import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
+import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
+import com.example.tradingbot.client.model.okx.request.FillsArchiveLinkRequest;
+import com.example.tradingbot.client.model.okx.request.FillsArchiveRequest;
+import com.example.tradingbot.client.model.okx.request.FillsRequest;
+import com.example.tradingbot.client.model.okx.request.get.GetOrderDetailsSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistoryArchiveSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistorySearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersPendingSearchParams;
+import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
+import com.example.tradingbot.client.model.okx.response.OrderResponse;
+import com.example.tradingbot.client.model.okx.response.PositionResponse;
+import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
+import com.example.tradingbot.client.model.okx.response.TradeFillsArchiveResponse;
 import com.example.tradingbot.client.service.okx.OkxRestClient;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/okx/v5/trade")
@@ -14,22 +30,22 @@ public class OkxTradeProxyController {
     private final OkxRestClient okxRestClient;
 
     @GetMapping("/orders-pending")
-    public OkxApiResponse<OrderResponse> getOrdersPending(OrdersPendingRequest request) {
+    public OkxApiResponse<OrderResponse> getOrdersPending(GetOrdersPendingSearchParams request) {
         return okxRestClient.getOrdersPending(request);
     }
 
     @GetMapping("/order")
-    public OkxApiResponse<OrderResponse> getOrderDetails(OrderDetailsRequest request) {
+    public OkxApiResponse<OrderResponse> getOrderDetails(GetOrderDetailsSearchParams request) {
         return okxRestClient.getOrderDetails(request);
     }
 
     @GetMapping("/orders-history")
-    public OkxApiResponse<OrderResponse> getOrdersHistory(OrdersHistoryRequest request) {
+    public OkxApiResponse<OrderResponse> getOrdersHistory(GetOrdersHistorySearchParams request) {
         return okxRestClient.getOrdersHistory(request);
     }
 
     @GetMapping("/orders-history-archive")
-    public OkxApiResponse<OrderResponse> getOrdersHistoryArchive(OrdersHistoryRequest request) {
+    public OkxApiResponse<OrderResponse> getOrdersHistoryArchive(GetOrdersHistoryArchiveSearchParams request) {
         return okxRestClient.getOrdersHistoryArchive(request);
     }
 

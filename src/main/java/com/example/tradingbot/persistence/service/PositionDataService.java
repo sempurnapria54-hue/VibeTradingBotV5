@@ -1,29 +1,40 @@
 package com.example.tradingbot.persistence.service;
 
+import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.model.PositionEntity;
 import com.example.tradingbot.persistence.repository.PositionRepository;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.example.tradingbot.util.Constant.ErrorCode.POSITION_NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
 public class PositionDataService {
 
     private final PositionRepository positionRepository;
+    private final PositionMapper mapper;
 
     @Transactional
-    public PositionEntity save(PositionEntity positionEntity) {
-        return positionRepository.save(positionEntity);
+    public Position save(Position position) {
+        PositionEntity data = mapper.domainToData(position);
+        PositionEntity saved = positionRepository.save(data);
+        return mapper.dataToDomain(saved);
     }
 
-    @Transactional
-    public List<PositionEntity> saveAll(List<PositionEntity> positionEntities) {
-        return positionRepository.saveAll(positionEntities);
+    public Position findByDealIdRequired(Long dealId) {
+        return positionRepository.findByDealId(dealId)
+                                 .map(mapper::dataToDomain)
+                                 .orElseThrow(() -> new RuntimeException(POSITION_NOT_FOUND));
     }
 
-    public List<PositionEntity> findAllByExchangeIdAndInstrumentId(Long exchangeId, Long instrumentId) {
-        return positionRepository.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
+    public Position findByIdRequired(Long id) {
+        return positionRepository.findById(id)
+                                 .map(mapper::dataToDomain)
+                                 .orElseThrow(() -> new RuntimeException(POSITION_NOT_FOUND));
     }
+
+
 }

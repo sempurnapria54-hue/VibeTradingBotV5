@@ -2,38 +2,52 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
 import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
-import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
-import com.example.tradingbot.rest.model.response.InstrumentResponse;
-import java.util.List;
+import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;
+import com.example.tradingbot.rest.model.response.instrument.InstrumentPageResponse;
+import com.example.tradingbot.rest.model.response.instrument.InstrumentResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.springframework.data.domain.Page;
 
-@Mapper(componentModel = "spring")
+import java.util.List;
+
+@Mapper(componentModel = "spring", uses = CandleGroupMapper.class)
 public interface InstrumentMapper {
-
-    @Mapping(source = "instId", target = "externalId")
-    @Mapping(source = "instType", target = "type")
-    Instrument clientOkxResponseToDomain(com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
-
-    @Mapping(source = "externalId", target = "instId")
-    @Mapping(source = "type", target = "instType")
-    com.example.tradingbot.client.model.okx.response.InstrumentResponse domainToClient(Instrument source);
 
     @Mapping(source = "type", target = "instrumentType")
     @Mapping(source = "externalId", target = "instrumentId")
-    InstrumentsRequest domainToClientOkxRequest(Instrument source);
+    InstrumentsRequest domainSearchParamsToClientOkxRequest(InstrumentSearchParams source);
 
-    List<Instrument> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
+    @Mapping(source = "instId", target = "externalId")
+    @Mapping(source = "instType", target = "type")
+    Instrument clientOkxResponseToDomain(
+            com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
 
-    @Mapping(source = "internalId", target = "internalId")
-    @Mapping(source = "exchangeId", target = "exchangeInternalId")
-    @Mapping(source = "externalId", target = "instId")
-    @Mapping(source = "type", target = "instType")
-    InstrumentResponse domainToRest(InstrumentEntity source);
+    List<Instrument> clientOkxResponseToDomain(
+            List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
 
-    List<InstrumentResponse> domainToRest(List<InstrumentEntity> source);
+    InstrumentResponse domainToRest(Instrument source);
 
-    @Mapping(source = "externalId", target = "externalId")
-    InstrumentEntity restToDomain(CreateInstrumentRequest request);
+    List<com.example.tradingbot.rest.model.response.instrument.Instrument> domainToRest(List<Instrument> source);
+
+    Instrument restToDomain(CreateInstrumentRequest request);
+
+    InstrumentEntity domainToData(Instrument source);
+
+    Instrument dataToDomain(InstrumentEntity source);
+
+    List<Instrument> dataToDomain(List<InstrumentEntity> source);
+
+    InstrumentSearchParams restToDomain(
+            com.example.tradingbot.rest.model.request.instrument.search_params.InstrumentSearchParams source);
+
+    InstrumentPageResponse domainToRest(Page<Instrument> result);
+
+    Page<Instrument> dataToDomain(Page<InstrumentEntity> data);
+
+    @Mapping(target = "id", ignore = true)
+    void domainToDomainOnCreate(Instrument source, @MappingTarget Instrument target);
 }

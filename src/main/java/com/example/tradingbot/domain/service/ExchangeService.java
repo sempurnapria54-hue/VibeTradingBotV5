@@ -1,32 +1,34 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.exchange.Exchange.Status;
+import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
-import com.example.tradingbot.rest.model.request.CreateExchangeRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-
-import static com.example.tradingbot.util.factory.ExchangeFactory.createExchangeEntity;
 
 @Service
 @RequiredArgsConstructor
 public class ExchangeService {
 
     private final ExchangeDataService exchangeDataService;
+    private final ExchangeMapper exchangeMapper;
 
-    public ExchangeEntity getRequiredByInternalId(String internalId) {
-        return exchangeDataService.findRequiredByInternalId(internalId);
-    }
-
-    public ExchangeEntity createExchange(CreateExchangeRequest request) {
+    public Exchange createExchange(Exchange request) {
         checkExistence(request.getName());
-        var exchangeEntity = createExchangeEntity(request);
-        return exchangeDataService.save(exchangeEntity);
+        Exchange exchange = new Exchange();
+        exchangeMapper.domainToDomainOnCreate(request, exchange);
+        exchange.setStatus(Status.CREATED);
+        return exchangeDataService.save(exchange);
     }
 
-    public List<ExchangeEntity> getAll() {
+    public Exchange getRequiredById(Long id) {
+        return exchangeDataService.findRequiredById(id);
+    }
+
+    public List<Exchange> getAll() {
         return exchangeDataService.findAll();
     }
 

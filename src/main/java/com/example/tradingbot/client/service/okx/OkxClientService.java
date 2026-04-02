@@ -1,10 +1,60 @@
 package com.example.tradingbot.client.service.okx;
 
-import com.example.tradingbot.client.model.okx.request.*;
-import com.example.tradingbot.client.model.okx.response.*;
+import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CandlesRequest;
+import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
+import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
+import com.example.tradingbot.client.model.okx.request.FillsArchiveLinkRequest;
+import com.example.tradingbot.client.model.okx.request.FillsArchiveRequest;
+import com.example.tradingbot.client.model.okx.request.FillsRequest;
+import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
+import com.example.tradingbot.client.model.okx.request.get.GetAlgoOrdersHistorySearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrderDetailsSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersAlgoPendingSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistoryArchiveSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistorySearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersPendingSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetPositionsSearchParams;
+import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
+import com.example.tradingbot.client.model.okx.response.CandleResponse;
+import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
+import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
+import com.example.tradingbot.client.model.okx.response.OrderResponse;
+import com.example.tradingbot.client.model.okx.response.PositionResponse;
+import com.example.tradingbot.client.model.okx.response.PriceTickerResponse;
+import com.example.tradingbot.client.model.okx.response.TickerRequest;
+import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
+import com.example.tradingbot.client.model.okx.response.TradeFillsArchiveResponse;
+import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.domain.model.*;
-import com.example.tradingbot.mapping.*;
+import com.example.tradingbot.domain.model.Candle;
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.PriceTicker;
+import com.example.tradingbot.domain.model.TradeFill;
+import com.example.tradingbot.domain.model.TradeFillsArchive;
+import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.search_params.CandleSearchParams;
+import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
+import com.example.tradingbot.domain.model.search_params.PriceTickerSearchParams;
+import com.example.tradingbot.domain.model.search_params.TradeFillsSearchParams;
+import com.example.tradingbot.mapping.AlgoOrderMapper;
+import com.example.tradingbot.mapping.BalanceMapper;
+import com.example.tradingbot.mapping.CandleMapper;
+import com.example.tradingbot.mapping.InstrumentMapper;
+import com.example.tradingbot.mapping.OrderMapper;
+import com.example.tradingbot.mapping.PositionMapper;
+import com.example.tradingbot.mapping.PriceTickerMapper;
+import com.example.tradingbot.mapping.TradeFillMapper;
+import com.example.tradingbot.mapping.TradeFillsArchiveMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,201 +82,163 @@ public class OkxClientService implements ClientService {
         return EXCHANGE_NAME_OKX;
     }
 
+    /**
+     * GET.
+     */
+    //TODO: тут норм, остальное рефакторим.
     @Override
-    public List<Balance> getBalance(Object... args) {
-        Balance balance = (Balance) args[0];
-        BalanceRequest request = balanceMapper.domainToClientOkxRequest(balance);
-        OkxApiResponse<BalanceResponse> response = okxRestClient.getBalance(request);
-        return balanceMapper.clientOkxResponseToDomain(response.getData());
+    public BalanceContainerExternalSnapshot getBalanceContainer(Exchange exchange) {
+        OkxApiResponse<BalanceResponse> response = okxRestClient.getBalances();
+        return balanceMapper.clientOkxToExternalSnapshot(exchange.getId(), response.getData()
+                                                                                   .getFirst());
+    }
+
+    //TODO: тут норм, остальное рефакторим.
+    @Override
+    public List<PositionExternalSnapshot> getPositionsByInstrument(Instrument instrument) {
+        GetPositionsSearchParams searchParams = new GetPositionsSearchParams();
+        searchParams.setInstrumentExternalId(instrument.getExternalId());
+        searchParams.setInstrumentExternalType(instrument.getExternalType());
+        OkxApiResponse<PositionResponse> response = okxRestClient.getPositions(searchParams);
+        return positionMapper.clientOkxToExternalSnapshot(response.getData());
+    }
+
+    //TODO: тут норм, остальное рефакторим.
+    @Override
+    public List<PositionExternalSnapshot> getAllPositions() {
+        OkxApiResponse<PositionResponse> response = okxRestClient.getAllPositions();
+        return positionMapper.clientOkxToExternalSnapshot(response.getData());
     }
 
     @Override
-    public List<Position> getPositions(Object... args) {
-        Position position = (Position) args[0];
-        Instrument instrument = (Instrument) args[1];
-
-        PositionsRequest request = positionMapper.domainToClientOkxPositionsRequest(position);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setInstrumentType(instrument.getType());
-
-        OkxApiResponse<PositionResponse> response = okxRestClient.getPositions(request);
-        return positionMapper.clientOkxResponseToDomain(response.getData());
+    public List<Order> getActiveOrdersByInstrument(Instrument instrument) {
+        GetOrdersPendingSearchParams searchParams = new GetOrdersPendingSearchParams();
+        searchParams.setInstrumentExternalId(instrument.getExternalId());
+        searchParams.setInstrumentExternalType(instrument.getExternalType());
+        OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(searchParams);
+        List<OrderResponse> data = response.getData();
+        return orderMapper.clientOkxToDomain(data);
     }
 
     @Override
-    public List<Order> getOrdersPending(Object... args) {
-        Order order = (Order) args[0];
-        Instrument instrument = (Instrument) args[1];
+    public List<Order> getActiveOrdersByInstrumentType(Instrument instrument) {
+        GetOrdersPendingSearchParams searchParams = new GetOrdersPendingSearchParams();
+        searchParams.setInstrumentExternalType(instrument.getExternalType());
+        OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(searchParams);
+        List<OrderResponse> data = response.getData();
+        return orderMapper.clientOkxToDomain(data);
+    }
 
-        OrdersPendingRequest request = orderMapper.domainToClientOkxOrdersPendingRequest(order);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setInstrumentType(instrument.getType());
+    @Override
+    public Order getOrder(String externalInstrumentId, String externalOrderId, String internalOrderId) {
+        GetOrderDetailsSearchParams searchParams = new GetOrderDetailsSearchParams();
+        searchParams.setInstrumentExternalId(externalInstrumentId);
+        searchParams.setExternalId(externalOrderId);
+        searchParams.setInternalId(internalOrderId);
+        OkxApiResponse<OrderResponse> response = okxRestClient.getOrderDetails(searchParams);
+        return orderMapper.clientOkxToDomain(response.getData()
+                                                     .getFirst());
+    }
 
-        OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(request);
+    @Override
+    public List<Order> getOrdersHistory(Instrument instrument) {
+        GetOrdersHistorySearchParams searchParams = new GetOrdersHistorySearchParams();
+        searchParams.setInstrumentExternalType(instrument.getExternalType());
+        searchParams.setInstrumentExternalId(instrument.getExternalId());
+        OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistory(searchParams);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
-    public List<Order> getOrderDetails(Object... args) {
-        Order order = (Order) args[0];
-        String instrumentExternalId = (String) args[1];
-
-        OrderDetailsRequest request = orderMapper.domainToClientOkxOrderDetailsRequest(order);
-        request.setInstrumentId(instrumentExternalId);
-
-        OkxApiResponse<OrderResponse> response = okxRestClient.getOrderDetails(request);
+    public List<Order> getOrdersHistoryArchive(Instrument instrument) {
+        GetOrdersHistoryArchiveSearchParams searchParams = new GetOrdersHistoryArchiveSearchParams();
+        searchParams.setInstrumentExternalType(instrument.getExternalType());
+        searchParams.setInstrumentExternalId(instrument.getExternalId());
+        OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistoryArchive(searchParams);
         return orderMapper.clientOkxResponseToDomain(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
-    public List<AlgoOrder> getOrdersAlgoPending(Object... args) {
-        AlgoOrder algoOrder = (AlgoOrder) args[0];
-        Instrument instrument = (Instrument) args[1];
-
-        OrdersAlgoPendingRequest request = algoOrderMapper.domainToClientOkxOrdersAlgoPendingRequest(algoOrder);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setInstrumentType(instrument.getType());
-
-        OkxApiResponse<AlgoOrderResponse> response = okxRestClient.getOrdersAlgoPending(request);
-        return algoOrderMapper.clientOkxResponseToDomain(response.getData());
+    public List<AlgoOrderExternalSnapshot> getActiveAlgoOrders(Instrument instrument, AlgoOrder algoOrder) {
+        GetOrdersAlgoPendingSearchParams params = new GetOrdersAlgoPendingSearchParams();
+        params.setAlgoOrderExternalType(algoOrder.getExternalType());
+        params.setInstrumentExternalType(instrument.getExternalType());
+        params.setInstrumentExternalId(instrument.getExternalId());
+        OkxApiResponse<AlgoOrderResponse> response = okxRestClient.getOrdersAlgoPending(params);
+        return algoOrderMapper.clientToExternalSnapshot(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
-    public List<Order> getOrdersHistory(Object... args) {
-        Order order = (Order) args[0];
-        Instrument instrument = (Instrument) args[1];
-        String orderHistoryAfter = (String) args[2];
-        String orderHistoryBefore = (String) args[3];
-        String orderHistoryLimit = (String) args[4];
-
-        OrdersHistoryRequest request = orderMapper.domainToClientOkxOrdersHistoryRequest(order);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setInstrumentType(instrument.getType());
-        request.setAfter(orderHistoryAfter);
-        request.setBefore(orderHistoryBefore);
-        request.setLimit(orderHistoryLimit);
-
-        OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistory(request);
-        return orderMapper.clientOkxResponseToDomain(response.getData());
+    public AlgoOrderExternalSnapshot getAlgoOrder(AlgoOrder algoOrder) {
+        OkxApiResponse<AlgoOrderResponse> response = okxRestClient.getOrderAlgoDetails(
+                algoOrder.getInternalId(),
+                algoOrder.getExternalId()
+        );
+        return algoOrderMapper.clientToExternalSnapshot(response.getData()
+                                                                .getFirst());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
-    public List<Order> getOrdersHistoryArchive(Object... args) {
-        Order order = (Order) args[0];
-        Instrument instrument = (Instrument) args[1];
-        String orderHistoryAfter = (String) args[2];
-        String orderHistoryBefore = (String) args[3];
-        String orderHistoryLimit = (String) args[4];
+    public List<AlgoOrderExternalSnapshot> getAlgoOrdersHistory(Instrument instrument, AlgoOrder algoOrder) {
+        GetAlgoOrdersHistorySearchParams searchParams = new GetAlgoOrdersHistorySearchParams();
+        searchParams.setExternalAlgoOrderType(algoOrder.getExternalType());
+        searchParams.setExternalStatus(algoOrder.getExternalStatus());
+        searchParams.setAlgoOrderExternalId(algoOrder.getExternalId());
+        searchParams.setInstrumentExternalId(instrument.getExternalId());
 
-        OrdersHistoryRequest request = orderMapper.domainToClientOkxOrdersHistoryRequest(order);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setInstrumentType(instrument.getType());
-        request.setAfter(orderHistoryAfter);
-        request.setBefore(orderHistoryBefore);
-        request.setLimit(orderHistoryLimit);
-
-        OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistoryArchive(request);
-        return orderMapper.clientOkxResponseToDomain(response.getData());
+        OkxApiResponse<AlgoOrderResponse> response = okxRestClient.getOrdersAlgoHistory(searchParams);
+        return algoOrderMapper.clientToExternalSnapshot(response.getData());
     }
+
 
     @Override
     public List<TradeFill> getFills(Object... args) {
-        TradeFill tradeFill = (TradeFill) args[0];
-        Instrument instrument = (Instrument) args[1];
-        String fillsAfter = (String) args[2];
-        String fillsBefore = (String) args[3];
-        String fillsLimit = (String) args[4];
-
-        FillsRequest request = tradeFillMapper.domainToClientOkxRequest(tradeFill);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setInstrumentType(instrument.getType());
-        request.setAfter(fillsAfter);
-        request.setBefore(fillsBefore);
-        request.setLimit(fillsLimit);
-
+        TradeFillsSearchParams searchParams = (TradeFillsSearchParams) args[0];
+        FillsRequest request = tradeFillMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFills(request);
         return tradeFillMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<TradeFill> getFillsHistory(Object... args) {
-        TradeFill tradeFill = (TradeFill) args[0];
-        Instrument instrument = (Instrument) args[1];
-        String fillsAfter = (String) args[2];
-        String fillsBefore = (String) args[3];
-        String fillsLimit = (String) args[4];
-
-        FillsRequest request = tradeFillMapper.domainToClientOkxRequest(tradeFill);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setInstrumentType(instrument.getType());
-        request.setAfter(fillsAfter);
-        request.setBefore(fillsBefore);
-        request.setLimit(fillsLimit);
-
+        TradeFillsSearchParams searchParams = (TradeFillsSearchParams) args[0];
+        FillsRequest request = tradeFillMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFillsHistory(request);
         return tradeFillMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<TradeFillsArchive> requestFillsArchive(Object... args) {
-        TradeFillsArchive tradeFillsArchive = (TradeFillsArchive) args[0];
-        Instrument instrument = (Instrument) args[1];
-
-        FillsArchiveRequest request = tradeFillsArchiveMapper.domainToClientOkxRequest(tradeFillsArchive);
-        request.setInstrumentType(instrument.getType());
-
+        TradeFillsSearchParams searchParams = (TradeFillsSearchParams) args[0];
+        FillsArchiveRequest request = tradeFillsArchiveMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.requestFillsArchive(request);
         return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<TradeFillsArchive> getFillsArchiveLink(Object... args) {
-        TradeFillsArchive tradeFillsArchive = (TradeFillsArchive) args[0];
-        Instrument instrument = (Instrument) args[1];
-
-        FillsArchiveLinkRequest request = tradeFillsArchiveMapper.domainToClientOkxLinkRequest(tradeFillsArchive);
-        request.setInstrumentType(instrument.getType());
-
+        TradeFillsSearchParams searchParams = (TradeFillsSearchParams) args[0];
+        FillsArchiveLinkRequest request = tradeFillsArchiveMapper.domainSearchParamsToClientOkxLinkRequest(
+                searchParams);
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.getFillsArchiveLink(request);
         return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Candle> getCandles(Object... args) {
-        Candle candle = (Candle) args[0];
-        Instrument instrument = (Instrument) args[1];
-        String candleBar = (String) args[2];
-        String candleAfter = (String) args[3];
-        String candleBefore = (String) args[4];
-        String candleLimit = (String) args[5];
-
-        CandlesRequest request = candleMapper.domainToClientOkxRequest(candle);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setBar(candleBar);
-        request.setAfter(candleAfter);
-        request.setBefore(candleBefore);
-        request.setLimit(candleLimit);
-
+        CandleSearchParams searchParams = (CandleSearchParams) args[0];
+        CandlesRequest request = candleMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<CandleResponse> response = okxRestClient.getCandles(request);
         return candleMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<Candle> getHistoryCandles(Object... args) {
-        Candle candle = (Candle) args[0];
-        Instrument instrument = (Instrument) args[1];
-        String candleBar = (String) args[2];
-        String candleAfter = (String) args[3];
-        String candleBefore = (String) args[4];
-        String candleLimit = (String) args[5];
-
-        CandlesRequest request = candleMapper.domainToClientOkxRequest(candle);
-        request.setInstrumentId(instrument.getExternalId());
-        request.setBar(candleBar);
-        request.setAfter(candleAfter);
-        request.setBefore(candleBefore);
-        request.setLimit(candleLimit);
-
+        CandleSearchParams searchParams = (CandleSearchParams) args[0];
+        CandlesRequest request = candleMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<CandleResponse> response = okxRestClient.getHistoryCandles(request);
         return candleMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -260,10 +272,7 @@ public class OkxClientService implements ClientService {
     }
 
     @Override
-    public List<Order> cancelOrder(Object... args) {
-        Order order = (Order) args[0];
-        String instrumentExternalId = (String) args[1];
-
+    public List<Order> cancelOrder(Order order, String instrumentExternalId) {
         CancelOrderRequest request = orderMapper.domainToClientOkxCancelRequest(order);
         request.setInstrumentId(instrumentExternalId);
 
@@ -272,19 +281,12 @@ public class OkxClientService implements ClientService {
     }
 
     @Override
-    public List<AlgoOrder> createAlgoOrder(Object... args) {
-        AlgoOrder algoOrder = (AlgoOrder) args[0];
-        String instrumentExternalId = (String) args[1];
-        String tradeMode = (String) args[2];
-        String positionSide = (String) args[3];
-        String orderSide = (String) args[4];
-
+    public List<AlgoOrder> createAlgoOrder(AlgoOrder algoOrder, Instrument instrument, Position position) {
         CreateAlgoOrderRequest request = algoOrderMapper.domainToClientOkxRequest(algoOrder);
-        request.setInstrumentId(instrumentExternalId);
-        request.setTradeMode(tradeMode);
-        request.setPositionSide(positionSide);
-        request.setSide(orderSide);
-
+        request.setInstrumentId(instrument.getExternalId());
+        request.setTradeMode(instrument.getExternalMarginMode());
+        request.setPositionSide(position.getExternalSide());
+        request.setSide(algoOrder.getExternalDirection());
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.createAlgoOrder(request);
         return algoOrderMapper.clientOkxResponseToDomain(response.getData());
     }
@@ -308,7 +310,7 @@ public class OkxClientService implements ClientService {
         String marginCurrency = (String) args[2];
         String autoCancel = (String) args[3];
 
-        ClosePositionRequest request = positionMapper.domainToClientOkxRequest(position);
+        ClosePositionRequest request = positionMapper.domainToClientOkxCloseRequest(position);
         request.setInstrumentId(instrumentExternalId);
         request.setCurrency(marginCurrency);
         request.setAutoCancel(autoCancel);
@@ -319,16 +321,16 @@ public class OkxClientService implements ClientService {
 
     @Override
     public List<Instrument> getInstruments(Object... args) {
-        Instrument instrument = (Instrument) args[0];
-        InstrumentsRequest request = instrumentMapper.domainToClientOkxRequest(instrument);
+        InstrumentSearchParams searchParams = (InstrumentSearchParams) args[0];
+        InstrumentsRequest request = instrumentMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<InstrumentResponse> response = okxRestClient.getInstruments(request);
         return instrumentMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
     public List<PriceTicker> getTicker(Object... args) {
-        PriceTicker priceTicker = (PriceTicker) args[0];
-        TickerRequest request = priceTickerMapper.domainToClientOkxRequest(priceTicker);
+        PriceTickerSearchParams searchParams = (PriceTickerSearchParams) args[0];
+        TickerRequest request = priceTickerMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<PriceTickerResponse> response = okxRestClient.getTicker(request);
         return priceTickerMapper.clientOkxResponseToDomain(response.getData());
     }

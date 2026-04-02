@@ -1,6 +1,7 @@
-## Доменная модель для `GET /api/v5/account/balance` + маппинг
+## Доменная модель для `GET /api/v5/account/balanceExternalSnapshot` + маппинг
 
-Ниже — **доменная модель для хранения snapshot баланса в БД** (без persistence-аннотаций, но с audit-полями) + **маппинг в YAML** (OKX response → доменная модель). Можно копировать в md.
+Ниже — **доменная модель для хранения snapshot баланса в БД** (без persistence-аннотаций, но с audit-полями) + **маппинг
+в YAML** (OKX response → доменная модель). Можно копировать в md.
 
 ---
 
@@ -12,11 +13,12 @@ package com.example.tradingbot.domain.model.exchange;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Snapshot баланса аккаунта (ответ /account/balance).
+ * Snapshot баланса аккаунта (ответ /account/balanceExternalSnapshot).
  *
  * Это доменная модель (без persistence-аннотаций).
  * Хранение в БД делается отдельным persistence-слоем.
@@ -230,7 +232,7 @@ public class Balance {
         /** maxSpotInUse — максимальный spot risk offset amount (portfolio margin). */
         private BigDecimal maxSpotInUse;
 
-        /** spotIsoBal — spot isolated balance (copy-trading/особые режимы). */
+        /** spotIsoBal — spot isolated balanceExternalSnapshot (copy-trading/особые режимы). */
         private BigDecimal spotIsolatedBalance;
 
         /** smtSyncEq — smart sync equity (copy trader). */
@@ -294,7 +296,7 @@ public class Balance {
 
 ---
 
-## 2) Маппинг (YAML): OKX `GET /account/balance` → `Balance`
+## 2) Маппинг (YAML): OKX `GET /account/balanceExternalSnapshot` → `Balance`
 
 ```yaml
 # верхний уровень: OKX отдаёт data[0] как агрегат по аккаунту
@@ -333,9 +335,9 @@ details[*].ccy: details[*].currency                                  # код в
 
 details[*].eq: details[*].equity                                     # equity по валюте
 
-details[*].cashBal: details[*].cashBalance                           # cash balance
+details[*].cashBal: details[*].cashBalance                           # cash balanceExternalSnapshot
 
-details[*].availBal: details[*].availableBalance                     # available balance
+details[*].availBal: details[*].availableBalance                     # available balanceExternalSnapshot
 
 details[*].uTime: details[*].sourceUpdatedAt                          # ms -> Instant
 
@@ -345,9 +347,9 @@ details[*].availEq: details[*].availableEquity                        # availabl
 
 details[*].disEq: details[*].discountedEquityUsd                       # discount equity (USD)
 
-details[*].fixedBal: details[*].fixedBalance                           # fixed balance
+details[*].fixedBal: details[*].fixedBalance                           # fixed balanceExternalSnapshot
 
-details[*].frozenBal: details[*].frozenBalance                         # frozen balance
+details[*].frozenBal: details[*].frozenBalance                         # frozen balanceExternalSnapshot
 
 details[*].ordFrozen: details[*].orderFrozen                           # order frozen
 
@@ -393,7 +395,7 @@ details[*].clSpotInUseAmt: details[*].clSpotInUseAmount                # cl spot
 
 details[*].maxSpotInUse: details[*].maxSpotInUse                       # max spot in use
 
-details[*].spotIsoBal: details[*].spotIsolatedBalance                  # spot iso balance
+details[*].spotIsoBal: details[*].spotIsolatedBalance                  # spot iso balanceExternalSnapshot
 
 details[*].smtSyncEq: details[*].smartSyncEquity                       # smart sync equity
 
@@ -401,7 +403,7 @@ details[*].spotCopyTradingEq: details[*].spotCopyTradingEquity         # spot co
 
 # spot cost basis / pnl
 
-details[*].spotBal: details[*].spotBalance                             # spot balance
+details[*].spotBal: details[*].spotBalance                             # spot balanceExternalSnapshot
 
 details[*].openAvgPx: details[*].openAveragePriceUsd                   # open avg px (USD)
 
@@ -433,7 +435,7 @@ details[*].autoLendMtAmt: details[*].autoLendMatchedAmount             # auto le
 
 # misc
 
-details[*].rewardBal: details[*].rewardBalance                         # reward balance
+details[*].rewardBal: details[*].rewardBalance                         # reward balanceExternalSnapshot
 ```
 
 **Правила конвертации (коротко, чтобы маппинг был “рабочим”):**

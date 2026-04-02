@@ -57,6 +57,7 @@ if (data == null) {
     ... 
 };
 ```
+
 ```java
 if (data != null) {
         ...
@@ -112,6 +113,7 @@ collection != null  && !collection.isEmpty();
 ### 2.2.1. Null-check policy (строго)
 
 Для null-проверок в Java используем только:
+
 - `Objects.isNull(x)`
 - `Objects.nonNull(x)`
 
@@ -120,16 +122,19 @@ collection != null  && !collection.isEmpty();
 Избегаем прямого отрицания в условиях для boolean/equals-проверок.
 
 Запрещено:
+
 - `!flag`
 - `!Objects.equals(a, b)`
 - `!"CONST".equals(value)`
 
 Нужно:
+
 - `BooleanUtils.isFalse(flag)` / `BooleanUtils.isTrue(flag)`
 - `BooleanUtils.isFalse(Objects.equals(a, b))`
 - для сравнения строк: сначала `Objects.equals(...)`, затем при необходимости оборачивать в `BooleanUtils.isFalse(...)`
 
 Запрещено использовать `== null` и `!= null` в любых выражениях, не только в `if`:
+
 - в `if/else`
 - в тернарных выражениях
 - в присваиваниях
@@ -176,7 +181,8 @@ if (Objects.nonNull(bodyObject)) {
 
 ### 2.3. Lombok вместо ручных конструкторов/геттеров/сеттеров
 
-Вместо ручной генерации **конструкторов/геттеров/сеттеров/equals/hashCode/toString** предпочтительно использовать Lombok.
+Вместо ручной генерации **конструкторов/геттеров/сеттеров/equals/hashCode/toString** предпочтительно использовать
+Lombok.
 
 Рекомендации:
 
@@ -215,10 +221,10 @@ if (Objects.nonNull(bodyObject)) {
 * Для **каждой доменной сущности** — отдельный mapper (например: `OrderMapper`, `PositionMapper`, и т.д.).
 * В каждом mapper — отдельные методы под направления маппинга:
 
-  * `clientToDomain(...)`
-  * `domainToClient(...)` (если потребуется)
-  * `domainToRest(...)`
-  * `restToDomain(...)` (если потребуется)
+    * `clientToDomain(...)`
+    * `domainToClient(...)` (если потребуется)
+    * `domainToRest(...)`
+    * `restToDomain(...)` (если потребуется)
 * Название метода должно отражать **какой слой в какой** мапим.
 * Методы могут называться одинаково, но иметь разные входные параметры.
 * **Client DTO OKX наружу не возвращаем**.
@@ -243,44 +249,55 @@ if (Objects.nonNull(bodyObject)) {
 ---
 
 ## 8) Контроллеры
+
 * Можно использовать @RequestParam, но если их более 2, то лучше использовать @ParameterObject
 
 ---
 
 ## 9) Нейминг
-* Не нужно сокращать названия в доменном слое, надо использовать названия из описания доменных моделей. Если описания такой модели ещё нет, то всё равно надо полные слова, без сокращений.
-  Например: Вместо private String bal; нужно private String balance;
-* Вот пример моделей и нейминга по слоям. OrderRequest(REST) -> Order (Domain) -> OkxClientOrder (ClientService) -> OkxRestClient -> OkxClientOrder (
+
+* Не нужно сокращать названия в доменном слое, надо использовать названия из описания доменных моделей. Если описания
+  такой модели ещё нет, то всё равно надо полные слова, без сокращений.
+  Например: Вместо private String bal; нужно private String balanceExternalSnapshot;
+* Вот пример моделей и нейминга по слоям. OrderRequest(REST) -> Order (Domain) -> OkxClientOrder (ClientService) ->
+  OkxRestClient -> OkxClientOrder (
 
 ---
 
 ## 10) Зоны ответственности
-### Controller 
+
+### Controller
+
 * REST → Domain
 * вызывает Service
 * Domain → REST
 * никогда не видит client DTO и не вызывает OkxRestClient
 
 ### Service (application/service)
+
 * принимает Domain
 * вызывает ClientService
 * добавляет прикладную логику
 
 ### ClientService (domain-in / domain-out)
+
 * Domain → client DTO
 * вызывает OkxRestClient
 * client DTO → Domain
 * возвращает Domain наверх
 
 ### DataService
+
 * Domain → Persistence
 * вызывает Repository
 * Persistence → Domain
 
 ### OkxRestClient
+
 * чистый HTTP + подпись + DTO
 
 ### Repository
+
 * Просто интерфейсы с методами - запросами в бд
 * Могут содержать нативные запросы через аннотации над методами
 
@@ -293,6 +310,7 @@ if (Objects.nonNull(bodyObject)) {
 * `docs/api/okx/` (если затронуты методы OKX)
 * `docs/models/domain/` (если менялись доменные модели/инварианты)
 * `codex/stage/` (если это часть этапа)
+
 ---
 
 ## 12) Конфигурация и секреты (Vault)
@@ -300,6 +318,7 @@ if (Objects.nonNull(bodyObject)) {
 * В коде и бинах используем только стандартные Spring properties (например `okx.*`, `spring.datasource.*`).
 * Для бизнес-свойств в `application.yaml` запрещено указывать значения формата `vault://...#...`.
 * Допускаются плейсхолдеры окружения (`${OKX_API_KEY:}` и т.п.) и/или документационные маркеры вида `{OKX_API_KEY}`.
-* Прямые Vault URI допустимы только в `spring.config.import` для подключения источника конфигурации, но не как значения доменных/бизнес-полей.
+* Прямые Vault URI допустимы только в `spring.config.import` для подключения источника конфигурации, но не как значения
+  доменных/бизнес-полей.
 * Реальные секреты в репозиторий не коммитим.
 

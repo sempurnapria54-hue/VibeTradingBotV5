@@ -7,5 +7,5 @@ import lombok.Setter;
 @Setter
 public class FillsArchiveRequest {
 
-    private String instrumentType;
+    private String externalInstrumentType;
 }

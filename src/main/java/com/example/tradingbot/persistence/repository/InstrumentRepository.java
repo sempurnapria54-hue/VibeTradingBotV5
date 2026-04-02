@@ -1,13 +1,17 @@
 package com.example.tradingbot.persistence.repository;
 
 import com.example.tradingbot.persistence.model.InstrumentEntity;
-import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
-public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Long> {
+import java.util.Optional;
+
+@Repository
+public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Long>,
+        JpaSpecificationExecutor<InstrumentEntity> {
 
     Optional<InstrumentEntity> findByExchangeIdAndName(Long exchangeId, String name);
 
@@ -15,30 +19,13 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
 
     Optional<InstrumentEntity> findByExchangeIdAndInternalId(Long exchangeId, String internalId);
 
-    @Query("""
-        select i.externalId
-        from InstrumentEntity i
-        where i.exchangeId = :exchangeId
-          and i.internalId = :internalId
-        """)
-    Optional<String> findExternalIdByExchangeIdAndInternalId(@Param("exchangeId") Long exchangeId, @Param("internalId") String internalId);
+    Optional<InstrumentEntity> findByInternalId(String internalId);
 
-    @Query("""
-        select i.id
-        from InstrumentEntity i
-        where i.internalId = :instrumentInternalId
-          and i.exchangeId = (
-              select e.id
-              from ExchangeEntity e
-              where e.internalId = :exchangeInternalId
-          )
-        """)
-    Optional<Long> findIdByExchangeInternalIdAndInstrumentInternalId(
-        @Param("exchangeInternalId") String exchangeInternalId,
-        @Param("instrumentInternalId") String instrumentInternalId
-    );
-
-    List<InstrumentEntity> findAllByExchangeId(Long exchangeId);
-
-    boolean existsByExchangeIdAndExternalId(Long exchangeId, String externalId);
+    @Query(value = """
+            select i.*
+            from instruments i
+            join deals d on d.instrument_id = i.id
+            where d.id = :dealId
+            """, nativeQuery = true)
+    Optional<InstrumentEntity> findByDealId(@Param("dealId") Long dealId);
 }

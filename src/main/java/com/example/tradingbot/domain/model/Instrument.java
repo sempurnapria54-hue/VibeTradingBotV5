@@ -1,10 +1,16 @@
 package com.example.tradingbot.domain.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.List;
 
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Instrument extends Auditable {
 
     /**
@@ -30,12 +36,12 @@ public class Instrument extends Auditable {
     /**
      * Тип инструмента на бирже: SPOT/MARGIN/SWAP/FUTURES/OPTION.
      */
-    private String type;
+    private String externalType;
 
     /**
      * Статус: CREATED/HOLD/SYNC/CANDLES_LOADING/ACTIVE.
      */
-    private String status;
+    private Status status;
 
     /**
      * Режим маржи (cross/isolated).
@@ -43,12 +49,32 @@ public class Instrument extends Auditable {
     private MarginMode marginMode;
 
     /**
+     * Режим маржи на бирже (cross/isolated).
+     */
+    private String externalMarginMode;
+
+    /**
      * Плечо.
      */
     private Integer leverage;
 
+    /**
+     * Набор групп свечей для разных таймфреймов инструмента.
+     */
+    private List<CandleGroup> candleGroups;
+
     public enum MarginMode {
         ISOLATED,
         CROSS
+    }
+
+    public enum Status {
+        CREATED,
+        HOLD,
+        SYNC,
+        CANDLES_LOADING,
+        ACTIVE,
+        CLOSED,
+        ERROR
     }
 }

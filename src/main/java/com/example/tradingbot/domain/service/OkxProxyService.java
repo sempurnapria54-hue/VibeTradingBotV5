@@ -1,13 +1,17 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.client.model.okx.request.*;
+import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
+import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
+import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
+import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
 import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
 import com.example.tradingbot.client.model.okx.response.OrderResponse;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
 import com.example.tradingbot.client.service.okx.OkxRestClient;
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
 import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +34,8 @@ public class OkxProxyService {
         request.setSize(orderEntity.getSize());
         request.setPrice(orderEntity.getPrice());
         request.setClientOrderId(orderEntity.getInternalId());
-        return okxRestClient.createOrder(request).getData();
+        return okxRestClient.createOrder(request)
+                            .getData();
     }
 
     public List<OrderResponse> cancelOrder(OrderEntity orderEntity, InstrumentEntity instrumentEntity) {
@@ -38,7 +43,8 @@ public class OkxProxyService {
         request.setInstrumentId(instrumentEntity.getExternalId());
         request.setOrderId(orderEntity.getExternalId());
         request.setClientOrderId(orderEntity.getInternalId());
-        return okxRestClient.cancelOrder(request).getData();
+        return okxRestClient.cancelOrder(request)
+                            .getData();
     }
 
     public List<AlgoOrderResponse> createAlgoOrder(AlgoOrderEntity algoOrderEntity, InstrumentEntity instrumentEntity) {
@@ -51,7 +57,8 @@ public class OkxProxyService {
         request.setTriggerPrice(algoOrderEntity.getTriggerPrice());
         request.setOrderPrice(algoOrderEntity.getTriggerExecutionPrice());
         request.setClientOrderId(algoOrderEntity.getInternalId());
-        return okxRestClient.createAlgoOrder(request).getData();
+        return okxRestClient.createAlgoOrder(request)
+                            .getData();
     }
 
     public List<AlgoOrderResponse> cancelAlgoOrder(AlgoOrderEntity algoOrderEntity, InstrumentEntity instrumentEntity) {
@@ -59,10 +66,12 @@ public class OkxProxyService {
         request.setInstrumentId(instrumentEntity.getExternalId());
         request.setAlgoOrderId(algoOrderEntity.getExternalId());
         request.setClientOrderId(algoOrderEntity.getInternalId());
-        return okxRestClient.cancelAlgoOrder(request).getData();
+        return okxRestClient.cancelAlgoOrder(request)
+                            .getData();
     }
 
     public List<PositionResponse> closePosition(ClosePositionRequest request) {
-        return okxRestClient.closePosition(request).getData();
+        return okxRestClient.closePosition(request)
+                            .getData();
     }
 }

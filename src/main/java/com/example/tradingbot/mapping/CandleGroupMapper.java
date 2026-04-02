@@ -1,18 +1,32 @@
 package com.example.tradingbot.mapping;
 
+import com.example.tradingbot.domain.model.CandleGroup;
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
-import com.example.tradingbot.rest.model.response.CandleGroupResponse;
+import com.example.tradingbot.rest.model.request.candle_group.CreateCandleGroupRequest;
+import com.example.tradingbot.rest.model.response.candle_group.CandleGroupContainerResponse;
+import com.example.tradingbot.rest.model.response.candle_group.CandleGroupResponse;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface CandleGroupMapper {
 
-    List<CandleGroupResponse> domainToRest(List<CandleGroupEntity> source);
+    CandleGroupContainerResponse domainListToRestContainer(List<CandleGroup> source);
 
-    CandleGroupResponse domainToRest(CandleGroupEntity source);
+    CandleGroupResponse domainToRest(CandleGroup source);
 
-    CandleGroupEntity restToDomain(CreateCandleGroupRequest source);
+    CandleGroup restToDomain(CreateCandleGroupRequest request);
+
+    @Mapping(target = "id", ignore = true)
+    void domainToDomainOnCreate(CandleGroup source, @MappingTarget CandleGroup target);
+
+    CandleGroupEntity domainToData(CandleGroup candleGroup);
+
+    CandleGroup dataToDomain(CandleGroupEntity candleGroup);
+
+    @Mapping(target = "timeframe", source = ".")
+    CandleGroup restToDomain(String value);
 }

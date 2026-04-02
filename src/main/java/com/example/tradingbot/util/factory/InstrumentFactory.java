@@ -2,7 +2,7 @@ package com.example.tradingbot.util.factory;
 
 import com.example.tradingbot.persistence.model.CandleGroupEntity;
 import com.example.tradingbot.persistence.model.InstrumentEntity;
-import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
+import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;
 import lombok.experimental.UtilityClass;
 
 import java.util.List;
@@ -18,15 +18,18 @@ public class InstrumentFactory {
 
     public static InstrumentEntity createInstrumentEntity(Long exchangeId, CreateInstrumentRequest request) {
         InstrumentEntity instrumentEntity = new InstrumentEntity();
-        instrumentEntity.setInternalId(UUID.randomUUID().toString());
-        instrumentEntity.setType(request.getType());
+        instrumentEntity.setInternalId(UUID.randomUUID()
+                                           .toString());
+        instrumentEntity.setExternalType(request.getType());
         instrumentEntity.setExternalId(request.getExternalId());
         instrumentEntity.setExchangeId(exchangeId);
         instrumentEntity.setPositionMode(DEFAULT_POSITION_MODE);
         instrumentEntity.setStatus(INSTRUMENT_STATUS_CREATED);
-        List<CandleGroupEntity> groupEntities = request.getCandleGroups().stream()
-                .map(candleGroupRequest -> createCandleGroupEntity(instrumentEntity, candleGroupRequest))
-                .collect(toList());
+        List<CandleGroupEntity> groupEntities = request.getCandleGroups()
+                                                       .stream()
+                                                       .map(candleGroupRequest -> createCandleGroupEntity(
+                                                               instrumentEntity, candleGroupRequest))
+                                                       .collect(toList());
 
         instrumentEntity.setCandleGroups(groupEntities);
         return instrumentEntity;

@@ -1,16 +1,16 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.Instrument.Status;
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
+import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
-import com.example.tradingbot.rest.model.request.CreateInstrumentRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
-import static com.example.tradingbot.util.factory.InstrumentFactory.createInstrumentEntity;
 
 @Service
 @RequiredArgsConstructor
@@ -18,39 +18,33 @@ public class InstrumentService {
 
     private final InstrumentDataService instrumentDataService;
     private final ExchangeDataService exchangeDataService;
+    private final InstrumentMapper instrumentMapper;
 
-    public InstrumentEntity createInstrument(String exchangeInternalId, CreateInstrumentRequest request) {
-        var exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
-        checkExistence(exchangeId, request.getExternalId());
-        var instrumentEntity = createInstrumentEntity(exchangeId, request);
-        return instrumentDataService.save(instrumentEntity);
+    public Instrument createInstrument(String exchangeInternalId, Instrument request) {
+        Exchange exchange = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
+
+        checkExistence(exchange.getId(), request.getExternalId());
+
+        Instrument instrument = new Instrument();
+        instrumentMapper.domainToDomainOnCreate(request, instrument);
+        instrument.setStatus(Status.ACTIVE);
+        return instrumentDataService.save(instrument);
     }
 
-    public List<InstrumentEntity> getAllByExchange(String exchangeInternalId) {
-        var exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
-        return instrumentDataService.findAllByExchangeId(exchangeId);
-    }
-
-    public InstrumentEntity getRequiredByExchangeIdAndName(Long exchangeId, String name) {
-        return instrumentDataService.findRequiredByExchangeIdAndName(exchangeId, name);
-    }
-
-    public InstrumentEntity getRequiredByExchangeIdAndInternalId(Long exchangeId, String internalId) {
-        return instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeId, internalId);
-    }
-
-    public Long getRequiredIdByExchangeInternalIdAndInstrumentInternalId(String exchangeInternalId, String instrumentInternalId) {
-        return instrumentDataService.findIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId)
-                .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
-    }
-
-    public InstrumentEntity getRequiredByExchangeInternalIdAndInstrumentInternalId(String exchangeInternalId, String instrumentInternalId) {
-        var exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
-        return instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeId, instrumentInternalId);
-    }
 
     private void checkExistence(Long exchangeId, String externalId) {
         instrumentDataService.checkNotExists(exchangeId, externalId);
     }
 
+    public Instrument getByInternalId(String instrumentInternalId) {
+        return instrumentDataService.findRequiredByInternalId(instrumentInternalId);
+    }
+
+    public Instrument getRequiredById(Long instrumentId) {
+        return instrumentDataService.findRequiredById(instrumentId);
+    }
+
+    public Page<Instrument> getByParams(InstrumentSearchParams searchParams, Pageable pageable) {
+        return instrumentDataService.search(searchParams, pageable);
+    }
 }

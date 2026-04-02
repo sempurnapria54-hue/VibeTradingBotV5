@@ -1,60 +1,97 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersAlgoPendingRequest;
-import com.example.tradingbot.client.model.okx.response.PositionResponse;
-import com.example.tradingbot.domain.model.AlgoOrder;
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import com.example.tradingbot.rest.model.response.AlgoOrderResponse;
+import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
+import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
+import com.example.tradingbot.rest.model.response.algo_order.AlgoOrderPageResponse;
+import com.example.tradingbot.rest.model.response.algo_order.AlgoOrderResponse;
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.NullValueCheckStrategy;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring")
-public interface AlgoOrderMapper {
+@Mapper(
+        componentModel = "spring",
+        nullValueCheckStrategy = NullValueCheckStrategy.ALWAYS
+)
+public interface AlgoOrderMapper extends CommonMapper {
 
-    @Mapping(source = "algoId", target = "externalId")
-    @Mapping(source = "clOrdId", target = "internalId")
-    @Mapping(source = "state", target = "externalStatus")
-    @Mapping(source = "ordType", target = "externalType")
-    @Mapping(source = "sz", target = "size")
-    @Mapping(source = "tpTriggerPx", target = "takeProfitTriggerPrice")
-    @Mapping(source = "slTriggerPx", target = "stopLossTriggerPrice")
-    @Mapping(source = "callbackRatio", target = "trailingFallenPercents")
-    @Mapping(source = "callbackSpread", target = "trailingFallenAbsoluteValue")
-    AlgoOrder clientOkxResponseToDomain(com.example.tradingbot.client.model.okx.response.AlgoOrderResponse source);
+    /**
+     * REST
+     */
 
-    @Mapping(source = "externalId", target = "algoId")
-    @Mapping(source = "internalId", target = "clOrdId")
-    @Mapping(source = "externalStatus", target = "state")
-    @Mapping(source = "externalType", target = "ordType")
-    @Mapping(source = "size", target = "sz")
-    @Mapping(source = "takeProfitTriggerPrice", target = "tpTriggerPx")
-    @Mapping(source = "stopLossTriggerPrice", target = "slTriggerPx")
-    @Mapping(source = "trailingFallenPercents", target = "callbackRatio")
-    @Mapping(source = "trailingFallenAbsoluteValue", target = "callbackSpread")
-    com.example.tradingbot.client.model.okx.response.AlgoOrderResponse domainToClient(AlgoOrder source);
+    AlgoOrderResponse domainToRest(AlgoOrder source);
 
-    @Mapping(source = "internalId", target = "clientOrderId")
-    @Mapping(source = "externalType", target = "orderType")
-    @Mapping(source = "size", target = "size")
-    @Mapping(source = "takeProfitTriggerPrice", target = "triggerPrice")
-    @Mapping(source = "stopLossTriggerPrice", target = "orderPrice")
-    CreateAlgoOrderRequest domainToClientOkxRequest(AlgoOrder source);
+    AlgoOrderPageResponse domainToRest(Page<AlgoOrder> source);
 
-    @Mapping(source = "externalId", target = "algoOrderId")
-    @Mapping(source = "internalId", target = "clientOrderId")
-    CancelAlgoOrderRequest domainToClientOkxCancelRequest(AlgoOrder source);
+    AlgoOrder restToDomain(com.example.tradingbot.rest.model.request.algo_order.CreateAlgoOrderRequest source);
 
-    @Mapping(source = "externalType", target = "orderType")
-    OrdersAlgoPendingRequest domainToClientOkxOrdersAlgoPendingRequest(AlgoOrder source);
+    AlgoOrderSearchParams restToDomainSearchParams(
+            com.example.tradingbot.rest.model.request.algo_order.search_params.AlgoOrderSearchParams source);
 
-    AlgoOrderResponse domainToRest(AlgoOrderEntity source);
 
-    @Mapping(source = "pos", target = "size")
-    AlgoOrder closePositionToDomain(PositionResponse source);
+    /**
+     * DATA
+     */
 
-    List<AlgoOrder> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
+    default Page<AlgoOrder> dataToDomain(Page<AlgoOrderEntity> source) {
+        if (source == null) {
+            return Page.empty();
+        }
+
+        return source.map(this::dataToDomain);
+    }
+
+    AlgoOrder dataToDomain(AlgoOrderEntity source);
+
+    AlgoOrderEntity domainToData(AlgoOrder source);
+
+
+    /**
+     * CLIENT
+     */
+
+    List<AlgoOrderExternalSnapshot> clientToExternalSnapshot(
+            List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
+
+    @Mapping(target = "externalId", source = "algoId")
+    @Mapping(target = "externalType", source = "ordType")
+    @Mapping(target = "externalStatus", source = "state")
+    @Mapping(target = "externalDirection", source = "side")
+    @Mapping(target = "externalPositionSide", source = "posSide")
+    @Mapping(target = "condition.trigger.stopLoss.externalType", source = "slTriggerPxType")
+    @Mapping(target = "condition.trigger.stopLoss.externalValue", source = "slTriggerPx", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "condition.trigger.takeProfit.externalType", source = "tpTriggerPxType")
+    @Mapping(target = "condition.trigger.takeProfit.externalValue", source = "tpTriggerPx", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "condition.trailing.activationPrice.externalValue", source = "activePx", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "condition.trailing.externalPrice", source = "moveTriggerPx", qualifiedByName = "stringToBigDecimal")
+    AlgoOrderExternalSnapshot clientToExternalSnapshot(
+            com.example.tradingbot.client.model.okx.response.AlgoOrderResponse source);
+
+
+    /**
+     * DOMAIN_COPY
+     */
+
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "externalId", source = "externalId")
+    @Mapping(target = "externalType", source = "externalType")
+    @Mapping(target = "externalStatus", source = "externalStatus")
+    @Mapping(target = "externalDirection", source = "externalDirection")
+    @Mapping(target = "externalPositionSide", source = "externalPositionSide")
+    @Mapping(target = "condition.trigger.stopLoss.externalType", source = "condition.trigger.stopLoss.externalType")
+    @Mapping(target = "condition.trigger.stopLoss.externalValue", source = "condition.trigger.stopLoss.externalValue")
+    @Mapping(target = "condition.trigger.takeProfit.externalType", source = "condition.trigger.takeProfit.externalType")
+    @Mapping(target = "condition.trigger.takeProfit.externalValue", source = "condition.trigger.takeProfit.externalValue")
+    @Mapping(target = "condition.trailing.activationPrice.externalValue", source = "condition.trailing.activationPrice.externalValue")
+    @Mapping(target = "condition.trailing.externalPrice", source = "condition.trailing.externalPrice")
+    void updateDomainFromExternalSnapshot(AlgoOrderExternalSnapshot source,
+                                          @org.mapstruct.MappingTarget AlgoOrder target);
+
+
 }

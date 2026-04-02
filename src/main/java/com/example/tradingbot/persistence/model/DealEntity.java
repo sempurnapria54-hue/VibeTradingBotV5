@@ -1,6 +1,16 @@
 package com.example.tradingbot.persistence.model;
 
-import jakarta.persistence.*;
+import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -34,7 +44,7 @@ public class DealEntity {
     /**
      * Межсервисный идентификатор.
      */
-    @Column(name="internal_id", nullable=false, updatable=false)
+    @Column(name = "internal_id", nullable = false, updatable = false)
     private String internalId;
 
     /**
@@ -46,16 +56,14 @@ public class DealEntity {
     /**
      * Текущий внутренний статус.
      */
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private Status status;
+    private String status;
 
     /**
      * Причина закрытия.
      */
-    @Enumerated(EnumType.STRING)
     @Column(name = "close_reason")
-    private CloseReason closeReason;
+    private String closeReason;
 
     /**
      * Сколько принесла сделка. Если убыток, то отрицательное число.
@@ -66,123 +74,22 @@ public class DealEntity {
     /**
      * Список ордеров.
      */
-    @OneToMany(mappedBy = "deal", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToMany(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deal_id")
     private List<OrderEntity> orderEntities;
 
     /**
      * Список алго-ордеров.
      */
-    @OneToMany(mappedBy = "deal", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToMany(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deal_id")
     private List<AlgoOrderEntity> algoOrderEntities;
 
     /**
      * Список позиций.
      */
-    @OneToMany(mappedBy = "deal", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToMany(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deal_id")
     private List<PositionEntity> positionEntities;
 
-    public enum Status {
-
-        /**
-         * Сделка создана локально, но входной ордер ещё не отправлен.
-         */
-        CREATED,
-
-        /**
-         * Входной ордер отправлен на биржу (есть OrderEntity со статусом PENDING/SENT),
-         * позиции ещё нет.
-         */
-        ORDER_PENDING,
-
-        /**
-         * Позиция появилась (PositionEntity создан/активен), но защита ещё не гарантирована
-         * (attached SL может ещё не активен, отдельный SL ещё не создан/не подтверждён).
-         */
-        POSITION_UNPROTECTED,
-
-        /**
-         * Есть отдельный SL algo (AlgoOrderEntity) и он подтверждён биржей (PENDING/ACTIVE),
-         * attached SL уже удалён или помечен к удалению.
-         */
-        POSITION_PROTECTED,
-
-        /**
-         * Позиция открыта и бот её сопровождает (трейлинг/правила стратегии активны).
-         * (Можно объединить с POSITION_OPEN_PROTECTED, но удобно отделять как "рабочий режим")
-         */
-        ACTIVE,
-
-        /**
-         * Инициирован выход: отправлен закрывающий ордер / close-position,
-         * ожидаем подтверждения, что позиции нет.
-         */
-        EXIT_PENDING,
-
-        /**
-         * Сделка завершена успешно: позиция закрыта, активных ордеров/алго от сделки нет.
-         */
-        CLOSED,
-
-        /**
-         * Сделка остановлена из-за ошибки/аномалии (не удалось выставить защиту,
-         * не удалось реконсилировать, биржа отвечает ошибками и т.п.).
-         * В этом статусе бот не продолжает торговые действия без ручного решения.
-         */
-        ERROR
-    }
-
-    public enum CloseReason {
-
-        /**
-         * Сработал stop-loss (обычный или algo SL).
-         */
-        STOP_LOSS,
-
-        /**
-         * Сработал take-profit (если используешь TP).
-         */
-        TAKE_PROFIT,
-
-        /**
-         * Закрыли по сигналу стратегии (ручной выход по правилам, не SL/TP).
-         */
-        STRATEGY_EXIT,
-
-        /**
-         * Вышли по таймауту/времени удержания (time stop).
-         */
-        TIME_STOP,
-
-        /**
-         * Закрыли из-за риска/ограничений (маржа, плечо, лимиты, max positions, emergency risk rule).
-         */
-        RISK_CONTROL,
-
-        /**
-         * Экстренная остановка (kill switch): закрыли всё и/или отменили ордера.
-         */
-        EMERGENCY_STOP,
-
-        /**
-         * Ручное вмешательство пользователя (закрыто в UI/вручную через API).
-         */
-        MANUAL,
-
-        /**
-         * Закрытие в результате реконсиляции/восстановления после рестарта
-         * (например, бот обнаружил, что позиции уже нет, и завершил сделку).
-         */
-        RECONCILIATION,
-
-        /**
-         * Невозможно обеспечить защиту (не удалось выставить/подтвердить SL),
-         * поэтому позицию закрыли принудительно (fail-safe).
-         */
-        PROTECTION_FAILED,
-
-        /**
-         * Биржа ликвидировала позицию.
-         */
-        LIQUIDATION
-    }
 }

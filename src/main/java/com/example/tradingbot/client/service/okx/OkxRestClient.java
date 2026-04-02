@@ -1,12 +1,10 @@
 package com.example.tradingbot.client.service.okx;
 
-import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
+import com.example.tradingbot.client.exception.ExternalApiException;
+import com.example.tradingbot.client.exception.ExternalTransportException;
 import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
-import com.example.tradingbot.client.model.okx.response.BalanceResponse;
-import com.example.tradingbot.client.model.okx.request.BalanceRequest;
 import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
-import com.example.tradingbot.client.model.okx.response.CandleResponse;
 import com.example.tradingbot.client.model.okx.request.CandlesRequest;
 import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
 import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
@@ -14,22 +12,25 @@ import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
 import com.example.tradingbot.client.model.okx.request.FillsArchiveLinkRequest;
 import com.example.tradingbot.client.model.okx.request.FillsArchiveRequest;
 import com.example.tradingbot.client.model.okx.request.FillsRequest;
-import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
 import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
+import com.example.tradingbot.client.model.okx.request.get.GetAlgoOrdersHistorySearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrderDetailsSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersAlgoPendingSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistoryArchiveSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistorySearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersPendingSearchParams;
+import com.example.tradingbot.client.model.okx.request.get.GetPositionsSearchParams;
+import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
+import com.example.tradingbot.client.model.okx.response.CandleResponse;
+import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
 import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
-import com.example.tradingbot.client.model.okx.request.OrderDetailsRequest;
 import com.example.tradingbot.client.model.okx.response.OrderResponse;
-import com.example.tradingbot.client.model.okx.request.OrdersAlgoPendingRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersHistoryRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersPendingRequest;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
-import com.example.tradingbot.client.model.okx.request.PositionsRequest;
 import com.example.tradingbot.client.model.okx.response.PriceTickerResponse;
 import com.example.tradingbot.client.model.okx.response.TickerRequest;
 import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
 import com.example.tradingbot.client.model.okx.response.TradeFillsArchiveResponse;
-import com.example.tradingbot.client.exception.ExternalApiException;
-import com.example.tradingbot.client.exception.ExternalTransportException;
+import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.config.OkxConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static java.util.Objects.isNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 @Component
 @RequiredArgsConstructor
 public class OkxRestClient {
@@ -62,42 +68,87 @@ public class OkxRestClient {
     private final OkxConfig okxConfig;
     private final OkxAuthSigner signer;
     private final ObjectMapper objectMapper;
+    private final OkxRequestValidator requestValidator;
 
-    public OkxApiResponse<BalanceResponse> getBalance(BalanceRequest request) {
+    /**
+     * GET.
+     */
+    public OkxApiResponse<BalanceResponse> getBalances() {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "ccy", request.getCurrency());
         return getPrivate("/api/v5/account/balance", params, new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxApiResponse<PositionResponse> getPositions(PositionsRequest request) {
+    public OkxApiResponse<PositionResponse> getPositions(GetPositionsSearchParams request) {
         return getPrivate("/api/v5/account/positions", positionsParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxApiResponse<OrderResponse> getOrdersPending(OrdersPendingRequest request) {
-        return getPrivate("/api/v5/trade/orders-pending", ordersPendingParams(request), new ParameterizedTypeReference<>() {
+    public OkxApiResponse<PositionResponse> getAllPositions() {
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        return getPrivate("/api/v5/account/positions", params, new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxApiResponse<OrderResponse> getOrderDetails(OrderDetailsRequest request) {
+    public OkxApiResponse<OrderResponse> getOrdersPending(GetOrdersPendingSearchParams request) {
+        return getPrivate("/api/v5/trade/orders-pending", ordersPendingParams(request),
+                          new ParameterizedTypeReference<>() {
+                          });
+    }
+
+    public OkxApiResponse<OrderResponse> getOrderDetails(GetOrderDetailsSearchParams request) {
         return getPrivate("/api/v5/trade/order", orderDetailsParams(request), new ParameterizedTypeReference<>() {
         });
     }
 
+    public OkxApiResponse<OrderResponse> getOrdersHistory(GetOrdersHistorySearchParams request) {
+        return getPrivate("/api/v5/trade/orders-history", ordersHistoryParams(request),
+                          new ParameterizedTypeReference<>() {
+                          });
+    }
 
-    public OkxApiResponse<AlgoOrderResponse> getOrdersAlgoPending(OrdersAlgoPendingRequest request) {
-        return getPrivate("/api/v5/trade/orders-algo-pending", ordersAlgoPendingParams(request), new ParameterizedTypeReference<>() {
+    public OkxApiResponse<OrderResponse> getOrdersHistoryArchive(GetOrdersHistoryArchiveSearchParams request) {
+        return getPrivate("/api/v5/trade/orders-history-archive", ordersHistoryArchiveParams(request),
+                          new ParameterizedTypeReference<>() {
+                          });
+    }
+
+
+    public OkxApiResponse<AlgoOrderResponse> getOrdersAlgoPending(GetOrdersAlgoPendingSearchParams request) {
+        return getPrivate("/api/v5/trade/orders-algo-pending", ordersAlgoPendingParams(request),
+                          new ParameterizedTypeReference<>() {
+                          });
+    }
+
+    public OkxApiResponse<AlgoOrderResponse> getOrderAlgoDetails(String algoOrderInternalId,
+                                                                 String algoOrderExternalId) {
+        if (isBlank(algoOrderInternalId) && isBlank(algoOrderExternalId)) {
+            throw new IllegalArgumentException(
+                    "Either algoOrderExternalId (algoId) or algoOrderInternalId (algoClOrdId) must be provided");
+        }
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        addIfPresent(params, "algoId", algoOrderExternalId);
+        addIfPresent(params, "algoClOrdId", algoOrderInternalId);
+
+        return getPrivate("/api/v5/trade/order-algo", params, new ParameterizedTypeReference<>() {
         });
     }
 
-    public OkxApiResponse<OrderResponse> getOrdersHistory(OrdersHistoryRequest request) {
-        return getPrivate("/api/v5/trade/orders-history", ordersHistoryParams(request), new ParameterizedTypeReference<>() {
-        });
-    }
+    public OkxApiResponse<AlgoOrderResponse> getOrdersAlgoHistory(GetAlgoOrdersHistorySearchParams searchParams) {
+        requestValidator.validate(searchParams);
 
-    public OkxApiResponse<OrderResponse> getOrdersHistoryArchive(OrdersHistoryRequest request) {
-        return getPrivate("/api/v5/trade/orders-history-archive", ordersHistoryParams(request), new ParameterizedTypeReference<>() {
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        addIfPresent(params, "ordType", searchParams.getExternalAlgoOrderType());
+        addIfPresent(params, "instId", searchParams.getInstrumentExternalId());
+        addIfPresent(params, "instType", searchParams.getInstrumentExternalType());
+        addIfPresent(params, "state", searchParams.getExternalStatus());
+        addIfPresent(params, "after", searchParams.getAfterAlgoOrderExternalId());
+        addIfPresent(params, "before", searchParams.getBeforeAlgoOrderExternalId());
+        addIfPresent(params, "limit", searchParams.getLimit());
+        addIfPresent(params, "algoId", searchParams.getAlgoOrderExternalId());
+
+        return getPrivate("/api/v5/trade/orders-algo-history", params, new ParameterizedTypeReference<>() {
         });
     }
 
@@ -112,14 +163,14 @@ public class OkxRestClient {
     }
 
     public OkxApiResponse<TradeFillsArchiveResponse> requestFillsArchive(FillsArchiveRequest request) {
-        Map<String, String> body = Collections.singletonMap("instType", request.getInstrumentType());
+        Map<String, String> body = Collections.singletonMap("instType", request.getExternalInstrumentType());
         return postPrivate("/api/v5/trade/fills-archive", body, new ParameterizedTypeReference<>() {
         });
     }
 
     public OkxApiResponse<TradeFillsArchiveResponse> getFillsArchiveLink(FillsArchiveLinkRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instType", request.getInstrumentType());
+        addIfPresent(params, "instType", request.getExternalInstrumentType());
         return getPrivate("/api/v5/trade/fills-archive", params, new ParameterizedTypeReference<>() {
         });
     }
@@ -150,8 +201,9 @@ public class OkxRestClient {
     }
 
     public OkxApiResponse<AlgoOrderResponse> createAlgoOrder(CreateAlgoOrderRequest request) {
-        return postPrivate("/api/v5/trade/order-algo", createAlgoOrderBody(request), new ParameterizedTypeReference<>() {
-        });
+        return postPrivate("/api/v5/trade/order-algo", createAlgoOrderBody(request),
+                           new ParameterizedTypeReference<>() {
+                           });
     }
 
     public OkxApiResponse<AlgoOrderResponse> cancelAlgoOrder(CancelAlgoOrderRequest request) {
@@ -166,72 +218,166 @@ public class OkxRestClient {
     }
 
     public OkxApiResponse<PositionResponse> closePosition(ClosePositionRequest request) {
-        return postPrivate("/api/v5/trade/close-position", closePositionBody(request), new ParameterizedTypeReference<>() {
-        });
+        return postPrivate("/api/v5/trade/close-position", closePositionBody(request),
+                           new ParameterizedTypeReference<>() {
+                           });
     }
 
     public OkxApiResponse<InstrumentResponse> getInstruments(InstrumentsRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instType", request.getInstrumentType());
-        addIfPresent(params, "instId", request.getInstrumentId());
+        addIfPresent(params, "instType", request.getExternalType());
+        addIfPresent(params, "instId", request.getExternalId());
         return getPublic("/api/v5/public/instruments", params, new ParameterizedTypeReference<>() {
         });
     }
 
     public OkxApiResponse<PriceTickerResponse> getTicker(TickerRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instId", request.getInstrumentId());
+        addIfPresent(params, "instId", request.getExternalInstrumentId());
         return getPublic("/api/v5/market/ticker", params, new ParameterizedTypeReference<>() {
         });
     }
 
-    private MultiValueMap<String, String> positionsParams(PositionsRequest request) {
+    private MultiValueMap<String, String> positionsParams(GetPositionsSearchParams request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instId", request.getInstrumentId());
-        addIfPresent(params, "instType", request.getInstrumentType());
+        addIfPresent(params, "instId", request.getInstrumentExternalId());
+        addIfPresent(params, "instType", request.getInstrumentExternalType());
         return params;
     }
 
-    private MultiValueMap<String, String> ordersPendingParams(OrdersPendingRequest request) {
+    private MultiValueMap<String, String> ordersPendingParams(GetOrdersPendingSearchParams request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instId", request.getInstrumentId());
-        addIfPresent(params, "instType", request.getInstrumentType());
+        addIfPresent(params, "instId", request.getInstrumentExternalId());
+        addIfPresent(params, "instType", request.getInstrumentExternalType());
+        addIfPresent(params, "state", request.getExternalStatus());
+        addIfPresent(params, "ordType", request.getExternalType());
+        addIfPresent(params, "after", request.getAfterOrderExternalId());
+        addIfPresent(params, "before", request.getBeforeOrderExternalId());
+        addIfPresent(params, "limit", request.getLimit());
         return params;
     }
 
-    private MultiValueMap<String, String> orderDetailsParams(OrderDetailsRequest request) {
+    private MultiValueMap<String, String> orderDetailsParams(GetOrderDetailsSearchParams request) {
+        if (isNull(request)) {
+            throw new IllegalArgumentException("GetOrderDetailsSearchParams is null");
+        }
+
+        if (isBlank(request.getInstrumentExternalId())) {
+            throw new IllegalArgumentException("instId (instrumentExternalId) is required");
+        }
+
+        if (isBlank(request.getExternalId()) && isBlank(request.getInternalId())) {
+            throw new IllegalArgumentException("ordId (externalId) or clOrdId (internalId) is required");
+        }
+
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instId", request.getInstrumentId());
-        addIfPresent(params, "ordId", request.getOrderId());
-        addIfPresent(params, "clOrdId", request.getClientOrderId());
+        addIfPresent(params, "instId", request.getInstrumentExternalId());
+        addIfPresent(params, "ordId", request.getExternalId());
+        addIfPresent(params, "clOrdId", request.getInternalId());
         return params;
     }
 
+    private MultiValueMap<String, String> ordersAlgoPendingParams(GetOrdersAlgoPendingSearchParams request) {
+        if (isNull(request)) {
+            throw new IllegalArgumentException("GetOrdersAlgoPendingSearchParams is null");
+        }
+        if (isBlank(request.getAlgoOrderExternalType())) {
+            throw new IllegalArgumentException("ordType (algoOrderExternalType) is required");
+        }
 
-    private MultiValueMap<String, String> ordersAlgoPendingParams(OrdersAlgoPendingRequest request) {
+        boolean hasAfter = isNotBlank(request.getAfterAlgoOrderExternalId());
+        boolean hasBefore = isNotBlank(request.getBeforeAlgoOrderExternalId());
+
+        if (hasAfter && hasBefore) {
+            throw new IllegalArgumentException(
+                    "Only one of afterAlgoOrderExternalId / beforeAlgoOrderExternalId must be set");
+        }
+
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "ordType", request.getOrderType());
-        addIfPresent(params, "instId", request.getInstrumentId());
-        addIfPresent(params, "instType", request.getInstrumentType());
+        addIfPresent(params, "ordType", request.getAlgoOrderExternalType());
+        addIfPresent(params, "algoId", request.getAlgoOrderExternalId());
+        addIfPresent(params, "instType", request.getInstrumentExternalType());
+        addIfPresent(params, "instId", request.getInstrumentExternalId());
+        addIfPresent(params, "after", request.getAfterAlgoOrderExternalId());
+        addIfPresent(params, "before", request.getBeforeAlgoOrderExternalId());
+        addIfPresent(params, "limit", request.getLimit());
         return params;
     }
 
-    private MultiValueMap<String, String> ordersHistoryParams(OrdersHistoryRequest request) {
+    private MultiValueMap<String, String> ordersHistoryParams(GetOrdersHistorySearchParams request) {
+        if (isNull(request)) {
+            throw new IllegalArgumentException("OrdersHistoryRequest is null");
+        }
+        if (isBlank(request.getInstrumentExternalType())) {
+            throw new IllegalArgumentException("instType (instrumentExternalType) is required");
+        }
+
+        boolean hasBegin = isNotBlank(request.getBegin());
+        boolean hasEnd = isNotBlank(request.getEnd());
+
+        if (hasBegin && isFalse(hasEnd)) {
+            throw new IllegalArgumentException("end is required when begin is set");
+        }
+        if (isFalse(hasBegin) && hasEnd) {
+            throw new IllegalArgumentException("begin is required when end is set");
+        }
+
+        boolean hasAfter = isNotBlank(request.getAfterOrderExternalId());
+        boolean hasBefore = isNotBlank(request.getBeforeOrderExternalId());
+
+        if (hasAfter && hasBefore) {
+            throw new IllegalArgumentException("Only one of afterExternalOrderId / beforeExternalOrderId must be set");
+        }
+        if ((hasAfter || hasBefore) && (hasBegin || hasEnd)) {
+            throw new IllegalArgumentException("Use either after/before pagination OR begin/end time filter, not both");
+        }
+
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instType", request.getInstrumentType());
-        addIfPresent(params, "instId", request.getInstrumentId());
-        addIfPresent(params, "state", request.getState());
-        addIfPresent(params, "after", request.getAfter());
-        addIfPresent(params, "before", request.getBefore());
+        addIfPresent(params, "instType", request.getInstrumentExternalType());
+        addIfPresent(params, "instFamily", request.getInstrumentExternalFamily());
+        addIfPresent(params, "instId", request.getInstrumentExternalId());
+        addIfPresent(params, "ordType", request.getExternalType());
+        addIfPresent(params, "state", request.getExternalStatus());
+        addIfPresent(params, "category", request.getExternalCategory());
+        addIfPresent(params, "after", request.getAfterOrderExternalId());
+        addIfPresent(params, "before", request.getBeforeOrderExternalId());
+        addIfPresent(params, "begin", request.getBegin());
+        addIfPresent(params, "end", request.getEnd());
+        addIfPresent(params, "limit", request.getLimit());
+        return params;
+    }
+
+    private MultiValueMap<String, String> ordersHistoryArchiveParams(GetOrdersHistoryArchiveSearchParams request) {
+        if (isNull(request)) {
+            throw new IllegalArgumentException("OrdersHistoryRequest is null");
+        }
+        if (isBlank(request.getInstrumentExternalType())) {
+            throw new IllegalArgumentException("instType (instrumentExternalType) is required");
+        }
+
+        boolean hasAfter = isNotBlank(request.getAfterOrderExternalId());
+        boolean hasBefore = isNotBlank(request.getBeforeOrderExternalId());
+
+        if (hasAfter && hasBefore) {
+            throw new IllegalArgumentException("Only one of afterOrderExternalId / beforeOrderExternalId must be set");
+        }
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        addIfPresent(params, "instType", request.getInstrumentExternalType());
+        addIfPresent(params, "instId", request.getInstrumentExternalId());
+        addIfPresent(params, "ordType", request.getExternalType());
+        addIfPresent(params, "state", request.getExternalStatus());
+        addIfPresent(params, "after", request.getAfterOrderExternalId());
+        addIfPresent(params, "before", request.getBeforeOrderExternalId());
         addIfPresent(params, "limit", request.getLimit());
         return params;
     }
 
     private MultiValueMap<String, String> fillsParams(FillsRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instType", request.getInstrumentType());
-        addIfPresent(params, "instId", request.getInstrumentId());
-        addIfPresent(params, "ordId", request.getOrderId());
+        addIfPresent(params, "instType", request.getExternalInstrumentType());
+        addIfPresent(params, "instId", request.getExternalInstrumentId());
+        addIfPresent(params, "ordId", request.getExternalOrderId());
         addIfPresent(params, "after", request.getAfter());
         addIfPresent(params, "before", request.getBefore());
         addIfPresent(params, "limit", request.getLimit());
@@ -240,8 +386,8 @@ public class OkxRestClient {
 
     private MultiValueMap<String, String> candlesParams(CandlesRequest request) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        addIfPresent(params, "instId", request.getInstrumentId());
-        addIfPresent(params, "bar", request.getBar());
+        addIfPresent(params, "instId", request.getExternalInstrumentId());
+        addIfPresent(params, "bar", request.getExternalTimeframe());
         addIfPresent(params, "after", request.getAfter());
         addIfPresent(params, "before", request.getBefore());
         addIfPresent(params, "limit", request.getLimit());
@@ -304,48 +450,48 @@ public class OkxRestClient {
     }
 
     private void addIfPresent(MultiValueMap<String, String> params, String key, String value) {
-        if (Objects.nonNull(value) && BooleanUtils.isFalse(value.isBlank())) {
+        if (Objects.nonNull(value) && isFalse(value.isBlank())) {
             params.add(key, value);
         }
     }
 
     private void putIfPresent(Map<String, String> body, String key, String value) {
-        if (Objects.nonNull(value) && BooleanUtils.isFalse(value.isBlank())) {
+        if (Objects.nonNull(value) && isFalse(value.isBlank())) {
             body.put(key, value);
         }
     }
 
 
     private void putIfPresentObject(Map<String, Object> body, String key, String value) {
-        if (Objects.nonNull(value) && BooleanUtils.isFalse(value.isBlank())) {
+        if (Objects.nonNull(value) && isFalse(value.isBlank())) {
             body.put(key, value);
         }
     }
 
     private <T> OkxApiResponse<T> getPrivate(String path,
-                                          MultiValueMap<String, String> params,
-                                          ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
+                                             MultiValueMap<String, String> params,
+                                             ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
         return exchange(path, HttpMethod.GET, params, null, true, typeReference);
     }
 
     private <T> OkxApiResponse<T> getPublic(String path,
-                                         MultiValueMap<String, String> params,
-                                         ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
+                                            MultiValueMap<String, String> params,
+                                            ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
         return exchange(path, HttpMethod.GET, params, null, false, typeReference);
     }
 
     private <T> OkxApiResponse<T> postPrivate(String path,
-                                           Object bodyObject,
-                                           ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
+                                              Object bodyObject,
+                                              ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
         return exchange(path, HttpMethod.POST, new LinkedMultiValueMap<>(), bodyObject, true, typeReference);
     }
 
     private <T> OkxApiResponse<T> exchange(String path,
-                                        HttpMethod method,
-                                        MultiValueMap<String, String> params,
-                                        Object bodyObject,
-                                        boolean signed,
-                                        ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
+                                           HttpMethod method,
+                                           MultiValueMap<String, String> params,
+                                           Object bodyObject,
+                                           boolean signed,
+                                           ParameterizedTypeReference<OkxApiResponse<T>> typeReference) {
         String body = "";
         if (Objects.nonNull(bodyObject)) {
             body = toJson(bodyObject);
@@ -369,18 +515,20 @@ public class OkxRestClient {
             validateEnvelope(envelope, path);
             return envelope;
         } catch (ResourceAccessException exception) {
-            throw new ExternalTransportException("Timeout or connection error for endpoint " + path, HttpStatus.GATEWAY_TIMEOUT);
+            throw new ExternalTransportException("Timeout or connection error for endpoint " + path,
+                                                 HttpStatus.GATEWAY_TIMEOUT);
         } catch (HttpStatusCodeException exception) {
             throw new ExternalTransportException("HTTP error from OKX for endpoint " + path, HttpStatus.BAD_GATEWAY);
         }
     }
 
     private void validateEnvelope(OkxApiResponse<?> envelope, String path) {
-        if (Objects.isNull(envelope)) {
-            throw new ExternalTransportException("Empty response from OKX for endpoint " + path, HttpStatus.BAD_GATEWAY);
+        if (isNull(envelope)) {
+            throw new ExternalTransportException("Empty response from OKX for endpoint " + path,
+                                                 HttpStatus.BAD_GATEWAY);
         }
         boolean success = BooleanUtils.isTrue(Objects.equals(envelope.getCode(), "0"));
-        if (BooleanUtils.isFalse(success)) {
+        if (isFalse(success)) {
             throw new ExternalApiException(envelope.getCode(), envelope.getMsg(), HttpStatus.BAD_REQUEST);
         }
     }
@@ -394,6 +542,9 @@ public class OkxRestClient {
     }
 
     private String buildPathWithQuery(String path, MultiValueMap<String, String> params) {
-        return UriComponentsBuilder.fromPath(path).queryParams(params).build().toUriString();
+        return UriComponentsBuilder.fromPath(path)
+                                   .queryParams(params)
+                                   .build()
+                                   .toUriString();
     }
 }

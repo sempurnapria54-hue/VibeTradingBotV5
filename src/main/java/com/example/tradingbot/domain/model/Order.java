@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
@@ -37,7 +38,7 @@ public class Order extends Auditable {
     /**
      * Тип ордера в бизнес-терминах.
      */
-    private String type;
+    private Type type;
 
     /**
      * Сторона ордера (buy/sell).
@@ -74,6 +75,11 @@ public class Order extends Auditable {
      */
     private BigDecimal fee;
 
+    /**
+     * Прикреплённыe SL при создании.
+     */
+    private List<AttachedAlgoOrder> attachedAlgoOrders;
+
     public enum Status {
         /**
          * Запись создана локально, ещё не отправляли
@@ -103,5 +109,19 @@ public class Order extends Auditable {
          * Не удалось создать/обновить
          */
         FAILED
+    }
+
+    public enum Type {
+
+        /**
+         * Ордер на вход в сделку: открыть позицию.
+         */
+        ENTRY,
+
+        /**
+         * Ордер на вход в сделку: открыть позицию вместе с привязанным SL.
+         */
+        ENTRY_ATTACHED_STOP_LOSS,
+
     }
 }

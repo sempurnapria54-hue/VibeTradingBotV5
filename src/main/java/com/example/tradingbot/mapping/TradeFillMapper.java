@@ -3,6 +3,7 @@ package com.example.tradingbot.mapping;
 import com.example.tradingbot.client.model.okx.request.FillsRequest;
 import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
 import com.example.tradingbot.domain.model.TradeFill;
+import com.example.tradingbot.domain.model.search_params.TradeFillsSearchParams;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -33,9 +34,7 @@ public interface TradeFillMapper {
     @Mapping(source = "timestamp", target = "ts")
     TradeFillResponse domainToClient(TradeFill source);
 
-    @Mapping(source = "externalInstrumentId", target = "instrumentId")
-    @Mapping(source = "externalOrderId", target = "orderId")
-    FillsRequest domainToClientOkxRequest(TradeFill source);
+    FillsRequest domainSearchParamsToClientOkxRequest(TradeFillsSearchParams source);
 
     List<TradeFill> clientOkxResponseToDomain(List<TradeFillResponse> source);
 }

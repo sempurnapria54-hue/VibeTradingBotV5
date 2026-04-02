@@ -1,22 +1,12 @@
 package com.example.tradingbot.persistence.repository;
 
 import com.example.tradingbot.persistence.model.OrderEntity;
-import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
+import java.util.Optional;
 
-    List<OrderEntity> findAllByExchangeIdAndInstrumentId(Long exchangeId, Long instrumentId);
+public interface OrderRepository extends JpaRepository<OrderEntity, Long>, JpaSpecificationExecutor<OrderEntity> {
 
-    Optional<OrderEntity> findByExchangeIdAndInstrumentIdAndClientOrderId(
-        Long exchangeId,
-        Long instrumentId,
-        String clientOrderId
-    );
-    List<OrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(
-        Long exchangeId,
-        Long instrumentId,
-        String exchangeOrderId
-    );
+    Optional<OrderEntity> findByInternalId(String internalId);
 }

@@ -7,8 +7,8 @@ import lombok.Setter;
 @Setter
 public class CandlesRequest {
 
-    private String instrumentId;
-    private String bar;
+    private String externalInstrumentId;
+    private String externalTimeframe;
     private String after;
     private String before;
     private String limit;

@@ -1,5 +1,7 @@
 package com.example.tradingbot.persistence.service;
 
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.persistence.model.ExchangeEntity;
 import com.example.tradingbot.persistence.repository.ExchangeRepository;
 import lombok.RequiredArgsConstructor;
@@ -7,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.EXCHANGE_ALREADY_EXISTS;
 import static com.example.tradingbot.util.Constant.ErrorCode.EXCHANGE_NOT_FOUND;
@@ -16,42 +17,36 @@ import static com.example.tradingbot.util.Constant.ErrorCode.EXCHANGE_NOT_FOUND;
 @RequiredArgsConstructor
 public class ExchangeDataService {
 
-    private final ExchangeRepository exchangeRepository;
+    private final ExchangeRepository repository;
+    private final ExchangeMapper mapper;
 
     @Transactional
-    public ExchangeEntity save(ExchangeEntity exchangeEntity) {
-        return exchangeRepository.save(exchangeEntity);
+    public Exchange save(Exchange exchange) {
+        ExchangeEntity exchangeEntity = mapper.domainToData(exchange);
+        ExchangeEntity saved = repository.save(exchangeEntity);
+        return mapper.dataToDomain(saved);
     }
 
-    public Optional<ExchangeEntity> findById(Long id) {
-        return exchangeRepository.findById(id);
+    public Exchange findRequiredByInternalId(String internalId) {
+        return repository.findByInternalId(internalId)
+                         .map(mapper::dataToDomain)
+                         .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
     }
 
-    public Optional<ExchangeEntity> findRequiredById(Long id) {
-        return exchangeRepository.findById(id);
-    }
-
-    public Optional<ExchangeEntity> findByName(String name) {
-        return exchangeRepository.findByName(name);
-    }
-
-    public ExchangeEntity findRequiredByInternalId(String internalId) {
-        return exchangeRepository.findByInternalId(internalId)
-                .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
-    }
-
-    public Long getRequiredIdByInternalId(String internalId) {
-        return exchangeRepository.findIdByInternalId(internalId)
-                .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
-    }
-
-    public List<ExchangeEntity> findAll() {
-        return exchangeRepository.findAll();
+    public List<Exchange> findAll() {
+        List<ExchangeEntity> data = repository.findAll();
+        return mapper.dataToDomain(data);
     }
 
     public void checkNotExists(String name) {
-        if (exchangeRepository.existsByName(name)) {
+        if (repository.existsByName(name)) {
             throw new RuntimeException(EXCHANGE_ALREADY_EXISTS);
         }
+    }
+
+    public Exchange findRequiredById(Long id) {
+        return repository.findById(id)
+                         .map(mapper::dataToDomain)
+                         .orElseThrow(() -> new RuntimeException(EXCHANGE_NOT_FOUND));
     }
 }

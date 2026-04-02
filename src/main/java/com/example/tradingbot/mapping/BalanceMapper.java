@@ -1,33 +1,42 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.client.model.okx.request.BalanceRequest;
-import com.example.tradingbot.client.model.okx.response.BalanceResponse;
-import com.example.tradingbot.domain.model.Balance;
+import com.example.tradingbot.client.model.okx.response.balance.BalanceDetail;
+import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
+import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
+import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceExternalSnapshot;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.NullValueMappingStrategy;
 
 import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface BalanceMapper {
 
-    @Mapping(source = "ccy", target = "currency")
-    @Mapping(source = "cashBal", target = "cashBalance")
-    @Mapping(source = "availBal", target = "availableBalance")
-    @Mapping(source = "eq", target = "equity")
-    @Mapping(source = "frozenBal", target = "frozenBalance")
-    @Mapping(source = "upl", target = "unrealizedProfit")
-    Balance clientOkxResponseToDomain(BalanceResponse source);
+    BalanceExternalSnapshot clientOkxResponseToDomain(BalanceResponse source);
 
-    @Mapping(source = "currency", target = "ccy")
-    @Mapping(source = "cashBalance", target = "cashBal")
-    @Mapping(source = "availableBalance", target = "availBal")
-    @Mapping(source = "equity", target = "eq")
-    @Mapping(source = "frozenBalance", target = "frozenBal")
-    @Mapping(source = "unrealizedProfit", target = "upl")
-    BalanceResponse domainToClient(Balance source);
+    BalanceResponse domainToClient(BalanceExternalSnapshot source);
 
-    List<Balance> clientOkxResponseToDomain(List<BalanceResponse> source);
+    List<BalanceExternalSnapshot> clientOkxResponseToDomain(List<BalanceResponse> source);
 
-    BalanceRequest domainToClientOkxRequest(Balance source);
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "currency", source = "ccy")
+    @Mapping(target = "cashBalance", source = "cashBal")
+    @Mapping(target = "availableBalance", source = "availBal")
+    @Mapping(target = "equity", source = "eq")
+    @Mapping(target = "frozenBalance", source = "frozenBal")
+    @Mapping(target = "unrealizedProfit", source = "upl")
+    BalanceExternalSnapshot clientOkxToExternalSnapshot(BalanceDetail source);
+
+    @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
+    List<BalanceExternalSnapshot> clientOkxToExternalSnapshot(List<BalanceDetail> source);
+
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "exchangeId", source = "exchangeId")
+    @Mapping(target = "totalEquity", source = "response.totalEq")
+    @Mapping(target = "unrealizedProfit", source = "response.upl")
+    @Mapping(target = "balances", source = "response.details")
+    BalanceContainerExternalSnapshot clientOkxToExternalSnapshot(Long exchangeId, BalanceResponse response);
 }

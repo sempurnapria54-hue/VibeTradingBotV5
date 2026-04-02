@@ -1,20 +1,9 @@
 package com.example.tradingbot.persistence.model;
 
-import com.example.tradingbot.rest.model.request.CreateExchangeRequest;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.UUID;
-
-import static com.example.tradingbot.util.Constant.Status.Exchange.EXCHANGE_STATUS_CREATED;
 
 @Getter
 @Setter

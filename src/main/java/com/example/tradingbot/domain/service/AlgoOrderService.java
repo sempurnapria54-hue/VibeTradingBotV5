@@ -1,65 +1,129 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.client.service.ClientManager;
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.deal.Deal;
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
+import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
+import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
-import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
-import static com.example.tradingbot.util.factory.AlgoOrderFactory.createAlgoOrderEntity;
+import static com.example.tradingbot.util.Constant.ErrorCode.ALGO_ORDER_NOT_FOUND_ON_EXCHANGE;
 
 @Service
 @RequiredArgsConstructor
 public class AlgoOrderService {
 
-    private final TradingGuardService tradingGuardService;
     private final AlgoOrderDataService algoOrderDataService;
-    private final OkxProxyService okxProxyService;
-    private final ExchangeService exchangeService;
-    private final InstrumentService instrumentService;
     private final ExchangeDataService exchangeDataService;
     private final InstrumentDataService instrumentDataService;
+    private final DealDataService dealDataService;
+    private final AlgoOrderMapper algoOrderMapper;
+    private final ClientManager clientManager;
 
     @Transactional
-    public AlgoOrderEntity createAlgoOrder(String exchangeInternalId, String instrumentInternalId, CreateAlgoOrderRequest request) {
-        ExchangeEntity exchangeEntity = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
-        InstrumentEntity instrumentEntity = instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), instrumentInternalId);
-        tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
+    public AlgoOrder createAlgoOrder(String dealInternalId, AlgoOrder request) {
+        Deal deal = dealDataService.findRequiredByInternalId(dealInternalId);
 
-        AlgoOrderEntity algoOrderEntity = createAlgoOrderEntity(instrumentEntity, request);
-        algoOrderDataService.save(algoOrderEntity);
-
-        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.createAlgoOrder(algoOrderEntity, instrumentEntity));
-        algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
-        return algoOrderDataService.save(algoOrderEntity);
+        AlgoOrder algoOrder = new AlgoOrder();
+        algoOrderMapper.domainToDomainOnCreate(request, algoOrder);
+        algoOrder.setStatus(AlgoOrder.Status.CREATED);
+        return algoOrderDataService.save(algoOrder);
     }
 
-    public AlgoOrderEntity cancelAlgoOrder(String exchangeInternalId, String instrumentInternalId, String orderId) {
-        ExchangeEntity exchangeEntity = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
-        InstrumentEntity instrumentEntity = instrumentDataService.findRequiredByExchangeIdAndInternalId(exchangeEntity.getId(), instrumentInternalId);
-        tradingGuardService.assertTradingAllowed(exchangeEntity, instrumentEntity);
+    @Transactional
+    public AlgoOrder createOnExchange(String algoOrderInternalId) {
+        AlgoOrder algoOrder = algoOrderDataService.findRequiredByInternalId(algoOrderInternalId);
+        Deal deal = dealDataService.findRequiredById(algoOrder.getDealId());
+        Instrument instrument = instrumentDataService.findRequiredByDealId(algoOrder.getDealId());
+        Exchange exchange = exchangeDataService.findRequiredById(instrument.getExchangeId());
+        Position position = deal.getPositions()
+                                .getFirst();
 
-        AlgoOrderEntity algoOrderEntity =
-                algoOrderDataService.findRequiredByExchangeIdAndInstrumentIdAndClientAlgoOrderId(exchangeEntity.getId(), instrumentEntity.getId(), orderId);
+        List<AlgoOrder> externalAlgoOrders = clientManager.getClientService(exchange.getName())
+                                                          .createAlgoOrder(algoOrder, instrument, position);
 
-        AlgoOrderResponse responseAlgoOrder = extractFirstAlgoOrder(okxProxyService.cancelAlgoOrder(algoOrderEntity, instrumentEntity));
-        algoOrderEntity.applyAlgoOrderResponse(responseAlgoOrder);
-        return algoOrderDataService.save(algoOrderEntity);
+        AlgoOrder externalAlgoOrder = getRequiredByExternalId(externalAlgoOrders, algoOrder.getExternalId());
+        algoOrderMapper.domainToDomainOnUpdate(externalAlgoOrder, algoOrder);
+        algoOrder.setStatus(AlgoOrder.Status.PENDING);
+        return algoOrderDataService.save(algoOrder);
     }
 
-    private AlgoOrderResponse extractFirstAlgoOrder(List<AlgoOrderResponse> orders) {
-        if (orders.isEmpty()) {
-            throw new TradingCommandException(HttpStatus.BAD_GATEWAY, "OKX_EMPTY_RESPONSE", "OKX returned empty algo order response");
-        }
-        return orders.getFirst();
+    public AlgoOrder syncAlgoOrder(String exchangeInternalId, String internalId) {
+        Exchange exchange = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
+        AlgoOrder algoOrder = algoOrderDataService.findRequiredByInternalId(internalId);
+
+        List<AlgoOrder> externalAlgoOrders = clientManager.getClientService(exchange.getName())
+                                                          .createAlgoOrder(algoOrder);
+        AlgoOrder externalAlgoOrder = getRequiredByExternalId(externalAlgoOrders, algoOrder.getExternalId());
+
+        algoOrderMapper.domainToDomainOnUpdate(externalAlgoOrder, algoOrder);
+        return algoOrderDataService.save(algoOrder);
     }
+
+    public AlgoOrder cancelAlgoOrder(String exchangeInternalId, String instrumentInternalId,
+                                     String algoOrderInternalId) {
+        Exchange exchange = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
+        Instrument instrument = instrumentDataService.findRequiredByInternalId(instrumentInternalId);
+        AlgoOrder algoOrder = algoOrderDataService.findRequiredByInternalId(algoOrderInternalId);
+
+        List<AlgoOrder> externalAlgoOrders = clientManager.getClientService(exchange.getName())
+                                                          .cancelAlgoOrder(algoOrder, instrument.getExternalId());
+
+        AlgoOrder externalAlgoOrder = getRequiredByExternalId(externalAlgoOrders, algoOrder.getExternalId());
+        algoOrderMapper.domainToDomainOnUpdate(externalAlgoOrder, algoOrder);
+        algoOrder.setStatus(AlgoOrder.Status.CLOSED);
+        return algoOrderDataService.save(algoOrder);
+    }
+
+    public AlgoOrder getByInternalId(String algoOrderInternalId) {
+        return algoOrderDataService.findRequiredByInternalId(algoOrderInternalId);
+    }
+
+    public Page<AlgoOrder> getByParams(AlgoOrderSearchParams searchParams, Pageable pageable) {
+        return algoOrderDataService.search(searchParams, pageable);
+    }
+
+    private AlgoOrder getRequiredByExternalId(List<AlgoOrder> orders, String externalId) {
+        return orders.stream()
+                     .filter(ord -> Objects.equals(externalId, ord.getExternalId()))
+                     .findFirst()
+                     .orElseThrow(() -> new TradingCommandException(HttpStatus.BAD_GATEWAY,
+                                                                    "EMPTY_RESPONSE",
+                                                                    ALGO_ORDER_NOT_FOUND_ON_EXCHANGE)
+                     );
+
+    }
+
+    public void refreshActiveAlgoOrders(Deal deal) {
+
+    }
+
+    public void createMainProtection(Deal deal) {
+
+    }
+
+    public void cancelAttachedProtection(Deal deal) {
+
+    }
+
+    public void amendMainProtection(Deal deal) {
+
+    }
+
+
+//    TODO: Нужен StatusResolver, когда получаем ответ от биржи;
 }

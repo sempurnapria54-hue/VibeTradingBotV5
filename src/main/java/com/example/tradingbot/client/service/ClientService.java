@@ -1,6 +1,17 @@
 package com.example.tradingbot.client.service;
 
-import com.example.tradingbot.domain.model.*;
+import com.example.tradingbot.domain.model.Candle;
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.PriceTicker;
+import com.example.tradingbot.domain.model.TradeFill;
+import com.example.tradingbot.domain.model.TradeFillsArchive;
+import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 
 import java.util.List;
 
@@ -8,19 +19,37 @@ public interface ClientService {
 
     String getName();
 
-    List<Balance> getBalance(Object... args);
+    /**
+     * GET.
+     */
+    //TODO: тут норм, остальное рефакторим.
+    BalanceContainerExternalSnapshot getBalanceContainer(Exchange exchange);
 
-    List<Position> getPositions(Object... args);
+    //TODO: тут норм, остальное рефакторим.
+    List<PositionExternalSnapshot> getPositionsByInstrument(Instrument instrument);
 
-    List<Order> getOrdersPending(Object... args);
+    //TODO: тут норм, остальное рефакторим.
+    List<PositionExternalSnapshot> getAllPositions();
 
-    List<Order> getOrderDetails(Object... args);
+    List<Order> getActiveOrdersByInstrument(Instrument instrument);
 
-    List<AlgoOrder> getOrdersAlgoPending(Object... args);
+    List<Order> getActiveOrdersByInstrumentType(Instrument instrument);
 
-    List<Order> getOrdersHistory(Object... args);
+    Order getOrder(String externalInstrumentId, String externalOrderId, String internalOrderId);
 
-    List<Order> getOrdersHistoryArchive(Object... args);
+    List<Order> getOrdersHistory(Instrument instrument);
+
+    List<Order> getOrdersHistoryArchive(Instrument instrument);
+
+
+    //TODO: тут норм, остальное рефакторим.
+    List<AlgoOrderExternalSnapshot> getActiveAlgoOrders(Instrument instrument, AlgoOrder algoOrder);
+
+    //TODO: тут норм, остальное рефакторим.
+    AlgoOrderExternalSnapshot getAlgoOrder(AlgoOrder algoOrder);
+
+    //TODO: тут норм, остальное рефакторим.
+    List<AlgoOrderExternalSnapshot> getAlgoOrdersHistory(Instrument instrument, AlgoOrder algoOrder);
 
     List<TradeFill> getFills(Object... args);
 
@@ -38,9 +67,9 @@ public interface ClientService {
 
     List<Order> amendOrder(Object... args);
 
-    List<Order> cancelOrder(Object... args);
+    List<Order> cancelOrder(Order order, String instrumentExternalId);
 
-    List<AlgoOrder> createAlgoOrder(Object... args);
+    List<AlgoOrder> createAlgoOrder(AlgoOrder algoOrder, Instrument instrument, Position position);
 
     List<AlgoOrder> cancelAlgoOrder(Object... args);
 
@@ -49,4 +78,5 @@ public interface ClientService {
     List<Instrument> getInstruments(Object... args);
 
     List<PriceTicker> getTicker(Object... args);
+
 }

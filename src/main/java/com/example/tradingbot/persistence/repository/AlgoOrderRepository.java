@@ -1,22 +1,14 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.persistence.model.AlgoOrderEntity;
-import java.util.List;
-import java.util.Optional;
+import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface AlgoOrderRepository extends JpaRepository<AlgoOrderEntity, Long> {
+import java.util.Optional;
 
-    List<AlgoOrderEntity> findAllByExchangeIdAndInstrumentId(Long exchangeId, Long instrumentId);
+public interface AlgoOrderRepository extends JpaRepository<AlgoOrderEntity, Long>,
+        JpaSpecificationExecutor<AlgoOrderEntity> {
 
-    Optional<AlgoOrderEntity> findByExchangeIdAndInstrumentIdAndClientAlgoOrderId(
-        Long exchangeId,
-        Long instrumentId,
-        String clientAlgoOrderId
-    );
-    List<AlgoOrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeAlgoOrderId(
-        Long exchangeId,
-        Long instrumentId,
-        String exchangeAlgoOrderId
-    );
+    Optional<AlgoOrderEntity> findByInternalId(String internalId);
+
 }

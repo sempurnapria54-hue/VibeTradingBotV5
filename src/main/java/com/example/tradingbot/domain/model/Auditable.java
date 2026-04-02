@@ -13,4 +13,6 @@ public class Auditable {
     private String createdBy;
     private OffsetDateTime modifiedAt;
     private String modifiedBy;
+    private OffsetDateTime externalCreatedAt;
+    private OffsetDateTime externalModifiedAt;
 }

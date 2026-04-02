@@ -4,6 +4,7 @@ import com.example.tradingbot.client.model.okx.request.FillsArchiveLinkRequest;
 import com.example.tradingbot.client.model.okx.request.FillsArchiveRequest;
 import com.example.tradingbot.client.model.okx.response.TradeFillsArchiveResponse;
 import com.example.tradingbot.domain.model.TradeFillsArchive;
+import com.example.tradingbot.domain.model.search_params.TradeFillsSearchParams;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -22,9 +23,9 @@ public interface TradeFillsArchiveMapper {
     @Mapping(source = "externalStatusMessage", target = "msg")
     TradeFillsArchiveResponse domainToClient(TradeFillsArchive source);
 
-    FillsArchiveRequest domainToClientOkxRequest(TradeFillsArchive source);
+    FillsArchiveRequest domainSearchParamsToClientOkxRequest(TradeFillsSearchParams source);
 
-    FillsArchiveLinkRequest domainToClientOkxLinkRequest(TradeFillsArchive source);
+    FillsArchiveLinkRequest domainSearchParamsToClientOkxLinkRequest(TradeFillsSearchParams source);
 
     List<TradeFillsArchive> clientOkxResponseToDomain(List<TradeFillsArchiveResponse> source);
 }

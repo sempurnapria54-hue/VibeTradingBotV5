@@ -2,16 +2,15 @@ package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.ExchangeService;
 import com.example.tradingbot.mapping.ExchangeMapper;
-import com.example.tradingbot.rest.model.request.CreateExchangeRequest;
-import com.example.tradingbot.rest.model.response.ExchangeResponse;
+import com.example.tradingbot.rest.model.request.exchange.CreateExchangeRequest;
+import com.example.tradingbot.rest.model.response.exchange.ExchangeContainerResponse;
+import com.example.tradingbot.rest.model.response.exchange.ExchangeResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -23,13 +22,14 @@ public class ExchangeController {
 
     @PostMapping
     public ExchangeResponse createExchange(@RequestBody CreateExchangeRequest request) {
-        var domainExchange = exchangeService.createExchange(request);
+        var domainRq = exchangeMapper.restToDomain(request);
+        var domainExchange = exchangeService.createExchange(domainRq);
         return exchangeMapper.domainToRest(domainExchange);
     }
 
     @GetMapping
-    public List<ExchangeResponse> getAll() {
+    public ExchangeContainerResponse getAll() {
         var exchanges = exchangeService.getAll();
-        return exchangeMapper.domainToRest(exchanges);
+        return exchangeMapper.domainListToRestContainer(exchanges);
     }
 }

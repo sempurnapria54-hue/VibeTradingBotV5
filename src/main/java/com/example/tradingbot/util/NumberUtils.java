@@ -1,9 +1,10 @@
 package com.example.tradingbot.util;
 
+import lombok.experimental.UtilityClass;
+
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import lombok.experimental.UtilityClass;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -23,5 +24,13 @@ public class NumberUtils {
             return null;
         }
         return OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC);
+    }
+
+    public static int parseIntSafe(String value, String fieldName) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException(fieldName + " must be a valid integer", ex);
+        }
     }
 }

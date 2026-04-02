@@ -1,44 +1,29 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
-import com.example.tradingbot.client.model.okx.request.OrderDetailsRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersHistoryRequest;
-import com.example.tradingbot.client.model.okx.request.OrdersPendingRequest;
+import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistorySearchParams;
+import com.example.tradingbot.client.model.okx.response.OrderResponse.AttachAlgoOrd;
+import com.example.tradingbot.domain.model.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.search_params.OrderSearchParams;
 import com.example.tradingbot.persistence.model.OrderEntity;
-import com.example.tradingbot.rest.model.response.OrderResponse;
+import com.example.tradingbot.rest.model.response.order.OrderPageResponse;
+import com.example.tradingbot.rest.model.response.order.OrderResponse;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValueMappingStrategy;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface OrderMapper {
 
-    @Mapping(source = "ordId", target = "externalId")
-    @Mapping(source = "clOrdId", target = "internalId")
-    @Mapping(source = "ordType", target = "type")
-    @Mapping(source = "state", target = "externalStatus")
-    @Mapping(source = "px", target = "price")
-    @Mapping(source = "sz", target = "size")
-    @Mapping(source = "avgPx", target = "averagePrice")
-    @Mapping(source = "accFillSz", target = "accumulatedFillSize")
-    @Mapping(source = "fee", target = "fee")
-    Order clientOkxResponseToDomain(com.example.tradingbot.client.model.okx.response.OrderResponse source);
-
-    @Mapping(source = "externalId", target = "ordId")
-    @Mapping(source = "internalId", target = "clOrdId")
-    @Mapping(source = "type", target = "ordType")
-    @Mapping(source = "externalStatus", target = "state")
-    @Mapping(source = "price", target = "px")
-    @Mapping(source = "size", target = "sz")
-    @Mapping(source = "averagePrice", target = "avgPx")
-    @Mapping(source = "accumulatedFillSize", target = "accFillSz")
-    @Mapping(source = "fee", target = "fee")
-    com.example.tradingbot.client.model.okx.response.OrderResponse domainToClient(Order source);
 
     @Mapping(source = "internalId", target = "clientOrderId")
     @Mapping(source = "side", target = "side")
@@ -57,21 +42,56 @@ public interface OrderMapper {
     @Mapping(source = "price", target = "newPrice")
     AmendOrderRequest domainToClientOkxAmendRequest(Order source);
 
-    @Mapping(source = "externalId", target = "orderId")
-    @Mapping(source = "internalId", target = "clientOrderId")
-    OrderDetailsRequest domainToClientOkxOrderDetailsRequest(Order source);
+    GetOrdersHistorySearchParams domainSearchParamsToClientOkxOrdersHistoryRequest(OrderSearchParams source);
 
-    @Mapping(source = "externalStatus", target = "state")
-    OrdersHistoryRequest domainToClientOkxOrdersHistoryRequest(Order source);
+    OrderResponse domainToRest(Order source);
 
-    OrdersPendingRequest domainToClientOkxOrdersPendingRequest(Order source);
-
-    OrderResponse domainToRest(OrderEntity source);
+    OrderPageResponse domainToRest(Page<Order> source);
 
     List<Order> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.OrderResponse> source);
 
-    Order restRequestToDomain(com.example.tradingbot.rest.model.request.CreateOrderRequest source);
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "internalId", source = "clOrdId")
+    @Mapping(target = "externalId", source = "ordId")
+    @Mapping(target = "type", source = "ordType")
+    @Mapping(target = "side", source = "side")
+    @Mapping(target = "externalStatus", source = "state")
+    @Mapping(target = "price", source = "px", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "size", source = "sz", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "accumulatedFillSize", source = "accFillSz", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "averagePrice", source = "avgPx", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "fee", source = "fee", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "externalCreatedAt", source = "cTime", qualifiedByName = "toOffsetDateTimeUtc")
+    @Mapping(target = "externalModifiedAt", source = "uTime", qualifiedByName = "toOffsetDateTimeUtc")
+    @Mapping(target = "attachedAlgoOrders", source = "attachAlgoOrds")
+    Order clientOkxToDomain(com.example.tradingbot.client.model.okx.response.OrderResponse source);
 
-    @Mapping(target = "id", ignore = true)
-    void domainToEntityOnCreate(Order source, @MappingTarget OrderEntity target);
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "type", constant = "ATTACHED_STOP_LOSS")
+    @Mapping(target = "internalId", source = "attachAlgoClOrdId")
+    @Mapping(target = "externalAttachedId", source = "attachAlgoId")
+    @Mapping(target = "externalId", source = "algoId")
+    @Mapping(target = "externalType", constant = "attachAlgoOrds")
+    @Mapping(target = "size", source = "sz", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx", qualifiedByName = "toBigDecimal")
+    AttachedAlgoOrder clientOkxToDomain(AttachAlgoOrd source);
+
+    @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
+    List<Order> clientOkxToDomain(List<com.example.tradingbot.client.model.okx.response.OrderResponse> data);
+
+    Order restRequestToDomain(com.example.tradingbot.rest.model.request.order.CreateOrderRequest source);
+
+    Order dataToDomain(OrderEntity data);
+
+    Page<Order> dataToDomain(Page<OrderEntity> data);
+
+    OrderEntity domainToData(Order data);
+
+    OrderSearchParams restToDomainSearchParams(
+            com.example.tradingbot.rest.model.request.order.search_params.OrderSearchParams request);
+
+    void domainToDomainOnCreate(Order source, @MappingTarget Order target);
+
+    void domainToDomainOnCancel(Order source, @MappingTarget Order target);
+
 }

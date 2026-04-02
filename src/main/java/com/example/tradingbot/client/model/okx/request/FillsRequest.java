@@ -7,9 +7,9 @@ import lombok.Setter;
 @Setter
 public class FillsRequest {
 
-    private String instrumentType;
-    private String instrumentId;
-    private String orderId;
+    private String externalInstrumentType;
+    private String externalInstrumentId;
+    private String externalOrderId;
     private String after;
     private String before;
     private String limit;

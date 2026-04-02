@@ -1,40 +1,46 @@
 package com.example.tradingbot.domain.service;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.domain.model.CandleGroup;
+import com.example.tradingbot.domain.model.CandleGroup.Status;
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.mapping.CandleGroupMapper;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
-import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
+import com.example.tradingbot.persistence.service.InstrumentDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static com.example.tradingbot.util.factory.CandleGroupFactory.createCandleGroupEntity;
-
 @Service
 @RequiredArgsConstructor
 public class CandleGroupService {
 
     private final CandleGroupDataService candleGroupDataService;
-    private final InstrumentService instrumentService;
+    private final InstrumentDataService instrumentDataService;
     private final ExchangeDataService exchangeDataService;
+    private final CandleGroupMapper candleGroupMapper;
 
-    public List<CandleGroupEntity> getByInstrument(String exchangeInternalId, String instrumentInternalId) {
-        Long instrumentId = instrumentService.getRequiredIdByExchangeInternalIdAndInstrumentInternalId(exchangeInternalId, instrumentInternalId);
-        return candleGroupDataService.findAllByInstrumentId(instrumentId);
+    public List<CandleGroup> getByInstrument(String instrumentInternalId) {
+        Instrument instrument = instrumentDataService.findRequiredByInternalId(instrumentInternalId);
+        return instrument.getCandleGroups();
     }
 
     @Transactional
-    public CandleGroupEntity create(String exchangeInternalId, String instrumentInternalId, CreateCandleGroupRequest request) {
-        Long exchangeId = exchangeDataService.getRequiredIdByInternalId(exchangeInternalId);
-        InstrumentEntity instrument = instrumentService.getRequiredByExchangeIdAndInternalId(exchangeId, instrumentInternalId);
+    public CandleGroup create(String exchangeInternalId,
+                              String instrumentInternalId,
+                              CandleGroup request) {
+        Exchange exchange = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
+        Instrument instrument = instrumentDataService.findRequiredByInternalId(instrumentInternalId);
 
         checkExistence(instrument.getId(), request.getTimeframe());
 
-        var candleGroupEntity = createCandleGroupEntity(instrument, request);
-        return candleGroupDataService.save(candleGroupEntity);
+        CandleGroup candleGroup = new CandleGroup();
+        candleGroupMapper.domainToDomainOnCreate(request, candleGroup);
+        candleGroup.setStatus(Status.CREATED);
+        return candleGroupDataService.save(candleGroup);
     }
 
     private void checkExistence(Long instrumentId, String timeFrame) {

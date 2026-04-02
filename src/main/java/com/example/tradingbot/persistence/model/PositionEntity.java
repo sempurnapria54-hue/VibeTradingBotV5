@@ -1,12 +1,19 @@
 package com.example.tradingbot.persistence.model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 
 import static com.example.tradingbot.util.Constant.Service.PRICE_PRECISION;
 import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
@@ -32,11 +39,10 @@ public class PositionEntity extends AuditableEntity {
     private Long id;
 
     /**
-     * Идентификатор сделки.
+     * Идентификатор сделки-владельца.
      */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "deal_id", nullable = false, updatable = false)
-    private DealEntity deal;
+    @Column(name = "deal_id", nullable = false, updatable = false)
+    private Long dealId;
 
     /**
      * Межсервисный идентификатор.
@@ -62,6 +68,12 @@ public class PositionEntity extends AuditableEntity {
      */
     @Column(name = "side", nullable = false, updatable = false)
     private String side;
+
+    /**
+     * Сторона позиции на бирже (long/short/net).
+     */
+    @Column(name = "external_side", nullable = false)
+    private String externalSide;
 
     /**
      * Размер позиции.

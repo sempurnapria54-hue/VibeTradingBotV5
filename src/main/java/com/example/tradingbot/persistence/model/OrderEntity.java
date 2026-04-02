@@ -1,22 +1,24 @@
 package com.example.tradingbot.persistence.model;
 
-import com.example.tradingbot.client.model.okx.response.OrderResponse;
-import com.example.tradingbot.rest.model.request.CreateOrderRequest;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import static com.example.tradingbot.util.Constant.Service.PRICE_PRECISION;
 import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
-import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_CREATED;
-import static com.example.tradingbot.util.Constant.Status.Order.ORDER_STATUS_IN_PROGRESS;
-import static com.example.tradingbot.util.NumberUtils.parseOffsetDateTimeFromMillisSafe;
 
 @Getter
 @Setter
@@ -39,11 +41,10 @@ public class OrderEntity extends AuditableEntity {
     private Long id;
 
     /**
-     * Идентификатор сделки.
+     * Идентификатор сделки-владельца.
      */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "deal_id", nullable = false, updatable = false)
-    private DealEntity deal;
+    @Column(name = "deal_id", nullable = false, updatable = false)
+    private Long dealId;
 
     /**
      * Межсервисный идентификатор ордера.
@@ -60,9 +61,8 @@ public class OrderEntity extends AuditableEntity {
     /**
      * Текущий внутренний статус ордера.
      */
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private Status status;
+    private String status;
 
     /**
      * Тип ордера в бизнес-терминах.
@@ -116,49 +116,6 @@ public class OrderEntity extends AuditableEntity {
      * Прикреплённый SL при создании.
      */
     @OneToMany(mappedBy = "order", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    private List<AttachedStopLossEntity>attachedStopLossEntities;
+    private List<AttachedAlgoOrderEntity> attachedAlgoOrders;
 
-    public void applyOrderResponse(OrderResponse responseOrder) {
-        setExternalId(responseOrder.getOrdId());
-        setExternalStatus(responseOrder.getState());
-//        setStatus(ORDER_STATUS_IN_PROGRESS);
-        setSide(responseOrder.getSide());
-        setType(responseOrder.getOrdType());
-//        setPrice(responseOrder.getPx());
-//        setSize(responseOrder.getSz());
-//        setAccumulatedFillSize(responseOrder.getAccFillSz());
-//        setAveragePrice(responseOrder.getAvgPx());
-//        setFee(responseOrder.getFee());
-    }
-
-    public enum Status {
-        /**
-         * Запись создана локально, ещё не отправляли
-         */
-        CREATED,
-        /**
-         * Отправили, но ещё не активен
-         */
-        PENDING,
-        /**
-         * Реально активен на бирже (после fill)
-         */
-        ACTIVE,
-        /**
-         * Полностью выполнен на бирже
-         */
-        COMPLETED,
-        /**
-         * Частично выполнен на бирже
-         */
-        PARTIALLY_COMPLETED,
-        /**
-         * Отменён
-         */
-        CLOSED,
-        /**
-         * Не удалось создать/обновить
-         */
-        FAILED
-    }
 }

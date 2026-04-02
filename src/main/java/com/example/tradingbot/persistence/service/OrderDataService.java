@@ -1,12 +1,14 @@
 package com.example.tradingbot.persistence.service;
 
+import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.search_params.OrderSearchParams;
+import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.persistence.repository.OrderRepository;
-
-import java.util.List;
-import java.util.Optional;
-
+import com.example.tradingbot.persistence.specification.OrderSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,42 +19,26 @@ import static com.example.tradingbot.util.Constant.ErrorCode.ORDER_NOT_FOUND;
 public class OrderDataService {
 
     private final OrderRepository orderRepository;
+    private final OrderMapper mapper;
 
     @Transactional
-    public OrderEntity save(OrderEntity orderEntity) {
-        return orderRepository.save(orderEntity);
+    public Order save(Order order) {
+        OrderEntity data = mapper.domainToData(order);
+        OrderEntity saved = orderRepository.save(data);
+        return mapper.dataToDomain(saved);
     }
 
-    @Transactional
-    public List<OrderEntity> saveAll(List<OrderEntity> orderEntities) {
-        return orderRepository.saveAll(orderEntities);
+    public Order findRequiredByInternalId(String internalOrderId) {
+        OrderEntity data = orderRepository.findByInternalId(internalOrderId)
+                                          .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND));
+        return mapper.dataToDomain(data);
     }
 
-    public List<OrderEntity> findAllByExchangeIdAndInstrumentId(Long exchangeId, Long instrumentId) {
-        return orderRepository.findAllByExchangeIdAndInstrumentId(exchangeId, instrumentId);
-    }
-
-
-    public List<OrderEntity> findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(
-            Long exchangeId,
-            Long instrumentId,
-            String exchangeOrderId
-    ) {
-        return orderRepository.findAllByExchangeIdAndInstrumentIdAndExchangeOrderId(exchangeId, instrumentId, exchangeOrderId);
-    }
-
-    public Optional<OrderEntity> findByExchangeIdAndInstrumentIdAndClientOrderId(
-            Long exchangeId,
-            Long instrumentId,
-            String clientOrderId
-    ) {
-        return orderRepository.findByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, clientOrderId);
-    }
-
-    public OrderEntity findRequiredByExchangeIdAndInstrumentIdAndClientOrderId(Long exchangeId,
-                                                                               Long instrumentId,
-                                                                               String clientOrderId) {
-        return orderRepository.findByExchangeIdAndInstrumentIdAndClientOrderId(exchangeId, instrumentId, clientOrderId)
-                .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND));
+    public Page<Order> search(OrderSearchParams params, Pageable pageable) {
+        Page<OrderEntity> data = orderRepository.findAll(
+                OrderSpecification.bySearchParams(params),
+                pageable
+        );
+        return mapper.dataToDomain(data);
     }
 }

@@ -7,5 +7,5 @@ import lombok.Setter;
 @Setter
 public class TickerRequest {
 
-    private String instrumentId;
+    private String externalInstrumentId;
 }

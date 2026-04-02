@@ -1,62 +1,79 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.model.Order;
-import com.example.tradingbot.domain.service.AlgoOrderService;
 import com.example.tradingbot.domain.service.OrderService;
-import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.mapping.OrderMapper;
-import com.example.tradingbot.rest.model.request.CreateAlgoOrderRequest;
-import com.example.tradingbot.rest.model.request.CreateOrderRequest;
-import com.example.tradingbot.rest.model.response.AlgoOrderResponse;
-import com.example.tradingbot.rest.model.response.OrderResponse;
+import com.example.tradingbot.rest.model.request.algo_order.SyncAlgoOrderRequest;
+import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
+import com.example.tradingbot.rest.model.request.order.search_params.OrderSearchParams;
+import com.example.tradingbot.rest.model.response.algo_order.AlgoOrderResponse;
+import com.example.tradingbot.rest.model.response.order.OrderPageResponse;
+import com.example.tradingbot.rest.model.response.order.OrderResponse;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/{exchangeId}/instruments/{instrumentId}/orders")
+@RequestMapping("/api/orders")
 public class OrderController {
 
     private final OrderService orderService;
-    private final AlgoOrderService algoOrderService;
-    private final OrderMapper orderMapper;
-    private final AlgoOrderMapper algoOrderMapper;
+    private final OrderMapper mapper;
 
-    @PostMapping()
-    public OrderResponse createOrder(@PathVariable(name = "exchangeId") String exchangeInternalId,
-                                     @PathVariable(name = "instrumentId") String instrumentInternalId,
-                                     @RequestBody CreateOrderRequest request) {
-        Order domainRequest = orderMapper.restRequestToDomain(request);
-        var order = orderService.createOrder(exchangeInternalId, instrumentInternalId, domainRequest);
-        return orderMapper.domainToRest(order);
+    @GetMapping("/{orderId}")
+    public OrderResponse getById(@PathVariable(name = "orderId") String internalOrderId) {
+        var result = orderService.getByInternalId(internalOrderId);
+        return mapper.domainToRest(result);
     }
 
-    @DeleteMapping("{orderId}/cancel")
-    public OrderResponse cancelOrders(@PathVariable(name = "exchangeId") String exchangeInternalId,
-                                      @PathVariable(name = "instrumentId") String instrumentInternalId,
-                                      @PathVariable(name = "orderId") String orderId) {
-        var order = orderService.cancelOrder(exchangeInternalId, instrumentInternalId, orderId);
-        return orderMapper.domainToRest(order);
+    @GetMapping
+    public OrderPageResponse getByParams(@ParameterObject OrderSearchParams request,
+                                         @ParameterObject
+                                         @PageableDefault(page = 0,
+                                                 size = 20,
+                                                 sort = "id",
+                                                 direction = Sort.Direction.DESC)
+                                         Pageable pageable) {
+        var searchParams = mapper.restToDomainSearchParams(request);
+        var result = orderService.getByParams(searchParams, pageable);
+        return mapper.domainToRest(result);
     }
 
-    @PostMapping("/algo")
-    public AlgoOrderResponse createAlgoOrder(@PathVariable(name = "exchangeId") String exchangeInternalId,
-                                             @PathVariable(name = "instrumentId") String instrumentInternalId,
-                                             @RequestBody CreateAlgoOrderRequest request) {
-        var algoOrder = algoOrderService.createAlgoOrder(exchangeInternalId, instrumentInternalId, request);
-        return algoOrderMapper.domainToRest(algoOrder);
+    @PostMapping
+    public OrderResponse createOrder(@RequestBody CreateOrderRequest request) {
+        var domainRq = mapper.restRequestToDomain(request);
+        var order = orderService.createOrder(request.getDealInternalId(), domainRq);
+        return mapper.domainToRest(order);
     }
 
-    @DeleteMapping("/algo/{orderId}/cancel")
-    public AlgoOrderResponse cancelAlgoOrder(@PathVariable(name = "exchangeId") String exchangeInternalId,
-                                             @PathVariable(name = "instrumentId") String instrumentInternalId,
-                                             @PathVariable(name = "orderId") String orderId) {
-        var algoOrder = algoOrderService.cancelAlgoOrder(exchangeInternalId, instrumentInternalId, orderId);
-        return algoOrderMapper.domainToRest(algoOrder);
+    @PutMapping("/activate")
+    public AlgoOrderResponse activateAlgoOrder(@RequestBody ActivateAlgoOrderRequest request) {
+        var result = orderService.createOnExchange(request.getExchangeInternalId(),
+                                                   request.getInstrumentInternalId(), request.getInternalId(),
+                                                   request.getDealInternalId());
+        return mapper.domainToRest(result);
     }
+
+    @PutMapping("/sync/{algoOrderId}")
+    public AlgoOrderResponse syncAlgoOrder(@RequestBody SyncAlgoOrderRequest request) {
+        var result = orderService.syncAlgoOrder(request.getExchangeInternalId(), request.getInternalId());
+        return mapper.domainToRest(result);
+    }
+
+    @DeleteMapping("{orderId}")
+    public OrderResponse cancelOrder(@PathVariable(name = "orderId") String internalOrderId) {
+        var order = orderService.cancelOrder(internalOrderId);
+        return mapper.domainToRest(order);
+    }
+
 }

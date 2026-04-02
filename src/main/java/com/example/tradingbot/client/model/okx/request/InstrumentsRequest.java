@@ -7,6 +7,6 @@ import lombok.Setter;
 @Setter
 public class InstrumentsRequest {
 
-    private String instrumentType;
-    private String instrumentId;
+    private String externalType;
+    private String externalId;
 }

@@ -2,8 +2,9 @@ package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.CandleGroupService;
 import com.example.tradingbot.mapping.CandleGroupMapper;
-import com.example.tradingbot.rest.model.request.CreateCandleGroupRequest;
-import com.example.tradingbot.rest.model.response.CandleGroupResponse;
+import com.example.tradingbot.rest.model.request.candle_group.CreateCandleGroupRequest;
+import com.example.tradingbot.rest.model.response.candle_group.CandleGroupContainerResponse;
+import com.example.tradingbot.rest.model.response.candle_group.CandleGroupResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,28 +13,27 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/{exchangeId}/instruments/{instrumentId}/candle-groups")
+@RequestMapping("/api/candle-groups")
 public class CandleGroupController {
 
     private final CandleGroupService candleGroupService;
     private final CandleGroupMapper candleGroupMapper;
 
-    @GetMapping
-    public List<CandleGroupResponse> getByInstrument(@PathVariable(name = "exchangeId") String exchangeInternalId,
-                                                     @PathVariable(name = "instrumentId") String instrumentInternalId) {
-        var candleGroups = candleGroupService.getByInstrument(exchangeInternalId, instrumentInternalId);
-        return candleGroupMapper.domainToRest(candleGroups);
+    @GetMapping("/{instrumentId}")
+    public CandleGroupContainerResponse getByInstrument(
+            @PathVariable(name = "instrumentId") String instrumentInternalId) {
+        var candleGroups = candleGroupService.getByInstrument(instrumentInternalId);
+        return candleGroupMapper.domainListToRestContainer(candleGroups);
     }
 
     @PostMapping
-    public CandleGroupResponse createGroup(@PathVariable(name = "exchangeId") String exchangeInternalId,
-                                           @PathVariable(name = "instrumentId") String instrumentInternalId,
-                                           @RequestBody CreateCandleGroupRequest request) {
-        var candleGroupEntity = candleGroupService.create(exchangeInternalId, instrumentInternalId, request);
-        return candleGroupMapper.domainToRest(candleGroupEntity);
+    public CandleGroupResponse createGroup(@RequestBody CreateCandleGroupRequest request) {
+        var domainRq = candleGroupMapper.restToDomain(request);
+        var candleGroup = candleGroupService.create(request.getExchangeInternalId(),
+                                                    request.getInstrumentInternalId(),
+                                                    domainRq);
+        return candleGroupMapper.domainToRest(candleGroup);
     }
 }
