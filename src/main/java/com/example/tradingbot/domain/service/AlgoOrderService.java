@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.service;
 
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.position.Position;

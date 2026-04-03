@@ -111,6 +111,7 @@ public class OkxClientService implements ClientService {
         return positionMapper.clientOkxToExternalSnapshot(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
     public List<OrderExternalSnapshot> getActiveOrdersByInstrument(Instrument instrument) {
         GetOrdersPendingSearchParams searchParams = new GetOrdersPendingSearchParams();
@@ -120,6 +121,7 @@ public class OkxClientService implements ClientService {
         return orderMapper.clientOkxToExternalSnapshot(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
     public List<OrderExternalSnapshot> getActiveOrdersByInstrumentType(Instrument instrument) {
         GetOrdersPendingSearchParams searchParams = new GetOrdersPendingSearchParams();
@@ -128,6 +130,7 @@ public class OkxClientService implements ClientService {
         return orderMapper.clientOkxToExternalSnapshot(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
     public OrderExternalSnapshot getOrder(String externalInstrumentId, String externalOrderId, String internalOrderId) {
         GetOrderDetailsSearchParams searchParams = new GetOrderDetailsSearchParams();
@@ -136,9 +139,10 @@ public class OkxClientService implements ClientService {
         searchParams.setInternalId(internalOrderId);
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrderDetails(searchParams);
         return orderMapper.clientOkxToExternalSnapshot(response.getData()
-                                                                .getFirst());
+                                                               .getFirst());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
     public List<OrderExternalSnapshot> getOrdersHistory(Instrument instrument) {
         GetOrdersHistorySearchParams searchParams = new GetOrdersHistorySearchParams();
@@ -148,6 +152,7 @@ public class OkxClientService implements ClientService {
         return orderMapper.clientOkxToExternalSnapshot(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
     public List<OrderExternalSnapshot> getOrdersHistoryArchive(Instrument instrument) {
         GetOrdersHistoryArchiveSearchParams searchParams = new GetOrdersHistoryArchiveSearchParams();
@@ -226,17 +231,17 @@ public class OkxClientService implements ClientService {
         return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
-    public List<Candle> getCandles(Object... args) {
-        CandleSearchParams searchParams = (CandleSearchParams) args[0];
+    public List<Candle> getCandles(CandleSearchParams searchParams) {
         CandlesRequest request = candleMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<CandleResponse> response = okxRestClient.getCandles(request);
         return candleMapper.clientOkxResponseToDomain(response.getData());
     }
 
+    //TODO: тут норм, остальное рефакторим.
     @Override
-    public List<Candle> getHistoryCandles(Object... args) {
-        CandleSearchParams searchParams = (CandleSearchParams) args[0];
+    public List<Candle> getHistoryCandles(CandleSearchParams searchParams) {
         CandlesRequest request = candleMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<CandleResponse> response = okxRestClient.getHistoryCandles(request);
         return candleMapper.clientOkxResponseToDomain(response.getData());
