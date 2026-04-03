@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrde
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 
 import java.util.List;
@@ -31,15 +32,15 @@ public interface ClientService {
     //TODO: тут норм, остальное рефакторим.
     List<PositionExternalSnapshot> getAllPositions();
 
-    List<Order> getActiveOrdersByInstrument(Instrument instrument);
+    List<OrderExternalSnapshot> getActiveOrdersByInstrument(Instrument instrument);
 
-    List<Order> getActiveOrdersByInstrumentType(Instrument instrument);
+    List<OrderExternalSnapshot> getActiveOrdersByInstrumentType(Instrument instrument);
 
-    Order getOrder(String externalInstrumentId, String externalOrderId, String internalOrderId);
+    OrderExternalSnapshot getOrder(String externalInstrumentId, String externalOrderId, String internalOrderId);
 
-    List<Order> getOrdersHistory(Instrument instrument);
+    List<OrderExternalSnapshot> getOrdersHistory(Instrument instrument);
 
-    List<Order> getOrdersHistoryArchive(Instrument instrument);
+    List<OrderExternalSnapshot> getOrdersHistoryArchive(Instrument instrument);
 
 
     //TODO: тут норм, остальное рефакторим.

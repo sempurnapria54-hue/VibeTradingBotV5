@@ -7,6 +7,8 @@ import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistorySearc
 import com.example.tradingbot.client.model.okx.response.OrderResponse.AttachAlgoOrd;
 import com.example.tradingbot.domain.model.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.search_params.OrderSearchParams;
 import com.example.tradingbot.persistence.model.OrderEntity;
 import com.example.tradingbot.rest.model.response.order.OrderPageResponse;
@@ -50,6 +52,48 @@ public interface OrderMapper {
 
     List<Order> clientOkxResponseToDomain(List<com.example.tradingbot.client.model.okx.response.OrderResponse> source);
 
+
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "internalId", source = "clOrdId")
+    @Mapping(target = "externalId", source = "ordId")
+    @Mapping(target = "type", source = "ordType")
+    @Mapping(target = "side", source = "side")
+    @Mapping(target = "externalStatus", source = "state")
+    @Mapping(target = "price", source = "px", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "size", source = "sz", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "accumulatedFillSize", source = "accFillSz", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "averagePrice", source = "avgPx", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "fee", source = "fee", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "externalCreatedAt", source = "cTime", qualifiedByName = "toOffsetDateTimeUtc")
+    @Mapping(target = "externalModifiedAt", source = "uTime", qualifiedByName = "toOffsetDateTimeUtc")
+    @Mapping(target = "attachedAlgoOrders", source = "attachAlgoOrds")
+    OrderExternalSnapshot clientOkxToExternalSnapshot(com.example.tradingbot.client.model.okx.response.OrderResponse source);
+
+    @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
+    List<OrderExternalSnapshot> clientOkxToExternalSnapshot(List<com.example.tradingbot.client.model.okx.response.OrderResponse> data);
+
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "internalId", source = "attachAlgoClOrdId")
+    @Mapping(target = "externalAttachedId", source = "attachAlgoId")
+    @Mapping(target = "externalId", source = "algoId")
+    @Mapping(target = "externalType", source = "tpOrdKind")
+    @Mapping(target = "size", source = "sz")
+    @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx")
+    AttachedAlgoOrderExternalSnapshot clientOkxToExternalSnapshot(AttachAlgoOrd source);
+
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "internalId", source = "internalId")
+    @Mapping(target = "externalId", source = "externalId")
+    @Mapping(target = "side", source = "side")
+    @Mapping(target = "externalStatus", source = "externalStatus")
+    @Mapping(target = "price", source = "price")
+    @Mapping(target = "size", source = "size")
+    @Mapping(target = "accumulatedFillSize", source = "accumulatedFillSize")
+    @Mapping(target = "averagePrice", source = "averagePrice")
+    @Mapping(target = "fee", source = "fee")
+    @Mapping(target = "externalCreatedAt", source = "externalCreatedAt")
+    @Mapping(target = "externalModifiedAt", source = "externalModifiedAt")
+    void updateDomainFromExternalSnapshot(OrderExternalSnapshot source, @MappingTarget Order target);
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "internalId", source = "clOrdId")
     @Mapping(target = "externalId", source = "ordId")

@@ -8,6 +8,7 @@ import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.search_params.OrderSearchParams;
 import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.persistence.service.DealDataService;
@@ -115,13 +116,13 @@ public class OrderService {
         List<Order> orders = clientService.cancelOrder(order, instrument.getExternalId());
 
 
-        Order cancelled = clientService.getOrder(instrument.getExternalId(),
-                                                 order.getExternalId(),
-                                                 order.getInternalId());
+        OrderExternalSnapshot cancelledSnapshot = clientService.getOrder(instrument.getExternalId(),
+                                                                 order.getExternalId(),
+                                                                 order.getInternalId());
 
 
-        checkOnCancel(cancelled);
-        mapper.domainToDomainOnCancel(cancelled, order);
+        checkOnCancel(cancelledSnapshot);
+        mapper.updateDomainFromExternalSnapshot(cancelledSnapshot, order);
         order.setStatus(CLOSED);
         return orderDataService.save(order);
     }
@@ -137,7 +138,7 @@ public class OrderService {
 
     }
 
-    private void checkOnCancel(Order order) {
+    private void checkOnCancel(OrderExternalSnapshot order) {
 
     }
 
