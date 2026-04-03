@@ -40,6 +40,7 @@ import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
@@ -324,10 +325,10 @@ public class OkxClientService implements ClientService {
     }
 
     @Override
-    public List<Instrument> getInstruments(InstrumentSearchParams searchParams) {
+    public List<InstrumentExternalSnapshot> getInstruments(InstrumentSearchParams searchParams) {
         InstrumentsRequest request = instrumentMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<InstrumentResponse> response = okxRestClient.getInstruments(request);
-        return instrumentMapper.clientOkxResponseToDomain(response.getData());
+        return instrumentMapper.clientOkxToExternalSnapshot(response.getData());
     }
 
     @Override
