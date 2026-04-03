@@ -14,6 +14,8 @@ import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternal
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.search_params.CandleSearchParams;
+import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
+import com.example.tradingbot.domain.model.search_params.PriceTickerSearchParams;
 
 import java.util.List;
 
@@ -86,8 +88,7 @@ public interface ClientService {
 
     List<Position> closePosition(Object... args);
 
-    List<Instrument> getInstruments(Object... args);
+    List<Instrument> getInstruments(InstrumentSearchParams searchParams);
 
-    List<PriceTicker> getTicker(Object... args);
-
+    List<PriceTicker> getTicker(PriceTickerSearchParams searchParams);
 }

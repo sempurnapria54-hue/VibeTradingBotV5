@@ -324,16 +324,14 @@ public class OkxClientService implements ClientService {
     }
 
     @Override
-    public List<Instrument> getInstruments(Object... args) {
-        InstrumentSearchParams searchParams = (InstrumentSearchParams) args[0];
+    public List<Instrument> getInstruments(InstrumentSearchParams searchParams) {
         InstrumentsRequest request = instrumentMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<InstrumentResponse> response = okxRestClient.getInstruments(request);
         return instrumentMapper.clientOkxResponseToDomain(response.getData());
     }
 
     @Override
-    public List<PriceTicker> getTicker(Object... args) {
-        PriceTickerSearchParams searchParams = (PriceTickerSearchParams) args[0];
+    public List<PriceTicker> getTicker(PriceTickerSearchParams searchParams) {
         TickerRequest request = priceTickerMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<PriceTickerResponse> response = okxRestClient.getTicker(request);
         return priceTickerMapper.clientOkxResponseToDomain(response.getData());

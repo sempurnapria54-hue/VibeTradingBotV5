@@ -11,12 +11,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class InstrumentSearchParams {
 
-    private Long id;
-    private String internalId;
-    private Long exchangeId;
-    private String exchangeInternalId;
-    private String externalId;
     private String externalType;
-    private String status;
-
+    private String externalId;
 }

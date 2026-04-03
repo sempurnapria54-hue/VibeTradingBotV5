@@ -7,18 +7,32 @@ import lombok.Setter;
 @Setter
 public class PriceTicker extends Auditable {
 
-    /** Идентификатор инструмента (instId). */
+    /**
+     * Идентификатор инструмента (instId).
+     */
     private String externalInstrumentId;
-    /** Последняя цена сделки. */
+    /**
+     * Последняя цена сделки.
+     */
     private String lastPrice;
-    /** Mark price инструмента. */
+    /**
+     * Mark price инструмента.
+     */
     private String markPrice;
-    /** Индексная цена инструмента. */
+    /**
+     * Индексная цена инструмента.
+     */
     private String indexPrice;
-    /** Лучшая цена продажи (ask). */
+    /**
+     * Лучшая цена продажи (ask).
+     */
     private String askPrice;
-    /** Лучшая цена покупки (bid). */
+    /**
+     * Лучшая цена покупки (bid).
+     */
     private String bidPrice;
-    /** Временная метка тикера в миллисекундах UTC. */
+    /**
+     * Временная метка тикера в миллисекундах UTC.
+     */
     private String timestamp;
 }
