@@ -10,6 +10,7 @@ import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
@@ -88,7 +89,7 @@ public interface ClientService {
 
     List<Position> closePosition(Object... args);
 
-    List<Instrument> getInstruments(InstrumentSearchParams searchParams);
+    List<InstrumentExternalSnapshot> getInstruments(InstrumentSearchParams searchParams);
 
     List<PriceTicker> getTicker(PriceTickerSearchParams searchParams);
 }
