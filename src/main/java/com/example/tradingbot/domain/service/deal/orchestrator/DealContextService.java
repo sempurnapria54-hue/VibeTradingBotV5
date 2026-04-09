@@ -1,15 +1,19 @@
 package com.example.tradingbot.domain.service.deal.orchestrator;
 
 import com.example.tradingbot.domain.model.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.algo_order.ConditionType;
 import com.example.tradingbot.domain.model.deal.Deal;
+import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.market.MarketPhase;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.strategy.Strategy;
 import com.example.tradingbot.domain.model.strategy.StrategyDetails;
 import com.example.tradingbot.domain.service.DealService;
+import com.example.tradingbot.domain.service.ExchangeService;
+import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.market.MarketPhaseService;
 import com.example.tradingbot.domain.service.strategy.StrategyService;
@@ -26,27 +30,28 @@ import java.util.stream.Collectors;
 public class DealContextService {
 
     private final DealService dealService;
-
     private final MarketPhaseService marketPhaseService;
-
     private final StrategyService strategyService;
-
+    private final InstrumentService instrumentService;
+    private final ExchangeService exchangeService;
 
     public DealContext load(Long dealId) {
         Deal deal = dealService.getRequiredById(dealId);
+        Instrument instrument = instrumentService.getRequiredById(deal.getInstrumentId());
+        Exchange exchange = exchangeService.getRequiredById(instrument.getExchangeId());
 
         DealContext context = new DealContext();
         context.setDeal(deal);
+        context.setExchange(exchange);
+        context.setInstrument(instrument);
         context.setEntryOrder(resolveEntryOrder(deal));
         context.setActivePosition(resolveActivePosition(deal));
         context.setActiveAlgoOrders(resolveActiveAlgoOrders(deal));
 
-        Long instrumentId = deal.getInstrumentId();
-
-        MarketPhase marketPhase = this.marketPhaseService.getMarketPhase(instrumentId);
+        MarketPhase marketPhase = this.marketPhaseService.getMarketPhase(instrument.getId());
         context.setMarketPhase(marketPhase);
 
-        Strategy strategy = this.strategyService.getActiveStrategyRequired(instrumentId);
+        Strategy strategy = this.strategyService.getActiveStrategyRequired(instrument.getId());
         context.setStrategy(strategy);
 
         StrategyDetails strategyDetails = resolveStrategyDetails(strategy, marketPhase);

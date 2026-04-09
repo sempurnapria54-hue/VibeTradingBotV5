@@ -1,9 +1,11 @@
 package com.example.tradingbot.domain.service.deal.state_machine;
 
 import com.example.tradingbot.domain.model.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.deal.Deal;
+import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.market.MarketPhase;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.strategy.Strategy;
@@ -18,6 +20,16 @@ import java.util.Objects;
 @Getter
 @Setter
 public class DealContext {
+
+    /**
+     * Биржа.
+     */
+    private Exchange exchange;
+
+    /**
+     * Инструмент
+     */
+    private Instrument instrument;
 
     /**
      * Главный агрегат сделки.
