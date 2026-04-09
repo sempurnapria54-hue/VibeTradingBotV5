@@ -9,4 +9,5 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
 
     Optional<DealEntity> findByInternalId(String internalId);
 
+    Optional<DealEntity> findTopByInstrumentIdOrderByIdDesc(Long instrumentId);
 }

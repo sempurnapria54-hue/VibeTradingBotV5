@@ -12,6 +12,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Optional;
+
 import static com.example.tradingbot.util.Constant.ErrorCode.ORDER_NOT_FOUND;
 
 @Service
@@ -32,6 +35,18 @@ public class OrderDataService {
         OrderEntity data = orderRepository.findByInternalId(internalOrderId)
                                           .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND));
         return mapper.dataToDomain(data);
+    }
+
+    public Optional<Order> findByExternalId(String externalId) {
+        return orderRepository.findByExternalId(externalId)
+                              .map(mapper::dataToDomain);
+    }
+
+    public List<Order> findByInstrumentId(Long instrumentId) {
+        return orderRepository.findAllByInstrumentId(instrumentId)
+                              .stream()
+                              .map(mapper::dataToDomain)
+                              .toList();
     }
 
     public Page<Order> search(OrderSearchParams params, Pageable pageable) {
