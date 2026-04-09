@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Optional;
+
 import static com.example.tradingbot.util.Constant.ErrorCode.POSITION_NOT_FOUND;
 
 @Service
@@ -36,5 +39,16 @@ public class PositionDataService {
                                  .orElseThrow(() -> new RuntimeException(POSITION_NOT_FOUND));
     }
 
+    public Optional<Position> findByExternalId(String externalId) {
+        return positionRepository.findByExternalId(externalId)
+                                 .map(mapper::dataToDomain);
+    }
+
+    public List<Position> findByInstrumentId(Long instrumentId) {
+        return positionRepository.findAllByInstrumentId(instrumentId)
+                                 .stream()
+                                 .map(mapper::dataToDomain)
+                                 .toList();
+    }
 
 }

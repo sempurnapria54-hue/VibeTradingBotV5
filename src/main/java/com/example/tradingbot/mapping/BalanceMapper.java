@@ -2,18 +2,26 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.response.balance.BalanceDetail;
 import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
+import com.example.tradingbot.domain.model.balance.Balance;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceExternalSnapshot;
+import com.example.tradingbot.persistence.model.BalanceEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValueMappingStrategy;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 
 import java.util.List;
 
 @Mapper(componentModel = "spring")
-public interface BalanceMapper {
+public interface BalanceMapper extends CommonMapper {
+
+    Balance toDomain(BalanceEntity source);
+
+    BalanceEntity toEntity(Balance source);
 
     BalanceExternalSnapshot clientOkxResponseToDomain(BalanceResponse source);
 
@@ -39,4 +47,11 @@ public interface BalanceMapper {
     @Mapping(target = "unrealizedProfit", source = "response.upl")
     @Mapping(target = "balances", source = "response.details")
     BalanceContainerExternalSnapshot clientOkxToExternalSnapshot(Long exchangeId, BalanceResponse response);
+
+    @BeanMapping(ignoreByDefault = true, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "available", source = "availableBalance", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "frozen", source = "frozenBalance", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "total", source = "cashBalance", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "externalUpdatedAt", source = "externalModifiedAt")
+    void updateDomainFromSnapshot(BalanceExternalSnapshot source, @MappingTarget Balance target);
 }

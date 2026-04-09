@@ -1,6 +1,8 @@
 package com.example.tradingbot.domain.service.deal.state_machine;
 
 import com.example.tradingbot.domain.model.deal.Deal;
+import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.service.AlgoOrderService;
 import com.example.tradingbot.domain.service.BalanceService;
 import com.example.tradingbot.domain.service.OrderService;
@@ -52,19 +54,26 @@ public class ServiceCommandExecutor {
     }
 
     private void executeSingleCommand(DealContext context, ServiceCommandType command) {
+        Exchange exchange = context.getExchange();
+        Instrument instrument = context.getInstrument();
+        if (exchange == null) {
+            throw new IllegalStateException("exchange is null");
+        }
+        if (instrument == null) {
+            throw new IllegalStateException("instrument is null");
+        }
+
         Deal deal = context.getDeal();
         if (deal == null) {
             throw new IllegalStateException("deal is null");
         }
 
-//        TODO: передавать в контексте биржу и инструмент
-
         switch (command) {
-            case REFRESH_POSITIONS -> positionService.refreshPosition(deal);
+            case REFRESH_POSITIONS -> positionService.refreshPosition(exchange, instrument);
 
-            case REFRESH_BALANCE -> balanceService.refreshBalance(deal);
+            case REFRESH_BALANCE -> balanceService.refreshBalance(exchange);
 
-            case REFRESH_PENDING_ORDERS -> orderService.refreshPendingOrders(deal);
+            case REFRESH_PENDING_ORDERS -> orderService.refreshPendingOrders(exchange, instrument);
 
             case CREATE_ENTRY_ORDER -> orderService.createEntryOrder(deal);
 

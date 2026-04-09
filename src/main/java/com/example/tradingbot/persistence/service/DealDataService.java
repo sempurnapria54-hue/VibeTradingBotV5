@@ -7,6 +7,8 @@ import com.example.tradingbot.persistence.repository.DealRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 import static com.example.tradingbot.util.Constant.ErrorCode.DEAL_NOT_FOUND;
 
 @Service
@@ -32,5 +34,10 @@ public class DealDataService {
         return dealRepository.findById(id)
                              .map(mapper::dataToDomain)
                              .orElseThrow(() -> new RuntimeException(DEAL_NOT_FOUND));
+    }
+
+    public Optional<Deal> findLatestByInstrumentId(Long instrumentId) {
+        return dealRepository.findTopByInstrumentIdOrderByIdDesc(instrumentId)
+                             .map(mapper::dataToDomain);
     }
 }

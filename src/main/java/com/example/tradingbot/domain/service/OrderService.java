@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 import static com.example.tradingbot.domain.model.Order.Status.CLOSED;
 import static com.example.tradingbot.domain.model.Order.Status.CREATED;
@@ -143,8 +145,43 @@ public class OrderService {
     }
 
 
-    public void refreshPendingOrders(Deal deal) {
+    @Transactional
+    public void refreshPendingOrders(Exchange exchange, Instrument instrument) {
+        List<OrderExternalSnapshot> externalSnapshots = clientManager.getClientService(exchange.getName())
+                                                                     .getActiveOrdersByInstrument(instrument);
+        if (externalSnapshots == null) {
+            externalSnapshots = List.of();
+        }
+        List<Order> localOrders = orderDataService.findByInstrumentId(instrument.getId());
+        if (localOrders == null) {
+            localOrders = List.of();
+        }
 
+        for (Order localOrder : localOrders) {
+            if (localOrder == null) {
+                continue;
+            }
+            OrderExternalSnapshot matching = findMatchingByExternalId(externalSnapshots, localOrder.getExternalId());
+            if (matching == null) {
+                localOrder.setStatus(CLOSED);
+                orderDataService.save(localOrder);
+                continue;
+            }
+            mapper.updateDomainFromExternalSnapshot(matching, localOrder);
+            localOrder.setStatus(resolveOrderStatus(matching.getExternalStatus()));
+            orderDataService.save(localOrder);
+        }
+
+        for (OrderExternalSnapshot snapshot : externalSnapshots) {
+            if (snapshot == null || snapshot.getExternalId() == null) {
+                continue;
+            }
+            if (existsByExternalId(localOrders, snapshot.getExternalId())) {
+                continue;
+            }
+            Order created = resolveUnknownOrder(snapshot, instrument.getId());
+            orderDataService.save(created);
+        }
     }
 
     public void createEntryOrder(Deal deal) {
@@ -153,5 +190,70 @@ public class OrderService {
 
     public void refreshEntryOrder(Deal deal) {
 
+    }
+
+    private boolean existsByExternalId(List<Order> orders, String externalId) {
+        for (Order order : orders) {
+            if (order == null) {
+                continue;
+            }
+            if (Objects.equals(order.getExternalId(), externalId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Order resolveUnknownOrder(OrderExternalSnapshot snapshot, Long instrumentId) {
+        Optional<Deal> dealOptional = dealDataService.findLatestByInstrumentId(instrumentId);
+        if (dealOptional.isEmpty()) {
+            throw new IllegalStateException("Deal is missing for instrument: " + instrumentId);
+        }
+        Order created = new Order();
+        created.setDealId(dealOptional.get().getId());
+        created.setInternalId(resolveInternalId(snapshot));
+        mapper.updateDomainFromExternalSnapshot(snapshot, created);
+        created.setStatus(resolveOrderStatus(snapshot.getExternalStatus()));
+        return created;
+    }
+
+    private OrderExternalSnapshot findMatchingByExternalId(List<OrderExternalSnapshot> snapshots, String externalId) {
+        for (OrderExternalSnapshot snapshot : snapshots) {
+            if (snapshot == null) {
+                continue;
+            }
+            if (Objects.equals(snapshot.getExternalId(), externalId)) {
+                return snapshot;
+            }
+        }
+        return null;
+    }
+
+    private String resolveInternalId(OrderExternalSnapshot snapshot) {
+        if (snapshot.getInternalId() != null && !snapshot.getInternalId()
+                                                         .isBlank()) {
+            return snapshot.getInternalId();
+        }
+        return UUID.randomUUID()
+                   .toString();
+    }
+
+    private Order.Status resolveOrderStatus(String externalStatus) {
+        if (externalStatus == null) {
+            return PENDING;
+        }
+        if ("live".equalsIgnoreCase(externalStatus)) {
+            return PENDING;
+        }
+        if ("partially_filled".equalsIgnoreCase(externalStatus)) {
+            return Order.Status.PARTIALLY_COMPLETED;
+        }
+        if ("filled".equalsIgnoreCase(externalStatus)) {
+            return Order.Status.COMPLETED;
+        }
+        if ("canceled".equalsIgnoreCase(externalStatus)) {
+            return CLOSED;
+        }
+        return PENDING;
     }
 }
