@@ -138,7 +138,8 @@ public class AnomalyReport extends Auditable {
     }
 
     public void toError(String message, String internalAfter, String externalAfter) {
-        if (isNull(status) || isFalse(status == Status.KILL_SWITCH_EXECUTED)) {
+        boolean isValidTransition = status == Status.IN_PROGRESS || status == Status.KILL_SWITCH_EXECUTED;
+        if (isNull(status) || isFalse(isValidTransition)) {
             throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
         }
         setStatus(Status.ERROR);
