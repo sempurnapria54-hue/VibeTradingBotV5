@@ -29,6 +29,12 @@ public class AnomalyReportEntity extends AuditableEntity {
     private Long id;
 
     /**
+     * Межсервисный идентификатор.
+     */
+    @Column(name = "internal_id", nullable = false, updatable = false)
+    private String internalId;
+
+    /**
      * Идентификатор биржи.
      */
     @Column(name = "exchange_id", nullable = false)

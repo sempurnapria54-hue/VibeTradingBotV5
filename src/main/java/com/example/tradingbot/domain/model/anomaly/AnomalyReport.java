@@ -4,6 +4,9 @@ import com.example.tradingbot.domain.model.Auditable;
 import lombok.Getter;
 import lombok.Setter;
 
+import static java.util.Objects.isNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 @Getter
 @Setter
 public class AnomalyReport extends Auditable {
@@ -12,6 +15,11 @@ public class AnomalyReport extends Auditable {
      * Внутренний идентификатор отчёта об аномалии.
      */
     private Long id;
+
+    /**
+     * Межсервисный идентификатор.
+     */
+    private String internalId;
 
     /**
      * Идентификатор биржи, в рамках которой зафиксирована аномалия.
@@ -103,4 +111,40 @@ public class AnomalyReport extends Auditable {
          */
         NON_CRITICAL
     }
+
+    public void toInProgress() {
+        if (isNull(status) || isFalse(status == Status.CREATED)) {
+            throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
+        }
+        setStatus(AnomalyReport.Status.IN_PROGRESS);
+    }
+
+    public void toKillSwitchExecuted(String internalAfter, String externalAfter) {
+        if (isNull(status) || isFalse(status == Status.IN_PROGRESS)) {
+            throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
+        }
+        setStatus(AnomalyReport.Status.KILL_SWITCH_EXECUTED);
+        setInternalAfter(internalAfter);
+        setExternalAfter(externalAfter);
+    }
+
+    public void toCompleted(String internalAfter, String externalAfter) {
+        if (isNull(status) || isFalse(status == Status.KILL_SWITCH_EXECUTED)) {
+            throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
+        }
+        setStatus(AnomalyReport.Status.COMPLETED);
+        setInternalAfter(internalAfter);
+        setExternalAfter(externalAfter);
+    }
+
+    public void toError(String internalAfter, String externalAfter) {
+        if (isNull(status) || isFalse(status == Status.KILL_SWITCH_EXECUTED)) {
+            throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
+        }
+        setStatus(AnomalyReport.Status.COMPLETED);
+        setInternalAfter(internalAfter);
+        setExternalAfter(externalAfter);
+    }
+
+
 }
