@@ -9,6 +9,7 @@ import java.util.Set;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.springframework.util.CollectionUtils.isEmpty;
 
 @UtilityClass
 public class CollectionUtils {
@@ -19,6 +20,10 @@ public class CollectionUtils {
                     fieldName + " has unsupported value: " + value + ". Allowed values: " + allowedValues
             );
         }
+    }
+
+    public static boolean doNotContains(Collection<?> collection, Object value) {
+        return isEmpty(collection) || isNull(value) || isFalse(collection.contains(value));
     }
 
     public static <T> Collection<T> emptyIfNull(Collection<T> collection) {

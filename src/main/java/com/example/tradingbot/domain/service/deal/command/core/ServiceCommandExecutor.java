@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.service.deal.state_machine;
+package com.example.tradingbot.domain.service.deal.command.core;
 
 import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.deal.Deal;
@@ -6,8 +6,9 @@ import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.service.AlgoOrderService;
 import com.example.tradingbot.domain.service.BalanceService;
 import com.example.tradingbot.domain.service.OrderService;
-import com.example.tradingbot.domain.service.deal.executor.RefreshPositionExecutor;
 import com.example.tradingbot.domain.service.deal.ExitService;
+import com.example.tradingbot.domain.service.deal.command.refresh.RefreshPositionExecutor;
+import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.kill_switch.KillSwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

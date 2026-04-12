@@ -13,9 +13,7 @@ public class AnomalyReportFactory {
     public static AnomalyReport createAnomalyReport(Long exchangeId,
                                                     Long instrumentId,
                                                     Severity severity,
-                                                    String code,
-                                                    String internalBefore,
-                                                    String externalBefore) {
+                                                    String code) {
         AnomalyReport anomalyReport = new AnomalyReport();
         anomalyReport.setInternalId(UUID.randomUUID()
                                         .toString());
@@ -24,8 +22,6 @@ public class AnomalyReportFactory {
         anomalyReport.setInstrumentId(instrumentId);
         anomalyReport.setSeverity(severity);
         anomalyReport.setCode(code);
-        anomalyReport.setInternalBefore(internalBefore);
-        anomalyReport.setExternalBefore(externalBefore);
         return anomalyReport;
     }
 

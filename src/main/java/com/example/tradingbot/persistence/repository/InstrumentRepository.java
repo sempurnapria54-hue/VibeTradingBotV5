@@ -28,4 +28,6 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
             where d.id = :dealId
             """, nativeQuery = true)
     Optional<InstrumentEntity> findByDealId(@Param("dealId") Long dealId);
+
+    boolean existsByExchangeIdAndExternalId(Long exchangeId, String externalId);
 }

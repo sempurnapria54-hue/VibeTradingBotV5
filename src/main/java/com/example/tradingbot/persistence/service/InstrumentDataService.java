@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_ALREADY_EXISTS;
 import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
 
 @Service
@@ -28,11 +29,11 @@ public class InstrumentDataService {
         return mapper.dataToDomain(saved);
     }
 
-//    public void checkNotExists(Long exchangeId, String externalId) {
-//        if (instrumentRepository.existsByExchangeIdAndExternalId(exchangeId, externalId)) {
-//            throw new RuntimeException(INSTRUMENT_ALREADY_EXISTS);
-//        }
-//    }
+    public void checkNotExists(Long exchangeId, String externalId) {
+        if (repository.existsByExchangeIdAndExternalId(exchangeId, externalId)) {
+            throw new RuntimeException(INSTRUMENT_ALREADY_EXISTS);
+        }
+    }
 
     public Instrument findRequiredByInternalId(String internalId) {
         return repository.findByInternalId(internalId)

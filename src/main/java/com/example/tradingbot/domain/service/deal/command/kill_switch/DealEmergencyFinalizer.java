@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.service.kill_switch.executor;
+package com.example.tradingbot.domain.service.deal.command.kill_switch;
 
 import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.persistence.service.DealDataService;

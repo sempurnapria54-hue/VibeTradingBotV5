@@ -11,10 +11,15 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import static com.example.tradingbot.util.CollectionUtils.doNotContains;
+import static com.example.tradingbot.util.CollectionUtils.emptyIfNull;
 
 @Component
-public class KillSwitchExternalAlgoOrderReader {
+public class ExternalAlgoOrderReader {
 
     public List<AlgoOrderExternalSnapshot> readExternalAlgoOrders(ClientService clientService,
                                                                   Instrument instrument,
@@ -26,9 +31,8 @@ public class KillSwitchExternalAlgoOrderReader {
             AlgoOrder probe = new AlgoOrder();
             probe.setExternalType(type);
 
-            List<AlgoOrderExternalSnapshot> externalSnapshots = nullSafeList(
-                    clientService.getActiveAlgoOrders(instrument, probe));
-            for (AlgoOrderExternalSnapshot externalSnapshot : externalSnapshots) {
+            List<AlgoOrderExternalSnapshot> externalSnapshots = clientService.getActiveAlgoOrders(instrument, probe);
+            for (AlgoOrderExternalSnapshot externalSnapshot : emptyIfNull(externalSnapshots)) {
                 if (externalSnapshot == null) {
                     continue;
                 }
@@ -50,21 +54,14 @@ public class KillSwitchExternalAlgoOrderReader {
         types.add("trigger");
         types.add("move_order_stop");
 
-        for (AlgoOrder internalAlgoOrder : nullSafeList(internalAlgoOrders)) {
-            String externalType = internalAlgoOrder.getExternalType();
-            if (externalType == null || externalType.isBlank()) {
-                continue;
-            }
-            types.add(externalType);
-        }
+        Set<String> unknownExternalTypes = emptyIfNull(internalAlgoOrders).stream()
+                                                                          .filter(Objects::nonNull)
+                                                                          .map(AlgoOrder::getExternalType)
+                                                                          .filter(externalType -> doNotContains(types,
+                                                                                                                externalType))
+                                                                          .collect(Collectors.toSet());
 
+        types.addAll(unknownExternalTypes);
         return types;
-    }
-
-    private <T> List<T> nullSafeList(List<T> items) {
-        if (items == null) {
-            return List.of();
-        }
-        return items;
     }
 }

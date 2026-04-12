@@ -48,8 +48,18 @@ public class InstrumentService {
         return instrumentDataService.search(searchParams, pageable);
     }
 
-    public Instrument blockByKillSwitch(Instrument instrument) {
+    public void blockInstrument(Instrument instrument) {
         instrument.setStatus(Status.ERROR);
-        return instrumentDataService.save(instrument);
+        instrumentDataService.save(instrument);
+    }
+
+    public void holdInstrument(Instrument instrument) {
+        instrument.setStatus(Status.HOLD);
+        instrumentDataService.save(instrument);
+    }
+
+    public void activateInstrument(Instrument instrument) {
+        instrument.setStatus(Status.ACTIVE);
+        instrumentDataService.save(instrument);
     }
 }

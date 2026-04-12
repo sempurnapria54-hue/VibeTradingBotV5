@@ -270,4 +270,8 @@ public class Position extends Auditable {
         setStatus(Status.CLOSED);
         setCloseReason(closeReason);
     }
+
+    public boolean isLive() {
+        return status == Status.ACTIVE;
+    }
 }

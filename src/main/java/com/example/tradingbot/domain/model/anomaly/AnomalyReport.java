@@ -119,32 +119,34 @@ public class AnomalyReport extends Auditable {
         setStatus(AnomalyReport.Status.IN_PROGRESS);
     }
 
-    public void toKillSwitchExecuted() {
+    public void toKillSwitchExecuted(String internalBefore,
+                                     String externalBefore,
+                                     String internalAfter,
+                                     String externalAfter) {
         if (isNull(status) || isFalse(status == Status.IN_PROGRESS)) {
             throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
         }
         setStatus(AnomalyReport.Status.KILL_SWITCH_EXECUTED);
-    }
-
-    public void toCompleted(String internalAfter, String externalAfter) {
-        if (isNull(status) || isFalse(status == Status.KILL_SWITCH_EXECUTED)) {
-            throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
-        }
-        setStatus(AnomalyReport.Status.COMPLETED);
+        setInternalBefore(internalBefore);
+        setExternalBefore(externalBefore);
         setInternalAfter(internalAfter);
         setExternalAfter(externalAfter);
     }
 
-    public void toError(String message, String internalAfter, String externalAfter) {
+    public void toCompleted(String message) {
+        if (isNull(status) || isFalse(status == Status.KILL_SWITCH_EXECUTED)) {
+            throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
+        }
+        setStatus(AnomalyReport.Status.COMPLETED);
+        setMessage(message);
+    }
+
+    public void toError(String message) {
         boolean isValidTransition = status == Status.IN_PROGRESS || status == Status.KILL_SWITCH_EXECUTED;
         if (isNull(status) || isFalse(isValidTransition)) {
             throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
         }
         setStatus(Status.ERROR);
         setMessage(message);
-        setInternalAfter(internalAfter);
-        setExternalAfter(externalAfter);
     }
-
-
 }

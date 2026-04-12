@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.service.deal.executor;
+package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.domain.model.Instrument;
@@ -51,32 +51,23 @@ public class RefreshPositionExecutor {
             return;
         }
 
-        PositionExternalSnapshot snapshot = isEmpty(externalSnapshots) ? null : externalSnapshots.getFirst();
-        Position position = isEmpty(activeDomainPositions) ? null : activeDomainPositions.getFirst();
+        PositionExternalSnapshot snapshot = externalSnapshots.getFirst();
+        Position position = activeDomainPositions.getFirst();
 
         if (nonNull(position)) {
             refreshFromSnapshot(activeDomainPositions, snapshot);
         } else {
-            createFromSnapshot(snapshot, instrument, dealId, exchange);
+            createFromSnapshot(snapshot, dealId);
         }
     }
 
-    private void createFromSnapshot(PositionExternalSnapshot snapshot,
-                                    Instrument instrument,
-                                    Long dealId,
-                                    Exchange exchange) {
+    private void createFromSnapshot(PositionExternalSnapshot snapshot, Long dealId) {
         Position position = positionDataService.findByExternalId(snapshot.getExternalId());
         if (isNull(position)) {
             position = createPosition(dealId);
             mapper.updateDomainFromExternalSnapshot(snapshot, position);
             positionDataService.save(position);
-            return;
         }
-        clientManager.getClientService(exchange.getName())
-                     .closePositions(instrument);
-        position.toClose(CloseReason.UNKNOWN);
-        positionDataService.save(position);
-        throw new RuntimeException("ThreadRuleError: not active position in database with active snapshot");
     }
 
     private void refreshFromSnapshot(List<Position> activeDomainPositions, PositionExternalSnapshot snapshot) {

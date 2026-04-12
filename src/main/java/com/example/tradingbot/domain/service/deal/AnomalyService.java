@@ -19,39 +19,40 @@ public class AnomalyService {
     public AnomalyReport create(Long exchangeId,
                                 Long instrumentId,
                                 Severity severity,
-                                String code,
-                                String internalBefore,
-                                String externalBefore) {
-        AnomalyReport report = createAnomalyReport(exchangeId, instrumentId, severity, code, internalBefore,
-                                                   externalBefore);
+                                String code) {
+        AnomalyReport report = createAnomalyReport(exchangeId, instrumentId, severity, code);
         return anomalyReportDataService.save(report);
     }
 
     @Transactional
-    public AnomalyReport markInProgress(Long reportId) {
+    public void markInProgress(Long reportId) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
         report.toInProgress();
-        return anomalyReportDataService.save(report);
+        anomalyReportDataService.save(report);
     }
 
     @Transactional
-    public AnomalyReport markKillSwitchExecuted(Long reportId) {
+    public void markKillSwitchExecuted(Long reportId,
+                                       String internalBefore,
+                                       String externalBefore,
+                                       String internalAfter,
+                                       String externalAfter) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
-        report.toKillSwitchExecuted();
-        return anomalyReportDataService.save(report);
+        report.toKillSwitchExecuted(internalBefore, externalBefore, internalAfter, externalAfter);
+        anomalyReportDataService.save(report);
     }
 
     @Transactional
-    public AnomalyReport complete(Long reportId, String message, String internalAfter, String externalAfter) {
+    public void complete(Long reportId, String message) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
-        report.toCompleted(internalAfter, externalAfter);
-        return anomalyReportDataService.save(report);
+        report.toCompleted(message);
+        anomalyReportDataService.save(report);
     }
 
     @Transactional
-    public AnomalyReport markError(Long reportId, String message, String internalAfter, String externalAfter) {
+    public void markError(Long reportId, String message) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
-        report.toError(message, internalAfter, externalAfter);
-        return anomalyReportDataService.save(report);
+        report.toError(message);
+        anomalyReportDataService.save(report);
     }
 }

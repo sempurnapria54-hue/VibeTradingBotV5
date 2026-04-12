@@ -17,32 +17,33 @@ import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveSt
 
 @Component
 @RequiredArgsConstructor
-public class KillSwitchStateSnapshotReader {
+public class StateSnapshotReader {
 
     private final PositionDataService positionDataService;
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
     private final DealDataService dealDataService;
-    private final KillSwitchExternalAlgoOrderReader killSwitchExternalAlgoOrderReader;
+    private final ExternalAlgoOrderReader externalAlgoOrderReader;
 
-    public StateSnapshot readActionState(ClientService clientService, Instrument instrument) {
+    public StateSnapshot readBeforeSnapshot(ClientService clientService, Instrument instrument) {
         StateSnapshot snapshot = new StateSnapshot();
         snapshot.setInternalPositions(positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                            LIVE_POSITION_STATUSES));
+                                                                                           LIVE_POSITION_STATUSES));
         snapshot.setInternalOrders(orderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                      LIVE_ORDER_STATUSES));
+                                                                                     LIVE_ORDER_STATUSES));
         snapshot.setInternalAlgoOrders(algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                              LIVE_ALGO_ORDER_STATUSES));
-        snapshot.setInternalDeals(dealDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_DEAL_STATUSES));
+                                                                                             LIVE_ALGO_ORDER_STATUSES));
+        snapshot.setInternalDeals(
+                dealDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_DEAL_STATUSES));
         snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
         snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
-        snapshot.setExternalAlgoOrders(killSwitchExternalAlgoOrderReader.readExternalAlgoOrders(clientService,
-                                                                                                 instrument,
-                                                                                                 snapshot.getInternalAlgoOrders()));
+        snapshot.setExternalAlgoOrders(externalAlgoOrderReader.readExternalAlgoOrders(clientService,
+                                                                                      instrument,
+                                                                                      snapshot.getInternalAlgoOrders()));
         return snapshot;
     }
 
-    public StateSnapshot readReportSnapshot(ClientService clientService, Instrument instrument) {
+    public StateSnapshot readAfterSnapshot(ClientService clientService, Instrument instrument) {
         StateSnapshot snapshot = new StateSnapshot();
         snapshot.setInternalPositions(positionDataService.findByInstrumentId(instrument.getId()));
         snapshot.setInternalOrders(orderDataService.findByInstrumentId(instrument.getId()));
@@ -50,9 +51,9 @@ public class KillSwitchStateSnapshotReader {
         snapshot.setInternalDeals(dealDataService.findByInstrumentId(instrument.getId()));
         snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
         snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
-        snapshot.setExternalAlgoOrders(killSwitchExternalAlgoOrderReader.readExternalAlgoOrders(clientService,
-                                                                                                 instrument,
-                                                                                                 snapshot.getInternalAlgoOrders()));
+        snapshot.setExternalAlgoOrders(externalAlgoOrderReader.readExternalAlgoOrders(clientService,
+                                                                                      instrument,
+                                                                                      snapshot.getInternalAlgoOrders()));
         return snapshot;
     }
 }

@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.service.deal.state_machine;
+package com.example.tradingbot.domain.service.deal.command.core;
 
 /**
  * Сервисные команды, которые возвращает state machine.
