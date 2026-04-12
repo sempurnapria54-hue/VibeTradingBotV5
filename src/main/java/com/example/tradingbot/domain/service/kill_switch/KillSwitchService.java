@@ -12,16 +12,13 @@ import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.kill_switch.executor.CancelAlgoOrderExecutor;
 import com.example.tradingbot.domain.service.kill_switch.executor.CancelOrderExecutor;
 import com.example.tradingbot.domain.service.kill_switch.executor.ClosePositionExecutor;
 import com.example.tradingbot.domain.service.kill_switch.executor.DealEmergencyFinalizer;
-import com.example.tradingbot.persistence.service.AlgoOrderDataService;
-import com.example.tradingbot.persistence.service.DealDataService;
+import com.example.tradingbot.domain.service.kill_switch.reader.KillSwitchStateSnapshotReader;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
-import com.example.tradingbot.persistence.service.InstrumentDataService;
-import com.example.tradingbot.persistence.service.OrderDataService;
-import com.example.tradingbot.persistence.service.PositionDataService;
 import com.example.tradingbot.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,18 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 import static com.example.tradingbot.domain.model.Instrument.Status.ERROR;
-import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_ALGO_ORDER_STATUSES;
 import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_DEAL_STATUSES;
-import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_ORDER_STATUSES;
-import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_POSITION_STATUSES;
 import static com.example.tradingbot.util.CollectionUtils.emptyIfNull;
 import static java.util.Objects.nonNull;
 import static org.hibernate.internal.util.collections.CollectionHelper.isNotEmpty;
@@ -53,21 +43,18 @@ public class KillSwitchService {
     private static final String RESULT_OK = "Kill-switch completed. Instrument risk fully removed.";
 
     private final ClientManager clientManager;
-    private final PositionDataService positionDataService;
-    private final OrderDataService orderDataService;
-    private final AlgoOrderDataService algoOrderDataService;
-    private final DealDataService dealDataService;
-    private final InstrumentDataService instrumentDataService;
+    private final InstrumentService instrumentService;
     private final ExchangeDataService exchangeDataService;
     private final CancelOrderExecutor cancelOrderExecutor;
     private final CancelAlgoOrderExecutor cancelAlgoOrderExecutor;
     private final ClosePositionExecutor closePositionExecutor;
     private final DealEmergencyFinalizer dealEmergencyFinalizer;
+    private final KillSwitchStateSnapshotReader killSwitchStateSnapshotReader;
     private final JsonUtils jsonUtils;
 
     @Transactional
     public void executeKillSwitch(Deal deal) {
-        Instrument instrument = instrumentDataService.findRequiredById(deal.getInstrumentId());
+        Instrument instrument = instrumentService.getRequiredById(deal.getInstrumentId());
         Exchange exchange = exchangeDataService.findRequiredById(instrument.getExchangeId());
         executeKillSwitch(exchange, instrument, deal.getId(), "STATE_MACHINE_ERROR");
     }
@@ -79,7 +66,7 @@ public class KillSwitchService {
                                               String reasonCode) {
         ClientService clientService = clientManager.getClientService(exchange.getName());
 
-        StateSnapshot actionState = readActionState(clientService, instrument);
+        StateSnapshot actionState = killSwitchStateSnapshotReader.readActionState(clientService, instrument);
 
         blockInstrument(instrument, reasonCode);
         cancelOrderExecutor.execute(clientService, instrument, actionState.getInternalOrders());
@@ -90,7 +77,7 @@ public class KillSwitchService {
                                       isNotEmpty(actionState.getExternalPositions()));
         dealEmergencyFinalizer.execute(actionState.getInternalDeals());
 
-        StateSnapshot reportAfter = readReportSnapshot(clientService, instrument);
+        StateSnapshot reportAfter = killSwitchStateSnapshotReader.readReportSnapshot(clientService, instrument);
 
         String internalAfter = jsonUtils.buildInternalSnapshot(reportAfter, instrument);
         String externalAfter = jsonUtils.buildExternalSnapshot(reportAfter, instrument);
@@ -110,81 +97,11 @@ public class KillSwitchService {
     }
 
     private void blockInstrument(Instrument instrument, String reasonCode) {
-        instrument.setStatus(ERROR);
-        instrumentDataService.save(instrument);
-        log.warn("Kill-switch lock applied for instrument {} with reason {}", instrument.getExternalId(), reasonCode);
-    }
-
-    private StateSnapshot readActionState(ClientService clientService, Instrument instrument) {
-        StateSnapshot snapshot = new StateSnapshot();
-        snapshot.setInternalPositions(positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                            LIVE_POSITION_STATUSES));
-        snapshot.setInternalOrders(orderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                      LIVE_ORDER_STATUSES));
-        snapshot.setInternalAlgoOrders(algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                              LIVE_ALGO_ORDER_STATUSES));
-        snapshot.setInternalDeals(dealDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_DEAL_STATUSES));
-
-        snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
-        snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
-        snapshot.setExternalAlgoOrders(getExternalAlgoOrders(clientService,
-                                                             instrument,
-                                                             snapshot.getInternalAlgoOrders()));
-        return snapshot;
-    }
-
-    private StateSnapshot readReportSnapshot(ClientService clientService, Instrument instrument) {
-        StateSnapshot snapshot = new StateSnapshot();
-        snapshot.setInternalPositions(positionDataService.findByInstrumentId(instrument.getId()));
-        snapshot.setInternalOrders(orderDataService.findByInstrumentId(instrument.getId()));
-        snapshot.setInternalAlgoOrders(algoOrderDataService.findByInstrumentId(instrument.getId()));
-        snapshot.setInternalDeals(dealDataService.findByInstrumentId(instrument.getId()));
-        snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
-        snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
-        snapshot.setExternalAlgoOrders(getExternalAlgoOrders(clientService,
-                                                             instrument,
-                                                             snapshot.getInternalAlgoOrders()));
-        return snapshot;
-    }
-
-    private List<AlgoOrderExternalSnapshot> getExternalAlgoOrders(ClientService clientService,
-                                                                  Instrument instrument,
-                                                                  List<AlgoOrder> internalAlgoOrders) {
-        Set<String> types = new LinkedHashSet<>();
-        types.add("conditional");
-        types.add("oco");
-        types.add("trigger");
-        types.add("move_order_stop");
-
-        for (AlgoOrder internalAlgoOrder : internalAlgoOrders) {
-            if (internalAlgoOrder == null) {
-                continue;
-            }
-            String externalType = internalAlgoOrder.getExternalType();
-            if (externalType == null || externalType.isBlank()) {
-                continue;
-            }
-            types.add(externalType);
-        }
-
-        Map<String, AlgoOrderExternalSnapshot> deduplicated = new LinkedHashMap<>();
-        for (String type : types) {
-            AlgoOrder probe = new AlgoOrder();
-            probe.setExternalType(type);
-            List<AlgoOrderExternalSnapshot> externalSnapshots =
-                    nullSafeList(clientService.getActiveAlgoOrders(instrument, probe));
-            for (AlgoOrderExternalSnapshot externalSnapshot : externalSnapshots) {
-                if (externalSnapshot == null) {
-                    continue;
-                }
-                String key = externalSnapshot.getExternalId();
-                if (key == null) {
-                    key = type + "::" + deduplicated.size();
-                }
-                deduplicated.put(key, externalSnapshot);
-            }
-        }
-        return new ArrayList<>(deduplicated.values());
+        instrumentService.blockByKillSwitch(instrument);
+        log.warn("Kill-switch lock applied for instrument {} with reason {}. New status: {}",
+                 instrument.getExternalId(),
+                 reasonCode,
+                 ERROR);
     }
 
     private boolean isSuccess(StateSnapshot after) {
@@ -291,12 +208,5 @@ public class KillSwitchService {
                 Objects.equals("live", snapshot.getExternalStatus().toLowerCase())
                         || Objects.equals("pause", snapshot.getExternalStatus().toLowerCase())
         );
-    }
-
-    private <T> List<T> nullSafeList(List<T> items) {
-        if (items == null) {
-            return List.of();
-        }
-        return items;
     }
 }
