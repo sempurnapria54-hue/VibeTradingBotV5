@@ -112,23 +112,20 @@ public class AnomalyReport extends Auditable {
         NON_CRITICAL
     }
 
-    public void toInProgress() {
+    public void toInProgress(String internalBefore, String externalBefore) {
         if (isNull(status) || isFalse(status == Status.CREATED)) {
             throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
         }
         setStatus(AnomalyReport.Status.IN_PROGRESS);
+        setInternalBefore(internalBefore);
+        setExternalBefore(externalBefore);
     }
 
-    public void toKillSwitchExecuted(String internalBefore,
-                                     String externalBefore,
-                                     String internalAfter,
-                                     String externalAfter) {
+    public void toKillSwitchExecuted(String internalAfter, String externalAfter) {
         if (isNull(status) || isFalse(status == Status.IN_PROGRESS)) {
             throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
         }
         setStatus(AnomalyReport.Status.KILL_SWITCH_EXECUTED);
-        setInternalBefore(internalBefore);
-        setExternalBefore(externalBefore);
         setInternalAfter(internalAfter);
         setExternalAfter(externalAfter);
     }

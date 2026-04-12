@@ -13,16 +13,6 @@ public class KillSwitchResult {
     private boolean success;
 
     /**
-     * Внутренний before-снимок (БД состояние) до выполнения kill-switch.
-     */
-    private String internalBefore;
-
-    /**
-     * Внешний before-снимок (биржевое состояние) до выполнения kill-switch.
-     */
-    private String externalBefore;
-
-    /**
      * Внутренний after-снимок (БД состояние) после выполнения kill-switch.
      */
     private String internalAfter;

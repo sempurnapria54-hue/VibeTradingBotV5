@@ -65,11 +65,16 @@ public class KillSwitchService {
                                               String reasonCode) {
         ClientService clientService = clientManager.getClientService(exchange.getName());
         StateSnapshot beforeSnapshot = stateSnapshotReader.readBeforeSnapshot(clientService, instrument);
+        return executeKillSwitch(exchange, instrument, dealId, reasonCode, beforeSnapshot);
+    }
 
-        KillSwitchResult result = new KillSwitchResult();
-        result.setInternalBefore(jsonUtils.buildInternalSnapshot(beforeSnapshot, instrument));
-        result.setExternalBefore(jsonUtils.buildExternalSnapshot(beforeSnapshot, instrument));
-
+    @Transactional
+    public KillSwitchResult executeKillSwitch(Exchange exchange,
+                                              Instrument instrument,
+                                              Long dealId,
+                                              String reasonCode,
+                                              StateSnapshot beforeSnapshot) {
+        ClientService clientService = clientManager.getClientService(exchange.getName());
         cancelOrderExecutor.execute(clientService, instrument, beforeSnapshot.getInternalOrders());
         cancelAlgoOrderExecutor.execute(clientService, instrument, beforeSnapshot.getInternalAlgoOrders());
         closePositionExecutor.execute(clientService,
@@ -85,13 +90,14 @@ public class KillSwitchService {
 
         log.warn("Kill-switch executed. Exchange: {}, instrument: {}, dealId: {}, reason: {}, success: {}, message: {}",
                  exchange.getName(), instrument.getExternalId(), dealId, reasonCode, success, message);
-
+        KillSwitchResult result = new KillSwitchResult();
         result.setSuccess(success);
         result.setInternalAfter(jsonUtils.buildInternalSnapshot(afterSnapshot, instrument));
         result.setExternalAfter(jsonUtils.buildExternalSnapshot(afterSnapshot, instrument));
         result.setMessage(message);
         return result;
     }
+
 
     private String resolveMessage(StateSnapshot afterSnapshot, boolean success) {
         if (success) {

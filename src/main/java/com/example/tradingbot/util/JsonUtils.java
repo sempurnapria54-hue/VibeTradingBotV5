@@ -1,6 +1,7 @@
 package com.example.tradingbot.util;
 
 import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.Instrument.Status;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,13 +25,14 @@ public class JsonUtils {
         }
     }
 
+    public String buildInternalSnapshot(StateSnapshot snapshot, Instrument instrument, Status instrumentStatusBefore) {
+        LinkedHashMap<String, Object> payload = buildInternalPayload(snapshot, instrument);
+        payload.put("instrumentStatusBefore", instrumentStatusBefore);
+        return toJson(payload);
+    }
+
     public String buildInternalSnapshot(StateSnapshot snapshot, Instrument instrument) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("instrument", instrument);
-        payload.put("positions", snapshot.getInternalPositions());
-        payload.put("orders", snapshot.getInternalOrders());
-        payload.put("algoOrders", snapshot.getInternalAlgoOrders());
-        payload.put("deals", snapshot.getInternalDeals());
+        LinkedHashMap<String, Object> payload = buildInternalPayload(snapshot, instrument);
         return toJson(payload);
     }
 
@@ -41,5 +43,15 @@ public class JsonUtils {
         payload.put("orders", snapshot.getExternalOrders());
         payload.put("algoOrders", snapshot.getExternalAlgoOrders());
         return toJson(payload);
+    }
+
+    private LinkedHashMap<String, Object> buildInternalPayload(StateSnapshot snapshot, Instrument instrument) {
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+        payload.put("instrument", instrument);
+        payload.put("positions", snapshot.getInternalPositions());
+        payload.put("orders", snapshot.getInternalOrders());
+        payload.put("algoOrders", snapshot.getInternalAlgoOrders());
+        payload.put("deals", snapshot.getInternalDeals());
+        return payload;
     }
 }

@@ -1,14 +1,20 @@
 package com.example.tradingbot.domain.service.deal;
 
+import com.example.tradingbot.client.service.ClientManager;
+import com.example.tradingbot.client.service.ClientService;
 import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.Instrument.Status;
 import com.example.tradingbot.domain.model.anomaly.AnomalyReport;
 import com.example.tradingbot.domain.model.anomaly.AnomalyReport.Severity;
 import com.example.tradingbot.domain.model.deal.KillSwitchResult;
 import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.service.InstrumentService;
 import com.example.tradingbot.domain.service.kill_switch.KillSwitchService;
+import com.example.tradingbot.domain.service.kill_switch.reader.StateSnapshotReader;
+import com.example.tradingbot.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +33,9 @@ public class TradeRuleValidator {
     private final KillSwitchService killSwitchService;
     private final InstrumentService instrumentService;
     private final AnomalyService anomalyService;
+    private final ClientManager clientManager;
+    private final StateSnapshotReader stateSnapshotReader;
+    private final JsonUtils jsonUtils;
 
     public void validatePositions(Exchange exchange,
                                   Instrument instrument,
@@ -62,17 +71,22 @@ public class TradeRuleValidator {
                                                Long dealId,
                                                String code,
                                                Severity severity) {
+        Status instrumentStatusBefore = instrument.getStatus();
         instrumentService.holdInstrument(instrument);
 
         AnomalyReport report = anomalyService.create(exchange.getId(), instrument.getId(), severity, code);
-        anomalyService.markInProgress(report.getId());
+
+        ClientService clientService = clientManager.getClientService(exchange.getName());
+        StateSnapshot beforeSnapshot = stateSnapshotReader.readBeforeSnapshot(clientService, instrument);
+        String internalBefore = jsonUtils.buildInternalSnapshot(beforeSnapshot, instrument, instrumentStatusBefore);
+        String externalBefore = jsonUtils.buildExternalSnapshot(beforeSnapshot, instrument);
+
+        anomalyService.markInProgress(report.getId(), internalBefore, externalBefore);
 
         try {
             KillSwitchResult killSwitchResult =
-                    killSwitchService.executeKillSwitch(exchange, instrument, dealId, code);
+                    killSwitchService.executeKillSwitch(exchange, instrument, dealId, code, beforeSnapshot);
             anomalyService.markKillSwitchExecuted(report.getId(),
-                                                  killSwitchResult.getInternalBefore(),
-                                                  killSwitchResult.getExternalBefore(),
                                                   killSwitchResult.getInternalAfter(),
                                                   killSwitchResult.getExternalAfter());
 

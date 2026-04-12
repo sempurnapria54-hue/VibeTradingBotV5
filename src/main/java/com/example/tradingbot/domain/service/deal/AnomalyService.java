@@ -25,20 +25,18 @@ public class AnomalyService {
     }
 
     @Transactional
-    public void markInProgress(Long reportId) {
+    public void markInProgress(Long reportId, String internalBefore, String externalBefore) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
-        report.toInProgress();
+        report.toInProgress(internalBefore, externalBefore);
         anomalyReportDataService.save(report);
     }
 
     @Transactional
     public void markKillSwitchExecuted(Long reportId,
-                                       String internalBefore,
-                                       String externalBefore,
                                        String internalAfter,
                                        String externalAfter) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
-        report.toKillSwitchExecuted(internalBefore, externalBefore, internalAfter, externalAfter);
+        report.toKillSwitchExecuted(internalAfter, externalAfter);
         anomalyReportDataService.save(report);
     }
 
