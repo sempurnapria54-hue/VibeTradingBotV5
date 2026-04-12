@@ -119,13 +119,11 @@ public class AnomalyReport extends Auditable {
         setStatus(AnomalyReport.Status.IN_PROGRESS);
     }
 
-    public void toKillSwitchExecuted(String internalAfter, String externalAfter) {
+    public void toKillSwitchExecuted() {
         if (isNull(status) || isFalse(status == Status.IN_PROGRESS)) {
             throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
         }
         setStatus(AnomalyReport.Status.KILL_SWITCH_EXECUTED);
-        setInternalAfter(internalAfter);
-        setExternalAfter(externalAfter);
     }
 
     public void toCompleted(String internalAfter, String externalAfter) {

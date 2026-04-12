@@ -42,16 +42,15 @@ public class TradeRuleValidator {
                                   List<PositionExternalSnapshot> externalSnapshots,
                                   List<Position> domainPositions) {
         if (hasOverheadPositions(externalSnapshots, domainPositions)) {
-            String code = resolvePositionsCode(externalSnapshots, domainPositions);
-            Severity severity = resolvePositionsSeverity(externalSnapshots, domainPositions);
             executeTradeRuleViolationFlow(exchange,
                                           instrument,
                                           dealId,
-                                          code,
-                                          severity,
+                                          OVERHEAD_POSITIONS_COUNT,
+                                          Severity.CRITICAL,
                                           externalSnapshots,
                                           domainPositions);
-            throw new TradeRuleViolationException("Trade rule violation detected for positions: " + code);
+            throw new TradeRuleViolationException(
+                    "Trade rule violation detected for positions: " + OVERHEAD_POSITIONS_COUNT);
         }
     }
 
@@ -66,16 +65,6 @@ public class TradeRuleValidator {
 
     private boolean hasDomainOverheadPositions(List<Position> domainPositions) {
         return isNotEmpty(domainPositions) && domainPositions.size() > INTEGER_ONE;
-    }
-
-    private String resolvePositionsCode(List<PositionExternalSnapshot> externalSnapshots,
-                                        List<Position> domainPositions) {
-        return OVERHEAD_POSITIONS_COUNT;
-    }
-
-    private Severity resolvePositionsSeverity(List<PositionExternalSnapshot> externalSnapshots,
-                                              List<Position> domainPositions) {
-        return Severity.CRITICAL;
     }
 
     private void executeTradeRuleViolationFlow(Exchange exchange,
@@ -98,11 +87,10 @@ public class TradeRuleValidator {
 
         try {
             killSwitchService.executeTradeRuleViolation(exchange, instrument, dealId, code);
+            anomalyService.markKillSwitchExecuted(report.getId());
 
             String internalAfter = serializeInternalSnapshot(loadInternalSnapshotAfterKillSwitch(instrument));
             String externalAfter = serializeExternalSnapshot(loadExternalSnapshotAfterKillSwitch(exchange, instrument));
-
-            anomalyService.markKillSwitchExecuted(report.getId(), internalAfter, externalAfter);
             anomalyService.complete(report.getId(), null, internalAfter, externalAfter);
         } catch (Exception exception) {
             String internalAfter = serializeInternalSnapshot(loadInternalSnapshotAfterKillSwitch(instrument));
@@ -117,7 +105,8 @@ public class TradeRuleValidator {
                                                                     Set.of(Status.ACTIVE.name()));
     }
 
-    private List<PositionExternalSnapshot> loadExternalSnapshotAfterKillSwitch(Exchange exchange, Instrument instrument) {
+    private List<PositionExternalSnapshot> loadExternalSnapshotAfterKillSwitch(Exchange exchange,
+                                                                               Instrument instrument) {
         return clientManager.getClientService(exchange.getName())
                             .getPositionsByInstrument(instrument);
     }

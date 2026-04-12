@@ -35,9 +35,9 @@ public class AnomalyService {
     }
 
     @Transactional
-    public AnomalyReport markKillSwitchExecuted(Long reportId, String internalAfter, String externalAfter) {
+    public AnomalyReport markKillSwitchExecuted(Long reportId) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
-        report.toKillSwitchExecuted(internalAfter, externalAfter);
+        report.toKillSwitchExecuted();
         return anomalyReportDataService.save(report);
     }
 
