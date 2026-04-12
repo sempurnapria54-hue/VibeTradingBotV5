@@ -32,8 +32,7 @@ public class JsonUtils {
     }
 
     public String buildInternalSnapshot(StateSnapshot snapshot, Instrument instrument) {
-        LinkedHashMap<String, Object> payload = buildInternalPayload(snapshot, instrument);
-        return toJson(payload);
+        return toJson(buildInternalPayload(snapshot, instrument));
     }
 
     public String buildExternalSnapshot(StateSnapshot snapshot, Instrument instrument) {
@@ -80,7 +79,6 @@ public class JsonUtils {
 
     private Map<String, Object> buildExternalRelatedInactivePayload(StateSnapshot snapshot) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("positions", snapshot.getExternalRelatedInactivePositions());
         payload.put("orders", snapshot.getExternalRelatedInactiveOrders());
         payload.put("algoOrders", snapshot.getExternalRelatedInactiveAlgoOrders());
         return payload;

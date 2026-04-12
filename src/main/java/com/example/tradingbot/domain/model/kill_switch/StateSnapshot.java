@@ -20,14 +20,16 @@ public class StateSnapshot {
     private List<Order> internalOrders;
     private List<AlgoOrder> internalAlgoOrders;
     private List<Deal> internalDeals;
+
     private List<Position> internalRelatedInactivePositions;
     private List<Order> internalRelatedInactiveOrders;
     private List<AlgoOrder> internalRelatedInactiveAlgoOrders;
     private List<Deal> internalRelatedInactiveDeals;
+
     private List<PositionExternalSnapshot> externalPositions;
     private List<OrderExternalSnapshot> externalOrders;
     private List<AlgoOrderExternalSnapshot> externalAlgoOrders;
-    private List<PositionExternalSnapshot> externalRelatedInactivePositions;
+
     private List<OrderExternalSnapshot> externalRelatedInactiveOrders;
     private List<AlgoOrderExternalSnapshot> externalRelatedInactiveAlgoOrders;
 }

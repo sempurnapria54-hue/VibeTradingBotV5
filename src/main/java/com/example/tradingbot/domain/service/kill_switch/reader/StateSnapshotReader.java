@@ -14,15 +14,17 @@ import com.example.tradingbot.persistence.service.PositionDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_ALGO_ORDER_STATUSES;
 import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_DEAL_STATUSES;
 import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_ORDER_STATUSES;
 import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_POSITION_STATUSES;
+import static com.example.tradingbot.util.CollectionUtils.doNotContains;
 import static com.example.tradingbot.util.CollectionUtils.emptyIfNull;
+import static java.util.Objects.isNull;
 
 @Component
 @RequiredArgsConstructor
@@ -32,23 +34,30 @@ public class StateSnapshotReader {
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
     private final DealDataService dealDataService;
-    private final ExternalAlgoOrderReader externalAlgoOrderReader;
+    private final ExternalPositionSnapshotReader externalPositionSnapshotReader;
+    private final ExternalOrderSnapshotReader externalOrderSnapshotReader;
+    private final ExternalAlgoOrderSnapshotReader externalAlgoOrderSnapshotReader;
 
     public StateSnapshot readBeforeSnapshot(ClientService clientService, Instrument instrument) {
         StateSnapshot snapshot = new StateSnapshot();
-        snapshot.setInternalPositions(positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                           LIVE_POSITION_STATUSES));
-        snapshot.setInternalOrders(orderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                     LIVE_ORDER_STATUSES));
-        snapshot.setInternalAlgoOrders(algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                             LIVE_ALGO_ORDER_STATUSES));
-        snapshot.setInternalDeals(
-                dealDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_DEAL_STATUSES));
-        snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
-        snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
-        snapshot.setExternalAlgoOrders(externalAlgoOrderReader.readExternalAlgoOrders(clientService,
-                                                                                      instrument,
-                                                                                      snapshot.getInternalAlgoOrders()));
+        snapshot.setInternalPositions(readActiveInternalPositions(instrument));
+        snapshot.setInternalOrders(readActiveInternalOrders(instrument));
+        snapshot.setInternalAlgoOrders(readActiveInternalAlgoOrders(instrument));
+        snapshot.setInternalDeals(readActiveInternalDeals(instrument));
+
+        snapshot.setInternalRelatedInactivePositions(List.of());
+        snapshot.setInternalRelatedInactiveOrders(List.of());
+        snapshot.setInternalRelatedInactiveAlgoOrders(List.of());
+        snapshot.setInternalRelatedInactiveDeals(List.of());
+
+        snapshot.setExternalPositions(externalPositionSnapshotReader.readActivePositions(clientService, instrument));
+        snapshot.setExternalOrders(externalOrderSnapshotReader.readActiveOrders(clientService, instrument));
+        snapshot.setExternalAlgoOrders(externalAlgoOrderSnapshotReader.readActiveAlgoOrders(clientService,
+                                                                                            instrument,
+                                                                                            snapshot.getInternalAlgoOrders()));
+
+        snapshot.setExternalRelatedInactiveOrders(List.of());
+        snapshot.setExternalRelatedInactiveAlgoOrders(List.of());
         return snapshot;
     }
 
@@ -56,115 +65,85 @@ public class StateSnapshotReader {
                                            Instrument instrument,
                                            StateSnapshot beforeSnapshot) {
         StateSnapshot safeBeforeSnapshot = beforeSnapshot;
-        if (safeBeforeSnapshot == null) {
+        if (isNull(safeBeforeSnapshot)) {
             safeBeforeSnapshot = new StateSnapshot();
         }
+
         StateSnapshot snapshot = new StateSnapshot();
-        snapshot.setInternalPositions(positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                           LIVE_POSITION_STATUSES));
-        snapshot.setInternalOrders(orderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                     LIVE_ORDER_STATUSES));
-        snapshot.setInternalAlgoOrders(algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                             LIVE_ALGO_ORDER_STATUSES));
-        snapshot.setInternalDeals(dealDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                   LIVE_DEAL_STATUSES));
+        snapshot.setInternalPositions(readActiveInternalPositions(instrument));
+        snapshot.setInternalOrders(readActiveInternalOrders(instrument));
+        snapshot.setInternalAlgoOrders(readActiveInternalAlgoOrders(instrument));
+        snapshot.setInternalDeals(readActiveInternalDeals(instrument));
+
         snapshot.setInternalRelatedInactivePositions(resolveRelatedInactivePositions(safeBeforeSnapshot));
         snapshot.setInternalRelatedInactiveOrders(resolveRelatedInactiveOrders(safeBeforeSnapshot));
         snapshot.setInternalRelatedInactiveAlgoOrders(resolveRelatedInactiveAlgoOrders(safeBeforeSnapshot));
         snapshot.setInternalRelatedInactiveDeals(resolveRelatedInactiveDeals(instrument, safeBeforeSnapshot));
-        snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
-        snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
-        snapshot.setExternalAlgoOrders(externalAlgoOrderReader.readExternalAlgoOrders(clientService,
-                                                                                      instrument,
-                                                                                      snapshot.getInternalAlgoOrders()));
-        snapshot.setExternalRelatedInactivePositions(List.of());
-        snapshot.setExternalRelatedInactiveOrders(List.of());
-        snapshot.setExternalRelatedInactiveAlgoOrders(List.of());
+
+        snapshot.setExternalPositions(externalPositionSnapshotReader.readActivePositions(clientService, instrument));
+        snapshot.setExternalOrders(externalOrderSnapshotReader.readActiveOrders(clientService, instrument));
+        snapshot.setExternalAlgoOrders(externalAlgoOrderSnapshotReader.readActiveAlgoOrders(clientService,
+                                                                                            instrument,
+                                                                                            snapshot.getInternalAlgoOrders()));
+
+        snapshot.setExternalRelatedInactiveOrders(
+                externalOrderSnapshotReader.readRelatedInactiveOrders(clientService, instrument));
+        snapshot.setExternalRelatedInactiveAlgoOrders(
+                externalAlgoOrderSnapshotReader.readRelatedInactiveAlgoOrders(clientService,
+                                                                              instrument,
+                                                                              safeBeforeSnapshot.getInternalAlgoOrders()));
         return snapshot;
     }
 
+    private List<Position> readActiveInternalPositions(Instrument instrument) {
+        return positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_POSITION_STATUSES);
+    }
+
+    private List<Order> readActiveInternalOrders(Instrument instrument) {
+        return orderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_ORDER_STATUSES);
+    }
+
+    private List<AlgoOrder> readActiveInternalAlgoOrders(Instrument instrument) {
+        return algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_ALGO_ORDER_STATUSES);
+    }
+
+    private List<Deal> readActiveInternalDeals(Instrument instrument) {
+        return dealDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_DEAL_STATUSES);
+    }
+
     private List<Position> resolveRelatedInactivePositions(StateSnapshot beforeSnapshot) {
-        List<Position> relatedInactivePositions = new ArrayList<>();
-        for (Position position : emptyIfNull(beforeSnapshot.getInternalPositions())) {
-            if (position == null) {
-                continue;
-            }
-            if (position.isLive()) {
-                continue;
-            }
-            relatedInactivePositions.add(position);
-        }
-        return relatedInactivePositions;
+        return emptyIfNull(beforeSnapshot.getInternalPositions()).stream()
+                                                                 .filter(Objects::nonNull)
+                                                                 .filter(Position::isNotLive)
+                                                                 .toList();
     }
 
     private List<Order> resolveRelatedInactiveOrders(StateSnapshot beforeSnapshot) {
-        List<Order> relatedInactiveOrders = new ArrayList<>();
-        for (Order order : emptyIfNull(beforeSnapshot.getInternalOrders())) {
-            if (order == null) {
-                continue;
-            }
-            if (order.isLive()) {
-                continue;
-            }
-            relatedInactiveOrders.add(order);
-        }
-        return relatedInactiveOrders;
+        return emptyIfNull(beforeSnapshot.getInternalOrders()).stream()
+                                                              .filter(Objects::nonNull)
+                                                              .filter(Order::isNotLive)
+                                                              .toList();
     }
 
     private List<AlgoOrder> resolveRelatedInactiveAlgoOrders(StateSnapshot beforeSnapshot) {
-        List<AlgoOrder> relatedInactiveAlgoOrders = new ArrayList<>();
-        for (AlgoOrder algoOrder : emptyIfNull(beforeSnapshot.getInternalAlgoOrders())) {
-            if (algoOrder == null) {
-                continue;
-            }
-            if (algoOrder.isLive()) {
-                continue;
-            }
-            relatedInactiveAlgoOrders.add(algoOrder);
-        }
-        return relatedInactiveAlgoOrders;
+        return emptyIfNull(beforeSnapshot.getInternalAlgoOrders()).stream()
+                                                                  .filter(Objects::nonNull)
+                                                                  .filter(AlgoOrder::isNotLive)
+                                                                  .toList();
     }
 
     private List<Deal> resolveRelatedInactiveDeals(Instrument instrument, StateSnapshot beforeSnapshot) {
-        List<Deal> relatedInactiveDeals = new ArrayList<>();
-        for (Deal deal : emptyIfNull(beforeSnapshot.getInternalDeals())) {
-            if (deal == null) {
-                continue;
-            }
-            if (isLiveDeal(deal)) {
-                continue;
-            }
-            relatedInactiveDeals.add(deal);
-        }
+        List<Deal> beforeInactiveDeals = emptyIfNull(
+                beforeSnapshot.getInternalDeals()).stream()
+                                                  .filter(Objects::nonNull)
+                                                  .filter(Deal::isNotLive)
+                                                  .toList();
 
-        dealDataService.findLatestByInstrumentId(instrument.getId())
-                       .ifPresent(latestDeal -> {
-                           if (isLiveDeal(latestDeal)) {
-                               return;
-                           }
-                           if (containsDeal(relatedInactiveDeals, latestDeal)) {
-                               return;
-                           }
-                           relatedInactiveDeals.add(0, latestDeal);
-                       });
-        return relatedInactiveDeals;
-    }
-
-    private boolean containsDeal(List<Deal> deals, Deal candidate) {
-        for (Deal deal : deals) {
-            if (deal == null || deal.getId() == null || candidate.getId() == null) {
-                continue;
-            }
-            if (Objects.equals(deal.getId(), candidate.getId())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isLiveDeal(Deal deal) {
-        return deal != null
-                && deal.getStatus() != null
-                && LIVE_DEAL_STATUSES.contains(deal.getStatus().name());
+        return dealDataService.findLatestByInstrumentId(instrument.getId())
+                              .filter(Deal::isNotLive)
+                              .filter(latestDeal -> doNotContains(beforeInactiveDeals, latestDeal))
+                              .map(latestDeal -> Stream.concat(Stream.of(latestDeal), beforeInactiveDeals.stream())
+                                                       .toList())
+                              .orElse(beforeInactiveDeals);
     }
 }

@@ -4,11 +4,15 @@ import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.position.Position;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.List;
+
+import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_DEAL_STATUSES;
+import static com.example.tradingbot.util.CollectionUtils.doNotContains;
 
 @Getter
 @Setter
@@ -17,16 +21,19 @@ public class Deal extends Auditable {
     /**
      * Внутренний идентификатор.
      */
+    @EqualsAndHashCode.Include
     private Long id;
 
     /**
      * Межсервисный идентификатор.
      */
+    @EqualsAndHashCode.Include
     private String internalId;
 
     /**
      * Идентификатор инструмента.
      */
+    @EqualsAndHashCode.Include
     private Long instrumentId;
 
     /**
@@ -252,5 +259,9 @@ public class Deal extends Auditable {
     public void toError(CloseReason reason) {
         setStatus(Status.ERROR);
         setCloseReason(reason);
+    }
+
+    public boolean isNotLive() {
+        return doNotContains(LIVE_DEAL_STATUSES, getStatus().name());
     }
 }

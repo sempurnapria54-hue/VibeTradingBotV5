@@ -6,6 +6,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 @Getter
 @Setter
 public class AlgoOrder extends Auditable {
@@ -127,6 +129,10 @@ public class AlgoOrder extends Auditable {
 
     public boolean isLive() {
         return AlgoOrder.Status.ACTIVE == status || AlgoOrder.Status.PENDING == status;
+    }
+
+    public boolean isNotLive() {
+        return isFalse(isLive());
     }
 
     public void toClose(CloseReason reason) {

@@ -29,6 +29,4 @@ public class CollectionUtils {
     public static <T> Collection<T> emptyIfNull(Collection<T> collection) {
         return isNull(collection) ? Collections.emptyList() : collection;
     }
-
-
 }

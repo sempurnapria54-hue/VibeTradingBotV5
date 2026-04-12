@@ -8,6 +8,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -273,5 +275,9 @@ public class Position extends Auditable {
 
     public boolean isLive() {
         return status == Status.ACTIVE;
+    }
+
+    public boolean isNotLive() {
+        return isFalse(isLive());
     }
 }

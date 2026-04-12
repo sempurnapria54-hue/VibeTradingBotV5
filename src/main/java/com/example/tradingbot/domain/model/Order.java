@@ -6,6 +6,8 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 @Getter
 @Setter
 public class Order extends Auditable {
@@ -142,6 +144,10 @@ public class Order extends Auditable {
                 || status == Status.PENDING
                 || status == Status.ACTIVE
                 || status == Status.PARTIALLY_COMPLETED;
+    }
+
+    public boolean isNotLive() {
+        return isFalse(isLive());
     }
 
     public void toClose(CloseReason reason) {
