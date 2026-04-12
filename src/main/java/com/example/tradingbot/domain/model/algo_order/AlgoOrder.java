@@ -31,6 +31,11 @@ public class AlgoOrder extends Auditable {
     private Status status;
 
     /**
+     * Причина закрытия algo-ордера.
+     */
+    private CloseReason closeReason;
+
+    /**
      * Доменный тип условия.
      * Дублируется с condition.getType() для удобной фильтрации/логирования.
      */
@@ -113,7 +118,19 @@ public class AlgoOrder extends Auditable {
         SELL
     }
 
+    public enum CloseReason {
+        /**
+         * Algo-ордер отменён аварийным kill-switch.
+         */
+        KILL_SWITCH
+    }
+
     public boolean isLive() {
         return AlgoOrder.Status.ACTIVE == status || AlgoOrder.Status.PENDING == status;
+    }
+
+    public void toClose(CloseReason reason) {
+        setStatus(Status.CLOSED);
+        setCloseReason(reason);
     }
 }

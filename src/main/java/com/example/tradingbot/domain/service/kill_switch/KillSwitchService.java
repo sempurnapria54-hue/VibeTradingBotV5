@@ -83,7 +83,7 @@ public class KillSwitchService {
                                       isNotEmpty(beforeSnapshot.getExternalPositions()));
         dealEmergencyFinalizer.execute(beforeSnapshot.getInternalDeals());
 
-        StateSnapshot afterSnapshot = stateSnapshotReader.readAfterSnapshot(clientService, instrument);
+        StateSnapshot afterSnapshot = stateSnapshotReader.readAfterSnapshot(clientService, instrument, beforeSnapshot);
 
         boolean success = isSuccess(afterSnapshot);
         String message = resolveMessage(afterSnapshot, success);

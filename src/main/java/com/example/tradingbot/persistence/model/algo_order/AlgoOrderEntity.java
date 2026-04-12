@@ -60,6 +60,12 @@ public class AlgoOrderEntity extends AuditableEntity {
     private String status;
 
     /**
+     * Причина закрытия algo-ордера.
+     */
+    @Column(name = "close_reason")
+    private String closeReason;
+
+    /**
      * Доменный тип условия (строка вместо enum).
      * Дублируется с condition.type для фильтрации/логирования.
      */

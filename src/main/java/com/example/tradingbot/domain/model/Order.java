@@ -36,6 +36,11 @@ public class Order extends Auditable {
     private Status status;
 
     /**
+     * Причина закрытия ордера.
+     */
+    private CloseReason closeReason;
+
+    /**
      * Тип ордера в бизнес-терминах.
      */
     private Type type;
@@ -125,10 +130,22 @@ public class Order extends Auditable {
 
     }
 
+    public enum CloseReason {
+        /**
+         * Ордер отменён аварийным kill-switch.
+         */
+        KILL_SWITCH
+    }
+
     public boolean isLive() {
         return status == Status.CREATED
                 || status == Status.PENDING
                 || status == Status.ACTIVE
                 || status == Status.PARTIALLY_COMPLETED;
+    }
+
+    public void toClose(CloseReason reason) {
+        setStatus(Status.CLOSED);
+        setCloseReason(reason);
     }
 }

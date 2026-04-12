@@ -248,4 +248,9 @@ public class Deal extends Auditable {
          */
         LIQUIDATION
     }
+
+    public void toError(CloseReason reason) {
+        setStatus(Status.ERROR);
+        setCloseReason(reason);
+    }
 }

@@ -65,6 +65,12 @@ public class OrderEntity extends AuditableEntity {
     private String status;
 
     /**
+     * Причина закрытия ордера.
+     */
+    @Column(name = "close_reason")
+    private String closeReason;
+
+    /**
      * Тип ордера в бизнес-терминах.
      */
     @Column(name = "type")

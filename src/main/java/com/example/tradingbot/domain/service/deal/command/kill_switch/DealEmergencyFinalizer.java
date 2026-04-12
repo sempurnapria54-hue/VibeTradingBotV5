@@ -18,8 +18,7 @@ public class DealEmergencyFinalizer {
             if (deal == null) {
                 continue;
             }
-            deal.setStatus(Deal.Status.ERROR);
-            deal.setCloseReason(Deal.CloseReason.EMERGENCY_STOP);
+            deal.toError(Deal.CloseReason.EMERGENCY_STOP);
             dealDataService.save(deal);
         }
     }

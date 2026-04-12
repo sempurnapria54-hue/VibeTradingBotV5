@@ -21,7 +21,7 @@ public class CancelAlgoOrderExecutor {
                 continue;
             }
             clientService.cancelAlgoOrder(algoOrder, instrument.getExternalId());
-            algoOrder.setStatus(AlgoOrder.Status.CLOSED);
+            algoOrder.toClose(AlgoOrder.CloseReason.KILL_SWITCH);
             algoOrderDataService.save(algoOrder);
         }
     }
