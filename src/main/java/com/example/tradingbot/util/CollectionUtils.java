@@ -2,8 +2,11 @@ package com.example.tradingbot.util;
 
 import lombok.experimental.UtilityClass;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
 
+import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -17,5 +20,10 @@ public class CollectionUtils {
             );
         }
     }
+
+    public static <T> Collection<T> emptyIfNull(Collection<T> collection) {
+        return isNull(collection) ? Collections.emptyList() : collection;
+    }
+
 
 }

@@ -8,7 +8,7 @@ import com.example.tradingbot.domain.service.BalanceService;
 import com.example.tradingbot.domain.service.OrderService;
 import com.example.tradingbot.domain.service.PositionService;
 import com.example.tradingbot.domain.service.deal.ExitService;
-import com.example.tradingbot.domain.service.deal.KillSwitchService;
+import com.example.tradingbot.domain.service.kill_switch.KillSwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

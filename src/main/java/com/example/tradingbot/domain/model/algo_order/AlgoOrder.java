@@ -112,4 +112,8 @@ public class AlgoOrder extends Auditable {
          */
         SELL
     }
+
+    public boolean isLive() {
+        return AlgoOrder.Status.ACTIVE == status || AlgoOrder.Status.PENDING == status;
+    }
 }

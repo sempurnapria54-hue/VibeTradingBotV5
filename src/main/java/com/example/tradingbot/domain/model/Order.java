@@ -124,4 +124,11 @@ public class Order extends Auditable {
         ENTRY_ATTACHED_STOP_LOSS,
 
     }
+
+    public boolean isLive() {
+        return status == Status.CREATED
+                || status == Status.PENDING
+                || status == Status.ACTIVE
+                || status == Status.PARTIALLY_COMPLETED;
+    }
 }

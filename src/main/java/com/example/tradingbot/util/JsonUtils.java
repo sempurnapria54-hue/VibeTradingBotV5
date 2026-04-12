@@ -1,9 +1,14 @@
 package com.example.tradingbot.util;
 
+import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -17,5 +22,23 @@ public class JsonUtils {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Unable to serialize reconcile snapshot", exception);
         }
+    }
+
+    public String buildInternalSnapshot(StateSnapshot snapshot, Instrument instrument) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("instrument", instrument);
+        payload.put("positions", snapshot.getInternalPositions());
+        payload.put("orders", snapshot.getInternalOrders());
+        payload.put("algoOrders", snapshot.getInternalAlgoOrders());
+        return toJson(payload);
+    }
+
+    public String buildExternalSnapshot(StateSnapshot snapshot, Instrument instrument) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("instrumentExternalId", instrument.getExternalId());
+        payload.put("positions", snapshot.getExternalPositions());
+        payload.put("orders", snapshot.getExternalOrders());
+        payload.put("algoOrders", snapshot.getExternalAlgoOrders());
+        return toJson(payload);
     }
 }

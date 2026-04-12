@@ -9,6 +9,7 @@ import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.Position.Status;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.service.kill_switch.KillSwitchService;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import com.example.tradingbot.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
@@ -88,7 +89,7 @@ public class TradeRuleValidator {
 
         try {
             KillSwitchResult killSwitchResult =
-                    killSwitchService.executeTradeRuleViolation(exchange, instrument, dealId, code);
+                    killSwitchService.executeKillSwitch(exchange, instrument, dealId, code);
             anomalyService.markKillSwitchExecuted(report.getId());
 
             if (killSwitchResult.isSuccess()) {
