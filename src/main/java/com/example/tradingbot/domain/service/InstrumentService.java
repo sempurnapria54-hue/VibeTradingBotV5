@@ -47,4 +47,9 @@ public class InstrumentService {
     public Page<Instrument> getByParams(InstrumentSearchParams searchParams, Pageable pageable) {
         return instrumentDataService.search(searchParams, pageable);
     }
+
+    public Instrument blockByKillSwitch(Instrument instrument) {
+        instrument.setStatus(Status.ERROR);
+        return instrumentDataService.save(instrument);
+    }
 }
