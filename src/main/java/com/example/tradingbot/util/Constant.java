@@ -26,6 +26,7 @@ public class Constant {
         public static final String CANDLE_GROUP_NOT_FOUND = "candle.group.not.found";
         public static final String EXCHANGE_ALREADY_EXISTS = "exchange.already.exists";
         public static final String RECONCILE_REPORT_NOT_FOUND = "reconcile.report.not.found";
+        public static final String ANOMALY_REPORT_NOT_FOUND = "anomaly.report.not.found";
         public static final String CLIENT_SERVICE_NOT_FOUND = "client.service.not.found";
 
         public static final String ALGO_ORDER_NOT_FOUND_ON_EXCHANGE = "algo.order.not.found.on.exchange";
