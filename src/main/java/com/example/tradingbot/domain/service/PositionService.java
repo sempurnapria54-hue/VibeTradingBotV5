@@ -8,6 +8,7 @@ import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.Position.CloseReason;
 import com.example.tradingbot.domain.model.position.Position.Status;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.service.deal.TradeRuleValidator;
 import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +23,7 @@ import java.util.Set;
 import static com.example.tradingbot.util.factory.PositionFactory.createPosition;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static org.apache.commons.lang3.math.NumberUtils.INTEGER_ONE;
 import static org.hibernate.internal.util.collections.CollectionHelper.isEmpty;
-import static org.hibernate.internal.util.collections.CollectionHelper.isNotEmpty;
 
 @Slf4j
 @Service
@@ -34,6 +33,7 @@ public class PositionService {
     private final PositionDataService positionDataService;
     private final ClientManager clientManager;
     private final PositionMapper mapper;
+    private final TradeRuleValidator tradeRuleValidator;
 
     @Transactional
     public void refreshPositions(Exchange exchange, Instrument instrument, Deal deal) {
@@ -44,7 +44,7 @@ public class PositionService {
                 positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
                                                                      Set.of(Status.ACTIVE.name()));
 
-        checkAndCloseDuplicates(snapshots, activeDomainPositions, exchange, instrument);
+        tradeRuleValidator.validatePositions(exchange, instrument, deal.getId(), snapshots, activeDomainPositions);
 
         if (isEmpty(snapshots) && isEmpty(activeDomainPositions)) {
             log.info("Not active positions and snapshots for exchange {}, instrument {} , deal {}",
@@ -52,8 +52,8 @@ public class PositionService {
             return;
         }
 
-        PositionExternalSnapshot snapshot = snapshots.getFirst();
-        Position position = activeDomainPositions.getFirst();
+        PositionExternalSnapshot snapshot = isEmpty(snapshots) ? null : snapshots.getFirst();
+        Position position = isEmpty(activeDomainPositions) ? null : activeDomainPositions.getFirst();
 
         if (nonNull(position)) {
             refreshFromSnapshot(activeDomainPositions, snapshot);
@@ -61,25 +61,6 @@ public class PositionService {
             createFromSnapshot(snapshot, instrument, deal.getId(), exchange);
         }
     }
-
-    private void checkAndCloseDuplicates(List<PositionExternalSnapshot> snapshots, List<Position> activeDomainPositions,
-                                         Exchange exchange, Instrument instrument) {
-        if (isNotEmpty(snapshots) && snapshots.size() > INTEGER_ONE) {
-            clientManager.getClientService(exchange.getName())
-                         .closePositions(instrument);
-            throw new RuntimeException("ThreadRuleError: more than one position per instrument is open");
-        }
-        if (isNotEmpty(activeDomainPositions) && activeDomainPositions.size() > INTEGER_ONE) {
-            activeDomainPositions.forEach(this::emergencyClose);
-            throw new RuntimeException("ThreadRuleError: more than one position per instrument is open");
-        }
-    }
-
-    private void emergencyClose(Position position) {
-        position.toClose(CloseReason.EMERGENCY_CLOSE);
-        positionDataService.save(position);
-    }
-
 
     private void createFromSnapshot(PositionExternalSnapshot snapshot, Instrument instrument, Long dealId,
                                     Exchange exchange) {
