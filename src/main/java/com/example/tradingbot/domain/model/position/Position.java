@@ -265,4 +265,9 @@ public class Position extends Auditable {
          */
         UNKNOWN
     }
+
+    public void toClose(CloseReason closeReason) {
+        setStatus(Status.CLOSED);
+        setCloseReason(closeReason);
+    }
 }

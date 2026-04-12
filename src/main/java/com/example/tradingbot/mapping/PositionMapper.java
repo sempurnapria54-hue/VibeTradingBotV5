@@ -2,6 +2,7 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
+import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.persistence.model.PositionEntity;
@@ -52,9 +53,8 @@ public interface PositionMapper extends CommonMapper {
     List<PositionExternalSnapshot> clientOkxToExternalSnapshot(List<PositionResponse> source);
 
 
-    @Mapping(source = "marginMode", target = "marginMode")
-    @Mapping(source = "side", target = "positionSide")
-    ClosePositionRequest domainToClientOkxCloseRequest(Position source);
+    @Mapping(source = "externalId", target = "instrumentId")
+    ClosePositionRequest domainToClientOkxCloseRequest(Instrument source);
 
 
     /**

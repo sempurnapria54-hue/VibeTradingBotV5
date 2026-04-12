@@ -87,7 +87,7 @@ public interface ClientService {
 
     List<AlgoOrder> cancelAlgoOrder(Object... args);
 
-    List<Position> closePosition(Object... args);
+    List<PositionExternalSnapshot> closePositions(Instrument instrument);
 
     List<InstrumentExternalSnapshot> getInstruments(InstrumentSearchParams searchParams);
 

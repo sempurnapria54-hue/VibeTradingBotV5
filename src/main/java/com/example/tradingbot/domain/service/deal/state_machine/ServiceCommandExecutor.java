@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.service.deal.state_machine;
 
+import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.service.AlgoOrderService;
 import com.example.tradingbot.domain.service.BalanceService;
 import com.example.tradingbot.domain.service.OrderService;
@@ -69,7 +69,7 @@ public class ServiceCommandExecutor {
         }
 
         switch (command) {
-            case REFRESH_POSITIONS -> positionService.refreshPosition(exchange, instrument);
+            case REFRESH_POSITIONS -> positionService.refreshPositions(exchange, instrument, deal);
 
             case REFRESH_BALANCE -> balanceService.refreshBalance(exchange);
 

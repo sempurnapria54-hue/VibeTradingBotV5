@@ -309,19 +309,10 @@ public class OkxClientService implements ClientService {
     }
 
     @Override
-    public List<Position> closePosition(Object... args) {
-        Position position = (Position) args[0];
-        String instrumentExternalId = (String) args[1];
-        String marginCurrency = (String) args[2];
-        String autoCancel = (String) args[3];
-
-        ClosePositionRequest request = positionMapper.domainToClientOkxCloseRequest(position);
-        request.setInstrumentId(instrumentExternalId);
-        request.setCurrency(marginCurrency);
-        request.setAutoCancel(autoCancel);
-
+    public List<PositionExternalSnapshot> closePositions(Instrument instrument) {
+        ClosePositionRequest request = positionMapper.domainToClientOkxCloseRequest(instrument);
         OkxApiResponse<PositionResponse> response = okxRestClient.closePosition(request);
-        return positionMapper.clientOkxResponseToDomain(response.getData());
+        return positionMapper.clientOkxToExternalSnapshot(response.getData());
     }
 
     @Override

@@ -9,7 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.POSITION_NOT_FOUND;
 
@@ -39,16 +40,17 @@ public class PositionDataService {
                                  .orElseThrow(() -> new RuntimeException(POSITION_NOT_FOUND));
     }
 
-    public Optional<Position> findByExternalId(String externalId) {
+    public Position findByExternalId(String externalId) {
         return positionRepository.findByExternalId(externalId)
-                                 .map(mapper::dataToDomain);
+                                 .map(mapper::dataToDomain)
+                                 .orElse(null);
     }
 
-    public List<Position> findByInstrumentId(Long instrumentId) {
-        return positionRepository.findAllByInstrumentId(instrumentId)
+    public List<Position> findAllByInstrumentIdAndStatuses(Long instrumentId, Set<String> statuses) {
+        return positionRepository.findAllByInstrumentIdAndStatuses(instrumentId, statuses)
                                  .stream()
                                  .map(mapper::dataToDomain)
-                                 .toList();
+                                 .collect(Collectors.toList());
     }
 
 }

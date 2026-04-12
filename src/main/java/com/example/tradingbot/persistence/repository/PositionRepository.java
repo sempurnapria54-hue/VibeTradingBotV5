@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface PositionRepository extends JpaRepository<PositionEntity, Long> {
 
@@ -22,4 +23,15 @@ public interface PositionRepository extends JpaRepository<PositionEntity, Long> 
             order by p.id desc
             """, nativeQuery = true)
     List<PositionEntity> findAllByInstrumentId(@Param("instrumentId") Long instrumentId);
+
+    @Query(value = """
+            select p.*
+            from positions p
+            join deals d on d.id = p.deal_id
+            where d.instrument_id = :instrumentId
+            and p.status IN(:statuses)
+            order by p.id desc
+            """, nativeQuery = true)
+    List<PositionEntity> findAllByInstrumentIdAndStatuses(@Param("instrumentId") Long instrumentId,
+                                                          @Param("status") Set<String> statuses);
 }

@@ -2,105 +2,111 @@ package com.example.tradingbot.domain.service;
 
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.position.Position.Side;
-import com.example.tradingbot.domain.model.position.Position.Status;
 import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.model.position.Position.CloseReason;
+import com.example.tradingbot.domain.model.position.Position.Status;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.mapping.PositionMapper;
-import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.Objects;
+import java.util.Set;
 
-import static org.springframework.util.CollectionUtils.isEmpty;
+import static com.example.tradingbot.util.factory.PositionFactory.createPosition;
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.math.NumberUtils.INTEGER_ONE;
+import static org.hibernate.internal.util.collections.CollectionHelper.isEmpty;
+import static org.hibernate.internal.util.collections.CollectionHelper.isNotEmpty;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PositionService {
 
     private final PositionDataService positionDataService;
     private final ClientManager clientManager;
-    private final DealDataService dealDataService;
     private final PositionMapper mapper;
 
     @Transactional
-    public Position refreshPosition(Exchange exchange, Instrument instrument) {
-        List<PositionExternalSnapshot> externalSnapshots = clientManager.getClientService(exchange.getName())
-                                                                        .getPositionsByInstrument(instrument);
-        if (externalSnapshots == null) {
-            externalSnapshots = List.of();
-        }
-        if (!isEmpty(externalSnapshots) && externalSnapshots.size() > 1) {
-            throw new RuntimeException("Invalid positions in deal");
+    public void refreshPositions(Exchange exchange, Instrument instrument, Deal deal) {
+        List<PositionExternalSnapshot> snapshots = clientManager.getClientService(exchange.getName())
+                                                                .getPositionsByInstrument(instrument);
+
+        List<Position> activeDomainPositions =
+                positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
+                                                                     Set.of(Status.ACTIVE.name()));
+
+        checkAndCloseDuplicates(snapshots, activeDomainPositions, exchange, instrument);
+
+        if (isEmpty(snapshots) && isEmpty(activeDomainPositions)) {
+            log.info("Not active positions and snapshots for exchange {}, instrument {} , deal {}",
+                     exchange.getName(), instrument.getExchangeId(), deal.getInternalId());
+            return;
         }
 
-        Position position = resolveCurrentPosition(instrument.getId());
-        if (isEmpty(externalSnapshots)) {
-            if (position == null) {
-                return null;
-            }
-            position.setStatus(Status.CLOSED);
-            return positionDataService.save(position);
-        }
+        PositionExternalSnapshot snapshot = snapshots.getFirst();
+        Position position = activeDomainPositions.getFirst();
 
-        PositionExternalSnapshot snapshot = externalSnapshots.getFirst();
-        Position target = prepareTargetPosition(position, snapshot, instrument.getId());
-        mapper.updateDomainFromExternalSnapshot(snapshot, target);
-        target.setStatus(resolvePositionStatus(snapshot));
-        return positionDataService.save(target);
+        if (nonNull(position)) {
+            refreshFromSnapshot(activeDomainPositions, snapshot);
+        } else {
+            createFromSnapshot(snapshot, instrument, deal.getId(), exchange);
+        }
     }
 
-    private Position resolveCurrentPosition(Long instrumentId) {
-        List<Position> positions = positionDataService.findByInstrumentId(instrumentId);
-        if (positions == null || positions.isEmpty()) {
-            return null;
+    private void checkAndCloseDuplicates(List<PositionExternalSnapshot> snapshots, List<Position> activeDomainPositions,
+                                         Exchange exchange, Instrument instrument) {
+        if (isNotEmpty(snapshots) && snapshots.size() > INTEGER_ONE) {
+            clientManager.getClientService(exchange.getName())
+                         .closePositions(instrument);
+            throw new RuntimeException("ThreadRuleError: more than one position per instrument is open");
         }
-        return positions.getFirst();
+        if (isNotEmpty(activeDomainPositions) && activeDomainPositions.size() > INTEGER_ONE) {
+            activeDomainPositions.forEach(this::emergencyClose);
+            throw new RuntimeException("ThreadRuleError: more than one position per instrument is open");
+        }
     }
 
-    private Position prepareTargetPosition(Position existingPosition,
-                                           PositionExternalSnapshot snapshot,
-                                           Long instrumentId) {
-        if (existingPosition != null) {
-            return existingPosition;
-        }
-
-        if (snapshot != null && snapshot.getExternalId() != null) {
-            Optional<Position> existingByExternalId = positionDataService.findByExternalId(snapshot.getExternalId());
-            if (existingByExternalId.isPresent()) {
-                return existingByExternalId.get();
-            }
-        }
-
-        Optional<com.example.tradingbot.domain.model.deal.Deal> dealOptional =
-                dealDataService.findLatestByInstrumentId(instrumentId);
-        if (dealOptional.isEmpty()) {
-            throw new IllegalStateException("Deal is missing for instrument: " + instrumentId);
-        }
-
-        Position created = new Position();
-        created.setDealId(dealOptional.get().getId());
-        created.setInternalId(UUID.randomUUID()
-                                  .toString());
-        created.setSide(Side.NET);
-        created.setStatus(Status.ACTIVE);
-        return created;
+    private void emergencyClose(Position position) {
+        position.toClose(CloseReason.EMERGENCY_CLOSE);
+        positionDataService.save(position);
     }
 
-    private Status resolvePositionStatus(PositionExternalSnapshot snapshot) {
-        if (snapshot == null || snapshot.getSize() == null) {
-            return Status.CLOSED;
+
+    private void createFromSnapshot(PositionExternalSnapshot snapshot, Instrument instrument, Long dealId,
+                                    Exchange exchange) {
+        Position position = positionDataService.findByExternalId(snapshot.getExternalId());
+        if (isNull(position)) {
+            position = createPosition(dealId);
+            mapper.updateDomainFromExternalSnapshot(snapshot, position);
+            positionDataService.save(position);
+            return;
         }
-        if (snapshot.getSize()
-                    .signum() <= 0) {
-            return Status.CLOSED;
+        clientManager.getClientService(exchange.getName())
+                     .closePositions(instrument);
+        position.toClose(CloseReason.UNKNOWN);
+        positionDataService.save(position);
+        throw new RuntimeException("ThreadRuleError: not active position in database with active snapshot");
+    }
+
+    private void refreshFromSnapshot(List<Position> activeDomainPositions, PositionExternalSnapshot snapshot) {
+        activeDomainPositions.forEach(position -> refreshFromSnapshots(position, snapshot));
+    }
+
+    private void refreshFromSnapshots(Position position, PositionExternalSnapshot snapshot) {
+        if (nonNull(snapshot) && Objects.equals(position.getExternalId(), snapshot.getExternalId())) {
+            mapper.updateDomainFromExternalSnapshot(snapshot, position);
+        } else {
+            position.toClose(CloseReason.EXCHANGE_FORCED);
         }
-        return Status.ACTIVE;
+        positionDataService.save(position);
     }
 }
