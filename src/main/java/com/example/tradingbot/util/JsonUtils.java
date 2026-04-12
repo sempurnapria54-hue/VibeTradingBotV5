@@ -30,6 +30,7 @@ public class JsonUtils {
         payload.put("positions", snapshot.getInternalPositions());
         payload.put("orders", snapshot.getInternalOrders());
         payload.put("algoOrders", snapshot.getInternalAlgoOrders());
+        payload.put("deals", snapshot.getInternalDeals());
         return toJson(payload);
     }
 

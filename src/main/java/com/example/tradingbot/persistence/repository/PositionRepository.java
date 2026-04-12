@@ -33,5 +33,5 @@ public interface PositionRepository extends JpaRepository<PositionEntity, Long> 
             order by p.id desc
             """, nativeQuery = true)
     List<PositionEntity> findAllByInstrumentIdAndStatuses(@Param("instrumentId") Long instrumentId,
-                                                          @Param("status") Set<String> statuses);
+                                                          @Param("statuses") Set<String> statuses);
 }
