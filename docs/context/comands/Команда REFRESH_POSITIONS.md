@@ -5,12 +5,13 @@
 Команда `REFRESH_POSITIONS` нужна для синхронизации фактического состояния позиций по инструменту между биржей и
 локальной БД.
 
-Это **не торговое решение** и **не аварийный сценарий**.
+Это **не торговое решение**, но в случае нарушения торговых инвариантов она должна уметь привести к полному аварийному
+сценарию через `TradeRuleValidator`.
 
 Команда должна:
 
 * прочитать фактические позиции на бирже по инструменту;
-* прочитать текущие позиции из БД по инструменту;
+* прочитать текущее состояние позиций в БД по инструменту;
 * передать оба набора данных в проверку торговых инвариантов;
 * если инварианты не нарушены — выполнить обычный sync;
 * если инварианты нарушены — не продолжать обычный sync.
@@ -27,7 +28,8 @@
 
 * handler решил, что нужно обновить позиции;
 * executor вызвал `PositionService.refreshPositions(...)`;
-* сервис обновил состояние в БД;
+* сервис либо синхронизировал состояние в БД;
+* либо через `TradeRuleValidator` запустил полный аварийный сценарий и прервал обычный flow;
 * orchestrator затем заново пересобрал `DealContext`.
 
 Важно:
@@ -43,9 +45,9 @@
 
 * `Exchange exchange`
 * `Instrument instrument`
-* `Long dealId` — только если при создании новой позиции требуется обязательная привязка к сделке
+* `Long dealId` — только если при создании новой позиции обязательна привязка к сделке
 
-Если новая позиция может существовать только вместе с `dealId`, то лучше передавать именно `dealId`, а не весь `Deal`.
+Если новая позиция должна существовать вместе со сделкой, лучше передавать именно `dealId`, а не весь `Deal`.
 
 Плохо:
 
@@ -67,8 +69,6 @@ refreshPositions(Exchange exchange, Instrument instrument, Long dealId)
 
 `PositionService` должен запросить позиции по инструменту у клиентского сервиса биржи.
 
-На этом этапе нужно получить snapshot позиций по конкретному инструменту.
-
 Ожидаемый результат:
 
 * список внешних snapshot-позиций;
@@ -76,7 +76,7 @@ refreshPositions(Exchange exchange, Instrument instrument, Long dealId)
 
 ### Шаг 2. Прочитать данные из БД
 
-`PositionService` должен загрузить из БД текущее состояние позиций по инструменту.
+`PositionService` должен загрузить текущее состояние позиций из БД по инструменту.
 
 Обычно интересуют:
 
@@ -91,6 +91,7 @@ refreshPositions(Exchange exchange, Instrument instrument, Long dealId)
 
 * `exchange`
 * `instrument`
+* `dealId`
 * внешние позиции с биржи
 * внутренние позиции из БД
 
@@ -98,16 +99,16 @@ refreshPositions(Exchange exchange, Instrument instrument, Long dealId)
 
 Если всё нормально — возвращается управление в `PositionService`.
 
-Если найдено нарушение — validator сам запускает нужные сервисы:
+Если найдено нарушение — validator сам выполняет полный аварийный сценарий:
 
-* `KillSwitchService`
-* `AnomalyService`
-
-После этого validator должен остановить обычный sync, например через исключение.
+* создаёт и ведёт `AnomalyReport`;
+* вызывает полноценный `KillSwitchService`;
+* завершает репорт статусом `COMPLETED` или `ERROR`;
+* после этого выбрасывает доменное исключение.
 
 ### Шаг 4. Выполнить обычный sync
 
-Если validator не обнаружил критичного нарушения и не прервал flow, `PositionService` выполняет обычную синхронизацию.
+Если validator не обнаружил нарушения и не прервал flow исключением, `PositionService` выполняет обычную синхронизацию.
 
 ### Шаг 5. Сохранить изменения в БД
 
@@ -225,16 +226,19 @@ FSM работает только с уже нормализованными д�
 * определить, есть ли нарушение правил;
 * при нарушении:
 
-    * вызвать `KillSwitchService`;
-    * вызвать `AnomalyService`;
-    * остановить обычный sync.
+    * создать `AnomalyReport`;
+    * перевести его в `IN_PROGRESS`;
+    * вызвать полноценный `KillSwitchService`;
+    * собрать `internalAfter` и `externalAfter`;
+    * завершить репорт статусом `COMPLETED` или `ERROR`;
+    * выбросить `TradeRuleViolationException`.
 
 Таким образом:
 
 * `PositionService` остаётся use-case сервисом команды;
-* `TradeRuleValidator` отвечает за правила;
+* `TradeRuleValidator` отвечает за правила и полный аварийный flow;
 * `KillSwitchService` отвечает за аварийную реакцию;
-* `AnomalyService` отвечает за отчёт об инциденте.
+* `AnomalyService` отвечает за сопровождение репорта об инциденте.
 
 ---
 
@@ -258,11 +262,13 @@ public void refreshPositions(Exchange exchange, Instrument instrument, Long deal
 1. PositionService читает позиции с биржи по instrument
 2. PositionService читает позиции из БД по instrument
 3. PositionService передаёт оба набора данных в TradeRuleValidator
-4. Если validator выявил нарушение:
-   - запускаются KillSwitchService и AnomalyService
-   - обычный sync останавливается
-5. Если validator ничего не выявил:
+4. Если validator ничего не выявил:
    - PositionService создаёт / обновляет / закрывает позиции в БД
+5. Если validator выявил нарушение:
+   - формируется и ведётся AnomalyReport
+   - выполняется полноценный KillSwitchService
+   - validator выбрасывает TradeRuleViolationException
+   - обычный sync прекращается
 6. Orchestrator потом заново грузит DealContext
 ```
 
@@ -287,7 +293,9 @@ public void refreshPositions(Exchange exchange, Instrument instrument, Long deal
 ### После аварийного сценария
 
 * обычный sync не продолжается;
-* аварийная реакция и отчёт об аномалии уже запущены через validator.
+* аномалия уже обработана или попытка обработки уже выполнена;
+* состояние зафиксировано в `AnomalyReport`;
+* незавершённый сценарий при необходимости позже сможет подобрать `AnomalyJob`.
 
 ---
 
@@ -300,6 +308,7 @@ public void refreshPositions(Exchange exchange, Instrument instrument, Long deal
 * читает биржу и БД;
 * прогоняет данные через `TradeRuleValidator`;
 * если всё нормально — синкает позиции;
-* если есть нарушение — не продолжает обычный sync.
+* если есть нарушение — `TradeRuleValidator` выполняет полный аварийный flow и после этого прерывает команду
+  исключением.
 
-Это не торговое решение, не kill-switch и не отчёт об аномалии.
+Это не торговое решение FSM, но это команда, внутри которой может быть запущена полная обработка аномалии.
