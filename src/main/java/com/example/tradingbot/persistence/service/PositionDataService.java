@@ -46,6 +46,13 @@ public class PositionDataService {
                                  .orElse(null);
     }
 
+    public List<Position> findByInstrumentId(Long instrumentId) {
+        return positionRepository.findAllByInstrumentId(instrumentId)
+                                 .stream()
+                                 .map(mapper::dataToDomain)
+                                 .collect(Collectors.toList());
+    }
+
     public List<Position> findAllByInstrumentIdAndStatuses(Long instrumentId, Set<String> statuses) {
         return positionRepository.findAllByInstrumentIdAndStatuses(instrumentId, statuses)
                                  .stream()

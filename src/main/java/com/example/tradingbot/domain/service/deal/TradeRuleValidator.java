@@ -4,6 +4,7 @@ import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.anomaly.AnomalyReport;
 import com.example.tradingbot.domain.model.anomaly.AnomalyReport.Severity;
+import com.example.tradingbot.domain.model.deal.KillSwitchResult;
 import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.Position.Status;
@@ -86,12 +87,21 @@ public class TradeRuleValidator {
         anomalyService.markInProgress(report.getId());
 
         try {
-            killSwitchService.executeTradeRuleViolation(exchange, instrument, dealId, code);
+            KillSwitchResult killSwitchResult =
+                    killSwitchService.executeTradeRuleViolation(exchange, instrument, dealId, code);
             anomalyService.markKillSwitchExecuted(report.getId());
 
-            String internalAfter = serializeInternalSnapshot(loadInternalSnapshotAfterKillSwitch(instrument));
-            String externalAfter = serializeExternalSnapshot(loadExternalSnapshotAfterKillSwitch(exchange, instrument));
-            anomalyService.complete(report.getId(), null, internalAfter, externalAfter);
+            if (killSwitchResult.isSuccess()) {
+                anomalyService.complete(report.getId(),
+                                        killSwitchResult.getMessage(),
+                                        killSwitchResult.getInternalAfter(),
+                                        killSwitchResult.getExternalAfter());
+            } else {
+                anomalyService.markError(report.getId(),
+                                         killSwitchResult.getMessage(),
+                                         killSwitchResult.getInternalAfter(),
+                                         killSwitchResult.getExternalAfter());
+            }
         } catch (Exception exception) {
             String internalAfter = serializeInternalSnapshot(loadInternalSnapshotAfterKillSwitch(instrument));
             String externalAfter = serializeExternalSnapshot(loadExternalSnapshotAfterKillSwitch(exchange, instrument));
@@ -99,6 +109,7 @@ public class TradeRuleValidator {
             anomalyService.markError(report.getId(), errorMessage, internalAfter, externalAfter);
         }
     }
+
 
     private List<Position> loadInternalSnapshotAfterKillSwitch(Instrument instrument) {
         return positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
