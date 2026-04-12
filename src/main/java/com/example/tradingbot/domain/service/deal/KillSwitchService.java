@@ -16,11 +16,11 @@ public class KillSwitchService {
 
     }
 
-    public void executeTradeRuleViolationStub(Exchange exchange,
-                                              Instrument instrument,
-                                              Long dealId,
-                                              String code) {
-        log.warn("Trade rule violation stub executed. Exchange: {}, instrument: {}, dealId: {}, code: {}",
+    public void executeTradeRuleViolation(Exchange exchange,
+                                          Instrument instrument,
+                                          Long dealId,
+                                          String code) {
+        log.warn("Trade rule violation kill-switch executed. Exchange: {}, instrument: {}, dealId: {}, code: {}",
                  exchange.getName(), instrument.getExchangeId(), dealId, code);
     }
 }

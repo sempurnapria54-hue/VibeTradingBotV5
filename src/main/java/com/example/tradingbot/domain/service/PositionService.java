@@ -37,22 +37,22 @@ public class PositionService {
 
     @Transactional
     public void refreshPositions(Exchange exchange, Instrument instrument, Deal deal) {
-        List<PositionExternalSnapshot> snapshots = clientManager.getClientService(exchange.getName())
-                                                                .getPositionsByInstrument(instrument);
+        List<PositionExternalSnapshot> externalSnapshots = clientManager.getClientService(exchange.getName())
+                                                                        .getPositionsByInstrument(instrument);
 
         List<Position> activeDomainPositions =
                 positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
                                                                      Set.of(Status.ACTIVE.name()));
 
-        tradeRuleValidator.validatePositions(exchange, instrument, deal.getId(), snapshots, activeDomainPositions);
+        tradeRuleValidator.validatePositions(exchange, instrument, deal.getId(), externalSnapshots, activeDomainPositions);
 
-        if (isEmpty(snapshots) && isEmpty(activeDomainPositions)) {
+        if (isEmpty(externalSnapshots) && isEmpty(activeDomainPositions)) {
             log.info("Not active positions and snapshots for exchange {}, instrument {} , deal {}",
                      exchange.getName(), instrument.getExchangeId(), deal.getInternalId());
             return;
         }
 
-        PositionExternalSnapshot snapshot = isEmpty(snapshots) ? null : snapshots.getFirst();
+        PositionExternalSnapshot snapshot = isEmpty(externalSnapshots) ? null : externalSnapshots.getFirst();
         Position position = isEmpty(activeDomainPositions) ? null : activeDomainPositions.getFirst();
 
         if (nonNull(position)) {
