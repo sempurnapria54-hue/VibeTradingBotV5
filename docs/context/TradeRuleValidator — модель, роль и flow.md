@@ -1,4 +1,4 @@
-# TradeRuleValidator — модель, роль и flow
+# TradeRuleValidator — flow с executor-моделью
 
 ## Цель
 
@@ -10,270 +10,132 @@
 * проверку допустимости состояния;
 * запуск полного аварийного сценария при нарушении правил.
 
-`TradeRuleValidator` не является частью FSM и не заменяет sync-сервисы.
+---
+
+## Место в новой executor-модели
+
+`TradeRuleValidator` используется только в refresh-flow.
+
+Например:
+
+* `RefreshPositionExecutor`
+* `RefreshPendingOrdersExecutor`
+* `RefreshAlgoOrdersExecutor`
+
+Он не должен использоваться из `KillSwitchService` и не должен вызывать refresh-executors обратно.
 
 ---
 
-## Главное назначение
+## Главная цепочка
 
-`TradeRuleValidator` отвечает на вопрос:
-
-> допустимо ли текущее состояние системы, или уже обнаружена торговая аномалия?
-
-Если состояние допустимо, validator просто возвращает управление назад в sync-сервис.
-
-Если состояние недопустимо, validator:
-
-* определяет `code` аномалии;
-* определяет `severity`;
-* формирует начальный `AnomalyReport`;
-* выполняет полноценный `KillSwitchService`;
-* собирает `internalAfter` и `externalAfter`;
-* завершает обработку `AnomalyReport` статусом `COMPLETED` или `ERROR`;
-* после этого выбрасывает доменное исключение, чтобы обычный sync не продолжался.
-
----
-
-## Почему validator нужен отдельно
-
-Без `TradeRuleValidator` sync-сервисы начинают смешивать в себе слишком много обязанностей:
-
-* читать биржу;
-* читать БД;
-* проверять инварианты;
-* решать, аномалия это или нет;
-* выполнять аварийную реакцию;
-* формировать и завершать отчёт.
-
-Это делает sync-сервисы тяжёлыми и плохо тестируемыми.
-
-С отдельным validator получается чистое разделение:
-
-* sync-сервис читает данные;
-* validator проверяет правила и при нарушении полностью обрабатывает аномалию;
-* `KillSwitchService` снимает риск;
-* `AnomalyService` фиксирует состояние обработки.
-
----
-
-## Место в архитектуре
-
-### Sync-сервис
-
-Например, `PositionService`:
-
-* читает snapshot с биржи;
-* читает текущее состояние из БД;
-* передаёт оба набора данных в `TradeRuleValidator`;
-* если validator не выявил нарушение — делает обычный sync;
-* если validator выявил нарушение — обычный sync больше не выполняется.
-
-### TradeRuleValidator
-
-* анализирует входные данные;
-* проверяет инварианты;
-* при нарушении выполняет полный аварийный сценарий;
-* выбрасывает доменное исключение, чтобы прервать sync.
-
-### KillSwitchService
-
-* выполняет полноценное аварийное снятие риска по инструменту.
-
-### AnomalyService
-
-* создаёт и сопровождает `AnomalyReport` по статусам обработки.
-
-### AnomalyJob
-
-* не является основным обработчиком аномалии;
-* используется как recovery-механизм, если процесс оборвался на середине.
-
-### FSM / handlers
-
-* вообще не знают деталей validator;
-* получают уже итоговые доменные факты после sync.
-
----
-
-## Что validator должен уметь проверять
-
-`TradeRuleValidator` должен уметь делать разные проверки для разных команд.
-
-На уровне концепции у него есть отдельные направления проверки:
-
-* проверка позиций;
-* проверка обычных ордеров;
-* проверка algo-ордеров;
-* при необходимости в будущем — комплексная проверка по инструменту.
-
-Не нужно делать giant-method на всё сразу.
-
-Лучше иметь отдельные методы:
-
-* `validatePositions(...)`
-* `validateOrders(...)`
-* `validateAlgoOrders(...)`
-
----
-
-## Первое применение: REFRESH_POSITIONS
-
-На первом этапе validator нужен для команды `REFRESH_POSITIONS`.
-
-Flow такой:
+На примере позиций:
 
 ```text
-1. PositionService читает позиции с биржи по instrument
-2. PositionService читает позиции из БД по instrument
-3. PositionService передаёт данные в TradeRuleValidator.validatePositions(...)
-4. Если validator ничего не выявил:
-   - PositionService делает обычный sync
-5. Если validator выявил нарушение:
-   - создаётся и ведётся AnomalyReport
-   - выполняется полноценный kill-switch
-   - после завершения validator выбрасывает исключение
-   - обычный sync прекращается
+ServiceCommandExecutor
+  -> RefreshPositionExecutor
+     -> TradeRuleValidator
+        -> AnomalyService
+        -> KillSwitchService
+           -> ClosePositionExecutor
+           -> CancelOrderExecutor
+           -> CancelAlgoOrderExecutor
+           -> DealEmergencyFinalizer
 ```
+
+Важно:
+
+* `TradeRuleValidator` сам запускает полный аварийный сценарий;
+* после завершения аварийного сценария он выбрасывает `TradeRuleViolationException`;
+* обычный refresh после этого не продолжается.
 
 ---
 
-## Какие данные получает validator
+## Что получает validator
 
-Validator должен принимать не `DealContext`, а только минимально нужные данные для проверки.
+Validator должен принимать только минимально необходимые данные.
 
 Для проверки позиций это обычно:
 
 * `Exchange exchange`
 * `Instrument instrument`
-* `Long dealId` — если нужен для аварийного сценария или создания новой позиции в других ветках
+* `Long dealId`
 * `List<PositionExternalSnapshot> externalSnapshots`
 * `List<Position> domainPositions`
 
-Главное правило:
-
-* никаких зависимостей от FSM;
-* никаких запросов к `DealContext`;
-* только необходимые данные.
+Без `DealContext` и без зависимости от FSM.
 
 ---
 
-## Что считается результатом проверки
+## Что validator делает, если всё ок
 
-### Сценарий 1. Всё ок
+Если состояние допустимо:
 
-Validator не делает побочных действий.
-
-Он просто возвращает управление обратно в sync-сервис.
-
-### Сценарий 2. Найдено нарушение
-
-Validator:
-
-* классифицирует нарушение;
-* выбирает `code`;
-* выбирает `severity`;
-* создаёт `AnomalyReport` со статусом `CREATED`;
-* переводит его в `IN_PROGRESS`;
-* выполняет полноценный `KillSwitchService`;
-* собирает `internalAfter` и `externalAfter`;
-* если всё завершилось успешно:
-
-    * ставит `KILL_SWITCH_EXECUTED`;
-    * затем `COMPLETED`;
-* если что-то пошло не так:
-
-    * ставит `ERROR`;
-    * заполняет `message`;
-* после этого выбрасывает `TradeRuleViolationException`.
+* validator ничего не меняет;
+* не вызывает побочных сервисов;
+* просто возвращает управление в refresh-executor.
 
 ---
 
-## Полный flow обработки аномалии внутри validator
+## Что validator делает, если найдено нарушение
 
-### Шаг 1. Найти нарушение
+Если найдено нарушение, validator выполняет полный аварийный сценарий.
 
-Validator определяет, что состояние нарушает торговые инварианты.
+### Шаг 1. Классифицирует нарушение
 
-### Шаг 2. Сформировать начальный репорт
+Определяет:
 
-Создаётся `AnomalyReport`:
-
-* `exchangeId`
-* `instrumentId`
-* `severity`
 * `code`
+* `severity`
+
+### Шаг 2. Собирает before-снимки
+
+Собирает:
+
 * `internalBefore`
 * `externalBefore`
-* `status = CREATED`
 
-### Шаг 3. Начать обработку
+Это должны быть **полные слепки по инструменту**, а не только данные, которые validator прямо сейчас сравнивал.
 
-Репорт переводится в `IN_PROGRESS`.
+### Шаг 3. Создаёт `AnomalyReport`
 
-### Шаг 4. Выполнить kill-switch
+Через `AnomalyService.create(...)`.
 
-Вызывается полноценный `KillSwitchService` по инструменту.
+### Шаг 4. Переводит репорт в `IN_PROGRESS`
 
-### Шаг 5. Собрать финальные снимки
+Через `AnomalyService.markInProgress(...)`.
 
-После аварийного сценария validator повторно читает локальное и внешнее состояние:
+### Шаг 5. Вызывает `KillSwitchService`
 
+Передаёт:
+
+* `exchange`
+* `instrument`
+* `dealId`
+* `reasonCode`
+
+### Шаг 6. Получает `KillSwitchResult`
+
+Из него берёт:
+
+* `success`
 * `internalAfter`
 * `externalAfter`
+* `message`
 
-### Шаг 6. Завершить репорт
+### Шаг 7. Завершает `AnomalyReport`
 
-Если риск снят полностью:
+Если `success = true`:
 
-* `status = KILL_SWITCH_EXECUTED`
-* затем `status = COMPLETED`
+* сначала `markKillSwitchExecuted(...)`
+* затем `complete(...)`
 
-Если обработка не удалась:
+Если `success = false` или произошла ошибка:
 
-* `status = ERROR`
-* `message` содержит текст ошибки
+* `markError(...)`
 
-### Шаг 7. Прервать обычный sync
+### Шаг 8. Прерывает обычный sync
 
-После завершения аварийного сценария validator выбрасывает `TradeRuleViolationException`.
-
-Это не неожиданная ошибка, а осознанное прерывание обычного flow.
-
----
-
-## Роль AnomalyJob
-
-`AnomalyJob` в этой схеме — не основной обработчик аномалий, а recovery-механизм.
-
-Она нужна, если процесс оборвался на середине.
-
-Job должна подхватывать отчёты со статусами:
-
-* `CREATED`
-* `IN_PROGRESS`
-* `KILL_SWITCH_EXECUTED`
-
-И дожимать их до:
-
-* `COMPLETED`
-* либо `ERROR`
-
----
-
-## Что validator должен запускать при нарушении
-
-### 1. AnomalyService
-
-Validator вызывает `AnomalyService`, чтобы:
-
-* создать репорт;
-* менять его статус по шагам;
-* сохранить `internalAfter` и `externalAfter`;
-* сохранить `message` в случае ошибки.
-
-### 2. KillSwitchService
-
-Validator вызывает полноценный `KillSwitchService`, чтобы перевести инструмент в безопасное состояние.
+После этого validator **всегда** выбрасывает `TradeRuleViolationException`.
 
 ---
 
@@ -284,33 +146,28 @@ Validator вызывает полноценный `KillSwitchService`, чтоб�
 * выполнять обычный sync позиций, ордеров и algo-ордеров;
 * менять `DealContext`;
 * принимать решения FSM;
-* напрямую обновлять статусы сделки;
-* резолвить внешние биржевые статусы в доменные — это делает соответствующий sync-сервис.
+* руками закрывать позиции или ордера;
+* резолвить внешние статусы биржи в доменные.
+
+Статусы резолвят соответствующие refresh executors.
+
+Аварийные действия выполняют соответствующие close/cancel executors через `KillSwitchService`.
 
 ---
 
-## Примеры проверок для позиций
+## Какие проверки должен уметь делать
 
-На уровне `REFRESH_POSITIONS` validator может проверять такие инварианты:
+Минимально по позициям:
 
-* на бирже по инструменту не более одной открытой позиции;
-* в БД по инструменту не более одной активной позиции;
-* внешнее и внутреннее состояние не противоречат базовым правилам;
-* нет критичного расхождения, которое требует аварийной остановки.
+* на бирже не более одной открытой позиции по инструменту;
+* в БД не более одной активной позиции по инструменту;
+* внешнее и внутреннее состояние не нарушают базовые правила.
 
-Примеры кодов аномалий:
-
-* `OVERHEAD_POSITIONS_COUNT`
-* `UNKNOWN_POSITION`
-* `POSITION_STATE_MISMATCH`
+Позже — аналогично для orders и algo-orders.
 
 ---
 
-## Как лучше организовать класс
-
-На текущем этапе допустимо оставить один сервис `TradeRuleValidator` с отдельными методами по направлениям.
-
-Примерно так:
+## Рекомендуемая структура класса
 
 ```java
 public class TradeRuleValidator {
@@ -326,42 +183,36 @@ public class TradeRuleValidator {
 }
 ```
 
-Внутри допустимо использовать private helper-методы:
+Внутри допустимы helper-методы:
 
 * `checkExternalPositionsCount(...)`
 * `checkInternalPositionsCount(...)`
-* `handleViolation(...)`
-* `resolveSeverity(...)`
 * `resolveCode(...)`
+* `resolveSeverity(...)`
 * `buildInternalBefore(...)`
 * `buildExternalBefore(...)`
-* `buildInternalAfter(...)`
-* `buildExternalAfter(...)`
+* `handleViolation(...)`
 
 ---
 
-## Исключение
+## Роль `AnomalyJob`
 
-Нужно отдельное доменное исключение:
+`AnomalyJob` не является основным обработчиком новой аномалии.
 
-* `TradeRuleViolationException`
+Она используется как recovery-механизм:
 
-Смысл:
-
-* validator обнаружил нарушение;
-* полный аварийный сценарий уже выполнен или попытка выполнена;
-* обычный sync надо прекратить.
+* если процесс оборвался после `CREATED`;
+* после `IN_PROGRESS`;
+* после `KILL_SWITCH_EXECUTED`.
 
 ---
 
 ## Короткий итог
 
-`TradeRuleValidator` — это точка проверки торговых инвариантов перед sync-операцией.
+`TradeRuleValidator` в новой модели:
 
-Он:
-
-* получает внешние и внутренние данные;
-* проверяет правила;
-* если всё ок — возвращает управление sync-сервису;
-* если не ок — полностью обрабатывает аномалию через `AnomalyService` и `KillSwitchService`;
-* после этого выбрасывает доменное исключение, чтобы остановить обычный sync.
+* используется из refresh-executors;
+* при нарушении сам запускает полный аварийный flow;
+* делегирует фактическое аварийное закрытие в `KillSwitchService`;
+* ведёт `AnomalyReport` через `AnomalyService`;
+* всегда выбрасывает `TradeRuleViolationException`, чтобы остановить обычный sync.
