@@ -22,7 +22,8 @@ public class AnomalyService {
                                 String code,
                                 String internalBefore,
                                 String externalBefore) {
-        AnomalyReport report = createAnomalyReport(exchangeId, instrumentId, severity, code, internalBefore, externalBefore);
+        AnomalyReport report = createAnomalyReport(exchangeId, instrumentId, severity, code, internalBefore,
+                                                   externalBefore);
         return anomalyReportDataService.save(report);
     }
 
@@ -50,10 +51,7 @@ public class AnomalyService {
     @Transactional
     public AnomalyReport markError(Long reportId, String message, String internalAfter, String externalAfter) {
         AnomalyReport report = anomalyReportDataService.getRequiredById(reportId);
-        report.setStatus(AnomalyReport.Status.ERROR);
-        report.setMessage(message);
-        report.setInternalAfter(internalAfter);
-        report.setExternalAfter(externalAfter);
+        report.toError(message, internalAfter, externalAfter);
         return anomalyReportDataService.save(report);
     }
 }

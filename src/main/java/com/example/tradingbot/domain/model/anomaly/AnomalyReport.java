@@ -137,11 +137,12 @@ public class AnomalyReport extends Auditable {
         setExternalAfter(externalAfter);
     }
 
-    public void toError(String internalAfter, String externalAfter) {
+    public void toError(String message, String internalAfter, String externalAfter) {
         if (isNull(status) || isFalse(status == Status.KILL_SWITCH_EXECUTED)) {
             throw new IllegalStateException("Unexpected error: invalid status transition in AnomalyReport");
         }
-        setStatus(AnomalyReport.Status.COMPLETED);
+        setStatus(Status.ERROR);
+        setMessage(message);
         setInternalAfter(internalAfter);
         setExternalAfter(externalAfter);
     }
