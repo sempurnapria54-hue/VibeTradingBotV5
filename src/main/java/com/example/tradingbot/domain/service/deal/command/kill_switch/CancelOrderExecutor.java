@@ -21,7 +21,7 @@ public class CancelOrderExecutor {
                 continue;
             }
             clientService.cancelOrder(order, instrument.getExternalId());
-            order.setStatus(Order.Status.CLOSED);
+            order.toClose(Order.CloseReason.KILL_SWITCH);
             orderDataService.save(order);
         }
     }

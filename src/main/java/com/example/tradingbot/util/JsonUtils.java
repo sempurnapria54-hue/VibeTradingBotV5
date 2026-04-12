@@ -39,19 +39,50 @@ public class JsonUtils {
     public String buildExternalSnapshot(StateSnapshot snapshot, Instrument instrument) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("instrumentExternalId", instrument.getExternalId());
-        payload.put("positions", snapshot.getExternalPositions());
-        payload.put("orders", snapshot.getExternalOrders());
-        payload.put("algoOrders", snapshot.getExternalAlgoOrders());
+        payload.put("active", buildExternalActivePayload(snapshot));
+        payload.put("relatedInactive", buildExternalRelatedInactivePayload(snapshot));
         return toJson(payload);
     }
 
     private LinkedHashMap<String, Object> buildInternalPayload(StateSnapshot snapshot, Instrument instrument) {
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("instrument", instrument);
+        payload.put("active", buildInternalActivePayload(snapshot));
+        payload.put("relatedInactive", buildInternalRelatedInactivePayload(snapshot));
+        return payload;
+    }
+
+    private Map<String, Object> buildInternalActivePayload(StateSnapshot snapshot) {
+        Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("positions", snapshot.getInternalPositions());
         payload.put("orders", snapshot.getInternalOrders());
         payload.put("algoOrders", snapshot.getInternalAlgoOrders());
         payload.put("deals", snapshot.getInternalDeals());
+        return payload;
+    }
+
+    private Map<String, Object> buildInternalRelatedInactivePayload(StateSnapshot snapshot) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("positions", snapshot.getInternalRelatedInactivePositions());
+        payload.put("orders", snapshot.getInternalRelatedInactiveOrders());
+        payload.put("algoOrders", snapshot.getInternalRelatedInactiveAlgoOrders());
+        payload.put("deals", snapshot.getInternalRelatedInactiveDeals());
+        return payload;
+    }
+
+    private Map<String, Object> buildExternalActivePayload(StateSnapshot snapshot) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("positions", snapshot.getExternalPositions());
+        payload.put("orders", snapshot.getExternalOrders());
+        payload.put("algoOrders", snapshot.getExternalAlgoOrders());
+        return payload;
+    }
+
+    private Map<String, Object> buildExternalRelatedInactivePayload(StateSnapshot snapshot) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("positions", snapshot.getExternalRelatedInactivePositions());
+        payload.put("orders", snapshot.getExternalRelatedInactiveOrders());
+        payload.put("algoOrders", snapshot.getExternalRelatedInactiveAlgoOrders());
         return payload;
     }
 }
