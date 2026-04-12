@@ -7,7 +7,9 @@ import com.example.tradingbot.persistence.repository.DealRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.DEAL_NOT_FOUND;
 
@@ -39,5 +41,19 @@ public class DealDataService {
     public Optional<Deal> findLatestByInstrumentId(Long instrumentId) {
         return dealRepository.findTopByInstrumentIdOrderByIdDesc(instrumentId)
                              .map(mapper::dataToDomain);
+    }
+
+    public List<Deal> findByInstrumentId(Long instrumentId) {
+        return dealRepository.findAllByInstrumentId(instrumentId)
+                             .stream()
+                             .map(mapper::dataToDomain)
+                             .toList();
+    }
+
+    public List<Deal> findAllByInstrumentIdAndStatuses(Long instrumentId, Set<String> statuses) {
+        return dealRepository.findAllByInstrumentIdAndStatuses(instrumentId, statuses)
+                             .stream()
+                             .map(mapper::dataToDomain)
+                             .toList();
     }
 }

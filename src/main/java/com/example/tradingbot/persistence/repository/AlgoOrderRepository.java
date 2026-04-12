@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface AlgoOrderRepository extends JpaRepository<AlgoOrderEntity, Long>,
         JpaSpecificationExecutor<AlgoOrderEntity> {
@@ -22,5 +23,16 @@ public interface AlgoOrderRepository extends JpaRepository<AlgoOrderEntity, Long
             order by ao.id desc
             """, nativeQuery = true)
     List<AlgoOrderEntity> findAllByInstrumentId(@Param("instrumentId") Long instrumentId);
+
+    @Query(value = """
+            select ao.*
+            from algo_orders ao
+            join deals d on d.id = ao.deal_id
+            where d.instrument_id = :instrumentId
+            and ao.status IN(:statuses)
+            order by ao.id desc
+            """, nativeQuery = true)
+    List<AlgoOrderEntity> findAllByInstrumentIdAndStatuses(@Param("instrumentId") Long instrumentId,
+                                                           @Param("statuses") Set<String> statuses);
 
 }

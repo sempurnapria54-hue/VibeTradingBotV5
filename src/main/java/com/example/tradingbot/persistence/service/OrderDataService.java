@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.ORDER_NOT_FOUND;
 
@@ -44,6 +45,13 @@ public class OrderDataService {
 
     public List<Order> findByInstrumentId(Long instrumentId) {
         return orderRepository.findAllByInstrumentId(instrumentId)
+                              .stream()
+                              .map(mapper::dataToDomain)
+                              .toList();
+    }
+
+    public List<Order> findAllByInstrumentIdAndStatuses(Long instrumentId, Set<String> statuses) {
+        return orderRepository.findAllByInstrumentIdAndStatuses(instrumentId, statuses)
                               .stream()
                               .map(mapper::dataToDomain)
                               .toList();

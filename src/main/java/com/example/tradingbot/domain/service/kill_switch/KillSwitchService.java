@@ -12,8 +12,12 @@ import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
-import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.service.kill_switch.executor.CancelAlgoOrderExecutor;
+import com.example.tradingbot.domain.service.kill_switch.executor.CancelOrderExecutor;
+import com.example.tradingbot.domain.service.kill_switch.executor.ClosePositionExecutor;
+import com.example.tradingbot.domain.service.kill_switch.executor.DealEmergencyFinalizer;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
+import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
@@ -33,8 +37,10 @@ import java.util.Objects;
 import java.util.Set;
 
 import static com.example.tradingbot.domain.model.Instrument.Status.ERROR;
-import static com.example.tradingbot.domain.model.Order.Status.CLOSED;
-import static com.example.tradingbot.domain.model.position.Position.CloseReason.EMERGENCY_CLOSE;
+import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_ALGO_ORDER_STATUSES;
+import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_DEAL_STATUSES;
+import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_ORDER_STATUSES;
+import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_POSITION_STATUSES;
 import static com.example.tradingbot.util.CollectionUtils.emptyIfNull;
 import static java.util.Objects.nonNull;
 import static org.hibernate.internal.util.collections.CollectionHelper.isNotEmpty;
@@ -50,8 +56,13 @@ public class KillSwitchService {
     private final PositionDataService positionDataService;
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
+    private final DealDataService dealDataService;
     private final InstrumentDataService instrumentDataService;
     private final ExchangeDataService exchangeDataService;
+    private final CancelOrderExecutor cancelOrderExecutor;
+    private final CancelAlgoOrderExecutor cancelAlgoOrderExecutor;
+    private final ClosePositionExecutor closePositionExecutor;
+    private final DealEmergencyFinalizer dealEmergencyFinalizer;
     private final JsonUtils jsonUtils;
 
     @Transactional
@@ -68,20 +79,24 @@ public class KillSwitchService {
                                               String reasonCode) {
         ClientService clientService = clientManager.getClientService(exchange.getName());
 
-        StateSnapshot before = readState(clientService, instrument);
+        StateSnapshot actionState = readActionState(clientService, instrument);
 
         blockInstrument(instrument, reasonCode);
-        cancelPendingOrders(clientService, instrument, before.getExternalOrders());
-        closeOpenPositions(clientService, instrument, before.getExternalPositions());
-        cancelPendingAlgoOrders(clientService, instrument, before.getExternalAlgoOrders());
-        updateLocalState(before);
+        cancelOrderExecutor.execute(clientService, instrument, actionState.getInternalOrders());
+        cancelAlgoOrderExecutor.execute(clientService, instrument, actionState.getInternalAlgoOrders());
+        closePositionExecutor.execute(clientService,
+                                      instrument,
+                                      actionState.getInternalPositions(),
+                                      isNotEmpty(actionState.getExternalPositions()));
+        dealEmergencyFinalizer.execute(actionState.getInternalDeals());
 
-        StateSnapshot after = readState(clientService, instrument);
-        String internalAfter = jsonUtils.buildInternalSnapshot(after, instrument);
-        String externalAfter = jsonUtils.buildExternalSnapshot(after, instrument);
+        StateSnapshot reportAfter = readReportSnapshot(clientService, instrument);
 
-        boolean success = isSuccess(after);
-        String message = success ? RESULT_OK : buildFailureMessage(after);
+        String internalAfter = jsonUtils.buildInternalSnapshot(reportAfter, instrument);
+        String externalAfter = jsonUtils.buildExternalSnapshot(reportAfter, instrument);
+
+        boolean success = isSuccess(reportAfter);
+        String message = success ? RESULT_OK : buildFailureMessage(reportAfter);
 
         log.warn("Kill-switch executed. Exchange: {}, instrument: {}, dealId: {}, reason: {}, success: {}, message: {}",
                  exchange.getName(), instrument.getExternalId(), dealId, reasonCode, success, message);
@@ -100,84 +115,35 @@ public class KillSwitchService {
         log.warn("Kill-switch lock applied for instrument {} with reason {}", instrument.getExternalId(), reasonCode);
     }
 
-    private void cancelPendingOrders(ClientService clientService,
-                                     Instrument instrument,
-                                     List<OrderExternalSnapshot> externalOrders) {
-        for (OrderExternalSnapshot externalOrder : externalOrders) {
-            if (externalOrder == null || externalOrder.getExternalId() == null) {
-                continue;
-            }
-            if (!isPendingOrderSnapshot(externalOrder)) {
-                continue;
-            }
-            Order orderToCancel = new Order();
-            orderToCancel.setExternalId(externalOrder.getExternalId());
-            orderToCancel.setInternalId(externalOrder.getInternalId());
-            clientService.cancelOrder(orderToCancel, instrument.getExternalId());
-        }
+    private StateSnapshot readActionState(ClientService clientService, Instrument instrument) {
+        StateSnapshot snapshot = new StateSnapshot();
+        snapshot.setInternalPositions(positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
+                                                                                            LIVE_POSITION_STATUSES));
+        snapshot.setInternalOrders(orderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
+                                                                                      LIVE_ORDER_STATUSES));
+        snapshot.setInternalAlgoOrders(algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
+                                                                                              LIVE_ALGO_ORDER_STATUSES));
+        snapshot.setInternalDeals(dealDataService.findAllByInstrumentIdAndStatuses(instrument.getId(), LIVE_DEAL_STATUSES));
+
+        snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
+        snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
+        snapshot.setExternalAlgoOrders(getExternalAlgoOrders(clientService,
+                                                             instrument,
+                                                             snapshot.getInternalAlgoOrders()));
+        return snapshot;
     }
 
-    private void cancelPendingAlgoOrders(ClientService clientService,
-                                         Instrument instrument,
-                                         List<AlgoOrderExternalSnapshot> externalAlgoOrders) {
-        for (AlgoOrderExternalSnapshot externalAlgoOrder : externalAlgoOrders) {
-            if (externalAlgoOrder == null || externalAlgoOrder.getExternalId() == null) {
-                continue;
-            }
-            if (!isLiveAlgoSnapshot(externalAlgoOrder)) {
-                continue;
-            }
-            AlgoOrder algoToCancel = new AlgoOrder();
-            algoToCancel.setExternalId(externalAlgoOrder.getExternalId());
-            clientService.cancelAlgoOrder(algoToCancel, instrument.getExternalId());
-        }
-    }
-
-    private void closeOpenPositions(ClientService clientService,
-                                    Instrument instrument,
-                                    List<PositionExternalSnapshot> externalPositions) {
-        if (externalPositions.isEmpty()) {
-            return;
-        }
-        clientService.closePositions(instrument);
-    }
-
-    private void updateLocalState(StateSnapshot before) {
-        for (Position position : before.getInternalPositions()) {
-            if (position == null) {
-                continue;
-            }
-            position.toClose(EMERGENCY_CLOSE);
-            positionDataService.save(position);
-        }
-
-        for (Order order : before.getInternalOrders()) {
-            if (order == null) {
-                continue;
-            }
-            order.setStatus(CLOSED);
-            orderDataService.save(order);
-        }
-
-        for (AlgoOrder algoOrder : before.getInternalAlgoOrders()) {
-            if (algoOrder == null) {
-                continue;
-            }
-            algoOrder.setStatus(AlgoOrder.Status.CLOSED);
-            algoOrderDataService.save(algoOrder);
-        }
-    }
-
-    private StateSnapshot readState(ClientService clientService, Instrument instrument) {
+    private StateSnapshot readReportSnapshot(ClientService clientService, Instrument instrument) {
         StateSnapshot snapshot = new StateSnapshot();
         snapshot.setInternalPositions(positionDataService.findByInstrumentId(instrument.getId()));
         snapshot.setInternalOrders(orderDataService.findByInstrumentId(instrument.getId()));
         snapshot.setInternalAlgoOrders(algoOrderDataService.findByInstrumentId(instrument.getId()));
-
+        snapshot.setInternalDeals(dealDataService.findByInstrumentId(instrument.getId()));
         snapshot.setExternalPositions(clientService.getPositionsByInstrument(instrument));
         snapshot.setExternalOrders(clientService.getActiveOrdersByInstrument(instrument));
-        snapshot.setExternalAlgoOrders(
-                getExternalAlgoOrders(clientService, instrument, snapshot.getInternalAlgoOrders()));
+        snapshot.setExternalAlgoOrders(getExternalAlgoOrders(clientService,
+                                                             instrument,
+                                                             snapshot.getInternalAlgoOrders()));
         return snapshot;
     }
 
@@ -237,15 +203,17 @@ public class KillSwitchService {
         if (containsActiveOrder(after.getInternalOrders())) {
             return false;
         }
-        return !containsLiveAlgoOrder(after.getInternalAlgoOrders());
+        if (containsLiveAlgoOrder(after.getInternalAlgoOrders())) {
+            return false;
+        }
+        return !containsLiveDeal(after.getInternalDeals());
     }
 
     private String buildFailureMessage(StateSnapshot after) {
         List<String> failures = new ArrayList<>();
 
         if (isNotEmpty(after.getExternalPositions())) {
-            failures.add("external open positions=" + after.getExternalPositions()
-                                                           .size());
+            failures.add("external open positions=" + after.getExternalPositions().size());
         }
         if (containsPendingOrderSnapshot(after.getExternalOrders())) {
             failures.add("external pending orders present");
@@ -261,6 +229,9 @@ public class KillSwitchService {
         }
         if (containsLiveAlgoOrder(after.getInternalAlgoOrders())) {
             failures.add("internal active/pending algo-orders present");
+        }
+        if (containsLiveDeal(after.getInternalDeals())) {
+            failures.add("internal active deals present");
         }
 
         if (failures.isEmpty()) {
@@ -282,40 +253,43 @@ public class KillSwitchService {
     }
 
     private boolean containsActiveOrder(List<Order> orders) {
-        return emptyIfNull(orders).stream()
-                                  .anyMatch(order -> nonNull(order) && order.isLive());
+        return emptyIfNull(orders).stream().anyMatch(order -> nonNull(order) && order.isLive());
     }
 
     private boolean containsLiveAlgoOrder(List<AlgoOrder> algoOrders) {
-        return emptyIfNull(algoOrders).stream()
-                                      .anyMatch(algoOrder -> nonNull(algoOrder) && algoOrder.isLive());
+        return emptyIfNull(algoOrders).stream().anyMatch(algoOrder -> nonNull(algoOrder) && algoOrder.isLive());
+    }
+
+    private boolean containsLiveDeal(List<Deal> deals) {
+        return emptyIfNull(deals).stream().anyMatch(this::isLiveDeal);
+    }
+
+    private boolean isLiveDeal(Deal deal) {
+        return nonNull(deal)
+                && nonNull(deal.getStatus())
+                && LIVE_DEAL_STATUSES.contains(deal.getStatus().name());
     }
 
     private boolean containsPendingOrderSnapshot(List<OrderExternalSnapshot> snapshots) {
-        return emptyIfNull(snapshots).stream()
-                                     .anyMatch(this::isPendingOrderSnapshot);
+        return emptyIfNull(snapshots).stream().anyMatch(this::isPendingOrderSnapshot);
     }
 
     private boolean isPendingOrderSnapshot(OrderExternalSnapshot snapshot) {
         return nonNull(snapshot)
                 && nonNull(snapshot.getExternalStatus())
-                && Objects.equals("live", snapshot.getExternalStatus()
-                                                  .toLowerCase());
+                && Objects.equals("live", snapshot.getExternalStatus().toLowerCase());
     }
 
     private boolean containsLiveAlgoSnapshot(List<AlgoOrderExternalSnapshot> snapshots) {
-        return emptyIfNull(snapshots).stream()
-                                     .anyMatch(this::isLiveAlgoSnapshot);
+        return emptyIfNull(snapshots).stream().anyMatch(this::isLiveAlgoSnapshot);
     }
 
     private boolean isLiveAlgoSnapshot(AlgoOrderExternalSnapshot snapshot) {
         return nonNull(snapshot)
                 && nonNull(snapshot.getExternalStatus())
                 && (
-                Objects.equals("live", snapshot.getExternalStatus()
-                                               .toLowerCase())
-                        || Objects.equals("pause", snapshot.getExternalStatus()
-                                                           .toLowerCase())
+                Objects.equals("live", snapshot.getExternalStatus().toLowerCase())
+                        || Objects.equals("pause", snapshot.getExternalStatus().toLowerCase())
         );
     }
 
@@ -325,5 +299,4 @@ public class KillSwitchService {
         }
         return items;
     }
-
 }

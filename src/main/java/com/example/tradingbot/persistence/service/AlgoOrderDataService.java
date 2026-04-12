@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.ALGO_ORDER_NOT_FOUND;
@@ -38,6 +39,13 @@ public class AlgoOrderDataService {
 
     public List<AlgoOrder> findByInstrumentId(Long instrumentId) {
         return algoOrderRepository.findAllByInstrumentId(instrumentId)
+                                  .stream()
+                                  .map(mapper::dataToDomain)
+                                  .toList();
+    }
+
+    public List<AlgoOrder> findAllByInstrumentIdAndStatuses(Long instrumentId, Set<String> statuses) {
+        return algoOrderRepository.findAllByInstrumentIdAndStatuses(instrumentId, statuses)
                                   .stream()
                                   .map(mapper::dataToDomain)
                                   .toList();

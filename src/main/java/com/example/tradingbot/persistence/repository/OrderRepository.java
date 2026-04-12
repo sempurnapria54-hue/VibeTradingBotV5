@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface OrderRepository extends JpaRepository<OrderEntity, Long>, JpaSpecificationExecutor<OrderEntity> {
 
@@ -23,4 +24,15 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long>, JpaSp
             order by o.id desc
             """, nativeQuery = true)
     List<OrderEntity> findAllByInstrumentId(@Param("instrumentId") Long instrumentId);
+
+    @Query(value = """
+            select o.*
+            from orders o
+            join deals d on d.id = o.deal_id
+            where d.instrument_id = :instrumentId
+            and o.status IN(:statuses)
+            order by o.id desc
+            """, nativeQuery = true)
+    List<OrderEntity> findAllByInstrumentIdAndStatuses(@Param("instrumentId") Long instrumentId,
+                                                       @Param("statuses") Set<String> statuses);
 }
