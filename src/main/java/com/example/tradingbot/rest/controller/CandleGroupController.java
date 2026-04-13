@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.service.CandleGroupService;
+import com.example.tradingbot.domain.service.core.CandleGroupService;
 import com.example.tradingbot.mapping.CandleGroupMapper;
 import com.example.tradingbot.rest.model.request.candle_group.CreateCandleGroupRequest;
 import com.example.tradingbot.rest.model.response.candle_group.CandleGroupContainerResponse;

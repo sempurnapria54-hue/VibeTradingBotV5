@@ -5,7 +5,7 @@ import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.domain.model.balance.Balance;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceExternalSnapshot;
-import com.example.tradingbot.persistence.model.BalanceEntity;
+import com.example.tradingbot.persistence.model.balance.BalanceEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;

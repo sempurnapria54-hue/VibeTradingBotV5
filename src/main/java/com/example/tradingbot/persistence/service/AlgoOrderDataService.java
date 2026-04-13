@@ -3,17 +3,17 @@ package com.example.tradingbot.persistence.service;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
-import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.deal.algo_order.AlgoOrderEntity;
 import com.example.tradingbot.persistence.repository.AlgoOrderRepository;
 import com.example.tradingbot.persistence.specification.AlgoOrderSpecification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
-import org.springframework.transaction.annotation.Transactional;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.ALGO_ORDER_NOT_FOUND;
 

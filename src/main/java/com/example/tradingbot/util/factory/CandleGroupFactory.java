@@ -1,7 +1,7 @@
 package com.example.tradingbot.util.factory;
 
-import com.example.tradingbot.persistence.model.CandleGroupEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.candle.CandleGroupEntity;
+import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import com.example.tradingbot.rest.model.request.candle_group.CreateCandleGroupRequest;
 import lombok.experimental.UtilityClass;
 

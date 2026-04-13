@@ -3,7 +3,7 @@ package com.example.tradingbot.mapping;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
-import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.deal.algo_order.AlgoOrderEntity;
 import com.example.tradingbot.rest.model.response.algo_order.AlgoOrderPageResponse;
 import com.example.tradingbot.rest.model.response.algo_order.AlgoOrderResponse;
 import org.mapstruct.BeanMapping;

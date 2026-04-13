@@ -1,10 +1,10 @@
 package com.example.tradingbot.persistence.specification;
 
 import com.example.tradingbot.domain.model.search_params.OrderSearchParams;
-import com.example.tradingbot.persistence.model.DealEntity;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
-import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.deal.DealEntity;
+import com.example.tradingbot.persistence.model.deal.order.OrderEntity;
+import com.example.tradingbot.persistence.model.exchange.ExchangeEntity;
+import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Join;

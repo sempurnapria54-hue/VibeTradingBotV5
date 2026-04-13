@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.service.OrderService;
+import com.example.tradingbot.domain.service.core.OrderService;
 import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.rest.model.request.algo_order.SyncAlgoOrderRequest;
 import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;

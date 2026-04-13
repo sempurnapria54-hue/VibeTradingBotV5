@@ -1,9 +1,9 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.Order;
+import com.example.tradingbot.domain.model.order.Order;
 import com.example.tradingbot.domain.model.search_params.OrderSearchParams;
 import com.example.tradingbot.mapping.OrderMapper;
-import com.example.tradingbot.persistence.model.OrderEntity;
+import com.example.tradingbot.persistence.model.deal.order.OrderEntity;
 import com.example.tradingbot.persistence.repository.OrderRepository;
 import com.example.tradingbot.persistence.specification.OrderSpecification;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.persistence.model.deal.position.PositionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

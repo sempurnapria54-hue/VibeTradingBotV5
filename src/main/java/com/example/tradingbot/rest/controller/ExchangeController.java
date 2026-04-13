@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.service.ExchangeService;
+import com.example.tradingbot.domain.service.core.ExchangeService;
 import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.rest.model.request.exchange.CreateExchangeRequest;
 import com.example.tradingbot.rest.model.response.exchange.ExchangeContainerResponse;

@@ -1,10 +1,10 @@
 package com.example.tradingbot.domain.model.strategy;
 
-import com.example.tradingbot.domain.model.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.Auditable;
-import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.algo_order.ConditionType;
 import com.example.tradingbot.domain.model.market.MarketPhase;
+import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.order.Order;
 import lombok.Getter;
 import lombok.Setter;
 

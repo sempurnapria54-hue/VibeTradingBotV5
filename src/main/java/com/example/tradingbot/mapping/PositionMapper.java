@@ -2,10 +2,10 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
-import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
-import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.persistence.model.deal.position.PositionEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;

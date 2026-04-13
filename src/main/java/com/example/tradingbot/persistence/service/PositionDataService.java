@@ -2,7 +2,7 @@ package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.mapping.PositionMapper;
-import com.example.tradingbot.persistence.model.PositionEntity;
+import com.example.tradingbot.persistence.model.deal.position.PositionEntity;
 import com.example.tradingbot.persistence.repository.PositionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

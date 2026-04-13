@@ -1,7 +1,7 @@
 package com.example.tradingbot.persistence.specification;
 
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
-import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.deal.algo_order.AlgoOrderEntity;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;

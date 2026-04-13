@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.deal.state_machine;
 
+import com.example.tradingbot.domain.model.commands.ServiceCommandType;
 import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.service.deal.command.core.ServiceCommandType;
 
 import java.util.List;
 

@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.model.kill_switch;
 
-import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.deal.Deal;
+import com.example.tradingbot.domain.model.order.Order;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;

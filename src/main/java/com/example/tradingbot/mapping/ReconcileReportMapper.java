@@ -1,12 +1,11 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.persistence.model.ReconcileAnomalyEntity;
-import com.example.tradingbot.persistence.model.ReconcileReportEntity;
 import com.example.tradingbot.rest.model.response.ReconcileReportAnomalyResponse;
 import com.example.tradingbot.rest.model.response.ReconcileReportResponse;
-import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface ReconcileReportMapper {

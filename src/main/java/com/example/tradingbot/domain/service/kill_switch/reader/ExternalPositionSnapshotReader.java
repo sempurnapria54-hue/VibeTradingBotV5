@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.kill_switch.reader;
 
 import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 import org.springframework.stereotype.Component;
 

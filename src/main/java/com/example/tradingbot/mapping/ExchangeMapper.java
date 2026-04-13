@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
+import com.example.tradingbot.persistence.model.exchange.ExchangeEntity;
 import com.example.tradingbot.rest.model.request.exchange.CreateExchangeRequest;
 import com.example.tradingbot.rest.model.response.exchange.ExchangeContainerResponse;
 import com.example.tradingbot.rest.model.response.exchange.ExchangeResponse;

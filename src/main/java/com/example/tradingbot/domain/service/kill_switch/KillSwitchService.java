@@ -2,21 +2,21 @@ package com.example.tradingbot.domain.service.kill_switch;
 
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.domain.model.Instrument;
-import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.deal.KillSwitchResult;
 import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.instrument.Instrument;
+import com.example.tradingbot.domain.model.kill_switch.KillSwitchResult;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
+import com.example.tradingbot.domain.model.order.Order;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
-import com.example.tradingbot.domain.service.InstrumentService;
-import com.example.tradingbot.domain.service.deal.command.kill_switch.CancelAlgoOrderExecutor;
-import com.example.tradingbot.domain.service.deal.command.kill_switch.CancelOrderExecutor;
-import com.example.tradingbot.domain.service.deal.command.kill_switch.ClosePositionExecutor;
-import com.example.tradingbot.domain.service.deal.command.kill_switch.DealEmergencyFinalizer;
+import com.example.tradingbot.domain.service.core.InstrumentService;
+import com.example.tradingbot.domain.service.deal.command.close.CloseAlgoOrderExecutor;
+import com.example.tradingbot.domain.service.deal.command.close.CloseDealExecutor;
+import com.example.tradingbot.domain.service.deal.command.close.CloseOrderExecutor;
+import com.example.tradingbot.domain.service.deal.command.close.ClosePositionExecutor;
 import com.example.tradingbot.domain.service.kill_switch.reader.StateSnapshotReader;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.util.JsonUtils;
@@ -44,10 +44,10 @@ public class KillSwitchService {
     private final ClientManager clientManager;
     private final InstrumentService instrumentService;
     private final ExchangeDataService exchangeDataService;
-    private final CancelOrderExecutor cancelOrderExecutor;
-    private final CancelAlgoOrderExecutor cancelAlgoOrderExecutor;
+    private final CloseOrderExecutor closeOrderExecutor;
+    private final CloseAlgoOrderExecutor closeAlgoOrderExecutor;
     private final ClosePositionExecutor closePositionExecutor;
-    private final DealEmergencyFinalizer dealEmergencyFinalizer;
+    private final CloseDealExecutor closeDealExecutor;
     private final StateSnapshotReader stateSnapshotReader;
     private final JsonUtils jsonUtils;
 
@@ -75,13 +75,13 @@ public class KillSwitchService {
                                               String reasonCode,
                                               StateSnapshot beforeSnapshot) {
         ClientService clientService = clientManager.getClientService(exchange.getName());
-        cancelOrderExecutor.execute(clientService, instrument, beforeSnapshot.getInternalOrders());
-        cancelAlgoOrderExecutor.execute(clientService, instrument, beforeSnapshot.getInternalAlgoOrders());
+        closeOrderExecutor.execute(clientService, instrument, beforeSnapshot.getInternalOrders());
+        closeAlgoOrderExecutor.execute(clientService, instrument, beforeSnapshot.getInternalAlgoOrders());
         closePositionExecutor.execute(clientService,
                                       instrument,
                                       beforeSnapshot.getInternalPositions(),
                                       isNotEmpty(beforeSnapshot.getExternalPositions()));
-        dealEmergencyFinalizer.execute(beforeSnapshot.getInternalDeals());
+        closeDealExecutor.execute(beforeSnapshot.getInternalDeals());
 
         StateSnapshot afterSnapshot = stateSnapshotReader.readAfterSnapshot(clientService, instrument, beforeSnapshot);
 

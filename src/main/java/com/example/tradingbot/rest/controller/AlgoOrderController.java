@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.service.AlgoOrderService;
+import com.example.tradingbot.domain.service.core.AlgoOrderService;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.rest.model.request.algo_order.CancelAlgoOrderRequest;
 import com.example.tradingbot.rest.model.request.algo_order.CreateAlgoOrderRequest;

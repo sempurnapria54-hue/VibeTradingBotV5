@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.service.InstrumentService;
+import com.example.tradingbot.domain.service.core.InstrumentService;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;
 import com.example.tradingbot.rest.model.request.instrument.search_params.InstrumentSearchParams;

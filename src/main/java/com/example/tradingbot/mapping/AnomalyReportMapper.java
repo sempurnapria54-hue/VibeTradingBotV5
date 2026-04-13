@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.anomaly.AnomalyReport;
-import com.example.tradingbot.persistence.model.AnomalyReportEntity;
+import com.example.tradingbot.persistence.model.anomaly.AnomalyReportEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -12,11 +12,11 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface AnomalyReportMapper {
 
-    AnomalyReport toDomain(AnomalyReportEntity entity);
+    AnomalyReport dataToDomain(AnomalyReportEntity entity);
 
-    List<AnomalyReport> toDomain(List<AnomalyReportEntity> entities);
+    List<AnomalyReport> dataToDomain(List<AnomalyReportEntity> entities);
 
-    AnomalyReportEntity toEntity(AnomalyReport domain);
+    AnomalyReportEntity domainToData(AnomalyReport domain);
 
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "status", source = "status")

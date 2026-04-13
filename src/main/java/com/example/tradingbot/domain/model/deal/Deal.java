@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.model.deal;
 
 import com.example.tradingbot.domain.model.Auditable;
-import com.example.tradingbot.domain.model.Order;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.order.Order;
 import com.example.tradingbot.domain.model.position.Position;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

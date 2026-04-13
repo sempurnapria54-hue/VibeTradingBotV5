@@ -1,11 +1,11 @@
 package com.example.tradingbot.domain.service.deal.state_machine.handler;
 
+import com.example.tradingbot.domain.model.commands.ServiceCommandType;
 import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.domain.model.deal.DealEvent;
 import com.example.tradingbot.domain.model.market.MarketPhase;
 import com.example.tradingbot.domain.model.strategy.Strategy;
 import com.example.tradingbot.domain.model.strategy.StrategyDetails;
-import com.example.tradingbot.domain.service.deal.command.core.ServiceCommandType;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.deal.state_machine.TransitionResult;
 import org.springframework.stereotype.Service;

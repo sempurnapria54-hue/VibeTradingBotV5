@@ -2,7 +2,7 @@ package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.mapping.DealMapper;
-import com.example.tradingbot.persistence.model.DealEntity;
+import com.example.tradingbot.persistence.model.deal.DealEntity;
 import com.example.tradingbot.persistence.repository.DealRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

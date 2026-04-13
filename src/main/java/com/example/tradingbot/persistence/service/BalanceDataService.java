@@ -2,7 +2,7 @@ package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.domain.model.balance.Balance;
 import com.example.tradingbot.mapping.BalanceMapper;
-import com.example.tradingbot.persistence.model.BalanceEntity;
+import com.example.tradingbot.persistence.model.balance.BalanceEntity;
 import com.example.tradingbot.persistence.repository.BalanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

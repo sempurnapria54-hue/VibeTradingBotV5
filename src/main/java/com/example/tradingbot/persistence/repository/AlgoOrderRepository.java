@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.persistence.model.algo_order.AlgoOrderEntity;
+import com.example.tradingbot.persistence.model.deal.algo_order.AlgoOrderEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;

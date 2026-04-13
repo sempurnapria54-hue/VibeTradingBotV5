@@ -1,7 +1,5 @@
 package com.example.tradingbot.client.service.okx;
 
-import com.example.tradingbot.client.exception.ExternalApiException;
-import com.example.tradingbot.client.exception.ExternalTransportException;
 import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
 import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
@@ -32,6 +30,8 @@ import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
 import com.example.tradingbot.client.model.okx.response.TradeFillsArchiveResponse;
 import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.config.OkxConfig;
+import com.example.tradingbot.exception.ExternalApiException;
+import com.example.tradingbot.exception.ExternalTransportException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.BooleanUtils;

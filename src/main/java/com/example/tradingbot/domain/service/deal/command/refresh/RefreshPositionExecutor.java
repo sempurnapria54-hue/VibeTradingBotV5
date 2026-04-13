@@ -1,13 +1,13 @@
 package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.client.service.ClientManager;
-import com.example.tradingbot.domain.model.Instrument;
 import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.Position.CloseReason;
 import com.example.tradingbot.domain.model.position.Position.Status;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
-import com.example.tradingbot.domain.service.deal.TradeRuleValidator;
+import com.example.tradingbot.domain.service.validator.TradeRuleValidator;
 import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import lombok.RequiredArgsConstructor;

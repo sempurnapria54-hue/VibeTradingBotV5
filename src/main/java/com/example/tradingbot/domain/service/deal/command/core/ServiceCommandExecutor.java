@@ -1,11 +1,12 @@
 package com.example.tradingbot.domain.service.deal.command.core;
 
-import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.commands.ServiceCommandType;
 import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.service.AlgoOrderService;
-import com.example.tradingbot.domain.service.BalanceService;
-import com.example.tradingbot.domain.service.OrderService;
+import com.example.tradingbot.domain.model.instrument.Instrument;
+import com.example.tradingbot.domain.service.core.AlgoOrderService;
+import com.example.tradingbot.domain.service.core.BalanceService;
+import com.example.tradingbot.domain.service.core.OrderService;
 import com.example.tradingbot.domain.service.deal.ExitService;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshPositionExecutor;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;

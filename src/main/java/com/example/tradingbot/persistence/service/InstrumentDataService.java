@@ -1,9 +1,9 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.Instrument;
+import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
 import com.example.tradingbot.mapping.InstrumentMapper;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import com.example.tradingbot.persistence.repository.InstrumentRepository;
 import com.example.tradingbot.persistence.specification.InstrumentSpecification;
 import lombok.RequiredArgsConstructor;

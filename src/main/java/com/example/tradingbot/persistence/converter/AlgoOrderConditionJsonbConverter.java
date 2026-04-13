@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.converter;
 
-import com.example.tradingbot.persistence.model.algo_order.Condition;
+import com.example.tradingbot.persistence.model.deal.algo_order.Condition;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,8 +1,8 @@
 package com.example.tradingbot.persistence.specification;
 
 import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
-import com.example.tradingbot.persistence.model.ExchangeEntity;
-import com.example.tradingbot.persistence.model.InstrumentEntity;
+import com.example.tradingbot.persistence.model.exchange.ExchangeEntity;
+import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import lombok.NoArgsConstructor;
