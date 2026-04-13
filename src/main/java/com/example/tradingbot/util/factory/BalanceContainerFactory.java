@@ -1,19 +1,32 @@
 package com.example.tradingbot.util.factory;
 
 import com.example.tradingbot.domain.model.balance.BalanceContainer;
-import lombok.experimental.UtilityClass;
+import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
+import com.example.tradingbot.mapping.BalanceContainerMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 
-@UtilityClass
+@Component
+@RequiredArgsConstructor
 public class BalanceContainerFactory {
 
-    public static BalanceContainer createBalanceContainer(Long exchangeId) {
+    private final BalanceContainerMapper mapper;
+
+    public BalanceContainer createFromSnapshot(Long exchangeId, BalanceContainerExternalSnapshot snapshot) {
+        BalanceContainer balanceContainer = createEmptyBalanceContainer(exchangeId);
+        mapper.updateDomainFromSnapshot(snapshot, balanceContainer);
+        return balanceContainer;
+    }
+
+    private static BalanceContainer createEmptyBalanceContainer(Long exchangeId) {
         BalanceContainer balanceContainer = new BalanceContainer();
         balanceContainer.setExchangeId(exchangeId);
         balanceContainer.setTotalEquity(BigDecimal.ZERO);
         balanceContainer.setUnrealizedProfit(BigDecimal.ZERO);
-        balanceContainer.clearBalances();
+        balanceContainer.setBalances(new ArrayList<>());
         return balanceContainer;
     }
 }

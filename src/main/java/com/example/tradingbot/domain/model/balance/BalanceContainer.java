@@ -5,9 +5,11 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
+
+import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Getter
 @Setter
@@ -43,28 +45,19 @@ public class BalanceContainer extends Auditable {
      */
     private List<Balance> balances;
 
-    public void clearBalances() {
+    public void replaceBalances(List<Balance> balances) {
+        clearBalances();
+        if (isEmpty(balances)) {
+            return;
+        }
+        setBalances(balances);
+    }
+
+    private void clearBalances() {
         if (balances == null) {
             balances = new ArrayList<>();
             return;
         }
         balances.clear();
-    }
-
-    public void addBalance(Balance balance) {
-        if (balances == null) {
-            balances = new ArrayList<>();
-        }
-        balances.add(balance);
-    }
-
-    public void replaceBalances(List<Balance> balances) {
-        clearBalances();
-        if (balances == null) {
-            return;
-        }
-        for (Balance balance : balances) {
-            addBalance(balance);
-        }
     }
 }

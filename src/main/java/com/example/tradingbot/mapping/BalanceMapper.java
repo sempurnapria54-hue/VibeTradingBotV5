@@ -1,7 +1,6 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.response.balance.BalanceDetail;
-import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.domain.model.balance.Balance;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceExternalSnapshot;
 import com.example.tradingbot.persistence.model.balance.BalanceEntity;
@@ -19,24 +18,18 @@ import java.util.List;
 public interface BalanceMapper extends CommonMapper {
 
     @Mapping(target = "balanceContainerId", source = "balanceContainer.id")
-    Balance toDomain(BalanceEntity source);
+    Balance dataToDomain(BalanceEntity source);
 
     @Mapping(target = "balanceContainer.id", source = "balanceContainerId")
-    BalanceEntity toEntity(Balance source);
-
-    BalanceExternalSnapshot clientOkxResponseToDomain(BalanceResponse source);
-
-    BalanceResponse domainToClient(BalanceExternalSnapshot source);
-
-    List<BalanceExternalSnapshot> clientOkxResponseToDomain(List<BalanceResponse> source);
+    BalanceEntity domainToData(Balance source);
 
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "currency", source = "ccy")
-    @Mapping(target = "cashBalance", source = "cashBal")
-    @Mapping(target = "availableBalance", source = "availBal")
-    @Mapping(target = "equity", source = "eq")
-    @Mapping(target = "frozenBalance", source = "frozenBal")
-    @Mapping(target = "unrealizedProfit", source = "upl")
+    @Mapping(target = "cashBalance", source = "cashBal", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "availableBalance", source = "availBal", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "equity", source = "eq", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "frozenBalance", source = "frozenBal", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "unrealizedProfit", source = "upl", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "externalModifiedAt", source = "uTime", qualifiedByName = "toOffsetDateTimeUtc")
     BalanceExternalSnapshot clientOkxToExternalSnapshot(BalanceDetail source);
 

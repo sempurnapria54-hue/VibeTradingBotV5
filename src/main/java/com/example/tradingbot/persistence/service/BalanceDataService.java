@@ -19,13 +19,13 @@ public class BalanceDataService {
 
     public Optional<Balance> findByExchangeIdAndCurrency(Long exchangeId, String currency) {
         return balanceRepository.findByExchangeIdAndCurrency(exchangeId, currency)
-                                .map(balanceMapper::toDomain);
+                                .map(balanceMapper::dataToDomain);
     }
 
     @Transactional
     public Balance save(Balance balance) {
-        BalanceEntity data = balanceMapper.toEntity(balance);
+        BalanceEntity data = balanceMapper.domainToData(balance);
         BalanceEntity saved = balanceRepository.save(data);
-        return balanceMapper.toDomain(saved);
+        return balanceMapper.dataToDomain(saved);
     }
 }

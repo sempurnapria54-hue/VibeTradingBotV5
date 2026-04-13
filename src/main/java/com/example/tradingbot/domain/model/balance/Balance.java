@@ -17,11 +17,6 @@ public class Balance extends Auditable {
     private Long id;
 
     /**
-     * Идентификатор биржи-владельца баланса.
-     */
-    private Long exchangeId;
-
-    /**
      * Валюта баланса (например USDT).
      */
     private String currency;
