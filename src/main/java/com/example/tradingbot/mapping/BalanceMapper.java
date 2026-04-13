@@ -3,7 +3,6 @@ package com.example.tradingbot.mapping;
 import com.example.tradingbot.client.model.okx.response.balance.BalanceDetail;
 import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.domain.model.balance.Balance;
-import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceExternalSnapshot;
 import com.example.tradingbot.persistence.model.balance.BalanceEntity;
 import org.mapstruct.BeanMapping;
@@ -43,14 +42,6 @@ public interface BalanceMapper extends CommonMapper {
 
     @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
     List<BalanceExternalSnapshot> clientOkxToExternalSnapshot(List<BalanceDetail> source);
-
-    @BeanMapping(ignoreByDefault = true)
-    @Mapping(target = "exchangeId", source = "exchangeId")
-    @Mapping(target = "totalEquity", source = "response.totalEq")
-    @Mapping(target = "unrealizedProfit", source = "response.upl")
-    @Mapping(target = "externalModifiedAt", source = "response.uTime", qualifiedByName = "toOffsetDateTimeUtc")
-    @Mapping(target = "balanceExternalSnapshots", source = "response.details")
-    BalanceContainerExternalSnapshot clientOkxToExternalSnapshot(Long exchangeId, BalanceResponse response);
 
     @BeanMapping(ignoreByDefault = true, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "available", source = "availableBalance", qualifiedByName = "stringToBigDecimal")
