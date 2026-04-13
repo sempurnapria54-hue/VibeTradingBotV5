@@ -51,12 +51,6 @@ public class BalanceEntity extends AuditableEntity {
     private String currency;
 
     /**
-     * Идентификатор контейнера snapshot аккаунта.
-     */
-    @Column(name = "balance_container_id", nullable = false)
-    private Long balanceContainerId;
-
-    /**
      * Доступный баланс.
      */
     @Column(name = "available", nullable = false, precision = PRICE_PRECISION, scale = PRICE_SCALE)
@@ -81,6 +75,6 @@ public class BalanceEntity extends AuditableEntity {
     private OffsetDateTime externalUpdatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "balance_container_id", nullable = false, insertable = false, updatable = false)
+    @JoinColumn(name = "balance_container_id", nullable = false)
     private BalanceContainerEntity balanceContainer;
 }

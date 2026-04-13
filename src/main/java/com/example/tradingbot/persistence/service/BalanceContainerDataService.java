@@ -22,6 +22,11 @@ public class BalanceContainerDataService {
                                          .map(balanceContainerMapper::toDomain);
     }
 
+    public Optional<BalanceContainer> findByExchangeIdWithBalances(Long exchangeId) {
+        return balanceContainerRepository.findByExchangeIdWithBalances(exchangeId)
+                                         .map(balanceContainerMapper::toDomain);
+    }
+
     @Transactional
     public BalanceContainer save(BalanceContainer balanceContainer) {
         BalanceContainerEntity entity = balanceContainerMapper.toEntity(balanceContainer);

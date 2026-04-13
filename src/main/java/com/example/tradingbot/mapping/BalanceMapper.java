@@ -19,8 +19,10 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface BalanceMapper extends CommonMapper {
 
+    @Mapping(target = "balanceContainerId", source = "balanceContainer.id")
     Balance toDomain(BalanceEntity source);
 
+    @Mapping(target = "balanceContainer.id", source = "balanceContainerId")
     BalanceEntity toEntity(Balance source);
 
     BalanceExternalSnapshot clientOkxResponseToDomain(BalanceResponse source);

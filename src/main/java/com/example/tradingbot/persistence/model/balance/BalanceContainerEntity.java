@@ -1,13 +1,15 @@
 package com.example.tradingbot.persistence.model.balance;
 
 import com.example.tradingbot.persistence.model.AuditableEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
@@ -47,6 +49,7 @@ public class BalanceContainerEntity extends AuditableEntity {
     @Column(name = "external_updated_at")
     private OffsetDateTime externalUpdatedAt;
 
-    @OneToMany(mappedBy = "balanceContainer", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "balanceContainer", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
     private List<BalanceEntity> balances;
 }
