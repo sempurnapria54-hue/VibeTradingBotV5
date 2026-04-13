@@ -27,6 +27,11 @@ public class Balance extends Auditable {
     private String currency;
 
     /**
+     * Идентификатор контейнера snapshot аккаунта.
+     */
+    private Long balanceContainerId;
+
+    /**
      * Доступный баланс.
      */
     private BigDecimal available;
