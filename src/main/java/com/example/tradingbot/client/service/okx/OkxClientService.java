@@ -50,7 +50,6 @@ import com.example.tradingbot.domain.model.search_params.PriceTickerSearchParams
 import com.example.tradingbot.domain.model.search_params.TradeFillsSearchParams;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
-import com.example.tradingbot.mapping.BalanceMapper;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.mapping.OrderMapper;
@@ -70,7 +69,6 @@ import static com.example.tradingbot.util.Constant.ExchangeNames.EXCHANGE_NAME_O
 public class OkxClientService implements ClientService {
 
     private final OkxRestClient okxRestClient;
-    private final BalanceMapper balanceMapper;
     private final BalanceContainerMapper balanceContainerMapper;
     private final PositionMapper positionMapper;
     private final OrderMapper orderMapper;

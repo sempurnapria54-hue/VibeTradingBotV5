@@ -12,7 +12,7 @@ public interface CommonMapper {
     @Named("stringToBigDecimal")
     default BigDecimal stringToBigDecimal(String value) {
         if (value == null || value.isBlank()) {
-            return null;
+            return BigDecimal.ZERO;
         }
 
         return new BigDecimal(value);

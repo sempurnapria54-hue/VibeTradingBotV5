@@ -3,8 +3,8 @@ package com.example.tradingbot.mapping;
 import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.domain.model.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
-import com.example.tradingbot.persistence.model.balance.BalanceEntity;
 import com.example.tradingbot.persistence.model.balance.BalanceContainerEntity;
+import com.example.tradingbot.persistence.model.balance.BalanceEntity;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -17,9 +17,9 @@ import java.util.List;
 @Mapper(componentModel = "spring", uses = BalanceMapper.class)
 public interface BalanceContainerMapper extends CommonMapper {
 
-    BalanceContainer toDomain(BalanceContainerEntity source);
+    BalanceContainer dataToDomain(BalanceContainerEntity source);
 
-    BalanceContainerEntity toEntity(BalanceContainer source);
+    BalanceContainerEntity domainToData(BalanceContainer source);
 
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "exchangeId", source = "exchangeId")
