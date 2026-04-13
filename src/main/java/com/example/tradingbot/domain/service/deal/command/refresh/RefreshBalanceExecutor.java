@@ -9,14 +9,15 @@ import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.mapping.BalanceMapper;
 import com.example.tradingbot.persistence.service.BalanceContainerDataService;
-import com.example.tradingbot.persistence.service.BalanceDataService;
+import com.example.tradingbot.util.factory.BalanceContainerFactory;
+import com.example.tradingbot.util.factory.BalanceFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,7 +25,6 @@ public class RefreshBalanceExecutor {
 
     private final ClientManager clientManager;
     private final BalanceContainerDataService balanceContainerDataService;
-    private final BalanceDataService balanceDataService;
     private final BalanceContainerMapper balanceContainerMapper;
     private final BalanceMapper balanceMapper;
 
@@ -36,56 +36,14 @@ public class RefreshBalanceExecutor {
             return;
         }
 
-        BalanceContainer balanceContainer = resolveOrCreateContainer(exchange.getId());
+        BalanceContainer balanceContainer = balanceContainerDataService.findByExchangeIdWithBalances(exchange.getId())
+                                                                       .orElseGet(() -> BalanceContainerFactory.createBalanceContainer(
+                                                                               exchange.getId()));
         balanceContainerMapper.updateDomainFromSnapshot(externalSnapshot, balanceContainer);
         applyContainerDefaults(balanceContainer);
-        BalanceContainer savedContainer = balanceContainerDataService.save(balanceContainer);
-
-        List<BalanceExternalSnapshot> balanceSnapshots = externalSnapshot.getBalanceExternalSnapshots();
-        if (balanceSnapshots == null) {
-            return;
-        }
-
-        for (BalanceExternalSnapshot snapshot : balanceSnapshots) {
-            if (snapshot == null || snapshot.getCurrency() == null) {
-                continue;
-            }
-            Balance balance = resolveOrCreateBalance(exchange.getId(), snapshot.getCurrency(), savedContainer.getId());
-            balanceMapper.updateDomainFromSnapshot(snapshot, balance);
-            applyBalanceDefaults(balance);
-            balanceDataService.save(balance);
-        }
-    }
-
-    private BalanceContainer resolveOrCreateContainer(Long exchangeId) {
-        Optional<BalanceContainer> existingContainer = balanceContainerDataService.findByExchangeId(exchangeId);
-        if (existingContainer.isPresent()) {
-            return existingContainer.get();
-        }
-
-        BalanceContainer createdContainer = new BalanceContainer();
-        createdContainer.setExchangeId(exchangeId);
-        createdContainer.setTotalEquity(BigDecimal.ZERO);
-        createdContainer.setUnrealizedProfit(BigDecimal.ZERO);
-        return createdContainer;
-    }
-
-    private Balance resolveOrCreateBalance(Long exchangeId, String currency, Long balanceContainerId) {
-        Optional<Balance> existingBalance = balanceDataService.findByExchangeIdAndCurrency(exchangeId, currency);
-        if (existingBalance.isPresent()) {
-            Balance balance = existingBalance.get();
-            balance.setBalanceContainerId(balanceContainerId);
-            return balance;
-        }
-
-        Balance createdBalance = new Balance();
-        createdBalance.setExchangeId(exchangeId);
-        createdBalance.setCurrency(currency);
-        createdBalance.setBalanceContainerId(balanceContainerId);
-        createdBalance.setAvailable(BigDecimal.ZERO);
-        createdBalance.setFrozen(BigDecimal.ZERO);
-        createdBalance.setTotal(BigDecimal.ZERO);
-        return createdBalance;
+        List<Balance> balances = createBalances(exchange.getId(), externalSnapshot.getBalanceExternalSnapshots());
+        balanceContainer.replaceBalances(balances);
+        balanceContainerDataService.save(balanceContainer);
     }
 
     private void applyContainerDefaults(BalanceContainer balanceContainer) {
@@ -107,5 +65,23 @@ public class RefreshBalanceExecutor {
         if (balance.getTotal() == null) {
             balance.setTotal(BigDecimal.ZERO);
         }
+    }
+
+    private List<Balance> createBalances(Long exchangeId, List<BalanceExternalSnapshot> balanceSnapshots) {
+        List<Balance> balances = new ArrayList<>();
+        if (balanceSnapshots == null) {
+            return balances;
+        }
+
+        for (BalanceExternalSnapshot snapshot : balanceSnapshots) {
+            if (snapshot == null || snapshot.getCurrency() == null) {
+                continue;
+            }
+            Balance balance = BalanceFactory.createBalance(exchangeId, snapshot.getCurrency());
+            balanceMapper.updateDomainFromSnapshot(snapshot, balance);
+            applyBalanceDefaults(balance);
+            balances.add(balance);
+        }
+        return balances;
     }
 }
