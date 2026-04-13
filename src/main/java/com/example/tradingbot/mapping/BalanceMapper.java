@@ -36,6 +36,7 @@ public interface BalanceMapper extends CommonMapper {
     @Mapping(target = "equity", source = "eq")
     @Mapping(target = "frozenBalance", source = "frozenBal")
     @Mapping(target = "unrealizedProfit", source = "upl")
+    @Mapping(target = "externalModifiedAt", source = "uTime", qualifiedByName = "toOffsetDateTimeUtc")
     BalanceExternalSnapshot clientOkxToExternalSnapshot(BalanceDetail source);
 
     @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
@@ -45,7 +46,8 @@ public interface BalanceMapper extends CommonMapper {
     @Mapping(target = "exchangeId", source = "exchangeId")
     @Mapping(target = "totalEquity", source = "response.totalEq")
     @Mapping(target = "unrealizedProfit", source = "response.upl")
-    @Mapping(target = "balances", source = "response.details")
+    @Mapping(target = "externalModifiedAt", source = "response.uTime", qualifiedByName = "toOffsetDateTimeUtc")
+    @Mapping(target = "balanceExternalSnapshots", source = "response.details")
     BalanceContainerExternalSnapshot clientOkxToExternalSnapshot(Long exchangeId, BalanceResponse response);
 
     @BeanMapping(ignoreByDefault = true, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

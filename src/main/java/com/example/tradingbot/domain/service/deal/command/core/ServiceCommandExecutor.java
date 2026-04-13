@@ -5,9 +5,9 @@ import com.example.tradingbot.domain.model.deal.Deal;
 import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.service.core.AlgoOrderService;
-import com.example.tradingbot.domain.service.core.BalanceService;
 import com.example.tradingbot.domain.service.core.OrderService;
 import com.example.tradingbot.domain.service.deal.ExitService;
+import com.example.tradingbot.domain.service.deal.command.refresh.RefreshBalanceExecutor;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshPositionExecutor;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.kill_switch.KillSwitchService;
@@ -23,7 +23,7 @@ public class ServiceCommandExecutor {
 
     private final RefreshPositionExecutor refreshPositionExecutor;
 
-    private final BalanceService balanceService;
+    private final RefreshBalanceExecutor refreshBalanceExecutor;
 
     private final OrderService orderService;
 
@@ -73,7 +73,7 @@ public class ServiceCommandExecutor {
         switch (command) {
             case REFRESH_POSITIONS -> refreshPositionExecutor.execute(exchange, instrument, deal.getId());
 
-            case REFRESH_BALANCE -> balanceService.refreshBalance(exchange);
+            case REFRESH_BALANCE -> refreshBalanceExecutor.execute(exchange);
 
             case REFRESH_PENDING_ORDERS -> orderService.refreshPendingOrders(exchange, instrument);
 

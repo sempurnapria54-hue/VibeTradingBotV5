@@ -5,7 +5,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
@@ -48,6 +51,12 @@ public class BalanceEntity extends AuditableEntity {
     private String currency;
 
     /**
+     * Идентификатор контейнера snapshot аккаунта.
+     */
+    @Column(name = "balance_container_id", nullable = false)
+    private Long balanceContainerId;
+
+    /**
      * Доступный баланс.
      */
     @Column(name = "available", nullable = false, precision = PRICE_PRECISION, scale = PRICE_SCALE)
@@ -70,4 +79,8 @@ public class BalanceEntity extends AuditableEntity {
      */
     @Column(name = "external_updated_at")
     private OffsetDateTime externalUpdatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "balance_container_id", nullable = false, insertable = false, updatable = false)
+    private BalanceContainerEntity balanceContainer;
 }
