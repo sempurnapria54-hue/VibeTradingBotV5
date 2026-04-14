@@ -9,6 +9,8 @@ import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.instrument.Instrument.Status;
 import com.example.tradingbot.domain.model.kill_switch.KillSwitchResult;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
+import com.example.tradingbot.domain.model.order.Order;
+import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.service.anomaly.AnomalyService;
@@ -20,7 +22,10 @@ import com.example.tradingbot.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMessage;
 import static org.apache.commons.lang3.math.NumberUtils.INTEGER_ONE;
@@ -31,6 +36,10 @@ import static org.hibernate.internal.util.collections.CollectionHelper.isNotEmpt
 public class TradeRuleValidator {
 
     private static final String OVERHEAD_POSITIONS_COUNT = "OVERHEAD_POSITIONS_COUNT";
+    private static final String REFRESH_PENDING_ORDERS_EXTERNAL_DUPLICATES = "REFRESH_PENDING_ORDERS_EXTERNAL_DUPLICATES";
+    private static final String REFRESH_PENDING_ORDERS_INTERNAL_DUPLICATES = "REFRESH_PENDING_ORDERS_INTERNAL_DUPLICATES";
+    private static final String REFRESH_PENDING_ORDERS_UNMATCHED_EXTERNAL = "REFRESH_PENDING_ORDERS_UNMATCHED_EXTERNAL";
+    private static final String REFRESH_PENDING_ORDERS_INVALID_INSTRUMENT_SCOPE = "REFRESH_PENDING_ORDERS_INVALID_INSTRUMENT_SCOPE";
 
     private final KillSwitchService killSwitchService;
     private final InstrumentService instrumentService;
@@ -55,6 +64,136 @@ public class TradeRuleValidator {
         }
     }
 
+    public void validateRefreshPendingOrders(Exchange exchange,
+                                             Instrument instrument,
+                                             Long dealId,
+                                             List<OrderExternalSnapshot> externalPendingOrders,
+                                             List<Order> internalLiveOrders) {
+        String violationCode = resolveRefreshPendingOrdersViolationCode(instrument,
+                                                                        externalPendingOrders,
+                                                                        internalLiveOrders);
+        if (violationCode == null) {
+            return;
+        }
+
+        executeTradeRuleViolationFlow(exchange,
+                                      instrument,
+                                      dealId,
+                                      violationCode,
+                                      Severity.CRITICAL);
+        throw new TradeRuleViolationException(
+                "Trade rule violation detected for refresh pending orders: " + violationCode);
+    }
+
+    private String resolveRefreshPendingOrdersViolationCode(Instrument instrument,
+                                                            List<OrderExternalSnapshot> externalPendingOrders,
+                                                            List<Order> internalLiveOrders) {
+        if (hasExternalDuplicates(externalPendingOrders)) {
+            return REFRESH_PENDING_ORDERS_EXTERNAL_DUPLICATES;
+        }
+
+        if (hasInternalDuplicates(internalLiveOrders)) {
+            return REFRESH_PENDING_ORDERS_INTERNAL_DUPLICATES;
+        }
+
+        if (hasInternalOrdersFromAnotherInstrument(instrument, internalLiveOrders)) {
+            return REFRESH_PENDING_ORDERS_INVALID_INSTRUMENT_SCOPE;
+        }
+
+        if (hasUnmatchedOrAmbiguousExternalOrders(externalPendingOrders, internalLiveOrders)) {
+            return REFRESH_PENDING_ORDERS_UNMATCHED_EXTERNAL;
+        }
+
+        return null;
+    }
+
+    private boolean hasExternalDuplicates(List<OrderExternalSnapshot> externalPendingOrders) {
+        Map<String, Integer> byExternalId = new HashMap<>();
+        Map<String, Integer> byInternalId = new HashMap<>();
+
+        for (OrderExternalSnapshot snapshot : safeOrderSnapshots(externalPendingOrders)) {
+            if (incrementAndCheckDuplicate(byExternalId, snapshot.getExternalId())) {
+                return true;
+            }
+            if (incrementAndCheckDuplicate(byInternalId, snapshot.getInternalId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInternalDuplicates(List<Order> internalLiveOrders) {
+        Map<String, Integer> byExternalId = new HashMap<>();
+        Map<String, Integer> byInternalId = new HashMap<>();
+
+        for (Order order : safeOrders(internalLiveOrders)) {
+            if (incrementAndCheckDuplicate(byExternalId, order.getExternalId())) {
+                return true;
+            }
+            if (incrementAndCheckDuplicate(byInternalId, order.getInternalId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasUnmatchedOrAmbiguousExternalOrders(List<OrderExternalSnapshot> externalPendingOrders,
+                                                           List<Order> internalLiveOrders) {
+        for (OrderExternalSnapshot externalOrder : safeOrderSnapshots(externalPendingOrders)) {
+            long matchesByExternalId = safeOrders(internalLiveOrders).stream()
+                                                                     .filter(local -> Objects.equals(
+                                                                             local.getExternalId(),
+                                                                             externalOrder.getExternalId()))
+                                                                     .count();
+            if (matchesByExternalId > 1) {
+                return true;
+            }
+            if (matchesByExternalId == 1) {
+                continue;
+            }
+
+            long matchesByInternalId = safeOrders(internalLiveOrders).stream()
+                                                                     .filter(local -> Objects.equals(
+                                                                             local.getInternalId(),
+                                                                             externalOrder.getInternalId()))
+                                                                     .count();
+            if (matchesByInternalId != 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInternalOrdersFromAnotherInstrument(Instrument instrument, List<Order> internalLiveOrders) {
+        for (Order order : safeOrders(internalLiveOrders)) {
+            if (order.getDealId() == null) {
+                return true;
+            }
+            Long orderInstrumentId = instrumentService.findRequiredByDealId(order.getDealId()).getId();
+            if (!Objects.equals(orderInstrumentId, instrument.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<OrderExternalSnapshot> safeOrderSnapshots(List<OrderExternalSnapshot> snapshots) {
+        return snapshots == null ? List.of() : snapshots;
+    }
+
+    private List<Order> safeOrders(List<Order> orders) {
+        return orders == null ? List.of() : orders;
+    }
+
+    private boolean incrementAndCheckDuplicate(Map<String, Integer> counters, String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+        int nextCount = counters.getOrDefault(key, 0) + 1;
+        counters.put(key, nextCount);
+        return nextCount > 1;
+    }
+
     private boolean hasOverheadPositions(List<PositionExternalSnapshot> externalSnapshots,
                                          List<Position> domainPositions) {
         return hasExternalOverheadPositions(externalSnapshots) || hasDomainOverheadPositions(domainPositions);
@@ -66,16 +205,6 @@ public class TradeRuleValidator {
 
     private boolean hasDomainOverheadPositions(List<Position> domainPositions) {
         return isNotEmpty(domainPositions) && domainPositions.size() > INTEGER_ONE;
-    }
-
-
-    public void validateRefreshOrders(Exchange exchange,
-                                      Instrument instrument,
-                                      List<com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot> externalSnapshots,
-                                      List<com.example.tradingbot.domain.model.order.Order> localLiveOrders) {
-        // Stage 1: explicit rule set for order refresh is not defined yet.
-        // Keep method as a dedicated extension point so RefreshOrderExecutor
-        // can enforce invariants before mutating persistent order state.
     }
 
     private void executeTradeRuleViolationFlow(Exchange exchange,

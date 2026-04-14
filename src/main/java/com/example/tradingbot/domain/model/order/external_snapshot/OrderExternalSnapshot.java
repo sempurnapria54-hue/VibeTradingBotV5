@@ -45,12 +45,12 @@ public class OrderExternalSnapshot extends Auditable {
     private BigDecimal price;
 
     /**
-     * Размер ордера.
+     * Объём ордера.
      */
     private BigDecimal size;
 
     /**
-     * Накопленный исполненный размер ордера.
+     * Накопленный исполненный объём ордера.
      */
     private BigDecimal accumulatedFillSize;
 

@@ -8,6 +8,7 @@ import com.example.tradingbot.domain.service.core.AlgoOrderService;
 import com.example.tradingbot.domain.service.core.OrderService;
 import com.example.tradingbot.domain.service.deal.ExitService;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshBalanceExecutor;
+import com.example.tradingbot.domain.service.deal.command.refresh.RefreshOrderExecutor;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshPositionExecutor;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.kill_switch.KillSwitchService;
@@ -24,6 +25,8 @@ public class ServiceCommandExecutor {
     private final RefreshPositionExecutor refreshPositionExecutor;
 
     private final RefreshBalanceExecutor refreshBalanceExecutor;
+
+    private final RefreshOrderExecutor refreshOrderExecutor;
 
     private final OrderService orderService;
 
@@ -75,7 +78,7 @@ public class ServiceCommandExecutor {
 
             case REFRESH_BALANCE -> refreshBalanceExecutor.execute(exchange);
 
-            case REFRESH_PENDING_ORDERS -> orderService.refreshPendingOrders(exchange, instrument);
+            case REFRESH_PENDING_ORDERS -> refreshOrderExecutor.execute(exchange, instrument, deal.getId());
 
             case CREATE_ENTRY_ORDER -> orderService.createEntryOrder(deal);
 
