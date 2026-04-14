@@ -148,8 +148,8 @@ public class OrderService {
 
 
     @Transactional
-    public void refreshPendingOrders(Exchange exchange, Instrument instrument) {
-        refreshOrderExecutor.execute(exchange, instrument);
+    public void refreshPendingOrders(Exchange exchange, Instrument instrument, Long dealId) {
+        refreshOrderExecutor.execute(exchange, instrument, dealId);
     }
 
     public void createEntryOrder(Deal deal) {
