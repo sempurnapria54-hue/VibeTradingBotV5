@@ -7,6 +7,7 @@ import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
+import com.example.tradingbot.domain.service.deal.command.refresh.RefreshAlgoOrderExecutor;
 import com.example.tradingbot.exception.TradingCommandException;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
@@ -35,6 +36,7 @@ public class AlgoOrderService {
     private final DealDataService dealDataService;
     private final AlgoOrderMapper algoOrderMapper;
     private final ClientManager clientManager;
+    private final RefreshAlgoOrderExecutor refreshAlgoOrderExecutor;
 
     @Transactional
     public AlgoOrder createAlgoOrder(String dealInternalId, AlgoOrder request) {
@@ -111,7 +113,9 @@ public class AlgoOrderService {
     }
 
     public void refreshActiveAlgoOrders(Deal deal) {
-
+        Instrument instrument = instrumentDataService.findRequiredByDealId(deal.getId());
+        Exchange exchange = exchangeDataService.findRequiredById(instrument.getExchangeId());
+        refreshAlgoOrderExecutor.execute(exchange, instrument);
     }
 
     public void createMainProtection(Deal deal) {
