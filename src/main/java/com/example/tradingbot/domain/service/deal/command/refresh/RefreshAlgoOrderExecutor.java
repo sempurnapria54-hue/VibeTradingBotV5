@@ -1,19 +1,24 @@
 package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.client.service.ClientManager;
+import com.example.tradingbot.client.service.ClientService;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
-import com.example.tradingbot.mapping.AlgoOrderMapper;
+import com.example.tradingbot.domain.service.validator.TradeRuleValidator;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
-import com.example.tradingbot.persistence.service.OrderDataService;
+import com.example.tradingbot.persistence.service.AttachedAlgoOrderDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -22,188 +27,328 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RefreshAlgoOrderExecutor {
 
+    private static final Set<String> DEFAULT_ALGO_TYPES = Set.of("conditional", "oco", "trigger", "move_order_stop");
+    private static final Set<String> LIVE_ALGO_STATUSES = Set.of(AlgoOrder.Status.PENDING.name(), AlgoOrder.Status.ACTIVE.name());
+    private static final Set<String> LIVE_ATTACHED_STATUSES = Set.of(AttachedAlgoOrder.Status.ATTACHED.name(),
+                                                                      AttachedAlgoOrder.Status.ACTIVE.name());
+    private static final Set<String> HISTORY_FINAL_STATUSES = Set.of("effective", "canceled", "order_failed");
+
     private final ClientManager clientManager;
     private final AlgoOrderDataService algoOrderDataService;
-    private final OrderDataService orderDataService;
-    private final AlgoOrderMapper algoOrderMapper;
+    private final AttachedAlgoOrderDataService attachedAlgoOrderDataService;
+    private final TradeRuleValidator tradeRuleValidator;
+    private final AlgoOrderSyncService algoOrderSyncService;
 
     @Transactional
-    public void execute(Exchange exchange, Instrument instrument) {
-        refreshStandaloneAlgoOrders(exchange, instrument);
-        refreshAttachedAlgoOrders(exchange, instrument);
-    }
-
-    private void refreshStandaloneAlgoOrders(Exchange exchange, Instrument instrument) {
-        List<AlgoOrder> liveOrders = algoOrderDataService.findAllByInstrumentIdAndStatuses(
+    public void execute(Exchange exchange, Instrument instrument, Long dealId) {
+        List<AlgoOrder> internalLiveAlgoOrders = algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
+                                                                                                        LIVE_ALGO_STATUSES);
+        List<AttachedAlgoOrder> internalAttachedAlgoOrders = attachedAlgoOrderDataService.findAllByInstrumentIdAndStatuses(
                 instrument.getId(),
-                Set.of(AlgoOrder.Status.PENDING.name(), AlgoOrder.Status.ACTIVE.name())
+                LIVE_ATTACHED_STATUSES
         );
 
-        for (AlgoOrder algoOrder : liveOrders) {
-            AlgoSnapshotResolution resolution = resolveAlgoSnapshot(exchange, instrument, algoOrder);
-            if (resolution == null || resolution.snapshot() == null) {
+        List<AlgoOrderExternalSnapshot> externalLiveSnapshots = readExternalLiveSnapshots(exchange,
+                                                                                           instrument,
+                                                                                           internalLiveAlgoOrders,
+                                                                                           internalAttachedAlgoOrders);
+
+        tradeRuleValidator.validateRefreshAlgoOrders(exchange,
+                                                     instrument,
+                                                     dealId,
+                                                     externalLiveSnapshots,
+                                                     internalLiveAlgoOrders,
+                                                     internalAttachedAlgoOrders);
+
+        Map<String, MatchedLocalEntity> localIndex = buildLocalIndex(internalLiveAlgoOrders, internalAttachedAlgoOrders);
+        Set<String> matchedKeys = syncMatchedLiveSnapshots(externalLiveSnapshots, localIndex);
+        finalizeMissingLiveEntities(exchange, instrument, localIndex, matchedKeys);
+    }
+
+    private List<AlgoOrderExternalSnapshot> readExternalLiveSnapshots(Exchange exchange,
+                                                                      Instrument instrument,
+                                                                      List<AlgoOrder> internalLiveAlgoOrders,
+                                                                      List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
+        ClientService clientService = clientManager.getClientService(exchange.getName());
+        Set<String> ordTypes = resolveOrdTypes(internalLiveAlgoOrders, internalAttachedAlgoOrders);
+
+        Map<String, AlgoOrderExternalSnapshot> deduplicated = new LinkedHashMap<>();
+        for (String ordType : ordTypes) {
+            AlgoOrder probe = new AlgoOrder();
+            probe.setExternalType(ordType);
+
+            List<AlgoOrderExternalSnapshot> snapshots = clientService.getActiveAlgoOrders(instrument, probe);
+            for (AlgoOrderExternalSnapshot snapshot : safeExternalSnapshots(snapshots)) {
+                deduplicated.putIfAbsent(externalSnapshotKey(snapshot), snapshot);
+            }
+        }
+
+        return new ArrayList<>(deduplicated.values());
+    }
+
+    private Set<String> resolveOrdTypes(List<AlgoOrder> internalLiveAlgoOrders,
+                                        List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
+        Set<String> ordTypes = new LinkedHashSet<>(DEFAULT_ALGO_TYPES);
+
+        for (AlgoOrder algoOrder : safeAlgoOrders(internalLiveAlgoOrders)) {
+            if (algoOrder.getExternalType() != null && !algoOrder.getExternalType().isBlank()) {
+                ordTypes.add(algoOrder.getExternalType());
+            }
+        }
+
+        for (AttachedAlgoOrder attachedAlgoOrder : safeAttachedOrders(internalAttachedAlgoOrders)) {
+            if (attachedAlgoOrder.getExternalType() != null && !attachedAlgoOrder.getExternalType().isBlank()) {
+                ordTypes.add(attachedAlgoOrder.getExternalType());
+            }
+        }
+
+        return ordTypes;
+    }
+
+    private Set<String> syncMatchedLiveSnapshots(List<AlgoOrderExternalSnapshot> externalLiveSnapshots,
+                                                 Map<String, MatchedLocalEntity> localIndex) {
+        Set<String> matchedKeys = new LinkedHashSet<>();
+
+        for (AlgoOrderExternalSnapshot external : safeExternalSnapshots(externalLiveSnapshots)) {
+            Optional<Map.Entry<String, MatchedLocalEntity>> matched = findMatchedLocal(localIndex, external);
+            if (matched.isEmpty()) {
                 continue;
             }
-            AlgoOrderExternalSnapshot snapshot = resolution.snapshot();
-            algoOrderMapper.updateDomainFromExternalSnapshot(snapshot, algoOrder);
-            algoOrder.setStatus(resolveAlgoStatus(snapshot.getExternalStatus()));
-            algoOrderDataService.save(algoOrder);
+
+            matchedKeys.add(matched.get().getKey());
+            MatchedLocalEntity entity = matched.get().getValue();
+            entity.applyLive(external);
+        }
+
+        return matchedKeys;
+    }
+
+    private void finalizeMissingLiveEntities(Exchange exchange,
+                                             Instrument instrument,
+                                             Map<String, MatchedLocalEntity> localIndex,
+                                             Set<String> matchedKeys) {
+        for (Map.Entry<String, MatchedLocalEntity> entry : localIndex.entrySet()) {
+            if (matchedKeys.contains(entry.getKey())) {
+                continue;
+            }
+
+            MatchedLocalEntity entity = entry.getValue();
+            AlgoOrderExternalSnapshot detail = tryReadDetail(exchange, entity.probe());
+            if (detail != null) {
+                entity.applyFinal(detail);
+                continue;
+            }
+
+            AlgoOrderExternalSnapshot history = tryReadHistory(exchange, instrument, entity.probe());
+            if (history != null) {
+                entity.applyFinal(history);
+                continue;
+            }
+
+            throw new IllegalStateException("Unresolved algo state for local entity: " + entity.debugId());
         }
     }
 
-    private void refreshAttachedAlgoOrders(Exchange exchange, Instrument instrument) {
-        orderDataService.findByInstrumentId(instrument.getId())
-                        .forEach(order -> {
-                            if (order.getAttachedAlgoOrders() == null) {
-                                return;
-                            }
-                            order.getAttachedAlgoOrders()
-                                 .stream()
-                                 .filter(this::requiresAlgoRefresh)
-                                 .forEach(attached -> refreshAttached(exchange,
-                                                                      instrument,
-                                                                      order,
-                                                                      attached));
-                        });
-    }
-
-    private boolean requiresAlgoRefresh(AttachedAlgoOrder attached) {
-        return attached.getStatus() == AttachedAlgoOrder.Status.ATTACHED
-                || attached.getStatus() == AttachedAlgoOrder.Status.ACTIVE;
-    }
-
-    private void refreshAttached(Exchange exchange,
-                                 Instrument instrument,
-                                 com.example.tradingbot.domain.model.order.Order order,
-                                 AttachedAlgoOrder attached) {
-        AlgoOrder probe = new AlgoOrder();
-        probe.setInternalId(attached.getInternalId());
-        probe.setExternalId(attached.getExternalId());
-        probe.setExternalType(attached.getExternalType());
-        probe.setExternalStatus(attached.getExternalStatus());
-
-        AlgoSnapshotResolution resolution = resolveAlgoSnapshot(exchange, instrument, probe);
-        if (resolution == null || resolution.snapshot() == null) {
-            return;
-        }
-        AlgoOrderExternalSnapshot snapshot = resolution.snapshot();
-
-        attached.setExternalId(firstNonBlank(attached.getExternalId(), snapshot.getExternalId()));
-        attached.setExternalType(firstNonBlank(attached.getExternalType(), snapshot.getExternalType()));
-        attached.setExternalStatus(snapshot.getExternalStatus());
-
-        AttachedAlgoOrder.Status before = attached.getStatus();
-        applyAttachedStatusTransition(attached, resolution);
-        if (before != attached.getStatus()) {
-            orderDataService.save(order);
-        }
-    }
-
-    private AlgoSnapshotResolution resolveAlgoSnapshot(Exchange exchange, Instrument instrument, AlgoOrder algoOrder) {
-        AlgoOrderExternalSnapshot detail = tryGetAlgoDetail(exchange, algoOrder);
-        if (detail != null) {
-            return new AlgoSnapshotResolution(detail, AlgoSnapshotSource.DETAIL);
-        }
-
-        List<AlgoOrderExternalSnapshot> pending = clientManager.getClientService(exchange.getName())
-                                                               .getActiveAlgoOrders(instrument, algoOrder);
-        Optional<AlgoOrderExternalSnapshot> fromPending = findMatching(pending, algoOrder);
-        if (fromPending.isPresent()) {
-            return new AlgoSnapshotResolution(fromPending.get(), AlgoSnapshotSource.PENDING);
-        }
-
-        List<AlgoOrderExternalSnapshot> history = clientManager.getClientService(exchange.getName())
-                                                               .getAlgoOrdersHistory(instrument, algoOrder);
-        return findMatching(history, algoOrder)
-                .map(snapshot -> new AlgoSnapshotResolution(snapshot, AlgoSnapshotSource.HISTORY))
-                .orElse(null);
-    }
-
-    private AlgoOrderExternalSnapshot tryGetAlgoDetail(Exchange exchange, AlgoOrder algoOrder) {
+    private AlgoOrderExternalSnapshot tryReadDetail(Exchange exchange, AlgoOrder probe) {
         try {
-            return clientManager.getClientService(exchange.getName()).getAlgoOrder(algoOrder);
+            return clientManager.getClientService(exchange.getName()).getAlgoOrder(probe);
         } catch (RuntimeException exception) {
             return null;
         }
     }
 
-    private Optional<AlgoOrderExternalSnapshot> findMatching(List<AlgoOrderExternalSnapshot> snapshots, AlgoOrder algoOrder) {
-        if (snapshots == null) {
-            return Optional.empty();
+    private AlgoOrderExternalSnapshot tryReadHistory(Exchange exchange, Instrument instrument, AlgoOrder probe) {
+        ClientService clientService = clientManager.getClientService(exchange.getName());
+        for (String status : HISTORY_FINAL_STATUSES) {
+            AlgoOrder historyProbe = copyProbe(probe);
+            historyProbe.setExternalStatus(status);
+
+            List<AlgoOrderExternalSnapshot> historySnapshots = clientService.getAlgoOrdersHistory(instrument, historyProbe);
+            Optional<AlgoOrderExternalSnapshot> matched = findMatch(historySnapshots, probe);
+            if (matched.isPresent()) {
+                return matched.get();
+            }
         }
-        return snapshots.stream()
-                        .filter(snapshot -> Objects.equals(snapshot.getExternalId(), algoOrder.getExternalId())
-                                || (algoOrder.getExternalId() == null && snapshot.getExternalType() != null))
-                        .findFirst();
+        return null;
     }
 
-    private AlgoOrder.Status resolveAlgoStatus(String externalStatus) {
-        if (externalStatus == null) {
-            return AlgoOrder.Status.PENDING;
-        }
-        String normalized = externalStatus.toLowerCase();
-        return switch (normalized) {
-            case "live", "pause" -> AlgoOrder.Status.ACTIVE;
-            case "effective", "canceled" -> AlgoOrder.Status.CLOSED;
-            case "order_failed" -> AlgoOrder.Status.FAILED;
-            default -> AlgoOrder.Status.PENDING;
-        };
+    private Optional<AlgoOrderExternalSnapshot> findMatch(List<AlgoOrderExternalSnapshot> snapshots, AlgoOrder probe) {
+        return safeExternalSnapshots(snapshots).stream()
+                                               .filter(snapshot -> Objects.equals(snapshot.getExternalId(),
+                                                                                  probe.getExternalId())
+                                                       || Objects.equals(snapshot.getInternalId(), probe.getInternalId()))
+                                               .findFirst();
     }
 
-    private void applyAttachedStatusTransition(AttachedAlgoOrder attached,
-                                               AlgoSnapshotResolution resolution) {
-        String normalizedStatus = normalizeStatus(resolution.snapshot().getExternalStatus());
-        if (normalizedStatus == null) {
-            return;
-        }
+    private Map<String, MatchedLocalEntity> buildLocalIndex(List<AlgoOrder> algoOrders,
+                                                             List<AttachedAlgoOrder> attachedAlgoOrders) {
+        Map<String, MatchedLocalEntity> result = new LinkedHashMap<>();
 
-        if (isLiveStatus(normalizedStatus)) {
-            attached.toActive();
-            return;
+        for (AlgoOrder algoOrder : safeAlgoOrders(algoOrders)) {
+            result.put(localEntityKey(algoOrder), MatchedLocalEntity.forAlgoOrder(algoOrder,
+                                                                                   algoOrderDataService,
+                                                                                   algoOrderSyncService));
         }
 
-        if (resolution.source() == AlgoSnapshotSource.HISTORY && isClosedStatus(normalizedStatus)) {
-            attached.toClose();
-            return;
+        for (AttachedAlgoOrder attachedAlgoOrder : safeAttachedOrders(attachedAlgoOrders)) {
+            result.put(localEntityKey(attachedAlgoOrder),
+                       MatchedLocalEntity.forAttachedAlgoOrder(attachedAlgoOrder,
+                                                               attachedAlgoOrderDataService,
+                                                               algoOrderSyncService));
         }
 
-        if (resolution.source() == AlgoSnapshotSource.HISTORY && isFailedStatus(normalizedStatus)) {
-            attached.toFail();
+        return result;
+    }
+
+    private Optional<Map.Entry<String, MatchedLocalEntity>> findMatchedLocal(Map<String, MatchedLocalEntity> localIndex,
+                                                                              AlgoOrderExternalSnapshot external) {
+        return localIndex.entrySet()
+                         .stream()
+                         .filter(entry -> entry.getValue().matches(external))
+                         .findFirst();
+    }
+
+    private String externalSnapshotKey(AlgoOrderExternalSnapshot snapshot) {
+        return "ext=" + safe(snapshot.getExternalId()) + "|int=" + safe(snapshot.getInternalId()) + "|type=" + safe(
+                snapshot.getExternalType());
+    }
+
+    private String localEntityKey(AlgoOrder algoOrder) {
+        return "algo|ext=" + safe(algoOrder.getExternalId()) + "|int=" + safe(algoOrder.getInternalId());
+    }
+
+    private String localEntityKey(AttachedAlgoOrder attachedAlgoOrder) {
+        return "attached|extAtt=" + safe(attachedAlgoOrder.getExternalAttachedId())
+                + "|ext=" + safe(attachedAlgoOrder.getExternalId())
+                + "|int=" + safe(attachedAlgoOrder.getInternalId());
+    }
+
+    private AlgoOrder copyProbe(AlgoOrder source) {
+        AlgoOrder copy = new AlgoOrder();
+        copy.setInternalId(source.getInternalId());
+        copy.setExternalId(source.getExternalId());
+        copy.setExternalType(source.getExternalType());
+        copy.setExternalStatus(source.getExternalStatus());
+        return copy;
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
+    }
+
+    private List<AlgoOrderExternalSnapshot> safeExternalSnapshots(List<AlgoOrderExternalSnapshot> snapshots) {
+        return snapshots == null ? List.of() : snapshots;
+    }
+
+    private List<AlgoOrder> safeAlgoOrders(List<AlgoOrder> orders) {
+        return orders == null ? List.of() : orders;
+    }
+
+    private List<AttachedAlgoOrder> safeAttachedOrders(List<AttachedAlgoOrder> orders) {
+        return orders == null ? List.of() : orders;
+    }
+
+    private record MatchedLocalEntity(EntityType type,
+                                      AlgoOrder algoOrder,
+                                      AttachedAlgoOrder attachedAlgoOrder,
+                                      AlgoOrderDataService algoOrderDataService,
+                                      AttachedAlgoOrderDataService attachedAlgoOrderDataService,
+                                      AlgoOrderSyncService algoOrderSyncService) {
+
+        static MatchedLocalEntity forAlgoOrder(AlgoOrder algoOrder,
+                                               AlgoOrderDataService algoOrderDataService,
+                                               AlgoOrderSyncService algoOrderSyncService) {
+            return new MatchedLocalEntity(EntityType.ALGO,
+                                          algoOrder,
+                                          null,
+                                          algoOrderDataService,
+                                          null,
+                                          algoOrderSyncService);
+        }
+
+        static MatchedLocalEntity forAttachedAlgoOrder(AttachedAlgoOrder attachedAlgoOrder,
+                                                       AttachedAlgoOrderDataService attachedAlgoOrderDataService,
+                                                       AlgoOrderSyncService algoOrderSyncService) {
+            return new MatchedLocalEntity(EntityType.ATTACHED,
+                                          null,
+                                          attachedAlgoOrder,
+                                          null,
+                                          attachedAlgoOrderDataService,
+                                          algoOrderSyncService);
+        }
+
+        boolean matches(AlgoOrderExternalSnapshot external) {
+            if (type == EntityType.ALGO) {
+                if (Objects.equals(algoOrder.getExternalId(), external.getExternalId())
+                        && algoOrder.getExternalId() != null) {
+                    return true;
+                }
+                return Objects.equals(algoOrder.getInternalId(), external.getInternalId())
+                        && algoOrder.getInternalId() != null;
+            }
+
+            if (Objects.equals(attachedAlgoOrder.getExternalId(), external.getExternalId())
+                    && attachedAlgoOrder.getExternalId() != null) {
+                return true;
+            }
+            if (Objects.equals(attachedAlgoOrder.getInternalId(), external.getInternalId())
+                    && attachedAlgoOrder.getInternalId() != null) {
+                return true;
+            }
+            return Objects.equals(attachedAlgoOrder.getExternalAttachedId(), external.getExternalId())
+                    && attachedAlgoOrder.getExternalAttachedId() != null;
+        }
+
+        void applyLive(AlgoOrderExternalSnapshot snapshot) {
+            if (type == EntityType.ALGO) {
+                algoOrderSyncService.applyLiveSnapshot(algoOrder, snapshot);
+                algoOrderDataService.save(algoOrder);
+                return;
+            }
+            algoOrderSyncService.applyLiveSnapshot(attachedAlgoOrder, snapshot);
+            attachedAlgoOrderDataService.save(attachedAlgoOrder);
+        }
+
+        void applyFinal(AlgoOrderExternalSnapshot snapshot) {
+            if (type == EntityType.ALGO) {
+                algoOrderSyncService.applySnapshot(algoOrder, snapshot);
+                algoOrderDataService.save(algoOrder);
+                return;
+            }
+            algoOrderSyncService.applyFinalSnapshot(attachedAlgoOrder, snapshot);
+            attachedAlgoOrderDataService.save(attachedAlgoOrder);
+        }
+
+        AlgoOrder probe() {
+            AlgoOrder probe = new AlgoOrder();
+            if (type == EntityType.ALGO) {
+                probe.setExternalId(algoOrder.getExternalId());
+                probe.setInternalId(algoOrder.getInternalId());
+                probe.setExternalType(algoOrder.getExternalType());
+                return probe;
+            }
+
+            probe.setExternalId(attachedAlgoOrder.getExternalId());
+            probe.setInternalId(attachedAlgoOrder.getInternalId());
+            probe.setExternalType(attachedAlgoOrder.getExternalType());
+            return probe;
+        }
+
+        String debugId() {
+            if (type == EntityType.ALGO) {
+                return safe(algoOrder.getInternalId()) + "/" + safe(algoOrder.getExternalId());
+            }
+            return safe(attachedAlgoOrder.getInternalId()) + "/" + safe(attachedAlgoOrder.getExternalId()) + "/"
+                    + safe(attachedAlgoOrder.getExternalAttachedId());
+        }
+
+        private String safe(String value) {
+            return value == null ? "" : value;
         }
     }
 
-    private boolean isLiveStatus(String normalizedStatus) {
-        return "live".equals(normalizedStatus) || "pause".equals(normalizedStatus);
-    }
-
-    private boolean isClosedStatus(String normalizedStatus) {
-        return "effective".equals(normalizedStatus) || "canceled".equals(normalizedStatus);
-    }
-
-    private boolean isFailedStatus(String normalizedStatus) {
-        return "order_failed".equals(normalizedStatus) || "failed".equals(normalizedStatus);
-    }
-
-    private String normalizeStatus(String externalStatus) {
-        if (externalStatus == null || externalStatus.isBlank()) {
-            return null;
-        }
-        return externalStatus.toLowerCase();
-    }
-
-    private String firstNonBlank(String current, String candidate) {
-        if (current != null && !current.isBlank()) {
-            return current;
-        }
-        return candidate;
-    }
-
-    private record AlgoSnapshotResolution(AlgoOrderExternalSnapshot snapshot, AlgoSnapshotSource source) {
-    }
-
-    private enum AlgoSnapshotSource {
-        DETAIL,
-        PENDING,
-        HISTORY
+    private enum EntityType {
+        ALGO,
+        ATTACHED
     }
 }

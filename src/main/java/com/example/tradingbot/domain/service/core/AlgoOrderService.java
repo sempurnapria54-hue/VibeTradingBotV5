@@ -115,7 +115,7 @@ public class AlgoOrderService {
     public void refreshActiveAlgoOrders(Deal deal) {
         Instrument instrument = instrumentDataService.findRequiredByDealId(deal.getId());
         Exchange exchange = exchangeDataService.findRequiredById(instrument.getExchangeId());
-        refreshAlgoOrderExecutor.execute(exchange, instrument);
+        refreshAlgoOrderExecutor.execute(exchange, instrument, deal.getId());
     }
 
     public void createMainProtection(Deal deal) {
