@@ -91,4 +91,57 @@ public class AttachedAlgoOrder extends Auditable {
          */
         FAILED
     }
+
+    public boolean isActiveLike() {
+        return status == Status.ATTACHED || status == Status.ACTIVE;
+    }
+
+    public boolean isTerminal() {
+        return status == Status.CLOSED || status == Status.FAILED;
+    }
+
+    public boolean canTransitionTo(Status targetStatus) {
+        if (targetStatus == null) {
+            return false;
+        }
+        if (status == targetStatus) {
+            return true;
+        }
+        if (status == null) {
+            return targetStatus == Status.CREATED
+                    || targetStatus == Status.ATTACHED
+                    || targetStatus == Status.FAILED;
+        }
+
+        return switch (status) {
+            case CREATED -> targetStatus == Status.ATTACHED || targetStatus == Status.FAILED;
+            case ATTACHED -> targetStatus == Status.ACTIVE
+                    || targetStatus == Status.CLOSED
+                    || targetStatus == Status.FAILED;
+            case ACTIVE -> targetStatus == Status.CLOSED || targetStatus == Status.FAILED;
+            case CLOSED, FAILED -> false;
+        };
+    }
+
+    public void toAttached() {
+        transitionTo(Status.ATTACHED);
+    }
+
+    public void toActive() {
+        transitionTo(Status.ACTIVE);
+    }
+
+    public void toClose() {
+        transitionTo(Status.CLOSED);
+    }
+
+    public void toFail() {
+        transitionTo(Status.FAILED);
+    }
+
+    private void transitionTo(Status targetStatus) {
+        if (canTransitionTo(targetStatus)) {
+            this.status = targetStatus;
+        }
+    }
 }

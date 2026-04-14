@@ -40,10 +40,11 @@ public class RefreshAlgoOrderExecutor {
         );
 
         for (AlgoOrder algoOrder : liveOrders) {
-            AlgoOrderExternalSnapshot snapshot = resolveAlgoSnapshot(exchange, instrument, algoOrder);
-            if (snapshot == null) {
+            AlgoSnapshotResolution resolution = resolveAlgoSnapshot(exchange, instrument, algoOrder);
+            if (resolution == null || resolution.snapshot() == null) {
                 continue;
             }
+            AlgoOrderExternalSnapshot snapshot = resolution.snapshot();
             algoOrderMapper.updateDomainFromExternalSnapshot(snapshot, algoOrder);
             algoOrder.setStatus(resolveAlgoStatus(snapshot.getExternalStatus()));
             algoOrderDataService.save(algoOrder);
@@ -81,34 +82,41 @@ public class RefreshAlgoOrderExecutor {
         probe.setExternalType(attached.getExternalType());
         probe.setExternalStatus(attached.getExternalStatus());
 
-        AlgoOrderExternalSnapshot snapshot = resolveAlgoSnapshot(exchange, instrument, probe);
-        if (snapshot == null) {
+        AlgoSnapshotResolution resolution = resolveAlgoSnapshot(exchange, instrument, probe);
+        if (resolution == null || resolution.snapshot() == null) {
             return;
         }
+        AlgoOrderExternalSnapshot snapshot = resolution.snapshot();
 
         attached.setExternalId(firstNonBlank(attached.getExternalId(), snapshot.getExternalId()));
         attached.setExternalType(firstNonBlank(attached.getExternalType(), snapshot.getExternalType()));
         attached.setExternalStatus(snapshot.getExternalStatus());
-        attached.setStatus(resolveAttachedStatus(snapshot.getExternalStatus()));
-        orderDataService.save(order);
+
+        AttachedAlgoOrder.Status before = attached.getStatus();
+        applyAttachedStatusTransition(attached, resolution);
+        if (before != attached.getStatus()) {
+            orderDataService.save(order);
+        }
     }
 
-    private AlgoOrderExternalSnapshot resolveAlgoSnapshot(Exchange exchange, Instrument instrument, AlgoOrder algoOrder) {
+    private AlgoSnapshotResolution resolveAlgoSnapshot(Exchange exchange, Instrument instrument, AlgoOrder algoOrder) {
         AlgoOrderExternalSnapshot detail = tryGetAlgoDetail(exchange, algoOrder);
         if (detail != null) {
-            return detail;
+            return new AlgoSnapshotResolution(detail, AlgoSnapshotSource.DETAIL);
         }
 
         List<AlgoOrderExternalSnapshot> pending = clientManager.getClientService(exchange.getName())
                                                                .getActiveAlgoOrders(instrument, algoOrder);
         Optional<AlgoOrderExternalSnapshot> fromPending = findMatching(pending, algoOrder);
         if (fromPending.isPresent()) {
-            return fromPending.get();
+            return new AlgoSnapshotResolution(fromPending.get(), AlgoSnapshotSource.PENDING);
         }
 
         List<AlgoOrderExternalSnapshot> history = clientManager.getClientService(exchange.getName())
                                                                .getAlgoOrdersHistory(instrument, algoOrder);
-        return findMatching(history, algoOrder).orElse(null);
+        return findMatching(history, algoOrder)
+                .map(snapshot -> new AlgoSnapshotResolution(snapshot, AlgoSnapshotSource.HISTORY))
+                .orElse(null);
     }
 
     private AlgoOrderExternalSnapshot tryGetAlgoDetail(Exchange exchange, AlgoOrder algoOrder) {
@@ -142,17 +150,45 @@ public class RefreshAlgoOrderExecutor {
         };
     }
 
-    private AttachedAlgoOrder.Status resolveAttachedStatus(String externalStatus) {
-        if (externalStatus == null) {
-            return AttachedAlgoOrder.Status.ATTACHED;
+    private void applyAttachedStatusTransition(AttachedAlgoOrder attached,
+                                               AlgoSnapshotResolution resolution) {
+        String normalizedStatus = normalizeStatus(resolution.snapshot().getExternalStatus());
+        if (normalizedStatus == null) {
+            return;
         }
-        String normalized = externalStatus.toLowerCase();
-        return switch (normalized) {
-            case "live", "pause" -> AttachedAlgoOrder.Status.ACTIVE;
-            case "effective", "canceled" -> AttachedAlgoOrder.Status.CLOSED;
-            case "order_failed" -> AttachedAlgoOrder.Status.FAILED;
-            default -> AttachedAlgoOrder.Status.ATTACHED;
-        };
+
+        if (isLiveStatus(normalizedStatus)) {
+            attached.toActive();
+            return;
+        }
+
+        if (resolution.source() == AlgoSnapshotSource.HISTORY && isClosedStatus(normalizedStatus)) {
+            attached.toClose();
+            return;
+        }
+
+        if (resolution.source() == AlgoSnapshotSource.HISTORY && isFailedStatus(normalizedStatus)) {
+            attached.toFail();
+        }
+    }
+
+    private boolean isLiveStatus(String normalizedStatus) {
+        return "live".equals(normalizedStatus) || "pause".equals(normalizedStatus);
+    }
+
+    private boolean isClosedStatus(String normalizedStatus) {
+        return "effective".equals(normalizedStatus) || "canceled".equals(normalizedStatus);
+    }
+
+    private boolean isFailedStatus(String normalizedStatus) {
+        return "order_failed".equals(normalizedStatus) || "failed".equals(normalizedStatus);
+    }
+
+    private String normalizeStatus(String externalStatus) {
+        if (externalStatus == null || externalStatus.isBlank()) {
+            return null;
+        }
+        return externalStatus.toLowerCase();
     }
 
     private String firstNonBlank(String current, String candidate) {
@@ -160,5 +196,14 @@ public class RefreshAlgoOrderExecutor {
             return current;
         }
         return candidate;
+    }
+
+    private record AlgoSnapshotResolution(AlgoOrderExternalSnapshot snapshot, AlgoSnapshotSource source) {
+    }
+
+    private enum AlgoSnapshotSource {
+        DETAIL,
+        PENDING,
+        HISTORY
     }
 }
