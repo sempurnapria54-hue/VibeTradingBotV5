@@ -6,6 +6,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
+import static io.micrometer.common.util.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 @Getter
@@ -138,5 +139,9 @@ public class AlgoOrder extends Auditable {
     public void toClose(CloseReason reason) {
         setStatus(Status.CLOSED);
         setCloseReason(reason);
+    }
+
+    public boolean hasExternalType() {
+        return isNotBlank(externalType);
     }
 }

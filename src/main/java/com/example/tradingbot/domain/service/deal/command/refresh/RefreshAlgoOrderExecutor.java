@@ -23,14 +23,17 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.example.tradingbot.util.CollectionUtils.emptyIfNull;
+
 @Service
 @RequiredArgsConstructor
 public class RefreshAlgoOrderExecutor {
 
     private static final Set<String> DEFAULT_ALGO_TYPES = Set.of("conditional", "oco", "trigger", "move_order_stop");
-    private static final Set<String> LIVE_ALGO_STATUSES = Set.of(AlgoOrder.Status.PENDING.name(), AlgoOrder.Status.ACTIVE.name());
+    private static final Set<String> LIVE_ALGO_STATUSES = Set.of(AlgoOrder.Status.PENDING.name(),
+                                                                 AlgoOrder.Status.ACTIVE.name());
     private static final Set<String> LIVE_ATTACHED_STATUSES = Set.of(AttachedAlgoOrder.Status.ATTACHED.name(),
-                                                                      AttachedAlgoOrder.Status.ACTIVE.name());
+                                                                     AttachedAlgoOrder.Status.ACTIVE.name());
     private static final Set<String> HISTORY_FINAL_STATUSES = Set.of("effective", "canceled", "order_failed");
 
     private final ClientManager clientManager;
@@ -41,17 +44,18 @@ public class RefreshAlgoOrderExecutor {
 
     @Transactional
     public void execute(Exchange exchange, Instrument instrument, Long dealId) {
-        List<AlgoOrder> internalLiveAlgoOrders = algoOrderDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                                                        LIVE_ALGO_STATUSES);
+        List<AlgoOrder> internalLiveAlgoOrders = algoOrderDataService.findAllByInstrumentIdAndStatuses(
+                instrument.getId(),
+                LIVE_ALGO_STATUSES);
         List<AttachedAlgoOrder> internalAttachedAlgoOrders = attachedAlgoOrderDataService.findAllByInstrumentIdAndStatuses(
                 instrument.getId(),
                 LIVE_ATTACHED_STATUSES
         );
 
         List<AlgoOrderExternalSnapshot> externalLiveSnapshots = readExternalLiveSnapshots(exchange,
-                                                                                           instrument,
-                                                                                           internalLiveAlgoOrders,
-                                                                                           internalAttachedAlgoOrders);
+                                                                                          instrument,
+                                                                                          internalLiveAlgoOrders,
+                                                                                          internalAttachedAlgoOrders);
 
         tradeRuleValidator.validateRefreshAlgoOrders(exchange,
                                                      instrument,
@@ -60,7 +64,8 @@ public class RefreshAlgoOrderExecutor {
                                                      internalLiveAlgoOrders,
                                                      internalAttachedAlgoOrders);
 
-        Map<String, MatchedLocalEntity> localIndex = buildLocalIndex(internalLiveAlgoOrders, internalAttachedAlgoOrders);
+        Map<String, MatchedLocalEntity> localIndex = buildLocalIndex(internalLiveAlgoOrders,
+                                                                     internalAttachedAlgoOrders);
         Set<String> matchedKeys = syncMatchedLiveSnapshots(externalLiveSnapshots, localIndex);
         finalizeMissingLiveEntities(exchange, instrument, localIndex, matchedKeys);
     }
@@ -78,7 +83,7 @@ public class RefreshAlgoOrderExecutor {
             probe.setExternalType(ordType);
 
             List<AlgoOrderExternalSnapshot> snapshots = clientService.getActiveAlgoOrders(instrument, probe);
-            for (AlgoOrderExternalSnapshot snapshot : safeExternalSnapshots(snapshots)) {
+            for (AlgoOrderExternalSnapshot snapshot : emptyIfNull(snapshots)) {
                 deduplicated.putIfAbsent(externalSnapshotKey(snapshot), snapshot);
             }
         }
@@ -90,14 +95,14 @@ public class RefreshAlgoOrderExecutor {
                                         List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
         Set<String> ordTypes = new LinkedHashSet<>(DEFAULT_ALGO_TYPES);
 
-        for (AlgoOrder algoOrder : safeAlgoOrders(internalLiveAlgoOrders)) {
-            if (algoOrder.getExternalType() != null && !algoOrder.getExternalType().isBlank()) {
+        for (AlgoOrder algoOrder : emptyIfNull(internalLiveAlgoOrders)) {
+            if (algoOrder.hasExternalType()) {
                 ordTypes.add(algoOrder.getExternalType());
             }
         }
 
-        for (AttachedAlgoOrder attachedAlgoOrder : safeAttachedOrders(internalAttachedAlgoOrders)) {
-            if (attachedAlgoOrder.getExternalType() != null && !attachedAlgoOrder.getExternalType().isBlank()) {
+        for (AttachedAlgoOrder attachedAlgoOrder : emptyIfNull(internalAttachedAlgoOrders)) {
+            if (attachedAlgoOrder.hasExternalType()) {
                 ordTypes.add(attachedAlgoOrder.getExternalType());
             }
         }
@@ -109,14 +114,16 @@ public class RefreshAlgoOrderExecutor {
                                                  Map<String, MatchedLocalEntity> localIndex) {
         Set<String> matchedKeys = new LinkedHashSet<>();
 
-        for (AlgoOrderExternalSnapshot external : safeExternalSnapshots(externalLiveSnapshots)) {
+        for (AlgoOrderExternalSnapshot external : emptyIfNull(externalLiveSnapshots)) {
             Optional<Map.Entry<String, MatchedLocalEntity>> matched = findMatchedLocal(localIndex, external);
             if (matched.isEmpty()) {
                 continue;
             }
 
-            matchedKeys.add(matched.get().getKey());
-            MatchedLocalEntity entity = matched.get().getValue();
+            matchedKeys.add(matched.get()
+                                   .getKey());
+            MatchedLocalEntity entity = matched.get()
+                                               .getValue();
             entity.applyLive(external);
         }
 
@@ -151,7 +158,8 @@ public class RefreshAlgoOrderExecutor {
 
     private AlgoOrderExternalSnapshot tryReadDetail(Exchange exchange, AlgoOrder probe) {
         try {
-            return clientManager.getClientService(exchange.getName()).getAlgoOrder(probe);
+            return clientManager.getClientService(exchange.getName())
+                                .getAlgoOrder(probe);
         } catch (RuntimeException exception) {
             return null;
         }
@@ -163,7 +171,8 @@ public class RefreshAlgoOrderExecutor {
             AlgoOrder historyProbe = copyProbe(probe);
             historyProbe.setExternalStatus(status);
 
-            List<AlgoOrderExternalSnapshot> historySnapshots = clientService.getAlgoOrdersHistory(instrument, historyProbe);
+            List<AlgoOrderExternalSnapshot> historySnapshots = clientService.getAlgoOrdersHistory(instrument,
+                                                                                                  historyProbe);
             Optional<AlgoOrderExternalSnapshot> matched = findMatch(historySnapshots, probe);
             if (matched.isPresent()) {
                 return matched.get();
@@ -173,24 +182,26 @@ public class RefreshAlgoOrderExecutor {
     }
 
     private Optional<AlgoOrderExternalSnapshot> findMatch(List<AlgoOrderExternalSnapshot> snapshots, AlgoOrder probe) {
-        return safeExternalSnapshots(snapshots).stream()
-                                               .filter(snapshot -> Objects.equals(snapshot.getExternalId(),
-                                                                                  probe.getExternalId())
-                                                       || Objects.equals(snapshot.getInternalId(), probe.getInternalId()))
-                                               .findFirst();
+        return emptyIfNull(snapshots).stream()
+                                     .filter(snapshot ->
+                                                     Objects.equals(snapshot.getExternalId(), probe.getExternalId())
+                                                             || Objects.equals(snapshot.getInternalId(),
+                                                                               probe.getInternalId())
+                                     )
+                                     .findFirst();
     }
 
     private Map<String, MatchedLocalEntity> buildLocalIndex(List<AlgoOrder> algoOrders,
-                                                             List<AttachedAlgoOrder> attachedAlgoOrders) {
+                                                            List<AttachedAlgoOrder> attachedAlgoOrders) {
         Map<String, MatchedLocalEntity> result = new LinkedHashMap<>();
 
-        for (AlgoOrder algoOrder : safeAlgoOrders(algoOrders)) {
+        for (AlgoOrder algoOrder : emptyIfNull(algoOrders)) {
             result.put(localEntityKey(algoOrder), MatchedLocalEntity.forAlgoOrder(algoOrder,
-                                                                                   algoOrderDataService,
-                                                                                   algoOrderSyncService));
+                                                                                  algoOrderDataService,
+                                                                                  algoOrderSyncService));
         }
 
-        for (AttachedAlgoOrder attachedAlgoOrder : safeAttachedOrders(attachedAlgoOrders)) {
+        for (AttachedAlgoOrder attachedAlgoOrder : emptyIfNull(attachedAlgoOrders)) {
             result.put(localEntityKey(attachedAlgoOrder),
                        MatchedLocalEntity.forAttachedAlgoOrder(attachedAlgoOrder,
                                                                attachedAlgoOrderDataService,
@@ -201,10 +212,11 @@ public class RefreshAlgoOrderExecutor {
     }
 
     private Optional<Map.Entry<String, MatchedLocalEntity>> findMatchedLocal(Map<String, MatchedLocalEntity> localIndex,
-                                                                              AlgoOrderExternalSnapshot external) {
+                                                                             AlgoOrderExternalSnapshot external) {
         return localIndex.entrySet()
                          .stream()
-                         .filter(entry -> entry.getValue().matches(external))
+                         .filter(entry -> entry.getValue()
+                                               .matches(external))
                          .findFirst();
     }
 
@@ -234,18 +246,6 @@ public class RefreshAlgoOrderExecutor {
 
     private String safe(String value) {
         return value == null ? "" : value;
-    }
-
-    private List<AlgoOrderExternalSnapshot> safeExternalSnapshots(List<AlgoOrderExternalSnapshot> snapshots) {
-        return snapshots == null ? List.of() : snapshots;
-    }
-
-    private List<AlgoOrder> safeAlgoOrders(List<AlgoOrder> orders) {
-        return orders == null ? List.of() : orders;
-    }
-
-    private List<AttachedAlgoOrder> safeAttachedOrders(List<AttachedAlgoOrder> orders) {
-        return orders == null ? List.of() : orders;
     }
 
     private record MatchedLocalEntity(EntityType type,

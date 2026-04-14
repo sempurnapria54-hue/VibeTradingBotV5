@@ -6,6 +6,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
+import static io.micrometer.common.util.StringUtils.isNotBlank;
+
 @Getter
 @Setter
 public class AttachedAlgoOrder extends Auditable {
@@ -137,6 +139,10 @@ public class AttachedAlgoOrder extends Auditable {
 
     public void toFail() {
         transitionTo(Status.FAILED);
+    }
+
+    public boolean hasExternalType() {
+        return isNotBlank(externalType);
     }
 
     private void transitionTo(Status targetStatus) {
