@@ -68,6 +68,16 @@ public class TradeRuleValidator {
         return isNotEmpty(domainPositions) && domainPositions.size() > INTEGER_ONE;
     }
 
+
+    public void validateRefreshOrders(Exchange exchange,
+                                      Instrument instrument,
+                                      List<com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot> externalSnapshots,
+                                      List<com.example.tradingbot.domain.model.order.Order> localLiveOrders) {
+        // Stage 1: explicit rule set for order refresh is not defined yet.
+        // Keep method as a dedicated extension point so RefreshOrderExecutor
+        // can enforce invariants before mutating persistent order state.
+    }
+
     private void executeTradeRuleViolationFlow(Exchange exchange,
                                                Instrument instrument,
                                                Long dealId,
