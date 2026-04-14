@@ -10,6 +10,11 @@ import java.math.BigDecimal;
 public class AlgoOrderExternalSnapshot {
 
     /**
+     * Клиентский идентификатор algo-ордера на бирже (algoClOrdId).
+     */
+    private String internalId;
+
+    /**
      * Идентификатор algo-ордера на бирже (algoId).
      */
     private String externalId;

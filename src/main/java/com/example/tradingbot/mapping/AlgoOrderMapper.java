@@ -60,6 +60,7 @@ public interface AlgoOrderMapper extends CommonMapper {
             List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
 
     @Mapping(target = "externalId", source = "algoId")
+    @Mapping(target = "internalId", source = "algoClOrdId")
     @Mapping(target = "externalType", source = "ordType")
     @Mapping(target = "externalStatus", source = "state")
     @Mapping(target = "externalDirection", source = "side")

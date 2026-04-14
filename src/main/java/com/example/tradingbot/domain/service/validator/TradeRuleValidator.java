@@ -9,7 +9,10 @@ import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.instrument.Instrument.Status;
 import com.example.tradingbot.domain.model.kill_switch.KillSwitchResult;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
+import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.order.Order;
+import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
@@ -40,6 +43,11 @@ public class TradeRuleValidator {
     private static final String REFRESH_PENDING_ORDERS_INTERNAL_DUPLICATES = "REFRESH_PENDING_ORDERS_INTERNAL_DUPLICATES";
     private static final String REFRESH_PENDING_ORDERS_UNMATCHED_EXTERNAL = "REFRESH_PENDING_ORDERS_UNMATCHED_EXTERNAL";
     private static final String REFRESH_PENDING_ORDERS_INVALID_INSTRUMENT_SCOPE = "REFRESH_PENDING_ORDERS_INVALID_INSTRUMENT_SCOPE";
+    private static final String REFRESH_ALGO_ORDERS_EXTERNAL_DUPLICATES = "REFRESH_ALGO_ORDERS_EXTERNAL_DUPLICATES";
+    private static final String REFRESH_ALGO_ORDERS_INTERNAL_ALGO_DUPLICATES = "REFRESH_ALGO_ORDERS_INTERNAL_ALGO_DUPLICATES";
+    private static final String REFRESH_ALGO_ORDERS_INTERNAL_ATTACHED_DUPLICATES = "REFRESH_ALGO_ORDERS_INTERNAL_ATTACHED_DUPLICATES";
+    private static final String REFRESH_ALGO_ORDERS_UNMATCHED_EXTERNAL = "REFRESH_ALGO_ORDERS_UNMATCHED_EXTERNAL";
+    private static final String REFRESH_ALGO_ORDERS_INVALID_INSTRUMENT_SCOPE = "REFRESH_ALGO_ORDERS_INVALID_INSTRUMENT_SCOPE";
 
     private final KillSwitchService killSwitchService;
     private final InstrumentService instrumentService;
@@ -83,6 +91,171 @@ public class TradeRuleValidator {
                                       Severity.CRITICAL);
         throw new TradeRuleViolationException(
                 "Trade rule violation detected for refresh pending orders: " + violationCode);
+    }
+
+    public void validateRefreshAlgoOrders(Exchange exchange,
+                                          Instrument instrument,
+                                          Long dealId,
+                                          List<AlgoOrderExternalSnapshot> externalLiveAlgoSnapshots,
+                                          List<AlgoOrder> internalLiveAlgoOrders,
+                                          List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
+        String violationCode = resolveRefreshAlgoOrdersViolationCode(instrument,
+                                                                     externalLiveAlgoSnapshots,
+                                                                     internalLiveAlgoOrders,
+                                                                     internalAttachedAlgoOrders);
+        if (violationCode == null) {
+            return;
+        }
+
+        executeTradeRuleViolationFlow(exchange,
+                                      instrument,
+                                      dealId,
+                                      violationCode,
+                                      Severity.CRITICAL);
+        throw new TradeRuleViolationException(
+                "Trade rule violation detected for refresh algo orders: " + violationCode);
+    }
+
+    private String resolveRefreshAlgoOrdersViolationCode(Instrument instrument,
+                                                         List<AlgoOrderExternalSnapshot> externalLiveAlgoSnapshots,
+                                                         List<AlgoOrder> internalLiveAlgoOrders,
+                                                         List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
+        if (hasExternalAlgoDuplicates(externalLiveAlgoSnapshots)) {
+            return REFRESH_ALGO_ORDERS_EXTERNAL_DUPLICATES;
+        }
+
+        if (hasInternalAlgoDuplicates(internalLiveAlgoOrders)) {
+            return REFRESH_ALGO_ORDERS_INTERNAL_ALGO_DUPLICATES;
+        }
+
+        if (hasInternalAttachedDuplicates(internalAttachedAlgoOrders)) {
+            return REFRESH_ALGO_ORDERS_INTERNAL_ATTACHED_DUPLICATES;
+        }
+
+        if (hasInternalAlgoOrdersFromAnotherInstrument(instrument, internalLiveAlgoOrders)) {
+            return REFRESH_ALGO_ORDERS_INVALID_INSTRUMENT_SCOPE;
+        }
+
+        if (hasUnmatchedOrAmbiguousExternalAlgoOrders(externalLiveAlgoSnapshots,
+                                                      internalLiveAlgoOrders,
+                                                      internalAttachedAlgoOrders)) {
+            return REFRESH_ALGO_ORDERS_UNMATCHED_EXTERNAL;
+        }
+
+        return null;
+    }
+
+    private boolean hasExternalAlgoDuplicates(List<AlgoOrderExternalSnapshot> snapshots) {
+        Map<String, Integer> byExternalId = new HashMap<>();
+        Map<String, Integer> byInternalId = new HashMap<>();
+
+        for (AlgoOrderExternalSnapshot snapshot : safeAlgoSnapshots(snapshots)) {
+            if (incrementAndCheckDuplicate(byExternalId, snapshot.getExternalId())) {
+                return true;
+            }
+            if (incrementAndCheckDuplicate(byInternalId, snapshot.getInternalId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInternalAlgoDuplicates(List<AlgoOrder> internalLiveAlgoOrders) {
+        Map<String, Integer> byExternalId = new HashMap<>();
+        Map<String, Integer> byInternalId = new HashMap<>();
+
+        for (AlgoOrder order : safeAlgoOrders(internalLiveAlgoOrders)) {
+            if (incrementAndCheckDuplicate(byExternalId, order.getExternalId())) {
+                return true;
+            }
+            if (incrementAndCheckDuplicate(byInternalId, order.getInternalId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInternalAttachedDuplicates(List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
+        Map<String, Integer> byExternalAttachedId = new HashMap<>();
+        Map<String, Integer> byExternalId = new HashMap<>();
+        Map<String, Integer> byInternalId = new HashMap<>();
+
+        for (AttachedAlgoOrder order : safeAttachedOrders(internalAttachedAlgoOrders)) {
+            if (incrementAndCheckDuplicate(byExternalAttachedId, order.getExternalAttachedId())) {
+                return true;
+            }
+            if (incrementAndCheckDuplicate(byExternalId, order.getExternalId())) {
+                return true;
+            }
+            if (incrementAndCheckDuplicate(byInternalId, order.getInternalId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInternalAlgoOrdersFromAnotherInstrument(Instrument instrument,
+                                                                List<AlgoOrder> internalLiveAlgoOrders) {
+        for (AlgoOrder algoOrder : safeAlgoOrders(internalLiveAlgoOrders)) {
+            if (algoOrder.getDealId() == null) {
+                return true;
+            }
+            Long algoInstrumentId = instrumentService.findRequiredByDealId(algoOrder.getDealId()).getId();
+            if (!Objects.equals(algoInstrumentId, instrument.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasUnmatchedOrAmbiguousExternalAlgoOrders(List<AlgoOrderExternalSnapshot> externalSnapshots,
+                                                               List<AlgoOrder> internalLiveAlgoOrders,
+                                                               List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
+        for (AlgoOrderExternalSnapshot external : safeAlgoSnapshots(externalSnapshots)) {
+            long matchesByExternalId = safeAlgoOrders(internalLiveAlgoOrders).stream()
+                                                                              .filter(local -> Objects.equals(
+                                                                                      local.getExternalId(),
+                                                                                      external.getExternalId()))
+                                                                              .count();
+            matchesByExternalId += safeAttachedOrders(internalAttachedAlgoOrders).stream()
+                                                                                  .filter(local -> Objects.equals(
+                                                                                          local.getExternalId(),
+                                                                                          external.getExternalId()))
+                                                                                  .count();
+            if (matchesByExternalId > 1) {
+                return true;
+            }
+            if (matchesByExternalId == 1) {
+                continue;
+            }
+
+            long matchesByInternalId = safeAlgoOrders(internalLiveAlgoOrders).stream()
+                                                                              .filter(local -> Objects.equals(
+                                                                                      local.getInternalId(),
+                                                                                      external.getInternalId()))
+                                                                              .count();
+            matchesByInternalId += safeAttachedOrders(internalAttachedAlgoOrders).stream()
+                                                                                  .filter(local -> Objects.equals(
+                                                                                          local.getInternalId(),
+                                                                                          external.getInternalId()))
+                                                                                  .count();
+            if (matchesByInternalId > 1) {
+                return true;
+            }
+            if (matchesByInternalId == 1) {
+                continue;
+            }
+
+            long matchesByExternalAttachedId = safeAttachedOrders(internalAttachedAlgoOrders).stream()
+                                                                                               .filter(local -> Objects.equals(
+                                                                                                       local.getExternalAttachedId(),
+                                                                                                       external.getExternalId()))
+                                                                                               .count();
+            if (matchesByExternalAttachedId != 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String resolveRefreshPendingOrdersViolationCode(Instrument instrument,
@@ -182,6 +355,18 @@ public class TradeRuleValidator {
     }
 
     private List<Order> safeOrders(List<Order> orders) {
+        return orders == null ? List.of() : orders;
+    }
+
+    private List<AlgoOrderExternalSnapshot> safeAlgoSnapshots(List<AlgoOrderExternalSnapshot> snapshots) {
+        return snapshots == null ? List.of() : snapshots;
+    }
+
+    private List<AlgoOrder> safeAlgoOrders(List<AlgoOrder> orders) {
+        return orders == null ? List.of() : orders;
+    }
+
+    private List<AttachedAlgoOrder> safeAttachedOrders(List<AttachedAlgoOrder> orders) {
         return orders == null ? List.of() : orders;
     }
 
