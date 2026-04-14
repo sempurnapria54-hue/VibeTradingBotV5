@@ -38,18 +38,22 @@ public class RefreshAttachedAlgoOrderExecutor {
                 return created;
             });
             updateFromExternal(local, external);
-            resolveAttachedStatus(local);
+            transitionToAttachedIfAllowed(order, local);
             touched.add(local);
         }
 
-        if (shouldCloseMissingAttached(order, snapshot)) {
+        if (shouldFailMissingAttached(snapshot)) {
+            localChildren.stream()
+                         .filter(local -> !touched.contains(local))
+                         .forEach(local -> transitionToFailedIfAllowed(order, local));
+        }
+
+        if (shouldCloseMissingAttached(snapshot)) {
             localChildren.stream()
                          .filter(this::isLive)
                          .filter(local -> !touched.contains(local))
-                         .forEach(local -> local.setStatus(AttachedAlgoOrder.Status.CLOSED));
+                         .forEach(local -> transitionToClosedIfAllowed(order, local));
         }
-
-        orderDataService.save(order);
     }
 
     private List<AttachedAlgoOrder> ensureChildren(Order order) {
@@ -98,26 +102,56 @@ public class RefreshAttachedAlgoOrderExecutor {
         local.setType(AttachedAlgoOrder.Type.ATTACHED_STOP_LOSS);
     }
 
-    private void resolveAttachedStatus(AttachedAlgoOrder local) {
-        if (local.getStatus() == AttachedAlgoOrder.Status.ACTIVE) {
-            return;
-        }
-        local.setStatus(AttachedAlgoOrder.Status.ATTACHED);
+    private void transitionToAttachedIfAllowed(Order order, AttachedAlgoOrder local) {
+        AttachedAlgoOrder.Status before = local.getStatus();
+        local.toAttached();
+        persistOnStatusChange(order, local, before);
     }
 
-    private boolean shouldCloseMissingAttached(Order order, OrderExternalSnapshot snapshot) {
+    private void transitionToClosedIfAllowed(Order order, AttachedAlgoOrder local) {
+        AttachedAlgoOrder.Status before = local.getStatus();
+        local.toClose();
+        persistOnStatusChange(order, local, before);
+    }
+
+    private void transitionToFailedIfAllowed(Order order, AttachedAlgoOrder local) {
+        AttachedAlgoOrder.Status before = local.getStatus();
+        local.toFail();
+        persistOnStatusChange(order, local, before);
+    }
+
+    private void persistOnStatusChange(Order order, AttachedAlgoOrder local, AttachedAlgoOrder.Status beforeStatus) {
+        if (beforeStatus != local.getStatus()) {
+            orderDataService.save(order);
+        }
+    }
+
+    private boolean shouldCloseMissingAttached(OrderExternalSnapshot snapshot) {
         if (snapshot.getAttachedAlgoOrders() != null && !snapshot.getAttachedAlgoOrders().isEmpty()) {
             return false;
         }
         if (snapshot.getExternalStatus() == null) {
             return false;
         }
-        return "canceled".equalsIgnoreCase(snapshot.getExternalStatus());
+        String normalized = snapshot.getExternalStatus().toLowerCase();
+        return "canceled".equals(normalized) || "mmp_canceled".equals(normalized);
+    }
+
+    private boolean shouldFailMissingAttached(OrderExternalSnapshot snapshot) {
+        if (snapshot.getAttachedAlgoOrders() != null && !snapshot.getAttachedAlgoOrders().isEmpty()) {
+            return false;
+        }
+        if (snapshot.getExternalStatus() == null) {
+            return false;
+        }
+        String normalized = snapshot.getExternalStatus().toLowerCase();
+        return "failed".equals(normalized)
+                || "order_failed".equals(normalized)
+                || "rejected".equals(normalized);
     }
 
     private boolean isLive(AttachedAlgoOrder order) {
-        return order.getStatus() != AttachedAlgoOrder.Status.CLOSED
-                && order.getStatus() != AttachedAlgoOrder.Status.FAILED;
+        return !order.isTerminal();
     }
 
     private BigDecimal parseDecimal(String value) {
