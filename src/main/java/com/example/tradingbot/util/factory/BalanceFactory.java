@@ -30,7 +30,7 @@ public class BalanceFactory {
 
     private Balance createFromSnapshot(BalanceExternalSnapshot snapshot) {
         Balance balance = createEmptyBalance(snapshot.getCurrency());
-        balanceMapper.updateDomainFromSnapshot(snapshot, balance);
+        balanceMapper.updateDomainFromExternalSnapshot(snapshot, balance);
         return balance;
     }
 

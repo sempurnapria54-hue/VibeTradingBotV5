@@ -39,7 +39,7 @@ public class RefreshBalanceExecutor {
         if (isNull(balanceContainer)) {
             balanceContainer = balanceContainerFactory.createFromSnapshot(exchange.getId(), externalSnapshot);
         } else {
-            balanceContainerMapper.updateDomainFromSnapshot(externalSnapshot, balanceContainer);
+            balanceContainerMapper.updateDomainFromExternalSnapshot(externalSnapshot, balanceContainer);
         }
 
         List<Balance> balances = balanceFactory.createBalances(externalSnapshot.getBalanceExternalSnapshots());

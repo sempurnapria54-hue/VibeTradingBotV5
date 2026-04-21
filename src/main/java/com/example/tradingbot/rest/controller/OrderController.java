@@ -51,7 +51,7 @@ public class OrderController {
 
     @PostMapping
     public OrderResponse createOrder(@RequestBody CreateOrderRequest request) {
-        var domainRq = mapper.restRequestToDomain(request);
+        var domainRq = mapper.restToDomain(request);
         var order = orderService.createOrder(request.getDealInternalId(), domainRq);
         return mapper.domainToRest(order);
     }

@@ -12,6 +12,10 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface TradeFillMapper {
 
+    /**
+     * CLIENT
+     */
+
     @Mapping(source = "billId", target = "externalBillId")
     @Mapping(source = "tradeId", target = "externalTradeId")
     @Mapping(source = "ordId", target = "externalOrderId")
@@ -21,7 +25,7 @@ public interface TradeFillMapper {
     @Mapping(source = "fillPx", target = "fillPrice")
     @Mapping(source = "fillPnl", target = "fillPnl")
     @Mapping(source = "ts", target = "timestamp")
-    TradeFill clientOkxResponseToDomain(TradeFillResponse source);
+    TradeFill clientToDomain(TradeFillResponse source);
 
     @Mapping(source = "externalBillId", target = "billId")
     @Mapping(source = "externalTradeId", target = "tradeId")
@@ -36,5 +40,5 @@ public interface TradeFillMapper {
 
     FillsRequest domainSearchParamsToClientOkxRequest(TradeFillsSearchParams source);
 
-    List<TradeFill> clientOkxResponseToDomain(List<TradeFillResponse> source);
+    List<TradeFill> clientToDomain(List<TradeFillResponse> source);
 }

@@ -21,16 +21,20 @@ import java.util.List;
 @Mapper(componentModel = "spring", uses = CandleGroupMapper.class)
 public interface InstrumentMapper extends CommonMapper {
 
-    @Mapping(source = "type", target = "instrumentType")
-    @Mapping(source = "externalId", target = "instrumentId")
+    /**
+     * CLIENT
+     */
+
+    @Mapping(source = "externalType", target = "externalType")
+    @Mapping(source = "externalId", target = "externalId")
     InstrumentsRequest domainSearchParamsToClientOkxRequest(InstrumentSearchParams source);
 
     @Mapping(source = "instId", target = "externalId")
-    @Mapping(source = "instType", target = "type")
-    Instrument clientOkxResponseToDomain(
+    @Mapping(source = "instType", target = "externalType")
+    Instrument clientToDomain(
             com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
 
-    List<Instrument> clientOkxResponseToDomain(
+    List<Instrument> clientToDomain(
             List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
 
     @BeanMapping(ignoreByDefault = true)
@@ -44,18 +48,45 @@ public interface InstrumentMapper extends CommonMapper {
     @Mapping(target = "contractValue", source = "ctVal", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "contractMultiplier", source = "ctMult", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "priceTickSize", source = "tickSz", qualifiedByName = "stringToBigDecimal")
-    InstrumentExternalSnapshot clientOkxToExternalSnapshot(
+    InstrumentExternalSnapshot clientToExternalSnapshot(
             com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
 
     @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
-    List<InstrumentExternalSnapshot> clientOkxToExternalSnapshot(
+    List<InstrumentExternalSnapshot> clientToExternalSnapshot(
             List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
 
+
+    /**
+     * REST
+     */
+
+    @Mapping(target = "instrument", source = ".")
     InstrumentResponse domainToRest(Instrument source);
 
     List<com.example.tradingbot.rest.model.response.instrument.Instrument> domainToRest(List<Instrument> source);
 
+    @Mapping(target = "externalType", source = "type")
     Instrument restToDomain(CreateInstrumentRequest request);
+
+    @Mapping(target = "externalType", source = "externalType")
+    @Mapping(target = "externalId", source = "externalId")
+    InstrumentSearchParams restToDomainSearchParams(
+            com.example.tradingbot.rest.model.request.instrument.search_params.InstrumentSearchParams source);
+
+    default InstrumentPageResponse domainToRest(Page<Instrument> result) {
+        if (result == null) {
+            return new InstrumentPageResponse(Page.empty());
+        }
+
+        return new InstrumentPageResponse(result.map(this::domainToRestModel));
+    }
+
+    com.example.tradingbot.rest.model.response.instrument.Instrument domainToRestModel(Instrument source);
+
+
+    /**
+     * DATA
+     */
 
     InstrumentEntity domainToData(Instrument source);
 
@@ -63,12 +94,18 @@ public interface InstrumentMapper extends CommonMapper {
 
     List<Instrument> dataToDomain(List<InstrumentEntity> source);
 
-    InstrumentSearchParams restToDomain(
-            com.example.tradingbot.rest.model.request.instrument.search_params.InstrumentSearchParams source);
+    default Page<Instrument> dataToDomain(Page<InstrumentEntity> data) {
+        if (data == null) {
+            return Page.empty();
+        }
 
-    InstrumentPageResponse domainToRest(Page<Instrument> result);
+        return data.map(this::dataToDomain);
+    }
 
-    Page<Instrument> dataToDomain(Page<InstrumentEntity> data);
+
+    /**
+     * DOMAIN_COPY
+     */
 
     @Mapping(target = "id", ignore = true)
     void domainToDomainOnCreate(Instrument source, @MappingTarget Instrument target);

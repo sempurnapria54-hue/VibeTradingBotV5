@@ -12,13 +12,17 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface CandleMapper {
 
+    /**
+     * CLIENT
+     */
+
     @Mapping(source = "ts", target = "openTimestamp")
-    Candle clientOkxResponseToDomain(CandleResponse source);
+    Candle clientToDomain(CandleResponse source);
 
     @Mapping(source = "openTimestamp", target = "ts")
     CandleResponse domainToClient(Candle source);
 
     CandlesRequest domainSearchParamsToClientOkxRequest(CandleSearchParams source);
 
-    List<Candle> clientOkxResponseToDomain(List<CandleResponse> source);
+    List<Candle> clientToDomain(List<CandleResponse> source);
 }

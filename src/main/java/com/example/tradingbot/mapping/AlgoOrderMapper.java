@@ -9,6 +9,7 @@ import com.example.tradingbot.rest.model.response.algo_order.AlgoOrderResponse;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValueCheckStrategy;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.springframework.data.domain.Page;
@@ -25,10 +26,21 @@ public interface AlgoOrderMapper extends CommonMapper {
      * REST
      */
 
+    @Mapping(target = "algoOrder", source = ".")
     AlgoOrderResponse domainToRest(AlgoOrder source);
 
-    AlgoOrderPageResponse domainToRest(Page<AlgoOrder> source);
+    default AlgoOrderPageResponse domainToRest(Page<AlgoOrder> source) {
+        if (source == null) {
+            return new AlgoOrderPageResponse(Page.empty());
+        }
 
+        return new AlgoOrderPageResponse(source.map(this::domainToRestModel));
+    }
+
+    com.example.tradingbot.rest.model.response.algo_order.AlgoOrder domainToRestModel(AlgoOrder source);
+
+    @Mapping(target = "conditionType", source = "type")
+    @Mapping(target = "direction", source = "internalSide")
     AlgoOrder restToDomain(com.example.tradingbot.rest.model.request.algo_order.CreateAlgoOrderRequest source);
 
     AlgoOrderSearchParams restToDomainSearchParams(
@@ -56,9 +68,31 @@ public interface AlgoOrderMapper extends CommonMapper {
      * CLIENT
      */
 
+    @Mapping(target = "orderType", source = "externalType")
+    @Mapping(target = "size", source = "size")
+    @Mapping(target = "clientOrderId", source = "internalId")
+    com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest domainToClientOkxRequest(AlgoOrder source);
+
+    @Mapping(target = "algoOrderId", source = "externalId")
+    @Mapping(target = "clientOrderId", source = "internalId")
+    com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest domainToClientOkxCancelRequest(AlgoOrder source);
+
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "externalId", source = "algoId")
+    @Mapping(target = "internalId", source = "algoClOrdId")
+    @Mapping(target = "externalType", source = "ordType")
+    @Mapping(target = "externalStatus", source = "state")
+    @Mapping(target = "externalDirection", source = "side")
+    @Mapping(target = "externalPositionSide", source = "posSide")
+    @Mapping(target = "size", source = "sz", qualifiedByName = "stringToBigDecimal")
+    AlgoOrder clientToDomain(com.example.tradingbot.client.model.okx.response.AlgoOrderResponse source);
+
+    List<AlgoOrder> clientToDomain(List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
+
     List<AlgoOrderExternalSnapshot> clientToExternalSnapshot(
             List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
 
+    @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "externalId", source = "algoId")
     @Mapping(target = "internalId", source = "algoClOrdId")
     @Mapping(target = "externalType", source = "ordType")
@@ -92,7 +126,41 @@ public interface AlgoOrderMapper extends CommonMapper {
     @Mapping(target = "condition.trailing.activationPrice.externalValue", source = "condition.trailing.activationPrice.externalValue")
     @Mapping(target = "condition.trailing.externalPrice", source = "condition.trailing.externalPrice")
     void updateDomainFromExternalSnapshot(AlgoOrderExternalSnapshot source,
-                                          @org.mapstruct.MappingTarget AlgoOrder target);
+                                          @MappingTarget AlgoOrder target);
 
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "dealId", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "closeReason", ignore = true)
+    @Mapping(target = "externalId", ignore = true)
+    @Mapping(target = "externalType", ignore = true)
+    @Mapping(target = "externalStatus", ignore = true)
+    @Mapping(target = "externalDirection", ignore = true)
+    @Mapping(target = "externalPositionSide", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "modifiedAt", ignore = true)
+    @Mapping(target = "modifiedBy", ignore = true)
+    @Mapping(target = "externalCreatedAt", ignore = true)
+    @Mapping(target = "externalModifiedAt", ignore = true)
+    void domainToDomainOnCreate(AlgoOrder source, @MappingTarget AlgoOrder target);
 
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "dealId", ignore = true)
+    @Mapping(target = "internalId", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "closeReason", ignore = true)
+    @Mapping(target = "conditionType", ignore = true)
+    @Mapping(target = "size", ignore = true)
+    @Mapping(target = "direction", ignore = true)
+    @Mapping(target = "condition", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "modifiedAt", ignore = true)
+    @Mapping(target = "modifiedBy", ignore = true)
+    @Mapping(target = "externalCreatedAt", ignore = true)
+    @Mapping(target = "externalModifiedAt", ignore = true)
+    void domainToDomainOnUpdate(AlgoOrder source, @MappingTarget AlgoOrder target);
 }

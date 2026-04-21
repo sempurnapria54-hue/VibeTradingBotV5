@@ -40,7 +40,7 @@ public class InstrumentController {
                                                       sort = "id",
                                                       direction = Sort.Direction.DESC)
                                               Pageable pageable) {
-        var domainSearchParams = instrumentMapper.restToDomain(request);
+        var domainSearchParams = instrumentMapper.restToDomainSearchParams(request);
         var result = instrumentService.getByParams(domainSearchParams, pageable);
         return instrumentMapper.domainToRest(result);
     }

@@ -14,19 +14,39 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface CandleGroupMapper {
 
-    CandleGroupContainerResponse domainListToRestContainer(List<CandleGroup> source);
+    /**
+     * REST
+     */
 
+    @Mapping(target = "candleGroup", source = ".")
     CandleGroupResponse domainToRest(CandleGroup source);
 
+    com.example.tradingbot.rest.model.response.candle_group.CandleGroup domainToRestModel(CandleGroup source);
+
+    @Mapping(target = "candleGroups", source = ".")
+    CandleGroupContainerResponse domainListToRestContainer(List<CandleGroup> source);
+
+    @Mapping(target = "externalTimeframe", source = "timeframe")
     CandleGroup restToDomain(CreateCandleGroupRequest request);
+
+    @Mapping(target = "timeframe", source = ".")
+    @Mapping(target = "externalTimeframe", source = ".")
+    CandleGroup restToDomain(String value);
+
+
+    /**
+     * DOMAIN_COPY
+     */
 
     @Mapping(target = "id", ignore = true)
     void domainToDomainOnCreate(CandleGroup source, @MappingTarget CandleGroup target);
 
+
+    /**
+     * DATA
+     */
+
     CandleGroupEntity domainToData(CandleGroup candleGroup);
 
     CandleGroup dataToDomain(CandleGroupEntity candleGroup);
-
-    @Mapping(target = "timeframe", source = ".")
-    CandleGroup restToDomain(String value);
 }

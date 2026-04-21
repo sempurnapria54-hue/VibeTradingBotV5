@@ -17,7 +17,7 @@ public class BalanceContainerFactory {
 
     public BalanceContainer createFromSnapshot(Long exchangeId, BalanceContainerExternalSnapshot snapshot) {
         BalanceContainer balanceContainer = createEmptyBalanceContainer(exchangeId);
-        mapper.updateDomainFromSnapshot(snapshot, balanceContainer);
+        mapper.updateDomainFromExternalSnapshot(snapshot, balanceContainer);
         return balanceContainer;
     }
 

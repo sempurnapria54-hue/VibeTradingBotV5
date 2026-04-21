@@ -13,10 +13,14 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface TradeFillsArchiveMapper {
 
+    /**
+     * CLIENT
+     */
+
     @Mapping(source = "ts", target = "timestamp")
     @Mapping(source = "code", target = "externalStatusCode")
     @Mapping(source = "msg", target = "externalStatusMessage")
-    TradeFillsArchive clientOkxResponseToDomain(TradeFillsArchiveResponse source);
+    TradeFillsArchive clientToDomain(TradeFillsArchiveResponse source);
 
     @Mapping(source = "timestamp", target = "ts")
     @Mapping(source = "externalStatusCode", target = "code")
@@ -27,5 +31,5 @@ public interface TradeFillsArchiveMapper {
 
     FillsArchiveLinkRequest domainSearchParamsToClientOkxLinkRequest(TradeFillsSearchParams source);
 
-    List<TradeFillsArchive> clientOkxResponseToDomain(List<TradeFillsArchiveResponse> source);
+    List<TradeFillsArchive> clientToDomain(List<TradeFillsArchiveResponse> source);
 }

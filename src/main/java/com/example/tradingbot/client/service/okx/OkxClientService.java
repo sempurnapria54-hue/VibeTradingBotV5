@@ -91,8 +91,8 @@ public class OkxClientService implements ClientService {
     @Override
     public BalanceContainerExternalSnapshot getBalanceContainer(Exchange exchange) {
         OkxApiResponse<BalanceResponse> response = okxRestClient.getBalances();
-        return balanceContainerMapper.clientOkxToExternalSnapshot(exchange.getId(), response.getData()
-                                                                                            .getFirst());
+        return balanceContainerMapper.clientToExternalSnapshot(exchange.getId(), response.getData()
+                                                                                   .getFirst());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -102,14 +102,14 @@ public class OkxClientService implements ClientService {
         searchParams.setInstrumentExternalId(instrument.getExternalId());
         searchParams.setInstrumentExternalType(instrument.getExternalType());
         OkxApiResponse<PositionResponse> response = okxRestClient.getPositions(searchParams);
-        return positionMapper.clientOkxToExternalSnapshot(response.getData());
+        return positionMapper.clientToExternalSnapshot(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
     @Override
     public List<PositionExternalSnapshot> getAllPositions() {
         OkxApiResponse<PositionResponse> response = okxRestClient.getAllPositions();
-        return positionMapper.clientOkxToExternalSnapshot(response.getData());
+        return positionMapper.clientToExternalSnapshot(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -119,7 +119,7 @@ public class OkxClientService implements ClientService {
         searchParams.setInstrumentExternalId(instrument.getExternalId());
         searchParams.setInstrumentExternalType(instrument.getExternalType());
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(searchParams);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData());
+        return orderMapper.clientToExternalSnapshot(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -128,7 +128,7 @@ public class OkxClientService implements ClientService {
         GetOrdersPendingSearchParams searchParams = new GetOrdersPendingSearchParams();
         searchParams.setInstrumentExternalType(instrument.getExternalType());
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersPending(searchParams);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData());
+        return orderMapper.clientToExternalSnapshot(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -139,8 +139,8 @@ public class OkxClientService implements ClientService {
         searchParams.setExternalId(externalOrderId);
         searchParams.setInternalId(internalOrderId);
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrderDetails(searchParams);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData()
-                                                               .getFirst());
+        return orderMapper.clientToExternalSnapshot(response.getData()
+                                                            .getFirst());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -150,7 +150,7 @@ public class OkxClientService implements ClientService {
         searchParams.setInstrumentExternalType(instrument.getExternalType());
         searchParams.setInstrumentExternalId(instrument.getExternalId());
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistory(searchParams);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData());
+        return orderMapper.clientToExternalSnapshot(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -160,7 +160,7 @@ public class OkxClientService implements ClientService {
         searchParams.setInstrumentExternalType(instrument.getExternalType());
         searchParams.setInstrumentExternalId(instrument.getExternalId());
         OkxApiResponse<OrderResponse> response = okxRestClient.getOrdersHistoryArchive(searchParams);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData());
+        return orderMapper.clientToExternalSnapshot(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -204,7 +204,7 @@ public class OkxClientService implements ClientService {
         TradeFillsSearchParams searchParams = (TradeFillsSearchParams) args[0];
         FillsRequest request = tradeFillMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFills(request);
-        return tradeFillMapper.clientOkxResponseToDomain(response.getData());
+        return tradeFillMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -212,7 +212,7 @@ public class OkxClientService implements ClientService {
         TradeFillsSearchParams searchParams = (TradeFillsSearchParams) args[0];
         FillsRequest request = tradeFillMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<TradeFillResponse> response = okxRestClient.getFillsHistory(request);
-        return tradeFillMapper.clientOkxResponseToDomain(response.getData());
+        return tradeFillMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -220,7 +220,7 @@ public class OkxClientService implements ClientService {
         TradeFillsSearchParams searchParams = (TradeFillsSearchParams) args[0];
         FillsArchiveRequest request = tradeFillsArchiveMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.requestFillsArchive(request);
-        return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
+        return tradeFillsArchiveMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -229,7 +229,7 @@ public class OkxClientService implements ClientService {
         FillsArchiveLinkRequest request = tradeFillsArchiveMapper.domainSearchParamsToClientOkxLinkRequest(
                 searchParams);
         OkxApiResponse<TradeFillsArchiveResponse> response = okxRestClient.getFillsArchiveLink(request);
-        return tradeFillsArchiveMapper.clientOkxResponseToDomain(response.getData());
+        return tradeFillsArchiveMapper.clientToDomain(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -237,7 +237,7 @@ public class OkxClientService implements ClientService {
     public List<Candle> getCandles(CandleSearchParams searchParams) {
         CandlesRequest request = candleMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<CandleResponse> response = okxRestClient.getCandles(request);
-        return candleMapper.clientOkxResponseToDomain(response.getData());
+        return candleMapper.clientToDomain(response.getData());
     }
 
     //TODO: тут норм, остальное рефакторим.
@@ -245,7 +245,7 @@ public class OkxClientService implements ClientService {
     public List<Candle> getHistoryCandles(CandleSearchParams searchParams) {
         CandlesRequest request = candleMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<CandleResponse> response = okxRestClient.getHistoryCandles(request);
-        return candleMapper.clientOkxResponseToDomain(response.getData());
+        return candleMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -261,7 +261,7 @@ public class OkxClientService implements ClientService {
         request.setPositionSide(positionSide);
 
         OkxApiResponse<OrderResponse> response = okxRestClient.createOrder(request);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData());
+        return orderMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -273,7 +273,7 @@ public class OkxClientService implements ClientService {
         request.setInstrumentId(instrumentExternalId);
 
         OkxApiResponse<OrderResponse> response = okxRestClient.amendOrder(request);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData());
+        return orderMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -282,7 +282,7 @@ public class OkxClientService implements ClientService {
         request.setInstrumentId(instrumentExternalId);
 
         OkxApiResponse<OrderResponse> response = okxRestClient.cancelOrder(request);
-        return orderMapper.clientOkxToExternalSnapshot(response.getData());
+        return orderMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -293,7 +293,7 @@ public class OkxClientService implements ClientService {
         request.setPositionSide(position.getExternalSide());
         request.setSide(algoOrder.getExternalDirection());
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.createAlgoOrder(request);
-        return algoOrderMapper.clientOkxResponseToDomain(response.getData());
+        return algoOrderMapper.clientToDomain(response.getData());
     }
 
     @Override
@@ -305,27 +305,27 @@ public class OkxClientService implements ClientService {
         request.setInstrumentId(instrumentExternalId);
 
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.cancelAlgoOrder(request);
-        return algoOrderMapper.clientOkxResponseToDomain(response.getData());
+        return algoOrderMapper.clientToDomain(response.getData());
     }
 
     @Override
     public List<PositionExternalSnapshot> closePositions(Instrument instrument) {
         ClosePositionRequest request = positionMapper.domainToClientOkxCloseRequest(instrument);
         OkxApiResponse<PositionResponse> response = okxRestClient.closePosition(request);
-        return positionMapper.clientOkxToExternalSnapshot(response.getData());
+        return positionMapper.clientToExternalSnapshot(response.getData());
     }
 
     @Override
     public List<InstrumentExternalSnapshot> getInstruments(InstrumentSearchParams searchParams) {
         InstrumentsRequest request = instrumentMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<InstrumentResponse> response = okxRestClient.getInstruments(request);
-        return instrumentMapper.clientOkxToExternalSnapshot(response.getData());
+        return instrumentMapper.clientToExternalSnapshot(response.getData());
     }
 
     @Override
     public List<PriceTicker> getTicker(PriceTickerSearchParams searchParams) {
         TickerRequest request = priceTickerMapper.domainSearchParamsToClientOkxRequest(searchParams);
         OkxApiResponse<PriceTickerResponse> response = okxRestClient.getTicker(request);
-        return priceTickerMapper.clientOkxResponseToDomain(response.getData());
+        return priceTickerMapper.clientToDomain(response.getData());
     }
 }

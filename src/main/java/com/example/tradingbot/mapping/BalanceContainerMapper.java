@@ -17,9 +17,17 @@ import java.util.List;
 @Mapper(componentModel = "spring", uses = BalanceMapper.class)
 public interface BalanceContainerMapper extends CommonMapper {
 
+    /**
+     * DATA
+     */
+
     BalanceContainer dataToDomain(BalanceContainerEntity source);
 
     BalanceContainerEntity domainToData(BalanceContainer source);
+
+    /**
+     * CLIENT
+     */
 
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "exchangeId", source = "exchangeId")
@@ -27,13 +35,18 @@ public interface BalanceContainerMapper extends CommonMapper {
     @Mapping(target = "unrealizedProfit", source = "response.upl")
     @Mapping(target = "externalModifiedAt", source = "response.uTime", qualifiedByName = "toOffsetDateTimeUtc")
     @Mapping(target = "balanceExternalSnapshots", source = "response.details")
-    BalanceContainerExternalSnapshot clientOkxToExternalSnapshot(Long exchangeId, BalanceResponse response);
+    BalanceContainerExternalSnapshot clientToExternalSnapshot(Long exchangeId, BalanceResponse response);
+
+    /**
+     * DOMAIN_COPY
+     */
 
     @BeanMapping(ignoreByDefault = true, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "totalEquity", source = "totalEquity", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "unrealizedProfit", source = "unrealizedProfit", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "externalUpdatedAt", source = "externalModifiedAt")
-    void updateDomainFromSnapshot(BalanceContainerExternalSnapshot source, @MappingTarget BalanceContainer target);
+    void updateDomainFromExternalSnapshot(BalanceContainerExternalSnapshot source,
+                                          @MappingTarget BalanceContainer target);
 
     @AfterMapping
     default void linkChildren(@MappingTarget BalanceContainerEntity target) {
