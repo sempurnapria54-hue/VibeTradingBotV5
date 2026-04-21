@@ -8,14 +8,19 @@ import com.example.tradingbot.persistence.service.OrderDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 @Service
 @RequiredArgsConstructor
@@ -27,16 +32,22 @@ public class RefreshAttachedAlgoOrderExecutor {
     public void refreshAttachedAlgoOrders(Order order, OrderExternalSnapshot snapshot) {
         List<AttachedAlgoOrder> localChildren = ensureChildren(order);
         List<AttachedAlgoOrderExternalSnapshot> externalChildren = extractExternalChildren(snapshot);
+        Set<AttachedAlgoOrder> matchedLocalChildren = new HashSet<>();
+        boolean changed = false;
 
         for (AttachedAlgoOrderExternalSnapshot external : externalChildren) {
             AttachedAlgoOrder child = findMatch(localChildren, external)
                     .orElseGet(() -> createChild(order, localChildren, external));
+            matchedLocalChildren.add(child);
 
-            boolean changed = updateFromExternal(child, external);
-            boolean statusChanged = applyStatusFromExternalProof(child, external);
-            if (changed || statusChanged) {
-                persist(order);
-            }
+            changed |= updateFromExternal(child, external);
+            changed |= applyStatusFromExternalProof(child, external);
+        }
+
+        changed |= applyMissingLocalChildrenLifecycle(order, localChildren, matchedLocalChildren);
+
+        if (changed) {
+            persist(order);
         }
     }
 
@@ -46,14 +57,14 @@ public class RefreshAttachedAlgoOrderExecutor {
     }
 
     private List<AttachedAlgoOrderExternalSnapshot> extractExternalChildren(OrderExternalSnapshot snapshot) {
-        if (snapshot.getAttachedAlgoOrders() == null) {
+        if (Objects.isNull(snapshot) || CollectionUtils.isEmpty(snapshot.getAttachedAlgoOrders())) {
             return List.of();
         }
         return snapshot.getAttachedAlgoOrders();
     }
 
     private List<AttachedAlgoOrder> ensureChildren(Order order) {
-        if (order.getAttachedAlgoOrders() == null) {
+        if (CollectionUtils.isEmpty(order.getAttachedAlgoOrders())) {
             order.setAttachedAlgoOrders(new ArrayList<>());
         }
         return order.getAttachedAlgoOrders();
@@ -64,21 +75,23 @@ public class RefreshAttachedAlgoOrderExecutor {
         return localChildren.stream()
                             .filter(local -> Objects.equals(local.getExternalAttachedId(),
                                                             external.getExternalAttachedId())
-                                    && local.getExternalAttachedId() != null)
+                                    && Objects.nonNull(local.getExternalAttachedId()))
                             .findFirst()
                             .or(() -> localChildren.stream()
                                                    .filter(local -> Objects.equals(local.getExternalId(),
                                                                                    external.getExternalId())
-                                                           && local.getExternalId() != null)
+                                                           && Objects.nonNull(local.getExternalId()))
                                                    .findFirst())
                             .or(() -> localChildren.stream()
                                                    .filter(local -> Objects.equals(local.getInternalId(),
                                                                                    external.getInternalId())
-                                                           && local.getInternalId() != null)
+                                                           && Objects.nonNull(local.getInternalId()))
                                                    .findFirst())
                             .or(() -> localChildren.stream()
                                                    .filter(local -> local.getType()
                                                            == AttachedAlgoOrder.Type.ATTACHED_STOP_LOSS)
+                                                   .filter(local -> local.canTransitionTo(
+                                                           AttachedAlgoOrder.Status.ATTACHED))
                                                    .max(Comparator.comparing(AttachedAlgoOrder::getCreatedAt,
                                                                              Comparator.nullsLast(
                                                                                      Comparator.naturalOrder()))));
@@ -106,13 +119,14 @@ public class RefreshAttachedAlgoOrderExecutor {
         changed |= setIfChanged(local.getExternalType(), external.getExternalType(), local::setExternalType);
 
         BigDecimal newSize = parseDecimal(external.getSize());
-        if (!Objects.equals(local.getSize(), newSize) && newSize != null) {
+        if (Objects.nonNull(newSize) && isFalse(Objects.equals(local.getSize(), newSize))) {
             local.setSize(newSize);
             changed = true;
         }
 
         BigDecimal newSlTrigger = parseDecimal(external.getStopLossTriggerPrice());
-        if (!Objects.equals(local.getStopLossTriggerPrice(), newSlTrigger) && newSlTrigger != null) {
+        if (Objects.nonNull(newSlTrigger)
+                && isFalse(Objects.equals(local.getStopLossTriggerPrice(), newSlTrigger))) {
             local.setStopLossTriggerPrice(newSlTrigger);
             changed = true;
         }
@@ -126,14 +140,66 @@ public class RefreshAttachedAlgoOrderExecutor {
     }
 
     private boolean applyStatusFromExternalProof(AttachedAlgoOrder local,
-                                                AttachedAlgoOrderExternalSnapshot external) {
+                                                 AttachedAlgoOrderExternalSnapshot external) {
         AttachedAlgoOrder.Status before = local.getStatus();
-        local.toAttached();
-        return before != local.getStatus();
+        if (hasFailureProof(external) && isOrderSnapshotFailureTransitionAllowed(local)) {
+            local.toFail();
+            return isFalse(Objects.equals(before, local.getStatus()));
+        }
+
+        if (local.canTransitionTo(AttachedAlgoOrder.Status.ATTACHED)) {
+            local.toAttached();
+        }
+
+        return isFalse(Objects.equals(before, local.getStatus()));
+    }
+
+    private boolean applyMissingLocalChildrenLifecycle(Order order,
+                                                       List<AttachedAlgoOrder> localChildren,
+                                                       Set<AttachedAlgoOrder> matchedLocalChildren) {
+        boolean changed = false;
+
+        for (AttachedAlgoOrder localChild : localChildren) {
+            if (matchedLocalChildren.contains(localChild)) {
+                continue;
+            }
+            if (localChild.isTerminal()) {
+                continue;
+            }
+            if (isOrderSnapshotCloseTransitionAllowed(order, localChild)) {
+                localChild.toClose();
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private boolean isOrderSnapshotFailureTransitionAllowed(AttachedAlgoOrder local) {
+        return Objects.equals(local.getStatus(), AttachedAlgoOrder.Status.CREATED)
+                || Objects.equals(local.getStatus(), AttachedAlgoOrder.Status.ATTACHED);
+    }
+
+    private boolean isOrderSnapshotCloseTransitionAllowed(Order order, AttachedAlgoOrder localChild) {
+        if (Objects.isNull(order)) {
+            return false;
+        }
+        if (Objects.equals(localChild.getStatus(), AttachedAlgoOrder.Status.ACTIVE)) {
+            return false;
+        }
+        if (isFalse(localChild.canTransitionTo(AttachedAlgoOrder.Status.CLOSED))) {
+            return false;
+        }
+
+        return Objects.equals(order.getStatus(), Order.Status.CLOSED);
+    }
+
+    private boolean hasFailureProof(AttachedAlgoOrderExternalSnapshot external) {
+        return isNotBlank(external.getFailCode()) || isNotBlank(external.getFailReason());
     }
 
     private boolean setIfChanged(String current, String candidate, java.util.function.Consumer<String> setter) {
-        if (!isNotBlank(candidate) || Objects.equals(current, candidate)) {
+        if (isFalse(isNotBlank(candidate)) || Objects.equals(current, candidate)) {
             return false;
         }
         setter.accept(candidate);
@@ -145,7 +211,7 @@ public class RefreshAttachedAlgoOrderExecutor {
     }
 
     private BigDecimal parseDecimal(String value) {
-        if (!isNotBlank(value)) {
+        if (isFalse(isNotBlank(value))) {
             return null;
         }
         try {
@@ -156,6 +222,6 @@ public class RefreshAttachedAlgoOrderExecutor {
     }
 
     private boolean isNotBlank(String value) {
-        return value != null && !value.isBlank();
+        return Objects.nonNull(value) && isFalse(value.isBlank());
     }
 }

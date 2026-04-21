@@ -23,6 +23,7 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
+import java.util.Objects;
 
 @Mapper(componentModel = "spring", uses = AttachedAlgoOrderMapper.class)
 public interface OrderMapper extends CommonMapper {
@@ -35,7 +36,7 @@ public interface OrderMapper extends CommonMapper {
     OrderResponse domainToRest(Order source);
 
     default OrderPageResponse domainToRest(Page<Order> source) {
-        if (source == null) {
+        if (Objects.isNull(source)) {
             return new OrderPageResponse(Page.empty());
         }
 
@@ -116,6 +117,8 @@ public interface OrderMapper extends CommonMapper {
     @Mapping(target = "externalType", source = "tpOrdKind")
     @Mapping(target = "size", source = "sz", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "failCode", source = "failCode")
+    @Mapping(target = "failReason", source = "failReason")
     AttachedAlgoOrderExternalSnapshot clientToExternalSnapshot(AttachAlgoOrd source);
 
     @BeanMapping(ignoreByDefault = true)
@@ -154,7 +157,7 @@ public interface OrderMapper extends CommonMapper {
     Order dataToDomain(OrderEntity source);
 
     default Page<Order> dataToDomain(Page<OrderEntity> source) {
-        if (source == null) {
+        if (Objects.isNull(source)) {
             return Page.empty();
         }
 

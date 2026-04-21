@@ -32,8 +32,7 @@ public class RefreshAlgoOrderExecutor {
     private static final Set<String> DEFAULT_ALGO_TYPES = Set.of("conditional", "oco", "trigger", "move_order_stop");
     private static final Set<String> LIVE_ALGO_STATUSES = Set.of(AlgoOrder.Status.PENDING.name(),
                                                                  AlgoOrder.Status.ACTIVE.name());
-    private static final Set<String> LIVE_ATTACHED_STATUSES = Set.of(AttachedAlgoOrder.Status.ATTACHED.name(),
-                                                                     AttachedAlgoOrder.Status.ACTIVE.name());
+    private static final Set<String> LIVE_ATTACHED_STATUSES = AttachedAlgoOrder.activeLikeStatusNames();
     private static final Set<String> HISTORY_FINAL_STATUSES = Set.of("effective", "canceled", "order_failed");
 
     private final ClientManager clientManager;
@@ -141,13 +140,13 @@ public class RefreshAlgoOrderExecutor {
 
             MatchedLocalEntity entity = entry.getValue();
             AlgoOrderExternalSnapshot detail = tryReadDetail(exchange, entity.probe());
-            if (detail != null) {
+            if (Objects.nonNull(detail)) {
                 entity.applyFinal(detail);
                 continue;
             }
 
             AlgoOrderExternalSnapshot history = tryReadHistory(exchange, instrument, entity.probe());
-            if (history != null) {
+            if (Objects.nonNull(history)) {
                 entity.applyFinal(history);
                 continue;
             }
@@ -245,7 +244,11 @@ public class RefreshAlgoOrderExecutor {
     }
 
     private String safe(String value) {
-        return value == null ? "" : value;
+        if (Objects.isNull(value)) {
+            return "";
+        }
+
+        return value;
     }
 
     private record MatchedLocalEntity(EntityType type,
@@ -280,23 +283,23 @@ public class RefreshAlgoOrderExecutor {
         boolean matches(AlgoOrderExternalSnapshot external) {
             if (type == EntityType.ALGO) {
                 if (Objects.equals(algoOrder.getExternalId(), external.getExternalId())
-                        && algoOrder.getExternalId() != null) {
+                        && Objects.nonNull(algoOrder.getExternalId())) {
                     return true;
                 }
                 return Objects.equals(algoOrder.getInternalId(), external.getInternalId())
-                        && algoOrder.getInternalId() != null;
+                        && Objects.nonNull(algoOrder.getInternalId());
             }
 
             if (Objects.equals(attachedAlgoOrder.getExternalId(), external.getExternalId())
-                    && attachedAlgoOrder.getExternalId() != null) {
+                    && Objects.nonNull(attachedAlgoOrder.getExternalId())) {
                 return true;
             }
             if (Objects.equals(attachedAlgoOrder.getInternalId(), external.getInternalId())
-                    && attachedAlgoOrder.getInternalId() != null) {
+                    && Objects.nonNull(attachedAlgoOrder.getInternalId())) {
                 return true;
             }
             return Objects.equals(attachedAlgoOrder.getExternalAttachedId(), external.getExternalId())
-                    && attachedAlgoOrder.getExternalAttachedId() != null;
+                    && Objects.nonNull(attachedAlgoOrder.getExternalAttachedId());
         }
 
         void applyLive(AlgoOrderExternalSnapshot snapshot) {
@@ -343,7 +346,11 @@ public class RefreshAlgoOrderExecutor {
         }
 
         private String safe(String value) {
-            return value == null ? "" : value;
+            if (Objects.isNull(value)) {
+                return "";
+            }
+
+            return value;
         }
     }
 

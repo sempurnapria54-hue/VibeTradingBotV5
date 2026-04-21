@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import java.util.Locale;
 import java.util.Objects;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 @Service
 @RequiredArgsConstructor
 public class AlgoOrderSyncService {
@@ -17,7 +19,7 @@ public class AlgoOrderSyncService {
     private final AlgoOrderMapper algoOrderMapper;
 
     public boolean applyLiveSnapshot(AlgoOrder target, AlgoOrderExternalSnapshot snapshot) {
-        if (target == null || snapshot == null) {
+        if (Objects.isNull(target) || Objects.isNull(snapshot)) {
             return false;
         }
 
@@ -32,58 +34,61 @@ public class AlgoOrderSyncService {
     }
 
     public boolean applySnapshot(AlgoOrder target, AlgoOrderExternalSnapshot snapshot) {
-        if (target == null || snapshot == null) {
+        if (Objects.isNull(target) || Objects.isNull(snapshot)) {
             return false;
         }
 
         AlgoOrder.Status previousStatus = target.getStatus();
         algoOrderMapper.updateDomainFromExternalSnapshot(snapshot, target);
         AlgoOrder.Status resolved = resolveAlgoStatus(snapshot.getExternalStatus());
-        if (resolved != null) {
+        if (Objects.nonNull(resolved)) {
             target.setStatus(resolved);
         }
         return !Objects.equals(previousStatus, target.getStatus());
     }
 
     public void applyLiveSnapshot(AttachedAlgoOrder target, AlgoOrderExternalSnapshot snapshot) {
-        if (target == null || snapshot == null) {
+        if (Objects.isNull(target) || Objects.isNull(snapshot)) {
             return;
         }
 
-        if (isBlank(target.getExternalId()) && !isBlank(snapshot.getExternalId())) {
+        if (isBlank(target.getExternalId()) && isNotBlank(snapshot.getExternalId())) {
             target.setExternalId(snapshot.getExternalId());
         }
-        if (isBlank(target.getInternalId()) && !isBlank(snapshot.getInternalId())) {
+        if (isBlank(target.getInternalId()) && isNotBlank(snapshot.getInternalId())) {
             target.setInternalId(snapshot.getInternalId());
         }
-        if (isBlank(target.getExternalType()) && !isBlank(snapshot.getExternalType())) {
+        if (isBlank(target.getExternalType()) && isNotBlank(snapshot.getExternalType())) {
             target.setExternalType(snapshot.getExternalType());
         }
         target.setExternalStatus(snapshot.getExternalStatus());
-        if (isLive(snapshot.getExternalStatus())) {
+        if (isLive(snapshot.getExternalStatus())
+                && target.canTransitionTo(AttachedAlgoOrder.Status.ACTIVE)) {
             target.toActive();
         }
     }
 
     public void applyFinalSnapshot(AttachedAlgoOrder target, AlgoOrderExternalSnapshot snapshot) {
-        if (target == null || snapshot == null) {
+        if (Objects.isNull(target) || Objects.isNull(snapshot)) {
             return;
         }
         applyLiveSnapshot(target, snapshot);
 
         String status = normalize(snapshot.getExternalStatus());
-        if ("effective".equals(status) || "canceled".equals(status)) {
+        if ((Objects.equals("effective", status) || Objects.equals("canceled", status))
+                && target.canTransitionTo(AttachedAlgoOrder.Status.CLOSED)) {
             target.toClose();
             return;
         }
-        if ("order_failed".equals(status) || "failed".equals(status)) {
+        if ((Objects.equals("order_failed", status) || Objects.equals("failed", status))
+                && target.canTransitionTo(AttachedAlgoOrder.Status.FAILED)) {
             target.toFail();
         }
     }
 
     private AlgoOrder.Status resolveAlgoStatus(String externalStatus) {
         String normalized = normalize(externalStatus);
-        if (normalized == null) {
+        if (Objects.isNull(normalized)) {
             return null;
         }
         return switch (normalized) {
@@ -96,7 +101,7 @@ public class AlgoOrderSyncService {
 
     private boolean isLive(String externalStatus) {
         String normalized = normalize(externalStatus);
-        return "live".equals(normalized) || "pause".equals(normalized);
+        return Objects.equals("live", normalized) || Objects.equals("pause", normalized);
     }
 
     private String normalize(String status) {
@@ -107,6 +112,10 @@ public class AlgoOrderSyncService {
     }
 
     private boolean isBlank(String value) {
-        return value == null || value.isBlank();
+        return Objects.isNull(value) || value.isBlank();
+    }
+
+    private boolean isNotBlank(String value) {
+        return Objects.nonNull(value) && isFalse(value.isBlank());
     }
 }
