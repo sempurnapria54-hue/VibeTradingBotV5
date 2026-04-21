@@ -38,6 +38,12 @@ public class OrderDataService {
         return mapper.dataToDomain(data);
     }
 
+    public Order findRequiredById(Long orderId) {
+        OrderEntity data = orderRepository.findById(orderId)
+                                          .orElseThrow(() -> new RuntimeException(ORDER_NOT_FOUND));
+        return mapper.dataToDomain(data);
+    }
+
     public Optional<Order> findByExternalId(String externalId) {
         return orderRepository.findByExternalId(externalId)
                               .map(mapper::dataToDomain);

@@ -21,6 +21,7 @@ import com.example.tradingbot.domain.service.core.InstrumentService;
 import com.example.tradingbot.domain.service.kill_switch.KillSwitchService;
 import com.example.tradingbot.domain.service.kill_switch.reader.StateSnapshotReader;
 import com.example.tradingbot.exception.TradeRuleViolationException;
+import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,7 @@ public class TradeRuleValidator {
     private final ClientManager clientManager;
     private final StateSnapshotReader stateSnapshotReader;
     private final JsonUtils jsonUtils;
+    private final OrderDataService orderDataService;
 
     public void validatePositions(Exchange exchange,
                                   Instrument instrument,
@@ -80,7 +82,7 @@ public class TradeRuleValidator {
         String violationCode = resolveRefreshPendingOrdersViolationCode(instrument,
                                                                         externalPendingOrders,
                                                                         internalLiveOrders);
-        if (violationCode == null) {
+        if (Objects.isNull(violationCode)) {
             return;
         }
 
@@ -103,7 +105,7 @@ public class TradeRuleValidator {
                                                                      externalLiveAlgoSnapshots,
                                                                      internalLiveAlgoOrders,
                                                                      internalAttachedAlgoOrders);
-        if (violationCode == null) {
+        if (Objects.isNull(violationCode)) {
             return;
         }
 
@@ -133,6 +135,9 @@ public class TradeRuleValidator {
         }
 
         if (hasInternalAlgoOrdersFromAnotherInstrument(instrument, internalLiveAlgoOrders)) {
+            return REFRESH_ALGO_ORDERS_INVALID_INSTRUMENT_SCOPE;
+        }
+        if (hasInternalAttachedOrdersFromAnotherInstrument(instrument, internalAttachedAlgoOrders)) {
             return REFRESH_ALGO_ORDERS_INVALID_INSTRUMENT_SCOPE;
         }
 
@@ -197,11 +202,31 @@ public class TradeRuleValidator {
     private boolean hasInternalAlgoOrdersFromAnotherInstrument(Instrument instrument,
                                                                 List<AlgoOrder> internalLiveAlgoOrders) {
         for (AlgoOrder algoOrder : safeAlgoOrders(internalLiveAlgoOrders)) {
-            if (algoOrder.getDealId() == null) {
+            if (Objects.isNull(algoOrder.getDealId())) {
                 return true;
             }
             Long algoInstrumentId = instrumentService.findRequiredByDealId(algoOrder.getDealId()).getId();
             if (!Objects.equals(algoInstrumentId, instrument.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInternalAttachedOrdersFromAnotherInstrument(Instrument instrument,
+                                                                   List<AttachedAlgoOrder> internalAttachedAlgoOrders) {
+        for (AttachedAlgoOrder attachedAlgoOrder : safeAttachedOrders(internalAttachedAlgoOrders)) {
+            if (Objects.isNull(attachedAlgoOrder.getOrderId())) {
+                return true;
+            }
+
+            Order order = orderDataService.findRequiredById(attachedAlgoOrder.getOrderId());
+            if (Objects.isNull(order.getDealId())) {
+                return true;
+            }
+
+            Long attachedInstrumentId = instrumentService.findRequiredByDealId(order.getDealId()).getId();
+            if (!Objects.equals(attachedInstrumentId, instrument.getId())) {
                 return true;
             }
         }

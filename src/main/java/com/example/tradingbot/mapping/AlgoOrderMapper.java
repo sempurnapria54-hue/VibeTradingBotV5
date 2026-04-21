@@ -78,10 +78,12 @@ public interface AlgoOrderMapper extends CommonMapper {
             List<com.example.tradingbot.client.model.okx.response.AlgoOrderResponse> source);
 
     @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "size", source = "sz", qualifiedByName = "algoOrderStringToBigDecimal")
     @Mapping(target = "externalId", source = "algoId")
     @Mapping(target = "internalId", source = "algoClOrdId")
     @Mapping(target = "externalType", source = "ordType")
     @Mapping(target = "externalStatus", source = "state")
+    @Mapping(target = "failCode", source = "failCode")
     @Mapping(target = "externalDirection", source = "side")
     @Mapping(target = "externalPositionSide", source = "posSide")
     @Mapping(target = "condition.trigger.stopLoss.externalType", source = "slTriggerPxType")
