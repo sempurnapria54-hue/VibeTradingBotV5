@@ -83,9 +83,9 @@ public interface ClientService {
 
     List<Order> cancelOrder(Order order, String instrumentExternalId);
 
-    List<AlgoOrder> createAlgoOrder(AlgoOrder algoOrder, Instrument instrument, Position position);
+    AlgoOrderExternalSnapshot createAlgoOrder(AlgoOrder algoOrder, Instrument instrument, Position position);
 
-    List<AlgoOrder> cancelAlgoOrder(Object... args);
+    AlgoOrderExternalSnapshot cancelAlgoOrder(Object... args);
 
     List<PositionExternalSnapshot> closePositions(Instrument instrument);
 

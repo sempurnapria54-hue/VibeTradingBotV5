@@ -1,33 +1,8 @@
 package com.example.tradingbot.client.service.okx;
 
-import com.example.tradingbot.client.model.okx.request.AmendOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CancelAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CancelOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CandlesRequest;
-import com.example.tradingbot.client.model.okx.request.ClosePositionRequest;
-import com.example.tradingbot.client.model.okx.request.CreateAlgoOrderRequest;
-import com.example.tradingbot.client.model.okx.request.CreateOrderRequest;
-import com.example.tradingbot.client.model.okx.request.FillsArchiveLinkRequest;
-import com.example.tradingbot.client.model.okx.request.FillsArchiveRequest;
-import com.example.tradingbot.client.model.okx.request.FillsRequest;
-import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
-import com.example.tradingbot.client.model.okx.request.get.GetAlgoOrdersHistorySearchParams;
-import com.example.tradingbot.client.model.okx.request.get.GetOrderDetailsSearchParams;
-import com.example.tradingbot.client.model.okx.request.get.GetOrdersAlgoPendingSearchParams;
-import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistoryArchiveSearchParams;
-import com.example.tradingbot.client.model.okx.request.get.GetOrdersHistorySearchParams;
-import com.example.tradingbot.client.model.okx.request.get.GetOrdersPendingSearchParams;
-import com.example.tradingbot.client.model.okx.request.get.GetPositionsSearchParams;
-import com.example.tradingbot.client.model.okx.response.AlgoOrderResponse;
-import com.example.tradingbot.client.model.okx.response.CandleResponse;
-import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
-import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
-import com.example.tradingbot.client.model.okx.response.OrderResponse;
-import com.example.tradingbot.client.model.okx.response.PositionResponse;
-import com.example.tradingbot.client.model.okx.response.PriceTickerResponse;
-import com.example.tradingbot.client.model.okx.response.TickerRequest;
-import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
-import com.example.tradingbot.client.model.okx.response.TradeFillsArchiveResponse;
+import com.example.tradingbot.client.model.okx.request.*;
+import com.example.tradingbot.client.model.okx.request.get.*;
+import com.example.tradingbot.client.model.okx.response.*;
 import com.example.tradingbot.client.model.okx.response.balance.BalanceResponse;
 import com.example.tradingbot.client.service.ClientService;
 import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
@@ -48,15 +23,7 @@ import com.example.tradingbot.domain.model.search_params.CandleSearchParams;
 import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
 import com.example.tradingbot.domain.model.search_params.PriceTickerSearchParams;
 import com.example.tradingbot.domain.model.search_params.TradeFillsSearchParams;
-import com.example.tradingbot.mapping.AlgoOrderMapper;
-import com.example.tradingbot.mapping.BalanceContainerMapper;
-import com.example.tradingbot.mapping.CandleMapper;
-import com.example.tradingbot.mapping.InstrumentMapper;
-import com.example.tradingbot.mapping.OrderMapper;
-import com.example.tradingbot.mapping.PositionMapper;
-import com.example.tradingbot.mapping.PriceTickerMapper;
-import com.example.tradingbot.mapping.TradeFillMapper;
-import com.example.tradingbot.mapping.TradeFillsArchiveMapper;
+import com.example.tradingbot.mapping.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -286,18 +253,18 @@ public class OkxClientService implements ClientService {
     }
 
     @Override
-    public List<AlgoOrder> createAlgoOrder(AlgoOrder algoOrder, Instrument instrument, Position position) {
+    public AlgoOrderExternalSnapshot createAlgoOrder(AlgoOrder algoOrder, Instrument instrument, Position position) {
         CreateAlgoOrderRequest request = algoOrderMapper.domainToClientOkxRequest(algoOrder);
         request.setInstrumentId(instrument.getExternalId());
         request.setTradeMode(instrument.getExternalMarginMode());
         request.setPositionSide(position.getExternalSide());
         request.setSide(algoOrder.getExternalDirection());
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.createAlgoOrder(request);
-        return algoOrderMapper.clientToDomain(response.getData());
+        return algoOrderMapper.clientToExternalSnapshot(response.getData().getFirst());
     }
 
     @Override
-    public List<AlgoOrder> cancelAlgoOrder(Object... args) {
+    public AlgoOrderExternalSnapshot cancelAlgoOrder(Object... args) {
         AlgoOrder algoOrder = (AlgoOrder) args[0];
         String instrumentExternalId = (String) args[1];
 
@@ -305,7 +272,7 @@ public class OkxClientService implements ClientService {
         request.setInstrumentId(instrumentExternalId);
 
         OkxApiResponse<AlgoOrderResponse> response = okxRestClient.cancelAlgoOrder(request);
-        return algoOrderMapper.clientToDomain(response.getData());
+        return algoOrderMapper.clientToExternalSnapshot(response.getData().getFirst());
     }
 
     @Override

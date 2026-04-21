@@ -25,8 +25,13 @@ public interface ExchangeMapper {
 
     com.example.tradingbot.rest.model.response.exchange.Exchange domainToRestModel(Exchange source);
 
-    @Mapping(target = "exchanges", source = ".")
-    ExchangeContainerResponse domainListToRestContainer(List<Exchange> exchanges);
+    List<com.example.tradingbot.rest.model.response.exchange.Exchange> domainListToRestModelList(List<Exchange> source);
+
+    default ExchangeContainerResponse domainListToRestContainer(List<Exchange> source) {
+        ExchangeContainerResponse response = new ExchangeContainerResponse();
+        response.setExchanges(domainListToRestModelList(source));
+        return response;
+    }
 
 
     /**

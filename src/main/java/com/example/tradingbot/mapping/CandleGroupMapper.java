@@ -23,8 +23,14 @@ public interface CandleGroupMapper {
 
     com.example.tradingbot.rest.model.response.candle_group.CandleGroup domainToRestModel(CandleGroup source);
 
-    @Mapping(target = "candleGroups", source = ".")
-    CandleGroupContainerResponse domainListToRestContainer(List<CandleGroup> source);
+    List<com.example.tradingbot.rest.model.response.candle_group.CandleGroup> domainListToRestModelList(
+            List<CandleGroup> source);
+
+    default CandleGroupContainerResponse domainListToRestContainer(List<CandleGroup> source) {
+        CandleGroupContainerResponse response = new CandleGroupContainerResponse();
+        response.setCandleGroups(domainListToRestModelList(source));
+        return response;
+    }
 
     @Mapping(target = "externalTimeframe", source = "timeframe")
     CandleGroup restToDomain(CreateCandleGroupRequest request);

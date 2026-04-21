@@ -5,13 +5,10 @@ import com.example.tradingbot.domain.model.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.persistence.model.balance.BalanceContainerEntity;
 import com.example.tradingbot.persistence.model.balance.BalanceEntity;
-import org.mapstruct.AfterMapping;
-import org.mapstruct.BeanMapping;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.*;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Mapper(componentModel = "spring", uses = BalanceMapper.class)
@@ -33,7 +30,7 @@ public interface BalanceContainerMapper extends CommonMapper {
     @Mapping(target = "exchangeId", source = "exchangeId")
     @Mapping(target = "totalEquity", source = "response.totalEq")
     @Mapping(target = "unrealizedProfit", source = "response.upl")
-    @Mapping(target = "externalModifiedAt", source = "response.uTime", qualifiedByName = "toOffsetDateTimeUtc")
+    @Mapping(target = "externalModifiedAt", source = "response.uTime", qualifiedByName = "containerToOffsetDateTimeUtc")
     @Mapping(target = "balanceExternalSnapshots", source = "response.details")
     BalanceContainerExternalSnapshot clientToExternalSnapshot(Long exchangeId, BalanceResponse response);
 
@@ -42,8 +39,8 @@ public interface BalanceContainerMapper extends CommonMapper {
      */
 
     @BeanMapping(ignoreByDefault = true, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "totalEquity", source = "totalEquity", qualifiedByName = "stringToBigDecimal")
-    @Mapping(target = "unrealizedProfit", source = "unrealizedProfit", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "totalEquity", source = "totalEquity", qualifiedByName = "containerStringToBigDecimal")
+    @Mapping(target = "unrealizedProfit", source = "unrealizedProfit", qualifiedByName = "containerStringToBigDecimal")
     @Mapping(target = "externalUpdatedAt", source = "externalModifiedAt")
     void updateDomainFromExternalSnapshot(BalanceContainerExternalSnapshot source,
                                           @MappingTarget BalanceContainer target);
@@ -57,5 +54,20 @@ public interface BalanceContainerMapper extends CommonMapper {
         for (BalanceEntity balance : balances) {
             balance.setBalanceContainer(target);
         }
+    }
+
+
+    /**
+     * COMMON_WRAP
+     */
+
+    @Named("containerStringToBigDecimal")
+    default BigDecimal containerStringToBigDecimal(String value) {
+        return CommonMapper.super.stringToBigDecimal(value);
+    }
+
+    @Named("containerToOffsetDateTimeUtc")
+    default OffsetDateTime containerToOffsetDateTimeUtc(String value) {
+        return CommonMapper.super.toOffsetDateTimeUtc(value);
     }
 }

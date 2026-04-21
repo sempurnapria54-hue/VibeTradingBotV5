@@ -2,6 +2,8 @@ package com.example.tradingbot.domain.service.validator;
 
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.client.service.ClientService;
+import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.anomaly.AnomalyReport;
 import com.example.tradingbot.domain.model.anomaly.AnomalyReport.Severity;
 import com.example.tradingbot.domain.model.exchange.Exchange;
@@ -11,8 +13,6 @@ import com.example.tradingbot.domain.model.kill_switch.KillSwitchResult;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
 import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.order.Order;
-import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
