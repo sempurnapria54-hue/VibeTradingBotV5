@@ -2,24 +2,29 @@ package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.domain.model.order.Order;
 import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+
+import java.util.Locale;
+import java.util.Objects;
 
 @Component
 public class OrderStatusResolver {
 
     public Order.Status resolveStatus(OrderExternalSnapshot snapshot) {
-        if (snapshot == null) {
+        if (Objects.isNull(snapshot)) {
             return Order.Status.PENDING;
         }
         return resolveStatus(snapshot.getExternalStatus());
     }
 
     private Order.Status resolveStatus(String externalStatus) {
-        if (externalStatus == null || externalStatus.isBlank()) {
+        if (StringUtils.isBlank(externalStatus)) {
             return Order.Status.PENDING;
         }
 
-        String normalized = externalStatus.trim().toLowerCase();
+        String normalized = externalStatus.trim()
+                                          .toLowerCase(Locale.ROOT);
         return switch (normalized) {
             case "live" -> Order.Status.PENDING;
             case "partially_filled" -> Order.Status.PARTIALLY_COMPLETED;

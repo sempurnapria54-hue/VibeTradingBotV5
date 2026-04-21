@@ -12,6 +12,7 @@ import com.example.tradingbot.persistence.service.OrderDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -19,6 +20,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 @Service
 @RequiredArgsConstructor
@@ -62,16 +65,16 @@ public class RefreshOrderExecutor {
             applySnapshot(matchedOrder, snapshot);
             Order savedOrder = orderDataService.save(matchedOrder);
             refreshAttachedAlgoOrderExecutor.refreshAttachedAlgoOrders(savedOrder, snapshot);
-            if (savedOrder.getId() != null) {
+            if (Objects.nonNull(savedOrder.getId())) {
                 handledLocalIds.add(savedOrder.getId());
             }
         }
 
         List<Order> missingFromPending = internalLiveOrders.stream()
-                                                           .filter(order -> order.getId() == null
-                                                                   || !handledLocalIds.contains(order.getId()))
+                                                           .filter(order -> Objects.isNull(order.getId())
+                                                                   || isFalse(handledLocalIds.contains(order.getId())))
                                                            .toList();
-        if (missingFromPending.isEmpty()) {
+        if (CollectionUtils.isEmpty(missingFromPending)) {
             return;
         }
 
@@ -97,7 +100,10 @@ public class RefreshOrderExecutor {
     }
 
     private List<OrderExternalSnapshot> safeList(List<OrderExternalSnapshot> snapshots) {
-        return snapshots == null ? List.of() : snapshots;
+        if (Objects.isNull(snapshots)) {
+            return List.of();
+        }
+        return snapshots;
     }
 
     private Optional<Order> matchLocalOrder(List<Order> localLiveOrders, OrderExternalSnapshot snapshot) {
@@ -122,17 +128,17 @@ public class RefreshOrderExecutor {
                                                        List<OrderExternalSnapshot> history,
                                                        List<OrderExternalSnapshot> archive) {
         OrderExternalSnapshot detail = tryGetOrderDetail(clientService, instrument, order);
-        if (detail != null) {
+        if (Objects.nonNull(detail)) {
             return detail;
         }
 
         OrderExternalSnapshot fromHistory = findByIdentity(history, order);
-        if (fromHistory != null) {
+        if (Objects.nonNull(fromHistory)) {
             return fromHistory;
         }
 
         OrderExternalSnapshot fromArchive = findByIdentity(archive, order);
-        if (fromArchive != null) {
+        if (Objects.nonNull(fromArchive)) {
             return fromArchive;
         }
 
@@ -144,7 +150,7 @@ public class RefreshOrderExecutor {
                                                          instrument,
                                                          order.getExternalId(),
                                                          null);
-        if (byExternalId != null) {
+        if (Objects.nonNull(byExternalId)) {
             return byExternalId;
         }
         return tryGetOrder(clientService, instrument, null, order.getInternalId());

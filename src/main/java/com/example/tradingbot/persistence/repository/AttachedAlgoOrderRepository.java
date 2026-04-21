@@ -13,6 +13,14 @@ public interface AttachedAlgoOrderRepository extends JpaRepository<AttachedAlgoO
     @Query(value = """
             select aao.*
             from attached_algo_orders aao
+            where aao.order_id = :orderId
+            order by aao.id desc
+            """, nativeQuery = true)
+    List<AttachedAlgoOrderEntity> findAllByOrderId(@Param("orderId") Long orderId);
+
+    @Query(value = """
+            select aao.*
+            from attached_algo_orders aao
             join orders o on o.id = aao.order_id
             join deals d on d.id = o.deal_id
             where d.instrument_id = :instrumentId

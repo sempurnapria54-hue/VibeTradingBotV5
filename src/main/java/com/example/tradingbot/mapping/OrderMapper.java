@@ -104,6 +104,9 @@ public interface OrderMapper extends CommonMapper {
     @Mapping(target = "externalCreatedAt", source = "cTime", qualifiedByName = "toOffsetDateTimeUtc")
     @Mapping(target = "externalModifiedAt", source = "uTime", qualifiedByName = "toOffsetDateTimeUtc")
     @Mapping(target = "attachedAlgoOrders", source = "attachAlgoOrds")
+    @Mapping(target = "attachedAlgoInternalId", source = "attachAlgoClOrdId")
+    @Mapping(target = "takeProfitTriggerPrice", source = "tpTriggerPx", qualifiedByName = "stringToBigDecimal")
+    @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx", qualifiedByName = "stringToBigDecimal")
     OrderExternalSnapshot clientToExternalSnapshot(com.example.tradingbot.client.model.okx.response.OrderResponse source);
 
     @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)

@@ -68,4 +68,19 @@ public class OrderExternalSnapshot extends Auditable {
      * Снапшоты прикреплённых algo-ордеров (attachAlgoOrds).
      */
     private List<AttachedAlgoOrderExternalSnapshot> attachedAlgoOrders;
+
+    /**
+     * Клиентский идентификатор прикреплённой защиты из top-level order snapshot.
+     */
+    private String attachedAlgoInternalId;
+
+    /**
+     * Top-level триггер take-profit из order snapshot.
+     */
+    private BigDecimal takeProfitTriggerPrice;
+
+    /**
+     * Top-level триггер stop-loss из order snapshot.
+     */
+    private BigDecimal stopLossTriggerPrice;
 }
