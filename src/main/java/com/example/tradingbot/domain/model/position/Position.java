@@ -10,6 +10,9 @@ import java.math.BigDecimal;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+/**
+ * Открытая или закрытая позиция по инструменту.
+ */
 @Getter
 @Setter
 @NoArgsConstructor

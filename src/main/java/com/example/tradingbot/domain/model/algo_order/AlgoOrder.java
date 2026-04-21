@@ -9,6 +9,9 @@ import java.math.BigDecimal;
 import static io.micrometer.common.util.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+/**
+ * Самостоятельный algo-ордер сопровождения сделки.
+ */
 @Getter
 @Setter
 public class AlgoOrder extends Auditable {

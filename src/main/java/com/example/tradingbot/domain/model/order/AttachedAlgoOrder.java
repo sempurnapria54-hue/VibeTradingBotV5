@@ -8,6 +8,9 @@ import java.math.BigDecimal;
 
 import static io.micrometer.common.util.StringUtils.isNotBlank;
 
+/**
+ * Прикреплённый защитный algo-ордер обычного ордера.
+ */
 @Getter
 @Setter
 public class AttachedAlgoOrder extends Auditable {

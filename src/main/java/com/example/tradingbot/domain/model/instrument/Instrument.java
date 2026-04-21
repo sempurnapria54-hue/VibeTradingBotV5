@@ -9,6 +9,9 @@ import lombok.Setter;
 
 import java.util.List;
 
+/**
+ * Торговый инструмент биржи.
+ */
 @Getter
 @Setter
 @NoArgsConstructor

@@ -7,6 +7,9 @@ import lombok.Setter;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+/**
+ * Отчёт о глобальной аномалии системы.
+ */
 @Getter
 @Setter
 public class AnomalyReport extends Auditable {

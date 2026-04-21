@@ -8,6 +8,7 @@ import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.position.Position;
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshAlgoOrderExecutor;
+import com.example.tradingbot.domain.service.deal.command.refresh.SyncAlgoOrderExecutor;
 import com.example.tradingbot.exception.TradingCommandException;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
@@ -37,6 +38,7 @@ public class AlgoOrderService {
     private final AlgoOrderMapper algoOrderMapper;
     private final ClientManager clientManager;
     private final RefreshAlgoOrderExecutor refreshAlgoOrderExecutor;
+    private final SyncAlgoOrderExecutor syncAlgoOrderExecutor;
 
     @Transactional
     public AlgoOrder createAlgoOrder(String dealInternalId, AlgoOrder request) {
@@ -69,13 +71,7 @@ public class AlgoOrderService {
     public AlgoOrder syncAlgoOrder(String exchangeInternalId, String internalId) {
         Exchange exchange = exchangeDataService.findRequiredByInternalId(exchangeInternalId);
         AlgoOrder algoOrder = algoOrderDataService.findRequiredByInternalId(internalId);
-
-        List<AlgoOrder> externalAlgoOrders = clientManager.getClientService(exchange.getName())
-                                                          .createAlgoOrder(algoOrder);
-        AlgoOrder externalAlgoOrder = getRequiredByExternalId(externalAlgoOrders, algoOrder.getExternalId());
-
-        algoOrderMapper.domainToDomainOnUpdate(externalAlgoOrder, algoOrder);
-        return algoOrderDataService.save(algoOrder);
+        return syncAlgoOrderExecutor.execute(exchange, algoOrder);
     }
 
     public AlgoOrder cancelAlgoOrder(String exchangeInternalId, String instrumentInternalId,

@@ -7,6 +7,9 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * Баланс аккаунта по одной валюте.
+ */
 @Getter
 @Setter
 public class Balance extends Auditable {
