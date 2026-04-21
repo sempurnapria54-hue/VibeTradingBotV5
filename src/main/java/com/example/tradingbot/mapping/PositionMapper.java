@@ -36,6 +36,7 @@ public interface PositionMapper extends CommonMapper {
      * CLIENT
      */
     @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "instrumentExternalId", source = "instId")
     @Mapping(target = "externalId", source = "posId")
     @Mapping(target = "externalSide", source = "posSide")
     @Mapping(target = "size", source = "pos", qualifiedByName = "stringToBigDecimal")

@@ -15,6 +15,11 @@ import java.math.BigDecimal;
 public class PositionExternalSnapshot extends Auditable {
 
     /**
+     * Идентификатор инструмента на бирже.
+     */
+    private String instrumentExternalId;
+
+    /**
      * Идентификатор позиции на бирже.
      */
     private String externalId;

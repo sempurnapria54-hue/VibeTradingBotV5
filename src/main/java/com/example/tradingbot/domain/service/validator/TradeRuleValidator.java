@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMessage;
 import static org.apache.commons.lang3.math.NumberUtils.INTEGER_ONE;
 import static org.hibernate.internal.util.collections.CollectionHelper.isNotEmpty;
@@ -40,6 +41,8 @@ import static org.hibernate.internal.util.collections.CollectionHelper.isNotEmpt
 public class TradeRuleValidator {
 
     private static final String OVERHEAD_POSITIONS_COUNT = "OVERHEAD_POSITIONS_COUNT";
+    private static final String POSITIONS_INVALID_INSTRUMENT_SCOPE = "POSITIONS_INVALID_INSTRUMENT_SCOPE";
+    private static final String POSITIONS_IDENTITY_MISMATCH = "POSITIONS_IDENTITY_MISMATCH";
     private static final String REFRESH_PENDING_ORDERS_EXTERNAL_DUPLICATES = "REFRESH_PENDING_ORDERS_EXTERNAL_DUPLICATES";
     private static final String REFRESH_PENDING_ORDERS_INTERNAL_DUPLICATES = "REFRESH_PENDING_ORDERS_INTERNAL_DUPLICATES";
     private static final String REFRESH_PENDING_ORDERS_UNMATCHED_EXTERNAL = "REFRESH_PENDING_ORDERS_UNMATCHED_EXTERNAL";
@@ -63,15 +66,36 @@ public class TradeRuleValidator {
                                   Long dealId,
                                   List<PositionExternalSnapshot> externalSnapshots,
                                   List<Position> domainPositions) {
-        if (hasOverheadPositions(externalSnapshots, domainPositions)) {
-            executeTradeRuleViolationFlow(exchange,
-                                          instrument,
-                                          dealId,
-                                          OVERHEAD_POSITIONS_COUNT,
-                                          Severity.CRITICAL);
-            throw new TradeRuleViolationException(
-                    "Trade rule violation detected for positions: " + OVERHEAD_POSITIONS_COUNT);
+        String violationCode = resolvePositionsViolationCode(instrument, externalSnapshots, domainPositions);
+        if (Objects.isNull(violationCode)) {
+            return;
         }
+
+        executeTradeRuleViolationFlow(exchange,
+                                      instrument,
+                                      dealId,
+                                      violationCode,
+                                      Severity.CRITICAL);
+        throw new TradeRuleViolationException(
+                "Trade rule violation detected for positions: " + violationCode);
+    }
+
+    private String resolvePositionsViolationCode(Instrument instrument,
+                                                 List<PositionExternalSnapshot> externalSnapshots,
+                                                 List<Position> domainPositions) {
+        if (hasOverheadPositions(externalSnapshots, domainPositions)) {
+            return OVERHEAD_POSITIONS_COUNT;
+        }
+        if (hasExternalPositionsFromAnotherInstrument(instrument, externalSnapshots)) {
+            return POSITIONS_INVALID_INSTRUMENT_SCOPE;
+        }
+        if (hasInternalPositionsFromAnotherInstrument(instrument, domainPositions)) {
+            return POSITIONS_INVALID_INSTRUMENT_SCOPE;
+        }
+        if (hasPositionIdentityMismatch(externalSnapshots, domainPositions)) {
+            return POSITIONS_IDENTITY_MISMATCH;
+        }
+        return null;
     }
 
     public void validateRefreshPendingOrders(Exchange exchange,
@@ -206,7 +230,7 @@ public class TradeRuleValidator {
                 return true;
             }
             Long algoInstrumentId = instrumentService.findRequiredByDealId(algoOrder.getDealId()).getId();
-            if (!Objects.equals(algoInstrumentId, instrument.getId())) {
+            if (isFalse(Objects.equals(algoInstrumentId, instrument.getId()))) {
                 return true;
             }
         }
@@ -226,7 +250,7 @@ public class TradeRuleValidator {
             }
 
             Long attachedInstrumentId = instrumentService.findRequiredByDealId(order.getDealId()).getId();
-            if (!Objects.equals(attachedInstrumentId, instrument.getId())) {
+            if (isFalse(Objects.equals(attachedInstrumentId, instrument.getId()))) {
                 return true;
             }
         }
@@ -364,11 +388,11 @@ public class TradeRuleValidator {
 
     private boolean hasInternalOrdersFromAnotherInstrument(Instrument instrument, List<Order> internalLiveOrders) {
         for (Order order : safeOrders(internalLiveOrders)) {
-            if (order.getDealId() == null) {
+            if (Objects.isNull(order.getDealId())) {
                 return true;
             }
             Long orderInstrumentId = instrumentService.findRequiredByDealId(order.getDealId()).getId();
-            if (!Objects.equals(orderInstrumentId, instrument.getId())) {
+            if (isFalse(Objects.equals(orderInstrumentId, instrument.getId()))) {
                 return true;
             }
         }
@@ -376,27 +400,56 @@ public class TradeRuleValidator {
     }
 
     private List<OrderExternalSnapshot> safeOrderSnapshots(List<OrderExternalSnapshot> snapshots) {
-        return snapshots == null ? List.of() : snapshots;
+        if (Objects.isNull(snapshots)) {
+            return List.of();
+        }
+        return snapshots;
+    }
+
+    private List<PositionExternalSnapshot> safePositionSnapshots(List<PositionExternalSnapshot> snapshots) {
+        if (Objects.isNull(snapshots)) {
+            return List.of();
+        }
+        return snapshots;
+    }
+
+    private List<Position> safePositions(List<Position> positions) {
+        if (Objects.isNull(positions)) {
+            return List.of();
+        }
+        return positions;
     }
 
     private List<Order> safeOrders(List<Order> orders) {
-        return orders == null ? List.of() : orders;
+        if (Objects.isNull(orders)) {
+            return List.of();
+        }
+        return orders;
     }
 
     private List<AlgoOrderExternalSnapshot> safeAlgoSnapshots(List<AlgoOrderExternalSnapshot> snapshots) {
-        return snapshots == null ? List.of() : snapshots;
+        if (Objects.isNull(snapshots)) {
+            return List.of();
+        }
+        return snapshots;
     }
 
     private List<AlgoOrder> safeAlgoOrders(List<AlgoOrder> orders) {
-        return orders == null ? List.of() : orders;
+        if (Objects.isNull(orders)) {
+            return List.of();
+        }
+        return orders;
     }
 
     private List<AttachedAlgoOrder> safeAttachedOrders(List<AttachedAlgoOrder> orders) {
-        return orders == null ? List.of() : orders;
+        if (Objects.isNull(orders)) {
+            return List.of();
+        }
+        return orders;
     }
 
     private boolean incrementAndCheckDuplicate(Map<String, Integer> counters, String key) {
-        if (key == null || key.isBlank()) {
+        if (Objects.isNull(key) || key.isBlank()) {
             return false;
         }
         int nextCount = counters.getOrDefault(key, 0) + 1;
@@ -407,6 +460,58 @@ public class TradeRuleValidator {
     private boolean hasOverheadPositions(List<PositionExternalSnapshot> externalSnapshots,
                                          List<Position> domainPositions) {
         return hasExternalOverheadPositions(externalSnapshots) || hasDomainOverheadPositions(domainPositions);
+    }
+
+    private boolean hasExternalPositionsFromAnotherInstrument(Instrument instrument,
+                                                              List<PositionExternalSnapshot> externalSnapshots) {
+        for (PositionExternalSnapshot snapshot : safePositionSnapshots(externalSnapshots)) {
+            if (Objects.isNull(snapshot.getInstrumentExternalId())) {
+                return true;
+            }
+            if (isFalse(Objects.equals(snapshot.getInstrumentExternalId(), instrument.getExternalId()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInternalPositionsFromAnotherInstrument(Instrument instrument,
+                                                              List<Position> domainPositions) {
+        for (Position position : safePositions(domainPositions)) {
+            if (Objects.isNull(position.getDealId())) {
+                return true;
+            }
+
+            Long positionInstrumentId = instrumentService.findRequiredByDealId(position.getDealId()).getId();
+            if (isFalse(Objects.equals(positionInstrumentId, instrument.getId()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasPositionIdentityMismatch(List<PositionExternalSnapshot> externalSnapshots,
+                                                List<Position> domainPositions) {
+        if (safePositionSnapshots(externalSnapshots).size() != INTEGER_ONE) {
+            return false;
+        }
+        if (safePositions(domainPositions).size() != INTEGER_ONE) {
+            return false;
+        }
+
+        PositionExternalSnapshot externalSnapshot = safePositionSnapshots(externalSnapshots).getFirst();
+        Position domainPosition = safePositions(domainPositions).getFirst();
+        if (Objects.isNull(externalSnapshot) || Objects.isNull(domainPosition)) {
+            return false;
+        }
+        if (Objects.isNull(externalSnapshot.getExternalId())) {
+            return false;
+        }
+        if (Objects.isNull(domainPosition.getExternalId())) {
+            return false;
+        }
+
+        return isFalse(Objects.equals(externalSnapshot.getExternalId(), domainPosition.getExternalId()));
     }
 
     private boolean hasExternalOverheadPositions(List<PositionExternalSnapshot> externalSnapshots) {
