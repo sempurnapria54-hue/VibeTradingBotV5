@@ -18,6 +18,7 @@ public class Constant {
         public static final String EXCHANGE_NOT_FOUND = "exchange.not.found";
         public static final String INSTRUMENT_NOT_FOUND = "instrument.not.found";
         public static final String DEAL_NOT_FOUND = "deal.not.found";
+        public static final String STRATEGY_NOT_FOUND = "strategy.not.found";
         public static final String ORDER_NOT_FOUND = "order.not.found";
         public static final String POSITION_NOT_FOUND = "position.not.found";
         public static final String ALGO_ORDER_NOT_FOUND = "algo.order.not.found";

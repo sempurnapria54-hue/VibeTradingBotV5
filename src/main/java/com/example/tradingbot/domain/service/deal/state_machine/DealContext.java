@@ -83,7 +83,7 @@ public class DealContext {
      * Детали стратегии для текущей фазы рынка.
      * <p>
      * Это именно те настройки, по которым сейчас должна работать сделка:
-     * тип входа, тип защиты, риск, maxLeverage и т.д.
+     * phaseEntryPolicy, риск, maxLeverage и шаги стратегии по Deal.Status.
      */
     private StrategyDetails strategyDetails;
 

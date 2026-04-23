@@ -8,11 +8,11 @@ import com.example.tradingbot.domain.model.strategy.Strategy;
 import com.example.tradingbot.domain.model.strategy.StrategyDetails;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.deal.state_machine.TransitionResult;
+import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-
-import static java.util.Objects.isNull;
+import java.util.Objects;
 
 @Service
 public class PrecheckHandler implements StateHandler {
@@ -25,15 +25,15 @@ public class PrecheckHandler implements StateHandler {
     @Override
     public void checkEntryInvariants(DealContext context) {
         Deal deal = context.getDeal();
-        if (deal == null) {
+        if (Objects.isNull(deal)) {
             throw new IllegalStateException("deal is null");
         }
 
-        if (deal.getStatus() != Deal.Status.PRECHECK) {
+        if (BooleanUtils.isFalse(Objects.equals(deal.getStatus(), Deal.Status.PRECHECK))) {
             throw new IllegalStateException("deal.status must be PRECHECK");
         }
 
-        if (deal.getInstrumentId() == null) {
+        if (Objects.isNull(deal.getInstrumentId())) {
             throw new IllegalStateException("deal.instrumentId is null");
         }
     }
@@ -59,7 +59,7 @@ public class PrecheckHandler implements StateHandler {
 
     @Override
     public void checkExitInvariants(DealContext context, TransitionResult result) {
-        if (result.getNextStatus() == Deal.Status.ENTRY_SUBMITTED && isPrecheckBlocked(context)) {
+        if (Objects.equals(result.getNextStatus(), Deal.Status.ENTRY_SUBMITTED) && isPrecheckBlocked(context)) {
             throw new IllegalStateException("Precheck transition to ENTRY_SUBMITTED is not allowed");
         }
     }
@@ -87,7 +87,7 @@ public class PrecheckHandler implements StateHandler {
     /**
      * PRECHECK считается успешно пройденным, если:
      * - стратегия существует и активна;
-     * - для текущей фазы рынка найдены активные детали стратегии;
+     * - для текущей фазы рынка найдены детали стратегии;
      * - торговля в этой фазе не запрещена;
      * - фаза рынка определена и не UNKNOWN;
      * - по инструменту нет активной позиции;
@@ -98,11 +98,11 @@ public class PrecheckHandler implements StateHandler {
         StrategyDetails strategyDetails = context.getStrategyDetails();
         MarketPhase marketPhase = context.getMarketPhase();
 
-        if (isNull(strategy) || strategy.isNotActive()) {
+        if (Objects.isNull(strategy) || strategy.isNotActive()) {
             return false;
         }
 
-        if (isNull(strategyDetails) || strategyDetails.isNotActive()) {
+        if (Objects.isNull(strategyDetails)) {
             return false;
         }
 
@@ -110,7 +110,7 @@ public class PrecheckHandler implements StateHandler {
             return false;
         }
 
-        if (isNull(marketPhase) || isNull(marketPhase.getType()) || marketPhase.isUnknown()) {
+        if (Objects.isNull(marketPhase) || Objects.isNull(marketPhase.getType()) || marketPhase.isUnknown()) {
             return false;
         }
 
@@ -139,6 +139,6 @@ public class PrecheckHandler implements StateHandler {
      * - уже созданный entry-ордер.
      */
     private boolean isPrecheckBlocked(DealContext context) {
-        return !isPrecheckPassed(context);
+        return BooleanUtils.isFalse(isPrecheckPassed(context));
     }
 }

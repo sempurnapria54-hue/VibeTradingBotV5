@@ -18,6 +18,7 @@ import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.market.MarketPhaseService;
 import com.example.tradingbot.domain.service.strategy.StrategyService;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -74,12 +75,13 @@ public class DealContextService {
 
         Position activePosition = positions.stream()
                                            .filter(Objects::nonNull)
-                                           .filter(position -> position.getStatus() == Position.Status.ACTIVE)
+                                           .filter(position -> Objects.equals(position.getStatus(),
+                                                                              Position.Status.ACTIVE))
                                            .max(Comparator.comparing(Position::getCreatedAt,
                                                                      Comparator.nullsLast(Comparator.naturalOrder())))
                                            .orElse(null);
 
-        if (activePosition != null) {
+        if (Objects.nonNull(activePosition)) {
             return activePosition;
         }
 
@@ -98,15 +100,15 @@ public class DealContextService {
     }
 
     private StrategyDetails resolveStrategyDetails(Strategy strategy, MarketPhase marketPhase) {
-        if (strategy == null) {
+        if (Objects.isNull(strategy)) {
             return null;
         }
 
-        if (strategy.getStatus() != Strategy.Status.ACTIVE) {
+        if (strategy.isNotActive()) {
             return null;
         }
 
-        if (marketPhase == null || marketPhase.getType() == null) {
+        if (Objects.isNull(marketPhase) || Objects.isNull(marketPhase.getType())) {
             return null;
         }
 
@@ -114,21 +116,21 @@ public class DealContextService {
     }
 
     private boolean isEntryOrder(Order order) {
-        if (order.getType() == null) {
+        if (Objects.isNull(order.getType())) {
             return false;
         }
 
-        return order.getType() == Order.Type.ENTRY
-                || order.getType() == Order.Type.ENTRY_ATTACHED_STOP_LOSS;
+        return Objects.equals(order.getType(), Order.Type.ENTRY)
+                || Objects.equals(order.getType(), Order.Type.ENTRY_ATTACHED_STOP_LOSS);
     }
 
     private boolean isActiveAlgoOrder(AlgoOrder algoOrder) {
-        if (algoOrder.getStatus() != AlgoOrder.Status.PENDING
-                && algoOrder.getStatus() != AlgoOrder.Status.ACTIVE) {
+        if (Objects.isNull(algoOrder.getStatus())) {
             return false;
         }
 
-        return true;
+        return Objects.equals(algoOrder.getStatus(), AlgoOrder.Status.PENDING)
+                || Objects.equals(algoOrder.getStatus(), AlgoOrder.Status.ACTIVE);
     }
 
     /**
@@ -136,11 +138,11 @@ public class DealContextService {
      * лучше делать это derived-методом внутри DealContext, а не хранить отдельным полем.
      */
     private AttachedAlgoOrder resolveActiveAttachedStopLoss(Order entryOrder) {
-        if (entryOrder == null) {
+        if (Objects.isNull(entryOrder)) {
             return null;
         }
 
-        if (entryOrder.getAttachedAlgoOrders() == null) {
+        if (Objects.isNull(entryOrder.getAttachedAlgoOrders())) {
             return null;
         }
 
@@ -155,30 +157,31 @@ public class DealContextService {
     }
 
     private boolean isAttachedStopLoss(AttachedAlgoOrder attachedAlgoOrder) {
-        if (attachedAlgoOrder.getType() == null) {
+        if (Objects.isNull(attachedAlgoOrder.getType())) {
             return false;
         }
 
-        return attachedAlgoOrder.getType() == AttachedAlgoOrder.Type.ATTACHED_STOP_LOSS;
+        return Objects.equals(attachedAlgoOrder.getType(), AttachedAlgoOrder.Type.ATTACHED_STOP_LOSS);
     }
 
     private boolean isNotClosedAttached(AttachedAlgoOrder attachedAlgoOrder) {
-        return attachedAlgoOrder.getStatus() != AttachedAlgoOrder.Status.CLOSED
-                && attachedAlgoOrder.getStatus() != AttachedAlgoOrder.Status.FAILED;
+        return BooleanUtils.isFalse(Objects.equals(attachedAlgoOrder.getStatus(), AttachedAlgoOrder.Status.CLOSED))
+                && BooleanUtils.isFalse(Objects.equals(attachedAlgoOrder.getStatus(), AttachedAlgoOrder.Status.FAILED));
     }
 
     private boolean hasMainStopProtection(List<AlgoOrder> activeAlgoOrders) {
-        if (activeAlgoOrders == null || activeAlgoOrders.isEmpty()) {
+        if (Objects.isNull(activeAlgoOrders) || activeAlgoOrders.isEmpty()) {
             return false;
         }
 
         return activeAlgoOrders.stream()
                                .filter(Objects::nonNull)
-                               .anyMatch(algoOrder -> algoOrder.getConditionType() == ConditionType.STOP_LOSS);
+                               .anyMatch(algoOrder -> Objects.equals(algoOrder.getConditionType(),
+                                                                     ConditionType.STOP_LOSS));
     }
 
     private <T> List<T> safeList(List<T> source) {
-        if (source == null) {
+        if (Objects.isNull(source)) {
             return List.of();
         }
 

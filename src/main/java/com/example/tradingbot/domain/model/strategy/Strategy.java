@@ -4,17 +4,24 @@ import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.market.MarketPhase;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.BooleanUtils;
 
 import java.util.List;
 import java.util.Objects;
-
-import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 @Getter
 @Setter
 public class Strategy extends Auditable {
 
+    /**
+     * Технический ID БД.
+     */
     private Long id;
+
+    /**
+     * Безопасный внешний / межсервисный идентификатор стратегии.
+     */
+    private String internalId;
 
     /**
      * Инструмент, для которого предназначена стратегия.
@@ -22,87 +29,42 @@ public class Strategy extends Auditable {
     private Long instrumentId;
 
     /**
-     * Имя стратегии.
+     * Человекочитаемое имя стратегии.
      */
     private String name;
 
     /**
-     * Текущий статус стратегии.
+     * Версия append-only стратегии.
      */
-    private Status status;
+    private Integer version;
 
     /**
-     * Детали стратегии по фазам рынка.
+     * Статус контейнера стратегии.
+     */
+    private StrategyStatus status;
+
+    /**
+     * Ровно одна detail на одну фазу рынка.
      */
     private List<StrategyDetails> details;
 
     public StrategyDetails getActiveDetails(MarketPhase.Type marketPhaseType) {
-        if (this.details == null) {
+        if (Objects.isNull(marketPhaseType) || Objects.isNull(this.details)) {
             return null;
         }
 
         return this.details.stream()
                            .filter(Objects::nonNull)
-                           .filter(item -> item.getStatus() == StrategyDetails.Status.ACTIVE)
-                           .filter(item -> item.getMarketPhaseType() == marketPhaseType)
+                           .filter(item -> Objects.equals(item.getMarketPhaseType(), marketPhaseType))
                            .findFirst()
                            .orElse(null);
     }
 
-    /**
-     * Статус стратегии как контейнера.
-     * <p>
-     * Этот enum определяет,
-     * можно ли использовать стратегию в целом,
-     * независимо от деталей по конкретным фазам рынка.
-     */
-    public enum Status {
-
-        /**
-         * Черновик стратегии.
-         * <p>
-         * Такая стратегия ещё находится в работе:
-         * - может быть неполной,
-         * - может меняться по структуре,
-         * - не должна использоваться в live-торговле.
-         */
-        DRAFT,
-
-        /**
-         * Активная стратегия.
-         * <p>
-         * Именно такая стратегия может быть выбрана сервисом стратегий
-         * для конкретного инструмента и использована оркестратором.
-         */
-        ACTIVE,
-
-        /**
-         * Временно приостановленная стратегия.
-         * <p>
-         * Используется, когда:
-         * - стратегию не нужно удалять,
-         * - но торговать по ней сейчас нельзя.
-         */
-        PAUSED,
-
-        /**
-         * Архивная стратегия.
-         * <p>
-         * Нужна для:
-         * - хранения истории,
-         * - сравнения версий,
-         * - анализа старых сделок и тестов.
-         * <p>
-         * В активной торговле использоваться не должна.
-         */
-        ARCHIVED
-    }
-
     public boolean isActive() {
-        return status == Status.ACTIVE;
+        return Objects.equals(this.status, StrategyStatus.ACTIVE);
     }
 
     public boolean isNotActive() {
-        return isFalse(isActive());
+        return BooleanUtils.isFalse(isActive());
     }
 }
