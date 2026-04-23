@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * В доменной модели и в JSON детали стратегии группируются по Deal.Status,
+ * потому что это хорошо совпадает с текущей FSM сделки.
+ */
 @Getter
 @Setter
 public class StrategyDetails extends Auditable {
@@ -53,6 +57,11 @@ public class StrategyDetails extends Auditable {
 
     /**
      * Шаги стратегии, сгруппированные по статусу сделки.
+     * <p>
+     * Для чтения это выглядит удобно:
+     * PRECHECK -> [...]
+     * ENTRY_FINALIZED -> [...]
+     * MANAGING -> [...]
      */
     private Map<Deal.Status, List<StrategyStep>> stepsByStatus;
 

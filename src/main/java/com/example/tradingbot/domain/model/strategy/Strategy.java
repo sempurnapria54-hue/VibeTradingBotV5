@@ -9,6 +9,13 @@ import org.apache.commons.lang3.BooleanUtils;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Стратегия хранит торговые правила, условия и ожидаемые действия.
+ * <p>
+ * FSM сделки управляет реальными runtime-сущностями,
+ * а стратегия говорит, что должно быть сделано
+ * и при каких условиях.
+ */
 @Getter
 @Setter
 public class Strategy extends Auditable {
@@ -35,6 +42,7 @@ public class Strategy extends Auditable {
 
     /**
      * Версия append-only стратегии.
+     * При изменении стратегия не редактируется, а создаётся заново.
      */
     private Integer version;
 

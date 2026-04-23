@@ -914,32 +914,7 @@ public class TrailingSettings {
 
 ---
 
-# 14. Что убрали
-
-Из финальной модели убраны:
-
-* `stepOrder`
-* `dependsOnStepType`
-* `BreakevenSettings`
-* `PartialTakeProfitSettings`
-* `ExitEfficiencySettings`
-* `ENTRY_PROTECTION`
-* отдельный `gridSettings`
-
-Причины:
-
-* порядок нужен только внутри rules одного condition;
-* breakeven — это отдельный step;
-* partial TP — это несколько action в одном step;
-* exit by efficiency — это отдельный exit-step через condition;
-* вход с attached SL — это один бизнес-шаг `ENTRY`;
-* grid лучше выражается шагами и `StrategyPricePlacement`, а не special-case объектом.
-
----
-
----
-
-# 15. JSON-примеры
+# 14. JSON-примеры
 
 JSON-примеры вынесены в отдельный файл:
 
