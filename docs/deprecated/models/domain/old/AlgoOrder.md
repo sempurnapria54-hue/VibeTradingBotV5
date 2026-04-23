@@ -222,11 +222,12 @@ public class CancelAlgoOrderResponse {
 > Цель доменной модели: хранить у себя **намерение** (что мы хотели поставить) + **результат биржи** (algoId, коды) + audit/диагностику.
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 

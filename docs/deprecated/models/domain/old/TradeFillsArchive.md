@@ -1,9 +1,10 @@
 ## 6) Доменная модель для архива fills (сделок)
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.time.Instant;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,58 +19,58 @@ import lombok.Setter;
 @Setter
 public class TradeFillsArchive {
 
-    /** Внутренний идентификатор записи в БД (если используешь). */
-    private Long id;
+  /** Внутренний идентификатор записи в БД (если используешь). */
+  private Long id;
 
-    /** Год, за который запрашиваем архив (4 цифры), например "2025". */
-    private String year;
+  /** Год, за который запрашиваем архив (4 цифры), например "2025". */
+  private String year;
 
-    /** Квартал: Q1/Q2/Q3/Q4 (регистр важен). */
-    private String quarter;
+  /** Квартал: Q1/Q2/Q3/Q4 (регистр важен). */
+  private String quarter;
 
-    /**
-     * result из POST:
-     * true  — ссылка уже была
-     * false — ссылка ещё не готова, биржа начала генерацию
-     */
-    private Boolean requestLinkAlreadyExists;
+  /**
+   * result из POST:
+   * true  — ссылка уже была
+   * false — ссылка ещё не готова, биржа начала генерацию
+   */
+  private Boolean requestLinkAlreadyExists;
 
-    /** ts из POST: когда биржа впервые получила запрос (ms -> Instant). */
-    private Instant exchangeRequestReceivedAt;
+  /** ts из POST: когда биржа впервые получила запрос (ms -> Instant). */
+  private Instant exchangeRequestReceivedAt;
 
-    /**
-     * state из GET:
-     * finished — ссылка готова
-     * ongoing  — ещё генерируется
-     * failed   — ошибка (обычно нужно применить заново)
-     */
-    private ArchiveState state;
+  /**
+   * state из GET:
+   * finished — ссылка готова
+   * ongoing  — ещё генерируется
+   * failed   — ошибка (обычно нужно применить заново)
+   */
+  private ArchiveState state;
 
-    /** fileHref из GET: ссылка на файл с архивом (обычно временная). */
-    private String fileHref;
+  /** fileHref из GET: ссылка на файл с архивом (обычно временная). */
+  private String fileHref;
 
-    /** ts из GET: когда биржа сформировала ссылку на скачивание (ms -> Instant). */
-    private Instant exchangeLinkGeneratedAt;
+  /** ts из GET: когда биржа сформировала ссылку на скачивание (ms -> Instant). */
+  private Instant exchangeLinkGeneratedAt;
 
-    // --------- Auditing (DB) ---------
+  // --------- Auditing (DB) ---------
 
-    /** createdAt — когда запись создана в нашей БД. */
-    private Instant createdAt;
+  /** createdAt — когда запись создана в нашей БД. */
+  private Instant createdAt;
 
-    /** updatedAt — когда запись обновлена в нашей БД. */
-    private Instant updatedAt;
+  /** updatedAt — когда запись обновлена в нашей БД. */
+  private Instant updatedAt;
 
-    /** createdBy — кем создана (опционально). */
-    private String createdBy;
+  /** createdBy — кем создана (опционально). */
+  private String createdBy;
 
-    /** updatedBy — кем обновлена (опционально). */
-    private String updatedBy;
+  /** updatedBy — кем обновлена (опционально). */
+  private String updatedBy;
 
-    public enum ArchiveState {
-        FINISHED,
-        ONGOING,
-        FAILED
-    }
+  public enum ArchiveState {
+    FINISHED,
+    ONGOING,
+    FAILED
+  }
 }
 ```
 

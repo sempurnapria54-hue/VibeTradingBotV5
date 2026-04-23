@@ -2,11 +2,11 @@ package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
-import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.service.validator.TradeRuleValidator;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.AttachedAlgoOrderDataService;

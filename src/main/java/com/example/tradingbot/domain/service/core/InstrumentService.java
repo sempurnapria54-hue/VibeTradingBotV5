@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.service.core;
 
-import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.instrument.Instrument.Status;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.instrument.Instrument.Status;
 import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.persistence.service.ExchangeDataService;

@@ -8,7 +8,7 @@
 ## 1) Доменная сущность `Balance`
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;

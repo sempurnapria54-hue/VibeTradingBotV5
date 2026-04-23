@@ -18,11 +18,12 @@
 ## 1) Доменная сущность `Order`
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -42,335 +43,335 @@ import lombok.Setter;
 @Setter
 public class Order {
 
-    // --------- Идентификаторы (наши / биржи) ---------
+  // --------- Идентификаторы (наши / биржи) ---------
 
-    /** Внутренний идентификатор записи в БД (если используешь). */
-    private Long id;
+  /** Внутренний идентификатор записи в БД (если используешь). */
+  private Long id;
 
-    /** ID инструмента в нашей БД (справочник инструментов). */
-    private Long instrumentId;
+  /** ID инструмента в нашей БД (справочник инструментов). */
+  private Long instrumentId;
 
-    /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
-    private String exchangeInstrumentName;
+  /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
+  private String exchangeInstrumentName;
 
-    /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
-    private InstrumentType instrumentType;
+  /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
+  private InstrumentType instrumentType;
 
-    /** ordId — ID ордера на стороне OKX (появится после успешного create). */
-    private String exchangeOrderId;
+  /** ordId — ID ордера на стороне OKX (появится после успешного create). */
+  private String exchangeOrderId;
 
-    /** clOrdId — наш client order id (задаём сами при создании). */
-    private String clientOrderId;
+  /** clOrdId — наш client order id (задаём сами при создании). */
+  private String clientOrderId;
 
-    /** tag — метка/тэг (если передавали). */
-    private String tag;
+  /** tag — метка/тэг (если передавали). */
+  private String tag;
 
-    /** category — категория ордера (часто "normal"). */
-    private String category;
+  /** category — категория ордера (часто "normal"). */
+  private String category;
 
-    // --------- Два статуса: внешний (OKX) и наш доменный ---------
+  // --------- Два статуса: внешний (OKX) и наш доменный ---------
 
-    /**
-     * Внешний статус ордера как пришёл от OKX (строка).
-     * Примеры: live / partially_filled / filled / canceled / mmp_canceled / ...
-     */
-    private String externalStatus;
+  /**
+   * Внешний статус ордера как пришёл от OKX (строка).
+   * Примеры: live / partially_filled / filled / canceled / mmp_canceled / ...
+   */
+  private String externalStatus;
 
-    /** Наш доменный статус для бизнес-логики (ретраи, восстановление, решения). */
-    private Status status;
+  /** Наш доменный статус для бизнес-логики (ретраи, восстановление, решения). */
+  private Status status;
 
-    // --------- Поля для надежности (последняя попытка + результат create) ---------
+  // --------- Поля для надежности (последняя попытка + результат create) ---------
 
-    /** Последний requestId/корреляция в нашем приложении (удобно для логов). */
-    private String lastRequestId;
+  /** Последний requestId/корреляция в нашем приложении (удобно для логов). */
+  private String lastRequestId;
 
-    /** Когда мы последний раз пытались отправить запрос (создать/изменить). */
-    private Instant lastAttemptAt;
+  /** Когда мы последний раз пытались отправить запрос (создать/изменить). */
+  private Instant lastAttemptAt;
 
-    /** Результат последнего CREATE на уровне OKX (data[0].sCode). */
-    private String lastCreateResultCode;
+  /** Результат последнего CREATE на уровне OKX (data[0].sCode). */
+  private String lastCreateResultCode;
 
-    /** Сообщение последнего CREATE на уровне OKX (data[0].sMsg). */
-    private String lastCreateResultMessage;
+  /** Сообщение последнего CREATE на уровне OKX (data[0].sMsg). */
+  private String lastCreateResultMessage;
 
-    /** Когда биржа обработала запрос (data[0].ts, ms -> Instant). */
-    private Instant exchangeProcessedAt;
+  /** Когда биржа обработала запрос (data[0].ts, ms -> Instant). */
+  private Instant exchangeProcessedAt;
 
-    // --------- Сторона / режим позиции / режим торговли ---------
+  // --------- Сторона / режим позиции / режим торговли ---------
 
-    /** side — buy/sell. */
-    private OrderSide side;
+  /** side — buy/sell. */
+  private OrderSide side;
 
-    /** posSide — net/long/short (зависит от режима позиций). */
-    private PositionSide positionSide;
+  /** posSide — net/long/short (зависит от режима позиций). */
+  private PositionSide positionSide;
 
-    /** tdMode — режим торговли: isolated/cross/cash. */
-    private TradeMode tradeMode;
+  /** tdMode — режим торговли: isolated/cross/cash. */
+  private TradeMode tradeMode;
 
-    /** ccy — валюта маржи/обеспечения (для USDT‑SWAP обычно USDT). */
-    private String marginCurrency;
+  /** ccy — валюта маржи/обеспечения (для USDT‑SWAP обычно USDT). */
+  private String marginCurrency;
 
-    /** lever — плечо. */
-    private BigDecimal leverage;
+  /** lever — плечо. */
+  private BigDecimal leverage;
 
-    /** reduceOnly — true/false: ордер только уменьшает позицию. */
-    private Boolean reduceOnly;
+  /** reduceOnly — true/false: ордер только уменьшает позицию. */
+  private Boolean reduceOnly;
 
-    // --------- Параметры ордера (intent / snapshot) ---------
+  // --------- Параметры ордера (intent / snapshot) ---------
 
-    /** ordType — тип ордера (limit/market/post_only/ioc/fok и т.д.). */
-    private String orderType;
+  /** ordType — тип ордера (limit/market/post_only/ioc/fok и т.д.). */
+  private String orderType;
 
-    /** px — цена (для limit). Для market часто пусто. */
-    private BigDecimal price;
+  /** px — цена (для limit). Для market часто пусто. */
+  private BigDecimal price;
 
-    /** sz — размер ордера. Для SWAP это обычно контракты. */
-    private BigDecimal size;
+  /** sz — размер ордера. Для SWAP это обычно контракты. */
+  private BigDecimal size;
 
-    /** tgtCcy — только для SPOT market: base_ccy или quote_ccy. */
-    private String targetCurrencyMode;
+  /** tgtCcy — только для SPOT market: base_ccy или quote_ccy. */
+  private String targetCurrencyMode;
 
-    // --------- Исполнение (snapshot) ---------
+  // --------- Исполнение (snapshot) ---------
 
-    /** accFillSz — сколько уже исполнено (накопленно). */
-    private BigDecimal accumulatedFillSize;
+  /** accFillSz — сколько уже исполнено (накопленно). */
+  private BigDecimal accumulatedFillSize;
 
-    /** fillPx — цена последнего исполнения (если было). */
-    private BigDecimal lastFillPrice;
+  /** fillPx — цена последнего исполнения (если было). */
+  private BigDecimal lastFillPrice;
 
-    /** fillSz — размер последнего исполнения. */
-    private BigDecimal lastFillSize;
+  /** fillSz — размер последнего исполнения. */
+  private BigDecimal lastFillSize;
 
-    /** fillTime — время последнего исполнения (ms -> Instant). */
-    private Instant lastFillTime;
+  /** fillTime — время последнего исполнения (ms -> Instant). */
+  private Instant lastFillTime;
 
-    /** avgPx — средняя цена исполнения. */
-    private BigDecimal averageFillPrice;
+  /** avgPx — средняя цена исполнения. */
+  private BigDecimal averageFillPrice;
 
-    /** tradeId — ID последней сделки по этому ордеру. */
-    private String lastTradeId;
+  /** tradeId — ID последней сделки по этому ордеру. */
+  private String lastTradeId;
 
-    // --------- Комиссии / ребейты / PnL ---------
+  // --------- Комиссии / ребейты / PnL ---------
 
-    /** fee — комиссия (часто отрицательная, если уже были сделки). */
-    private BigDecimal fee;
+  /** fee — комиссия (часто отрицательная, если уже были сделки). */
+  private BigDecimal fee;
 
-    /** feeCcy — валюта комиссии. */
-    private String feeCurrency;
+  /** feeCcy — валюта комиссии. */
+  private String feeCurrency;
 
-    /** rebate — ребейт (возврат) для maker‑сделок (если применимо). */
-    private BigDecimal rebate;
+  /** rebate — ребейт (возврат) для maker‑сделок (если применимо). */
+  private BigDecimal rebate;
 
-    /** rebateCcy — валюта ребейта. */
-    private String rebateCurrency;
+  /** rebateCcy — валюта ребейта. */
+  private String rebateCurrency;
 
-    /** pnl — PnL без учёта комиссии (часто 0/пусто). */
-    private BigDecimal pnl;
+  /** pnl — PnL без учёта комиссии (часто 0/пусто). */
+  private BigDecimal pnl;
 
-    // --------- TP/SL (прикреплённые к ордеру) ---------
+  // --------- TP/SL (прикреплённые к ордеру) ---------
 
-    /** attachAlgoClOrdId — наш client id для прикреплённых TP/SL (если задавали). */
+  /** attachAlgoClOrdId — наш client id для прикреплённых TP/SL (если задавали). */
+  private String attachAlgoClientOrderId;
+
+  /** tpTriggerPx — триггер TP (если TP прикреплён напрямую). */
+  private BigDecimal tpTriggerPrice;
+
+  /** tpTriggerPxType — тип цены триггера TP: last/index/mark. */
+  private TriggerPriceType tpTriggerPriceType;
+
+  /** tpOrdPx — цена исполнения TP (для limit‑TP). */
+  private BigDecimal tpOrderPrice;
+
+  /** slTriggerPx — триггер SL (если SL прикреплён напрямую). */
+  private BigDecimal slTriggerPrice;
+
+  /** slTriggerPxType — тип цены триггера SL: last/index/mark. */
+  private TriggerPriceType slTriggerPriceType;
+
+  /** slOrdPx — цена исполнения SL. */
+  private BigDecimal slOrderPrice;
+
+  /** attachAlgoOrds[] — список прикреплённых algo‑ордеров (детали TP/SL). */
+  private List<AttachedAlgoOrder> attachedAlgoOrders;
+
+  /** linkedAlgoOrd.algoId — связанный algoId (например в OCO), если есть. */
+  private String linkedAlgoId;
+
+  /** algoId — algo ID (может быть пустым, пока не triggered). */
+  private String algoId;
+
+  /** algoClOrdId — client algo id (если задавали). */
+  private String algoClientOrderId;
+
+  /** isTpLimit — true/false: это TP‑limit или нет. */
+  private Boolean tpLimit;
+
+  // --------- Self-trade prevention ---------
+
+  /** stpMode — режим защиты от самоторговли (пример: cancel_maker). */
+  private String selfTradePreventionMode;
+
+  // --------- Источник / отмена ---------
+
+  /** source — откуда появился ордер (код строкой). */
+  private String source;
+
+  /** cancelSource — кто/что отменило ордер (код строкой), если отменён. */
+  private String cancelSource;
+
+  /** cancelSourceReason — причина отмены (если биржа дала). */
+  private String cancelSourceReason;
+
+  // --------- Прочее + timestamps ---------
+
+  /** tradeQuoteCcy — котируемая валюта торговли (например USDT). */
+  private String tradeQuoteCurrency;
+
+  /** cTime — время создания ордера на бирже (ms -> Instant). */
+  private Instant sourceCreatedAt;
+
+  /** uTime — время последнего обновления ордера на бирже (ms -> Instant). */
+  private Instant sourceUpdatedAt;
+
+  // --------- Auditing (DB) ---------
+
+  /** createdAt — когда запись создана в нашей БД. */
+  private Instant createdAt;
+
+  /** updatedAt — когда запись обновлена в нашей БД. */
+  private Instant updatedAt;
+
+  /** createdBy — кем создана (опционально). */
+  private String createdBy;
+
+  /** updatedBy — кем обновлена (опционально). */
+  private String updatedBy;
+
+  // --------- Nested models / enums ---------
+
+  /** Детализация одного элемента массива attachAlgoOrds[]. */
+  @Getter
+  @Setter
+  public static class AttachedAlgoOrder {
+
+    /** attachAlgoId — ID прикреплённого algo‑ордера на OKX. */
+    private String attachAlgoId;
+
+    /** attachAlgoClOrdId — наш client id прикреплённого algo‑ордера. */
     private String attachAlgoClientOrderId;
 
-    /** tpTriggerPx — триггер TP (если TP прикреплён напрямую). */
+    /** tpOrdKind — вид TP: condition или limit. */
+    private String tpOrderKind;
+
+    /** tpTriggerPx — триггер TP. */
     private BigDecimal tpTriggerPrice;
+
+    /** tpTriggerRatio — триггер TP в процентах (например 0.3 = 30%). */
+    private BigDecimal tpTriggerRatio;
 
     /** tpTriggerPxType — тип цены триггера TP: last/index/mark. */
     private TriggerPriceType tpTriggerPriceType;
 
-    /** tpOrdPx — цена исполнения TP (для limit‑TP). */
+    /** tpOrdPx — цена TP. */
     private BigDecimal tpOrderPrice;
 
-    /** slTriggerPx — триггер SL (если SL прикреплён напрямую). */
+    /** slTriggerPx — триггер SL. */
     private BigDecimal slTriggerPrice;
+
+    /** slTriggerRatio — триггер SL в процентах (например 0.3 = 30%). */
+    private BigDecimal slTriggerRatio;
 
     /** slTriggerPxType — тип цены триггера SL: last/index/mark. */
     private TriggerPriceType slTriggerPriceType;
 
-    /** slOrdPx — цена исполнения SL. */
+    /** slOrdPx — цена SL. */
     private BigDecimal slOrderPrice;
 
-    /** attachAlgoOrds[] — список прикреплённых algo‑ордеров (детали TP/SL). */
-    private List<AttachedAlgoOrder> attachedAlgoOrders;
+    /** sz — размер (актуально для split‑TP, когда тейки дробятся). */
+    private BigDecimal size;
 
-    /** linkedAlgoOrd.algoId — связанный algoId (например в OCO), если есть. */
-    private String linkedAlgoId;
+    /** amendPxOnTriggerType — Cost‑price SL (0/1). */
+    private String amendPriceOnTriggerType;
 
-    /** algoId — algo ID (может быть пустым, пока не triggered). */
-    private String algoId;
+    /** failCode — код ошибки, если не удалось выставить/изменить. */
+    private String failCode;
 
-    /** algoClOrdId — client algo id (если задавали). */
-    private String algoClientOrderId;
+    /** failReason — причина ошибки (если есть). */
+    private String failReason;
 
-    /** isTpLimit — true/false: это TP‑limit или нет. */
-    private Boolean tpLimit;
+    /** Результат последней CANCEL операции (data[0].sCode). */
+    private String lastCancelResultCode;
 
-    // --------- Self-trade prevention ---------
+    /** Сообщение последней CANCEL операции (data[0].sMsg). */
+    private String lastCancelResultMessage;
+  }
 
-    /** stpMode — режим защиты от самоторговли (пример: cancel_maker). */
-    private String selfTradePreventionMode;
+  public enum Status {
+    /** Запись создана у нас, но на биржу ещё не отправляли. */
+    NEW,
 
-    // --------- Источник / отмена ---------
+    /** Мы отправили create (или собираемся отправить) — "заявка ушла". */
+    CREATE_REQUESTED,
 
-    /** source — откуда появился ордер (код строкой). */
-    private String source;
+    /** Биржа приняла create (есть ordId и sCode=0). */
+    CREATE_ACCEPTED,
 
-    /** cancelSource — кто/что отменило ордер (код строкой), если отменён. */
-    private String cancelSource;
+    /** Биржа отклонила create (sCode!=0). */
+    CREATE_REJECTED,
 
-    /** cancelSourceReason — причина отмены (если биржа дала). */
-    private String cancelSourceReason;
+    /** Биржа подтверждает, что ордер активен. */
+    LIVE,
 
-    // --------- Прочее + timestamps ---------
+    /** Ордер частично исполнен. */
+    PARTIALLY_FILLED,
 
-    /** tradeQuoteCcy — котируемая валюта торговли (например USDT). */
-    private String tradeQuoteCurrency;
+    /** Ордер полностью исполнен. */
+    FILLED,
 
-    /** cTime — время создания ордера на бирже (ms -> Instant). */
-    private Instant sourceCreatedAt;
+    /** Ордер отменён (в т.ч. mmp_canceled). */
+    CANCELED,
 
-    /** uTime — время последнего обновления ордера на бирже (ms -> Instant). */
-    private Instant sourceUpdatedAt;
+    /** Мы не смогли корректно обработать/обновить ордер. */
+    FAILED,
 
-    // --------- Auditing (DB) ---------
+    /** Неизвестно (например, пришёл новый статус, который мы ещё не учли). */
+    UNKNOWN,
 
-    /** createdAt — когда запись создана в нашей БД. */
-    private Instant createdAt;
+    CANCEL_REQUESTED,
+    CANCEL_ACCEPTED,
+    CANCEL_REJECTED
+  }
 
-    /** updatedAt — когда запись обновлена в нашей БД. */
-    private Instant updatedAt;
+  public enum InstrumentType {
+    SPOT,
+    MARGIN,
+    SWAP,
+    FUTURES,
+    OPTION
+  }
 
-    /** createdBy — кем создана (опционально). */
-    private String createdBy;
+  public enum OrderSide {
+    BUY,
+    SELL
+  }
 
-    /** updatedBy — кем обновлена (опционально). */
-    private String updatedBy;
+  public enum PositionSide {
+    NET,
+    LONG,
+    SHORT
+  }
 
-    // --------- Nested models / enums ---------
+  public enum TradeMode {
+    ISOLATED,
+    CROSS,
+    CASH
+  }
 
-    /** Детализация одного элемента массива attachAlgoOrds[]. */
-    @Getter
-    @Setter
-    public static class AttachedAlgoOrder {
-
-        /** attachAlgoId — ID прикреплённого algo‑ордера на OKX. */
-        private String attachAlgoId;
-
-        /** attachAlgoClOrdId — наш client id прикреплённого algo‑ордера. */
-        private String attachAlgoClientOrderId;
-
-        /** tpOrdKind — вид TP: condition или limit. */
-        private String tpOrderKind;
-
-        /** tpTriggerPx — триггер TP. */
-        private BigDecimal tpTriggerPrice;
-
-        /** tpTriggerRatio — триггер TP в процентах (например 0.3 = 30%). */
-        private BigDecimal tpTriggerRatio;
-
-        /** tpTriggerPxType — тип цены триггера TP: last/index/mark. */
-        private TriggerPriceType tpTriggerPriceType;
-
-        /** tpOrdPx — цена TP. */
-        private BigDecimal tpOrderPrice;
-
-        /** slTriggerPx — триггер SL. */
-        private BigDecimal slTriggerPrice;
-
-        /** slTriggerRatio — триггер SL в процентах (например 0.3 = 30%). */
-        private BigDecimal slTriggerRatio;
-
-        /** slTriggerPxType — тип цены триггера SL: last/index/mark. */
-        private TriggerPriceType slTriggerPriceType;
-
-        /** slOrdPx — цена SL. */
-        private BigDecimal slOrderPrice;
-
-        /** sz — размер (актуально для split‑TP, когда тейки дробятся). */
-        private BigDecimal size;
-
-        /** amendPxOnTriggerType — Cost‑price SL (0/1). */
-        private String amendPriceOnTriggerType;
-
-        /** failCode — код ошибки, если не удалось выставить/изменить. */
-        private String failCode;
-
-        /** failReason — причина ошибки (если есть). */
-        private String failReason;
-
-        /** Результат последней CANCEL операции (data[0].sCode). */
-        private String lastCancelResultCode;
-
-        /** Сообщение последней CANCEL операции (data[0].sMsg). */
-        private String lastCancelResultMessage;
-    }
-
-    public enum Status {
-        /** Запись создана у нас, но на биржу ещё не отправляли. */
-        NEW,
-
-        /** Мы отправили create (или собираемся отправить) — "заявка ушла". */
-        CREATE_REQUESTED,
-
-        /** Биржа приняла create (есть ordId и sCode=0). */
-        CREATE_ACCEPTED,
-
-        /** Биржа отклонила create (sCode!=0). */
-        CREATE_REJECTED,
-
-        /** Биржа подтверждает, что ордер активен. */
-        LIVE,
-
-        /** Ордер частично исполнен. */
-        PARTIALLY_FILLED,
-
-        /** Ордер полностью исполнен. */
-        FILLED,
-
-        /** Ордер отменён (в т.ч. mmp_canceled). */
-        CANCELED,
-
-        /** Мы не смогли корректно обработать/обновить ордер. */
-        FAILED,
-
-        /** Неизвестно (например, пришёл новый статус, который мы ещё не учли). */
-        UNKNOWN,
-      
-       CANCEL_REQUESTED,
-       CANCEL_ACCEPTED,
-       CANCEL_REJECTED
-    }
-
-    public enum InstrumentType {
-        SPOT,
-        MARGIN,
-        SWAP,
-        FUTURES,
-        OPTION
-    }
-
-    public enum OrderSide {
-        BUY,
-        SELL
-    }
-
-    public enum PositionSide {
-        NET,
-        LONG,
-        SHORT
-    }
-
-    public enum TradeMode {
-        ISOLATED,
-        CROSS,
-        CASH
-    }
-
-    public enum TriggerPriceType {
-        LAST,
-        INDEX,
-        MARK
-    }
+  public enum TriggerPriceType {
+    LAST,
+    INDEX,
+    MARK
+  }
 }
 ```
 

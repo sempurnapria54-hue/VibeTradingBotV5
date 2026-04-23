@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.kill_switch;
 
-import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.order.Order;
-import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.deal.Deal;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.position.Position;
 
 import java.util.Set;
 

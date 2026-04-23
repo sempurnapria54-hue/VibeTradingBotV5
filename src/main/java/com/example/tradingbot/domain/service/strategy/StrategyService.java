@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.strategy;
 
-import com.example.tradingbot.domain.model.strategy.Strategy;
+import com.example.tradingbot.domain.model.trade.strategy.Strategy;
 import com.example.tradingbot.persistence.service.StrategyDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

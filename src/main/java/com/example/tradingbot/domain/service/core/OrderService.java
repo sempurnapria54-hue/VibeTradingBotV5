@@ -3,12 +3,12 @@ package com.example.tradingbot.domain.service.core;
 import com.example.tradingbot.client.model.okx.response.OrderResponse;
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
-import com.example.tradingbot.domain.model.order.Order;
-import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.deal.Deal;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.search_params.OrderSearchParams;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshOrderExecutor;
 import com.example.tradingbot.exception.TradingCommandException;
@@ -26,11 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
 
-import static com.example.tradingbot.domain.model.order.Order.Status.CLOSED;
-import static com.example.tradingbot.domain.model.order.Order.Status.CREATED;
+import static com.example.tradingbot.domain.model.core.order.Order.Status.CLOSED;
+import static com.example.tradingbot.domain.model.core.order.Order.Status.CREATED;
 
 @Service
 @RequiredArgsConstructor

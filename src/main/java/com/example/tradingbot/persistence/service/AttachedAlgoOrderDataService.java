@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.mapping.AttachedAlgoOrderMapper;
 import com.example.tradingbot.persistence.model.deal.order.AttachedAlgoOrderEntity;
 import com.example.tradingbot.persistence.repository.AttachedAlgoOrderRepository;

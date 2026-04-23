@@ -1,10 +1,10 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.algo_order.Condition;
-import com.example.tradingbot.domain.model.algo_order.Trailing;
-import com.example.tradingbot.domain.model.algo_order.Trigger;
-import com.example.tradingbot.domain.model.algo_order.TriggerPrice;
-import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.algo_order.Condition;
+import com.example.tradingbot.domain.model.core.algo_order.Trailing;
+import com.example.tradingbot.domain.model.core.algo_order.Trigger;
+import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
+import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 

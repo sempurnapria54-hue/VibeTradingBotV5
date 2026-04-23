@@ -1,10 +1,10 @@
 package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.client.service.ClientManager;
-import com.example.tradingbot.domain.model.balance.Balance;
-import com.example.tradingbot.domain.model.balance.BalanceContainer;
-import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceContainerExternalSnapshot;
-import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.balance.Balance;
+import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.persistence.service.BalanceContainerDataService;
 import com.example.tradingbot.util.factory.BalanceContainerFactory;

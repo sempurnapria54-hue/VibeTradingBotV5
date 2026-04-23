@@ -1,7 +1,7 @@
 package com.example.tradingbot.util;
 
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.instrument.Instrument.Status;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.instrument.Instrument.Status;
 import com.example.tradingbot.domain.model.kill_switch.StateSnapshot;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

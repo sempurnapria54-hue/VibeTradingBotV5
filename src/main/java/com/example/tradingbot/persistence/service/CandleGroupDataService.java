@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.candle.CandleGroup;
+import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.mapping.CandleGroupMapper;
 import com.example.tradingbot.persistence.model.candle.CandleGroupEntity;
 import com.example.tradingbot.persistence.repository.CandleGroupRepository;

@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.core;
 
-import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshBalanceExecutor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

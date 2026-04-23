@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.service.deal.command.refresh;
 
-import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
-import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.persistence.model.deal.algo_order.AlgoOrderEntity;

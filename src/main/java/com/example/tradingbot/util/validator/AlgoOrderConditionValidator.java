@@ -1,9 +1,9 @@
 package com.example.tradingbot.util.validator;
 
-import com.example.tradingbot.domain.model.algo_order.ConditionType;
-import com.example.tradingbot.domain.model.algo_order.Trailing;
-import com.example.tradingbot.domain.model.algo_order.Trigger;
-import com.example.tradingbot.domain.model.algo_order.TriggerPrice;
+import com.example.tradingbot.domain.model.core.algo_order.ConditionType;
+import com.example.tradingbot.domain.model.core.algo_order.Trailing;
+import com.example.tradingbot.domain.model.core.algo_order.Trigger;
+import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
 
 import java.math.BigDecimal;
 

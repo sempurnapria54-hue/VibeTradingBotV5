@@ -1,8 +1,8 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.instrument.external_snapshot.InstrumentExternalSnapshot;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;

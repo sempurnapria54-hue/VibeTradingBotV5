@@ -1,8 +1,8 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.response.balance.BalanceDetail;
-import com.example.tradingbot.domain.model.balance.Balance;
-import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceExternalSnapshot;
+import com.example.tradingbot.domain.model.core.balance.Balance;
+import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceExternalSnapshot;
 import com.example.tradingbot.persistence.model.balance.BalanceEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.IterableMapping;

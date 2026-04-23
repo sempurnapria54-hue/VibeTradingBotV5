@@ -1,8 +1,8 @@
 package com.example.tradingbot.util.factory;
 
-import com.example.tradingbot.domain.model.position.Position;
-import com.example.tradingbot.domain.model.position.Position.Side;
-import com.example.tradingbot.domain.model.position.Position.Status;
+import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.model.core.position.Position.Side;
+import com.example.tradingbot.domain.model.core.position.Position.Status;
 import lombok.experimental.UtilityClass;
 
 import java.util.UUID;

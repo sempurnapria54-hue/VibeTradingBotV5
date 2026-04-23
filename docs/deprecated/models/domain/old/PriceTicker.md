@@ -12,10 +12,11 @@
 ## 1) Доменная сущность `PriceTicker`
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -33,79 +34,79 @@ import lombok.Setter;
 @Setter
 public class PriceTicker {
 
-    /** Внутренний идентификатор записи в БД (если используешь). */
-    private Long id;
+  /** Внутренний идентификатор записи в БД (если используешь). */
+  private Long id;
 
-    /** ID инструмента в нашей БД (справочник инструментов). */
-    private Long instrumentId;
+  /** ID инструмента в нашей БД (справочник инструментов). */
+  private Long instrumentId;
 
-    /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
-    private String exchangeInstrumentName;
+  /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
+  private String exchangeInstrumentName;
 
-    /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
-    private String exchangeInstrumentType;
+  /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
+  private String exchangeInstrumentType;
 
-    // --------- Основные цены ---------
+  // --------- Основные цены ---------
 
-    /** last — последняя цена сделки. */
-    private BigDecimal lastPrice;
+  /** last — последняя цена сделки. */
+  private BigDecimal lastPrice;
 
-    /** lastSz — размер последней сделки (в базовой валюте или контрактах — зависит от инструмента). */
-    private BigDecimal lastSize;
+  /** lastSz — размер последней сделки (в базовой валюте или контрактах — зависит от инструмента). */
+  private BigDecimal lastSize;
 
-    /** bidPx — лучшая цена покупки (лучший bid). */
-    private BigDecimal bestBidPrice;
+  /** bidPx — лучшая цена покупки (лучший bid). */
+  private BigDecimal bestBidPrice;
 
-    /** bidSz — объём на лучшем bid. */
-    private BigDecimal bestBidSize;
+  /** bidSz — объём на лучшем bid. */
+  private BigDecimal bestBidSize;
 
-    /** askPx — лучшая цена продажи (лучший ask). */
-    private BigDecimal bestAskPrice;
+  /** askPx — лучшая цена продажи (лучший ask). */
+  private BigDecimal bestAskPrice;
 
-    /** askSz — объём на лучшем ask. */
-    private BigDecimal bestAskSize;
+  /** askSz — объём на лучшем ask. */
+  private BigDecimal bestAskSize;
 
-    // --------- 24h статистика ---------
+  // --------- 24h статистика ---------
 
-    /** open24h — цена открытия 24 часа назад. */
-    private BigDecimal open24h;
+  /** open24h — цена открытия 24 часа назад. */
+  private BigDecimal open24h;
 
-    /** high24h — максимум за 24 часа. */
-    private BigDecimal high24h;
+  /** high24h — максимум за 24 часа. */
+  private BigDecimal high24h;
 
-    /** low24h — минимум за 24 часа. */
-    private BigDecimal low24h;
+  /** low24h — минимум за 24 часа. */
+  private BigDecimal low24h;
 
-    /** vol24h — объём за 24 часа (обычно в базовой валюте). */
-    private BigDecimal volume24h;
+  /** vol24h — объём за 24 часа (обычно в базовой валюте). */
+  private BigDecimal volume24h;
 
-    /** volCcy24h — объём за 24 часа в котируемой валюте (например USDT). */
-    private BigDecimal volumeCurrency24h;
+  /** volCcy24h — объём за 24 часа в котируемой валюте (например USDT). */
+  private BigDecimal volumeCurrency24h;
 
-    /** sodUtc0 — цена на начало дня по UTC+0. */
-    private BigDecimal startOfDayUtc0;
+  /** sodUtc0 — цена на начало дня по UTC+0. */
+  private BigDecimal startOfDayUtc0;
 
-    /** sodUtc8 — цена на начало дня по UTC+8. */
-    private BigDecimal startOfDayUtc8;
+  /** sodUtc8 — цена на начало дня по UTC+8. */
+  private BigDecimal startOfDayUtc8;
 
-    // --------- Timestamps ---------
+  // --------- Timestamps ---------
 
-    /** ts — время тикера от биржи (ms -> Instant). */
-    private Instant sourceTimestamp;
+  /** ts — время тикера от биржи (ms -> Instant). */
+  private Instant sourceTimestamp;
 
-    // --------- Auditing (DB) ---------
+  // --------- Auditing (DB) ---------
 
-    /** createdAt — когда запись создана в нашей БД. */
-    private Instant createdAt;
+  /** createdAt — когда запись создана в нашей БД. */
+  private Instant createdAt;
 
-    /** updatedAt — когда запись обновлена в нашей БД. */
-    private Instant updatedAt;
+  /** updatedAt — когда запись обновлена в нашей БД. */
+  private Instant updatedAt;
 
-    /** createdBy — кем создана (опционально). */
-    private String createdBy;
+  /** createdBy — кем создана (опционально). */
+  private String createdBy;
 
-    /** updatedBy — кем обновлена (опционально). */
-    private String updatedBy;
+  /** updatedBy — кем обновлена (опционально). */
+  private String updatedBy;
 }
 ```
 

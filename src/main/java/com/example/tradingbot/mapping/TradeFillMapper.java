@@ -2,7 +2,7 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.request.FillsRequest;
 import com.example.tradingbot.client.model.okx.response.TradeFillResponse;
-import com.example.tradingbot.domain.model.market.TradeFill;
+import com.example.tradingbot.domain.model.core.trade_fill.TradeFill;
 import com.example.tradingbot.domain.model.search_params.TradeFillsSearchParams;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

@@ -2,7 +2,7 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.client.model.okx.response.PriceTickerResponse;
 import com.example.tradingbot.client.model.okx.response.TickerRequest;
-import com.example.tradingbot.domain.model.market.PriceTicker;
+import com.example.tradingbot.domain.model.trade.market.PriceTicker;
 import com.example.tradingbot.domain.model.search_params.PriceTickerSearchParams;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

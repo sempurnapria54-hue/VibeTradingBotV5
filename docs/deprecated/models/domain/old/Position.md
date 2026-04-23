@@ -9,11 +9,12 @@
 ## 1) Доменная сущность `Position`
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,227 +32,227 @@ import lombok.Setter;
 @Setter
 public class Position {
 
-    // --------- Identity ---------
+  // --------- Identity ---------
 
-    /** Внутренний идентификатор записи в БД (если используешь). */
-    private Long id;
+  /** Внутренний идентификатор записи в БД (если используешь). */
+  private Long id;
 
-    /** ID инструмента в нашей БД (справочник инструментов). */
-    private Long instrumentId;
+  /** ID инструмента в нашей БД (справочник инструментов). */
+  private Long instrumentId;
 
-    /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
-    private String exchangeInstrumentName;
+  /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
+  private String exchangeInstrumentName;
 
-    /** Тип инструмента: SWAP/FUTURES/OPTION/MARGIN. */
-    private InstrumentType instrumentType;
+  /** Тип инструмента: SWAP/FUTURES/OPTION/MARGIN. */
+  private InstrumentType instrumentType;
 
-    /** Режим маржи: ISOLATED/CROSS. */
-    private MarginMode marginMode;
+  /** Режим маржи: ISOLATED/CROSS. */
+  private MarginMode marginMode;
 
-    /** Сторона позиции: NET/LONG/SHORT. */
-    private PositionSide positionSide;
+  /** Сторона позиции: NET/LONG/SHORT. */
+  private PositionSide positionSide;
 
-    /** Валюта маржи/обеспечения (обычно USDT). */
-    private String marginCurrency;
+  /** Валюта маржи/обеспечения (обычно USDT). */
+  private String marginCurrency;
 
-    /** posId — id позиции на бирже (удобно для даунтайма/сверки). */
-    private String exchangePosId;
+  /** posId — id позиции на бирже (удобно для даунтайма/сверки). */
+  private String exchangePosId;
 
-    /** tradeId — id последней сделки по позиции (для корреляции и даунтайма). */
-    private String lastTradeId;
+  /** tradeId — id последней сделки по позиции (для корреляции и даунтайма). */
+  private String lastTradeId;
 
-    // --------- Size / Prices ---------
+  // --------- Size / Prices ---------
 
-    /** pos — размер позиции в контрактах. В NET-режиме знак может означать направление. */
-    private BigDecimal positionContracts;
+  /** pos — размер позиции в контрактах. В NET-режиме знак может означать направление. */
+  private BigDecimal positionContracts;
 
-    /** avgPx — средняя цена входа. */
-    private BigDecimal averagePrice;
+  /** avgPx — средняя цена входа. */
+  private BigDecimal averagePrice;
 
-    /** markPx — mark price (главная цена для рисков). */
-    private BigDecimal markPrice;
+  /** markPx — mark price (главная цена для рисков). */
+  private BigDecimal markPrice;
 
-    /** last — last price (последняя цена сделки; чаще для отображения). */
-    private BigDecimal lastPrice;
+  /** last — last price (последняя цена сделки; чаще для отображения). */
+  private BigDecimal lastPrice;
 
-    /** bePx — цена безубытка. */
-    private BigDecimal breakEvenPrice;
+  /** bePx — цена безубытка. */
+  private BigDecimal breakEvenPrice;
 
-    // --------- Risk / Margin ---------
+  // --------- Risk / Margin ---------
 
-    /** lever — плечо (например 10). */
-    private BigDecimal leverage;
+  /** lever — плечо (например 10). */
+  private BigDecimal leverage;
 
-    /** liqPx — расчётная цена ликвидации. */
-    private BigDecimal liquidationPrice;
+  /** liqPx — расчётная цена ликвидации. */
+  private BigDecimal liquidationPrice;
 
-    /** margin — маржа в позиции (особенно важно для isolated). */
-    private BigDecimal positionMargin;
+  /** margin — маржа в позиции (особенно важно для isolated). */
+  private BigDecimal positionMargin;
 
-    /** notionalUsd — номинал позиции в USD (размер позиции в деньгах). */
-    private BigDecimal notionalUsd;
+  /** notionalUsd — номинал позиции в USD (размер позиции в деньгах). */
+  private BigDecimal notionalUsd;
 
-    /** mgnRatio — margin ratio (насколько близко к риску). */
-    private BigDecimal marginRatio;
+  /** mgnRatio — margin ratio (насколько близко к риску). */
+  private BigDecimal marginRatio;
 
-    /** mmr — maintenance margin requirement. */
-    private BigDecimal maintenanceMargin;
+  /** mmr — maintenance margin requirement. */
+  private BigDecimal maintenanceMargin;
 
-    /** adl — индикатор ADL 0..5 (как строка в OKX). */
-    private String adl;
+  /** adl — индикатор ADL 0..5 (как строка в OKX). */
+  private String adl;
 
-    // --------- PnL / Fees ---------
+  // --------- PnL / Fees ---------
 
-    /** upl — плавающий PnL (unrealized). */
-    private BigDecimal unrealizedPnl;
+  /** upl — плавающий PnL (unrealized). */
+  private BigDecimal unrealizedPnl;
 
-    /** uplRatio — upl в относительном виде. */
-    private BigDecimal unrealizedPnlRatio;
+  /** uplRatio — upl в относительном виде. */
+  private BigDecimal unrealizedPnlRatio;
 
-    /** realizedPnl — реализованный PnL (если биржа его даёт в этом snapshot). */
-    private BigDecimal realizedPnl;
+  /** realizedPnl — реализованный PnL (если биржа его даёт в этом snapshot). */
+  private BigDecimal realizedPnl;
 
-    /** fundingFee — суммарный funding (важно для SWAP). */
-    private BigDecimal fundingFee;
+  /** fundingFee — суммарный funding (важно для SWAP). */
+  private BigDecimal fundingFee;
 
-    /** fee — комиссии. */
-    private BigDecimal fee;
+  /** fee — комиссии. */
+  private BigDecimal fee;
 
-    // --------- Attached TP/SL (если есть) ---------
+  // --------- Attached TP/SL (если есть) ---------
 
-    /**
-     * closeOrderAlgo[] — прикреплённые к позиции алгоритмические ордера закрытия (TP/SL и т.п.).
-     *
-     * Важно: API отдаёт массив, поэтому храним список.
-     */
-    private List<CloseAlgoOrder> closeAlgoOrders;
+  /**
+   * closeOrderAlgo[] — прикреплённые к позиции алгоритмические ордера закрытия (TP/SL и т.п.).
+   *
+   * Важно: API отдаёт массив, поэтому храним список.
+   */
+  private List<CloseAlgoOrder> closeAlgoOrders;
 
-    // --------- Close-position operation (по аналогии с Order) ---------
+  // --------- Close-position operation (по аналогии с Order) ---------
 
-    /**
-     * externalStatus — сырой статус/ярлык, который мы можем хранить "как есть".
-     *
-     * Пример:
-     * - "open" (позиция есть)
-     * - "close_requested" (мы отправили close-position)
-     * - "close_accepted" (биржа приняла)
-     * - "close_rejected" (биржа отказала)
-     * - "closed" (подтверждено snapshot-ом, что позиции нет)
-     */
-    private String externalStatus;
+  /**
+   * externalStatus — сырой статус/ярлык, который мы можем хранить "как есть".
+   *
+   * Пример:
+   * - "open" (позиция есть)
+   * - "close_requested" (мы отправили close-position)
+   * - "close_accepted" (биржа приняла)
+   * - "close_rejected" (биржа отказала)
+   * - "closed" (подтверждено snapshot-ом, что позиции нет)
+   */
+  private String externalStatus;
 
-    /** status — наш доменный статус позиции/операции закрытия. */
-    private Status status;
+  /** status — наш доменный статус позиции/операции закрытия. */
+  private Status status;
 
-    /** autoCancelOnClose — мы закрывали с autoCxl=true/false. */
-    private Boolean autoCancelOnClose;
+  /** autoCancelOnClose — мы закрывали с autoCxl=true/false. */
+  private Boolean autoCancelOnClose;
 
-    /** lastRequestId — наш id последней попытки закрытия (для корреляции/ретраев). */
-    private String lastRequestId;
+  /** lastRequestId — наш id последней попытки закрытия (для корреляции/ретраев). */
+  private String lastRequestId;
 
-    /** lastAttemptAt — когда последняя попытка close-position была отправлена. */
-    private Instant lastAttemptAt;
+  /** lastAttemptAt — когда последняя попытка close-position была отправлена. */
+  private Instant lastAttemptAt;
 
-    /** lastCloseResultCode — code из ответа close-position (верхний уровень). */
-    private String lastCloseResultCode;
+  /** lastCloseResultCode — code из ответа close-position (верхний уровень). */
+  private String lastCloseResultCode;
 
-    /** lastCloseResultMessage — msg из ответа close-position (верхний уровень). */
-    private String lastCloseResultMessage;
+  /** lastCloseResultMessage — msg из ответа close-position (верхний уровень). */
+  private String lastCloseResultMessage;
 
-    /** exchangeProcessedAt — когда мы считаем, что биржа "реально" обработала закрытие (обычно ставим после reconcile). */
-    private Instant exchangeProcessedAt;
+  /** exchangeProcessedAt — когда мы считаем, что биржа "реально" обработала закрытие (обычно ставим после reconcile). */
+  private Instant exchangeProcessedAt;
 
-    // --------- Exchange timestamps ---------
+  // --------- Exchange timestamps ---------
 
-    /** cTime — время создания позиции на бирже (ms -> Instant). */
-    private Instant sourceCreatedAt;
+  /** cTime — время создания позиции на бирже (ms -> Instant). */
+  private Instant sourceCreatedAt;
 
-    /** uTime — время последнего обновления позиции на бирже (ms -> Instant). */
-    private Instant sourceUpdatedAt;
+  /** uTime — время последнего обновления позиции на бирже (ms -> Instant). */
+  private Instant sourceUpdatedAt;
 
-    // --------- Auditing (DB) ---------
+  // --------- Auditing (DB) ---------
 
-    /** createdAt — когда запись создана в нашей БД. */
-    private Instant createdAt;
+  /** createdAt — когда запись создана в нашей БД. */
+  private Instant createdAt;
 
-    /** updatedAt — когда запись обновлена в нашей БД. */
-    private Instant updatedAt;
+  /** updatedAt — когда запись обновлена в нашей БД. */
+  private Instant updatedAt;
 
-    /** createdBy — кем создана (опционально). */
-    private String createdBy;
+  /** createdBy — кем создана (опционально). */
+  private String createdBy;
 
-    /** updatedBy — кем обновлена (опционально). */
-    private String updatedBy;
+  /** updatedBy — кем обновлена (опционально). */
+  private String updatedBy;
 
-    // --------- Nested models / enums ---------
+  // --------- Nested models / enums ---------
 
-    /**
-     * Описание одного элемента массива closeOrderAlgo[].
-     * Обычно содержит TP/SL параметры (если они выставлены как algo/attached).
-     */
-    @Getter
-    @Setter
-    public static class CloseAlgoOrder {
+  /**
+   * Описание одного элемента массива closeOrderAlgo[].
+   * Обычно содержит TP/SL параметры (если они выставлены как algo/attached).
+   */
+  @Getter
+  @Setter
+  public static class CloseAlgoOrder {
 
-        /** algoId — id algo-ордера. */
-        private String algoId;
+    /** algoId — id algo-ордера. */
+    private String algoId;
 
-        /** tpTriggerPx — цена-триггер тейк-профита (если есть). */
-        private BigDecimal tpTriggerPrice;
+    /** tpTriggerPx — цена-триггер тейк-профита (если есть). */
+    private BigDecimal tpTriggerPrice;
 
-        /** tpTriggerPxType — тип цены для TP: LAST/INDEX/MARK. */
-        private TriggerPriceType tpTriggerPriceType;
+    /** tpTriggerPxType — тип цены для TP: LAST/INDEX/MARK. */
+    private TriggerPriceType tpTriggerPriceType;
 
-        /** slTriggerPx — цена-триггер стоп-лосса (если есть). */
-        private BigDecimal slTriggerPrice;
+    /** slTriggerPx — цена-триггер стоп-лосса (если есть). */
+    private BigDecimal slTriggerPrice;
 
-        /** slTriggerPxType — тип цены для SL: LAST/INDEX/MARK. */
-        private TriggerPriceType slTriggerPriceType;
+    /** slTriggerPxType — тип цены для SL: LAST/INDEX/MARK. */
+    private TriggerPriceType slTriggerPriceType;
 
-        /** closeFraction — доля закрытия (1 = 100%). */
-        private BigDecimal closeFraction;
-    }
+    /** closeFraction — доля закрытия (1 = 100%). */
+    private BigDecimal closeFraction;
+  }
 
-    public enum Status {
-        /** Позиция есть (pos != 0). */
-        OPEN,
+  public enum Status {
+    /** Позиция есть (pos != 0). */
+    OPEN,
 
-        /** Мы отправили close-position. */
-        CLOSE_REQUESTED,
+    /** Мы отправили close-position. */
+    CLOSE_REQUESTED,
 
-        /** Биржа приняла запрос close-position (ответ code=0). */
-        CLOSE_ACCEPTED,
+    /** Биржа приняла запрос close-position (ответ code=0). */
+    CLOSE_ACCEPTED,
 
-        /** Биржа отказала в close-position (ответ code!=0). */
-        CLOSE_REJECTED,
+    /** Биржа отказала в close-position (ответ code!=0). */
+    CLOSE_REJECTED,
 
-        /** Подтверждено snapshot-ом, что позиции нет / pos=0. */
-        CLOSED
-    }
+    /** Подтверждено snapshot-ом, что позиции нет / pos=0. */
+    CLOSED
+  }
 
-    public enum InstrumentType {
-        SWAP,
-        FUTURES,
-        OPTION,
-        MARGIN
-    }
+  public enum InstrumentType {
+    SWAP,
+    FUTURES,
+    OPTION,
+    MARGIN
+  }
 
-    public enum MarginMode {
-        ISOLATED,
-        CROSS
-    }
+  public enum MarginMode {
+    ISOLATED,
+    CROSS
+  }
 
-    public enum PositionSide {
-        NET,
-        LONG,
-        SHORT
-    }
+  public enum PositionSide {
+    NET,
+    LONG,
+    SHORT
+  }
 
-    public enum TriggerPriceType {
-        LAST,
-        INDEX,
-        MARK
-    }
+  public enum TriggerPriceType {
+    LAST,
+    INDEX,
+    MARK
+  }
 }
 ```
 

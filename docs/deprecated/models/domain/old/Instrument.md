@@ -17,10 +17,11 @@
 ## 1) Доменная сущность `Instrument`
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -33,96 +34,96 @@ import lombok.Setter;
 @Setter
 public class Instrument {
 
-    /** Внутренний идентификатор инструмента в нашей БД. */
-    private Long id;
+  /** Внутренний идентификатор инструмента в нашей БД. */
+  private Long id;
 
-    /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
-    private String exchangeInstrumentName;
+  /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
+  private String exchangeInstrumentName;
 
-    /** Тип инструмента на бирже: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
-    private InstrumentType instrumentType;
+  /** Тип инструмента на бирже: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
+  private InstrumentType instrumentType;
 
-    /** Семейство инструмента (instFamily). */
-    private String instrumentFamily;
+  /** Семейство инструмента (instFamily). */
+  private String instrumentFamily;
 
-    /** Underlying (uly). Для деривативов: базовый символ (может быть пустым). */
-    private String underlying;
+  /** Underlying (uly). Для деривативов: базовый символ (может быть пустым). */
+  private String underlying;
 
-    /** Базовая валюта (baseCcy), например ETH. */
-    private String baseCurrency;
+  /** Базовая валюта (baseCcy), например ETH. */
+  private String baseCurrency;
 
-    /** Котируемая валюта (quoteCcy), например USDT. */
-    private String quoteCurrency;
+  /** Котируемая валюта (quoteCcy), например USDT. */
+  private String quoteCurrency;
 
-    /** Валюта расчётов/маржи по контракту (settleCcy), например USDT. */
-    private String settleCurrency;
+  /** Валюта расчётов/маржи по контракту (settleCcy), например USDT. */
+  private String settleCurrency;
 
-    // --------- Контрактная математика (обычно стабильна) ---------
+  // --------- Контрактная математика (обычно стабильна) ---------
 
-    /** Тип контракта (ctType): LINEAR / INVERSE (может быть пустым для SPOT). */
-    private ContractType contractType;
+  /** Тип контракта (ctType): LINEAR / INVERSE (может быть пустым для SPOT). */
+  private ContractType contractType;
 
-    /** Стоимость 1 контракта (ctVal). */
-    private BigDecimal contractValue;
+  /** Стоимость 1 контракта (ctVal). */
+  private BigDecimal contractValue;
 
-    /** Валюта contractValue (ctValCcy). */
-    private String contractValueCurrency;
+  /** Валюта contractValue (ctValCcy). */
+  private String contractValueCurrency;
 
-    /** Мультипликатор контракта (ctMult), если биржа его возвращает. */
-    private BigDecimal contractMultiplier;
+  /** Мультипликатор контракта (ctMult), если биржа его возвращает. */
+  private BigDecimal contractMultiplier;
 
-    // --------- Прочие «стабильные» поля ---------
+  // --------- Прочие «стабильные» поля ---------
 
-    /** Время листинга на бирже (listTime, ms -> Instant). */
-    private Instant listedAt;
+  /** Время листинга на бирже (listTime, ms -> Instant). */
+  private Instant listedAt;
 
-    /** Время экспирации (expTime) — актуально для FUTURES/OPTION. */
-    private Instant expiresAt;
+  /** Время экспирации (expTime) — актуально для FUTURES/OPTION. */
+  private Instant expiresAt;
 
-    /** Алиас (alias) — чаще полезен для фьючей. */
-    private String alias;
+  /** Алиас (alias) — чаще полезен для фьючей. */
+  private String alias;
 
-    // --------- Динамическая спека (может меняться) ---------
+  // --------- Динамическая спека (может меняться) ---------
 
-    /**
-     * Динамическая спецификация инструмента.
-     *
-     * Здесь лежит то, что может меняться на бирже:
-     * tickSz/lotSz/minSz/max* и state.
-     */
-    private InstrumentDynamicSpec dynamicSpec;
+  /**
+   * Динамическая спецификация инструмента.
+   *
+   * Здесь лежит то, что может меняться на бирже:
+   * tickSz/lotSz/minSz/max* и state.
+   */
+  private InstrumentDynamicSpec dynamicSpec;
 
-    // --------- Управление у нас ---------
+  // --------- Управление у нас ---------
 
-    /** Активен ли инструмент в нашем боте (мы его торгуем/собираем данные). */
-    private Boolean active;
+  /** Активен ли инструмент в нашем боте (мы его торгуем/собираем данные). */
+  private Boolean active;
 
-    // --------- Auditing (DB) ---------
+  // --------- Auditing (DB) ---------
 
-    /** createdAt — когда запись создана в нашей БД. */
-    private Instant createdAt;
+  /** createdAt — когда запись создана в нашей БД. */
+  private Instant createdAt;
 
-    /** updatedAt — когда запись обновлена в нашей БД. */
-    private Instant updatedAt;
+  /** updatedAt — когда запись обновлена в нашей БД. */
+  private Instant updatedAt;
 
-    /** createdBy — кем создана (опционально). */
-    private String createdBy;
+  /** createdBy — кем создана (опционально). */
+  private String createdBy;
 
-    /** updatedBy — кем обновлена (опционально). */
-    private String updatedBy;
+  /** updatedBy — кем обновлена (опционально). */
+  private String updatedBy;
 
-    public enum InstrumentType {
-        SPOT,
-        MARGIN,
-        SWAP,
-        FUTURES,
-        OPTION
-    }
+  public enum InstrumentType {
+    SPOT,
+    MARGIN,
+    SWAP,
+    FUTURES,
+    OPTION
+  }
 
-    public enum ContractType {
-        LINEAR,
-        INVERSE
-    }
+  public enum ContractType {
+    LINEAR,
+    INVERSE
+  }
 }
 ```
 
@@ -131,10 +132,11 @@ public class Instrument {
 ## 2) Доменная сущность `InstrumentDynamicSpec`
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -147,73 +149,73 @@ import lombok.Setter;
 @Setter
 public class InstrumentDynamicSpec {
 
-    /** Минимальный шаг цены (tickSz) для поля px. */
-    private BigDecimal tickSize;
+  /** Минимальный шаг цены (tickSz) для поля px. */
+  private BigDecimal tickSize;
 
-    /** Шаг размера (lotSz). Для SWAP/FUTURES обычно шаг в контрактах. */
-    private BigDecimal lotSize;
+  /** Шаг размера (lotSz). Для SWAP/FUTURES обычно шаг в контрактах. */
+  private BigDecimal lotSize;
 
-    /** Минимальный размер ордера (minSz). Для SWAP/FUTURES — в контрактах. */
-    private BigDecimal minSize;
+  /** Минимальный размер ордера (minSz). Для SWAP/FUTURES — в контрактах. */
+  private BigDecimal minSize;
 
-    // --------- Лимиты по размерам/суммам ---------
+  // --------- Лимиты по размерам/суммам ---------
 
-    /** Максимальный размер (sz) для limit ордера (maxLmtSz). */
-    private BigDecimal maxLimitSize;
+  /** Максимальный размер (sz) для limit ордера (maxLmtSz). */
+  private BigDecimal maxLimitSize;
 
-    /** Максимальный размер (sz) для market ордера (maxMktSz). */
-    private BigDecimal maxMarketSize;
+  /** Максимальный размер (sz) для market ордера (maxMktSz). */
+  private BigDecimal maxMarketSize;
 
-    /** Максимальный размер (sz) для TWAP (maxTwapSz). */
-    private BigDecimal maxTwapSize;
+  /** Максимальный размер (sz) для TWAP (maxTwapSz). */
+  private BigDecimal maxTwapSize;
 
-    /** Максимальный размер (sz) для iceberg (maxIcebergSz). */
-    private BigDecimal maxIcebergSize;
+  /** Максимальный размер (sz) для iceberg (maxIcebergSz). */
+  private BigDecimal maxIcebergSize;
 
-    /** Максимальный размер (sz) для trigger ордеров (maxTriggerSz). */
-    private BigDecimal maxTriggerSize;
+  /** Максимальный размер (sz) для trigger ордеров (maxTriggerSz). */
+  private BigDecimal maxTriggerSize;
 
-    /** Максимальный размер (sz) для stop market (maxStopSz). */
-    private BigDecimal maxStopSize;
+  /** Максимальный размер (sz) для stop market (maxStopSz). */
+  private BigDecimal maxStopSize;
 
-    /** Максимальная сумма (amount) для limit ордера (maxLmtAmt). Обычно актуально для SPOT. */
-    private BigDecimal maxLimitAmount;
+  /** Максимальная сумма (amount) для limit ордера (maxLmtAmt). Обычно актуально для SPOT. */
+  private BigDecimal maxLimitAmount;
 
-    /** Максимальная сумма (amount) для market ордера (maxMktAmt). Обычно актуально для SPOT. */
-    private BigDecimal maxMarketAmount;
+  /** Максимальная сумма (amount) для market ордера (maxMktAmt). Обычно актуально для SPOT. */
+  private BigDecimal maxMarketAmount;
 
-    // --------- Статус/прочее ---------
+  // --------- Статус/прочее ---------
 
-    /** Статус инструмента (state): live/suspend/preopen/expired/... */
-    private ExchangeState exchangeState;
+  /** Статус инструмента (state): live/suspend/preopen/expired/... */
+  private ExchangeState exchangeState;
 
-    /** Максимально доступное плечо (lever), если биржа возвращает. */
-    private BigDecimal maxLeverage;
+  /** Максимально доступное плечо (lever), если биржа возвращает. */
+  private BigDecimal maxLeverage;
 
-    /** Тип правил торговли (ruleType), например normal / pre_market. */
-    private String ruleType;
+  /** Тип правил торговли (ruleType), например normal / pre_market. */
+  private String ruleType;
 
-    /** Тип открытия (openType), чаще актуально для SPOT. */
-    private String openType;
+  /** Тип открытия (openType), чаще актуально для SPOT. */
+  private String openType;
 
-    /** Категория/группа — системные поля OKX (если приходят и хочется хранить). */
-    private String category;
+  /** Категория/группа — системные поля OKX (если приходят и хочется хранить). */
+  private String category;
 
-    private String groupId;
+  private String groupId;
 
-    // --------- Source timestamps ---------
+  // --------- Source timestamps ---------
 
-    /** uTime — время обновления от биржи (обычно через WS instruments). */
-    private Instant sourceUpdatedAt;
+  /** uTime — время обновления от биржи (обычно через WS instruments). */
+  private Instant sourceUpdatedAt;
 
-    public enum ExchangeState {
-        LIVE,
-        SUSPEND,
-        PREOPEN,
-        EXPIRED,
-        TEST,
-        UNKNOWN
-    }
+  public enum ExchangeState {
+    LIVE,
+    SUSPEND,
+    PREOPEN,
+    EXPIRED,
+    TEST,
+    UNKNOWN
+  }
 }
 ```
 

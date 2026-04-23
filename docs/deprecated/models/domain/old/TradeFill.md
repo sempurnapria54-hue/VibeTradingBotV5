@@ -3,10 +3,11 @@
 ### 1) Доменная сущность `TradeFill`
 
 ```java
-package com.example.tradingbot.domain.model.exchange;
+package com.example.tradingbot.domain.model.core.exchange;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,95 +22,95 @@ import lombok.Setter;
 @Setter
 public class TradeFill {
 
-    /** Внутренний идентификатор записи в БД (если используешь). */
-    private Long id;
+  /** Внутренний идентификатор записи в БД (если используешь). */
+  private Long id;
 
-    /** ID инструмента в нашей БД (справочник инструментов). */
-    private Long instrumentId;
+  /** ID инструмента в нашей БД (справочник инструментов). */
+  private Long instrumentId;
 
-    /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
-    private String exchangeInstrumentName;
+  /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
+  private String exchangeInstrumentName;
 
-    /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
-    private InstrumentType instrumentType;
+  /** Тип инструмента: SPOT/MARGIN/SWAP/FUTURES/OPTION. */
+  private InstrumentType instrumentType;
 
-    /** ordId — ID ордера на стороне OKX, который породил сделку. */
-    private String exchangeOrderId;
+  /** ordId — ID ордера на стороне OKX, который породил сделку. */
+  private String exchangeOrderId;
 
-    /** clOrdId — наш client order id (если задавали). */
-    private String clientOrderId;
+  /** clOrdId — наш client order id (если задавали). */
+  private String clientOrderId;
 
-    /** tradeId — ID сделки на стороне OKX. */
-    private String exchangeTradeId;
+  /** tradeId — ID сделки на стороне OKX. */
+  private String exchangeTradeId;
 
-    /** billId — внутренний ID записи (удобен для пагинации after/before). */
-    private String billId;
+  /** billId — внутренний ID записи (удобен для пагинации after/before). */
+  private String billId;
 
-    /** tag — метка/тэг (если передавали). */
-    private String tag;
+  /** tag — метка/тэг (если передавали). */
+  private String tag;
 
-    /** fillPx — цена сделки. */
-    private BigDecimal price;
+  /** fillPx — цена сделки. */
+  private BigDecimal price;
 
-    /** fillSz — объём сделки. Для SWAP обычно контракты. */
-    private BigDecimal size;
+  /** fillSz — объём сделки. Для SWAP обычно контракты. */
+  private BigDecimal size;
 
-    /** side — buy/sell. */
-    private OrderSide side;
+  /** side — buy/sell. */
+  private OrderSide side;
 
-    /** posSide — net/long/short (если биржа вернула). */
-    private PositionSide positionSide;
+  /** posSide — net/long/short (если биржа вернула). */
+  private PositionSide positionSide;
 
-    /** execType — maker/taker по ликвидности. */
-    private ExecutionType executionType;
+  /** execType — maker/taker по ликвидности. */
+  private ExecutionType executionType;
 
-    /** feeCcy — валюта комиссии. */
-    private String feeCurrency;
+  /** feeCcy — валюта комиссии. */
+  private String feeCurrency;
 
-    /** fee — комиссия за сделку (часто отрицательная). */
-    private BigDecimal fee;
+  /** fee — комиссия за сделку (часто отрицательная). */
+  private BigDecimal fee;
 
-    /** ts — время сделки на бирже. */
-    private Instant sourceTradeTime;
+  /** ts — время сделки на бирже. */
+  private Instant sourceTradeTime;
 
-    // --------- Auditing (DB) ---------
+  // --------- Auditing (DB) ---------
 
-    /** createdAt — когда запись создана в нашей БД. */
-    private Instant createdAt;
+  /** createdAt — когда запись создана в нашей БД. */
+  private Instant createdAt;
 
-    /** updatedAt — когда запись обновлена в нашей БД. */
-    private Instant updatedAt;
+  /** updatedAt — когда запись обновлена в нашей БД. */
+  private Instant updatedAt;
 
-    /** createdBy — кем создана (опционально). */
-    private String createdBy;
+  /** createdBy — кем создана (опционально). */
+  private String createdBy;
 
-    /** updatedBy — кем обновлена (опционально). */
-    private String updatedBy;
+  /** updatedBy — кем обновлена (опционально). */
+  private String updatedBy;
 
-    public enum InstrumentType {
-        SPOT,
-        MARGIN,
-        SWAP,
-        FUTURES,
-        OPTION
-    }
+  public enum InstrumentType {
+    SPOT,
+    MARGIN,
+    SWAP,
+    FUTURES,
+    OPTION
+  }
 
-    public enum OrderSide {
-        BUY,
-        SELL
-    }
+  public enum OrderSide {
+    BUY,
+    SELL
+  }
 
-    public enum PositionSide {
-        NET,
-        LONG,
-        SHORT
-    }
+  public enum PositionSide {
+    NET,
+    LONG,
+    SHORT
+  }
 
-    /** Maker/Taker. */
-    public enum ExecutionType {
-        MAKER,
-        TAKER
-    }
+  /** Maker/Taker. */
+  public enum ExecutionType {
+    MAKER,
+    TAKER
+  }
 }
 ```
 

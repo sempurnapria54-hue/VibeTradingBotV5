@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.service.deal.orchestrator;
 
 import com.example.tradingbot.domain.model.commands.ServiceCommandType;
-import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.deal.DealEvent;
+import com.example.tradingbot.domain.model.core.deal.Deal;
+import com.example.tradingbot.domain.model.core.deal.DealEvent;
 import com.example.tradingbot.domain.service.core.DealService;
 import com.example.tradingbot.domain.service.deal.command.core.ServiceCommandExecutor;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 
-import static com.example.tradingbot.domain.model.deal.Deal.CloseReason.EMERGENCY_STOP;
+import static com.example.tradingbot.domain.model.core.deal.Deal.CloseReason.EMERGENCY_STOP;
 
 @Slf4j
 @Service

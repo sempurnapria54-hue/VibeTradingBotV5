@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.deal.state_machine;
 
-import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.deal.DealEvent;
+import com.example.tradingbot.domain.model.core.deal.Deal;
+import com.example.tradingbot.domain.model.core.deal.DealEvent;
 import com.example.tradingbot.domain.service.deal.state_machine.handler.StateHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

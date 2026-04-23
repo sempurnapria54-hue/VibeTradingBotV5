@@ -1,16 +1,16 @@
 package com.example.tradingbot.domain.service.deal.orchestrator;
 
-import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.algo_order.ConditionType;
-import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.market.MarketPhase;
-import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
-import com.example.tradingbot.domain.model.order.Order;
-import com.example.tradingbot.domain.model.position.Position;
-import com.example.tradingbot.domain.model.strategy.Strategy;
-import com.example.tradingbot.domain.model.strategy.StrategyDetails;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.ConditionType;
+import com.example.tradingbot.domain.model.core.deal.Deal;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.trade.market.MarketPhase;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.model.trade.strategy.Strategy;
+import com.example.tradingbot.domain.model.trade.strategy.StrategyDetails;
 import com.example.tradingbot.domain.service.core.DealService;
 import com.example.tradingbot.domain.service.core.ExchangeService;
 import com.example.tradingbot.domain.service.core.InstrumentService;

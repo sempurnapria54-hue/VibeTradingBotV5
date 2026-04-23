@@ -2,10 +2,10 @@ package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.order.Order;
-import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.service.validator.TradeRuleValidator;
 import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.persistence.service.OrderDataService;

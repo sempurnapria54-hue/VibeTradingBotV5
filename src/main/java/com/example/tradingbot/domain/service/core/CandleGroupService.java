@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.core;
 
-import com.example.tradingbot.domain.model.candle.CandleGroup;
-import com.example.tradingbot.domain.model.candle.CandleGroup.Status;
-import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.instrument.Instrument;
+import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
+import com.example.tradingbot.domain.model.trade.candle.CandleGroup.Status;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.mapping.CandleGroupMapper;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;

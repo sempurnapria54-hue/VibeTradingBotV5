@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.deal.command.core;
 
 import com.example.tradingbot.domain.model.commands.ServiceCommandType;
-import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.exchange.Exchange;
-import com.example.tradingbot.domain.model.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.deal.Deal;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.service.core.AlgoOrderService;
 import com.example.tradingbot.domain.service.core.OrderService;
 import com.example.tradingbot.domain.service.deal.ExitService;

@@ -1,7 +1,7 @@
 package com.example.tradingbot.util.factory;
 
-import com.example.tradingbot.domain.model.balance.Balance;
-import com.example.tradingbot.domain.model.balance.external_snapshot.BalanceExternalSnapshot;
+import com.example.tradingbot.domain.model.core.balance.Balance;
+import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceExternalSnapshot;
 import com.example.tradingbot.mapping.BalanceMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

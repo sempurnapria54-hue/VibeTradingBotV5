@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.service.core;
 
 import com.example.tradingbot.client.service.ClientManager;
-import com.example.tradingbot.domain.model.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.deal.Deal;
-import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.deal.Deal;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
 import com.example.tradingbot.domain.service.deal.command.refresh.RefreshAlgoOrderExecutor;
 import com.example.tradingbot.domain.service.deal.command.refresh.SyncAlgoOrderExecutor;

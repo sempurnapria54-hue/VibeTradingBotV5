@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.deal.orchestrator;
 
-import com.example.tradingbot.domain.model.deal.Deal;
+import com.example.tradingbot.domain.model.core.deal.Deal;
 
 public interface DealAggregateService {
 

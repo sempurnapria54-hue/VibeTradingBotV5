@@ -1,6 +1,6 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.domain.model.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.persistence.model.deal.order.AttachedAlgoOrderEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.deal.command.refresh;
 
-import com.example.tradingbot.domain.model.order.Order;
-import com.example.tradingbot.domain.model.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 

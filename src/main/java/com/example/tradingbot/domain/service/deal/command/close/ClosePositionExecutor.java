@@ -1,8 +1,8 @@
 package com.example.tradingbot.domain.service.deal.command.close;
 
 import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.domain.model.instrument.Instrument;
-import com.example.tradingbot.domain.model.position.Position;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

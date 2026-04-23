@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.model.search_params;
 
-import com.example.tradingbot.domain.model.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

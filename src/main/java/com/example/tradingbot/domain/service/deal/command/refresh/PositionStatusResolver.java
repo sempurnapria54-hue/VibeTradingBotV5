@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.service.deal.command.refresh;
 
-import com.example.tradingbot.domain.model.position.Position;
-import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;

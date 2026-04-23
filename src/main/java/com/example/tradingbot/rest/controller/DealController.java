@@ -1,6 +1,6 @@
 package com.example.tradingbot.rest.controller;
 
-import com.example.tradingbot.domain.model.deal.Deal;
+import com.example.tradingbot.domain.model.core.deal.Deal;
 import com.example.tradingbot.domain.service.core.DealService;
 import com.example.tradingbot.mapping.DealMapper;
 import com.example.tradingbot.rest.model.response.DealResponse;

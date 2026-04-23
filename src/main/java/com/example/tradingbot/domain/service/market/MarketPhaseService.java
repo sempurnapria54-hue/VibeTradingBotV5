@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.market;
 
-import com.example.tradingbot.domain.model.market.MarketPhase;
+import com.example.tradingbot.domain.model.trade.market.MarketPhase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

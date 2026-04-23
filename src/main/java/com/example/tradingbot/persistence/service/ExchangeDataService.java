@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.exchange.Exchange;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.persistence.model.exchange.ExchangeEntity;
 import com.example.tradingbot.persistence.repository.ExchangeRepository;

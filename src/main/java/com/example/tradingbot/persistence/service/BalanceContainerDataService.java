@@ -1,6 +1,6 @@
 package com.example.tradingbot.persistence.service;
 
-import com.example.tradingbot.domain.model.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.persistence.model.balance.BalanceContainerEntity;
 import com.example.tradingbot.persistence.repository.BalanceContainerRepository;
