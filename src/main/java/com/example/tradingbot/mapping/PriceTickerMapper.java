@@ -12,6 +12,10 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface PriceTickerMapper {
 
+    /**
+     * CLIENT
+     */
+
     @Mapping(source = "instId", target = "externalInstrumentId")
     @Mapping(source = "last", target = "lastPrice")
     @Mapping(source = "markPx", target = "markPrice")
@@ -19,7 +23,7 @@ public interface PriceTickerMapper {
     @Mapping(source = "askPx", target = "askPrice")
     @Mapping(source = "bidPx", target = "bidPrice")
     @Mapping(source = "ts", target = "timestamp")
-    PriceTicker clientOkxResponseToDomain(PriceTickerResponse source);
+    PriceTicker clientToDomain(PriceTickerResponse source);
 
     @Mapping(source = "externalInstrumentId", target = "instId")
     @Mapping(source = "lastPrice", target = "last")
@@ -32,5 +36,5 @@ public interface PriceTickerMapper {
 
     TickerRequest domainSearchParamsToClientOkxRequest(PriceTickerSearchParams source);
 
-    List<PriceTicker> clientOkxResponseToDomain(List<PriceTickerResponse> source);
+    List<PriceTicker> clientToDomain(List<PriceTickerResponse> source);
 }

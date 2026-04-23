@@ -6,6 +6,9 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
+/**
+ * Одна свеча рынка в UTC.
+ */
 @Getter
 @Setter
 public class Candle extends Auditable {

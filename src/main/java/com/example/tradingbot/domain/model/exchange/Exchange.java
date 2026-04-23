@@ -1,15 +1,19 @@
 package com.example.tradingbot.domain.model.exchange;
 
+import com.example.tradingbot.domain.model.Auditable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Биржа, с которой работает торговый бот.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Exchange {
+public class Exchange extends Auditable {
 
     /**
      * Внутренний идентификатор биржи.

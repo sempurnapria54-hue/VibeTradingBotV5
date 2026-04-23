@@ -36,8 +36,9 @@ public interface PositionMapper extends CommonMapper {
      * CLIENT
      */
     @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "instrumentExternalId", source = "instId")
     @Mapping(target = "externalId", source = "posId")
-    @Mapping(target = "externalSide", source = "posSide", qualifiedByName = "stringToPositionSide")
+    @Mapping(target = "externalSide", source = "posSide")
     @Mapping(target = "size", source = "pos", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "averagePrice", source = "avgPx", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "markPrice", source = "markPx", qualifiedByName = "stringToBigDecimal")
@@ -47,10 +48,10 @@ public interface PositionMapper extends CommonMapper {
     @Mapping(target = "unrealizedProfit", source = "upl", qualifiedByName = "stringToBigDecimal")
     @Mapping(target = "externalCreatedAt", source = "cTime", qualifiedByName = "toOffsetDateTimeUtc")
     @Mapping(target = "externalModifiedAt", source = "uTime", qualifiedByName = "toOffsetDateTimeUtc")
-    PositionExternalSnapshot clientOkxToExternalSnapshot(PositionResponse source);
+    PositionExternalSnapshot clientToExternalSnapshot(PositionResponse source);
 
     @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
-    List<PositionExternalSnapshot> clientOkxToExternalSnapshot(List<PositionResponse> source);
+    List<PositionExternalSnapshot> clientToExternalSnapshot(List<PositionResponse> source);
 
 
     @Mapping(source = "externalId", target = "instrumentId")

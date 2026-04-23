@@ -18,6 +18,13 @@ public class AttachedAlgoOrderDataService {
     private final AttachedAlgoOrderRepository attachedAlgoOrderRepository;
     private final AttachedAlgoOrderMapper attachedAlgoOrderMapper;
 
+    public List<AttachedAlgoOrder> findAllByOrderId(Long orderId) {
+        return attachedAlgoOrderRepository.findAllByOrderId(orderId)
+                                          .stream()
+                                          .map(attachedAlgoOrderMapper::dataToDomain)
+                                          .toList();
+    }
+
     public List<AttachedAlgoOrder> findAllByInstrumentIdAndStatuses(Long instrumentId, Set<String> statuses) {
         return attachedAlgoOrderRepository.findAllByInstrumentIdAndStatuses(instrumentId, statuses)
                                           .stream()

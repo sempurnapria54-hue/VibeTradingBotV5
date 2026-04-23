@@ -9,6 +9,9 @@ import java.util.List;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+/**
+ * Обычный биржевой ордер, связанный со сделкой.
+ */
 @Getter
 @Setter
 public class Order extends Auditable {

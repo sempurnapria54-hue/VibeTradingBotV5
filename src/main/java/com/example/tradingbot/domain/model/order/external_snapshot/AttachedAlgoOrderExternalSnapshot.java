@@ -39,4 +39,14 @@ public class AttachedAlgoOrderExternalSnapshot {
      * Триггер-цена stop-loss у прикреплённого algo-ордера.
      */
     private String stopLossTriggerPrice;
+
+    /**
+     * Код ошибки создания или привязки attached protection на стороне OKX.
+     */
+    private String failCode;
+
+    /**
+     * Текст причины ошибки создания или привязки attached protection на стороне OKX.
+     */
+    private String failReason;
 }

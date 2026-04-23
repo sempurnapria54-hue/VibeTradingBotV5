@@ -14,11 +14,29 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface ExchangeMapper {
 
+    /**
+     * REST
+     */
+
     Exchange restToDomain(CreateExchangeRequest exchange);
 
+    @Mapping(target = "exchange", source = ".")
     ExchangeResponse domainToRest(Exchange source);
 
-    List<com.example.tradingbot.rest.model.response.exchange.Exchange> domainToRest(List<Exchange> source);
+    com.example.tradingbot.rest.model.response.exchange.Exchange domainToRestModel(Exchange source);
+
+    List<com.example.tradingbot.rest.model.response.exchange.Exchange> domainListToRestModelList(List<Exchange> source);
+
+    default ExchangeContainerResponse domainListToRestContainer(List<Exchange> source) {
+        ExchangeContainerResponse response = new ExchangeContainerResponse();
+        response.setExchanges(domainListToRestModelList(source));
+        return response;
+    }
+
+
+    /**
+     * DATA
+     */
 
     ExchangeEntity domainToData(Exchange source);
 
@@ -26,8 +44,11 @@ public interface ExchangeMapper {
 
     List<Exchange> dataToDomain(List<ExchangeEntity> source);
 
+
+    /**
+     * DOMAIN_COPY
+     */
+
     @Mapping(target = "id", ignore = true)
     void domainToDomainOnCreate(Exchange source, @MappingTarget Exchange target);
-
-    ExchangeContainerResponse domainListToRestContainer(List<Exchange> exchanges);
 }

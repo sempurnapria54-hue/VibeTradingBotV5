@@ -1,6 +1,5 @@
 package com.example.tradingbot.rest.controller.okxproxy;
 
-import com.example.tradingbot.client.model.okx.request.get.GetBalancesRequest;
 import com.example.tradingbot.client.model.okx.request.get.GetPositionsSearchParams;
 import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.client.model.okx.response.PositionResponse;
@@ -20,8 +19,8 @@ public class OkxAccountProxyController {
     private final OkxRestClient okxRestClient;
 
     @GetMapping("/balance")
-    public OkxApiResponse<BalanceResponse> getBalance(GetBalancesRequest request) {
-        return okxRestClient.getBalance(request);
+    public OkxApiResponse<BalanceResponse> getBalance() {
+        return okxRestClient.getBalances();
     }
 
     @GetMapping("/positions")

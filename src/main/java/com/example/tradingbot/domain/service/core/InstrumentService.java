@@ -31,7 +31,6 @@ public class InstrumentService {
         return instrumentDataService.save(instrument);
     }
 
-
     private void checkExistence(Long exchangeId, String externalId) {
         instrumentDataService.checkNotExists(exchangeId, externalId);
     }
@@ -61,5 +60,9 @@ public class InstrumentService {
     public void activateInstrument(Instrument instrument) {
         instrument.setStatus(Status.ACTIVE);
         instrumentDataService.save(instrument);
+    }
+
+    public Instrument findRequiredByDealId(Long dealId) {
+        return instrumentDataService.findRequiredByDealId(dealId);
     }
 }

@@ -1,4 +1,4 @@
-package com.example.tradingbot.client.model.okx.request.get;
+package com.example.tradingbot.rest.model.request.order;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class GetBalancesRequest {
+public class SyncOrderRequest {
 
-    private String currency;
+    private String exchangeInternalId;
 }

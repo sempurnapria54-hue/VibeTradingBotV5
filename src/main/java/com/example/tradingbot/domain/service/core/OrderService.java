@@ -152,6 +152,18 @@ public class OrderService {
         refreshOrderExecutor.execute(exchange, instrument, dealId);
     }
 
+    public Order activateOrder(String exchangeInternalId, String internalOrderId) {
+        throw new TradingCommandException(HttpStatus.NOT_IMPLEMENTED,
+                                          "ORDER_ACTIVATION_NOT_IMPLEMENTED",
+                                          "Order activation is not implemented in compile stabilization stage.");
+    }
+
+    public Order syncOrder(String exchangeInternalId, String internalOrderId) {
+        throw new TradingCommandException(HttpStatus.NOT_IMPLEMENTED,
+                                          "ORDER_SYNC_NOT_IMPLEMENTED",
+                                          "Order sync is not implemented in compile stabilization stage.");
+    }
+
     public void createEntryOrder(Deal deal) {
 
     }

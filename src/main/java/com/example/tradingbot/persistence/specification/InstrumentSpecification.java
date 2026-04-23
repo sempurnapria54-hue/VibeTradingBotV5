@@ -26,7 +26,7 @@ public class InstrumentSpecification {
             addEqualsPredicate(predicates, criteriaBuilder, root.get("exchangeId"), params.getExchangeId());
             addEqualsPredicate(predicates, criteriaBuilder, root.get("externalId"), params.getExternalId());
             addEqualsPredicate(predicates, criteriaBuilder, root.get("externalType"), params.getExternalType());
-            addEqualsPredicate(predicates, criteriaBuilder, root.get("status"), params.getStatus());
+            addEqualsPredicate(predicates, criteriaBuilder, root.get("status"), params.getInternalStatus().name());
 
             if (hasText(params.getExchangeInternalId())) {
                 Subquery<Long> exchangeSubquery = query.subquery(Long.class);

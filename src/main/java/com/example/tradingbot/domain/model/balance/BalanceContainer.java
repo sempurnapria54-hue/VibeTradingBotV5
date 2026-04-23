@@ -11,6 +11,9 @@ import java.util.List;
 
 import static org.springframework.util.CollectionUtils.isEmpty;
 
+/**
+ * Снимок баланса аккаунта на бирже.
+ */
 @Getter
 @Setter
 public class BalanceContainer extends Auditable {

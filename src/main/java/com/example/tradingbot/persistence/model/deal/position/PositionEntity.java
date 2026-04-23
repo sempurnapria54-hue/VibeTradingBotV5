@@ -25,7 +25,7 @@ import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
 @NoArgsConstructor
 @Table(name = "positions", uniqueConstraints = {
         @UniqueConstraint(
-                name = "uk_external_id",
+                name = "uk_positions_external_id",
                 columnNames = {"external_id"}
         )
 })

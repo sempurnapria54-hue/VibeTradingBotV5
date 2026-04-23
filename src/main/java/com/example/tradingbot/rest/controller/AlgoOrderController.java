@@ -56,23 +56,9 @@ public class AlgoOrderController {
         return algoOrderMapper.domainToRest(result);
     }
 
-    @PutMapping("/{algoOrderId}/activate")
-    public AlgoOrderResponse activateAlgoOrder(@PathVariable(name = "algoOrderId") String algoOrderInternalId) {
-        var result = algoOrderService.createOnExchange(algoOrderInternalId);
-        return algoOrderMapper.domainToRest(result);
-    }
-
     @PutMapping("/{algoOrderId}/sync")
     public AlgoOrderResponse syncAlgoOrder(@RequestBody SyncAlgoOrderRequest request) {
         var result = algoOrderService.syncAlgoOrder(request.getExchangeInternalId(), request.getInternalId());
-        return algoOrderMapper.domainToRest(result);
-    }
-
-    @DeleteMapping("/{algoOrderId}/cancel")
-    public AlgoOrderResponse cancelAlgoOrder(@RequestBody CancelAlgoOrderRequest request) {
-        var result = algoOrderService.cancelAlgoOrder(request.getExchangeInternalId(),
-                                                      request.getInstrumentInternalId(),
-                                                      request.getInternalId());
         return algoOrderMapper.domainToRest(result);
     }
 }

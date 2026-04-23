@@ -26,7 +26,7 @@ import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
 @NoArgsConstructor
 @Table(name = "algo_orders", uniqueConstraints = {
         @UniqueConstraint(
-                name = "uk_internal_id",
+                name = "uk_algo_orders_internal_id",
                 columnNames = {"internal_id"}
         )
 })

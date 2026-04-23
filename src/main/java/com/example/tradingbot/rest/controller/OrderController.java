@@ -2,10 +2,10 @@ package com.example.tradingbot.rest.controller;
 
 import com.example.tradingbot.domain.service.core.OrderService;
 import com.example.tradingbot.mapping.OrderMapper;
-import com.example.tradingbot.rest.model.request.algo_order.SyncAlgoOrderRequest;
+import com.example.tradingbot.rest.model.request.order.ActivateOrderRequest;
 import com.example.tradingbot.rest.model.request.order.CreateOrderRequest;
+import com.example.tradingbot.rest.model.request.order.SyncOrderRequest;
 import com.example.tradingbot.rest.model.request.order.search_params.OrderSearchParams;
-import com.example.tradingbot.rest.model.response.algo_order.AlgoOrderResponse;
 import com.example.tradingbot.rest.model.response.order.OrderPageResponse;
 import com.example.tradingbot.rest.model.response.order.OrderResponse;
 import lombok.RequiredArgsConstructor;
@@ -51,22 +51,21 @@ public class OrderController {
 
     @PostMapping
     public OrderResponse createOrder(@RequestBody CreateOrderRequest request) {
-        var domainRq = mapper.restRequestToDomain(request);
+        var domainRq = mapper.restToDomain(request);
         var order = orderService.createOrder(request.getDealInternalId(), domainRq);
         return mapper.domainToRest(order);
     }
 
     @PutMapping("/activate")
-    public AlgoOrderResponse activateAlgoOrder(@RequestBody ActivateAlgoOrderRequest request) {
-        var result = orderService.createOnExchange(request.getExchangeInternalId(),
-                                                   request.getInstrumentInternalId(), request.getInternalId(),
-                                                   request.getDealInternalId());
+    public OrderResponse activateOrder(@RequestBody ActivateOrderRequest request) {
+        var result = orderService.activateOrder(request.getExchangeInternalId(), request.getInternalId());
         return mapper.domainToRest(result);
     }
 
-    @PutMapping("/sync/{algoOrderId}")
-    public AlgoOrderResponse syncAlgoOrder(@RequestBody SyncAlgoOrderRequest request) {
-        var result = orderService.syncAlgoOrder(request.getExchangeInternalId(), request.getInternalId());
+    @PutMapping("/sync/{orderId}")
+    public OrderResponse syncOrder(@PathVariable(name = "orderId") String internalOrderId,
+                                   @RequestBody SyncOrderRequest request) {
+        var result = orderService.syncOrder(request.getExchangeInternalId(), internalOrderId);
         return mapper.domainToRest(result);
     }
 

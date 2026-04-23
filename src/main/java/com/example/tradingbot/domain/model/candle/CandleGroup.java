@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Группа свечей одного инструмента и таймфрейма.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -27,6 +30,11 @@ public class CandleGroup extends Auditable {
      * Таймфрейм группы (например 1m/5m/1H).
      */
     private String timeframe;
+
+    /**
+     * Таймфрейм группы в формате биржи.
+     */
+    private String externalTimeframe;
 
     /**
      * Текущий статус жизненного цикла загрузки свечей.

@@ -1,5 +1,6 @@
 package com.example.tradingbot.persistence.model.deal;
 
+import com.example.tradingbot.persistence.model.AuditableEntity;
 import com.example.tradingbot.persistence.model.deal.algo_order.AlgoOrderEntity;
 import com.example.tradingbot.persistence.model.deal.order.OrderEntity;
 import com.example.tradingbot.persistence.model.deal.position.PositionEntity;
@@ -29,11 +30,11 @@ import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
 @NoArgsConstructor
 @Table(name = "deals", uniqueConstraints = {
         @UniqueConstraint(
-                name = "uk_internal_id",
+                name = "uk_deals_internal_id",
                 columnNames = {"internal_id"}
         )
 })
-public class DealEntity {
+public class DealEntity extends AuditableEntity {
 
     /**
      * Внутренний идентификатор.

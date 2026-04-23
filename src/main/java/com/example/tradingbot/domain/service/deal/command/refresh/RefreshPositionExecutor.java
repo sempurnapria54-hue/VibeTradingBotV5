@@ -1,28 +1,21 @@
 package com.example.tradingbot.domain.service.deal.command.refresh;
 
 import com.example.tradingbot.client.service.ClientManager;
+import com.example.tradingbot.client.service.ClientService;
 import com.example.tradingbot.domain.model.exchange.Exchange;
 import com.example.tradingbot.domain.model.instrument.Instrument;
 import com.example.tradingbot.domain.model.position.Position;
-import com.example.tradingbot.domain.model.position.Position.CloseReason;
-import com.example.tradingbot.domain.model.position.Position.Status;
 import com.example.tradingbot.domain.model.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.service.validator.TradeRuleValidator;
-import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-
-import static com.example.tradingbot.util.factory.PositionFactory.createPosition;
-import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
-import static org.hibernate.internal.util.collections.CollectionHelper.isEmpty;
 
 @Slf4j
 @Service
@@ -31,55 +24,86 @@ public class RefreshPositionExecutor {
 
     private final PositionDataService positionDataService;
     private final ClientManager clientManager;
-    private final PositionMapper mapper;
     private final TradeRuleValidator tradeRuleValidator;
+    private final PositionStatusResolver positionStatusResolver;
+    private final PositionSyncService positionSyncService;
 
     @Transactional
     public void execute(Exchange exchange, Instrument instrument, Long dealId) {
-        List<PositionExternalSnapshot> externalSnapshots = clientManager.getClientService(exchange.getName())
-                                                                        .getPositionsByInstrument(instrument);
+        List<PositionExternalSnapshot> externalSnapshots = readLiveExternalSnapshots(exchange, instrument);
+        List<Position> activeDomainPositions = positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
+                                                                                                    Position.liveStatusNames());
 
-        List<Position> activeDomainPositions =
-                positionDataService.findAllByInstrumentIdAndStatuses(instrument.getId(),
-                                                                     Set.of(Status.ACTIVE.name()));
+        tradeRuleValidator.validatePositions(exchange,
+                                             instrument,
+                                             dealId,
+                                             externalSnapshots,
+                                             activeDomainPositions);
 
-        tradeRuleValidator.validatePositions(exchange, instrument, dealId, externalSnapshots, activeDomainPositions);
+        PositionExternalSnapshot externalSnapshot = getFirstExternalSnapshot(externalSnapshots);
+        Position activeDomainPosition = getFirstActivePosition(activeDomainPositions);
 
-        if (isEmpty(externalSnapshots) && isEmpty(activeDomainPositions)) {
-            log.info("Not active positions and snapshots for exchange {}, instrument {}, dealId {}",
-                     exchange.getName(), instrument.getExchangeId(), dealId);
+        if (Objects.isNull(externalSnapshot) && Objects.isNull(activeDomainPosition)) {
+            log.info("No live positions to refresh for exchange {}, instrument {}, dealId {}",
+                     exchange.getName(),
+                     instrument.getExternalId(),
+                     dealId);
             return;
         }
 
-        PositionExternalSnapshot snapshot = externalSnapshots.getFirst();
-        Position position = activeDomainPositions.getFirst();
-
-        if (nonNull(position)) {
-            refreshFromSnapshot(activeDomainPositions, snapshot);
-        } else {
-            createFromSnapshot(snapshot, dealId);
+        if (Objects.nonNull(externalSnapshot) && Objects.nonNull(activeDomainPosition)) {
+            positionSyncService.applySnapshot(activeDomainPosition, externalSnapshot);
+            positionDataService.save(activeDomainPosition);
+            return;
         }
+
+        if (Objects.nonNull(externalSnapshot)) {
+            createOrReviveFromSnapshot(externalSnapshot, dealId);
+            return;
+        }
+
+        positionSyncService.closeMissingPosition(activeDomainPosition);
+        positionDataService.save(activeDomainPosition);
     }
 
-    private void createFromSnapshot(PositionExternalSnapshot snapshot, Long dealId) {
+    private List<PositionExternalSnapshot> readLiveExternalSnapshots(Exchange exchange, Instrument instrument) {
+        ClientService clientService = clientManager.getClientService(exchange.getName());
+        List<PositionExternalSnapshot> externalSnapshots = clientService.getPositionsByInstrument(instrument);
+        if (CollectionUtils.isEmpty(externalSnapshots)) {
+            return List.of();
+        }
+
+        return externalSnapshots.stream()
+                                .filter(Objects::nonNull)
+                                .filter(this::isLiveExternalSnapshot)
+                                .toList();
+    }
+
+    private boolean isLiveExternalSnapshot(PositionExternalSnapshot snapshot) {
+        return Objects.equals(positionStatusResolver.resolveStatus(snapshot), Position.Status.ACTIVE);
+    }
+
+    private void createOrReviveFromSnapshot(PositionExternalSnapshot snapshot, Long dealId) {
         Position position = positionDataService.findByExternalId(snapshot.getExternalId());
-        if (isNull(position)) {
-            position = createPosition(dealId);
-            mapper.updateDomainFromExternalSnapshot(snapshot, position);
-            positionDataService.save(position);
-        }
-    }
-
-    private void refreshFromSnapshot(List<Position> activeDomainPositions, PositionExternalSnapshot snapshot) {
-        activeDomainPositions.forEach(position -> refreshFromSnapshots(position, snapshot));
-    }
-
-    private void refreshFromSnapshots(Position position, PositionExternalSnapshot snapshot) {
-        if (nonNull(snapshot) && Objects.equals(position.getExternalId(), snapshot.getExternalId())) {
-            mapper.updateDomainFromExternalSnapshot(snapshot, position);
+        if (Objects.isNull(position)) {
+            position = positionSyncService.createFromSnapshot(snapshot, dealId);
         } else {
-            position.toClose(CloseReason.EXCHANGE_FORCED);
+            positionSyncService.applySnapshot(position, snapshot);
         }
         positionDataService.save(position);
+    }
+
+    private PositionExternalSnapshot getFirstExternalSnapshot(List<PositionExternalSnapshot> externalSnapshots) {
+        if (CollectionUtils.isEmpty(externalSnapshots)) {
+            return null;
+        }
+        return externalSnapshots.getFirst();
+    }
+
+    private Position getFirstActivePosition(List<Position> activeDomainPositions) {
+        if (CollectionUtils.isEmpty(activeDomainPositions)) {
+            return null;
+        }
+        return activeDomainPositions.getFirst();
     }
 }

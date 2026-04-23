@@ -27,7 +27,7 @@ import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
 @Entity
 @Table(name = "orders", uniqueConstraints = {
         @UniqueConstraint(
-                name = "uk_internal_id",
+                name = "uk_orders_internal_id",
                 columnNames = {"internal_id"}
         )
 })

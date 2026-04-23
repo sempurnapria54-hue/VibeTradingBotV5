@@ -10,12 +10,17 @@ import java.math.BigDecimal;
 public class AlgoOrderExternalSnapshot {
 
     /**
-     * Клиентский идентификатор algo-ордера на бирже (algoClOrdId).
+     * Объём algo-ордера на стороне биржи.
+     */
+    private BigDecimal size;
+
+    /**
+     * Клиентский идентификатор algo-ордера на стороне биржи (algoClOrdId).
      */
     private String internalId;
 
     /**
-     * Идентификатор algo-ордера на бирже (algoId).
+     * Идентификатор algo-ордера на стороне биржи (algoId).
      */
     private String externalId;
 
@@ -30,7 +35,12 @@ public class AlgoOrderExternalSnapshot {
     private String externalStatus;
 
     /**
-     * Сторона algo-ордера на бирже (buy/sell).
+     * Код ошибки algo-ордера на стороне биржи, если биржа его вернула.
+     */
+    private String failCode;
+
+    /**
+     * Сторона algo-ордера на стороне биржи (buy/sell).
      */
     private String externalDirection;
 

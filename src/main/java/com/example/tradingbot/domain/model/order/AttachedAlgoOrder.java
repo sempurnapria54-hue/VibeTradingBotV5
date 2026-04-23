@@ -5,12 +5,23 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.Objects;
+import java.util.Set;
 
 import static io.micrometer.common.util.StringUtils.isNotBlank;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+/**
+ * Прикреплённый защитный algo-ордер обычного ордера.
+ */
 @Getter
 @Setter
 public class AttachedAlgoOrder extends Auditable {
+
+    private static final Set<String> ACTIVE_LIKE_STATUS_NAMES = Set.of(
+            Status.ATTACHED.name(),
+            Status.ACTIVE.name()
+    );
 
     /**
      * Внутренний идентификатор.
@@ -94,33 +105,37 @@ public class AttachedAlgoOrder extends Auditable {
         FAILED
     }
 
+    public static Set<String> activeLikeStatusNames() {
+        return ACTIVE_LIKE_STATUS_NAMES;
+    }
+
     public boolean isActiveLike() {
-        return status == Status.ATTACHED || status == Status.ACTIVE;
+        return Objects.equals(status, Status.ATTACHED) || Objects.equals(status, Status.ACTIVE);
     }
 
     public boolean isTerminal() {
-        return status == Status.CLOSED || status == Status.FAILED;
+        return Objects.equals(status, Status.CLOSED) || Objects.equals(status, Status.FAILED);
     }
 
     public boolean canTransitionTo(Status targetStatus) {
-        if (targetStatus == null) {
+        if (Objects.isNull(targetStatus)) {
             return false;
         }
-        if (status == targetStatus) {
+        if (Objects.equals(status, targetStatus)) {
             return true;
         }
-        if (status == null) {
-            return targetStatus == Status.CREATED
-                    || targetStatus == Status.ATTACHED
-                    || targetStatus == Status.FAILED;
+        if (Objects.isNull(status)) {
+            return Objects.equals(targetStatus, Status.CREATED);
         }
 
         return switch (status) {
-            case CREATED -> targetStatus == Status.ATTACHED || targetStatus == Status.FAILED;
-            case ATTACHED -> targetStatus == Status.ACTIVE
-                    || targetStatus == Status.CLOSED
-                    || targetStatus == Status.FAILED;
-            case ACTIVE -> targetStatus == Status.CLOSED || targetStatus == Status.FAILED;
+            case CREATED -> Objects.equals(targetStatus, Status.ATTACHED)
+                    || Objects.equals(targetStatus, Status.FAILED);
+            case ATTACHED -> Objects.equals(targetStatus, Status.ACTIVE)
+                    || Objects.equals(targetStatus, Status.CLOSED)
+                    || Objects.equals(targetStatus, Status.FAILED);
+            case ACTIVE -> Objects.equals(targetStatus, Status.CLOSED)
+                    || Objects.equals(targetStatus, Status.FAILED);
             case CLOSED, FAILED -> false;
         };
     }
@@ -146,8 +161,21 @@ public class AttachedAlgoOrder extends Auditable {
     }
 
     private void transitionTo(Status targetStatus) {
-        if (canTransitionTo(targetStatus)) {
-            this.status = targetStatus;
+        if (isFalse(canTransitionTo(targetStatus))) {
+            throw new IllegalStateException(
+                    "Illegal AttachedAlgoOrder transition: "
+                            + status
+                            + " -> "
+                            + targetStatus
+                            + " for internalId="
+                            + internalId
+                            + ", externalId="
+                            + externalId
+                            + ", externalAttachedId="
+                            + externalAttachedId
+            );
         }
+
+        this.status = targetStatus;
     }
 }

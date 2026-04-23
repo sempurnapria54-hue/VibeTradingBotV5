@@ -14,6 +14,9 @@ import java.util.List;
 import static com.example.tradingbot.domain.service.kill_switch.KillSwitchLiveStatuses.LIVE_DEAL_STATUSES;
 import static com.example.tradingbot.util.CollectionUtils.doNotContains;
 
+/**
+ * Сделка и её жизненный цикл в FSM.
+ */
 @Getter
 @Setter
 public class Deal extends Auditable {

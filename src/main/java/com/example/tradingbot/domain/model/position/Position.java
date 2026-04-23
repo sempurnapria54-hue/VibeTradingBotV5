@@ -7,14 +7,21 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.Objects;
+import java.util.Set;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+/**
+ * Открытая или закрытая позиция по инструменту.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Position extends Auditable {
+
+    private static final Set<String> LIVE_STATUS_NAMES = Set.of(Status.ACTIVE.name());
 
     /**
      * Внутренний идентификатор.
@@ -268,13 +275,17 @@ public class Position extends Auditable {
         UNKNOWN
     }
 
+    public static Set<String> liveStatusNames() {
+        return LIVE_STATUS_NAMES;
+    }
+
     public void toClose(CloseReason closeReason) {
         setStatus(Status.CLOSED);
         setCloseReason(closeReason);
     }
 
     public boolean isLive() {
-        return status == Status.ACTIVE;
+        return Objects.equals(status, Status.ACTIVE);
     }
 
     public boolean isNotLive() {

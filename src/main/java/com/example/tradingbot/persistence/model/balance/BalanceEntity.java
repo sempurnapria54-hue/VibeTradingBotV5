@@ -26,7 +26,7 @@ import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
 @NoArgsConstructor
 @Entity
 @Table(name = "balances", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_balances_exchange_currency", columnNames = {"exchange_id", "currency"})
+        @UniqueConstraint(name = "uk_balances_balance_container_currency", columnNames = {"balance_container_id", "currency"})
 })
 public class BalanceEntity extends AuditableEntity {
 
