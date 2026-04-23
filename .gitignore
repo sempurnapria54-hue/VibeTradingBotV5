@@ -2,3 +2,4 @@
 # Local env (do not commit)
 .env.local
 /target/
+.idea/
