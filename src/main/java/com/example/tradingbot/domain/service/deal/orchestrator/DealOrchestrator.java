@@ -1,6 +1,6 @@
 package com.example.tradingbot.domain.service.deal.orchestrator;
 
-import com.example.tradingbot.domain.model.commands.ServiceCommandType;
+import com.example.tradingbot.domain.model.commands.ServiceCommand;
 import com.example.tradingbot.domain.model.core.deal.Deal;
 import com.example.tradingbot.domain.model.core.deal.DealEvent;
 import com.example.tradingbot.domain.service.core.DealService;
@@ -103,8 +103,8 @@ public class DealOrchestrator {
             );
         }
 
-        List<ServiceCommandType> commands = transitionResult.getCommands();
-        if (commands == null || commands.isEmpty()) {
+        List<ServiceCommand> commands = transitionResult.getCommands();
+        if (Objects.isNull(commands) || commands.isEmpty()) {
             persistDeal(deal);
             return;
         }

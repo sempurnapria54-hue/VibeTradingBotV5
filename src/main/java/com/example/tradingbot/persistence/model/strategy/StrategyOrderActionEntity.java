@@ -13,6 +13,8 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StrategyOrderActionEntity implements StrategyActionEntity {
 
+    private Long id;
+
     private String actionType;
 
     private String orderType;

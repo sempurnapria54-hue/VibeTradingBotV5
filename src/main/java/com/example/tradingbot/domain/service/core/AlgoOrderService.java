@@ -1,17 +1,14 @@
 package com.example.tradingbot.domain.service.core;
 
-import com.example.tradingbot.client.service.ClientManager;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.search_params.AlgoOrderSearchParams;
-import com.example.tradingbot.domain.service.deal.command.refresh.RefreshAlgoOrderExecutor;
 import com.example.tradingbot.domain.service.deal.command.refresh.SyncAlgoOrderExecutor;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
-import com.example.tradingbot.persistence.service.InstrumentDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,11 +21,8 @@ public class AlgoOrderService {
 
     private final AlgoOrderDataService algoOrderDataService;
     private final ExchangeDataService exchangeDataService;
-    private final InstrumentDataService instrumentDataService;
     private final DealDataService dealDataService;
     private final AlgoOrderMapper algoOrderMapper;
-    private final ClientManager clientManager;
-    private final RefreshAlgoOrderExecutor refreshAlgoOrderExecutor;
     private final SyncAlgoOrderExecutor syncAlgoOrderExecutor;
 
     @Transactional
@@ -38,6 +32,7 @@ public class AlgoOrderService {
         AlgoOrder algoOrder = new AlgoOrder();
         algoOrderMapper.domainToDomainOnCreate(request, algoOrder);
         algoOrder.setStatus(AlgoOrder.Status.CREATED);
+        algoOrder.setDealId(deal.getId());
         return algoOrderDataService.save(algoOrder);
     }
 
@@ -54,19 +49,4 @@ public class AlgoOrderService {
     public Page<AlgoOrder> getByParams(AlgoOrderSearchParams searchParams, Pageable pageable) {
         return algoOrderDataService.search(searchParams, pageable);
     }
-
-    public void createMainProtection(Deal deal) {
-
-    }
-
-    public void cancelAttachedProtection(Deal deal) {
-
-    }
-
-    public void amendMainProtection(Deal deal) {
-
-    }
-
-
-//    TODO: Нужен StatusResolver, когда получаем ответ от биржи;
 }

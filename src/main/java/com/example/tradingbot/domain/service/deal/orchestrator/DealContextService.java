@@ -45,6 +45,8 @@ public class DealContextService {
         context.setDeal(deal);
         context.setExchange(exchange);
         context.setInstrument(instrument);
+        context.setOrders(safeList(deal.getOrders()));
+        context.setAlgoOrders(safeList(deal.getAlgoOrders()));
         context.setEntryOrder(resolveEntryOrder(deal));
         context.setActivePosition(resolveActivePosition(deal));
         context.setActiveAlgoOrders(resolveActiveAlgoOrders(deal));

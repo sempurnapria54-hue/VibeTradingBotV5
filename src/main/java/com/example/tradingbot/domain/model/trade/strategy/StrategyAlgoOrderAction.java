@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 @Setter
 public class StrategyAlgoOrderAction implements StrategyAction {
 
+    private Long id;
+
     /**
      * CREATE / AMEND / CANCEL / CLOSE_FULL / CLOSE_PARTIAL
      * <p>

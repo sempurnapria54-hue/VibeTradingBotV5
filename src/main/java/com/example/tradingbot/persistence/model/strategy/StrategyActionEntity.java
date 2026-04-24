@@ -10,4 +10,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = StrategyPositionActionEntity.class, name = "POSITION")
 })
 public interface StrategyActionEntity {
+
+    Long getId();
+
+    void setId(Long id);
 }

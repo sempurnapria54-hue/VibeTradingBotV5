@@ -4,7 +4,10 @@ import com.example.tradingbot.domain.model.core.deal.Deal;
 import com.example.tradingbot.domain.model.core.deal.DealEvent;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.deal.state_machine.TransitionResult;
+import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
 
 @Service
 public class ClosedHandler implements StateHandler {
@@ -17,11 +20,11 @@ public class ClosedHandler implements StateHandler {
     @Override
     public void checkEntryInvariants(DealContext context) {
         Deal deal = context.getDeal();
-        if (deal == null) {
+        if (Objects.isNull(deal)) {
             throw new IllegalStateException("deal is null");
         }
 
-        if (deal.getStatus() != Deal.Status.CLOSED) {
+        if (BooleanUtils.isFalse(Objects.equals(deal.getStatus(), Deal.Status.CLOSED))) {
             throw new IllegalStateException("deal.status must be CLOSED");
         }
     }

@@ -12,10 +12,13 @@ import com.example.tradingbot.domain.model.trade.strategy.Strategy;
 import com.example.tradingbot.domain.model.trade.strategy.StrategyDetails;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.BooleanUtils;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+
+import static com.example.tradingbot.util.CollectionUtils.emptyIfNull;
 
 @Getter
 @Setter
@@ -46,6 +49,8 @@ public class DealContext {
      */
     private Order entryOrder;
 
+    private List<Order> orders;
+
     /**
      * Текущая активная позиция сделки.
      * <p>
@@ -64,6 +69,8 @@ public class DealContext {
      * - trailing и другие защитные ордера.
      */
     private List<AlgoOrder> activeAlgoOrders;
+
+    private List<AlgoOrder> algoOrders;
 
     /**
      * Текущая фаза рынка по инструменту.
@@ -91,7 +98,7 @@ public class DealContext {
      * Вернуть идентификатор инструмента сделки.
      */
     public Long getInstrumentId() {
-        if (this.deal == null) {
+        if (Objects.isNull(this.deal)) {
             return null;
         }
 
@@ -102,7 +109,7 @@ public class DealContext {
      * Есть ли входной ордер.
      */
     public boolean hasEntryOrder() {
-        return this.entryOrder != null;
+        return Objects.nonNull(this.entryOrder);
     }
 
     /**
@@ -112,28 +119,28 @@ public class DealContext {
      * по текущему состоянию ордера.
      */
     public boolean isEntryOrderFinal() {
-        if (this.entryOrder == null) {
+        if (Objects.isNull(this.entryOrder)) {
             return false;
         }
 
-        return this.entryOrder.getStatus() == Order.Status.COMPLETED
-                || this.entryOrder.getStatus() == Order.Status.CLOSED
-                || this.entryOrder.getStatus() == Order.Status.PARTIALLY_COMPLETED;
+        return Objects.equals(this.entryOrder.getStatus(), Order.Status.COMPLETED)
+                || Objects.equals(this.entryOrder.getStatus(), Order.Status.CLOSED)
+                || Objects.equals(this.entryOrder.getStatus(), Order.Status.PARTIALLY_COMPLETED);
     }
 
     /**
      * Подтверждена ли активная позиция.
      */
     public boolean hasActivePosition() {
-        if (this.activePosition == null) {
+        if (Objects.isNull(this.activePosition)) {
             return false;
         }
 
-        if (this.activePosition.getStatus() != Position.Status.ACTIVE) {
+        if (BooleanUtils.isFalse(Objects.equals(this.activePosition.getStatus(), Position.Status.ACTIVE))) {
             return false;
         }
 
-        if (this.activePosition.getSize() == null) {
+        if (Objects.isNull(this.activePosition.getSize())) {
             return false;
         }
 
@@ -147,7 +154,7 @@ public class DealContext {
      * Это полезный derived-факт для перехода из MANAGING в EXIT_PENDING.
      */
     public boolean isPositionClosed() {
-        return !hasActivePosition();
+        return BooleanUtils.isFalse(hasActivePosition());
     }
 
     /**
@@ -157,7 +164,7 @@ public class DealContext {
      * attached-защита является частью entryOrder.
      */
     public AttachedAlgoOrder getActiveAttachedStopLoss() {
-        if (this.entryOrder == null || this.entryOrder.getAttachedAlgoOrders() == null) {
+        if (Objects.isNull(this.entryOrder) || Objects.isNull(this.entryOrder.getAttachedAlgoOrders())) {
             return null;
         }
 
@@ -176,7 +183,11 @@ public class DealContext {
      * на основную algo-защиту.
      */
     public boolean hasAttachedStopLoss() {
-        return getActiveAttachedStopLoss() != null;
+        return Objects.nonNull(getActiveAttachedStopLoss());
+    }
+
+    public boolean hasAttachedProtection() {
+        return hasAttachedStopLoss();
     }
 
     /**
@@ -186,7 +197,7 @@ public class DealContext {
      * handler’ы и сервисы могут проверять нужные роли точнее.
      */
     public boolean hasMainProtection() {
-        return this.activeAlgoOrders != null && !this.activeAlgoOrders.isEmpty();
+        return BooleanUtils.isFalse(emptyIfNull(this.activeAlgoOrders).isEmpty());
     }
 
     /**
@@ -195,7 +206,7 @@ public class DealContext {
      * После успешного PROTECTION_SWITCHED attached-защиты быть уже не должно.
      */
     public boolean isAttachedRemoved() {
-        return !hasAttachedStopLoss();
+        return BooleanUtils.isFalse(hasAttachedStopLoss());
     }
 
     /**
@@ -208,11 +219,11 @@ public class DealContext {
      * - позиции нет.
      */
     public boolean isReadyForEntrySubmission() {
-        return this.deal != null
-                && this.strategy != null
-                && this.strategyDetails != null
-                && !hasEntryOrder()
-                && !hasActivePosition();
+        return Objects.nonNull(this.deal)
+                && Objects.nonNull(this.strategy)
+                && Objects.nonNull(this.strategyDetails)
+                && BooleanUtils.isFalse(hasEntryOrder())
+                && BooleanUtils.isFalse(hasActivePosition());
     }
 
     /**
@@ -254,5 +265,65 @@ public class DealContext {
      */
     public boolean isReadyForExitPending() {
         return isPositionClosed();
+    }
+
+    public boolean isEntryOrderFinalized() {
+        return isEntryOrderFinal();
+    }
+
+    public Order findOrderByStrategyActionId(Long strategyActionId) {
+        if (Objects.isNull(strategyActionId)) {
+            return null;
+        }
+
+        return safeOrders().stream()
+                           .filter(Objects::nonNull)
+                           .filter(order -> Objects.equals(order.getStrategyActionId(), strategyActionId))
+                           .findFirst()
+                           .orElse(null);
+    }
+
+    public boolean hasOrderByStrategyActionId(Long strategyActionId) {
+        return Objects.nonNull(findOrderByStrategyActionId(strategyActionId));
+    }
+
+    public AlgoOrder findAlgoOrderByStrategyActionId(Long strategyActionId) {
+        if (Objects.isNull(strategyActionId)) {
+            return null;
+        }
+
+        return safeAlgoOrders().stream()
+                               .filter(Objects::nonNull)
+                               .filter(algoOrder -> Objects.equals(algoOrder.getStrategyActionId(), strategyActionId))
+                               .findFirst()
+                               .orElse(null);
+    }
+
+    public boolean hasAlgoOrderByStrategyActionId(Long strategyActionId) {
+        return Objects.nonNull(findAlgoOrderByStrategyActionId(strategyActionId));
+    }
+
+    public List<Order> safeOrders() {
+        if (Objects.nonNull(this.orders)) {
+            return this.orders;
+        }
+
+        if (Objects.nonNull(this.deal) && Objects.nonNull(this.deal.getOrders())) {
+            return this.deal.getOrders();
+        }
+
+        return List.of();
+    }
+
+    public List<AlgoOrder> safeAlgoOrders() {
+        if (Objects.nonNull(this.algoOrders)) {
+            return this.algoOrders;
+        }
+
+        if (Objects.nonNull(this.deal) && Objects.nonNull(this.deal.getAlgoOrders())) {
+            return this.deal.getAlgoOrders();
+        }
+
+        return List.of();
     }
 }

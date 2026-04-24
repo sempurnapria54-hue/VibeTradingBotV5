@@ -162,12 +162,4 @@ public class OrderService {
                                           "Order sync is not implemented in compile stabilization stage.");
     }
 
-    public void createEntryOrder(Deal deal) {
-
-    }
-
-    public void refreshEntryOrder(Deal deal) {
-
-    }
-
 }

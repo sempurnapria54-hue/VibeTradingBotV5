@@ -38,6 +38,12 @@ public class AlgoOrderDataService {
                                   .orElseThrow(() -> new RuntimeException(ALGO_ORDER_NOT_FOUND));
     }
 
+    public AlgoOrder findRequiredById(Long id) {
+        return algoOrderRepository.findById(id)
+                                  .map(mapper::dataToDomain)
+                                  .orElseThrow(() -> new RuntimeException(ALGO_ORDER_NOT_FOUND));
+    }
+
     public Optional<AlgoOrder> findByDealIdAndStrategyActionId(Long dealId, Long strategyActionId) {
         return algoOrderRepository.findByDealIdAndStrategyActionId(dealId, strategyActionId)
                                   .map(mapper::dataToDomain);

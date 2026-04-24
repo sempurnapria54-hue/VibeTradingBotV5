@@ -4,7 +4,11 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "actionKind")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = StrategyOrderActionModel.class, name = "ORDER"),
@@ -26,4 +30,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
         }
 )
 public abstract class StrategyActionModel {
+
+    @Schema(description = "Stable strategy action id. If omitted on create, service assigns it once.")
+    private Long id;
 }

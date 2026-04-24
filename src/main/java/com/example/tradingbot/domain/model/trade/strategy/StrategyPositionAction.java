@@ -12,6 +12,8 @@ import java.math.BigDecimal;
 @Setter
 public class StrategyPositionAction implements StrategyAction {
 
+    private Long id;
+
     /**
      * CLOSE_FULL / CLOSE_PARTIAL.
      */

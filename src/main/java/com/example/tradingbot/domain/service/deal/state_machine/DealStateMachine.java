@@ -31,7 +31,7 @@ public class DealStateMachine {
 
         handler.checkExitInvariants(context, result);
 
-        if (result.getNextStatus() != null) {
+        if (Objects.nonNull(result.getNextStatus())) {
             deal.setStatus(result.getNextStatus());
         }
 
@@ -40,7 +40,7 @@ public class DealStateMachine {
 
     private StateHandler getHandlerRequired(Deal.Status status) {
         return handlers.stream()
-                       .filter(e -> e.supportedStatus() == status)
+                       .filter(e -> Objects.equals(e.supportedStatus(), status))
                        .findFirst()
                        .orElseThrow(() -> new IllegalStateException("No handler for status: " + status));
     }
@@ -50,12 +50,12 @@ public class DealStateMachine {
         Objects.requireNonNull(event);
 
         Deal deal = context.getDeal();
-        if (deal == null) {
+        if (Objects.isNull(deal)) {
             throw new IllegalStateException("deal is null");
         }
 
         Deal.Status currentStatus = deal.getStatus();
-        if (currentStatus == null) {
+        if (Objects.isNull(currentStatus)) {
             throw new IllegalStateException("deal.status is null");
         }
     }

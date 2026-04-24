@@ -1,21 +1,33 @@
 package com.example.tradingbot.domain.service.deal.state_machine.handler;
 
+import com.example.tradingbot.domain.model.commands.ServiceCommand;
 import com.example.tradingbot.domain.model.commands.ServiceCommandType;
 import com.example.tradingbot.domain.model.core.deal.Deal;
 import com.example.tradingbot.domain.model.core.deal.DealEvent;
 import com.example.tradingbot.domain.model.trade.market.MarketPhase;
 import com.example.tradingbot.domain.model.trade.strategy.Strategy;
 import com.example.tradingbot.domain.model.trade.strategy.StrategyDetails;
+import com.example.tradingbot.domain.model.trade.strategy.StrategyStepType;
+import com.example.tradingbot.domain.service.deal.command.core.ServiceCommandFactory;
 import com.example.tradingbot.domain.service.deal.state_machine.DealContext;
 import com.example.tradingbot.domain.service.deal.state_machine.TransitionResult;
+import com.example.tradingbot.domain.service.strategy.interpreter.StrategyActionInterpreter;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
+@RequiredArgsConstructor
 public class PrecheckHandler implements StateHandler {
+
+    private final ServiceCommandFactory commandFactory;
+
+    private final StrategyActionInterpreter strategyActionInterpreter;
 
     @Override
     public Deal.Status supportedStatus() {
@@ -43,13 +55,13 @@ public class PrecheckHandler implements StateHandler {
         return switch (event) {
             case CHECK_ENTRY_INVARIANTS -> TransitionResult.stay();
 
-            case PROCESS, RETRY -> process();
+            case PROCESS, RETRY -> process(context);
 
             case CHECK_EXIT_INVARIANTS -> checkExitInvariantsInternal(context);
 
             case FAIL -> {
                 context.getDeal()
-                       .setCloseReason(Deal.CloseReason.EMERGENCY_STOP);
+                        .setCloseReason(Deal.CloseReason.EMERGENCY_STOP);
                 yield TransitionResult.moveTo(Deal.Status.ERROR);
             }
 
@@ -64,16 +76,18 @@ public class PrecheckHandler implements StateHandler {
         }
     }
 
-    private TransitionResult process() {
-        return TransitionResult.stay(List.of(
-                ServiceCommandType.REFRESH_POSITIONS,
-                ServiceCommandType.REFRESH_BALANCE,
-                ServiceCommandType.REFRESH_PENDING_ORDERS
-        ));
+    private TransitionResult process(DealContext context) {
+        List<ServiceCommand> commands = new ArrayList<>();
+        commands.add(commandFactory.system(context, ServiceCommandType.REFRESH_POSITION));
+        commands.add(commandFactory.system(context, ServiceCommandType.REFRESH_BALANCE));
+        commands.add(commandFactory.system(context, ServiceCommandType.REFRESH_PENDING_ORDERS));
+        commands.addAll(strategyActionInterpreter.interpret(context, Set.of(StrategyStepType.ENTRY,
+                                                                            StrategyStepType.GRID_ENTRY)));
+        return TransitionResult.stay(commands);
     }
 
     private TransitionResult checkExitInvariantsInternal(DealContext context) {
-        if (isPrecheckPassed(context)) {
+        if (context.hasEntryOrder() && isPrecheckPassed(context)) {
             return TransitionResult.moveTo(Deal.Status.ENTRY_SUBMITTED);
         }
 
@@ -84,15 +98,6 @@ public class PrecheckHandler implements StateHandler {
         return TransitionResult.stay();
     }
 
-    /**
-     * PRECHECK считается успешно пройденным, если:
-     * - стратегия существует и активна;
-     * - для текущей фазы рынка найдены детали стратегии;
-     * - торговля в этой фазе не запрещена;
-     * - фаза рынка определена и не UNKNOWN;
-     * - по инструменту нет активной позиции;
-     * - входной ордер ещё не создан.
-     */
     private boolean isPrecheckPassed(DealContext context) {
         Strategy strategy = context.getStrategy();
         StrategyDetails strategyDetails = context.getStrategyDetails();
@@ -114,30 +119,9 @@ public class PrecheckHandler implements StateHandler {
             return false;
         }
 
-        if (context.hasActivePosition()) {
-            return false;
-        }
-
-        if (context.hasEntryOrder()) {
-            return false;
-        }
-
-        return true;
+        return BooleanUtils.isFalse(context.hasActivePosition());
     }
 
-    /**
-     * PRECHECK считается заблокированным, если:
-     * - контекст не прошёл precheck,
-     * - и при этом это штатный сценарий "не входим", а не авария.
-     * <p>
-     * Пока что сюда относятся:
-     * - неактивная стратегия;
-     * - отсутствие деталей стратегии под фазу рынка;
-     * - запрет торговли в данной фазе;
-     * - UNKNOWN-фаза рынка;
-     * - уже существующая позиция;
-     * - уже созданный entry-ордер.
-     */
     private boolean isPrecheckBlocked(DealContext context) {
         return BooleanUtils.isFalse(isPrecheckPassed(context));
     }

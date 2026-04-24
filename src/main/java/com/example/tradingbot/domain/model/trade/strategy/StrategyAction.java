@@ -7,4 +7,8 @@ package com.example.tradingbot.domain.model.trade.strategy;
  * с большим количеством nullable-полей.
  */
 public interface StrategyAction {
+
+    Long getId();
+
+    void setId(Long id);
 }
