@@ -15,6 +15,10 @@ public interface AlgoOrderRepository extends JpaRepository<AlgoOrderEntity, Long
 
     Optional<AlgoOrderEntity> findByInternalId(String internalId);
 
+    Optional<AlgoOrderEntity> findByDealIdAndStrategyActionId(Long dealId, Long strategyActionId);
+
+    boolean existsByDealIdAndStrategyActionId(Long dealId, Long strategyActionId);
+
     @Query(value = """
             select ao.*
             from algo_orders ao

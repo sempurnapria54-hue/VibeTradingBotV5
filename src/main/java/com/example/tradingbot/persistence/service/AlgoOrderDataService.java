@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.example.tradingbot.util.Constant.ErrorCode.ALGO_ORDER_NOT_FOUND;
@@ -35,6 +36,15 @@ public class AlgoOrderDataService {
         return algoOrderRepository.findByInternalId(internalId)
                                   .map(mapper::dataToDomain)
                                   .orElseThrow(() -> new RuntimeException(ALGO_ORDER_NOT_FOUND));
+    }
+
+    public Optional<AlgoOrder> findByDealIdAndStrategyActionId(Long dealId, Long strategyActionId) {
+        return algoOrderRepository.findByDealIdAndStrategyActionId(dealId, strategyActionId)
+                                  .map(mapper::dataToDomain);
+    }
+
+    public boolean existsByDealIdAndStrategyActionId(Long dealId, Long strategyActionId) {
+        return algoOrderRepository.existsByDealIdAndStrategyActionId(dealId, strategyActionId);
     }
 
     public List<AlgoOrder> findByInstrumentId(Long instrumentId) {

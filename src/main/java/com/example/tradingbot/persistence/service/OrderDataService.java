@@ -49,6 +49,15 @@ public class OrderDataService {
                               .map(mapper::dataToDomain);
     }
 
+    public Optional<Order> findByDealIdAndStrategyActionId(Long dealId, Long strategyActionId) {
+        return orderRepository.findByDealIdAndStrategyActionId(dealId, strategyActionId)
+                              .map(mapper::dataToDomain);
+    }
+
+    public boolean existsByDealIdAndStrategyActionId(Long dealId, Long strategyActionId) {
+        return orderRepository.existsByDealIdAndStrategyActionId(dealId, strategyActionId);
+    }
+
     public List<Order> findByInstrumentId(Long instrumentId) {
         return orderRepository.findAllByInstrumentId(instrumentId)
                               .stream()

@@ -106,6 +106,7 @@ public interface AlgoOrderMapper extends CommonMapper {
     @Mapping(target = "externalStatus", source = "externalStatus")
     @Mapping(target = "externalDirection", source = "externalDirection")
     @Mapping(target = "externalPositionSide", source = "externalPositionSide")
+    @Mapping(target = "strategyActionId", ignore = true)
     void updateDomainFromExternalSnapshot(AlgoOrderExternalSnapshot source,
                                           @MappingTarget AlgoOrder target);
 

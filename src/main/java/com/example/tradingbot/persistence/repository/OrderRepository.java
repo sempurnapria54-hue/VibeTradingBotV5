@@ -16,6 +16,10 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long>, JpaSp
 
     Optional<OrderEntity> findByExternalId(String externalId);
 
+    Optional<OrderEntity> findByDealIdAndStrategyActionId(Long dealId, Long strategyActionId);
+
+    boolean existsByDealIdAndStrategyActionId(Long dealId, Long strategyActionId);
+
     @Query(value = """
             select o.*
             from orders o

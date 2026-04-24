@@ -29,6 +29,10 @@ import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
         @UniqueConstraint(
                 name = "uk_orders_internal_id",
                 columnNames = {"internal_id"}
+        ),
+        @UniqueConstraint(
+                name = "uk_orders_deal_id_strategy_action_id",
+                columnNames = {"deal_id", "strategy_action_id"}
         )
 })
 public class OrderEntity extends AuditableEntity {
@@ -46,6 +50,13 @@ public class OrderEntity extends AuditableEntity {
      */
     @Column(name = "deal_id", nullable = false, updatable = false)
     private Long dealId;
+
+    /**
+     * Идентификатор действия стратегии, по которому была создана сущность.
+     * Нужен FSM для восстановления после рестарта и понимания, какие actions уже материализованы.
+     */
+    @Column(name = "strategy_action_id")
+    private Long strategyActionId;
 
     /**
      * Межсервисный идентификатор ордера.

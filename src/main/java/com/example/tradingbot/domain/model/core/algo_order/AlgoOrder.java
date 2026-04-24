@@ -27,6 +27,12 @@ public class AlgoOrder extends Auditable {
     private Long dealId;
 
     /**
+     * Идентификатор действия стратегии, по которому была создана сущность.
+     * Нужен FSM для восстановления после рестарта и понимания, какие actions уже материализованы.
+     */
+    private Long strategyActionId;
+
+    /**
      * Межсервисный идентификатор algo-ордера (идемпотентность).
      */
     private String internalId;

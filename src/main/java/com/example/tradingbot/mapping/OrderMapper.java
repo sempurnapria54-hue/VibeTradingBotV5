@@ -207,5 +207,6 @@ public interface OrderMapper extends CommonMapper {
     @Mapping(target = "fee", source = "fee")
     @Mapping(target = "externalCreatedAt", source = "externalCreatedAt")
     @Mapping(target = "externalModifiedAt", source = "externalModifiedAt")
+    @Mapping(target = "strategyActionId", ignore = true)
     void updateDomainFromExternalSnapshot(OrderExternalSnapshot source, @MappingTarget Order target);
 }
