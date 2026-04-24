@@ -47,6 +47,10 @@ public class InstrumentDataService {
                          .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
     }
 
+    public boolean existsById(Long id) {
+        return repository.existsById(id);
+    }
+
     public Instrument findRequiredByDealId(Long dealId) {
         return repository.findByDealId(dealId)
                          .map(mapper::dataToDomain)

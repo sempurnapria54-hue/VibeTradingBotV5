@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
@@ -22,8 +23,7 @@ import java.util.List;
 @NoArgsConstructor
 @Entity
 @Table(name = "strategies", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_strategies_internal_id", columnNames = {"internal_id"}),
-        @UniqueConstraint(name = "uk_strategies_instrument_id_version", columnNames = {"instrument_id", "version"})
+        @UniqueConstraint(name = "uk_strategies_internal_id", columnNames = {"internal_id"})
 })
 public class StrategyEntity extends AuditableEntity {
 
@@ -47,6 +47,7 @@ public class StrategyEntity extends AuditableEntity {
     @Column(name = "status", nullable = false)
     private String status;
 
+    @OrderBy("marketPhaseType ASC, id ASC")
     @OneToMany(mappedBy = "strategy", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StrategyDetailsEntity> detailEntities;
 }

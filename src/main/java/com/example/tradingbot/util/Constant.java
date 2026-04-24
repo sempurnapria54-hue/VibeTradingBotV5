@@ -19,6 +19,10 @@ public class Constant {
         public static final String INSTRUMENT_NOT_FOUND = "instrument.not.found";
         public static final String DEAL_NOT_FOUND = "deal.not.found";
         public static final String STRATEGY_NOT_FOUND = "strategy.not.found";
+        public static final String STRATEGY_ALREADY_EXISTS = "strategy.already.exists";
+        public static final String STRATEGY_STATUS_TRANSITION_NOT_ALLOWED = "strategy.status.transition.not.allowed";
+        public static final String STRATEGY_REQUEST_INVALID = "strategy.request.invalid";
+        public static final String STRATEGY_VALIDATION_FAILED = "strategy.validation.failed";
         public static final String ORDER_NOT_FOUND = "order.not.found";
         public static final String POSITION_NOT_FOUND = "position.not.found";
         public static final String ALGO_ORDER_NOT_FOUND = "algo.order.not.found";
