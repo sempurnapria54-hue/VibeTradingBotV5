@@ -15,6 +15,9 @@ import java.math.BigDecimal;
 @Setter
 public class StrategyOrderAction implements StrategyAction {
 
+    /**
+     * Стабильный id action внутри immutable стратегии.
+     */
     private Long id;
 
     /**

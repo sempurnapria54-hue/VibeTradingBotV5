@@ -13,9 +13,18 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TrailingSettingsEntity {
 
+    /**
+     * Порог профита, после которого можно активировать trailing.
+     */
     private BigDecimal activationProfitPercents;
 
+    /**
+     * Callback trailing в процентах от экстремума.
+     */
     private BigDecimal callbackPercents;
 
+    /**
+     * Дополнительный буфер после activationProfitPercents.
+     */
     private BigDecimal activationBufferPercents;
 }

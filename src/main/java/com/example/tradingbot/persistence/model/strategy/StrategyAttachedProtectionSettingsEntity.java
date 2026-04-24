@@ -11,7 +11,13 @@ import lombok.Setter;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StrategyAttachedProtectionSettingsEntity {
 
+    /**
+     * Тип attached protection внутри entry order.
+     */
     private String attachedType;
 
+    /**
+     * Настройки стартового stop-loss для attached protection.
+     */
     private StopLossSettingsEntity stopLossSettings;
 }

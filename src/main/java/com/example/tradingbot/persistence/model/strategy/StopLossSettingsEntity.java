@@ -13,9 +13,18 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StopLossSettingsEntity {
 
+    /**
+     * Способ расчёта stop-loss цены.
+     */
     private String calculationType;
 
+    /**
+     * Дистанция stop-loss в процентах.
+     */
     private BigDecimal distancePercents;
 
+    /**
+     * Тип trigger price на бирже: MARK, LAST или INDEX.
+     */
     private String triggerPriceType;
 }

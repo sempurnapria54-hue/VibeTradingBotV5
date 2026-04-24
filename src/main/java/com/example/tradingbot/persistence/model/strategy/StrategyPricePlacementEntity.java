@@ -13,11 +13,23 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StrategyPricePlacementEntity {
 
+    /**
+     * Базовая цена, от которой строится placement.
+     */
     private String baseType;
 
+    /**
+     * Тип рыночной цены, если placement опирается на market snapshot.
+     */
     private String marketPriceType;
 
+    /**
+     * Сторона смещения цены относительно базы.
+     */
     private String offsetSide;
 
+    /**
+     * Величина смещения в процентах.
+     */
     private BigDecimal percents;
 }

@@ -17,11 +17,23 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class AmendAlgoOrderCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Локальный id algo-order, который нужно изменить.
+     */
     private Long algoOrderId;
 
+    /**
+     * StrategyAction id для fallback-поиска algo-order после рестарта.
+     */
     private Long strategyActionId;
 
+    /**
+     * Новый размер algo-order в контрактах, если стратегия его изменила.
+     */
     private BigDecimal size;
 
+    /**
+     * Новое условие algo-order, если стратегия изменила trigger/SL/TP/trailing параметры.
+     */
     private Condition condition;
 }

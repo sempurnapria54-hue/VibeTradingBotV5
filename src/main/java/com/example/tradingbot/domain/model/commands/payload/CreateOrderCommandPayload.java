@@ -19,15 +19,33 @@ import java.util.List;
 @AllArgsConstructor
 public class CreateOrderCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Стабильный id StrategyAction, по которому создаётся runtime order.
+     */
     private Long strategyActionId;
 
+    /**
+     * Доменный тип создаваемого order.
+     */
     private Order.Type orderType;
 
+    /**
+     * Биржевая сторона order: buy или sell.
+     */
     private String side;
 
+    /**
+     * Цена order. Для market-like сценариев может быть null.
+     */
     private BigDecimal price;
 
+    /**
+     * Размер order в контрактах для SWAP/FUTURES.
+     */
     private BigDecimal size;
 
+    /**
+     * Attached protection, создаваемая локально вместе с entry order.
+     */
     private List<AttachedAlgoOrder> attachedAlgoOrders;
 }

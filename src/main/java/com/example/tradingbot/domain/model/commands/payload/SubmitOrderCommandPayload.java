@@ -14,7 +14,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class SubmitOrderCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Локальный id order, который уже создан в БД.
+     */
     private Long orderId;
 
+    /**
+     * StrategyAction id для fallback-поиска order после рестарта.
+     */
     private Long strategyActionId;
 }

@@ -16,7 +16,13 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ClosePositionCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Локальный id позиции. Может быть null, если закрывается активная позиция из DealContext.
+     */
     private Long positionId;
 
+    /**
+     * Доля закрытия позиции в процентах. Null означает полный выход.
+     */
     private BigDecimal closeFractionPercents;
 }

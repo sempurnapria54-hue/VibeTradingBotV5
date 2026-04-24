@@ -8,7 +8,13 @@ package com.example.tradingbot.domain.model.trade.strategy;
  */
 public interface StrategyAction {
 
+    /**
+     * Стабильный id action внутри immutable стратегии.
+     */
     Long getId();
 
+    /**
+     * Задать стабильный id action при создании стратегии или восстановлении из JSON.
+     */
     void setId(Long id);
 }

@@ -14,7 +14,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class SubmitAlgoOrderCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Локальный id algo-order, который уже создан в БД.
+     */
     private Long algoOrderId;
 
+    /**
+     * StrategyAction id для fallback-поиска algo-order после рестарта.
+     */
     private Long strategyActionId;
 }

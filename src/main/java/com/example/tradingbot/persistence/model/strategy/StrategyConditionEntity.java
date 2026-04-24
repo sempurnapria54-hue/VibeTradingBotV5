@@ -13,5 +13,8 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StrategyConditionEntity {
 
+    /**
+     * JSONB-список rules. Все rules внутри condition должны быть истинны.
+     */
     private List<StrategyConditionRuleEntity> rules;
 }

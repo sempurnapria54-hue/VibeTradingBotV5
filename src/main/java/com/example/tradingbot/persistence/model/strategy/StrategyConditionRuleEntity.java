@@ -13,9 +13,18 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StrategyConditionRuleEntity {
 
+    /**
+     * Порядок проверки rule внутри condition.
+     */
     private Integer level;
 
+    /**
+     * Тип условия, которое проверяет StrategyConditionEvaluator.
+     */
     private String ruleType;
 
+    /**
+     * Процентный параметр rule, если он нужен конкретному типу условия.
+     */
     private BigDecimal percents;
 }

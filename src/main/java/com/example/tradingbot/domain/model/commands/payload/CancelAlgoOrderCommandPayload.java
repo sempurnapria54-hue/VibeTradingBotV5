@@ -14,7 +14,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class CancelAlgoOrderCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Локальный id algo-order, который нужно отменить.
+     */
     private Long algoOrderId;
 
+    /**
+     * StrategyAction id для fallback-поиска algo-order после рестарта.
+     */
     private Long strategyActionId;
 }

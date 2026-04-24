@@ -19,17 +19,38 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class CreateAlgoOrderCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Стабильный id StrategyAction, по которому создаётся runtime algo-order.
+     */
     private Long strategyActionId;
 
+    /**
+     * Доменный тип условия algo-order.
+     */
     private ConditionType conditionType;
 
+    /**
+     * Размер algo-order в контрактах для SWAP/FUTURES.
+     */
     private BigDecimal size;
 
+    /**
+     * Доменная сторона algo-order.
+     */
     private AlgoOrder.Direction direction;
 
+    /**
+     * Биржевой тип algo-order для OKX ordType.
+     */
     private String externalType;
 
+    /**
+     * Биржевая сторона algo-order: buy или sell.
+     */
     private String externalDirection;
 
+    /**
+     * Условие с trigger/take-profit/stop-loss/trailing параметрами.
+     */
     private Condition condition;
 }

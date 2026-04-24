@@ -11,7 +11,13 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 })
 public interface StrategyActionEntity {
 
+    /**
+     * Стабильный id action, хранимый внутри JSON стратегии.
+     */
     Long getId();
 
+    /**
+     * Задать stable action id при маппинге JSON entity.
+     */
     void setId(Long id);
 }

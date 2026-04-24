@@ -55,11 +55,17 @@ public class StrategyStepEntity extends AuditableEntity {
     @Column(name = "step_index", nullable = false)
     private Integer stepIndex;
 
+    /**
+     * JSONB-условие применимости шага стратегии.
+     */
     @Convert(converter = StrategyConditionJsonbConverter.class)
     @Column(name = "condition", columnDefinition = "jsonb")
     @ColumnTransformer(write = "?::jsonb")
     private StrategyConditionEntity condition;
 
+    /**
+     * JSONB-список actions, которые FSM материализует через ServiceCommand.
+     */
     @Convert(converter = StrategyActionListJsonbConverter.class)
     @Column(name = "actions", columnDefinition = "jsonb")
     @ColumnTransformer(write = "?::jsonb")
