@@ -24,7 +24,10 @@
 * `StrategyActionCalculator` рассчитывает runtime-параметры действия стратегии: цену, размер и риск.
 * `ServiceCommandFactory` превращает рассчитанное действие в атомарные `ServiceCommand`.
 * `Order`, `AlgoOrder`, `Position` остаются чистыми runtime-сущностями биржи и не хранят `strategyActionId`.
-* Связь действия стратегии с runtime-сущностью хранится в `DealActionState`.
+* У каждого `StrategyAction` есть явный `key`, заданный в JSON стратегии.
+* Для `AMEND` / `CANCEL` используется `targetActionKey`, который ссылается на `key` другого action в той же `StrategyDetail`.
+* При сохранении стратегии `targetActionKey` валидируется и резолвится во внутреннюю ссылку на target action.
+* Runtime-связь действия стратегии с runtime-сущностью хранится в `DealActionState` через `strategyActionId` и `RuntimeTarget`.
 * Аудит и история исполнения фиксируют факты, но не являются источником runtime-логики FSM.
 
 ---
@@ -729,6 +732,14 @@ public class StrategyConditionOperand {
 
 ```java
 public interface StrategyAction {
+
+    /**
+     * Стабильный ключ action внутри StrategyDetail.
+     *
+     * Задаётся явно в JSON при создании стратегии.
+     * Нужен для ссылок между actions и для первичной валидации targetActionKey.
+     */
+    String getKey();
 }
 ```
 
@@ -750,6 +761,23 @@ Attached protection встроена внутрь order-action.
 
 ```java
 public class StrategyOrderAction implements StrategyAction {
+
+    /**
+     * Стабильный ключ action внутри StrategyDetail.
+     *
+     * Задаётся явно в JSON при создании стратегии.
+     * Должен быть уникален в рамках одной StrategyDetail.
+     */
+    private String key;
+
+    /**
+     * Для AMEND / CANCEL: key action, который создал target order.
+     *
+     * Для CREATE должен быть null.
+     * При сохранении стратегии валидируется и резолвится во внутреннюю ссылку
+     * на target action.
+     */
+    private String targetActionKey;
 
     /**
      * CREATE / AMEND / CANCEL.
@@ -1073,6 +1101,23 @@ Standalone algo-order.
 public class StrategyAlgoOrderAction implements StrategyAction {
 
     /**
+     * Стабильный ключ action внутри StrategyDetail.
+     *
+     * Задаётся явно в JSON при создании стратегии.
+     * Должен быть уникален в рамках одной StrategyDetail.
+     */
+    private String key;
+
+    /**
+     * Для AMEND / CANCEL: key action, который создал target algo-order.
+     *
+     * Для CREATE должен быть null.
+     * При сохранении стратегии валидируется и резолвится во внутреннюю ссылку
+     * на target action.
+     */
+    private String targetActionKey;
+
+    /**
      * CREATE / AMEND / CANCEL.
      *
      * Для algo-ордера допустимы:
@@ -1150,6 +1195,14 @@ public class StrategyAlgoOrderAction implements StrategyAction {
 
 ```java
 public class StrategyPositionAction implements StrategyAction {
+
+    /**
+     * Стабильный ключ action внутри StrategyDetail.
+     *
+     * Задаётся явно в JSON при создании стратегии.
+     * Должен быть уникален в рамках одной StrategyDetail.
+     */
+    private String key;
 
     /**
      * CLOSE_FULL / CLOSE_PARTIAL.
@@ -1263,13 +1316,92 @@ public enum StrategyActionType {
 
 ---
 
-# 14. Семантика placement для StrategyOrderAction
+# 14. Семантика key и targetActionKey
+
+## 14.1. key
+
+`key` — стабильный ключ action внутри одной `StrategyDetail`.
+
+Он задаётся явно в JSON при создании стратегии.
+
+Пример:
+
+```jsonc
+{
+  "actionKind": "ORDER",
+  "key": "grid-entry-long-1",
+  "actionType": "CREATE",
+  "orderType": "ENTRY",
+  "direction": "LONG",
+  "level": 1
+}
+```
+
+`key` нужен для:
+
+* валидации стратегии;
+* ссылок из `AMEND` / `CANCEL` actions на ранее описанные actions;
+* резолва `targetActionKey` во внутреннюю ссылку на target action;
+* читаемого debug/timeline.
+
+## 14.2. targetActionKey
+
+`targetActionKey` — это ключ action, который создал runtime-сущность, над которой нужно выполнить `AMEND` или `CANCEL`.
+
+Пример:
+
+```jsonc
+{
+  "actionKind": "ORDER",
+  "key": "cancel-grid-entry-long-1",
+  "actionType": "CANCEL",
+  "targetActionKey": "grid-entry-long-1",
+  "orderType": "ENTRY",
+  "direction": "LONG",
+  "level": 1
+}
+```
+
+При сохранении стратегии:
+
+```text
+targetActionKey
+  -> валидируется внутри StrategyDetail
+  -> резолвится во внутреннюю ссылку на target action
+```
+
+Runtime-логика после сохранения стратегии:
+
+```text
+AMEND / CANCEL action
+  -> имеет ссылку на target StrategyAction
+  -> находит DealActionState(dealId, target strategyActionId)
+  -> получает RuntimeTarget
+  -> создаёт ServiceCommand с конкретным orderId / algoOrderId
+```
+
+## 14.3. Валидация
+
+При создании стратегии нужно проверить:
+
+1. `key` обязателен у каждого `StrategyAction`.
+2. `key` уникален в рамках одной `StrategyDetail`.
+3. `targetActionKey` должен ссылаться на существующий `action.key` в той же `StrategyDetail`.
+4. `targetActionKey` обязателен для `AMEND` и `CANCEL` у `ORDER` / `ALGO_ORDER` actions.
+5. `CREATE` не должен иметь `targetActionKey`.
+6. `ORDER AMEND` / `ORDER CANCEL` должны ссылаться на `ORDER CREATE`.
+7. `ALGO_ORDER AMEND` / `ALGO_ORDER CANCEL` должны ссылаться на `ALGO_ORDER CREATE`.
+8. Нельзя ссылаться на action из другой `StrategyDetail`.
+
+---
+
+# 15. Семантика placement для StrategyOrderAction
 
 `placement` используется так:
 
 * при `actionType = CREATE` — для расчёта цены нового ордера;
 * при `actionType = AMEND` — как новая целевая схема позиционирования цены, если стратегия действительно перестраивает ордер;
-* при `actionType = CANCEL` — обычно цена не нужна, а нужная runtime-сущность определяется через `DealActionState`.
+* при `actionType = CANCEL` — обычно цена не нужна, а нужная runtime-сущность определяется через `targetActionKey -> target StrategyAction -> DealActionState`.
 
 Важно:
 
@@ -1278,7 +1410,7 @@ public enum StrategyActionType {
 
 ---
 
-# 15. Семантика OCO_FULL в StrategyAlgoOrderAction
+# 16. Семантика OCO_FULL в StrategyAlgoOrderAction
 
 Если `conditionType = OCO_FULL`, то:
 
@@ -1294,7 +1426,7 @@ closeFractionPercents = 100
 
 ---
 
-# 16. StopLossSettings
+# 17. StopLossSettings
 
 `triggerPriceType` обязателен, потому что runtime trigger-based algo conditions реально завязаны на `TriggerPriceType`.
 
@@ -1360,7 +1492,7 @@ public enum StopLossCalculationType {
 
 ---
 
-# 17. TrailingSettings
+# 18. TrailingSettings
 
 `TrailingSettings` остаётся, потому что trailing реально выражается как отдельная форма algo condition.
 
@@ -1390,17 +1522,22 @@ public class TrailingSettings {
 
 ---
 
-# 18. Связь стратегии с DealActionState
+# 19. Связь стратегии с DealActionState
 
 Стратегия не хранит runtime-состояние выполнения.
 
-Runtime-связь хранится отдельно:
+Связь строится так:
 
 ```text
-StrategyAction
-  -> DealActionState
-     -> targetEntityType
-     -> targetEntityId
+StrategyAction.key
+  -> используется при создании стратегии для валидации и резолва targetActionKey
+
+StrategyAction.id
+  -> используется в runtime
+  -> DealActionState.strategyActionId
+     -> RuntimeTarget
+        -> entityType
+        -> entityId
 ```
 
 Это нужно, чтобы:
@@ -1410,17 +1547,22 @@ StrategyAction
 * не хранить `strategyActionId` прямо в биржевых сущностях;
 * не строить runtime-логику по аудиту.
 
-Ключевой инвариант:
+Ключевые инварианты:
 
 ```text
+UNIQUE(strategy_detail_id, key)
 UNIQUE(deal_id, strategy_action_id)
 ```
 
-Но он находится в `DealActionState`, а не в `Order` / `AlgoOrder`.
+Важно:
+
+> `key` нужен для JSON/API и ссылок между actions внутри стратегии.
+>
+> Runtime работает через `strategyActionId`, а не через `strategyActionKey`.
 
 ---
 
-# 19. Связь стратегии с калькуляторами
+# 20. Связь стратегии с калькуляторами
 
 Стратегия хранит не готовые цены, размеры и риск,
 а правила их расчёта.
@@ -1454,7 +1596,7 @@ StrategyDetail.riskPerTradePercent / maxLeverage
 
 ---
 
-# 20. Связь стратегии с индикаторами и snapshots
+# 21. Связь стратегии с индикаторами и snapshots
 
 Стратегия может ссылаться на условия, которые проверяются по индикаторам и market snapshots.
 
@@ -1474,7 +1616,7 @@ StrategyDetail.riskPerTradePercent / maxLeverage
 
 ---
 
-# 21. JSON-примеры
+# 22. JSON-примеры
 
 JSON-примеры можно хранить в отдельном файле:
 
@@ -1486,15 +1628,18 @@ Strategy API examples.md
 
 При обновлении JSON-примеров нужно учитывать:
 
+* у каждого `StrategyAction` должен быть `key`;
+* для `AMEND` / `CANCEL` у `ORDER` / `ALGO_ORDER` должен быть `targetActionKey`;
+* `targetActionKey` должен ссылаться на `action.key` в той же `StrategyDetail`;
 * `StrategyPricePlacement.priceSource` вместо старого `marketPriceType`;
 * `StopLossSettings.calculationType` как enum `StopLossCalculationType`;
 * расширенную модель `StrategyConditionRule`;
 * отсутствие `strategyActionId` в runtime-сущностях;
-* использование `DealActionState` для runtime-связи action -> entity.
+* использование `DealActionState.strategyActionId + RuntimeTarget` для runtime-связи action -> entity.
 
 ---
 
-# 22. Что изменилось относительно прошлой версии
+# 23. Что изменилось относительно прошлой версии
 
 1. `PriceResolver` переименован концептуально в `PriceCalculator`.
 2. Добавлен `StrategyActionCalculator` как оркестратор `PriceCalculator`, `SizeCalculator`, `RiskCalculator`.
@@ -1503,5 +1648,8 @@ Strategy API examples.md
 5. `StopLossSettings.calculationType` стал enum `StopLossCalculationType`, а не строкой.
 6. Уточнено, что `level` живёт в стратегии и не переносится в `Order` / `AlgoOrder` как runtime-role.
 7. Уточнено, что `Order`, `AlgoOrder`, `Position` не хранят `strategyActionId`.
-8. Добавлен раздел про `DealActionState`.
-9. Добавлены ссылки на новые процессные документы.
+8. Добавлен обязательный `StrategyAction.key`.
+9. Добавлен `targetActionKey` для `AMEND` / `CANCEL` у `ORDER` / `ALGO_ORDER`.
+10. Уточнено, что `targetActionKey` при сохранении стратегии валидируется и резолвится во внутреннюю ссылку на target action.
+11. Уточнено, что runtime-связь action -> entity строится через `DealActionState.strategyActionId + RuntimeTarget`.
+12. Добавлены ссылки на новые процессные документы.
