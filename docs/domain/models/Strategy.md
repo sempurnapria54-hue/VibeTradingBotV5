@@ -1,14 +1,31 @@
-# Модель стратегии — финальная версия
+# Модель стратегии
 
-Ниже зафиксирована финальная форма strategy-layer, к которой мы пришли.
+> Статус документа: актуальная версия strategy-layer.
+>
+> Эта дока описывает только модель стратегии: правила, условия и ожидаемые действия.
+>
+> Runtime-процессы вынесены в отдельные документы:
+>
+> * `01. Жизненный цикл сделки`
+> * `02. Сервисные команды`
+> * `03. Калькуляторы действий стратегии`
+> * `04. Расчёт индикаторов и рыночных snapshots`
+> * `05. Аудит и история исполнения`
 
-Главная идея:
+---
 
-* **стратегия** хранит торговые правила, условия и ожидаемые действия;
-* **FSM сделки** управляет реальными сущностями `Deal / Order / AttachedAlgoOrder / AlgoOrder / Position`;
-* стратегия **не хранит** сервисные команды и не пытается управлять runtime-сущностями напрямую;
-* стратегия говорит **что** должно быть создано/изменено/отменено и **при каких условиях**;
-* стейт-машина и orchestration-слой решают, **когда именно** интерпретировать эти правила и в какие низкоуровневые команды их превратить.
+# Главная идея
+
+* **Стратегия** хранит торговые правила, условия и ожидаемые действия.
+* **FSM сделки** управляет runtime-сделкой и её этапами.
+* **Стратегия не хранит сервисные команды** и не пытается управлять runtime-сущностями напрямую.
+* Стратегия говорит **что** должно быть создано / изменено / отменено и **при каких условиях**.
+* Стейт-машина и orchestration-слой решают, **когда именно** интерпретировать эти правила.
+* `StrategyActionCalculator` рассчитывает runtime-параметры действия стратегии: цену, размер и риск.
+* `ServiceCommandFactory` превращает рассчитанное действие в атомарные `ServiceCommand`.
+* `Order`, `AlgoOrder`, `Position` остаются чистыми runtime-сущностями биржи и не хранят `strategyActionId`.
+* Связь действия стратегии с runtime-сущностью хранится в `DealActionState`.
+* Аудит и история исполнения фиксируют факты, но не являются источником runtime-логики FSM.
 
 ---
 
@@ -39,7 +56,9 @@ public class Strategy extends Auditable {
 
     /**
      * Версия append-only стратегии.
-     * При изменении стратегия не редактируется, а создаётся заново.
+     *
+     * При изменении стратегия не редактируется,
+     * а создаётся новая версия.
      */
     private Integer version;
 
@@ -51,7 +70,7 @@ public class Strategy extends Auditable {
     /**
      * Ровно одна detail на одну фазу рынка.
      */
-    private List<StrategyDetails> details;
+    private List<StrategyDetail> details;
 }
 ```
 
@@ -59,6 +78,7 @@ public class Strategy extends Auditable {
 
 ```java
 public enum StrategyStatus {
+
     /**
      * Стратегия создана, но ещё не введена в активное использование.
      */
@@ -66,16 +86,24 @@ public enum StrategyStatus {
 
     /**
      * Единственная активная стратегия инструмента.
+     *
+     * Новые сделки по инструменту могут создаваться только по активной стратегии.
      */
     ACTIVE,
 
     /**
-     * Стратегия существует, но временно не участвует в резолве.
+     * Стратегия существует, но временно не участвует в создании новых сделок.
+     *
+     * Уже открытые сделки должны продолжать жить по pinned-версии стратегии,
+     * если отдельная политика остановки стратегии не говорит иначе.
      */
     INACTIVE,
 
     /**
      * Логически удалённая стратегия.
+     *
+     * Новые сделки по ней не создаются.
+     * Для старых сделок поведение должно определяться отдельной политикой.
      */
     DELETED
 }
@@ -83,13 +111,13 @@ public enum StrategyStatus {
 
 ---
 
-# 2. StrategyDetails
+# 2. StrategyDetail
 
 В доменной модели и в JSON детали стратегии группируются по `Deal.Status`,
 потому что это хорошо совпадает с текущей FSM сделки.
 
 ```java
-public class StrategyDetails {
+public class StrategyDetail {
 
     /**
      * Технический ID БД.
@@ -118,11 +146,17 @@ public class StrategyDetails {
 
     /**
      * Максимально допустимое плечо.
+     *
+     * Фактическое плечо не должно превышать ни это значение,
+     * ни глобальный лимит risk policy.
      */
     private Integer maxLeverage;
 
     /**
      * High-level ориентир reward/risk.
+     *
+     * Используется как настройка стратегии и ориентир для валидации,
+     * но конкретные TP/SL всё равно задаются в action settings.
      */
     private BigDecimal targetRiskRewardRatio;
 
@@ -142,6 +176,7 @@ public class StrategyDetails {
 
 ```java
 public enum PhaseEntryPolicy {
+
     /**
      * Торгуем по направлению фазы.
      */
@@ -205,8 +240,13 @@ public class StrategyStep {
 
 ```java
 public enum StrategyStepType {
+
     /**
      * Вход в сделку.
+     *
+     * На этапе поиска входа этот step проверяется EntryScannerJob.
+     * После создания Deal FSM может использовать entry-step в PRECHECK,
+     * чтобы создать entry order.
      */
     ENTRY,
 
@@ -282,6 +322,8 @@ public class StrategyCondition {
 }
 ```
 
+## StrategyConditionRule
+
 ```java
 public class StrategyConditionRule {
 
@@ -292,14 +334,82 @@ public class StrategyConditionRule {
 
     /**
      * Тип правила.
+     *
+     * Для простых бизнес-условий можно использовать конкретные ruleType:
+     * NO_OPEN_POSITION, POSITION_OPENED, PROFIT_PERCENTS_REACHED и т.д.
+     *
+     * Для гибких входных условий можно использовать generic-типы:
+     * INDICATOR_COMPARE, PRICE_COMPARE, MARKET_PHASE_IS и т.д.
      */
     private StrategyConditionRuleType ruleType;
 
     /**
+     * Таймфрейм, на котором проверяется правило.
+     *
+     * Примеры:
+     * 1m, 3m, 5m, 15m, 1H, 4H.
+     *
+     * Если правило не зависит от таймфрейма, поле может быть null.
+     */
+    private String timeframe;
+
+    /**
+     * Источник данных для левой части условия.
+     *
+     * Примеры:
+     * PRICE, INDICATOR, SIGNAL, MARKET_PHASE, MARKET_STRUCTURE, POSITION, ORDER.
+     */
+    private StrategyConditionSourceType sourceType;
+
+    /**
+     * Левая часть условия.
+     *
+     * Примеры:
+     * RSI_14,
+     * EMA_FAST,
+     * MACD_HISTOGRAM,
+     * CLOSE_PRICE,
+     * RANGE_HIGH,
+     * MARKET_PHASE.
+     */
+    private String leftOperand;
+
+    /**
+     * Оператор проверки.
+     */
+    private StrategyConditionOperator operator;
+
+    /**
+     * Правая часть условия.
+     *
+     * Это может быть число, enum, другой индикатор,
+     * уровень структуры рынка или ссылка на runtime-факт.
+     */
+    private StrategyConditionOperand rightOperand;
+
+    /**
      * Универсальный процентный параметр.
+     *
      * Используется только если ruleType этого требует.
+     *
+     * Примеры:
+     * PROFIT_PERCENTS_REACHED = 1.5
+     * LOSS_PERCENTS_REACHED = 0.5
      */
     private BigDecimal percents;
+
+    /**
+     * Дополнительные параметры правила.
+     *
+     * Примеры:
+     * periods,
+     * confirmationBars,
+     * candleShift,
+     * threshold,
+     * expectedDirection,
+     * paramsVersion.
+     */
+    private JsonNode params;
 }
 ```
 
@@ -312,6 +422,13 @@ public enum StrategyConditionRuleType {
      * По инструменту нет открытой позиции.
      */
     NO_OPEN_POSITION,
+
+    /**
+     * По инструменту нет активной сделки.
+     *
+     * Чаще используется EntryScannerJob перед созданием новой Deal.
+     */
+    NO_ACTIVE_DEAL,
 
     /**
      * Входной ордер уже финализирован.
@@ -356,7 +473,249 @@ public enum StrategyConditionRuleType {
     /**
      * Сделка потеряла экономическую эффективность.
      */
-    EFFICIENCY_BELOW_THRESHOLD
+    EFFICIENCY_BELOW_THRESHOLD,
+
+    /**
+     * Фаза рынка равна ожидаемой.
+     *
+     * Пример:
+     * MARKET_PHASE_IS BULL_TREND.
+     */
+    MARKET_PHASE_IS,
+
+    /**
+     * Сравнение значения индикатора.
+     *
+     * Примеры:
+     * RSI_14 > 50,
+     * EMA_FAST > EMA_SLOW,
+     * MACD_HISTOGRAM > 0.
+     */
+    INDICATOR_COMPARE,
+
+    /**
+     * Сравнение цены с уровнем или другой ценой.
+     *
+     * Примеры:
+     * CLOSE_PRICE > RANGE_HIGH,
+     * MARK_PRICE < ENTRY_PRICE.
+     */
+    PRICE_COMPARE,
+
+    /**
+     * Пересечение цены / индикатора уровня сверху вниз или снизу вверх.
+     *
+     * Примеры:
+     * CLOSE crossed above RANGE_HIGH,
+     * EMA_FAST crossed above EMA_SLOW.
+     */
+    CROSSOVER,
+
+    /**
+     * Проверка сигнала или score из signal/quorum слоя.
+     */
+    SIGNAL_SCORE_REACHED,
+
+    /**
+     * Проверка объёмного фильтра.
+     */
+    VOLUME_FILTER_PASSED,
+
+    /**
+     * Проверка, что свеча закрылась и данные можно использовать без look-ahead.
+     */
+    CANDLE_CLOSED
+}
+```
+
+## StrategyConditionSourceType
+
+```java
+public enum StrategyConditionSourceType {
+
+    /**
+     * Цена: last, mark, index, bid, ask, close и т.д.
+     */
+    PRICE,
+
+    /**
+     * Значение технического индикатора.
+     */
+    INDICATOR,
+
+    /**
+     * Сигнал или score из signal/quorum слоя.
+     */
+    SIGNAL,
+
+    /**
+     * Фаза рынка.
+     */
+    MARKET_PHASE,
+
+    /**
+     * Структура рынка: range, swing, support, resistance.
+     */
+    MARKET_STRUCTURE,
+
+    /**
+     * Позиция.
+     */
+    POSITION,
+
+    /**
+     * Ordinary order.
+     */
+    ORDER,
+
+    /**
+     * Algo-order.
+     */
+    ALGO_ORDER,
+
+    /**
+     * Баланс / доступная маржа / собственные средства.
+     */
+    BALANCE,
+
+    /**
+     * Время, сессия, день недели или тайминг свечи.
+     */
+    TIME,
+
+    /**
+     * Константное значение.
+     */
+    CONSTANT
+}
+```
+
+## StrategyConditionOperator
+
+```java
+public enum StrategyConditionOperator {
+
+    /**
+     * Равно.
+     */
+    EQ,
+
+    /**
+     * Не равно.
+     */
+    NE,
+
+    /**
+     * Больше.
+     */
+    GT,
+
+    /**
+     * Больше или равно.
+     */
+    GTE,
+
+    /**
+     * Меньше.
+     */
+    LT,
+
+    /**
+     * Меньше или равно.
+     */
+    LTE,
+
+    /**
+     * Значение находится между границами.
+     */
+    BETWEEN,
+
+    /**
+     * Значение не находится между границами.
+     */
+    NOT_BETWEEN,
+
+    /**
+     * Пересечение уровня снизу вверх.
+     */
+    CROSSED_ABOVE,
+
+    /**
+     * Пересечение уровня сверху вниз.
+     */
+    CROSSED_BELOW,
+
+    /**
+     * Условие истинно.
+     */
+    IS_TRUE,
+
+    /**
+     * Условие ложно.
+     */
+    IS_FALSE,
+
+    /**
+     * Сущность или значение существует.
+     */
+    EXISTS,
+
+    /**
+     * Сущность или значение отсутствует.
+     */
+    NOT_EXISTS
+}
+```
+
+## StrategyConditionOperand
+
+```java
+public class StrategyConditionOperand {
+
+    /**
+     * Источник данных операнда.
+     */
+    private StrategyConditionSourceType sourceType;
+
+    /**
+     * Тип значения.
+     *
+     * Примеры:
+     * NUMBER,
+     * STRING,
+     * ENUM,
+     * PRICE_FIELD,
+     * INDICATOR_VALUE,
+     * MARKET_STRUCTURE_LEVEL,
+     * BOOLEAN.
+     */
+    private String valueType;
+
+    /**
+     * Имя поля или значения.
+     *
+     * Примеры:
+     * RSI_14,
+     * EMA_FAST,
+     * RANGE_HIGH,
+     * BULL_TREND.
+     */
+    private String name;
+
+    /**
+     * Числовое значение, если операнд — число.
+     */
+    private BigDecimal numberValue;
+
+    /**
+     * Строковое значение, если операнд — строка или enum.
+     */
+    private String stringValue;
+
+    /**
+     * Дополнительные параметры операнда.
+     */
+    private JsonNode params;
 }
 ```
 
@@ -373,6 +732,14 @@ public interface StrategyAction {
 }
 ```
 
+Важно:
+
+> `StrategyAction` — это не `ServiceCommand`.
+>
+> `StrategyAction` описывает ожидаемое действие стратегии.
+>
+> Runtime-сущность, созданная или изменённая по этому action, связывается через `DealActionState`.
+
 ---
 
 # 6. StrategyOrderAction
@@ -385,10 +752,10 @@ Attached protection встроена внутрь order-action.
 public class StrategyOrderAction implements StrategyAction {
 
     /**
-     * CREATE / AMEND / CANCEL / CLOSE_FULL / CLOSE_PARTIAL
-     *
-     * Для обычного ордера в большинстве случаев:
      * CREATE / AMEND / CANCEL.
+     *
+     * Для обычного ордера допустимы:
+     * CREATE, AMEND, CANCEL.
      */
     private StrategyActionType actionType;
 
@@ -404,8 +771,8 @@ public class StrategyOrderAction implements StrategyAction {
     /**
      * Нормализованное направление стратегии.
      *
-     * LONG -> resolver маппит в buy для entry order
-     * SHORT -> resolver маппит в sell для entry order
+     * LONG -> runtime mapper / command factory маппит в buy для entry order.
+     * SHORT -> runtime mapper / command factory маппит в sell для entry order.
      */
     private StrategyTradeDirection direction;
 
@@ -413,16 +780,22 @@ public class StrategyOrderAction implements StrategyAction {
      * Доля расчётного объёма сценария.
      *
      * Пример:
-     * 25 = 25% от объёма, который уже посчитал PositionCalculator.
+     * 25 = 25% от объёма, который посчитает SizeCalculator.
      */
     private BigDecimal allocationPercents;
 
     /**
-     * Уровень действия.
+     * Уровень действия внутри стратегии.
      *
      * Примеры:
-     * - grid entry #1..#4
-     * - серия входов в одном шаге
+     * - grid entry #1..#4;
+     * - серия входов в одном шаге;
+     * - несколько однотипных actions в одном StrategyStep.
+     *
+     * Важно:
+     * level живёт в стратегии.
+     * level не переносится в Order / AlgoOrder как runtime-role.
+     * Runtime-связь action -> сущность хранится через DealActionState.
      */
     private Integer level;
 
@@ -443,7 +816,7 @@ public class StrategyOrderAction implements StrategyAction {
 }
 ```
 
-## Общий direction для strategy-layer
+## StrategyTradeDirection
 
 ```java
 public enum StrategyTradeDirection {
@@ -455,8 +828,8 @@ public enum StrategyTradeDirection {
      * на росте цены инструмента.
      *
      * В strategy-layer это нормализованное направление.
-     * Дальше resolver уже маппит его в конкретные значения
-     * runtime-моделей и биржевых полей.
+     * Дальше runtime mapper / command factory уже маппит его
+     * в конкретные значения runtime-моделей и биржевых полей.
      *
      * Примеры:
      * - для обычного entry order это обычно будет buy;
@@ -471,8 +844,8 @@ public enum StrategyTradeDirection {
      * на падении цены инструмента.
      *
      * В strategy-layer это нормализованное направление.
-     * Дальше resolver уже маппит его в конкретные значения
-     * runtime-моделей и биржевых полей.
+     * Дальше runtime mapper / command factory уже маппит его
+     * в конкретные значения runtime-моделей и биржевых полей.
      *
      * Примеры:
      * - для обычного entry order это обычно будет sell;
@@ -498,12 +871,19 @@ public class StrategyPricePlacement {
     private StrategyPriceBaseType baseType;
 
     /**
-     * Если baseType = MARKET_PRICE,
-     * то указываем, какую именно рыночную цену брать: LAST / INDEX / MARK.
+     * Источник рыночной цены, если baseType = MARKET_PRICE.
      *
-     * Для RANGE_LOW / RANGE_HIGH / ENTRY_PRICE = null.
+     * Примеры:
+     * LAST_PRICE,
+     * MARK_PRICE,
+     * INDEX_PRICE,
+     * BEST_BID_PRICE,
+     * BEST_ASK_PRICE,
+     * MID_PRICE.
+     *
+     * Для RANGE_LOW / RANGE_HIGH / ENTRY_PRICE обычно null.
      */
-    private TriggerPriceType marketPriceType;
+    private StrategyPriceSource priceSource;
 
     /**
      * Куда смещаемся относительно базы.
@@ -550,7 +930,7 @@ public enum StrategyPriceBaseType {
     RANGE_HIGH,
 
     /**
-     * Цена входа в позицию (entry price).
+     * Цена входа в позицию.
      *
      * Используется как база, когда цену нового действия
      * нужно рассчитывать относительно уже существующей сделки.
@@ -565,17 +945,48 @@ public enum StrategyPriceBaseType {
     /**
      * Текущая рыночная цена.
      *
-     * В отличие от RANGE_LOW / RANGE_HIGH / ENTRY_PRICE,
-     * здесь дополнительно требуется указать,
-     * какую именно рыночную цену брать:
-     * LAST / INDEX / MARK.
-     *
-     * Примеры:
-     * - поставить ордер относительно текущей mark price;
-     * - рассчитать уровень от текущей last price;
-     * - сместиться от актуальной index price.
+     * Здесь дополнительно требуется указать priceSource:
+     * LAST_PRICE, MARK_PRICE, INDEX_PRICE, BEST_BID_PRICE,
+     * BEST_ASK_PRICE или MID_PRICE.
      */
     MARKET_PRICE
+}
+```
+
+## StrategyPriceSource
+
+```java
+public enum StrategyPriceSource {
+
+    /**
+     * Последняя цена сделки.
+     */
+    LAST_PRICE,
+
+    /**
+     * Mark price.
+     */
+    MARK_PRICE,
+
+    /**
+     * Index price.
+     */
+    INDEX_PRICE,
+
+    /**
+     * Лучший bid из стакана.
+     */
+    BEST_BID_PRICE,
+
+    /**
+     * Лучший ask из стакана.
+     */
+    BEST_ASK_PRICE,
+
+    /**
+     * Средняя между bid и ask.
+     */
+    MID_PRICE
 }
 ```
 
@@ -612,13 +1023,14 @@ public enum StrategyPriceOffsetSide {
 }
 ```
 
-### Почему это отдельная модель
+### Почему это отдельные модели
 
-* `StrategyTradeDirection` отвечает за **торговое направление**: `LONG / SHORT`
-* `StrategyPriceOffsetSide` отвечает за **геометрию смещения цены**: `ABOVE / BELOW`
-* `TriggerPriceType` отвечает за **тип рыночной цены**: `LAST / INDEX / MARK`
+* `StrategyTradeDirection` отвечает за **торговое направление**: `LONG / SHORT`.
+* `StrategyPriceOffsetSide` отвечает за **геометрию смещения цены**: `ABOVE / BELOW`.
+* `StrategyPriceSource` отвечает за **источник рыночной цены**: `LAST_PRICE / MARK_PRICE / INDEX_PRICE / BID / ASK / MID`.
+* `TriggerPriceType` отвечает за **тип trigger-цены на бирже** для algo-orders: `LAST / INDEX / MARK`.
 
-Это три разных смысла, поэтому их не надо смешивать.
+Это разные смыслы, поэтому их не надо смешивать.
 
 ---
 
@@ -661,10 +1073,10 @@ Standalone algo-order.
 public class StrategyAlgoOrderAction implements StrategyAction {
 
     /**
-     * CREATE / AMEND / CANCEL / CLOSE_FULL / CLOSE_PARTIAL
-     *
-     * Для algo-ордера в большинстве случаев:
      * CREATE / AMEND / CANCEL.
+     *
+     * Для algo-ордера допустимы:
+     * CREATE, AMEND, CANCEL.
      */
     private StrategyActionType actionType;
 
@@ -677,8 +1089,12 @@ public class StrategyAlgoOrderAction implements StrategyAction {
      * Уровень действия.
      *
      * Примеры:
-     * - TP1 / TP2 / TP3
-     * - несколько защит в одном step
+     * - TP1 / TP2 / TP3;
+     * - несколько защит в одном step.
+     *
+     * Важно:
+     * level живёт в стратегии.
+     * Runtime-связь action -> algo-order хранится через DealActionState.
      */
     private Integer level;
 
@@ -686,9 +1102,9 @@ public class StrategyAlgoOrderAction implements StrategyAction {
      * Настройки stop-loss.
      *
      * Используется для:
-     * - STOP_LOSS
-     * - OCO_FULL
-     * - PARTIAL_STOP_LOSS
+     * - STOP_LOSS;
+     * - OCO_FULL;
+     * - PARTIAL_STOP_LOSS, если такой condition type появится.
      */
     private StopLossSettings stopLossSettings;
 
@@ -713,14 +1129,14 @@ public class StrategyAlgoOrderAction implements StrategyAction {
      * При каком профите срабатывает действие.
      *
      * Примеры:
-     * - TAKE_PROFIT
-     * - PARTIAL_TAKE_PROFIT
-     * - OCO_FULL (если нужен TP-компонент)
+     * - TAKE_PROFIT;
+     * - PARTIAL_TAKE_PROFIT;
+     * - OCO_FULL, если нужен TP-компонент.
      */
     private BigDecimal triggerProfitPercents;
 
     /**
-     * MARK / LAST / INDEX.
+     * Тип trigger-цены на бирже: LAST / INDEX / MARK.
      */
     private TriggerPriceType triggerPriceType;
 }
@@ -742,6 +1158,8 @@ public class StrategyPositionAction implements StrategyAction {
 
     /**
      * Уровень действия.
+     *
+     * Используется, если в одном step есть несколько position actions.
      */
     private Integer level;
 
@@ -756,8 +1174,7 @@ public class StrategyPositionAction implements StrategyAction {
 
 # 11. Общий action type
 
-По договорённости `StrategyPositionActionType` схлопывается с `StrategyActionOperationType`.
-Оставляем один общий enum для всех действий.
+По договорённости оставляем один общий enum для всех действий.
 
 ```java
 public enum StrategyActionType {
@@ -766,8 +1183,8 @@ public enum StrategyActionType {
      * Создать новую сущность по правилу стратегии.
      *
      * Примеры:
-     * - создать обычный entry order;
-     * - создать attached stop-loss вместе с entry;
+     * - создать ordinary entry order;
+     * - создать entry order с attached stop-loss;
      * - создать standalone algo-order защиты;
      * - создать partial take profit уровень.
      */
@@ -788,7 +1205,7 @@ public enum StrategyActionType {
      * Отменить существующую сущность.
      *
      * Примеры:
-     * - отменить pending обычный ордер;
+     * - отменить pending ordinary order;
      * - снять grid-ордера при breakout;
      * - отменить attached protection после переключения на main protection;
      * - отменить активный algo-order перед перестройкой защиты.
@@ -821,73 +1238,129 @@ public enum StrategyActionType {
 
 ---
 
-### Семантика общего `StrategyActionType`
+# 12. Семантика общего StrategyActionType
 
 Важно явно зафиксировать допустимые значения по подтипам action:
 
-- `StrategyOrderAction` использует только: `CREATE`, `AMEND`, `CANCEL`
-- `StrategyAlgoOrderAction` использует только: `CREATE`, `AMEND`, `CANCEL`
-- `StrategyPositionAction` использует только: `CLOSE_FULL`, `CLOSE_PARTIAL`
+* `StrategyOrderAction` использует только: `CREATE`, `AMEND`, `CANCEL`.
+* `StrategyAlgoOrderAction` использует только: `CREATE`, `AMEND`, `CANCEL`.
+* `StrategyPositionAction` использует только: `CLOSE_FULL`, `CLOSE_PARTIAL`.
 
 То есть общий enum один, но допустимые значения валидируются по конкретному подтипу действия.
 
-### Семантика `actionKind` в JSON
+---
 
-В JSON-примерах ниже использовалось поле `actionKind` со значениями:
-- `ORDER`
-- `ALGO_ORDER`
-- `POSITION`
+# 13. Семантика actionKind в JSON
+
+В JSON-примерах может использоваться поле `actionKind` со значениями:
+
+* `ORDER`
+* `ALGO_ORDER`
+* `POSITION`
 
 Это не отдельное поле доменной модели, а **JSON discriminator**,
-который нужен только для сериализации/десериализации и выбора конкретного подтипа `StrategyAction`.
+который нужен только для сериализации / десериализации и выбора конкретного подтипа `StrategyAction`.
 
-### Семантика `placement` для `StrategyOrderAction`
+---
+
+# 14. Семантика placement для StrategyOrderAction
 
 `placement` используется так:
 
-- при `actionType = CREATE` — для расчёта цены нового ордера;
-- при `actionType = CANCEL` — как способ однозначно идентифицировать,
-  какой именно grid-level нужно отменить;
-- при `actionType = AMEND` — как новая целевая схема позиционирования цены,
-  если стратегия действительно перестраивает ордер.
+* при `actionType = CREATE` — для расчёта цены нового ордера;
+* при `actionType = AMEND` — как новая целевая схема позиционирования цены, если стратегия действительно перестраивает ордер;
+* при `actionType = CANCEL` — обычно цена не нужна, а нужная runtime-сущность определяется через `DealActionState`.
 
-### Семантика `OCO_FULL` в `StrategyAlgoOrderAction`
+Важно:
+
+> `placement` не должен быть основным способом идентификации runtime-сущности.
+> Для связи action стратегии с runtime-сущностью используется `DealActionState`.
+
+---
+
+# 15. Семантика OCO_FULL в StrategyAlgoOrderAction
 
 Если `conditionType = OCO_FULL`, то:
 
-- stop-loss компонент строится из `stopLossSettings`;
-- take-profit компонент строится из `triggerProfitPercents` и `triggerPriceType`;
-- `closeFractionPercents` определяет, какую долю позиции закрывает OCO.
+* stop-loss компонент строится из `stopLossSettings`;
+* take-profit компонент строится из `triggerProfitPercents` и `triggerPriceType`;
+* `closeFractionPercents` определяет, какую долю позиции закрывает OCO.
 
-Для полного закрытия позиции обычно используется `closeFractionPercents = 100`.
+Для полного закрытия позиции обычно используется:
 
-# 12. StopLossSettings
+```text
+closeFractionPercents = 100
+```
 
-`triggerPriceType` обязателен, потому что runtime trigger-based algo conditions у тебя реально завязаны на `TriggerPriceType`.
+---
+
+# 16. StopLossSettings
+
+`triggerPriceType` обязателен, потому что runtime trigger-based algo conditions реально завязаны на `TriggerPriceType`.
 
 ```java
 public class StopLossSettings {
 
     /**
-     * ENTRY_PRICE_PERCENT / ATR_PERCENT / MARKET_STRUCTURE_BUFFER_PERCENT
+     * Как считать stop-loss.
      */
-    private String calculationType;
+    private StopLossCalculationType calculationType;
 
     /**
      * Универсальное процентное расстояние.
+     *
+     * Смысл зависит от calculationType:
+     * - ENTRY_PRICE_PERCENT: процент от entry price;
+     * - ATR_PERCENT: процент от ATR, где 150 = 1.5 ATR;
+     * - MARKET_STRUCTURE_BUFFER_PERCENT: buffer от структурного уровня.
      */
     private BigDecimal distancePercents;
 
     /**
-     * LAST / INDEX / MARK.
+     * Тип trigger-цены на бирже: LAST / INDEX / MARK.
      */
     private TriggerPriceType triggerPriceType;
 }
 ```
 
+## StopLossCalculationType
+
+```java
+public enum StopLossCalculationType {
+
+    /**
+     * Stop-loss считается как процент от цены входа.
+     *
+     * LONG:
+     * SL = entryPrice - entryPrice * distancePercents / 100
+     *
+     * SHORT:
+     * SL = entryPrice + entryPrice * distancePercents / 100
+     */
+    ENTRY_PRICE_PERCENT,
+
+    /**
+     * Stop-loss считается как расстояние от ATR.
+     *
+     * distancePercents = 150 означает 1.5 ATR.
+     */
+    ATR_PERCENT,
+
+    /**
+     * Stop-loss ставится за уровень структуры рынка.
+     *
+     * Примеры:
+     * - LONG SL ниже swing low;
+     * - SHORT SL выше swing high;
+     * - grid SL за range low / range high.
+     */
+    MARKET_STRUCTURE_BUFFER_PERCENT
+}
+```
+
 ---
 
-# 13. TrailingSettings
+# 17. TrailingSettings
 
 `TrailingSettings` остаётся, потому что trailing реально выражается как отдельная форма algo condition.
 
@@ -896,12 +1369,15 @@ public class TrailingSettings {
 
     /**
      * После какого профита можно включить trailing.
-     * Если null — сразу.
+     *
+     * Если null — trailing включается сразу.
      */
     private BigDecimal activationProfitPercents;
 
     /**
      * Расстояние trailing от экстремума.
+     *
+     * Обычно передаётся на биржу как callback ratio / callback percent.
      */
     private BigDecimal callbackPercents;
 
@@ -914,10 +1390,118 @@ public class TrailingSettings {
 
 ---
 
-# 14. JSON-примеры
+# 18. Связь стратегии с DealActionState
 
-JSON-примеры вынесены в отдельный файл:
+Стратегия не хранит runtime-состояние выполнения.
 
-`Strategy API examples.md`
+Runtime-связь хранится отдельно:
+
+```text
+StrategyAction
+  -> DealActionState
+     -> targetEntityType
+     -> targetEntityId
+```
+
+Это нужно, чтобы:
+
+* `Order`, `AlgoOrder`, `Position` оставались чистыми биржевыми сущностями;
+* FSM могла восстановиться после рестарта;
+* не хранить `strategyActionId` прямо в биржевых сущностях;
+* не строить runtime-логику по аудиту.
+
+Ключевой инвариант:
+
+```text
+UNIQUE(deal_id, strategy_action_id)
+```
+
+Но он находится в `DealActionState`, а не в `Order` / `AlgoOrder`.
+
+---
+
+# 19. Связь стратегии с калькуляторами
+
+Стратегия хранит не готовые цены, размеры и риск,
+а правила их расчёта.
+
+Runtime-расчёт делает:
+
+```text
+StrategyActionCalculator
+  -> PriceCalculator
+  -> SizeCalculator
+  -> RiskCalculator
+```
+
+Примеры:
+
+```text
+StrategyOrderAction.placement
+  -> PriceCalculator считает price
+
+StrategyOrderAction.allocationPercents
+  -> SizeCalculator считает sizeContracts
+
+StrategyDetail.riskPerTradePercent / maxLeverage
+  -> RiskCalculator проверяет риск
+```
+
+Важно:
+
+> StrategyActionCalculator собирает свежий CalculationContext в runtime,
+> потому что цена и рыночные данные могут измениться между сбором DealContext и выполнением команды.
+
+---
+
+# 20. Связь стратегии с индикаторами и snapshots
+
+Стратегия может ссылаться на условия, которые проверяются по индикаторам и market snapshots.
+
+Но стратегия сама не считает индикаторы.
+
+Индикаторы и snapshots готовят:
+
+* `IndicatorJob`
+* `MarketStructureJob`
+* `MarketPhaseJob`
+
+Их используют:
+
+* `EntryScannerJob` — для поиска входа;
+* `StrategyConditionEvaluator` — для проверки условий step;
+* `StrategyActionCalculator` — для расчёта цены, размера и риска.
+
+---
+
+# 21. JSON-примеры
+
+JSON-примеры можно хранить в отдельном файле:
+
+```text
+Strategy API examples.md
+```
 
 Это сделано, чтобы основной документ оставался компактным и был сфокусирован именно на модели.
+
+При обновлении JSON-примеров нужно учитывать:
+
+* `StrategyPricePlacement.priceSource` вместо старого `marketPriceType`;
+* `StopLossSettings.calculationType` как enum `StopLossCalculationType`;
+* расширенную модель `StrategyConditionRule`;
+* отсутствие `strategyActionId` в runtime-сущностях;
+* использование `DealActionState` для runtime-связи action -> entity.
+
+---
+
+# 22. Что изменилось относительно прошлой версии
+
+1. `PriceResolver` переименован концептуально в `PriceCalculator`.
+2. Добавлен `StrategyActionCalculator` как оркестратор `PriceCalculator`, `SizeCalculator`, `RiskCalculator`.
+3. `StrategyConditionRule` расширен, чтобы описывать ENTRY-условия по индикаторам, цене, фазе рынка и структуре.
+4. `StrategyPricePlacement.marketPriceType` заменён на `StrategyPriceSource priceSource`.
+5. `StopLossSettings.calculationType` стал enum `StopLossCalculationType`, а не строкой.
+6. Уточнено, что `level` живёт в стратегии и не переносится в `Order` / `AlgoOrder` как runtime-role.
+7. Уточнено, что `Order`, `AlgoOrder`, `Position` не хранят `strategyActionId`.
+8. Добавлен раздел про `DealActionState`.
+9. Добавлены ссылки на новые процессные документы.

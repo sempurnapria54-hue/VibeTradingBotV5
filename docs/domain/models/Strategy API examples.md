@@ -2,12 +2,39 @@
 
 Ниже вынесены JSONC-примеры для strategy-layer.
 
-# 15. Три финальных JSONC-примера
-
-Ниже `JSONC`, а не строгий JSON.
+Это `JSONC`, а не строгий JSON.
 Комментарии `//` нужны только для чтения.
 
-## 15.1 BULL_TREND / FOLLOW_PHASE
+---
+
+# 1. Что изменено относительно старых примеров
+
+1. В `StrategyPricePlacement` поле `marketPriceType` заменено на `priceSource`.
+2. `StopLossSettings.calculationType` трактуется как enum `StopLossCalculationType`:
+
+    * `ENTRY_PRICE_PERCENT`
+    * `ATR_PERCENT`
+    * `MARKET_STRUCTURE_BUFFER_PERCENT`
+3. `StrategyConditionRule` расширен:
+
+    * `timeframe`
+    * `sourceType`
+    * `leftOperand`
+    * `operator`
+    * `rightOperand`
+    * `params`
+4. Для простых доменных правил можно по-прежнему указывать только:
+
+    * `level`
+    * `ruleType`
+    * `percents`, если он нужен.
+5. `level` остаётся в strategy action, но не переносится в `Order` / `AlgoOrder` как runtime-role.
+6. Runtime-связь `StrategyAction -> Order / AlgoOrder / Position` выполняется через `DealActionState`.
+7. `Order`, `AlgoOrder`, `Position` не хранят `strategyActionId`.
+
+---
+
+# 2. BULL_TREND / FOLLOW_PHASE
 
 ```jsonc
 {
@@ -31,12 +58,69 @@
       {
         "stepType": "ENTRY",
         // На PRECHECK готовим входной ордер со страховочным attached SL.
+        // Входные условия также может предварительно проверять EntryScannerJob
+        // до создания Deal.
 
         "condition": {
           "rules": [
             {
               "level": 1,
               "ruleType": "NO_OPEN_POSITION"
+              // По инструменту нет открытой позиции.
+            },
+            {
+              "level": 2,
+              "ruleType": "MARKET_PHASE_IS",
+              "sourceType": "MARKET_PHASE",
+              "leftOperand": "MARKET_PHASE",
+              "operator": "EQ",
+              "rightOperand": {
+                "sourceType": "CONSTANT",
+                "valueType": "ENUM",
+                "name": "BULL_TREND",
+                "stringValue": "BULL_TREND"
+              }
+              // Фаза рынка должна быть BULL_TREND.
+            },
+            {
+              "level": 3,
+              "ruleType": "INDICATOR_COMPARE",
+              "timeframe": "15m",
+              "sourceType": "INDICATOR",
+              "leftOperand": "EMA_FAST",
+              "operator": "GT",
+              "rightOperand": {
+                "sourceType": "INDICATOR",
+                "valueType": "INDICATOR_VALUE",
+                "name": "EMA_SLOW"
+              },
+              "params": {
+                "fastPeriod": 10,
+                "slowPeriod": 50
+              }
+              // EMA fast выше EMA slow на 15m.
+            },
+            {
+              "level": 4,
+              "ruleType": "INDICATOR_COMPARE",
+              "timeframe": "5m",
+              "sourceType": "INDICATOR",
+              "leftOperand": "RSI_14",
+              "operator": "GTE",
+              "rightOperand": {
+                "sourceType": "CONSTANT",
+                "valueType": "NUMBER",
+                "numberValue": 50
+              }
+              // RSI подтверждает long-сценарий.
+            },
+            {
+              "level": 5,
+              "ruleType": "CANDLE_CLOSED",
+              "timeframe": "5m",
+              "sourceType": "TIME",
+              "operator": "IS_TRUE"
+              // Используем закрытую свечу, чтобы не ловить look-ahead.
             }
           ]
         },
@@ -44,29 +128,34 @@
         "actions": [
           {
             "actionKind": "ORDER",
-            // Это StrategyOrderAction.
+            // JSON discriminator: это StrategyOrderAction.
 
             "actionType": "CREATE",
             "orderType": "ENTRY_ATTACHED_STOP_LOSS",
             // Реальный Order.Type: входной ордер с attached SL.
 
             "direction": "LONG",
-            // Нормализованное торговое направление strategy-layer.
+            // Нормализованное направление strategy-layer.
+            // Runtime mapper / command factory потом превратит его в buy/long.
 
             "allocationPercents": 100,
-            // Берём 100% от объёма, который уже посчитал PositionCalculator.
+            // Берём 100% от объёма, который посчитает SizeCalculator.
 
             "level": 1,
+            // Уровень action внутри стратегии.
+            // Не переносится в Order / AlgoOrder как runtime-role.
 
             "placement": null,
-            // Для такого входа цену может определить отдельный price resolver.
+            // Market-like вход.
+            // PriceCalculator рассчитает reference price в runtime.
 
             "attachedProtection": {
               "attachedType": "ATTACHED_STOP_LOSS",
-              // Attached protection на входе.
 
               "stopLossSettings": {
                 "calculationType": "ATR_PERCENT",
+                // StopLossCalculationType.ATR_PERCENT
+
                 "distancePercents": 150,
                 // 150% ATR = 1.5 * ATR.
 
@@ -81,7 +170,7 @@
     "ENTRY_FINALIZED": [
       {
         "stepType": "MAIN_PROTECTION",
-        // После подтверждения позиции создаём основную защиту.
+        // После подтверждения позиции создаём основную standalone-защиту.
 
         "condition": {
           "rules": [
@@ -95,11 +184,11 @@
         "actions": [
           {
             "actionKind": "ALGO_ORDER",
-            // Это StrategyAlgoOrderAction.
+            // JSON discriminator: это StrategyAlgoOrderAction.
 
             "actionType": "CREATE",
             "conditionType": "OCO_FULL",
-            // Основная защита = OCO (SL + TP).
+            // Основная защита = OCO: SL + TP.
 
             "level": 1,
 
@@ -126,7 +215,7 @@
     "MANAGING": [
       {
         "stepType": "PROTECTION_ADJUSTMENT",
-        // После +1% переносим защиту ближе к безубытку.
+        // После +1% переносим stop-loss ближе к безубытку.
 
         "condition": {
           "rules": [
@@ -229,7 +318,7 @@
         "actions": [
           {
             "actionKind": "POSITION",
-            // Это StrategyPositionAction.
+            // JSON discriminator: это StrategyPositionAction.
 
             "actionType": "CLOSE_FULL",
             "level": 1,
@@ -242,7 +331,9 @@
 }
 ```
 
-## 15.2 BEAR_TREND / FOLLOW_PHASE с partial exit лесенкой
+---
+
+# 3. BEAR_TREND / FOLLOW_PHASE с partial exit лесенкой
 
 ```jsonc
 {
@@ -266,6 +357,58 @@
             {
               "level": 1,
               "ruleType": "NO_OPEN_POSITION"
+            },
+            {
+              "level": 2,
+              "ruleType": "MARKET_PHASE_IS",
+              "sourceType": "MARKET_PHASE",
+              "leftOperand": "MARKET_PHASE",
+              "operator": "EQ",
+              "rightOperand": {
+                "sourceType": "CONSTANT",
+                "valueType": "ENUM",
+                "name": "BEAR_TREND",
+                "stringValue": "BEAR_TREND"
+              }
+            },
+            {
+              "level": 3,
+              "ruleType": "INDICATOR_COMPARE",
+              "timeframe": "15m",
+              "sourceType": "INDICATOR",
+              "leftOperand": "EMA_FAST",
+              "operator": "LT",
+              "rightOperand": {
+                "sourceType": "INDICATOR",
+                "valueType": "INDICATOR_VALUE",
+                "name": "EMA_SLOW"
+              },
+              "params": {
+                "fastPeriod": 10,
+                "slowPeriod": 50
+              }
+              // EMA fast ниже EMA slow на 15m.
+            },
+            {
+              "level": 4,
+              "ruleType": "INDICATOR_COMPARE",
+              "timeframe": "5m",
+              "sourceType": "INDICATOR",
+              "leftOperand": "RSI_14",
+              "operator": "LTE",
+              "rightOperand": {
+                "sourceType": "CONSTANT",
+                "valueType": "NUMBER",
+                "numberValue": 50
+              }
+              // RSI подтверждает short-сценарий.
+            },
+            {
+              "level": 5,
+              "ruleType": "CANDLE_CLOSED",
+              "timeframe": "5m",
+              "sourceType": "TIME",
+              "operator": "IS_TRUE"
             }
           ]
         },
@@ -311,7 +454,7 @@
             "actionKind": "ALGO_ORDER",
             "actionType": "CREATE",
             "conditionType": "STOP_LOSS",
-            // Сначала ставим базовый стоп без OCO.
+            // Сначала ставим базовый standalone stop-loss без OCO.
 
             "level": 1,
 
@@ -334,7 +477,7 @@
       {
         "stepType": "PARTIAL_EXIT",
         // Один общий condition -> пакет действий.
-        // Здесь сразу создаём TP1/TP2/TP3.
+        // Здесь сразу создаём TP1 / TP2 / TP3.
 
         "condition": {
           "rules": [
@@ -425,7 +568,9 @@
 }
 ```
 
-## 15.3 RANGE / GRID
+---
+
+# 4. RANGE / GRID
 
 ```jsonc
 {
@@ -454,6 +599,44 @@
             {
               "level": 1,
               "ruleType": "NO_OPEN_POSITION"
+            },
+            {
+              "level": 2,
+              "ruleType": "MARKET_PHASE_IS",
+              "sourceType": "MARKET_PHASE",
+              "leftOperand": "MARKET_PHASE",
+              "operator": "EQ",
+              "rightOperand": {
+                "sourceType": "CONSTANT",
+                "valueType": "ENUM",
+                "name": "RANGE",
+                "stringValue": "RANGE"
+              }
+            },
+            {
+              "level": 3,
+              "ruleType": "PRICE_COMPARE",
+              "timeframe": "5m",
+              "sourceType": "PRICE",
+              "leftOperand": "MARK_PRICE",
+              "operator": "BETWEEN",
+              "rightOperand": {
+                "sourceType": "MARKET_STRUCTURE",
+                "valueType": "MARKET_STRUCTURE_LEVEL",
+                "name": "RANGE_LOW_RANGE_HIGH"
+              },
+              "params": {
+                "lowerBound": "RANGE_LOW",
+                "upperBound": "RANGE_HIGH"
+              }
+              // Mark price находится внутри диапазона.
+            },
+            {
+              "level": 4,
+              "ruleType": "CANDLE_CLOSED",
+              "timeframe": "5m",
+              "sourceType": "TIME",
+              "operator": "IS_TRUE"
             }
           ]
         },
@@ -468,11 +651,11 @@
             "level": 1,
             "placement": {
               "baseType": "RANGE_LOW",
-              "marketPriceType": null,
+              "priceSource": null,
               "offsetSide": "ABOVE",
               "percents": 10
             },
-            // Первый long grid-level = +10% от нижней границы range.
+            // Первый long grid-level = +10% от ширины range выше нижней границы.
 
             "attachedProtection": null
           },
@@ -485,11 +668,11 @@
             "level": 2,
             "placement": {
               "baseType": "RANGE_LOW",
-              "marketPriceType": null,
+              "priceSource": null,
               "offsetSide": "ABOVE",
               "percents": 30
             },
-            // Второй long grid-level = +30% от нижней границы range.
+            // Второй long grid-level = +30% от ширины range выше нижней границы.
 
             "attachedProtection": null
           },
@@ -502,11 +685,11 @@
             "level": 3,
             "placement": {
               "baseType": "RANGE_HIGH",
-              "marketPriceType": null,
+              "priceSource": null,
               "offsetSide": "BELOW",
               "percents": 30
             },
-            // Первый short grid-level = -30% от верхней границы range.
+            // Первый short grid-level = -30% от ширины range ниже верхней границы.
 
             "attachedProtection": null
           },
@@ -519,11 +702,11 @@
             "level": 4,
             "placement": {
               "baseType": "RANGE_HIGH",
-              "marketPriceType": null,
+              "priceSource": null,
               "offsetSide": "BELOW",
               "percents": 10
             },
-            // Второй short grid-level = -10% от верхней границы range.
+            // Второй short grid-level = -10% от ширины range ниже верхней границы.
 
             "attachedProtection": null
           }
@@ -621,6 +804,8 @@
       {
         "stepType": "GRID_MANAGEMENT",
         // Если диапазон сломан — снимаем все grid-входы.
+        // Runtime-сущности для отмены определяются через DealActionState,
+        // а не через placement как основной идентификатор.
 
         "condition": {
           "rules": [
@@ -641,12 +826,10 @@
             "direction": "LONG",
             "allocationPercents": null,
             "level": 1,
-            "placement": {
-              "baseType": "RANGE_LOW",
-              "marketPriceType": null,
-              "offsetSide": "ABOVE",
-              "percents": 10
-            },
+            "placement": null,
+            // Для CANCEL placement не обязателен.
+            // Целевая runtime-сущность определяется через DealActionState.
+
             "attachedProtection": null
           },
           {
@@ -656,12 +839,7 @@
             "direction": "LONG",
             "allocationPercents": null,
             "level": 2,
-            "placement": {
-              "baseType": "RANGE_LOW",
-              "marketPriceType": null,
-              "offsetSide": "ABOVE",
-              "percents": 30
-            },
+            "placement": null,
             "attachedProtection": null
           },
           {
@@ -671,12 +849,7 @@
             "direction": "SHORT",
             "allocationPercents": null,
             "level": 3,
-            "placement": {
-              "baseType": "RANGE_HIGH",
-              "marketPriceType": null,
-              "offsetSide": "BELOW",
-              "percents": 30
-            },
+            "placement": null,
             "attachedProtection": null
           },
           {
@@ -686,12 +859,7 @@
             "direction": "SHORT",
             "allocationPercents": null,
             "level": 4,
-            "placement": {
-              "baseType": "RANGE_HIGH",
-              "marketPriceType": null,
-              "offsetSide": "BELOW",
-              "percents": 10
-            },
+            "placement": null,
             "attachedProtection": null
           }
         ]
@@ -730,14 +898,18 @@
 
 ---
 
-# 16. Итог по смыслу
+# 5. Итог по смыслу
 
-Эта модель сейчас фиксирует следующее:
+Эти примеры фиксируют следующее:
 
-* стратегия хранит **торговые правила**;
-* шаги сгруппированы по `Deal.Status`, а не живут отдельной осью статусов;
-* один шаг = одно condition + пакет действий;
-* `level` нужен у `StrategyConditionRule` и у `StrategyAction`, но не у самого step;
-* grid выражается не через отдельный `gridSettings`, а через несколько `StrategyOrderAction` с разным `StrategyPricePlacement`;
-* partial exits выражаются несколькими `StrategyAlgoOrderAction` в одном шаге;
-* breakeven и exit by efficiency — это отдельные steps, а не settings-объекты.
+* стратегия хранит торговые правила;
+* шаги сгруппированы по `Deal.Status`;
+* один step = одно condition + пакет actions;
+* `StrategyConditionRule` может быть простым доменным правилом или гибким правилом по индикаторам/цене/фазе;
+* `level` нужен у condition rules и strategy actions;
+* `level` не переносится в `Order` / `AlgoOrder` как runtime-role;
+* grid выражается несколькими `StrategyOrderAction` с разным `StrategyPricePlacement`;
+* partial exits выражаются несколькими `StrategyAlgoOrderAction`;
+* breakeven и exit by efficiency — отдельные steps;
+* runtime-связь action -> entity хранится в `DealActionState`;
+* аудит не является источником runtime-логики FSM.
