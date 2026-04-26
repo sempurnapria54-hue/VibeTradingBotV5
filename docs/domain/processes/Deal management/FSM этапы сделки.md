@@ -9,6 +9,10 @@
 > Модель стратегии вынесена в документ: `Strategy.md`.
 >
 > Command-layer вынесен в документ: `Сервисные команды`.
+>
+> Расчёт индикаторов, структуры рынка, фазы и freshness-check вынесен в документ: `04. Расчёт индикаторов и рыночных данных`.
+>
+> Аудит и timeline сделки вынесены в документ: `05. Аудит и история исполнения`.
 
 ---
 
@@ -36,6 +40,27 @@ FSM работает по:
 Главное правило:
 
 > FSM решает, какой этап сделки сейчас актуален, какие strategy steps можно проверить, какие service commands нужно создать и можно ли перейти в следующий `Deal.Status`.
+
+# Зафиксированные решения lifecycle / FSM
+
+В эту версию документа встроены решения, принятые в `01. Жизненный цикл сделки` и `Strategy.md`:
+
+```text
+Q1. Strategy.INACTIVE / Strategy.DELETED / market data expired
+Q2. entryReason: короткий код в Deal, подробности в аудите
+Q3. entryStepType: ENTRY / GRID_ENTRY хранится в Deal
+Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условный
+```
+
+Для FSM это означает:
+
+* `Strategy.INACTIVE` не меняет сопровождение уже открытой сделки: FSM продолжает работать по pinned `StrategyDetail`.
+* `Strategy.DELETED` не запускает новые сделки и для уже открытых сделок приводит к graceful shutdown, если это безопасно.
+* Устаревание рыночных данных не меняет `Strategy.Status`; перед проверкой data-dependent `StrategyStep` handler вызывает `MarketDataExpirationChecker.checkForStep(dealContext, step)`.
+* `Deal.entryReason` и `Deal.entryStepType` не управляют FSM-переходами, но используются для API/UI/аналитики/аудита.
+* `PROTECTION_SWITCHED` используется только если реально выполняется замена temporary attached protection на standalone main protection.
+* Если switch не нужен, допустим прямой переход `ENTRY_FINALIZED -> MANAGING`, но только если позиция безопасна для сопровождения.
+
 
 ---
 
@@ -179,7 +204,21 @@ StrategyDetail.stepsByStatus[MANAGING]:
 
 > В этом статусе сделки вот какие шаги вообще могут быть применены.
 
-## 2.2. StrategyCondition решает, применим ли step
+## 2.2. Freshness-check выполняется перед StrategyCondition
+
+Перед проверкой `StrategyCondition` для data-dependent step handler проверяет свежесть данных:
+
+```text
+handler
+  -> берёт steps для текущего Deal.Status
+  -> для каждого StrategyStep вызывает MarketDataExpirationChecker.checkForStep(dealContext, step)
+  -> если данные свежие, проверяет StrategyCondition
+  -> если данные устарели или отсутствуют, применяет StrategyStep.marketDataExpiredSetting
+```
+
+`MarketDataExpirationChecker` описан в документе `04. Расчёт индикаторов и рыночных данных`.
+
+## 2.3. StrategyCondition решает, применим ли step
 
 FSM handler не должен сам знать, когда переносить SL, делать partial exit или закрывать позицию по правилу стратегии.
 
@@ -188,11 +227,12 @@ FSM handler не должен сам знать, когда переносить
 ```text
 handler
   -> берёт steps для текущего Deal.Status
-  -> для каждого StrategyStep проверяет StrategyCondition
+  -> проверяет freshness нужных данных step
+  -> для каждого fresh StrategyStep проверяет StrategyCondition
   -> если condition true, step применим
 ```
 
-## 2.3. StrategyAction говорит, что именно сделать
+## 2.4. StrategyAction говорит, что именно сделать
 
 После того как `StrategyCondition` прошла, FSM берёт:
 
@@ -213,7 +253,7 @@ FSM сама не двигает SL.
 
 FSM создаёт runtime-команды через калькулятор и command-layer.
 
-## 2.4. StrategyActionCalculator применяет настройки стратегии
+## 2.5. StrategyActionCalculator применяет настройки стратегии
 
 Стратегия влияет на расчёт через:
 
@@ -236,7 +276,7 @@ StrategyActionCalculator
 
 И только после этого создаётся `ServiceCommand`.
 
-## 2.5. Что стратегия не делает
+## 2.6. Что стратегия не делает
 
 Стратегия не решает напрямую:
 
@@ -328,14 +368,16 @@ FSM handler не должен сам считать индикаторы, стр
 ## 4.4. Рабочая логика этапа
 
 1. Найти `StrategyStep` со `stepType = ENTRY` или `GRID_ENTRY`.
-2. Проверить `StrategyCondition` выбранного step.
-3. Если condition не выполнен — не создавать entry action и оставить сделку в текущем статусе или завершить по отдельной политике.
-4. Если condition выполнен — взять `StrategyAction` из step.
-5. Для каждого action проверить `DealActionState`.
-6. Если action ещё не материализован — вызвать `StrategyActionCalculator`.
-7. Создать `CREATE_ORDER` через `ServiceCommandFactory`.
-8. После создания локального order создать или запланировать `SUBMIT_ORDER`.
-9. Если action уже был создан до рестарта — продолжить с refresh/submit по `DealActionState`.
+2. Проверить свежесть данных step через `MarketDataExpirationChecker.checkForStep(dealContext, step)`.
+3. Если данные устарели или отсутствуют — применить `StrategyStep.marketDataExpiredSetting`.
+4. Если данные свежие — проверить `StrategyCondition` выбранного step.
+5. Если condition не выполнен — не создавать entry action и оставить сделку в текущем статусе или завершить по отдельной политике.
+6. Если condition выполнен — взять `StrategyAction` из step.
+7. Для каждого action проверить `DealActionState`.
+8. Если action ещё не материализован — вызвать `StrategyActionCalculator`.
+9. Создать `CREATE_ORDER` через `ServiceCommandFactory`.
+10. После создания локального order создать или запланировать `SUBMIT_ORDER`.
+11. Если action уже был создан до рестарта — продолжить с refresh/submit по `DealActionState`.
 
 ## 4.5. Выходные проверки
 
@@ -507,13 +549,27 @@ EXECUTE_KILL_SWITCH
 
 ## 6.1. Назначение
 
-`ENTRY_FINALIZED` создаёт или подтверждает основную standalone-защиту позиции.
+`ENTRY_FINALIZED` подтверждает, что вход завершён, позиция открыта, и определяет следующий безопасный путь сопровождения.
+
+На этом этапе стратегия может требовать создать или подтвердить standalone main protection.
+
+Но не каждая стратегия обязана заменять temporary attached protection на standalone main protection.
+
+Поэтому `ENTRY_FINALIZED` не всегда ведёт в `PROTECTION_SWITCHED`.
+
+Допустимые варианты:
+
+```text
+ENTRY_FINALIZED -> PROTECTION_SWITCHED -> MANAGING
+ENTRY_FINALIZED -> MANAGING
+ENTRY_FINALIZED -> ERROR
+```
 
 ## 6.2. Источники информации
 
 * `Deal`;
 * pinned `StrategyDetail`;
-* `StrategyStep` со `stepType = MAIN_PROTECTION`;
+* `StrategyStep` со `stepType = MAIN_PROTECTION`, если такой step есть;
 * `StrategyCondition` protection-step;
 * `Instrument`;
 * `PositionContext`;
@@ -522,6 +578,7 @@ EXECUTE_KILL_SWITCH
 * attached protection внутри entry `Order`;
 * локальные `AlgoOrder`;
 * `DealActionState` по protection actions;
+* результат refresh-команд по position/order/algo-orders;
 * свежий `CalculationContext`, если нужно рассчитать SL / TP / OCO / trailing.
 
 Через `CalculationContext` могут быть получены:
@@ -532,6 +589,13 @@ EXECUTE_KILL_SWITCH
 * `MarketStructure`, если защита считается от swing/range/support/resistance;
 * `MarketPhase`, если защита зависит от текущей фазы;
 * актуальный balance/risk snapshot.
+
+Подробности по freshness и `CalculationContext` см. в документах:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+03. Калькуляторы действий стратегии
+```
 
 ## 6.3. Входные проверки
 
@@ -544,44 +608,61 @@ EXECUTE_KILL_SWITCH
 * entry order финализирован или есть достаточные факты исполнения;
 * известна фактическая цена входа или есть путь получить её через `REFRESH_FILLS`;
 * нет больше одной позиции по инструменту;
-* нет критичного риска без возможности защиты.
+* нет критичного риска без возможности защиты;
+* если стратегия стала `DELETED`, нужно идти в graceful shutdown, а не применять обычные data-dependent steps.
 
 ## 6.4. Рабочая логика этапа
 
-1. Найти `StrategyStep` со `stepType = MAIN_PROTECTION`.
-2. Проверить `StrategyCondition` protection-step.
-3. Если condition выполнен — взять protection actions.
-4. Для каждого action проверить `DealActionState`.
-5. Если основной protection action ещё не материализован — вызвать `StrategyActionCalculator`.
-6. Создать `CREATE_ALGO_ORDER`.
-7. Создать или запланировать `SUBMIT_ALGO_ORDER`.
-8. Создать refresh-команды для подтверждения active protection.
-9. Если нужно снять attached protection после main protection — создать cancel-команду только после подтверждения main protection.
+1. Определить по pinned `StrategyDetail`, нужен ли фактический protection switch.
+2. Если есть `StrategyStep` со `stepType = MAIN_PROTECTION`, проверить свежесть данных step через `MarketDataExpirationChecker.checkForStep(dealContext, step)`.
+3. Если данные устарели или отсутствуют — применить `StrategyStep.marketDataExpiredSetting`.
+4. Если данные свежие — проверить `StrategyCondition` protection-step.
+5. Если condition выполнен — взять protection actions.
+6. Для каждого action проверить `DealActionState`.
+7. Если основной protection action ещё не материализован — вызвать `StrategyActionCalculator`.
+8. Создать `CREATE_ALGO_ORDER`.
+9. Создать или запланировать `SUBMIT_ALGO_ORDER`.
+10. Создать refresh-команды для подтверждения active protection.
+11. Если нужно снять attached protection после main protection — создать cancel-команду только после подтверждения main protection.
+12. Если protection switch не нужен, проверить безопасное состояние позиции для перехода в `MANAGING`.
 
 ## 6.5. Выходные проверки
 
 Этап можно считать завершённым, если:
 
-* standalone protection создана;
-* standalone protection подтверждена как active;
 * позиция активна;
-* временная attached protection больше не нужна или безопасно снята;
-* нет дублирующей защиты;
+* entry order финализирован;
+* требования strategy / risk policy по защите выполнены;
+* если strategy / risk policy требует защиту — активная защита подтверждена;
+* если защита не обязательна — это явно разрешено strategy / risk policy;
+* нет дублирующей конфликтующей защиты;
 * нет orphan algo-orders;
-* риск позиции защищён.
+* нет риска, требующего kill-switch.
 
-Именно эти выходные проверки отвечают за переход:
+Обычные переходы:
 
 ```text
 ENTRY_FINALIZED -> PROTECTION_SWITCHED
+ENTRY_FINALIZED -> MANAGING
 ```
+
+`ENTRY_FINALIZED -> PROTECTION_SWITCHED` используется только если фактически нужен protection switch:
+
+```text
+temporary attached protection
+  -> standalone main protection подтверждена active
+  -> attached protection можно снять или уже снята
+```
+
+`ENTRY_FINALIZED -> MANAGING` разрешён, если switch не нужен и позиция безопасна для сопровождения.
 
 ## 6.6. Переходы
 
-Обычный переход:
+Обычные переходы:
 
 ```text
 ENTRY_FINALIZED -> PROTECTION_SWITCHED
+ENTRY_FINALIZED -> MANAGING
 ```
 
 Аварийный переход:
@@ -590,13 +671,14 @@ ENTRY_FINALIZED -> PROTECTION_SWITCHED
 ENTRY_FINALIZED -> ERROR
 ```
 
-Recovery-переход:
+Recovery-переходы:
 
 ```text
 ENTRY_FINALIZED -> PROTECTION_SWITCHED
+ENTRY_FINALIZED -> MANAGING
 ```
 
-Recovery допустим, если после рестарта main protection уже активна.
+Recovery допустим, если после рестарта facts однозначно подтверждают более поздний безопасный этап.
 
 ## 6.7. Допустимые StrategyStep
 
@@ -604,6 +686,8 @@ Recovery допустим, если после рестарта main protection 
 MAIN_PROTECTION
 FAIL_SAFE
 ```
+
+Если protection switch не нужен, `MAIN_PROTECTION` может отсутствовать или быть неприменимым для данной стратегии.
 
 ## 6.8. Возможные ServiceCommand
 
@@ -619,13 +703,25 @@ MARK_DEAL_ERROR
 EXECUTE_KILL_SWITCH
 ```
 
----
+Новые `ServiceCommandType` для Q4 не требуются.
 
 # 7. PROTECTION_SWITCHED
 
 ## 7.1. Назначение
 
-`PROTECTION_SWITCHED` подтверждает, что основная защита активна, а временная attached-защита больше не создаёт конфликт.
+`PROTECTION_SWITCHED` подтверждает не просто факт наличия защиты.
+
+Он подтверждает конкретный switch-сценарий:
+
+```text
+temporary attached protection
+  -> standalone main protection подтверждена active
+  -> temporary attached protection снята или больше не влияет на риск
+```
+
+Этот статус не является обязательным для всех сделок.
+
+Если strategy steps не требуют замены temporary attached protection на standalone main protection, FSM не должна искусственно переводить сделку в `PROTECTION_SWITCHED`.
 
 ## 7.2. Источники информации
 
@@ -654,7 +750,10 @@ EXECUTE_KILL_SWITCH
 * main protection существует локально;
 * main protection имеет связь через `DealActionState`;
 * по инструменту нет больше одной позиции;
-* нет критичного расхождения БД и биржи.
+* нет критичного расхождения БД и биржи;
+* этот статус действительно применим для текущего protection-switch flow.
+
+Если после рестарта выяснилось, что switch не нужен, а позиция безопасна, допустим safe forward recovery в `MANAGING`.
 
 ## 7.4. Рабочая логика этапа
 
@@ -663,7 +762,7 @@ EXECUTE_KILL_SWITCH
 3. Проверить, осталась ли attached protection.
 4. Если attached protection ещё активна и main protection уже подтверждена — создать cancel-команду.
 5. Проверить pending orders, которые могут конфликтовать с защитой.
-6. Если есть конфликт — cancel или ERROR в зависимости от риска.
+6. Если есть конфликт — cancel или `ERROR` в зависимости от риска.
 
 ## 7.5. Выходные проверки
 
@@ -723,8 +822,6 @@ MARK_DEAL_ERROR
 EXECUTE_KILL_SWITCH
 ```
 
----
-
 # 8. MANAGING
 
 ## 8.1. Назначение
@@ -780,19 +877,21 @@ EXECUTE_KILL_SWITCH
 
 1. Обновить позицию и live-сущности, если это нужно для актуальности.
 2. Взять из `StrategyDetail.stepsByStatus[MANAGING]` допустимые steps.
-3. Проверить conditions для:
+3. Для каждого data-dependent step проверить `MarketDataExpirationChecker.checkForStep(dealContext, step)`.
+4. Если данные устарели или отсутствуют — применить `StrategyStep.marketDataExpiredSetting`.
+5. Если данные свежие — проверить conditions для:
 
     * `PROTECTION_ADJUSTMENT`;
     * `PARTIAL_EXIT`;
     * `GRID_MANAGEMENT`;
     * `EXIT`;
     * `FAIL_SAFE`.
-4. Для каждого применимого step взять actions.
-5. Для actions, которые создают или меняют сущности, проверить `DealActionState`.
-6. Для нового или изменяемого action вызвать `StrategyActionCalculator`.
-7. Создать нужные `ServiceCommand`.
-8. Если condition требует полного выхода — создать `CLOSE_POSITION` или соответствующие cancel/close-команды.
-9. Если risk/fail-safe condition сработал — перейти к emergency flow.
+6. Для каждого применимого step взять actions.
+7. Для actions, которые создают или меняют сущности, проверить `DealActionState`.
+8. Для нового или изменяемого action вызвать `StrategyActionCalculator`.
+9. Создать нужные `ServiceCommand`.
+10. Если condition требует полного выхода — создать `CLOSE_POSITION` или соответствующие cancel/close-команды.
+11. Если risk/fail-safe condition сработал — перейти к emergency flow.
 
 ## 8.5. Выходные проверки
 
@@ -1193,7 +1292,57 @@ ERROR / EXECUTE_KILL_SWITCH
 
 # 13. Вопросы к обсуждению
 
+В эту редакцию внесены решения Q1–Q4.
+
+Закрыто и применено:
+
+```text
+Q1. Strategy.INACTIVE / Strategy.DELETED / market data expired.
+Q2. entryReason: короткий код в Deal, подробности в аудите.
+Q3. entryStepType: ENTRY / GRID_ENTRY хранится в Deal.
+Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условный.
+```
+
+Остаются вопросы для следующих итераций:
+
 1. Нужно ли разрешать автоматический переход `ERROR -> CLOSED`, если kill-switch снял весь риск и сделка фактически закрыта?
 2. Нужно ли для `PRECHECK` поддерживать сценарий “entry condition больше не актуален — закрыть Deal без ошибки”, или созданный `Deal` всегда должен либо пойти дальше, либо стать `ERROR`?
-3. Нужно ли выделить отдельный статус между `ENTRY_FINALIZED` и `PROTECTION_SWITCHED`, если позже захотим явно разделить “main protection established” и “attached protection cancelled”?
-4. Нужно ли `CLOSED` дополнительно валидировать периодическим job'ом, или это зона `AnomalyJob`?
+3. Нужно ли `CLOSED` дополнительно валидировать периодическим job'ом, или это зона `AnomalyJob`?
+
+---
+
+# 14. Что изменено в этой редакции
+
+Изменения внесены точечно, без удаления существующих разделов и подробных комментариев, если они не противоречили принятым решениям.
+
+## Добавлено
+
+```text
+1. Раздел с зафиксированными решениями Q1–Q4.
+2. Проверка MarketDataExpirationChecker перед StrategyCondition для data-dependent steps.
+3. Условная семантика PROTECTION_SWITCHED.
+4. Прямой безопасный переход ENTRY_FINALIZED -> MANAGING, если protection switch не нужен.
+5. Ссылки на документы по рыночным данным, калькуляторам и аудиту.
+```
+
+## Изменено
+
+```text
+1. ENTRY_FINALIZED больше не обязан вести только в PROTECTION_SWITCHED.
+2. PROTECTION_SWITCHED теперь описан как статус только фактического protection-switch flow.
+3. MANAGING проверяет freshness конкретного StrategyStep перед выполнением data-dependent actions.
+4. Раздел вопросов обновлён: Q1–Q4 считаются применёнными, остались только нерешённые вопросы.
+```
+
+## Удалено / заменено
+
+```text
+1. Старая обязательная цепочка ENTRY_FINALIZED -> PROTECTION_SWITCHED -> MANAGING заменена на условную:
+   - ENTRY_FINALIZED -> PROTECTION_SWITCHED -> MANAGING;
+   - ENTRY_FINALIZED -> MANAGING.
+
+2. Вопрос про отдельный PROTECTION_ESTABLISHED убран из открытых, потому что решение принято:
+   новый статус не вводим.
+```
+
+Другие разделы, модели и комментарии сохранены.

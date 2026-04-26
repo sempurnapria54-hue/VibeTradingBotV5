@@ -48,6 +48,21 @@ StrategyActionCalculator
 >
 > IndicatorJob / MarketStructureJob / MarketPhaseJob заранее готовят данные.
 
+# Зафиксированные решения lifecycle / FSM
+
+В эту версию документа встроены решения Q1–Q4 из `Strategy.md` и `01. Жизненный цикл сделки`.
+
+Для расчёта рыночных данных это означает:
+
+* `Strategy.Status` не расширяется статусами свежести данных.
+* `Strategy.ACTIVE` — административное разрешение, а не гарантия runtime-ready данных.
+* `Strategy.INACTIVE` блокирует новые сделки, но уже открытые сделки могут использовать pinned `StrategyDetail`.
+* `Strategy.DELETED` блокирует новые расчёты для стратегии и приводит открытые сделки к graceful shutdown в lifecycle/FSM.
+* `maxAgeBars` заменён на `expirationDuration` в strategy settings.
+* Устаревание данных вычисляется в runtime через `MarketDataExpirationChecker`.
+* Job'ы не меняют `Strategy.Status`; если нет свежих входных данных, они не создают новый result, а старый result постепенно становится expired.
+
+
 ---
 
 # 2. Термины после переименований
@@ -570,8 +585,13 @@ public class StrategyIndicatorSetting extends Auditable {
     /** Назначение настройки. */
     private Destiny destiny;
 
-    /** Допустимый возраст последнего значения в свечах. */
-    private Integer maxAgeBars;
+    /**
+     * Сколько времени последнее значение индикатора считается свежим.
+     *
+     * Если последнее IndicatorValue старше expirationDuration,
+     * MarketDataExpirationChecker считает его устаревшим.
+     */
+    private Duration expirationDuration;
 
     public enum Destiny {
         MARKET_PHASE,
@@ -767,7 +787,7 @@ public interface IndicatorService {
 }
 ```
 
-Если нужного значения нет или оно устарело по `maxAgeBars`, это блокирующее условие для:
+Если нужного значения нет или оно устарело по `expirationDuration`, это блокирующее условие для:
 
 * активации стратегии;
 * создания новой сделки;
@@ -851,8 +871,13 @@ public class StrategyMarketStructureSetting extends Auditable {
     /** Назначение настройки. */
     private Destiny destiny;
 
-    /** Допустимый возраст последней структуры в свечах. */
-    private Integer maxAgeBars;
+    /**
+     * Сколько времени последняя рассчитанная структура рынка считается свежей.
+     *
+     * Если последняя MarketStructure старше expirationDuration,
+     * MarketDataExpirationChecker считает её устаревшей.
+     */
+    private Duration expirationDuration;
 
     public enum Destiny {
         MARKET_PHASE,
@@ -950,7 +975,7 @@ MarketStructure.type = UNKNOWN
 Актуальность проверяется через:
 
 ```text
-StrategyMarketStructureSetting.maxAgeBars
+StrategyMarketStructureSetting.expirationDuration
 MarketStructure.confirmedAt / windowEndAt
 ```
 
@@ -1012,7 +1037,7 @@ public interface MarketStructureService {
 }
 ```
 
-Если нужная структура отсутствует или устарела по `maxAgeBars`, это блокирующее условие для:
+Если нужная структура отсутствует или устарела по `expirationDuration`, это блокирующее условие для:
 
 * активации стратегии;
 * входа;
@@ -1079,8 +1104,13 @@ public class StrategyMarketPhaseSetting extends Auditable {
     /** Настройки структуры рынка, которые нужны для расчёта фазы рынка. */
     private List<StrategyMarketStructureSetting> marketStructureSettings;
 
-    /** Допустимый возраст последней рассчитанной фазы в свечах. */
-    private Integer maxAgeBars;
+    /**
+     * Сколько времени последняя рассчитанная фаза рынка считается свежей.
+     *
+     * Если последняя MarketPhase старше expirationDuration,
+     * MarketDataExpirationChecker считает её устаревшей.
+     */
+    private Duration expirationDuration;
 }
 ```
 
@@ -1164,7 +1194,7 @@ MarketPhase.type = UNKNOWN
 Актуальность проверяется через:
 
 ```text
-StrategyMarketPhaseSetting.maxAgeBars
+StrategyMarketPhaseSetting.expirationDuration
 MarketPhase.candleTimestamp / confirmedAt
 ```
 
@@ -1186,30 +1216,102 @@ public interface MarketPhaseService {
 
 `EntryScannerJob` использует `MarketPhaseService`, чтобы выбрать `StrategyDetail`.
 
-Если фаза отсутствует или устарела по `maxAgeBars`, новые сделки не создаются.
+Если фаза отсутствует или устарела по `expirationDuration`, новые сделки не создаются.
 
 ---
 
-# 25. EntryScannerJob
+# 25. MarketDataExpirationChecker
+
+`MarketDataExpirationChecker` — runtime-сервис проверки свежести данных.
+
+Он не хранит состояние в БД и не меняет `Strategy.Status`.
+
+Он отвечает только на вопрос:
+
+> Нужные данные свежие, частично устарели, полностью устарели или отсутствуют?
+
+```java
+public interface MarketDataExpirationChecker {
+
+    /**
+     * Проверить, не устарели ли данные для поиска нового входа.
+     */
+    MarketDataExpirationResult checkForEntry(Strategy strategy);
+
+    /**
+     * Проверить, не устарели ли данные, нужные конкретному StrategyStep.
+     */
+    MarketDataExpirationResult checkForStep(
+            DealContext dealContext,
+            StrategyStep step
+    );
+}
+```
+
+```java
+public class MarketDataExpirationResult {
+
+    /** Общий статус устаревания данных. */
+    private Status status;
+
+    /** Когда была выполнена проверка. */
+    private OffsetDateTime checkedAt;
+
+    /** С какого времени данные считаются устаревшими. */
+    private OffsetDateTime expiredSince;
+
+    /** Причины устаревания или отсутствия данных. */
+    private List<String> reasons;
+
+    public enum Status {
+        NOT_EXPIRED,
+        PARTIALLY_EXPIRED,
+        EXPIRED,
+        MISSING
+    }
+}
+```
+
+`MarketDataExpirationChecker` использует `expirationDuration` из:
+
+```text
+StrategyIndicatorSetting.expirationDuration
+StrategyMarketStructureSetting.expirationDuration
+StrategyMarketPhaseSetting.expirationDuration
+```
+
+Поведение при expired/missing data задаётся не здесь, а в `StrategyStep.marketDataExpiredSetting`.
+
+Подробности по применению результата в FSM см. в документах:
+
+```text
+01. Жизненный цикл сделки
+FSM этапы сделки
+```
+
+---
+
+# 26. EntryScannerJob
 
 `EntryScannerJob` относится к жизненному циклу сделки, но использует данные из этой доки.
 
 Он делает:
 
 1. Получает активные стратегии.
-2. Для каждой стратегии получает актуальную `MarketPhase` по `Strategy.marketPhaseSetting`.
-3. Проверяет свежесть `MarketPhase` по `maxAgeBars`.
-4. По `MarketPhase.Type` выбирает `StrategyDetail`.
-5. Получает нужные данные для entry condition:
+2. Для каждой стратегии вызывает `MarketDataExpirationChecker.checkForEntry(strategy)`.
+3. Если нужные данные устарели или отсутствуют — новую `Deal` не создаёт.
+4. Если данные свежие — получает актуальную `MarketPhase` по `Strategy.marketPhaseSetting`.
+5. По `MarketPhase.Type` выбирает `StrategyDetail`.
+6. Получает нужные данные для entry condition:
 
    * `MarketPriceData`;
    * `IndicatorValue`;
    * `MarketStructure`;
    * `MarketPhase`;
    * balance/risk data, если нужно.
-6. Находит `StrategyStep` с `stepType = ENTRY` или `GRID_ENTRY`.
-7. Проверяет `StrategyCondition`.
-8. Если условия выполнены — вызывает `DealOpeningService`.
+7. Находит `StrategyStep` с `stepType = ENTRY` или `GRID_ENTRY`.
+8. Проверяет `StrategyCondition`.
+9. Если условия выполнены — вызывает `DealOpeningService`.
 
 Важно:
 
@@ -1219,7 +1321,8 @@ public interface MarketPhaseService {
 
 ---
 
-# 26. Использование данных в StrategyConditionEvaluator
+# 27. Использование данных в StrategyConditionEvaluator
+
 
 `StrategyConditionEvaluator` может использовать готовые данные для проверки условий.
 
@@ -1243,7 +1346,7 @@ Evaluator не считает индикаторы и не ищет структ
 
 ---
 
-# 27. Использование данных в StrategyActionCalculator
+# 28. Использование данных в StrategyActionCalculator
 
 `StrategyActionCalculator` использует готовые данные для расчёта параметров действия.
 
@@ -1269,7 +1372,7 @@ POSITION_MARK_PRICE
 
 ---
 
-# 28. Какие данные нужны для входа
+# 29. Какие данные нужны для входа
 
 Минимальный набор для ENTRY conditions:
 
@@ -1296,7 +1399,7 @@ ATR_ABOVE_MINIMUM
 
 ---
 
-# 29. Какие данные нужны для сопровождения сделки
+# 30. Какие данные нужны для сопровождения сделки
 
 Во время `MANAGING` данные нужны для:
 
@@ -1325,7 +1428,7 @@ GRID_MANAGEMENT
 
 ---
 
-# 30. Идемпотентность расчётов
+# 31. Идемпотентность расчётов
 
 Jobs должны быть идемпотентными.
 
@@ -1353,7 +1456,7 @@ MarketPhase:
 
 ---
 
-# 31. Активация стратегии и готовность данных
+# 32. Активация стратегии и готовность данных
 
 Перед активацией стратегии нужно проверить, что все нужные данные могут быть подготовлены.
 
@@ -1384,7 +1487,7 @@ StrategyMarketPhaseSetting
 
 ---
 
-# 32. Главное правило
+# 33. Главное правило
 
 ```text
 IndicatorJob / MarketStructureJob / MarketPhaseJob
@@ -1401,3 +1504,41 @@ StrategyActionCalculator
 ```
 
 Ни один из этих потребителей не должен сам считать индикаторы по свечам или искать структуру рынка по свечам.
+
+
+---
+
+# 34. Что изменено в этой редакции
+
+Изменения внесены точечно, без удаления существующих разделов и подробных комментариев, если они не противоречили принятым решениям.
+
+## Добавлено
+
+```text
+1. Раздел с зафиксированными решениями Q1–Q4.
+2. MarketDataExpirationChecker как runtime-сервис проверки freshness.
+3. Ссылки на документы Strategy.md, 01, 03 и FSM этапы сделки в местах, где данные используются runtime-слоем.
+4. Уточнение, что job'ы не меняют Strategy.Status.
+```
+
+## Изменено
+
+```text
+1. maxAgeBars заменён на expirationDuration в:
+   - StrategyIndicatorSetting;
+   - StrategyMarketStructureSetting;
+   - StrategyMarketPhaseSetting.
+2. EntryScannerJob теперь проверяет MarketDataExpirationChecker.checkForEntry(strategy) перед созданием Deal.
+3. Services должны отдавать готовые данные, а freshness трактуется через expirationDuration.
+```
+
+## Удалено / заменено
+
+```text
+1. Старые ссылки на maxAgeBars заменены на expirationDuration.
+
+Причина:
+expirationDuration лучше отражает runtime freshness-check и не привязан напрямую к количеству баров.
+```
+
+Другие разделы, модели и комментарии сохранены.
