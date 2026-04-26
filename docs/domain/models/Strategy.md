@@ -31,6 +31,27 @@
 * Runtime-связь действия стратегии с runtime-сущностью хранится в `DealActionState` через `strategyActionId` и `RuntimeTarget`.
 * Аудит и история исполнения фиксируют факты, но не являются источником runtime-логики FSM.
 
+## Зафиксированные решения lifecycle / FSM
+
+В эту версию документа встроены принятые решения:
+
+```text
+Q1. Strategy.INACTIVE / Strategy.DELETED / market data expired
+Q2. entryReason: короткий код в Deal, подробности в аудите
+Q3. entryStepType: ENTRY / GRID_ENTRY хранится в Deal
+Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условный
+```
+
+Для strategy-layer это означает:
+
+* `Strategy.ACTIVE` означает административное разрешение стратегии, но не гарантирует runtime-ready состояние данных.
+* `Strategy.INACTIVE` блокирует только новые сделки; уже открытые сделки продолжают сопровождаться по pinned `StrategyDetail`.
+* `Strategy.DELETED` блокирует новые сделки и переводит уже открытые сделки в graceful shutdown.
+* Срок свежести данных хранится в strategy settings как `expirationDuration`.
+* Поведение при устаревании данных хранится на уровне `StrategyStep.marketDataExpiredSetting`.
+* `StrategyStepType.ENTRY` / `GRID_ENTRY` при создании сделки сохраняются в `Deal.entryStepType`; `Deal.entryReason` при этом равен `STRATEGY`.
+* `PROTECTION_SWITCHED` используется только если реально выполняется замена temporary attached protection на main protection.
+
 ---
 
 # 1. Общие правила модели
@@ -52,6 +73,7 @@
 * `IndicatorParams`;
 * `MarketStructureParams`;
 * `StrategyStep`;
+* `StrategyMarketDataExpiredSetting`;
 * `StrategyCondition`;
 * `StrategyConditionRule`;
 * `StrategyAction` и его подтипам.
@@ -68,11 +90,19 @@
 
 Жизненный цикл всей стратегии задаёт `Strategy.Status`.
 
-Если стратегия `DELETED`, новые расчёты и новые сделки по ней не запускаются.
+`Strategy.Status` описывает административное состояние стратегии, а не runtime-свежесть рыночных данных.
 
 Если стратегия `INACTIVE`, новые сделки по ней не создаются.
 
-Уже открытые сделки продолжают жить по pinned `StrategyDetail`, если отдельная политика остановки стратегии не говорит иначе.
+Уже открытые сделки продолжают жить по pinned `StrategyDetail`.
+
+Если стратегия `DELETED`, новые расчёты и новые сделки по ней не запускаются.
+
+Уже открытые сделки переводятся в graceful shutdown.
+
+Устаревшие свечи, индикаторы, структура рынка или фаза рынка не меняют `Strategy.Status`.
+
+Для этого используется runtime-проверка свежести данных через `MarketDataExpirationChecker` и политика `StrategyStep.marketDataExpiredSetting`.
 
 ## 1.4. key нужен только у StrategyAction
 
@@ -133,6 +163,11 @@ public class Strategy extends Auditable {
      * Статус контейнера стратегии.
      *
      * Статус стратегии управляет жизненным циклом всех вложенных immutable-настроек.
+     *
+     * Важно:
+     * status не описывает runtime-свежесть рыночных данных.
+     * Устаревшие данные обрабатываются через MarketDataExpirationChecker
+     * и StrategyStep.marketDataExpiredSetting.
      */
     private Status status;
 
@@ -163,15 +198,19 @@ public class Strategy extends Auditable {
         /**
          * Единственная активная стратегия инструмента.
          *
-         * Новые сделки по инструменту могут создаваться только по активной стратегии.
+         * Новые сделки по инструменту могут создаваться только по активной стратегии,
+         * если рыночные данные не устарели, условия входа выполнены,
+         * а risk/invariant checks пройдены.
+         *
+         * ACTIVE не означает, что прямо сейчас можно открыть сделку.
+         * Это административное разрешение стратегии к работе.
          */
         ACTIVE,
 
         /**
          * Стратегия существует, но временно не участвует в создании новых сделок.
          *
-         * Уже открытые сделки должны продолжать жить по pinned-версии StrategyDetail,
-         * если отдельная политика остановки стратегии не говорит иначе.
+         * Уже открытые сделки продолжают жить по pinned-версии StrategyDetail.
          */
         INACTIVE,
 
@@ -179,7 +218,7 @@ public class Strategy extends Auditable {
          * Логически удалённая стратегия.
          *
          * Новые сделки по ней не создаются.
-         * Для старых сделок поведение должно определяться отдельной политикой.
+         * Уже открытые сделки переводятся в graceful shutdown.
          */
         DELETED
     }
@@ -282,16 +321,17 @@ public class StrategyMarketPhaseSetting extends Auditable {
     private List<StrategyMarketStructureSetting> marketStructureSettings;
 
     /**
-     * Допустимый возраст последней рассчитанной фазы в свечах.
+     * Сколько времени последняя рассчитанная фаза рынка считается свежей.
      *
      * Например:
-     * timeframe = ONE_HOUR
-     * maxAgeBars = 3
+     * PT5M  -> 5 минут;
+     * PT15M -> 15 минут;
+     * PT1H  -> 1 час.
      *
-     * Это значит, что EntryScannerJob может использовать MarketPhase,
-     * только если она рассчитана не старше трёх закрытых часовых свечей.
+     * Если последняя MarketPhase старше expirationDuration,
+     * MarketDataExpirationChecker считает её устаревшей.
      */
-    private Integer maxAgeBars;
+    private Duration expirationDuration;
 }
 ```
 
@@ -560,9 +600,12 @@ public class StrategyIndicatorSetting extends Auditable {
     private Destiny destiny;
 
     /**
-     * Допустимый возраст последнего значения в свечах.
+     * Сколько времени последнее значение индикатора считается свежим.
+     *
+     * Если последнее IndicatorValue старше expirationDuration,
+     * MarketDataExpirationChecker считает его устаревшим.
      */
-    private Integer maxAgeBars;
+    private Duration expirationDuration;
 
     public enum Destiny {
 
@@ -756,9 +799,12 @@ public class StrategyMarketStructureSetting extends Auditable {
     private Destiny destiny;
 
     /**
-     * Допустимый возраст последней структуры в свечах.
+     * Сколько времени последняя рассчитанная структура рынка считается свежей.
+     *
+     * Если последняя MarketStructure старше expirationDuration,
+     * MarketDataExpirationChecker считает её устаревшей.
      */
-    private Integer maxAgeBars;
+    private Duration expirationDuration;
 
     public enum Destiny {
 
@@ -885,6 +931,20 @@ public class StrategyStep extends Auditable {
      * если condition выполнено.
      */
     private List<StrategyAction> actions;
+
+    /**
+     * Обязательная политика поведения, если данные,
+     * нужные именно этому step, устарели или отсутствуют.
+     *
+     * Проверяются только те данные, которые реально нужны step:
+     * - StrategyConditionRule.indicatorSetting;
+     * - StrategyConditionRule.marketStructureSetting;
+     * - StrategyOrderAction.placement.marketStructureSetting;
+     * - StrategyAlgoOrderAction.stopLossSettings.indicatorSetting;
+     * - StrategyAlgoOrderAction.stopLossSettings.marketStructureSetting;
+     * - StrategyMarketPhaseSetting, если step зависит от MarketPhase.
+     */
+    private StrategyMarketDataExpiredSetting marketDataExpiredSetting;
 }
 ```
 
@@ -899,6 +959,10 @@ public enum StrategyStepType {
      * На этапе поиска входа этот step проверяется EntryScannerJob.
      * После создания Deal FSM может использовать entry-step в PRECHECK,
      * чтобы создать entry order.
+     *
+     * Если сделка создана через этот step:
+     * - Deal.entryReason = STRATEGY;
+     * - Deal.entryStepType = ENTRY.
      */
     ENTRY,
 
@@ -924,6 +988,10 @@ public enum StrategyStepType {
 
     /**
      * Grid-входы во флэте.
+     *
+     * Если сделка создана через этот step:
+     * - Deal.entryReason = STRATEGY;
+     * - Deal.entryStepType = GRID_ENTRY.
      */
     GRID_ENTRY,
 
@@ -947,6 +1015,143 @@ public enum StrategyStepType {
      */
     FAIL_SAFE
 }
+```
+
+## 11.2. Связь StrategyStepType с Deal.entryStepType
+
+`Deal.entryStepType` хранит только тип entry-step, по которому была создана сделка.
+
+Допустимые значения:
+
+```text
+ENTRY
+GRID_ENTRY
+null
+```
+
+Правила:
+
+```text
+StrategyStepType.ENTRY
+  -> Deal.entryReason = STRATEGY
+  -> Deal.entryStepType = ENTRY
+
+StrategyStepType.GRID_ENTRY
+  -> Deal.entryReason = STRATEGY
+  -> Deal.entryStepType = GRID_ENTRY
+
+Manual / recovery / unknown creation
+  -> Deal.entryReason = MANUAL / RECOVERY / UNKNOWN
+  -> Deal.entryStepType = null или known ENTRY / GRID_ENTRY, если это точно восстановлено по фактам
+```
+
+Остальные `StrategyStepType` не могут быть значением `Deal.entryStepType`:
+
+```text
+MAIN_PROTECTION
+PROTECTION_ADJUSTMENT
+PARTIAL_EXIT
+GRID_MANAGEMENT
+EXIT
+FAIL_SAFE
+```
+
+Причина:
+
+> `entryStepType` отвечает только на вопрос, какой entry-step создал Deal.
+>
+> Он не управляет FSM и не является источником runtime-логики.
+
+## 11.3. StrategyMarketDataExpiredSetting
+
+`StrategyMarketDataExpiredSetting` определяет, что делать, если данные для конкретного `StrategyStep` устарели или отсутствуют.
+
+Он не определяет, когда данные устарели.
+
+Срок свежести задаётся рядом с настройкой данных:
+
+```text
+StrategyIndicatorSetting.expirationDuration
+StrategyMarketStructureSetting.expirationDuration
+StrategyMarketPhaseSetting.expirationDuration
+```
+
+Runtime-проверку выполняет `MarketDataExpirationChecker`.
+
+```java
+public class StrategyMarketDataExpiredSetting extends Auditable {
+
+    /**
+     * Что делать, если данные устарели,
+     * но позиция защищена активной защитой.
+     */
+    private MarketDataExpiredAction protectedPositionAction;
+
+    /**
+     * Что делать, если данные устарели,
+     * а позиция не защищена.
+     */
+    private MarketDataExpiredAction unprotectedPositionAction;
+}
+```
+
+```java
+public enum MarketDataExpiredAction {
+
+    /**
+     * Ждать свежих данных.
+     *
+     * Step не выполняется, но сделка остаётся в текущем состоянии.
+     */
+    WAIT,
+
+    /**
+     * Заблокировать выполнение этого StrategyStep.
+     *
+     * Refresh / cancel / close / safety commands остаются разрешены,
+     * но actions этого step не выполняются.
+     */
+    BLOCK_STEP,
+
+    /**
+     * Начать мягкое закрытие сделки.
+     */
+    GRACEFUL_CLOSE,
+
+    /**
+     * Немедленно снять риск через kill-switch.
+     */
+    KILL_SWITCH
+}
+```
+
+Важно:
+
+> `marketDataExpiredSetting` обязателен для каждого `StrategyStep`.
+>
+> Default-policy на уровне `StrategyDetail` не используем, потому что разные steps могут зависеть от разных данных и разных таймфреймов.
+
+## 11.4. Связь StrategyStep с PROTECTION_SWITCHED
+
+`PROTECTION_SWITCHED` не является обязательным этапом для всех сделок.
+
+Стратегия может предусматривать разные сценарии:
+
+```text
+1. Temporary attached protection заменяется на standalone main protection.
+2. Attached protection остаётся основной защитой.
+3. Main protection создаётся отдельным action без switch-сценария.
+4. Стратегия / risk policy явно разрешает сопровождение без обязательной protection-замены.
+```
+
+Поэтому `StrategyStep` определяет, нужен ли protection switch фактически.
+
+Если strategy steps не требуют замены temporary attached protection на main protection, FSM не должна искусственно переводить сделку в `PROTECTION_SWITCHED`.
+
+Подробная логика переходов описана в документе:
+
+```text
+FSM этапы сделки
 ```
 
 ---
@@ -2347,6 +2552,10 @@ StrategyDetail.riskPerTradePercent / maxLeverage
 > StrategyActionCalculator собирает свежий CalculationContext в runtime,
 > потому что цена и рыночные данные могут измениться между сбором DealContext и выполнением команды.
 
+Если данные, нужные action / step, устарели и `StrategyStep.marketDataExpiredSetting` запрещает выполнение, `StrategyActionCalculator` не должен рассчитывать торговый action.
+
+Safety-команды и cleanup-команды при этом остаются разрешены.
+
 Подробности по `StrategyActionCalculator`, `CalculationContext`, `PriceCalculator`, `SizeCalculator`, `RiskCalculator`, `MarketPriceData` и `InstrumentExternalRules` см. в документе:
 
 ```text
@@ -2372,6 +2581,20 @@ StrategyDetail.riskPerTradePercent / maxLeverage
 * `EntryScannerJob` — для поиска входа;
 * `StrategyConditionEvaluator` — для проверки условий step;
 * `StrategyActionCalculator` — для расчёта цены, размера и риска.
+
+Свежесть результатов проверяется через `MarketDataExpirationChecker`.
+
+Job'ы не меняют `Strategy.Status`.
+
+Если новых закрытых свечей нет:
+
+```text
+job не создаёт новый result;
+старый result остаётся в БД;
+MarketDataExpirationChecker со временем считает его expired по expirationDuration.
+```
+
+Устаревшие рыночные данные не переводят стратегию в `INACTIVE` и не создают отдельный статус стратегии.
 
 Общая связка:
 
@@ -2539,6 +2762,8 @@ Strategy API examples.md
 * для `AMEND` / `CANCEL` у `ORDER` / `ALGO_ORDER` должен быть `targetActionKey`;
 * `targetActionKey` должен ссылаться на `action.key` в той же `StrategyDetail`;
 * settings не используют `key`;
+* settings используют `expirationDuration`, а не старый `maxAgeBars`;
+* у каждого `StrategyStep` должен быть `marketDataExpiredSetting`;
 * одна `StrategyMarketPhaseSetting` описывает алгоритм классификации рынка во все поддерживаемые `MarketPhase.Type`;
 * `Strategy.details` содержит максимум одну `StrategyDetail` на один `MarketPhase.Type`;
 * `StrategyPricePlacement.priceSource` используется только для `MARKET_PRICE`;
@@ -2546,6 +2771,8 @@ Strategy API examples.md
 * `StopLossSettings.calculationType` — enum `StopLossCalculationType`;
 * для `ATR_PERCENT` в `StopLossSettings` нужна `StrategyIndicatorSetting` с ATR;
 * для `MARKET_STRUCTURE_BUFFER_PERCENT` нужна `StrategyMarketStructureSetting`;
+* `StrategyStepType.ENTRY / GRID_ENTRY` влияют на `Deal.entryStepType`;
+* `Deal.entryReason` при strategy-входе будет `STRATEGY`;
 * `Order`, `AlgoOrder`, `Position` не хранят `strategyActionId`;
 * runtime-связь action -> entity строится через `DealActionState.strategyActionId + RuntimeTarget`.
 
@@ -2566,8 +2793,12 @@ Strategy API examples.md
 * `EntryScannerJob`;
 * выбор `StrategyDetail`;
 * создание `Deal`;
+* `Deal.entryReason`;
+* `Deal.entryStepType`;
+* `Deal.shutdownReason`;
 * `DealContext`;
 * FSM статусы сделки;
+* graceful shutdown;
 * восстановление после рестарта;
 * роль `DealActionState` в runtime.
 
@@ -2628,6 +2859,7 @@ Strategy API examples.md
 * `MarketPhase`;
 * `MarketPriceData`;
 * `InstrumentExternalRules`;
+* `MarketDataExpirationChecker`;
 * freshness и idempotency расчётов.
 
 ## 38.5. Аудит и история исполнения
@@ -2643,8 +2875,61 @@ Strategy API examples.md
 * история исполнения сервисных команд;
 * история изменений runtime-сущностей;
 * timeline сделки;
+* entry context;
+* shutdownReason;
+* protection switch timeline;
 * связь аудита с `Deal`, `Order`, `AlgoOrder`, `Position`, `Balance`.
 
 Важно:
 
 > Аудит не является источником runtime-логики FSM.
+
+
+---
+
+# 39. Что изменено в этой редакции
+
+Изменения внесены точечно, без удаления существующих разделов и подробных комментариев, если они не противоречили принятым решениям.
+
+## Добавлено
+
+```text
+1. Раздел "Зафиксированные решения lifecycle / FSM".
+2. Поле StrategyStep.marketDataExpiredSetting.
+3. Модель StrategyMarketDataExpiredSetting.
+4. Enum MarketDataExpiredAction.
+5. Описание связи StrategyStepType.ENTRY / GRID_ENTRY с Deal.entryStepType.
+6. Описание условной семантики PROTECTION_SWITCHED.
+7. Уточнение связи стратегии с MarketDataExpirationChecker.
+8. Уточнения в JSON-checklist и связях с другими документами.
+```
+
+## Изменено
+
+```text
+1. Strategy.Status:
+   - ACTIVE теперь явно означает административное разрешение, а не runtime-ready состояние;
+   - INACTIVE не влияет на уже открытые сделки;
+   - DELETED запускает graceful shutdown открытых сделок.
+
+2. maxAgeBars заменён на expirationDuration в:
+   - StrategyMarketPhaseSetting;
+   - StrategyIndicatorSetting;
+   - StrategyMarketStructureSetting.
+
+3. StrategyActionCalculator:
+   - добавлено правило не рассчитывать data-dependent action,
+     если нужные данные устарели и policy запрещает выполнение.
+```
+
+## Удалено / заменено
+
+```text
+1. maxAgeBars заменён на expirationDuration.
+
+Причина:
+expirationDuration лучше подходит для runtime freshness-check,
+не зависит напрямую от количества баров и согласован с MarketDataExpirationChecker.
+```
+
+Другие разделы, модели и комментарии сохранены.
