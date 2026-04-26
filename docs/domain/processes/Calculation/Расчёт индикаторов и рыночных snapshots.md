@@ -1,0 +1,1403 @@
+# 04. Расчёт индикаторов и рыночных данных
+
+> Статус документа: процессная дока по подготовке рыночных данных.
+>
+> Документ обновлён после решений по:
+>
+> * `IndicatorValue` вместо `IndicatorSnapshot`;
+> * `MarketStructure` / `MarketPriceLevel` вместо `MarketStructureSnapshot`;
+> * `MarketPhase` как отдельный результат расчёта;
+> * `MarketPriceData` как runtime value object без хранения в БД;
+> * `InstrumentExternalRules` как persisted external rules инструмента;
+> * `StrategyIndicatorSetting`, `StrategyMarketStructureSetting`, `StrategyMarketPhaseSetting` как immutable-настройки стратегии.
+>
+> Связанные доки:
+>
+> * `Strategy.md`
+> * `01. Жизненный цикл сделки`
+> * `03. Калькуляторы действий стратегии`
+
+---
+
+# 1. Главная идея
+
+Индикаторы, структура рынка, фаза рынка и внешние правила инструмента готовятся отдельно от жизненного цикла сделки.
+
+Эти данные нужны не только для входа.
+
+Они используются в трёх местах:
+
+```text
+EntryScannerJob
+  -> понять, можно ли создать Deal
+
+StrategyConditionEvaluator
+  -> понять, можно ли выполнить step в уже открытой сделке
+
+StrategyActionCalculator
+  -> посчитать цену, размер и риск
+```
+
+Главное правило:
+
+> FSM не считает индикаторы.
+>
+> PriceCalculator не считает индикаторы.
+>
+> StrategyActionCalculator не ищет структуру рынка по свечам.
+>
+> IndicatorJob / MarketStructureJob / MarketPhaseJob заранее готовят данные.
+
+---
+
+# 2. Термины после переименований
+
+Старые названия больше не используем как основные:
+
+```text
+IndicatorSnapshot        -> IndicatorValue
+MarketStructureSnapshot  -> MarketStructure / MarketPriceLevel
+MarketPriceSnapshot      -> MarketPriceData
+InstrumentSpec           -> InstrumentExternalRules
+```
+
+Смысл:
+
+```text
+IndicatorValue
+  -> готовое значение конкретного индикатора
+
+MarketStructure
+  -> готовый результат расчёта структуры рынка
+
+MarketPriceLevel
+  -> конкретный уровень внутри MarketStructure
+
+MarketPhase
+  -> готовая фаза рынка, рассчитанная по StrategyMarketPhaseSetting
+
+MarketPriceData
+  -> runtime-данные текущих цен, не persisted
+
+InstrumentExternalRules
+  -> актуальные внешние правила инструмента от биржи, persisted
+```
+
+---
+
+# 3. Общая схема
+
+```text
+CandleJob
+  -> обновляет свечи
+
+InstrumentExternalRulesSyncJob
+  -> обновляет внешние правила инструмента из REST
+
+IndicatorJob
+  -> считает IndicatorValue
+
+MarketStructureJob
+  -> считает MarketStructure / MarketPriceLevel
+
+MarketPhaseJob
+  -> считает MarketPhase
+
+EntryScannerJob
+  -> проверяет ENTRY conditions
+
+DealOrchestratorJob / FSM
+  -> использует готовые данные через condition evaluator и calculators
+```
+
+Общая цепочка зависимостей:
+
+```text
+Candles
+  -> IndicatorJob
+     -> IndicatorValue
+
+Candles + optional IndicatorValue
+  -> MarketStructureJob
+     -> MarketStructure
+        -> MarketPriceLevel
+
+IndicatorValue + MarketStructure
+  -> MarketPhaseJob
+     -> MarketPhase
+```
+
+---
+
+# 4. Общие правила хранения
+
+## 4.1. Persisted-модели наследуются от Auditable
+
+Все модели, которые хранятся в БД, наследуются от `Auditable`.
+
+Это касается:
+
+* `InstrumentExternalRules`;
+* `StrategyIndicatorSetting`;
+* `IndicatorParams`;
+* `IndicatorValue`;
+* `StrategyMarketStructureSetting`;
+* `MarketStructureParams`;
+* `MarketStructure`;
+* `MarketPriceLevel`;
+* `StrategyMarketPhaseSetting`;
+* `MarketPhaseParams`;
+* `MarketPhase`.
+
+`MarketPriceData` не наследуется от `Auditable`, потому что не хранится в БД.
+
+## 4.2. Immutable-настройки живут вместе со стратегией
+
+Всё, что пришло при создании стратегии, считается immutable.
+
+Если стратегия `DELETED`, jobs не должны считать новые данные для этой стратегии.
+
+Если стратегия `INACTIVE`, новые сделки по ней не создаются, но уже открытые сделки могут продолжать сопровождаться по pinned `StrategyDetail`.
+
+## 4.3. Статусы у settings не нужны
+
+Жизненный цикл вложенных immutable-настроек управляется статусом `Strategy.Status`.
+
+Отдельные статусы у settings и params не нужны.
+
+## 4.4. key у settings не нужен
+
+`key` не используем в:
+
+* `StrategyIndicatorSetting`;
+* `StrategyMarketStructureSetting`;
+* `StrategyMarketPhaseSetting`.
+
+Связи между настройками в domain/entity — объектные.
+
+`key` остаётся только у `StrategyAction`, потому что нужен для `targetActionKey`.
+
+---
+
+# 5. CandleJob
+
+`CandleJob` готовит базовые свечные данные.
+
+Делает:
+
+* загружает свежие свечи;
+* обновляет историю свечей;
+* следит за закрытием свечей;
+* сохраняет данные в доменные таблицы;
+* не допускает look-ahead.
+
+Не делает:
+
+* не считает стратегические сигналы;
+* не создаёт `Deal`;
+* не управляет сделкой;
+* не считает SL/TP.
+
+Важное правило:
+
+> Для расчёта индикаторов использовать только закрытые свечи.
+
+---
+
+# 6. InstrumentExternalRulesSyncJob
+
+`InstrumentExternalRulesSyncJob` обновляет внешние правила инструмента.
+
+Источник:
+
+```text
+GET /api/v5/public/instruments
+```
+
+На первом этапе обновляем только через REST.
+
+WebSocket для instruments можно добавить позже.
+
+`InstrumentExternalRules` меняется редко, поэтому хранить его в БД как актуальный snapshot правил инструмента имеет смысл.
+
+Используется для:
+
+* округления цены;
+* округления размера;
+* расчёта размера в контрактах;
+* проверки min/max limits;
+* проверки биржевого max leverage;
+* проверки, можно ли торговать инструмент.
+
+## 6.1. InstrumentExternalRulesExternalSnapshot
+
+Snapshot после маппера из client model.
+
+Поля называются так же, как в domain, но без наших доменных enum-полей.
+
+```java
+public class InstrumentExternalRulesExternalSnapshot {
+
+    private String externalInstrumentType;
+    private String externalInstrumentId;
+    private String externalBaseCurrency;
+    private String externalQuoteCurrency;
+    private String externalSettleCurrency;
+    private String externalContractType;
+    private String externalContractValue;
+    private String externalContractValueCurrency;
+    private String externalTickSize;
+    private String externalLotSize;
+    private String externalMinSize;
+    private String externalMaxLimitSize;
+    private String externalMaxMarketSize;
+    private String externalMaxTriggerSize;
+    private String externalMaxStopSize;
+    private String externalMaxLeverage;
+    private String externalState;
+}
+```
+
+## 6.2. InstrumentExternalRules
+
+```java
+public class InstrumentExternalRules extends Auditable {
+
+    /** Технический ID записи. */
+    private Long id;
+
+    /** Внутренний ID инструмента в нашей системе. */
+    private Long instrumentId;
+
+    /** Нормализованный тип инструмента. */
+    private InstrumentType instrumentType;
+
+    /** Нормализованный тип контракта. */
+    private ContractType contractType;
+
+    /** Нормализованный статус инструмента. */
+    private Status status;
+
+    private String externalInstrumentType;
+    private String externalInstrumentId;
+    private String externalBaseCurrency;
+    private String externalQuoteCurrency;
+    private String externalSettleCurrency;
+    private String externalContractType;
+    private String externalContractValue;
+    private String externalContractValueCurrency;
+    private String externalTickSize;
+    private String externalLotSize;
+    private String externalMinSize;
+    private String externalMaxLimitSize;
+    private String externalMaxMarketSize;
+    private String externalMaxTriggerSize;
+    private String externalMaxStopSize;
+    private String externalMaxLeverage;
+    private String externalState;
+
+    public enum Status {
+        LIVE,
+        SUSPEND,
+        PREOPEN,
+        EXPIRED,
+        TEST,
+        UNKNOWN
+    }
+}
+```
+
+## 6.3. InstrumentType
+
+```java
+public enum InstrumentType {
+
+    /** Бессрочный своп / perpetual contract. */
+    SWAP,
+
+    /** Фьючерс с датой экспирации. */
+    FUTURES,
+
+    /** Спотовый инструмент. */
+    SPOT,
+
+    /** Маржинальный инструмент. Для текущего бота не используется. */
+    MARGIN,
+
+    /** Опцион. Для текущего бота не используется. */
+    OPTION,
+
+    /** Тип инструмента не удалось нормализовать. */
+    UNKNOWN
+}
+```
+
+## 6.4. ContractType
+
+```java
+public enum ContractType {
+
+    /** Линейный контракт. */
+    LINEAR,
+
+    /** Обратный контракт. */
+    INVERSE,
+
+    /** Тип контракта не удалось нормализовать. */
+    UNKNOWN
+}
+```
+
+---
+
+# 7. MarketPriceData
+
+`MarketPriceData` нужен для входа, условий и калькуляторов.
+
+Он не хранится в БД.
+
+Историю тикеров не ведём.
+
+Кэш на первом этапе не используем.
+
+Flow:
+
+```text
+Client model OKX ticker
+  -> MarketPriceDataExternalSnapshot
+  -> MarketPriceData
+  -> CalculationContext
+```
+
+## 7.1. MarketPriceDataExternalSnapshot
+
+```java
+public class MarketPriceDataExternalSnapshot {
+
+    /** Тип инструмента на стороне биржи. */
+    private String externalInstrumentType;
+
+    /** ID инструмента на стороне биржи. */
+    private String externalInstrumentId;
+
+    /** Последняя цена сделки. */
+    private BigDecimal externalLastPrice;
+
+    /** Лучшая цена продажи. */
+    private BigDecimal externalAskPrice;
+
+    /** Лучшая цена покупки. */
+    private BigDecimal externalBidPrice;
+
+    /** Время тикера на стороне биржи. */
+    private OffsetDateTime externalTimestamp;
+}
+```
+
+## 7.2. MarketPriceData
+
+```java
+public class MarketPriceData {
+
+    /** Внутренний ID инструмента в нашей системе. */
+    private Long instrumentId;
+
+    /** Тип инструмента на стороне биржи. */
+    private String externalInstrumentType;
+
+    /** ID инструмента на стороне биржи. */
+    private String externalInstrumentId;
+
+    /** Последняя цена сделки. */
+    private BigDecimal externalLastPrice;
+
+    /** Лучшая цена продажи. */
+    private BigDecimal externalAskPrice;
+
+    /** Лучшая цена покупки. */
+    private BigDecimal externalBidPrice;
+
+    /** Время тикера на стороне биржи. */
+    private OffsetDateTime externalTimestamp;
+}
+```
+
+`MID_PRICE` не храним:
+
+```text
+midPrice = (externalBidPrice + externalAskPrice) / 2
+```
+
+---
+
+# 8. TimeFrame
+
+`TimeFrame` — чистый доменный enum.
+
+OKX-строки в нём не храним.
+
+```java
+public enum TimeFrame {
+
+    ONE_MINUTE,
+    THREE_MINUTES,
+    FIVE_MINUTES,
+    FIFTEEN_MINUTES,
+    ONE_HOUR,
+    TWO_HOURS,
+    FOUR_HOURS,
+    ONE_DAY
+}
+```
+
+Маппинг OKX-строк живёт только в `TimeFrameMapper`:
+
+```java
+public class TimeFrameMapper {
+
+    /** Доменный TimeFrame -> строка OKX client/API. */
+    public String domainToOkxClient(TimeFrame timeframe) {
+        // TimeFrame.ONE_HOUR -> "1H"
+    }
+
+    /** Строка OKX client/API -> доменный TimeFrame. */
+    public TimeFrame okxClientToDomain(String externalCode) {
+        // "1H" -> TimeFrame.ONE_HOUR
+    }
+}
+```
+
+Правила:
+
+```text
+маппинг строгий
+без lowerCase / upperCase
+TimeFrameResolver пока не нужен
+```
+
+---
+
+# 9. IndicatorJob
+
+`IndicatorJob` считает технические индикаторы.
+
+Примеры:
+
+* EMA;
+* RSI;
+* MACD;
+* Stochastic;
+* Bollinger Bands;
+* OBV;
+* ATR.
+
+Источник настроек:
+
+```text
+StrategyIndicatorSetting
+```
+
+Источник данных:
+
+```text
+Candles
+```
+
+Результат:
+
+```text
+IndicatorValue
+```
+
+`IndicatorJob` делает:
+
+* читает активные/готовящиеся стратегии;
+* читает их `StrategyIndicatorSetting`;
+* читает закрытые свечи;
+* считает значения индикаторов;
+* сохраняет только значения после warmup-зоны;
+* обеспечивает идемпотентный пересчёт;
+* не допускает look-ahead.
+
+Не делает:
+
+* не принимает решение о входе;
+* не создаёт сделку;
+* не создаёт ордера;
+* не сопровождает сделку;
+* не считает phase напрямую.
+
+## 9.1. Warmup
+
+`warmup` в `IndicatorValue` не храним.
+
+Правило:
+
+```text
+IndicatorJob сам пропускает warmup-зону
+и сохраняет только значения, пригодные для live-логики.
+```
+
+Пример:
+
+```text
+period = 50
+свечи 1–50  -> разгон, значение не сохраняем
+свеча 51+   -> сохраняем IndicatorValue
+```
+
+Для более консервативных индикаторов можно увеличить warmup внутри алгоритма, но это ответственность `IndicatorJob`.
+
+---
+
+# 10. StrategyIndicatorSetting
+
+```java
+public class StrategyIndicatorSetting extends Auditable {
+
+    /** Технический ID настройки. */
+    private Long id;
+
+    /** Таймфрейм индикатора. */
+    private TimeFrame timeframe;
+
+    /** Тип индикатора. */
+    private IndicatorValue.Type indicatorType;
+
+    /** Immutable-параметры индикатора. */
+    private IndicatorParams params;
+
+    /** Назначение настройки. */
+    private Destiny destiny;
+
+    /** Допустимый возраст последнего значения в свечах. */
+    private Integer maxAgeBars;
+
+    public enum Destiny {
+        MARKET_PHASE,
+        ENTRY_CONDITION,
+        ACTION_PRICE,
+        PROTECTION,
+        EXIT_CONDITION
+    }
+}
+```
+
+`required` не нужен: если настройка указана в стратегии, она обязательна для соответствующего сценария.
+
+---
+
+# 11. IndicatorParams
+
+```java
+public abstract class IndicatorParams extends Auditable {
+
+    /** Технический ID параметров. */
+    private Long id;
+
+    /** Тип индикатора. */
+    private IndicatorValue.Type indicatorType;
+}
+```
+
+Примеры:
+
+```java
+public class AtrParams extends IndicatorParams {
+    private Integer period;
+}
+```
+
+```java
+public class EmaParams extends IndicatorParams {
+    private Integer period;
+}
+```
+
+```java
+public class RsiParams extends IndicatorParams {
+    private Integer period;
+}
+```
+
+```java
+public class MacdParams extends IndicatorParams {
+    private Integer fastPeriod;
+    private Integer slowPeriod;
+    private Integer signalPeriod;
+}
+```
+
+```java
+public class BollingerBandsParams extends IndicatorParams {
+    private Integer period;
+    private BigDecimal deviationMultiplier;
+}
+```
+
+```java
+public class StochasticParams extends IndicatorParams {
+    private Integer kPeriod;
+    private Integer dPeriod;
+    private Integer smoothPeriod;
+}
+```
+
+```java
+public class ObvParams extends IndicatorParams {
+    private Boolean enabled;
+}
+```
+
+---
+
+# 12. IndicatorValue
+
+`IndicatorValue` — готовое значение индикатора, рассчитанное `IndicatorJob`.
+
+```java
+public abstract class IndicatorValue extends Auditable {
+
+    /** Технический ID значения индикатора. */
+    private Long id;
+
+    /** Внутренний ID инструмента. */
+    private Long instrumentId;
+
+    /** Настройка стратегии, по которой было рассчитано значение. */
+    private StrategyIndicatorSetting setting;
+
+    /** Время свечи, на которой рассчитан индикатор. */
+    private OffsetDateTime candleTimestamp;
+
+    public enum Type {
+        ATR,
+        EMA,
+        RSI,
+        MACD,
+        STOCHASTIC,
+        BOLLINGER_BANDS,
+        OBV
+    }
+}
+```
+
+Наследники:
+
+```java
+public class AtrValue extends IndicatorValue {
+    private BigDecimal atr;
+}
+```
+
+```java
+public class EmaValue extends IndicatorValue {
+    private BigDecimal ema;
+}
+```
+
+```java
+public class RsiValue extends IndicatorValue {
+    private BigDecimal rsi;
+}
+```
+
+```java
+public class MacdValue extends IndicatorValue {
+    private BigDecimal macdLine;
+    private BigDecimal signalLine;
+    private BigDecimal histogram;
+}
+```
+
+```java
+public class BollingerBandsValue extends IndicatorValue {
+    private BigDecimal upperBand;
+    private BigDecimal middleBand;
+    private BigDecimal lowerBand;
+    private BigDecimal bandwidth;
+    private BigDecimal percentB;
+}
+```
+
+```java
+public class StochasticValue extends IndicatorValue {
+    private BigDecimal k;
+    private BigDecimal d;
+}
+```
+
+```java
+public class ObvValue extends IndicatorValue {
+    private BigDecimal obv;
+}
+```
+
+Правила:
+
+```text
+confirmed не храним
+warmup не храним
+IndicatorJob сохраняет только значения после warmup-зоны
+индикаторы считаются только по закрытым свечам
+```
+
+---
+
+# 13. IndicatorService
+
+`IndicatorService` отдаёт готовые значения индикаторов.
+
+Он не считает индикаторы сам.
+
+Примеры методов:
+
+```java
+public interface IndicatorService {
+
+    AtrValue getLatestAtr(
+            Long instrumentId,
+            StrategyIndicatorSetting setting
+    );
+
+    List<IndicatorValue> getLatestValues(
+            Long instrumentId,
+            Collection<StrategyIndicatorSetting> settings
+    );
+}
+```
+
+Если нужного значения нет или оно устарело по `maxAgeBars`, это блокирующее условие для:
+
+* активации стратегии;
+* создания новой сделки;
+* выполнения action, если значение нужно для расчёта.
+
+---
+
+# 14. MarketStructureJob
+
+`MarketStructureJob` отвечает за уровни рынка.
+
+Он готовит данные, которые нужны:
+
+* для входов от диапазона;
+* для grid;
+* для SL за структурный уровень;
+* для breakout conditions;
+* для сопровождения позиции.
+
+Источник настроек:
+
+```text
+StrategyMarketStructureSetting
+```
+
+Основной источник данных:
+
+```text
+Candles
+```
+
+Дополнительный источник, если нужен алгоритму:
+
+```text
+IndicatorValue
+```
+
+Результат:
+
+```text
+MarketStructure
+  -> MarketPriceLevel
+```
+
+`MarketStructureJob` делает:
+
+* ищет swing high;
+* ищет swing low;
+* считает range low;
+* считает range high;
+* определяет support / resistance;
+* может использовать `IndicatorValue` как фильтр шума;
+* сохраняет `MarketStructure` и `MarketPriceLevel`.
+
+Не делает:
+
+* не создаёт сделку;
+* не ставит ордера;
+* не переносит SL;
+* не исполняет команды.
+
+---
+
+# 15. StrategyMarketStructureSetting
+
+```java
+public class StrategyMarketStructureSetting extends Auditable {
+
+    /** Технический ID настройки. */
+    private Long id;
+
+    /** Таймфрейм, на котором должна рассчитываться структура рынка. */
+    private TimeFrame timeframe;
+
+    /** Тип структуры рынка, которую нужно подготовить. */
+    private MarketStructure.Type structureType;
+
+    /** Immutable-параметры расчёта структуры рынка. */
+    private MarketStructureParams params;
+
+    /** Назначение настройки. */
+    private Destiny destiny;
+
+    /** Допустимый возраст последней структуры в свечах. */
+    private Integer maxAgeBars;
+
+    public enum Destiny {
+        MARKET_PHASE,
+        ENTRY_CONDITION,
+        ACTION_PRICE,
+        PROTECTION,
+        EXIT_CONDITION
+    }
+}
+```
+
+---
+
+# 16. MarketStructureParams
+
+```java
+public class MarketStructureParams extends Auditable {
+
+    /** Технический ID параметров. */
+    private Long id;
+
+    /** Размер окна свечей для анализа. */
+    private Integer lookbackBars;
+
+    /** Минимальное количество касаний уровня. */
+    private Integer minTouches;
+
+    /** Минимальная ширина range в процентах. */
+    private BigDecimal minRangeWidthPercents;
+
+    /** Максимальная ширина range в процентах. */
+    private BigDecimal maxRangeWidthPercents;
+
+    /** Буфер подтверждения пробоя. */
+    private BigDecimal breakoutBufferPercents;
+
+    /** Количество закрытых свечей для подтверждения пробоя. */
+    private Integer breakoutConfirmationBars;
+
+    /** Окно для поиска swing high / swing low. */
+    private Integer swingLookbackBars;
+}
+```
+
+`version` и `canonicalJson` не нужны, потому что params immutable и привязаны к стратегии.
+
+---
+
+# 17. MarketStructure
+
+```java
+public class MarketStructure extends Auditable {
+
+    /** Технический ID результата расчёта. */
+    private Long id;
+
+    /** Внутренний ID инструмента. */
+    private Long instrumentId;
+
+    /** Настройка стратегии, по которой была рассчитана структура. */
+    private StrategyMarketStructureSetting setting;
+
+    /** Тип структуры рынка. */
+    private Type type;
+
+    /** Начало окна свечей, по которому рассчитана структура. */
+    private OffsetDateTime windowStartAt;
+
+    /** Конец окна свечей, по которому рассчитана структура. */
+    private OffsetDateTime windowEndAt;
+
+    /** Свеча, на которой структура была подтверждена. */
+    private OffsetDateTime confirmedAt;
+
+    /** Ценовые уровни структуры. */
+    private List<MarketPriceLevel> levels;
+
+    public enum Type {
+        RANGE,
+        UPTREND,
+        DOWNTREND,
+        UNKNOWN
+    }
+}
+```
+
+`MarketStructure.Status` не нужен.
+
+Если структура сломалась, `MarketStructureJob` сохраняет новый результат, например:
+
+```text
+MarketStructure.type = UNKNOWN
+```
+
+Актуальность проверяется через:
+
+```text
+StrategyMarketStructureSetting.maxAgeBars
+MarketStructure.confirmedAt / windowEndAt
+```
+
+---
+
+# 18. MarketPriceLevel
+
+```java
+public class MarketPriceLevel extends Auditable {
+
+    /** Технический ID уровня. */
+    private Long id;
+
+    /** Тип уровня. */
+    private Type type;
+
+    /** Цена уровня. */
+    private BigDecimal price;
+
+    /** Свеча, на которой уровень был найден. */
+    private OffsetDateTime detectedAt;
+
+    /** Свеча, на которой уровень был подтверждён. */
+    private OffsetDateTime confirmedAt;
+
+    public enum Type {
+        RANGE_LOW,
+        RANGE_HIGH,
+        SWING_LOW,
+        SWING_HIGH,
+        SUPPORT,
+        RESISTANCE
+    }
+}
+```
+
+---
+
+# 19. MarketStructureService
+
+`MarketStructureService` отдаёт готовую структуру рынка.
+
+Он не ищет уровни по свечам сам.
+
+Пример:
+
+```java
+public interface MarketStructureService {
+
+    MarketStructure getLatestStructure(
+            Long instrumentId,
+            StrategyMarketStructureSetting setting
+    );
+
+    MarketPriceLevel getRequiredLevel(
+            MarketStructure structure,
+            MarketPriceLevel.Type levelType
+    );
+}
+```
+
+Если нужная структура отсутствует или устарела по `maxAgeBars`, это блокирующее условие для:
+
+* активации стратегии;
+* входа;
+* выполнения action, который зависит от структуры.
+
+---
+
+# 20. MarketPhaseJob
+
+`MarketPhaseJob` определяет фазу рынка.
+
+Источник настройки:
+
+```text
+StrategyMarketPhaseSetting
+```
+
+Источники данных:
+
+```text
+IndicatorValue + MarketStructure
+```
+
+Результат:
+
+```text
+MarketPhase
+```
+
+`MarketPhaseJob` делает:
+
+* читает `StrategyMarketPhaseSetting` активных/готовящихся стратегий;
+* читает готовые `IndicatorValue`;
+* читает готовые `MarketStructure`;
+* применяет `MarketPhaseParams`;
+* сохраняет актуальный `MarketPhase`;
+* может сохранять confidence/score.
+
+Не делает:
+
+* не создаёт `Deal`;
+* не выставляет ордера;
+* не сопровождает сделку.
+
+---
+
+# 21. StrategyMarketPhaseSetting
+
+```java
+public class StrategyMarketPhaseSetting extends Auditable {
+
+    /** Технический ID настройки. */
+    private Long id;
+
+    /** Таймфрейм, на котором считается фаза рынка. */
+    private TimeFrame timeframe;
+
+    /** Immutable-параметры расчёта фазы рынка. */
+    private MarketPhaseParams params;
+
+    /** Настройки индикаторов, которые нужны для расчёта фазы рынка. */
+    private List<StrategyIndicatorSetting> indicatorSettings;
+
+    /** Настройки структуры рынка, которые нужны для расчёта фазы рынка. */
+    private List<StrategyMarketStructureSetting> marketStructureSettings;
+
+    /** Допустимый возраст последней рассчитанной фазы в свечах. */
+    private Integer maxAgeBars;
+}
+```
+
+---
+
+# 22. MarketPhaseParams
+
+```java
+public class MarketPhaseParams extends Auditable {
+
+    /** Технический ID параметров. */
+    private Long id;
+
+    /** Тип алгоритма расчёта фазы рынка. */
+    private AlgorithmType algorithmType;
+
+    /** Минимальный score, чтобы признать рынок трендовым. */
+    private BigDecimal minTrendScore;
+
+    /** Минимальный score, чтобы признать рынок диапазонным. */
+    private BigDecimal minRangeScore;
+
+    /** Количество закрытых свечей для подтверждения смены фазы. */
+    private Integer confirmationBars;
+
+    public enum AlgorithmType {
+        STRUCTURE_ONLY,
+        INDICATORS_ONLY,
+        STRUCTURE_AND_INDICATORS
+    }
+}
+```
+
+`version` и `canonicalJson` не нужны, потому что params immutable и привязаны к стратегии.
+
+---
+
+# 23. MarketPhase
+
+```java
+public class MarketPhase extends Auditable {
+
+    /** Технический ID результата расчёта. */
+    private Long id;
+
+    /** Внутренний ID инструмента. */
+    private Long instrumentId;
+
+    /** Настройка стратегии, по которой была рассчитана фаза. */
+    private StrategyMarketPhaseSetting setting;
+
+    /** Тип рассчитанной фазы рынка. */
+    private Type type;
+
+    /** Время свечи, на которой рассчитана фаза. */
+    private OffsetDateTime candleTimestamp;
+
+    /** Время, с которого фазу можно использовать без look-ahead. */
+    private OffsetDateTime confirmedAt;
+
+    /** Уверенность алгоритма в выбранной фазе. */
+    private BigDecimal confidenceScore;
+
+    public enum Type {
+        BULL_TREND,
+        BEAR_TREND,
+        RANGE,
+        UNKNOWN
+    }
+}
+```
+
+`MarketPhase.Status` не нужен.
+
+Если фаза была бычьей, а потом стала неопределённой, создаётся новый актуальный результат:
+
+```text
+MarketPhase.type = UNKNOWN
+```
+
+Актуальность проверяется через:
+
+```text
+StrategyMarketPhaseSetting.maxAgeBars
+MarketPhase.candleTimestamp / confirmedAt
+```
+
+---
+
+# 24. MarketPhaseService
+
+`MarketPhaseService` отдаёт актуальную фазу рынка.
+
+```java
+public interface MarketPhaseService {
+
+    MarketPhase getLatestPhase(
+            Long instrumentId,
+            StrategyMarketPhaseSetting setting
+    );
+}
+```
+
+`EntryScannerJob` использует `MarketPhaseService`, чтобы выбрать `StrategyDetail`.
+
+Если фаза отсутствует или устарела по `maxAgeBars`, новые сделки не создаются.
+
+---
+
+# 25. EntryScannerJob
+
+`EntryScannerJob` относится к жизненному циклу сделки, но использует данные из этой доки.
+
+Он делает:
+
+1. Получает активные стратегии.
+2. Для каждой стратегии получает актуальную `MarketPhase` по `Strategy.marketPhaseSetting`.
+3. Проверяет свежесть `MarketPhase` по `maxAgeBars`.
+4. По `MarketPhase.Type` выбирает `StrategyDetail`.
+5. Получает нужные данные для entry condition:
+
+   * `MarketPriceData`;
+   * `IndicatorValue`;
+   * `MarketStructure`;
+   * `MarketPhase`;
+   * balance/risk data, если нужно.
+6. Находит `StrategyStep` с `stepType = ENTRY` или `GRID_ENTRY`.
+7. Проверяет `StrategyCondition`.
+8. Если условия выполнены — вызывает `DealOpeningService`.
+
+Важно:
+
+> `EntryScannerJob` не создаёт order.
+>
+> Он создаёт только `Deal` через `DealOpeningService`.
+
+---
+
+# 26. Использование данных в StrategyConditionEvaluator
+
+`StrategyConditionEvaluator` может использовать готовые данные для проверки условий.
+
+Примеры:
+
+```text
+RANGE_BREAKOUT_CONFIRMED
+  -> использует MarketStructure + MarketPriceData
+
+TREND_CHANGED
+  -> использует IndicatorValue + MarketPhase
+
+PROFIT_PERCENTS_REACHED
+  -> использует Position.avgPrice + MarketPriceData
+
+LOSS_PERCENTS_REACHED
+  -> использует Position.avgPrice + MarketPriceData
+```
+
+Evaluator не считает индикаторы и не ищет структуру рынка сам.
+
+---
+
+# 27. Использование данных в StrategyActionCalculator
+
+`StrategyActionCalculator` использует готовые данные для расчёта параметров действия.
+
+Примеры:
+
+```text
+ATR_VALUE
+  -> AtrValue.atr
+  -> PriceCalculator считает SL = entry - 1.5 ATR
+
+RANGE_LOW / RANGE_HIGH
+  -> MarketStructure.levels
+  -> PriceCalculator считает grid levels
+
+MARK_PRICE / LAST_PRICE / BID / ASK
+  -> MarketPriceData
+  -> PriceCalculator считает reference или limit price
+
+POSITION_MARK_PRICE
+  -> Position snapshot
+  -> RiskCalculator оценивает риск
+```
+
+---
+
+# 28. Какие данные нужны для входа
+
+Минимальный набор для ENTRY conditions:
+
+* текущая цена `MarketPriceData`;
+* фаза рынка `MarketPhase`;
+* индикаторы сигнала `IndicatorValue`;
+* структура рынка `MarketStructure`;
+* баланс;
+* наличие активной сделки/позиции;
+* risk limits.
+
+Примеры условий:
+
+```text
+NO_ACTIVE_DEAL
+NO_OPEN_POSITION
+MARKET_PHASE_IS BULL_TREND
+EMA_FAST_ABOVE_EMA_SLOW
+RSI_ABOVE 50
+RANGE_BREAKOUT_CONFIRMED
+VOLUME_FILTER_PASSED
+ATR_ABOVE_MINIMUM
+```
+
+---
+
+# 29. Какие данные нужны для сопровождения сделки
+
+Во время `MANAGING` данные нужны для:
+
+* переноса SL;
+* trailing;
+* partial exit;
+* выхода по смене тренда;
+* grid management;
+* fail-safe условий.
+
+Примеры:
+
+```text
+PROFIT_PERCENTS_REACHED
+  -> current price + entry price
+
+TREND_CHANGED
+  -> MarketPhase + IndicatorValue
+
+PROTECTION_ADJUSTMENT
+  -> AtrValue + entry price + current price
+
+GRID_MANAGEMENT
+  -> MarketStructure rangeLow/rangeHigh + current price
+```
+
+---
+
+# 30. Идемпотентность расчётов
+
+Jobs должны быть идемпотентными.
+
+Правила:
+
+* считать по закрытым свечам;
+* не использовать future data;
+* сохранять результат с уникальностью по instrument + setting + candle/window timestamp;
+* при повторном запуске не создавать дубли;
+* иметь checkpoint по последнему рассчитанному timestamp;
+* если стратегия удалена, новые данные для неё не считать.
+
+Примеры уникальности:
+
+```text
+IndicatorValue:
+  UNIQUE(instrument_id, strategy_indicator_setting_id, candle_timestamp)
+
+MarketStructure:
+  UNIQUE(instrument_id, strategy_market_structure_setting_id, window_end_at)
+
+MarketPhase:
+  UNIQUE(instrument_id, strategy_market_phase_setting_id, candle_timestamp)
+```
+
+---
+
+# 31. Активация стратегии и готовность данных
+
+Перед активацией стратегии нужно проверить, что все нужные данные могут быть подготовлены.
+
+Если стратегия требует:
+
+```text
+StrategyIndicatorSetting
+StrategyMarketStructureSetting
+StrategyMarketPhaseSetting
+```
+
+то система должна проверить:
+
+* хватает ли свечной истории;
+* можно ли рассчитать индикаторы после warmup;
+* можно ли рассчитать структуру рынка;
+* можно ли рассчитать фазу рынка;
+* есть ли актуальные `InstrumentExternalRules`.
+
+Если нужных данных нет:
+
+```text
+стратегия не активируется
+или активируется только после backfill/warmup
+```
+
+Подробный механизм backfill можно оформить отдельной задачей реализации.
+
+---
+
+# 32. Главное правило
+
+```text
+IndicatorJob / MarketStructureJob / MarketPhaseJob
+  -> готовят данные
+
+EntryScannerJob
+  -> использует эти данные для входа
+
+StrategyConditionEvaluator
+  -> использует эти данные для условий сделки
+
+StrategyActionCalculator
+  -> использует эти данные для расчёта цены/размера/риска
+```
+
+Ни один из этих потребителей не должен сам считать индикаторы по свечам или искать структуру рынка по свечам.
