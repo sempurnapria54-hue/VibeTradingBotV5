@@ -2,24 +2,25 @@
 
 > Статус документа: актуальная версия strategy-layer.
 >
-> Эта дока описывает только модель стратегии: правила, условия и ожидаемые действия.
+> Эта дока описывает только модель стратегии: правила, условия, настройки рыночных данных и ожидаемые действия.
 >
 > Runtime-процессы вынесены в отдельные документы:
 >
 > * `01. Жизненный цикл сделки`
 > * `02. Сервисные команды`
 > * `03. Калькуляторы действий стратегии`
-> * `04. Расчёт индикаторов и рыночных snapshots`
+> * `04. Расчёт индикаторов и рыночных данных`
 > * `05. Аудит и история исполнения`
 
 ---
 
 # Главная идея
 
-* **Стратегия** хранит торговые правила, условия и ожидаемые действия.
+* **Стратегия** хранит торговые правила, условия, настройки расчёта рыночных данных и ожидаемые действия.
 * **FSM сделки** управляет runtime-сделкой и её этапами.
 * **Стратегия не хранит сервисные команды** и не пытается управлять runtime-сущностями напрямую.
 * Стратегия говорит **что** должно быть создано / изменено / отменено и **при каких условиях**.
+* Стратегия говорит, какие индикаторы, структуры рынка и фазы рынка должны быть заранее подготовлены.
 * Стейт-машина и orchestration-слой решают, **когда именно** интерпретировать эти правила.
 * `StrategyActionCalculator` рассчитывает runtime-параметры действия стратегии: цену, размер и риск.
 * `ServiceCommandFactory` превращает рассчитанное действие в атомарные `ServiceCommand`.
@@ -32,7 +33,78 @@
 
 ---
 
-# 1. Strategy
+# 1. Общие правила модели
+
+## 1.1. Стратегия immutable
+
+Стратегия создаётся как immutable-конфигурация.
+
+Если нужно изменить правила стратегии, создаётся новая стратегия, а не редактируется существующая.
+
+Это относится к:
+
+* `Strategy`;
+* `StrategyDetail`;
+* `StrategyMarketPhaseSetting`;
+* `StrategyIndicatorSetting`;
+* `StrategyMarketStructureSetting`;
+* `MarketPhaseParams`;
+* `IndicatorParams`;
+* `MarketStructureParams`;
+* `StrategyStep`;
+* `StrategyCondition`;
+* `StrategyConditionRule`;
+* `StrategyAction` и его подтипам.
+
+## 1.2. Все хранимые модели наследуются от Auditable
+
+Все классы, которые сохраняются в БД, должны наследоваться от `Auditable`.
+
+Это нужно для единого аудита технических дат создания и обновления.
+
+## 1.3. Жизненный цикл задаёт Strategy.Status
+
+У вложенных immutable-настроек не нужны отдельные статусы.
+
+Жизненный цикл всей стратегии задаёт `Strategy.Status`.
+
+Если стратегия `DELETED`, новые расчёты и новые сделки по ней не запускаются.
+
+Если стратегия `INACTIVE`, новые сделки по ней не создаются.
+
+Уже открытые сделки продолжают жить по pinned `StrategyDetail`, если отдельная политика остановки стратегии не говорит иначе.
+
+## 1.4. key нужен только у StrategyAction
+
+`key` нужен у `StrategyAction`, потому что через него работает `targetActionKey`.
+
+В settings `key` не используем:
+
+* `StrategyIndicatorSetting` — без `key`;
+* `StrategyMarketStructureSetting` — без `key`;
+* `StrategyMarketPhaseSetting` — без `key`.
+
+Связи между settings делаются объектными ссылками.
+
+## 1.5. Domain и Entity работают объектами
+
+В доменной модели и JPA Entity используем объектные связи.
+
+В БД это будет храниться через FK / join-table.
+
+Для загрузки стратегии целиком нужны отдельные repository-методы с `JOIN FETCH` или `@EntityGraph`.
+
+Подробности по runtime-загрузке стратегии и pinned `StrategyDetail` см. в документе:
+
+```text
+01. Жизненный цикл сделки
+```
+
+---
+
+# 2. Strategy
+
+`Strategy` — главный immutable-контейнер торговой стратегии.
 
 ```java
 public class Strategy extends Auditable {
@@ -58,69 +130,241 @@ public class Strategy extends Auditable {
     private String name;
 
     /**
-     * Версия append-only стратегии.
+     * Статус контейнера стратегии.
      *
-     * При изменении стратегия не редактируется,
-     * а создаётся новая версия.
+     * Статус стратегии управляет жизненным циклом всех вложенных immutable-настроек.
      */
-    private Integer version;
+    private Status status;
 
     /**
-     * Статус контейнера стратегии.
+     * Настройка расчёта рыночной фазы.
+     *
+     * Одна настройка описывает алгоритм классификации рынка,
+     * который может вернуть разные MarketPhase.Type:
+     * BULL_TREND, BEAR_TREND, RANGE, UNKNOWN.
      */
-    private StrategyStatus status;
+    private StrategyMarketPhaseSetting marketPhaseSetting;
 
     /**
      * Ровно одна detail на одну фазу рынка.
+     *
+     * EntryScannerJob выбирает detail по результату MarketPhaseJob:
+     * MarketPhase.Type -> StrategyDetail.marketPhaseType.
      */
     private List<StrategyDetail> details;
+
+    public enum Status {
+
+        /**
+         * Стратегия создана, но ещё не введена в активное использование.
+         */
+        CREATED,
+
+        /**
+         * Единственная активная стратегия инструмента.
+         *
+         * Новые сделки по инструменту могут создаваться только по активной стратегии.
+         */
+        ACTIVE,
+
+        /**
+         * Стратегия существует, но временно не участвует в создании новых сделок.
+         *
+         * Уже открытые сделки должны продолжать жить по pinned-версии StrategyDetail,
+         * если отдельная политика остановки стратегии не говорит иначе.
+         */
+        INACTIVE,
+
+        /**
+         * Логически удалённая стратегия.
+         *
+         * Новые сделки по ней не создаются.
+         * Для старых сделок поведение должно определяться отдельной политикой.
+         */
+        DELETED
+    }
 }
 ```
 
-## StrategyStatus
+## 2.1. Как передать настройки определения нескольких фаз рынка
+
+Отдельная сущность для нескольких phase profiles не нужна.
+
+Одна `StrategyMarketPhaseSetting` описывает алгоритм, который умеет классифицировать рынок в несколько фаз:
+
+```text
+StrategyMarketPhaseSetting
+  -> IndicatorSettings: EMA, MACD, ATR, Bollinger Bands
+  -> MarketStructureSettings: RANGE, UPTREND, DOWNTREND
+  -> MarketPhaseParams:
+       algorithmType
+       minTrendScore
+       minRangeScore
+       confirmationBars
+```
+
+`MarketPhaseJob` применяет эту настройку и сохраняет один актуальный результат:
+
+```text
+MarketPhase.Type = BULL_TREND | BEAR_TREND | RANGE | UNKNOWN
+```
+
+После этого `EntryScannerJob` выбирает detail:
+
+```text
+MarketPhase.Type
+  -> StrategyDetail.marketPhaseType
+```
+
+Инвариант:
+
+```text
+внутри одной Strategy должна быть не более одной StrategyDetail на один MarketPhase.Type
+```
+
+Подробности по `MarketPhaseJob`, хранению `MarketPhase` и freshness-проверкам см. в документе:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+```
+
+Подробности по тому, как `EntryScannerJob` выбирает `StrategyDetail`, см. в документе:
+
+```text
+01. Жизненный цикл сделки
+```
+
+---
+
+# 3. StrategyMarketPhaseSetting
+
+`StrategyMarketPhaseSetting` — настройка стратегии, по которой `MarketPhaseJob` считает фазу рынка.
+
+Живёт на уровне `Strategy`, потому что фаза рынка нужна **до выбора `StrategyDetail`**.
 
 ```java
-public enum StrategyStatus {
+public class StrategyMarketPhaseSetting extends Auditable {
 
     /**
-     * Стратегия создана, но ещё не введена в активное использование.
+     * Технический ID настройки.
      */
-    CREATED,
+    private Long id;
 
     /**
-     * Единственная активная стратегия инструмента.
+     * Таймфрейм, на котором считается фаза рынка.
+     */
+    private TimeFrame timeframe;
+
+    /**
+     * Immutable-параметры расчёта фазы рынка.
+     */
+    private MarketPhaseParams params;
+
+    /**
+     * Настройки индикаторов, которые нужны для расчёта фазы рынка.
      *
-     * Новые сделки по инструменту могут создаваться только по активной стратегии.
+     * Например:
+     * - EMA для определения направления тренда;
+     * - MACD для подтверждения импульса;
+     * - ATR для оценки волатильности;
+     * - Bollinger bandwidth для определения range / squeeze.
      */
-    ACTIVE,
+    private List<StrategyIndicatorSetting> indicatorSettings;
 
     /**
-     * Стратегия существует, но временно не участвует в создании новых сделок.
+     * Настройки структуры рынка, которые нужны для расчёта фазы рынка.
      *
-     * Уже открытые сделки должны продолжать жить по pinned-версии стратегии,
-     * если отдельная политика остановки стратегии не говорит иначе.
+     * Например:
+     * - RANGE для определения боковика;
+     * - UPTREND для подтверждения бычьей структуры;
+     * - DOWNTREND для подтверждения медвежьей структуры.
      */
-    INACTIVE,
+    private List<StrategyMarketStructureSetting> marketStructureSettings;
 
     /**
-     * Логически удалённая стратегия.
+     * Допустимый возраст последней рассчитанной фазы в свечах.
      *
-     * Новые сделки по ней не создаются.
-     * Для старых сделок поведение должно определяться отдельной политикой.
+     * Например:
+     * timeframe = ONE_HOUR
+     * maxAgeBars = 3
+     *
+     * Это значит, что EntryScannerJob может использовать MarketPhase,
+     * только если она рассчитана не старше трёх закрытых часовых свечей.
      */
-    DELETED
+    private Integer maxAgeBars;
 }
 ```
 
 ---
 
-# 2. StrategyDetail
+# 4. MarketPhaseParams
 
-В доменной модели и в JSON детали стратегии группируются по `Deal.Status`,
-потому что это хорошо совпадает с текущей FSM сделки.
+`MarketPhaseParams` — immutable-параметры алгоритма расчёта фазы рынка.
 
 ```java
-public class StrategyDetail {
+public class MarketPhaseParams extends Auditable {
+
+    /**
+     * Технический ID параметров.
+     */
+    private Long id;
+
+    /**
+     * Тип алгоритма расчёта фазы рынка.
+     */
+    private AlgorithmType algorithmType;
+
+    /**
+     * Минимальный score, чтобы признать рынок трендовым.
+     */
+    private BigDecimal minTrendScore;
+
+    /**
+     * Минимальный score, чтобы признать рынок диапазонным.
+     */
+    private BigDecimal minRangeScore;
+
+    /**
+     * Количество закрытых свечей для подтверждения смены фазы.
+     */
+    private Integer confirmationBars;
+
+    public enum AlgorithmType {
+
+        /**
+         * Фаза определяется только по структуре рынка.
+         */
+        STRUCTURE_ONLY,
+
+        /**
+         * Фаза определяется только по значениям индикаторов.
+         */
+        INDICATORS_ONLY,
+
+        /**
+         * Фаза определяется по структуре рынка и подтверждается индикаторами.
+         */
+        STRUCTURE_AND_INDICATORS
+    }
+}
+```
+
+Подробности по `MarketPhaseJob`, `MarketPhase` и freshness-проверкам см. в документе:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+```
+
+---
+
+# 5. StrategyDetail
+
+`StrategyDetail` — набор торговых правил для конкретной фазы рынка.
+
+В доменной модели и в JSON детали стратегии группируются по `Deal.Status`, потому что это хорошо совпадает с текущей FSM сделки.
+
+```java
+public class StrategyDetail extends Auditable {
 
     /**
      * Технический ID БД.
@@ -128,12 +372,9 @@ public class StrategyDetail {
     private Long id;
 
     /**
-     * Владелец detail.
-     */
-    private Long strategyId;
-
-    /**
      * Для какой фазы рынка работает detail.
+     *
+     * Фаза берётся из MarketPhase, рассчитанной по Strategy.marketPhaseSetting.
      */
     private MarketPhase.Type marketPhaseType;
 
@@ -164,6 +405,27 @@ public class StrategyDetail {
     private BigDecimal targetRiskRewardRatio;
 
     /**
+     * Настройки индикаторов, нужные уже после выбора StrategyDetail.
+     *
+     * Например:
+     * - ATR для SL;
+     * - RSI для ENTRY condition;
+     * - EMA для фильтра сопровождения;
+     * - Bollinger bandwidth для проверки волатильности.
+     */
+    private List<StrategyIndicatorSetting> indicatorSettings;
+
+    /**
+     * Настройки структуры рынка, нужные уже после выбора StrategyDetail.
+     *
+     * Например:
+     * - RANGE_LOW / RANGE_HIGH для grid;
+     * - SWING_LOW / SWING_HIGH для SL;
+     * - SUPPORT / RESISTANCE для условий входа и выхода.
+     */
+    private List<StrategyMarketStructureSetting> marketStructureSettings;
+
+    /**
      * Шаги стратегии, сгруппированные по статусу сделки.
      *
      * Для чтения это выглядит удобно:
@@ -175,7 +437,7 @@ public class StrategyDetail {
 }
 ```
 
-## PhaseEntryPolicy
+## 5.1. PhaseEntryPolicy
 
 ```java
 public enum PhaseEntryPolicy {
@@ -202,7 +464,7 @@ public enum PhaseEntryPolicy {
 }
 ```
 
-## Матрица допустимости
+## 5.2. Матрица допустимости
 
 * `BULL_TREND` -> `FOLLOW_PHASE | CONTRARIAN | NO_TRADE`
 * `BEAR_TREND` -> `FOLLOW_PHASE | CONTRARIAN | NO_TRADE`
@@ -211,7 +473,389 @@ public enum PhaseEntryPolicy {
 
 ---
 
-# 3. StrategyStep
+# 6. Волатильность в стратегии
+
+Отдельная сущность `VolatilitySetting` на первом этапе не нужна.
+
+Волатильность представляется через заранее рассчитанные индикаторы:
+
+* `ATR`;
+* `Bollinger Bands bandwidth`;
+* при необходимости — другие future-индикаторы волатильности.
+
+Если стратегия использует волатильность для расчёта фазы рынка, это описывается через:
+
+```text
+StrategyMarketPhaseSetting.indicatorSettings
+  -> StrategyIndicatorSetting(indicatorType = ATR, destiny = MARKET_PHASE)
+  -> StrategyIndicatorSetting(indicatorType = BOLLINGER_BANDS, destiny = MARKET_PHASE)
+```
+
+Если стратегия использует волатильность после выбора `StrategyDetail`, это описывается через:
+
+```text
+StrategyDetail.indicatorSettings
+  -> StrategyIndicatorSetting(indicatorType = ATR, destiny = ACTION_PRICE / PROTECTION / ENTRY_CONDITION)
+```
+
+Калькулятор не должен считать волатильность по свечам в runtime.
+
+Он должен читать готовые `IndicatorValue` через `IndicatorService`.
+
+Подробности по `IndicatorJob`, `IndicatorValue`, warmup и freshness см. в документе:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+```
+
+Если нужно учитывать текущий spread / bid / ask, это не волатильность в смысле индикатора.
+
+Это runtime-цена из `MarketPriceData`, которую собирает `StrategyActionCalculator` перед расчётом.
+
+Подробности по `MarketPriceData` и `CalculationContext` см. в документе:
+
+```text
+03. Калькуляторы действий стратегии
+```
+
+---
+
+# 7. StrategyIndicatorSetting
+
+`StrategyIndicatorSetting` — настройка стратегии для расчёта нужных `IndicatorValue`.
+
+Такая настройка может использоваться:
+
+* внутри `StrategyMarketPhaseSetting` — если индикатор нужен для расчёта фазы;
+* внутри `StrategyDetail` — если индикатор нужен после выбора детали.
+
+```java
+public class StrategyIndicatorSetting extends Auditable {
+
+    /**
+     * Технический ID настройки.
+     */
+    private Long id;
+
+    /**
+     * Таймфрейм индикатора.
+     */
+    private TimeFrame timeframe;
+
+    /**
+     * Тип индикатора.
+     */
+    private IndicatorValue.Type indicatorType;
+
+    /**
+     * Immutable-параметры индикатора.
+     */
+    private IndicatorParams params;
+
+    /**
+     * Назначение настройки.
+     *
+     * Отвечает на вопрос: для чего стратегии нужен этот индикатор.
+     */
+    private Destiny destiny;
+
+    /**
+     * Допустимый возраст последнего значения в свечах.
+     */
+    private Integer maxAgeBars;
+
+    public enum Destiny {
+
+        /**
+         * Индикатор нужен для расчёта MarketPhase.
+         */
+        MARKET_PHASE,
+
+        /**
+         * Индикатор нужен для условия входа.
+         */
+        ENTRY_CONDITION,
+
+        /**
+         * Индикатор нужен для расчёта цены action.
+         *
+         * Например ATR для SL.
+         */
+        ACTION_PRICE,
+
+        /**
+         * Индикатор нужен для расчёта защиты.
+         */
+        PROTECTION,
+
+        /**
+         * Индикатор нужен для условия выхода.
+         */
+        EXIT_CONDITION
+    }
+}
+```
+
+---
+
+# 8. IndicatorParams
+
+`IndicatorParams` — immutable-параметры расчёта индикатора.
+
+```java
+public abstract class IndicatorParams extends Auditable {
+
+    /**
+     * Технический ID параметров.
+     */
+    private Long id;
+
+    /**
+     * Тип индикатора.
+     */
+    private IndicatorValue.Type indicatorType;
+}
+```
+
+Примеры наследников:
+
+```java
+public class AtrParams extends IndicatorParams {
+
+    /**
+     * Период ATR.
+     */
+    private Integer period;
+}
+```
+
+```java
+public class EmaParams extends IndicatorParams {
+
+    /**
+     * Период EMA.
+     */
+    private Integer period;
+}
+```
+
+```java
+public class RsiParams extends IndicatorParams {
+
+    /**
+     * Период RSI.
+     */
+    private Integer period;
+}
+```
+
+```java
+public class MacdParams extends IndicatorParams {
+
+    /**
+     * Быстрый период MACD.
+     */
+    private Integer fastPeriod;
+
+    /**
+     * Медленный период MACD.
+     */
+    private Integer slowPeriod;
+
+    /**
+     * Период signal line.
+     */
+    private Integer signalPeriod;
+}
+```
+
+```java
+public class BollingerBandsParams extends IndicatorParams {
+
+    /**
+     * Период Bollinger Bands.
+     */
+    private Integer period;
+
+    /**
+     * Множитель стандартного отклонения.
+     */
+    private BigDecimal deviationMultiplier;
+}
+```
+
+```java
+public class StochasticParams extends IndicatorParams {
+
+    /**
+     * Период %K.
+     */
+    private Integer kPeriod;
+
+    /**
+     * Период %D.
+     */
+    private Integer dPeriod;
+
+    /**
+     * Сглаживание.
+     */
+    private Integer smoothPeriod;
+}
+```
+
+```java
+public class ObvParams extends IndicatorParams {
+
+    /**
+     * Пока дополнительных параметров нет.
+     */
+    private Boolean enabled;
+}
+```
+
+---
+
+# 9. StrategyMarketStructureSetting
+
+`StrategyMarketStructureSetting` — настройка стратегии для расчёта нужной структуры рынка.
+
+Такая настройка может использоваться:
+
+* внутри `StrategyMarketPhaseSetting` — если структура нужна для расчёта фазы;
+* внутри `StrategyDetail` — если структура нужна после выбора детали.
+
+```java
+public class StrategyMarketStructureSetting extends Auditable {
+
+    /**
+     * Технический ID настройки.
+     */
+    private Long id;
+
+    /**
+     * Таймфрейм, на котором должна рассчитываться структура рынка.
+     */
+    private TimeFrame timeframe;
+
+    /**
+     * Тип структуры рынка, которую нужно подготовить.
+     */
+    private MarketStructure.Type structureType;
+
+    /**
+     * Immutable-параметры расчёта структуры рынка.
+     */
+    private MarketStructureParams params;
+
+    /**
+     * Назначение настройки.
+     *
+     * Отвечает на вопрос: для чего стратегии нужна эта структура рынка.
+     */
+    private Destiny destiny;
+
+    /**
+     * Допустимый возраст последней структуры в свечах.
+     */
+    private Integer maxAgeBars;
+
+    public enum Destiny {
+
+        /**
+         * Структура нужна для расчёта MarketPhase.
+         */
+        MARKET_PHASE,
+
+        /**
+         * Структура нужна для проверки условий входа.
+         */
+        ENTRY_CONDITION,
+
+        /**
+         * Структура нужна для расчёта цены action.
+         *
+         * Например grid от RANGE_LOW / RANGE_HIGH.
+         */
+        ACTION_PRICE,
+
+        /**
+         * Структура нужна для расчёта защиты.
+         *
+         * Например SL за SWING_LOW / SWING_HIGH.
+         */
+        PROTECTION,
+
+        /**
+         * Структура нужна для условий выхода.
+         */
+        EXIT_CONDITION
+    }
+}
+```
+
+---
+
+# 10. MarketStructureParams
+
+`MarketStructureParams` — immutable-параметры расчёта структуры рынка.
+
+```java
+public class MarketStructureParams extends Auditable {
+
+    /**
+     * Технический ID параметров.
+     */
+    private Long id;
+
+    /**
+     * Размер окна свечей для анализа.
+     */
+    private Integer lookbackBars;
+
+    /**
+     * Минимальное количество касаний уровня.
+     */
+    private Integer minTouches;
+
+    /**
+     * Минимальная ширина range в процентах.
+     */
+    private BigDecimal minRangeWidthPercents;
+
+    /**
+     * Максимальная ширина range в процентах.
+     */
+    private BigDecimal maxRangeWidthPercents;
+
+    /**
+     * Буфер подтверждения пробоя.
+     *
+     * Например 15 = 15% от ширины диапазона.
+     */
+    private BigDecimal breakoutBufferPercents;
+
+    /**
+     * Количество закрытых свечей для подтверждения пробоя.
+     */
+    private Integer breakoutConfirmationBars;
+
+    /**
+     * Окно для поиска swing high / swing low.
+     */
+    private Integer swingLookbackBars;
+}
+```
+
+Подробности по `MarketStructureJob`, `MarketStructure` и `MarketPriceLevel` см. в документе:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+```
+
+---
+
+# 11. StrategyStep
 
 Один `StrategyStep` =
 
@@ -219,7 +863,12 @@ public enum PhaseEntryPolicy {
 * пакет действий, который нужно выполнить целиком, если условие истинно.
 
 ```java
-public class StrategyStep {
+public class StrategyStep extends Auditable {
+
+    /**
+     * Технический ID шага.
+     */
+    private Long id;
 
     /**
      * Бизнес-смысл шага.
@@ -239,7 +888,7 @@ public class StrategyStep {
 }
 ```
 
-## StrategyStepType
+## 11.1. StrategyStepType
 
 ```java
 public enum StrategyStepType {
@@ -302,21 +951,20 @@ public enum StrategyStepType {
 
 ---
 
-# 4. StrategyCondition
+# 12. StrategyCondition
 
 `StrategyCondition` — это набор rules.
+
 Все rules внутри одного condition должны быть истинны.
 
-## Порядок проверки rules
+## 12.1. Порядок проверки rules
 
-Если нужен детерминированный порядок проверки rules,
-то он задаётся полем `level` у `StrategyConditionRule`.
+Если нужен детерминированный порядок проверки rules, то он задаётся полем `level` у `StrategyConditionRule`.
 
-Это **не** глобальный порядок шагов стратегии,
-а только локальный порядок проверки правил внутри одного condition.
+Это **не** глобальный порядок шагов стратегии, а только локальный порядок проверки правил внутри одного condition.
 
 ```java
-public class StrategyCondition {
+public class StrategyCondition extends Auditable {
 
     /**
      * Rules проверяются по level ASC.
@@ -325,10 +973,10 @@ public class StrategyCondition {
 }
 ```
 
-## StrategyConditionRule
+## 12.2. StrategyConditionRule
 
 ```java
-public class StrategyConditionRule {
+public class StrategyConditionRule extends Auditable {
 
     /**
      * Порядок проверки правила внутри condition.
@@ -349,12 +997,9 @@ public class StrategyConditionRule {
     /**
      * Таймфрейм, на котором проверяется правило.
      *
-     * Примеры:
-     * 1m, 3m, 5m, 15m, 1H, 4H.
-     *
      * Если правило не зависит от таймфрейма, поле может быть null.
      */
-    private String timeframe;
+    private TimeFrame timeframe;
 
     /**
      * Источник данных для левой части условия.
@@ -391,6 +1036,28 @@ public class StrategyConditionRule {
     private StrategyConditionOperand rightOperand;
 
     /**
+     * Если rule использует конкретную настройку индикатора,
+     * то ссылка хранится объектом.
+     *
+     * Примеры:
+     * - RSI для INDICATOR_COMPARE;
+     * - EMA для CROSSOVER;
+     * - ATR для фильтра волатильности.
+     */
+    private StrategyIndicatorSetting indicatorSetting;
+
+    /**
+     * Если rule использует конкретную структуру рынка,
+     * то ссылка хранится объектом.
+     *
+     * Примеры:
+     * - RANGE_HIGH для breakout;
+     * - RANGE_LOW для grid-entry;
+     * - SWING_LOW / SWING_HIGH для условий защиты.
+     */
+    private StrategyMarketStructureSetting marketStructureSetting;
+
+    /**
      * Универсальный процентный параметр.
      *
      * Используется только если ruleType этого требует.
@@ -400,23 +1067,12 @@ public class StrategyConditionRule {
      * LOSS_PERCENTS_REACHED = 0.5
      */
     private BigDecimal percents;
-
-    /**
-     * Дополнительные параметры правила.
-     *
-     * Примеры:
-     * periods,
-     * confirmationBars,
-     * candleShift,
-     * threshold,
-     * expectedDirection,
-     * paramsVersion.
-     */
-    private JsonNode params;
 }
 ```
 
-## StrategyConditionRuleType
+---
+
+# 13. StrategyConditionRuleType
 
 ```java
 public enum StrategyConditionRuleType {
@@ -531,7 +1187,9 @@ public enum StrategyConditionRuleType {
 }
 ```
 
-## StrategyConditionSourceType
+---
+
+# 14. StrategyConditionSourceType
 
 ```java
 public enum StrategyConditionSourceType {
@@ -593,7 +1251,9 @@ public enum StrategyConditionSourceType {
 }
 ```
 
-## StrategyConditionOperator
+---
+
+# 15. StrategyConditionOperator
 
 ```java
 public enum StrategyConditionOperator {
@@ -670,10 +1330,12 @@ public enum StrategyConditionOperator {
 }
 ```
 
-## StrategyConditionOperand
+---
+
+# 16. StrategyConditionOperand
 
 ```java
-public class StrategyConditionOperand {
+public class StrategyConditionOperand extends Auditable {
 
     /**
      * Источник данных операнда.
@@ -714,17 +1376,12 @@ public class StrategyConditionOperand {
      * Строковое значение, если операнд — строка или enum.
      */
     private String stringValue;
-
-    /**
-     * Дополнительные параметры операнда.
-     */
-    private JsonNode params;
 }
 ```
 
 ---
 
-# 5. StrategyAction
+# 17. StrategyAction
 
 Действия делаются типизированными.
 
@@ -751,16 +1408,22 @@ public interface StrategyAction {
 >
 > Runtime-сущность, созданная или изменённая по этому action, связывается через `DealActionState`.
 
+Подробности по `DealActionState` и `ServiceCommand` см. в документе:
+
+```text
+02. Сервисные команды
+```
+
 ---
 
-# 6. StrategyOrderAction
+# 18. StrategyOrderAction
 
 Обычный ордер.
 
 Attached protection встроена внутрь order-action.
 
 ```java
-public class StrategyOrderAction implements StrategyAction {
+public class StrategyOrderAction extends Auditable implements StrategyAction {
 
     /**
      * Стабильный ключ action внутри StrategyDetail.
@@ -844,7 +1507,9 @@ public class StrategyOrderAction implements StrategyAction {
 }
 ```
 
-## StrategyTradeDirection
+---
+
+# 19. StrategyTradeDirection
 
 ```java
 public enum StrategyTradeDirection {
@@ -885,13 +1550,12 @@ public enum StrategyTradeDirection {
 
 ---
 
-# 7. StrategyPricePlacement
+# 20. StrategyPricePlacement
 
-Если мы отказались от отдельного `gridSettings`,
-то параметры позиционирования цены grid-ордеров должны жить в `StrategyOrderAction`.
+Если мы отказались от отдельного `gridSettings`, то параметры позиционирования цены grid-ордеров должны жить в `StrategyOrderAction`.
 
 ```java
-public class StrategyPricePlacement {
+public class StrategyPricePlacement extends Auditable {
 
     /**
      * От какой базы считаем цену.
@@ -909,9 +1573,24 @@ public class StrategyPricePlacement {
      * BEST_ASK_PRICE,
      * MID_PRICE.
      *
-     * Для RANGE_LOW / RANGE_HIGH / ENTRY_PRICE обычно null.
+     * Для RANGE_LOW / RANGE_HIGH / SWING_LOW / SWING_HIGH / ENTRY_PRICE обычно null.
      */
     private StrategyPriceSource priceSource;
+
+    /**
+     * Настройка структуры рынка, если baseType берётся из MarketStructure.
+     *
+     * Обязательна для:
+     * RANGE_LOW,
+     * RANGE_HIGH,
+     * SWING_LOW,
+     * SWING_HIGH,
+     * SUPPORT,
+     * RESISTANCE.
+     *
+     * Для ENTRY_PRICE и MARKET_PRICE обычно null.
+     */
+    private StrategyMarketStructureSetting marketStructureSetting;
 
     /**
      * Куда смещаемся относительно базы.
@@ -928,7 +1607,7 @@ public class StrategyPricePlacement {
 }
 ```
 
-## StrategyPriceBaseType
+## 20.1. StrategyPriceBaseType
 
 ```java
 public enum StrategyPriceBaseType {
@@ -958,6 +1637,46 @@ public enum StrategyPriceBaseType {
     RANGE_HIGH,
 
     /**
+     * Последний значимый swing low.
+     *
+     * Используется как структурный уровень,
+     * от которого можно считать цену входа, stop-loss или защитный буфер.
+     *
+     * Примеры:
+     * - поставить LONG stop-loss ниже swing low;
+     * - поставить отложенный вход около swing low;
+     * - проверить, что цена не пробила локальную структуру.
+     */
+    SWING_LOW,
+
+    /**
+     * Последний значимый swing high.
+     *
+     * Используется как структурный уровень,
+     * от которого можно считать цену входа, stop-loss или защитный буфер.
+     *
+     * Примеры:
+     * - поставить SHORT stop-loss выше swing high;
+     * - поставить отложенный вход около swing high;
+     * - проверить, что цена не пробила локальную структуру.
+     */
+    SWING_HIGH,
+
+    /**
+     * Уровень поддержки.
+     *
+     * Используется как опорный уровень для входа, выхода или фильтра.
+     */
+    SUPPORT,
+
+    /**
+     * Уровень сопротивления.
+     *
+     * Используется как опорный уровень для входа, выхода или фильтра.
+     */
+    RESISTANCE,
+
+    /**
      * Цена входа в позицию.
      *
      * Используется как база, когда цену нового действия
@@ -981,7 +1700,7 @@ public enum StrategyPriceBaseType {
 }
 ```
 
-## StrategyPriceSource
+## 20.2. StrategyPriceSource
 
 ```java
 public enum StrategyPriceSource {
@@ -1018,7 +1737,7 @@ public enum StrategyPriceSource {
 }
 ```
 
-## StrategyPriceOffsetSide
+## 20.3. StrategyPriceOffsetSide
 
 ```java
 public enum StrategyPriceOffsetSide {
@@ -1051,7 +1770,7 @@ public enum StrategyPriceOffsetSide {
 }
 ```
 
-### Почему это отдельные модели
+## 20.4. Почему это отдельные модели
 
 * `StrategyTradeDirection` отвечает за **торговое направление**: `LONG / SHORT`.
 * `StrategyPriceOffsetSide` отвечает за **геометрию смещения цены**: `ABOVE / BELOW`.
@@ -1060,12 +1779,18 @@ public enum StrategyPriceOffsetSide {
 
 Это разные смыслы, поэтому их не надо смешивать.
 
+Подробности по расчёту цены см. в документе:
+
+```text
+03. Калькуляторы действий стратегии
+```
+
 ---
 
-# 8. StrategyAttachedProtectionSettings
+# 21. StrategyAttachedProtectionSettings
 
 ```java
-public class StrategyAttachedProtectionSettings {
+public class StrategyAttachedProtectionSettings extends Auditable {
 
     /**
      * Сейчас по домену это фактически ATTACHED_STOP_LOSS.
@@ -1081,7 +1806,7 @@ public class StrategyAttachedProtectionSettings {
 
 ---
 
-# 9. StrategyAlgoOrderAction
+# 22. StrategyAlgoOrderAction
 
 Standalone algo-order.
 
@@ -1098,7 +1823,7 @@ Standalone algo-order.
 * exit by efficiency — это отдельный exit-step через condition.
 
 ```java
-public class StrategyAlgoOrderAction implements StrategyAction {
+public class StrategyAlgoOrderAction extends Auditable implements StrategyAction {
 
     /**
      * Стабильный ключ action внутри StrategyDetail.
@@ -1189,12 +1914,12 @@ public class StrategyAlgoOrderAction implements StrategyAction {
 
 ---
 
-# 10. StrategyPositionAction
+# 23. StrategyPositionAction
 
 Действия над позицией.
 
 ```java
-public class StrategyPositionAction implements StrategyAction {
+public class StrategyPositionAction extends Auditable implements StrategyAction {
 
     /**
      * Стабильный ключ action внутри StrategyDetail.
@@ -1225,7 +1950,7 @@ public class StrategyPositionAction implements StrategyAction {
 
 ---
 
-# 11. Общий action type
+# 24. Общий action type
 
 По договорённости оставляем один общий enum для всех действий.
 
@@ -1291,7 +2016,7 @@ public enum StrategyActionType {
 
 ---
 
-# 12. Семантика общего StrategyActionType
+# 25. Семантика общего StrategyActionType
 
 Важно явно зафиксировать допустимые значения по подтипам action:
 
@@ -1303,7 +2028,7 @@ public enum StrategyActionType {
 
 ---
 
-# 13. Семантика actionKind в JSON
+# 26. Семантика actionKind в JSON
 
 В JSON-примерах может использоваться поле `actionKind` со значениями:
 
@@ -1311,14 +2036,13 @@ public enum StrategyActionType {
 * `ALGO_ORDER`
 * `POSITION`
 
-Это не отдельное поле доменной модели, а **JSON discriminator**,
-который нужен только для сериализации / десериализации и выбора конкретного подтипа `StrategyAction`.
+Это не отдельное поле доменной модели, а **JSON discriminator**, который нужен только для сериализации / десериализации и выбора конкретного подтипа `StrategyAction`.
 
 ---
 
-# 14. Семантика key и targetActionKey
+# 27. Семантика key и targetActionKey
 
-## 14.1. key
+## 27.1. key
 
 `key` — стабильный ключ action внутри одной `StrategyDetail`.
 
@@ -1344,7 +2068,7 @@ public enum StrategyActionType {
 * резолва `targetActionKey` во внутреннюю ссылку на target action;
 * читаемого debug/timeline.
 
-## 14.2. targetActionKey
+## 27.2. targetActionKey
 
 `targetActionKey` — это ключ action, который создал runtime-сущность, над которой нужно выполнить `AMEND` или `CANCEL`.
 
@@ -1380,7 +2104,7 @@ AMEND / CANCEL action
   -> создаёт ServiceCommand с конкретным orderId / algoOrderId
 ```
 
-## 14.3. Валидация
+## 27.3. Валидация
 
 При создании стратегии нужно проверить:
 
@@ -1393,9 +2117,15 @@ AMEND / CANCEL action
 7. `ALGO_ORDER AMEND` / `ALGO_ORDER CANCEL` должны ссылаться на `ALGO_ORDER CREATE`.
 8. Нельзя ссылаться на action из другой `StrategyDetail`.
 
+Подробности по runtime-связи `StrategyAction -> DealActionState -> RuntimeTarget -> ServiceCommand` см. в документе:
+
+```text
+02. Сервисные команды
+```
+
 ---
 
-# 15. Семантика placement для StrategyOrderAction
+# 28. Семантика placement для StrategyOrderAction
 
 `placement` используется так:
 
@@ -1410,7 +2140,7 @@ AMEND / CANCEL action
 
 ---
 
-# 16. Семантика OCO_FULL в StrategyAlgoOrderAction
+# 29. Семантика OCO_FULL в StrategyAlgoOrderAction
 
 Если `conditionType = OCO_FULL`, то:
 
@@ -1426,12 +2156,12 @@ closeFractionPercents = 100
 
 ---
 
-# 17. StopLossSettings
+# 30. StopLossSettings
 
 `triggerPriceType` обязателен, потому что runtime trigger-based algo conditions реально завязаны на `TriggerPriceType`.
 
 ```java
-public class StopLossSettings {
+public class StopLossSettings extends Auditable {
 
     /**
      * Как считать stop-loss.
@@ -1452,10 +2182,28 @@ public class StopLossSettings {
      * Тип trigger-цены на бирже: LAST / INDEX / MARK.
      */
     private TriggerPriceType triggerPriceType;
+
+    /**
+     * Настройка индикатора, если stop-loss считается от индикатора.
+     *
+     * Например:
+     * - ATR для ATR_PERCENT.
+     */
+    private StrategyIndicatorSetting indicatorSetting;
+
+    /**
+     * Настройка структуры рынка, если stop-loss считается от уровня структуры.
+     *
+     * Например:
+     * - SWING_LOW / SWING_HIGH;
+     * - RANGE_LOW / RANGE_HIGH;
+     * - SUPPORT / RESISTANCE.
+     */
+    private StrategyMarketStructureSetting marketStructureSetting;
 }
 ```
 
-## StopLossCalculationType
+## 30.1. StopLossCalculationType
 
 ```java
 public enum StopLossCalculationType {
@@ -1492,12 +2240,12 @@ public enum StopLossCalculationType {
 
 ---
 
-# 18. TrailingSettings
+# 31. TrailingSettings
 
 `TrailingSettings` остаётся, потому что trailing реально выражается как отдельная форма algo condition.
 
 ```java
-public class TrailingSettings {
+public class TrailingSettings extends Auditable {
 
     /**
      * После какого профита можно включить trailing.
@@ -1522,7 +2270,7 @@ public class TrailingSettings {
 
 ---
 
-# 19. Связь стратегии с DealActionState
+# 32. Связь стратегии с DealActionState
 
 Стратегия не хранит runtime-состояние выполнения.
 
@@ -1560,12 +2308,17 @@ UNIQUE(deal_id, strategy_action_id)
 >
 > Runtime работает через `strategyActionId`, а не через `strategyActionKey`.
 
+Подробности см. в документе:
+
+```text
+02. Сервисные команды
+```
+
 ---
 
-# 20. Связь стратегии с калькуляторами
+# 33. Связь стратегии с калькуляторами
 
-Стратегия хранит не готовые цены, размеры и риск,
-а правила их расчёта.
+Стратегия хранит не готовые цены, размеры и риск, а правила их расчёта.
 
 Runtime-расчёт делает:
 
@@ -1594,19 +2347,25 @@ StrategyDetail.riskPerTradePercent / maxLeverage
 > StrategyActionCalculator собирает свежий CalculationContext в runtime,
 > потому что цена и рыночные данные могут измениться между сбором DealContext и выполнением команды.
 
+Подробности по `StrategyActionCalculator`, `CalculationContext`, `PriceCalculator`, `SizeCalculator`, `RiskCalculator`, `MarketPriceData` и `InstrumentExternalRules` см. в документе:
+
+```text
+03. Калькуляторы действий стратегии
+```
+
 ---
 
-# 21. Связь стратегии с индикаторами и snapshots
+# 34. Связь стратегии с расчётными job'ами
 
-Стратегия может ссылаться на условия, которые проверяются по индикаторам и market snapshots.
+Стратегия может ссылаться на условия, которые проверяются по индикаторам, структуре рынка и фазе рынка.
 
-Но стратегия сама не считает индикаторы.
+Но стратегия сама не считает индикаторы, структуру и фазу.
 
-Индикаторы и snapshots готовят:
+Данные готовят:
 
-* `IndicatorJob`
-* `MarketStructureJob`
-* `MarketPhaseJob`
+* `IndicatorJob`;
+* `MarketStructureJob`;
+* `MarketPhaseJob`.
 
 Их используют:
 
@@ -1614,9 +2373,157 @@ StrategyDetail.riskPerTradePercent / maxLeverage
 * `StrategyConditionEvaluator` — для проверки условий step;
 * `StrategyActionCalculator` — для расчёта цены, размера и риска.
 
+Общая связка:
+
+```text
+Strategy
+  -> StrategyMarketPhaseSetting
+     -> StrategyIndicatorSetting
+     -> StrategyMarketStructureSetting
+
+StrategyDetail
+  -> StrategyIndicatorSetting
+  -> StrategyMarketStructureSetting
+
+IndicatorJob
+  -> считает IndicatorValue
+
+MarketStructureJob
+  -> считает MarketStructure / MarketPriceLevel
+
+MarketPhaseJob
+  -> считает MarketPhase
+```
+
+Подробности по `IndicatorJob`, `IndicatorValue`, `MarketStructureJob`, `MarketStructure`, `MarketPriceLevel`, `MarketPhaseJob`, `MarketPhase` и freshness-проверкам см. в документе:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+```
+
+Подробности по тому, как `EntryScannerJob` использует `MarketPhase` для выбора `StrategyDetail`, см. в документе:
+
+```text
+01. Жизненный цикл сделки
+```
+
 ---
 
-# 22. JSON-примеры
+# 35. TimeFrame
+
+`TimeFrame` — чистый доменный enum.
+
+OKX-строки в нём не храним.
+
+```java
+public enum TimeFrame {
+
+    ONE_MINUTE,
+    THREE_MINUTES,
+    FIVE_MINUTES,
+    FIFTEEN_MINUTES,
+    ONE_HOUR,
+    TWO_HOURS,
+    FOUR_HOURS,
+    ONE_DAY
+}
+```
+
+Маппинг OKX-строк живёт только в `TimeFrameMapper`:
+
+```java
+public class TimeFrameMapper {
+
+    /**
+     * Доменный TimeFrame -> строка OKX client/API.
+     */
+    public String domainToOkxClient(TimeFrame timeframe) {
+        // TimeFrame.ONE_HOUR -> "1H"
+    }
+
+    /**
+     * Строка OKX client/API -> доменный TimeFrame.
+     */
+    public TimeFrame okxClientToDomain(String externalCode) {
+        // "1H" -> TimeFrame.ONE_HOUR
+    }
+}
+```
+
+Правила:
+
+```text
+маппинг строгий
+без lowerCase / upperCase
+TimeFrameResolver пока не нужен
+```
+
+Подробности по загрузке свечей и OKX timeframe см. в документе:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+```
+
+---
+
+# 36. Загрузка стратегии из БД
+
+Связи в entity-моделях объектные, но по умолчанию должны быть `LAZY`.
+
+Для рабочих сценариев нужны отдельные repository-методы.
+
+## 36.1. Загрузка стратегии целиком
+
+Пример через `@EntityGraph`:
+
+```java
+@EntityGraph(attributePaths = {
+        "marketPhaseSetting",
+        "marketPhaseSetting.params",
+        "marketPhaseSetting.indicatorSettings",
+        "marketPhaseSetting.indicatorSettings.params",
+        "marketPhaseSetting.marketStructureSettings",
+        "marketPhaseSetting.marketStructureSettings.params",
+        "details",
+        "details.indicatorSettings",
+        "details.indicatorSettings.params",
+        "details.marketStructureSettings",
+        "details.marketStructureSettings.params",
+        "details.stepsByStatus",
+        "details.stepsByStatus.condition",
+        "details.stepsByStatus.condition.rules",
+        "details.stepsByStatus.actions"
+})
+Optional<StrategyEntity> findFullById(Long id);
+```
+
+## 36.2. Загрузка отдельной StrategyDetail целиком
+
+Отдельный метод нужен, потому что `Deal` хранит pinned `StrategyDetail`.
+
+```java
+@EntityGraph(attributePaths = {
+        "indicatorSettings",
+        "indicatorSettings.params",
+        "marketStructureSettings",
+        "marketStructureSettings.params",
+        "stepsByStatus",
+        "stepsByStatus.condition",
+        "stepsByStatus.condition.rules",
+        "stepsByStatus.actions"
+})
+Optional<StrategyDetailEntity> findFullById(Long id);
+```
+
+Подробности по pinned `StrategyDetail` см. в документе:
+
+```text
+01. Жизненный цикл сделки
+```
+
+---
+
+# 37. JSON-примеры
 
 JSON-примеры можно хранить в отдельном файле:
 
@@ -1624,32 +2531,120 @@ JSON-примеры можно хранить в отдельном файле:
 Strategy API examples.md
 ```
 
-Это сделано, чтобы основной документ оставался компактным и был сфокусирован именно на модели.
+Это сделано, чтобы основной документ оставался сфокусирован именно на модели.
 
 При обновлении JSON-примеров нужно учитывать:
 
 * у каждого `StrategyAction` должен быть `key`;
 * для `AMEND` / `CANCEL` у `ORDER` / `ALGO_ORDER` должен быть `targetActionKey`;
 * `targetActionKey` должен ссылаться на `action.key` в той же `StrategyDetail`;
-* `StrategyPricePlacement.priceSource` вместо старого `marketPriceType`;
-* `StopLossSettings.calculationType` как enum `StopLossCalculationType`;
-* расширенную модель `StrategyConditionRule`;
-* отсутствие `strategyActionId` в runtime-сущностях;
-* использование `DealActionState.strategyActionId + RuntimeTarget` для runtime-связи action -> entity.
+* settings не используют `key`;
+* одна `StrategyMarketPhaseSetting` описывает алгоритм классификации рынка во все поддерживаемые `MarketPhase.Type`;
+* `Strategy.details` содержит максимум одну `StrategyDetail` на один `MarketPhase.Type`;
+* `StrategyPricePlacement.priceSource` используется только для `MARKET_PRICE`;
+* `StrategyPricePlacement.marketStructureSetting` используется для `RANGE_LOW`, `RANGE_HIGH`, `SWING_LOW`, `SWING_HIGH`, `SUPPORT`, `RESISTANCE`;
+* `StopLossSettings.calculationType` — enum `StopLossCalculationType`;
+* для `ATR_PERCENT` в `StopLossSettings` нужна `StrategyIndicatorSetting` с ATR;
+* для `MARKET_STRUCTURE_BUFFER_PERCENT` нужна `StrategyMarketStructureSetting`;
+* `Order`, `AlgoOrder`, `Position` не хранят `strategyActionId`;
+* runtime-связь action -> entity строится через `DealActionState.strategyActionId + RuntimeTarget`.
 
 ---
 
-# 23. Что изменилось относительно прошлой версии
+# 38. Связь с другими документами
 
-1. `PriceResolver` переименован концептуально в `PriceCalculator`.
-2. Добавлен `StrategyActionCalculator` как оркестратор `PriceCalculator`, `SizeCalculator`, `RiskCalculator`.
-3. `StrategyConditionRule` расширен, чтобы описывать ENTRY-условия по индикаторам, цене, фазе рынка и структуре.
-4. `StrategyPricePlacement.marketPriceType` заменён на `StrategyPriceSource priceSource`.
-5. `StopLossSettings.calculationType` стал enum `StopLossCalculationType`, а не строкой.
-6. Уточнено, что `level` живёт в стратегии и не переносится в `Order` / `AlgoOrder` как runtime-role.
-7. Уточнено, что `Order`, `AlgoOrder`, `Position` не хранят `strategyActionId`.
-8. Добавлен обязательный `StrategyAction.key`.
-9. Добавлен `targetActionKey` для `AMEND` / `CANCEL` у `ORDER` / `ALGO_ORDER`.
-10. Уточнено, что `targetActionKey` при сохранении стратегии валидируется и резолвится во внутреннюю ссылку на target action.
-11. Уточнено, что runtime-связь action -> entity строится через `DealActionState.strategyActionId + RuntimeTarget`.
-12. Добавлены ссылки на новые процессные документы.
+## 38.1. Жизненный цикл сделки
+
+Документ:
+
+```text
+01. Жизненный цикл сделки
+```
+
+Там описано:
+
+* `EntryScannerJob`;
+* выбор `StrategyDetail`;
+* создание `Deal`;
+* `DealContext`;
+* FSM статусы сделки;
+* восстановление после рестарта;
+* роль `DealActionState` в runtime.
+
+## 38.2. Сервисные команды
+
+Документ:
+
+```text
+02. Сервисные команды
+```
+
+Там описано:
+
+* `ServiceCommand`;
+* `ServiceCommandType`;
+* payload'ы команд;
+* `CREATE -> SUBMIT -> REFRESH`;
+* `DealActionState`;
+* `RuntimeTarget`;
+* retry policy;
+* связь `targetActionKey -> target StrategyAction -> DealActionState`.
+
+## 38.3. Калькуляторы действий стратегии
+
+Документ:
+
+```text
+03. Калькуляторы действий стратегии
+```
+
+Там описано:
+
+* `StrategyActionCalculator`;
+* `CalculationContext`;
+* `PriceCalculator`;
+* `SizeCalculator`;
+* `RiskCalculator`;
+* `MarketPriceData`;
+* `InstrumentExternalRules`;
+* формулы расчёта цен и размеров.
+
+## 38.4. Расчёт индикаторов и рыночных данных
+
+Документ:
+
+```text
+04. Расчёт индикаторов и рыночных данных
+```
+
+Там описано:
+
+* `IndicatorJob`;
+* `IndicatorValue`;
+* `MarketStructureJob`;
+* `MarketStructure`;
+* `MarketPriceLevel`;
+* `MarketPhaseJob`;
+* `MarketPhase`;
+* `MarketPriceData`;
+* `InstrumentExternalRules`;
+* freshness и idempotency расчётов.
+
+## 38.5. Аудит и история исполнения
+
+Документ:
+
+```text
+05. Аудит и история исполнения
+```
+
+Там описываются:
+
+* история исполнения сервисных команд;
+* история изменений runtime-сущностей;
+* timeline сделки;
+* связь аудита с `Deal`, `Order`, `AlgoOrder`, `Position`, `Balance`.
+
+Важно:
+
+> Аудит не является источником runtime-логики FSM.
