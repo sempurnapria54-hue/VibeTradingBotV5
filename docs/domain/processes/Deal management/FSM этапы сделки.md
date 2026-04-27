@@ -47,9 +47,14 @@ FSM работает по:
 
 ```text
 Q1. Strategy.INACTIVE / Strategy.DELETED / market data expired
-Q2. entryReason: короткий код в Deal, подробности в аудите
+Q2. entryReason: короткий код в Deal, подробности в `05. Аудит и история исполнения`
 Q3. entryStepType: ENTRY / GRID_ENTRY хранится в Deal
 Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условный
+Q5. ERROR -> CLOSED запрещён; добавлен EMERGENCY_CLOSED
+Q6. PRECHECK может закрыть candidate Deal с ENTRY_CONDITION_EXPIRED, если live risk ещё не создан
+Q7. CLOSED / EMERGENCY_CLOSED — terminal-статусы без handlers; CloseHandler переименовывается в ExitPendingHandler
+Q8. ACKED не добавляем; CONFIRMED убираем; успешный terminal-статус action — COMPLETED
+Q9. ServiceCommand — runtime object; persisted queue не вводим; direct partial close запрещён
 ```
 
 Для FSM это означает:
@@ -60,6 +65,13 @@ Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условны
 * `Deal.entryReason` и `Deal.entryStepType` не управляют FSM-переходами, но используются для API/UI/аналитики/аудита.
 * `PROTECTION_SWITCHED` используется только если реально выполняется замена temporary attached protection на standalone main protection.
 * Если switch не нужен, допустим прямой переход `ENTRY_FINALIZED -> MANAGING`, но только если позиция безопасна для сопровождения.
+* `ERROR -> CLOSED` запрещён; аварийная финализация идёт через `ERROR -> EMERGENCY_CLOSED`.
+* `PRECHECK -> CLOSED` с `ENTRY_CONDITION_EXPIRED` разрешён только если live risk ещё не создан.
+* `CLOSED` и `EMERGENCY_CLOSED` — terminal-статусы без handlers.
+* `CloseHandler` переименовывается в `ExitPendingHandler`.
+* `DealActionStateStatus.CONFIRMED` не используется; action success terminal status — `COMPLETED`.
+* `ServiceCommand` — runtime object; FSM после рестарта не ищет pending commands в БД.
+* Direct partial close запрещён; partial exit выполняется через reduce-only `Order` / `AlgoOrder`.
 
 
 ---
@@ -371,7 +383,10 @@ FSM handler не должен сам считать индикаторы, стр
 2. Проверить свежесть данных step через `MarketDataExpirationChecker.checkForStep(dealContext, step)`.
 3. Если данные устарели или отсутствуют — применить `StrategyStep.marketDataExpiredSetting`.
 4. Если данные свежие — проверить `StrategyCondition` выбранного step.
-5. Если condition не выполнен — не создавать entry action и оставить сделку в текущем статусе или завершить по отдельной политике.
+5. Если condition не выполнен — проверить, создан ли live risk.
+    * Если live risk отсутствует, закрыть candidate Deal без ошибки:
+      `Deal.status = CLOSED`, `Deal.closeReason = ENTRY_CONDITION_EXPIRED`.
+    * Если live risk уже есть или состояние неизвестно, прямое `CLOSED` запрещено: нужен recovery / safety-flow.
 6. Если condition выполнен — взять `StrategyAction` из step.
 7. Для каждого action проверить `DealActionState`.
 8. Если action ещё не материализован — вызвать `StrategyActionCalculator`.
@@ -395,6 +410,7 @@ FSM handler не должен сам считать индикаторы, стр
 
 ```text
 PRECHECK -> ENTRY_SUBMITTED
+PRECHECK -> CLOSED (только ENTRY_CONDITION_EXPIRED без live risk)
 ```
 
 Аварийные переходы:
@@ -624,6 +640,8 @@ ENTRY_FINALIZED -> ERROR
 9. Создать или запланировать `SUBMIT_ALGO_ORDER`.
 10. Создать refresh-команды для подтверждения active protection.
 11. Если нужно снять attached protection после main protection — создать cancel-команду только после подтверждения main protection.
+12. `DealActionStateStatus.COMPLETED` для protection action ставится только после refresh/search/history facts.
+13. ACK от биржи не считается runtime-truth.
 12. Если protection switch не нужен, проверить безопасное состояние позиции для перехода в `MANAGING`.
 
 ## 6.5. Выходные проверки
@@ -1096,55 +1114,35 @@ EXECUTE_KILL_SWITCH
 
 # 10. CLOSED
 
+`CLOSED` — terminal-статус штатного закрытия.
+
+Для `CLOSED` отдельный FSM handler не нужен.
+
+Финальную проверку перед `CLOSED` выполняет `ExitPendingHandler` на переходе:
+
+```text
+EXIT_PENDING -> CLOSED
+```
+
 ## 10.1. Назначение
 
-`CLOSED` — нормальное терминальное состояние сделки.
+`CLOSED` означает:
 
-В этом статусе сделка больше не сопровождается как активная.
+```text
+штатная ветка закрытия завершена;
+position закрыта или отсутствует;
+live ordinary orders отсутствуют;
+live algo-orders отсутствуют;
+attached protection больше не влияет на риск;
+финальные факты подтверждены refresh/search/history;
+Deal больше не требует runtime-сопровождения FSM.
+```
 
-## 10.2. Источники информации
+## 10.2. Поведение после CLOSED
 
-* `Deal`;
-* финальные `Order`;
-* финальные `AlgoOrder`;
-* финальная `Position`;
-* fills;
-* order history;
-* algo-order history;
-* история команд;
-* история изменений сущностей.
+Обычная FSM сделку больше не сопровождает.
 
-## 10.3. Входные проверки
-
-Проверяем:
-
-* `Deal.status = CLOSED`;
-* позиция закрыта;
-* live risk отсутствует;
-* live orders отсутствуют;
-* live algo-orders отсутствуют.
-
-Если после рестарта выяснилось, что в `CLOSED` есть активный риск, это уже аномалия и должен сработать anomaly/recovery flow.
-
-## 10.4. Рабочая логика этапа
-
-Обычные FSM-команды сопровождения не создаются.
-
-Разрешены только:
-
-* чтение;
-* отчётность;
-* аналитика;
-* аудит;
-* построение timeline сделки.
-
-## 10.5. Выходные проверки
-
-Нет обычных выходных проверок, потому что `CLOSED` — терминальный нормальный статус.
-
-## 10.6. Переходы
-
-Обычных переходов нет.
+Если после `CLOSED` найден live risk, это зона `AnomalyJob / ReconciliationJob`, а не `ClosedHandler`.
 
 ---
 
@@ -1152,16 +1150,26 @@ EXECUTE_KILL_SWITCH
 
 ## 11.1. Назначение
 
-`ERROR` — аварийное состояние сделки.
+`ERROR` означает:
 
-В `ERROR` обычная торговая стратегия не применяется.
+```text
+обнаружена авария;
+обычная strategy/FSM-логика заблокирована;
+risk может быть живой;
+нужен safety-flow / recovery / kill-switch.
+```
 
-Здесь приоритет:
+`ErrorHandler` не выполняет обычные strategy steps.
 
-* безопасность;
-* снятие риска;
-* фиксация состояния;
-* расследование.
+В `ERROR` запрещено:
+
+```text
+проверять обычные strategy steps;
+создавать новые entry/grid orders;
+делать data-dependent protection adjustment;
+делать partial exit по обычным strategy conditions;
+продолжать MANAGING-flow.
+```
 
 ## 11.2. Источники информации
 
@@ -1171,76 +1179,101 @@ EXECUTE_KILL_SWITCH
 * все локальные `Order`;
 * все локальные `AlgoOrder`;
 * `DealActionState`;
-* exchange snapshots:
+* результаты refresh/search/history;
+* результат kill-switch / safety-flow.
 
-    * positions;
-    * pending orders;
-    * pending algo-orders;
-    * fills/history, если нужно;
-* anomaly report, если ошибка пришла из `AnomalyJob`;
-* результат kill-switch-команд.
+## 11.3. Рабочая логика этапа
 
-## 11.3. Входные проверки
-
-Проверяем:
-
-* `Deal.status = ERROR`;
-* есть ли активный риск;
-* есть ли позиция без защиты;
-* есть ли live orders/algo-orders без связи со сделкой;
-* есть ли расхождение между БД и биржей;
-* нужна ли аварийная очистка риска.
-
-## 11.4. Рабочая логика этапа
-
-1. Создать refresh-команды, если состояние неактуально.
-2. Если есть активный риск — создать `EXECUTE_KILL_SWITCH`.
-3. Если риск уже снят — оставить сделку в `ERROR` для ручного разбора или отдельной финализации.
-4. Зафиксировать состояние для расследования через аудит/историю.
-
-## 11.5. Выходные проверки
-
-Обычного автоматического перехода из `ERROR` в рабочий статус нет.
-
-Можно проверить:
-
-* активный риск снят;
-* позиция закрыта;
-* live orders отсутствуют;
-* live algo-orders отсутствуют;
-* состояние зафиксировано для расследования.
-
-Вопрос о переводе из `ERROR` в другой статус должен решаться отдельной политикой.
-
-## 11.6. Переходы
-
-Обычные переходы не фиксируем.
-
-Команды безопасности возможны:
+`ErrorHandler` выполняет только safety/recovery-логику:
 
 ```text
-ERROR -> ERROR
+REFRESH_POSITION;
+REFRESH_PENDING_ORDERS;
+REFRESH_ALGO_ORDERS;
+REFRESH_ORDER_HISTORY;
+REFRESH_ALGO_ORDER_HISTORY;
+REFRESH_FILLS;
+CANCEL_ORDER;
+CANCEL_ALGO_ORDER;
+CLOSE_POSITION;
+EXECUTE_KILL_SWITCH;
+MARK_DEAL_ERROR.
 ```
 
-## 11.7. Допустимые StrategyStep
+## 11.4. Выходные проверки
 
-Обычная стратегия не применяется.
-
-Допустим только аварийный safety-flow, если он оформлен как системная логика, а не как обычная торговая стратегия.
-
-## 11.8. Возможные ServiceCommand
+`ErrorHandler` может перевести сделку:
 
 ```text
-EXECUTE_KILL_SWITCH
-MARK_DEAL_ERROR
+ERROR -> EMERGENCY_CLOSED
+```
+
+только если подтверждено:
+
+```text
+1. Position закрыта или отсутствует.
+2. Live ordinary orders отсутствуют.
+3. Live algo-orders отсутствуют.
+4. Attached protection отсутствует или больше не влияет на риск.
+5. Нет pending сущностей, которые могут создать или увеличить риск.
+6. Финальные exchange facts подтверждены.
+7. Сделка больше не требует runtime-сопровождения FSM.
+```
+
+Если хотя бы один пункт не подтверждён:
+
+```text
+сделка остаётся в ERROR;
+ErrorHandler продолжает safety-flow;
+или требуется ручной разбор.
+```
+
+Запрещённый переход:
+
+```text
+ERROR -> CLOSED
+```
+
+## 11.5. Возможные ServiceCommand
+
+```text
 REFRESH_POSITION
 REFRESH_PENDING_ORDERS
 REFRESH_ALGO_ORDERS
+REFRESH_ORDER_HISTORY
+REFRESH_ALGO_ORDER_HISTORY
+REFRESH_FILLS
+CANCEL_ORDER
+CANCEL_ALGO_ORDER
+CLOSE_POSITION
+EXECUTE_KILL_SWITCH
+MARK_DEAL_ERROR
 ```
 
 ---
 
-# 12. Общие правила recovery
+# 12. EMERGENCY_CLOSED
+
+`EMERGENCY_CLOSED` — terminal-статус аварийного закрытия после подтверждённого снятия live risk.
+
+Для `EMERGENCY_CLOSED` отдельный FSM handler не нужен.
+
+## 12.1. Назначение
+
+`EMERGENCY_CLOSED` означает:
+
+```text
+аварийный сценарий завершён;
+kill-switch / safety-flow снял live risk;
+отсутствие live risk подтверждено refresh/search/history facts;
+сделка terminal, но не считается штатно закрытой.
+```
+
+Если после `EMERGENCY_CLOSED` найден live risk, это глобальная аномалия и зона `AnomalyJob / ReconciliationJob`.
+
+---
+
+# 13. Общие правила recovery
 
 ## 12.1. Recovery не равен обычному переходу
 
@@ -1290,32 +1323,33 @@ ERROR / EXECUTE_KILL_SWITCH
 
 ---
 
-# 13. Вопросы к обсуждению
+# 14. Открытые вопросы
 
-В эту редакцию внесены решения Q1–Q4.
-
-Закрыто и применено:
+Открытые вопросы после применения Q1–Q9:
 
 ```text
-Q1. Strategy.INACTIVE / Strategy.DELETED / market data expired.
-Q2. entryReason: короткий код в Deal, подробности в аудите.
-Q3. entryStepType: ENTRY / GRID_ENTRY хранится в Deal.
-Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условный.
+Q1. AMEND_ALGO_ORDER: direct amend или safe replace для protection-сценариев.
+Q2. ServiceCommandFactory создаёт цепочку команд сразу или по одной.
+Q3. Разделять ли EXCHANGE_TIMEOUT и UNKNOWN_RESULT.
+Q4. Scope CalculationContext: на action, step или проход FSM.
+Q5. Ошибки калькуляторов: controlled exception или error-result.
+Q6. RiskCalculator: blocking result или warning mode.
+Q7. Timeline сделки и группировка технических шагов в `05. Аудит и история исполнения`.
 ```
-
-Остаются вопросы для следующих итераций:
-
-1. Нужно ли разрешать автоматический переход `ERROR -> CLOSED`, если kill-switch снял весь риск и сделка фактически закрыта?
-2. Нужно ли для `PRECHECK` поддерживать сценарий “entry condition больше не актуален — закрыть Deal без ошибки”, или созданный `Deal` всегда должен либо пойти дальше, либо стать `ERROR`?
-3. Нужно ли `CLOSED` дополнительно валидировать периодическим job'ом, или это зона `AnomalyJob`?
 
 ---
 
-# 14. Что изменено в этой редакции
+# 15. Что изменено в этой редакции
 
 Изменения внесены точечно, без удаления существующих разделов и подробных комментариев, если они не противоречили принятым решениям.
 
 ## Добавлено
+
+* Решения Q5–Q9 в зафиксированные lifecycle/FSM правила.
+* `EMERGENCY_CLOSED` как terminal-статус без handler.
+* Ветка `PRECHECK -> CLOSED` с `ENTRY_CONDITION_EXPIRED`, если live risk ещё не создан.
+* Runtime-only recovery для `ServiceCommand`.
+
 
 ```text
 1. Раздел с зафиксированными решениями Q1–Q4.
@@ -1326,6 +1360,11 @@ Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условны
 ```
 
 ## Изменено
+
+* `CLOSED` и `EMERGENCY_CLOSED` описаны как terminal-статусы без handlers.
+* `ERROR` больше не может переходить в `CLOSED`; только в `EMERGENCY_CLOSED` после safety-flow.
+* Открытые вопросы обновлены и перенумерованы по критичности после Q1–Q9.
+
 
 ```text
 1. ENTRY_FINALIZED больше не обязан вести только в PROTECTION_SWITCHED.

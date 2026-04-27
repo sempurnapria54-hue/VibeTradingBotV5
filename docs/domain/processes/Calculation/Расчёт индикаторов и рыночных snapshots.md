@@ -50,7 +50,7 @@ StrategyActionCalculator
 
 # Зафиксированные решения lifecycle / FSM
 
-В эту версию документа встроены решения Q1–Q4 из `Strategy.md` и `01. Жизненный цикл сделки`.
+В эту версию документа встроены решения Q1–Q9 из `Strategy.md`, `01. Жизненный цикл сделки`, `FSM этапы сделки` и `02. Сервисные команды`.
 
 Для расчёта рыночных данных это означает:
 
@@ -61,6 +61,10 @@ StrategyActionCalculator
 * `maxAgeBars` заменён на `expirationDuration` в strategy settings.
 * Устаревание данных вычисляется в runtime через `MarketDataExpirationChecker`.
 * Job'ы не меняют `Strategy.Status`; если нет свежих входных данных, они не создают новый result, а старый result постепенно становится expired.
+* Если данные устарели в `PRECHECK`, FSM может закрыть candidate Deal с `ENTRY_CONDITION_EXPIRED`, но только если live risk ещё не создан.
+* Для открытой сделки устаревание данных обрабатывается через `StrategyStep.marketDataExpiredSetting`, а не через изменение `Strategy.Status`.
+* `ServiceCommand` остаётся runtime object; job'ы рыночных данных не создают и не восстанавливают pending commands.
+* Partial exit использует готовые данные только для расчёта reduce-only `Order` / `AlgoOrder`, но не direct partial close позиции.
 
 
 ---
@@ -1405,7 +1409,7 @@ ATR_ABOVE_MINIMUM
 
 * переноса SL;
 * trailing;
-* partial exit;
+* partial exit через reduce-only `Order` / `AlgoOrder`;
 * выхода по смене тренда;
 * grid management;
 * fail-safe условий.
@@ -1514,6 +1518,10 @@ StrategyActionCalculator
 
 ## Добавлено
 
+* Упоминание решений Q5–Q9 там, где они влияют на freshness и использование рыночных данных.
+* Правило: partial exit использует market data только для расчёта reduce-only `Order` / `AlgoOrder`, не direct partial close.
+
+
 ```text
 1. Раздел с зафиксированными решениями Q1–Q4.
 2. MarketDataExpirationChecker как runtime-сервис проверки freshness.
@@ -1522,6 +1530,9 @@ StrategyActionCalculator
 ```
 
 ## Изменено
+
+* Раздел зафиксированных lifecycle/FSM решений расширен до Q1–Q9.
+
 
 ```text
 1. maxAgeBars заменён на expirationDuration в:

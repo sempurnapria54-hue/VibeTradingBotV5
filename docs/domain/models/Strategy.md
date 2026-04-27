@@ -30,6 +30,8 @@
 * При сохранении стратегии `targetActionKey` валидируется и резолвится во внутреннюю ссылку на target action.
 * Runtime-связь действия стратегии с runtime-сущностью хранится в `DealActionState` через `strategyActionId` и `RuntimeTarget`.
 * Аудит и история исполнения фиксируют факты, но не являются источником runtime-логики FSM.
+* `StrategyPositionAction` поддерживает только полный выход из позиции: direct partial close запрещён как инвариант стратегии и системы.
+* Частичное уменьшение позиции выражается только через `StrategyOrderAction` / `StrategyAlgoOrderAction` с reduce-only semantics и последующим recovery через `DealActionState` + fills/history/refresh.
 
 ## Зафиксированные решения lifecycle / FSM
 
@@ -37,9 +39,14 @@
 
 ```text
 Q1. Strategy.INACTIVE / Strategy.DELETED / market data expired
-Q2. entryReason: короткий код в Deal, подробности в аудите
+Q2. entryReason: короткий код в Deal, подробности в `05. Аудит и история исполнения`
 Q3. entryStepType: ENTRY / GRID_ENTRY хранится в Deal
 Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условный
+Q5. ERROR -> CLOSED запрещён; добавлен EMERGENCY_CLOSED
+Q6. PRECHECK может закрыть candidate Deal с ENTRY_CONDITION_EXPIRED, если live risk ещё не создан
+Q7. CLOSED / EMERGENCY_CLOSED — terminal-статусы без handlers; CloseHandler переименовывается в ExitPendingHandler
+Q8. ACKED не добавляем; CONFIRMED убираем; успешный terminal-статус action — COMPLETED
+Q9. ServiceCommand — runtime object; persisted queue не вводим; direct partial close запрещён
 ```
 
 Для strategy-layer это означает:
@@ -51,6 +58,9 @@ Q4. PROTECTION_ESTABLISHED не вводим; PROTECTION_SWITCHED условны
 * Поведение при устаревании данных хранится на уровне `StrategyStep.marketDataExpiredSetting`.
 * `StrategyStepType.ENTRY` / `GRID_ENTRY` при создании сделки сохраняются в `Deal.entryStepType`; `Deal.entryReason` при этом равен `STRATEGY`.
 * `PROTECTION_SWITCHED` используется только если реально выполняется замена temporary attached protection на main protection.
+* `ERROR -> CLOSED` запрещён; аварийное завершение после safety-flow фиксируется через `EMERGENCY_CLOSED`.
+* `ACKED` не является runtime-статусом action; `DealActionStateStatus.COMPLETED` ставится только после refresh/search/history facts.
+* `ServiceCommand` — runtime object, pending commands в БД не храним.
 
 ---
 
@@ -983,6 +993,11 @@ public enum StrategyStepType {
 
     /**
      * Частичная фиксация прибыли или частичный выход.
+     *
+     * Важно:
+     * step может описывать частичное уменьшение позиции,
+     * но direct position action для partial close запрещён.
+     * Частичный выход должен быть выражен через reduce-only Order / AlgoOrder actions.
      */
     PARTIAL_EXIT,
 
@@ -2123,6 +2138,23 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
 
 Действия над позицией.
 
+Главный инвариант:
+
+```text
+StrategyPositionAction не поддерживает частичное закрытие позиции.
+Direct partial close запрещён как инвариант стратегии и системы.
+```
+
+Причина:
+
+```text
+частичное уменьшение позиции должно быть трассируемым через Order / AlgoOrder;
+нужен stable client id;
+нужна связь через DealActionState;
+нужен recovery через fills/history/refresh;
+нельзя безопасно повторять direct partial close после неизвестного результата.
+```
+
 ```java
 public class StrategyPositionAction extends Auditable implements StrategyAction {
 
@@ -2135,7 +2167,7 @@ public class StrategyPositionAction extends Auditable implements StrategyAction 
     private String key;
 
     /**
-     * CLOSE_FULL / CLOSE_PARTIAL.
+     * Только CLOSE_FULL.
      */
     private StrategyActionType actionType;
 
@@ -2145,13 +2177,35 @@ public class StrategyPositionAction extends Auditable implements StrategyAction 
      * Используется, если в одном step есть несколько position actions.
      */
     private Integer level;
-
-    /**
-     * Для частичного закрытия.
-     */
-    private BigDecimal closeFractionPercents;
 }
 ```
+
+Разрешено:
+
+```text
+StrategyPositionAction.actionType = CLOSE_FULL
+```
+
+Запрещено:
+
+```text
+StrategyPositionAction.actionType = CLOSE_PARTIAL
+```
+
+Если стратегия хочет частично уменьшить позицию, это должно быть выражено через:
+
+```text
+StrategyOrderAction reduce-only;
+StrategyAlgoOrderAction partial take-profit / reduce-only semantics.
+```
+
+Такой action должен материализоваться в `Order` / `AlgoOrder` и восстанавливаться через:
+
+```text
+DealActionState -> RuntimeTarget -> Order/AlgoOrder -> fills/history/refresh
+```
+
+Подробности по runtime-recovery см. в документе `02. Сервисные команды`.
 
 ---
 
@@ -2206,14 +2260,13 @@ public enum StrategyActionType {
     CLOSE_FULL,
 
     /**
-     * Частично закрыть позицию.
+     * Зарезервировано только как legacy/future enum value.
      *
-     * Используется для действий над позицией, когда стратегия требует:
-     * - частичный выход по позиции;
-     * - сокращение позиции по этапам;
-     * - частичную фиксацию объёма вне algo-механики.
+     * В текущей модели стратегии direct partial close запрещён.
+     * Нельзя использовать в StrategyPositionAction.
      *
-     * Обычно требует указания closeFractionPercents.
+     * Частичное уменьшение позиции всегда выражается через
+     * reduce-only StrategyOrderAction / StrategyAlgoOrderAction.
      */
     CLOSE_PARTIAL
 }
@@ -2227,7 +2280,9 @@ public enum StrategyActionType {
 
 * `StrategyOrderAction` использует только: `CREATE`, `AMEND`, `CANCEL`.
 * `StrategyAlgoOrderAction` использует только: `CREATE`, `AMEND`, `CANCEL`.
-* `StrategyPositionAction` использует только: `CLOSE_FULL`, `CLOSE_PARTIAL`.
+* `StrategyPositionAction` использует только: `CLOSE_FULL`.
+* `CLOSE_PARTIAL` запрещён для `StrategyPositionAction` как постоянный инвариант стратегии и системы.
+* Частичное уменьшение позиции выражается через `StrategyOrderAction` / `StrategyAlgoOrderAction`, а не через direct position action.
 
 То есть общий enum один, но допустимые значения валидируются по конкретному подтипу действия.
 
@@ -2321,6 +2376,9 @@ AMEND / CANCEL action
 6. `ORDER AMEND` / `ORDER CANCEL` должны ссылаться на `ORDER CREATE`.
 7. `ALGO_ORDER AMEND` / `ALGO_ORDER CANCEL` должны ссылаться на `ALGO_ORDER CREATE`.
 8. Нельзя ссылаться на action из другой `StrategyDetail`.
+9. `StrategyPositionAction.actionType = CLOSE_PARTIAL` запрещён.
+10. Любое частичное уменьшение позиции должно быть выражено через reduce-only `StrategyOrderAction` / `StrategyAlgoOrderAction`.
+11. Partial exit action должен иметь возможность recovery через `DealActionState -> RuntimeTarget -> Order/AlgoOrder -> fills/history/refresh`.
 
 Подробности по runtime-связи `StrategyAction -> DealActionState -> RuntimeTarget -> ServiceCommand` см. в документе:
 
@@ -2893,6 +2951,11 @@ Strategy API examples.md
 
 ## Добавлено
 
+* Решения Q5–Q9 в зафиксированные lifecycle/FSM правила.
+* Инвариант: direct partial close через `StrategyPositionAction.CLOSE_PARTIAL` запрещён всегда.
+* Правило: partial exit выражается только через reduce-only `StrategyOrderAction` / `StrategyAlgoOrderAction`.
+
+
 ```text
 1. Раздел "Зафиксированные решения lifecycle / FSM".
 2. Поле StrategyStep.marketDataExpiredSetting.
@@ -2905,6 +2968,10 @@ Strategy API examples.md
 ```
 
 ## Изменено
+
+* `StrategyPositionAction` теперь поддерживает только `CLOSE_FULL`.
+* Семантика `StrategyActionType.CLOSE_PARTIAL` ограничена: значение не используется для direct position action.
+
 
 ```text
 1. Strategy.Status:
