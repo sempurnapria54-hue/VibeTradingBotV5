@@ -11,6 +11,7 @@
 > * `03. Калькуляторы действий стратегии`
 > * `04. Расчёт индикаторов и рыночных данных`
 > * `05. Аудит и история исполнения`
+> * `Оценка рисков`
 
 ---
 
@@ -24,6 +25,8 @@
 * Стейт-машина и orchestration-слой решают, **когда именно** интерпретировать эти правила.
 * `StrategyActionCalculator` рассчитывает runtime-параметры действия стратегии: цену, размер и риск.
 * `ServiceCommandFactory` превращает рассчитанное действие в атомарные `ServiceCommand`.
+* `RiskValidator` проверяет рассчитанное действие после расчёта цены и размера, но до создания торговой `ServiceCommand`.
+* `RiskBlockResolver` определяет runtime-реакцию FSM на блокирующий risk-result.
 * `Order`, `AlgoOrder`, `Position` остаются чистыми runtime-сущностями биржи и не хранят `strategyActionId`.
 * У каждого `StrategyAction` есть явный `key`, заданный в JSON стратегии.
 * Для `AMEND` / `CANCEL` используется `targetActionKey`, который ссылается на `key` другого action в той же `StrategyDetail`.
@@ -50,6 +53,11 @@
 * Direct partial close позиции запрещён как постоянный инвариант стратегии и приложения.
 * `StrategyPositionAction` поддерживает только полное закрытие позиции через `CLOSE_FULL`.
 * Любое частичное уменьшение позиции выражается только через трассируемые `StrategyOrderAction` / `StrategyAlgoOrderAction` с reduce-only semantics, `DealActionState`, stable client id и recovery через fills/history/refresh.
+* Risk-check для торгового action выполняется после расчёта `CalculatedStrategyAction` и до `ServiceCommandFactory`.
+* Risk-check не выполняется перед `REFRESH_*` / search / history командами, потому что они не создают новый торговый риск.
+* `CalculationContext` собирается отдельно для каждого рассчитываемого `StrategyAction`.
+* Один `StrategyAction` = один свежий `CalculationContext`; context не переиспользуется на весь `StrategyStep`.
+* `EXCHANGE_ERROR`, `INTERNAL_ERROR`, `VALIDATION_ERROR` относятся к runtime/FSM и command-layer; стратегия не хранит error policy.
 
 ---
 
@@ -2587,6 +2595,72 @@ Safety-команды и cleanup-команды при этом остаются
 03. Калькуляторы действий стратегии
 ```
 
+
+## 33.1. Уточнение по risk-layer после Q2–Q8
+
+В старых формулировках `RiskCalculator` мог упоминаться как часть цепочки калькуляторов.
+
+После решений Q2–Q8 смысл уточняется так:
+
+```text
+StrategyActionCalculator
+  -> собирает свежий CalculationContext для одного StrategyAction
+  -> PriceCalculator считает цену
+  -> SizeCalculator считает размер
+  -> возвращает CalculatedStrategyAction
+
+RiskValidator
+  -> проверяет рассчитанное действие
+  -> возвращает RiskCheckResult
+
+RiskBlockResolver
+  -> по RiskCheckResult и текущему FSM-статусу определяет реакцию handler'а
+
+ServiceCommandFactory
+  -> получает только action, который прошёл расчёт и risk-check
+  -> создаёт одну актуальную runtime ServiceCommand
+```
+
+Главное правило:
+
+```text
+risk-check выполняется после расчёта цены/размера,
+но до создания торговой ServiceCommand.
+```
+
+`RiskValidator` не вызывается перед read-only refresh/search/history командами.
+
+Подробности по `RiskCheckResult`, `RiskCheckCode`, `RiskDecision`, `RiskBlockResolver` и реакции FSM на `BLOCKED` см. в документе:
+
+```text
+Оценка рисков
+```
+
+## 33.2. Уточнение по CalculationContext после Q7
+
+`CalculationContext` не является context'ом на весь `StrategyStep`.
+
+Правило:
+
+```text
+один рассчитываемый StrategyAction = один свежий CalculationContext
+```
+
+Причина:
+
+```text
+actions внутри StrategyStep выполняются последовательно;
+после каждого action могут измениться Order / AlgoOrder / Position / Balance / market facts;
+следующий action не должен считаться по устаревшему context.
+```
+
+Подробности см. в документе:
+
+```text
+03. Калькуляторы действий стратегии
+```
+
+
 ---
 
 # 34. Связь стратегии с расчётными job'ами
@@ -2908,6 +2982,32 @@ Strategy API examples.md
 Важно:
 
 > Аудит не является источником runtime-логики FSM.
+
+
+## 38.6. Оценка рисков
+
+Документ:
+
+```text
+Оценка рисков
+```
+
+Там описано:
+
+* `RiskValidator`;
+* `RiskCheckResult`;
+* `RiskCheckCode`;
+* `RiskDecision`;
+* `RiskBlockResolver`;
+* реакция FSM на `RiskDecision.BLOCKED`;
+* различие блокирующих и неблокирующих risk-results;
+* правило: `RiskValidator` вызывается после расчёта action и до создания торговой команды;
+* правило: read-only refresh/search/history команды не требуют risk-check.
+
+Важно:
+
+> Strategy-layer хранит настройки и намерения, но runtime risk-policy применяет отдельный risk-layer.
+
 
 
 ---

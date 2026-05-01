@@ -14,6 +14,8 @@
 >
 > Аудит и timeline сделки вынесены в документ: `05. Аудит и история исполнения`.
 
+> Оценка риска и `RiskValidator / RiskBlockResolver` описаны в документе: `Оценка рисков`.
+
 ---
 
 # Главная идея
@@ -1309,3 +1311,402 @@ ERROR / EXECUTE_KILL_SWITCH
 ```
 
 ---
+
+---
+
+# 13. Дополнение после Q2–Q8: обработка risk/calculation/command-flow
+
+Этот раздел добавлен после решений Q2–Q8.
+
+Он не заменяет регламент handlers выше, а уточняет общий порядок выполнения strategy actions внутри handler.
+
+## 13.1. Общий runtime-flow одного StrategyAction
+
+Для любого торгового `StrategyAction`, который может создать, изменить, отменить или закрыть runtime-сущность, handler работает по схеме:
+
+```text
+1. Проверить входные инварианты handler.
+2. Обновить или запросить нужные exchange facts, если состояние неактуально.
+3. Выбрать StrategyStep из pinned StrategyDetail.
+4. Проверить freshness step через MarketDataExpirationChecker.
+5. Проверить StrategyCondition.
+6. Выбрать текущий StrategyAction.
+7. Проверить DealActionState по этому action.
+8. Собрать свежий CalculationContext именно для этого action.
+9. Выполнить StrategyActionCalculator.
+10. Выполнить RiskValidator.
+11. Если risk result = BLOCKED, вызвать RiskBlockResolver.
+12. Если action разрешён, создать одну актуальную ServiceCommand через ServiceCommandFactory.
+13. Передать ServiceCommand в ServiceCommandExecutor.
+14. После выполнения обновить facts / DealActionState / runtime-сущности.
+15. Только потом переходить к следующему action или выходной проверке этапа.
+```
+
+Важно:
+
+```text
+RiskValidator вызывается после расчёта price/size,
+но до создания торговой ServiceCommand.
+```
+
+Перед refresh/read-only командами `RiskValidator` не вызывается.
+
+## 13.2. Один action = один CalculationContext
+
+Handler не должен собирать один `CalculationContext` на весь `StrategyStep`.
+
+Правило:
+
+```text
+один рассчитываемый StrategyAction = один свежий CalculationContext
+```
+
+Причина:
+
+```text
+StrategyStep не atomic transaction.
+Actions выполняются последовательно.
+После каждого action могут измениться Order / AlgoOrder / Position / Balance / market facts.
+```
+
+Если step содержит несколько actions:
+
+```text
+action1 -> CalculationContext #1 -> calculation -> risk -> command
+action2 -> CalculationContext #2 -> calculation -> risk -> command
+```
+
+## 13.3. Step из нескольких actions
+
+На первом этапе выбираем безопасное правило:
+
+```text
+если текущий action не завершён,
+следующий action этого step не стартует.
+```
+
+Это относится к статусам:
+
+```text
+CREATED
+SUBMITTED
+RETRY_PENDING
+FAILED
+```
+
+Если action ушёл в `RETRY_PENDING`:
+
+```text
+весь step ждёт retry текущего action;
+следующие actions step не выполняются;
+handler может выполнять refresh / safety commands.
+```
+
+Это снижает параллелизм, но делает flow предсказуемым и безопасным.
+
+## 13.4. RiskValidator и RiskBlockResolver
+
+`RiskValidator` возвращает результат проверки риска по уже рассчитанному action.
+
+Если результат блокирующий:
+
+```text
+RiskCheckResult = BLOCKED
+```
+
+handler вызывает:
+
+```text
+RiskBlockResolver.resolve(...)
+```
+
+`RiskBlockResolver` не исполняет команды.
+
+Он возвращает доменное решение для handler:
+
+```text
+закрыть candidate Deal без ошибки;
+перевести Deal в ERROR;
+пропустить action;
+ждать retry;
+разрешить только safety-flow.
+```
+
+Именно handler принимает финальное runtime-решение:
+
+```text
+какой Deal.status поставить;
+какие ServiceCommand создать;
+какой transition вернуть.
+```
+
+## 13.5. Реакция FSM на BLOCKED risk result
+
+### PRECHECK
+
+Если `RiskValidator` блокирует entry action в `PRECHECK`, а live risk ещё не создан:
+
+```text
+Deal.status = CLOSED
+Deal.closeReason = RISK_CONTROL
+```
+
+Это штатное закрытие candidate Deal без `ERROR`.
+
+Отдельное правило `ENTRY_CONDITION_EXPIRED` остаётся в силе:
+
+```text
+ENTRY_CONDITION_EXPIRED
+  -> condition входа стал false
+
+RISK_CONTROL
+  -> condition может быть true, но risk-layer запретил вход
+```
+
+### ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING / EXIT_PENDING
+
+Если live risk есть, мог появиться или состояние неизвестно:
+
+```text
+Deal.status = ERROR
+```
+
+Дальше работает `ErrorHandler` / safety-flow.
+
+Обычные strategy steps больше не выполняются.
+
+## 13.6. Неблокирующий risk result
+
+Неблокирующий risk result не останавливает FSM.
+
+Он может быть записан в:
+
+```text
+лог;
+метрики;
+будущую историю исполнения;
+timeline warning.
+```
+
+Но если action разрешён, handler продолжает обычный flow:
+
+```text
+ServiceCommandFactory -> ServiceCommandExecutor
+```
+
+## 13.7. Controlled calculation errors
+
+`StrategyActionCalculator` не должен превращать ожидаемые runtime-проблемы в random exception.
+
+Для контролируемых ошибок используется calculation-result:
+
+```text
+TEMPORARY_ERROR
+PERMANENT_ERROR
+```
+
+### TEMPORARY_ERROR
+
+Примеры:
+
+```text
+нет свежей цены;
+ещё не готов indicator value;
+задержался market structure;
+exchange facts временно не обновлены.
+```
+
+Реакция handler:
+
+```text
+DealActionState.status = RETRY_PENDING
+nextRetryAt = now + retry policy delay
+step ждёт retry текущего action
+```
+
+Если `nextRetryAt` ещё не наступил, handler не должен пытаться выполнить этот action повторно.
+
+### PERMANENT_ERROR
+
+Примеры:
+
+```text
+action невозможно рассчитать;
+конфигурация не позволяет получить нужную цену/размер;
+target отсутствует и это не временное состояние;
+расчёт нарушает runtime-инвариант.
+```
+
+Реакция для активных runtime-статусов сделки:
+
+```text
+Deal.status = ERROR
+```
+
+## 13.8. Unexpected exceptions
+
+Unexpected exceptions не превращаются в `CalculationError`.
+
+Они ловятся на границе:
+
+```text
+DealOrchestratorJob / FSM execution boundary
+```
+
+Базовые коды:
+
+```text
+INTERNAL_ERROR
+EXCHANGE_ERROR
+VALIDATION_ERROR
+```
+
+Где:
+
+```text
+INTERNAL_ERROR
+  -> баг приложения, NPE, mapper, неожиданное состояние
+
+EXCHANGE_ERROR
+  -> timeout, connection reset, gateway/API error, ошибка клиента биржи
+
+VALIDATION_ERROR
+  -> нарушение инварианта/валидации, которое не должно было попасть в runtime
+```
+
+Runtime-реакция:
+
+```text
+Deal.status = ERROR
+```
+
+Если ошибка связана с конкретным action:
+
+```text
+retryable EXCHANGE_ERROR -> DealActionState.RETRY_PENDING
+non-retryable error      -> DealActionState.FAILED
+```
+
+## 13.9. EXCHANGE_ERROR
+
+`UNKNOWN_RESULT` на первом этапе не используем.
+
+`EXCHANGE_TIMEOUT` отдельно не используем.
+
+Все проблемы взаимодействия с биржей классифицируем как:
+
+```text
+EXCHANGE_ERROR
+```
+
+FSM не выбирает отдельную ветку по этому коду.
+
+Каждый проход FSM и так должен сначала опираться на:
+
+```text
+refresh/search/history facts
+DealContext
+DealActionState
+Order / AlgoOrder / Position
+```
+
+`EXCHANGE_ERROR` нужен для:
+
+```text
+retry context;
+логов;
+метрик;
+диагностики;
+будущей истории исполнения.
+```
+
+## 13.10. ServiceCommandFactory создаёт одну актуальную команду
+
+Handler не должен ожидать, что `ServiceCommandFactory` сразу создаст всю цепочку:
+
+```text
+CREATE_ORDER -> SUBMIT_ORDER -> REFRESH_ORDER
+```
+
+Правило:
+
+```text
+один проход / один текущий action state -> одна актуальная ServiceCommand
+```
+
+Пример:
+
+```text
+DealActionState отсутствует
+  -> CREATE_ORDER
+
+DealActionState = CREATED
+  -> SUBMIT_ORDER
+
+DealActionState = SUBMITTED
+  -> REFRESH_ORDER / REFRESH_POSITION / history/fills
+```
+
+Это согласуется с тем, что `ServiceCommand` — runtime object, а не persisted queue.
+
+## 13.11. CLOSE_POSITION и refresh после закрытия
+
+`CLOSE_POSITION` используется только для полного закрытия позиции.
+
+Domain payload не содержит:
+
+```text
+autoCxl
+autoCancelOrders
+```
+
+Exchange adapter для OKX может технически отправить `autoCxl=true`, но FSM не должна на это полагаться.
+
+После `CLOSE_POSITION` handler должен пройти refresh-контур:
+
+```text
+REFRESH_POSITION
+REFRESH_PENDING_ORDERS
+REFRESH_ALGO_ORDERS
+REFRESH_ORDER_HISTORY
+REFRESH_ALGO_ORDER_HISTORY
+REFRESH_FILLS
+```
+
+Если остались известные сделке live orders/algo-orders:
+
+```text
+CANCEL_ORDER
+CANCEL_ALGO_ORDER
+```
+
+Если найдены неизвестные live-сущности:
+
+```text
+это anomaly/safety-flow,
+а не обычный cleanup сделки.
+```
+
+## 13.12. REFRESH_FILLS
+
+`REFRESH_FILLS` — runtime read-only команда.
+
+На первом этапе `Fill` как отдельную persisted entity не храним.
+
+Один общий `RefreshFillsExecutor`:
+
+```text
+загружает fills;
+сопоставляет их с известными Order / AlgoOrder / Position facts;
+обновляет вложенные runtime-сущности;
+не обновляет Deal напрямую.
+```
+
+`Deal` обновляет handler по фактам вложенных сущностей.
+
+Повторный `REFRESH_FILLS` должен быть идемпотентным:
+
+```text
+filled size / fee / pnl не должны задваиваться.
+```
+
