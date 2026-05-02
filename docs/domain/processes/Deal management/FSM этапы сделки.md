@@ -493,6 +493,32 @@ EXECUTE_KILL_SWITCH
 7. Если order исполнен частично — определить, достаточно ли этого для появления позиции и продолжения этапа.
 8. Если факты противоречивы — перейти в recovery или `ERROR`.
 
+### 5.4.1. Missing attached protection
+
+Если attached protection ожидалась, но после `REFRESH_ORDER` не найдена внутри `OrderExternalSnapshot.attachedAlgoOrders` по `internalId`, отсутствие в одном snapshot не считается финальным фактом.
+
+Базовая политика зависит от состояния parent `Order` и runtime facts:
+
+```text
+parent Order CREATED / PENDING
+  -> attached остаётся PENDING, ждём следующий refresh / retry / recovery
+
+parent Order ACTIVE / PARTIALLY_COMPLETED
+  -> запускаем дополнительный search-cycle
+
+parent Order COMPLETED
+  -> проверяем позицию и standalone main protection
+  -> если позиция active и standalone protection отсутствует, Deal -> ERROR
+
+parent Order CANCELED
+  -> attached -> CANCELED, closeReason = PARENT_ORDER_CANCELED
+
+parent Order ERROR
+  -> attached -> ERROR, closeReason = UNKNOWN
+```
+
+Подробная модель `Order` и `AttachedAlgoOrder` описана в документе `Order.md`.
+
 ## 5.5. Выходные проверки
 
 Этап можно считать завершённым, если:
