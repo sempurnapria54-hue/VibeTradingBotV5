@@ -68,6 +68,7 @@ level стратегии
 * Внешний статус сначала проходит через `OrderExternalStatusResolver`.
 * Unknown external status не маппится в `Order.Status.UNKNOWN`.
 * Unknown external status приводит к controlled exception, `Deal -> ERROR` и `Exchange HOLD`.
+* Неизвестный внешний статус приводит к `ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)`, `Deal -> ERROR` и `Exchange HOLD`.
 * `tdMode = isolated` и `posSide = net` не хранятся в `Order` на первом этапе.
 * Для OKX `tdMode = isolated` и `posSide = net` задаются константами в `OkxClientService`.
 * `positionReducingOnly` хранится в `Order` как доменное намерение: ordinary order должен только уменьшать позицию и не должен увеличивать / открывать новую.
@@ -965,6 +966,23 @@ Resolver не должен:
 
 Он только нормализует внешний статус.
 
+## 7.1.1. Exception policy для неизвестного external status
+
+Если `OrderExternalStatusResolver` получил внешний статус ordinary order, который нельзя безопасно смэппить в `Order.Status`, он выбрасывает:
+
+```text
+ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)
+```
+
+Runtime-реакция:
+
+```text
+Order -> ERROR
+Order.closeReason = UNKNOWN_EXTERNAL_STATUS
+Deal -> ERROR
+Exchange -> HOLD
+```
+
 ## 7.2. OKX mapping для ordinary order
 
 | OKX source | OKX raw status | Domain status | Комментарий |
@@ -974,14 +992,14 @@ Resolver не должен:
 | order details / history | `filled` | `COMPLETED` | Ордер полностью исполнен. |
 | order details / history | `canceled` | `CANCELED` | Ордер отменён. |
 | order history | `mmp_canceled` | `CANCELED` | Ордер отменён механизмом MMP; на первом этапе считаем отменой. |
-| any | unknown value | throws `UnknownExternalStatusException` | Refresh-flow переводит локальный `Order` в `ERROR` с `closeReason = UNKNOWN_EXTERNAL_STATUS`. После этого `Deal` переводится в `ERROR`, а `Exchange` — в `HOLD`. |
+| any | unknown value | throws `ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)` | Refresh-flow переводит локальный `Order` в `ERROR` с `closeReason = UNKNOWN_EXTERNAL_STATUS`. После этого `Deal` переводится в `ERROR`, а `Exchange` — в `HOLD`. |
 
 ## 7.3. Unknown external status policy
 
 Если resolver получил неизвестный внешний статус ordinary order:
 
 ```text
-UnknownExternalStatusException
+ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)
   -> RefreshExecutor / refresh boundary ловит controlled exception
   -> локальный Order переводится в ERROR
   -> Order.closeReason = UNKNOWN_EXTERNAL_STATUS
@@ -996,7 +1014,7 @@ UnknownExternalStatusException
 Resolver не возвращает Order.Status.ERROR как обычный mapping-result.
 
 ERROR — это не распознанный биржевой статус, а safety-состояние локального Order,
-которое выставляется refresh-flow после перехвата UnknownExternalStatusException.
+которое выставляется refresh-flow после перехвата ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS).
 ```
 
 `Exchange HOLD` блокирует normal trading commands:

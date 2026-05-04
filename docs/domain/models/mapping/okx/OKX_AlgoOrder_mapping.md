@@ -409,6 +409,14 @@ AlgoOrder.conditionType -> OkxAlgoOrderTypeResolver -> ordType
 | `tpTriggerPxType` | `condition.trigger.takeProfit.externalType` | last/index/mark. |
 | `activePx` | `condition.trailing.activationPrice.externalValue` | Если activationPrice есть. |
 | `moveTriggerPx` | `condition.trailing.externalPrice` | Текущее значение trailing, если OKX вернул. |
+
+Важно по `activePx`:
+
+```text
+Если OKX не возвращает отдельный тип цены активации trailing,
+condition.trailing.activationPrice.externalType остаётся null.
+Это нормально и не считается нарушением exchange invariant.
+```
 | `ordType` | not mapped | Проверяется adapter-layer как invariant. |
 | `side` | not mapped | Проверяется adapter-layer как invariant. |
 | `actualSide` | not mapped | Не храним; можно проверить или оставить в raw audit. |
@@ -453,7 +461,7 @@ snapshot.externalStatus
   -> AlgoOrder.Status или ExternalStatusException
 ```
 
-`canceled` closeReason:
+`canceled` closeПричина:
 
 ```text
 OKX state=canceled
@@ -482,36 +490,36 @@ Notes:
 ```text
 pause
   -> active-like external state;
-  -> algo-order exists on exchange and may still affect risk/cleanup.
+  -> algo-order существует на бирже и всё ещё может влиять на risk/cleanup.
 
 partially_effective
-  -> partial success;
-  -> not a target strategy state;
-  -> maps to PARTIALLY_COMPLETED and requires further FSM analysis.
+  -> частичный успех;
+  -> это не целевое состояние стратегии;
+  -> маппится в PARTIALLY_COMPLETED и требует дальнейшего анализа FSM.
 
 partially_failed
-  -> partial failure;
-  -> part of the scenario may have executed;
-  -> problem-state and error/safety flow.
+  -> частичный сбой;
+  -> часть сценария могла успеть выполниться;
+  -> это problem-state и переход в error/safety flow.
 ```
 
 ---
 
-# 11. Adapter invariant validation
+# 11. Проверка exchange-specific invariants в adapter-layer
 
-Client / adapter-layer validates exchange-specific invariants.
+Client / adapter-layer проверяет exchange-specific инварианты.
 
 ## 11.1. `tdMode`
 
-Expected:
+Ожидаемое значение:
 
 ```text
 tdMode = isolated
 ```
 
-Domain `AlgoOrder` does not store this field.
+Доменный `AlgoOrder` это поле не хранит.
 
-Mismatch:
+Если значение не совпало:
 
 ```text
 ExternalInvariantViolationException
@@ -521,15 +529,15 @@ Exchange HOLD
 
 ## 11.2. `posSide`
 
-Expected:
+Ожидаемое значение:
 
 ```text
 posSide = net
 ```
 
-Domain `AlgoOrder` does not store this field.
+Доменный `AlgoOrder` это поле не хранит.
 
-Mismatch:
+Если значение не совпало:
 
 ```text
 ExternalInvariantViolationException
@@ -539,13 +547,13 @@ Exchange HOLD
 
 ## 11.3. `side`
 
-Expected:
+Ожидаемое значение:
 
 ```text
 AlgoOrder.direction -> OKX side
 ```
 
-Mismatch:
+Если значение не совпало:
 
 ```text
 ExternalInvariantViolationException
@@ -553,75 +561,75 @@ ExternalInvariantViolationException
 
 ## 11.4. `ordType`
 
-Expected:
+Ожидаемое значение:
 
 ```text
 AlgoOrder.conditionType -> OKX ordType
 ```
 
-Mismatch:
+Если значение не совпало:
 
 ```text
 ExternalInvariantViolationException
 ```
 
-Validation is one-way:
+Валидация односторонняя:
 
 ```text
-conditionType -> expected ordType
+conditionType -> ожидаемый ordType
 ```
 
-Do not reverse-map `ordType -> conditionType`, because `conditional` covers several domain condition types.
+Не делаем обратный маппинг `ordType -> conditionType`, потому что OKX `conditional` покрывает несколько доменных `ConditionType`.
 
 ## 11.5. `reduceOnly`
 
-Expected:
+Ожидаемое значение:
 
 ```text
 AlgoOrder.positionReducingOnly -> OKX reduceOnly
 ```
 
-If OKX response contains `reduceOnly`, adapter may compare expected/actual.
+Если OKX response содержит `reduceOnly`, adapter может сравнить ожидаемое и фактическое значение.
 
-Mismatch:
+Если значение не совпало:
 
 ```text
 ExternalInvariantViolationException
 ```
 
-If another exchange does not support reduce-only / close-only, adapter may ignore `positionReducingOnly`; unsupported exchange does not block first-stage runtime.
+Если другая биржа не поддерживает reduce-only / close-only механизм, adapter может проигнорировать `positionReducingOnly`; unsupported exchange не блокирует runtime первого этапа.
 
 ## 11.6. Size
 
-Do not hard-validate:
+Не валидируем как жёсткий инвариант:
 
 ```text
 AlgoOrder.size == actualSz
 ```
 
-Reason:
+Причина:
 
 ```text
-AlgoOrder.size is calculated intent.
-actualSz is external fact after trigger.
-actualSz may be different because of partial trigger/execution.
+AlgoOrder.size — рассчитанный intent.
+actualSz — внешний факт после trigger.
+actualSz может отличаться из-за partial trigger / execution.
 ```
 
 ---
 
-# 12. ExternalNotFound policy
+# 12. Политика ExternalNotFoundException
 
-`ExternalNotFoundException` is thrown only by the refresh/recovery-search boundary.
+`ExternalNotFoundException` выбрасывает только refresh / recovery-search boundary.
 
-For `AlgoOrder`, it means:
+Для `AlgoOrder` это означает:
 
 ```text
-after checking all relevant algo-order sources,
-the expected AlgoOrder was not found
-and its final state cannot be explained.
+после проверки всех релевантных algo-order источников,
+ожидаемый `AlgoOrder` не найден
+и его финальное состояние нельзя безопасно объяснить.
 ```
 
-Relevant OKX sources:
+Релевантные OKX-источники:
 
 ```text
 GET /api/v5/trade/order-algo
@@ -629,13 +637,13 @@ GET /api/v5/trade/orders-algo-pending
 GET /api/v5/trade/orders-algo-history
 ```
 
-Not enough:
+Недостаточно:
 
 ```text
-one empty data=[] response from order-algo
+одного пустого ответа `data=[]` из `order-algo`
 ```
 
-Runtime reaction:
+Runtime-реакция:
 
 ```text
 AlgoOrder -> ERROR
@@ -644,82 +652,82 @@ Deal -> ERROR
 Exchange -> HOLD
 ```
 
-Meaning:
+Смысл:
 
 ```text
-this is likely an integration/API/id-mapping/query/pagination/ordType-filter problem.
-Trading must stop until the issue is investigated.
+это вероятный признак проблемы интеграции / API / id mapping / query / pagination / ordType-filter.
+Нормальный торговый flow должен быть остановлен до разбора проблемы.
 ```
 
 ---
 
-# 13. Submit semantics
+# 13. Семантика submit
 
-`SUBMIT_ALGO_ORDER` uses stable client id:
+`SUBMIT_ALGO_ORDER` использует стабильный client id:
 
 ```text
 AlgoOrder.internalId -> algoClOrdId
 ```
 
-Before retry submit:
+Перед retry submit:
 
 ```text
-search/refresh by algoClOrdId
+поиск / refresh по algoClOrdId
 ```
 
-If algo-order is found:
+Если algo-order найден:
 
 ```text
-update local AlgoOrder from external snapshot
+обновить локальный `AlgoOrder` из external snapshot
 ```
 
-If not found:
+Если не найден:
 
 ```text
-send create algo-order request
+отправить запрос создания algo-order
 ```
 
-ACK from create response is not runtime-truth.
+ACK из create response не является runtime-truth.
 
-Final action completion requires refresh/search/history fact.
+Финальное завершение action требует refresh/search/history-факта.
 
 ---
 
-# 14. Cancel semantics
+# 14. Семантика cancel
 
-`CANCEL_ALGO_ORDER` uses common command policy:
+`CANCEL_ALGO_ORDER` использует общую command policy:
 
 ```text
-ACK is not runtime-truth.
+ACK не является runtime-truth.
 ```
 
-Cancel request result:
+Результат cancel request:
 
 ```text
 sCode=0
 ```
 
-means only:
+означает только:
 
 ```text
-cancel request accepted / operation acknowledged
+cancel request принят / операция подтверждена технически
 ```
 
-It does not mean:
+Это не означает:
 
 ```text
 AlgoOrder.Status.CANCELED
 ```
 
-Final cancellation:
+Финальная отмена:
 
 ```text
 OKX state=canceled
   -> AlgoOrder.CANCELED
-  -> closeReason from cancel intent
+  -> closeReason из cancel intent
 ```
 
-If refresh/history shows another fact:
+Если refresh/history показывает другой факт:
 
 ```text
 effective
@@ -735,7 +743,7 @@ partially_failed
   -> ExternalStatusException / PARTIALLY_FAILED
 ```
 
-Cancel reason source:
+Источник причины отмены:
 
 ```text
 strategy/FSM cleanup  -> CANCELED_BY_STRATEGY
@@ -746,27 +754,27 @@ manual                -> MANUAL_CANCEL
 
 ---
 
-# 15. Amend semantics
+# 15. Семантика amend
 
-`AMEND_ALGO_ORDER` updates existing `AlgoOrder` on OKX.
+`AMEND_ALGO_ORDER` обновляет существующий `AlgoOrder` на OKX.
 
-Amend response / ACK is not runtime-truth.
+Ответ amend / ACK не является runtime-truth.
 
-After `AMEND_ALGO_ORDER`:
+После `AMEND_ALGO_ORDER`:
 
 ```text
 REFRESH_ALGO_ORDER / REFRESH_ALGO_ORDERS / REFRESH_ALGO_ORDER_HISTORY
 ```
 
-confirms actual state and parameters.
+подтверждает фактическое состояние и параметры.
 
-`AmendAlgoOrderExecutor` does not make trading decisions and does not finalize `AlgoOrder` by ACK alone.
+`AmendAlgoOrderExecutor` не принимает торговые решения и не финализирует `AlgoOrder` только по ACK.
 
 ---
 
-# 16. Linked ordinary orders
+# 16. Связанные ordinary orders
 
-OKX may return:
+OKX может вернуть:
 
 ```text
 ordId
@@ -780,29 +788,29 @@ ordId / ordIdList -> AlgoOrderExternalSnapshot.linkedOrderExternalIds
                   -> AlgoOrder.linkedOrderExternalIds
 ```
 
-First-stage policy:
+Политика первого этапа:
 
 ```text
-store only;
-do not create domain Order automatically;
-do not create DealActionState;
-do not run ordinary order refresh from AlgoOrder refresh executor;
-do not use these ids as FSM targets.
+только храним;
+не создаём domain `Order` автоматически;
+не создаём `DealActionState`;
+не запускаем ordinary order refresh из `RefreshAlgoOrderExecutor`;
+не используем эти ids как FSM targets.
 ```
 
-Future research:
+Вопрос на будущее:
 
 ```text
-how to use linkedOrderExternalIds for fills / recovery / audit.
+как использовать `linkedOrderExternalIds` для fills / recovery / audit.
 ```
 
 ---
 
-# 17. Refresh executor boundary
+# 17. Граница ответственности RefreshAlgoOrderExecutor
 
-`RefreshAlgoOrderExecutor` updates only `AlgoOrder`.
+`RefreshAlgoOrderExecutor` обновляет только `AlgoOrder`.
 
-It does not run:
+Он не запускает:
 
 ```text
 REFRESH_ORDER
@@ -812,13 +820,13 @@ REFRESH_FILLS
 REFRESH_POSITION
 ```
 
-Those commands are chosen by FSM / DealOrchestrator after analyzing `DealContext` and status facts.
+Эти команды выбирает FSM / DealOrchestrator после анализа `DealContext` и статусных фактов.
 
 ---
 
-# 18. Field summary
+# 18. Сводка по полям
 
-## 18.1. Stored in domain `AlgoOrder`
+## 18.1. Храним в domain `AlgoOrder`
 
 ```text
 internalId
@@ -838,7 +846,7 @@ externalTriggerTime
 linkedOrderExternalIds
 ```
 
-## 18.2. Not stored in domain `AlgoOrder`
+## 18.2. Не храним в domain `AlgoOrder`
 
 ```text
 strategyActionId
@@ -854,7 +862,7 @@ actualSide
 closeFraction
 ```
 
-## 18.3. Stored in `AlgoOrderExternalSnapshot`
+## 18.3. Храним в `AlgoOrderExternalSnapshot`
 
 ```text
 internalId
@@ -868,7 +876,7 @@ condition
 linkedOrderExternalIds
 ```
 
-## 18.4. Not stored in `AlgoOrderExternalSnapshot`
+## 18.4. Не храним в `AlgoOrderExternalSnapshot`
 
 ```text
 externalType / ordType

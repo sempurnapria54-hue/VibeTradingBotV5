@@ -508,7 +508,7 @@ Mapping для ordinary order:
 | details/history | `filled` | `COMPLETED` | `FILLED` | Ордер полностью исполнен. |
 | details/history | `canceled` | `CANCELED` | context-dependent | Причина отмены определяется runtime-контекстом. |
 | history/archive | `mmp_canceled` | `CANCELED` | `UNKNOWN` by default | Можно расширить позже отдельной причиной, если понадобится. |
-| any | unknown value | throws `UnknownExternalStatusException` | `UNKNOWN_EXTERNAL_STATUS` after boundary handling | Resolver бросает controlled exception; refresh-flow переводит локальный Order в `ERROR`. |
+| any | unknown value | throws `ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)` | `UNKNOWN_EXTERNAL_STATUS` after boundary handling | Resolver бросает controlled exception; refresh-flow переводит локальный Order в `ERROR`. |
 
 ## 11.1. Unknown external status policy
 
@@ -522,7 +522,7 @@ Resolver не возвращает Order.Status.ERROR как обычный mapp
 
 ```text
 OrderExternalStatusResolver
-  -> throws UnknownExternalStatusException
+  -> throws ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)
 ```
 
 Дальше refresh boundary / executor boundary выполняет safety-реакцию:
@@ -540,6 +540,59 @@ Exchange.status = HOLD
 ERROR — это не распознанный биржевой статус,
 а локальное safety-состояние Order после невозможности безопасно интерпретировать внешний факт.
 ```
+
+## 11.2. ExternalNotFoundException / order evidence-cycle
+
+`ExternalNotFoundException` выбрасывает order refresh / recovery-search boundary, если ожидаемый ordinary `Order` не найден после полного order evidence-cycle.
+
+Для OKX order evidence-cycle включает:
+
+```text
+GET /api/v5/trade/order
+GET /api/v5/trade/orders-pending
+GET /api/v5/trade/orders-history
+GET /api/v5/trade/orders-history-archive, если обычная history уже не покрывает нужный период
+```
+
+Правило поиска:
+
+```text
+если Order.externalId есть:
+  искать по ordId
+
+если Order.externalId нет:
+  искать по clOrdId = Order.internalId
+```
+
+Пустой ответ одного endpoint не является основанием для `MISSING_AFTER_REFRESH`.
+
+Если после полного order evidence-cycle order не найден:
+
+```text
+throw ExternalNotFoundException
+Order.status = ERROR
+Order.closeReason = MISSING_AFTER_REFRESH
+Deal.status = ERROR
+Exchange.status = HOLD
+```
+
+Смысл `MISSING_AFTER_REFRESH`:
+
+```text
+после полного order evidence-cycle система не смогла найти expected order
+и не смогла безопасно объяснить его финал через order sources.
+```
+
+Это считается признаком ошибки интеграции / id mapping / query / pagination / history-window и требует остановки normal trading-flow на бирже до разбора.
+
+Если FSM нужны дополнительные факты по сделке, она отдельными командами запрашивает:
+
+```text
+REFRESH_FILLS
+REFRESH_POSITION
+```
+
+Но `RefreshOrderExecutor` не должен сам сопровождать всю сделку целиком.
 
 ---
 
@@ -650,6 +703,27 @@ Runtime-правило:
 cancel response не переводит Order в CANCELED как финальный факт;
 CANCELED подтверждается refresh/search/history.
 ```
+
+## 15.1. Общая ACK policy для OKX order operations
+
+Для OKX create / amend / cancel responses действует общее правило:
+
+```text
+response ACK / sCode=0 не является runtime-truth.
+```
+
+Финальные статусы ordinary `Order` подтверждаются только через exchange facts:
+
+```text
+order details
+pending orders
+order history
+order history archive, если нужно
+```
+
+`CANCEL_ORDER` не ставит `Order.CANCELED` без refresh/search/history факта.
+
+`AMEND_ORDER` не считается подтверждённым без refresh/search/history факта по новым параметрам.
 
 ---
 
@@ -816,7 +890,9 @@ Runtime-реакция: `Order.ERROR`, `Order.closeReason = EXCHANGE_INVARIANT_V
 8. Если биржа не поддерживает reduce-only / close-only механизм, adapter может проигнорировать `positionReducingOnly`; unsupported exchange не блокируем.
 9. Если OKX вернул `reduceOnly`, и он не совпал с `Order.positionReducingOnly`, это `EXCHANGE_INVARIANT_VIOLATION`: `Order.ERROR / Deal.ERROR / Exchange.HOLD`.
 10. Unknown external status не маппится в обычный domain status.
-11. Unknown external status приводит к `UnknownExternalStatusException` и затем к `Order.ERROR / Deal.ERROR / Exchange.HOLD`.
-12. Attached protection остаётся embedded частью parent `Order`.
-13. Attached protection матчится по `internalId = attachAlgoClOrdId`.
-14. Missing attached protection в одном snapshot не считается финальным фактом.
+11. Unknown external status приводит к `ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)` и затем к `Order.ERROR / Deal.ERROR / Exchange.HOLD`.
+12. `ExternalNotFoundException` используется только после полного order evidence-cycle, а не после одного пустого response.
+13. `MISSING_AFTER_REFRESH` означает `Order.ERROR / Deal.ERROR / Exchange.HOLD` из-за невозможности найти expected order по order sources.
+14. Attached protection остаётся embedded частью parent `Order`.
+15. Attached protection матчится по `internalId = attachAlgoClOrdId`.
+16. Missing attached protection в одном snapshot не считается финальным фактом.
