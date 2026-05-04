@@ -70,7 +70,8 @@
 * как `OrderResponse.AttachAlgoOrd` превращается в `AttachedAlgoOrderExternalSnapshot`;
 * как external snapshot обновляет domain `Order`;
 * как работает mapping external status -> domain status;
-* какие значения задаются константами в `OkxClientService`.
+* какие значения задаются константами в `OkxClientService`;
+* как OKX-specific invariant check сверяет `Order.positionReducingOnly` с `OrderResponse.reduceOnly`, если OKX вернул этот факт.
 
 ## 3.2. Что не описывает эта дока
 
@@ -247,6 +248,9 @@ public class CreateOrderRequest {
 
     /** Stable client id OKX: clOrdId. Используется для идемпотентности. */
     private String clientOrderId;
+
+    /** reduceOnly OKX: ордер должен только уменьшать позицию. */
+    private String reduceOnly;
 }
 ```
 
@@ -406,6 +410,7 @@ Mapping:
 | `attachAlgoClOrdId` | `attachedAlgoInternalId` | Top-level attached client id, fallback/diagnostic. |
 | `tpTriggerPx` | `takeProfitTriggerPrice` | Сейчас domain attached поддерживает SL; TP может быть future extension. |
 | `slTriggerPx` | `stopLossTriggerPrice` | Top-level SL trigger. |
+| `reduceOnly` | not mapped | Не сохраняется в `OrderExternalSnapshot`; используется adapter-layer для exchange invariant validation. |
 
 Правила конвертации:
 
@@ -414,6 +419,7 @@ empty string -> null
 numeric string -> BigDecimal
 state stays raw string in OrderExternalSnapshot.externalStatus
 status resolution happens later in OrderExternalStatusResolver
+reduceOnly is not stored in OrderExternalSnapshot; OKX adapter may validate it directly from OrderResponse
 ```
 
 ---
@@ -551,7 +557,7 @@ ERROR — это не распознанный биржевой статус,
 | `Order.size` | `size` | `sz` | BigDecimal -> string. Для SWAP/FUTURES — контракты. |
 | `Order.price` | `price` | `px` | Передаётся только если нужен для order type. |
 | `Order.internalId` | `clientOrderId` | `clOrdId` | Stable idempotency key. |
-| `Order.reduceOnly` | future field if DTO extended | `reduceOnly` | В текущем DTO поля нет; нужно добавить, если отправляем reduce-only ordinary order. |
+| `Order.positionReducingOnly` | `reduceOnly` | `reduceOnly` | Доменное намерение маппится в OKX reduceOnly, если значение задано. |
 | `Order.attachedAlgoOrders` | future field if DTO extended | `attachAlgoOrds` | В текущем DTO поля нет; нужно добавить для entry with attached SL. |
 
 ## 12.1. Константы `OkxClientService`
@@ -740,14 +746,14 @@ OkxClientService должен сам выставлять константы:
 - net.
 ```
 
-## 17.2. `CreateOrderRequest` не содержит reduceOnly
+## 17.2. `CreateOrderRequest` должен принимать OKX `reduceOnly`
 
-Если ordinary order используется для partial exit, `reduceOnly` нужен в OKX request.
+Если ordinary order используется для partial exit, `Order.positionReducingOnly` должен быть передан в OKX request как `reduceOnly`.
 
 Целевая правка DTO:
 
 ```java
-/** Ордер может только уменьшать позицию и не должен увеличивать/открывать её. */
+/** OKX reduceOnly: ордер может только уменьшать позицию. */
 private String reduceOnly;
 ```
 
@@ -773,17 +779,28 @@ state — сырой статус OKX order.
 Для details/history может быть filled / canceled / mmp_canceled и другие terminal statuses.
 ```
 
-## 17.5. `OrderResponse.reduceOnly` должен маппиться в `Order.reduceOnly`
+## 17.5. `OrderResponse.reduceOnly` не должен маппиться в `OrderExternalSnapshot`
 
 `OrderResponse` уже содержит `reduceOnly`.
 
-Целевой mapping:
+Целевое правило:
 
 ```text
-OrderResponse.reduceOnly -> OrderExternalSnapshot.reduceOnly -> Order.reduceOnly
+OrderResponse.reduceOnly -> adapter invariant validation only
 ```
 
-Если в `OrderExternalSnapshot` такого поля ещё нет, его стоит добавить.
+`OrderResponse.reduceOnly` не маппится в `OrderExternalSnapshot` и не обновляет `Order.positionReducingOnly`.
+
+Если OKX вернул `reduceOnly`, adapter-layer может сравнить его с локальным intent:
+
+```text
+expected = Order.positionReducingOnly
+actual = OrderResponse.reduceOnly
+```
+
+Если значения не совпали, выбрасывается controlled exchange error с кодом `EXCHANGE_INVARIANT_VIOLATION`.
+
+Runtime-реакция: `Order.ERROR`, `Order.closeReason = EXCHANGE_INVARIANT_VIOLATION`, `Deal.ERROR`, `Exchange.HOLD`.
 
 ---
 
@@ -793,9 +810,13 @@ OrderResponse.reduceOnly -> OrderExternalSnapshot.reduceOnly -> Order.reduceOnly
 2. `OKX Order mapping.md` описывает только OKX-specific mapping.
 3. Domain `Order` не хранит `tdMode` и `posSide`.
 4. `tdMode=isolated` и `posSide=net` задаются константами в `OkxClientService`.
-5. Domain `Order` хранит `reduceOnly`.
-6. Unknown external status не маппится в обычный domain status.
-7. Unknown external status приводит к `UnknownExternalStatusException` и затем к `Order.ERROR / Deal.ERROR / Exchange.HOLD`.
-8. Attached protection остаётся embedded частью parent `Order`.
-9. Attached protection матчится по `internalId = attachAlgoClOrdId`.
-10. Missing attached protection в одном snapshot не считается финальным фактом.
+5. Domain `Order` хранит `positionReducingOnly` как доменное намерение, а не как внешний факт биржи.
+6. `Order.positionReducingOnly` маппится в OKX `reduceOnly` при создании ordinary order.
+7. `OrderResponse.reduceOnly` не маппится в `OrderExternalSnapshot`; он используется только для OKX-specific invariant validation.
+8. Если биржа не поддерживает reduce-only / close-only механизм, adapter может проигнорировать `positionReducingOnly`; unsupported exchange не блокируем.
+9. Если OKX вернул `reduceOnly`, и он не совпал с `Order.positionReducingOnly`, это `EXCHANGE_INVARIANT_VIOLATION`: `Order.ERROR / Deal.ERROR / Exchange.HOLD`.
+10. Unknown external status не маппится в обычный domain status.
+11. Unknown external status приводит к `UnknownExternalStatusException` и затем к `Order.ERROR / Deal.ERROR / Exchange.HOLD`.
+12. Attached protection остаётся embedded частью parent `Order`.
+13. Attached protection матчится по `internalId = attachAlgoClOrdId`.
+14. Missing attached protection в одном snapshot не считается финальным фактом.

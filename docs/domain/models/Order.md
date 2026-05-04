@@ -70,10 +70,51 @@ level стратегии
 * Unknown external status приводит к controlled exception, `Deal -> ERROR` и `Exchange HOLD`.
 * `tdMode = isolated` и `posSide = net` не хранятся в `Order` на первом этапе.
 * Для OKX `tdMode = isolated` и `posSide = net` задаются константами в `OkxClientService`.
-* `reduceOnly` хранится в `Order`, потому что это runtime-свойство исполнения и обязательный признак для partial exit через ordinary order.
+* `positionReducingOnly` хранится в `Order` как доменное намерение: ordinary order должен только уменьшать позицию и не должен увеличивать / открывать новую.
+* `positionReducingOnly` не является внешним фактом биржи и не заполняется из `OrderExternalSnapshot`.
+* Если конкретная биржа поддерживает reduce-only / close-only механизм, client-layer маппит `positionReducingOnly` в соответствующее поле request.
+* Если биржа не поддерживает такой механизм, adapter может проигнорировать `positionReducingOnly`; unsupported exchange на первом этапе не блокируем.
 * Attached protection остаётся embedded-частью parent `Order`.
 * Attached protection не материализуется автоматически в standalone `AlgoOrder`, даже если в snapshot есть attached/algo identifiers.
 * Standalone `AlgoOrder` создаётся только отдельным `StrategyAlgoOrderAction` через `CREATE_ALGO_ORDER`.
+
+## 2.1. Exchange invariant validation
+
+`positionReducingOnly` хранится в domain `Order` как intent.
+
+Client-layer получает это значение при создании / проверке order и решает, как применить его на конкретной бирже.
+
+Для OKX:
+
+```text
+Order.positionReducingOnly -> OKX reduceOnly в create order request
+```
+
+Если OKX возвращает `reduceOnly` в response, adapter может сравнить:
+
+```text
+expected = Order.positionReducingOnly
+actual = OrderResponse.reduceOnly
+```
+
+Если значения не совпадают, adapter выбрасывает controlled exchange error с кодом:
+
+```text
+EXCHANGE_INVARIANT_VIOLATION
+```
+
+Runtime-реакция:
+
+```text
+Order -> ERROR
+Order.closeReason = EXCHANGE_INVARIANT_VIOLATION
+Deal -> ERROR
+Exchange -> HOLD
+```
+
+Если другая биржа не поддерживает reduce-only / close-only механизм, adapter может проигнорировать `positionReducingOnly`. Unsupported exchange на первом этапе не блокируем.
+
+`OrderExternalSnapshot` не хранит `reduceOnly`: если биржа возвращает такой факт, он проверяется в client / adapter layer напрямую из response.
 
 ---
 
@@ -97,7 +138,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
  * Простыми словами:
  * - это ordinary order на бирже;
  * - он хранит локальное намерение и факты с биржи;
- * - он может быть entry order, reduce-only order или order другой runtime-роли;
+ * - он может быть entry order, position-reducing-only order или order другой runtime-роли;
  * - роль в стратегии не хранится в самом Order, а определяется через DealActionState.
  */
 @Getter
@@ -191,12 +232,19 @@ public class Order extends Auditable {
     private BigDecimal fee;
 
     /**
-     * Признак, что ордер может только уменьшить уже существующую позицию.
+     * Доменное намерение, что ordinary order должен только уменьшать уже существующую позицию.
+     *
+     * Это не внешний факт биржи и не OKX-specific поле.
      *
      * Важно для partial exit: частичное уменьшение позиции разрешено только через
-     * reduce-only Order / AlgoOrder actions.
+     * position-reducing-only Order / AlgoOrder actions.
+     *
+     * Client-layer получает это значение и, если конкретная биржа поддерживает
+     * reduce-only / close-only механизм, маппит его в соответствующее поле request.
+     *
+     * Если биржа не поддерживает такой механизм, adapter может проигнорировать это значение.
      */
-    private Boolean reduceOnly;
+    private Boolean positionReducingOnly;
 
     /**
      * Прикреплённые защитные algo-orders, созданные вместе с parent order.
@@ -309,6 +357,14 @@ public class Order extends Auditable {
          * Биржа вернула неизвестный или неподдержанный внешний статус.
          */
         UNKNOWN_EXTERNAL_STATUS,
+
+        /**
+         * Биржевой client-layer обнаружил нарушение exchange-specific invariant.
+         *
+         * Например, OKX вернул reduceOnly=false,
+         * хотя локальный Order.positionReducingOnly=true.
+         */
+        EXCHANGE_INVARIANT_VIOLATION,
 
         /**
          * Причина не определена.
@@ -690,8 +746,6 @@ public class AttachedAlgoOrder extends Auditable {
 ---
 
 # 5. External snapshots
-
-- `OKX_Order_mapping.md` — маппинг OKX request/response DTO, `OrderExternalSnapshot`, `AttachedAlgoOrderExternalSnapshot` и правил заполнения `Order` / `AttachedAlgoOrder`.
 
 ## 5.1. `OrderExternalSnapshot`
 
@@ -1114,14 +1168,7 @@ attachedAlgoOrders
 ```text
 COMPLETED
 CANCELED
-```
-
-Если history snapshot содержит неизвестный внешний статус, `OrderExternalStatusResolver` бросает
-`UnknownExternalStatusException`, а refresh-flow переводит локальный `Order` в:
-
-```text
-Order.status = ERROR
-Order.closeReason = UNKNOWN_EXTERNAL_STATUS
+ERROR, если внешний статус не распознан
 ```
 
 ## 10.4. `REFRESH_FILLS`
@@ -1172,6 +1219,7 @@ positionSide
 instrument external rules
 fresh market price
 raw command result history
+exchange response reduceOnly as separate external snapshot field
 ```
 
 Причины:
@@ -1180,6 +1228,7 @@ raw command result history
 * `tdMode = isolated` и `posSide = net` задаются константами в `OkxClientService`.
 * Внешние правила инструмента и текущая цена собираются в `CalculationContext` перед расчётом action.
 * История command execution проектируется отдельно и не является runtime state.
+* `Order.positionReducingOnly` хранит наше доменное намерение, но `OrderExternalSnapshot` не хранит отдельный `reduceOnly` факт биржи. Для OKX этот факт проверяется в adapter-layer напрямую из `OrderResponse.reduceOnly`.
 
 ---
 
