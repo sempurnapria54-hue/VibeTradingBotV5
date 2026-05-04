@@ -343,11 +343,13 @@ public class Order extends Auditable {
         MANUAL_CANCEL,
 
         /**
-         * Ордер больше не нужен, потому что связанный runtime-контекст изменился.
+         * Условие, ради которого ordinary order был создан или ожидался,
+         * больше не актуально.
          *
-         * Например, позиция уже закрыта другим способом или step больше не актуален.
+         * Например, entry/grid/management condition истёк или step больше не актуален.
+         * Это штатная причина отмены/неотправки order, а не ошибка.
          */
-        NO_LONGER_RELEVANT,
+        CONDITION_EXPIRED,
 
         /**
          * Ордер ожидался, но после refresh/search/history цикла не найден.

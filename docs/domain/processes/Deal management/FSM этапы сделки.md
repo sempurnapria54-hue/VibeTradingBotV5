@@ -63,6 +63,8 @@ FSM работает по:
 * `ACKED` и `CONFIRMED` не являются runtime-статусами action.
 * `CLOSE_POSITION` используется только для полного закрытия позиции.
 * Direct partial close позиции запрещён. Partial exit выполняется через reduce-only `Order` / `AlgoOrder` actions.
+* `RiskValidator` не вызывается для risk-reducing / cleanup / safety commands: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH`.
+* Для `CANCEL_*`, `CLOSE_POSITION` и `EXECUTE_KILL_SWITCH` handler выполняет только minimal domain / exchange safety checks и опирается на refresh/search/history facts.
 
 ---
 
@@ -110,6 +112,7 @@ FSM работает по:
 
 * создавать refresh-команды;
 * создавать `CREATE_*` / `SUBMIT_*` / `AMEND_*` / `CANCEL_*` команды;
+* создавать risk-reducing / cleanup / safety-команды без `RiskValidator`, если нужно снять или локализовать риск;
 * проверять `StrategyCondition`;
 * выбирать `StrategyAction`;
 * вызывать `StrategyActionCalculator`;
@@ -1348,7 +1351,7 @@ ERROR / EXECUTE_KILL_SWITCH
 
 ## 13.1. Общий runtime-flow одного StrategyAction
 
-Для любого торгового `StrategyAction`, который может создать, изменить, отменить или закрыть runtime-сущность, handler работает по схеме:
+Для торгового `StrategyAction`, который может создать или изменить runtime-риск, handler работает по схеме:
 
 ```text
 1. Проверить входные инварианты handler.
@@ -1360,9 +1363,9 @@ ERROR / EXECUTE_KILL_SWITCH
 7. Проверить DealActionState по этому action.
 8. Собрать свежий CalculationContext именно для этого action.
 9. Выполнить StrategyActionCalculator.
-10. Выполнить RiskValidator.
-11. Если risk result = BLOCKED, вызвать RiskBlockResolver.
-12. Если action разрешён, создать одну актуальную ServiceCommand через ServiceCommandFactory.
+10. Если action создаёт или изменяет риск — выполнить RiskValidator.
+11. Если risk result = BLOCKED — вызвать RiskBlockResolver.
+12. Если action разрешён — создать одну актуальную ServiceCommand через ServiceCommandFactory.
 13. Передать ServiceCommand в ServiceCommandExecutor.
 14. После выполнения обновить facts / DealActionState / runtime-сущности.
 15. Только потом переходить к следующему action или выходной проверке этапа.
@@ -1372,10 +1375,39 @@ ERROR / EXECUTE_KILL_SWITCH
 
 ```text
 RiskValidator вызывается после расчёта price/size,
-но до создания торговой ServiceCommand.
+но до создания risk-creating / risk-modifying ServiceCommand.
 ```
 
-Перед refresh/read-only командами `RiskValidator` не вызывается.
+`RiskValidator` не вызывается перед refresh/read-only командами и перед risk-reducing / cleanup / safety commands.
+
+Risk-creating / risk-modifying commands:
+
+```text
+CREATE_ORDER
+AMEND_ORDER
+CREATE_ALGO_ORDER
+AMEND_ALGO_ORDER
+```
+
+Risk-reducing / cleanup / safety commands:
+
+```text
+CANCEL_ORDER
+CANCEL_ALGO_ORDER
+CLOSE_POSITION
+EXECUTE_KILL_SWITCH
+```
+
+Для risk-reducing / cleanup / safety commands handler выполняет minimal domain / exchange safety checks:
+
+```text
+сущность существует или есть понятный recovery-path;
+сущность относится к текущей сделке / инструменту;
+для CLOSE_POSITION закрывается вся позиция, а не часть;
+есть нужные internal/external identifiers или можно выполнить search по stable client id;
+если сущность уже terminal — handler верит refresh/search/history facts и не создаёт лишний cancel/close;
+команда не противоречит known exchange facts.
+```
 
 ## 13.2. Один action = один CalculationContext
 
@@ -1432,6 +1464,12 @@ handler может выполнять refresh / safety commands.
 
 ## 13.4. RiskValidator и RiskBlockResolver
 
+`RiskValidator` применяется только к action, который создаёт или изменяет runtime-риск.
+
+Он не применяется к `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `CLOSE_POSITION` и `EXECUTE_KILL_SWITCH`, потому что эти команды снимают, уменьшают или локализуют риск.
+
+Для cleanup / safety commands нужны minimal domain / exchange safety checks, а не risk-policy validation.
+
 `RiskValidator` возвращает результат проверки риска по уже рассчитанному action.
 
 Если результат блокирующий:
@@ -1470,7 +1508,7 @@ RiskBlockResolver.resolve(...)
 
 ### PRECHECK
 
-Если `RiskValidator` блокирует entry action в `PRECHECK`, а live risk ещё не создан:
+Если `RiskValidator` блокирует entry / risk-creating action в `PRECHECK`, а live risk ещё не создан:
 
 ```text
 Deal.status = CLOSED
@@ -1678,6 +1716,25 @@ DealActionState = SUBMITTED
 ## 13.11. CLOSE_POSITION и refresh после закрытия
 
 `CLOSE_POSITION` используется только для полного закрытия позиции.
+
+`RiskValidator` для `CLOSE_POSITION` не вызывается ни в normal-flow, ни в safety-flow.
+
+Причина:
+
+```text
+CLOSE_POSITION не создаёт новый риск,
+а убирает или локализует уже существующий live risk.
+```
+
+Перед созданием `CLOSE_POSITION` handler выполняет только minimal domain / exchange safety checks:
+
+```text
+позиция существует или подтверждена exchange facts;
+позиция относится к текущей сделке / инструменту;
+закрывается вся позиция, не partial;
+есть необходимые данные для exchange adapter;
+команда не противоречит текущему known exchange state.
+```
 
 Domain payload не содержит:
 

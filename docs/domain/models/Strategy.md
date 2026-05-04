@@ -53,6 +53,8 @@
 * Direct partial close позиции запрещён как постоянный инвариант стратегии и приложения.
 * `StrategyPositionAction` поддерживает только полное закрытие позиции через `CLOSE_FULL`.
 * Любое частичное уменьшение позиции выражается только через трассируемые `StrategyOrderAction` / `StrategyAlgoOrderAction` с reduce-only semantics, `DealActionState`, stable client id и recovery через fills/history/refresh.
+* В strategy-layer используем доменное намерение `positionReducingOnly`, если action должен только уменьшать существующую позицию. OKX `reduceOnly` — это только client/adapter field.
+* Для `StrategyAlgoOrderAction` на первом этапе `positionReducingOnly=true` выводится из самого назначения standalone algo-order: SL/TP/OCO/trailing/partial exit являются protective/closing actions и не должны открывать или увеличивать позицию.
 * Risk-check для торгового action выполняется после расчёта `CalculatedStrategyAction` и до `ServiceCommandFactory`.
 * Risk-check не выполняется перед `REFRESH_*` / search / history командами, потому что они не создают новый торговый риск.
 * `CalculationContext` собирается отдельно для каждого рассчитываемого `StrategyAction`.
@@ -999,7 +1001,7 @@ public enum StrategyStepType {
      * Важно:
      * partial exit не выполняется через direct position action.
      * Частичное уменьшение позиции всегда выражается через
-     * reduce-only StrategyOrderAction или StrategyAlgoOrderAction.
+     * position-reducing-only StrategyOrderAction или StrategyAlgoOrderAction.
      */
     PARTIAL_EXIT,
 
@@ -1703,12 +1705,17 @@ public class StrategyOrderAction extends Auditable implements StrategyAction {
     private BigDecimal allocationPercents;
 
     /**
-     * Признак, что order должен только уменьшать существующую позицию.
+     * Доменное намерение, что ordinary order должен только уменьшать существующую позицию.
      *
      * Обязателен для partial exit / partial take profit через ordinary order.
      * Такой action не должен открывать или увеличивать позицию.
+     *
+     * Важно:
+     * это strategy-level intent, а не OKX-specific поле.
+     * В runtime оно материализуется в Order.positionReducingOnly.
+     * OKX reduceOnly появляется только в client/adapter layer.
      */
-    private Boolean reduceOnly;
+    private Boolean positionReducingOnly;
 
     /**
      * Уровень действия внутри стратегии.
@@ -1740,6 +1747,34 @@ public class StrategyOrderAction extends Auditable implements StrategyAction {
      */
     private StrategyAttachedProtectionSettings attachedProtection;
 }
+```
+
+## 18.1. `positionReducingOnly` в StrategyOrderAction
+
+`StrategyOrderAction.positionReducingOnly` — это доменное намерение strategy-layer.
+
+Оно означает:
+
+```text
+создаваемый ordinary order должен только уменьшать уже существующую позицию
+и не должен открывать или увеличивать позицию.
+```
+
+Runtime mapping:
+
+```text
+StrategyOrderAction.positionReducingOnly
+  -> CalculatedStrategyAction / ServiceCommand
+  -> Order.positionReducingOnly
+  -> OKX reduceOnly только внутри client/adapter layer
+```
+
+Важно:
+
+```text
+OKX reduceOnly не является полем strategy-layer.
+В strategy-модели не используем имя reduceOnly как доменное поле, чтобы не смешивать
+strategy intent и exchange-specific request/response field.
 ```
 
 ---
@@ -2147,6 +2182,38 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
 }
 ```
 
+## 22.1. `positionReducingOnly` для StrategyAlgoOrderAction
+
+На первом этапе standalone `StrategyAlgoOrderAction` используется для protective / closing scenarios:
+
+```text
+STOP_LOSS
+TAKE_PROFIT
+OCO_FULL
+TRAILING_PERCENTS
+TRAILING_VALUE
+PARTIAL_TAKE_PROFIT
+PARTIAL_STOP_LOSS
+```
+
+Поэтому для создаваемого runtime `AlgoOrder` доменное намерение выводится так:
+
+```text
+StrategyAlgoOrderAction
+  -> AlgoOrder.positionReducingOnly = true
+```
+
+Это означает:
+
+```text
+standalone AlgoOrder должен только уменьшать существующую позицию
+и не должен открывать или увеличивать позицию.
+```
+
+Если в будущем появится opening trigger algo-order, это будет отдельное архитектурное решение и отдельная настройка strategy-layer. Сейчас такой сценарий не поддерживается.
+
+OKX `reduceOnly` остаётся только exchange-specific полем client/adapter layer и не хранится в `StrategyAlgoOrderAction`.
+
 ---
 
 # 23. StrategyPositionAction
@@ -2162,7 +2229,7 @@ StrategyPositionAction.CLOSE_PARTIAL запрещён как постоянны�
 ```
 
 Частичное уменьшение позиции не является `StrategyPositionAction`.
-Оно всегда выражается через трассируемые `StrategyOrderAction` / `StrategyAlgoOrderAction` с reduce-only semantics.
+Оно всегда выражается через трассируемые `StrategyOrderAction` / `StrategyAlgoOrderAction` с position-reducing-only semantics.
 
 ```java
 public class StrategyPositionAction extends Auditable implements StrategyAction {
@@ -2257,7 +2324,7 @@ public enum StrategyActionType {
 
 ```text
 CLOSE_PARTIAL не является допустимым StrategyActionType.
-Частичное уменьшение позиции всегда моделируется через Order / AlgoOrder action с reduce-only semantics.
+Частичное уменьшение позиции всегда моделируется через Order / AlgoOrder action с position-reducing-only semantics.
 ```
 
 ---
@@ -2352,7 +2419,7 @@ AMEND / CANCEL action
 8. Нельзя ссылаться на action из другой `StrategyDetail`.
 9. `StrategyPositionAction.actionType` должен быть только `CLOSE_FULL`.
 10. Direct partial close через `StrategyPositionAction` запрещён всегда.
-11. Partial exit должен быть выражен через `StrategyOrderAction` или `StrategyAlgoOrderAction` с reduce-only semantics.
+11. Partial exit должен быть выражен через `StrategyOrderAction` или `StrategyAlgoOrderAction` с position-reducing-only semantics.
 12. Partial exit action не должен открывать или увеличивать позицию.
 
 Подробности по runtime-связи `StrategyAction -> DealActionState -> RuntimeTarget -> ServiceCommand` см. в документе:
