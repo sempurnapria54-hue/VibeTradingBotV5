@@ -63,6 +63,11 @@ FSM работает по:
 * `ACKED` и `CONFIRMED` не являются runtime-статусами action.
 * `CLOSE_POSITION` используется только для полного закрытия позиции.
 * Direct partial close позиции запрещён. Partial exit выполняется через reduce-only `Order` / `AlgoOrder` actions.
+* FSM напрямую не создаёт и не обновляет `Position`. Локальная `Position` создаётся и обновляется только через `REFRESH_POSITION`.
+* Live risk по позиции считается вычисляемо: `Position.status == ACTIVE && Position.externalSize > 0`.
+* `Position.status == ACTIVE && externalSize == 0` означает, что биржа всё ещё возвращает position record, но live market risk по размеру позиции отсутствует. Это cleanup / anomaly / retry case, а не normal `CLOSED`.
+* После `CLOSE_POSITION` факт закрытия позиции подтверждается через `REFRESH_POSITION`.
+* `REFRESH_FILLS` используется в финализации сделки для итогового подсчёта profit/loss.
 * `RiskValidator` не вызывается для risk-reducing / cleanup / safety commands: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH`.
 * Для `CANCEL_*`, `CLOSE_POSITION` и `EXECUTE_KILL_SWITCH` handler выполняет только minimal domain / exchange safety checks и опирается на refresh/search/history facts.
 
@@ -491,10 +496,12 @@ EXECUTE_KILL_SWITCH
 2. Если entry order отправлен, но состояние не подтверждено — создать `REFRESH_ORDER`.
 3. Если order не найден среди pending — создать `REFRESH_ORDER_HISTORY`.
 4. Если order мог исполниться — создать `REFRESH_POSITION`.
-5. Если нужна фактическая цена исполнения — создать `REFRESH_FILLS`.
+5. Если нужна фактическая цена исполнения или итоговые факты исполнения — создать `REFRESH_FILLS`.
 6. Если результат отправки неизвестен — перед повторным `SUBMIT_ORDER` сначала искать order по client order id.
 7. Если order исполнен частично — определить, достаточно ли этого для появления позиции и продолжения этапа.
-8. Если факты противоречивы — перейти в recovery или `ERROR`.
+8. Если `REFRESH_POSITION` нашёл позицию, а локальной `Position` ещё нет — `RefreshPositionExecutor` создаёт `Position` и привязывает её к `Deal`.
+9. Если entry order исполнился, но после рестарта `REFRESH_POSITION` уже не находит позицию, handler должен добрать order/algo/fills/history facts и перейти в `EXIT_PENDING`, если факты объясняют закрытие позиции по SL / TP / trailing.
+10. Если факты противоречивы — перейти в recovery или `ERROR`.
 
 ### 5.4.1. Missing attached protection
 
@@ -524,14 +531,16 @@ parent Order ERROR
 
 ## 5.5. Выходные проверки
 
-Этап можно считать завершённым, если:
+Этап можно считать завершённым как успешный вход, если:
 
 * entry order финализирован;
-* позиция открыта;
+* позиция открыта и материализована через `REFRESH_POSITION`;
 * позиция соответствует сделке, инструменту и направлению;
 * если attached protection была нужна — она подтверждена или не потеряна;
 * нет конфликтующих active orders;
 * нет критичных аномалий.
+
+Если после рестарта entry order исполнен, но позиция уже закрылась на стороне биржи по SL / TP / trailing, это не является anomaly при наличии active `Deal` и known entry order. Такой кейс переводится в `EXIT_PENDING` для добора history/fills facts и финализации сделки.
 
 Именно эти выходные проверки отвечают за переход:
 
@@ -558,9 +567,12 @@ Recovery-переходы:
 ```text
 ENTRY_SUBMITTED -> ENTRY_FINALIZED
 ENTRY_SUBMITTED -> PROTECTION_SWITCHED
+ENTRY_SUBMITTED -> EXIT_PENDING
 ```
 
 Recovery-переход дальше `ENTRY_FINALIZED` допустим, если после рестарта уже есть позиция и активная основная защита.
+
+Recovery-переход в `EXIT_PENDING` допустим, если entry order исполнился, позиция успела появиться и закрыться на бирже, а history/fills/protection facts объясняют закрытие.
 
 ## 5.7. Допустимые StrategyStep
 
@@ -579,6 +591,8 @@ REFRESH_PENDING_ORDERS
 REFRESH_POSITION
 REFRESH_FILLS
 REFRESH_ORDER_HISTORY
+REFRESH_ALGO_ORDER_HISTORY
+FINALIZE_DEAL_ENTRY
 MARK_DEAL_ERROR
 EXECUTE_KILL_SWITCH
 ```
@@ -906,7 +920,8 @@ EXECUTE_KILL_SWITCH
 
 * `Deal.status = MANAGING`;
 * есть pinned `StrategyDetail`;
-* позиция активна или есть факты, что она уже закрыта и нужен переход в `EXIT_PENDING`;
+* позиция активна с live risk или есть факты, что позиция уже закрыта и нужен переход в `EXIT_PENDING`;
+* если `Position.status == ACTIVE && externalSize == 0`, handler не считает это normal `CLOSED`, а переводит кейс в cleanup / retry / anomaly-разбор по контексту;
 * main protection существует и актуальна;
 * по инструменту нет больше одной позиции;
 * нет чужих live orders/algo-orders;
@@ -931,7 +946,9 @@ EXECUTE_KILL_SWITCH
 8. Для нового или изменяемого action вызвать `StrategyActionCalculator`.
 9. Создать нужные `ServiceCommand`.
 10. Если condition требует полного выхода — создать `CLOSE_POSITION` или соответствующие cancel/close-команды.
-11. Если risk/fail-safe condition сработал — перейти к emergency flow.
+11. Если `REFRESH_POSITION` показывает, что позиции больше нет, перейти в `EXIT_PENDING` для cleanup и финализации.
+12. Если `REFRESH_POSITION` показывает `ACTIVE` с `externalSize == 0`, выполнить cleanup / retry / anomaly-разбор по контексту.
+13. Если risk/fail-safe condition сработал — перейти к emergency flow.
 
 ## 8.5. Выходные проверки
 
@@ -939,7 +956,7 @@ EXECUTE_KILL_SWITCH
 
 * стратегия инициировала выход;
 * позиция закрывается или уже закрыта;
-* создана команда закрытия позиции или есть факт закрытия;
+* создана команда закрытия позиции или есть факт закрытия через `REFRESH_POSITION`;
 * нужно дочистить orders/algo-orders/fills/history.
 
 Переход в `ERROR` нужен, если:
@@ -972,10 +989,9 @@ Recovery-переходы:
 
 ```text
 MANAGING -> EXIT_PENDING
-MANAGING -> CLOSED
 ```
 
-Recovery в `CLOSED` допустим только если после рестарта факты показывают, что позиция закрыта, live risk отсутствует, а финализация уже может быть выполнена безопасно.
+Recovery в `EXIT_PENDING` допустим, если после рестарта факты показывают, что позиция закрыта или закрывается, live risk по позиции отсутствует, но сделку ещё нужно дочистить и финализировать.
 
 ## 8.7. Допустимые StrategyStep
 
@@ -1049,12 +1065,12 @@ EXECUTE_KILL_SWITCH
 
 ## 9.4. Рабочая логика этапа
 
-1. Создать `REFRESH_POSITION`.
+1. Создать `REFRESH_POSITION`, чтобы подтвердить отсутствие live-risk позиции.
 2. Создать `REFRESH_PENDING_ORDERS`.
 3. Создать `REFRESH_ALGO_ORDERS`.
 4. Если есть live ordinary orders — создать `CANCEL_ORDER`.
 5. Если есть live algo-orders — создать `CANCEL_ALGO_ORDER`.
-6. Если нужны fills — создать `REFRESH_FILLS`.
+6. Создать `REFRESH_FILLS`, если нужны факты исполнений для итогового profit/loss.
 7. Если нужна история ordinary orders — создать `REFRESH_ORDER_HISTORY`.
 8. Если нужна история algo-orders — создать `REFRESH_ALGO_ORDER_HISTORY`.
 9. Определить или подтвердить `Deal.CloseReason`.
@@ -1065,11 +1081,12 @@ EXECUTE_KILL_SWITCH
 
 Этап можно считать завершённым, если:
 
-* позиция закрыта;
+* `REFRESH_POSITION` подтвердил, что позиции на бирже нет, или локальная `Position` отсутствовала и собранные entry/exit facts доказывают отсутствие live risk;
+* active position в домене переведена в `CLOSED`, если она была материализована;
 * нет активного рыночного риска;
 * нет live ordinary orders;
 * нет live algo-orders;
-* fills загружены, если нужны для финализации;
+* fills загружены, если нужны для финализации profit/loss;
 * order history загружена, если нужна;
 * algo-order history загружена, если нужна;
 * причина закрытия определена;
@@ -1299,7 +1316,7 @@ CLOSE_POSITION
 
 Recovery-переход после рестарта может произойти на входе в handler, если факты показывают, что сделка уже ушла дальше.
 
-Пример:
+Пример 1:
 
 ```text
 Deal.status = ENTRY_SUBMITTED
@@ -1311,6 +1328,22 @@ Deal.status = ENTRY_SUBMITTED
 
 Безопасный recovery:
   ENTRY_SUBMITTED -> PROTECTION_SWITCHED
+```
+
+Пример 2:
+
+```text
+Deal.status = ENTRY_SUBMITTED
+
+Факты:
+  entry order completed
+  position уже появилась на бирже
+  position уже закрылась по SL / TP / trailing
+  REFRESH_POSITION не находит позицию
+  order/algo/fills/history объясняют закрытие
+
+Безопасный recovery:
+  ENTRY_SUBMITTED -> EXIT_PENDING
 ```
 
 Это не обычный бизнес-переход.
@@ -1745,16 +1778,13 @@ autoCancelOrders
 
 Exchange adapter для OKX может технически отправить `autoCxl=true`, но FSM не должна на это полагаться.
 
-После `CLOSE_POSITION` handler должен пройти refresh-контур:
+После `CLOSE_POSITION` handler подтверждает факт закрытия позиции через:
 
 ```text
 REFRESH_POSITION
-REFRESH_PENDING_ORDERS
-REFRESH_ALGO_ORDERS
-REFRESH_ORDER_HISTORY
-REFRESH_ALGO_ORDER_HISTORY
-REFRESH_FILLS
 ```
+
+Дальше handler дочищает known live orders/algo-orders и добирает history/fills facts для финализации сделки.
 
 Если остались известные сделке live orders/algo-orders:
 
@@ -1774,6 +1804,8 @@ CANCEL_ALGO_ORDER
 
 `REFRESH_FILLS` — runtime read-only команда.
 
+`REFRESH_FILLS` используется в финализации сделки для итогового подсчёта profit/loss.
+
 На первом этапе `Fill` как отдельную persisted entity не храним.
 
 Один общий `RefreshFillsExecutor`:
@@ -1784,6 +1816,8 @@ CANCEL_ALGO_ORDER
 обновляет вложенные runtime-сущности;
 не обновляет Deal напрямую.
 ```
+
+`Deal.resultProfit` считается на основании фактов исполнений, собранных через `REFRESH_FILLS`.
 
 `Deal` обновляет handler по фактам вложенных сущностей.
 
