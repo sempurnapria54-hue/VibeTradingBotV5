@@ -68,8 +68,9 @@ FSM работает по:
 * `Position.status == ACTIVE && externalSize == 0` означает, что биржа всё ещё возвращает position record, но live market risk по размеру позиции отсутствует. Это cleanup / anomaly / retry case, а не normal `CLOSED`.
 * После `CLOSE_POSITION` факт закрытия позиции подтверждается через `REFRESH_POSITION`.
 * `REFRESH_FILLS` используется в финализации сделки для итогового подсчёта profit/loss.
-* `RiskValidator` не вызывается для risk-reducing / cleanup / safety commands: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH`.
-* Для `CANCEL_*`, `CLOSE_POSITION` и `EXECUTE_KILL_SWITCH` handler выполняет только minimal domain / exchange safety checks и опирается на refresh/search/history facts.
+* `RiskValidator` не вызывается для exit / risk-reducing / cleanup / safety-flow: reduce-only partial exit, `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH`.
+* Для reduce-only partial exit handler не вызывает RiskValidator, а проверяет только safety/invariant условия: reduce-only intent, размер, направление уменьшения позиции, принадлежность к текущей Deal и актуальные exchange facts.
+* Для cleanup / safety commands (`CANCEL_*`, `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH`) RiskValidator не вызывается; handler выполняет minimal domain / exchange safety checks по refresh/search/history facts.
 
 ---
 
@@ -890,11 +891,11 @@ EXECUTE_KILL_SWITCH
 * pinned `StrategyDetail`;
 * `StrategyStep` со step types:
 
-    * `PROTECTION_ADJUSTMENT`;
-    * `PARTIAL_EXIT`;
-    * `GRID_MANAGEMENT`;
-    * `EXIT`;
-    * `FAIL_SAFE`;
+  * `PROTECTION_ADJUSTMENT`;
+  * `PARTIAL_EXIT`;
+  * `GRID_MANAGEMENT`;
+  * `EXIT`;
+  * `FAIL_SAFE`;
 * `StrategyCondition` выбранных managing-steps;
 * `Instrument`;
 * `PositionContext`;
@@ -936,11 +937,11 @@ EXECUTE_KILL_SWITCH
 4. Если данные устарели или отсутствуют — применить `StrategyStep.marketDataExpiredSetting`.
 5. Если данные свежие — проверить conditions для:
 
-    * `PROTECTION_ADJUSTMENT`;
-    * `PARTIAL_EXIT`;
-    * `GRID_MANAGEMENT`;
-    * `EXIT`;
-    * `FAIL_SAFE`.
+  * `PROTECTION_ADJUSTMENT`;
+  * `PARTIAL_EXIT`;
+  * `GRID_MANAGEMENT`;
+  * `EXIT`;
+  * `FAIL_SAFE`.
 6. Для каждого применимого step взять actions.
 7. Для actions, которые создают или меняют сущности, проверить `DealActionState`.
 8. Для нового или изменяемого action вызвать `StrategyActionCalculator`.
@@ -1396,12 +1397,13 @@ ERROR / EXECUTE_KILL_SWITCH
 7. Проверить DealActionState по этому action.
 8. Собрать свежий CalculationContext именно для этого action.
 9. Выполнить StrategyActionCalculator.
-10. Если action создаёт или изменяет риск — выполнить RiskValidator.
-11. Если risk result = BLOCKED — вызвать RiskBlockResolver.
-12. Если action разрешён — создать одну актуальную ServiceCommand через ServiceCommandFactory.
-13. Передать ServiceCommand в ServiceCommandExecutor.
-14. После выполнения обновить facts / DealActionState / runtime-сущности.
-15. Только потом переходить к следующему action или выходной проверке этапа.
+10. Если action создаёт, увеличивает или ослабляет контроль риска — выполнить RiskValidator.
+11. Если action относится к exit / cleanup / safety-flow — выполнить minimal domain / exchange safety checks и invariant checks.
+12. Если risk result = BLOCKED — вызвать RiskBlockResolver.
+13. Если action разрешён или minimal checks пройдены — создать одну актуальную ServiceCommand через ServiceCommandFactory.
+14. Передать ServiceCommand в ServiceCommandExecutor.
+15. После выполнения обновить facts / DealActionState / runtime-сущности.
+16. Только потом переходить к следующему action или выходной проверке этапа.
 ```
 
 Важно:
@@ -1413,7 +1415,7 @@ RiskValidator вызывается после расчёта price/size,
 
 `RiskValidator` не вызывается перед refresh/read-only командами и перед risk-reducing / cleanup / safety commands.
 
-Risk-creating / risk-modifying commands:
+Risk-creating / risk-modifying actions обычно материализуются через:
 
 ```text
 CREATE_ORDER
@@ -1421,6 +1423,8 @@ AMEND_ORDER
 CREATE_ALGO_ORDER
 AMEND_ALGO_ORDER
 ```
+
+Но если эти же команды используются для reduce-only partial exit, они не проходят RiskValidator и проверяются через minimal safety / invariant checks.
 
 Risk-reducing / cleanup / safety commands:
 
@@ -1497,13 +1501,23 @@ handler может выполнять refresh / safety commands.
 
 ## 13.4. RiskValidator и RiskBlockResolver
 
-`RiskValidator` применяется только к action, который создаёт или изменяет runtime-риск.
+`RiskValidator` применяется только к action, который создаёт, увеличивает или ослабляет контроль runtime-риска.
 
-Он не применяется к `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `CLOSE_POSITION` и `EXECUTE_KILL_SWITCH`, потому что эти команды снимают, уменьшают или локализуют риск.
+Он не применяется к exit / cleanup / safety-flow, потому что эти действия снимают, уменьшают или локализуют риск.
 
-Для cleanup / safety commands нужны minimal domain / exchange safety checks, а не risk-policy validation.
+К exit / cleanup / safety-flow относятся:
 
-`RiskValidator` возвращает результат проверки риска по уже рассчитанному action.
+```text
+reduce-only partial exit через Order / AlgoOrder
+CANCEL_ORDER
+CANCEL_ALGO_ORDER
+CLOSE_POSITION
+EXECUTE_KILL_SWITCH
+```
+
+Для таких действий нужны minimal domain / exchange safety checks и invariant checks, а не risk-policy validation.
+
+`RiskValidator` возвращает результат проверки риска по уже рассчитанному risk-creating / risk-modifying action.
 
 Если результат блокирующий:
 
@@ -1560,9 +1574,9 @@ RISK_CONTROL
   -> condition может быть true, но risk-layer запретил вход
 ```
 
-### ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING / EXIT_PENDING
+### ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING
 
-Если live risk есть, мог появиться или состояние неизвестно:
+Если risk-creating / risk-increasing / risk-weakening action заблокирован RiskValidator, а live risk уже есть, мог появиться или состояние неизвестно:
 
 ```text
 Deal.status = ERROR
@@ -1571,6 +1585,9 @@ Deal.status = ERROR
 Дальше работает `ErrorHandler` / safety-flow.
 
 Обычные strategy steps больше не выполняются.
+
+В `EXIT_PENDING` RiskValidator обычно не вызывается: этот этап занимается cleanup/finalization.
+Если exit / cleanup action не проходит minimal safety / invariant checks, handler действует через refresh / recovery / ERROR / safety-flow, но это не `RiskValidationResult`.
 
 ## 13.6. Неблокирующий risk result
 
