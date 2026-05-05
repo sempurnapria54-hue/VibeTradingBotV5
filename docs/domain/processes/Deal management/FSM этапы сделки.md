@@ -71,6 +71,12 @@ FSM работает по:
 * `RiskValidator` не вызывается для exit / risk-reducing / cleanup / safety-flow: reduce-only partial exit, `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH`.
 * Для reduce-only partial exit handler не вызывает RiskValidator, а проверяет только safety/invariant условия: reduce-only intent, размер, направление уменьшения позиции, принадлежность к текущей Deal и актуальные exchange facts.
 * Для cleanup / safety commands (`CANCEL_*`, `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH`) RiskValidator не вызывается; handler выполняет minimal domain / exchange safety checks по refresh/search/history facts.
+* `BalanceContainer` в `DealContext` — последняя persisted версия account snapshot, а не гарантия свежести.
+* `BalanceContainer` не имеет собственного `Status`; stale определяется через freshness-check.
+* `REFRESH_BALANCE` — единственный runtime-flow обновления `BalanceContainer`.
+* FSM / handler обязан обеспечить fresh `BalanceContainer` при старте обработки сделки / `PRECHECK`, перед risk-sensitive action, при финализации выхода и при emergency/safety finalization.
+* Если balance absent/stale перед risk-check, handler создаёт `REFRESH_BALANCE` и не вызывает `RiskValidator` на этой итерации.
+* `REFRESH_BALANCE` после выхода не участвует в расчёте `Deal.resultProfit`; итоговый profit/loss считается через `REFRESH_FILLS`.
 
 ---
 
@@ -320,6 +326,22 @@ FSM handler не должен сам считать индикаторы, стр
 
 Для расчёта конкретного действия используется свежий `CalculationContext`, который собирается внутри `StrategyActionCalculator`.
 
+
+## 3.1. Balance freshness как precondition
+
+`BalanceContainer` в `DealContext` используется как account-state snapshot для sizing и risk-policy, но сам факт его наличия не означает свежесть.
+
+Правила:
+
+```text
+risk-sensitive flow
+  -> проверить BalanceContainer freshness
+  -> если absent/stale: создать REFRESH_BALANCE и остановить обработку action на этой итерации
+  -> если fresh: разрешено собирать CalculationContext / вызывать RiskValidator
+```
+
+`RiskValidator` дополнительно защищается: если ему передали absent/stale/invalid `BalanceContainer`, он возвращает `BLOCKED` с кодом `BALANCE_NOT_FRESH` / `BALANCE_INVALID`.
+
 ---
 
 # 4. PRECHECK
@@ -377,6 +399,15 @@ FSM handler не должен сам считать индикаторы, стр
 * или перейти в `ERROR`, если обнаружен опасный риск.
 
 ## 4.4. Рабочая логика этапа
+
+Перед созданием entry order handler обязан обеспечить fresh `BalanceContainer`:
+
+```text
+если BalanceContainer absent/stale
+  -> создать REFRESH_BALANCE
+  -> остаться в PRECHECK
+  -> не вызывать RiskValidator и не создавать CREATE_ORDER на этой итерации
+```
 
 1. Найти `StrategyStep` со `stepType = ENTRY` или `GRID_ENTRY`.
 2. Проверить свежесть данных step через `MarketDataExpirationChecker.checkForStep(dealContext, step)`.
@@ -591,6 +622,7 @@ REFRESH_ORDER
 REFRESH_PENDING_ORDERS
 REFRESH_POSITION
 REFRESH_FILLS
+REFRESH_BALANCE
 REFRESH_ORDER_HISTORY
 REFRESH_ALGO_ORDER_HISTORY
 FINALIZE_DEAL_ENTRY
@@ -747,6 +779,7 @@ FAIL_SAFE
 ## 6.8. Возможные ServiceCommand
 
 ```text
+REFRESH_BALANCE
 CREATE_ALGO_ORDER
 SUBMIT_ALGO_ORDER
 REFRESH_ALGO_ORDER
@@ -937,11 +970,11 @@ EXECUTE_KILL_SWITCH
 4. Если данные устарели или отсутствуют — применить `StrategyStep.marketDataExpiredSetting`.
 5. Если данные свежие — проверить conditions для:
 
-  * `PROTECTION_ADJUSTMENT`;
-  * `PARTIAL_EXIT`;
-  * `GRID_MANAGEMENT`;
-  * `EXIT`;
-  * `FAIL_SAFE`.
+* `PROTECTION_ADJUSTMENT`;
+* `PARTIAL_EXIT`;
+* `GRID_MANAGEMENT`;
+* `EXIT`;
+* `FAIL_SAFE`.
 6. Для каждого применимого step взять actions.
 7. Для actions, которые создают или меняют сущности, проверить `DealActionState`.
 8. Для нового или изменяемого action вызвать `StrategyActionCalculator`.
@@ -1007,6 +1040,7 @@ FAIL_SAFE
 ## 8.8. Возможные ServiceCommand
 
 ```text
+REFRESH_BALANCE
 AMEND_ALGO_ORDER
 CREATE_ALGO_ORDER
 SUBMIT_ALGO_ORDER
@@ -1072,11 +1106,12 @@ EXECUTE_KILL_SWITCH
 4. Если есть live ordinary orders — создать `CANCEL_ORDER`.
 5. Если есть live algo-orders — создать `CANCEL_ALGO_ORDER`.
 6. Создать `REFRESH_FILLS`, если нужны факты исполнений для итогового profit/loss.
-7. Если нужна история ordinary orders — создать `REFRESH_ORDER_HISTORY`.
-8. Если нужна история algo-orders — создать `REFRESH_ALGO_ORDER_HISTORY`.
-9. Определить или подтвердить `Deal.CloseReason`.
-10. Создать `FINALIZE_DEAL_EXIT`, если факты готовы.
-11. Создать `MARK_DEAL_CLOSED`, если всё очищено.
+7. Создать `REFRESH_BALANCE` после снятия live risk и загрузки/сопоставления fills, чтобы обновить account snapshot.
+8. Если нужна история ordinary orders — создать `REFRESH_ORDER_HISTORY`.
+9. Если нужна история algo-orders — создать `REFRESH_ALGO_ORDER_HISTORY`.
+10. Определить или подтвердить `Deal.CloseReason`.
+11. Создать `FINALIZE_DEAL_EXIT`, если факты готовы.
+12. Создать `MARK_DEAL_CLOSED`, если всё очищено.
 
 ## 9.5. Выходные проверки
 
@@ -1088,6 +1123,7 @@ EXECUTE_KILL_SWITCH
 * нет live ordinary orders;
 * нет live algo-orders;
 * fills загружены, если нужны для финализации profit/loss;
+* balance snapshot обновлён через `REFRESH_BALANCE` после выхода;
 * order history загружена, если нужна;
 * algo-order history загружена, если нужна;
 * причина закрытия определена;
