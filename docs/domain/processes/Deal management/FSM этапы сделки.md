@@ -35,7 +35,8 @@ FSM работает по:
 * `DealContext`;
 * pinned `StrategyDetail`;
 * `DealActionState`;
-* runtime-сущностям `Order`, `AlgoOrder`, `Position`, `BalanceContainer`;
+* `Deal` runtime graph: `deal.orders`, `deal.algoOrders`, `deal.position`;
+* `BalanceContainer` из `DealContext`;
 * результатам refresh-команд;
 * свежему `CalculationContext`, который собирается внутри `StrategyActionCalculator` только для конкретного action.
 
@@ -58,7 +59,7 @@ FSM работает по:
 * Финальную проверку аварийного закрытия выполняет `ErrorHandler` перед переходом `ERROR -> EMERGENCY_CLOSED`.
 * `ERROR -> CLOSED` запрещён.
 * В `ERROR` не выполняются обычные strategy steps. Разрешены только safety / recovery / refresh / kill-switch действия.
-* После restart FSM не ищет pending `ServiceCommand`. Она пересобирает `DealContext`, смотрит `DealActionState`, runtime-сущности и exchange facts.
+* После restart FSM не ищет pending `ServiceCommand`. Она пересобирает `DealContext`, смотрит `Deal` runtime graph, `DealActionState`, `BalanceContainer` и exchange facts.
 * `DealActionStateStatus.COMPLETED` ставится только после refresh/search/history facts.
 * `ACKED` и `CONFIRMED` не являются runtime-статусами action.
 * `CLOSE_POSITION` используется только для полного закрытия позиции.
@@ -315,10 +316,11 @@ FSM handler не должен сам считать индикаторы, стр
 
 Он использует:
 
-* `DealContext` — факты сделки;
+* `DealContext` — runtime-контекст сделки;
 * pinned `StrategyDetail` — правила сделки;
 * `DealActionState` — runtime-состояние strategy actions;
-* локальные `Order`, `AlgoOrder`, `Position`, `BalanceContainer`;
+* `Deal` runtime graph: `deal.orders`, `deal.algoOrders`, `deal.position`;
+* `BalanceContainer` из `DealContext`;
 * результаты refresh-команд;
 * `StrategyActionCalculator`, если нужно рассчитать параметры нового action.
 
@@ -360,9 +362,8 @@ risk-sensitive flow
 * `StrategyCondition` выбранного entry-step;
 * `Instrument`;
 * `BalanceContainer`;
-* `PositionContext`;
-* локальные `Order`, если они уже есть по сделке или инструменту;
-* локальные `AlgoOrder`, если они уже есть по сделке или инструменту;
+* `Deal` runtime graph: `deal.position`, `deal.orders`, `deal.algoOrders`;
+* актуальные instrument-level facts из refresh/search, если нужно проверить отсутствие чужой позиции или конфликтующих live-сущностей;
 * `DealActionState`;
 * свежий `CalculationContext`, если нужно рассчитать параметры entry action.
 
@@ -383,7 +384,7 @@ risk-sensitive flow
 * есть pinned `StrategyDetail`;
 * есть `Instrument`;
 * есть `BalanceContainer` или можно создать `REFRESH_BALANCE`;
-* `PositionContext` не содержит больше одной позиции по инструменту;
+* refresh/search facts не показывают больше одной позиции по инструменту;
 * нет активной позиции, если вход предполагает новую позицию;
 * нет активной сделки по инструменту, если одновременно разрешена только одна сделка;
 * нет конфликтующих live orders;
@@ -498,9 +499,7 @@ EXECUTE_KILL_SWITCH
 * `Instrument`;
 * локальный entry `Order`;
 * attached protection внутри entry `Order`, если она должна была быть создана;
-* `PositionContext`;
-* локальные `Order`;
-* локальные `AlgoOrder`;
+* `Deal` runtime graph: `deal.position`, `deal.orders`, `deal.algoOrders`;
 * `DealActionState` по entry action;
 * результат `REFRESH_ORDER`;
 * результат `REFRESH_PENDING_ORDERS`;
@@ -659,11 +658,7 @@ ENTRY_FINALIZED -> ERROR
 * `StrategyStep` со `stepType = MAIN_PROTECTION`, если такой step есть;
 * `StrategyCondition` protection-step;
 * `Instrument`;
-* `PositionContext`;
-* активная `Position`;
-* entry `Order`;
-* attached protection внутри entry `Order`;
-* локальные `AlgoOrder`;
+* `Deal` runtime graph: active `deal.position`, entry `Order`, attached protection внутри entry `Order`, `deal.algoOrders`;
 * `DealActionState` по protection actions;
 * результат refresh-команд по position/order/algo-orders;
 * свежий `CalculationContext`, если нужно рассчитать SL / TP / OCO / trailing.
@@ -816,13 +811,7 @@ temporary attached protection
 * `Deal`;
 * pinned `StrategyDetail`;
 * `Instrument`;
-* `PositionContext`;
-* активная `Position`;
-* entry `Order`;
-* attached protection внутри `Order`;
-* standalone protective `AlgoOrder`;
-* все локальные `AlgoOrder` сделки;
-* все локальные `Order` сделки;
+* `Deal` runtime graph: active `deal.position`, entry `Order`, attached protection внутри `Order`, standalone protective `AlgoOrder`, `deal.orders`, `deal.algoOrders`;
 * `DealActionState` по attached/protection actions;
 * результат `REFRESH_POSITION`;
 * результат `REFRESH_ALGO_ORDERS`;
@@ -931,10 +920,7 @@ EXECUTE_KILL_SWITCH
   * `FAIL_SAFE`;
 * `StrategyCondition` выбранных managing-steps;
 * `Instrument`;
-* `PositionContext`;
-* активная `Position`;
-* локальные `Order`;
-* локальные `AlgoOrder`;
+* `Deal` runtime graph: active `deal.position`, `deal.orders`, `deal.algoOrders`;
 * `DealActionState`;
 * `BalanceContainer`;
 * свежий `CalculationContext`, если нужно рассчитать параметры action.
@@ -1073,10 +1059,7 @@ EXECUTE_KILL_SWITCH
 * `Deal`;
 * pinned `StrategyDetail`;
 * `Instrument`;
-* `PositionContext`;
-* последняя известная `Position`;
-* локальные `Order`;
-* локальные `AlgoOrder`;
+* `Deal` runtime graph: последняя известная `deal.position`, `deal.orders`, `deal.algoOrders`;
 * `DealActionState`;
 * результат `REFRESH_POSITION`;
 * результат `REFRESH_PENDING_ORDERS`;
@@ -1256,9 +1239,7 @@ EXECUTE_KILL_SWITCH
 
 * `Deal`;
 * `DealContext`;
-* `PositionContext`;
-* live ordinary orders;
-* live algo-orders;
+* `Deal` runtime graph: `deal.position`, live ordinary orders, live algo-orders;
 * exchange snapshots;
 * refresh/search/history facts;
 * результат kill-switch-команд.

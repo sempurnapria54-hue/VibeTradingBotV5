@@ -336,7 +336,7 @@ Deal.CloseReason
 
 Kill-switch закрыл позицию:
   Position.CloseReason = KILL_SWITCH
-  Deal.CloseReason = EMERGENCY_STOP / RISK_CONTROL
+  Deal.CloseReason = EMERGENCY_CLOSE
 ```
 
 `closeReason` не должен перетираться.
