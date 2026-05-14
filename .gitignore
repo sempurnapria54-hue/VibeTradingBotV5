@@ -3,3 +3,5 @@
 .env.local
 /target/
 .idea/
+.docs/planing
+.m2/
