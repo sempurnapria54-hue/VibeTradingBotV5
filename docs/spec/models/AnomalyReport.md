@@ -1,6 +1,7 @@
-[MIGRATED → docs/spec/models/AnomalyReport.md]
+# AnomalyReport
 
-# AnomalyReport — модель и правила формирования репорта
+- **Статус:** актуальная спецификация.
+- **Источник:** мигрирован из `docs/deprecated/models/domain/AnomalyReport — модель и правила формирования репорта.md` согласно ADR-0001.
 
 ## Цель
 

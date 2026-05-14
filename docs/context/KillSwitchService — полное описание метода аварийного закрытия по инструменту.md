@@ -1,3 +1,5 @@
+[DEPRECATED — заменён KillSwitchExecutor, см. docs/domain/processes/Deal management/Сервисные команды.md и docs/domain/processes/Deal management/FSM этапы сделки.md]
+
 # KillSwitchService — оркестрация аварийного сценария по инструменту
 
 ## Цель
