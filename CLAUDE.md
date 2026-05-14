@@ -68,6 +68,7 @@ If something is unclear, ambiguous, or appears to contradict:
 
 - Default model for non-trivial work: **Opus**. Switch to Sonnet for routine code work to save budget.
 - Do **not** commit by default — leave changes in working tree for human review.
+- **Auto-staging.** After creating or modifying files in this project, run `git add` on those files so they appear as staged changes in IDEA. This applies to created files, modified files, and deletions. Do NOT commit — staging only.
 - When making changes that touch documented models or processes, **proactively** check and update related documents. This is a baseline behavior, not an optional step.
 - At the end of significant work, run `knowledge-curator` to verify nothing was left undocumented.
 

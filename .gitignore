@@ -5,3 +5,7 @@
 .idea/
 .docs/planing
 .m2/
+
+# Claude Code — user-local settings (per-machine)
+.claude/settings.local.json
+.claude/settings.local.*
