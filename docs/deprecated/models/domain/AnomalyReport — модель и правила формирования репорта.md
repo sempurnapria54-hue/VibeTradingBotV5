@@ -1,4 +1,4 @@
-[MIGRATED → docs/spec/models/AnomalyReport.md]
+> **[MIGRATED → docs/spec/models/AnomalyReport.md и docs/spec/lifecycle/AnomalyReport.md]** — этот документ больше не источник правды.
 
 # AnomalyReport — модель и правила формирования репорта
 
