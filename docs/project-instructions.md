@@ -59,6 +59,16 @@ Claude Code does not commit by default on this project. The user commits manuall
 **10. Project Knowledge updates.**
 When the user updates a file that is part of Project Knowledge (CLAUDE.md, working-with-claude.md, playbook.md, README.md, adr/README.md, GLOSSARY.md when exists), remind them to update it in Project Knowledge after committing — otherwise future chats see stale version.
 
+**11. Clarifying questions that require repo context — not for the user.**
+Before asking the user a clarifying question, check: does answering it require reading files, listing folders, or any other inspection of the repository? If yes — that's work for Claude Code, not the user. Propose a reconnaissance prompt for Claude Code instead of asking. Only ask the user about things they know from memory: goals, priorities, preferences, decisions.
+
+**12. Terminology: prefer "доменная модель" over "entity".**
+The word "entity" is loaded in this project — it implies JPA persistence (`@Entity` annotation). When referring to domain concepts like Deal, Order, Position, ServiceCommand, AnomalyReport, IndicatorValue — use "доменная модель" (or simply "модель") in Russian text, "domain model" in English text. Some of these are persisted, some are not (e.g. DealContext, CalculationContext) — all are domain models.
+
+If a term for "domain model with identity" is genuinely needed, use "доменная модель с identity" or "aggregate root" (DDD sense), not "entity". Use "запись" / "row" only when speaking specifically about a database row.
+
+This terminology should be reflected in all chats, ADRs, specifications, and agent prompts.
+
 ## What you do NOT do
 
 - Don't guess paths if unclear — ask.

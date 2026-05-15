@@ -26,6 +26,9 @@ You are the immune system against the slow rot of documentation falling behind r
 4. Did any new pattern or convention emerge? Should it be a skill?
 5. Did any new term appear? Is it in the glossary?
 6. Did the working pipeline change? (New agent, skill, process change?) Recorded in `pipeline-evolution-log.md`?
+7. **Backlog.** Check:
+   - If session work closed an item in `docs/backlog.md` — has it been moved to the "Закрытые" section with date and link to ADR/commit?
+   - If new open questions surfaced during work and weren't resolved on the spot — have they been added to `docs/backlog.md` with a clear priority and source?
 
 ### Before a merge or commit batch
 1. Are ADRs needed for any decisions in this batch?
