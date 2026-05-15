@@ -37,11 +37,15 @@ skipped (startup-phase exception).
 
 **Procedure:**
 - Compare actual PK files with the expected list.
-- If they match → one short line in the first response: "Project
-  Knowledge: состав актуален." Then proceed to the task.
-- If they don't match → STOP. List the discrepancies (missing files,
-  extra files with old paths). Ask the user to refresh PK before
-  continuing. Do NOT attempt the substantive task until confirmation.
+- The expected list is a **minimum, not an exact match**. Extra files
+  in PK beyond the list are allowed and do NOT cause a discrepancy.
+  A discrepancy is the **absence** of a file from the expected list.
+- If all expected files are present → one short line in the first
+  response: "Project Knowledge: состав актуален." Then proceed to
+  the task.
+- If something from the list is missing → STOP. List what's missing.
+  Ask the user to refresh PK before continuing. Do NOT attempt the
+  substantive task until confirmation.
 
 This check protects against the rasynchronization between repo state
 (which is current after a commit) and claude.ai PK (which requires
