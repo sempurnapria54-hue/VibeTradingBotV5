@@ -8,10 +8,19 @@ Currently supports OKX. Architecture designed for adding more exchanges.
 
 This project uses a structured collaboration model with Claude. Before making any non-trivial change, read:
 
-- `docs/working-with-claude.md` — core working model: source hierarchy, agents, skills, ADRs, knowledge capture rules.
-- `docs/playbook.md` — operational scenarios: how to make decisions, create or update agents and skills, run retrospectives.
+- `.claude/working-with-claude.md` — core working model: source hierarchy, agents, skills, ADRs, knowledge capture rules.
+- `.claude/flow/playbook.md` — operational scenarios: how to make decisions, create or update agents and skills, run retrospectives.
 
-Pipeline history lives in `docs/pipeline-evolution-log.md`. Read it to understand how the current setup evolved.
+Pipeline history lives in `.claude/pipeline-evolution-log.md`. Read it to understand how the current setup evolved.
+
+## Documentation organization
+
+The repository separates product documentation from Claude collaboration artifacts:
+
+- **`docs/`** — product documentation: models, API, conventions, specs, glossary. Describes what the bot is.
+- **`.claude/`** — everything related to working on this project through Claude: working artifacts (ADR, backlog), process documents (`working-with-claude.md`, `flow/playbook.md`, `pipeline-evolution-log.md`), Claude configuration (`project-instructions.md`, `agents/`, `skills/`), historical snapshots (`strategy-summary/`).
+
+ADR-0003 records the rationale for this split.
 
 ## Source of truth hierarchy
 
@@ -19,7 +28,7 @@ When sources disagree, follow this priority (top wins):
 
 1. **`docs/spec/`** — target specification (models, processes, interfaces). Being built incrementally. **Primary source of truth for topics already migrated here.**
 2. **`docs/domain/`**, **`docs/api/`** — current live specifications. Used as source of truth for topics **not yet migrated to `docs/spec/`**. Files migrated to spec are marked `[MIGRATED → docs/spec/...]` on the first line and stop being authoritative.
-3. **Source code in `src/main/java/`**, **`docs/adr/`** (Architecture Decision Records), **`docs/conventions/`** (code style, tech radar).
+3. **Source code in `src/main/java/`**, **`.claude/adr/`** (Architecture Decision Records), **`docs/conventions/`** (code style, tech radar).
 4. **Other docs in `docs/`** (planning, ops).
 5. **Archives**: `docs/context/`, `docs/deprecated/`, `docs/planning/` legacy entries, any path containing `old/`, `archive/`, `deprecated/`. **Reference only. Never authoritative.** Use only if a topic has no coverage in higher priority sources, AND the content does not contradict them.
 
@@ -32,21 +41,24 @@ src/main/resources/db/migration/  Flyway migrations (V1..V7)
 src/test/java/                 Tests (currently empty — see ADRs for test strategy)
 docs/
 spec/                        ★ TARGET specification (growing, primary source of truth)
-adr/                         Architecture Decision Records (append-only)
 conventions/                 Code style, tech radar
 domain/                      Current live specification (legacy, being migrated)
 api/                         API documentation (OKX, internal)
-planning/                    Roadmap, milestones, execution log
+planning/                    Roadmap, milestones, execution log (long-term plans)
 ops/                         Operational notes
-working-with-claude.md       Collaboration model (read this)
-playbook.md                  Operational scenarios for the human
-pipeline-evolution-log.md    History of changes to the working setup
 README.md                    Documentation map
 GLOSSARY.md                  (TBD) Domain terms
 .claude/
+working-with-claude.md       Collaboration model (read this)
+project-instructions.md      Backup of claude.ai Custom Instructions
+pipeline-evolution-log.md    History of changes to the working setup
 agents/                      Subagent definitions (architect, domain-expert, etc.)
 skills/                      Reusable knowledge and procedures
-notes/                       Working notes (agent-issues, skill-issues, work-log)
+adr/                         Architecture Decision Records (append-only) + README
+flow/                        Operational procedures (playbook)
+planning/                    Working backlog
+strategy-summary/            Versioned strategy snapshots (v1, v2, …)
+notes/                       TBD — created when first observation log appears
 
 ## Key project conventions
 
@@ -72,4 +84,4 @@ If something is unclear, ambiguous, or appears to contradict:
 - When making changes that touch documented models or processes, **proactively** check and update related documents. This is a baseline behavior, not an optional step.
 - At the end of significant work, run `knowledge-curator` to verify nothing was left undocumented.
 
-For operational scenarios (creating agents, updating skills, retrospectives), see `docs/playbook.md`.
+For operational scenarios (creating agents, updating skills, retrospectives), see `.claude/flow/playbook.md`.

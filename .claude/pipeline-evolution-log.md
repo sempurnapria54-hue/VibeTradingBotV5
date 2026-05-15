@@ -10,6 +10,43 @@
 
 ---
 
+## 2026-05-15 — ADR-0003: разделение продуктовой документации и работы с Claude
+
+**Что:** принят ADR-0003 (`.claude/adr/0003-meta-docs-relocation.md`).
+Введено разделение: `docs/` для продуктовой документации, `.claude/`
+для работы над проектом через Claude.
+
+**Переехало:**
+- working-with-claude.md, project-instructions.md,
+  pipeline-evolution-log.md → `.claude/`.
+- playbook.md → `.claude/flow/`.
+- backlog.md → `.claude/planning/`.
+- Все ADR + шаблон + README → `.claude/adr/`.
+- setup-strategy-summary.md → `.claude/strategy-summary/strategy-summary-v1.md`
+  (с переименованием, без редактирования содержания).
+
+**Создано:**
+- `.claude/strategy-summary/strategy-summary-v2.md` —
+  актуальный снимок.
+- Раздел «Алгоритм работы с ADR» в `.claude/adr/README.md`.
+- Блоки технических примечаний в ADR-0001 и ADR-0002.
+
+**Обновлено:**
+- CLAUDE.md (пути, Repository layout, описание разделения).
+- docs/README.md (упоминания meta-файлов, указание места ADR).
+- knowledge-curator.md, spec-document-workflow/SKILL.md (ссылки).
+- backlog.md: пункт закрыт; ADR-0003 (?) Каталог аномалий → ADR-0004.
+
+**Новый паттерн зафиксирован:** версионированные снимки
+(`.claude/strategy-summary/`).
+
+**Не сделано (требует ручной работы человека):**
+- Обновление Project Knowledge в claude.ai (перезагрузить
+  переехавшие файлы, обновить Custom Instructions из
+  `.claude/project-instructions.md`).
+
+---
+
 ## 2026-05-14 — открытый вопрос: разделение docs/ vs .claude/
 
 В backlog заведён кандидат на ADR-0003: разделение документации проекта

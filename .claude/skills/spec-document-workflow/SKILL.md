@@ -22,7 +22,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
   миграцию выполнять с этим скиллом, но действовать осторожно (не
   ограничиваться им).
 - Работа с любыми файлами **вне** `docs/spec/` (включая `docs/domain/`,
-  `docs/adr/`, `docs/planning/`).
+  `.claude/adr/`, `.claude/planning/`).
 - Редактирование шаблонов в `docs/spec/_templates/` (это отдельная
   задача, требующая согласования через ADR).
 
@@ -38,7 +38,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
 - **Контракт, не реализация.** Никаких Java-сниппетов. Структура —
   таблицами полей. SQL DDL — в Flyway-миграциях, не здесь.
 
-Полный стандарт — в `docs/adr/0002-spec-document-standard.md`. При
+Полный стандарт — в `.claude/adr/0002-spec-document-standard.md`. При
 неоднозначности всегда смотри ADR.
 
 ## Процедура
@@ -100,7 +100,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
    - Сверить структуру (frontmatter, обязательные разделы).
    - Если документ устарел относительно шаблона — это сигнал. Не править
      молча: либо привести в соответствие в той же сессии (если изменение
-     невелико), либо завести задачу в `docs/planning/backlog.md`.
+     невелико), либо завести задачу в `.claude/planning/backlog.md`.
 3. **Внести изменения в тело документа.** Никаких addenda. Если нужно
    зафиксировать дельту относительно прошлого состояния — это работа для
    ADR, не для документа спецификации.
@@ -129,7 +129,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
   `integrations/okx/order-mapping.md` — обновить и их.
 - **ADR.** Если изменение мотивировано новым решением — оно должно быть
   ADR. Если ADR ещё нет — поднять руку пользователю.
-- **Backlog (`docs/planning/backlog.md`).**
+- **Backlog (`.claude/planning/backlog.md`).**
   - Если изменение **закрывает** пункт из backlog — переместить пункт в
     раздел «Закрытые» с датой и ссылкой на коммит/ADR.
   - Если в процессе всплыл **новый открытый вопрос** — завести в backlog
@@ -167,7 +167,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
 - [ ] Нет SQL DDL. Структура БД — в Flyway-миграциях.
 - [ ] Нет addenda-разделов («Дополнение после Q2-Q8», «Уточнение
       после ...» и подобные).
-- [ ] Нет встроенных «Открытых вопросов» — они в `docs/planning/backlog.md`.
+- [ ] Нет встроенных «Открытых вопросов» — они в `.claude/planning/backlog.md`.
 
 **Стиль:**
 
@@ -181,7 +181,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
 
 - [ ] Размер документа ≤1000 строк.
 - [ ] Если >1000 строк: добавить запись в раздел «Документы под пересмотр
-      размера» в `docs/planning/backlog.md` с указанием пути, количества
+      размера» в `.claude/planning/backlog.md` с указанием пути, количества
       строк, даты и возможных направлений декомпозиции.
 
 **Связное обновление:**
@@ -223,9 +223,9 @@ backlog).
 
 ## Связанные документы
 
-- `docs/adr/0002-spec-document-standard.md` — полный стандарт.
+- `.claude/adr/0002-spec-document-standard.md` — полный стандарт.
 - `docs/spec/_templates/` — шаблоны жанров.
-- `docs/playbook.md`, Сценарий 7 — операционная процедура с точки зрения
+- `.claude/flow/playbook.md`, Сценарий 7 — операционная процедура с точки зрения
   пользователя.
-- `docs/planning/backlog.md` — куда заводить открытые вопросы и пункты на
+- `.claude/planning/backlog.md` — куда заводить открытые вопросы и пункты на
   пересмотр размера.

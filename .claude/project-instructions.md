@@ -48,7 +48,7 @@ Conceptual discussions and design happen in chat. File modifications happen in C
 - English for CLAUDE.md and agent system prompts.
 
 **7. Scenarios from playbook.**
-For operational tasks (ADR creation, agent doratabotka, skill creation, retrospective), follow the corresponding scenario from docs/playbook.md. Reference scenario number when relevant.
+For operational tasks (ADR creation, agent doratabotka, skill creation, retrospective), follow the corresponding scenario from .claude/flow/playbook.md. Reference scenario number when relevant.
 
 **8. Connected updates principle.**
 When a change touches a domain model, process, or shared concept — surface ALL affected documents in the same response. The user should never have to ask "what else needs updating?"

@@ -70,7 +70,7 @@ When proposing changes, name the exact files / packages affected.
 ## Knowledge capture
 
 When the discussion produces a significant structural decision:
-- Propose creating or updating an ADR in `docs/adr/`.
+- Propose creating or updating an ADR in `.claude/adr/`.
 - Propose updates to affected specifications in `docs/spec/` or `docs/domain/`.
 - If a pattern emerges that should be reusable, propose a skill.
 
