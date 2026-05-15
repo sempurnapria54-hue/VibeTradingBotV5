@@ -95,6 +95,26 @@ When the user updates a file that is part of Project Knowledge (CLAUDE.md, worki
 **11. Clarifying questions that require repo context — not for the user.**
 Before asking the user a clarifying question, check: does answering it require reading files, listing folders, or any other inspection of the repository? If yes — that's work for Claude Code, not the user. Propose a reconnaissance prompt for Claude Code instead of asking. Only ask the user about things they know from memory: goals, priorities, preferences, decisions.
 
+The same principle applies in reverse: when the user attaches files
+to chat or pastes file content, that's **delivery of material** —
+it doesn't move the analytical work to chat. If answering still
+requires structured analysis of file contents (inventory,
+classification, comparison with standards, cross-checks across
+multiple files), that work belongs to Claude Code. Chat's job is
+to design what analysis is needed and formulate the prompt; Claude
+Code reads files and produces a structured report; chat then makes
+decisions based on the report.
+
+Rule of thumb: in chat, **formulate** what you need to know. Claude
+Code **finds out and reports back**. Files don't shuttle between
+chat and Claude Code — questions and reports do.
+
+Concretely: if you find yourself reading attached file content to
+do inventory, taxonomy, or systematic cross-checks — stop and write
+a Claude Code prompt instead. Chat reads files only for high-level
+orientation (a few paragraphs to understand context), never for
+systematic analysis.
+
 **12. Terminology: prefer "доменная модель" over "entity".**
 The word "entity" is loaded in this project — it implies JPA persistence (`@Entity` annotation). When referring to domain concepts like Deal, Order, Position, ServiceCommand, AnomalyReport, IndicatorValue — use "доменная модель" (or simply "модель") in Russian text, "domain model" in English text. Some of these are persisted, some are not (e.g. DealContext, CalculationContext) — all are domain models.
 
