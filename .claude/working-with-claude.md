@@ -68,10 +68,11 @@ Knowledge Curator в конце каждой сессии должен пров�
 5. **Структура `docs/spec/`** зафиксирована в [ADR-0002](adr/0002-spec-document-standard.md). Шесть жанровых
    каталогов: `models/`, `lifecycle/`, `processes/`, `integrations/`,
    `references/`, `invariants/`. Шаблоны для каждого — в
-   `docs/spec/_templates/`. Полные правила (имена файлов, frontmatter,
-   стиль ссылок, размер документов, что допустимо в spec) — в ADR-0002.
-   При работе с документами в `docs/spec/` автоматически активируется
-   скилл `spec-document-workflow`, обеспечивающий соблюдение стандарта.
+   `.claude/templates/documents/` (см. [ADR-0004](adr/0004-spec-templates-relocation.md)).
+   Полные правила (имена файлов, frontmatter, стиль ссылок, размер
+   документов, что допустимо в spec) — в ADR-0002. При работе с
+   документами в `docs/spec/` автоматически активируется скилл
+   `spec-document-workflow`, обеспечивающий соблюдение стандарта.
 
 Эта же логика применима к `docs/api/`, если решим её переносить.
 
@@ -100,7 +101,7 @@ Knowledge Curator в конце каждой сессии должен пров�
 
 ## ADR — архитектурные решения
 
-ADR хранятся в `.claude/adr/`. Индекс — `.claude/adr/README.md`. Шаблон — `.claude/adr/0000-template.md`.
+ADR хранятся в `.claude/adr/`. Индекс — `.claude/adr/README.md`. Шаблон — `.claude/templates/documents/adr.md`.
 
 **Правила ADR:**
 

@@ -185,6 +185,11 @@
   Ссылка: `../adr/0001-reconcile-via-anomaly-report.md`.
 - ✅ **ADR-0003: Разделение продуктовой документации и работы с Claude.**
   Закрыто 2026-05-15. Ссылка: `../adr/0003-meta-docs-relocation.md`.
+- ✅ **[2026-05-15] Перенос шаблонов spec-документов в `.claude/`** —
+  принят ADR-0004 (`../adr/0004-spec-templates-relocation.md`).
+- ✅ **[2026-05-15] Перенос шаблона ADR в `.claude/templates/documents/adr.md`** —
+  принят ADR-0005 (`../adr/0005-adr-template-relocation.md`). Семантика
+  `documents/` расширена до «шаблоны markdown-документов проекта».
 
 ---
 

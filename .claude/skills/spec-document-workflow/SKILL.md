@@ -23,7 +23,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
   ограничиваться им).
 - Работа с любыми файлами **вне** `docs/spec/` (включая `docs/domain/`,
   `.claude/adr/`, `.claude/planning/`).
-- Редактирование шаблонов в `docs/spec/_templates/` (это отдельная
+- Редактирование шаблонов в `.claude/templates/documents/` (это отдельная
   задача, требующая согласования через ADR).
 
 ## Базовые принципы (выжимка из ADR-0002)
@@ -69,8 +69,11 @@ description: Use when creating, updating, or reviewing any document under `docs/
 
 ### Шаг 3a. Создание нового документа
 
-1. **Скопировать шаблон** из `docs/spec/_templates/<genre>.md` в целевой
-   путь. Не писать с нуля.
+1. **Скопировать шаблон** из `.claude/templates/documents/<genre>.md`
+   в целевой путь. Не писать с нуля. Соответствие жанра имени файла
+   шаблона: `model → model.md`, `lifecycle → lifecycle.md`,
+   `process → process.md`, `integration-mapping → integration-mapping.md`,
+   `reference → reference.md`, `invariant → invariant.md`.
 2. **Определить имя файла:**
    - PascalCase, если документ описывает один конкретный класс. Имя
      файла = имя класса (`Order.md`, `AlgoOrder.md`,
@@ -96,7 +99,7 @@ description: Use when creating, updating, or reviewing any document under `docs/
 1. **Прочитать документ полностью.** Не править вслепую — изменение
    может затронуть разделы, на которые ссылается другая часть документа.
 2. **Проверить соответствие шаблону:**
-   - Открыть `docs/spec/_templates/<genre>.md` для жанра документа.
+   - Открыть `.claude/templates/documents/<genre>.md` для жанра документа.
    - Сверить структуру (frontmatter, обязательные разделы).
    - Если документ устарел относительно шаблона — это сигнал. Не править
      молча: либо привести в соответствие в той же сессии (если изменение
@@ -224,7 +227,7 @@ backlog).
 ## Связанные документы
 
 - `.claude/adr/0002-spec-document-standard.md` — полный стандарт.
-- `docs/spec/_templates/` — шаблоны жанров.
+- `.claude/templates/documents/` — шаблоны жанров (переехали по ADR-0004).
 - `.claude/flow/playbook.md`, Сценарий 7 — операционная процедура с точки зрения
   пользователя.
 - `.claude/planning/backlog.md` — куда заводить открытые вопросы и пункты на

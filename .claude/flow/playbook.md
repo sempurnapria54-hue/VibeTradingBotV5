@@ -264,9 +264,12 @@
    - Какие пункты backlog закрываются / появляются.
 3. **Claude Code:** скилл `spec-document-workflow` активируется
    автоматически. Он направляет:
-   - Скопировать шаблон из `docs/spec/_templates/<жанр>.md` в целевой
-     путь (для создания) или прочитать существующий документ (для
-     обновления).
+   - Скопировать шаблон из `.claude/templates/documents/<имя>.md`
+     в целевой путь (для создания) или прочитать существующий
+     документ (для обновления). Соответствие жанра имени шаблона:
+     `models → model.md`, `lifecycle → lifecycle.md`,
+     `processes → process.md`, `integrations → integration-mapping.md`,
+     `references → reference.md`, `invariants → invariant.md`.
    - Заполнить шаблон полученным содержанием.
    - Проверить связные обновления (другие spec-документы, ADR, backlog).
    - Пройтись по чек-листу (входит в скилл).

@@ -58,6 +58,7 @@ adr/                         Architecture Decision Records (append-only) + READM
 flow/                        Operational procedures (playbook)
 planning/                    Working backlog
 strategy-summary/            Versioned strategy snapshots (v1, v2, …)
+templates/                   Templates (documents/ — markdown-document templates: adr.md, model.md, lifecycle.md, process.md, integration-mapping.md, reference.md, invariant.md; per ADR-0004, ADR-0005)
 notes/                       TBD — created when first observation log appears
 
 ## Key project conventions
