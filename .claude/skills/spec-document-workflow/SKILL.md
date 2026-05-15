@@ -1,6 +1,6 @@
 ---
 name: spec-document-workflow
-description: Use when creating, updating, or reviewing any document under `docs/spec/`. Covers all six genres (models, lifecycle, processes, integrations, references, invariants), template application, frontmatter management, and the full ADR-0002 compliance checklist. NOT for migrating documents from `docs/domain/` to `docs/spec/` (separate skill `spec-document-migration` — to be created) and NOT for editing files outside `docs/spec/`.
+description: Use when creating, updating, or reviewing any document under `docs/spec/`. Covers all six genres (models, lifecycle, processes, integrations, references, invariants), template application, frontmatter management, and the full ADR-0002 compliance checklist. NOT for migrating documents from `docs/domain/` to `docs/spec/` (use `spec-document-migration`) and NOT for editing files outside `docs/spec/`.
 ---
 
 # spec-document-workflow
@@ -17,10 +17,9 @@ description: Use when creating, updating, or reviewing any document under `docs/
 
 ## Когда НЕ активируется
 
-- Миграция документа из `docs/domain/` в `docs/spec/` — для этого
-  планируется отдельный скилл `spec-document-migration`. До его создания
-  миграцию выполнять с этим скиллом, но действовать осторожно (не
-  ограничиваться им).
+- Миграция документа из `docs/domain/` или `docs/deprecated/`
+  в `docs/spec/` — для этого активируется скилл
+  [`spec-document-migration`](../spec-document-migration/SKILL.md).
 - Работа с любыми файлами **вне** `docs/spec/` (включая `docs/domain/`,
   `.claude/adr/`, `.claude/planning/`).
 - Редактирование шаблонов в `.claude/templates/documents/` (это отдельная
@@ -226,6 +225,8 @@ backlog).
 
 ## Связанные документы
 
+- [`spec-document-migration`](../spec-document-migration/SKILL.md) —
+  соседний скилл для миграции из legacy-локаций.
 - `.claude/adr/0002-spec-document-standard.md` — полный стандарт.
 - `.claude/templates/documents/` — шаблоны жанров (переехали по ADR-0004).
 - `.claude/flow/playbook.md`, Сценарий 7 — операционная процедура с точки зрения
