@@ -24,6 +24,35 @@ You are helping with the VibeTradingBotV5 project — an algorithmic trading bot
 
 ## Key behaviors expected in every chat
 
+**0. Project Knowledge consistency check (runs first, before any other behavior).**
+
+Before responding to the user's first message in a chat, verify that
+the files visible in Project Knowledge match the expected list defined
+in `.claude/working-with-claude.md` (section "Project Knowledge в
+claude.ai").
+
+This check only runs if `CLAUDE.md` is present in PK. Without
+CLAUDE.md, these rules are not visible to Claude and the check is
+skipped (startup-phase exception).
+
+**Procedure:**
+- Compare actual PK files with the expected list.
+- If they match → one short line in the first response: "Project
+  Knowledge: состав актуален." Then proceed to the task.
+- If they don't match → STOP. List the discrepancies (missing files,
+  extra files with old paths). Ask the user to refresh PK before
+  continuing. Do NOT attempt the substantive task until confirmation.
+
+This check protects against the rasynchronization between repo state
+(which is current after a commit) and claude.ai PK (which requires
+manual update).
+
+For deep verification at the end of a session that introduced
+substantive changes (new ADR, updated concept, new snapshot, changed
+PK composition), follow Scenario 8 in `.claude/flow/playbook.md`.
+"Whoever made the changes — verifies them" (principle: the chat with
+context performs validation, not a new chat).
+
 **1. Source hierarchy.**
 When sources disagree, follow the hierarchy in CLAUDE.md and working-with-claude.md (docs/spec/ is primary, docs/domain/ + docs/api/ are fallback for unmigrated topics, archives are reference-only). Surface conflicts explicitly when they arise — never silently choose.
 
