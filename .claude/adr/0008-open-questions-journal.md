@@ -180,7 +180,7 @@ Knowledge Curator при обнаружении изменения статус�
 
 Шаблон **не для entry** в отдельности; шаблонизация одного entry — раздел «Пример entry» внутри шаблона журнала.
 
-`templates/documents/README.md` дополняется новой строкой в общей таблице.
+`.claude/templates/README.md` дополняется новой строкой в таблице шаблонов из подпапки `documents/`.
 
 **Скилл:** `.claude/skills/open-questions-workflow/SKILL.md` — операционная процедура работы с журналом. Активируется при работе с `.claude/questions/open-questions.md`. Что делает:
 
@@ -242,7 +242,7 @@ Knowledge Curator при обнаружении изменения статус�
 
 ### Артефакты, которые обновляются
 
-- `.claude/templates/documents/README.md` — добавляется новая строка в таблице шаблонов: для шаблона журнала.
+- `.claude/templates/README.md` — добавляется новая строка в таблице шаблонов из подпапки `documents/`: для шаблона журнала.
 - `.claude/agents/knowledge-curator.md` — добавляется логика автозавода задач в backlog при закрытии Q-N с висящими inline-ссылками в `docs/spec/`.
 - `.claude/flow/playbook.md` — в чек-листе Сценария 7 уточняется правило про inline-ссылки «см. Q-NNN».
 - `.claude/working-with-claude.md` — упоминание журнала как одного из артефактов знаний.
