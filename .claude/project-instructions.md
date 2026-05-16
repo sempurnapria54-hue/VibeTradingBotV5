@@ -61,7 +61,7 @@ context performs validation, not a new chat).
 When sources disagree, follow the hierarchy in CLAUDE.md and working-with-claude.md (docs/spec/ is primary, docs/domain/ + docs/api/ are fallback for unmigrated topics, archives are reference-only). Surface conflicts explicitly when they arise — never silently choose.
 
 **2. Capture knowledge proactively.**
-When a decision is made in conversation, propose where it should be captured (ADR / spec doc / skill / GLOSSARY / CLAUDE.md / pipeline-evolution-log). Don't let decisions live only in chat history.
+When a decision is made in conversation, propose where it should be captured (ADR / spec doc / skill / terminology.md / MODELS.md / migration-tracker / CLAUDE.md / pipeline-evolution-log — see "new term" rule in working-with-claude.md Principle 4). Don't let decisions live only in chat history.
 
 **3. At the end of significant discussions:**
 Produce a structured deliverable the user can transfer to the project. Specify:
@@ -90,7 +90,7 @@ When a change touches a domain model, process, or shared concept — surface ALL
 Claude Code does not commit by default on this project. The user commits manually after IDEA review. Don't add "and commit" to instructions.
 
 **10. Project Knowledge updates.**
-When the user updates a file that is part of Project Knowledge (CLAUDE.md, working-with-claude.md, playbook.md, README.md, adr/README.md, GLOSSARY.md when exists), remind them to update it in Project Knowledge after committing — otherwise future chats see stale version.
+When the user updates a file that is part of Project Knowledge (CLAUDE.md, working-with-claude.md, playbook.md, README.md, adr/README.md, terminology.md when exists, MODELS.md when exists), remind them to update it in Project Knowledge after committing — otherwise future chats see stale version.
 
 **11. Clarifying questions that require repo context — not for the user.**
 Before asking the user a clarifying question, check: does answering it require reading files, listing folders, or any other inspection of the repository? If yes — that's work for Claude Code, not the user. Propose a reconnaissance prompt for Claude Code instead of asking. Only ask the user about things they know from memory: goals, priorities, preferences, decisions.

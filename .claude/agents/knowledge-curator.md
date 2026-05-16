@@ -24,7 +24,7 @@ You are the immune system against the slow rot of documentation falling behind r
 2. What code was changed? Does it reflect any decision worth recording?
 3. Were any specifications affected? Are they updated?
 4. Did any new pattern or convention emerge? Should it be a skill?
-5. Did any new term appear? Is it in the glossary?
+5. Did any new term appear? Apply the "new term routing" rule (see working-with-claude.md Principle 4): model name → `docs/spec/MODELS.md` + model document; terminological convention → `docs/conventions/terminology.md`; cross-cutting concept → corresponding invariant/process/lifecycle document in `docs/spec/`. Check that the term landed in the correct artifact.
 6. Did the working pipeline change? (New agent, skill, process change?) Recorded in `pipeline-evolution-log.md`?
 7. **Backlog.** Check:
    - If session work closed an item in `.claude/planning/backlog.md` — has it been moved to the "Закрытые" section with date and link to ADR/commit?
@@ -41,7 +41,7 @@ You are the immune system against the slow rot of documentation falling behind r
 2. Agents — are any of them never invoked? Candidates for retrospective discussion.
 3. Skills — are any never activated? Candidates for description fix or removal.
 4. ADRs — are any "Proposed" that should be "Accepted" or vice versa?
-5. Glossary — are there terms used in specs that aren't defined?
+5. `docs/spec/MODELS.md` — are there model names used in specs that aren't in the registry? `docs/conventions/terminology.md` — are there terminological conventions applied inconsistently across specs? Cross-cutting concepts mentioned in specs should each have a corresponding invariant/process/lifecycle document.
 
 ## Process
 
@@ -49,7 +49,7 @@ When invoked:
 1. Scan recent activity: git log, recent file changes, current chat context.
 2. Identify undocumented decisions or patterns.
 3. For each one, propose:
-   - Where it should live (ADR / spec file / skill / pipeline-evolution-log / GLOSSARY / CLAUDE.md).
+   - Where it should live (ADR / spec file / skill / pipeline-evolution-log / terminology.md / MODELS.md / migration-tracker.md / CLAUDE.md — see "new term routing" rule for terms specifically).
    - A concrete draft (1-3 sentences for log entries, longer for ADRs).
 4. Present as a numbered list to the user. They accept / reject / edit each item.
 
@@ -79,7 +79,7 @@ Follow `CLAUDE.md`. When proposing a capture location, use the hierarchy:
 - Decisions with alternatives → ADR.
 - "How is the system" → spec (`docs/spec/` if migrated, `docs/domain/` otherwise).
 - "How to do task X" → skill.
-- New term → GLOSSARY.
+- New term → routed per Principle 4 rule (MODELS.md / terminology.md / corresponding spec document).
 - Project convention → CLAUDE.md or relevant skill.
 - Change in working pipeline → pipeline-evolution-log.
 

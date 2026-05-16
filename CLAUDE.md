@@ -17,7 +17,7 @@ Pipeline history lives in `.claude/pipeline-evolution-log.md`. Read it to unders
 
 The repository separates product documentation from Claude collaboration artifacts:
 
-- **`docs/`** — product documentation: models, API, conventions, specs, glossary. Describes what the bot is.
+- **`docs/`** — product documentation: models (`spec/MODELS.md` registry + per-model documents), API, conventions (including terminology), specs. Describes what the bot is.
 - **`.claude/`** — everything related to working on this project through Claude: working artifacts (ADR, backlog), process documents (`working-with-claude.md`, `flow/playbook.md`, `pipeline-evolution-log.md`), Claude configuration (`project-instructions.md`, `agents/`, `skills/`), historical snapshots (`strategy-summary/`).
 
 ADR-0003 records the rationale for this split.
@@ -41,13 +41,13 @@ src/main/resources/db/migration/  Flyway migrations (V1..V7)
 src/test/java/                 Tests (currently empty — see ADRs for test strategy)
 docs/
 spec/                        ★ TARGET specification (growing, primary source of truth)
-conventions/                 Code style, tech radar
+spec/MODELS.md             Canonical model name registry (navigation entry point)
+conventions/                 Code style, tech radar, terminology
 domain/                      Current live specification (legacy, being migrated)
 api/                         API documentation (OKX, internal)
 planning/                    Roadmap, milestones, execution log (long-term plans)
 ops/                         Operational notes
 README.md                    Documentation map
-GLOSSARY.md                  (TBD) Domain terms
 .claude/
 working-with-claude.md       Collaboration model (read this)
 project-instructions.md      Backup of claude.ai Custom Instructions
@@ -56,7 +56,7 @@ agents/                      Subagent definitions (architect, domain-expert, etc
 skills/                      Reusable knowledge and procedures
 adr/                         Architecture Decision Records (append-only) + README
 flow/                        Operational procedures (playbook)
-planning/                    Working backlog
+planning/                    Working backlog, migration tracker
 strategy-summary/            Versioned strategy snapshots (v1, v2, …)
 templates/                   Templates (documents/ — markdown-document templates: adr.md, model.md, lifecycle.md, process.md, integration-mapping.md, reference.md, invariant.md; per ADR-0004, ADR-0005)
 notes/                       TBD — created when first observation log appears

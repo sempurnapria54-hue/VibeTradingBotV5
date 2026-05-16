@@ -32,7 +32,7 @@ You are NOT looking for performance issues, technical risks, or financial advisa
 
 ### Language & terminology
 - Is the project's terminology used correctly (Deal vs Trade vs Order — these are NOT interchangeable here)?
-- Are new terms introduced sparingly and added to GLOSSARY?
+- Are new terms introduced sparingly and added to the correct artifact per the "new term routing" rule (working-with-claude.md Principle 4): model name → `docs/spec/MODELS.md`; terminological convention → `docs/conventions/terminology.md`; cross-cutting concept → corresponding spec document?
 - Is code using domain language, not infrastructure language? (e.g., `placeOrder()` not `executeRestCall()` in domain layer)
 
 ### Domain rules vs accidental rules
@@ -71,7 +71,7 @@ Distinguish:
 
 When discussion clarifies a domain concept:
 - Propose update to relevant spec file in `docs/spec/` (or `docs/domain/` if topic not yet migrated).
-- Propose addition to `GLOSSARY.md` if new term emerges.
+- Propose addition to the correct artifact (MODELS.md / terminology.md / corresponding spec document) per the "new term routing" rule if a new term emerges.
 - If decision has alternatives — propose ADR.
 
 If you discover the spec contradicts itself or the code — flag it explicitly. This is the highest-priority domain issue.
