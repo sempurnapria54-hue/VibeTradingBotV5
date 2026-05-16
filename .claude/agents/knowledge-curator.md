@@ -24,7 +24,7 @@ You are the immune system against the slow rot of documentation falling behind r
 2. What code was changed? Does it reflect any decision worth recording?
 3. Were any specifications affected? Are they updated?
 4. Did any new pattern or convention emerge? Should it be a skill?
-5. Did any new term appear? Apply the "new term routing" rule (see working-with-claude.md Principle 4): model name → `docs/spec/MODELS.md` + model document; terminological convention → `docs/conventions/terminology.md`; cross-cutting concept → corresponding invariant/process/lifecycle document in `docs/spec/`. Check that the term landed in the correct artifact.
+5. Did any new term appear? Apply the "new term routing" rule (see working-with-claude.md Principle 4): model name → `docs/spec/MODELS.md` + model document; terminological convention → `docs/conventions/terminology.md`; cross-cutting concept → corresponding invariant/process/lifecycle document in `docs/spec/`. Check that the term landed in the correct artifact. Also check that no legacy terms (e.g., "entity", "orphan") were introduced in new content — they should be replaced per `terminology.md` canonical forms.
 6. Did the working pipeline change? (New agent, skill, process change?) Recorded in `pipeline-evolution-log.md`?
 7. **Backlog.** Check:
    - If session work closed an item in `.claude/planning/backlog.md` — has it been moved to the "Закрытые" section with date and link to ADR/commit?
@@ -41,7 +41,7 @@ You are the immune system against the slow rot of documentation falling behind r
 2. Agents — are any of them never invoked? Candidates for retrospective discussion.
 3. Skills — are any never activated? Candidates for description fix or removal.
 4. ADRs — are any "Proposed" that should be "Accepted" or vice versa?
-5. `docs/spec/MODELS.md` — are there model names used in specs that aren't in the registry? `docs/conventions/terminology.md` — are there terminological conventions applied inconsistently across specs? Cross-cutting concepts mentioned in specs should each have a corresponding invariant/process/lifecycle document.
+5. `docs/spec/MODELS.md` — are there model names used in specs that aren't in the registry? `docs/conventions/terminology.md` — are canonical terms applied consistently across specs? Specifically check for legacy terms that have been replaced: "entity" / "сущность" / "domain object" (canonical: "доменная модель"); "persisted" in Russian text (canonical: "хранимое"); "orphan" / "orphan-сущность" (canonical: "domain-only" or "external-only"). If found in non-historical contexts — flag as violation. Cross-cutting concepts mentioned in specs should each have a corresponding invariant/process/lifecycle document.
 
 ## Process
 
