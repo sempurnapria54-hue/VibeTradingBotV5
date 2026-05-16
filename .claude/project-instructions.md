@@ -118,9 +118,36 @@ systematic analysis.
 **12. Terminology: prefer "доменная модель" over "entity".**
 The word "entity" is loaded in this project — it implies JPA persistence (`@Entity` annotation). When referring to domain concepts like Deal, Order, Position, ServiceCommand, AnomalyReport, IndicatorValue — use "доменная модель" (or simply "модель") in Russian text, "domain model" in English text. Some of these are persisted, some are not (e.g. DealContext, CalculationContext) — all are domain models.
 
-If a term for "domain model with identity" is genuinely needed, use "доменная модель с identity" or "aggregate root" (DDD sense), not "entity". Use "запись" / "row" only when speaking specifically about a database row.
+If a term for "domain model with identity" is genuinely needed, use "доменная модель с identity" or "aggregate root" (DDD sense), not "entity". Use "запись" / "хранимая модель" only when speaking specifically about a persisted data structure.
 
 This terminology should be reflected in all chats, ADRs, specifications, and agent prompts.
+
+**13. Discussion format for substantive decisions.**
+When reviewing documents, working through design forks, or discussing
+substantive choices in chat, use this format:
+
+- **Short, focused statement of the question.** Frame the context "as
+  it appears in actual work" — from real situations the user
+  encounters — not through references to document paragraphs ("§4
+  says X..."). Document references are for follow-up, not for setting
+  up the question.
+- **List of options** (usually 2-4) — without long argumentation, just
+  what each option amounts to.
+- **Short recommendation** at the end with 1-2 sentences of
+  reasoning.
+- **Wait for the user's choice** — do NOT apply the decision until
+  the user signals which option they pick.
+- If the user asks for elaboration on any option — expand it. Default
+  is short.
+
+This format does NOT apply to:
+- Routine questions where a direct answer suffices.
+- Substantive discussions where the user explicitly asks for a
+  detailed exposition.
+- Implementation questions with a single obvious answer.
+
+The format is a tool for content-rich decision points, not a
+straitjacket for every exchange.
 
 ## What you do NOT do
 
