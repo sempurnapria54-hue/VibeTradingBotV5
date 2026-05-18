@@ -35,6 +35,8 @@ This check only runs if `CLAUDE.md` is present in PK. Without
 CLAUDE.md, these rules are not visible to Claude and the check is
 skipped (startup-phase exception).
 
+`project-instructions.md` живёт здесь, не в Project Knowledge.
+
 **Procedure:**
 - Compare actual PK files with the expected list.
 - The expected list is a **minimum, not an exact match**. Extra files

@@ -173,7 +173,6 @@ ADR хранятся в `.claude/adr/`. Индекс — `.claude/adr/README.md`
 - `.claude/flow/playbook.md`
 - `docs/README.md`
 - `.claude/adr/README.md`
-- `.claude/project-instructions.md` (опционально — для прозрачности; основная функция файла — резервная копия для Custom Instructions Проекта)
 - (по мере появления) `docs/conventions/terminology.md`, `docs/spec/MODELS.md`, `docs/ROADMAP.md`
 
 **Все чаты по проекту создаются внутри этого Проекта.** Тогда любая новая сессия со мной автоматически видит эти файлы.

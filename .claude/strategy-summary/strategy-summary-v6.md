@@ -244,7 +244,6 @@ ADR-0001..0005 — Accepted. ADR-0006..0009 — Proposed (после право�
 - `.claude/flow/playbook.md` (обновлён в итерации 1)
 - `docs/README.md`
 - `.claude/adr/README.md`
-- `.claude/project-instructions.md`
 - `docs/conventions/terminology.md`
 - `docs/spec/MODELS.md`
 - `.claude/questions/open-questions.md`
