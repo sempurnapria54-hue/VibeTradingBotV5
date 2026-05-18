@@ -12,7 +12,7 @@ related_processes: []
 инварианта или orphan-сущности на бирже, проходит через обработку
 аварийного сценария и завершается фиксацией финальных снимков
 состояния. Структура модели — в
-[AnomalyReport](../models/AnomalyReport.md).
+[AnomalyReport](../models/core/AnomalyReport.md).
 
 ## Жизненный цикл
 
@@ -84,7 +84,7 @@ related_processes: []
 | Ошибка обработки (`ERROR`) | `status`, `message`. |
 
 Структурное содержимое jsonb-полей — в разделе «Персистентность»
-документа [AnomalyReport](../models/AnomalyReport.md).
+документа [AnomalyReport](../models/core/AnomalyReport.md).
 
 ## Обработка сбоев
 

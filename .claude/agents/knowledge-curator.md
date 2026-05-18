@@ -29,6 +29,10 @@ You are the immune system against the slow rot of documentation falling behind r
 7. **Backlog.** Check:
    - If session work closed an item in `.claude/planning/backlog.md` — has it been moved to the "Закрытые" section with date and link to ADR/commit?
    - If new open questions surfaced during work and weren't resolved on the spot — have they been added to `.claude/planning/backlog.md` with a clear priority and source?
+8. **Заглушка ↔ Q-N coupling** (migration algorithm structural invariant — see skill `spec-document-migration`, раздел «Работа с упоминаниями неполных сущностей»). Check both directions:
+   - If a stub model/process/invariant document was created in `docs/spec/` this session (only определение и связи filled; structural sections missing or explicitly pending) — verify an open Q-N with classification `missing-model` / `missing-process` / `missing-invariant` exists for its content gap, with the model/process/invariant name as subject.
+   - If a Q-N with `missing-*` classification was closed (status → Resolved) this session — verify the corresponding document in `docs/spec/` was created or enriched and its registration in `docs/spec/MODELS.md` (for models) was performed; verify the Resolution field links to the created document.
+   - Stub without paired Q-N, or closed `missing-*` Q-N without corresponding document update, or document created without closing the matching Q-N — flag as drift.
 
 ### Before a merge or commit batch
 1. Are ADRs needed for any decisions in this batch?
@@ -41,7 +45,7 @@ You are the immune system against the slow rot of documentation falling behind r
 2. Agents — are any of them never invoked? Candidates for retrospective discussion.
 3. Skills — are any never activated? Candidates for description fix or removal.
 4. ADRs — are any "Proposed" that should be "Accepted" or vice versa?
-5. `docs/spec/MODELS.md` — are there model names used in specs that aren't in the registry? `docs/conventions/terminology.md` — are canonical terms applied consistently across specs? Specifically check for legacy terms that have been replaced: "entity" / "сущность" / "domain object" (canonical: "доменная модель"); "persisted" in Russian text (canonical: "хранимое"); "orphan" / "orphan-сущность" (canonical: "domain-only" or "external-only"). If found in non-historical contexts — flag as violation. Cross-cutting concepts mentioned in specs should each have a corresponding invariant/process/lifecycle document.
+5. `docs/spec/MODELS.md` is a **reflection** of created model documents, not a gate. Drift to flag: a model document exists in `docs/spec/models/` but its name is missing from `MODELS.md`, or present in the registry as a stub description rather than as a link. Do **not** flag the inverse: a model name appearing in spec prose without a registry entry is not a violation — under the migration algorithm, names may legitimately appear in text before their document is created, with a Q-N tracking the gap (see skill `spec-document-migration`). `docs/conventions/terminology.md` — are canonical terms applied consistently across specs? Specifically check for legacy terms that have been replaced: "entity" / "сущность" / "domain object" (canonical: "доменная модель"); "persisted" in Russian text (canonical: "хранимое"); "orphan" / "orphan-сущность" (canonical: "domain-only" or "external-only"). If found in non-historical contexts — flag as violation. Cross-cutting concepts mentioned in specs should each have a corresponding invariant/process/lifecycle document.
 
 ## Process
 

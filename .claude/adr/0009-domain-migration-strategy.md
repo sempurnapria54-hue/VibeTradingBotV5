@@ -388,7 +388,11 @@ Kill-switch, orphan, freshness, reconcile, FSM сделки, anomaly — пол�
 
 ### Технические
 
-(пусто)
+- [2026-05-17] Целевой документ `docs/spec/models/AnomalyReport.md`,
+  упомянутый в §Consequences (раздел про backlog-пункт), переехал в
+  `docs/spec/models/core/AnomalyReport.md` по дисциплине ADR-0007 §1.
+  Ссылки в теле этого документа не обновлялись согласно принципу
+  append-only.
 
 ### Содержательные
 

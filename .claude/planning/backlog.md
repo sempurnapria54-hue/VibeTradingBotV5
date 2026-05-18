@@ -225,6 +225,16 @@
   Стартовая версия после пилотного кейса миграции AnomalyReport.
   Помечен как первая версия — ожидается итерация после 2-3
   миграций. См. коммит.
+- ✅ **[2026-05-17] Перенос `docs/spec/models/AnomalyReport.md` →
+  `docs/spec/models/core/AnomalyReport.md`.** Закрытие структурной
+  части задачи из ADR-0006 §Consequences (раскладка по подкаталогам
+  по ADR-0007 §1). Содержательная часть (frontmatter, таблицы,
+  разделение на model + lifecycle) закрыта 2026-05-15. Обновлены
+  ссылки в `docs/spec/lifecycle/AnomalyReport.md` (2 места) и
+  `docs/spec/MODELS.md` (запись AnomalyReport дополнена ссылкой на
+  model-документ). Технические примечания добавлены в ADR-0001,
+  ADR-0002, ADR-0006, ADR-0009.
+  *Источник: B-2 анализа dry-run миграции (`.claude/notes/migration-dryrun-analysis-2026-05-17.md`).*
 
 ---
 
@@ -249,3 +259,7 @@
   + добавлен пункт пересмотра после фазы 5. По решению о
   расщеплении функций глоссария (правки в Proposed-ADR-0007 §3
   и ADR-0009 §9).
+- 2026-05-17 — закрыт пункт «Перенос
+  `docs/spec/models/AnomalyReport.md` → `docs/spec/models/core/AnomalyReport.md`»
+  (структурная часть задачи из ADR-0006 §Consequences по дисциплине
+  ADR-0007 §1).

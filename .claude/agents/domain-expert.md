@@ -35,6 +35,10 @@ You are NOT looking for performance issues, technical risks, or financial advisa
 - Are new terms introduced sparingly and added to the correct artifact per the "new term routing" rule (working-with-claude.md Principle 4): model name → `docs/spec/MODELS.md`; terminological convention → `docs/conventions/terminology.md`; cross-cutting concept → corresponding spec document? Also: are canonical terms from `terminology.md` applied? Specifically, no "entity" / "сущность" (use "доменная модель"); no "persisted" in Russian text (use "хранимое"); no "orphan" (use "domain-only" / "external-only"). Flag legacy terms in new content.
 - Is code using domain language, not infrastructure language? (e.g., `placeOrder()` not `executeRestCall()` in domain layer)
 
+### При ревью миграционных правок
+- Apply the entity-type tests from skill `spec-document-migration` (раздел «Определение типа сущности при миграции») to every name mentioned in the migrated text: модель / процесс / invariant / integration / reference / реализационный класс / значение. The tests are not duplicated here — check the skill. Reject documents created in `docs/spec/models/` for implementation classes (`Executor`, `Repository`, `Mapper`, `Service`, `Factory`, `Handler` и т.п.) or for value-names (status literals, command names, anomaly codes) — those appear only as roles inside other documents.
+- `docs/spec/MODELS.md` is a **reflection** of created model documents, not a gate. Do not require «модель должна быть в реестре» when reviewing a name's introduction or mention — the registry is updated as a consequence of creating the model document. The opposite drift (model document exists in `docs/spec/models/`, name missing from registry) is a real issue and belongs to knowledge-curator's scope; flag if encountered.
+
 ### Domain rules vs accidental rules
 - Is this rule fundamental to trading, or just to our current implementation?
 - Are domain rules separated from technical constraints?

@@ -36,6 +36,10 @@ You are NOT looking for trading logic bugs, runtime race conditions, or domain s
 - Are modules cohesive (related code together) and decoupled (independent of unrelated changes)?
 - Is the package structure reflecting the architecture, or fighting it?
 
+### При ревью миграционных правок
+- Apply the entity-type tests from skill `spec-document-migration` (раздел «Определение типа сущности при миграции») when reviewing what is being introduced as a standalone document. Implementation classes — `Executor`, `Repository`, `Mapper`, `Service`, `Configuration`, `Factory`, `Handler`, `Resolver`, `Validator`, `Builder`, `Listener` — are NOT standalone domain documents. They are mentioned as roles inside process- or lifecycle-документах of the model they serve. Reject attempts to create dedicated `docs/spec/models/` documents for these classes; reject also a `docs/spec/processes/` document whose subject is a class without a triggered flow.
+- `docs/spec/MODELS.md` is a reflection of created model documents, not a gate. Do not block introduction of a model on its absence from the registry — registry updates follow document creation. Tests apply to the доменная модель itself, not to its presence in the registry.
+
 ### Extension points
 - Where will the next exchange plug in? Is that path obvious?
 - Where will the next strategy plug in? Is that path obvious?

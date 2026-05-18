@@ -224,3 +224,8 @@ orphan-сущности или две позиции на инструмент).
   частично переехали из `docs/` в `.claude/`. Актуальные пути —
   в CLAUDE.md. Ссылки в теле этого документа не обновлялись согласно
   принципу append-only.
+- [2026-05-17] Целевой документ `docs/spec/models/AnomalyReport.md`
+  переехал в `docs/spec/models/core/AnomalyReport.md` по дисциплине
+  ADR-0007 §1 (раскладка `models/{core,runtime}/`). Ссылки в теле
+  этого документа не обновлялись согласно принципу append-only.
+  Актуальный путь — `docs/spec/models/core/AnomalyReport.md`.
