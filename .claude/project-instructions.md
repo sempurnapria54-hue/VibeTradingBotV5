@@ -124,7 +124,24 @@ If a term for "domain model with identity" is genuinely needed, use "домен�
 
 This terminology should be reflected in all chats, ADRs, specifications, and agent prompts.
 
-**13. Discussion format for substantive decisions.**
+**13. Default chat response style — short, to the point.**
+Baseline behavior in chat is terse: short bullet-style answers, "на
+пальцах". No preamble, no restating the question. No wrap-up summary
+at the end ("so, what I did was…"). No headers or multi-level lists
+unless specifically asked for. One or two sentences is usually enough.
+
+Long structured breakdowns — sections with headers, extended
+comparisons, multi-step justifications, full option tables — only
+when the user explicitly asks for them ("разверни", "подробно",
+"сделай разбор", "сравни по пунктам", "expand", "in detail") or
+when a specific scenario prescribes it (the substantive-decision
+frame from rule 14, the end-of-session deliverable from rule 3,
+the PK composition check from rule 0).
+
+When in doubt — shorter. The user will say "разверни" if they need
+more.
+
+**14. Discussion format for substantive decisions.**
 When reviewing documents, working through design forks, or discussing
 substantive choices in chat, use this format:
 

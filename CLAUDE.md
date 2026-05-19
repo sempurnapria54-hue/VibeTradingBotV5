@@ -13,6 +13,30 @@ This project uses a structured collaboration model with Claude. Before making an
 
 Pipeline history lives in `.claude/pipeline-evolution-log.md`. Read it to understand how the current setup evolved.
 
+## Process layers (navigation by question)
+
+The project organizes knowledge into layers. Each layer is identified by the question it answers — use these as a navigation map:
+
+- **Specification** — *what exists in the system?* → `docs/spec/` (target; legacy live specs in `docs/domain/`, `docs/api/` — see source hierarchy below)
+- **ADR** — *why was this chosen over alternatives?* → `.claude/adr/`
+- **Convention** — *how is it done in this project?* → `docs/conventions/`
+- **Skill** — *how is an operation performed?* → `.claude/skills/`
+- **Agent** — *which role looks at this?* → `.claude/agents/` (see `.claude/agents/README.md` for per-agent questions)
+
+Journals and state snapshots are not knowledge layers — their legitimate place is the **Trackers** section directly below, indexed by the question they answer about *current state* rather than *where to put new knowledge*.
+
+## Trackers (navigation by state)
+
+Where process layers categorize **knowledge by topic** (where new information goes), trackers capture **current state** (where things are right now). Each tracker is identified by the question it answers:
+
+- **Strategy snapshot** — *where are we now and how did we get here?* → `.claude/strategy-summary/`
+- **Open questions journal** — *what's still unresolved?* → `.claude/questions/open-questions.md`
+- **Backlog** — *what's in flight?* → `.claude/planning/backlog.md`
+- **Migration tracker** — *where are we in the migration?* → `.claude/planning/migration-tracker.md`
+- **Pipeline evolution log** — *how did the pipeline change?* → `.claude/pipeline-evolution-log.md`
+
+Layers stay structurally stable; trackers turn over with state.
+
 ## Documentation organization
 
 The repository separates product documentation from Claude collaboration artifacts:
@@ -52,7 +76,7 @@ README.md                    Documentation map
 working-with-claude.md       Collaboration model (read this)
 project-instructions.md      Backup of claude.ai Custom Instructions
 pipeline-evolution-log.md    History of changes to the working setup
-agents/                      Subagent definitions (architect, domain-expert, etc.)
+agents/                      Subagent definitions (architect, domain-expert, etc.) + README
 skills/                      Reusable knowledge and procedures
 adr/                         Architecture Decision Records (append-only) + README
 flow/                        Operational procedures (playbook)
