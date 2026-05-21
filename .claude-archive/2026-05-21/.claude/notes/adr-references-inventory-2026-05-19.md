@@ -438,7 +438,7 @@ ADR имеется в виду:
 
 | Строка | Тип | ADR | Контекст |
 |---|---|---|---|
-| 9 | direct-id + path | 0006 | «по [ADR-0006 §1](../../.claude/adr/0006-spec-principles.md)» — markdown-ссылка с путём |
+| 9 | direct-id + path | 0006 | «по [ADR-0006 §1](../adr/0006-spec-principles.md)» — markdown-ссылка с путём |
 
 ### 4.5. `docs/spec/models/core/AnomalyReport.md`
 

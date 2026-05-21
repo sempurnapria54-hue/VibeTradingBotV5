@@ -7,5 +7,5 @@
 .m2/
 
 # Claude Code — user-local settings (per-machine)
-.claude/settings.local.json
-.claude/settings.local.*
+.claude-archive/2026-05-21/.claude/settings.local.json
+.claude-archive/2026-05-21/.claude/settings.local.json
