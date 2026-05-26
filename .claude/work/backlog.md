@@ -15,7 +15,10 @@
 зафиксированные критерии:
 - гранулярность модели — `.claude/decisions/model-granularity.md`;
 - первоисточник правил — `.claude/decisions/rule-source-of-truth.md`;
-- exchange-specific — `.claude/decisions/client-layer-docs.md`.
+- exchange-specific — `.claude/decisions/client-layer-docs.md`;
+- runtime value objects — `.claude/decisions/runtime-value-object.md`;
+- разделение моделей core/other —
+  `.claude/decisions/models-core-vs-other.md`.
 
 Активно использовать `docs/components/` (тип введён первой обкаткой,
 но в обороте не задействован) — для resolver / executor / checker /

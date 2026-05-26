@@ -36,10 +36,12 @@
 | `.claude/work/history/` | Что мы уже сделали? | `YYYY-MM-DD-kebab-case.md` | Один файл = одна завершённая задача, короткое summary. |
 | `.claude-archive/` | (Архив.) | — | Не место для новых файлов. |
 | `docs/decisions/` | Почему мы решили так, а не иначе? (продукт) | kebab-case по сути | Один файл = одно решение. |
-| `docs/models/` | Что это? (доменная модель/объект) | PascalCase | Имя совпадает с именем Java-класса. |
+| `docs/models/core/` | Что это за торговая модель? | PascalCase | Имя совпадает с именем Java-класса. |
+| `docs/models/other/` | Что это за модель? | PascalCase / kebab-case | Имя совпадает с Java-классом, если применимо; для свечей, индикаторов, аудита и иных не-классов — по теме. |
 | `docs/lifecycles/` | Через какие состояния проходит этот объект? Кто управляет? | PascalCase (совпадает с моделью) | Один файл = lifecycle одного объекта. |
 | `docs/processes/` | Как устроен этот процесс? | kebab-case по теме | Например, загрузка свечей, расчёт индикаторов. |
 | `docs/components/` | Кто выполняет? | PascalCase | Имя совпадает с именем Java-класса. |
+| `docs/components/models/` | Что это за runtime-объект? | PascalCase | Имя совпадает с именем Java-класса. См. `.claude/decisions/runtime-value-object.md`. |
 | `docs/rules/` | Какое правило действует в системе? | kebab-case по теме | Инварианты + бизнес-правила. Тип уточняется внутри файла при необходимости. |
 | `docs/dictionary/` | Что означает этот термин? | kebab-case | Для терминов-классов — короткая статья со ссылкой на `docs/models/`. |
 | `docs/client/<ExchangeName>/models/` | Какие поля у модели API биржи? | PascalCase (совпадает с DTO/моделью API биржи) | Exchange-specific. См. `.claude/decisions/client-layer-docs.md`. |
