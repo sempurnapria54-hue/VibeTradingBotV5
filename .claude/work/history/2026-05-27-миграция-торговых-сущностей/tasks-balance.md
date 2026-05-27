@@ -79,12 +79,9 @@
   отдельный процесс (`.claude-archive/.../processes/Audit/Аудит и
   история исполнения.md`). Мигрируется в составе аудита.
 
-## Открытые вопросы (требуют ответа)
+## Открытые вопросы
 
-- **BAL-Q8. OKX balance endpoint.** В архивной mapping-доке путь —
-  `GET /api/v5/account/balanceExternalSnapshot`, что выглядит как
-  ошибка (нормализованный snapshot — доменное имя, не путь OKX). В
-  `okx-balance-mapping.md` записан вероятный реальный путь
-  `/api/v5/account/balance`. Сверить с авторитетной API-докой
-  (`.claude-archive/.../docs/api/okx/Получить баланс REST.md`) при
-  миграции API-кластера OKX и при необходимости поправить.
+Открытых вопросов по Balance нет. BAL-Q8 (сверка OKX balance
+endpoint) закрыт — путь подтверждён в
+`docs/client/okx/rules/okx-balance-mapping.md`
+(`GET /api/v5/account/balanceExternalSnapshot`).

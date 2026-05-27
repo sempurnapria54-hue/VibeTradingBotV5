@@ -19,18 +19,14 @@ legacy.
 ## Endpoint
 
 ```text
-GET /api/v5/account/balance?ccy={settleCurrency}
+GET /api/v5/account/balanceExternalSnapshot?ccy={settleCurrency}
 ```
 
 Для текущего `ETH-USDT-SWAP`: `?ccy=USDT`. Назначение — account-level
-snapshot баланса + currency-level details по settle currency.
-
-> ⚠️ В архивной mapping-доке эндпоинт записан как
-> `/api/v5/account/balanceExternalSnapshot` — похоже на ошибку
-> копирования (нормализованный snapshot — это доменное имя, не путь
-> OKX). Здесь записан вероятный реальный путь `/api/v5/account/balance`;
-> сверку с авторитетной API-докой см. в открытом вопросе
-> `.claude/work/questions/tasks/balance.md` (BAL-Q8).
+snapshot баланса + currency-level details по settle currency. Путь
+подтверждён архивной API-докой
+`.claude-archive/2026-05-21/docs/api/okx/Получить баланс REST.md`
+(заголовок эндпоинта + curl-пример).
 
 - Query: `ccy` — опционально, одна валюта или список до 20 через
   запятую. Для runtime бота передаётся settle currency инструмента
