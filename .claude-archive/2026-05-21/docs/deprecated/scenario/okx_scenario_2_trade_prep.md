@@ -225,7 +225,7 @@ pm.request.headers.upsert({ key: "x-simulated-trading", value: simulatedTrading 
 ### Шаг 5 — Баланс USDT (база для riskUSDT = 1%)
 
 **GET**  
-`https://www.okx.com/api/v5/account/balanceExternalSnapshot?ccy=USDT`
+`https://www.okx.com/api/v5/account/balance?ccy=USDT`
 
 **Кейс “до пополнения”:**
 
@@ -423,7 +423,7 @@ pm.request.headers.upsert({ key: "x-simulated-trading", value: simulatedTrading 
 - [ ] `POST /account/set-leverage` → `code=0`, `isolated`, `lever=10`
 - [ ] `GET /public/instruments` получены `ctVal`, `lotSz`, `minSz`, `tickSz`
 - [ ] `GET /public/mark-price` получен `markPx`
-- [ ] `GET /account/balanceExternalSnapshot?ccy=USDT` получены `eq`/`availBal`
+- [ ] `GET /account/balance?ccy=USDT` получены `eq`/`availBal`
 - [ ] `GET /account/max-size` (опционально) работает и даёт потолок
 - [ ] `sz` рассчитан и округлён по `lotSz`, цены по `tickSz`
 
@@ -435,7 +435,7 @@ pm.request.headers.upsert({ key: "x-simulated-trading", value: simulatedTrading 
 2) `POST /api/v5/account/set-leverage` → isolated + x10
 3) `GET /api/v5/public/instruments?instType=SWAP&instId=ETH-USDT-SWAP` → `ctVal=0.1`, `lotSz=minSz=0.01`, `tickSz=0.01`
 4) `GET /api/v5/public/mark-price?...` → `markPx=3104.22`
-5) `GET /api/v5/account/balanceExternalSnapshot?ccy=USDT` → `eq=56.983941`
+5) `GET /api/v5/account/balance?ccy=USDT` → `eq=56.983941`
 6) `GET /api/v5/account/max-size?...` → `maxBuy=1.8`, `maxSell=1.82`
 7) Ошибка `51010` решена сменой account mode в UI (Trade → Futures → Settings → Account mode)
 

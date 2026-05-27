@@ -82,6 +82,7 @@
 ## Открытые вопросы
 
 Открытых вопросов по Balance нет. BAL-Q8 (сверка OKX balance
-endpoint) закрыт — путь подтверждён в
-`docs/client/okx/rules/okx-balance-mapping.md`
-(`GET /api/v5/account/balanceExternalSnapshot`).
+endpoint) закрыт — верный путь `GET /api/v5/account/balance`
+зафиксирован в `docs/client/okx/rules/okx-balance-mapping.md`.
+Архивные доки содержат `balanceExternalSnapshot` — это опечатка
+архива (подтверждено пользователем), не реальный эндпоинт OKX.

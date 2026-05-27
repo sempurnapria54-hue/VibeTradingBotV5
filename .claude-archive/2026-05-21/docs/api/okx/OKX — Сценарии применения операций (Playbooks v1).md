@@ -44,7 +44,7 @@ cancel) и логируем.
 
 **Шаги:**
 
-1. `GET /account/balanceExternalSnapshot?ccy=USDT` — понять доступные средства.
+1. `GET /account/balance?ccy=USDT` — понять доступные средства.
 2. `GET /account/positions?instId=...` — получить позиции по инструменту.
 3. `GET /trade/orders-pending?instId=...` — получить висящие ордера.
 4. (Опционально) `GET /trade/fills` (последние 3 дня) — чтобы быстро закрыть «дыру» по факту исполнения во время

@@ -1,6 +1,6 @@
 ### Получить баланс (REST)
 
-**Endpoint:** `GET /api/v5/account/balanceExternalSnapshot`  
+**Endpoint:** `GET /api/v5/account/balance`
 **Query (опционально):**
 
 - `ccy` — одна валюта или список до 20 через запятую (USDT или BTC,ETH).
@@ -26,7 +26,7 @@
 **Пример запроса:**
 
 ```bash
-curl -X GET 'https://www.okx.com/api/v5/account/balanceExternalSnapshot?ccy=USDT' \
+curl -X GET 'https://www.okx.com/api/v5/account/balance?ccy=USDT' \
   -H 'Content-Type: application/json' \
   -H 'OK-ACCESS-KEY: <api_key>' \
   -H 'OK-ACCESS-SIGN: <base64_hmac_sha256_signature>' \

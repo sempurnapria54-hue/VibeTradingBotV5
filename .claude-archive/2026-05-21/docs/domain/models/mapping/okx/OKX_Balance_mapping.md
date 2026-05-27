@@ -100,7 +100,7 @@ OKX endpoint-доки являются источником истины по:
 ## 4.1. Получить баланс
 
 ```text
-GET /api/v5/account/balanceExternalSnapshot
+GET /api/v5/account/balance
 ```
 
 Используется в `REFRESH_BALANCE`.
@@ -108,13 +108,13 @@ GET /api/v5/account/balanceExternalSnapshot
 Основной запрос для проекта:
 
 ```text
-GET /api/v5/account/balanceExternalSnapshot?ccy={settleCurrency}
+GET /api/v5/account/balance?ccy={settleCurrency}
 ```
 
 Для текущего `ETH-USDT-SWAP`:
 
 ```text
-GET /api/v5/account/balanceExternalSnapshot?ccy=USDT
+GET /api/v5/account/balance?ccy=USDT
 ```
 
 Назначение:

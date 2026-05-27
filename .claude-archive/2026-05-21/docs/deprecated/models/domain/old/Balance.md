@@ -1,4 +1,4 @@
-## Доменная модель для `GET /api/v5/account/balanceExternalSnapshot` + маппинг
+## Доменная модель для `GET /api/v5/account/balance` + маппинг
 
 Ниже — **доменная модель для хранения snapshot баланса в БД** (без persistence-аннотаций, но с audit-полями) + **маппинг
 в YAML** (OKX response → доменная модель). Можно копировать в md.
@@ -18,7 +18,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Snapshot баланса аккаунта (ответ /account/balanceExternalSnapshot).
+ * Snapshot баланса аккаунта (ответ /account/balance).
  *
  * Это доменная модель (без persistence-аннотаций).
  * Хранение в БД делается отдельным persistence-слоем.
@@ -296,7 +296,7 @@ public class Balance {
 
 ---
 
-## 2) Маппинг (YAML): OKX `GET /account/balanceExternalSnapshot` → `Balance`
+## 2) Маппинг (YAML): OKX `GET /account/balance` → `Balance`
 
 ```yaml
 # верхний уровень: OKX отдаёт data[0] как агрегат по аккаунту

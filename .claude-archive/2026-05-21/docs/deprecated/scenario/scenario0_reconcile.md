@@ -61,7 +61,7 @@ Order of calls is deliberate: **positions → orders → algos → balanceExtern
 
 4) **Balance / equity**
 
-- `GET /api/v5/account/balanceExternalSnapshot`
+- `GET /api/v5/account/balance`
 - recommended filter: `?ccy=USDT`
 
 ---
@@ -133,7 +133,7 @@ Derive:
 
 Call:
 
-- `GET /account/balanceExternalSnapshot?ccy=USDT`
+- `GET /account/balance?ccy=USDT`
 
 Derive:
 
