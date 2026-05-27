@@ -18,7 +18,9 @@
 - exchange-specific — `.claude/decisions/client-layer-docs.md`;
 - runtime value objects — `.claude/decisions/runtime-value-object.md`;
 - разделение моделей core/other —
-  `.claude/decisions/models-core-vs-other.md`.
+  `.claude/decisions/models-core-vs-other.md`;
+- FSM-handler как компонент —
+  `.claude/decisions/fsm-handler-as-component.md`.
 
 Активно использовать `docs/components/` (тип введён первой обкаткой,
 но в обороте не задействован) — для resolver / executor / checker /
