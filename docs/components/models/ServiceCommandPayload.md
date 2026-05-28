@@ -23,7 +23,7 @@ payload-подтипы команд существуют (разделами).
 загруженной сущности. `positionSide`/`marginMode` в payload — generic
 command-level intent; OKX adapter всё равно ставит `tdMode=isolated`,
 `posSide=net` и валидирует response (см.
-`docs/client/okx/rules/okx-order-mapping.md`).
+`docs/models/mapping/Order.md`).
 
 ## CreateOrderCommandPayload
 
@@ -80,7 +80,7 @@ command-level intent; OKX adapter всё равно ставит `tdMode=isolate
 содержит `closeFraction` — `CLOSE_POSITION` всегда full close (см.
 `docs/rules/no-partial-close.md`). Не содержит `autoCancelOrders`/`autoCxl`
 — это OKX-specific флаг adapter (см.
-`docs/client/okx/rules/okx-position-mapping.md`). `instrumentExternalId`/
+`docs/models/mapping/Position.md`). `instrumentExternalId`/
 `positionSide`/`marginMode` не нужны — приходят из `DealContext` /
 adapter.
 
@@ -88,4 +88,4 @@ adapter.
 
 Параметры attached protection при создании order со стартовым SL/TP
 (вложен в `CreateOrderCommandPayload.attachedProtection`). Структура
-attached protection — `docs/models/core/Order.md` (`AttachedAlgoOrder`).
+attached protection — `docs/models/domain/core/Order.md` (`AttachedAlgoOrder`).

@@ -17,7 +17,7 @@
 `MarketPriceData` не считается заранее: нужен прямо перед расчётом
 параметров действия. Flow: client-модель OKX ticker →
 `MarketPriceDataExternalSnapshot` → `MarketPriceData` (OKX-маппинг —
-`docs/client/okx/rules/okx-market-price-data-mapping.md`).
+`docs/models/mapping/MarketPriceData.md`).
 
 В рамках одного `CalculationContext` `MarketPriceData` получается один
 раз и переиспользуется, чтобы не плодить REST-запросы.

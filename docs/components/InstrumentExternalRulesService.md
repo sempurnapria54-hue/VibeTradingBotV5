@@ -9,7 +9,7 @@
 
 `InstrumentExternalRulesService` отдаёт актуальные
 `InstrumentExternalRules` (см.
-`docs/models/other/InstrumentExternalRules.md`) из БД. Сам правила не
+`docs/models/domain/other/InstrumentExternalRules.md`) из БД. Сам правила не
 запрашивает у биржи — их обновляет
 `docs/components/InstrumentExternalRulesSyncJob.md`.
 

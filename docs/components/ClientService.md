@@ -35,8 +35,8 @@ evidence-cycle может быть error/recovery (см.
 refresh обязан вернуть валидный `BalanceContainerExternalSnapshot` с
 обязательной `settleCurrency`; пустой response / нет settleCurrency /
 invalid fields → controlled external/account error (см.
-`docs/models/core/BalanceContainer.md`,
-`docs/client/okx/rules/okx-balance-mapping.md`).
+`docs/models/domain/core/BalanceContainer.md`,
+`docs/models/mapping/Balance.md`).
 
 Контракт-интерфейс (ориентир): методы вроде `getPosition(exchange,
 instrument)` возвращают snapshot или `null`, бросают exception при

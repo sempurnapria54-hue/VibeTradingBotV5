@@ -13,7 +13,7 @@
 прогоняет через `PositionStatusResolver`, применяет `status`, заполняет
 `closeReason candidate` только если текущий `== null`. Для OKX — один
 логический запрос `GET /account/positions` по instType+instId (см.
-`docs/client/okx/rules/okx-position-mapping.md`).
+`docs/models/mapping/Position.md`).
 
 ## Политика результата
 
@@ -30,7 +30,7 @@ snapshot != null -> позиция есть         -> Position.status = ACTIVE
 
 `externalSize == 0` при `ACTIVE` — exchange record есть, live risk нет
 (cleanup/anomaly/retry). Live risk: `status == ACTIVE && externalSize > 0`
-(см. `docs/models/core/Position.md`). При обычном запуске
+(см. `docs/models/domain/core/Position.md`). При обычном запуске
 `requestedCloseReason` не получает. Общая семантика `REFRESH_*` —
 `docs/components/ServiceCommandExecutor.md`.
 

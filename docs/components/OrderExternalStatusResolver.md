@@ -28,5 +28,5 @@ kill-switch, не закрывает сделку, не создаёт anomaly r
 
 `live`→ACTIVE, `partially_filled`→PARTIALLY_COMPLETED, `filled`→COMPLETED,
 `canceled`/`mmp_canceled`→CANCELED, unknown→`ExternalStatusException`
-(детали и closeReason — `docs/client/okx/rules/okx-order-mapping.md`).
+(детали и closeReason — `docs/models/mapping/Order.md`).
 `ExternalNotFoundException` — только после полного order evidence-cycle.

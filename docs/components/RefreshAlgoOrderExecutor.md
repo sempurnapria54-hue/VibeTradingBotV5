@@ -12,7 +12,7 @@
 статус через `AlgoOrderExternalStatusResolver`, при необходимости
 обновляет `DealActionState` (см.
 `docs/rules/external-status-resolution.md`,
-`docs/client/okx/rules/okx-algo-order-mapping.md`).
+`docs/models/mapping/AlgoOrder.md`).
 
 Обновляет только `AlgoOrder`; `REFRESH_ORDER` / `REFRESH_PENDING_ORDERS`
 / `REFRESH_ORDER_HISTORY` / `REFRESH_FILLS` / `REFRESH_POSITION` выбирает

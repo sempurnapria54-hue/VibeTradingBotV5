@@ -7,7 +7,7 @@
 ## Назначение
 
 `MarketPhaseJob` определяет фазу рынка и сохраняет `MarketPhase` (см.
-`docs/models/other/MarketPhase.md`). Настройка —
+`docs/models/domain/other/MarketPhase.md`). Настройка —
 `StrategyMarketPhaseSetting`; источники данных — готовые `IndicatorValue`
 и `MarketStructure`; параметры — `MarketPhaseParams`.
 

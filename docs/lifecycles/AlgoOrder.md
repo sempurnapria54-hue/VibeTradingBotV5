@@ -5,7 +5,7 @@
 Через какие статусы проходит `AlgoOrder`, кто и при каких фактах их
 меняет.
 
-Структура модели — в `docs/models/core/AlgoOrder.md`.
+Структура модели — в `docs/models/domain/core/AlgoOrder.md`.
 
 ## Кто управляет
 
@@ -86,7 +86,7 @@ safety-каскад (`docs/rules/external-status-resolution.md`).
 - **Exchange invariant violation** (`tdMode`/`posSide`/`side`/
   `ordType`/`reduceOnly` mismatch) → `ExternalInvariantViolationException`
   → `closeReason = EXCHANGE_INVARIANT_VIOLATION` (детали — в
-  `docs/client/okx/rules/okx-algo-order-mapping.md`).
+  `docs/models/mapping/AlgoOrder.md`).
 - **Not found после полного algo evidence-cycle** →
   `ExternalNotFoundException` → `closeReason = MISSING_AFTER_REFRESH`.
   Пустой `data=[]` одного endpoint — **не** основание; нужен полный

@@ -10,7 +10,7 @@ data-dependent действия.
 - Срок свежести каждого вида рыночных данных задаётся через
   `expirationDuration` в strategy settings (`StrategyIndicatorSetting`,
   `StrategyMarketStructureSetting`, `StrategyMarketPhaseSetting`, см.
-  `docs/models/core/Strategy.md`). `maxAgeBars` не используется.
+  `docs/models/domain/aggregate/Strategy.md`). `maxAgeBars` не используется.
 - Устаревание вычисляется в runtime сервисом
   `MarketDataExpirationChecker` (см.
   `docs/components/MarketDataExpirationChecker.md`); состояние свежести в

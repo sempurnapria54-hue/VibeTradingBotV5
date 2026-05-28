@@ -27,15 +27,18 @@ command-подсистемы). Решение применено ко всей �
 ## Принятое решение
 
 При миграции сущности размещается только то, чем сущность владеет:
-модель, lifecycle, владельческие правила, exchange-specific факты в
-`docs/client/<Биржа>/`. Cross-cutting (компоненты, RVO, jobs,
-command-подсистема, calc/risk-слой, anomaly/safety, аудит и подобное),
-которые текущая сущность задевает лишь частично, паркуются в
-`.claude/work/questions/tasks/<задача>.md` как форвард-заметки.
+модель, lifecycle, владельческие правила, mapping в
+`docs/models/mapping/<Сущность>.md` (под-разделом per-source) и
+source-specific факты в `docs/integrations/{name}/`. Cross-cutting
+(компоненты, RVO, jobs, command-подсистема, calc/risk-слой,
+anomaly/safety, аудит и подобное), которые текущая сущность задевает
+лишь частично, паркуются в `.claude/work/questions/tasks/<задача>.md`
+как форвард-заметки.
 
 Доменное существо cross-cutting, видимое в текущем источнике, при этом
 фиксируется в файлах владельца — например, статус-таблица resolver'а
-живёт в `docs/lifecycles/` владельца и `docs/client/<Биржа>/rules/`, а
+живёт в `docs/lifecycles/` владельца и
+`docs/models/mapping/<Сущность>.md` (раздел статус-резолвера), а
 `docs/components/<Resolver>.md` не создаётся до миграции
 resolver-кластера.
 

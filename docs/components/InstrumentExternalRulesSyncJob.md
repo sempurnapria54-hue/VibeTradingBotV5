@@ -8,7 +8,7 @@
 ## Назначение
 
 `InstrumentExternalRulesSyncJob` обновляет `InstrumentExternalRules` (см.
-`docs/models/other/InstrumentExternalRules.md`) из REST биржи. Источник:
+`docs/models/domain/other/InstrumentExternalRules.md`) из REST биржи. Источник:
 `GET /api/v5/public/instruments`.
 
 На первом этапе обновление только через REST; WebSocket для instruments
@@ -20,7 +20,7 @@
 - читает правила инструмента из REST;
 - маппит client-модель в `InstrumentExternalRulesExternalSnapshot`,
   затем в `InstrumentExternalRules` (OKX-маппинг —
-  `docs/client/okx/rules/okx-instrument-mapping.md`);
+  `docs/models/mapping/InstrumentExternalRules.md`);
 - сохраняет/обновляет актуальный snapshot правил.
 
 ## Связи

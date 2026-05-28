@@ -19,7 +19,7 @@
 система верит exchange facts (effective→COMPLETED,
 partially_effective→PARTIALLY_COMPLETED, order_failed/partially_failed →
 `ExternalStatusException`, см.
-`docs/client/okx/rules/okx-algo-order-mapping.md`).
+`docs/models/mapping/AlgoOrder.md`).
 
 ACK не runtime truth (см. `docs/rules/ack-not-runtime-truth.md`); общая
 семантика `AMEND_*` — `docs/components/ServiceCommandExecutor.md`.

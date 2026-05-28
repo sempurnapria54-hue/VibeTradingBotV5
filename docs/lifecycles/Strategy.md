@@ -5,7 +5,7 @@
 Через какие административные статусы проходит `Strategy`, что каждый
 из них разрешает/блокирует и кто управляет переходами.
 
-Структура модели — в `docs/models/core/Strategy.md`.
+Структура модели — в `docs/models/domain/aggregate/Strategy.md`.
 
 ## Природа статуса
 
@@ -56,5 +56,5 @@ DELETED  -> новые сделки блокируются; открытые -> 
 деактивация/логическое удаление стратегии). Расчётные jobs
 (`IndicatorJob`/`MarketStructureJob`/`MarketPhaseJob`) `Strategy.Status`
 **не** меняют. Immutability стратегии (см.
-`docs/models/core/Strategy.md`) означает, что правила не
+`docs/models/domain/aggregate/Strategy.md`) означает, что правила не
 редактируются — меняется только статус контейнера.

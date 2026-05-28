@@ -10,7 +10,7 @@
 `AnomalyJob` ищет не штатные runtime-ситуации, а нарушения базовых
 инвариантов — сравнивает exchange live facts с доменными active
 entities. Фиксирует anomaly/safety report (`AnomalyReport`, см.
-`docs/models/other/AnomalyReport.md`) и может инициировать safety-flow по
+`docs/models/domain/other/AnomalyReport.md`) и может инициировать safety-flow по
 правилам системы. Сделку по FSM **не** ведёт.
 
 ## Типовые anomaly-кейсы

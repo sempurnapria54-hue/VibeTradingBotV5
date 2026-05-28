@@ -11,7 +11,7 @@
 биржи, сопоставляет с известными `Order` / `AlgoOrder` / `Position`
 facts и обновляет вложенные runtime-сущности. Используется в финализации
 сделки для итогового подсчёта profit/loss; `Deal.resultProfit` считается
-на основании фактов через `REFRESH_FILLS` (правило — `docs/models/core/Deal.md`).
+на основании фактов через `REFRESH_FILLS` (правило — `docs/models/domain/aggregate/Deal.md`).
 
 `Fill` как отдельную persisted entity на первом этапе не вводим (один
 общий `RefreshFillsExecutor`; материализация `TradeFill` — backlog п.6).

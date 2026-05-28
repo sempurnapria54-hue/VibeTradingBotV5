@@ -27,4 +27,4 @@ FSM-решения, не запускает cleanup. Неизвестный ст
 (recovery-state, не штатная цель), `effective`→COMPLETED/TRIGGERED,
 `canceled`→CANCELED, `order_failed`→`ExternalStatusException(ORDER_FAILED)`,
 `partially_failed`→`ExternalStatusException(PARTIALLY_FAILED)` (детали —
-`docs/client/okx/rules/okx-algo-order-mapping.md`).
+`docs/models/mapping/AlgoOrder.md`).

@@ -8,7 +8,7 @@
 ## Назначение
 
 `MarketPhaseService` отдаёт актуальную `MarketPhase` (см.
-`docs/models/other/MarketPhase.md`). Сам фазу не считает — её заранее
+`docs/models/domain/other/MarketPhase.md`). Сам фазу не считает — её заранее
 считает `docs/components/MarketPhaseJob.md`.
 
 ## Контракт (пример метода)

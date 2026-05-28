@@ -22,7 +22,7 @@
 
 | Поле | Тип | Назначение |
 |---|---|---|
-| `sourceAction` | `StrategyAction` | Исходное действие стратегии (см. `docs/models/core/Strategy.md`). |
+| `sourceAction` | `StrategyAction` | Исходное действие стратегии (см. `docs/models/domain/aggregate/Strategy.md`). |
 | `calculatedPrice` | `CalculatedPrice` | Рассчитанная цена / набор цен (см. `docs/components/models/CalculatedPrice.md`). |
 | `calculatedSize` | `CalculatedSize` | Рассчитанный размер order/algo/position action (см. `docs/components/models/CalculatedSize.md`). |
 | `description` | `String` | Комментарий/пояснение расчёта для логов и аудита. |

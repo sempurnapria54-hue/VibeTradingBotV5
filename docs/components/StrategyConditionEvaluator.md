@@ -30,5 +30,5 @@ Freshness нужных данных проверяется до evaluator'а
 (`MarketDataExpirationChecker.checkForStep`, правило —
 `docs/rules/market-data-freshness.md`). Evaluator только отвечает
 true/false по правилам condition (структура `StrategyCondition` /
-`StrategyConditionRule` — `docs/models/core/Strategy.md`); решение о
+`StrategyConditionRule` — `docs/models/domain/aggregate/Strategy.md`); решение о
 применении step и выборе action принимает FSM handler.

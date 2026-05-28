@@ -9,7 +9,7 @@
 
 `IndicatorJob` заранее считает технические индикаторы (EMA, RSI, MACD,
 Stochastic, Bollinger Bands, OBV, ATR) и сохраняет их как
-`IndicatorValue` (см. `docs/models/other/IndicatorValue.md`). Настройки —
+`IndicatorValue` (см. `docs/models/domain/other/IndicatorValue.md`). Настройки —
 `StrategyIndicatorSetting`; данные — закрытые свечи; результат —
 `IndicatorValue`.
 

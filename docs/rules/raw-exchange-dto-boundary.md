@@ -43,20 +43,21 @@ exception. `null` означает «не найдено в этом источ�
 refresh обязан вернуть валидный `BalanceContainerExternalSnapshot` с
 обязательной `settleCurrency`; пустой response / нет settleCurrency /
 invalid fields → controlled external/account error (не `null`). См.
-`docs/models/core/BalanceContainer.md`,
-`docs/client/okx/rules/okx-balance-mapping.md`.
+`docs/models/domain/core/BalanceContainer.md`,
+`docs/models/mapping/Balance.md`.
 
 ## Почему
 
 Normalized external snapshot содержит только поля, которые обновляют
-доменную модель. Это держит домен независимым от формата конкретной
-биржи и не даёт exchange-specific деталям протекать в торговую логику
-(exchange-specific факты живут в `docs/client/<Биржа>/` — см.
-`.claude/decisions/client-layer-docs.md`).
+доменную модель. Это держит домен независимым от формата конкретного
+источника и не даёт source-specific деталям протекать в торговую
+логику (source-specific факты живут в `docs/integrations/{name}/` —
+см. `.claude/decisions/model-layer-ontology.md`).
 
 ## Где применяется
 
 Сквозное правило, действует для всех refresh-flow всех сущностей
 (balance, position, order, algo-order и т. д.). Конкретные маппинги —
-в `docs/client/<Биржа>/rules/`. Первоисточник правила — здесь
-(сквозной слой, см. `.claude/decisions/rule-source-of-truth.md`).
+в `docs/models/mapping/<Сущность>.md` (per-source подразделами).
+Первоисточник правила — здесь (сквозной слой, см.
+`.claude/decisions/rule-source-of-truth.md`).

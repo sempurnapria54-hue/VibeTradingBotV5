@@ -8,7 +8,7 @@
 ## Назначение
 
 `MarketStructureService` отдаёт готовую `MarketStructure` и нужные
-`MarketPriceLevel` (см. `docs/models/other/MarketStructure.md`). Сам
+`MarketPriceLevel` (см. `docs/models/domain/other/MarketStructure.md`). Сам
 уровни по свечам не ищет — их заранее считает
 `docs/components/MarketStructureJob.md`.
 

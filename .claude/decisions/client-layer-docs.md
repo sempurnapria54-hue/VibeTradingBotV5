@@ -1,5 +1,13 @@
 # Документация биржевого клиента: где живут exchange-specific факты
 
+> **SUPERSEDED** by `.claude/decisions/model-layer-ontology.md`
+> (2026-05-28). `docs/client/<биржа>/` распущен: нативные модели —
+> `docs/models/integrations/<биржа>/`; mapping — `docs/models/mapping/`
+> (один файл на сущность, источники подразделами); контракты + лимиты
+> — `docs/integrations/<биржа>/contracts/`; правила источника —
+> `docs/integrations/<биржа>/rules/`. Файл сохранён как историческая
+> запись.
+
 ## На какой вопрос отвечает этот файл
 
 Где живут exchange-specific факты — биржевые модели API, маппинги,

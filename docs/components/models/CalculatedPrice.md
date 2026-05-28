@@ -69,4 +69,4 @@ activation/callback); без `CalculatedPrice` смысла не имеют → 
 Вокабуляр источников цены (`StrategyPriceSource`) для резолва — у
 `docs/components/PriceCalculator.md` (расширенный набор калькулятора).
 Конфигурационный подмножество для placement — раздел `StrategyPriceSource`
-в `docs/models/core/Strategy.md`.
+в `docs/models/domain/aggregate/Strategy.md`.

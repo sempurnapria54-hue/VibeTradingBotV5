@@ -43,14 +43,14 @@ exchange facts -> REFRESH_* -> обновлённые сущности в БД
 ```
 
 Live risk позиции вычисляется: `deal.position != null && status ==
-ACTIVE && externalSize > 0` (см. `docs/models/core/Position.md`).
+ACTIVE && externalSize > 0` (см. `docs/models/domain/core/Position.md`).
 
 ## Свежесть баланса и отдельные данные
 
 Наличие `balanceContainer` не означает свежесть — её проверяет
 FSM/handler перед risk-sensitive flow; при absent/stale handler создаёт
 `REFRESH_BALANCE` и пересобирает `DealContext` (см.
-`docs/models/core/BalanceContainer.md`). Свежие `InstrumentExternalRules`,
+`docs/models/domain/core/BalanceContainer.md`). Свежие `InstrumentExternalRules`,
 `MarketPriceData`, `IndicatorValue`, `MarketStructure`, `MarketPhase`,
 `CalculationContext` в `DealContext` не входят — собираются в
 `CalculationContext` в рантайме перед расчётом. Отдельный `PositionContext`

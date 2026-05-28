@@ -58,8 +58,8 @@ history-window; требует остановки normal trading-flow до ра�
 attached protection) без единственного владельца — первоисточник в
 сквозном слое (`.claude/decisions/rule-source-of-truth.md`).
 Exchange-specific перечень статусов и evidence-cycle endpoints — в
-`docs/client/<Биржа>/rules/` (для OKX —
-`docs/client/okx/rules/okx-order-mapping.md`).
+`docs/integrations/{name}/rules/` (для OKX —
+`docs/models/mapping/Order.md`).
 
 ## Связанное
 

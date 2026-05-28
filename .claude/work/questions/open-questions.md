@@ -36,7 +36,7 @@ retry-state, но `DealActionState` относится к `StrategyAction`, а
 финализация сделки — это lifecycle/system action. Audit/history не
 должен быть runtime-source, поэтому retry-state финализации нельзя
 хранить только в истории. Где его хранить — не решено.
-Связано: `docs/models/core/Deal.md`, `docs/lifecycles/Deal.md`.
+Связано: `docs/models/domain/aggregate/Deal.md`, `docs/lifecycles/Deal.md`.
 
 ### DEAL-Q2. Что делать, если resultProfit нельзя посчитать после исчерпания retry
 
@@ -47,7 +47,7 @@ retry-state, но `DealActionState` относится к `StrategyAction`, а
 на будущее: отдельный finalization state; перевод в `ERROR`;
 отдельный `DealFinalizationState`; ручной разбор; специальный
 operational flag без нарушения terminal semantics.
-Связано: `docs/models/core/Deal.md` §Итоговый PnL.
+Связано: `docs/models/domain/aggregate/Deal.md` §Итоговый PnL.
 
 ### PROC-Q1. Существует ли `PositionContext` как самостоятельный RVO
 
@@ -109,7 +109,7 @@ policy; (2) самостоятельный RVO `docs/components/models/RiskSetti
 
 `TimeFrame` — чистый доменный enum для таймфреймов свечей/индикаторов,
 OKX-строк не хранит. Размещение неясно: сейчас описан разделом в
-`docs/models/core/Strategy.md` (используется многими настройками
+`docs/models/domain/aggregate/Strategy.md` (используется многими настройками
 strategy-tree), но как самостоятельный enum может жить иначе.
 
 Цитата источника (архив, «Расчёт индикаторов и рыночных данных» §8):
@@ -117,18 +117,18 @@ strategy-tree), но как самостоятельный enum может жи�
 Значения: `ONE_MINUTE`, `THREE_MINUTES`, `FIVE_MINUTES`,
 `FIFTEEN_MINUTES`, `ONE_HOUR`, `TWO_HOURS`, `FOUR_HOURS`, `ONE_DAY`.
 Маппинг OKX-строк живёт отдельно (`TimeFrameMapper` /
-`docs/client/okx/rules/okx-timeframe-mapping.md`).
+`docs/models/mapping/TimeFrame.md`).
 
 Варианты:
-- `docs/models/other/TimeFrame.md` — самостоятельная модель-enum;
+- `docs/models/domain/other/TimeFrame.md` — самостоятельная модель-enum;
 - `docs/dictionary/time-frame.md` — словарная статья;
 - оставить разделом внутри market-data / `Strategy.md`.
 
 До решения отдельный файл не создаётся; `TimeFrame` упоминается как
 термин в местах использования.
-Связано: `docs/models/core/Strategy.md` (§TimeFrame),
-`docs/client/okx/rules/okx-timeframe-mapping.md`,
-`docs/models/other/IndicatorValue.md` / `MarketStructure.md` /
+Связано: `docs/models/domain/aggregate/Strategy.md` (§TimeFrame),
+`docs/models/mapping/TimeFrame.md`,
+`docs/models/domain/other/IndicatorValue.md` / `MarketStructure.md` /
 `MarketPhase.md` (через settings).
 
 ### ENUM-Q1. closeReason `RISK_CONTROL` vs `ENTRY_RISK_BLOCKED`
@@ -143,7 +143,7 @@ risk) между двумя архивными процессными докам
 - «Аудит и история исполнения» §7.1 (старше, черновое): `closeReason`
   может быть `ENTRY_RISK_BLOCKED` «или другое согласованное значение».
 
-`docs/lifecycles/Deal.md` и `docs/models/core/Deal.md` уже используют
+`docs/lifecycles/Deal.md` и `docs/models/domain/aggregate/Deal.md` уже используют
 `RISK_CONTROL` (в списке `CloseReason` `ENTRY_RISK_BLOCKED` помечен как не
 используемый). Решённый по букве risk-доки и lifecycle вариант —
 `RISK_CONTROL`; аудит-док даёт устаревшую формулировку.
@@ -151,7 +151,7 @@ risk) между двумя архивными процессными докам
 Вариант: подтвердить `RISK_CONTROL`, `ENTRY_RISK_BLOCKED` окончательно
 отвергнуть (закрыть вопрос ссылкой на decision). До закрытия список
 значений `closeReason` в `Deal.md` **не меняется**.
-Связано: `docs/models/core/Deal.md` (§Енумы, `CloseReason`),
+Связано: `docs/models/domain/aggregate/Deal.md` (§Енумы, `CloseReason`),
 `docs/lifecycles/Deal.md`,
 `.claude/work/questions/tasks/tasks-оценка-рисков.md` (ОР-Q1),
 `.claude/work/questions/tasks/tasks-аудит-и-история-исполнения.md` (АУ-Q2).
@@ -205,16 +205,16 @@ recovery) и как именно она ложится на `Deal.resultProfit`.
 (один общий `RefreshFillsExecutor`; материализация `TradeFill` —
 backlog).»
 
-Варианты: (1) ввести `docs/models/other/TradeFill.md` + lifecycle (по
+Варианты: (1) ввести `docs/models/domain/other/TradeFill.md` + lifecycle (по
 аналогии с `Order`/`AlgoOrder`) — даёт source-of-truth для PnL и
 аудита; (2) оставить агрегацию в `Order`/`AlgoOrder`/`Position`, без
 TradeFill — проще, но fills не персистятся отдельно. До решения
-поля DTO зафиксированы в `docs/client/okx/models/OkxFillResponse.md`;
+поля DTO зафиксированы в `docs/models/integrations/okx/OkxFillResponse.md`;
 маппинг → snapshot не описан (откладывается).
-Связано: `docs/client/okx/models/OkxFillResponse.md`,
-`docs/client/okx/rules/okx-fills-mapping.md`,
+Связано: `docs/models/integrations/okx/OkxFillResponse.md`,
+`docs/models/mapping/TradeFill.md`,
 `docs/components/RefreshFillsExecutor.md`,
-`docs/models/core/Deal.md` §Итоговый PnL.
+`docs/models/domain/aggregate/Deal.md` §Итоговый PnL.
 
 ### OKX-Q2. Persisted `TradeFillsArchive` и async-флоу выгрузки
 
@@ -237,10 +237,10 @@ polling state) и persisted-модель `TradeFillsArchive`.
 (`REQUESTED → ONGOING → FINISHED|FAILED`) + executor; (2) держать
 архив вне runtime (off-band tool для аудита); (3) отложить до явной
 потребности. До решения контракт endpoint'ов и поля responses
-зафиксированы в `docs/client/okx/models/OkxFillsArchiveResponse.md` и
-`docs/client/okx/rules/okx-fills-archive-mapping.md`.
-Связано: `docs/client/okx/models/OkxFillsArchiveResponse.md`,
-`docs/client/okx/rules/okx-fills-archive-mapping.md`, OKX-Q1.
+зафиксированы в `docs/models/integrations/okx/OkxFillsArchiveResponse.md` и
+`docs/integrations/okx/contracts/fills-archive.md`.
+Связано: `docs/models/integrations/okx/OkxFillsArchiveResponse.md`,
+`docs/integrations/okx/contracts/fills-archive.md`, OKX-Q1.
 
 ### OKX-Q3. Bills (`account/bills`) как источник `DealCashFlow`
 
@@ -260,16 +260,16 @@ OKX endpoint'ы `GET /account/bills` (7d) и `/account/bills-archive`
 - Рекомендуемая логика (архив): «Запросить bills ... Сохранить как
   DealCashFlow ... `Deal.resultProfit = sum(DealCashFlow.amount)`.»
 
-Варианты: (1) ввести `docs/models/other/DealCashFlow.md` + executor
+Варианты: (1) ввести `docs/models/domain/other/DealCashFlow.md` + executor
 `RefreshDealCashFlowExecutor` (или общий `RefreshDealFinalizationExecutor`
 с fills + bills) — даёт самый точный PnL; (2) считать PnL только через
 fills (без funding/rebate) — проще, но менее точно; (3) отложить до
 явной потребности. До решения контракт endpoint'ов и поля responses —
-`docs/client/okx/models/OkxAccountBillResponse.md` и
-`docs/client/okx/rules/okx-account-bills-mapping.md`.
-Связано: `docs/client/okx/models/OkxAccountBillResponse.md`,
-`docs/client/okx/rules/okx-account-bills-mapping.md`,
-`docs/models/core/Deal.md` §Итоговый PnL, DEAL-Q1, DEAL-Q2.
+`docs/models/integrations/okx/OkxAccountBillResponse.md` и
+`docs/integrations/okx/contracts/account-bills.md`.
+Связано: `docs/models/integrations/okx/OkxAccountBillResponse.md`,
+`docs/integrations/okx/contracts/account-bills.md`,
+`docs/models/domain/aggregate/Deal.md` §Итоговый PnL, DEAL-Q1, DEAL-Q2.
 
 ### OKX-Q4. WS-каналы OKX — отдельный заход
 
@@ -287,23 +287,24 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
   файлов; в каждом REST-файле есть короткая WS-заметка («WS — основной
   realtime-канал», «REST — fallback»).
 
-Варианты: (1) выделить кластер `docs/client/okx/ws/` или ввести
-`docs/client/okx/rules/okx-ws-channels.md` (один файл = один канал
+Варианты: (1) выделить кластер `docs/integrations/okx/ws/` или ввести
+`docs/integrations/okx/rules/okx-ws-channels.md` (один файл = один канал
 либо один файл = все каналы) — после сбора реальных push-примеров;
 (2) держать WS-альтернативу пометками внутри существующих
 `okx-*-mapping.md`, без отдельных файлов. До решения WS-каналы описаны
 только короткой пометкой в mapping-файлах; в `okx-service-urls.md`
 зафиксированы base URL public/private/business.
-Связано: `docs/client/okx/rules/okx-service-urls.md`,
-`docs/client/okx/rules/okx-ws-limits.md`,
-`docs/client/okx/rules/okx-order-mapping.md` (примеры WS-альтернатив).
+Связано: `docs/integrations/okx/contracts/service-urls.md`,
+`docs/integrations/okx/rules/ws-limits.md`,
+`docs/models/mapping/Order.md` (примеры WS-альтернатив).
 
-### DEAL-Q3. Размещение `DealActionState` (core/other, own lifecycle)
+### DEAL-Q3. Размещение `DealActionState` (domain layer + own lifecycle)
 
 `DealActionState` — persisted операционная модель runtime-состояния
 выполнения `StrategyAction`. Не торговая бизнес-сущность в смысле PnL, но
-тесно связана с сопровождением сделки. Не решено: `docs/models/core/` или
-`docs/models/other/`; нужен ли отдельный lifecycle (есть status-enum).
+тесно связана с сопровождением сделки. Не решено: `docs/models/domain/aggregate/`
+(тесная связь с сопровождением сделки) или `docs/models/domain/other/`
+(прочая хранимая); нужен ли отдельный lifecycle (есть status-enum).
 
 Цитаты источника:
 - «Сервисные команды» §6: `public class DealActionState extends Retryable`
@@ -322,10 +323,11 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
   выносит `RuntimeTarget` объектом и наследует от `Retryable`. Выбор
   представления — часть DEAL-Q3.
 
-Варианты: (1) `docs/models/other/DealActionState.md` + отдельный
+Варианты: (1) `docs/models/domain/other/DealActionState.md` + отдельный
 `docs/lifecycles/DealActionState.md` (status-enum как FSM); (2)
-`docs/models/core/` (тесная связь с сопровождением сделки); (3) без
-отдельного lifecycle (статусы — раздел модели).
+`docs/models/domain/aggregate/DealActionState.md` (тесная связь с
+сопровождением сделки); (3) без отдельного lifecycle (статусы — раздел
+модели).
 До решения файл модели **не материализуется**; в местах использования
 (`ServiceCommand`, executors, FSM handlers) упоминается с пометкой
 «структура и размещение — DEAL-Q3».

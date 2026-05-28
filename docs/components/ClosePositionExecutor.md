@@ -20,7 +20,7 @@ safety checks, отправляет full close request, сохраняет ACK /
 `autoCxl=true`, но handler всё равно подтверждает закрытие через
 `REFRESH_POSITION` и дочищает известные live `Order`/`AlgoOrder`
 командами `CANCEL_*` (unknown live tails → anomaly/safety-flow, см.
-`docs/client/okx/rules/okx-position-mapping.md`).
+`docs/models/mapping/Position.md`).
 
 Минимальные проверки: позиция существует и относится к сделке/инструменту;
 закрывается весь размер; есть данные для exchange request; команда не

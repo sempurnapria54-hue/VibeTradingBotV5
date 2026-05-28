@@ -35,7 +35,7 @@ risk-policy check `RiskValidator`): `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 (direct partial close через `StrategyPositionAction` / `CLOSE_POSITION`).
 Коды — `docs/components/models/RiskCheckResult.md` (`RiskCheckCode`).
 `StrategyPositionAction.actionType` — только `CLOSE_FULL` (см.
-`docs/models/core/Strategy.md`).
+`docs/models/domain/aggregate/Strategy.md`).
 
 ## Почему
 
@@ -48,6 +48,6 @@ risk-policy check `RiskValidator`): `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 
 ## Связанное
 
-- `docs/models/core/Position.md`, `docs/lifecycles/Position.md`.
+- `docs/models/domain/core/Position.md`, `docs/lifecycles/Position.md`.
 - `docs/rules/ack-not-runtime-truth.md` (факт закрытия подтверждается
   refresh-ом, не ACK).

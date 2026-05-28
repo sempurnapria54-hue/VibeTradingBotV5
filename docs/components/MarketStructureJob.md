@@ -8,7 +8,7 @@
 
 `MarketStructureJob` заранее готовит уровни рынка и сохраняет
 `MarketStructure` / `MarketPriceLevel` (см.
-`docs/models/other/MarketStructure.md`). Настройки —
+`docs/models/domain/other/MarketStructure.md`). Настройки —
 `StrategyMarketStructureSetting`; основной источник данных — закрытые
 свечи; дополнительный (если нужен алгоритму) — `IndicatorValue`.
 

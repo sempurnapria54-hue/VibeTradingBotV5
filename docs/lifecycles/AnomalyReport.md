@@ -5,7 +5,7 @@
 Через какие статусы проходит `AnomalyReport`, кто и при каких
 событиях их меняет.
 
-Структура модели — в `docs/models/other/AnomalyReport.md`.
+Структура модели — в `docs/models/domain/other/AnomalyReport.md`.
 
 ## Кто управляет
 

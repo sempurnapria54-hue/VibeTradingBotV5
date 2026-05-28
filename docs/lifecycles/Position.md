@@ -5,7 +5,7 @@
 Через какие статусы проходит `Position`, кто и при каких событиях их
 меняет.
 
-Структура модели и атрибуты — в `docs/models/core/Position.md`.
+Структура модели и атрибуты — в `docs/models/domain/core/Position.md`.
 
 ## Кто управляет
 
@@ -47,7 +47,7 @@ CLOSED                       -> позиции на бирже нет
 ERROR                        -> problem state, не normal closed
 ```
 
-Формула live risk — в `docs/models/core/Position.md`.
+Формула live risk — в `docs/models/domain/core/Position.md`.
 
 ## Переходы (через `REFRESH_POSITION`)
 

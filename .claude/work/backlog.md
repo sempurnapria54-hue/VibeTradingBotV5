@@ -149,7 +149,7 @@ NON_CRITICAL → после kill-switch может быть разрешена; 
 ### 10. API-кластер OKX — ✅ ЗАКРЫТО (2026-05-28)
 
 REST endpoint-доки из `.claude-archive/2026-05-21/docs/api/okx/*`
-мигрированы в `docs/client/okx/`. Что покрыто: order/algo/position/
+мигрированы в `docs/integrations/okx/`. Что покрыто: order/algo/position/
 balance/instrument/market-price-data — дополнены endpoint'ами,
 rate-limit, permission, response-полями (`cTime`/`uTime` и др.);
 candle (`okx-candle-mapping.md`), fills (`okx-fills-mapping.md` +
@@ -193,13 +193,13 @@ OKX-Q2 (`TradeFillsArchive` + async-флоу), OKX-Q3 (bills как источн
 **Тип:** методологическая ревизия по итогам миграции.
 
 **Сфера — накопительная.** Текущие затронутые модели:
-- `docs/models/core/Position.md` (§Что Position не хранит);
-- `docs/models/core/Order.md` (§Что Order не хранит);
-- `docs/models/core/Deal.md` (§Runtime graph — «не входят / не
+- `docs/models/domain/core/Position.md` (§Что Position не хранит);
+- `docs/models/domain/core/Order.md` (§Что Order не хранит);
+- `docs/models/domain/aggregate/Deal.md` (§Runtime graph — «не входят / не
   хранятся»);
-- `docs/models/core/Strategy.md` (§Что Strategy не хранит — через
+- `docs/models/domain/aggregate/Strategy.md` (§Что Strategy не хранит — через
   архитектурные инварианты);
-- `docs/models/other/AnomalyReport.md` (§Чего не хранит).
+- `docs/models/domain/other/AnomalyReport.md` (§Чего не хранит).
 
 В миграции процессов (2026-05-28) разделы «Чего не хранит» в новых
 файлах **не создавались** (новых затронутых моделей нет).

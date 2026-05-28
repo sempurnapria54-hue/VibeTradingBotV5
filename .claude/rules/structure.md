@@ -36,16 +36,22 @@
 | `.claude/work/history/` | Что мы уже сделали? | `YYYY-MM-DD-kebab-case.md` | Один файл = одна завершённая задача, короткое summary. Ценные детальные артефакты задачи — в одноимённой подпапке `YYYY-MM-DD-<задача>/`. |
 | `.claude-archive/` | (Архив.) | — | Не место для новых файлов. |
 | `docs/decisions/` | Почему мы решили так, а не иначе? (продукт) | kebab-case по сути | Один файл = одно решение. |
-| `docs/models/core/` | Что это за торговая модель? | PascalCase | Имя совпадает с именем Java-класса. |
-| `docs/models/other/` | Что это за модель? | PascalCase / kebab-case | Имя совпадает с Java-классом, если применимо; для свечей, индикаторов, аудита и иных не-классов — по теме. |
+| `docs/models/integrations/{name}/` | Какие поля у нативной модели источника `{name}`? | PascalCase (совпадает с DTO источника) | Инвентарь полей источника (used/unused). Один источник = один `{name}`. См. `.claude/decisions/model-layer-ontology.md`. |
+| `docs/models/externalSnapshot/` | Какая структура нормализованного граничного объекта `*ExternalSnapshot`? | PascalCase | Единственное, что выходит за `ClientService`/adapter (см. `docs/rules/raw-exchange-dto-boundary.md`). Файл — только при самостоятельном содержании. |
+| `docs/models/domain/core/` | Что это за торговая модель с биржевым воплощением? | PascalCase | Имя совпадает с именем Java-класса. |
+| `docs/models/domain/aggregate/` | Что это за сущность без биржевой привязки, нужная для торговли? | PascalCase | Имя совпадает с именем Java-класса. |
+| `docs/models/domain/other/` | Что это за прочая хранимая модель? | PascalCase / kebab-case | Имя совпадает с Java-классом, если применимо; для свечей, индикаторов, аудита и иных не-классов — по теме. |
+| `docs/models/persistence/` | Что это за модель хранимого слоя? | PascalCase / kebab-case | Слой-скаффолд; наполняется по мере появления persistence-проекций. |
+| `docs/models/rest/` | Что это за модель API нашего сервиса? | PascalCase / kebab-case | Request/response DTO нашего REST. Слой-скаффолд. |
+| `docs/models/mapping/` | Как сущность переходит между слоями (источник↔snapshot↔domain↔request) и как резолвится её статус? | PascalCase (совпадает с доменной сущностью) | Один файл = одна сущность; источники подразделами (`## OKX`, ...). См. `.claude/decisions/model-layer-ontology.md`. |
 | `docs/lifecycles/` | Через какие состояния проходит этот объект? Кто управляет? | PascalCase (совпадает с моделью) | Один файл = lifecycle одного объекта. |
 | `docs/processes/` | Как устроен этот процесс? | kebab-case по теме | Например, загрузка свечей, расчёт индикаторов. |
 | `docs/components/` | Кто выполняет? | PascalCase | Имя совпадает с именем Java-класса. |
 | `docs/components/models/` | Что это за runtime-объект? | PascalCase | Имя совпадает с именем Java-класса. См. `.claude/decisions/runtime-value-object.md`. |
 | `docs/rules/` | Какое правило действует в системе? | kebab-case по теме | Инварианты + бизнес-правила. Тип уточняется внутри файла при необходимости. |
-| `docs/dictionary/` | Что означает этот термин? | kebab-case | Для терминов-классов — короткая статья со ссылкой на `docs/models/`. |
-| `docs/client/<ExchangeName>/models/` | Какие поля у модели API биржи? | PascalCase (совпадает с DTO/моделью API биржи) | Exchange-specific. См. `.claude/decisions/client-layer-docs.md`. |
-| `docs/client/<ExchangeName>/rules/` | Какое правило биржи? | kebab-case по теме | Константы, маппинги, договорённости биржи. |
+| `docs/dictionary/` | Что означает этот термин? | kebab-case | Для терминов-классов — короткая статья со ссылкой на `docs/models/domain/...`. |
+| `docs/integrations/{name}/contracts/` | Каков контракт и какие лимиты у этой операции источника `{name}`? | kebab-case по теме | Endpoints, permissions, rate limits, ACK-семантика, пагинация. См. `.claude/decisions/model-layer-ontology.md`. |
+| `docs/integrations/{name}/rules/` | Какое правило источника `{name}`? | kebab-case по теме | Инварианты, adapter-константы, конвенции, специфичные для источника. |
 | `src/` | (Код.) | — | Не место для документации. |
 
 ## Принципы
@@ -58,6 +64,9 @@
   но связные группы по теме допускаются (например,
   `naming.md` — все правила именования вместе). Исключения
   для списков: `open-questions.md` и файлы в `questions/tasks/`.
+  Для `docs/models/mapping/<Сущность>.md` — один файл на сущность,
+  per-source детали подразделами (`## OKX`, …), чтобы не
+  дублировать source-agnostic ядро.
 - **Скиллы самодостаточны.** Содержат внутри себя знание,
   нужное для работы (перечни, критерии, признаки). Не
   ссылаются на справочники и на другие скиллы. Логику

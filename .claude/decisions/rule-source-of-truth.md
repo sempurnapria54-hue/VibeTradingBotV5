@@ -25,12 +25,17 @@ live risk (2 док. + внутридокументный дубль), ACK не 
 Первоисточник правила = **тот, кто им владеет**. Возможные
 владельцы:
 
-- **сущность** (`docs/models/` / `docs/lifecycles/`) — формула,
-  атрибут, поведение конкретного объекта;
+- **сущность** (`docs/models/domain/...` / `docs/lifecycles/`) —
+  формула, атрибут, поведение конкретного объекта;
 - **сквозной слой** (`docs/rules/`) — правило применимо к нескольким
   сущностям, единственного владельца нет;
-- **маппинг-слой** (`docs/client/<Биржа>/rules/`) — правило про
-  преобразование внешнего ↔ доменное (см. `client-layer-docs.md`);
+- **mapping-слой** (`docs/models/mapping/<Сущность>.md`) — правило
+  про преобразование между слоями (native ↔ snapshot ↔ domain ↔
+  request), статус-резолвинг;
+- **правило источника** (`docs/integrations/{name}/rules/`) —
+  инвариант или конвенция конкретного источника (например
+  reduce-only invariant, adapter-константы); см.
+  `model-layer-ontology.md`;
 - **процесс** (`docs/processes/`) — правило имеет смысл только в
   контексте конкретного процесса;
 - **компонент** (`docs/components/`) — правило про поведение
@@ -51,7 +56,7 @@ live risk (2 док. + внутридокументный дубль), ACK не 
 - external-status через resolver → компонент / процесс
   первоисточник; в `Order` / `AlgoOrder` — короткое упоминание.
 - `positionReducingOnly` vs OKX `reduceOnly` →
-  `docs/client/okx/rules/`.
+  `docs/integrations/okx/rules/reduce-only-invariant.md`.
 - 12-пунктная валидация стратегии → процесс / компонент-валидатор.
 - evidence-cycle refresh → процесс refresh.
 

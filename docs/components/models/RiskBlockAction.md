@@ -17,7 +17,7 @@ risk-кодам. RVO, не persisted (см.
 | Поле | Тип | Назначение |
 |---|---|---|
 | `type` | `Type` | Что должен сделать FSM handler. |
-| `closeReason` | `Deal.CloseReason` | Причина закрытия, если нужно закрыть candidate Deal (см. `docs/models/core/Deal.md`). |
+| `closeReason` | `Deal.CloseReason` | Причина закрытия, если нужно закрыть candidate Deal (см. `docs/models/domain/aggregate/Deal.md`). |
 | `errorCode` | `RuntimeErrorCode` | Код ошибки, если сделку нужно перевести в `ERROR` (см. `docs/rules/runtime-error-classification.md`). |
 | `comment` | `String` | Короткое пояснение для логов / будущей истории. |
 

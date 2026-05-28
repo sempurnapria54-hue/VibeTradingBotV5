@@ -5,7 +5,7 @@
 Через какие статусы проходят `Order` и embedded `AttachedAlgoOrder`,
 кто и при каких фактах их меняет.
 
-Структура моделей — в `docs/models/core/Order.md`.
+Структура моделей — в `docs/models/domain/core/Order.md`.
 
 ## Кто управляет
 
@@ -141,4 +141,4 @@ parent ERROR
   **не** основание для `MISSING_AFTER_REFRESH`.
 - **Exchange invariant violation** (`reduceOnly` mismatch и пр.):
   `Order.ERROR` + `closeReason = EXCHANGE_INVARIANT_VIOLATION` →
-  каскад (детали — `docs/client/okx/rules/okx-order-mapping.md`).
+  каскад (детали — `docs/models/mapping/Order.md`).

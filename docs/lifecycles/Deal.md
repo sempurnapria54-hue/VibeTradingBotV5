@@ -5,7 +5,7 @@
 Через какие FSM-статусы проходит `Deal`, какие из них terminal, какие
 инварианты переходов и как считается live risk сделки.
 
-Структура модели — в `docs/models/core/Deal.md`.
+Структура модели — в `docs/models/domain/aggregate/Deal.md`.
 
 ## Кто управляет
 

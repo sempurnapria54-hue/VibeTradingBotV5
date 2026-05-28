@@ -30,7 +30,7 @@
 
 Поведение при expired/missing задаётся не здесь, а в
 `StrategyStep.marketDataExpiredSetting` (`WAIT` / `BLOCK_STEP` /
-`GRACEFUL_CLOSE` / `KILL_SWITCH`, см. `docs/models/core/Strategy.md`).
+`GRACEFUL_CLOSE` / `KILL_SWITCH`, см. `docs/models/domain/aggregate/Strategy.md`).
 Применение результата в FSM — `docs/processes/deal-management.md`,
 `docs/lifecycles/Deal.md`. Сквозное правило свежести —
 `docs/rules/market-data-freshness.md`.

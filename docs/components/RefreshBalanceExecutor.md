@@ -11,7 +11,7 @@
 balance snapshot. Получает от `ClientService` уже validated
 `BalanceContainerExternalSnapshot`, создаёт `BalanceContainer` при
 отсутствии, обновляет account-level поля и полностью заменяет список
-`Balance` (см. `docs/models/core/BalanceContainer.md`).
+`Balance` (см. `docs/models/domain/core/BalanceContainer.md`).
 
 Особенности: баланс не управляемая торговая сущность (нет active/closed
 lifecycle, нет status resolver), `REFRESH_BALANCE` не проходит через
@@ -20,7 +20,7 @@ contract не используется: успешный refresh обязан в
 snapshot с обязательной `settleCurrency`; пустой response / нет
 settleCurrency / invalid fields → controlled external/account error (см.
 `docs/rules/raw-exchange-dto-boundary.md`,
-`docs/client/okx/rules/okx-balance-mapping.md`).
+`docs/models/mapping/Balance.md`).
 
 Не знает про raw OKX response и не валидирует OKX-specific поля: цепочка
 `ClientService → raw DTO → validation → BalanceContainerMapper →

@@ -29,7 +29,7 @@ contractsRounded = roundByLotSize(contracts)
 
 где `ctVal` = `InstrumentExternalRules.externalContractValue`, `lotSz` =
 `externalLotSize`, `minSz` = `externalMinSize` (см.
-`docs/models/other/InstrumentExternalRules.md`).
+`docs/models/domain/other/InstrumentExternalRules.md`).
 
 ## Инвариант partial exit
 

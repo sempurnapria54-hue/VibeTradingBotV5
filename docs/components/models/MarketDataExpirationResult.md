@@ -15,7 +15,7 @@
 Отвечает на вопрос: нужные данные свежие, частично устарели, полностью
 устарели или отсутствуют. Само поведение при устаревании задаёт не этот
 объект, а `StrategyStep.marketDataExpiredSetting` (см.
-`docs/models/core/Strategy.md` и `docs/rules/market-data-freshness.md`).
+`docs/models/domain/aggregate/Strategy.md` и `docs/rules/market-data-freshness.md`).
 
 ## Структура
 

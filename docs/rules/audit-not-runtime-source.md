@@ -31,7 +31,7 @@ queue. История исполнения команд не становитс�
 - `REFRESH_BALANCE` попадает в историю исполнения команд (баланс влияет на
   risk decisions).
 - `shutdownReason` виден в timeline, но **не** заменяет `closeReason` (см.
-  `docs/models/core/Deal.md`).
+  `docs/models/domain/aggregate/Deal.md`).
 - `CLOSED` и `EMERGENCY_CLOSED` различимы в отчётах (штатный vs аварийный
   terminal-финал); `ENTRY_CONDITION_EXPIRED` отображается как нормальное
   закрытие candidate Deal без live risk, не авария.

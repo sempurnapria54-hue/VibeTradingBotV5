@@ -54,4 +54,4 @@ freshness-check перед `StrategyCondition`
 исполняет команды, не строит аудит. Свежие рыночные данные в
 `DealContext` не кладёт — расчёт идёт по свежему `CalculationContext` в
 `StrategyActionCalculator`. Balance freshness — precondition перед
-risk-sensitive flow (см. `docs/models/core/BalanceContainer.md`).
+risk-sensitive flow (см. `docs/models/domain/core/BalanceContainer.md`).

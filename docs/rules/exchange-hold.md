@@ -42,7 +42,7 @@ TP/SL/trailing actions, pyramid/scaling и любые действия, увел
 отключения и задаётся отдельно (в отличие от `HOLD`, где safety/read
 всегда разрешены). Статус инструмента — также точка enforcement
 блокировки торговли после `AnomalyReport` (severity `CRITICAL` →
-торговля остаётся запрещённой; см. `docs/models/other/AnomalyReport.md`).
+торговля остаётся запрещённой; см. `docs/models/domain/other/AnomalyReport.md`).
 Полная модель/lifecycle `Exchange`/`Instrument` — backlog п.9.
 
 ## Почему

@@ -77,7 +77,7 @@ LONG TP  -> вверх    SHORT TP -> вниз
 `INSTRUMENT_MAX_PRICE`, `INSTRUMENT_TICK_SIZE`.
 
 Конфигурационное подмножество для placement (`LAST_PRICE` … `MID_PRICE`) —
-раздел `StrategyPriceSource` в `docs/models/core/Strategy.md`.
+раздел `StrategyPriceSource` в `docs/models/domain/aggregate/Strategy.md`.
 
 ## Источник цены → тип цены (примеры)
 

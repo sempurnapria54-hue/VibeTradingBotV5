@@ -14,7 +14,7 @@
 - **Плечо:** не выше разрешённого стратегией и глобальной risk policy и
   не выше биржевого лимита из `InstrumentExternalRules`
   (`externalMaxLeverage`, см.
-  `docs/models/other/InstrumentExternalRules.md`).
+  `docs/models/domain/other/InstrumentExternalRules.md`).
 - **Позиции:** не более одной позиции на инструмент.
 - **Сделки:** максимум одна активная сделка на инструмент, если будущая
   политика явно не разрешит иначе.
@@ -29,4 +29,4 @@ Enforcement: проверки плеча/маржи/borrow — risk-layer (`Risk
 `docs/components/models/RiskCheckResult.md`); «одна позиция/инструмент»,
 «чужой live risk» — `docs/components/AnomalyJob.md`. OKX-константы
 `tdMode=isolated`/`posSide=net` — adapter (см.
-`docs/client/okx/rules/okx-order-mapping.md`).
+`docs/models/mapping/Order.md`).

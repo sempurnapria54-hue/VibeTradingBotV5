@@ -8,7 +8,7 @@
 ## Назначение
 
 `IndicatorService` отдаёт готовые `IndicatorValue` (см.
-`docs/models/other/IndicatorValue.md`). Сам индикаторы не считает — их
+`docs/models/domain/other/IndicatorValue.md`). Сам индикаторы не считает — их
 заранее считает `docs/components/IndicatorJob.md`.
 
 ## Контракт (примеры методов)
