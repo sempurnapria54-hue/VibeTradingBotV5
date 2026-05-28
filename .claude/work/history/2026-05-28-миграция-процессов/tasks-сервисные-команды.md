@@ -34,6 +34,27 @@
   lifecycle/system action). Материализация финализационных executor'ов
   частично «под вопросом» до закрытия DEAL-Q1.
 
+## Решения прохода 2
+
+- **СК-Q1 — закрыт.** Мигрирован только `RuntimeErrorCode`
+  (`docs/rules/runtime-error-classification.md`); legacy-enum
+  `RetryErrorType` зафиксирован как вытесненный (там же и в
+  `docs/components/RetryPolicyService.md`).
+- **СК-Q2 / СК-Q3 — перенесены в CMD-Q1** (`open-questions.md`):
+  гранулярность executor'ов и payload'ов. Текущее решение: executor'ы —
+  file-per-executor; payload'ы — один `ServiceCommandPayload.md` с
+  разделами.
+- **СК-Q4 — финализационные executor'ы не материализованы.**
+  `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`, `MARK_DEAL_CLOSED`,
+  `MARK_DEAL_ERROR` executor'ы **не созданы** как компоненты: их
+  retry-state финализации не имеет места хранения (`DealActionState`
+  относится к `StrategyAction`, финализация — lifecycle/system action) —
+  открытый **DEAL-Q1** (`open-questions.md`). Команды присутствуют в
+  `ServiceCommandType` (`docs/components/models/ServiceCommand.md`). При
+  закрытии DEAL-Q1 — материализовать executor'ы.
+- **`DealActionState`** не материализован как модель — открытый
+  **DEAL-Q3** (`open-questions.md`).
+
 ## Форвард-заметки
 
 - **СК-FW1.** §3 `ServiceCommandType` (полный enum 24 значения) +

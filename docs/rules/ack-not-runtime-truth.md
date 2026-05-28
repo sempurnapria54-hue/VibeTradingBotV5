@@ -18,6 +18,19 @@ ACK (успешный response команды, `code = 0`) подтвержда�
   подтверждается соответствующим `REFRESH_*`, а не ACK-ом.
 - Executor после ACK не переводит сущность в финальный статус.
 
+### ACK от submit / amend / cancel / close
+
+- `SUBMIT_*`: ACK не означает, что сущность точно отправлена/активна;
+  факт подтверждается refresh/search/history. После ACK action может
+  перейти в `SUBMITTED`, но это не подтверждённый финал.
+- `AMEND_*`: ACK не подтверждает новые параметры — подтверждает refresh.
+- `CANCEL_ORDER` / `CANCEL_ALGO_ORDER`: ACK не финализирует сущность,
+  `CANCELED` по ACK не ставится; `closeReason` не перетирается, если уже
+  установлен. Если refresh/history показывает другой факт (например, algo
+  `effective`/`partially_effective`) — система верит exchange facts.
+- `CLOSE_POSITION`: см. выше — full close подтверждается
+  `REFRESH_POSITION`.
+
 ## Почему
 
 Сквозное правило по командам (`.claude/decisions/rule-source-of-truth.md`

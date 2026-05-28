@@ -26,6 +26,33 @@
   влияет документ» — кросс-ссылочная. Не воспроизводить как файл; влияние
   распределить по соответствующим компонентам или сквозным правилам.
 
+## Решения прохода 2
+
+- **СТ-Q1 (master-index) — разобран по владельцам.** Статусная механика
+  (`Order.Status`/`AlgoOrder.Status`/`Position.Status`/`CloseReason`,
+  attached protection, live-risk формулы, resolvers, exchange-hold,
+  controlled exceptions) **уже была мигрирована** прошлым model-кластером
+  в `docs/models/core/*`, `docs/lifecycles/*`, `docs/rules/*`,
+  `docs/client/okx/rules/*`. На проходе 2 дополнительно созданы
+  компоненты-resolver'ы (`OrderExternalStatusResolver`,
+  `AlgoOrderExternalStatusResolver`, `PositionStatusResolver` + RVO
+  `PositionStatusResolveResult`), `AnomalyJob`, `KillSwitchExecutor`,
+  правило `controlled-exchange-exceptions`; дополнены
+  `external-status-resolution` (result-object/write-once) и
+  `exchange-hold` (DISABLED). Статусные расширения моделей/lifecycles
+  **не дублировались** — уже присутствуют.
+- **СТ-Q2 (`Exchange`/`ExchangeAccount`/`Instrument` модели)** — за
+  рамками миграции процессов, backlog п.9 (статусная семантика —
+  `docs/rules/exchange-hold.md`).
+- **СТ-Q3 (Component impact matrix §11)** — не воспроизведён как файл;
+  влияние распределено по компонентам/правилам.
+- **Mappers** (`OrderMapper`, `PositionMapper`, `AlgoOrderMapper`,
+  `BalanceContainerMapper`) — упомянуты в архиве вскользь (например, СК
+  §REFRESH_BALANCE: «raw OKX DTO → validation → `BalanceContainerMapper`
+  → `BalanceContainerExternalSnapshot`»); доменное существо в
+  `docs/client/okx/rules/*`. **Не материализованы** как
+  `docs/components/<X>.md` — backlog п.2.
+
 ## Форвард-заметки
 
 - **СТ-FW1.** §5 — resolver'ы внешних статусов (`OrderExternalStatusResolver`,

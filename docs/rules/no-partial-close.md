@@ -16,6 +16,27 @@ close-position и где выполняется частичный выход.
   обновлённым `externalSize`, а не отдельный статус и не partial
   close.
 
+### Механизм partial exit
+
+Partial exit идёт через трассируемые runtime-сущности:
+`StrategyOrderAction` / `StrategyAlgoOrderAction` → `CREATE_* → SUBMIT_*
+→ REFRESH_*`/fills/history → `DealActionState.COMPLETED`. Обязательные
+свойства action: reduce-only semantics, stable client id, связь через
+`DealActionState`, восстановление через fills/history/refresh, запрет на
+увеличение позиции. Для reduce-only partial exit `RiskValidator` не
+вызывается — handler выполняет minimal safety/invariant checks (см.
+`docs/rules/risk-validator-scope.md`).
+
+### Коды нарушения инварианта
+
+Нарушения partial-exit инварианта — safety/invariant violation (не
+risk-policy check `RiskValidator`): `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
+`PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`
+(direct partial close через `StrategyPositionAction` / `CLOSE_POSITION`).
+Коды — `docs/components/models/RiskCheckResult.md` (`RiskCheckCode`).
+`StrategyPositionAction.actionType` — только `CLOSE_FULL` (см.
+`docs/models/core/Strategy.md`).
+
 ## Почему
 
 Сквозное правило по нескольким сущностям (`Position`, `Order`,

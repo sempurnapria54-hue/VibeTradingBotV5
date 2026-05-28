@@ -30,6 +30,21 @@ CLOSE_POSITION
 EXECUTE_KILL_SWITCH
 ```
 
+Также `HOLD` блокирует создание новых `ENTRY`/`GRID_ENTRY`, normal-flow
+TP/SL/trailing actions, pyramid/scaling и любые действия, увеличивающие
+торговое намерение вне safety-flow.
+
+## DISABLED (Exchange / Instrument)
+
+`HOLD` — safety-пауза; `DISABLED` — конфигурационное отключение
+`Exchange`/`Instrument`. На первом этапе `DISABLED` трактуется как
+запрет новых сделок; разрешение safety/read операций зависит от причины
+отключения и задаётся отдельно (в отличие от `HOLD`, где safety/read
+всегда разрешены). Статус инструмента — также точка enforcement
+блокировки торговли после `AnomalyReport` (severity `CRITICAL` →
+торговля остаётся запрещённой; см. `docs/models/other/AnomalyReport.md`).
+Полная модель/lifecycle `Exchange`/`Instrument` — backlog п.9.
+
 ## Почему
 
 Сквозное правило про gating команд на уровне биржи

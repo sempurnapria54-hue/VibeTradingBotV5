@@ -19,6 +19,33 @@ Raw exchange DTO (полный сырой response/DTO биржи) не выхо
 - Validation-only поля биржи используются внутри `ClientService` и в
   normalized snapshot не попадают.
 
+### Nullable contract ClientService
+
+Для read/refresh общий контракт: snapshot найден → `ExternalSnapshot`;
+успешно, но не найден → `null`; ошибка API / parse / invariant →
+exception. `null` означает «не найдено в этом источнике», а не ошибку;
+трактовка зависит от сущности (для `Position` `null` = позиции нет; для
+`Order`/`AlgoOrder` последний `null` после полного evidence-cycle может
+быть error/recovery). См. `docs/components/ClientService.md`,
+`docs/rules/external-status-resolution.md`.
+
+### Граничные `*ExternalSnapshot`
+
+Маппер из client-модели возвращает validated `*ExternalSnapshot`
+(`InstrumentExternalRulesExternalSnapshot`, `MarketPriceDataExternalSnapshot`,
+`BalanceContainerExternalSnapshot`, order/algo/position external snapshots)
+— external-поля модели, без доменных enum/нормализаций (они резолвятся при
+материализации). Это и есть единственное, что выходит за `ClientService`.
+
+### Balance — без normal null
+
+Для `REFRESH_BALANCE` normal `null` contract не применяется: успешный
+refresh обязан вернуть валидный `BalanceContainerExternalSnapshot` с
+обязательной `settleCurrency`; пустой response / нет settleCurrency /
+invalid fields → controlled external/account error (не `null`). См.
+`docs/models/core/BalanceContainer.md`,
+`docs/client/okx/rules/okx-balance-mapping.md`.
+
 ## Почему
 
 Normalized external snapshot содержит только поля, которые обновляют

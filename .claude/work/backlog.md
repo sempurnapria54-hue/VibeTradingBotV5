@@ -6,204 +6,159 @@
 
 ## Статус
 
-Миграция 6 торговых сущностей в `docs/` **завершена и закрыта**
-(summary — `.claude/work/history/2026-05-27-миграция-торговых-сущностей.md`).
-Ниже — планируемые миграции cross-cutting кластеров, накопленные как
-форвард-заметки при той миграции (стратегия —
-`.claude/decisions/cross-cutting-parking.md`; судьба заметок —
-`.claude/decisions/forward-notes-after-task-closure.md`).
+- Миграция 6 торговых сущностей в `docs/` **завершена и закрыта**
+  (`.claude/work/history/2026-05-27-миграция-торговых-сущностей.md`).
+- Миграция архивных процессов (8 доков `Audit/`/`Calculation/`/`Deal
+  management/`) **завершена и закрыта 2026-05-28**
+  (`.claude/work/history/2026-05-28-миграция-процессов.md`). Покрытые
+  cross-cutting пункты ниже свёрнуты как закрытые; частично покрытые —
+  обновлены.
 
-**Как читать пункты.** Каждый пункт — будущая миграция кластера:
-источник (архивные доки) + краткая суть + указатель на архивные
-форвард-заметки. Полные форвард-заметки разворачиваются при запуске
-пункта из:
-`.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-<сущность>.md`.
-Архивные торговые модели (`.claude-archive/.../docs/domain/models/`) и
-процессные доки **не удалены** — источник для этих миграций.
-
-## Активная миграция: архивные процессы
-
-**Запущена 2026-05-27.** Миграция всех процессных доков из
-`.claude-archive/2026-05-21/docs/domain/processes/` (кластеры `Audit/`,
-`Calculation/`, `Deal management/`) в `docs/`. Организована двухпроходно:
-проход 1 — карта артефактов (`.claude/work/progress/progress-карта-артефактов.md`),
-проход 2 — создание файлов в `docs/`. На каждый архивный док —
-пара `progress-<имя>.md` + `tasks-<имя>.md`.
-
-Этот пункт — зонтичный: он покрывает целиком или частично пункты **1, 3,
-4, 5, 6, 7** из «Cross-cutting миграции» ниже (Deal management; калькуляторы;
-risk-слой; индикаторы и рыночные данные; аудит/финализация PnL;
-anomaly/safety — в части компонентов и моделей, упомянутых в процессных
-доках). Пункты 2, 8, 9, 10 затрагиваются частично. По завершении миграции
-покрытые пункты сворачиваются, карта уезжает в `history/`.
-
-Решения по миграции (зафиксированы в чате): разделы «Чего не хранит» в
-новых файлах не создаём (методологическая ревизия — задача M1 ниже);
-карта артефактов — отдельный файл в `progress/`.
+**Как читать пункты.** Каждый пункт — будущая или завершённая миграция
+кластера: источник + суть + указатель на архивные форвард-заметки. Полные
+форвард-заметки разворачиваются из соответствующей подпапки `history/`:
+`2026-05-27-миграция-торговых-сущностей/tasks-<сущность>.md` (модельный
+кластер) или `2026-05-28-миграция-процессов/tasks-<док>.md` (процессы).
+Архивные модели и процессные доки в `.claude-archive/` **не удалены** —
+источник для оставшихся миграций.
 
 ## Cross-cutting миграции
 
-### 1. Deal management: lifecycle, FSM, команды
+### 1. Deal management: lifecycle, FSM, команды — ✅ ЗАКРЫТО (2026-05-28)
 
-**Источник:** `.claude-archive/2026-05-21/docs/domain/processes/Deal
-management/` (`Жизненный цикл сделки.md`, `FSM этапы сделки.md`,
-`Сервисные команды.md`, `Статусы торговых сущностей.md`); контекст —
-`docs/context/comands/*`, `docs/context/Сопровождение сделки.md`.
-**Суть:**
-- `DealContext` (RVO) + `DealActionState` (модель) + `RuntimeTarget`
-  — состав, сборка на проход FSM, recovery/idempotency.
-- FSM handlers per-status (`PrecheckHandler`…`ErrorHandler`) →
-  `docs/components/`; `DealStateMachine` + конструкция handler'а
-  (3 проверки) — по `.claude/decisions/fsm-handler-as-component.md`.
-- Подсистема `ServiceCommand`: executors, `ServiceCommandFactory`,
-  dispatch; `REFRESH_*` / `SUBMIT_*` / `AMEND_*` / `CANCEL_*` /
-  `CLOSE_POSITION`; retry/recovery boundary; «ServiceCommand —
-  runtime object, не persisted queue».
-- lifecycle/finalization commands (`FINALIZE_DEAL_EXIT`,
-  `MARK_DEAL_CLOSED`, emergency) — связано с `open-questions.md`
-  DEAL-Q1 (retry-state финализации).
-- `Статусы торговых сущностей.md` — master-index; разбирать по
-  владельцам (`.claude/decisions/master-index-not-fixated.md`),
-  сверить с уже мигрированными lifecycle.
-**Форвард-заметки:** `tasks-deal.md` (DEAL-FW1…FW4), `tasks-position.md`
-(POS-Q1, POS-Q6), `tasks-order.md` (ORD-Q1, ORD-Q3), `tasks-algo-order.md`
-(ALGO-Q1, ALGO-Q3), `tasks-balance.md` (BAL-Q1, BAL-Q4).
+Мигрировано: `DealContext` (RVO) + `DealContextService`; FSM handlers
+per-status (`PrecheckHandler`…`ErrorHandler`), `DealStateMachine` (+3
+проверки), `StrategyConditionEvaluator`; подсистема `ServiceCommand`
+(`ServiceCommand`+`ServiceCommandType`, `ServiceCommandPayload`,
+`ServiceCommandExecutor`, `ServiceCommandFactory`, `ClientService`,
+`RetryPolicyService`, 14 executor'ов); процесс `deal-management`; правила
+`command-lifecycle`, `runtime-error-classification`,
+`controlled-exchange-exceptions`, `trading-constraints`. Master-index
+«Статусы торговых сущностей» разобран по владельцам. Детали —
+`history/2026-05-28-миграция-процессов.md`.
+**Осталось:** финализационные executor'ы (`FINALIZE_*`/`MARK_*`) — DEAL-Q1;
+`DealActionState`/`Retryable`/`RuntimeTarget` модель — DEAL-Q3
+(`open-questions.md`).
 
-### 2. Resolver / mapper / checker компоненты
+### 2. Resolver / mapper / checker компоненты — частично
 
-**Источник:** mapping-доки (уже мигрированы в `docs/client/okx/rules/`)
-+ command-доки; `docs/context/comands/*`. **Суть:** компоненты
-adapter/command-слоя, чьё доменное существо уже зафиксировано в
-lifecycle/client-rules, но `docs/components/<X>.md` отложены:
-`OrderExternalStatusResolver`, `AttachedAlgoOrderStateResolver`,
-`PositionStatusResolver` (+ `PositionStatusResolveResult` RVO),
-`AlgoOrderExternalStatusResolver` (`OkxAlgoOrderExternalStatusResolver`),
-`OkxAlgoOrderTypeResolver`, `*Mapper` (`OrderMapper`, `PositionMapper`,
+**Мигрировано:** `OrderExternalStatusResolver`,
+`AlgoOrderExternalStatusResolver`, `PositionStatusResolver` (+
+`PositionStatusResolveResult` RVO), refresh/close executor'ы.
+**Осталось (backlog):** `*Mapper` (`OrderMapper`, `PositionMapper`,
 `AlgoOrderMapper`, `BalanceContainerMapper`), `BalanceFreshnessChecker`,
-`Refresh*Executor`, `ClosePositionExecutor`. **Форвард-заметки:**
-`tasks-order.md` (ORD-Q2), `tasks-position.md` (POS-Q2),
-`tasks-algo-order.md` (ALGO-Q2), `tasks-balance.md` (BAL-Q6). Может
-сливаться с п.1 (command-кластер).
+`OkxAlgoOrderTypeResolver`, `AttachedAlgoOrderStateResolver`.
+**Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q2),
+`tasks-position.md` (POS-Q2), `tasks-algo-order.md` (ALGO-Q2),
+`tasks-balance.md` (BAL-Q6); `2026-05-28-.../tasks-статусы-торговых-сущностей.md`
+(Mappers — Решения прохода 2).
 
-### 3. Калькуляторы действий стратегии + RVO
+### 3. Калькуляторы действий стратегии + RVO — ✅ ЗАКРЫТО (2026-05-28)
 
-**Источник:** `.claude-archive/.../processes/Calculation/Калькуляторы
-действий стратегии.md`. **Суть:** `StrategyActionCalculator`,
-`PriceCalculator`, `SizeCalculator` (вкл. `closeFractionPercents`/
-`allocationPercents` → размер), `StrategyConditionEvaluator`; RVO
-`CalculationContext`, `MarketPriceData`, `CalculatedStrategyAction`,
-`InstrumentExternalRules` → `docs/components/models/`. **Форвард-заметки:**
-`tasks-strategy.md` (STR-FW2), `tasks-order.md` (ORD-Q6),
-`tasks-algo-order.md` (ALGO-Q4).
+Мигрировано: `StrategyActionCalculator`, `CalculationContextFactory`,
+`PriceCalculator`, `SizeCalculator`, `MarketPriceDataService`,
+`InstrumentExternalRulesService`; RVO `CalculationContext`,
+`MarketPriceData`, `CalculatedStrategyAction`,
+`StrategyActionCalculationResult`, `CalculationError`, `CalculatedPrice`,
+`CalculatedSize`; процесс `strategy-action-calculation`.
+`StrategyConditionEvaluator` — в п.1. `InstrumentExternalRules` модель — в
+п.5. **Осталось:** `PositionContext` (PROC-Q1), `RiskSettings` (RISK-Q1) —
+`open-questions.md`.
 
-### 4. Risk-слой
+### 4. Risk-слой — ✅ ЗАКРЫТО (2026-05-28)
 
-**Источник:** `.claude-archive/.../processes/Calculation/Оценка
-рисков.md`; `docs/context/TradeRuleValidator — модель, роль и flow.md`.
-**Суть:** `RiskValidator` (после расчёта action, до торговой команды;
-не перед read-only), `RiskCheckResult`/`RiskCheckCode`/`RiskDecision`
-(RVO/енумы), `RiskBlockResolver`. **Форвард-заметки:**
-`tasks-strategy.md` (STR-FW3), `tasks-balance.md` (BAL-Q2),
-`tasks-position.md` (POS-Q3), `tasks-order.md` (ORD-Q4),
-`tasks-algo-order.md` (ALGO-Q5), `tasks-deal.md` (DEAL-FW6).
+Мигрировано: `RiskValidator`, `RiskBlockResolver`; RVO
+`RiskValidationResult`, `RiskCheckResult` (+ `RiskCheckCode`),
+`RiskBlockAction`; правило `risk-validator-scope`; процесс
+`risk-evaluation`. `TradeRuleValidator` (контекст-док) — см. п.7.
 
-### 5. Расчёт индикаторов и рыночных данных
+### 5. Расчёт индикаторов и рыночных данных — ✅ ЗАКРЫТО (2026-05-28)
 
-**Источник:** `.claude-archive/.../processes/Calculation/Расчёт
-индикаторов и рыночных данных.md`; `docs/deprecated/.../Candle.md`,
-`PriceTicker.md`, `Instrument.md`. **Суть:**
-- jobs: `IndicatorJob`, `MarketStructureJob`, `MarketPhaseJob`,
-  `EntryScannerJob`, `DealOrchestratorJob`.
-- `MarketDataExpirationChecker` (checker; статус стратегии не меняет).
-- модели market-data (`docs/models/other/` или отдельный кластер):
-  `MarketPhase` (+ `Type`), `MarketStructure` (+ `Type`),
-  `MarketPriceLevel`, `IndicatorValue` (+ `Type`), свечи, `Instrument`.
-- `TimeFrameMapper` (OKX timeframe ↔ доменный `TimeFrame`) →
-  `docs/client/okx/`.
-**Форвард-заметки:** `tasks-strategy.md` (STR-FW1, FW4, FW6, FW7).
+Мигрировано: jobs `CandleJob`, `InstrumentExternalRulesSyncJob`,
+`IndicatorJob`, `MarketStructureJob`, `MarketPhaseJob`; сервисы
+`Indicator`/`MarketStructure`/`MarketPhase` Service;
+`MarketDataExpirationChecker` (+ RVO `MarketDataExpirationResult`);
+market-data модели `InstrumentExternalRules`, `IndicatorValue`,
+`MarketStructure` (+ `MarketPriceLevel`), `MarketPhase`; правило
+`market-data-freshness`; процесс `market-data-calculation`; OKX
+`okx-timeframe-mapping`/`okx-instrument-mapping`/`okx-market-price-data-mapping`.
+**Осталось (вне процессных доков):** standalone модели `Candle`
+(`docs/deprecated/.../Candle.md`) и `Instrument` (→ п.9); размещение
+`TimeFrame` — TIME-Q1 (`open-questions.md`).
 
-### 6. Аудит и история исполнения; финализация PnL
+### 6. Аудит и история исполнения; финализация PnL — частично
 
 **Источник:** `.claude-archive/.../processes/Audit/Аудит и история
 исполнения.md`; `docs/deprecated/.../TradeFill.md`,
-`TradeFillsArchive.md`. **Суть:** аудит/timeline/entry context;
-breakdown PnL (fees, fundingFee, gross/net, fills, avg prices, partial
-exits); `TradeFill`/`TradeFillsArchive` модели + `REFRESH_FILLS`
-(`Deal.resultProfit` считается через них — правило в `Deal.md`);
-история command execution. Связано с `open-questions.md` DEAL-Q2.
-**Форвард-заметки:** `tasks-deal.md` (DEAL-FW5, FW9), `tasks-balance.md`
-(BAL-Q7), `tasks-order.md` (ORD-Q7), `tasks-position.md` (POS-Q5).
+`TradeFillsArchive.md`. Архивный док — рабочий каркас, **выведен из
+миграции процессов** (`.claude/decisions/process-materialization-criterion.md`):
+модели истории/timeline не спроектированы, ~30 подвопросов.
+**Мигрировано:** только сквозное правило `docs/rules/audit-not-runtime-source.md`
+(аудит не runtime-source FSM; `REFRESH_BALANCE` в истории; CLOSED vs
+EMERGENCY_CLOSED различимы; partial exit объясним).
+**Осталось:** модели `ServiceCommandExecutionHistory`, entity history,
+timeline, snapshot-формат; breakdown PnL (fees/fundingFee/gross-net/
+fills/avg prices/partial exits); `TradeFill`/`TradeFillsArchive` +
+`REFRESH_FILLS`; ~30 подвопросов. Связано с DEAL-Q1/DEAL-Q2.
+**Форвард-заметки:** `2026-05-28-.../tasks-аудит-и-история-исполнения.md`
+(§5/§8 подвопросы + Решения прохода 2); `2026-05-27-.../tasks-deal.md`
+(DEAL-FW5, FW9), `tasks-balance.md` (BAL-Q7), `tasks-order.md` (ORD-Q7),
+`tasks-position.md` (POS-Q5).
 
-Архивный док «Аудит и история исполнения» — рабочий каркас, не
-финализирован: модели истории и flow записи событий не описаны, большая
-часть содержания — открытые вопросы (~30 подвопросов в
-`tasks-аудит-и-история-исполнения.md`, проход 1 миграции процессов,
-2026-05-27). Полностью **выведен из миграции архивных процессов**
-(решение 2026-05-28, `.claude/decisions/process-materialization-criterion.md`).
-При запуске п.6 — пересмотреть вопросы (часть может оказаться
-неактуальной), не материализовать модели из неполного источника.
+### 7. Anomaly / safety / kill-switch — частично
 
-### 7. Anomaly / safety / kill-switch
+**Источник:** `docs/context/Аварийные executors …`, `KillSwitchService …`,
+`After-snapshot …`. **Мигрировано:** `AnomalyReport` модель+lifecycle
+(2026-05-27); `AnomalyJob`, `KillSwitchExecutor` (компоненты,
+2026-05-28). **Осталось:** `ReconciliationJob` (в архиве только название —
+live risk после terminal / позиция без active Deal), полный kill-switch
+flow (`KillSwitchService`, kill-switch report, after-snapshot,
+`Position.CloseReason = KILL_SWITCH`), `TradeRuleValidator`.
+**Форвард-заметки:** `2026-05-28-.../tasks-жизненный-цикл-сделки.md`
+(ReconciliationJob), `2026-05-27-.../tasks-position.md` (POS-Q7),
+`tasks-deal.md` (DEAL-FW7),
+`2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q1…Q3).
 
-**Источник:** `docs/context/Аварийные executors — семантика статусов
-и причин.md`, `docs/context/KillSwitchService — ...md`,
-`docs/context/After-snapshot — ...md`. **Суть:** `AnomalyJob`,
-`ReconciliationJob` (live risk после terminal / позиция без active
-Deal), kill-switch flow. **Форвард-заметки:** `tasks-position.md`
-(POS-Q7), `tasks-deal.md` (DEAL-FW7),
-`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`
-(ANOM-Q1…Q3).
-**Прогресс:** `AnomalyReport` модель+lifecycle мигрированы 2026-05-27
-(`docs/models/other/AnomalyReport.md`,
-`docs/lifecycles/AnomalyReport.md`); остаются компоненты `AnomalyJob`,
-`KillSwitchExecutor`, `TradeRuleValidator`.
+### 8. Strategy: enforcement, валидатор, примеры — частично
 
-### 8. Strategy: enforcement, валидатор, примеры
-
-**Источник:** `Strategy.md` (мигрирован), `Жизненный цикл сделки.md`,
-`Strategy API examples.md`, `docs/api/API стратегии.md`. **Суть:**
-- enforcement `Strategy.INACTIVE`/`DELETED` (блок новых /
-  graceful shutdown) в `EntryScannerJob` + FSM/lifecycle Deal —
-  тройная развилка B3 (`rule-source-of-truth.md`).
-- валидатор стратегии (12-пунктная валидация key/targetActionKey/
-  CLOSE_FULL/partial-exit) — компонент/процесс.
-- `Strategy API examples.md` — JSON-примеры (тип reference; уточнить,
-  воспроизводить ли как файл знания).
-**Форвард-заметки:** `tasks-strategy.md` (STR-FW8, FW9, FW10),
-`tasks-deal.md` (DEAL-FW8).
+**Мигрировано:** enforcement `Strategy.INACTIVE`/`DELETED` (блок новых /
+graceful shutdown) — в `docs/lifecycles/Strategy.md` (+ проверка в
+`EntryScannerJob`, реакция в `deal-management`/lifecycle Deal).
+**Осталось:** компонент-валидатор стратегии (12-пунктная валидация
+key/targetActionKey/CLOSE_FULL/partial-exit); `Strategy API examples.md`
+(JSON-примеры, тип reference — воспроизводить ли как файл знания).
+**Форвард-заметки:** `2026-05-27-.../tasks-strategy.md` (STR-FW8, FW9,
+FW10), `tasks-deal.md` (DEAL-FW8).
 
 ### 9. Exchange модель/lifecycle
 
-**Источник:** упоминания `Exchange.HOLD` (правило —
-`docs/rules/exchange-hold.md`); статусы Exchange/Instrument/Account.
-**Суть:** полная модель/lifecycle `Exchange` (статус `HOLD` среди
-прочих), Instrument/Account. В порядок 6 торговых сущностей не входила.
-Сюда же — enforcement `AnomalyReport.Severity` (CRITICAL → торговля по
-инструменту остаётся запрещённой; NON_CRITICAL → после kill-switch
-может быть разрешена; блокировка живёт в статусе инструмента).
-**Форвард-заметки:** `tasks-order.md` (ORD-Q5),
-`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`
-(ANOM-Q4).
+**Источник:** `Exchange.HOLD`/`DISABLED` (правило —
+`docs/rules/exchange-hold.md`, дополнено DISABLED 2026-05-28); статусы
+Exchange/Instrument/Account. **Суть:** полная модель/lifecycle `Exchange`
+(`HOLD` среди прочих), `Instrument`, `Account`. Сюда же — enforcement
+`AnomalyReport.Severity` (CRITICAL → торговля по инструменту запрещена;
+NON_CRITICAL → после kill-switch может быть разрешена; блокировка в
+статусе инструмента) и standalone модель `Instrument` для market-data
+(из п.5). **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
+`2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q4).
 
 ### 10. API-кластер OKX
 
-**Источник:** `.claude-archive/2026-05-21/docs/api/okx/*` (endpoint-доки,
-Playbooks), `docs/api/Справочник по API сервиса.md`. **Суть:** полная
-миграция OKX endpoint-доков в `docs/client/okx/` (модели запросов/
-ответов, лимиты, auth, особенности). Частично затронуто при миграции
-сущностей (balance/position/order/algo mapping). При миграции —
-сверить пути/поля, дополнить.
+**Источник:** `.claude-archive/2026-05-21/docs/api/okx/*`,
+`docs/api/Справочник по API сервиса.md`. **Суть:** полная миграция OKX
+endpoint-доков в `docs/client/okx/` (модели запросов/ответов, лимиты,
+auth, особенности). Частично затронуто: order/algo/position/balance
+mapping (model-кластер) + timeframe/instrument/market-price-data
+(2026-05-28). При миграции — сверить пути/поля, дополнить.
 
 ### Отложенные продуктовые вопросы (future)
 
 - `linkedOrderExternalIds` — использование для fills/recovery/audit
-  (`tasks-algo-order.md` ALGO-Q6).
+  (`2026-05-27-.../tasks-algo-order.md` ALGO-Q6).
 - Стандарт описания персистентности доменных моделей: формат и
-  версионирование jsonb-снимков (`AnomalyReport.internalBefore/After`,
-  `externalBefore/After` и др.). Общий методологический/реализационный
-  стандарт, шире одной модели.
-  (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`
-  ANOM-Q5).
+  версионирование jsonb-снимков (`AnomalyReport.internalBefore/After` и
+  др.). Шире одной модели.
+  (`2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` ANOM-Q5).
 
 ## Методологические задачи (по итогам миграции)
 
@@ -219,13 +174,11 @@ Playbooks), `docs/api/Справочник по API сервиса.md`. **Сут
 хранит» / «Что не хранит» появились в моделях. **Перед запуском
 задачи решить:** либо уточнить decision и зафиксировать практику
 (раздел разрешён в формате «отрицание + позитив»), либо почистить
-модели по букве decision (отрицания убрать, оставить только позитив
-там, где он живёт).
+модели по букве decision.
 
 **Тип:** методологическая ревизия по итогам миграции.
 
-**Сфера — накопительная** (пополняется по мере новых миграций).
-Текущие затронутые модели:
+**Сфера — накопительная.** Текущие затронутые модели:
 - `docs/models/core/Position.md` (§Что Position не хранит);
 - `docs/models/core/Order.md` (§Что Order не хранит);
 - `docs/models/core/Deal.md` (§Runtime graph — «не входят / не
@@ -234,11 +187,16 @@ Playbooks), `docs/api/Справочник по API сервиса.md`. **Сут
   архитектурные инварианты);
 - `docs/models/other/AnomalyReport.md` (§Чего не хранит).
 
-(При появлении новых мигрированных моделей с таким разделом —
-дописывать сюда.)
+В миграции процессов (2026-05-28) разделы «Чего не хранит» в новых
+файлах **не создавались** (новых затронутых моделей нет).
 
 ## Связанные открытые вопросы
 
-Продуктовые открытые вопросы по финализации `Deal` (DEAL-Q1,
-DEAL-Q2) — в `.claude/work/questions/open-questions.md`; разбираются
-в рамках п.1 / п.6.
+`.claude/work/questions/open-questions.md`:
+- **Продуктовые финализации `Deal`:** DEAL-Q1 (retry-state финализации;
+  п.1/п.6), DEAL-Q2 (resultProfit при исчерпании retry; п.6).
+- **Из миграции процессов:** PROC-Q1 (`PositionContext`; п.3), RISK-Q1
+  (`RiskSettings`; п.3/п.4), ENUM-Q1 (closeReason `RISK_CONTROL` vs
+  `ENTRY_RISK_BLOCKED`; п.6), DEAL-Q3 (`DealActionState` core/other +
+  lifecycle; п.1), TIME-Q1 (размещение `TimeFrame`; п.5), CMD-Q1
+  (гранулярность executor'ов/payload'ов; п.1).

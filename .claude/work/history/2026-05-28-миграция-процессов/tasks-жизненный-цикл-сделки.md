@@ -31,6 +31,16 @@
   `PLANNED → CREATED → SUBMITTED → COMPLETED / RETRY_PENDING / FAILED /
   SKIPPED`). Решить тип и наличие lifecycle на проходе 2.
 
+## Решения прохода 2
+
+- **`ReconciliationJob` — не материализован.** В архиве только название
+  (ЖЦ §11 / lifecycle вскользь: упомянут рядом с `AnomalyJob` как
+  поставщик report'ов и зона «live risk после terminal»), без описания.
+  Отложен в backlog п.7 (anomaly/safety/kill-switch). Граница с
+  `AnomalyJob` зафиксирована в `docs/components/AnomalyJob.md` и
+  `docs/lifecycles/Deal.md` (live risk после terminal → зона
+  AnomalyJob/ReconciliationJob).
+
 ## Форвард-заметки
 
 - **ЖЦ-FW1.** §1.1 «Архитектурные инварианты lifecycle/FSM» — крупный

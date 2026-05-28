@@ -1,0 +1,51 @@
+# MarketPhase
+
+## На какой вопрос отвечает этот файл
+
+Что это за модель `MarketPhase`: структура, енум `Type`, правила
+хранения и актуальности.
+
+## Назначение
+
+`MarketPhase` — готовая фаза рынка, рассчитанная `MarketPhaseJob` по
+`StrategyMarketPhaseSetting` на основе готовых `IndicatorValue` и
+`MarketStructure`. Persisted-модель рыночных данных, не про бизнес-цикл
+сделки → `other` (см. `.claude/decisions/models-core-vs-other.md`).
+
+`EntryScannerJob` по `MarketPhase.Type` выбирает `StrategyDetail`
+(`MarketPhase.Type → StrategyDetail.marketPhaseType`). Раздачей актуальной
+фазы занимается `docs/components/MarketPhaseService.md`.
+
+## Структура
+
+Java-класс, наследует `Auditable`.
+
+| Поле | Тип | Назначение |
+|---|---|---|
+| `id` | `Long` | Технический ID результата расчёта. |
+| `instrumentId` | `Long` | Внутренний ID инструмента. |
+| `setting` | `StrategyMarketPhaseSetting` | Настройка стратегии, по которой рассчитана фаза. |
+| `type` | `Type` | Тип рассчитанной фазы. |
+| `candleTimestamp` | `OffsetDateTime` | Время свечи расчёта. |
+| `confirmedAt` | `OffsetDateTime` | Время, с которого фазу можно использовать без look-ahead. |
+| `confidenceScore` | `BigDecimal` | Уверенность алгоритма в выбранной фазе. |
+
+## Енум `Type`
+
+`BULL_TREND`, `BEAR_TREND`, `RANGE`, `UNKNOWN`.
+
+Отдельного `Status` нет. При смене фазы создаётся новый актуальный
+результат (например, `type = UNKNOWN`). Актуальность проверяется через
+`StrategyMarketPhaseSetting.expirationDuration` и
+`candleTimestamp` / `confirmedAt` (правило —
+`docs/rules/market-data-freshness.md`).
+
+## Правила хранения
+
+- Считается только по закрытым свечам (без look-ahead).
+- Уникальность: `UNIQUE(instrument_id, strategy_market_phase_setting_id,
+  candle_timestamp)`.
+- Одна `StrategyMarketPhaseSetting` (на уровне `Strategy`, т.к. фаза нужна
+  до выбора `StrategyDetail`) описывает классификацию во все `Type`;
+  `MarketPhaseJob` сохраняет один актуальный результат на инструмент +
+  setting.

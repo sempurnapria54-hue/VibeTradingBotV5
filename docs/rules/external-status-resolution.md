@@ -23,6 +23,18 @@
   `ExternalNotFoundException` и выполняет safety-каскад с
   `MISSING_AFTER_REFRESH`. Пустой ответ одного endpoint — **не**
   основание для финального вывода.
+- **Result-object и write-once closeReason.** Resolver возвращает
+  result-object `status + optional closeReason candidate` (обобщённо
+  `EntityStatusResolveResult` / `StatusResolveResult<S,C>`); refresh/
+  executor применяет `status` всегда, а `closeReason candidate` —
+  только если текущий `closeReason == null` (ранее установленный не
+  перетирается). Для `Order`/`AlgoOrder` resolver работает с внешним
+  статусом биржи; для `Position` — с фактом наличия позиции
+  (`PositionExternalSnapshot` / `null`), где успешный `null` =
+  нормальный closed-on-exchange факт (`CLOSED` + `EXTERNAL_CLOSE`), а
+  не `ExternalNotFoundException`. Компоненты-resolver'ы —
+  `docs/components/OrderExternalStatusResolver.md`,
+  `AlgoOrderExternalStatusResolver.md`, `PositionStatusResolver.md`.
 
 ## Safety-каскад
 

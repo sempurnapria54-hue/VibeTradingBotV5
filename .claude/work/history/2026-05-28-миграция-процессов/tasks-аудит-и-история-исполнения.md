@@ -31,6 +31,29 @@
   букве процессных доков). Связано с правилом «`Deal.resultProfit` через
   REFRESH_FILLS» (владелец — `Deal.md`).
 
+## Решения прохода 2
+
+- **`audit-execution-history` НЕ материализован** как процесс — выведен
+  из миграции процессов (`.claude/decisions/process-materialization-criterion.md`):
+  архивный док — рабочий каркас, модели истории/timeline не спроектированы,
+  основное содержание — открытые подвопросы (§5/§8, ниже). Полностью
+  отложен в **backlog п.6**.
+- **Устойчивые инварианты аудита** (АУ §1–4) зафиксированы как сквозное
+  правило `docs/rules/audit-not-runtime-source.md` (аудит не runtime-source;
+  `REFRESH_BALANCE` в истории; `shutdownReason` в timeline не заменяет
+  `closeReason`; `CLOSED`/`EMERGENCY_CLOSED` различимы; partial exit
+  объясним через Order/AlgoOrder).
+- **Подвопросы аудита (§5: ~30 штук)** — НЕ заведены в `open-questions.md`
+  (по решению о выводе аудита из миграции; список значений для v12 их не
+  содержит). Остаются здесь и разворачиваются при запуске backlog п.6:
+  история исполнения команд (запись на попытку, статусы, payload/result
+  snapshot, raw response, correlation id, связь с `DealActionState`),
+  история изменения сущностей (одна общая vs per-entity, before/after
+  snapshots, diff vs snapshot), timeline сделки, snapshot-формат. Связано
+  с DEAL-Q1 / DEAL-Q2 (`open-questions.md`) и `TradeFill`/
+  `TradeFillsArchive` (АУ-Q3, backlog п.6).
+- **АУ-Q2 (closeReason)** — перенесён в ENUM-Q1 (`open-questions.md`).
+
 ## Форвард-заметки
 
 - **АУ-FW1.** §1–4/§6 — устойчиво зафиксированные инварианты аудита

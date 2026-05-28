@@ -1,0 +1,21 @@
+# CancelAlgoOrderExecutor
+
+## На какой вопрос отвечает этот файл
+
+Кто исполняет `CANCEL_ALGO_ORDER` (компонент-executor): что делает.
+
+## Назначение
+
+Получает `CANCEL_ALGO_ORDER`. Загружает algo-order по
+`payload.algoOrderId`, отправляет cancel, сохраняет ACK / command result;
+`AlgoOrder` в `CANCELED` по ACK не переводит — факт отмены подтверждается
+refresh/search/history. Если refresh/history показывает другой факт,
+верим exchange facts (см.
+`docs/client/okx/rules/okx-algo-order-mapping.md`).
+
+После рестарта pending cancel в очереди не восстанавливается (см.
+`docs/rules/command-lifecycle.md`). ACK не runtime truth (см.
+`docs/rules/ack-not-runtime-truth.md`); общая семантика `CANCEL_*` —
+`docs/components/ServiceCommandExecutor.md`.
+
+> Гранулярность executor-файлов под вопросом — CMD-Q1.
