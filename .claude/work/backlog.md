@@ -13,6 +13,10 @@
   (`.claude/work/history/2026-05-28-миграция-процессов.md`). Покрытые
   cross-cutting пункты ниже свёрнуты как закрытые; частично покрытые —
   обновлены.
+- Миграция API-кластера OKX (26 REST endpoint-доков) **завершена и
+  закрыта 2026-05-28**
+  (`.claude/work/history/2026-05-28-миграция-api-okx.md`). П.10 ниже
+  свёрнут как закрытый.
 
 **Как читать пункты.** Каждый пункт — будущая или завершённая миграция
 кластера: источник + суть + указатель на архивные форвард-заметки. Полные
@@ -142,14 +146,24 @@ NON_CRITICAL → после kill-switch может быть разрешена; 
 (из п.5). **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
 `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q4).
 
-### 10. API-кластер OKX
+### 10. API-кластер OKX — ✅ ЗАКРЫТО (2026-05-28)
 
-**Источник:** `.claude-archive/2026-05-21/docs/api/okx/*`,
-`docs/api/Справочник по API сервиса.md`. **Суть:** полная миграция OKX
-endpoint-доков в `docs/client/okx/` (модели запросов/ответов, лимиты,
-auth, особенности). Частично затронуто: order/algo/position/balance
-mapping (model-кластер) + timeframe/instrument/market-price-data
-(2026-05-28). При миграции — сверить пути/поля, дополнить.
+REST endpoint-доки из `.claude-archive/2026-05-21/docs/api/okx/*`
+мигрированы в `docs/client/okx/`. Что покрыто: order/algo/position/
+balance/instrument/market-price-data — дополнены endpoint'ами,
+rate-limit, permission, response-полями (`cTime`/`uTime` и др.);
+candle (`okx-candle-mapping.md`), fills (`okx-fills-mapping.md` +
+`OkxFillResponse`), fills-archive async-флоу
+(`okx-fills-archive-mapping.md` + `OkxFillsArchiveResponse`), bills
+(`okx-account-bills-mapping.md` + `OkxAccountBillResponse`),
+connectivity (`okx-ws-limits.md` + `okx-service-urls.md`). Не
+мигрировано: устаревший раздел «Реализация в коде (Stage 02)» обзорного
+файла; полноценная WS-документация (OKX-Q4). Playbooks v1 — вне
+скоупа. Детали — `history/2026-05-28-миграция-api-okx.md`.
+**Связанные open-questions:** OKX-Q1 (persisted `TradeFill`),
+OKX-Q2 (`TradeFillsArchive` + async-флоу), OKX-Q3 (bills как источник
+`DealCashFlow` / финализации `Deal`), OKX-Q4 (WS-каналы отдельным
+заходом).
 
 ### Отложенные продуктовые вопросы (future)
 
@@ -200,3 +214,8 @@ mapping (model-кластер) + timeframe/instrument/market-price-data
   `ENTRY_RISK_BLOCKED`; п.6), DEAL-Q3 (`DealActionState` core/other +
   lifecycle; п.1), TIME-Q1 (размещение `TimeFrame`; п.5), CMD-Q1
   (гранулярность executor'ов/payload'ов; п.1).
+- **Из миграции API-кластера OKX (п.10):** OKX-Q1 (persisted
+  `TradeFill` модель и executor финализации; п.6), OKX-Q2
+  (`TradeFillsArchive` async-флоу), OKX-Q3 (bills как источник
+  `DealCashFlow` / финализации `Deal`; п.6, DEAL-Q1/Q2), OKX-Q4
+  (WS-каналы OKX отдельным заходом).

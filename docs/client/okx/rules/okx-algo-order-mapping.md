@@ -17,13 +17,33 @@ command-подсистема (форвард-заметки в `.claude/work/que
 ## Endpoints
 
 - **Create** (`SUBMIT_ALGO_ORDER`): `POST /api/v5/trade/order-algo`.
+  Permission `Trade`; rate limit 20 req / 2 s по User ID + Instrument
+  ID. Body — общие поля (`instId`, `tdMode`, `side`, `ordType`, `sz`,
+  `posSide`, `reduceOnly`, `algoClOrdId`) + ordType-specific (см.
+  «Create request mapping» и «ordType-specific» ниже).
 - **Amend** (`AMEND_ALGO_ORDER`): `POST /api/v5/trade/amend-algos`.
+  Permission `Trade`; rate limit как `cancel-algos`. Body — `instId`,
+  `algoId` (если известен), `algoClOrdId`, новые trigger/trailing
+  значения.
 - **Cancel** (`CANCEL_ALGO_ORDER`): `POST /api/v5/trade/cancel-algos`.
+  Permission `Trade`; rate limit 20 req / 2 s по User ID + Instrument
+  ID. Body — `instId` + `algoId` (обязателен; `algoClOrdId` опц.,
+  диагностика). Отказ через `sCode != 0` (algo уже сработал/закрыт/
+  отменён/не найден).
 - **Details** (`REFRESH_ALGO_ORDER`): `GET /api/v5/trade/order-algo`.
+  Permission `Read`. Query: одно из `algoId` (приоритет) /
+  `algoClOrdId`; `instId` опц. Ответ — массив `data`, ожидается 0 или
+  1 элемент.
 - **Pending** (`REFRESH_ALGO_ORDERS`): `GET /api/v5/trade/orders-algo-pending`.
+  Permission `Read`. Фильтры по `ordType`, `instType`, `instId`,
+  `algoId`, пагинация `after`/`before` по `algoId`, `limit` ≤ 100.
 - **History** (`REFRESH_ALGO_ORDER_HISTORY`):
-  `GET /api/v5/trade/orders-algo-history` (часто требует `ordType` —
-  вычисляется из `conditionType`).
+  `GET /api/v5/trade/orders-algo-history`. Permission `Read`; rate
+  limit 20 req / 2 s по User ID. История доступна за последние 3
+  месяца. Query: **`ordType` обязателен** (вычисляется из
+  `conditionType`); + одно из `state` (`effective`/`canceled`/
+  `order_failed`/`partially_failed`) или `algoId`; опц. `instType`,
+  `instId`, пагинация `after`/`before` по `algoId`, `limit` ≤ 100.
 
 ACK любой create/amend/cancel (`sCode=0`) не является runtime truth
 (`docs/rules/ack-not-runtime-truth.md`). `CANCEL_ALGO_ORDER` не ставит
@@ -31,6 +51,38 @@ ACK любой create/amend/cancel (`sCode=0`) не является runtime tru
 history факта. Submit использует stable client id (`internalId →
 algoClOrdId`); перед retry — refresh/search по `algoClOrdId` (найден
 → обновить из snapshot; не найден → отправить create).
+
+### Create response (ACK)
+
+`POST /trade/order-algo` возвращает `data[0]` с `algoId`, `algoClOrdId`,
+`clOrdId` (deprecated), `sCode`, `sMsg`, `tag`. После successful submit
+`algoId` можно сохранить как `AlgoOrder.externalId`; статус — `PENDING`
+до refresh/search/history.
+
+### Cancel response (ACK)
+
+`POST /trade/cancel-algos` возвращает `data[0]` с `algoId`,
+`algoClOrdId`, `sCode`, `sMsg`. `sCode != 0` — отказ (уже сработал/не
+найден/нельзя отменить); финальное `CANCELED` — через refresh.
+
+## ordType-specific create body (по архиву)
+
+- `conditional` — TP **или** SL (если оба в `conditional` в net-режиме,
+  биржа может проигнорировать TP — для одновременных TP+SL использовать
+  `oco`).
+- `oco` — TP и SL вместе; срабатывание одного отменяет другой.
+- `trigger` — `triggerPx` + `orderPx` (`-1` = market) + опц.
+  `triggerPxType` (default `last`). Активы при постановке обычно **не
+  морозятся** (проверка баланса в момент срабатывания).
+- `move_order_stop` — trailing: ровно одно из `callbackRatio`
+  (`0.01` = 1%) / `callbackSpread` (абсолют); опц. `activePx` — без
+  него трейлинг включается сразу. Расчёт триггера: long → min + spread/
+  ratio; short → max − spread/ratio.
+
+`closeFraction` (доля позиции при срабатывании, `1` = 100%) на первом
+этапе не используем — см. §Create request mapping. Для protective
+обычно `reduceOnly=true`; для SWAP рекомендуется `tpTriggerPxType=mark`
+(не ловит шпильки `last`).
 
 ## ClientService константы
 

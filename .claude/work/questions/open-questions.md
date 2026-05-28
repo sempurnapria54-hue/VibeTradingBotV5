@@ -7,9 +7,11 @@
 ## Статус
 
 Открыты продуктовые вопросы по финализации `Deal` (перенесены из
-архивного `Deal.md` §15 при миграции, 2026-05-27) и один вопрос,
+архивного `Deal.md` §15 при миграции, 2026-05-27), один вопрос,
 обнаруженный при составлении карты артефактов миграции процессов
-(проход 1, 2026-05-27).
+(проход 1, 2026-05-27), и четыре вопроса от миграции API-кластера OKX
+(2026-05-28; OKX-Q1..Q4 — TradeFill, TradeFillsArchive, AccountBill /
+DealCashFlow, WS-каналы как отдельный заход).
 
 История закрытых вопросов пайплайна:
 
@@ -182,6 +184,119 @@ refresh-executor'а без отдельных секций отдельными 
 Связано: `docs/components/*Executor.md`,
 `docs/components/ServiceCommandExecutor.md`,
 `docs/components/models/ServiceCommandPayload.md`.
+
+### OKX-Q1. Persisted `TradeFill` модель и executor финализации
+
+OKX endpoint'ы `GET /trade/fills` и `GET /trade/fills-history`
+обеспечивают факты исполнения. На первом этапе `Fill` как persisted
+entity не введён: `RefreshFillsExecutor` агрегирует filled-метрики в
+существующие `Order`/`AlgoOrder`/`Position`. Не решено, нужна ли
+отдельная persisted-сущность `TradeFill` (для аудита / detailed PnL /
+recovery) и как именно она ложится на `Deal.resultProfit`.
+
+Цитаты источника (архив, `Получить сделки за последние 3 дня REST.md`):
+- «**fills ≠ ордера**: Order = заявка ... Fill = конкретная сделка
+  (каждое исполнение ордера порождает 1 или несколько fills).»
+- «`billId` — внутренний ID записи (используется как **якорь для
+  пагинации** через `after/before`).»
+
+Также в `docs/components/RefreshFillsExecutor.md` зафиксировано:
+«`Fill` как отдельную persisted entity на первом этапе не вводим
+(один общий `RefreshFillsExecutor`; материализация `TradeFill` —
+backlog).»
+
+Варианты: (1) ввести `docs/models/other/TradeFill.md` + lifecycle (по
+аналогии с `Order`/`AlgoOrder`) — даёт source-of-truth для PnL и
+аудита; (2) оставить агрегацию в `Order`/`AlgoOrder`/`Position`, без
+TradeFill — проще, но fills не персистятся отдельно. До решения
+поля DTO зафиксированы в `docs/client/okx/models/OkxFillResponse.md`;
+маппинг → snapshot не описан (откладывается).
+Связано: `docs/client/okx/models/OkxFillResponse.md`,
+`docs/client/okx/rules/okx-fills-mapping.md`,
+`docs/components/RefreshFillsExecutor.md`,
+`docs/models/core/Deal.md` §Итоговый PnL.
+
+### OKX-Q2. Persisted `TradeFillsArchive` и async-флоу выгрузки
+
+OKX endpoint'ы `POST/GET /trade/fills-archive` дают доступ к fills
+старше 3 месяцев и до ~2 лет через двухшаговый async-флоу (генерация
+файла → polling state → скачивание `fileHref`). На первом этапе ни
+executor, ни persisted-сущность `TradeFillsArchive` не введены: текущий
+runtime использует только `RefreshFillsExecutor` за последние 3
+месяца. Не решено: нужен ли async-executor под архив (с long-running
+polling state) и persisted-модель `TradeFillsArchive`.
+
+Цитаты источника (архив, `Запрос генерации файла из архива сделок REST.md`):
+- «**последние 3 месяца** — берёшь обычным `GET /api/v5/trade/fills-history`;
+  **старше 3 месяцев и до ~2 лет** — через архив: сначала **POST
+  (запросить генерацию)**, потом **GET (взять ссылку на файл)**.»
+- «`result=false`, OKX пишет, что файл может генерироваться **долго
+  (порядка десятков часов)**.»
+
+Варианты: (1) materialize `TradeFillsArchive` с lifecycle
+(`REQUESTED → ONGOING → FINISHED|FAILED`) + executor; (2) держать
+архив вне runtime (off-band tool для аудита); (3) отложить до явной
+потребности. До решения контракт endpoint'ов и поля responses
+зафиксированы в `docs/client/okx/models/OkxFillsArchiveResponse.md` и
+`docs/client/okx/rules/okx-fills-archive-mapping.md`.
+Связано: `docs/client/okx/models/OkxFillsArchiveResponse.md`,
+`docs/client/okx/rules/okx-fills-archive-mapping.md`, OKX-Q1.
+
+### OKX-Q3. Bills (`account/bills`) как источник `DealCashFlow`
+
+OKX endpoint'ы `GET /account/bills` (7d) и `/account/bills-archive`
+(3m) дают записи движения денег по аккаунту: realized PnL,
+комиссии/rebate, funding, прочие cashflow-события. Для итогового
+`Deal.resultProfit` bills могут быть **полнее** fills, потому что
+включают funding и rebate, не привязанные к конкретному ордеру.
+Доменно `AccountBill` / `DealCashFlow` не введены; вопрос — нужны ли
+сейчас.
+
+Цитаты источника (архив, `Получить bill-записи аккаунта за последние 7 дней REST.md`):
+- «В отличие от fills, bills показывают именно **изменение денег на
+  аккаунте**, а не только факт исполнения ордера.»
+- «Для финального `Deal.resultProfit` bills могут быть точнее, потому
+  что туда попадают не только trade executions, но и funding.»
+- Рекомендуемая логика (архив): «Запросить bills ... Сохранить как
+  DealCashFlow ... `Deal.resultProfit = sum(DealCashFlow.amount)`.»
+
+Варианты: (1) ввести `docs/models/other/DealCashFlow.md` + executor
+`RefreshDealCashFlowExecutor` (или общий `RefreshDealFinalizationExecutor`
+с fills + bills) — даёт самый точный PnL; (2) считать PnL только через
+fills (без funding/rebate) — проще, но менее точно; (3) отложить до
+явной потребности. До решения контракт endpoint'ов и поля responses —
+`docs/client/okx/models/OkxAccountBillResponse.md` и
+`docs/client/okx/rules/okx-account-bills-mapping.md`.
+Связано: `docs/client/okx/models/OkxAccountBillResponse.md`,
+`docs/client/okx/rules/okx-account-bills-mapping.md`,
+`docs/models/core/Deal.md` §Итоговый PnL, DEAL-Q1, DEAL-Q2.
+
+### OKX-Q4. WS-каналы OKX — отдельный заход
+
+В архивном источнике WS-каналы покрыты только обзорной таблицей: имена
+(`account`, `positions`, `orders`, `balance_and_position`, `tickers`,
+`candle<bar>`, `instruments`, `algo-orders`, `algo-advance`) и краткое
+назначение. Детального описания протокола подписок, push-сообщений,
+матчинга `orders` events с runtime-фактами — нет. Текущая миграция
+покрывает REST. WS — отдельный заход.
+
+Цитаты источника (архив, `okx_api_for_trading_bot_v5.md`):
+- «WS канал `orders` **не даёт начальный snapshot**. Он начинает слать
+  события **только при изменениях**.»
+- WS-каналы фигурируют в обзорной таблице операций без отдельных
+  файлов; в каждом REST-файле есть короткая WS-заметка («WS — основной
+  realtime-канал», «REST — fallback»).
+
+Варианты: (1) выделить кластер `docs/client/okx/ws/` или ввести
+`docs/client/okx/rules/okx-ws-channels.md` (один файл = один канал
+либо один файл = все каналы) — после сбора реальных push-примеров;
+(2) держать WS-альтернативу пометками внутри существующих
+`okx-*-mapping.md`, без отдельных файлов. До решения WS-каналы описаны
+только короткой пометкой в mapping-файлах; в `okx-service-urls.md`
+зафиксированы base URL public/private/business.
+Связано: `docs/client/okx/rules/okx-service-urls.md`,
+`docs/client/okx/rules/okx-ws-limits.md`,
+`docs/client/okx/rules/okx-order-mapping.md` (примеры WS-альтернатив).
 
 ### DEAL-Q3. Размещение `DealActionState` (core/other, own lifecycle)
 

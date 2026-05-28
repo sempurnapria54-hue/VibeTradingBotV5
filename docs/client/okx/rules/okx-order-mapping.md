@@ -17,20 +17,76 @@ command-подсистема (форвард-заметки в `.claude/work/que
 
 ## Endpoints
 
-- **Create** (`SUBMIT_ORDER`): `POST /api/v5/trade/order`.
+- **Create** (`SUBMIT_ORDER`): `POST /api/v5/trade/order`. Permission
+  `Trade`; rate limit 60 req / 2 s по User ID + Instrument ID.
 - **Amend** (`AMEND_ORDER`): `POST /api/v5/trade/amend-order`.
+  Permission `Trade`; rate limit 60 req / 2 s по User ID + Instrument
+  ID. Поля `newPx`/`newSz`/`attachAlgoOrds` — изменения должны включать
+  уже исполненную часть для `partially_filled`. `cxlOnFail` (boolean) —
+  биржа отменит ордер, если amend упал. `pxAmendType=0|1` — `1`
+  разрешает автокорректировку цены в допустимый диапазон.
 - **Cancel** (`CANCEL_ORDER`): `POST /api/v5/trade/cancel-order`.
+  Permission `Trade`; rate limit 60 req / 2 s по User ID + Instrument
+  ID. Body: `instId` + одно из `ordId` / `clOrdId` (если оба — биржа
+  использует `ordId`).
 - **Order details** (`REFRESH_ORDER`): `GET /api/v5/trade/order`.
+  Permission `Read`; rate limit 60 req / 2 s по User ID + Instrument
+  ID. Query: `instId` обязателен, одно из `ordId` / `clOrdId`. Если оба
+  — биржа возвращает по `ordId`. Если `clOrdId` переиспользован, биржа
+  возвращает **последний** ордер с этим `clOrdId`.
 - **Pending** (`REFRESH_PENDING_ORDERS`): `GET /api/v5/trade/orders-pending`.
-- **History** (`REFRESH_ORDER_HISTORY`): `GET /api/v5/trade/orders-history`,
-  `GET /api/v5/trade/orders-history-archive` (archive — для старых
-  периодов).
+  Permission `Read`; rate limit 60 req / 2 s по User ID. Фильтры:
+  `instType`, `instId`, `ordType`, `state` (`live`/`partially_filled`),
+  пагинация `after`/`before` по `ordId`, `limit` ≤ 100.
+- **History** (`REFRESH_ORDER_HISTORY`): `GET /api/v5/trade/orders-history`
+  (последние 7 дней; permission `Read`; rate limit 40 req / 2 s по User
+  ID), `GET /api/v5/trade/orders-history-archive` (последние 3 месяца;
+  rate limit 20 req / 2 s по User ID). Отменённые без исполнений хранятся
+  в `orders-history` только ~2 часа. Фильтры: `instType` (обязателен в
+  history), `instId`, `ordType`, `state` (`filled`/`canceled`/
+  `mmp_canceled`), `category` (`normal`/`adl`/`full_liquidation`/
+  `partial_liquidation`/`delivery`/`twap` и др.), `begin`/`end` по
+  `cTime` (только в history-7d), пагинация `after`/`before` по `ordId`,
+  `limit` ≤ 100.
 
 ACK любой create/amend/cancel (`sCode=0`) не является runtime truth
 (`docs/rules/ack-not-runtime-truth.md`): финальные статусы
 подтверждаются через order details / pending / history / archive.
 `CANCEL_ORDER` не ставит `CANCELED`, `AMEND_ORDER` не считается
 подтверждённым — без refresh/search/history факта.
+
+### Create response (ACK)
+
+`POST /trade/order` возвращает `data[0]` с `ordId`, `clOrdId`, `tag`,
+`ts` (когда OKX закончил обработку), `sCode`, `sMsg`. Top-level `inTime`
+/ `outTime` — диагностические времена REST-шлюза (микросекунды), в
+домен не маппятся. `ordId` после successful submit можно сохранить как
+`Order.externalId`; статус — `PENDING` до refresh/search/history.
+
+### Amend response (ACK)
+
+`POST /trade/amend-order` возвращает `data[0]` с `ordId`, `clOrdId`,
+`reqId` (если был передан в запросе), `ts`, `sCode`, `sMsg`. `sCode=0`
+— запрос принят, не «изменение подтверждено». Подтверждение — через
+`REFRESH_ORDER` или WS `orders`.
+
+### Cancel response (ACK)
+
+`POST /trade/cancel-order` возвращает `data[0]` с `ordId`, `clOrdId`,
+`sCode`, `sMsg`. `sCode != 0` означает отказ (ордер уже filled /
+canceled / не найден). Подтверждение `CANCELED` — через refresh / WS,
+не из ACK.
+
+### Amend TP/SL через `attachAlgoOrds`
+
+В body `POST /trade/amend-order` `attachAlgoOrds` — массив объектов
+для изменения прикреплённых TP/SL. Идентификация — `attachAlgoId`
+(биржевой) или `attachAlgoClOrdId` (client). Поля: `newTpTriggerPx`/
+`newTpOrdPx`/`newTpTriggerPxType`/`newTpOrdKind` (TP),
+`newSlTriggerPx`/`newSlOrdPx`/`newSlTriggerPxType` (SL),
+`newTpTriggerRatio`/`newSlTriggerRatio` (триггер в доле, только
+FUTURES/SWAP — взаимоисключимо с `newTp/SlTriggerPx`). Удаление TP —
+`newTpTriggerPx="0"` **или** `newTpOrdPx="0"`; SL — аналогично.
 
 ## ClientService константы
 
@@ -85,8 +141,36 @@ evidence-cycle: `GET /trade/order` → `orders-pending` →
 per-item error классифицируется (retryable → RETRY_PENDING;
 non-retryable → `Order.ERROR`/`Deal.ERROR` по ситуации).
 
-**Amend**: `instId`, `ordId` (предпочтительно), `clOrdId`, `newSz`,
-`newPx`. **Cancel**: `instId`, `ordId` (если известен) / `clOrdId`.
+Дополнительные поля create body (по источнику архива, при необходимости):
+`ccy` — валюта маржи (для USDT-SWAP обычно `USDT`); `tag` — метка
+(adapter может ставить общий `tb`-тег); `stpMode` — self-trade
+prevention (`cancel_maker`/`cancel_taker`/`cancel_both`). В domain
+`Order` не хранятся — adapter-policy. `expTime` (header, ms) —
+«срок годности запроса»; при необходимости задаётся в client-layer.
+
+**Attached TP/SL при create (один элемент `attachAlgoOrds[*]`):**
+`attachAlgoClOrdId` (client id), `tpTriggerPx`/`tpTriggerRatio`,
+`tpOrdPx` (`-1` = market после trigger), `tpOrdKind`
+(`condition`/`limit`, default `condition`), `slTriggerPx`/
+`slTriggerRatio`, `slOrdPx` (`-1` = market), `tpTriggerPxType`/
+`slTriggerPxType` (`last`/`index`/`mark`, default `last`), `sz`
+(для split-TP), `amendPxOnTriggerType` (`0`/`1` cost-price SL для
+split). `tpTriggerPx` vs `tpTriggerRatio` — взаимоисключимо;
+аналогично для SL.
+
+**Amend**: `instId` + одно из `ordId` (предпочтительно) / `clOrdId`;
+`reqId` (опц., echo в ACK для логов/retry-корреляции); `newPx`,
+`newSz` (для `partially_filled` — **включая** уже исполненное;
+`newSz ≤ filled` может перевести в `filled`); `cxlOnFail` (default
+`false`); `pxAmendType` (default `0`); `attachAlgoOrds[*]` —
+см. «Amend TP/SL» в §Endpoints.
+
+**Cancel**: `instId` + одно из `ordId` (предпочтительно) / `clOrdId`.
+
+**Pagination (pending / history / archive):** `after`/`before` — якорь
+по `ordId` (не времени), `limit ≤ 100`. Для глубокой выкачки: `after =
+min(ordId)` ответа → следующая страница. История 7 дней дополнительно
+поддерживает `begin`/`end` по `cTime` (ms).
 
 ## reduce-only invariant
 

@@ -63,3 +63,13 @@ fills/finalization, не через `Position`; `closeOrderAlgo[]` —
 
 `code = 0` → ACK success; `code != 0` → command failed. ACK не
 является runtime truth (см. `docs/rules/ack-not-runtime-truth.md`).
+В ответе **нет `ordId`** и нет «финального статуса позиции» —
+подтверждение через `REFRESH_POSITION` (+ опционально `fills`, WS).
+
+## Поля `closeOrderAlgo[]` (внутри одной позиции)
+
+Биржа может вернуть `closeOrderAlgo[]` — список «стратегий закрытия»,
+прикреплённых к позиции: `algoId`, `slTriggerPx`, `slTriggerPxType`,
+`tpTriggerPx`, `tpTriggerPxType`, `closeFraction`. Доменно эти данные
+живут как `AlgoOrder` (`docs/models/core/AlgoOrder.md`); из позиции не
+дублируются в snapshot.

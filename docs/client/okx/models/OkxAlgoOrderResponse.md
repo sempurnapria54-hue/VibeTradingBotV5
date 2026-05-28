@@ -32,6 +32,8 @@ history). Маппится в `AlgoOrderExternalSnapshot`. Доменная мо
 | `tpTriggerPxType` | тип цены TP | `condition.trigger.takeProfit.externalType` |
 | `activePx` | цена активации trailing | `condition.trailing.activationPrice.externalValue` |
 | `moveTriggerPx` | текущее значение trailing | `condition.trailing.externalPrice` |
+| `cTime` | время создания (ms) | `externalCreatedAt` |
+| `uTime` | время обновления (ms, есть в history) | `externalModifiedAt` |
 
 Если OKX не возвращает тип цены активации trailing,
 `condition.trailing.activationPrice.externalType` остаётся null —
@@ -42,6 +44,26 @@ history). Маппится в `AlgoOrderExternalSnapshot`. Доменная мо
 `ordType`, `side`, `actualSide`, `tdMode`, `posSide`, `reduceOnly`,
 `closeFraction` — **не маппятся**: проверяются adapter-layer как
 invariant (см. `okx-algo-order-mapping.md`) либо остаются в raw audit.
+
+## Поля диагностики / специфические режимы (не маппятся)
+
+`instType`, `instId` — для сверки expected Instrument. `ccy`, `lever`,
+`quickMgnType` — adapter / диагностика. `tag`, `clOrdId` (опц. связь
+с обычным ордером в сценариях), `last` (служебное «последняя цена при
+размещении»), `amendPxOnTriggerType` (`0`/`1` cost-price SL для
+split-TP). `tgtCcy` — только для SPOT market (`base_ccy`/`quote_ccy`).
+Trigger-режим: `triggerPx`, `triggerPxType`, `ordPx` — задают
+самостоятельный ordType `trigger` (выставление market/limit при
+пересечении). Trailing: `callbackRatio` / `callbackSpread` — задают
+параметры самого trailing (в snapshot обычно не выводим, доменно —
+`Condition.trailing.trailingPercents`/`trailingStepValue`).
+
+**Iceberg / TWAP** (для бота не используются, могут присутствовать
+пустыми): `pxVar`, `pxSpread`, `szLimit`, `pxLimit`, `timeInterval`.
+**Attached TP/SL** в algo (вложенный `attachAlgoOrds[*]` встречается
+не во всех режимах): `attachAlgoClOrdId`, `tp*Px`/`tp*PxType`/`tpOrdPx`,
+`sl*Px`/`sl*PxType`/`slOrdPx`; расширенный вариант — `attachAlgoId`,
+`tpOrdKind`, `failReason`.
 
 ## Конвертация
 

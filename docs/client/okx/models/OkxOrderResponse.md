@@ -29,11 +29,39 @@ adapter-layer (`docs/rules/raw-exchange-dto-boundary.md`); FSM не
 | `accFillSz` | исполненный объём | `accumulatedFillSize` |
 | `avgPx` | средняя цена исполнения | `averagePrice` |
 | `fee` | комиссия | `fee` |
+| `cTime` | время создания (ms) | `externalCreatedAt` |
+| `uTime` | время обновления (ms) | `externalModifiedAt` |
 | `attachAlgoOrds` | attached protection | `attachedAlgoOrders` |
 | `attachAlgoClOrdId` | top-level attached client id | `attachedAlgoInternalId` |
 | `tpTriggerPx` | top-level TP trigger | `takeProfitTriggerPrice` (future) |
 | `slTriggerPx` | top-level SL trigger | `stopLossTriggerPrice` |
 | `reduceOnly` | reduce-only факт | **не маппится** (только invariant validation в adapter) |
+
+## Поля только для adapter / validation / диагностика (не в snapshot)
+
+`instType`, `instId` — для сверки с expected Instrument; `tdMode`,
+`posSide`, `ccy`, `lever` — adapter-константы / validation;
+`fillPx`/`fillSz`/`fillTime`/`tradeId` — поля «последнего исполнения»;
+факт исполнения собирается из fills (`docs/components/RefreshFillsExecutor.md`,
+`docs/client/okx/rules/okx-fills-mapping.md`). `feeCcy`/`rebate`/
+`rebateCcy`/`pnl` — для итоговой аналитики через fills/finalization.
+`tag` — метка, может быть полезна для диагностики. `source` /
+`cancelSource` / `cancelSourceReason` / `category` (`normal`/`adl`/
+`liquidation`/`delivery`/`twap` и др.) — диагностика, в snapshot не
+выводится. `stpMode` / `stpId` — self-trade prevention. `quickMgnType`,
+`pxType`/`pxUsd`/`pxVol` (options), `tgtCcy` (SPOT market),
+`tradeQuoteCcy`, `linkedAlgoOrd.algoId`, `algoId`/`algoClOrdId`,
+`isTpLimit` — не в snapshot.
+
+## Поля внутри `attachAlgoOrds[*]` дополнительные (pending/details/history)
+
+В response `attachAlgoOrds[*]` помимо полей в таблице ниже может
+приходить: `tpTriggerPx`/`tpTriggerPxType`/`tpOrdPx` (TP параметры
+вложенного объекта; биржа дублирует top-level), `slTriggerPxType`/
+`slOrdPx` (SL), `tpTriggerRatio`/`slTriggerRatio` (триггер в доле,
+только FUTURES/SWAP), `amendPxOnTriggerType` (`0`/`1` cost-price SL
+для split-TP), `attachAlgoClOrdId` (см. ниже). Маппинг см. в таблице
+attached protection.
 
 ## Поля attached protection `attachAlgoOrds[*]` (→ `AttachedAlgoOrderExternalSnapshot`)
 

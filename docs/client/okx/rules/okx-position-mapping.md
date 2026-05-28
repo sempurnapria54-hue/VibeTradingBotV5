@@ -16,14 +16,29 @@ Exchange-specific mapping для OKX. Доменная модель и стат�
 
 - **Получить позиции** (`REFRESH_POSITION`):
   `GET /api/v5/account/positions?instType=SWAP&instId={instrumentExternalId}`.
-  Один логический запрос по инструменту; дополнительно по `posId` не
+  Permission `Read`; rate limit 10 req / 2 s по User ID. Один
+  логический запрос по инструменту; дополнительно по `posId` не
   ищем — цель в наличии/отсутствии live position по инструменту, а не
   в доказательстве старого `posId` (который после закрытия живёт
-  ограниченное время). Ретраи — только при технических/API проблемах
-  (timeout, connection reset, 5xx, rate limit, temporary error).
+  ограниченное время — биржа держит ~30 дней). Ретраи — только при
+  технических/API проблемах (timeout, connection reset, 5xx, rate
+  limit, temporary error). Query (все опц.): `instType`, `instId` (до
+  10 через запятую), `posId` (до 20). В net-режиме на инструмент
+  ожидается одна запись с `posSide=net`; в long/short — отдельные
+  `posSide=long`/`short`.
 - **Закрыть позицию** (`CLOSE_POSITION`):
-  `POST /api/v5/trade/close-position`. Response — ACK, не финальный
-  статус (см. `docs/rules/ack-not-runtime-truth.md`).
+  `POST /api/v5/trade/close-position`. Permission `Trade`; rate limit
+  20 req / 2 s по User ID + Instrument ID. Body: `instId` (обяз.),
+  `mgnMode` (обяз.; `isolated`/`cross`), `posSide` (условно обяз. —
+  для net: `net`; для long/short: `long`/`short`), `ccy` (опц., для
+  USDT-SWAP — `USDT`), `autoCxl` (опц. boolean — автоматически
+  отменить все активные ордера по инструменту перед закрытием;
+  рекомендуется `true`). Response — ACK, не финальный статус (см.
+  `docs/rules/ack-not-runtime-truth.md`).
+
+Подтверждение факта закрытия — через `REFRESH_POSITION`
+(позиция исчезла или `pos=0`), опционально через `fills` и/или WS
+`positions`/`orders`.
 
 ## ClientService constants / policy
 
