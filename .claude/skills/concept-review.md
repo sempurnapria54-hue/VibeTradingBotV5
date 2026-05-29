@@ -96,11 +96,12 @@
 
 1. **Определить охват.** По формулировке шага собрать список
    релевантных доков: модели (`docs/models/...`), lifecycles
-   (`docs/lifecycles/`), процессы (`docs/processes/`), правила
-   (`docs/rules/`), словарь (`docs/dictionary/`), интеграции
-   (`docs/integrations/{name}/`), mapping
-   (`docs/models/mapping/`). Что код шага реально затронет — то и
-   в охват. Что не затронет — вне охвата (помечается, но не
+   (`docs/lifecycles/`), процессы (`docs/processes/`), компоненты
+   (`docs/components/` — executors, сервисы; `docs/components/models/`
+   — компонентные модели), правила (`docs/rules/`), словарь
+   (`docs/dictionary/`), интеграции (`docs/integrations/{name}/`),
+   mapping (`docs/models/mapping/`). Что код шага реально затронет —
+   то и в охват. Что не затронет — вне охвата (помечается, но не
    проверяется).
 
 2. **Проход по охвату.** По каждому доку в охвате — применить
