@@ -14,8 +14,9 @@ Mapping-слой для `MarketPriceData`. RVO — `docs/components/models/Marke
 `docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'а —
 `docs/integrations/<name>/contracts/market-price-data.md`.
 
-Текущие источники: **OKX** (REST ticker; WS-канал `tickers` — основной
-runtime-источник, контракт описывает та же контрактная дока).
+Текущие источники: **OKX** (REST ticker). WS-канал `tickers` —
+планируемый realtime-источник, отложен до рефакторинга на
+микросервисы (OKX-Q4); до тех пор рантайм — REST.
 
 ## Source-agnostic ядро
 

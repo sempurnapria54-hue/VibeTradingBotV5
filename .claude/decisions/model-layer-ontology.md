@@ -65,7 +65,10 @@ integrations/{name}  →  externalSnapshot  →  domain  →  persistence
 
 - **`docs/models/domain/core/`** — торговая модель с биржевым
   воплощением. Текущий состав: `Position`, `Order`, `AlgoOrder`,
-  `BalanceContainer`.
+  `BalanceContainer`; reference-core `Instrument`, `Exchange`
+  (добавлены в `GAPS_CLOSE_1` шага 1 — дискриминатор «биржевое
+  воплощение» / идентичность; классификация на ревью, см.
+  `.claude/work/progress/phase-1-step-1-gaps-close-1.md`).
 
 - **`docs/models/domain/aggregate/`** — сущность без биржевой
   привязки, нужная для торговли. Текущий состав: `Deal`, `Strategy`.

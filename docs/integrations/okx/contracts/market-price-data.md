@@ -15,6 +15,6 @@ Mapping в `MarketPriceData` — `docs/models/mapping/MarketPriceData.md`
 Rate limit: 20 req / 2 s по IP + Instrument ID. Query: `instId`
 обязателен (`ETH-USDT-SWAP`).
 
-WS-альтернатива: public канал `tickers` (URL — `/ws/v5/public`),
-основной runtime-источник; REST — fallback при отсутствии WS / при
-старте до подъёма WS. Подробнее по WS-каналам — OKX-Q4.
+Текущий рантайм (до рефакторинга на микросервисы) — REST.
+WS-альтернатива: public канал `tickers` (URL — `/ws/v5/public`) —
+планируемый realtime-источник, отложен (OKX-Q4).

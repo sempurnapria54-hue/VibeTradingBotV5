@@ -119,14 +119,20 @@ strategy-tree), но как самостоятельный enum может жи�
 Маппинг OKX-строк живёт отдельно (`TimeFrameMapper` /
 `docs/models/mapping/TimeFrame.md`).
 
-Варианты:
-- `docs/models/domain/other/TimeFrame.md` — самостоятельная модель-enum;
-- `docs/dictionary/time-frame.md` — словарная статья;
-- оставить разделом внутри market-data / `Strategy.md`.
+Статус (GAPS_CLOSE_1, 2026-05-29): `CandleGroup.timeframe` (целевой
+тип `TimeFrame`) сделал enum явной кодовой зависимостью свечной
+подсистемы. По критерию первоисточника каноническое описание enum
+размещено разделом в `docs/models/domain/other/CandleGroup.md`
+(§«Енум `TimeFrame`»); `docs/models/mapping/TimeFrame.md` указывает
+туда. Для кода шага 1 вопрос закрыт (enum определён и размещён, шаг 1
+не блокирует).
 
-До решения отдельный файл не создаётся; `TimeFrame` упоминается как
-термин в местах использования.
-Связано: `docs/models/domain/aggregate/Strategy.md` (§TimeFrame),
+Остаточный хвост: раздел `TimeFrame` в
+`docs/models/domain/aggregate/Strategy.md` (шаг 2) свести до ссылки
+на канон в `CandleGroup.md`, чтобы не дублировать определение.
+Делается при проработке шага 2 (Стратегия).
+Связано: `docs/models/domain/other/CandleGroup.md` (§Енум),
+`docs/models/domain/aggregate/Strategy.md` (§TimeFrame),
 `docs/models/mapping/TimeFrame.md`,
 `docs/models/domain/other/IndicatorValue.md` / `MarketStructure.md` /
 `MarketPhase.md` (через settings).
@@ -297,6 +303,13 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 Связано: `docs/integrations/okx/contracts/service-urls.md`,
 `docs/integrations/okx/rules/ws-limits.md`,
 `docs/models/mapping/Order.md` (примеры WS-альтернатив).
+
+Статус (GAPS_CLOSE_1, 2026-05-29): шаг 1 — REST-first (WS отложен),
+поэтому OKX-Q4 **шаг 1 не блокирует**. Якорь пересмотра — рефакторинг
+на микросервисы (архитектурный рубеж роадмапа). Контрактные доки
+рыночных данных приведены к REST-first
+(`docs/integrations/okx/contracts/market-price-data.md`,
+`docs/models/mapping/MarketPriceData.md`).
 
 ### DEAL-Q3. Размещение `DealActionState` (domain layer + own lifecycle)
 

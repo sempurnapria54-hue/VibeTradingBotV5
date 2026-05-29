@@ -79,8 +79,11 @@ contracts = baseQty / ctVal
 
 ### Не маппимые поля OKX
 
-`instFamily`, `uly`, `baseCcy`/`quoteCcy`/`settleCcy` (хранятся в
-domain `Instrument`, не здесь), `ctMult`, `maxLmtSz`/`maxMktSz`/
+`instFamily`, `uly`, `baseCcy`/`quoteCcy`/`settleCcy` (приходят в
+`InstrumentExternalSnapshot` — граничный снапшот инструмента, не в
+этой модели; разграничение —
+`docs/models/domain/core/Instrument.md`), `ctMult`,
+`maxLmtSz`/`maxMktSz`/
 `maxTwapSz`/`maxIcebergSz`/`maxTriggerSz`/`maxStopSz`/`maxLmtAmt`/
 `maxMktAmt` (per-order лимиты — пока не используем),
 `listTime`/`expTime`/`openType`/`ruleType` (lifecycle биржи; для

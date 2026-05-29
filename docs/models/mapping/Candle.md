@@ -54,6 +54,16 @@ Mapping таймфреймов — `docs/models/mapping/TimeFrame.md`. Скво�
 `BigDecimal`; `ts` → epoch millis (`Instant`/`OffsetDateTime` в
 домене); `confirm` парсится как `boolean` (`"1"` → `true`).
 
+### → domain `Candle`
+
+`ts` → `Candle.openTimestamp`; `o`/`h`/`l`/`c` →
+`open`/`high`/`low`/`close`; `vol` → `volume` (домен хранит один
+объём; `volCcy`/`volCcyQuote` не маппятся). `confirm` в домен не
+пишется — фильтр закрытых свечей (см. ниже). Доменная модель —
+`docs/models/domain/other/Candle.md`; группа и lifecycle загрузки —
+`docs/models/domain/other/CandleGroup.md`,
+`docs/lifecycles/CandleGroup.md`.
+
 ### `confirm` policy
 
 В `/market/candles` первая свеча часто неполная (`confirm=0`); для

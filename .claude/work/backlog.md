@@ -100,14 +100,19 @@ market-data модели `InstrumentExternalRules`, `IndicatorValue`,
 `MarketStructure` (+ `MarketPriceLevel`), `MarketPhase`; правило
 `market-data-freshness`; процесс `market-data-calculation`; OKX
 `okx-timeframe-mapping`/`okx-instrument-mapping`/`okx-market-price-data-mapping`.
-**Осталось (вне процессных доков):** standalone модели `Candle`
-(`docs/deprecated/.../Candle.md`) и `Instrument` (→ п.9); размещение
-`TimeFrame` — TIME-Q1 (`open-questions.md`).
+**Осталось (вне процессных доков):** standalone модели `Candle` и
+`Instrument` материализованы в `GAPS_CLOSE_1` шага 1
+(`docs/models/domain/other/Candle.md`, `.../CandleGroup.md` +
+`docs/lifecycles/CandleGroup.md`; `docs/models/domain/core/Instrument.md`);
+`TimeFrame` размещён в `CandleGroup.md` (TIME-Q1 сужен до свёртки
+`Strategy.md`). Архивный исходник (легаси) —
+`.claude-archive/2026-05-21/docs/deprecated/models/domain/old/Candle.md`.
 
 ### 6. Аудит и история исполнения; финализация PnL — частично
 
 **Источник:** `.claude-archive/.../processes/Audit/Аудит и история
-исполнения.md`; `docs/deprecated/.../TradeFill.md`,
+исполнения.md`;
+`.claude-archive/2026-05-21/docs/deprecated/models/domain/old/TradeFill.md`,
 `TradeFillsArchive.md`. Архивный док — рабочий каркас, **выведен из
 миграции процессов** (`.claude/decisions/process-materialization-criterion.md`):
 модели истории/timeline не спроектированы, ~30 подвопросов.
@@ -157,7 +162,19 @@ Exchange/Instrument/Account. **Суть:** полная модель/lifecycle `
 `AnomalyReport.Severity` (CRITICAL → торговля по инструменту запрещена;
 NON_CRITICAL → после kill-switch может быть разрешена; блокировка в
 статусе инструмента) и standalone модель `Instrument` для market-data
-(из п.5). **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
+(из п.5).
+
+**Статус (GAPS_CLOSE_1, 2026-05-29):** материализованы минимальные
+доменные модели под шаг 1 — `Instrument`
+(`docs/models/domain/core/Instrument.md`) и `Exchange`
+(`docs/models/domain/core/Exchange.md`), набор статусов обеих как в
+классах. **Осталось:** полный lifecycle `Exchange` (`HOLD`/`DISABLED`
+среди состояний), lifecycle `Instrument`, `Account`; разграничение
+`Instrument` ↔ `InstrumentExternalSnapshot` ↔ `InstrumentExternalRules`
+(где живут base/quote/settle и прочие справочные поля, нет ли
+дублирования) — на `DOCS_CHECK_2` шага 1.
+
+**Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
 `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q4).
 
 ### 10. API-кластер OKX — ✅ ЗАКРЫТО (2026-05-28)

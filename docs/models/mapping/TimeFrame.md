@@ -8,11 +8,13 @@
 ## Контекст
 
 Mapping-слой для `TimeFrame`. Доменный enum `TimeFrame` строк
-источника не хранит (раздел `TimeFrame` в
-`docs/models/domain/aggregate/Strategy.md`; итоговое размещение
-enum — открытый вопрос TIME-Q1 в
-`.claude/work/questions/open-questions.md`). Маппинг строк живёт
-только здесь и в `TimeFrameMapper` (компонент adapter-слоя).
+источника не хранит; каноническое описание enum (первоисточник —
+свечная подсистема) — `docs/models/domain/other/CandleGroup.md`
+§«Енум `TimeFrame`». Маппинг строк живёт только здесь и в
+`TimeFrameMapper` (компонент adapter-слоя). Остаточная развилка
+размещения (свёртка раздела `TimeFrame` в
+`docs/models/domain/aggregate/Strategy.md` до ссылки) — TIME-Q1 в
+`.claude/work/questions/open-questions.md`.
 
 Текущие источники: **OKX**.
 

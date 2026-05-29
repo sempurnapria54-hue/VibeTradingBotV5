@@ -37,6 +37,26 @@ EntryScannerJob / DealOrchestratorJob (FSM)
 `InstrumentExternalRulesSyncJob.md`, `IndicatorJob.md`,
 `MarketStructureJob.md`, `MarketPhaseJob.md`.
 
+## Загрузка и целостность свечной истории (CandleJob)
+
+`CandleJob` ведёт свечную историю по группам `CandleGroup` (одна
+группа = инструмент + таймфрейм) через её жизненный цикл
+(`docs/lifecycles/CandleGroup.md`): историческая выкачка «в
+глубину» (`BACKFILL`) до `coverageStartUtcMillis`, регулярная
+докачка хвоста (`SYNC`), проверка целостности по count (`CHECK`) и
+докачка дыр (`REPAIR`) до подтверждённого покрытия (`ACTIVE`).
+Идемпотентность — по уникальности `(candleGroupId, openTimestamp)`;
+checkpoints покрытия — `coverageStartUtcMillis`/
+`coverageEndUtcMillis`. В историю попадают только закрытые свечи
+(`confirm=1`), без look-ahead.
+
+Контракт пагинации назад и лимиты OKX REST —
+`docs/integrations/okx/contracts/candle.md`. **Детали политики
+дозагрузки при дыре и глубины «всей» истории (с учётом предела OKX
+REST) на этом шаге не дорабатываются — см.
+`docs/lifecycles/CandleGroup.md` §«Что отложено» (всплывут на
+`DOCS_CHECK_2`).**
+
 ## Цепочка зависимостей данных
 
 ```text
@@ -79,5 +99,6 @@ StrategyActionCalculator -> расчёт цены / размера
 подготовлены: хватает ли свечной истории, можно ли рассчитать индикаторы
 после warmup, структуру и фазу, есть ли актуальные
 `InstrumentExternalRules`. Если нет — стратегия не активируется либо
-активируется только после backfill/warmup (механизм backfill —
-форвард-заметка backlog п.8).
+активируется только после backfill/warmup (загрузка свечной
+истории — раздел «Загрузка и целостность свечной истории» выше и
+`docs/lifecycles/CandleGroup.md`).
