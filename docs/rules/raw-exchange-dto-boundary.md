@@ -33,9 +33,12 @@ exception. `null` означает «не найдено в этом источ�
 
 Маппер из client-модели возвращает validated `*ExternalSnapshot`
 (`InstrumentExternalRulesExternalSnapshot`, `MarketPriceDataExternalSnapshot`,
-`BalanceContainerExternalSnapshot`, order/algo/position external snapshots)
-— external-поля модели, без доменных enum/нормализаций (они резолвятся при
-материализации). Это и есть единственное, что выходит за `ClientService`.
+`BalanceContainerExternalSnapshot`, `CandleExternalSnapshot`, order/algo/
+position external snapshots) — external-поля модели, без доменных
+enum/нормализаций (они резолвятся при материализации). Это и есть
+единственное, что выходит за `ClientService`. Для свечей это
+означает: OKX-массив проходит границу как `CandleExternalSnapshot`,
+а не сырым массивом (`docs/models/mapping/Candle.md`).
 
 ### Balance — без normal null
 

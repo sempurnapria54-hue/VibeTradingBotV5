@@ -168,11 +168,24 @@ NON_CRITICAL → после kill-switch может быть разрешена; 
 доменные модели под шаг 1 — `Instrument`
 (`docs/models/domain/core/Instrument.md`) и `Exchange`
 (`docs/models/domain/core/Exchange.md`), набор статусов обеих как в
-классах. **Осталось:** полный lifecycle `Exchange` (`HOLD`/`DISABLED`
-среди состояний), lifecycle `Instrument`, `Account`; разграничение
+классах.
+
+**Статус (GAPS_CLOSE_2, 2026-05-30):** материализован онбординг-путь
+lifecycle `Instrument` (`docs/lifecycles/Instrument.md`:
+`CREATED → SYNC → CANDLES_LOADING → ACTIVE` + координация
+`Instrument.Status` ↔ `CandleGroup.Status`); разграничение
 `Instrument` ↔ `InstrumentExternalSnapshot` ↔ `InstrumentExternalRules`
-(где живут base/quote/settle и прочие справочные поля, нет ли
-дублирования) — на `DOCS_CHECK_2` шага 1.
+для шага 1 **закрыто** (справочные поля живут только в транзиентном
+снапшоте; `InstrumentExternalRules` отложена за пределы шага 1 и на
+base/quote/settle больше не претендует — снят дубль Н1; см.
+`docs/models/mapping/Instrument.md`). **Осталось:** полный lifecycle
+`Exchange` (`HOLD`/`DISABLED` среди состояний), периферийные статусы
+`Instrument` (`HOLD`, `ERROR`-recovery, повторный онбординг,
+`CLOSED`), `Account`; материализация отложенной rules-подсистемы
+(`InstrumentExternalRules` + `InstrumentExternalRulesSyncJob`;
+округление/sizing/риск — поздние шаги) и её соотнесение со
+снапшот-концепцией / возможный ренейм — INSTR-Q1
+(`open-questions.md`).
 
 **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
 `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q4).
@@ -262,3 +275,7 @@ OKX-Q2 (`TradeFillsArchive` + async-флоу), OKX-Q3 (bills как источн
   (`TradeFillsArchive` async-флоу), OKX-Q3 (bills как источник
   `DealCashFlow` / финализации `Deal`; п.6, DEAL-Q1/Q2), OKX-Q4
   (WS-каналы OKX отдельным заходом).
+- **Из шага 1 Фазы 1 (поток рыночных данных):** INSTR-Q1
+  (соотнесение снапшот-концепции с `InstrumentExternalRules` /
+  возможный ренейм; п.9); ORCH-Q1 (владелец оркестрации онбординга
+  инструмента и загрузки свечей — `candle-loading`).

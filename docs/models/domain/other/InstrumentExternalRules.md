@@ -12,6 +12,17 @@
 бизнес-цикл сделки, а хранимые справочные правила инструмента → модель
 `other` (см. `.claude/decisions/models-core-vs-other.md`).
 
+> **Отложено за пределы шага 1.** Модель нужна поздним шагам
+> (округление цены/размера, sizing в контрактах, риск-преконтроль,
+> проверка торгуемости инструмента) — backlog п.9; в шаге 1 (поток
+> рыночных данных) она не материализуется. Справочные валюты
+> инструмента (base/quote/settle) эта модель **не держит** — они
+> приходят в транзиентном `InstrumentExternalSnapshot` (см.
+> `docs/models/domain/core/Instrument.md`,
+> `docs/models/mapping/Instrument.md`). Как снапшот-концепция ляжет
+> на эту модель и не потребуется ли ренейм — открытый вопрос
+> INSTR-Q1 (`.claude/work/questions/open-questions.md`).
+
 Используется для:
 
 - округления цены;
@@ -39,9 +50,6 @@ Java-класс, наследует `Auditable`.
 | `status` | `Status` | Нормализованный статус инструмента. |
 | `externalInstrumentType` | `String` | Сырой тип инструмента биржи. |
 | `externalInstrumentId` | `String` | ID инструмента на бирже. |
-| `externalBaseCurrency` | `String` | Базовая валюта. |
-| `externalQuoteCurrency` | `String` | Котируемая валюта. |
-| `externalSettleCurrency` | `String` | Валюта расчётов. |
 | `externalContractType` | `String` | Сырой тип контракта. |
 | `externalContractValue` | `String` | Стоимость контракта (`ctVal`). |
 | `externalContractValueCurrency` | `String` | Валюта стоимости контракта. |

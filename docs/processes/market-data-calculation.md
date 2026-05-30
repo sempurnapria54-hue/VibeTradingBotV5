@@ -2,27 +2,31 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как устроен процесс подготовки рыночных данных: какие jobs, в какой
-последовательности, по какой цепочке зависимостей, и где результаты
-используются.
+Как устроен процесс вычисления производных рыночных данных
+(индикаторы / структура / фаза) поверх загруженных свечей: какие
+jobs, в какой последовательности, по какой цепочке зависимостей, и
+где результаты используются.
 
 ## Главная идея
 
-Индикаторы, структура рынка, фаза рынка и внешние правила инструмента
-готовятся **отдельно** от жизненного цикла сделки. FSM и калькуляторы не
-считают эти данные сами — jobs готовят их заранее, потребители читают
-готовые результаты.
+Индикаторы, структура рынка и фаза рынка готовятся **отдельно** от
+жизненного цикла сделки. FSM и калькуляторы не считают эти данные
+сами — jobs готовят их заранее, потребители читают готовые
+результаты. (Подготовка спеков инструмента — `InstrumentExternalRules`
+через `InstrumentExternalRulesSyncJob` — в шаге 1 отложена, см. ниже.)
 
-Процесс — поставщик данных для `docs/processes/deal-management.md` (см.
-условие 1/2 в `.claude/decisions/process-materialization-criterion.md`).
+Свечи этот процесс **не добывает** — он вычисляет поверх уже
+загруженных свечей; их добыча и целостность — отдельный процесс
+`docs/processes/candle-loading.md` (поставщик). Сам
+`market-data-calculation` — поставщик производных данных для
+`docs/processes/deal-management.md` (см. условие 1/2 в
+`.claude/decisions/process-materialization-criterion.md`).
 
 ## Jobs и последовательность
 
 ```text
-CandleJob
-  -> обновляет свечи
-InstrumentExternalRulesSyncJob
-  -> обновляет внешние правила инструмента из REST
+candle-loading
+  -> поставляет загруженные свечи (docs/processes/candle-loading.md)
 IndicatorJob
   -> считает IndicatorValue
 MarketStructureJob
@@ -33,29 +37,25 @@ EntryScannerJob / DealOrchestratorJob (FSM)
   -> используют готовые данные (уже зона deal-management)
 ```
 
-Компоненты: `docs/components/CandleJob.md`,
-`InstrumentExternalRulesSyncJob.md`, `IndicatorJob.md`,
-`MarketStructureJob.md`, `MarketPhaseJob.md`.
+Компоненты: `docs/components/IndicatorJob.md`,
+`MarketStructureJob.md`, `MarketPhaseJob.md`. Загрузку свечей ведёт
+`docs/components/CandleJob.md` в процессе
+`docs/processes/candle-loading.md`.
 
-## Загрузка и целостность свечной истории (CandleJob)
+`InstrumentExternalRulesSyncJob` (подготовка спеков инструмента) в
+активную оркестрацию шага 1 **не входит**: он готовит
+`InstrumentExternalRules` — модель, отложенную за пределы шага 1
+(backlog п.9 / отложенная rules-подсистема), и материализуется
+вместе с правилами на поздних шагах
+(`docs/components/InstrumentExternalRulesSyncJob.md`).
 
-`CandleJob` ведёт свечную историю по группам `CandleGroup` (одна
-группа = инструмент + таймфрейм) через её жизненный цикл
-(`docs/lifecycles/CandleGroup.md`): историческая выкачка «в
-глубину» (`BACKFILL`) до `coverageStartUtcMillis`, регулярная
-докачка хвоста (`SYNC`), проверка целостности по count (`CHECK`) и
-докачка дыр (`REPAIR`) до подтверждённого покрытия (`ACTIVE`).
-Идемпотентность — по уникальности `(candleGroupId, openTimestamp)`;
-checkpoints покрытия — `coverageStartUtcMillis`/
-`coverageEndUtcMillis`. В историю попадают только закрытые свечи
-(`confirm=1`), без look-ahead.
+## Свечи как вход
 
-Контракт пагинации назад и лимиты OKX REST —
-`docs/integrations/okx/contracts/candle.md`. **Детали политики
-дозагрузки при дыре и глубины «всей» истории (с учётом предела OKX
-REST) на этом шаге не дорабатываются — см.
-`docs/lifecycles/CandleGroup.md` §«Что отложено» (всплывут на
-`DOCS_CHECK_2`).**
+Свечная история (добыча, целостность по count, онбординг
+инструмента) — процесс `docs/processes/candle-loading.md`. Сюда
+свечи приходят уже загруженными; этот процесс их только
+потребляет. Инвариант «только закрытые свечи, без look-ahead»
+обеспечивается на стороне загрузки.
 
 ## Цепочка зависимостей данных
 
@@ -100,5 +100,4 @@ StrategyActionCalculator -> расчёт цены / размера
 после warmup, структуру и фазу, есть ли актуальные
 `InstrumentExternalRules`. Если нет — стратегия не активируется либо
 активируется только после backfill/warmup (загрузка свечной
-истории — раздел «Загрузка и целостность свечной истории» выше и
-`docs/lifecycles/CandleGroup.md`).
+истории — процесс `docs/processes/candle-loading.md`).

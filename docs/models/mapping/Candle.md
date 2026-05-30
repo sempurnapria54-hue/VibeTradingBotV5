@@ -7,9 +7,10 @@
 
 ## Контекст
 
-Mapping-слой для свечей. Доменно свечи готовит
-`docs/components/CandleJob.md`; потребители —
-`IndicatorJob` и др. (`docs/processes/market-data-calculation.md`).
+Mapping-слой для свечей. Доменно свечи добывает
+`docs/components/CandleJob.md` (процесс
+`docs/processes/candle-loading.md`); потребители — `IndicatorJob`
+и др. (`docs/processes/market-data-calculation.md`).
 Mapping таймфреймов — `docs/models/mapping/TimeFrame.md`. Сквозные
 правила — `docs/rules/raw-exchange-dto-boundary.md`,
 `docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'ов
@@ -54,14 +55,31 @@ Mapping таймфреймов — `docs/models/mapping/TimeFrame.md`. Скво�
 `BigDecimal`; `ts` → epoch millis (`Instant`/`OffsetDateTime` в
 домене); `confirm` парсится как `boolean` (`"1"` → `true`).
 
+### Граница: `CandleExternalSnapshot`
+
+Свеча проходит границу `ClientService`/adapter как нормализованный
+`CandleExternalSnapshot`, не сырым OKX-массивом — сквозное правило
+`docs/rules/raw-exchange-dto-boundary.md`. Путь:
+
+```text
+OKX-массив [9] → CandleExternalSnapshot → domain Candle
+```
+
+`ClientService` валидирует длину массива (строго 9), парсит
+элементы и отдаёт `CandleExternalSnapshot` с runtime-useful
+полями: `openTimestamp` (`ts`), `open`/`high`/`low`/`close`,
+`volume` (`vol`), `confirm`. Validation-only объёмы
+`volCcy`/`volCcyQuote` за границу не выходят (в снапшот не входят).
+Доменные enum/нормализации в снапшоте не резолвятся.
+
 ### → domain `Candle`
 
-`ts` → `Candle.openTimestamp`; `o`/`h`/`l`/`c` →
-`open`/`high`/`low`/`close`; `vol` → `volume` (домен хранит один
-объём; `volCcy`/`volCcyQuote` не маппятся). `confirm` в домен не
-пишется — фильтр закрытых свечей (см. ниже). Доменная модель —
-`docs/models/domain/other/Candle.md`; группа и lifecycle загрузки —
-`docs/models/domain/other/CandleGroup.md`,
+Из `CandleExternalSnapshot`: `openTimestamp` →
+`Candle.openTimestamp`; `open`/`high`/`low`/`close` → одноимённые;
+`volume` → `volume` (домен хранит один объём). `confirm` в домен
+**не пишется** — это фильтр закрытых свечей (см. ниже). Доменная
+модель — `docs/models/domain/other/Candle.md`; группа и lifecycle
+загрузки — `docs/models/domain/other/CandleGroup.md`,
 `docs/lifecycles/CandleGroup.md`.
 
 ### `confirm` policy

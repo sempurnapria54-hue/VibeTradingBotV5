@@ -41,7 +41,9 @@ Mapping в свечи — `docs/models/mapping/Candle.md` (формат
 1. Стартовый запрос с `after = now_ms` (или без `after`).
 2. Из ответа берём `min(ts)`.
 3. Следующий запрос с `after = min(ts)`.
-4. Стоп: пустой `data` ИЛИ `min(ts) < coverage_start`.
+4. Стоп: пустой `data` (начало истории биржи) ИЛИ
+   `min(ts) ≤ plannedCandleStartDate` (достигнут плановый горизонт
+   инструмента — `docs/models/domain/core/Instrument.md`).
 
 ## WS-альтернатива
 

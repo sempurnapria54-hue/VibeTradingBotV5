@@ -11,7 +11,11 @@
 обнаруженный при составлении карты артефактов миграции процессов
 (проход 1, 2026-05-27), и четыре вопроса от миграции API-кластера OKX
 (2026-05-28; OKX-Q1..Q4 — TradeFill, TradeFillsArchive, AccountBill /
-DealCashFlow, WS-каналы как отдельный заход).
+DealCashFlow, WS-каналы как отдельный заход). Два вопроса — из шага 1
+Фазы 1 (2026-05-30): INSTR-Q1 (`GAPS_CLOSE_2` — разграничение
+`Instrument` / снапшот / `InstrumentExternalRules`) и ORCH-Q1 (вынос
+процесса `candle-loading` — владелец оркестрации онбординга и
+загрузки свечей).
 
 История закрытых вопросов пайплайна:
 
@@ -136,6 +140,57 @@ strategy-tree), но как самостоятельный enum может жи�
 `docs/models/mapping/TimeFrame.md`,
 `docs/models/domain/other/IndicatorValue.md` / `MarketStructure.md` /
 `MarketPhase.md` (через settings).
+
+### INSTR-Q1. Как снапшот-концепция ляжет на `InstrumentExternalRules` (и нужен ли ренейм)
+
+Шаг 1 (поток рыночных данных) развёл модель инструмента так: домен
+`Instrument` держит только идентичность (+ онбординг-статус,
+`plannedCandleStartDate`), а справочные поля спецификации
+(base/quote/settle, sizes, `state`, `lever`) приходят транзиентно в
+`InstrumentExternalSnapshot` и в шаге 1 персистентно **не**
+хранятся. Модель `InstrumentExternalRules` (persisted справочные
+правила) для шага 1 отложена (округление/sizing/риск — поздние
+шаги; backlog п.9) и на base/quote/settle больше не претендует —
+этим снят дубль Н1 (`DOCS_CHECK_2`).
+
+Не решено (всплывёт при материализации rules на поздних шагах): как
+именно снапшот-концепция (`InstrumentExternalSnapshot` —
+транзиентная граница) соотнесётся с persisted
+`InstrumentExternalRules` — отдельные ли это сущности, одна ли
+материализуется из другой, где окончательно живёт персистентный дом
+справочных полей; и не потребуется ли в результате **ренейм**
+`InstrumentExternalRules` (например, к снапшот-неймингу).
+
+Варианты на будущее: (1) `InstrumentExternalRules` остаётся
+самостоятельной persisted-моделью, материализуется из снапшота;
+(2) переосмыслить как persisted-проекцию снапшота с ренеймом;
+(3) иное по итогам проработки шагов округления/sizing/риска. До
+решения rules не материализуется; в шаге 1 справочные поля — только
+транзиентный снапшот.
+Связано: `docs/models/domain/core/Instrument.md`,
+`docs/models/mapping/Instrument.md`,
+`docs/models/domain/other/InstrumentExternalRules.md`,
+`docs/models/mapping/InstrumentExternalRules.md`, backlog п.9.
+
+### ORCH-Q1. Владелец оркестрации онбординга инструмента и загрузки свечей
+
+Кто драйвит переходы `Instrument.Status`
+(`CREATED → SYNC → CANDLES_LOADING → ACTIVE`) и `CandleGroup.Status`
+(`BACKFILL`/`SYNC`/`CHECK`/`REPAIR`/`ACTIVE`/`ERROR`) и координирует
+их между собой. Не решено при выносе процесса `candle-loading`
+(2026-05-30). Поглощает вопрос, поднятый при закрытии `GAPS_CLOSE_2`
+(владелец записи `Instrument.Status` был оставлен деталью `CODE`).
+
+Варианты: (1) отдельный orchestrator-компонент + per-status
+handler'ы по образцу FSM сделки (`docs/components/DealStateMachine.md`
++ handler'ы); (2) оркестрация внутри `CandleJob` + лёгкий координатор
+инструмента; (3) событийная модель; (4) иное. До решения владелец
+**не материализуется**: семантика переходов и координации зафиксирована
+в lifecycle-доках, оркестрация описана процессом `candle-loading`
+без привязки к компоненту-владельцу.
+Связано: `docs/processes/candle-loading.md`,
+`docs/lifecycles/Instrument.md`, `docs/lifecycles/CandleGroup.md`,
+`docs/components/CandleJob.md`.
 
 ### ENUM-Q1. closeReason `RISK_CONTROL` vs `ENTRY_RISK_BLOCKED`
 

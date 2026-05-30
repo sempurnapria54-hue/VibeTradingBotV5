@@ -10,18 +10,20 @@
 ## Кто управляет
 
 Статусы ведёт `docs/components/CandleJob.md` в рамках процесса
-`docs/processes/market-data-calculation.md`. Группа движется по
+`docs/processes/candle-loading.md`. Группа движется по
 статусам загрузки/докачки/проверки целостности свечной истории;
-покрытие фиксируется в `coverageStartUtcMillis`/
-`coverageEndUtcMillis` (checkpoints, чтобы рестарт `BACKFILL`/
-`REPAIR` не был дорогим).
+фактические границы загруженной истории фиксируются в
+`actualFirstUtcMillis`/`actualLastUtcMillis`, объём — в `count`
+(чтобы рестарт `BACKFILL`/`REPAIR` не был дорогим). Плановый
+горизонт загрузки — `Instrument.plannedCandleStartDate` (на
+инструмент, общий для всех таймфреймов).
 
 ## `CandleGroup.Status`
 
 | Статус | В расчётах | Final | Смысл |
 |---|---|---|---|
 | `CREATED` | нет | нет | Группа создана; данных нет или покрытие не подтверждено. |
-| `BACKFILL` | нет | нет | Историческая загрузка «в глубину» до `coverageStartUtcMillis`. В этом статусе обязательны checkpoints (`coverage*`). |
+| `BACKFILL` | нет | нет | Историческая загрузка «в глубину» до планового горизонта `Instrument.plannedCandleStartDate` либо до пустого ответа биржи. Фиксирует `actualFirstUtcMillis`/`actualLastUtcMillis`/`count`. |
 | `SYNC` | да | нет | Регулярная докачка хвоста (overlap последних N баров) по расписанию. |
 | `CHECK` | да | нет | Быстрая проверка целостности по count; при необходимости инициирует `REPAIR`. |
 | `REPAIR` | да* | нет | Найдены дыры → бинарный поиск по count + докачка окон. |
@@ -36,7 +38,7 @@
 
 ```text
 CREATED
-  -> BACKFILL        (выкачка истории «в глубину» до coverageStart)
+  -> BACKFILL        (выкачка истории «в глубину» до plannedCandleStartDate / пустого ответа)
   -> SYNC            (регулярная докачка хвоста)
   -> CHECK           (проверка целостности по count)
        -> ACTIVE     (дыр нет)
@@ -46,26 +48,63 @@ DELETED  <- ручное удаление; в расчётах не участв
 ```
 
 Проверка целостности — по count: число свечей от первой до
-последней по таймфрейму должно совпадать с ожидаемым для
-интервала покрытия. Все расчёты — только по закрытым свечам, без
-look-ahead (`docs/components/CandleJob.md`).
+последней по таймфрейму должно совпадать с ожидаемым по
+density-инварианту на `[actualFirst, actualLast]`
+(`docs/models/domain/other/CandleGroup.md` §«Целостность по
+count»). Все расчёты — только по закрытым свечам, без look-ahead
+(`docs/components/CandleJob.md`).
 
-## Что отложено (DOCS_CHECK_2)
+## Политика загрузки и целостности
 
-На уровне классов зафиксированы состояния и общий поток. **Не
-доработаны** (всплывут на `DOCS_CHECK_2`, см. backlog):
+Детали, ранее отложенные на `DOCS_CHECK_2`, зафиксированы здесь.
+Конкретные числа и тайминги (CRON-период, шаг деления при бинарном
+поиске, лимит окна докачки, число попыток до `ERROR`, дефолт
+горизонта) — конфигурируемы, проставляются на под-шаге `CODE`.
 
-- точная политика дозагрузки при обнаружении дыры (окна, шаги
-  бинарного поиска, число попыток до `ERROR`);
-- глубина «всей» истории с учётом предела OKX REST (до 1440 по
-  `market/candles`, пагинация назад по `history-candles` — см.
-  `docs/integrations/okx/contracts/candle.md`);
-- условия и расписание переходов `SYNC → CHECK`.
+### Глубина и покрытие (`BACKFILL`)
+
+- Плановый горизонт — `Instrument.plannedCandleStartDate`
+  (фиксированный конфигурируемый, **на инструмент**, общий для всех
+  таймфреймов; не per-группа).
+- `BACKFILL` пагинирует историю назад (по `history-candles`, см.
+  `docs/integrations/okx/contracts/candle.md`) до достижения
+  `plannedCandleStartDate` **либо** до пустого ответа биржи (начало
+  истории биржи по инструменту → фиксируется в
+  `actualFirstUtcMillis`).
+- Фактические границы загруженного — `actualFirstUtcMillis`/
+  `actualLastUtcMillis` на группе (per-ТФ).
+
+### Регулярная докачка хвоста (`SYNC`)
+
+- Включается по группе, когда подошёл новый закрытый бар (каданс
+  пропорционален таймфрейму): forward-fill от `actualLast` к `now`.
+- Запускается из общего тика `CandleJob` (CRON, см.
+  `docs/components/CandleJob.md`).
+
+### Проверка целостности (`CHECK`)
+
+- Выполняется **после любой записи** в группу (`SYNC`/`REPAIR`) и
+  **на старте**.
+- На старте — реконсиляция поддерживаемого `count` реальным
+  `COUNT(*)` (защита от рассинхрона после рестарта в середине
+  пачки); дальше проверка O(1) по `count` и
+  `actualFirst`/`actualLast` (density-инвариант).
+- Плотно (`count == (actualLast − actualFirst)/step + 1`) →
+  `ACTIVE`; дефицит → `REPAIR`.
+
+### Докачка дыр (`REPAIR`)
+
+- Дыра локализуется **бинарным поиском по count** (делим интервал,
+  сравниваем фактический count подынтервала с ожидаемым).
+- Локализованное окно докачивается точечно (`history-candles`).
+- Петля `REPAIR` ↔ `CHECK`, пока ряд не станет плотным.
+- Постоянная внутренняя дыра (биржа реально отдаёт пусто) после
+  исчерпания попыток → `ERROR`. Реестра известных пропусков нет.
 
 ## Связи
 
 - Модель — `docs/models/domain/other/CandleGroup.md`.
 - Производитель / оркестрация — `docs/components/CandleJob.md`,
-  `docs/processes/market-data-calculation.md`.
+  `docs/processes/candle-loading.md`.
 - Контракт OKX (пагинация/лимиты) —
   `docs/integrations/okx/contracts/candle.md`.

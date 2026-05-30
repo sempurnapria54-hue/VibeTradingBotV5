@@ -7,9 +7,10 @@
 
 ## Назначение
 
-`CandleJob` — job подготовки базовых свечных данных, на которые опираются
-все остальные расчёты рыночных данных (см.
-`docs/processes/market-data-calculation.md`).
+`CandleJob` — job добычи и поддержания целостности базовых свечных
+данных (процесс `docs/processes/candle-loading.md`), на которые
+опираются производные расчёты рыночных данных
+(`docs/processes/market-data-calculation.md`).
 
 ## Делает
 
@@ -33,22 +34,28 @@
 
 ## Жизненный цикл загрузки свечей
 
-`CandleJob` ведёт каждую `CandleGroup` (инструмент + таймфрейм) по
-её жизненному циклу — `docs/lifecycles/CandleGroup.md`
+`CandleJob` — CRON-job (период из конфига, порядка раза в минуту):
+ведёт каждую `CandleGroup` (инструмент + таймфрейм) по её
+жизненному циклу — `docs/lifecycles/CandleGroup.md`
 (`BACKFILL` → `SYNC` → `CHECK` → `REPAIR` → `ACTIVE`): историческая
-выкачка, регулярная докачка хвоста, проверка целостности по count,
-докачка дыр. Идемпотентность — по `(candleGroupId, openTimestamp)`;
-checkpoints покрытия — `coverageStartUtcMillis`/
-`coverageEndUtcMillis`. Оркестрация в общем потоке рыночных данных
-— `docs/processes/market-data-calculation.md`. Детали политики
-дозагрузки и глубины истории отложены до `DOCS_CHECK_2` (см.
-lifecycle §«Что отложено»).
+выкачка до планового горизонта `Instrument.plannedCandleStartDate`,
+регулярная докачка хвоста при новом баре, проверка целостности по
+count, докачка дыр бинарным поиском. Идемпотентность — по
+`(candleGroupId, openTimestamp)`; фактические границы —
+`actualFirstUtcMillis`/`actualLastUtcMillis`, объём — `count`. На
+старте `count` реконсилируется реальным `COUNT(*)` (защита от
+рассинхрона после рестарта в середине пачки). Оркестрация —
+процесс `docs/processes/candle-loading.md`. Политика загрузки и
+целостности (глубина, расписание, докачка дыр) —
+`docs/lifecycles/CandleGroup.md` §«Политика загрузки и
+целостности».
 
 ## Связи
 
 - Модель и lifecycle — `docs/models/domain/other/Candle.md`,
   `docs/models/domain/other/CandleGroup.md`,
   `docs/lifecycles/CandleGroup.md`.
-- Процесс — `docs/processes/market-data-calculation.md`.
+- Процесс — `docs/processes/candle-loading.md` (потребитель свечей
+  — `docs/processes/market-data-calculation.md`).
 - OKX-формат / контракт — `docs/models/mapping/Candle.md`,
   `docs/integrations/okx/contracts/candle.md`.

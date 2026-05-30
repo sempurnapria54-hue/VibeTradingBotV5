@@ -50,7 +50,11 @@ OKX `public/instruments` отдаёт больше полей. Часть из �
 т. п.) доменно не используются. Coded `InstrumentResponse` несёт
 только snapshot-релевантное подмножество.
 
-> Разграничение `InstrumentExternalSnapshot` (этот DTO) ↔
-> `InstrumentExternalRules` (богаче полями, отдельный DTO/маппинг),
-> устранение дублирования справочных полей — на доработке
-> (`DOCS_CHECK_2`, backlog п.9).
+> **Разграничение (шаг 1).** Этот DTO — источник для транзиентного
+> `InstrumentExternalSnapshot` (граница; справочные поля в шаге 1
+> персистентно не хранятся — `docs/models/mapping/Instrument.md`).
+> Богатая модель `InstrumentExternalRules` (`state`, `lever`,
+> `ctType`, sizes) отложена за пределы шага 1 (backlog п.9) и на
+> base/quote/settle больше не претендует — дубль Н1 снят.
+> Соотнесение снапшота с `InstrumentExternalRules` / возможный
+> ренейм — открытый вопрос INSTR-Q1.

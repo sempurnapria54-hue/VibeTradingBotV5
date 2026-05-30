@@ -32,7 +32,8 @@
 | `marginMode` | `MarginMode` | Режим маржи (нормализованный enum). |
 | `externalMarginMode` | `String` | Сырой режим маржи биржи (`cross`/`isolated`). |
 | `leverage` | `Integer` | Плечо. |
-| `candleGroups` | `List<CandleGroup>` | Группы свечей по таймфреймам инструмента (см. `docs/models/domain/other/CandleGroup.md`). |
+| `plannedCandleStartDate` | `Long` | Плановая нижняя граница истории свечей (UTC, мс): до неё пагинирует `BACKFILL` свечей. Конфигурируемый горизонт, **общий для всех таймфреймов** инструмента (не на группу); дефолт — из конфига (на `CODE`). См. `docs/models/domain/other/CandleGroup.md`, `docs/lifecycles/CandleGroup.md`. |
+| `candleGroups` | `List<CandleGroup>` | Группы свечей по таймфреймам инструмента (1:many, без промежуточного объекта; см. `docs/models/domain/other/CandleGroup.md`). |
 
 Поля аудита (`createdAt`/`modifiedAt`/`externalCreatedAt`/… ) —
 из `Auditable`.
@@ -44,7 +45,11 @@
 `CREATED`, `HOLD`, `SYNC`, `CANDLES_LOADING`, `ACTIVE`, `CLOSED`,
 `ERROR`. Статус жизненного цикла инструмента в системе (готовность
 к торговле: от создания и синхронизации спецификации к загрузке
-свечей и `ACTIVE`).
+свечей и `ACTIVE`). Онбординг-путь
+(`CREATED → SYNC → CANDLES_LOADING → ACTIVE`), триггеры и
+координация с готовностью групп свечей — `docs/lifecycles/Instrument.md`;
+периферийные статусы (`HOLD`, `ERROR`-recovery, повторный
+онбординг) для шага 1 отложены (backlog п.9).
 
 ### `MarginMode`
 
@@ -54,21 +59,29 @@
 ## Биржевое воплощение и справочные поля
 
 `Instrument` несёт только идентичность и торговую конфигурацию
-(`externalId`, `externalType`, `marginMode`, `leverage`). Справочные
-поля спецификации биржи (base/quote/settle currency, `lotSz`,
-`minSz`, `ctVal`, `ctMult`, `tickSz`) на доменном `Instrument` **не
+(`externalId`, `externalType`, `marginMode`, `leverage`) и плановый
+горизонт свечей (`plannedCandleStartDate`). Справочные поля
+спецификации биржи (base/quote/settle currency, `lotSz`, `minSz`,
+`ctVal`, `ctMult`, `tickSz`) на доменном `Instrument` **не
 хранятся** — они приходят в граничном `InstrumentExternalSnapshot`
 (класс
-`domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot`;
-mapping snapshot↔domain — на `DOCS_CHECK_2`, см. ниже).
-Торговые ограничения инструмента (tick/lot/min/max sizes, max
-leverage, статус) — отдельная модель
-`docs/models/domain/other/InstrumentExternalRules.md`.
+`domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot`)
+**транзиентно** и в шаге 1 персистентного дома не имеют. Mapping
+snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
+только идентичность).
 
-> Разграничение `Instrument` ↔ `InstrumentExternalSnapshot` ↔
-> `InstrumentExternalRules` (где именно живут base/quote/settle и
-> прочие справочные поля, нет ли дублирования) — на доработке;
-> отслеживается для `DOCS_CHECK_2` (см. backlog п.9).
+> **Разграничение `Instrument` ↔ `InstrumentExternalSnapshot` ↔
+> `InstrumentExternalRules` (шаг 1).** Справочные поля
+> (base/quote/settle, sizes) для шага 1 живут только в транзиентном
+> `InstrumentExternalSnapshot`; персистентного дома у них нет.
+> Модель `InstrumentExternalRules` (торговые ограничения: tick/lot/
+> min/max sizes, max leverage, статус) **отложена** за пределы
+> шага 1 (округление/sizing/риск — поздние шаги; backlog п.9) и на
+> base/quote/settle больше не претендует
+> (`docs/models/domain/other/InstrumentExternalRules.md`). Как
+> снапшот-концепция ляжет на `InstrumentExternalRules` и не
+> потребуется ли ренейм rules — открытый вопрос INSTR-Q1
+> (`.claude/work/questions/open-questions.md`).
 
 ## Персистентность
 
@@ -81,7 +94,9 @@ leverage, статус) — отдельная модель
   (uk_instrument_exchange_id_external_id).
 - `internal_id`, `exchange_id`, `external_id`, `external_type`,
   `status`, `margin_mode`, `leverage` — `NOT NULL`;
-  `external_margin_mode` — nullable.
+  `external_margin_mode`, `planned_candle_start_date` — nullable
+  (`planned_candle_start_date` проставляется при онбординге из
+  конфига).
 - `internal_id`, `exchange_id`, `margin_mode` — `updatable = false`
   (неизменны после создания).
 - `candleGroups` — `OneToMany` (mappedBy `instrument`), cascade
@@ -91,6 +106,8 @@ leverage, статус) — отдельная модель
 
 - Биржа-владелец — `docs/models/domain/core/Exchange.md`.
 - Группы свечей — `docs/models/domain/other/CandleGroup.md`.
-- Торговые правила инструмента —
+- Lifecycle онбординга — `docs/lifecycles/Instrument.md`.
+- Mapping snapshot↔domain — `docs/models/mapping/Instrument.md`.
+- Торговые правила инструмента (отложены за пределы шага 1) —
   `docs/models/domain/other/InstrumentExternalRules.md`.
 - Audit-база — `docs/models/domain/other/Auditable.md`.
