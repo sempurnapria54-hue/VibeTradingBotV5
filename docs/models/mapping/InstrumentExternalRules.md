@@ -26,12 +26,9 @@ source ответ → `InstrumentExternalRulesExternalSnapshot` (сырые
 `external*` строки) → `InstrumentExternalRules`.
 
 `external*`-поля snapshot сохраняются как есть (`externalTickSize`,
-`externalLotSize`, `externalMinSize`, `externalContractValue`,
-`externalMaxLeverage`, `externalState` и др.). Доменные проекции
-резолвятся при материализации модели:
+`externalLotSize`, `externalMinSize`, `externalContractValue` и
+др.). Доменные проекции резолвятся при материализации модели:
 
-- `externalState` → `InstrumentExternalRules.Status` (`LIVE` /
-  `SUSPEND` / `PREOPEN` / `EXPIRED` / `TEST` / `UNKNOWN`).
 - сырой тип инструмента → `InstrumentType` (`SWAP` / `FUTURES` /
   `SPOT` / `MARGIN` / `OPTION` / `UNKNOWN`).
 - сырой тип контракта → `ContractType` (`LINEAR` / `INVERSE` /
@@ -63,23 +60,27 @@ contracts = baseQty / ctVal
 | `ctVal` | `externalContractValue` |
 | `ctValCcy` | `externalContractValueCurrency` |
 | `ctType` | raw → `contractType` (резолв) |
-| `lever` | `externalMaxLeverage` |
-| `state` | raw → `Status` (резолв) |
 
-### OKX status resolver
+### Разграничение со снапшотом инструмента (шаг 1)
 
-| OKX raw `state` | Domain `Status` |
-|---|---|
-| `live` | `LIVE` |
-| `suspend` | `SUSPEND` |
-| `preopen` | `PREOPEN` |
-| `expired` | `EXPIRED` |
-| `test` | `TEST` |
-| unknown | `UNKNOWN` |
+Биржевые `state`/`lever` в шаге 1 потребляются доменным
+`Instrument` (`externalStatus`/`externalLeverage`) через граничный
+`InstrumentExternalSnapshot` — `docs/models/mapping/Instrument.md`.
+Здесь (rules-маппинг) они больше **не** маппятся: rules отложена за
+пределы шага 1 и описывает sizing/rounding-правила. Поля
+`externalState`/`externalMaxLeverage` и проекция `Status` в модели
+`InstrumentExternalRules` сохранены, но их сорсинг при
+материализации rules и соотнесение с биржевыми полями `Instrument`
+(в т.ч. возможный дубль/удаление) — открытый вопрос INSTR-Q2 (роль
+`externalLeverage` как биржевого потолка плеча, валидация рабочего
+плеча) и INSTR-Q1 (снапшот-концепция rules).
 
 ### Не маппимые поля OKX
 
-`instFamily`, `uly`, `baseCcy`/`quoteCcy`/`settleCcy` (приходят в
+`state`/`lever` (в шаге 1 → доменный `Instrument`:
+`externalStatus`/`externalLeverage`, через
+`InstrumentExternalSnapshot`; разграничение выше), `instFamily`,
+`uly`, `baseCcy`/`quoteCcy`/`settleCcy` (приходят в
 `InstrumentExternalSnapshot` — граничный снапшот инструмента, не в
 этой модели; разграничение —
 `docs/models/domain/core/Instrument.md`), `ctMult`,

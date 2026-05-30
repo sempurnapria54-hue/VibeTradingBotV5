@@ -28,10 +28,12 @@
 | `exchangeId` | `Long` | Внутренний ID биржи (`Exchange.id`). |
 | `externalId` | `String` | Имя инструмента на бирже (OKX `instId`), например `ETH-USDT-SWAP`. |
 | `externalType` | `String` | Тип инструмента на бирже: `SPOT`/`MARGIN`/`SWAP`/`FUTURES`/`OPTION`. |
-| `status` | `Status` | Нормализованный статус жизненного цикла инструмента. |
+| `status` | `Status` | Нормализованный статус жизненного цикла инструмента (онбординг-статус системы). |
+| `externalStatus` | `String` | Биржевой статус инструмента (сырой). Источник — OKX `state` из снапшота. Не путать с онбординг-`status`. |
 | `marginMode` | `MarginMode` | Режим маржи (нормализованный enum). |
 | `externalMarginMode` | `String` | Сырой режим маржи биржи (`cross`/`isolated`). |
-| `leverage` | `Integer` | Плечо. |
+| `leverage` | `Integer` | Рабочее плечо инструмента; **задаётся при создании инструмента**, не из снапшота. |
+| `externalLeverage` | `String` | Биржевое значение плеча (сырое). Источник — OKX `lever` из снапшота. |
 | `plannedCandleStartDate` | `Long` | Плановая нижняя граница истории свечей (UTC, мс): до неё пагинирует `BACKFILL` свечей. Конфигурируемый горизонт, **общий для всех таймфреймов** инструмента (не на группу); дефолт — из конфига (на `CODE`). См. `docs/models/domain/other/CandleGroup.md`, `docs/lifecycles/CandleGroup.md`. |
 | `candleGroups` | `List<CandleGroup>` | Группы свечей по таймфреймам инструмента (1:many, без промежуточного объекта; см. `docs/models/domain/other/CandleGroup.md`). |
 
@@ -58,30 +60,41 @@
 
 ## Биржевое воплощение и справочные поля
 
-`Instrument` несёт только идентичность и торговую конфигурацию
-(`externalId`, `externalType`, `marginMode`, `leverage`) и плановый
-горизонт свечей (`plannedCandleStartDate`). Справочные поля
+`Instrument` несёт идентичность, торговую конфигурацию (`externalId`,
+`externalType`, `marginMode`, `externalMarginMode`, `leverage`),
+биржевые поля из снапшота (`externalStatus`, `externalLeverage`) и
+плановый горизонт свечей (`plannedCandleStartDate`). Биржевые
+`externalStatus` (OKX `state`) и `externalLeverage` (OKX `lever`)
+приходят в граничном `InstrumentExternalSnapshot` (класс
+`domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot`)
+и **персистятся** на домен; рабочее `leverage` (`Integer`) задаётся
+при создании инструмента, не из снапшота. Справочные поля
 спецификации биржи (base/quote/settle currency, `lotSz`, `minSz`,
 `ctVal`, `ctMult`, `tickSz`) на доменном `Instrument` **не
-хранятся** — они приходят в граничном `InstrumentExternalSnapshot`
-(класс
-`domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot`)
+хранятся** — они приходят в `InstrumentExternalSnapshot`
 **транзиентно** и в шаге 1 персистентного дома не имеют. Mapping
 snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
-только идентичность).
+идентичность + `externalStatus` + `externalLeverage`).
 
 > **Разграничение `Instrument` ↔ `InstrumentExternalSnapshot` ↔
-> `InstrumentExternalRules` (шаг 1).** Справочные поля
-> (base/quote/settle, sizes) для шага 1 живут только в транзиентном
+> `InstrumentExternalRules` (шаг 1).** Биржевые `externalStatus`
+> (OKX `state`) и `externalLeverage` (OKX `lever`) приходят в
+> транзиентном `InstrumentExternalSnapshot` и **персистятся** на
+> `Instrument`. Справочные поля спецификации (base/quote/settle,
+> sizes) для шага 1 живут только в транзиентном
 > `InstrumentExternalSnapshot`; персистентного дома у них нет.
-> Модель `InstrumentExternalRules` (торговые ограничения: tick/lot/
-> min/max sizes, max leverage, статус) **отложена** за пределы
-> шага 1 (округление/sizing/риск — поздние шаги; backlog п.9) и на
-> base/quote/settle больше не претендует
-> (`docs/models/domain/other/InstrumentExternalRules.md`). Как
-> снапшот-концепция ляжет на `InstrumentExternalRules` и не
-> потребуется ли ренейм rules — открытый вопрос INSTR-Q1
-> (`.claude/work/questions/open-questions.md`).
+> Модель `InstrumentExternalRules` (sizing/rounding-правила:
+> tick/lot/min sizes, max-order sizes, `ctVal`, max leverage,
+> торгуемость) **отложена** за пределы шага 1 (округление/sizing/
+> риск — поздние шаги; backlog п.9) и на base/quote/settle больше
+> не претендует (`docs/models/domain/other/InstrumentExternalRules.md`).
+> Как снапшот-концепция ляжет на `InstrumentExternalRules` и не
+> потребуется ли ренейм — открытый вопрос INSTR-Q1; как биржевые
+> `externalStatus`/`externalLeverage` на `Instrument` соотносятся с
+> rules-полями (`externalState`/`externalMaxLeverage`/`Status`),
+> роль `externalLeverage` как биржевого потолка плеча и валидация
+> рабочего `leverage` (нарушение → `HOLD`) — открытый вопрос
+> INSTR-Q2 (`.claude/work/questions/open-questions.md`).
 
 ## Персистентность
 
@@ -94,9 +107,11 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
   (uk_instrument_exchange_id_external_id).
 - `internal_id`, `exchange_id`, `external_id`, `external_type`,
   `status`, `margin_mode`, `leverage` — `NOT NULL`;
-  `external_margin_mode`, `planned_candle_start_date` — nullable
+  `external_margin_mode`, `planned_candle_start_date`,
+  `external_status`, `external_leverage` — nullable
   (`planned_candle_start_date` проставляется при онбординге из
-  конфига).
+  конфига; `external_status`/`external_leverage` — при синхронизации
+  спецификации, переход `SYNC`).
 - `internal_id`, `exchange_id`, `margin_mode` — `updatable = false`
   (неизменны после создания).
 - `candleGroups` — `OneToMany` (mappedBy `instrument`), cascade
@@ -110,4 +125,7 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
 - Mapping snapshot↔domain — `docs/models/mapping/Instrument.md`.
 - Торговые правила инструмента (отложены за пределы шага 1) —
   `docs/models/domain/other/InstrumentExternalRules.md`.
+- Валидация рабочего `leverage` и роль `externalLeverage` как
+  биржевого потолка (отложено за пределы шага 1) — открытый вопрос
+  INSTR-Q2 (`.claude/work/questions/open-questions.md`).
 - Audit-база — `docs/models/domain/other/Auditable.md`.

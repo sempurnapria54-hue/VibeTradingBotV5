@@ -19,9 +19,15 @@
 > инструмента (base/quote/settle) эта модель **не держит** — они
 > приходят в транзиентном `InstrumentExternalSnapshot` (см.
 > `docs/models/domain/core/Instrument.md`,
-> `docs/models/mapping/Instrument.md`). Как снапшот-концепция ляжет
-> на эту модель и не потребуется ли ренейм — открытый вопрос
-> INSTR-Q1 (`.claude/work/questions/open-questions.md`).
+> `docs/models/mapping/Instrument.md`). Биржевые `state`/`lever`
+> (OKX) с шага 1 также живут на `Instrument`
+> (`externalStatus`/`externalLeverage`) и через эту модель не идут;
+> соотнесение с rules-полями `externalState`/`externalMaxLeverage`/
+> `Status` (в т.ч. сорсинг при материализации rules) и роль
+> `externalLeverage` как биржевого потолка плеча — открытый вопрос
+> INSTR-Q2. Как снапшот-концепция ляжет на эту модель и не
+> потребуется ли ренейм — открытый вопрос INSTR-Q1
+> (`.claude/work/questions/open-questions.md`).
 
 Используется для:
 
@@ -71,8 +77,12 @@ runtime-логики.
 
 ### `Status`
 `LIVE`, `SUSPEND`, `PREOPEN`, `EXPIRED`, `TEST`, `UNKNOWN`.
-Нормализованный статус инструмента; источник — `externalState`. Маппинг
-сырого статуса OKX — `docs/models/mapping/InstrumentExternalRules.md`.
+Нормализованный статус инструмента; источник — `externalState`.
+Биржевой `state` в шаге 1 потребляется доменным `Instrument`
+(`externalStatus`, сырой); сорсинг `externalState`/`Status` при
+материализации rules и соотнесение с `Instrument.externalStatus` —
+открытый вопрос INSTR-Q2 (см.
+`docs/models/mapping/InstrumentExternalRules.md`).
 
 ### `InstrumentType`
 `SWAP` (бессрочный своп / perpetual), `FUTURES` (фьючерс с датой

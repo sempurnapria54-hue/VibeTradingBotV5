@@ -32,13 +32,20 @@ exception. `null` означает «не найдено в этом источ�
 ### Граничные `*ExternalSnapshot`
 
 Маппер из client-модели возвращает validated `*ExternalSnapshot`
-(`InstrumentExternalRulesExternalSnapshot`, `MarketPriceDataExternalSnapshot`,
-`BalanceContainerExternalSnapshot`, `CandleExternalSnapshot`, order/algo/
-position external snapshots) — external-поля модели, без доменных
-enum/нормализаций (они резолвятся при материализации). Это и есть
-единственное, что выходит за `ClientService`. Для свечей это
-означает: OKX-массив проходит границу как `CandleExternalSnapshot`,
-а не сырым массивом (`docs/models/mapping/Candle.md`).
+(`InstrumentExternalSnapshot`, `InstrumentExternalRulesExternalSnapshot`,
+`MarketPriceDataExternalSnapshot`, `BalanceContainerExternalSnapshot`,
+`CandleExternalSnapshot`, order/algo/position external snapshots) —
+external-поля модели, без доменных enum/нормализаций (они
+резолвятся при материализации). Это и есть единственное, что
+выходит за `ClientService`. Для свечей это означает: OKX-массив
+проходит границу как `CandleExternalSnapshot`, а не сырым массивом
+(`docs/models/mapping/Candle.md`). Граница онбординга инструмента
+(шаг 1) — `InstrumentExternalSnapshot`: идентичность + биржевые
+`externalStatus`/`externalLeverage` (персистятся на `Instrument`) +
+справочные sizing-поля (транзиентны в шаге 1); см.
+`docs/models/mapping/Instrument.md`.
+`InstrumentExternalRulesExternalSnapshot` относится к отложенной
+rules-модели (backlog п.9).
 
 ### Balance — без normal null
 

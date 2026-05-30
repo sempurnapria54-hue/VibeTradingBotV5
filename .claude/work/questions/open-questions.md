@@ -11,11 +11,12 @@
 обнаруженный при составлении карты артефактов миграции процессов
 (проход 1, 2026-05-27), и четыре вопроса от миграции API-кластера OKX
 (2026-05-28; OKX-Q1..Q4 — TradeFill, TradeFillsArchive, AccountBill /
-DealCashFlow, WS-каналы как отдельный заход). Два вопроса — из шага 1
+DealCashFlow, WS-каналы как отдельный заход). Три вопроса — из шага 1
 Фазы 1 (2026-05-30): INSTR-Q1 (`GAPS_CLOSE_2` — разграничение
-`Instrument` / снапшот / `InstrumentExternalRules`) и ORCH-Q1 (вынос
-процесса `candle-loading` — владелец оркестрации онбординга и
-загрузки свечей).
+`Instrument` / снапшот / `InstrumentExternalRules`), INSTR-Q2
+(`GAPS_CLOSE_3` — валидация рабочего плеча и роль `externalLeverage`)
+и ORCH-Q1 (вынос процесса `candle-loading` — владелец оркестрации
+онбординга и загрузки свечей).
 
 История закрытых вопросов пайплайна:
 
@@ -144,14 +145,18 @@ strategy-tree), но как самостоятельный enum может жи�
 ### INSTR-Q1. Как снапшот-концепция ляжет на `InstrumentExternalRules` (и нужен ли ренейм)
 
 Шаг 1 (поток рыночных данных) развёл модель инструмента так: домен
-`Instrument` держит только идентичность (+ онбординг-статус,
-`plannedCandleStartDate`), а справочные поля спецификации
-(base/quote/settle, sizes, `state`, `lever`) приходят транзиентно в
-`InstrumentExternalSnapshot` и в шаге 1 персистентно **не**
-хранятся. Модель `InstrumentExternalRules` (persisted справочные
-правила) для шага 1 отложена (округление/sizing/риск — поздние
-шаги; backlog п.9) и на base/quote/settle больше не претендует —
-этим снят дубль Н1 (`DOCS_CHECK_2`).
+`Instrument` держит идентичность (+ онбординг-статус,
+`plannedCandleStartDate`, биржевые `externalStatus`/`externalLeverage`
+из снапшота, рабочее `leverage` из создания), а справочные
+sizing/rounding-поля спецификации (base/quote/settle, sizes)
+приходят транзиентно в `InstrumentExternalSnapshot` и в шаге 1
+персистентно **не** хранятся. Биржевые `state`/`lever` (OKX) с
+шага 1 персистятся на `Instrument` (`externalStatus`/
+`externalLeverage`), а не на rules (`GAPS_CLOSE_3`). Модель
+`InstrumentExternalRules` (persisted sizing/rounding-правила) для
+шага 1 отложена (округление/sizing/риск — поздние шаги; backlog
+п.9) и на base/quote/settle больше не претендует — этим снят дубль
+Н1 (`DOCS_CHECK_2`).
 
 Не решено (всплывёт при материализации rules на поздних шагах): как
 именно снапшот-концепция (`InstrumentExternalSnapshot` —
@@ -171,6 +176,37 @@ strategy-tree), но как самостоятельный enum может жи�
 `docs/models/mapping/Instrument.md`,
 `docs/models/domain/other/InstrumentExternalRules.md`,
 `docs/models/mapping/InstrumentExternalRules.md`, backlog п.9.
+
+### INSTR-Q2. Валидация рабочего плеча и роль `externalLeverage`
+
+Рабочее `leverage` инструмента (`Instrument.leverage`, `Integer`,
+задаётся при создании) не должно превышать конфиговый максимум
+плеча. При создании / обновлении / прочих операциях с инструментом
+превышение трактуется как нарушение торгового правила: инструмент
+**не выпускается на биржу** — переводится в `HOLD`. Шаг 1 (поток
+рыночных данных, онбординг-путь `CREATED → SYNC → CANDLES_LOADING →
+ACTIVE`) этого не требует и **не блокируется** — вопрос
+прорабатывается позже.
+
+Открытые аспекты:
+- Роль биржевого `externalLeverage` (OKX `lever`, сырое значение на
+  `Instrument`) как биржевого потолка плеча: выступает ли он
+  верхней границей для рабочего `leverage` и как соотносится с
+  конфиговым максимумом и с rules-полем `externalMaxLeverage`
+  (`docs/rules/trading-constraints.md` — лимит плеча сейчас сослан
+  на `InstrumentExternalRules.externalMaxLeverage`;
+  `docs/models/domain/other/InstrumentExternalRules.md`).
+- Состояние / действие `HOLD` в lifecycle инструмента: в текущем
+  материализованном онбординг-пути шага 1 `HOLD` нет
+  (`docs/lifecycles/Instrument.md`; периферийные статусы отложены —
+  backlog п.9). Нужен ли переход в `HOLD` при нарушении правила
+  плеча и кто его инициирует — не решено.
+
+Связано: `docs/models/domain/core/Instrument.md` (`leverage`,
+`externalLeverage`), `docs/lifecycles/Instrument.md`,
+`docs/rules/trading-constraints.md`,
+`docs/models/domain/other/InstrumentExternalRules.md`,
+`docs/models/mapping/InstrumentExternalRules.md`, INSTR-Q1.
 
 ### ORCH-Q1. Владелец оркестрации онбординга инструмента и загрузки свечей
 
