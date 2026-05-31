@@ -1,40 +1,27 @@
 package com.example.tradingbot.persistence.repository;
 
 import com.example.tradingbot.persistence.model.candle.CandleEntity;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
-import java.util.Optional;
-
 public interface CandleRepository extends JpaRepository<CandleEntity, Long> {
 
-    long countByCandleGroupIdAndTimestampBetween(Long candleGroupId, long from, long to);
+    long countByCandleGroupId(Long candleGroupId);
 
-    @Query("""
-            select min(c.timestamp)
-            from CandleEntity c
-            where c.candleGroupId = :groupId
-            """)
-    Optional<Long> findMinTimestampByCandleGroupId(@Param("groupId") Long groupId);
+    @Query("select min(c.openTimestamp) from CandleEntity c where c.candleGroupId = :groupId")
+    Long findMinOpenTimestamp(@Param("groupId") Long candleGroupId);
 
-    @Query("""
-            select max(c.timestamp)
-            from CandleEntity c
-            where c.candleGroupId = :groupId
-            """)
-    Optional<Long> findMaxTimestampByCandleGroupId(@Param("groupId") Long groupId);
+    @Query("select max(c.openTimestamp) from CandleEntity c where c.candleGroupId = :groupId")
+    Long findMaxOpenTimestamp(@Param("groupId") Long candleGroupId);
 
-    @Query("""
-            select c.timestamp
-            from CandleEntity c
-            where c.candleGroupId = :groupId and c.timestamp between :from and :to
-            order by c.timestamp asc
-            """)
-    List<Long> findTimestampsByCandleGroupIdAndTimestampBetweenOrderByTimestampAsc(
-            @Param("groupId") Long groupId,
-            @Param("from") long from,
-            @Param("to") long to
-    );
+    @Query("select count(c) from CandleEntity c "
+            + "where c.candleGroupId = :groupId and c.openTimestamp between :from and :to")
+    long countInRange(@Param("groupId") Long candleGroupId, @Param("from") Long fromMillis, @Param("to") Long toMillis);
+
+    @Query("select c.openTimestamp from CandleEntity c "
+            + "where c.candleGroupId = :groupId and c.openTimestamp between :from and :to")
+    List<Long> findOpenTimestampsInRange(@Param("groupId") Long candleGroupId,
+                                         @Param("from") Long fromMillis, @Param("to") Long toMillis);
 }

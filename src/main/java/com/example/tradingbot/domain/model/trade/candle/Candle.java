@@ -1,55 +1,46 @@
 package com.example.tradingbot.domain.model.trade.candle;
 
 import com.example.tradingbot.domain.model.Auditable;
+import java.math.BigDecimal;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.math.BigDecimal;
-
 /**
- * Одна свеча рынка в UTC.
+ * Одна свеча рынка (OHLCV) в UTC, относящаяся к группе свечей одного
+ * инструмента и таймфрейма (CandleGroup). База расчёта индикаторов и
+ * анализа рынка. Признак закрытия (confirm) не хранится: в БД попадают
+ * только закрытые свечи (правило производящей стороны, CandleJob). См.
+ * docs/models/domain/other/Candle.md, docs/models/mapping/Candle.md.
  */
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Candle extends Auditable {
 
-    /**
-     * Внутренний идентификатор свечи.
-     */
+    /** Внутренний идентификатор свечи. */
     private Long id;
 
-    /**
-     * Идентификатор группы свечей, к которой относится свеча.
-     */
+    /** ID группы свечей (CandleGroup.id). */
     private Long candleGroupId;
 
-    /**
-     * Время открытия свечи в UTC миллисекундах.
-     */
+    /** Время открытия свечи, UTC миллисекунды. */
     private Long openTimestamp;
 
-    /**
-     * Цена открытия свечи.
-     */
+    /** Цена открытия. */
     private BigDecimal open;
 
-    /**
-     * Максимальная цена за интервал свечи.
-     */
+    /** Максимум за интервал. */
     private BigDecimal high;
 
-    /**
-     * Минимальная цена за интервал свечи.
-     */
+    /** Минимум за интервал. */
     private BigDecimal low;
 
-    /**
-     * Цена закрытия свечи.
-     */
+    /** Цена закрытия. */
     private BigDecimal close;
 
-    /**
-     * Объём торгов за интервал свечи.
-     */
+    /** Объём торгов за интервал. */
     private BigDecimal volume;
 }

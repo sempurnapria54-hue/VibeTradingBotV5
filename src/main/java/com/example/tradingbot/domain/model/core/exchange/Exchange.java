@@ -7,7 +7,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Биржа, с которой работает торговый бот.
+ * Биржа, с которой работает бот: идентичность, точка подключения и
+ * статус использования. Инструменты ссылаются на биржу через
+ * {@code Instrument.exchangeId} (docs/models/domain/core/Exchange.md).
  */
 @Getter
 @Setter
@@ -15,32 +17,23 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Exchange extends Auditable {
 
-    /**
-     * Внутренний идентификатор биржи.
-     */
+    /** Внутренний идентификатор биржи. */
     private Long id;
-    /**
-     * Межсервисный идентификатор биржи.
-     */
+
+    /** Межсервисный идентификатор биржи. */
     private String internalId;
-    /**
-     * Уникальное имя биржи (например OKX).
-     */
+
+    /** Уникальное имя биржи (например, OKX). */
     private String name;
-    /**
-     * Базовый URL для API биржи.
-     */
+
+    /** Базовый URL API биржи. */
     private String baseUrl;
-    /**
-     * Текущий статус подключения/использования биржи.
-     */
+
+    /** Текущий статус подключения/использования биржи. */
     private Status status;
 
+    /** Статус подключения/использования биржи. */
     public enum Status {
-        CREATED,
-        PENDING,
-        ACTIVE,
-        CLOSED,
-        ERROR
+        CREATED, PENDING, ACTIVE, CLOSED, ERROR
     }
 }

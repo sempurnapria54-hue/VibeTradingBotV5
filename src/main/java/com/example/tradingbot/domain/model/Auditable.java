@@ -1,44 +1,36 @@
 package com.example.tradingbot.domain.model;
 
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.OffsetDateTime;
-
 /**
- * Общие audit-поля доменных сущностей.
+ * Базовый класс audit-полей доменных сущностей. Системные поля
+ * (createdAt/modifiedAt/createdBy/modifiedBy) проставляет
+ * persistence-слой (JPA auditing); биржевые
+ * (externalCreatedAt/externalModifiedAt) — код, производящий данные,
+ * из таймстемпов источника. Время — везде UTC
+ * (docs/rules/time-utc.md, docs/models/domain/other/Auditable.md).
  */
 @Getter
 @Setter
-public class Auditable {
+public abstract class Auditable {
 
-    /**
-     * Дата и время создания записи в системе.
-     */
+    /** Время создания записи в системе. */
     private OffsetDateTime createdAt;
 
-    /**
-     * Пользователь или сервис, создавший запись.
-     */
+    /** Пользователь/сервис, создавший запись. */
     private String createdBy;
 
-    /**
-     * Дата и время последнего изменения записи в системе.
-     */
+    /** Время последнего изменения в системе. */
     private OffsetDateTime modifiedAt;
 
-    /**
-     * Пользователь или сервис, выполнивший последнее изменение.
-     */
+    /** Пользователь/сервис последнего изменения. */
     private String modifiedBy;
 
-    /**
-     * Дата и время создания записи на стороне биржи.
-     */
+    /** Время создания записи на стороне биржи (носитель свежести). */
     private OffsetDateTime externalCreatedAt;
 
-    /**
-     * Дата и время последнего обновления записи на стороне биржи.
-     */
+    /** Время последнего обновления на стороне биржи (носитель свежести). */
     private OffsetDateTime externalModifiedAt;
 }

@@ -3,6 +3,7 @@ package com.example.tradingbot.persistence.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.CreatedBy;
@@ -11,51 +12,37 @@ import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.OffsetDateTime;
-
+/**
+ * Базовый persistence-класс audit-полей. Системные поля проставляет
+ * JPA auditing (см. {@code JpaAuditConfig}); биржевые
+ * external*-поля — код, производящий данные. Соответствует доменному
+ * {@code Auditable} (docs/models/domain/other/Auditable.md). Время — UTC.
+ */
 @Getter
 @Setter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class AuditableEntity {
 
-    /**
-     * Дата и время создания записи.
-     */
     @CreatedDate
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
-    /**
-     * Пользователь/сервис, создавший запись.
-     */
     @CreatedBy
-    @Column(name = "created_by")
+    @Column(name = "created_by", updatable = false)
     private String createdBy;
 
-    /**
-     * Дата и время последнего изменения записи.
-     */
     @LastModifiedDate
     @Column(name = "modified_at")
     private OffsetDateTime modifiedAt;
 
-    /**
-     * Пользователь/сервис, выполнивший последнее изменение.
-     */
     @LastModifiedBy
     @Column(name = "modified_by")
     private String modifiedBy;
 
-    /**
-     * Дата и время создания записи на бирже
-     */
     @Column(name = "external_created_at")
     private OffsetDateTime externalCreatedAt;
 
-    /**
-     * Дата и время последнего обновления записи на бирже
-     */
     @Column(name = "external_modified_at")
     private OffsetDateTime externalModifiedAt;
 }

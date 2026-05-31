@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: tradingbot
+  config:
+    import:
+      - vault://secret/tradingbot/okx
+      - vault://secret/tradingbot/postgres
+  cloud:
+    bootstrap:
+      enabled: false
+    vault:
+      enabled: true
+      uri: http://localhost:8200
+      authentication: TOKEN
+      token: ${VAULT_TOKEN:}
+      kv:
+        enabled: true
+        backend: secret
+        application-name: tradingbot
+  datasource:
+    url: ${DATASOURCE_URL}
+    username: ${DATASOURCE_USERNAME}
+    password: ${DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: false
+
+reconcile:
+  enabled: false
+  dry-run-on-startup: false
+  cancel-flow:
+    enabled: false
+
+synchronize-execution-environment:
+  reports:
+    retention-days: 14
+
+
+candle-groups:
+  job:
+    enabled: false
+    fixed-delay-ms: 10000
+    max-groups-per-run: 10
+    lease-duration-sec: 60
+    max-attempts-before-error: 5
+    batch-limit: 300
+    integrity-check-mode: NONE
+    sync-integrity-every-n-runs: 0
+    repair-leaf-bars: 64
+    lease-extend-every-batches: 1
+    tail-overlap-bars:
+      1m: 300
+      5m: 300
+      1H: 240
+      1Dutc: 120
+
+okx:
+  api-key: ${OKX_API_KEY}
+  secret-key: ${OKX_SECRET_KEY}
+  passphrase: ${OKX_PASSPHRASE}
+  base-url: ${OKX_BASE_URL:https://www.okx.com}
+
+# Справочник ожидаемых ключей в Vault (без прямых vault:// ссылок).
+vault-secret-keys:
+  okx:
+    api-key: '{OKX_API_KEY}'
+    secret-key: '{OKX_SECRET_KEY}'
+    passphrase: '{OKX_PASSPHRASE}'
+    base-url: '{OKX_BASE_URL}'
+  postgres:
+    url: '{DATASOURCE_URL}'
+    username: '{DATASOURCE_USERNAME}'
+    password: '{DATASOURCE_PASSWORD}'
+
+server:
+  port: 8080

@@ -1,20 +1,17 @@
 package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
 import com.example.tradingbot.mapping.InstrumentMapper;
-import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import com.example.tradingbot.persistence.repository.InstrumentRepository;
-import com.example.tradingbot.persistence.specification.InstrumentSpecification;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_ALREADY_EXISTS;
-import static com.example.tradingbot.util.Constant.ErrorCode.INSTRUMENT_NOT_FOUND;
-
+/**
+ * Граница domain ↔ persistence для {@link Instrument}.
+ */
 @Service
 @RequiredArgsConstructor
 public class InstrumentDataService {
@@ -24,42 +21,26 @@ public class InstrumentDataService {
 
     @Transactional
     public Instrument save(Instrument instrument) {
-        InstrumentEntity data = mapper.domainToData(instrument);
-        InstrumentEntity saved = repository.save(data);
-        return mapper.dataToDomain(saved);
+        return mapper.entityToDomain(repository.save(mapper.domainToEntity(instrument)));
     }
 
-    public void checkNotExists(Long exchangeId, String externalId) {
-        if (repository.existsByExchangeIdAndExternalId(exchangeId, externalId)) {
-            throw new RuntimeException(INSTRUMENT_ALREADY_EXISTS);
-        }
+    @Transactional(readOnly = true)
+    public Optional<Instrument> findById(Long id) {
+        return repository.findById(id).map(mapper::entityToDomain);
     }
 
-    public Instrument findRequiredByInternalId(String internalId) {
-        return repository.findByInternalId(internalId)
-                         .map(mapper::dataToDomain)
-                         .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
+    @Transactional(readOnly = true)
+    public Optional<Instrument> findByInternalId(String internalId) {
+        return repository.findByInternalId(internalId).map(mapper::entityToDomain);
     }
 
-    public Instrument findRequiredById(Long id) {
-        return repository.findById(id)
-                         .map(mapper::dataToDomain)
-                         .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
+    @Transactional(readOnly = true)
+    public Optional<Instrument> findByExchangeIdAndExternalId(Long exchangeId, String externalId) {
+        return repository.findByExchangeIdAndExternalId(exchangeId, externalId).map(mapper::entityToDomain);
     }
 
-    public boolean existsById(Long id) {
-        return repository.existsById(id);
-    }
-
-    public Instrument findRequiredByDealId(Long dealId) {
-        return repository.findByDealId(dealId)
-                         .map(mapper::dataToDomain)
-                         .orElseThrow(() -> new RuntimeException(INSTRUMENT_NOT_FOUND));
-    }
-
-    public Page<Instrument> search(InstrumentSearchParams searchParams, Pageable pageable) {
-        Page<InstrumentEntity> data =
-                repository.findAll(InstrumentSpecification.bySearchParams(searchParams), pageable);
-        return mapper.dataToDomain(data);
+    @Transactional(readOnly = true)
+    public List<Instrument> findByStatus(Instrument.Status status) {
+        return repository.findByStatus(status).stream().map(mapper::entityToDomain).toList();
     }
 }

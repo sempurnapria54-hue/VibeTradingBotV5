@@ -1,78 +1,52 @@
 package com.example.tradingbot.persistence.model.candle;
 
+import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.persistence.model.AuditableEntity;
+import com.example.tradingbot.util.PriceConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.math.BigDecimal;
-
-import static com.example.tradingbot.util.Constant.Service.PRICE_PRECISION;
-import static com.example.tradingbot.util.Constant.Service.PRICE_SCALE;
-
+/**
+ * Persistence-проекция {@link Candle} (таблица candles). Свеча не
+ * входит в JPA-агрегат группы — связь через плоский FK candle_group_id.
+ * Идемпотентность загрузки — уникальность (candle_group_id,
+ * open_timestamp) во Flyway. confirm не хранится (только закрытые свечи).
+ */
 @Getter
 @Setter
-@NoArgsConstructor
 @Entity
-@Table(name = "candles", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_candle_group_id_open_timestamp", columnNames = {"candle_group_id", "open_timestamp"})
-})
+@Table(name = "candles")
 public class CandleEntity extends AuditableEntity {
 
-    /**
-     * Внутренний идентификатор свечи.
-     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
     private Long id;
 
-    /**
-     * Идентификатор группы свечей, к которой относится свеча.
-     */
-    @Column(name = "candle_group_id", nullable = false, updatable = false, insertable = false)
+    @Column(name = "candle_group_id", nullable = false, updatable = false)
     private Long candleGroupId;
 
-    /**
-     * Время открытия свечи в UTC миллисекундах.
-     */
     @Column(name = "open_timestamp", nullable = false)
     private Long openTimestamp;
 
-    /**
-     * Цена открытия свечи.
-     */
-    @Column(name = "open", nullable = false, precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    @Column(name = "open", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
     private BigDecimal open;
 
-    /**
-     * Максимальная цена за интервал свечи.
-     */
-    @Column(name = "high", nullable = false, precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    @Column(name = "high", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
     private BigDecimal high;
 
-    /**
-     * Минимальная цена за интервал свечи.
-     */
-    @Column(name = "low", nullable = false, precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    @Column(name = "low", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
     private BigDecimal low;
 
-    /**
-     * Цена закрытия свечи.
-     */
-    @Column(name = "close", nullable = false, precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    @Column(name = "close", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
     private BigDecimal close;
 
-    /**
-     * Объём торгов за интервал свечи.
-     */
-    @Column(name = "volume", precision = PRICE_PRECISION, scale = PRICE_SCALE)
+    @Column(name = "volume", precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
     private BigDecimal volume;
 }

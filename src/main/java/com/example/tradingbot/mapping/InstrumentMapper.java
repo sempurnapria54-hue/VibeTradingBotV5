@@ -1,112 +1,78 @@
 package com.example.tradingbot.mapping;
 
-import com.example.tradingbot.client.model.okx.request.InstrumentsRequest;
+import com.example.tradingbot.api.model.request.CreateInstrumentApiRequest;
+import com.example.tradingbot.api.model.response.InstrumentApiResponse;
+import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
-import com.example.tradingbot.domain.model.search_params.InstrumentSearchParams;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
-import com.example.tradingbot.rest.model.request.instrument.CreateInstrumentRequest;
-import com.example.tradingbot.rest.model.response.instrument.InstrumentPageResponse;
-import com.example.tradingbot.rest.model.response.instrument.InstrumentResponse;
 import org.mapstruct.BeanMapping;
-import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValueMappingStrategy;
-import org.springframework.data.domain.Page;
 
-import java.util.List;
+/**
+ * Маппинг инструмента между слоями (docs/models/mapping/Instrument.md):
+ * client DTO OKX → граничный {@link InstrumentExternalSnapshot}, затем
+ * частичное обновление доменного {@link Instrument} из снапшота
+ * (идентичность + биржевые externalStatus/externalLeverage; шаг 1).
+ */
+@Mapper(componentModel = "spring")
+public interface InstrumentMapper {
 
-@Mapper(componentModel = "spring", uses = CandleGroupMapper.class)
-public interface InstrumentMapper extends CommonMapper {
-
-    /**
-     * CLIENT
-     */
-
-    @Mapping(source = "externalType", target = "externalType")
-    @Mapping(source = "externalId", target = "externalId")
-    InstrumentsRequest domainSearchParamsToClientOkxRequest(InstrumentSearchParams source);
-
-    @Mapping(source = "instId", target = "externalId")
-    @Mapping(source = "instType", target = "externalType")
-    Instrument clientToDomain(
-            com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
-
-    List<Instrument> clientToDomain(
-            List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
-
-    @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "externalInstrumentId", source = "instId")
     @Mapping(target = "externalInstrumentType", source = "instType")
-    @Mapping(target = "baseCurrency", source = "baseCcy")
-    @Mapping(target = "quoteCurrency", source = "quoteCcy")
-    @Mapping(target = "settleCurrency", source = "settleCcy")
-    @Mapping(target = "lotSize", source = "lotSz", qualifiedByName = "stringToBigDecimal")
-    @Mapping(target = "minimumOrderSize", source = "minSz", qualifiedByName = "stringToBigDecimal")
-    @Mapping(target = "contractValue", source = "ctVal", qualifiedByName = "stringToBigDecimal")
-    @Mapping(target = "contractMultiplier", source = "ctMult", qualifiedByName = "stringToBigDecimal")
-    @Mapping(target = "priceTickSize", source = "tickSz", qualifiedByName = "stringToBigDecimal")
-    InstrumentExternalSnapshot clientToExternalSnapshot(
-            com.example.tradingbot.client.model.okx.response.InstrumentResponse source);
-
-    @IterableMapping(nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
-    List<InstrumentExternalSnapshot> clientToExternalSnapshot(
-            List<com.example.tradingbot.client.model.okx.response.InstrumentResponse> source);
-
+    @Mapping(target = "externalStatus", source = "state")
+    @Mapping(target = "externalLeverage", source = "lever")
+    @Mapping(target = "externalBaseCurrency", source = "baseCcy")
+    @Mapping(target = "externalQuoteCurrency", source = "quoteCcy")
+    @Mapping(target = "externalSettleCurrency", source = "settleCcy")
+    @Mapping(target = "externalLotSize", source = "lotSz")
+    @Mapping(target = "externalMinSize", source = "minSz")
+    @Mapping(target = "externalContractValue", source = "ctVal")
+    @Mapping(target = "externalContractMultiplier", source = "ctMult")
+    @Mapping(target = "externalTickSize", source = "tickSz")
+    InstrumentExternalSnapshot clientToSnapshot(InstrumentResponse response);
 
     /**
-     * REST
+     * Частичное обновление инструмента из снапшота: только поля шага 1
+     * (идентичность + биржевые статус/плечо). Прочие поля инструмента
+     * (id, internalId, exchangeId, leverage, marginMode, ...) не
+     * трогаются.
      */
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "externalId", source = "externalInstrumentId")
+    @Mapping(target = "externalType", source = "externalInstrumentType")
+    @Mapping(target = "externalStatus", source = "externalStatus")
+    @Mapping(target = "externalLeverage", source = "externalLeverage")
+    void updateFromSnapshot(@MappingTarget Instrument instrument, InstrumentExternalSnapshot snapshot);
 
-    @Mapping(target = "instrument", source = ".")
-    InstrumentResponse domainToRest(Instrument source);
+    /**
+     * Domain → entity. {@code candleGroups} не траверсируется маппером —
+     * группами управляет {@code CandleGroupDataService} (агрегат
+     * cascade всё равно объявлен на entity).
+     */
+    @Mapping(target = "candleGroups", ignore = true)
+    InstrumentEntity domainToEntity(Instrument instrument);
 
-    List<com.example.tradingbot.rest.model.response.instrument.Instrument> domainToRest(List<Instrument> source);
+    @Mapping(target = "candleGroups", ignore = true)
+    Instrument entityToDomain(InstrumentEntity entity);
 
-    @Mapping(target = "externalType", source = "type")
-    Instrument restToDomain(CreateInstrumentRequest request);
-
-    @Mapping(target = "externalType", source = "externalType")
+    /**
+     * Api → domain при заведении: статус, биржевые поля и группы свечей
+     * проставляются системой/онбордингом, не из запроса. marginMode —
+     * строка запроса → enum по имени.
+     */
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "internalId", source = "internalId")
+    @Mapping(target = "exchangeId", source = "exchangeId")
     @Mapping(target = "externalId", source = "externalId")
-    InstrumentSearchParams restToDomainSearchParams(
-            com.example.tradingbot.rest.model.request.instrument.search_params.InstrumentSearchParams source);
+    @Mapping(target = "externalType", source = "externalType")
+    @Mapping(target = "marginMode", source = "marginMode")
+    @Mapping(target = "externalMarginMode", source = "externalMarginMode")
+    @Mapping(target = "leverage", source = "leverage")
+    @Mapping(target = "plannedCandleStartDate", source = "plannedCandleStartDate")
+    Instrument apiToDomain(CreateInstrumentApiRequest request);
 
-    default InstrumentPageResponse domainToRest(Page<Instrument> result) {
-        if (result == null) {
-            return new InstrumentPageResponse(Page.empty());
-        }
-
-        return new InstrumentPageResponse(result.map(this::domainToRestModel));
-    }
-
-    com.example.tradingbot.rest.model.response.instrument.Instrument domainToRestModel(Instrument source);
-
-
-    /**
-     * DATA
-     */
-
-    InstrumentEntity domainToData(Instrument source);
-
-    Instrument dataToDomain(InstrumentEntity source);
-
-    List<Instrument> dataToDomain(List<InstrumentEntity> source);
-
-    default Page<Instrument> dataToDomain(Page<InstrumentEntity> data) {
-        if (data == null) {
-            return Page.empty();
-        }
-
-        return data.map(this::dataToDomain);
-    }
-
-
-    /**
-     * DOMAIN_COPY
-     */
-
-    @Mapping(target = "id", ignore = true)
-    void domainToDomainOnCreate(Instrument source, @MappingTarget Instrument target);
+    InstrumentApiResponse domainToApi(Instrument instrument);
 }

@@ -1,64 +1,55 @@
 package com.example.tradingbot.domain.model.core.instrument.external_snapshot;
 
-import lombok.Getter;
-import lombok.Setter;
-
-import java.math.BigDecimal;
+import lombok.Builder;
+import lombok.Value;
 
 /**
- * Внешний снапшот инструмента, полученный из OKX REST GET /public/instruments.
+ * Нормализованный граничный снапшот инструмента — единственное, что
+ * выходит за ClientService/adapter при онбординге (шаг 1). Несёт
+ * идентичность и биржевые externalStatus/externalLeverage (персистятся
+ * на Instrument), плюс справочные sizing-поля спецификации
+ * (транзиентны: в шаге 1 персистентного дома нет, INSTR-Q1). Все поля
+ * сырые (String), доменные нормализации резолвятся при материализации.
+ * См. docs/models/mapping/Instrument.md,
+ * docs/rules/raw-exchange-dto-boundary.md.
  */
-@Getter
-@Setter
+@Value
+@Builder
 public class InstrumentExternalSnapshot {
 
-    /**
-     * Идентификатор инструмента на бирже (instId), например ETH-USDT-SWAP.
-     */
-    private String externalInstrumentId;
+    /** Имя инструмента на бирже (OKX instId). */
+    String externalInstrumentId;
 
-    /**
-     * Тип инструмента на бирже (instType): SPOT/MARGIN/SWAP/FUTURES/OPTION.
-     */
-    private String externalInstrumentType;
+    /** Тип инструмента на бирже (OKX instType). */
+    String externalInstrumentType;
 
-    /**
-     * Базовая валюта инструмента (baseCcy), например ETH.
-     */
-    private String baseCurrency;
+    /** Биржевой статус инструмента (OKX state). */
+    String externalStatus;
 
-    /**
-     * Котируемая валюта (quoteCcy), например USDT.
-     */
-    private String quoteCurrency;
+    /** Биржевое плечо (OKX lever). */
+    String externalLeverage;
 
-    /**
-     * Валюта расчётов по инструменту (settleCcy).
-     */
-    private String settleCurrency;
+    /** Базовая валюта (OKX baseCcy) — транзиентна в шаге 1. */
+    String externalBaseCurrency;
 
-    /**
-     * Шаг количества (lotSz) в терминах биржи.
-     */
-    private BigDecimal lotSize;
+    /** Котируемая валюта (OKX quoteCcy) — транзиентна в шаге 1. */
+    String externalQuoteCurrency;
 
-    /**
-     * Минимальный размер ордера (minSz).
-     */
-    private BigDecimal minimumOrderSize;
+    /** Валюта расчётов (OKX settleCcy) — транзиентна в шаге 1. */
+    String externalSettleCurrency;
 
-    /**
-     * Стоимость контракта (ctVal), актуально для деривативов.
-     */
-    private BigDecimal contractValue;
+    /** Размер лота (OKX lotSz) — транзиентен в шаге 1. */
+    String externalLotSize;
 
-    /**
-     * Мультипликатор контракта (ctMult), актуально для деривативов.
-     */
-    private BigDecimal contractMultiplier;
+    /** Минимальный размер ордера (OKX minSz) — транзиентен в шаге 1. */
+    String externalMinSize;
 
-    /**
-     * Шаг цены (tickSz).
-     */
-    private BigDecimal priceTickSize;
+    /** Стоимость контракта (OKX ctVal) — транзиентна в шаге 1. */
+    String externalContractValue;
+
+    /** Множитель контракта (OKX ctMult) — транзиентен в шаге 1. */
+    String externalContractMultiplier;
+
+    /** Шаг цены (OKX tickSz) — транзиентен в шаге 1. */
+    String externalTickSize;
 }

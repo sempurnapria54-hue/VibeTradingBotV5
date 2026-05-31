@@ -1,82 +1,52 @@
 spring:
   application:
     name: tradingbot
-  config:
-    import:
-      - vault://secret/tradingbot/okx
-      - vault://secret/tradingbot/postgres
-  cloud:
-    bootstrap:
-      enabled: false
-    vault:
-      enabled: true
-      uri: http://localhost:8200
-      authentication: TOKEN
-      token: ${VAULT_TOKEN:}
-      kv:
-        enabled: true
-        backend: secret
-        application-name: tradingbot
   datasource:
-    url: ${DATASOURCE_URL}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tradingbot}
+    username: ${DB_USERNAME:tradingbot}
+    password: ${DB_PASSWORD:tradingbot}
   jpa:
+    open-in-view: false
     hibernate:
-      ddl-auto: validate
+      # Источник истины схемы — Flyway-миграции, Hibernate схему не правит.
+      ddl-auto: none
     properties:
       hibernate:
         jdbc:
           time_zone: UTC
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/migration
 
-reconcile:
-  enabled: false
-  dry-run-on-startup: false
-  cancel-flow:
-    enabled: false
-
-synchronize-execution-environment:
-  reports:
-    retention-days: 14
-
-
-candle-groups:
-  job:
-    enabled: false
-    fixed-delay-ms: 10000
-    max-groups-per-run: 10
-    lease-duration-sec: 60
-    max-attempts-before-error: 5
-    batch-limit: 300
-    integrity-check-mode: NONE
-    sync-integrity-every-n-runs: 0
-    repair-leaf-bars: 64
-    lease-extend-every-batches: 1
-    tail-overlap-bars:
-      1m: 300
-      5m: 300
-      1H: 240
-      1Dutc: 120
-
+# Интеграция с OKX. Шаг 1 ходит только в публичные endpoint'ы
+# (instruments/candles) — auth/секреты не нужны. API-ключи и
+# конфигурация секретов (Vault) вводятся с приватными endpoint'ами и
+# на шаге 9 «Безопасность» (tech-radar: по потребности шага).
 okx:
-  api-key: ${OKX_API_KEY}
-  secret-key: ${OKX_SECRET_KEY}
-  passphrase: ${OKX_PASSPHRASE}
   base-url: ${OKX_BASE_URL:https://www.okx.com}
+  # Демо-флаг OKX: "1" — demo trading (header x-simulated-trading), пусто — реальный.
+  simulated: ${OKX_SIMULATED:1}
 
-# Справочник ожидаемых ключей в Vault (без прямых vault:// ссылок).
-vault-secret-keys:
-  okx:
-    api-key: '{OKX_API_KEY}'
-    secret-key: '{OKX_SECRET_KEY}'
-    passphrase: '{OKX_PASSPHRASE}'
-    base-url: '{OKX_BASE_URL}'
-  postgres:
-    url: '{DATASOURCE_URL}'
-    username: '{DATASOURCE_USERNAME}'
-    password: '{DATASOURCE_PASSWORD}'
+# Загрузка свечей (docs/processes/candle-loading.md). Числа
+# конфигурируемы, проставляются на CODE.
+candle-loading:
+  # Период тика CandleJob (CRON), порядка раза в минуту.
+  cron: ${CANDLE_JOB_CRON:0 * * * * *}
+  # Лимит свечей в одном запросе OKX history-candles (max 100).
+  page-size: 100
+  # Число попыток REPAIR до перевода группы в ERROR.
+  max-repair-attempts: 5
+  # Перекрытие хвоста при SYNC (число последних баров перезапрашивается).
+  sync-overlap-bars: 3
+  # Дефолтный плановый горизонт истории (UTC мс) при онбординге
+  # инструмента, если не задан явно.
+  default-planned-start-date: ${CANDLE_DEFAULT_PLANNED_START:0}
+  # Таймфреймы, под которые заводятся группы свечей инструмента.
+  # На шаге 1 (без стратегии) — из конфига; со стратегией (шаг 2) —
+  # из запрошенных стратегией индикаторов.
+  timeframes:
+    - ONE_HOUR
 
-server:
-  port: 8080
+logging:
+  level:
+    com.example.tradingbot: INFO

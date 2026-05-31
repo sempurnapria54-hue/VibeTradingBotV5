@@ -1,93 +1,73 @@
 package com.example.tradingbot.persistence.model.instrument;
 
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.persistence.model.AuditableEntity;
 import com.example.tradingbot.persistence.model.candle.CandleGroupEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import java.util.List;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.List;
-
+/**
+ * Persistence-проекция {@link Instrument} (таблица instruments).
+ * Владеет группами свечей (агрегат: cascade ALL + orphanRemoval).
+ * Реальная схема (уникальности internal_id и (exchange_id,
+ * external_id), FK) — во Flyway-миграциях.
+ */
 @Getter
 @Setter
-@NoArgsConstructor
 @Entity
-@Table(name = "instruments", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_instrument_internal_id", columnNames = "internal_id"),
-        @UniqueConstraint(name = "uk_instrument_exchange_id_external_id", columnNames = {"exchange_id", "external_id"})
-})
+@Table(name = "instruments")
 public class InstrumentEntity extends AuditableEntity {
 
-    /**
-     * Внутренний идентификатор инструмента.
-     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
     private Long id;
 
-    /**
-     * Межсервисный идентификатор инструмента.
-     */
     @Column(name = "internal_id", nullable = false, updatable = false)
     private String internalId;
 
-    /**
-     * Внутренний идентификатор биржи.
-     */
     @Column(name = "exchange_id", nullable = false, updatable = false)
     private Long exchangeId;
 
-    /**
-     * Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP.
-     */
     @Column(name = "external_id", nullable = false)
     private String externalId;
 
-    /**
-     * Тип инструмента на бирже: SPOT/MARGIN/SWAP/FUTURES/OPTION.
-     */
     @Column(name = "external_type", nullable = false)
     private String externalType;
 
-    /**
-     * Статус: CREATED/HOLD/SYNC/CANDLES_LOADING/ACTIVE.
-     */
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private String status;
-    /**
-     * Режим маржи (cross/isolated).
-     */
+    private Instrument.Status status;
+
+    @Column(name = "external_status")
+    private String externalStatus;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "margin_mode", nullable = false, updatable = false)
-    private String marginMode;
+    private Instrument.MarginMode marginMode;
 
-
-    /**
-     * Режим маржи на бирже (cross/isolated).
-     */
     @Column(name = "external_margin_mode")
     private String externalMarginMode;
 
-    /**
-     * Плечо.
-     */
     @Column(name = "leverage", nullable = false)
     private Integer leverage;
 
-    /**
-     * Набор групп свечей для разных таймфреймов инструмента.
-     */
-    @OneToMany(mappedBy = "instrument", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CandleGroupEntity> candleGroups;
+    @Column(name = "external_leverage")
+    private String externalLeverage;
 
+    @Column(name = "planned_candle_start_date")
+    private Long plannedCandleStartDate;
+
+    @OneToMany(mappedBy = "instrument", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CandleGroupEntity> candleGroups;
 }

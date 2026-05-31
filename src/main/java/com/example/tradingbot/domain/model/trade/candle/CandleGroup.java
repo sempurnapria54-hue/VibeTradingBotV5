@@ -1,13 +1,20 @@
 package com.example.tradingbot.domain.model.trade.candle;
 
 import com.example.tradingbot.domain.model.Auditable;
+import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Группа свечей одного инструмента и таймфрейма.
+ * Группа свечей одного инструмента и одного таймфрейма — единица
+ * загрузки/докачки/проверки целостности свечной истории. Несёт
+ * фактические границы загруженной истории и поддерживаемый count;
+ * плановый горизонт «до куда грузить» — на инструменте
+ * (Instrument.plannedCandleStartDate). См.
+ * docs/models/domain/other/CandleGroup.md,
+ * docs/lifecycles/CandleGroup.md.
  */
 @Getter
 @Setter
@@ -15,76 +22,62 @@ import lombok.Setter;
 @AllArgsConstructor
 public class CandleGroup extends Auditable {
 
-    /**
-     * Внутренний идентификатор группы свечей.
-     */
+    /** Внутренний идентификатор группы. */
     private Long id;
 
-    /**
-     * Инструмент-владелец группы свечей.
-     */
-
+    /** Инструмент-владелец (Instrument.id). */
     private Long instrumentId;
 
-    /**
-     * Таймфрейм группы (например 1m/5m/1H).
-     */
-    private String timeframe;
+    /** Канонический таймфрейм группы. */
+    private TimeFrame timeframe;
 
-    /**
-     * Таймфрейм группы в формате биржи.
-     */
+    /** Таймфрейм в формате биржи (сырой, например 1H). */
     private String externalTimeframe;
 
-    /**
-     * Текущий статус жизненного цикла загрузки свечей.
-     */
+    /** Статус жизненного цикла загрузки свечей. */
     private Status status;
 
-    /**
-     * Время открытия первой свечи в UTC миллисекундах.
-     */
-    private Long coverageStartUtcMillis;
+    /** Время открытия первой фактически загруженной свечи (UTC мс). */
+    private Long actualFirstUtcMillis;
+
+    /** Время открытия последней фактически загруженной свечи (UTC мс). */
+    private Long actualLastUtcMillis;
+
+    /** Поддерживаемое число свечей в группе (основа проверки целостности). */
+    private Long count;
 
     /**
-     * Время закрытия последней свечи в UTC миллисекундах.
+     * Ожидаемое по density-инварианту число свечей на фактических
+     * границах [actualFirst, actualLast]:
+     * {@code (actualLast - actualFirst) / step + 1}. Для пустой
+     * группы (границы не заданы) — 0.
      */
-    private Long coverageEndUtcMillis;
-
-    public enum Status {
-        /**
-         * Группа создана, данных нет или покрытие не подтверждено.
-         */
-        CREATED,
-        /**
-         * Идёт историческая загрузка “в глубину” до coverageStartUtcMillis.
-         * Важно: в этом статусе есть checkpoints (coverageStartUtcMillis, coverageEndUtcMillis) — иначе рестарт будет дорогим.
-         */
-        BACKFILL,
-        /**
-         * Регулярная докачка хвоста (overlap последних N баров) по расписанию.
-         */
-        SYNC,
-        /**
-         * Быстрая проверка целостности по count (и при необходимости инициирует repair).
-         */
-        CHECK,
-        /**
-         * Найдены дыры → бинарный поиск по count + докачка окон.
-         */
-        REPAIR,
-        /**
-         * Покрытие подтверждено, дыры отсутствуют.
-         */
-        ACTIVE,
-        /**
-         * Автоматически продолжать нельзя (превышены попытки/фатальная ошибка). Нужен ручной разбор/сброс.
-         */
-        ERROR,
-        /**
-         * Удалён, не участвует в расчётах
-         */
-        DELETED,
+    public long expectedCount() {
+        if (Objects.isNull(actualFirstUtcMillis) || Objects.isNull(actualLastUtcMillis)) {
+            return 0L;
+        }
+        long step = timeframe.getDurationMillis();
+        return (actualLastUtcMillis - actualFirstUtcMillis) / step + 1L;
     }
 
+    /**
+     * Ряд плотен на [actualFirst, actualLast]: поддерживаемый count
+     * совпадает с ожидаемым по density-инварианту. Дотягивание нижней
+     * границы до планового горизонта — забота BACKFILL, не плотности.
+     */
+    public boolean isDense() {
+        long expected = expectedCount();
+        long actual = Objects.isNull(count) ? 0L : count;
+        return actual == expected;
+    }
+
+    /** Группа готова (покрытие подтверждено, дыр нет). */
+    public boolean isActive() {
+        return Objects.equals(status, Status.ACTIVE);
+    }
+
+    /** Статус жизненного цикла загрузки свечей группы. */
+    public enum Status {
+        CREATED, BACKFILL, SYNC, CHECK, REPAIR, ACTIVE, ERROR, DELETED
+    }
 }
