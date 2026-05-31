@@ -104,8 +104,9 @@ market-data модели `InstrumentExternalRules`, `IndicatorValue`,
 `Instrument` материализованы в `GAPS_CLOSE_1` шага 1
 (`docs/models/domain/other/Candle.md`, `.../CandleGroup.md` +
 `docs/lifecycles/CandleGroup.md`; `docs/models/domain/core/Instrument.md`);
-`TimeFrame` размещён в `CandleGroup.md` (TIME-Q1 сужен до свёртки
-`Strategy.md`). Архивный исходник (легаси) —
+`TimeFrame` размещён в `CandleGroup.md` (TIME-Q1 закрыт на
+`GAPS_CLOSE_1` шага 2: раздел в `Strategy.md` сведён к ссылке).
+Архивный исходник (легаси) —
 `.claude-archive/2026-05-21/docs/deprecated/models/domain/old/Candle.md`.
 
 ### 6. Аудит и история исполнения; финализация PnL — частично
@@ -293,8 +294,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **Из миграции процессов:** PROC-Q1 (`PositionContext`; п.3), RISK-Q1
   (`RiskSettings`; п.3/п.4), ENUM-Q1 (closeReason `RISK_CONTROL` vs
   `ENTRY_RISK_BLOCKED`; п.6), DEAL-Q3 (`DealActionState` core/other +
-  lifecycle; п.1), TIME-Q1 (размещение `TimeFrame`; п.5), CMD-Q1
-  (гранулярность executor'ов/payload'ов; п.1).
+  lifecycle; п.1), CMD-Q1 (гранулярность executor'ов/payload'ов; п.1).
 - **Из миграции API-кластера OKX (п.10):** OKX-Q1 (persisted
   `TradeFill` модель и executor финализации; п.6), OKX-Q2
   (`TradeFillsArchive` async-флоу), OKX-Q3 (bills как источник

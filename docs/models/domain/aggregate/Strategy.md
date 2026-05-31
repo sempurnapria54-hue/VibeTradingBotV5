@@ -317,12 +317,11 @@ management, форвард-заметка.)
 
 ## TimeFrame
 
-Чистый доменный enum (OKX-строки не хранит): `ONE_MINUTE`,
-`THREE_MINUTES`, `FIVE_MINUTES`, `FIFTEEN_MINUTES`, `ONE_HOUR`,
-`TWO_HOURS`, `FOUR_HOURS`, `ONE_DAY`. Маппинг OKX-строк (`1H` ↔
-`ONE_HOUR`, строгий, без lower/upper-case) — в `TimeFrameMapper`
-(client/adapter, форвард-заметка). Используется многими настройками
-strategy-tree.
+Доменный enum таймфреймов; используется многими настройками
+strategy-tree (`timeframe`-поля). Каноническое определение (значения,
+отношение к OKX-строкам) — `docs/models/domain/other/CandleGroup.md`
+(§Енум `TimeFrame`); маппинг доменного значения ↔ строка биржи —
+`docs/models/mapping/TimeFrame.md`. Здесь не дублируется.
 
 ## Связи (расчёт / jobs / риск)
 

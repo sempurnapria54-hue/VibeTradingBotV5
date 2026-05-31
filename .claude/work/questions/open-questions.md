@@ -110,38 +110,6 @@ policy; (2) самостоятельный RVO `docs/components/models/RiskSetti
 Связано: `docs/components/models/CalculationContext.md`,
 `docs/components/RiskValidator.md`.
 
-### TIME-Q1. Где разместить доменный enum `TimeFrame`
-
-`TimeFrame` — чистый доменный enum для таймфреймов свечей/индикаторов,
-OKX-строк не хранит. Размещение неясно: сейчас описан разделом в
-`docs/models/domain/aggregate/Strategy.md` (используется многими настройками
-strategy-tree), но как самостоятельный enum может жить иначе.
-
-Цитата источника (архив, «Расчёт индикаторов и рыночных данных» §8):
-«`TimeFrame` — чистый доменный enum. OKX-строки в нём не храним.»
-Значения: `ONE_MINUTE`, `THREE_MINUTES`, `FIVE_MINUTES`,
-`FIFTEEN_MINUTES`, `ONE_HOUR`, `TWO_HOURS`, `FOUR_HOURS`, `ONE_DAY`.
-Маппинг OKX-строк живёт отдельно (`TimeFrameMapper` /
-`docs/models/mapping/TimeFrame.md`).
-
-Статус (GAPS_CLOSE_1, 2026-05-29): `CandleGroup.timeframe` (целевой
-тип `TimeFrame`) сделал enum явной кодовой зависимостью свечной
-подсистемы. По критерию первоисточника каноническое описание enum
-размещено разделом в `docs/models/domain/other/CandleGroup.md`
-(§«Енум `TimeFrame`»); `docs/models/mapping/TimeFrame.md` указывает
-туда. Для кода шага 1 вопрос закрыт (enum определён и размещён, шаг 1
-не блокирует).
-
-Остаточный хвост: раздел `TimeFrame` в
-`docs/models/domain/aggregate/Strategy.md` (шаг 2) свести до ссылки
-на канон в `CandleGroup.md`, чтобы не дублировать определение.
-Делается при проработке шага 2 (Стратегия).
-Связано: `docs/models/domain/other/CandleGroup.md` (§Енум),
-`docs/models/domain/aggregate/Strategy.md` (§TimeFrame),
-`docs/models/mapping/TimeFrame.md`,
-`docs/models/domain/other/IndicatorValue.md` / `MarketStructure.md` /
-`MarketPhase.md` (через settings).
-
 ### INSTR-Q1. Как снапшот-концепция ляжет на `InstrumentExternalRules` (и нужен ли ренейм)
 
 Шаг 1 (поток рыночных данных) развёл модель инструмента так: домен
