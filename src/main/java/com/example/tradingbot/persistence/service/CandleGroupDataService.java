@@ -1,5 +1,7 @@
 package com.example.tradingbot.persistence.service;
 
+import static java.util.stream.Collectors.toList;
+
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.mapping.CandleGroupMapper;
@@ -16,7 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Граница domain ↔ persistence для {@link CandleGroup}. Связь группы с
  * инструментом (owning side агрегата) проставляется здесь по плоскому
- * {@code instrumentId} домена.
+ * {@code instrumentId} домена. Доменные enum'ы (таймфрейм, статус)
+ * конвертируются в строки на границе репозитория.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,28 +31,29 @@ public class CandleGroupDataService {
 
     @Transactional
     public CandleGroup save(CandleGroup group) {
-        CandleGroupEntity entity = mapper.domainToEntity(group);
+        CandleGroupEntity entity = mapper.domainToPersistence(group);
         entity.setInstrument(instrumentRepository.getReferenceById(group.getInstrumentId()));
-        return mapper.entityToDomain(repository.save(entity));
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<CandleGroup> findById(Long id) {
-        return repository.findById(id).map(mapper::entityToDomain);
+        return mapper.persistenceToDomain(repository.save(entity));
     }
 
     @Transactional(readOnly = true)
     public List<CandleGroup> findByInstrumentId(Long instrumentId) {
-        return repository.findByInstrument_Id(instrumentId).stream().map(mapper::entityToDomain).toList();
+        return repository.findByInstrument_Id(instrumentId).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(toList());
     }
 
     @Transactional(readOnly = true)
     public Optional<CandleGroup> findByInstrumentIdAndTimeframe(Long instrumentId, TimeFrame timeframe) {
-        return repository.findByInstrument_IdAndTimeframe(instrumentId, timeframe).map(mapper::entityToDomain);
+        return repository.findByInstrument_IdAndTimeframe(instrumentId, timeframe.name())
+                .map(mapper::persistenceToDomain);
     }
 
     @Transactional(readOnly = true)
     public List<CandleGroup> findByStatusIn(Collection<CandleGroup.Status> statuses) {
-        return repository.findByStatusIn(statuses).stream().map(mapper::entityToDomain).toList();
+        List<String> statusNames = statuses.stream().map(Enum::name).collect(toList());
+        return repository.findByStatusIn(statusNames).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(toList());
     }
 }

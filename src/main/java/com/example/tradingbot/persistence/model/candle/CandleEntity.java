@@ -2,7 +2,7 @@ package com.example.tradingbot.persistence.model.candle;
 
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.persistence.model.AuditableEntity;
-import com.example.tradingbot.util.PriceConstants;
+import com.example.tradingbot.util.Constants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -35,18 +35,18 @@ public class CandleEntity extends AuditableEntity {
     @Column(name = "open_timestamp", nullable = false)
     private Long openTimestamp;
 
-    @Column(name = "open", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
+    @Column(name = "open", nullable = false, precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal open;
 
-    @Column(name = "high", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
+    @Column(name = "high", nullable = false, precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal high;
 
-    @Column(name = "low", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
+    @Column(name = "low", nullable = false, precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal low;
 
-    @Column(name = "close", nullable = false, precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
+    @Column(name = "close", nullable = false, precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal close;
 
-    @Column(name = "volume", precision = PriceConstants.PRICE_PRECISION, scale = PriceConstants.PRICE_SCALE)
+    @Column(name = "volume", precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal volume;
 }

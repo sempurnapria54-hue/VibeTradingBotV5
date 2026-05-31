@@ -35,5 +35,5 @@ public class CandleExternalSnapshot {
     BigDecimal volume;
 
     /** Признак закрытия свечи (OKX confirm=1 → true). Фильтр, в домен не пишется. */
-    boolean confirm;
+    Boolean confirm;
 }

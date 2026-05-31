@@ -4,26 +4,22 @@ import com.example.tradingbot.api.model.request.CreateExchangeApiRequest;
 import com.example.tradingbot.api.model.response.ExchangeApiResponse;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.persistence.model.exchange.ExchangeEntity;
-import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
 /**
  * Маппинг {@link Exchange} между слоями api ↔ domain ↔ persistence
- * (docs/models/domain/core/Exchange.md). Поля совпадают 1:1, enum
- * {@code Status} в api отдаётся строкой.
+ * (docs/models/domain/core/Exchange.md). Поля совпадают по имени; enum
+ * {@code Status} ↔ строка конвертируется MapStruct автоматически.
+ * Наружу отдаётся internalId, не id (api-модель без id).
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface ExchangeMapper {
 
-    ExchangeEntity domainToEntity(Exchange exchange);
+    ExchangeEntity domainToPersistence(Exchange exchange);
 
-    Exchange entityToDomain(ExchangeEntity entity);
+    Exchange persistenceToDomain(ExchangeEntity entity);
 
-    @BeanMapping(ignoreByDefault = true)
-    @Mapping(target = "internalId", source = "internalId")
-    @Mapping(target = "name", source = "name")
-    @Mapping(target = "baseUrl", source = "baseUrl")
     Exchange apiToDomain(CreateExchangeApiRequest request);
 
     ExchangeApiResponse domainToApi(Exchange exchange);

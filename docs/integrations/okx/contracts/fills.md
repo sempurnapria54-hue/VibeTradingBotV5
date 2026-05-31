@@ -42,7 +42,7 @@ Mapping (стаб, до материализации `TradeFill`) —
 3. Следующий запрос с `after = min(billId)`.
 4. Стоп: пустой `data`.
 
-## Контракт `ClientService`
+## Контракт `IntegrationService`
 
 Успешный запрос возвращает список fills (может быть пустым). На
 controlled error (`code != "0"`, parse, invariant) — exception в

@@ -6,7 +6,7 @@
 
 ## Правило
 
-`OkxClientService` сам выставляет в request body всех операций
+`OkxIntegrationService` сам выставляет в request body всех операций
 `Order`/`AlgoOrder`/`Position`:
 
 - `tdMode = isolated` — режим торговли;
@@ -31,7 +31,7 @@ response (`tdMode == isolated`, `posSide == net`) — invariant check,
 
 ## Где применяется
 
-- `OkxClientService` (создание/amend ордеров, close-position);
+- `OkxIntegrationService` (создание/amend ордеров, close-position);
 - adapter validation при refresh (request rejected, если received
   значение ≠ ожидаемого).
 

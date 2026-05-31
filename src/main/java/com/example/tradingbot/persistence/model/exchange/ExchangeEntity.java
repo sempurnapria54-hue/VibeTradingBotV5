@@ -4,8 +4,6 @@ import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.persistence.model.AuditableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -16,6 +14,8 @@ import lombok.Setter;
 /**
  * Persistence-проекция {@link Exchange} (таблица exchanges). Реальная
  * схема (уникальности, FK) — во Flyway-миграциях; здесь — ORM-маппинг.
+ * Enum'ы — только в домене; статус хранится строкой (значение =
+ * {@code name()} доменного enum).
  */
 @Getter
 @Setter
@@ -36,7 +36,6 @@ public class ExchangeEntity extends AuditableEntity {
     @Column(name = "base_url", nullable = false)
     private String baseUrl;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private Exchange.Status status;
+    private String status;
 }

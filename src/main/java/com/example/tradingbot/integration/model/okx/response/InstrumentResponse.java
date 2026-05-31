@@ -1,4 +1,4 @@
-package com.example.tradingbot.client.model.okx.response;
+package com.example.tradingbot.integration.model.okx.response;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -6,7 +6,7 @@ import lombok.Setter;
 /**
  * Нативный DTO OKX спецификации инструмента (GET /api/v5/public/instruments).
  * Несёт только snapshot-релевантное подмножество полей; все приходят
- * строками. Не выходит за ClientService/adapter
+ * строками. Не выходит за IntegrationService/adapter
  * (docs/models/integrations/okx/OkxInstrumentResponse.md).
  */
 @Getter

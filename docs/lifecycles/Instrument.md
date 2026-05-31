@@ -20,7 +20,7 @@
 (`docs/processes/candle-loading.md`):
 
 - синхронизацию спецификации (`SYNC`) обеспечивает запрос
-  инструмента у биржи через `docs/components/ClientService.md`
+  инструмента у биржи через `docs/components/IntegrationService.md`
   (результат — транзиентный `InstrumentExternalSnapshot`, см.
   `docs/models/mapping/Instrument.md`);
 - готовность свечных данных (`CANDLES_LOADING` → `ACTIVE`) ведут
@@ -53,7 +53,7 @@ CANDLES_LOADING
   -> ACTIVE            (все CandleGroup инструмента достигли ACTIVE)
 ```
 
-- `CREATED → SYNC`: инструмент взят в онбординг; `ClientService`
+- `CREATED → SYNC`: инструмент взят в онбординг; `IntegrationService`
   тянет спецификацию (идентичность + биржевые `externalStatus`/
   `externalLeverage` → domain, справочные sizing-поля транзиентно;
   `docs/models/mapping/Instrument.md`).
@@ -90,6 +90,6 @@ CANDLES_LOADING
 - Процесс / оркестрация / производитель свечей —
   `docs/processes/candle-loading.md`, `docs/components/CandleJob.md`.
 - Граница спецификации — `docs/models/mapping/Instrument.md`,
-  `docs/components/ClientService.md`.
+  `docs/components/IntegrationService.md`.
 - Владелец оркестрации — открытый вопрос ORCH-Q1.
 - Отложенные статусы и полный lifecycle — backlog п.9.

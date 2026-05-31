@@ -1,37 +1,39 @@
-package com.example.tradingbot.client.service.okx;
+package com.example.tradingbot.integration.service.okx;
 
-import com.example.tradingbot.client.model.okx.response.CandleResponse;
-import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
-import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
-import com.example.tradingbot.client.service.ClientService;
-import com.example.tradingbot.client.service.ExchangeClientException;
+import static java.util.Objects.isNull;
+import static java.util.stream.Collectors.toList;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
+import com.example.tradingbot.integration.model.okx.response.CandleResponse;
+import com.example.tradingbot.integration.model.okx.response.InstrumentResponse;
+import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
+import com.example.tradingbot.integration.service.ExchangeIntegrationException;
+import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
+import com.example.tradingbot.util.Constants;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
 /**
- * OKX-реализация {@link ClientService}: ходит в публичные REST-endpoint'ы
- * через {@link OkxRestClient}, валидирует структуру/код ответа и отдаёт
- * нормализованные снапшоты (docs/components/ClientService.md,
+ * OKX-реализация {@link IntegrationService}: ходит в публичные
+ * REST-endpoint'ы через {@link OkxRestClient}, валидирует структуру/код
+ * ответа и отдаёт нормализованные снапшоты (docs/components/ClientService.md,
  * docs/rules/raw-exchange-dto-boundary.md). Сырой OKX DTO наружу не
  * выходит.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OkxClientService implements ClientService {
-
-    private static final String OKX_SUCCESS_CODE = "0";
+public class OkxIntegrationService implements IntegrationService {
 
     private final OkxRestClient okxRestClient;
     private final InstrumentMapper instrumentMapper;
@@ -43,11 +45,11 @@ public class OkxClientService implements ClientService {
                 () -> okxRestClient.getInstruments(externalInstrumentType, externalInstrumentId),
                 "instruments", "instId=" + externalInstrumentId + " instType=" + externalInstrumentType);
         verifyCode(response, "instruments", "instId=" + externalInstrumentId);
-        if (CollectionUtils.isEmpty(response.getData())) {
+        if (isEmpty(response.getData())) {
             return null;
         }
         InstrumentResponse first = response.getData().getFirst();
-        return instrumentMapper.clientToSnapshot(first);
+        return instrumentMapper.integrationToSnapshot(first);
     }
 
     @Override
@@ -71,13 +73,13 @@ public class OkxClientService implements ClientService {
     }
 
     private List<CandleExternalSnapshot> toCandleSnapshots(List<List<String>> data) {
-        if (CollectionUtils.isEmpty(data)) {
+        if (isEmpty(data)) {
             return List.of();
         }
         return data.stream()
                 .map(CandleResponse::of)
-                .map(candleMapper::clientToSnapshot)
-                .toList();
+                .map(candleMapper::integrationToSnapshot)
+                .collect(toList());
     }
 
     private <T> T execute(Supplier<T> call, String endpoint, String context) {
@@ -85,19 +87,19 @@ public class OkxClientService implements ClientService {
             return call.get();
         } catch (RestClientException e) {
             log.error("OKX transport error [{}] {}", endpoint, context, e);
-            throw new ExchangeClientException("OKX transport error [" + endpoint + "] " + context, e);
+            throw new ExchangeIntegrationException("OKX transport error [" + endpoint + "] " + context, e);
         }
     }
 
     private void verifyCode(OkxApiResponse<?> response, String endpoint, String context) {
-        if (Objects.isNull(response)) {
+        if (isNull(response)) {
             log.error("OKX null response [{}] {}", endpoint, context);
-            throw new ExchangeClientException("OKX null response [" + endpoint + "] " + context);
+            throw new ExchangeIntegrationException("OKX null response [" + endpoint + "] " + context);
         }
-        boolean success = Objects.equals(OKX_SUCCESS_CODE, response.getCode());
-        if (BooleanUtils.isFalse(success)) {
+        boolean success = Objects.equals(Constants.Okx.SUCCESS_CODE, response.getCode());
+        if (isFalse(success)) {
             log.error("OKX error [{}] {} code={} msg={}", endpoint, context, response.getCode(), response.getMsg());
-            throw new ExchangeClientException("OKX error [" + endpoint + "] code=" + response.getCode()
+            throw new ExchangeIntegrationException("OKX error [" + endpoint + "] code=" + response.getCode()
                     + " msg=" + response.getMsg());
         }
     }

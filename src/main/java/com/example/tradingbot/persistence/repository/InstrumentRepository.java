@@ -1,16 +1,18 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Long> {
 
     Optional<InstrumentEntity> findByInternalId(String internalId);
 
-    Optional<InstrumentEntity> findByExchangeIdAndExternalId(Long exchangeId, String externalId);
+    List<InstrumentEntity> findByStatus(String status);
 
-    List<InstrumentEntity> findByStatus(Instrument.Status status);
+    @Query("select distinct i from InstrumentEntity i left join fetch i.candleGroups where i.id = :id")
+    Optional<InstrumentEntity> findByIdWithCandleGroups(@Param("id") Long id);
 }

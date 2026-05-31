@@ -29,7 +29,7 @@ exposure после действия. Метрики могут попасть �
 
 - **Не** переводит сделку в другой статус и **не** создаёт
   `ServiceCommand`.
-- **Не** обновляет баланс: не вызывает `REFRESH_BALANCE`, `ClientService`
+- **Не** обновляет баланс: не вызывает `REFRESH_BALANCE`, `IntegrationService`
   или OKX adapter. При absent/stale/invalid `BalanceContainer` возвращает
   `BLOCKED` (коды `BALANCE_NOT_FRESH` / `BALANCE_INVALID`), а не чинит
   snapshot сам.

@@ -1,11 +1,11 @@
-package com.example.tradingbot.client.service;
+package com.example.tradingbot.integration.service;
 
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
 import java.util.List;
 
 /**
- * Граница биржевого клиента / adapter-layer: сервисы ходят на биржу
+ * Граница интеграции с биржей / adapter-layer: сервисы ходят на биржу
  * только через него, наружу выходят только нормализованные
  * {@code *ExternalSnapshot} (docs/components/ClientService.md,
  * docs/rules/raw-exchange-dto-boundary.md).
@@ -15,7 +15,7 @@ import java.util.List;
  * exception. Маршрутизация по биржам (multi-exchange) — за пределами
  * шага 1 (одна биржа OKX).
  */
-public interface ClientService {
+public interface IntegrationService {
 
     /**
      * Спецификация инструмента → нормализованный снапшот.

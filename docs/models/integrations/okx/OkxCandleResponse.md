@@ -10,7 +10,7 @@
 Нативная модель источника OKX (Java `CandleResponse`).
 Возвращается `GET /api/v5/market/candles` и
 `GET /api/v5/market/history-candles`. Не выходит за
-`ClientService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
+`IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
 
 Формат провода, конвертация и `confirm` policy —
 `docs/models/mapping/Candle.md`. Доменная модель —

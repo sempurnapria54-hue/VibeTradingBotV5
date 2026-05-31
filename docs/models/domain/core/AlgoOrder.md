@@ -126,7 +126,7 @@ toCancel(reason)/toError(reason)` (через строгий `transitTo` с
 `DealActionState`), `externalType`/`ordType`, `externalDirection`/
 `side`, `externalPositionSide`/`posSide`, `tdMode`, `reduceOnly`
 (как факт), `actualSide`, `closeFraction`. OKX `tdMode=isolated`/
-`posSide=net` — константы `OkxClientService`. `reduceOnly` —
+`posSide=net` — константы `OkxIntegrationService`. `reduceOnly` —
 проверяется adapter-layer как invariant, не хранится.
 
 ## Отличие от attached protection

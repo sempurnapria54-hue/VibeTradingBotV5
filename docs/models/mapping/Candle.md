@@ -57,7 +57,7 @@ Mapping таймфреймов — `docs/models/mapping/TimeFrame.md`. Скво�
 
 ### Граница: `CandleExternalSnapshot`
 
-Свеча проходит границу `ClientService`/adapter как нормализованный
+Свеча проходит границу `IntegrationService`/adapter как нормализованный
 `CandleExternalSnapshot`, не сырым OKX-массивом — сквозное правило
 `docs/rules/raw-exchange-dto-boundary.md`. Путь:
 
@@ -65,7 +65,7 @@ Mapping таймфреймов — `docs/models/mapping/TimeFrame.md`. Скво�
 OKX-массив [9] → CandleExternalSnapshot → domain Candle
 ```
 
-`ClientService` валидирует длину массива (строго 9), парсит
+`IntegrationService` валидирует длину массива (строго 9), парсит
 элементы и отдаёт `CandleExternalSnapshot` с runtime-useful
 полями: `openTimestamp` (`ts`), `open`/`high`/`low`/`close`,
 `volume` (`vol`), `confirm`. Validation-only объёмы

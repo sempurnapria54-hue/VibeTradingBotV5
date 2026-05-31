@@ -9,7 +9,7 @@
 
 Тир `externalSnapshot` хранит нормализованные граничные объекты
 (`*ExternalSnapshot`). Это единственное, что выходит за
-`ClientService`/adapter (`docs/rules/raw-exchange-dto-boundary.md`).
+`IntegrationService`/adapter (`docs/rules/raw-exchange-dto-boundary.md`).
 Смыслово snapshot принадлежит домену, но материально — отдельный
 тир, граница между интеграцией и доменом.
 

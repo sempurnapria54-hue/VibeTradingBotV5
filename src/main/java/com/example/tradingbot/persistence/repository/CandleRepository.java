@@ -8,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface CandleRepository extends JpaRepository<CandleEntity, Long> {
 
-    long countByCandleGroupId(Long candleGroupId);
+    Long countByCandleGroupId(Long candleGroupId);
 
     @Query("select min(c.openTimestamp) from CandleEntity c where c.candleGroupId = :groupId")
     Long findMinOpenTimestamp(@Param("groupId") Long candleGroupId);
@@ -18,7 +18,7 @@ public interface CandleRepository extends JpaRepository<CandleEntity, Long> {
 
     @Query("select count(c) from CandleEntity c "
             + "where c.candleGroupId = :groupId and c.openTimestamp between :from and :to")
-    long countInRange(@Param("groupId") Long candleGroupId, @Param("from") Long fromMillis, @Param("to") Long toMillis);
+    Long countInRange(@Param("groupId") Long candleGroupId, @Param("from") Long fromMillis, @Param("to") Long toMillis);
 
     @Query("select c.openTimestamp from CandleEntity c "
             + "where c.candleGroupId = :groupId and c.openTimestamp between :from and :to")

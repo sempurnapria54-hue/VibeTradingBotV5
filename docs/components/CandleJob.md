@@ -50,6 +50,13 @@ count, докачка дыр бинарным поиском. Идемпотен
 `docs/lifecycles/CandleGroup.md` §«Политика загрузки и
 целостности».
 
+Пакет — `domain.jobs`. Кроме CRON, тик запускается вне расписания
+через `JobController` (`POST /api/jobs/candle-loading/trigger`):
+запуск **асинхронный** (не блокирует HTTP-ответ) через фасад
+`CandleJobFacade` (`@Async`) — см. `.claude/rules/codestyle.md`
+§«Джобы». Триггер появления нового закрытого бара — предикат модели
+`CandleGroup.hasNewClosedBar(now)`.
+
 ## Связи
 
 - Модель и lifecycle — `docs/models/domain/other/Candle.md`,

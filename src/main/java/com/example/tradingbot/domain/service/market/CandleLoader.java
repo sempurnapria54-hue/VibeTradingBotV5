@@ -1,22 +1,25 @@
 package com.example.tradingbot.domain.service.market;
 
-import com.example.tradingbot.client.service.ClientService;
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+import static java.util.stream.Collectors.toList;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+
 import com.example.tradingbot.config.CandleLoadingProperties;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
+import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.persistence.service.CandleDataService;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,7 +40,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CandleLoader {
 
-    private final ClientService clientService;
+    private final IntegrationService integrationService;
     private final CandleDataService candleDataService;
     private final CandleGroupDataService candleGroupDataService;
     private final InstrumentDataService instrumentDataService;
@@ -66,8 +69,8 @@ public class CandleLoader {
     }
 
     private void backfill(CandleGroup group) {
-        Instrument instrument = requireInstrument(group);
-        List<CandleExternalSnapshot> page = clientService.getHistoryCandles(
+        Instrument instrument = instrumentDataService.getRequiredById(group.getInstrumentId());
+        List<CandleExternalSnapshot> page = integrationService.getHistoryCandles(
                 instrument.getExternalId(), group.getExternalTimeframe(),
                 group.getActualFirstUtcMillis(), properties.getPageSize());
         persistClosed(group, page);
@@ -79,8 +82,8 @@ public class CandleLoader {
     }
 
     private void sync(CandleGroup group) {
-        Instrument instrument = requireInstrument(group);
-        List<CandleExternalSnapshot> page = clientService.getLatestCandles(
+        Instrument instrument = instrumentDataService.getRequiredById(group.getInstrumentId());
+        List<CandleExternalSnapshot> page = integrationService.getLatestCandles(
                 instrument.getExternalId(), group.getExternalTimeframe(), properties.getPageSize());
         persistClosed(group, page);
         reconcile(group);
@@ -110,14 +113,14 @@ public class CandleLoader {
             return;
         }
         HoleWindow window = locateHole(group);
-        if (Objects.isNull(window)) {
+        if (isNull(window)) {
             group.setStatus(CandleGroup.Status.CHECK);
             candleGroupDataService.save(group);
             return;
         }
-        Instrument instrument = requireInstrument(group);
+        Instrument instrument = instrumentDataService.getRequiredById(group.getInstrumentId());
         long step = group.getTimeframe().getDurationMillis();
-        List<CandleExternalSnapshot> page = clientService.getHistoryCandles(
+        List<CandleExternalSnapshot> page = integrationService.getHistoryCandles(
                 instrument.getExternalId(), group.getExternalTimeframe(),
                 window.toMillis() + step, properties.getPageSize());
         persistClosed(group, page);
@@ -127,12 +130,12 @@ public class CandleLoader {
     }
 
     private boolean isBackfillComplete(CandleGroup group, Instrument instrument, List<CandleExternalSnapshot> page) {
-        if (CollectionUtils.isEmpty(page)) {
+        if (isEmpty(page)) {
             return true;
         }
         Long first = group.getActualFirstUtcMillis();
         Long horizon = instrument.getPlannedCandleStartDate();
-        return Objects.nonNull(first) && Objects.nonNull(horizon) && first <= horizon;
+        return nonNull(first) && nonNull(horizon) && first <= horizon;
     }
 
     /**
@@ -143,7 +146,7 @@ public class CandleLoader {
     private HoleWindow locateHole(CandleGroup group) {
         Long first = group.getActualFirstUtcMillis();
         Long last = group.getActualLastUtcMillis();
-        if (Objects.isNull(first) || Objects.isNull(last)) {
+        if (isNull(first) || isNull(last)) {
             return null;
         }
         long step = group.getTimeframe().getDurationMillis();
@@ -165,10 +168,10 @@ public class CandleLoader {
 
     private void persistClosed(CandleGroup group, List<CandleExternalSnapshot> snapshots) {
         List<Candle> closed = snapshots.stream()
-                .filter(CandleExternalSnapshot::isConfirm)
+                .filter(CandleExternalSnapshot::getConfirm)
                 .map(candleMapper::snapshotToDomain)
-                .toList();
-        candleDataService.saveNewCandles(group.getId(), closed);
+                .collect(toList());
+        candleDataService.saveCandles(group.getId(), closed);
     }
 
     private void reconcile(CandleGroup group) {
@@ -178,16 +181,7 @@ public class CandleLoader {
         group.setActualLastUtcMillis(candleDataService.findMaxOpenTimestamp(groupId));
     }
 
-    private Instrument requireInstrument(CandleGroup group) {
-        return instrumentDataService.findById(group.getInstrumentId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Instrument not found for candle group: " + group.getId()));
-    }
-
     private long alignDown(long value, long step) {
         return (value / step) * step;
-    }
-
-    private record HoleWindow(long fromMillis, long toMillis) {
     }
 }

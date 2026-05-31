@@ -13,19 +13,34 @@ import lombok.Getter;
 @Getter
 public enum TimeFrame {
 
+    /** Бар 1 минута. */
     ONE_MINUTE(60_000L),
+
+    /** Бар 3 минуты. */
     THREE_MINUTES(180_000L),
+
+    /** Бар 5 минут. */
     FIVE_MINUTES(300_000L),
+
+    /** Бар 15 минут. */
     FIFTEEN_MINUTES(900_000L),
+
+    /** Бар 1 час. */
     ONE_HOUR(3_600_000L),
+
+    /** Бар 2 часа. */
     TWO_HOURS(7_200_000L),
+
+    /** Бар 4 часа. */
     FOUR_HOURS(14_400_000L),
+
+    /** Бар 1 день (UTC-выровненный). */
     ONE_DAY(86_400_000L);
 
     /** Длительность одного бара таймфрейма в миллисекундах. */
-    private final long durationMillis;
+    private final Long durationMillis;
 
-    TimeFrame(long durationMillis) {
+    TimeFrame(Long durationMillis) {
         this.durationMillis = durationMillis;
     }
 }

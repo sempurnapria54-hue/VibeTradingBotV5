@@ -6,8 +6,10 @@ import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.service.core.ExchangeService;
 import com.example.tradingbot.mapping.ExchangeMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,8 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * API бирж. Контроллер принимает api, делает apiToDomain, дальше
- * работает только с domain (codestyle: слои). Авторизация
- * (@PreAuthorize) — на шаге 9 «Безопасность».
+ * работает только с domain (codestyle: слои). Наружу адресуется по
+ * internalId. Авторизация (@PreAuthorize) — на шаге 9 «Безопасность».
  */
 @Validated
 @RestController
@@ -39,9 +41,11 @@ public class ExchangeController {
         return mapper.domainToApi(exchange);
     }
 
-    @GetMapping("/{exchangeId}")
+    @GetMapping("/{internalId}")
     @Operation(summary = "Получить биржу")
-    public ExchangeApiResponse getById(@PathVariable Long exchangeId) {
-        return mapper.domainToApi(exchangeService.getRequiredById(exchangeId));
+    public ExchangeApiResponse getByInternalId(
+            @Parameter(description = "Межсервисный идентификатор биржи", required = true)
+            @PathVariable @NotBlank String internalId) {
+        return mapper.domainToApi(exchangeService.getRequiredByInternalId(internalId));
     }
 }

@@ -1,10 +1,14 @@
 package com.example.tradingbot.api.controller;
 
+import static java.util.stream.Collectors.toList;
+
 import com.example.tradingbot.api.model.response.CandleGroupApiResponse;
 import com.example.tradingbot.domain.service.core.InstrumentService;
 import com.example.tradingbot.mapping.CandleGroupMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -15,12 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * API групп свечей инструмента (чтение статуса загрузки/покрытия).
- * Авторизация — шаг 9 «Безопасность».
+ * Инструмент адресуется по internalId; в ответе — internalId группы и
+ * instrumentInternalId. Авторизация — шаг 9 «Безопасность».
  */
 @Validated
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/instruments/{instrumentId}/candle-groups")
+@RequestMapping("/api/instruments/{instrumentInternalId}/candle-groups")
 @Tag(name = "CandleGroups", description = "Группы свечей инструмента")
 public class CandleGroupController {
 
@@ -29,9 +34,11 @@ public class CandleGroupController {
 
     @GetMapping
     @Operation(summary = "Список групп свечей инструмента")
-    public List<CandleGroupApiResponse> getByInstrument(@PathVariable Long instrumentId) {
-        return instrumentService.getCandleGroups(instrumentId).stream()
-                .map(mapper::domainToApi)
-                .toList();
+    public List<CandleGroupApiResponse> getByInstrument(
+            @Parameter(description = "Межсервисный идентификатор инструмента", required = true)
+            @PathVariable @NotBlank String instrumentInternalId) {
+        return instrumentService.getCandleGroups(instrumentInternalId).stream()
+                .map(group -> mapper.domainToApi(group, instrumentInternalId))
+                .collect(toList());
     }
 }

@@ -141,7 +141,7 @@ OKX mapping — в `docs/models/mapping/Order.md`.
 
 На первом этапе не хранит: `strategyActionId`/`strategyActionKey`
 (в `DealActionState`), `marginMode`/`tradeMode`/`positionSide` (OKX
-`tdMode=isolated`/`posSide=net` — константы `OkxClientService`),
+`tdMode=isolated`/`posSide=net` — константы `OkxIntegrationService`),
 external rules инструмента и fresh market price (собираются в
 `CalculationContext` перед расчётом action), raw command result
 history (проектируется отдельно, не runtime state), `reduceOnly` как

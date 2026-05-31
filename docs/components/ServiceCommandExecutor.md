@@ -34,7 +34,7 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
   новых параметров подтверждается refresh.
 - **`CANCEL_*`** — отправляет отмену; ACK не truth; `closeReason` не
   перетирается, если уже установлен.
-- **`REFRESH_*`** — читает exchange facts через `ClientService`, применяет
+- **`REFRESH_*`** — читает exchange facts через `IntegrationService`, применяет
   status resolver, обновляет сущность, заполняет `closeReason` только если
   текущий `== null`; торговых решений не принимает, cleanup не запускает,
   audit/history как runtime-source не использует.

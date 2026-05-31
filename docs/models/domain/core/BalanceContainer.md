@@ -116,7 +116,7 @@ externalUpdatedAt / updatedAt + balanceExpirationDuration -> fresh / stale
 
 `BalanceContainerExternalSnapshot` / `BalanceExternalSnapshot` —
 validated normalized snapshots, не persisted domain entity. Создаются
-внутри `ClientService` / adapter-layer после валидации raw response
+внутри `IntegrationService` / adapter-layer после валидации raw response
 биржи. Содержат **только** поля, нужные для обновления доменной
 модели; если поле не хранится в домене и не нужно для его обновления,
 оно в normalized snapshot не попадает (raw exchange DTO не выходит за
@@ -160,7 +160,7 @@ API / parse / invariant   -> exception / controlled error
   FSM / handler).
 - **CalculationContext** / `StrategyActionCalculator` могут
   использовать `BalanceContainer` как input для sizing, но не
-  обновляют его, не вызывают `ClientService`, не создают
+  обновляют его, не вызывают `IntegrationService`, не создают
   `REFRESH_BALANCE`, не принимают risk decision.
 - **RiskValidator** использует fresh `BalanceContainer` как входной
   snapshot (`externalTotalEquity` / `externalAdjustedEquity` /

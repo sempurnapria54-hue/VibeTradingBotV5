@@ -21,16 +21,16 @@ public class CandleLoadingProperties {
     private String cron;
 
     /** Лимит свечей в одном запросе OKX (≤ 100 для history-candles). */
-    private int pageSize = 100;
+    private Integer pageSize = 100;
 
     /** Перекрытие хвоста при SYNC (число последних баров перезапрашивается). */
-    private int syncOverlapBars = 3;
+    private Integer syncOverlapBars = 3;
 
     /** Число попыток REPAIR до перевода группы в ERROR. */
-    private int maxRepairAttempts = 5;
+    private Integer maxRepairAttempts = 5;
 
     /** Дефолтный плановый горизонт истории (UTC мс) при онбординге. */
-    private long defaultPlannedStartDate;
+    private Long defaultPlannedStartDate;
 
     /** Таймфреймы, под которые заводятся группы свечей инструмента. */
     private List<TimeFrame> timeframes = List.of(TimeFrame.ONE_HOUR);

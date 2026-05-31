@@ -193,7 +193,7 @@ FUTURES/SWAP — взаимоисключимо с `newTp/SlTriggerPx`). Уда�
 ## Целевые расхождения с текущим кодом (target refactoring)
 
 - `createOrder` не должен принимать `tradeMode`/`positionSide`
-  аргументами — `OkxClientService` сам ставит `isolated`/`net`.
+  аргументами — `OkxIntegrationService` сам ставит `isolated`/`net`.
 - `CreateOrderRequest` должен принимать `reduceOnly` и
   `attachAlgoOrds` (для `ENTRY_ATTACHED_STOP_LOSS`).
 - `OrderResponse.state` комментарий: raw статус OKX; pending —

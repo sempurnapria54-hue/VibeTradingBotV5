@@ -1,13 +1,10 @@
 package com.example.tradingbot.persistence.model.candle;
 
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
-import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.persistence.model.AuditableEntity;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,7 +18,9 @@ import lombok.Setter;
 /**
  * Persistence-проекция {@link CandleGroup} (таблица candle_groups).
  * Принадлежит инструменту (owning side агрегата). Реальная схема
- * (уникальность (instrument_id, timeframe), FK) — во Flyway.
+ * (уникальность (instrument_id, timeframe), уникальность internal_id,
+ * FK) — во Flyway. Enum'ы — только в домене; таймфрейм и статус
+ * хранятся строкой (значение = {@code name()}).
  */
 @Getter
 @Setter
@@ -33,20 +32,21 @@ public class CandleGroupEntity extends AuditableEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "internal_id", nullable = false, updatable = false)
+    private String internalId;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "instrument_id", nullable = false, updatable = false)
     private InstrumentEntity instrument;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "timeframe", nullable = false)
-    private TimeFrame timeframe;
+    private String timeframe;
 
     @Column(name = "external_timeframe", nullable = false)
     private String externalTimeframe;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private CandleGroup.Status status;
+    private String status;
 
     @Column(name = "actual_first_utc_millis")
     private Long actualFirstUtcMillis;

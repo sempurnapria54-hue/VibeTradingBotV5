@@ -9,7 +9,7 @@
 
 Нативная модель источника OKX (Java `PriceTickerResponse`).
 Возвращается `GET /api/v5/market/ticker`. Не выходит за
-`ClientService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
+`IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
 
 Mapping в `MarketPriceDataExternalSnapshot` и далее в
 `MarketPriceData` — `docs/models/mapping/MarketPriceData.md`

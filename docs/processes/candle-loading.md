@@ -41,6 +41,10 @@
 историю попадают только закрытые свечи (`confirm=1`), без
 look-ahead.
 
+Джоба живёт в пакете `domain.jobs`; кроме CRON, тик запускается вне
+расписания через `JobController` (`POST /api/jobs/candle-loading/trigger`)
+асинхронно (фасад `CandleJobFacade`, `@Async`) — codestyle §«Джобы».
+
 Контракт пагинации назад и лимиты OKX REST —
 `docs/integrations/okx/contracts/candle.md`. Полная политика
 загрузки и целостности (глубина, расписание `SYNC`/`CHECK`, докачка
@@ -72,6 +76,12 @@ per-status handler'ы по образцу FSM сделки, или иной ме
 lifecycle-доках, а оркестрация описана здесь без привязки к
 конкретному компоненту-владельцу. `CandleJob` остаётся
 производителем свечей (`docs/components/CandleJob.md`).
+
+В коде шага 1 `CandleJob` несёт **провизорную** координацию
+готовности (`refreshInstrumentReadiness`: переводит инструменты из
+`CANDLES_LOADING` в `ACTIVE`, когда их группы готовы) — минимальный
+seam, чтобы шаг работал end-to-end, а не канонический владелец
+оркестрации (он определяется в ORCH-Q1).
 
 ## Связи
 

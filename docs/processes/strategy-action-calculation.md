@@ -58,7 +58,7 @@ transaction.
   результат и risk-метрики; решение `ALLOWED/WARNING/BLOCKED` — у
   `docs/processes/risk-evaluation.md`.
 - **Не** создаёт команды (это `ServiceCommandFactory`) и не вызывает
-  `REFRESH_BALANCE`/`ClientService`.
+  `REFRESH_BALANCE`/`IntegrationService`.
 - Controlled calculation errors → `CalculationError`
   (`TEMPORARY`→RETRY_PENDING / `PERMANENT`→FAILED→Deal ERROR); unexpected
   exceptions ловятся на границе FSM (см.

@@ -1,16 +1,19 @@
-package com.example.tradingbot.client.model.okx.response;
+package com.example.tradingbot.integration.model.okx.response;
+
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
 import java.util.List;
 import lombok.Getter;
-import org.apache.commons.collections4.CollectionUtils;
 
 /**
  * Нативный DTO свечи OKX. На проводе свеча — позиционный массив из 9
  * строк {@code [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]}
  * (docs/models/integrations/okx/OkxCandleResponse.md). Adapter
  * разбирает массив в именованные поля через {@link #of(List)} с
- * валидацией длины (структурная валидация client-слоя). Числа — сырые
- * строки; конвертация в BigDecimal/boolean — на маппинге в snapshot.
+ * валидацией длины (структурная валидация integration-слоя). Индексы
+ * позиционного разбора — локальная техническая деталь, осмысленная
+ * только здесь, поэтому держатся рядом с кодом. Числа — сырые строки;
+ * конвертация в BigDecimal/boolean — на маппинге в snapshot.
  */
 @Getter
 public class CandleResponse {
@@ -70,10 +73,10 @@ public class CandleResponse {
      * 9 — защита от несоответствия формату источника.
      */
     public static CandleResponse of(List<String> raw) {
-        if (CollectionUtils.isEmpty(raw) || raw.size() != EXPECTED_LENGTH) {
+        if (isEmpty(raw) || raw.size() != EXPECTED_LENGTH) {
             throw new IllegalArgumentException(
                     "OKX candle array must have exactly " + EXPECTED_LENGTH + " elements, got: "
-                            + (CollectionUtils.isEmpty(raw) ? 0 : raw.size()));
+                            + (isEmpty(raw) ? 0 : raw.size()));
         }
         return new CandleResponse(raw);
     }

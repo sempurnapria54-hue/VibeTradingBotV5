@@ -8,7 +8,7 @@
 ## Контекст
 
 Нативная модель источника OKX. Возвращается `GET
-/api/v5/account/positions`. Не выходит за `ClientService`/adapter —
+/api/v5/account/positions`. Не выходит за `IntegrationService`/adapter —
 `docs/rules/raw-exchange-dto-boundary.md`.
 
 Mapping в `PositionExternalSnapshot` и далее в `Position` —

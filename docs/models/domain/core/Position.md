@@ -108,7 +108,7 @@ public boolean hasLiveRisk() {
 Нормализованный объект для обновления `Position` (не raw/diagnostic
 exchange response; раздел модели по `.claude/decisions/model-granularity.md`).
 Создаётся только если позиция реально найдена на бирже; если не
-найдена — `ClientService` возвращает `null`, а не пустой snapshot.
+найдена — `IntegrationService` возвращает `null`, а не пустой snapshot.
 
 Поля: `externalId`, `externalSize`, `externalAverageEntryPrice`,
 `externalMarkPrice`, `externalLiquidationPrice`, `externalMargin`,

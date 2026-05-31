@@ -1,11 +1,13 @@
-package com.example.tradingbot.client.service.okx;
+package com.example.tradingbot.integration.service.okx;
 
-import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
-import com.example.tradingbot.client.model.okx.response.OkxApiResponse;
+import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
+import com.example.tradingbot.integration.model.okx.response.InstrumentResponse;
+import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
+import com.example.tradingbot.util.Constants;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -21,16 +23,6 @@ import org.springframework.web.client.RestClient;
 @RequiredArgsConstructor
 public class OkxRestClient {
 
-    private static final String INSTRUMENTS_PATH = "/api/v5/public/instruments";
-    private static final String CANDLES_PATH = "/api/v5/market/candles";
-    private static final String HISTORY_CANDLES_PATH = "/api/v5/market/history-candles";
-
-    private static final String PARAM_INST_TYPE = "instType";
-    private static final String PARAM_INST_ID = "instId";
-    private static final String PARAM_BAR = "bar";
-    private static final String PARAM_AFTER = "after";
-    private static final String PARAM_LIMIT = "limit";
-
     private static final ParameterizedTypeReference<OkxApiResponse<InstrumentResponse>> INSTRUMENT_TYPE =
             new ParameterizedTypeReference<>() {
             };
@@ -44,9 +36,9 @@ public class OkxRestClient {
     public OkxApiResponse<InstrumentResponse> getInstruments(String instType, String instId) {
         return okxRestClientHttp.get()
                 .uri(uriBuilder -> {
-                    uriBuilder.path(INSTRUMENTS_PATH).queryParam(PARAM_INST_TYPE, instType);
-                    if (StringUtils.isNotBlank(instId)) {
-                        uriBuilder.queryParam(PARAM_INST_ID, instId);
+                    uriBuilder.path(Constants.Okx.INSTRUMENTS_PATH).queryParam(Constants.Okx.PARAM_INST_TYPE, instType);
+                    if (isNotBlank(instId)) {
+                        uriBuilder.queryParam(Constants.Okx.PARAM_INST_ID, instId);
                     }
                     return uriBuilder.build();
                 })
@@ -58,14 +50,14 @@ public class OkxRestClient {
     public OkxApiResponse<List<String>> getHistoryCandles(String instId, String bar, Long after, Integer limit) {
         return okxRestClientHttp.get()
                 .uri(uriBuilder -> {
-                    uriBuilder.path(HISTORY_CANDLES_PATH)
-                            .queryParam(PARAM_INST_ID, instId)
-                            .queryParam(PARAM_BAR, bar);
-                    if (Objects.nonNull(after)) {
-                        uriBuilder.queryParam(PARAM_AFTER, after);
+                    uriBuilder.path(Constants.Okx.HISTORY_CANDLES_PATH)
+                            .queryParam(Constants.Okx.PARAM_INST_ID, instId)
+                            .queryParam(Constants.Okx.PARAM_BAR, bar);
+                    if (nonNull(after)) {
+                        uriBuilder.queryParam(Constants.Okx.PARAM_AFTER, after);
                     }
-                    if (Objects.nonNull(limit)) {
-                        uriBuilder.queryParam(PARAM_LIMIT, limit);
+                    if (nonNull(limit)) {
+                        uriBuilder.queryParam(Constants.Okx.PARAM_LIMIT, limit);
                     }
                     return uriBuilder.build();
                 })
@@ -77,11 +69,11 @@ public class OkxRestClient {
     public OkxApiResponse<List<String>> getLatestCandles(String instId, String bar, Integer limit) {
         return okxRestClientHttp.get()
                 .uri(uriBuilder -> {
-                    uriBuilder.path(CANDLES_PATH)
-                            .queryParam(PARAM_INST_ID, instId)
-                            .queryParam(PARAM_BAR, bar);
-                    if (Objects.nonNull(limit)) {
-                        uriBuilder.queryParam(PARAM_LIMIT, limit);
+                    uriBuilder.path(Constants.Okx.CANDLES_PATH)
+                            .queryParam(Constants.Okx.PARAM_INST_ID, instId)
+                            .queryParam(Constants.Okx.PARAM_BAR, bar);
+                    if (nonNull(limit)) {
+                        uriBuilder.queryParam(Constants.Okx.PARAM_LIMIT, limit);
                     }
                     return uriBuilder.build();
                 })

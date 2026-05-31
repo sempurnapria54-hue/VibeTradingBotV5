@@ -1,11 +1,11 @@
-package com.example.tradingbot.domain.service.market;
+package com.example.tradingbot.domain.jobs;
 
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.service.core.InstrumentService;
+import com.example.tradingbot.domain.service.market.CandleLoader;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +16,8 @@ import org.springframework.stereotype.Component;
  * Производитель базовых свечных данных (docs/components/CandleJob.md):
  * CRON-тик ведёт каждую {@link CandleGroup} по её циклу через
  * {@link CandleLoader}. Триггерит докачку хвоста для ACTIVE-групп при
- * новом закрытом баре. Стратегических сигналов/сделок не считает.
+ * новом закрытом баре. Стратегических сигналов/сделок не считает. Вне
+ * расписания запускается асинхронно через {@link CandleJobFacade}.
  *
  * <p>ORCH-Q1 (провизорный seam): координацию готовности инструмента
  * (Instrument.Status по готовности групп) делает {@link #refreshInstrumentReadiness()}.
@@ -34,9 +35,6 @@ public class CandleJob {
             CandleGroup.Status.SYNC,
             CandleGroup.Status.CHECK,
             CandleGroup.Status.REPAIR);
-
-    /** Новый закрытый бар существует, когда прошло ≥ 2 длительностей бара после actualLast. */
-    private static final long CLOSED_BAR_FACTOR = 2L;
 
     private final CandleGroupDataService candleGroupDataService;
     private final CandleLoader candleLoader;
@@ -64,7 +62,7 @@ public class CandleJob {
         List<CandleGroup> activeGroups = candleGroupDataService.findByStatusIn(Set.of(CandleGroup.Status.ACTIVE));
         long now = System.currentTimeMillis();
         for (CandleGroup group : activeGroups) {
-            if (isNewClosedBarDue(group, now)) {
+            if (group.hasNewClosedBar(now)) {
                 group.setStatus(CandleGroup.Status.SYNC);
                 candleGroupDataService.save(group);
             }
@@ -80,14 +78,5 @@ public class CandleJob {
                 log.error("Instrument readiness evaluation failed for {}", instrument.getId(), e);
             }
         }
-    }
-
-    private boolean isNewClosedBarDue(CandleGroup group, long nowMillis) {
-        Long actualLast = group.getActualLastUtcMillis();
-        if (Objects.isNull(actualLast)) {
-            return false;
-        }
-        long step = group.getTimeframe().getDurationMillis();
-        return nowMillis - actualLast >= CLOSED_BAR_FACTOR * step;
     }
 }

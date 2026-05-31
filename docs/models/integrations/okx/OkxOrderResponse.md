@@ -10,7 +10,7 @@
 Нативная модель источника OKX. Возвращается `GET /trade/order`,
 `/trade/orders-pending`, `/trade/orders-history`,
 `/trade/orders-history-archive` и create/amend/cancel ACK (с
-сокращённым набором). Не выходит за `ClientService`/adapter — см.
+сокращённым набором). Не выходит за `IntegrationService`/adapter — см.
 `docs/rules/raw-exchange-dto-boundary.md`.
 
 Mapping в `OrderExternalSnapshot` и далее в `Order` —

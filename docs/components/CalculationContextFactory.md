@@ -25,7 +25,7 @@ balance (из `DealContext` / repository). Тяжёлые данные не сч
   context); общий context на step/handler/проход не собирает.
 - `MarketPriceData` в рамках одного context получает один раз и
   переиспользует.
-- **Не** вызывает `ClientService` / OKX adapter и **не** создаёт
+- **Не** вызывает `IntegrationService` / OKX adapter и **не** создаёт
   `REFRESH_BALANCE`.
 - Работает защитно: если обязательное готовое значение отсутствует, явно
   устарело, или сервис рыночных данных не может вернуть актуальную цену —

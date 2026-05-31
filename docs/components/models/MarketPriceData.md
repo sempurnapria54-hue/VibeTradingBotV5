@@ -47,7 +47,7 @@ externalAskPrice) / 2`.
 `externalInstrumentId`, `externalLastPrice`, `externalAskPrice`,
 `externalBidPrice`, `externalTimestamp` (без `instrumentId` — внутренний
 ID добавляется уже при сборке `MarketPriceData`). Сырой OKX DTO за
-`ClientService` не выходит; OKX ticker → snapshot маппинг —
+`IntegrationService` не выходит; OKX ticker → snapshot маппинг —
 `docs/models/mapping/MarketPriceData.md`.
 
 ## Правила использования

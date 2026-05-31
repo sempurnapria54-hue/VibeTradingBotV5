@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Прикладная логика {@link Exchange}: заведение биржи и чтение.
+ * Fetch-or-throw живёт в {@link ExchangeDataService} (codestyle:
+ * getRequiredBy* — в DataService), сюда делегируется.
  */
 @Service
 @RequiredArgsConstructor
@@ -19,8 +21,12 @@ public class ExchangeService {
         return exchangeDataService.save(exchange);
     }
 
-    public Exchange getRequiredById(Long id) {
-        return exchangeDataService.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Exchange not found: " + id));
+    public Exchange getRequiredByInternalId(String internalId) {
+        return exchangeDataService.getRequiredByInternalId(internalId);
+    }
+
+    /** Резолв internalId биржи по id — проекция одного поля, не вся сущность. */
+    public String getRequiredInternalIdById(Long id) {
+        return exchangeDataService.getRequiredInternalIdById(id);
     }
 }

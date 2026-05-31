@@ -100,7 +100,7 @@ runtime-логики.
 модели (`externalInstrumentType` … `externalState`), без доменных
 enum-полей `instrumentType`/`contractType`/`status` — они резолвятся уже
 при материализации `InstrumentExternalRules`. Сырой OKX DTO за
-`ClientService` не выходит; конкретный OKX-маппинг —
+`IntegrationService` не выходит; конкретный OKX-маппинг —
 `docs/models/mapping/InstrumentExternalRules.md`.
 
 ## Персистентность

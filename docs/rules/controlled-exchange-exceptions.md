@@ -25,7 +25,7 @@ Deal -> ERROR; Exchange -> HOLD по severity / safetyImpact
 
 ### ExternalInvariantViolationException
 
-Бросает `ClientService` / adapter-layer, если response получен, но
+Бросает `IntegrationService` / adapter-layer, если response получен, но
 нарушает ожидаемый exchange invariant (`tdMode != isolated`, `posSide !=
 net`, `side`/`ordType`/`reduceOnly` != expected).
 

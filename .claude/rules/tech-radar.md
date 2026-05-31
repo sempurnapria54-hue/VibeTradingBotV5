@@ -39,6 +39,7 @@
 | Lombok | boilerplate (геттеры/сеттеры/конструкторы/`@Builder`/`@Value`) | `adopt` |
 | MapStruct | маппинг между слоями (api↔domain↔persistence↔client) | `adopt` |
 | springdoc-openapi | OpenAPI/Swagger-документация нашего API | `adopt` |
+| Spring `@Async` / `@EnableAsync` | асинхронный запуск джоб вне расписания (через фасад, не блокируя HTTP-ответ) | `adopt` |
 
 Прочие модули Spring и библиотеки добавляются по ходу — по
 потребности шага, не превентивно.

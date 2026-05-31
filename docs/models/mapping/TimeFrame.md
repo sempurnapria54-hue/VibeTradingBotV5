@@ -34,6 +34,7 @@ TimeFrame.ONE_HOUR <-> "1H"
 
 - Маппинг строгий: без `lowerCase` / `upperCase`, точное соответствие
   строк.
-- `TimeFrameMapper` предоставляет обе стороны: `domainToOkxClient` и
-  `okxClientToDomain`.
+- `TimeFrameMapper` предоставляет `domainToOkx` (домен → строка OKX).
+  Обратное направление в коде шага 1 не используется и не заведено
+  (по потребности). Строки баров живут в `util.Constants.Okx`.
 - Отдельный `TimeFrameResolver` на первом этапе не нужен.

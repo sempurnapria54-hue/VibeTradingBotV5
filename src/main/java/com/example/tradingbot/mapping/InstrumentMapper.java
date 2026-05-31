@@ -2,22 +2,24 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.api.model.request.CreateInstrumentApiRequest;
 import com.example.tradingbot.api.model.response.InstrumentApiResponse;
-import com.example.tradingbot.client.model.okx.response.InstrumentResponse;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
+import com.example.tradingbot.integration.model.okx.response.InstrumentResponse;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
-import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.ReportingPolicy;
 
 /**
  * Маппинг инструмента между слоями (docs/models/mapping/Instrument.md):
- * client DTO OKX → граничный {@link InstrumentExternalSnapshot}, затем
- * частичное обновление доменного {@link Instrument} из снапшота
+ * integration DTO OKX → граничный {@link InstrumentExternalSnapshot},
+ * затем частичное обновление доменного {@link Instrument} из снапшота
  * (идентичность + биржевые externalStatus/externalLeverage; шаг 1).
+ * Наружу — internalId (свой и exchangeInternalId), не id из БД.
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
+        uses = CandleGroupMapper.class)
 public interface InstrumentMapper {
 
     @Mapping(target = "externalInstrumentId", source = "instId")
@@ -32,47 +34,42 @@ public interface InstrumentMapper {
     @Mapping(target = "externalContractValue", source = "ctVal")
     @Mapping(target = "externalContractMultiplier", source = "ctMult")
     @Mapping(target = "externalTickSize", source = "tickSz")
-    InstrumentExternalSnapshot clientToSnapshot(InstrumentResponse response);
+    InstrumentExternalSnapshot integrationToSnapshot(InstrumentResponse response);
 
     /**
-     * Частичное обновление инструмента из снапшота: только поля шага 1
-     * (идентичность + биржевые статус/плечо). Прочие поля инструмента
-     * (id, internalId, exchangeId, leverage, marginMode, ...) не
-     * трогаются.
+     * Частичное обновление инструмента из снапшота: идентичность +
+     * биржевые статус/плечо (шаг 1). {@code externalStatus} /
+     * {@code externalLeverage} совпадают по имени; {@code externalId} /
+     * {@code externalType} — из снапшотных external*-полей. Прочие поля
+     * инструмента (id, internalId, exchangeId, leverage, marginMode, ...)
+     * не трогаются.
      */
-    @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "externalId", source = "externalInstrumentId")
     @Mapping(target = "externalType", source = "externalInstrumentType")
-    @Mapping(target = "externalStatus", source = "externalStatus")
-    @Mapping(target = "externalLeverage", source = "externalLeverage")
-    void updateFromSnapshot(@MappingTarget Instrument instrument, InstrumentExternalSnapshot snapshot);
+    void snapshotToDomain(@MappingTarget Instrument instrument, InstrumentExternalSnapshot snapshot);
+
+    @Mapping(target = "candleGroups", ignore = true)
+    InstrumentEntity domainToPersistence(Instrument instrument);
+
+    @Mapping(target = "candleGroups", ignore = true)
+    Instrument persistenceToDomain(InstrumentEntity entity);
 
     /**
-     * Domain → entity. {@code candleGroups} не траверсируется маппером —
-     * группами управляет {@code CandleGroupDataService} (агрегат
-     * cascade всё равно объявлен на entity).
+     * Entity → domain ВМЕСТЕ с группами свечей — для проверок, которым
+     * нужны группы инструмента (например {@code isReadyForActivation}).
+     * Группы мапятся через {@code CandleGroupMapper}; грузить их нужно
+     * join fetch'ем, иначе коллекция не инициализирована.
      */
-    @Mapping(target = "candleGroups", ignore = true)
-    InstrumentEntity domainToEntity(Instrument instrument);
-
-    @Mapping(target = "candleGroups", ignore = true)
-    Instrument entityToDomain(InstrumentEntity entity);
+    Instrument persistenceToDomainWithCandleGroups(InstrumentEntity entity);
 
     /**
      * Api → domain при заведении: статус, биржевые поля и группы свечей
-     * проставляются системой/онбордингом, не из запроса. marginMode —
-     * строка запроса → enum по имени.
+     * проставляются системой/онбордингом, не из запроса. {@code exchangeId}
+     * резолвится сервисом из {@code exchangeInternalId} запроса (здесь не
+     * маппится). marginMode — строка запроса → enum по имени.
      */
-    @BeanMapping(ignoreByDefault = true)
-    @Mapping(target = "internalId", source = "internalId")
-    @Mapping(target = "exchangeId", source = "exchangeId")
-    @Mapping(target = "externalId", source = "externalId")
-    @Mapping(target = "externalType", source = "externalType")
-    @Mapping(target = "marginMode", source = "marginMode")
-    @Mapping(target = "externalMarginMode", source = "externalMarginMode")
-    @Mapping(target = "leverage", source = "leverage")
-    @Mapping(target = "plannedCandleStartDate", source = "plannedCandleStartDate")
     Instrument apiToDomain(CreateInstrumentApiRequest request);
 
-    InstrumentApiResponse domainToApi(Instrument instrument);
+    @Mapping(target = "exchangeInternalId", source = "exchangeInternalId")
+    InstrumentApiResponse domainToApi(Instrument instrument, String exchangeInternalId);
 }

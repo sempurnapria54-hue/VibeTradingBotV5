@@ -37,8 +37,8 @@
 - **безопасность** → `.claude/skills/security-review.md` —
   **деактивирован** до шага «Безопасность» (под-шаг `CODE`,
   реактивируется там);
-- **конвенции** → `.claude/skills/conventions-review.md` — стаб,
-  под-шаг `CODE`;
+- **конвенции** → `.claude/skills/conventions-review.md` — наполнен
+  по первому реальному `CODE`-ревью (шаг 1), под-шаг `CODE`;
 - **производительность** → `.claude/skills/performance-review.md` —
   стаб, под-шаг `CODE`;
 - **устойчивость к сбоям** → `.claude/skills/disaster-review.md` —

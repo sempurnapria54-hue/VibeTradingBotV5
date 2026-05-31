@@ -8,7 +8,7 @@
 ## Контекст
 
 Нативная модель источника OKX. Возвращается `GET
-/api/v5/account/balance`. Не выходит за `ClientService`/adapter —
+/api/v5/account/balance`. Не выходит за `IntegrationService`/adapter —
 `docs/rules/raw-exchange-dto-boundary.md`.
 
 Mapping в `BalanceContainerExternalSnapshot` /

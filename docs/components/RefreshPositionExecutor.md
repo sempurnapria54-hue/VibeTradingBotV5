@@ -8,7 +8,7 @@
 ## Назначение
 
 Получает `REFRESH_POSITION`. Берёт `Exchange`/`Instrument` из
-`DealContext` / command context, вызывает `ClientService` для текущей
+`DealContext` / command context, вызывает `IntegrationService` для текущей
 позиции по инструменту, получает `PositionExternalSnapshot` или `null`,
 прогоняет через `PositionStatusResolver`, применяет `status`, заполняет
 `closeReason candidate` только если текущий `== null`. Для OKX — один

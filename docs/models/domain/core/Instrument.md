@@ -40,6 +40,10 @@
 Поля аудита (`createdAt`/`modifiedAt`/`externalCreatedAt`/… ) —
 из `Auditable`.
 
+Наружу (API) инструмент адресуется `internalId`, его биржа —
+`exchangeInternalId`; числовые `id`/`exchangeId` — внутренняя деталь
+связей и наружу не отдаются (см. `docs/models/api/README.md`).
+
 ## Енумы
 
 ### `Status`
@@ -114,6 +118,8 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
   спецификации, переход `SYNC`).
 - `internal_id`, `exchange_id`, `margin_mode` — `updatable = false`
   (неизменны после создания).
+- `status` и `margin_mode` хранятся строкой (имя enum); enum — только
+  в домене (codestyle: enum'ы — в доменном слое).
 - `candleGroups` — `OneToMany` (mappedBy `instrument`), cascade
   `ALL`, `orphanRemoval = true`.
 

@@ -1,5 +1,7 @@
 package com.example.tradingbot.domain.model.core.instrument;
 
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
+
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import java.util.List;
@@ -8,7 +10,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.apache.commons.collections4.CollectionUtils;
 
 /**
  * Торговый инструмент биржи — базовая идентичность для рыночных
@@ -64,22 +65,53 @@ public class Instrument extends Auditable {
     /** Группы свечей по таймфреймам инструмента (1:many). */
     private List<CandleGroup> candleGroups;
 
+    /** Инструмент в стадии загрузки свечей. */
+    public Boolean isCandleLoading() {
+        return Objects.equals(status, Status.CANDLES_LOADING);
+    }
+
     /**
-     * Инструмент готов к активации, когда есть группы свечей и все они
-     * в {@code ACTIVE} (координация Instrument.Status ↔ CandleGroup.Status,
-     * docs/lifecycles/Instrument.md).
+     * Инструмент готов к активации: есть группы свечей и все они в
+     * {@code ACTIVE} (координация Instrument.Status ↔ CandleGroup.Status,
+     * docs/lifecycles/Instrument.md). Проверяет собственные
+     * {@code candleGroups} — для активации их грузят join fetch'ем.
      */
-    public boolean isReadyForActivation(List<CandleGroup> groups) {
-        return CollectionUtils.isNotEmpty(groups) && groups.stream().allMatch(CandleGroup::isActive);
+    public Boolean isReadyForActivation() {
+        return isNotEmpty(candleGroups) && candleGroups.stream().allMatch(CandleGroup::isActive);
     }
 
     /** Онбординг-статус инструмента в системе (готовность к торговле). */
     public enum Status {
-        CREATED, HOLD, SYNC, CANDLES_LOADING, ACTIVE, CLOSED, ERROR
+
+        /** Инструмент заведён, онбординг не начинался. */
+        CREATED,
+
+        /** Инструмент придержан (не вовлекается в онбординг). */
+        HOLD,
+
+        /** Идёт синхронизация спецификации с биржей. */
+        SYNC,
+
+        /** Идёт загрузка свечной истории под таймфреймы. */
+        CANDLES_LOADING,
+
+        /** Инструмент готов к торговле (все группы свечей активны). */
+        ACTIVE,
+
+        /** Инструмент выведен из использования. */
+        CLOSED,
+
+        /** Ошибка онбординга. */
+        ERROR
     }
 
     /** Нормализованный режим маржи; сырой биржевой — в externalMarginMode. */
     public enum MarginMode {
-        ISOLATED, CROSS
+
+        /** Изолированная маржа. */
+        ISOLATED,
+
+        /** Кросс-маржа. */
+        CROSS
     }
 }

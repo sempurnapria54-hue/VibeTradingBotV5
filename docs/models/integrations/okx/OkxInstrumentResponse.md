@@ -9,7 +9,7 @@
 
 Нативная модель источника OKX (Java `InstrumentResponse`).
 Возвращается `GET /api/v5/public/instruments`. Не выходит за
-`ClientService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
+`IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
 
 Mapping в `InstrumentExternalSnapshot` и далее в `Instrument`
 (идентичность + биржевые `externalStatus`/`externalLeverage` +

@@ -26,12 +26,12 @@ Balance → endpoint-доки источника → доменная модел
 ### Mapping-flow
 
 ```text
-source REST response -> raw DTO -> ClientService validation
+source REST response -> raw DTO -> IntegrationService validation
   -> BalanceContainerMapper -> BalanceContainerExternalSnapshot
   -> RefreshBalanceExecutor -> BalanceContainer / Balance
 ```
 
-Raw DTO не выходит за пределы `ClientService` / adapter-layer
+Raw DTO не выходит за пределы `IntegrationService` / adapter-layer
 (`docs/rules/raw-exchange-dto-boundary.md`); `RefreshBalanceExecutor`
 работает только с validated normalized snapshot.
 
@@ -67,7 +67,7 @@ snapshot полностью заменяет старый список currency 
 
 ### Validation (структурная, до маппинга)
 
-В `ClientService` источника:
+В `IntegrationService` источника:
 
 - **Structural:** `response != null`; `data != null`; ровно один
   account snapshot; `data[0] != null`; `data[0].details` не null и не
@@ -87,7 +87,7 @@ snapshot полностью заменяет старый список currency 
   запрещён); нет активных liability (торгуем только собственными
   средствами); нет account-режима, конфликтующего с isolated-only
   policy; settle currency соответствует инструменту. Validation-only
-  поля используются только внутри `ClientService`, в snapshot не
+  поля используются только внутри `IntegrationService`, в snapshot не
   попадают.
 
 ### Error policy

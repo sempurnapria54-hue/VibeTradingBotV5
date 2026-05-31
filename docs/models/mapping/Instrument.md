@@ -11,7 +11,7 @@
 Mapping-слой для `Instrument`. Доменная модель —
 `docs/models/domain/core/Instrument.md`. Граничный снапшот —
 `InstrumentExternalSnapshot` (транзиентный, единственное, что
-выходит за `ClientService`/adapter; см.
+выходит за `IntegrationService`/adapter; см.
 `docs/rules/raw-exchange-dto-boundary.md`). Сквозные правила —
 `docs/rules/raw-exchange-dto-boundary.md`,
 `docs/rules/business-logic-on-domain-model.md`. Контракт

@@ -1,5 +1,6 @@
 package com.example.tradingbot.config;
 
+import com.example.tradingbot.util.Constants;
 import java.util.Optional;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,8 +17,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 @EnableJpaAuditing(auditorAwareRef = "auditorAware")
 public class JpaAuditConfig {
 
-    private static final String SYSTEM_PRINCIPAL = "system";
-
     /**
      * Источник имени актора для createdBy/modifiedBy. До шага
      * «Безопасность» (Фаза 1, шаг 9) — постоянный системный принципал;
@@ -25,6 +24,6 @@ public class JpaAuditConfig {
      */
     @Bean
     public AuditorAware<String> auditorAware() {
-        return () -> Optional.of(SYSTEM_PRINCIPAL);
+        return () -> Optional.of(Constants.Audit.SYSTEM_PRINCIPAL);
     }
 }

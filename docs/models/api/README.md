@@ -13,9 +13,20 @@
 
 ## Статус
 
-**Скаффолд.** На момент введения слой пуст — внешний API сервиса
-ещё не вводится. Наполняется при появлении первых endpoint'ов
-наружу.
+API введён в шаге 1 (endpoint'ы для `Exchange` / `Instrument` /
+`CandleGroup` + триггер джобы). Отдельные per-DTO файлы здесь пока
+не заводятся: step-1 response-DTO просты (зеркало domain без `id`),
+под критерий ниже не подпадают. Конвенции слоя — ниже.
+
+## Конвенции api-слоя
+
+- Наружу отдаётся `internalId`, **не** `id` из БД; ссылки на
+  связанные сущности — их `internalId` (`exchangeInternalId`,
+  `instrumentInternalId`); path-параметры — `internalId`.
+- Каждое поле api-модели — со Swagger `@Schema(description = ...)`.
+- Enum'ы только в домене; в api поля под enum — `String`.
+- Auditable по слоям: api-ответы наследуют `AuditableApiResponse`
+  (см. `docs/models/domain/other/Auditable.md`).
 
 ## Когда заводить файл
 

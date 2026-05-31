@@ -1,4 +1,4 @@
-# ClientService
+# IntegrationService
 
 ## На какой вопрос отвечает этот файл
 
@@ -7,9 +7,9 @@ nullable contract, что не выходит наружу.
 
 ## Назначение
 
-`ClientService` — adapter boundary к бирже: executor'ы и refresh-flow
+`IntegrationService` — adapter boundary к бирже: executor'ы и refresh-flow
 ходят на биржу только через него. Сырой биржевой DTO (например, OKX
-response) за `ClientService` / adapter-layer **не** выходит — наружу
+response) за `IntegrationService` / adapter-layer **не** выходит — наружу
 возвращаются только validated `*ExternalSnapshot` (см.
 `docs/rules/raw-exchange-dto-boundary.md`).
 

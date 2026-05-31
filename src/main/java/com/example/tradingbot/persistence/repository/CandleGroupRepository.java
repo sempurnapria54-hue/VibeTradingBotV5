@@ -1,7 +1,5 @@
 package com.example.tradingbot.persistence.repository;
 
-import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
-import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.persistence.model.candle.CandleGroupEntity;
 import java.util.Collection;
 import java.util.List;
@@ -12,7 +10,7 @@ public interface CandleGroupRepository extends JpaRepository<CandleGroupEntity, 
 
     List<CandleGroupEntity> findByInstrument_Id(Long instrumentId);
 
-    Optional<CandleGroupEntity> findByInstrument_IdAndTimeframe(Long instrumentId, TimeFrame timeframe);
+    Optional<CandleGroupEntity> findByInstrument_IdAndTimeframe(Long instrumentId, String timeframe);
 
-    List<CandleGroupEntity> findByStatusIn(Collection<CandleGroup.Status> statuses);
+    List<CandleGroupEntity> findByStatusIn(Collection<String> statuses);
 }

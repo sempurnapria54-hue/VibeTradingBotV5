@@ -1,7 +1,7 @@
-package com.example.tradingbot.client.service;
+package com.example.tradingbot.integration.service;
 
 /**
- * Ошибка взаимодействия с биржей на границе ClientService/adapter:
+ * Ошибка взаимодействия с биржей на границе IntegrationService/adapter:
  * ошибка API (code != "0"), parse или нарушение структурного
  * инварианта ответа (docs/components/ClientService.md).
  *
@@ -11,13 +11,13 @@ package com.example.tradingbot.client.service;
  * минимальный placeholder; финальная иерархия исключений — открытый
  * вопрос, упирающийся код эскалирует его.
  */
-public class ExchangeClientException extends RuntimeException {
+public class ExchangeIntegrationException extends RuntimeException {
 
-    public ExchangeClientException(String message) {
+    public ExchangeIntegrationException(String message) {
         super(message);
     }
 
-    public ExchangeClientException(String message, Throwable cause) {
+    public ExchangeIntegrationException(String message, Throwable cause) {
         super(message, cause);
     }
 }

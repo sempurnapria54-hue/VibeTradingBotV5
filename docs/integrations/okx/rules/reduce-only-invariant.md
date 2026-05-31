@@ -33,7 +33,7 @@ Reduce-only — критическая защита от случайного у
 
 ## Где применяется
 
-- `OkxClientService` validation после create order;
+- `OkxIntegrationService` validation после create order;
 - `OrderExternalSnapshot` материализация (поле сознательно
   отсутствует, чтобы не дать silent override).
 

@@ -6,8 +6,6 @@ import com.example.tradingbot.persistence.model.candle.CandleGroupEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -21,7 +19,8 @@ import lombok.Setter;
  * Persistence-проекция {@link Instrument} (таблица instruments).
  * Владеет группами свечей (агрегат: cascade ALL + orphanRemoval).
  * Реальная схема (уникальности internal_id и (exchange_id,
- * external_id), FK) — во Flyway-миграциях.
+ * external_id), FK) — во Flyway-миграциях. Enum'ы — только в домене;
+ * статус и режим маржи хранятся строкой (значение = {@code name()}).
  */
 @Getter
 @Setter
@@ -45,16 +44,14 @@ public class InstrumentEntity extends AuditableEntity {
     @Column(name = "external_type", nullable = false)
     private String externalType;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private Instrument.Status status;
+    private String status;
 
     @Column(name = "external_status")
     private String externalStatus;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "margin_mode", nullable = false, updatable = false)
-    private Instrument.MarginMode marginMode;
+    private String marginMode;
 
     @Column(name = "external_margin_mode")
     private String externalMarginMode;

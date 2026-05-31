@@ -10,7 +10,7 @@
 Нативная модель источника OKX. Возвращается `GET /trade/order-algo`,
 `/trade/orders-algo-pending`, `/trade/orders-algo-history` и
 create/cancel ACK (с сокращённым набором). Не выходит за
-`ClientService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
+`IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
 
 Mapping в `AlgoOrderExternalSnapshot` и далее в `AlgoOrder` —
 `docs/models/mapping/AlgoOrder.md` (раздел `## OKX`). Доменная модель

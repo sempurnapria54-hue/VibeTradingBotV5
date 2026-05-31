@@ -47,7 +47,7 @@ externalSize = abs(pos)
 Если direction ≠ expected direction текущей сделки — нарушение
 invariant.
 
-### `ClientService` контракт (snapshot / null / exception)
+### `IntegrationService` контракт (snapshot / null / exception)
 
 ```text
 позиция найдена         -> PositionExternalSnapshot
@@ -146,7 +146,7 @@ lever   <= expected max leverage
 `POST /api/v5/trade/close-position`: `instId`, `mgnMode`, `posSide`,
 `ccy` (опц.), `autoCxl` (опц.). Берутся **не** из `Position`, а из
 `DealContext` / `Instrument` / Exchange-Account settings /
-`OkxClientService` policy:
+`OkxIntegrationService` policy:
 
 ```text
 Instrument.externalId     → instId

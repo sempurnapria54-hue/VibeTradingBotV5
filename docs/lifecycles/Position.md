@@ -10,7 +10,7 @@
 ## Кто управляет
 
 Статусы `Position` меняет только `REFRESH_POSITION` flow:
-`ClientService` отдаёт snapshot (или `null`), `PositionStatusResolver`
+`IntegrationService` отдаёт snapshot (или `null`), `PositionStatusResolver`
 возвращает `status + closeReason` candidate, `RefreshPositionExecutor`
 применяет результат. FSM напрямую `Position` не создаёт и не меняет.
 

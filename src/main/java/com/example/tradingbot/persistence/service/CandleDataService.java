@@ -1,16 +1,18 @@
 package com.example.tradingbot.persistence.service;
 
+import static java.util.Objects.nonNull;
+import static java.util.stream.Collectors.toList;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.persistence.model.candle.CandleEntity;
 import com.example.tradingbot.persistence.repository.CandleRepository;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,28 +34,29 @@ public class CandleDataService {
      * @return число фактически вставленных свечей.
      */
     @Transactional
-    public int saveNewCandles(Long candleGroupId, List<Candle> candles) {
-        if (CollectionUtils.isEmpty(candles)) {
+    public Integer saveCandles(Long candleGroupId, List<Candle> candles) {
+        if (isEmpty(candles)) {
             return 0;
         }
         long from = candles.stream().mapToLong(Candle::getOpenTimestamp).min().orElseThrow();
         long to = candles.stream().mapToLong(Candle::getOpenTimestamp).max().orElseThrow();
-        Set<Long> existing = new HashSet<>(repository.findOpenTimestampsInRange(candleGroupId, from, to));
+        Set<Long> existing = new HashSet<>(
+                repository.findOpenTimestampsInRange(candleGroupId, from, to));
         List<CandleEntity> toInsert = candles.stream()
-                .filter(candle -> BooleanUtils.isFalse(existing.contains(candle.getOpenTimestamp())))
+                .filter(candle -> isFalse(existing.contains(candle.getOpenTimestamp())))
                 .map(candle -> toEntity(candleGroupId, candle))
-                .toList();
+                .collect(toList());
         repository.saveAll(toInsert);
         return toInsert.size();
     }
 
     @Transactional(readOnly = true)
-    public long count(Long candleGroupId) {
+    public Long count(Long candleGroupId) {
         return repository.countByCandleGroupId(candleGroupId);
     }
 
     @Transactional(readOnly = true)
-    public long countInRange(Long candleGroupId, Long fromMillis, Long toMillis) {
+    public Long countInRange(Long candleGroupId, Long fromMillis, Long toMillis) {
         return repository.countInRange(candleGroupId, fromMillis, toMillis);
     }
 
@@ -68,8 +71,8 @@ public class CandleDataService {
     }
 
     private CandleEntity toEntity(Long candleGroupId, Candle candle) {
-        CandleEntity entity = mapper.domainToEntity(candle);
-        if (Objects.nonNull(entity)) {
+        CandleEntity entity = mapper.domainToPersistence(candle);
+        if (nonNull(entity)) {
             entity.setCandleGroupId(candleGroupId);
         }
         return entity;

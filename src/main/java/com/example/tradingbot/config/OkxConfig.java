@@ -1,6 +1,8 @@
 package com.example.tradingbot.config;
 
-import org.apache.commons.lang3.StringUtils;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
+import com.example.tradingbot.util.Constants;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
@@ -14,13 +16,11 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class OkxConfig {
 
-    private static final String SIMULATED_HEADER = "x-simulated-trading";
-
     @Bean
     public RestClient okxRestClientHttp(OkxProperties properties, RestClient.Builder builder) {
         RestClient.Builder configured = builder.baseUrl(properties.getBaseUrl());
-        if (StringUtils.isNotBlank(properties.getSimulated())) {
-            configured = configured.defaultHeader(SIMULATED_HEADER, properties.getSimulated());
+        if (isNotBlank(properties.getSimulated())) {
+            configured = configured.defaultHeader(Constants.Okx.SIMULATED_HEADER, properties.getSimulated());
         }
         return configured.build();
     }

@@ -23,6 +23,7 @@ lifecycle.
 | Поле | Тип | Назначение |
 |---|---|---|
 | `id` | `Long` | Внутренний идентификатор группы. |
+| `internalId` | `String` | Межсервисный идентификатор (наружу отдаётся вместо `id`); генерируется системой из `internalId` инструмента и таймфрейма, уникален. |
 | `instrumentId` | `Long` | Инструмент-владелец (`Instrument.id`). |
 | `timeframe` | `TimeFrame` | Канонический таймфрейм группы (enum, см. ниже). |
 | `externalTimeframe` | `String` | Таймфрейм в формате биржи (сырой, например `1H`). |
@@ -38,12 +39,6 @@ lifecycle.
 не на группу. `count` поддерживается при записи свечей и на старте
 реконсилируется реальным `COUNT(*)` (защита от рассинхрона после
 рестарта в середине пачки). Поля аудита — из `Auditable`.
-
-> **Расхождение класс↔концепция.** В Java-классе `timeframe` пока
-> `String`; целевой вид — канонический enum `TimeFrame` (как
-> `Instrument.marginMode` — нормализованный enum при сыром
-> `externalMarginMode: String`). Здесь зафиксирован целевой вид;
-> приведение типа в классе — на этапе `CODE` шага 1.
 
 ## Енум `TimeFrame`
 
@@ -102,14 +97,16 @@ density-инварианта. Идемпотентность записи и ind
 - `id` — identity (autoincrement).
 - Уникальность: `(instrument_id, timeframe)`
   (uk_candle_group_instrument_timeframe) — одна группа на
-  инструмент + таймфрейм.
-- `instrument_id`, `timeframe`, `external_timeframe`, `status`,
-  `count` — `NOT NULL` (`count` default `0`);
+  инструмент + таймфрейм; `internal_id`
+  (uk_candle_group_internal_id) — уникален.
+- `internal_id`, `instrument_id`, `timeframe`, `external_timeframe`,
+  `status`, `count` — `NOT NULL` (`count` default `0`);
   `actual_first_utc_millis`/`actual_last_utc_millis` — nullable
-  (null при `count = 0`).
+  (null при `count = 0`). `internal_id` — `updatable = false`.
 - Связь с инструментом — `ManyToOne` (`instrument_id`,
   `updatable = false`).
-- `status` хранится строкой (имя enum).
+- `timeframe` и `status` хранятся строкой (имя enum); enum — только
+  в домене (codestyle: enum'ы объявляются в доменном слое).
 
 ## Связи
 

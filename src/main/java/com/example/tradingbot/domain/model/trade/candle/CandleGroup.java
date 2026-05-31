@@ -1,5 +1,7 @@
 package com.example.tradingbot.domain.model.trade.candle;
 
+import static java.util.Objects.isNull;
+
 import com.example.tradingbot.domain.model.Auditable;
 import java.util.Objects;
 import lombok.AllArgsConstructor;
@@ -22,8 +24,18 @@ import lombok.Setter;
 @AllArgsConstructor
 public class CandleGroup extends Auditable {
 
+    /** Новый закрытый бар существует, когда прошло ≥ 2 длительностей бара после actualLast. */
+    private static final long CLOSED_BAR_FACTOR = 2L;
+
     /** Внутренний идентификатор группы. */
     private Long id;
+
+    /**
+     * Межсервисный идентификатор группы (наружу отдаётся вместо id).
+     * Генерируется системой при заведении группы из internalId
+     * инструмента и таймфрейма; уникален.
+     */
+    private String internalId;
 
     /** Инструмент-владелец (Instrument.id). */
     private Long instrumentId;
@@ -52,8 +64,8 @@ public class CandleGroup extends Auditable {
      * {@code (actualLast - actualFirst) / step + 1}. Для пустой
      * группы (границы не заданы) — 0.
      */
-    public long expectedCount() {
-        if (Objects.isNull(actualFirstUtcMillis) || Objects.isNull(actualLastUtcMillis)) {
+    public Long expectedCount() {
+        if (isNull(actualFirstUtcMillis) || isNull(actualLastUtcMillis)) {
             return 0L;
         }
         long step = timeframe.getDurationMillis();
@@ -65,19 +77,55 @@ public class CandleGroup extends Auditable {
      * совпадает с ожидаемым по density-инварианту. Дотягивание нижней
      * границы до планового горизонта — забота BACKFILL, не плотности.
      */
-    public boolean isDense() {
+    public Boolean isDense() {
         long expected = expectedCount();
-        long actual = Objects.isNull(count) ? 0L : count;
+        long actual = isNull(count) ? 0L : count;
         return actual == expected;
     }
 
     /** Группа готова (покрытие подтверждено, дыр нет). */
-    public boolean isActive() {
+    public Boolean isActive() {
         return Objects.equals(status, Status.ACTIVE);
+    }
+
+    /**
+     * Появился ли новый закрытый бар к моменту {@code nowMillis}: после
+     * открытия последней загруженной свечи прошло ≥ {@code CLOSED_BAR_FACTOR}
+     * длительностей бара. Пустая группа (нет actualLast) — нет.
+     */
+    public Boolean hasNewClosedBar(Long nowMillis) {
+        if (isNull(actualLastUtcMillis)) {
+            return false;
+        }
+        long step = timeframe.getDurationMillis();
+        return nowMillis - actualLastUtcMillis >= CLOSED_BAR_FACTOR * step;
     }
 
     /** Статус жизненного цикла загрузки свечей группы. */
     public enum Status {
-        CREATED, BACKFILL, SYNC, CHECK, REPAIR, ACTIVE, ERROR, DELETED
+
+        /** Группа заведена, загрузка не начиналась. */
+        CREATED,
+
+        /** Выкачка истории «в глубину» до планового горизонта. */
+        BACKFILL,
+
+        /** Докачка хвоста (свежие закрытые бары). */
+        SYNC,
+
+        /** Проверка целостности ряда по count. */
+        CHECK,
+
+        /** Докачка дыр (поиск и заполнение пропусков). */
+        REPAIR,
+
+        /** Ряд плотен и поддерживается — группа активна. */
+        ACTIVE,
+
+        /** Ошибка загрузки/целостности. */
+        ERROR,
+
+        /** Группа удалена (логически). */
+        DELETED
     }
 }

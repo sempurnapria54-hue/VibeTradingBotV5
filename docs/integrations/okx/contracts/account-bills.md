@@ -74,7 +74,7 @@ Native responses —
 deep archive flow (на момент миграции отдельного endpoint'а в архиве
 не зафиксировано).
 
-## ClientService контракт
+## IntegrationService контракт
 
 Endpoint'ы — private REST с подписью. На controlled error
 (`code != "0"`, parse, invariant) — exception в adapter

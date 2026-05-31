@@ -8,25 +8,25 @@ DTO по слоям.
 ## Правило
 
 Raw exchange DTO (полный сырой response/DTO биржи) не выходит за
-пределы `ClientService` / adapter-layer.
+пределы `IntegrationService` / adapter-layer.
 
-- `ClientService` получает raw response, валидирует структуру и
+- `IntegrationService` получает raw response, валидирует структуру и
   обязательные поля, проверяет exchange-specific invariants и маппит
   **только** runtime-useful поля в validated **normalized external
   snapshot**.
 - Наружу (в executor / domain / risk-layer) выходит только
   normalized snapshot, не raw DTO.
-- Validation-only поля биржи используются внутри `ClientService` и в
+- Validation-only поля биржи используются внутри `IntegrationService` и в
   normalized snapshot не попадают.
 
-### Nullable contract ClientService
+### Nullable contract IntegrationService
 
 Для read/refresh общий контракт: snapshot найден → `ExternalSnapshot`;
 успешно, но не найден → `null`; ошибка API / parse / invariant →
 exception. `null` означает «не найдено в этом источнике», а не ошибку;
 трактовка зависит от сущности (для `Position` `null` = позиции нет; для
 `Order`/`AlgoOrder` последний `null` после полного evidence-cycle может
-быть error/recovery). См. `docs/components/ClientService.md`,
+быть error/recovery). См. `docs/components/IntegrationService.md`,
 `docs/rules/external-status-resolution.md`.
 
 ### Граничные `*ExternalSnapshot`
@@ -37,7 +37,7 @@ exception. `null` означает «не найдено в этом источ�
 `CandleExternalSnapshot`, order/algo/position external snapshots) —
 external-поля модели, без доменных enum/нормализаций (они
 резолвятся при материализации). Это и есть единственное, что
-выходит за `ClientService`. Для свечей это означает: OKX-массив
+выходит за `IntegrationService`. Для свечей это означает: OKX-массив
 проходит границу как `CandleExternalSnapshot`, а не сырым массивом
 (`docs/models/mapping/Candle.md`). Граница онбординга инструмента
 (шаг 1) — `InstrumentExternalSnapshot`: идентичность + биржевые
