@@ -80,8 +80,8 @@ integrations/{name}  →  externalSnapshot  →  domain  →  persistence
   (entity-классы / jsonb-снимки / persistence-проекции). На момент
   введения слой пуст — скаффолд.
 
-- **`docs/models/rest/`** — модель API нашего сервиса (request /
-  response DTO REST-API). На момент введения слой пуст — скаффолд.
+- **`docs/models/api/`** — модель API нашего сервиса (request /
+  response DTO нашего API). На момент введения слой пуст — скаффолд.
 
 ### Маппинг — со-локированный тип под `models/`
 

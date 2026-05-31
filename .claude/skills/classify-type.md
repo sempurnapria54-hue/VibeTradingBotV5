@@ -72,7 +72,7 @@
 - **Модель хранимого слоя (скаффолд)** —
   «что это за модель хранимого слоя?» (`docs/models/persistence/`).
 - **Модель API нашего сервиса (скаффолд)** — «что это за модель API
-  нашего сервиса?» (`docs/models/rest/`).
+  нашего сервиса?» (`docs/models/api/`).
 - **Lifecycle** — «через какие состояния проходит этот объект,
   кто управляет?» (`docs/lifecycles/`).
 - **Продуктовый процесс** — «как устроен этот процесс?»
@@ -120,7 +120,7 @@
   нативная модель источника — `docs/models/integrations/{name}/`;
   external snapshot — `docs/models/externalSnapshot/`;
   persistence-проекция — `docs/models/persistence/`; модель нашего
-  REST API — `docs/models/rest/`. См.
+  API — `docs/models/api/`. См.
   `.claude/decisions/model-layer-ontology.md`. Имя совпадает с
   Java-классом (где применимо).
 - **Lifecycle (`docs/lifecycles/`)** — «через какие состояния

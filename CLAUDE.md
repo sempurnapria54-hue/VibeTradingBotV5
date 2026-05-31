@@ -1,6 +1,6 @@
 # VibeTradingBotV5
 
-Алготрейдинговый бот. Java 21 + Spring Boot 3 + PostgreSQL.
+Алготрейдинговый бот. Java 25 + Spring Boot 4 + PostgreSQL.
 
 ## На какой вопрос отвечает этот файл
 

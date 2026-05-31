@@ -32,10 +32,20 @@
 Процедуру каждого фокуса держит соответствующий скилл — в роли
 она не дублируется.
 
-- **концепция** → `.claude/skills/concept-review.md` — **активен**;
-- **безопасность** → `security-review` — отложен, под-шаг `CODE`;
-- **конвенции** → `conventions-review` — отложен, под-шаг `CODE`;
-- **тесты** → `test-review` — отложен, шаг 9.
+- **концепция** → `.claude/skills/concept-review.md` — **активен**,
+  под-шаг `DOCS_CHECK_N`;
+- **безопасность** → `.claude/skills/security-review.md` —
+  **деактивирован** до шага «Безопасность» (под-шаг `CODE`,
+  реактивируется там);
+- **конвенции** → `.claude/skills/conventions-review.md` — стаб,
+  под-шаг `CODE`;
+- **производительность** → `.claude/skills/performance-review.md` —
+  стаб, под-шаг `CODE`;
+- **устойчивость к сбоям** → `.claude/skills/disaster-review.md` —
+  стаб, под-шаг `CODE`;
+- **расхождения** → `.claude/skills/divergence-review.md` — стаб,
+  под-шаг `SYNC_DOCS_FROM_CODE`;
+- **тесты** → `test-review` — отложен, шаг «Тесты».
 
 ## Поведение
 

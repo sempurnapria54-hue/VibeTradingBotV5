@@ -44,6 +44,13 @@ Curator — оркестратор процесса фиксации знани�
 - `.claude/skills/classify-theme.md` — шаг 4, определение
   темы.
 - `.claude/skills/place-knowledge.md` — шаг 5, размещение.
+- `.claude/skills/reconcile-knowledge.md` — реконсиляция
+  существующей доки под изменившийся / удалённый код (под-шаг
+  `SYNC_DOCS_FROM_CODE`, расхождения change / remove; добавления
+  идут штатным потоком размещения выше).
+- `.claude/skills/find-code-examples.md` — подбор примеров из
+  реального кода проекта для дозаполнения доков (под-шаг
+  `SYNC_DOCS_FROM_CODE`, пост-код).
 
 ## Поведение
 
