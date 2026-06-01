@@ -16,7 +16,10 @@ DealCashFlow, WS-каналы как отдельный заход). Три во
 `Instrument` / снапшот / `InstrumentExternalRules`), INSTR-Q2
 (`GAPS_CLOSE_3` — валидация рабочего плеча и роль `externalLeverage`)
 и ORCH-Q1 (вынос процесса `candle-loading` — владелец оркестрации
-онбординга и загрузки свечей).
+онбординга и загрузки свечей). Три вопроса — из шага 2 Фазы 1
+(`GAPS_CLOSE_2`, 2026-06-01): STRAT-Q1 (источник истины контракта
+авторинга условия), STRAT-Q2 (терминология «сигнала»), STRAT-Q3
+(создание и валидация одной реализации).
 
 История закрытых вопросов пайплайна:
 
@@ -406,6 +409,69 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 Связано: `docs/components/models/ServiceCommand.md`,
 `docs/components/ServiceCommandFactory.md`, executor-компоненты,
 `docs/components/RetryPolicyService.md` (база `Retryable`).
+
+### STRAT-Q1. Источник истины контракта авторинга условия
+
+Грамматика `StrategyConditionRule` представлена в двух местах
+по-разному: в модели (`docs/models/domain/aggregate/Strategy.md`)
+индикатор в правиле задаётся **объектной ссылкой** `indicatorSetting`,
+а в `Strategy API` / examples — **строкой-меткой** `leftOperand` +
+инлайновый `params`. Плюс избыточность представления: `sourceType`
+дублируется на правиле и на операнде; `leftOperand: String` соседствует
+со структурированным `rightOperand: StrategyConditionOperand`;
+`StrategyConditionOperand.valueType` пересекается с `sourceType`. Не
+решено, что источник истины и каков контракт авторинга по-полям (какие
+поля заполнять под каждый `ruleType`, чтобы правило было валидным).
+
+Направление зафиксировано (`GAPS_CLOSE_2`, 2026-06-01): доки задают
+**контракт авторинга** условия, вычисление истинности — деталь
+evaluator'а (downstream, `StrategyConditionEvaluator`). Сам контракт
+по-полям до решения этого вопроса **не пишется**.
+
+Варианты: (1) объектно-ссылочная модель — источник истины, API
+резолвит метки → ссылки при сохранении; (2) строка-метка + инлайновый
+`params` — источник истины, модель выводится из него; (3) свести к
+одному представлению, убрав дубли (`sourceType` на одном уровне,
+развести `valueType`/`sourceType`). До решения per-field контракт не
+фиксируется; поля условия в `Strategy.md` остаются как перечислены.
+Связано: `docs/models/domain/aggregate/Strategy.md` (§Условия,
+§Контракт авторинга условия), `Strategy API examples` (форвард),
+STRAT-Q2.
+
+### STRAT-Q2. Терминология «сигнала»
+
+Формулировка шага 2 роадмапа — «объявляет нужные индикаторы и
+**условие сигнала**». Не решено, что есть «сигнал»: входной
+`StrategyCondition` ENTRY/`GRID_ENTRY`-шага, либо
+`StrategyConditionSourceType.SIGNAL` /
+`StrategyConditionRuleType.SIGNAL_SCORE_REACHED`. Во втором случае
+производитель «сигнала / signal-score» в доках не описан (name-level
+без источника).
+
+Варианты: (1) «сигнал» = входное условие ENTRY-шага, а
+`SOURCE.SIGNAL` / `SIGNAL_SCORE_REACHED` — отдельная (отложенная)
+механика скоринга со своим производителем; (2) «сигнал» — именно
+`SOURCE.SIGNAL` / `SIGNAL_SCORE_REACHED`, тогда нужно описать
+производителя; (3) иное. До решения термин не фиксируется.
+Связано: `docs/models/domain/aggregate/Strategy.md` (§Условия —
+`StrategyConditionSourceType` / `StrategyConditionRuleType`),
+`.claude/work/roadmap/phase-1.md` (шаг 2), STRAT-Q1.
+
+### STRAT-Q3. Создание и валидация одной реализации
+
+«Одна реализация» (scope шага 2 по Э1 — полное заполненное дерево) —
+как материализуется: API создания стратегии (кластер `Strategy API` —
+форвард-заметка), сид/миграция или тестовая фикстура. И входит ли в
+шаг 2 компонент-валидатор 12 правил (key / targetActionKey /
+CLOSE_FULL / partial-exit — правила в `Strategy.md` есть, сам
+валидатор — форвард-заметка / backlog п.8), или валидация
+откладывается.
+
+Варианты: (1) API создания + валидатор в шаге 2; (2) сид/фикстура
+одной стратегии, валидатор отложен; (3) гибрид. Нижний приоритет
+относительно Э4/Э2. До решения «одна реализация» не материализуется.
+Связано: `docs/models/domain/aggregate/Strategy.md` (§key /
+targetActionKey и валидация), `.claude/work/backlog.md`.
 
 ## Конвенция
 

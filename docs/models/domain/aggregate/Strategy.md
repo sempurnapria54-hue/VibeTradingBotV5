@@ -167,6 +167,21 @@ ENTRY/GRID_ENTRY condition; если стал false до live risk — `Deal`
 
 ## Условия (разделы)
 
+### Контракт авторинга условия (направление)
+Доки задают **контракт авторинга** условия: для каждого `ruleType` —
+какие поля `StrategyConditionRule` / `StrategyConditionOperand` нужно
+заполнить, чтобы правило было валидным. Вычисление истинности правила
+— деталь evaluator'а (downstream, `StrategyConditionEvaluator`); в
+модели не фиксируется.
+
+Сам контракт по-полям пока **не зафиксирован**: открыта нестыковка
+представления между моделью и `Strategy API` / examples (индикатор как
+строка-метка `leftOperand` + инлайновый `params` vs объектная ссылка
+`indicatorSetting`; дублирование `sourceType` на правиле и операнде;
+`valueType` vs `sourceType`). Источник истины — открытый вопрос
+**STRAT-Q1** (`.claude/work/questions/open-questions.md`); до его
+решения поля условия остаются как перечислены ниже.
+
 ### StrategyCondition
 `rules: List<StrategyConditionRule>` — все rules должны быть истинны;
 проверяются по `level` ASC (локальный порядок внутри condition, не
@@ -314,6 +329,54 @@ strategy_action_id)`. Runtime работает через `strategyActionId`, н
 orderId/algoOrderId. `placement` не основной способ идентификации
 runtime-сущности. (`DealActionState`/`RuntimeTarget` — кластер Deal
 management, форвард-заметка.)
+
+## Персистентность
+
+Дерево персистится **реляционным каркасом**: каждый узел (root,
+detail, step, action, настройки) — строка/таблица с `id`, объектные
+связи между узлами — через FK, загрузка дерева целиком — через
+`@EntityGraph` / `JOIN FETCH` (без N+1). Часть листовых настроек
+хранится JSONB-полями. Обоснование развилок и сознательный отход от
+архива (индикаторные `params`) —
+`docs/decisions/strategy-tree-persistence.md`.
+
+### Индикаторные `params`
+JSONB-поле `params` на строке `StrategyIndicatorSetting` (только
+непустые значения). В коде — абстрактный `IndicatorParams` + 7
+наследников; в БД — JSON, без отдельных таблиц params и без
+inheritance-маппинга. Валидацию полей params делает приложение.
+
+### Действия (`StrategyAction`)
+Наследование `JOINED`: базовая таблица `strategy_action`
+(`id`, `action_kind`, `key`, `action_type`, `level`,
+`target_action_key`) + таблицы по видам: `strategy_order_action`,
+`strategy_algo_order_action`, `strategy_position_action` (у позиции
+собственных полей нет). Вложенные настройки действий (`placement`,
+`attachedProtection`, `stopLossSettings`, `trailingSettings`) —
+JSONB-поля на строках соответствующих видов.
+
+### `stepsByStatus`
+`Map<Deal.Status, List<StrategyStep>>` хранится плоскими строками
+`strategy_step` с колонками `strategy_detail_id` (FK), `deal_status`
+(ключ map), `step_index` (порядок в списке). В домене Map
+пересобирается группировкой по `deal_status` и сортировкой по
+`step_index`. `marketDataExpiredSetting` шага — JSONB-поле.
+
+### Внутридеревные ссылки
+- Правило условия → настройка (`StrategyConditionRule.indicatorSetting`
+  / `marketStructureSetting`) — FK на строку настройки.
+- Ссылки изнутри JSON-листьев (напр. `stopLossSettings` с
+  `ATR_PERCENT` → индикаторная настройка) — «мягкие»: id/key внутри
+  JSON, резолвит приложение.
+- `targetActionKey` при сохранении стратегии резолвится в self-FK
+  `target_action_id → strategy_action.id` (см. §key / targetActionKey
+  и валидация).
+
+### Не зафиксировано
+Типы и nullability числовых полей дерева (Integer vs BigDecimal для
+`*Bars`/`*Period` vs `*Percents`/`*Score`/`*Ratio`/`*Multiplier`) на
+разборе `GAPS_CLOSE_2` не решались — проставляются при написании
+entity/Flyway-миграции.
 
 ## TimeFrame
 
