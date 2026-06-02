@@ -107,7 +107,7 @@ Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup` жив�
 (для фазы) и внутри `StrategyDetail` (после выбора детали).
 
 ### IndicatorParams (abstract) + наследники
-База: `id`, `indicatorType: IndicatorValue.Type`, `timeframe:
+База: `indicatorType: IndicatorValue.Type`, `timeframe:
 TimeFrame` (доменный таймфрейм серии), `warmup` (опциональный
 override — см. ниже). Наследники несут математические параметры по
 типу: `AtrParams(period)`, `EmaParams(period)`, `RsiParams(period)`,
@@ -389,28 +389,48 @@ management, форвард-заметка.)
 
 ## Персистентность
 
-Дерево персистится **реляционным каркасом**: каждый узел (root,
-detail, step, action, настройки) — строка/таблица с `id`, объектные
-связи между узлами — через FK, загрузка дерева целиком — через
-`@EntityGraph` / `JOIN FETCH` (без N+1). Часть листовых настроек
-хранится JSONB-полями. Обоснование развилок и сознательный отход от
-архива (индикаторные `params`) —
-`docs/decisions/strategy-tree-persistence.md`.
+Дерево персистится **реляционным каркасом** для узлов-контейнеров и
+каркасных узлов (`Strategy` (root), `StrategyMarketPhaseSetting`,
+`StrategyDetail`, `StrategyStep`, `StrategyAction`): каждый такой узел —
+строка/таблица с `id`, объектные связи между ними — через FK, загрузка
+дерева целиком — через `@EntityGraph` / `JOIN FETCH` (без N+1).
+**Листовые настройки рыночных данных (`StrategyIndicatorSetting`,
+`StrategyMarketStructureSetting`) и их `params` — JSONB** на строке
+своего контейнера, отдельных строк/таблиц у них нет (см. §Настройки
+рыночных данных ниже). Обоснование развилок и сознательный отход от
+архива — `docs/decisions/strategy-tree-persistence.md`.
 
-### Индикаторные `params`
-JSONB-поле `params` на строке `StrategyIndicatorSetting` (только
-непустые значения). В коде — абстрактный `IndicatorParams` + 7
-наследников; в БД — JSON, без отдельных таблиц params и без
-inheritance-маппинга. Валидацию полей params делает приложение.
+### Настройки рыночных данных (`StrategyIndicatorSetting` / `StrategyMarketStructureSetting`)
+Хранятся **JSONB**, не реляционными строками: контейнеры
+(`StrategyMarketPhaseSetting`, `StrategyDetail`) несут свои
+`indicatorSettings` / `marketStructureSettings` JSON-массивами на
+собственной строке. Своего `id`/таблицы у настройки нет; на неё
+ссылаются **по `key`** (операнд условия `indicatorKey` / structure-key,
+мягкие ссылки JSON-листьев `stopLossSettings`/`placement`) — резолвит
+приложение. `id` настройки в рантайме не используется (там работает
+`StrategyAction.id` через `DealActionState`). Уникальность `key`
+настройки в пределах контейнера — проверка приложения по JSON-массиву,
+не DB-UNIQUE.
+
+`params` настройки (`IndicatorParams` + 7 наследников;
+`MarketStructureParams` / `MarketPhaseParams`) едут внутри того же JSON
+(только непустые значения), без отдельных таблиц params и без
+inheritance-маппинга — в коде иерархия типов сохраняется. Валидацию
+полей делает приложение. Обоснование (почему настройки не реляционные
+узлы) — `docs/decisions/strategy-tree-persistence.md`.
 
 ### Действия (`StrategyAction`)
 Наследование `JOINED`: базовая таблица `strategy_action`
 (`id`, `action_kind`, `key`, `action_type`, `level`,
-`target_action_key`) + таблицы по видам: `strategy_order_action`,
-`strategy_algo_order_action`, `strategy_position_action` (у позиции
-собственных полей нет). Вложенные настройки действий (`placement`,
-`attachedProtection`, `stopLossSettings`, `trailingSettings`) —
-JSONB-поля на строках соответствующих видов.
+`target_action_key`, `target_action_id`) + таблицы по видам:
+`strategy_order_action`, `strategy_algo_order_action`,
+`strategy_position_action` (у позиции собственных полей нет).
+Self-ссылка действия хранится **двумя** колонками базовой таблицы:
+`target_action_key` (логический ключ — форма ввода и чтения) и
+`target_action_id` (self-FK `→ strategy_action.id`, резолвится при
+сохранении; см. §Внутридеревные ссылки). Вложенные настройки действий
+(`placement`, `attachedProtection`, `stopLossSettings`,
+`trailingSettings`) — JSONB-поля на строках соответствующих видов.
 
 ### `stepsByStatus`
 `Map<Deal.Status, List<StrategyStep>>` хранится плоскими строками
@@ -430,7 +450,11 @@ JSONB-поля на строках соответствующих видов.
   `ATR_PERCENT` → индикаторная настройка по `key`) — «мягкие»: id/key
   внутри JSON, резолвит приложение.
 - `targetActionKey` при сохранении стратегии резолвится в self-FK
-  `target_action_id → strategy_action.id` (см. §key / targetActionKey
+  `target_action_id → strategy_action.id`; базовая таблица хранит **и**
+  ключ, **и** id (денормализация, безопасная при immutable-записи).
+  Защита БД — FK + CHECK `target_action_id <> id` (нет self-loop). FK
+  здесь, в отличие от мягкой ссылки операнд→настройка (по `key`), —
+  ради БД-защиты ссылки действие→действие (см. §key / targetActionKey
   и валидация).
 
 ### Не зафиксировано
