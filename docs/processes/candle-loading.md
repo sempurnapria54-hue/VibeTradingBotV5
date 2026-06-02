@@ -65,6 +65,18 @@ look-ahead.
 **инструмента**; готовность данных для активации **стратегии** —
 более поздний слой (`docs/processes/market-data-calculation.md`).
 
+## Глубина под прогрев индикаторов — вход от стратегии (запарковано)
+
+Глубину исторической выкачки задаёт `Instrument.plannedCandleStartDate`
+(плановый горизонт на инструмент). Стратегия объявляет, сколько истории
+нужно для прогрева её индикаторов: эффективный `warmup` + `timeframe`
+каждой `StrategyIndicatorSetting`
+(`docs/models/domain/aggregate/Strategy.md` §IndicatorParams) — это
+**вход** для расчёта глубины загрузки на стороне рыночных данных. Как
+именно warmup-горизонт стратегии конкретно перекладывается в
+`plannedCandleStartDate` — cross-cutting strategy ↔ market-data,
+**запарковано** (всплывёт вместе с владельцем оркестрации, ORCH-Q1).
+
 ## Владелец оркестрации — открытый вопрос
 
 Кто драйвит переходы `Instrument.Status` и `CandleGroup.Status` и

@@ -92,9 +92,13 @@ status → step». Отклонено: step и так принадлежит det
 
 ### Внутридеревные ссылки — FK / «мягкие» / self-FK по типу ссылки
 
-- **Правило условия → настройка** (`StrategyConditionRule.indicatorSetting`
-  / `marketStructureSetting`) — FK на строку настройки (жёсткая ссылка
-  с реляционной целостностью).
+- **Операнд условия → настройка** (индикаторный операнд по
+  `indicatorKey`, market-structure операнд по ключу настройки) —
+  «мягкая» ссылка: ключ внутри структуры операнда, резолвит
+  приложение. STRAT-Q1 перенёс ссылку с правила на операнд
+  (`docs/decisions/strategy-condition-authoring-contract.md`); прежний
+  rule-level FK `StrategyConditionRule.indicatorSetting` снят вместе с
+  объектными ссылками на правиле.
 - **Ссылки изнутри JSON-листьев** (напр. `stopLossSettings` с
   `ATR_PERCENT` → индикаторная настройка) — «мягкие»: id/key внутри
   JSON, резолвит приложение (FK из JSONB невозможен).
@@ -112,14 +116,20 @@ status → step». Отклонено: step и так принадлежит det
   для `*Bars`/`*Period` vs `*Percents`/`*Score`/`*Ratio`/
   `*Multiplier`) на этом разборе **не решались** — проставляются при
   написании entity/Flyway-миграции.
-- Это решение закрывает эскалацию **Э4** (`GAPS_CLOSE_2`); грамматика
-  условия (Э2), терминология «сигнала» (Э3) и создание/валидация
-  одной реализации (Э5) остаются открытыми (STRAT-Q1/Q2/Q3).
+- Это решение закрывает эскалацию **Э4** (`GAPS_CLOSE_2`). Грамматика
+  условия (Э2 / STRAT-Q1), терминология «сигнала» (Э3 / STRAT-Q2) и
+  создание/валидация одной реализации (Э5 / STRAT-Q3) закрыты
+  отдельными решениями
+  (`docs/decisions/strategy-condition-authoring-contract.md`,
+  `strategy-signal-is-entry-condition.md`,
+  `strategy-materialization-and-validation.md`).
 
 ## Связи
 
 - Модель и схема — `docs/models/domain/aggregate/Strategy.md`
   (§Персистентность, §key / targetActionKey и валидация, §Связь с
   DealActionState).
+- Контракт авторинга условия (операнд → настройка по ключу) —
+  `docs/decisions/strategy-condition-authoring-contract.md`.
 - Открытые вопросы шага 2 — `.claude/work/questions/open-questions.md`
-  (STRAT-Q1/Q2/Q3).
+  (STRAT-Q4 — percent-anchor).

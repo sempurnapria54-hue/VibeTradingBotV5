@@ -3,8 +3,8 @@
 ## На какой вопрос отвечает этот файл
 
 Что сделано на под-шаге `GAPS_CLOSE_2` шага 2 (закрытие пробелов
-`DOCS_CHECK_2`): что закрыто полностью, что зафиксировано частично,
-что оставлено открытым на отдельную сессию.
+`DOCS_CHECK_2`): какие эскалации закрыты, какими решениями, что
+вынесено в новый открытый вопрос.
 
 ## Контекст
 
@@ -12,96 +12,101 @@
   нужные индикаторы и условие сигнала; одна реализация)».
 - Под-шаг: `GAPS_CLOSE_2` (`.claude/processes/roadmap-step-execution.md`).
 - Вход — gap-отчёт `phase-1-step-2-docs-check-2.md`: эскалации Э4
-  (персистентность — главная), Э2 (грамматика условия), Э3
-  (терминология «сигнала»), Э5 (создание/валидация одной реализации).
-- Проход **частичный**: полностью закрывается Э4; по Э2 фиксируется
-  только направление; Э3, Э5 и сведение нестыковки авторинга Э2
-  оставлены открытыми (отдельная сессия). `DOCS_CHECK_3` не
-  запускается.
+  (персистентность), Э2 (грамматика условия), Э3 (терминология
+  «сигнала»), Э5 (создание/валидация одной реализации).
+- Проход вёлся в **две сессии**: первая (2026-06-01) закрыла Э4 и
+  зафиксировала направление Э2, завела STRAT-Q1/Q2/Q3; вторая
+  (2026-06-02) разобрала STRAT-Q1/Q2/Q3 и **дозакрыла Э2/Э3/Э5**.
+  Теперь `GAPS_CLOSE_2` закрыт полностью; следующее — `DOCS_CHECK_3`.
 
-## Э4 — персистентность Strategy (закрыто, применено)
+## Э4 — персистентность Strategy (закрыто, сессия 1)
 
 **Решение.** Каркас дерева — реляционный; объектные связи через FK;
-загрузка целиком через `@EntityGraph` / `JOIN FETCH`. Конкретика:
+загрузка целиком через `@EntityGraph` / `JOIN FETCH`. Индикаторные
+`params` — JSONB (отход от архива); действия — наследование `JOINED`;
+`stepsByStatus` — плоские строки; ссылки — FK/мягкие/self-FK по типу.
+Размещение: `docs/decisions/strategy-tree-persistence.md` + раздел
+«Персистентность» в `docs/models/domain/aggregate/Strategy.md`.
 
-- **Индикаторные `params`** — JSONB-поле `params` на
-  `StrategyIndicatorSetting` (только непустые значения). В коде —
-  абстрактный `IndicatorParams` + 7 наследников; в БД — JSON, без
-  отдельных таблиц params и наследования. **Сознательный отход от
-  архива** (там `IndicatorParams` — отдельная сущность с
-  наследованием). Валидацию полей params берёт приложение.
-- **Действия (`StrategyAction`)** — наследование `JOINED`: база
-  `strategy_action` (`id`, `action_kind`, `key`, `action_type`,
-  `level`, `target_action_key`) + таблицы по видам
-  (`strategy_order_action`, `strategy_algo_order_action`,
-  `strategy_position_action` — у позиции своих полей нет). Вложенные
-  настройки (`placement`, `attachedProtection`, `stopLossSettings`,
-  `trailingSettings`) — JSONB-поля на строках видов.
-- **`stepsByStatus`** — плоские строки `strategy_step`
-  (`strategy_detail_id` FK, `deal_status` ключ map, `step_index`
-  порядок); Map пересобирается группировкой + сортировкой.
-  `marketDataExpiredSetting` шага — JSONB.
-- **Ссылки:** правило условия → settings = FK; ссылки изнутри
-  JSON-листьев = «мягкие» (id/key в JSON, резолвит приложение);
-  `targetActionKey` → self-FK `target_action_id`.
+Уточнено в сессии 2: бул «правило условия → настройка = FK» снят —
+ссылку несёт операнд по ключу (см. Э2/STRAT-Q1 ниже).
 
-**Не решали:** типы/nullability числовых полей дерева — проставляются
-при написании entity/миграции.
+## Э2 / STRAT-Q1 — контракт авторинга условия (закрыто, сессия 2)
 
-**Размещение.**
-- `docs/decisions/strategy-tree-persistence.md` — новое решение
-  (развилки + альтернативы + отход от архива).
-- `docs/models/domain/aggregate/Strategy.md` — новый раздел
-  «Персистентность» (конкретная схема, ссылка на decision).
+**Решение.** Источник истины — объектная settings-модель; строка-метка
+`leftOperand` + инлайновый `params` — форма ввода. Настройка индикатора
+`{ key, type, params }` (`timeframe`/`warmup` — в `params`); `warmup`
+выводится реализацией, override возможен (эффективный = override ??
+derived; потребитель — candle-loading). Правило — единая структура,
+операнды опциональны; rule-level `sourceType`/`timeframe`/объектные
+ссылки убраны; операнд самоописателен, `valueType`/`value` только у
+`CONSTANT`, индикаторный операнд → настройка по `indicatorKey`.
 
-## Э2 — грамматика условия (зафиксировано только направление)
+**Размещение.** `docs/decisions/strategy-condition-authoring-contract.md`
+(новый); переписан §Условия в `Strategy.md` (контракт, правило,
+операнд), §StrategyIndicatorSetting (`key`), §IndicatorParams
+(`timeframe`/`warmup` + вывод warmup), архитектурный инвариант о ключах
+настроек, §Внутридеревные ссылки в §Персистентности; уточнён
+`strategy-tree-persistence.md`. Cross-cutting warmup → глубина загрузки
+запаркован в `docs/processes/candle-loading.md` + cross-ref в
+`docs/components/IndicatorJob.md`.
 
-**Направление (зафиксировано).** Доки задают **контракт авторинга**
-условия (для каждого `ruleType` — какие поля заполнять для валидного
-правила); вычисление истинности — деталь evaluator'а (downstream,
-`StrategyConditionEvaluator`).
+## Э3 / STRAT-Q2 — «сигнал» = условие входа (закрыто, сессия 2)
 
-**Не пишем сейчас:** сам контракт по-полям — есть открытая нестыковка
-представления (объектная ссылка `indicatorSetting` в модели vs
-строка-метка `leftOperand` + инлайновый `params` в `Strategy API` /
-examples; дубль `sourceType`; `valueType` vs `sourceType`). Источник
-истины — STRAT-Q1.
+**Решение.** «Условие сигнала» = `condition.rules` входного шага
+(`ENTRY`/`GRID_ENTRY`); отдельной сущности «сигнала» нет. Удалены
+орфаны `StrategyConditionSourceType.SIGNAL` и
+`StrategyConditionRuleType.SIGNAL_SCORE_REACHED` (рационал удаления
+зафиксирован, чтобы не вернуть по инерции).
 
-**Размещение.** Заметка-направление — в `Strategy.md` (§Условия →
-«Контракт авторинга условия (направление)»), со ссылкой на STRAT-Q1.
+**Размещение.** `docs/decisions/strategy-signal-is-entry-condition.md`
+(новый); enum'ы вычищены в `Strategy.md` §Условия.
 
-## Открыто — НЕ закрыто (отдельная сессия)
+## Э5 / STRAT-Q3 — материализация и валидация (закрыто, сессия 2)
 
-Заведены в `.claude/work/questions/open-questions.md`:
+**Решение.** Материализация «одной реализации» — Strategy API полным
+жизненным циклом (`POST`/`GET`/`PUT`), дом API — шаг 2. Валидатор —
+линия реза create (структурно-ссылочные пункты, 400) / activate
+(семантика действий, 422 — отложено до шагов 4/7).
 
-- **STRAT-Q1** — источник истины контракта авторинга условия
-  (нестыковка авторинга Э2).
-- **STRAT-Q2** — терминология «сигнала» (Э3): входной
-  `StrategyCondition` ENTRY-шага vs `SourceType.SIGNAL` /
-  `SIGNAL_SCORE_REACHED` (производитель не описан).
-- **STRAT-Q3** — создание/валидация одной реализации (Э5): API
-  создания + валидатор 12 правил.
+**Размещение.** `docs/decisions/strategy-materialization-and-validation.md`
+(новый); §key / targetActionKey и валидация в `Strategy.md` дополнен
+линией create/activate; backlog п.8 обновлён (scope решён, остаётся
+воспроизведение `Strategy API examples`).
+
+## Новый открытый вопрос
+
+- **STRAT-Q4** — percent-anchor («−N% относительно чего»: вход /
+  предыдущая свеча / хай). Вынесен из STRAT-Q1 как самостоятельная
+  бизнес-развилка. Заведён в `.claude/work/questions/open-questions.md`.
 
 ## Что изменено
 
 | Файл | Что |
 |---|---|
-| `docs/decisions/strategy-tree-persistence.md` | Новый decision (Э4: реляционный каркас + JSONB + отход от архива по params). |
-| `docs/models/domain/aggregate/Strategy.md` | Новый раздел «Персистентность» (Э4); заметка «Контракт авторинга условия (направление)» в §Условия (Э2). |
-| `.claude/work/questions/open-questions.md` | Заведены STRAT-Q1/Q2/Q3; обновлён §Статус. |
-| `.claude/work/roadmap/phase-1.md` | Шаг 2: `DOCS_CHECK_2` → `GAPS_CLOSE_2`. |
+| `docs/decisions/strategy-tree-persistence.md` | Э4 (сессия 1); уточнён бул ссылки операнд→настройка, следствия/связи (сессия 2). |
+| `docs/decisions/strategy-condition-authoring-contract.md` | Новый (Э2/STRAT-Q1). |
+| `docs/decisions/strategy-signal-is-entry-condition.md` | Новый (Э3/STRAT-Q2). |
+| `docs/decisions/strategy-materialization-and-validation.md` | Новый (Э5/STRAT-Q3). |
+| `docs/models/domain/aggregate/Strategy.md` | Инвариант ключей; §StrategyIndicatorSetting (`key`); §IndicatorParams (`timeframe`/`warmup`); §Условия (контракт/правило/операнд/enum'ы); §валидация (create/activate); §Персистентность (операнд→настройка). |
+| `docs/processes/candle-loading.md` | Запаркована глубина под прогрев (warmup → загрузка). |
+| `docs/components/IndicatorJob.md` | Cross-ref на объявленную глубину warmup. |
+| `.claude/work/questions/open-questions.md` | STRAT-Q1/Q2/Q3 закрыты; заведён STRAT-Q4; §Статус. |
+| `.claude/work/backlog.md` | П.8: scope валидатора/материализации решён (STRAT-Q3). |
 
 ## Статус роадмапа
 
-- Шаг 2: `DOCS_CHECK_2` → `GAPS_CLOSE_2` (частично; `phase-1.md`).
+- Шаг 2: `GAPS_CLOSE_2` — **закрыт полностью** (Э4/Э2/Э3/Э5).
 - Фаза 1: `IN_PROGRESS` (ролляп без изменений).
-- Следующее — **отдельная сессия**: разбор STRAT-Q1/Q2/Q3, затем
-  `DOCS_CHECK_3` (сейчас **не** запускать).
+- Следующее — `DOCS_CHECK_3` (третья проверка целостности; в этой
+  сессии **не** запускалась).
 
 ## Сводка
 
-- Эскалаций закрыто полностью: 1 (Э4 — персистентность).
-- Зафиксировано частично: 1 (Э2 — только направление).
-- Заведено открытых вопросов: 3 (STRAT-Q1/Q2/Q3).
-- Изменено доков/трекинга: 4 файла (см. таблицу) + новый decision.
-- Не чисто: `GAPS_CLOSE_2` частичный; `DOCS_CHECK_3` отложен.
+- Эскалаций закрыто: 4 из 4 (Э4 — сессия 1; Э2/Э3/Э5 — сессия 2).
+- Новых решений: 3 (`strategy-condition-authoring-contract`,
+  `strategy-signal-is-entry-condition`,
+  `strategy-materialization-and-validation`) + уточнён
+  `strategy-tree-persistence`.
+- Закрыто открытых вопросов: 3 (STRAT-Q1/Q2/Q3); заведено: 1 (STRAT-Q4).
+- `GAPS_CLOSE_2` чист; готов переход к `DOCS_CHECK_3`.

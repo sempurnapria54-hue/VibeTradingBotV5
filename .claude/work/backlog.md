@@ -148,9 +148,15 @@ flow (`KillSwitchService`, kill-switch report, after-snapshot,
 **Мигрировано:** enforcement `Strategy.INACTIVE`/`DELETED` (блок новых /
 graceful shutdown) — в `docs/lifecycles/Strategy.md` (+ проверка в
 `EntryScannerJob`, реакция в `deal-management`/lifecycle Deal).
-**Осталось:** компонент-валидатор стратегии (12-пунктная валидация
-key/targetActionKey/CLOSE_FULL/partial-exit); `Strategy API examples.md`
-(JSON-примеры, тип reference — воспроизводить ли как файл знания).
+**Scope валидатора/материализации решён (STRAT-Q3, 2026-06-02):**
+материализация «одной реализации» — через Strategy API
+(`POST`/`GET`/`PUT`); валидатор расщеплён по линии create
+(структурно-ссылочные пункты, 400) / activate (семантика действий,
+422 — отложено); см.
+`docs/decisions/strategy-materialization-and-validation.md`.
+**Осталось:** сам компонент-валидатор и Strategy API — артефакты
+под-шага `CODE` шага 2; `Strategy API examples.md` (JSON-примеры, тип
+reference — воспроизводить ли как файл знания) — **остаётся открытым**.
 **Форвард-заметки:** `2026-05-27-.../tasks-strategy.md` (STR-FW8, FW9,
 FW10), `tasks-deal.md` (DEAL-FW8).
 

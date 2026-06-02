@@ -35,9 +35,14 @@
   `StrategyAction → runtime entity` хранится в `DealActionState`
   через `strategyActionId` и `RuntimeTarget` (см. §Связь с
   DealActionState).
-- **`key` нужен только у `StrategyAction`** (через него работает
-  `targetActionKey`); у settings `key` не используется — связи между
-  settings объектные.
+- **`key` — у `StrategyAction` и у настроек индикаторов/структур.** У
+  `StrategyAction` `key` работает через `targetActionKey`. У
+  `StrategyIndicatorSetting` (и настройки market-structure) `key`
+  нужен, чтобы на настройку ссылался операнд условия (`indicatorKey` /
+  structure-key) и «мягкие» ссылки JSON-листьев
+  (`stopLossSettings`/`placement`). Прочие settings — без `key`,
+  связи объектные (контейнмент внутри `StrategyMarketPhaseSetting` /
+  `StrategyDetail`).
 - **Direct partial close запрещён** как постоянный инвариант (см.
   `docs/rules/no-partial-close.md`): `StrategyPositionAction` только
   `CLOSE_FULL`; частичное уменьшение — только через
@@ -91,26 +96,44 @@
 `confirmationBars`.
 
 ### StrategyIndicatorSetting
-`timeframe`, `indicatorType: IndicatorValue.Type`, `params:
-IndicatorParams`, `destiny: Destiny`, `expirationDuration`. `Destiny`:
+`key` (стабильный ключ настройки — по нему ссылается индикаторный
+операнд условия, `indicatorKey`), `indicatorType: IndicatorValue.Type`
+(= `type` в форме ввода), `params: IndicatorParams`, `destiny:
+Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup` живут
+**внутри `params`** (см. §IndicatorParams; контракт —
+`docs/decisions/strategy-condition-authoring-contract.md`). `Destiny`:
 `MARKET_PHASE`, `ENTRY_CONDITION`, `ACTION_PRICE`, `PROTECTION`,
 `EXIT_CONDITION`. Используется внутри `StrategyMarketPhaseSetting`
 (для фазы) и внутри `StrategyDetail` (после выбора детали).
 
 ### IndicatorParams (abstract) + наследники
-База: `id`, `indicatorType: IndicatorValue.Type`. Наследники:
-`AtrParams(period)`, `EmaParams(period)`, `RsiParams(period)`,
+База: `id`, `indicatorType: IndicatorValue.Type`, `timeframe:
+TimeFrame` (доменный таймфрейм серии), `warmup` (опциональный
+override — см. ниже). Наследники несут математические параметры по
+типу: `AtrParams(period)`, `EmaParams(period)`, `RsiParams(period)`,
 `MacdParams(fastPeriod, slowPeriod, signalPeriod)`,
 `BollingerBandsParams(period, deviationMultiplier)`,
 `StochasticParams(kPeriod, dPeriod, smoothPeriod)`,
 `ObvParams(enabled)`. Волатильность отдельной сущностью не
 моделируется — через индикаторы ATR / Bollinger bandwidth.
 
+`warmup` по умолчанию **выводится** реализацией индикатора из
+`indicatorType` + `period` (оконные — `= period`; рекурсивные
+EMA/RSI/ATR — кратно `period`; MACD — от старшего периода). Автор может
+задать явный override в `params`; эффективный `warmup = override ??
+derived`. Потребитель — candle-loading (глубина истории для прогрева,
+`docs/processes/candle-loading.md`); runtime-пропуск разгонной зоны при
+расчёте — `docs/components/IndicatorJob.md` §Warmup. Контракт —
+`docs/decisions/strategy-condition-authoring-contract.md`.
+
 ### StrategyMarketStructureSetting
-`timeframe`, `structureType: MarketStructure.Type`, `params:
-MarketStructureParams`, `destiny: Destiny`, `expirationDuration`.
-`Destiny`: те же 5 значений, что у indicator (MARKET_PHASE /
-ENTRY_CONDITION / ACTION_PRICE / PROTECTION / EXIT_CONDITION).
+`key` (для ссылки операнда market-structure / «мягких» ссылок
+JSON-листьев; точное имя поля-ссылки — инкрементальная деталь, см.
+§StrategyConditionOperand), `timeframe`, `structureType:
+MarketStructure.Type`, `params: MarketStructureParams`, `destiny:
+Destiny`, `expirationDuration`. `Destiny`: те же 5 значений, что у
+indicator (MARKET_PHASE / ENTRY_CONDITION / ACTION_PRICE / PROTECTION /
+EXIT_CONDITION).
 
 ### MarketStructureParams
 `lookbackBars`, `minTouches`, `minRangeWidthPercents`,
@@ -167,20 +190,23 @@ ENTRY/GRID_ENTRY condition; если стал false до live risk — `Deal`
 
 ## Условия (разделы)
 
-### Контракт авторинга условия (направление)
-Доки задают **контракт авторинга** условия: для каждого `ruleType` —
-какие поля `StrategyConditionRule` / `StrategyConditionOperand` нужно
-заполнить, чтобы правило было валидным. Вычисление истинности правила
-— деталь evaluator'а (downstream, `StrategyConditionEvaluator`); в
-модели не фиксируется.
+### Контракт авторинга условия
+Доки задают **контракт авторинга** условия (для валидного правила —
+какие поля заполнить); вычисление истинности правила — деталь
+evaluator'а (downstream, `StrategyConditionEvaluator`), в модели не
+фиксируется.
 
-Сам контракт по-полям пока **не зафиксирован**: открыта нестыковка
-представления между моделью и `Strategy API` / examples (индикатор как
-строка-метка `leftOperand` + инлайновый `params` vs объектная ссылка
-`indicatorSetting`; дублирование `sourceType` на правиле и операнде;
-`valueType` vs `sourceType`). Источник истины — открытый вопрос
-**STRAT-Q1** (`.claude/work/questions/open-questions.md`); до его
-решения поля условия остаются как перечислены ниже.
+**Источник истины — объектная settings-модель** (ниже). Строка-метка
+`leftOperand` + инлайновый `params` из `Strategy API examples` — это
+**форма ввода**: API при сохранении резолвит метки в ссылки/настройки,
+домен работает с settings-моделью. Обоснование, отвергнутые
+альтернативы и открытые инкременты —
+`docs/decisions/strategy-condition-authoring-contract.md`.
+
+Per-`ruleType` контракт полей (какие именно поля под каждый `ruleType`,
+включая правила валидности комбинаций операндов) дозаполняется
+инкрементально при реализации каждого `ruleType`, превентивно не
+перечисляется.
 
 ### StrategyCondition
 `rules: List<StrategyConditionRule>` — все rules должны быть истинны;
@@ -188,33 +214,56 @@ ENTRY/GRID_ENTRY condition; если стал false до live risk — `Deal`
 глобальный порядок шагов).
 
 ### StrategyConditionRule
-`level`, `ruleType: StrategyConditionRuleType`, `timeframe` (nullable),
-`sourceType: StrategyConditionSourceType`, `leftOperand: String`,
-`operator: StrategyConditionOperator`, `rightOperand:
-StrategyConditionOperand`, `indicatorSetting` (объектная ссылка),
-`marketStructureSetting` (объектная ссылка), `percents`.
+Единая структура; операнды **опциональны** (левый / правый / оба / нет
+— отсутствующий не пишется):
+- `level`, `ruleType: StrategyConditionRuleType`;
+- **доменные правила** — плоские: `ruleType` [+ простые поля, напр.
+  `percents`];
+- **сравнивающие правила** — `operator: StrategyConditionOperator` +
+  симметричные структурированные `leftOperand` / `rightOperand:
+  StrategyConditionOperand`.
+
+Любой источник — на любой стороне (число слева или справа,
+indicator-vs-indicator допускается — базовый кейс кроссовера). Убраны
+с правила (несёт операнд / источник): rule-level `sourceType`,
+rule-level `timeframe`, объектные ссылки `indicatorSetting` /
+`marketStructureSetting`.
 
 `StrategyConditionRuleType`: `NO_OPEN_POSITION`, `NO_ACTIVE_DEAL`,
 `ENTRY_ORDER_FINALIZED`, `POSITION_OPENED`, `ATTACHED_STOP_LOSS_EXISTS`,
 `MAIN_PROTECTION_EXISTS`, `PROFIT_PERCENTS_REACHED`,
 `LOSS_PERCENTS_REACHED`, `RANGE_BREAKOUT_CONFIRMED`, `TREND_CHANGED`,
 `EFFICIENCY_BELOW_THRESHOLD`, `MARKET_PHASE_IS`, `INDICATOR_COMPARE`,
-`PRICE_COMPARE`, `CROSSOVER`, `SIGNAL_SCORE_REACHED`,
-`VOLUME_FILTER_PASSED`, `CANDLE_CLOSED`.
+`PRICE_COMPARE`, `CROSSOVER`, `VOLUME_FILTER_PASSED`, `CANDLE_CLOSED`.
+(`SIGNAL_SCORE_REACHED` удалён —
+`docs/decisions/strategy-signal-is-entry-condition.md`.)
 
-`StrategyConditionSourceType`: `PRICE`, `INDICATOR`, `SIGNAL`,
-`MARKET_PHASE`, `MARKET_STRUCTURE`, `POSITION`, `ORDER`, `ALGO_ORDER`,
-`BALANCE`, `TIME`, `CONSTANT`.
+`StrategyConditionSourceType`: `PRICE`, `INDICATOR`, `MARKET_PHASE`,
+`MARKET_STRUCTURE`, `POSITION`, `ORDER`, `ALGO_ORDER`, `BALANCE`,
+`TIME`, `CONSTANT`. (`SIGNAL` удалён —
+`docs/decisions/strategy-signal-is-entry-condition.md`.)
 
 `StrategyConditionOperator`: `EQ`, `NE`, `GT`, `GTE`, `LT`, `LTE`,
 `BETWEEN`, `NOT_BETWEEN`, `CROSSED_ABOVE`, `CROSSED_BELOW`, `IS_TRUE`,
 `IS_FALSE`, `EXISTS`, `NOT_EXISTS`.
 
 ### StrategyConditionOperand
-`sourceType: StrategyConditionSourceType`, `valueType: String` (NUMBER/
-STRING/ENUM/PRICE_FIELD/INDICATOR_VALUE/MARKET_STRUCTURE_LEVEL/
-BOOLEAN), `name: String`, `numberValue: BigDecimal`, `stringValue:
-String`.
+Самоописательный: `sourceType: StrategyConditionSourceType` + ссылка /
+значение по источнику.
+- `valueType` — только там, где тип **не выводится** из `sourceType`.
+  У `CONSTANT` обязателен (`NUMBER` / `ENUM` / `PERCENT` / …); у
+  вычисляемых (`INDICATOR` / `PRICE` / `MARKET_STRUCTURE` /
+  `MARKET_PHASE`) не пишется — тип подразумевается источником.
+- `value` (литерал) — только у `CONSTANT`; у вычисляемых источников
+  значение приходит в рантайме (evaluator).
+- индикаторный операнд ссылается на настройку по ключу `indicatorKey`;
+  операнд market-structure — по ключу настройки структуры.
+
+Точное имя поля-ссылки (per-source `priceKey`/`indicatorKey`/
+`structureKey` vs generic `key`) и консолидация литерала `CONSTANT`
+(единое `value` по `valueType` vs `name`/`stringValue`/`numberValue`)
+— инкрементальная деталь
+(`docs/decisions/strategy-condition-authoring-contract.md`).
 
 ## Действия (разделы)
 
@@ -311,10 +360,18 @@ buffer: swing/range/support/resistance).
 12. Partial exit action не открывает/не увеличивает позицию.
 
 Допустимые `actionType` по подтипам: ORDER/ALGO_ORDER —
-CREATE/AMEND/CANCEL; POSITION — только CLOSE_FULL. Валидатор
-(компонент/процесс) — форвард-заметка в task-вопросах
-(`.claude/decisions/rule-source-of-truth.md`: 12-пунктная валидация →
-процесс/компонент-валидатор).
+CREATE/AMEND/CANCEL; POSITION — только CLOSE_FULL.
+
+**Линия реза валидатора (create / activate).** Структурно-ссылочные
+пункты (1-3, 8: наличие/уникальность `key`, разрешённость ссылок в
+рамках detail) проверяются на **create (400)** в шаге 2. Пункты
+семантики действий (4-7, 9-12: `targetActionKey` для AMEND/CANCEL,
+ORDER↔ORDER / ALGO↔ALGO, `CLOSE_FULL`/partial-exit) опираются на
+незрелую в шаге 2 модель команд/сделок/FSM и отложены — до шагов 4/7
+и/или на **activate (422)** как «готова к запуску». Материализация
+«одной реализации» — через Strategy API (`POST`/`GET`/`PUT`).
+Обоснование — `docs/decisions/strategy-materialization-and-validation.md`.
+Сам компонент-валидатор и Strategy API — артефакты под-шага `CODE`.
 
 ## Связь с DealActionState
 
@@ -363,11 +420,15 @@ JSONB-поля на строках соответствующих видов.
 `step_index`. `marketDataExpiredSetting` шага — JSONB-поле.
 
 ### Внутридеревные ссылки
-- Правило условия → настройка (`StrategyConditionRule.indicatorSetting`
-  / `marketStructureSetting`) — FK на строку настройки.
+- Операнд условия → настройка (индикаторный операнд по `indicatorKey`,
+  market-structure операнд по ключу настройки структуры) — «мягкая»
+  ссылка: ключ внутри структуры операнда (операнды — JSONB на строке
+  `strategy_condition_rule`), резолвит приложение. STRAT-Q1 перенёс
+  ссылку с правила на операнд (рантайм-резолв по `key` настройки, не
+  rule-level FK; `docs/decisions/strategy-condition-authoring-contract.md`).
 - Ссылки изнутри JSON-листьев (напр. `stopLossSettings` с
-  `ATR_PERCENT` → индикаторная настройка) — «мягкие»: id/key внутри
-  JSON, резолвит приложение.
+  `ATR_PERCENT` → индикаторная настройка по `key`) — «мягкие»: id/key
+  внутри JSON, резолвит приложение.
 - `targetActionKey` при сохранении стратегии резолвится в self-FK
   `target_action_id → strategy_action.id` (см. §key / targetActionKey
   и валидация).
