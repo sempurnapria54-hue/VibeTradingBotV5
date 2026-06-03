@@ -16,9 +16,14 @@ DealCashFlow, WS-каналы как отдельный заход). Три во
 `Instrument` / снапшот / `InstrumentExternalRules`), INSTR-Q2
 (`GAPS_CLOSE_3` — валидация рабочего плеча и роль `externalLeverage`)
 и ORCH-Q1 (вынос процесса `candle-loading` — владелец оркестрации
-онбординга и загрузки свечей). Один вопрос — из шага 2 Фазы 1
-(`GAPS_CLOSE_2`, 2026-06-02): STRAT-Q4 (percent-anchor — якорь
-процент-смещения). STRAT-Q1/Q2/Q3 закрыты 2026-06-02 решениями
+онбординга и загрузки свечей). Два вопроса — из шага 2 Фазы 1:
+STRAT-Q4 (`GAPS_CLOSE_2`, 2026-06-02 — percent-anchor, якорь
+процент-смещения) и STRAT-Q5 (`GAPS_CLOSE_4`, 2026-06-03 —
+представление условия `StrategyCondition`/`StrategyConditionRule` в
+БД; Н1 из `DOCS_CHECK_4` оставлен открытым, переформулирован под
+общее правило персистентности
+`docs/rules/persistence-representation.md`).
+STRAT-Q1/Q2/Q3 закрыты 2026-06-02 решениями
 `docs/decisions/strategy-condition-authoring-contract.md` (STRAT-Q1),
 `strategy-signal-is-entry-condition.md` (STRAT-Q2),
 `strategy-materialization-and-validation.md` (STRAT-Q3).
@@ -138,6 +143,13 @@ sizing/rounding-поля спецификации (base/quote/settle, sizes)
 материализуется из другой, где окончательно живёт персистентный дом
 справочных полей; и не потребуется ли в результате **ренейм**
 `InstrumentExternalRules` (например, к снапшот-неймингу).
+
+Под общее правило персистентности
+(`docs/rules/persistence-representation.md`, 2026-06-03) дефолт
+представления материализованных rules — JSONB на строке владельца
+(`Instrument`), пока на них нет FK-ссылок из других мест;
+самостоятельная таблица — только как осознанное исключение. Это вход
+будущего решения, не предрешение.
 
 Варианты на будущее: (1) `InstrumentExternalRules` остаётся
 самостоятельной persisted-моделью, материализуется из снапшота;
@@ -398,7 +410,12 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
   `lastError` (`RetryError`). Отличие от СК §6: ЖЦ инлайнит
   `targetEntityType`/`targetEntityId` и retry-поля прямо в класс, СК §6
   выносит `RuntimeTarget` объектом и наследует от `Retryable`. Выбор
-  представления — часть DEAL-Q3.
+  представления — часть DEAL-Q3. Под общее правило персистентности
+  (`docs/rules/persistence-representation.md`, 2026-06-03) вложенные
+  объекты (`RuntimeTarget`, `lastError`/`RetryError`) в БД — JSONB на
+  строке `DealActionState` при любом доменном выборе; открытым
+  остаётся доменное представление (объект vs инлайн-поля), не
+  представление в БД.
 
 Варианты: (1) `docs/models/domain/other/DealActionState.md` + отдельный
 `docs/lifecycles/DealActionState.md` (status-enum как FSM); (2)
@@ -427,6 +444,40 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 Связано: `docs/models/domain/aggregate/Strategy.md` (§Условия,
 §StrategyPricePlacement — `percents`/`offsetSide`),
 `docs/decisions/strategy-condition-authoring-contract.md`.
+
+### STRAT-Q5. Представление условия (`StrategyCondition` / `StrategyConditionRule`) в БД
+
+Шаг 2 строит и персистит условие каждого `StrategyStep` (`condition:
+StrategyCondition` с `rules` и операндами), но представление условия
+в БД не выбрано. Доки совмещают два прочтения (нестыковка из
+`DOCS_CHECK_4`, Н1; сознательно не разрешена — это содержание
+вопроса): перечень реляционных каркасных узлов замкнут без
+`strategy_condition_rule` (`Strategy.md` §Персистентность,
+`strategy-tree-persistence.md` §Принятое решение), при этом
+§Внутридеревные ссылки обоих доков пишет «операнды — JSONB на строке
+`strategy_condition_rule`», трактуя его реляционной таблицей.
+
+Под общее правило персистентности
+(`docs/rules/persistence-representation.md`) дефолт — JSONB на строке
+`strategy_step` (условие навешано на шаг; FK на правило условия
+ниоткуда нет). Решение принимаем отдельно — правило к условию
+сознательно не автоприменено. Структурированность / число полей
+правила сами по себе — не аргумент за таблицу (правило сняло счётчик
+полей как критерий).
+
+Варианты: (1) JSONB всего условия на строке `strategy_step` — дефолт
+правила; тогда снять формулировку «строка `strategy_condition_rule`»;
+(2) реляционные `strategy_condition` (1:1 на шаге) + дочерние строки
+`strategy_condition_rule` (`level` / `rule_type` / `operator`, операнды
+JSONB) — осознанное исключение из правила с обоснованием decision'ом;
+тогда внести их в перечень каркасных узлов и добавить раздел
+персистентности условия.
+До решения нестыковка помечена в `Strategy.md` §Не зафиксировано и не
+выравнивается; entity/миграция условия не пишутся.
+Связано: `docs/models/domain/aggregate/Strategy.md` (§Условия,
+§Персистентность, §Внутридеревные ссылки, §Не зафиксировано),
+`docs/decisions/strategy-tree-persistence.md`,
+`docs/rules/persistence-representation.md`.
 
 ## Конвенция
 

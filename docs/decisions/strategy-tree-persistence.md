@@ -57,8 +57,10 @@ JSONB внутри контейнера, и почему это сознател
 **JSONB**, а не отдельными реляционными строками/таблицами: каждый
 контейнер несёт свои `indicatorSettings` / `marketStructureSettings`
 JSON-массивами на собственной строке. Их `params` (`IndicatorParams` +
-7 наследников; `MarketStructureParams` / `MarketPhaseParams`) едут
-внутри того же JSON (только непустые значения). В коде иерархия типов
+7 наследников; `MarketStructureParams`) едут внутри того же JSON
+(только непустые значения); дискриминатор подтипа `IndicatorParams` в
+payload не дублируется — тег несёт `indicatorType` настройки-владельца
+(Jackson `EXTERNAL_PROPERTY`). В коде иерархия типов
 сохраняется; в БД — JSON, без таблиц настроек и params и без
 inheritance-маппинга. Валидацию полей и уникальность `key` настройки в
 пределах контейнера (проверка по JSON-массиву, не DB-UNIQUE) берёт
@@ -74,9 +76,13 @@ inheritance-маппинга. Валидацию полей и уникальн�
 FK-целостность внутридеревных ссылок — к ним не применяется.
 Согласуется с тем, что `params` и так JSONB.
 
-**Следствие — `MarketStructureParams` / `MarketPhaseParams`.** Едут
-внутри JSONB-настройки; отдельного решения «JSONB vs колонки» для них
-больше нет — оно растворяется в этом решении.
+**Следствие — `MarketStructureParams` / `MarketPhaseParams`.**
+`MarketStructureParams` едет внутри JSONB-настройки.
+`MarketPhaseParams` — `params` контейнера `StrategyMarketPhaseSetting`,
+не листовой настройки: JSONB-колонка `params` на его реляционной
+строке (разведено на `GAPS_CLOSE_4`, Н3). Отдельного решения «JSONB vs
+колонки» для них больше нет — представление задаёт общее правило
+(`docs/rules/persistence-representation.md`).
 
 **Сознательный отход от архива (params).** В архиве `IndicatorParams` —
 отдельная сущность с наследованием. Отказались: мелкие наследники
@@ -101,13 +107,26 @@ inheritance-маппинга; params immutable, читаются всегда в
 
 ### Действия (`StrategyAction`) — реляционно, наследование `JOINED`
 
-Базовая таблица `strategy_action` (`id`, `action_kind`, `key`,
-`action_type`, `level`, `target_action_key`, `target_action_id`) +
-таблицы по видам: `strategy_order_action`, `strategy_algo_order_action`,
+Базовая таблица `strategy_action` (`id`, `strategy_step_id`,
+`strategy_detail_id`, `action_kind`, `key`, `action_type`, `level`,
+`target_action_key`, `target_action_id`) + таблицы по видам:
+`strategy_order_action`, `strategy_algo_order_action`,
 `strategy_position_action` (у позиции собственных полей нет —
 вырожденная подтаблица, допустимо при `JOINED`). Вложенные настройки
 действий (`placement`, `attachedProtection`, `stopLossSettings`,
 `trailingSettings`) — JSONB-поля на строках соответствующих видов.
+
+**Родительская FK и денормализация под `UNIQUE` (`GAPS_CLOSE_4`, Н2).**
+`strategy_step_id` — FK на родительский `strategy_step` (действие
+принадлежит шагу). `strategy_detail_id` — **денормализованный** FK на
+`strategy_detail` ради DB-`UNIQUE(strategy_detail_id, key)`:
+уникальность `key` действия по правилу валидации №2 — в рамках
+`StrategyDetail`, между действием и деталью лежит шаг, `UNIQUE` через
+join невозможен. Денормализация безопасна при immutable-записи — тот
+же аргумент, что у `target_action_id`. Отклонённая альтернатива —
+проверка приложения (как у `key` JSONB-настроек): у действия, в
+отличие от JSONB-настройки, есть реляционная строка — DB-защита
+доступна, от неё не отказываемся.
 
 Self-ссылка действия хранится **двумя** колонками базовой таблицы:
 `target_action_key` (логический ключ — форма ввода и чтения) и
@@ -195,6 +214,21 @@ status → step». Отклонено: step и так принадлежит det
   идентичности и правка `UNIQUE` — при построении кластеров Фаз 3/4.
   `MarketPhase` не затронут (ключ — контейнер `StrategyMarketPhaseSetting`,
   у него строка/`id` есть).
+- **`GAPS_CLOSE_4` — общее правило + Н2/Н3/Н4; условие (Н1) открыто.**
+  Решение обобщено в общее правило проекта
+  `docs/rules/persistence-representation.md` (реляционно — каркас и
+  FK-адресуемые сущности; всё навешанное — JSONB у владельца; `params`
+  всегда JSONB; полиморфный JSONB — дискриминатор на владельце,
+  Jackson `EXTERNAL_PROPERTY`; счётчик полей — не критерий). По
+  правилу закрыты: Н2 — `strategy_action` несёт `strategy_step_id`
+  (родитель) и денормализованный `strategy_detail_id` под
+  `UNIQUE(strategy_detail_id, key)` (см. §Действия); Н3 —
+  `MarketPhaseParams` разведён с листовыми params (JSONB-колонка
+  контейнера); Н4 — `indicatorType` снят с базы `IndicatorParams`,
+  дискриминатор — поле настройки-владельца. Представление условия
+  (`StrategyCondition`/`StrategyConditionRule`) сознательно **не**
+  закрыто — открытый вопрос STRAT-Q5
+  (`.claude/work/questions/open-questions.md`).
 
 ## Связи
 
@@ -203,5 +237,7 @@ status → step». Отклонено: step и так принадлежит det
   DealActionState).
 - Контракт авторинга условия (операнд → настройка по ключу) —
   `docs/decisions/strategy-condition-authoring-contract.md`.
+- Общее правило представления сущностей в БД (обобщение этого
+  решения) — `docs/rules/persistence-representation.md`.
 - Открытые вопросы шага 2 — `.claude/work/questions/open-questions.md`
-  (STRAT-Q4 — percent-anchor).
+  (STRAT-Q4 — percent-anchor; STRAT-Q5 — представление условия).

@@ -98,7 +98,8 @@
 ### StrategyIndicatorSetting
 `key` (стабильный ключ настройки — по нему ссылается индикаторный
 операнд условия, `indicatorKey`), `indicatorType: IndicatorValue.Type`
-(= `type` в форме ввода), `params: IndicatorParams`, `destiny:
+(= `type` в форме ввода; дискриминатор подтипа `params` — см.
+§IndicatorParams), `params: IndicatorParams`, `destiny:
 Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup` живут
 **внутри `params`** (см. §IndicatorParams; контракт —
 `docs/decisions/strategy-condition-authoring-contract.md`). `Destiny`:
@@ -107,10 +108,14 @@ Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup` жив�
 (для фазы) и внутри `StrategyDetail` (после выбора детали).
 
 ### IndicatorParams (abstract) + наследники
-База: `indicatorType: IndicatorValue.Type`, `timeframe:
-TimeFrame` (доменный таймфрейм серии), `warmup` (опциональный
-override — см. ниже). Наследники несут математические параметры по
-типу: `AtrParams(period)`, `EmaParams(period)`, `RsiParams(period)`,
+База: `timeframe: TimeFrame` (доменный таймфрейм серии), `warmup`
+(опциональный override — см. ниже). Собственного поля-типа у базы
+нет: дискриминатор подтипа — `indicatorType` настройки-владельца
+(`StrategyIndicatorSetting`), маппится Jackson `EXTERNAL_PROPERTY`
+и в JSON-payload `params` не дублируется (единственный источник
+тега — `docs/rules/persistence-representation.md`). Наследники несут
+только математические параметры по типу: `AtrParams(period)`,
+`EmaParams(period)`, `RsiParams(period)`,
 `MacdParams(fastPeriod, slowPeriod, signalPeriod)`,
 `BollingerBandsParams(period, deviationMultiplier)`,
 `StochasticParams(kPeriod, dPeriod, smoothPeriod)`,
@@ -398,7 +403,9 @@ management, форвард-заметка.)
 `StrategyMarketStructureSetting`) и их `params` — JSONB** на строке
 своего контейнера, отдельных строк/таблиц у них нет (см. §Настройки
 рыночных данных ниже). Обоснование развилок и сознательный отход от
-архива — `docs/decisions/strategy-tree-persistence.md`.
+архива — `docs/decisions/strategy-tree-persistence.md`; общее правило
+представления сущностей в БД —
+`docs/rules/persistence-representation.md`.
 
 ### Настройки рыночных данных (`StrategyIndicatorSetting` / `StrategyMarketStructureSetting`)
 Хранятся **JSONB**, не реляционными строками: контейнеры
@@ -413,19 +420,30 @@ management, форвард-заметка.)
 не DB-UNIQUE.
 
 `params` настройки (`IndicatorParams` + 7 наследников;
-`MarketStructureParams` / `MarketPhaseParams`) едут внутри того же JSON
-(только непустые значения), без отдельных таблиц params и без
-inheritance-маппинга — в коде иерархия типов сохраняется. Валидацию
-полей делает приложение. Обоснование (почему настройки не реляционные
-узлы) — `docs/decisions/strategy-tree-persistence.md`.
+`MarketStructureParams`) едут внутри того же JSON (только непустые
+значения), без отдельных таблиц params и без inheritance-маппинга — в
+коде иерархия типов сохраняется. Дискриминатор подтипа
+`IndicatorParams` в payload не дублируется — тег несёт `indicatorType`
+настройки-владельца (Jackson `EXTERNAL_PROPERTY`, см. §IndicatorParams).
+`MarketPhaseParams` — `params` реляционного контейнера
+`StrategyMarketPhaseSetting`, не часть JSON-массивов листовых настроек:
+JSONB-колонка `params` на строке `strategy_market_phase_setting`.
+Валидацию полей делает приложение. Обоснование (почему настройки не
+реляционные узлы) — `docs/decisions/strategy-tree-persistence.md`.
 
 ### Действия (`StrategyAction`)
 Наследование `JOINED`: базовая таблица `strategy_action`
-(`id`, `action_kind`, `key`, `action_type`, `level`,
-`target_action_key`, `target_action_id`) + таблицы по видам:
-`strategy_order_action`, `strategy_algo_order_action`,
-`strategy_position_action` (у позиции собственных полей нет).
-Self-ссылка действия хранится **двумя** колонками базовой таблицы:
+(`id`, `strategy_step_id`, `strategy_detail_id`, `action_kind`, `key`,
+`action_type`, `level`, `target_action_key`, `target_action_id`) +
+таблицы по видам: `strategy_order_action`,
+`strategy_algo_order_action`, `strategy_position_action` (у позиции
+собственных полей нет). Родитель действия — `strategy_step_id`
+(FK → `strategy_step`); `strategy_detail_id` — денормализованный FK →
+`strategy_detail` ради DB-`UNIQUE(strategy_detail_id, key)`
+(уникальность `key` действия — в рамках `StrategyDetail`, через
+несколько шагов, `UNIQUE` через join невозможен; см. §Связь с
+DealActionState). Денормализация безопасна при immutable-дереве — как
+у `target_action_id`. Self-ссылка действия хранится **двумя** колонками базовой таблицы:
 `target_action_key` (логический ключ — форма ввода и чтения) и
 `target_action_id` (self-FK `→ strategy_action.id`, резолвится при
 сохранении; см. §Внутридеревные ссылки). Вложенные настройки действий
@@ -462,6 +480,13 @@ Self-ссылка действия хранится **двумя** колонк�
 `*Bars`/`*Period` vs `*Percents`/`*Score`/`*Ratio`/`*Multiplier`) на
 разборе `GAPS_CLOSE_2` не решались — проставляются при написании
 entity/Flyway-миграции.
+
+Представление условия (`StrategyCondition` / `StrategyConditionRule`)
+в БД — открытый вопрос **STRAT-Q5**
+(`.claude/work/questions/open-questions.md`): перечень каркасных узлов
+(без `strategy_condition_rule`) и формулировка «операнды — JSONB на
+строке `strategy_condition_rule`» (§Внутридеревные ссылки) сознательно
+не выровнены до решения; entity/миграция условия не пишутся.
 
 ## TimeFrame
 
