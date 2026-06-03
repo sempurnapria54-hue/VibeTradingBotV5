@@ -80,7 +80,8 @@
 все `MarketPhase.Type` (`BULL_TREND`/`BEAR_TREND`/`RANGE`/`UNKNOWN`);
 `MarketPhaseJob` сохраняет один актуальный результат, `EntryScannerJob`
 выбирает detail по `MarketPhase.Type → StrategyDetail.marketPhaseType`
-(jobs — форвард-заметки в `.claude/work/questions/tasks/strategy.md`).
+(jobs — форвард-заметки в
+`.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-strategy.md`).
 
 ## Настройки рыночных данных (разделы)
 
@@ -402,7 +403,9 @@ management, форвард-заметка.)
 **Листовые настройки рыночных данных (`StrategyIndicatorSetting`,
 `StrategyMarketStructureSetting`) и их `params` — JSONB** на строке
 своего контейнера, отдельных строк/таблиц у них нет (см. §Настройки
-рыночных данных ниже). Обоснование развилок и сознательный отход от
+рыночных данных ниже). **Условие шага (`StrategyCondition` с `rules`
+и операндами) — JSONB** на строке `strategy_step` (см. §Условие ниже).
+Обоснование развилок и сознательный отход от
 архива — `docs/decisions/strategy-tree-persistence.md`; общее правило
 представления сущностей в БД —
 `docs/rules/persistence-representation.md`.
@@ -457,11 +460,26 @@ DealActionState). Денормализация безопасна при immutab
 пересобирается группировкой по `deal_status` и сортировкой по
 `step_index`. `marketDataExpiredSetting` шага — JSONB-поле.
 
+### Условие (`StrategyCondition`)
+Условие шага персистится **целиком JSONB-полем `condition`** на строке
+`strategy_step`: массив `rules` (у каждого правила `level` / `ruleType`
+/ `operator` + простые поля), операнды — JSONB внутри того же объекта.
+Отдельных таблиц `strategy_condition` / `strategy_condition_rule` нет;
+перечень реляционных каркасных узлов не пополняется. Это дефолт правила
+`docs/rules/persistence-representation.md` (условие навешано на
+каркасный `strategy_step`, FK внутрь условия ниоткуда нет); решение и
+отвергнутая реляционная альтернатива —
+`docs/decisions/strategy-tree-persistence.md` §Условие. Ссылки
+операнд → настройка остаются «мягкими» по `key` (см. §Внутридеревные
+ссылки); evaluator десериализует условие в объектную модель независимо
+от формы хранения.
+
 ### Внутридеревные ссылки
 - Операнд условия → настройка (индикаторный операнд по `indicatorKey`,
   market-structure операнд по ключу настройки структуры) — «мягкая»
-  ссылка: ключ внутри структуры операнда (операнды — JSONB на строке
-  `strategy_condition_rule`), резолвит приложение. STRAT-Q1 перенёс
+  ссылка: ключ внутри структуры операнда (операнды — внутри
+  condition-JSONB на строке `strategy_step`, см. §Условие), резолвит
+  приложение. STRAT-Q1 перенёс
   ссылку с правила на операнд (рантайм-резолв по `key` настройки, не
   rule-level FK; `docs/decisions/strategy-condition-authoring-contract.md`).
 - Ссылки изнутри JSON-листьев (напр. `stopLossSettings` с
@@ -480,13 +498,6 @@ DealActionState). Денормализация безопасна при immutab
 `*Bars`/`*Period` vs `*Percents`/`*Score`/`*Ratio`/`*Multiplier`) на
 разборе `GAPS_CLOSE_2` не решались — проставляются при написании
 entity/Flyway-миграции.
-
-Представление условия (`StrategyCondition` / `StrategyConditionRule`)
-в БД — открытый вопрос **STRAT-Q5**
-(`.claude/work/questions/open-questions.md`): перечень каркасных узлов
-(без `strategy_condition_rule`) и формулировка «операнды — JSONB на
-строке `strategy_condition_rule`» (§Внутридеревные ссылки) сознательно
-не выровнены до решения; entity/миграция условия не пишутся.
 
 ## TimeFrame
 
@@ -510,5 +521,6 @@ RVO (`CalculationContext`/`MarketPriceData`/`CalculatedStrategyAction`/
 `InstrumentExternalRules`) — отдельные кластеры
 (`docs/processes/` / `docs/components/` / `docs/components/models/` /
 `docs/models/domain/other/`), мигрируются отдельно (форвард-заметки в
-`.claude/work/questions/tasks/strategy.md`). JSON-примеры — отдельный
+`.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-strategy.md`).
+JSON-примеры — отдельный
 файл `Strategy API examples.md` (форвард-заметка).

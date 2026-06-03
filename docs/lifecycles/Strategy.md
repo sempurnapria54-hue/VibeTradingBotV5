@@ -14,7 +14,8 @@
 описывает runtime-свежесть рыночных данных: устаревшие свечи /
 индикаторы / структура / фаза рынка статус не меняют (свежесть —
 `MarketDataExpirationChecker` + `StrategyStep.marketDataExpiredSetting`;
-форвард-заметка в `.claude/work/questions/tasks/strategy.md`).
+форвард-заметка в
+`.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-strategy.md`).
 
 ## Статусы
 
