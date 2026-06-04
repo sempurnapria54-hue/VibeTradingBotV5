@@ -42,7 +42,7 @@ close-position ACK — `docs/integrations/okx/contracts/position.md`.
 | `uTime` | string-ms | время обновления |
 | `mgnMode` | string | режим маржи (`isolated`/`cross`); adapter сверяет `=isolated` |
 | `posSide` | string | сторона позиции (`net`/`long`/`short`); adapter сверяет `=net` |
-| `lever` | string-decimal | плечо; adapter сверяет `≤ max leverage` |
+| `lever` | string-decimal | плечо; adapter сверяет `≤` биржевого максимума (`externalMaxLeverage`) |
 
 ### Не используется bot'ом (отбрасывается на маппинге)
 

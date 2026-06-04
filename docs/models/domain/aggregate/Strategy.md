@@ -156,7 +156,6 @@ EXIT_CONDITION).
 | `marketPhaseType` | `MarketPhase.Type` | Для какой фазы работает detail. |
 | `phaseEntryPolicy` | `PhaseEntryPolicy` | Как торгуем в этой фазе. |
 | `riskPerTradePercent` | `BigDecimal` | Риск на сделку, % от капитала. |
-| `maxLeverage` | `Integer` | Максимальное плечо (не выше глобального risk-лимита). |
 | `targetRiskRewardRatio` | `BigDecimal` | High-level ориентир R/R. |
 | `indicatorSettings` | `List<StrategyIndicatorSetting>` | После выбора detail (ATR для SL, RSI для ENTRY и т.д.). |
 | `marketStructureSettings` | `List<StrategyMarketStructureSetting>` | После выбора detail. |

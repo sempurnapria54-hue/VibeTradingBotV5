@@ -73,7 +73,7 @@ Mapping в `OrderExternalSnapshot` и далее в `Order` —
 ### Не используется bot'ом (отбрасываются на маппинге)
 
 `ccy` (валюта маржи; adapter использует USDT-policy), `lever` (плечо;
-сверка против expected max leverage), `fillPx`/`fillSz`/`fillTime`/
+сверка против биржевого максимума `externalMaxLeverage`), `fillPx`/`fillSz`/`fillTime`/
 `tradeId` (поля «последнего исполнения» — факт собирается через
 fills, `docs/models/mapping/TradeFill.md`), `feeCcy`/`rebate`/
 `rebateCcy`/`pnl` (для итоговой аналитики через fills/finalization),

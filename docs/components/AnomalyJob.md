@@ -22,8 +22,8 @@ entities. Фиксирует anomaly/safety report (`AnomalyReport`, см.
 - больше одной позиции на инструмент (при максимуме одной);
 - DB entity closed, но exchange entity всё ещё live;
 - unknown external status; нарушен isolated margin; плечо выше
-  глобального лимита; чужой live risk на инструменте; после cleanup
-  остались неизвестные live-хвосты.
+  биржевого максимума (`externalMaxLeverage`); чужой live risk на
+  инструменте; после cleanup остались неизвестные live-хвосты.
 
 ## Исключение (не anomaly)
 

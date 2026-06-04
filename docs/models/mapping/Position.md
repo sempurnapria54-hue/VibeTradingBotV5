@@ -28,11 +28,11 @@ Mapping-слой для `Position`. Доменная модель —
 | `externalId` | `Position.externalId` | биржевой id позиции |
 | `externalSize` | `Position.externalSize` | размер по модулю |
 | `direction` | `Position.direction` | `LONG`/`SHORT` (из знака) |
-| `externalAverageEntryPrice` | `Position.averageEntryPrice` | средняя цена входа |
-| `externalMarkPrice` | `Position.markPrice` | mark price |
-| `externalLiquidationPrice` | `Position.liquidationPrice` | цена ликвидации |
-| `externalMargin` | `Position.margin` | маржа позиции |
-| `externalUnrealizedProfit` | `Position.unrealizedProfit` | нереализованный PnL |
+| `externalAverageEntryPrice` | `Position.externalAverageEntryPrice` | средняя цена входа |
+| `externalMarkPrice` | `Position.externalMarkPrice` | mark price |
+| `externalLiquidationPrice` | `Position.externalLiquidationPrice` | цена ликвидации |
+| `externalMargin` | `Position.externalMargin` | маржа позиции |
+| `externalUnrealizedProfit` | `Position.externalUnrealizedProfit` | нереализованный PnL |
 | `externalCreatedAt` | `Position.externalCreatedAt` | |
 | `externalModifiedAt` | `Position.externalModifiedAt` | |
 
@@ -75,7 +75,7 @@ problem-flow.
 instId    == expected Instrument.externalId
 posSide   == net (если применимо)
 mgnMode   == isolated (если применимо)
-lever     <= expected max leverage
+lever     <= биржевой максимум (externalMaxLeverage)
 ```
 
 Нарушение invariant → `ExternalInvariantViolationException`
@@ -138,7 +138,7 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 instId  == expected Instrument.externalId
 posSide == net
 mgnMode == isolated
-lever   <= expected max leverage
+lever   <= биржевой максимум (externalMaxLeverage)
 ```
 
 ### OKX close-position request body
