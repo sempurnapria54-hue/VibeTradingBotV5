@@ -56,6 +56,11 @@ public class InstrumentService {
         return instrumentDataService.getRequiredByInternalId(internalId);
     }
 
+    /** Резолв internalId инструмента по числовому id (для api-ответов смежных сущностей). */
+    public String getRequiredInternalIdById(Long id) {
+        return instrumentDataService.getRequiredInternalIdById(id);
+    }
+
     /**
      * CREATED → SYNC: тянет спецификацию у биржи и обновляет домен из
      * снапшота (идентичность + биржевые externalStatus/externalLeverage).

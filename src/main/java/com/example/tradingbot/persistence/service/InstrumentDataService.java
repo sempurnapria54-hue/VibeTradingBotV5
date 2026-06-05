@@ -62,4 +62,18 @@ public class InstrumentDataService {
                 .map(mapper::persistenceToDomain)
                 .collect(toList());
     }
+
+    /** Проекция: только internalId по id — без вытягивания всей сущности. */
+    @Transactional(readOnly = true)
+    public String getRequiredInternalIdById(Long id) {
+        return repository.findInternalIdById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Instrument not found: " + id));
+    }
+
+    /** Проекция: только id по internalId — без вытягивания всей сущности. */
+    @Transactional(readOnly = true)
+    public Long getRequiredIdByInternalId(String internalId) {
+        return repository.findIdByInternalId(internalId)
+                .orElseThrow(() -> new IllegalArgumentException("Instrument not found: " + internalId));
+    }
 }

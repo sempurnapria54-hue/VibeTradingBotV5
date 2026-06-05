@@ -18,7 +18,11 @@ create = структура / activate = готовность-к-запуску)
 ### A. Материализация — Strategy API полным жизненным циклом
 
 - `POST` — создать; `GET` — получить; `PUT` — activate / inactivate /
-  delete (смена статуса, не физическое удаление).
+  delete (смена статуса, не физическое удаление). Форма (`CODE`
+  шага 2): `POST /api/strategies`, `GET /api/strategies/{internalId}`,
+  `PUT /api/strategies/{internalId}/status` с телом `{status}`;
+  `CREATED` руками не ставится (400); недопустимый переход lifecycle и
+  вторая `ACTIVE` на инструменте — 422 (`UNPROCESSABLE_CONTENT`).
 - Это REST-поверхность над уже задокументированным lifecycle
   стратегии (enforcement `INACTIVE`/`DELETED`, проверка в
   `EntryScannerJob`; `docs/lifecycles/Strategy.md`) — не новая
@@ -37,7 +41,15 @@ create = структура / activate = готовность-к-запуску)
   владеет: валидный JSON; существование ключей индикаторов, на которые
   ссылаются правила; уникальность `key`; разрешённые enum; валидность
   комбинаций операндов; sanity `warmup`-override (не меньше
-  производимого минимума).
+  производимого минимума — на шаге 2 упрощённый floor по типу,
+  настоящий derive у реализаций индикаторов шага 3). Туда же (`CODE`
+  шага 2): ровно одна деталь на каждый `MarketPhase.Type` (неторгуемая
+  фаза — явная `NO_TRADE`-деталь); матрица политика×фаза
+  (`PhaseEntryPolicy.isAllowedFor`); парс ISO-8601 duration;
+  `attachedProtection` обязательна для `ENTRY_ATTACHED_STOP_LOSS`;
+  ссылки `indicatorKey`/`structureKey`/`targetActionKey` — в рамках
+  своей детали. Исполнитель — `StrategyCreateRequestValidator`
+  (api-слой) + Bean Validation per-field границ.
 - **Числовые торговые поля** (`riskPerTradePercent`,
   `targetRiskRewardRatio`, `allocationPercents`, `distancePercents`,
   …) на create ограничиваются только **структурно**: невозможные
@@ -71,7 +83,12 @@ create = структура / activate = готовность-к-запуску)
   `key`, разрешённость ссылок в рамках detail) — на create в шаге 2;
   пункты семантики действий — отложены (шаги 4/7 и/или activate).
 - Сам компонент-валидатор и Strategy API — артефакты под-шага `CODE`
-  шага 2; backlog п.8 в части валидатора/материализации закрыт по
+  шага 2; **созданы на `CODE` (2026-06-05)**: `StrategyController`,
+  `StrategyCreateRequestValidator`, `StrategyService` /
+  `StrategyDataService`. «Одна реализация» заавторена
+  (`src/main/resources/strategy-examples/trend-following-ema.json`,
+  касание `trading-specialist` по СТ-1). Backlog п.8 в части
+  валидатора/материализации закрыт по
   scope (остаётся открытым — воспроизведение `Strategy API examples`
   как файла знания).
 - Закрывает эскалацию **Э5** (`GAPS_CLOSE_2`) и вопрос **STRAT-Q3**.

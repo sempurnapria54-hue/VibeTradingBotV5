@@ -15,4 +15,10 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
 
     @Query("select distinct i from InstrumentEntity i left join fetch i.candleGroups where i.id = :id")
     Optional<InstrumentEntity> findByIdWithCandleGroups(@Param("id") Long id);
+
+    @Query("select i.internalId from InstrumentEntity i where i.id = :id")
+    Optional<String> findInternalIdById(@Param("id") Long id);
+
+    @Query("select i.id from InstrumentEntity i where i.internalId = :internalId")
+    Optional<Long> findIdByInternalId(@Param("internalId") String internalId);
 }

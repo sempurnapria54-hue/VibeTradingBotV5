@@ -107,19 +107,19 @@ inheritance-маппинга; params immutable, читаются всегда в
 
 ### Действия (`StrategyAction`) — реляционно, наследование `JOINED`
 
-Базовая таблица `strategy_action` (`id`, `strategy_step_id`,
+Базовая таблица `strategy_actions` (`id`, `strategy_step_id`,
 `strategy_detail_id`, `action_kind`, `key`, `action_type`, `level`,
 `target_action_key`, `target_action_id`) + таблицы по видам:
-`strategy_order_action`, `strategy_algo_order_action`,
-`strategy_position_action` (у позиции собственных полей нет —
+`strategy_order_actions`, `strategy_algo_order_actions`,
+`strategy_position_actions` (у позиции собственных полей нет —
 вырожденная подтаблица, допустимо при `JOINED`). Вложенные настройки
 действий (`placement`, `attachedProtection`, `stopLossSettings`,
 `trailingSettings`) — JSONB-поля на строках соответствующих видов.
 
 **Родительская FK и денормализация под `UNIQUE` (`GAPS_CLOSE_4`, Н2).**
-`strategy_step_id` — FK на родительский `strategy_step` (действие
+`strategy_step_id` — FK на родительский `strategy_steps` (действие
 принадлежит шагу). `strategy_detail_id` — **денормализованный** FK на
-`strategy_detail` ради DB-`UNIQUE(strategy_detail_id, key)`:
+`strategy_details` ради DB-`UNIQUE(strategy_detail_id, key)`:
 уникальность `key` действия по правилу валидации №2 — в рамках
 `StrategyDetail`, между действием и деталью лежит шаг, `UNIQUE` через
 join невозможен. Денормализация безопасна при immutable-записи — тот
@@ -130,7 +130,8 @@ join невозможен. Денормализация безопасна пр�
 
 Self-ссылка действия хранится **двумя** колонками базовой таблицы:
 `target_action_key` (логический ключ — форма ввода и чтения) и
-`target_action_id` (self-FK `→ strategy_action.id`, резолвится при
+`target_action_id` (self-FK `→ strategy_actions.id`, deferrable;
+резолвится при
 сохранении). Денормализация принята как безопасная при immutable-записи;
 защита БД — FK + CHECK `target_action_id <> id` (нет self-loop). FK
 здесь — в отличие от мягкой ссылки операнд→настройка (по `key`) — ради
@@ -148,7 +149,7 @@ nullable-колонками всех видов, хуже выражает сп�
 ### `stepsByStatus` — плоские строки, не map-таблица
 
 `Map<Deal.Status, List<StrategyStep>>` хранится плоскими строками
-`strategy_step` с колонками `strategy_detail_id` (FK), `deal_status`
+`strategy_steps` с колонками `strategy_detail_id` (FK), `deal_status`
 (ключ map), `step_index` (порядок в списке). В домене Map
 пересобирается группировкой по `deal_status` и сортировкой по
 `step_index`.
@@ -161,15 +162,15 @@ status → step». Отклонено: step и так принадлежит det
 ### Условие (`StrategyCondition`) — JSONB на строке шага (`GAPS_CLOSE_5`, STRAT-Q5)
 
 Условие шага (`StrategyCondition` с `rules` и операндами) персистится
-**целиком JSONB-полем `condition` на строке `strategy_step`**: массив
+**целиком JSONB-полем `condition` на строке `strategy_steps`**: массив
 правил (`level` / `ruleType` / `operator` + простые поля), операнды —
-JSONB внутри того же объекта. Отдельных таблиц `strategy_condition` /
-`strategy_condition_rule` нет; перечень реляционных каркасных узлов не
+JSONB внутри того же объекта. Отдельных таблиц `strategy_conditions` /
+`strategy_condition_rules` нет; перечень реляционных каркасных узлов не
 пополняется.
 
 **Почему.** Условие точно ложится под дефолт правила
 `docs/rules/persistence-representation.md`: навешано на каркасный
-`strategy_step`, FK внутрь правила/условия ниоткуда нет, операнды и
+`strategy_steps`, FK внутрь правила/условия ниоткуда нет, операнды и
 так JSONB, дерево immutable и грузится агрегатом целиком; evaluator
 десериализует условие в объектную модель независимо от формы хранения.
 Симметрично с ревизией `GAPS_CLOSE_3` (листовые настройки → JSONB в
@@ -181,23 +182,24 @@ JSONB внутри того же объекта. Отдельных таблиц
 из правила, которое требовало бы storage-специфичной причины:
 SQL-запросов по правилам между стратегиями или внешнего FK на правило.
 Для immutable-агрегата, грузящегося целиком, такой причины нет;
-вдобавок `strategy_condition` оказалась бы 1:1-таблицей без полезной
+вдобавок `strategy_conditions` оказалась бы 1:1-таблицей без полезной
 нагрузки.
 
 ### Внутридеревные ссылки — FK / «мягкие» / self-FK по типу ссылки
 
 - **Операнд условия → настройка** (индикаторный операнд по
-  `indicatorKey`, market-structure операнд по ключу настройки) —
+  `indicatorKey`, market-structure операнд по `structureKey`) —
   «мягкая» ссылка: ключ внутри структуры операнда, резолвит
   приложение. STRAT-Q1 перенёс ссылку с правила на операнд
   (`docs/decisions/strategy-condition-authoring-contract.md`); прежний
   rule-level FK `StrategyConditionRule.indicatorSetting` снят вместе с
   объектными ссылками на правиле.
 - **Ссылки изнутри JSON-листьев** (напр. `stopLossSettings` с
-  `ATR_PERCENT` → индикаторная настройка) — «мягкие»: id/key внутри
+  `ATR_PERCENT` → индикаторная настройка по `indicatorKey`) —
+  «мягкие»: ключ внутри
   JSON, резолвит приложение (FK из JSONB невозможен).
 - **`targetActionKey`** при сохранении стратегии резолвится в self-FK
-  `target_action_id → strategy_action.id`; базовая таблица хранит **и**
+  `target_action_id → strategy_actions.id`; базовая таблица хранит **и**
   ключ, **и** id (денормализация, безопасная при immutable-записи).
   Защита БД — FK + CHECK `target_action_id <> id`. FK здесь, в отличие
   от мягкой ссылки операнд→настройка, — ради БД-защиты ссылки
@@ -256,11 +258,25 @@ SQL-запросов по правилам между стратегиями и�
   закрыто — открытый вопрос STRAT-Q5.
 - **`GAPS_CLOSE_5` — условие → JSONB (STRAT-Q5 закрыт).** Представление
   условия зафиксировано по дефолту правила: JSONB-поле `condition` на
-  строке `strategy_step` (см. §Условие). В `Strategy.md` снята
+  строке `strategy_steps` (см. §Условие). В `Strategy.md` снята
   формулировка «операнды — JSONB на строке `strategy_condition_rule`»
   (§Внутридеревные ссылки теперь указывает на condition-JSONB шага),
   добавлен §Условие в §Персистентность, метка STRAT-Q5 убрана из
   §Не зафиксировано; entity/миграция условия разблокированы.
+- **`CODE` шага 2 (2026-06-05) — схема материализована.** Имена таблиц
+  приведены к общему правилу множественного числа
+  (`.claude/rules/codestyle.md` §Схема БД): `strategies`,
+  `strategy_market_phase_settings`, `strategy_details`,
+  `strategy_steps`, `strategy_actions`, `strategy_order_actions`,
+  `strategy_algo_order_actions`, `strategy_position_actions`
+  (FK-колонки/constraint'ы — в единственном). Self-FK
+  `target_action_id` объявлен deferrable (порядок вставки строк внутри
+  транзакции не ограничивает); резолв `targetActionKey` → id выполняет
+  `StrategyDataService` после вставки дерева. Типы числовых полей
+  зафиксированы (`Strategy.md` §Типы числовых полей). На `strategies` —
+  частичный UNIQUE «одна ACTIVE на инструмент». Нейминг «мягких» ссылок
+  унифицирован: `indicatorKey` / `structureKey` во всех носителях
+  (операнды, `StopLossSettings`, `StrategyPricePlacement`).
 
 ## Связи
 

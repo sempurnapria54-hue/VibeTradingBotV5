@@ -39,8 +39,9 @@
   `StrategyAction` `key` работает через `targetActionKey`. У
   `StrategyIndicatorSetting` (и настройки market-structure) `key`
   нужен, чтобы на настройку ссылался операнд условия (`indicatorKey` /
-  structure-key) и «мягкие» ссылки JSON-листьев
-  (`stopLossSettings`/`placement`). Прочие settings — без `key`,
+  `structureKey`) и «мягкие» ссылки JSON-листьев
+  (`stopLossSettings`/`placement` — те же поля `indicatorKey` /
+  `structureKey`). Прочие settings — без `key`,
   связи объектные (контейнмент внутри `StrategyMarketPhaseSetting` /
   `StrategyDetail`).
 - **Direct partial close запрещён** как постоянный инвариант (см.
@@ -72,7 +73,7 @@
 | `name` | `String` | Человекочитаемое имя. |
 | `status` | `Status` | Административный статус (см. lifecycle). |
 | `marketPhaseSetting` | `StrategyMarketPhaseSetting` | Настройка расчёта фазы рынка (живёт на уровне Strategy, т.к. фаза нужна **до** выбора `StrategyDetail`). |
-| `details` | `List<StrategyDetail>` | Ровно одна detail на один `MarketPhase.Type` (инвариант). |
+| `details` | `List<StrategyDetail>` | Ровно одна detail на один `MarketPhase.Type` (инвариант): create требует детали всех четырёх типов, неторгуемая фаза объявляется явной `NO_TRADE`-деталью. |
 
 `Status`: `CREATED`, `ACTIVE`, `INACTIVE`, `DELETED` (значения и
 эффекты — в `docs/lifecycles/Strategy.md`). Одна
@@ -127,15 +128,19 @@ Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup` жив�
 `indicatorType` + `period` (оконные — `= period`; рекурсивные
 EMA/RSI/ATR — кратно `period`; MACD — от старшего периода). Автор может
 задать явный override в `params`; эффективный `warmup = override ??
-derived`. Потребитель — candle-loading (глубина истории для прогрева,
+derived`. Create-валидация (шаг 2) проверяет override против
+упрощённого минимума по типу (окно/рекурсивные → `period`; MACD →
+`slow + signal`; стохастик — сумма окон; OBV → 1); настоящий derive —
+у реализаций индикаторов (шаг 3). Потребитель — candle-loading
+(глубина истории для прогрева,
 `docs/processes/candle-loading.md`); runtime-пропуск разгонной зоны при
 расчёте — `docs/components/IndicatorJob.md` §Warmup. Контракт —
 `docs/decisions/strategy-condition-authoring-contract.md`.
 
 ### StrategyMarketStructureSetting
-`key` (для ссылки операнда market-structure / «мягких» ссылок
-JSON-листьев; точное имя поля-ссылки — инкрементальная деталь, см.
-§StrategyConditionOperand), `timeframe`, `structureType:
+`key` (на него ссылаются операнд market-structure и «мягкие» ссылки
+JSON-листьев — поле `structureKey`, см. §StrategyConditionOperand),
+`timeframe`, `structureType:
 MarketStructure.Type`, `params: MarketStructureParams`, `destiny:
 Destiny`, `expirationDuration`. `Destiny`: те же 5 значений, что у
 indicator (MARKET_PHASE / ENTRY_CONDITION / ACTION_PRICE / PROTECTION /
@@ -164,7 +169,9 @@ EXIT_CONDITION).
 `PhaseEntryPolicy`: `FOLLOW_PHASE`, `CONTRARIAN`, `GRID`, `NO_TRADE`.
 Матрица допустимости: `BULL_TREND`/`BEAR_TREND` →
 `FOLLOW_PHASE`/`CONTRARIAN`/`NO_TRADE`; `RANGE` → `GRID`/`NO_TRADE`;
-`UNKNOWN` → `NO_TRADE`.
+`UNKNOWN` → `NO_TRADE`. Матрица — инвариант доменной модели (метод
+`PhaseEntryPolicy.isAllowedFor`); проверяется на create (400). У
+`NO_TRADE`-детали риск-поля и настройки опциональны (nullable).
 
 ## StrategyStep (раздел)
 
@@ -222,8 +229,10 @@ Per-`ruleType` контракт полей (какие именно поля п�
 Единая структура; операнды **опциональны** (левый / правый / оба / нет
 — отсутствующий не пишется):
 - `level`, `ruleType: StrategyConditionRuleType`;
-- **доменные правила** — плоские: `ruleType` [+ простые поля, напр.
-  `percents`];
+- **доменные правила** — плоские: `ruleType` [+ простые поля:
+  `percents` (PROFIT_/LOSS_PERCENTS_REACHED,
+  RANGE_BREAKOUT_CONFIRMED), `timeframe` (CANDLE_CLOSED — какой
+  таймфрейм закрыт)];
 - **сравнивающие правила** — `operator: StrategyConditionOperator` +
   симметричные структурированные `leftOperand` / `rightOperand:
   StrategyConditionOperand`.
@@ -254,21 +263,17 @@ rule-level `timeframe`, объектные ссылки `indicatorSetting` /
 
 ### StrategyConditionOperand
 Самоописательный: `sourceType: StrategyConditionSourceType` + ссылка /
-значение по источнику.
-- `valueType` — только там, где тип **не выводится** из `sourceType`.
-  У `CONSTANT` обязателен (`NUMBER` / `ENUM` / `PERCENT` / …); у
-  вычисляемых (`INDICATOR` / `PRICE` / `MARKET_STRUCTURE` /
-  `MARKET_PHASE`) не пишется — тип подразумевается источником.
-- `value` (литерал) — только у `CONSTANT`; у вычисляемых источников
-  значение приходит в рантайме (evaluator).
-- индикаторный операнд ссылается на настройку по ключу `indicatorKey`;
-  операнд market-structure — по ключу настройки структуры.
-
-Точное имя поля-ссылки (per-source `priceKey`/`indicatorKey`/
-`structureKey` vs generic `key`) и консолидация литерала `CONSTANT`
-(единое `value` по `valueType` vs `name`/`stringValue`/`numberValue`)
-— инкрементальная деталь
-(`docs/decisions/strategy-condition-authoring-contract.md`).
+значение по источнику (зафиксировано на `CODE` шага 2):
+- `valueType: ConstantValueType` (`NUMBER` / `PERCENT` / `ENUM` /
+  `BOOLEAN`) — только у `CONSTANT` (там обязателен); у вычисляемых
+  (`INDICATOR` / `PRICE` / `MARKET_STRUCTURE` / `MARKET_PHASE`) не
+  пишется — тип подразумевается источником.
+- `value: String` — единый литерал `CONSTANT` (строковое
+  представление, интерпретируется по `valueType`); у вычисляемых
+  источников значение приходит в рантайме (evaluator).
+- Ссылки per-source: индикаторный операнд — `indicatorKey`; операнд
+  market-structure — `structureKey`; ценовой операнд несёт
+  `priceSource: StrategyPriceSource`.
 
 ## Действия (разделы)
 
@@ -296,8 +301,8 @@ ENTRY_ATTACHED_STOP_LOSS обязательна).
 
 ### StrategyPricePlacement
 `baseType: StrategyPriceBaseType`, `priceSource: StrategyPriceSource`
-(только для `MARKET_PRICE`), `marketStructureSetting` (для
-RANGE_LOW/RANGE_HIGH/SWING_LOW/SWING_HIGH/SUPPORT/RESISTANCE),
+(только для `MARKET_PRICE`), `structureKey` (ключ настройки структуры,
+для RANGE_LOW/RANGE_HIGH/SWING_LOW/SWING_HIGH/SUPPORT/RESISTANCE),
 `offsetSide: StrategyPriceOffsetSide`, `percents`.
 - `StrategyPriceBaseType`: `RANGE_LOW`, `RANGE_HIGH`, `SWING_LOW`,
   `SWING_HIGH`, `SUPPORT`, `RESISTANCE`, `ENTRY_PRICE`, `MARKET_PRICE`.
@@ -335,8 +340,9 @@ Order/AlgoOrder reduce-only.
 `calculationType: StopLossCalculationType` (`ENTRY_PRICE_PERCENT` /
 `ATR_PERCENT` (150 = 1.5 ATR) / `MARKET_STRUCTURE_BUFFER_PERCENT`),
 `distancePercents`, `triggerPriceType: TriggerPriceType` (обязателен),
-`indicatorSetting` (для ATR), `marketStructureSetting` (для structure
-buffer: swing/range/support/resistance).
+`indicatorKey` (ключ ATR-настройки, для `ATR_PERCENT`), `structureKey`
+(ключ настройки структуры, для `MARKET_STRUCTURE_BUFFER_PERCENT`:
+swing/range/support/resistance).
 
 ### TrailingSettings
 `activationProfitPercents` (null — сразу), `callbackPercents`
@@ -404,11 +410,17 @@ management, форвард-заметка.)
 `StrategyDetail`, `StrategyStep`, `StrategyAction`): каждый такой узел —
 строка/таблица с `id`, объектные связи между ними — через FK, загрузка
 дерева целиком — через `@EntityGraph` / `JOIN FETCH` (без N+1).
+Таблицы: `strategies`, `strategy_market_phase_settings`,
+`strategy_details`, `strategy_steps`, `strategy_actions` + таблицы
+видов действий (имена таблиц — во множественном числе, общее правило
+`.claude/rules/codestyle.md` §Схема БД). На `strategies` — частичный
+UNIQUE-индекс «одна `ACTIVE` на инструмент» (БД-страховка инварианта
+lifecycle).
 **Листовые настройки рыночных данных (`StrategyIndicatorSetting`,
 `StrategyMarketStructureSetting`) и их `params` — JSONB** на строке
 своего контейнера, отдельных строк/таблиц у них нет (см. §Настройки
 рыночных данных ниже). **Условие шага (`StrategyCondition` с `rules`
-и операндами) — JSONB** на строке `strategy_step` (см. §Условие ниже).
+и операндами) — JSONB** на строке `strategy_steps` (см. §Условие ниже).
 Обоснование развилок и сознательный отход от
 архива — `docs/decisions/strategy-tree-persistence.md`; общее правило
 представления сущностей в БД —
@@ -419,7 +431,7 @@ management, форвард-заметка.)
 (`StrategyMarketPhaseSetting`, `StrategyDetail`) несут свои
 `indicatorSettings` / `marketStructureSettings` JSON-массивами на
 собственной строке. Своего `id`/таблицы у настройки нет; на неё
-ссылаются **по `key`** (операнд условия `indicatorKey` / structure-key,
+ссылаются **по `key`** (операнд условия `indicatorKey` / `structureKey`,
 мягкие ссылки JSON-листьев `stopLossSettings`/`placement`) — резолвит
 приложение. `id` настройки в рантайме не используется (там работает
 `StrategyAction.id` через `DealActionState`). Уникальность `key`
@@ -434,39 +446,39 @@ management, форвард-заметка.)
 настройки-владельца (Jackson `EXTERNAL_PROPERTY`, см. §IndicatorParams).
 `MarketPhaseParams` — `params` реляционного контейнера
 `StrategyMarketPhaseSetting`, не часть JSON-массивов листовых настроек:
-JSONB-колонка `params` на строке `strategy_market_phase_setting`.
+JSONB-колонка `params` на строке `strategy_market_phase_settings`.
 Валидацию полей делает приложение. Обоснование (почему настройки не
 реляционные узлы) — `docs/decisions/strategy-tree-persistence.md`.
 
 ### Действия (`StrategyAction`)
-Наследование `JOINED`: базовая таблица `strategy_action`
+Наследование `JOINED`: базовая таблица `strategy_actions`
 (`id`, `strategy_step_id`, `strategy_detail_id`, `action_kind`, `key`,
 `action_type`, `level`, `target_action_key`, `target_action_id`) +
-таблицы по видам: `strategy_order_action`,
-`strategy_algo_order_action`, `strategy_position_action` (у позиции
+таблицы по видам: `strategy_order_actions`,
+`strategy_algo_order_actions`, `strategy_position_actions` (у позиции
 собственных полей нет). Родитель действия — `strategy_step_id`
-(FK → `strategy_step`); `strategy_detail_id` — денормализованный FK →
-`strategy_detail` ради DB-`UNIQUE(strategy_detail_id, key)`
+(FK → `strategy_steps`); `strategy_detail_id` — денормализованный FK →
+`strategy_details` ради DB-`UNIQUE(strategy_detail_id, key)`
 (уникальность `key` действия — в рамках `StrategyDetail`, через
 несколько шагов, `UNIQUE` через join невозможен; см. §Связь с
 DealActionState). Денормализация безопасна при immutable-дереве — как
 у `target_action_id`. Self-ссылка действия хранится **двумя** колонками базовой таблицы:
 `target_action_key` (логический ключ — форма ввода и чтения) и
-`target_action_id` (self-FK `→ strategy_action.id`, резолвится при
-сохранении; см. §Внутридеревные ссылки). Вложенные настройки действий
+`target_action_id` (self-FK `→ strategy_actions.id`, deferrable;
+резолвится при сохранении; см. §Внутридеревные ссылки). Вложенные настройки действий
 (`placement`, `attachedProtection`, `stopLossSettings`,
 `trailingSettings`) — JSONB-поля на строках соответствующих видов.
 
 ### `stepsByStatus`
 `Map<Deal.Status, List<StrategyStep>>` хранится плоскими строками
-`strategy_step` с колонками `strategy_detail_id` (FK), `deal_status`
+`strategy_steps` с колонками `strategy_detail_id` (FK), `deal_status`
 (ключ map), `step_index` (порядок в списке). В домене Map
 пересобирается группировкой по `deal_status` и сортировкой по
 `step_index`. `marketDataExpiredSetting` шага — JSONB-поле.
 
 ### Условие (`StrategyCondition`)
 Условие шага персистится **целиком JSONB-полем `condition`** на строке
-`strategy_step`: массив `rules` (у каждого правила `level` / `ruleType`
+`strategy_steps`: массив `rules` (у каждого правила `level` / `ruleType`
 / `operator` + простые поля), операнды — JSONB внутри того же объекта.
 Отдельных таблиц `strategy_condition` / `strategy_condition_rule` нет;
 перечень реляционных каркасных узлов не пополняется. Это дефолт правила
@@ -480,28 +492,28 @@ DealActionState). Денормализация безопасна при immutab
 
 ### Внутридеревные ссылки
 - Операнд условия → настройка (индикаторный операнд по `indicatorKey`,
-  market-structure операнд по ключу настройки структуры) — «мягкая»
+  market-structure операнд по `structureKey`) — «мягкая»
   ссылка: ключ внутри структуры операнда (операнды — внутри
-  condition-JSONB на строке `strategy_step`, см. §Условие), резолвит
+  condition-JSONB на строке `strategy_steps`, см. §Условие), резолвит
   приложение. STRAT-Q1 перенёс
   ссылку с правила на операнд (рантайм-резолв по `key` настройки, не
   rule-level FK; `docs/decisions/strategy-condition-authoring-contract.md`).
 - Ссылки изнутри JSON-листьев (напр. `stopLossSettings` с
-  `ATR_PERCENT` → индикаторная настройка по `key`) — «мягкие»: id/key
-  внутри JSON, резолвит приложение.
+  `ATR_PERCENT` → индикаторная настройка по `indicatorKey`) —
+  «мягкие»: ключ внутри JSON, резолвит приложение.
 - `targetActionKey` при сохранении стратегии резолвится в self-FK
-  `target_action_id → strategy_action.id`; базовая таблица хранит **и**
+  `target_action_id → strategy_actions.id`; базовая таблица хранит **и**
   ключ, **и** id (денормализация, безопасная при immutable-записи).
   Защита БД — FK + CHECK `target_action_id <> id` (нет self-loop). FK
   здесь, в отличие от мягкой ссылки операнд→настройка (по `key`), —
   ради БД-защиты ссылки действие→действие (см. §key / targetActionKey
   и валидация).
 
-### Не зафиксировано
-Типы и nullability числовых полей дерева (Integer vs BigDecimal для
-`*Bars`/`*Period` vs `*Percents`/`*Score`/`*Ratio`/`*Multiplier`) на
-разборе `GAPS_CLOSE_2` не решались — проставляются при написании
-entity/Flyway-миграции.
+### Типы числовых полей (зафиксировано на `CODE`)
+`*Percents` / `*Score` / `*Ratio` / `*Multiplier` — `BigDecimal`
+(numeric(36,18), Constants.Price); `*Bars` / `*Period` / `level` /
+`warmup` — `Integer`. Риск-поля детали (`riskPerTradePercent`,
+`targetRiskRewardRatio`) — nullable (у `NO_TRADE`-детали риска нет).
 
 ## TimeFrame
 

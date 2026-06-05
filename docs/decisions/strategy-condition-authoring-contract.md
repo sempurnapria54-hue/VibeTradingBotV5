@@ -100,19 +100,30 @@ indicator-vs-indicator допускается — базовый кейс кро
 
 ### Операнд (`StrategyConditionOperand`) — самоописательный
 
-`sourceType` + ссылка/значение по источнику:
+`sourceType` + ссылка/значение по источнику (форма зафиксирована на
+`CODE` шага 2):
 
-- `valueType` — только там, где тип **не выводится** из `sourceType`.
-  У `CONSTANT` обязателен (`NUMBER` / `ENUM` / `PERCENT` / …); у
-  вычисляемых (`INDICATOR` / `PRICE` / `MARKET_STRUCTURE` /
-  `MARKET_PHASE`) не пишется — тип подразумевается источником.
-- `value` (литерал) — только у `CONSTANT`; у вычисляемых источников
-  значение приходит в рантайме (evaluator).
-- индикаторный операнд ссылается на настройку по ключу `indicatorKey`;
-  операнд market-structure — по ключу настройки структуры.
+- `valueType: ConstantValueType` (`NUMBER` / `PERCENT` / `ENUM` /
+  `BOOLEAN`) — только там, где тип **не выводится** из `sourceType`:
+  у `CONSTANT` обязателен; у вычисляемых (`INDICATOR` / `PRICE` /
+  `MARKET_STRUCTURE` / `MARKET_PHASE`) не пишется — тип
+  подразумевается источником.
+- `value: String` — единый литерал `CONSTANT` (строковое
+  представление, интерпретируется по `valueType`); у вычисляемых
+  источников значение приходит в рантайме (evaluator).
+- Ссылки per-source: индикаторный операнд — `indicatorKey`;
+  операнд market-structure — `structureKey`; ценовой операнд несёт
+  `priceSource: StrategyPriceSource`. Те же имена ключей-ссылок — у
+  «мягких» ссылок JSON-листьев (`StopLossSettings`,
+  `StrategyPricePlacement`).
 
 **Отвергнутая альтернатива.** `valueType` на всех операндах —
 избыточен у вычисляемых (`INDICATOR` + `INDICATOR_VALUE` — дубль).
+
+**Отвергнутая альтернатива (закрыта на `CODE`).** Generic `key` вместо
+per-source имён — теряет самоописательность операнда; раздельные
+`name`/`stringValue`/`numberValue` для литерала — три nullable-поля
+там, где заполняется ровно одно.
 
 ### Иммутабельность
 
@@ -120,19 +131,35 @@ indicator-vs-indicator допускается — базовый кейс кро
 `warmup`, правила, …) = **новая версия** стратегии (общий инвариант
 strategy-layer).
 
+## Per-`ruleType` контракт — зафиксированный минимум (`CODE` шага 2)
+
+Create-валидация (400) проверяет авторинг-минимум использованных
+типов; контракт дозаполняется при реализации каждого следующего
+`ruleType`:
+
+- `PROFIT_PERCENTS_REACHED` / `LOSS_PERCENTS_REACHED` /
+  `RANGE_BREAKOUT_CONFIRMED` — требуется `percents`;
+- `CANDLE_CLOSED` — требуется простое поле `timeframe` (какой
+  таймфрейм закрыт);
+- `MARKET_PHASE_IS` — operator + оба операнда, один из них `CONSTANT`
+  с фазой (`ENUM`-значение валидно по `MarketPhase.Type`);
+- `INDICATOR_COMPARE` / `PRICE_COMPARE` — operator + оба операнда,
+  хотя бы один с требуемым источником (INDICATOR / PRICE);
+- `CROSSOVER` — operator `CROSSED_ABOVE` / `CROSSED_BELOW` + оба
+  операнда;
+- операнды: `INDICATOR` → `indicatorKey` существует в настройках той
+  же детали; `MARKET_STRUCTURE` → `structureKey` существует;
+  `PRICE` → валидный `priceSource`; `CONSTANT` → `valueType` + `value`.
+
 ## Что осталось открытым (контракт не блокирует)
 
 - **percent-anchor** — «−N% относительно чего» (вход / предыдущая
   свеча / хай): чистая бизнес-семантика, вынесена в открытый вопрос
   **STRAT-Q4** (`.claude/work/questions/open-questions.md`).
-- **Per-`ruleType` контракт полей** (какие поля под каждый `ruleType`,
-  включая конкретные правила валидности комбинаций операндов) —
-  инкрементальный: дозаполняется при реализации каждого `ruleType`,
+- **Per-`ruleType` контракт остальных типов** (NO_OPEN_POSITION и
+  прочие плоские без полей — тривиальны; EFFICIENCY_BELOW_THRESHOLD,
+  VOLUME_FILTER_PASSED и др.) — дозаполняется при реализации,
   превентивно не перечисляется.
-- **Нейминг поля-ссылки операнда** (per-source `priceKey` /
-  `indicatorKey` / `structureKey` против одного generic `key`) и
-  консолидация литерала `CONSTANT` (единое `value` по `valueType`
-  вместо `name`/`stringValue`/`numberValue`) — инкрементальная деталь.
 
 ## Следствия
 

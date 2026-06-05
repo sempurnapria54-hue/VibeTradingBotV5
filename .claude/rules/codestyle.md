@@ -154,6 +154,15 @@
   их «использование» идёт через биндинг конфигурации / доступ к
   модели, не обязательно прямым вызовом.
 
+## Схема БД
+
+- **Имена таблиц — во множественном числе** (snake_case):
+  `strategies`, `strategy_order_actions`, не `strategy_order_action`.
+  Правило общее для всех таблиц проекта.
+- FK-колонки и имена constraint'ов/индексов остаются в единственном
+  числе (`instrument_id`, `fk_strategy_action_step`,
+  `uk_strategy_internal_id`).
+
 ## Слои моделей и enum'ы
 
 - Enum'ы объявляются **только в доменном слое**.
@@ -259,6 +268,14 @@ audit-поля проставляет persistence (JPA auditing); биржевы
   (последний возвращает неизменяемый список).
 - В именах методов нет слова `New`: `save<Class>`, не
   `saveNew<Class>`. Касается всех методов.
+- **Не использовать deprecated API** (классы/методы/константы) —
+  подбирать актуальную замену (например,
+  `HttpStatus.UNPROCESSABLE_CONTENT` вместо устаревшего
+  `UNPROCESSABLE_ENTITY`,
+  `ObjectMapper.setDefaultPropertyInclusion` вместо
+  `setSerializationInclusion`). Проверка — компиляция с
+  `-Dmaven.compiler.showDeprecation=true` без предупреждений в нашем
+  коде.
 - Метод вида `getRequiredById` / `getRequiredByInternalId`
   (вернуть сущность из репозитория или кинуть ошибку, если не
   найдена) располагается в соответствующем `DataService`, не в

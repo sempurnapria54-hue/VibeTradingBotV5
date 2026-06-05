@@ -1,0 +1,101 @@
+package com.example.tradingbot.persistence.service;
+
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+
+import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
+import com.example.tradingbot.mapping.StrategyMapper;
+import com.example.tradingbot.persistence.model.strategy.StrategyActionEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyDetailEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyEntity;
+import com.example.tradingbot.persistence.repository.StrategyRepository;
+import java.util.HashMap;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Граница domain ↔ persistence для {@link Strategy}. Здесь же —
+ * fetch-or-throw чтения и резолв self-ссылки действий: после вставки
+ * дерева targetActionKey резолвится в self-FK target_action_id (ключ →
+ * действие в рамках той же детали; правка управляемых сущностей до
+ * commit). Доменные enum'ы конвертируются в строки на границе
+ * репозитория; JSONB-навес — через StrategyJsonConverter в маппере.
+ */
+@Service
+@RequiredArgsConstructor
+public class StrategyDataService {
+
+    private final StrategyRepository repository;
+    private final StrategyMapper mapper;
+
+    /** Сохраняет полное дерево и резолвит target-ссылки действий (в одной транзакции). */
+    @Transactional
+    public Strategy save(Strategy strategy) {
+        StrategyEntity saved = repository.save(mapper.domainToPersistence(strategy));
+        resolveTargetActions(saved);
+        return mapper.persistenceToDomainWithTree(saved);
+    }
+
+    /** Корень без дерева — для операций статуса/идентичности. */
+    @Transactional(readOnly = true)
+    public Strategy getRequiredByInternalId(String internalId) {
+        return repository.findByInternalId(internalId)
+                .map(mapper::persistenceToDomain)
+                .orElseThrow(() -> new IllegalArgumentException("Strategy not found: " + internalId));
+    }
+
+    /** Стратегия со всем деревом (join fetch). */
+    @Transactional(readOnly = true)
+    public Strategy getRequiredByInternalIdWithTree(String internalId) {
+        return repository.findByInternalIdWithTree(internalId)
+                .map(mapper::persistenceToDomainWithTree)
+                .orElseThrow(() -> new IllegalArgumentException("Strategy not found: " + internalId));
+    }
+
+    /** Смена административного статуса без перезаписи дерева (immutable-правила не трогаются). */
+    @Transactional
+    public void updateStatus(String internalId, Strategy.Status status) {
+        StrategyEntity entity = repository.findByInternalId(internalId)
+                .orElseThrow(() -> new IllegalArgumentException("Strategy not found: " + internalId));
+        entity.setStatus(status.name());
+        repository.save(entity);
+    }
+
+    /** Есть ли у инструмента активная стратегия (инвариант: одна ACTIVE на инструмент). */
+    @Transactional(readOnly = true)
+    public Boolean existsActiveByInstrumentId(Long instrumentId) {
+        return repository.existsByInstrumentIdAndStatus(instrumentId, Strategy.Status.ACTIVE.name());
+    }
+
+    private void resolveTargetActions(StrategyEntity saved) {
+        if (isNull(saved.getDetails())) {
+            return;
+        }
+        saved.getDetails().forEach(this::resolveDetailTargetActions);
+    }
+
+    private void resolveDetailTargetActions(StrategyDetailEntity detail) {
+        if (isNull(detail.getSteps())) {
+            return;
+        }
+        Map<String, StrategyActionEntity> actionsByKey = new HashMap<>();
+        detail.getSteps().stream()
+                .filter(step -> nonNull(step.getActions()))
+                .forEach(step -> step.getActions()
+                        .forEach(action -> actionsByKey.put(action.getKey(), action)));
+        detail.getSteps().stream()
+                .filter(step -> nonNull(step.getActions()))
+                .forEach(step -> step.getActions().forEach(action -> {
+            if (nonNull(action.getTargetActionKey())) {
+                StrategyActionEntity target = actionsByKey.get(action.getTargetActionKey());
+                if (isNull(target)) {
+                    throw new IllegalStateException(
+                            "Unresolved targetActionKey after validation: " + action.getTargetActionKey());
+                }
+                action.setTargetAction(target);
+            }
+        }));
+    }
+}

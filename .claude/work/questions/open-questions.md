@@ -508,8 +508,8 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 ограничение роли объёма (вспомогательный фильтр, не единственное
 основание `ENTRY`-условия), выбор метрики. Здесь не решается —
 владелец **шаг 3** (индикаторы); затрагивает и авторинг стратегии
-(заметка специалисту —
-`.claude/work/questions/tasks/phase-1-step-2-strategy.md`).
+(чек-лист СТ-1, применён на `CODE` шага 2; архив —
+`.claude/work/history/2026-06-05-phase-1-step-2-strategy/tasks-phase-1-step-2-strategy.md`).
 Связано: `docs/models/domain/aggregate/Strategy.md` (§Условия),
 `docs/models/domain/other/IndicatorValue.md` (OBV),
 `docs/components/IndicatorJob.md`.

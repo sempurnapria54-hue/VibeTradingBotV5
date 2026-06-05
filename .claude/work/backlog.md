@@ -154,9 +154,19 @@ graceful shutdown) — в `docs/lifecycles/Strategy.md` (+ проверка в
 (структурно-ссылочные пункты, 400) / activate (семантика действий,
 422 — отложено); см.
 `docs/decisions/strategy-materialization-and-validation.md`.
-**Осталось:** сам компонент-валидатор и Strategy API — артефакты
-под-шага `CODE` шага 2; `Strategy API examples.md` (JSON-примеры, тип
-reference — воспроизводить ли как файл знания) — **остаётся открытым**.
+**Построено (`CODE` шага 2, DONE 2026-06-05):** Strategy API
+(`StrategyController`: `POST`/`GET`/`PUT …/status`), create-валидатор
+(`StrategyCreateRequestValidator`), полное дерево домен/persistence/
+маппинг (Flyway `V2`), «одна реализация»
+(`src/main/resources/strategy-examples/trend-following-ema.json`).
+Детали — `history/2026-06-05-phase-1-step-2-strategy.md`.
+**Осталось:**
+- **runtime-прогон Strategy API** (хвост scope шага 2, PostgreSQL не
+  был поднят): миграция `V2` → `POST` `trend-following-ema.json` →
+  `GET` → `PUT`-переходы статуса. Выполнить при поднятом PostgreSQL;
+  естественная точка — старт шага 3 (ему нужна живая стратегия).
+- `Strategy API examples.md` (JSON-примеры, тип reference —
+  воспроизводить ли как файл знания) — **остаётся открытым**.
 **Форвард-заметки:** `2026-05-27-.../tasks-strategy.md` (STR-FW8, FW9,
 FW10), `tasks-deal.md` (DEAL-FW8).
 
