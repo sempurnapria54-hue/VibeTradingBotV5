@@ -373,7 +373,12 @@ CREATE/AMEND/CANCEL; POSITION — только CLOSE_FULL.
 семантики действий (4-7, 9-12: `targetActionKey` для AMEND/CANCEL,
 ORDER↔ORDER / ALGO↔ALGO, `CLOSE_FULL`/partial-exit) опираются на
 незрелую в шаге 2 модель команд/сделок/FSM и отложены — до шагов 4/7
-и/или на **activate (422)** как «готова к запуску». Материализация
+и/или на **activate (422)** как «готова к запуску». Числовые торговые
+поля (`riskPerTradePercent`, `allocationPercents`, …) на create
+ограничиваются только структурно — невозможные значения (отрицательный
+риск; доля вне [0; 100] там, где поле — доля) → 400; торгово-суждённые
+диапазоны (консервативные ориентиры риска и т. п.) — семантика
+activate, на create не проверяются. Материализация
 «одной реализации» — через Strategy API (`POST`/`GET`/`PUT`).
 Обоснование — `docs/decisions/strategy-materialization-and-validation.md`.
 Сам компонент-валидатор и Strategy API — артефакты под-шага `CODE`.
