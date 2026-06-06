@@ -27,5 +27,3 @@ settleCurrency / invalid fields → controlled external/account error (см.
 BalanceContainerExternalSnapshot → upsert BalanceContainer → replace
 balances`. Команда попадает в историю исполнения (см.
 `docs/rules/audit-not-runtime-source.md`).
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

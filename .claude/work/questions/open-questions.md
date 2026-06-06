@@ -32,7 +32,15 @@ STRAT-Q1/Q2/Q3 закрыты 2026-06-02 решениями
 первый прогон торгового фокуса `trading-review`): RISK-Q2
 (worst-case guard поверх вычисленного плеча; владелец — шаг 5) и
 IND-Q1 (надёжность биржевого объёма / wash trading; владелец —
-шаг 3).
+шаг 3). По итогам валидации делегирования 2026-06-06: PROC-Q1
+закрыт (рудимент `PositionContext` снят из `CalculationContext.md`
+применением инварианта «одна `Deal` — максимум одна `Position`»;
+decision не заводился); CMD-Q1 закрыт решением
+`.claude/decisions/executor-payload-file-granularity.md`
+(file-per-executor; payload — раздел у своего executor'а), его
+отложенный подвопрос вынесен в CMD-Q2; ENUM-Q1 снят без решения
+как архивный артефакт (конфликт двух архивных доков; канон уже
+стоит на `RISK_CONTROL`).
 
 История закрытых вопросов пайплайна:
 
@@ -69,35 +77,6 @@ retry-state, но `DealActionState` относится к `StrategyAction`, а
 отдельный `DealFinalizationState`; ручной разбор; специальный
 operational flag без нарушения terminal semantics.
 Связано: `docs/models/domain/aggregate/Deal.md` §Итоговый PnL.
-
-### PROC-Q1. Существует ли `PositionContext` как самостоятельный RVO
-
-Противоречие между двумя архивными процессными доками. Модель
-`CalculationContext` («Калькуляторы действий стратегии» §4) содержит поле
-`private PositionContext positionContext;` (отдельно от `activePosition`).
-Но «Жизненный цикл сделки» §5.3 явно исключает `PositionContext` из
-`DealContext`: в рамках одной `Deal` допускается максимум одна `Position`,
-а отдельный контейнер не нужен. Не решено, существует ли `PositionContext`
-как доменный runtime value object или это рудимент. Влияет на состав RVO
-при миграции процессов (проход 2).
-
-Цитаты источника:
-- «Калькуляторы действий стратегии» §4 (модель `CalculationContext`):
-  `private Position activePosition;` и отдельно
-  `private PositionContext positionContext;` (комментарий: «Состояние
-  позиций по инструменту»).
-- «Жизненный цикл сделки» §5.3 «Что специально не входит в DealContext»:
-  отдельный `PositionContext` не нужен — в рамках одной `Deal`
-  допускается максимум одна `Position`.
-
-Варианты: (1) `PositionContext` — рудимент, не материализовать, в
-`CalculationContext` оставить только `activePosition`; (2) существует как
-самостоятельный RVO (мультипозиционный контекст по инструменту) →
-`docs/components/models/PositionContext.md`.
-Связано: `docs/components/models/CalculationContext.md` (поле помечено),
-`tasks-калькуляторы-действий-стратегии.md` (КЛ-Q1),
-`tasks-жизненный-цикл-сделки.md` (ЖЦ-Q2),
-`.claude/work/progress/progress-карта-артефактов.md`.
 
 ### RISK-Q1. Структура и материализация `RiskSettings`
 
@@ -257,63 +236,33 @@ handler'ы по образцу FSM сделки (`docs/components/DealStateMachi
 **не материализуется**: семантика переходов и координации зафиксирована
 в lifecycle-доках, оркестрация описана процессом `candle-loading`
 без привязки к компоненту-владельцу.
+
+Горизонт (взвешивание срока, 2026-06-06): отложен — узкий
+онбординг-кусок несёт провизорный seam шага 1 (`CandleJob`); широкое
+мультиисточниковое владение `Instrument.Status` (FSM, AnomalyJob и
+пр.) — отдельная ось (backlog п.9). Решать к концу фазы / когда
+осядет ось владения статусом.
 Связано: `docs/processes/candle-loading.md`,
 `docs/lifecycles/Instrument.md`, `docs/lifecycles/CandleGroup.md`,
 `docs/components/CandleJob.md`.
 
-### ENUM-Q1. closeReason `RISK_CONTROL` vs `ENTRY_RISK_BLOCKED`
+### CMD-Q2. Базовый тип/дискриминатор payload'ов и судьба `ServiceCommandPayload.md`
 
-Конфликт значения `Deal.closeReason` при risk-block в `PRECHECK` (до live
-risk) между двумя архивными процессными доками.
+Вынесен из CMD-Q1 при его закрытии (2026-06-06,
+`.claude/decisions/executor-payload-file-granularity.md`: гранулярность
+command-layer — file-per-executor; payload документируется разделом в
+доке своего executor'а, отдельного агрегирующего файла нет). Не решено:
+существует ли у payload'ов общий базовый тип/дискриминатор
+(`ServiceCommandPayload` как база + подтипы) и, если да, где живёт
+описание дискриминатора и какова судьба существующего
+`docs/components/models/ServiceCommandPayload.md`. Завязано на
+проработку command-layer. Содержимое payload'ов в любом случае едет к
+своему executor'у; до переноса разделы остаются в существующем файле.
 
-Цитаты источника:
-- «Оценка рисков» §8.1: при `BLOCKED` в `PRECHECK` без live risk —
-  `Deal.status = CLOSED`, `Deal.closeReason = RISK_CONTROL`; «Отдельный
-  `ENTRY_RISK_BLOCKED` не используем».
-- «Аудит и история исполнения» §7.1 (старше, черновое): `closeReason`
-  может быть `ENTRY_RISK_BLOCKED` «или другое согласованное значение».
-
-`docs/lifecycles/Deal.md` и `docs/models/domain/aggregate/Deal.md` уже используют
-`RISK_CONTROL` (в списке `CloseReason` `ENTRY_RISK_BLOCKED` помечен как не
-используемый). Решённый по букве risk-доки и lifecycle вариант —
-`RISK_CONTROL`; аудит-док даёт устаревшую формулировку.
-
-Вариант: подтвердить `RISK_CONTROL`, `ENTRY_RISK_BLOCKED` окончательно
-отвергнуть (закрыть вопрос ссылкой на decision). До закрытия список
-значений `closeReason` в `Deal.md` **не меняется**.
-Связано: `docs/models/domain/aggregate/Deal.md` (§Енумы, `CloseReason`),
-`docs/lifecycles/Deal.md`,
-`.claude/work/questions/tasks/tasks-оценка-рисков.md` (ОР-Q1),
-`.claude/work/questions/tasks/tasks-аудит-и-история-исполнения.md` (АУ-Q2).
-
-### CMD-Q1. Гранулярность файлов executor'ов и payload'ов
-
-Не решено, как гранулировать документацию command-layer: файл на каждый
-executor / payload (file-per-X) или группировка по семантике
-(CREATE_*/SUBMIT_*/AMEND_*/CANCEL_*/REFRESH_*; один файл payload'ов с
-разделами).
-
-Цитаты источника:
-- «Сервисные команды» §13 описывает детально ~14 executor'ов
-  (`CreateOrderExecutor`, `SubmitOrderExecutor`, `RefreshOrderExecutor`,
-  `AmendOrderExecutor`, `CancelOrderExecutor` и их algo-аналоги,
-  `RefreshPositionExecutor`, `ClosePositionExecutor`, `RefreshFillsExecutor`,
-  `RefreshBalanceExecutor`); refresh-executor'ы под `REFRESH_PENDING_ORDERS`
-  / `REFRESH_ALGO_ORDERS` / `REFRESH_ORDER_HISTORY` /
-  `REFRESH_ALGO_ORDER_HISTORY` упомянуты без отдельных секций.
-- «Сервисные команды» §10 даёт 9+ payload-классов (Create/Submit/Amend/
-  Cancel Order/AlgoOrder, ClosePosition, AttachedProtection).
-
-Текущее решение прохода 2 (до закрытия вопроса): executor'ы —
-file-per-executor (`docs/components/<X>Executor.md`); payload'ы — один файл
-`docs/components/models/ServiceCommandPayload.md` с разделами; четыре
-refresh-executor'а без отдельных секций отдельными файлами не заводятся
-(покрыты общей семантикой `REFRESH_*` и `ServiceCommandType`).
-Варианты на будущее: подтвердить file-per-executor либо сгруппировать;
-для payload'ов — оставить разделами либо вынести в отдельные файлы.
-Связано: `docs/components/*Executor.md`,
-`docs/components/ServiceCommandExecutor.md`,
-`docs/components/models/ServiceCommandPayload.md`.
+Горизонт (взвешивание срока): шаг 4 — материализация payload-детали.
+Связано: `docs/components/models/ServiceCommandPayload.md`,
+`docs/components/models/ServiceCommand.md`,
+`.claude/decisions/executor-payload-file-granularity.md`.
 
 ### OKX-Q1. Persisted `TradeFill` модель и executor финализации
 
@@ -473,6 +422,10 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 До решения файл модели **не материализуется**; в местах использования
 (`ServiceCommand`, executors, FSM handlers) упоминается с пометкой
 «структура и размещение — DEAL-Q3».
+
+Горизонт (взвешивание срока, 2026-06-06): шаг 4 — размещение решается
+штатно при материализации модели (чистая классификация, R3-рутина
+`knowledge-curator`), не пре-решается.
 Связано: `docs/components/models/ServiceCommand.md`,
 `docs/components/ServiceCommandFactory.md`, executor-компоненты,
 `docs/components/RetryPolicyService.md` (база `Retryable`).

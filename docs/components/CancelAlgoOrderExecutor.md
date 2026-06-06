@@ -17,5 +17,3 @@ refresh/search/history. Если refresh/history показывает друго
 `docs/rules/command-lifecycle.md`). ACK не runtime truth (см.
 `docs/rules/ack-not-runtime-truth.md`); общая семантика `CANCEL_*` —
 `docs/components/ServiceCommandExecutor.md`.
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

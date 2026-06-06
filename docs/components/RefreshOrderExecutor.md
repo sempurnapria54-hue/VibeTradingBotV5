@@ -19,5 +19,3 @@ refresh-команды (`REFRESH_FILLS`, `REFRESH_POSITION`,
 `DealOrchestratorJob`. `ExternalNotFoundException` — только после полного
 order evidence-cycle (см. `docs/models/mapping/Order.md`).
 Общая семантика `REFRESH_*` — `docs/components/ServiceCommandExecutor.md`.
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

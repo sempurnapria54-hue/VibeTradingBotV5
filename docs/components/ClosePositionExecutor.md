@@ -26,5 +26,3 @@ safety checks, отправляет full close request, сохраняет ACK /
 закрывается весь размер; есть данные для exchange request; команда не
 противоречит known exchange state. ACK не runtime truth (см.
 `docs/rules/ack-not-runtime-truth.md`).
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

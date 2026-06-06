@@ -54,8 +54,7 @@ ALLOWED  -> ServiceCommandFactory создаёт команду
 
 `RISK_CONTROL` отличается от `ENTRY_CONDITION_EXPIRED`: первое — вход
 запрещён risk-policy до live risk; второе — входное условие стало false.
-Отдельный `ENTRY_RISK_BLOCKED` не используется (но ср. конфликт ENUM-Q1,
-`.claude/work/questions/open-questions.md`). Реакция на BLOCKED как
+Отдельный `ENTRY_RISK_BLOCKED` не используется. Реакция на BLOCKED как
 статусная механика — `docs/lifecycles/Deal.md`.
 
 ## Несколько actions в одном StrategyStep

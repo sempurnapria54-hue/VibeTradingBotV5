@@ -54,5 +54,4 @@ FSM/handler перед risk-sensitive flow; при absent/stale handler созд
 `MarketPriceData`, `IndicatorValue`, `MarketStructure`, `MarketPhase`,
 `CalculationContext` в `DealContext` не входят — собираются в
 `CalculationContext` в рантайме перед расчётом. Отдельный `PositionContext`
-не используется (≤1 `Position` на `Deal`; материализация —
-PROC-Q1, `.claude/work/questions/open-questions.md`).
+не используется (≤1 `Position` на `Deal`).

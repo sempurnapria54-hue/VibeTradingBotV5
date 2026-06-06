@@ -80,8 +80,9 @@ per-status (`PrecheckHandler`…`ErrorHandler`), `DealStateMachine` (+3
 `StrategyActionCalculationResult`, `CalculationError`, `CalculatedPrice`,
 `CalculatedSize`; процесс `strategy-action-calculation`.
 `StrategyConditionEvaluator` — в п.1. `InstrumentExternalRules` модель — в
-п.5. **Осталось:** `PositionContext` (PROC-Q1), `RiskSettings` (RISK-Q1) —
-`open-questions.md`.
+п.5. **Осталось:** `RiskSettings` (RISK-Q1) — `open-questions.md`
+(`PositionContext` — PROC-Q1 закрыт 2026-06-06: рудимент, не
+материализуется).
 
 ### 4. Risk-слой — ✅ ЗАКРЫТО (2026-05-28)
 
@@ -307,10 +308,12 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 `.claude/work/questions/open-questions.md`:
 - **Продуктовые финализации `Deal`:** DEAL-Q1 (retry-state финализации;
   п.1/п.6), DEAL-Q2 (resultProfit при исчерпании retry; п.6).
-- **Из миграции процессов:** PROC-Q1 (`PositionContext`; п.3), RISK-Q1
-  (`RiskSettings`; п.3/п.4), ENUM-Q1 (closeReason `RISK_CONTROL` vs
-  `ENTRY_RISK_BLOCKED`; п.6), DEAL-Q3 (`DealActionState` core/other +
-  lifecycle; п.1), CMD-Q1 (гранулярность executor'ов/payload'ов; п.1).
+- **Из миграции процессов:** RISK-Q1 (`RiskSettings`; п.3/п.4), DEAL-Q3
+  (`DealActionState` core/other + lifecycle; п.1), CMD-Q2 (базовый
+  тип/дискриминатор payload'ов, судьба `ServiceCommandPayload.md`; п.1).
+  PROC-Q1 закрыт 2026-06-06 (рудимент), CMD-Q1 закрыт 2026-06-06
+  (`.claude/decisions/executor-payload-file-granularity.md`), ENUM-Q1
+  снят 2026-06-06 (архивный артефакт).
 - **Из миграции API-кластера OKX (п.10):** OKX-Q1 (persisted
   `TradeFill` модель и executor финализации; п.6), OKX-Q2
   (`TradeFillsArchive` async-флоу), OKX-Q3 (bills как источник

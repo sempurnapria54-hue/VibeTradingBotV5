@@ -33,5 +33,3 @@ snapshot != null -> позиция есть         -> Position.status = ACTIVE
 (см. `docs/models/domain/core/Position.md`). При обычном запуске
 `requestedCloseReason` не получает. Общая семантика `REFRESH_*` —
 `docs/components/ServiceCommandExecutor.md`.
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

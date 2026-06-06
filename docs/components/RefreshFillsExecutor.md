@@ -21,5 +21,3 @@ facts и обновляет вложенные runtime-сущности. Исп�
 Идемпотентность: повторный вызов не задваивает filled size / fee /
 realized pnl и приводит локальные факты к состоянию биржи. Общая
 семантика `REFRESH_*` — `docs/components/ServiceCommandExecutor.md`.
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

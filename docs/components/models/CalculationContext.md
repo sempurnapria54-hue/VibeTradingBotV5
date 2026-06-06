@@ -34,15 +34,11 @@ StrategyAction + свежие runtime-data` и должен быть собра�
 | `balanceContainer` | `BalanceContainer` | Persisted snapshot баланса для sizing и подготовки risk-policy; context его не обновляет. |
 | `activePosition` | `Position` | Активная позиция, если открыта. |
 | `entryOrder` | `Order` | Entry order, если уже создан. |
-| `positionContext` | `PositionContext` | Состояние позиций по инструменту — **материализация под вопросом, см. PROC-Q1**. |
 | `riskSettings` | `RiskSettings` | Настройки риска — **структура и материализация под вопросом, см. RISK-Q1**. |
 | `strategyDirection` | `StrategyTradeDirection` | Направление стратегии (`LONG`/`SHORT`). |
 
-`positionContext` присутствует как поле в архивной модели, но «Жизненный
-цикл сделки» исключает отдельный `PositionContext` (≤1 `Position` на
-`Deal`) — отдельный RVO не создаётся до решения PROC-Q1
-(`.claude/work/questions/open-questions.md`). `RiskSettings` нигде не
-описан детально — артефакт не создаётся до решения RISK-Q1.
+`RiskSettings` нигде не описан детально — артефакт не создаётся до
+решения RISK-Q1 (`.claude/work/questions/open-questions.md`).
 
 ## Scope сборки
 

@@ -18,5 +18,3 @@
 / `REFRESH_ORDER_HISTORY` / `REFRESH_FILLS` / `REFRESH_POSITION` выбирает
 FSM / `DealOrchestratorJob`. Общая семантика `REFRESH_*` —
 `docs/components/ServiceCommandExecutor.md`.
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

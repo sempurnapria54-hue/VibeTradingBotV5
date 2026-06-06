@@ -14,5 +14,3 @@ CREATED`. На биржу не ходит.
 
 Общая семантика `CREATE_*` — `docs/components/ServiceCommandExecutor.md`.
 `DealActionState` — DEAL-Q3 (`.claude/work/questions/open-questions.md`).
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.

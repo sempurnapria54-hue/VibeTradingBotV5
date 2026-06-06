@@ -13,5 +13,3 @@
 
 ACK не runtime truth (см. `docs/rules/ack-not-runtime-truth.md`); общая
 семантика `AMEND_*` — `docs/components/ServiceCommandExecutor.md`.
-
-> Гранулярность executor-файлов под вопросом — CMD-Q1.
