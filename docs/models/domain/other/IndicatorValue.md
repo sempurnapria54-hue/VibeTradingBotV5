@@ -8,9 +8,13 @@
 ## Назначение
 
 `IndicatorValue` — готовое значение технического индикатора,
-рассчитанное `IndicatorJob` по закрытым свечам и настройке
-`StrategyIndicatorSetting`. Persisted-модель рыночных данных, не про
-бизнес-цикл сделки → `other` (см.
+рассчитанное `IndicatorJob` по закрытым свечам для **конфигурации
+расчёта** (тип + `timeframe` + canonical-`params`), зарегистрированной в
+реестре `indicator_configs`. Значение **шарится** всеми настройками
+`StrategyIndicatorSetting`, которые эту конфигурацию запрашивают (ключ —
+по идентичности считаемого, не по настройке; см.
+`docs/decisions/market-data-result-identity-keying.md`). Persisted-модель
+рыночных данных, не про бизнес-цикл сделки → `other` (см.
 `.claude/decisions/models-core-vs-other.md`).
 
 Потребители читают готовые значения и **не** считают индикаторы сами:
@@ -27,7 +31,7 @@ Java abstract-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID значения. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `setting` | `StrategyIndicatorSetting` | Настройка стратегии, по которой рассчитано значение. |
+| `configId` | `Long` | Ссылка на конфигурацию расчёта (тип + `timeframe` + canonical-`params`) в реестре `indicator_configs` (см. `docs/decisions/market-data-result-identity-keying.md`). |
 | `candleTimestamp` | `OffsetDateTime` | Время свечи, на которой рассчитан индикатор. |
 
 Конкретное значение лежит в наследнике (по типу индикатора).
@@ -57,8 +61,11 @@ Java abstract-класс, наследует `Auditable`.
   значения после warmup-зоны (см.
   `docs/components/IndicatorJob.md`).
 - Индикаторы считаются только по закрытым свечам (без look-ahead).
-- Уникальность: `UNIQUE(instrument_id, strategy_indicator_setting_id,
-  candle_timestamp)`.
+- Уникальность: `UNIQUE(instrument_id, config_id, candle_timestamp)`
+  (ключ по идентичности считаемого через реестр конфигураций — см.
+  `docs/decisions/market-data-result-identity-keying.md`).
 - Свежесть значения проверяет `MarketDataExpirationChecker` по
-  `StrategyIndicatorSetting.expirationDuration` (правило —
+  `expirationDuration` **запрашивающей** `StrategyIndicatorSetting`:
+  значение шарится между настройками, свежесть оценивается под каждую
+  запрашивающую настройку в runtime (правило —
   `docs/rules/market-data-freshness.md`).

@@ -17,6 +17,9 @@ breakout-условий и сопровождения позиции.
 
 ## Делает
 
+- читает стратегии **всех статусов кроме `DELETED`** и их
+  `StrategyMarketStructureSetting` (перечень — как в правиле свежести,
+  `docs/rules/market-data-freshness.md`);
 - ищет swing high / swing low;
 - считает range low / range high;
 - определяет support / resistance;
@@ -33,6 +36,14 @@ breakout-условий и сопровождения позиции.
 ## Идемпотентность
 
 Считает по закрытым свечам, уникальность `UNIQUE(instrument_id,
-strategy_market_structure_setting_id, window_end_at)`. Если структура
+config_id, window_end_at)` (ключ по идентичности считаемого через реестр
+конфигураций — см.
+`docs/decisions/market-data-result-identity-keying.md`). Если структура
 сломалась — сохраняет новый результат (например, `type = UNKNOWN`), а не
 правит старый.
+
+**Checkpoint — производный, отдельного состояния нет.** «Докуда
+посчитано» = `max(window_end_at)` по таблице результатов для
+(`instrument_id` + `config_id`); «докуда считать» = время закрытия
+последней закрытой свечи в группе. Отдельная persisted checkpoint-модель
+не заводится.

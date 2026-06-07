@@ -9,7 +9,12 @@
 
 `MarketStructure` — готовый результат расчёта структуры рынка
 (уровни, диапазоны, тренд), рассчитанный `MarketStructureJob` по закрытым
-свечам и настройке `StrategyMarketStructureSetting`. Persisted-модель
+свечам для **конфигурации расчёта** (тип + `timeframe` +
+canonical-`params`), зарегистрированной в реестре
+`market_structure_configs`. Результат **шарится** всеми настройками
+`StrategyMarketStructureSetting`, которые эту конфигурацию запрашивают
+(ключ — по идентичности считаемого, не по настройке; см.
+`docs/decisions/market-data-result-identity-keying.md`). Persisted-модель
 рыночных данных, не про бизнес-цикл сделки → `other` (см.
 `.claude/decisions/models-core-vs-other.md`).
 
@@ -27,7 +32,7 @@ Java-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID результата расчёта. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `setting` | `StrategyMarketStructureSetting` | Настройка стратегии, по которой рассчитана структура. |
+| `configId` | `Long` | Ссылка на конфигурацию расчёта (тип + `timeframe` + canonical-`params`) в реестре `market_structure_configs` (см. `docs/decisions/market-data-result-identity-keying.md`). |
 | `type` | `Type` | Тип структуры рынка. |
 | `windowStartAt` | `OffsetDateTime` | Начало окна свечей расчёта. |
 | `windowEndAt` | `OffsetDateTime` | Конец окна свечей расчёта. |
@@ -68,7 +73,10 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 ## Правила хранения
 
 - Считается только по закрытым свечам (без look-ahead).
-- Уникальность: `UNIQUE(instrument_id, strategy_market_structure_setting_id,
-  window_end_at)`.
-- `version` / `canonicalJson` у `MarketStructureParams` не нужны: params
-  immutable и привязаны к стратегии (см. `docs/models/domain/aggregate/Strategy.md`).
+- Уникальность: `UNIQUE(instrument_id, config_id, window_end_at)`
+  (ключ по идентичности считаемого через реестр конфигураций — см.
+  `docs/decisions/market-data-result-identity-keying.md`).
+- Каноническая форма `params` вычисляется один раз — при регистрации
+  конфигурации в реестре (не на каждом результате); отдельные `version` /
+  `canonicalJson` на `MarketStructureParams` не нужны (params immutable,
+  см. `docs/models/domain/aggregate/Strategy.md`).

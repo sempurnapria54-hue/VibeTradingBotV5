@@ -45,7 +45,13 @@ Java-класс, наследует `Auditable`.
 - Считается только по закрытым свечам (без look-ahead).
 - Уникальность: `UNIQUE(instrument_id, strategy_market_phase_setting_id,
   candle_timestamp)`.
+- Хранится **история** — строка на свечу (`UNIQUE` по `candle_timestamp`),
+  а не upsert одной строки. «Актуальная фаза» = **последняя по
+  `candle_timestamp`** (её отдаёт `MarketPhaseService.getLatestPhase`).
+  Наследование `Auditable` и идемпотентность по `candle_timestamp`
+  осмысленны только при истории; формулировка согласована с соседними
+  моделями результатов (`IndicatorValue`, `MarketStructure` тоже хранят
+  ряд, а не правят строку).
 - Одна `StrategyMarketPhaseSetting` (на уровне `Strategy`, т.к. фаза нужна
   до выбора `StrategyDetail`) описывает классификацию во все `Type`;
-  `MarketPhaseJob` сохраняет один актуальный результат на инструмент +
-  setting.
+  `MarketPhaseJob` пишет новый актуальный результат поверх истории.
