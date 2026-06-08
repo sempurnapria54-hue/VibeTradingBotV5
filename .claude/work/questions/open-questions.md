@@ -424,8 +424,8 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 «структура и размещение — DEAL-Q3».
 
 Горизонт (взвешивание срока, 2026-06-06): шаг 4 — размещение решается
-штатно при материализации модели (чистая классификация, R3-рутина
-`knowledge-curator`), не пре-решается.
+штатно при материализации модели (чистая классификация,
+Автономия-рутина `knowledge-curator`), не пре-решается.
 Связано: `docs/components/models/ServiceCommand.md`,
 `docs/components/ServiceCommandFactory.md`, executor-компоненты,
 `docs/components/RetryPolicyService.md` (база `Retryable`).
