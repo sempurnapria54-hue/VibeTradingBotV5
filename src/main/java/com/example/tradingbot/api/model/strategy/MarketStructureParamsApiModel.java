@@ -39,4 +39,14 @@ public class MarketStructureParamsApiModel {
     @Positive
     @Schema(description = "Глубина поиска свингов, баров")
     private Integer swingLookbackBars;
+
+    @PositiveOrZero
+    @Schema(description = "Порог ER тренд/диапазон (ER ≥ порога → тренд); пусто — провизорный дефолт, "
+            + "калибровка на бэктесте фазы 2")
+    private BigDecimal trendEfficiencyThreshold;
+
+    @PositiveOrZero
+    @Schema(description = "Множитель k толеранса уровней (толеранс = k·ATR); пусто — провизорный дефолт, "
+            + "калибровка на бэктесте фазы 2")
+    private BigDecimal levelToleranceAtrMultiplier;
 }

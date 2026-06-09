@@ -37,6 +37,8 @@ public interface CandleMapper {
 
     CandleEntity domainToPersistence(Candle candle);
 
+    Candle persistenceToDomain(CandleEntity entity);
+
     @Named("toBigDecimal")
     default BigDecimal toBigDecimal(String value) {
         return isBlank(value) ? null : new BigDecimal(value);

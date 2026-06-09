@@ -22,10 +22,13 @@ public class StrategyMarketStructureSettingApiModel {
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String timeframe;
 
-    @NotBlank
-    @Schema(description = "Тип структуры: RANGE/UPTREND/DOWNTREND/UNKNOWN",
-            requiredMode = Schema.RequiredMode.REQUIRED)
-    private String structureType;
+    @Schema(description = "Ключ ER-индикатора того же контейнера — готовый вход резолвера (fork-A); "
+            + "пусто — внутренний прокси")
+    private String efficiencyRatioKey;
+
+    @Schema(description = "Ключ ATR-индикатора того же контейнера — толеранс уровней = k·ATR (D3); "
+            + "пусто — доля цены")
+    private String atrKey;
 
     @Valid
     @NotNull

@@ -1,5 +1,7 @@
 package com.example.tradingbot.util;
 
+import java.math.MathContext;
+import java.math.RoundingMode;
 import lombok.experimental.UtilityClass;
 
 /**
@@ -89,6 +91,14 @@ public final class Constants {
 
         /** Таймфрейм OKX: 1 день (UTC-выровненный, 1Dutc). */
         public static final String BAR_ONE_DAY = "1Dutc";
+    }
+
+    /** Константы расчёта производных рыночных данных (индикаторы/структура/фаза). */
+    @UtilityClass
+    public class Calc {
+
+        /** Контекст округления промежуточных делений BigDecimal в расчётах (precision/HALF_UP). */
+        public static final MathContext MATH_CONTEXT = new MathContext(34, RoundingMode.HALF_UP);
     }
 
     /** Константы аудита. */

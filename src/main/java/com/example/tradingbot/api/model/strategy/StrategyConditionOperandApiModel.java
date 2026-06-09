@@ -21,6 +21,11 @@ public class StrategyConditionOperandApiModel {
     @Schema(description = "Ключ настройки индикатора (только для INDICATOR)")
     private String indicatorKey;
 
+    @Schema(description = "Компонент многокомпонентного индикатора (MACD: MACD_LINE/SIGNAL_LINE/HISTOGRAM; "
+            + "Stochastic: STOCH_K/STOCH_D; Bollinger: UPPER_BAND/MIDDLE_BAND/LOWER_BAND/BANDWIDTH/PERCENT_B); "
+            + "обязателен для многокомпонентных, не задаётся для одно-компонентных")
+    private String indicatorComponent;
+
     @Schema(description = "Ключ настройки структуры рынка (только для MARKET_STRUCTURE)")
     private String structureKey;
 

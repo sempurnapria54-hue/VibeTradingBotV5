@@ -10,6 +10,7 @@ import com.example.tradingbot.api.model.request.CreateStrategyApiRequest;
 import com.example.tradingbot.api.model.response.StrategyApiResponse;
 import com.example.tradingbot.api.model.strategy.AtrParamsApiModel;
 import com.example.tradingbot.api.model.strategy.BollingerBandsParamsApiModel;
+import com.example.tradingbot.api.model.strategy.EfficiencyRatioParamsApiModel;
 import com.example.tradingbot.api.model.strategy.EmaParamsApiModel;
 import com.example.tradingbot.api.model.strategy.IndicatorParamsApiModel;
 import com.example.tradingbot.api.model.strategy.MacdParamsApiModel;
@@ -20,6 +21,7 @@ import com.example.tradingbot.api.model.strategy.StrategyActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyAlgoOrderActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyDetailApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyIndicatorSettingApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseRuleApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyPositionActionApiModel;
@@ -34,6 +36,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrd
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.AtrParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.BollingerBandsParams;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.EfficiencyRatioParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.EmaParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.MacdParams;
@@ -41,6 +44,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.ObvParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.RsiParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StochasticParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseRule;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.persistence.model.strategy.StrategyActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyAlgoOrderActionEntity;
@@ -100,7 +104,10 @@ public interface StrategyMapper {
     @SubclassMapping(source = ObvParamsApiModel.class, target = ObvParams.class)
     @SubclassMapping(source = StochasticParamsApiModel.class, target = StochasticParams.class)
     @SubclassMapping(source = BollingerBandsParamsApiModel.class, target = BollingerBandsParams.class)
+    @SubclassMapping(source = EfficiencyRatioParamsApiModel.class, target = EfficiencyRatioParams.class)
     IndicatorParams apiToDomain(IndicatorParamsApiModel api);
+
+    StrategyMarketPhaseRule apiToDomain(StrategyMarketPhaseRuleApiModel api);
 
     StrategyDetail apiToDomain(StrategyDetailApiModel api);
 
@@ -138,7 +145,10 @@ public interface StrategyMapper {
     @SubclassMapping(source = ObvParams.class, target = ObvParamsApiModel.class)
     @SubclassMapping(source = StochasticParams.class, target = StochasticParamsApiModel.class)
     @SubclassMapping(source = BollingerBandsParams.class, target = BollingerBandsParamsApiModel.class)
+    @SubclassMapping(source = EfficiencyRatioParams.class, target = EfficiencyRatioParamsApiModel.class)
     IndicatorParamsApiModel domainToApi(IndicatorParams params);
+
+    StrategyMarketPhaseRuleApiModel domainToApi(StrategyMarketPhaseRule rule);
 
     StrategyDetailApiModel domainToApi(StrategyDetail detail);
 
@@ -246,10 +256,30 @@ public interface StrategyMapper {
     @Mapping(target = "details", source = "details", qualifiedByName = "detailsWithStableOrder")
     Strategy persistenceToDomainWithTree(StrategyEntity entity);
 
+    /**
+     * Entity → domain только с настройками рыночных данных (для jobs
+     * расчёта): фаза и детали с их JSONB-настройками; шаги не маппятся.
+     */
+    @Mapping(target = "details", source = "details", qualifiedByName = "detailsSettingsOnly")
+    Strategy persistenceToDomainWithSettings(StrategyEntity entity);
+
     StrategyMarketPhaseSetting persistenceToDomain(StrategyMarketPhaseSettingEntity entity);
 
     @Mapping(target = "stepsByStatus", source = "steps")
     StrategyDetail persistenceToDomain(StrategyDetailEntity entity);
+
+    /** Деталь только с настройками (шаги игнорируются — нужны лишь indicator/structure settings). */
+    @Named("detailSettingsOnly")
+    @Mapping(target = "stepsByStatus", ignore = true)
+    StrategyDetail detailSettingsOnly(StrategyDetailEntity entity);
+
+    @Named("detailsSettingsOnly")
+    default List<StrategyDetail> detailsSettingsOnly(Set<StrategyDetailEntity> details) {
+        if (isNull(details)) {
+            return null;
+        }
+        return details.stream().map(this::detailSettingsOnly).collect(toList());
+    }
 
     StrategyStep persistenceToDomain(StrategyStepEntity entity);
 

@@ -38,4 +38,18 @@ public class MarketStructureParams {
 
     /** Глубина поиска свингов (баров). */
     private Integer swingLookbackBars;
+
+    /**
+     * Порог ER (тренд vs диапазон): ER ≥ порога → тренд (D2). Null —
+     * провизорный консервативный дефолт резолвера. Значение калибруется
+     * на бэктест-гейте фазы 2 (числом в канон не зашивается).
+     */
+    private BigDecimal trendEfficiencyThreshold;
+
+    /**
+     * Множитель k волатильность-относительного толеранса кластеризации
+     * уровней (толеранс = k·ATR, D3). Null — провизорный дефолт.
+     * Значение калибруется на бэктест-гейте фазы 2.
+     */
+    private BigDecimal levelToleranceAtrMultiplier;
 }

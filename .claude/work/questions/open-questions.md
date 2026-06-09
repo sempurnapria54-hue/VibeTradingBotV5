@@ -40,7 +40,10 @@ decision не заводился); CMD-Q1 закрыт решением
 (file-per-executor; payload — раздел у своего executor'а), его
 отложенный подвопрос вынесен в CMD-Q2; ENUM-Q1 снят без решения
 как архивный артефакт (конфликт двух архивных доков; канон уже
-стоит на `RISK_CONTROL`).
+стоит на `RISK_CONTROL`). Один вопрос — из закрывающего батча шага 3
+(2026-06-09, торговая валидация): STRUCT-Q1 (калибровка числовых порогов
+структуры — ER-порог тренда и k-толеранс — на бэктест-гейте фазы 2;
+владелец — фаза 2).
 
 История закрытых вопросов пайплайна:
 
@@ -489,6 +492,31 @@ the tape» [Harris, гл. 12, с. 259-260, 273-274]) → объёмное усл
 `docs/models/domain/aggregate/Strategy.md` (§Условия),
 `docs/models/domain/other/IndicatorValue.md` (OBV),
 `docs/components/IndicatorJob.md`.
+
+### STRUCT-Q1. Калибровка числовых порогов структуры рынка (ER-порог тренда, k-толеранс) (владелец — фаза 2)
+
+Закрывающий батч шага 3 (D2/D3, 2026-06-09) вынес два числовых порога
+резолвера структуры из захардкоженных констант в `MarketStructureParams`
+(per-конфиг): `trendEfficiencyThreshold` (ER ≥ порога → тренд vs диапазон,
+D2) и `levelToleranceAtrMultiplier` (k в толерансе кластеризации = k·ATR,
+D3). **Подход** грунтован корпусом (ER-дискриминация тренд/шум [Kaufman
+гл. 1 «Measuring Noise», гл. 17 KAMA]; свинг-фильтр/толеранс относительно
+волатильности [Kaufman гл. 5, гл. 8]), но **числовые значения — нет**:
+корпус не даёт ни бинарной ER-отсечки (ER используется континуально в
+KAMA), ни конкретного k. Значения — **пользовательский хвост**, калибруются
+на **бэктест-гейте фазы 2** (анализ робастности: широкая зона успеха, не
+пик — [Kaufman гл. 21]).
+
+До калибровки резолвер применяет **провизорные консервативные дефолты**
+(ER-порог 0.30; k 0.5), если поля не заданы в `MarketStructureParams`;
+числом в канон не зашиваются (в доках помечать «value: бэктест»). Находки
+ТВ1/ТВ3 торговой валидации шага 3 (`trading-review`).
+
+Связано: `docs/models/domain/aggregate/Strategy.md` (§MarketStructureParams),
+`docs/models/domain/other/MarketStructure.md` (§Семантика классификации),
+`docs/components/MarketStructureResolver.md`,
+`.claude/library/trading/distilled/strategy-patterns.md` §4,
+`.claude/library/trading/distilled/system-design.md` §5.
 
 ## Конвенция
 

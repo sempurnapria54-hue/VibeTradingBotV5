@@ -2,6 +2,7 @@ package com.example.tradingbot.persistence.service;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static java.util.stream.Collectors.toList;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.mapping.StrategyMapper;
@@ -10,6 +11,7 @@ import com.example.tradingbot.persistence.model.strategy.StrategyDetailEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyEntity;
 import com.example.tradingbot.persistence.repository.StrategyRepository;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -67,6 +69,18 @@ public class StrategyDataService {
     @Transactional(readOnly = true)
     public Boolean existsActiveByInstrumentId(Long instrumentId) {
         return repository.existsByInstrumentIdAndStatus(instrumentId, Strategy.Status.ACTIVE.name());
+    }
+
+    /**
+     * Стратегии всех статусов кроме DELETED с настройками рыночных данных
+     * (фаза + детали, без шагов) — вход jobs расчёта индикаторов/
+     * структуры/фазы.
+     */
+    @Transactional(readOnly = true)
+    public List<Strategy> findForMarketData() {
+        return repository.findAllWithSettingsByStatusNot(Strategy.Status.DELETED.name()).stream()
+                .map(mapper::persistenceToDomainWithSettings)
+                .collect(toList());
     }
 
     private void resolveTargetActions(StrategyEntity saved) {

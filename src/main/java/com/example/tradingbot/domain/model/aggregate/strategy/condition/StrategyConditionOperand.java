@@ -28,6 +28,13 @@ public class StrategyConditionOperand {
     /** Ключ настройки индикатора (только для sourceType = INDICATOR). */
     private String indicatorKey;
 
+    /**
+     * Адресуемый компонент многокомпонентного индикатора (только для
+     * INDICATOR): для MACD/Stochastic/Bollinger обязателен (автор
+     * выбирает осмысленную часть), для одно-компонентных не задаётся.
+     */
+    private IndicatorComponent indicatorComponent;
+
     /** Ключ настройки структуры рынка (только для sourceType = MARKET_STRUCTURE). */
     private String structureKey;
 

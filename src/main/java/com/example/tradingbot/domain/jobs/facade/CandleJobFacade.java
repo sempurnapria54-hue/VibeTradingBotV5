@@ -1,5 +1,6 @@
-package com.example.tradingbot.domain.jobs;
+package com.example.tradingbot.domain.jobs.facade;
 
+import com.example.tradingbot.domain.jobs.CandleJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -9,7 +10,8 @@ import org.springframework.stereotype.Component;
  * Фасад асинхронного запуска {@link CandleJob} вне расписания. Запуск
  * через контроллер не блокирует HTTP-ответ: {@link #trigger()} помечен
  * {@code @Async} и выполняется в отдельном потоке (codestyle: джобы вне
- * расписания триггерятся асинхронно через фасад).
+ * расписания триггерятся асинхронно через фасад). Фасады джоб живут в
+ * пакете domain.jobs.facade (конвенция проекта).
  */
 @Slf4j
 @Component

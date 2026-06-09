@@ -3,7 +3,7 @@ package com.example.tradingbot.api.model.strategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,9 +22,10 @@ public class StrategyMarketPhaseSettingApiModel {
     private String timeframe;
 
     @Valid
-    @NotNull
-    @Schema(description = "Параметры алгоритма классификации", requiredMode = Schema.RequiredMode.REQUIRED)
-    private MarketPhaseParamsApiModel params;
+    @NotEmpty
+    @Schema(description = "Авторские клаузы классификации фазы (first-match по level); "
+            + "не сработала ни одна → UNKNOWN", requiredMode = Schema.RequiredMode.REQUIRED)
+    private List<StrategyMarketPhaseRuleApiModel> phaseRules;
 
     @Valid
     @Schema(description = "Индикаторы для расчёта фазы (destiny = MARKET_PHASE)")

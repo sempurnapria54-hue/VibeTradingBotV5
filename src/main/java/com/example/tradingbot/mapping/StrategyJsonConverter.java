@@ -8,8 +8,8 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAtt
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPricePlacement;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.TrailingSettings;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
-import com.example.tradingbot.domain.model.aggregate.strategy.setting.MarketPhaseParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseRule;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -57,11 +57,11 @@ public class StrategyJsonConverter {
         });
     }
 
-    public String marketPhaseParamsToJson(MarketPhaseParams params) {
-        return writeJson(params);
+    public String phaseRulesToJson(List<StrategyMarketPhaseRule> phaseRules) {
+        return writeJson(phaseRules);
     }
 
-    public MarketPhaseParams jsonToMarketPhaseParams(String json) {
+    public List<StrategyMarketPhaseRule> jsonToPhaseRules(String json) {
         return readJson(json, new TypeReference<>() {
         });
     }

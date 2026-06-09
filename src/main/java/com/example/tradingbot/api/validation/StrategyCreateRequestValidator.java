@@ -9,6 +9,7 @@ import com.example.tradingbot.api.model.request.CreateStrategyApiRequest;
 import com.example.tradingbot.api.model.request.UpdateStrategyStatusApiRequest;
 import com.example.tradingbot.api.model.strategy.AtrParamsApiModel;
 import com.example.tradingbot.api.model.strategy.BollingerBandsParamsApiModel;
+import com.example.tradingbot.api.model.strategy.EfficiencyRatioParamsApiModel;
 import com.example.tradingbot.api.model.strategy.EmaParamsApiModel;
 import com.example.tradingbot.api.model.strategy.IndicatorParamsApiModel;
 import com.example.tradingbot.api.model.strategy.MacdParamsApiModel;
@@ -21,6 +22,7 @@ import com.example.tradingbot.api.model.strategy.StrategyConditionOperandApiMode
 import com.example.tradingbot.api.model.strategy.StrategyConditionRuleApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyDetailApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyIndicatorSettingApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseRuleApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
@@ -37,8 +39,8 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPri
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.ConstantValueType;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.IndicatorComponent;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.Destiny;
-import com.example.tradingbot.domain.model.aggregate.strategy.setting.MarketPhaseParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionSourceType;
@@ -49,9 +51,11 @@ import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
+import com.example.tradingbot.util.IndicatorComponents;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +83,24 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 public class StrategyCreateRequestValidator {
 
+    /** Допустимые ruleType в контексте классификации фазы (сравнивающие + структурно-событийные). */
+    private static final Set<String> PHASE_ALLOWED_RULE_TYPES = Set.of(
+            StrategyConditionRuleType.INDICATOR_COMPARE.name(),
+            StrategyConditionRuleType.PRICE_COMPARE.name(),
+            StrategyConditionRuleType.CROSSOVER.name(),
+            StrategyConditionRuleType.RANGE_BREAKOUT_CONFIRMED.name(),
+            StrategyConditionRuleType.VOLUME_FILTER_PASSED.name(),
+            StrategyConditionRuleType.CANDLE_CLOSED.name(),
+            StrategyConditionRuleType.MARKET_STRUCTURE_IS.name());
+
+    /** Допустимые sourceType операндов в контексте классификации фазы (без MARKET_PHASE и runtime-сделки). */
+    private static final Set<String> PHASE_ALLOWED_SOURCE_TYPES = Set.of(
+            StrategyConditionSourceType.INDICATOR.name(),
+            StrategyConditionSourceType.MARKET_STRUCTURE.name(),
+            StrategyConditionSourceType.PRICE.name(),
+            StrategyConditionSourceType.CONSTANT.name(),
+            StrategyConditionSourceType.TIME.name());
+
     public void validateCreate(CreateStrategyApiRequest request) {
         List<String> violations = new ArrayList<>();
         validateMarketPhaseSetting(request.getMarketPhaseSetting(), violations);
@@ -105,12 +127,67 @@ public class StrategyCreateRequestValidator {
         }
         validateEnum(TimeFrame.class, setting.getTimeframe(), "marketPhaseSetting.timeframe", violations);
         validateDuration(setting.getExpirationDuration(), "marketPhaseSetting.expirationDuration", violations);
-        if (nonNull(setting.getParams())) {
-            validateEnum(MarketPhaseParams.AlgorithmType.class,
-                    setting.getParams().getAlgorithmType(), "marketPhaseSetting.params.algorithmType", violations);
-        }
+        Map<String, IndicatorValue.Type> indicatorTypes = indicatorTypes(setting.getIndicatorSettings());
+        Set<String> structureKeys = structureSettingKeys(setting.getMarketStructureSettings());
         validateSettingsLists(setting.getIndicatorSettings(), setting.getMarketStructureSettings(),
-                "marketPhaseSetting", violations);
+                "marketPhaseSetting", indicatorTypes, violations);
+        validatePhaseRules(setting.getPhaseRules(), indicatorTypes, structureKeys, violations);
+    }
+
+    /**
+     * Клаузы классификации фазы: тип-фазы — известный enum; condition —
+     * только в контекстном whitelist фазы (ruleType сравнивающие/
+     * структурно-событийные; операнды без MARKET_PHASE и runtime-сделки).
+     */
+    private void validatePhaseRules(List<StrategyMarketPhaseRuleApiModel> phaseRules,
+                                    Map<String, IndicatorValue.Type> indicatorTypes,
+                                    Set<String> structureKeys, List<String> violations) {
+        if (isNull(phaseRules)) {
+            return;
+        }
+        for (int index = 0; index < phaseRules.size(); index++) {
+            StrategyMarketPhaseRuleApiModel rule = phaseRules.get(index);
+            String path = "marketPhaseSetting.phaseRules[" + index + "]";
+            validateEnum(MarketPhase.Type.class, rule.getType(), path + ".type", violations);
+            if (isNull(rule.getCondition()) || isNull(rule.getCondition().getRules())) {
+                continue;
+            }
+            List<StrategyConditionRuleApiModel> rules = rule.getCondition().getRules();
+            for (int ruleIndex = 0; ruleIndex < rules.size(); ruleIndex++) {
+                validatePhaseConditionRule(rules.get(ruleIndex),
+                        path + ".condition.rules[" + ruleIndex + "]", indicatorTypes, structureKeys, violations);
+            }
+        }
+    }
+
+    private void validatePhaseConditionRule(StrategyConditionRuleApiModel rule, String path,
+                                            Map<String, IndicatorValue.Type> indicatorTypes,
+                                            Set<String> structureKeys, List<String> violations) {
+        if (isFalse(EnumUtils.isValidEnum(StrategyConditionRuleType.class, rule.getRuleType()))) {
+            validateEnum(StrategyConditionRuleType.class, rule.getRuleType(), path + ".ruleType", violations);
+            return;
+        }
+        if (isFalse(PHASE_ALLOWED_RULE_TYPES.contains(rule.getRuleType()))) {
+            violations.add(path + ".ruleType " + rule.getRuleType()
+                    + " is not allowed in market phase classification context");
+        }
+        validatePhaseOperand(rule.getLeftOperand(), path + ".leftOperand", indicatorTypes, structureKeys, violations);
+        validatePhaseOperand(rule.getRightOperand(), path + ".rightOperand", indicatorTypes, structureKeys, violations);
+        validateRuleContract(rule, path, violations);
+    }
+
+    private void validatePhaseOperand(StrategyConditionOperandApiModel operand, String path,
+                                      Map<String, IndicatorValue.Type> indicatorTypes,
+                                      Set<String> structureKeys, List<String> violations) {
+        if (isNull(operand)) {
+            return;
+        }
+        if (EnumUtils.isValidEnum(StrategyConditionSourceType.class, operand.getSourceType())
+                && isFalse(PHASE_ALLOWED_SOURCE_TYPES.contains(operand.getSourceType()))) {
+            violations.add(path + ".sourceType " + operand.getSourceType()
+                    + " is not allowed in market phase classification context");
+        }
+        validateOperand(operand, path, indicatorTypes, structureKeys, violations);
     }
 
     private void validateDetails(List<StrategyDetailApiModel> details, List<String> violations) {
@@ -143,10 +220,11 @@ public class StrategyCreateRequestValidator {
         validateEnum(MarketPhase.Type.class, detail.getMarketPhaseType(), path + ".marketPhaseType", violations);
         validateEnum(PhaseEntryPolicy.class, detail.getPhaseEntryPolicy(), path + ".phaseEntryPolicy", violations);
         validatePolicyMatrix(detail, path, violations);
-        validateSettingsLists(detail.getIndicatorSettings(), detail.getMarketStructureSettings(), path, violations);
-        Set<String> indicatorKeys = settingKeys(detail.getIndicatorSettings());
+        Map<String, IndicatorValue.Type> indicatorTypes = indicatorTypes(detail.getIndicatorSettings());
         Set<String> structureKeys = structureSettingKeys(detail.getMarketStructureSettings());
-        validateSteps(detail, path, indicatorKeys, structureKeys, violations);
+        validateSettingsLists(detail.getIndicatorSettings(), detail.getMarketStructureSettings(),
+                path, indicatorTypes, violations);
+        validateSteps(detail, path, indicatorTypes, structureKeys, violations);
     }
 
     /** Матрица допустимости политика×фаза — инвариант доменной модели (PhaseEntryPolicy.isAllowedFor). */
@@ -164,7 +242,8 @@ public class StrategyCreateRequestValidator {
 
     private void validateSettingsLists(List<StrategyIndicatorSettingApiModel> indicators,
                                        List<StrategyMarketStructureSettingApiModel> structures,
-                                       String path, List<String> violations) {
+                                       String path, Map<String, IndicatorValue.Type> indicatorTypes,
+                                       List<String> violations) {
         if (nonNull(indicators)) {
             Set<String> keys = new HashSet<>();
             for (int index = 0; index < indicators.size(); index++) {
@@ -176,7 +255,7 @@ public class StrategyCreateRequestValidator {
             Set<String> keys = new HashSet<>();
             for (int index = 0; index < structures.size(); index++) {
                 validateStructureSetting(structures.get(index),
-                        path + ".marketStructureSettings[" + index + "]", keys, violations);
+                        path + ".marketStructureSettings[" + index + "]", keys, indicatorTypes, violations);
             }
         }
     }
@@ -214,6 +293,7 @@ public class StrategyCreateRequestValidator {
             case EmaParamsApiModel ema -> ema.getPeriod();
             case RsiParamsApiModel rsi -> rsi.getPeriod();
             case BollingerBandsParamsApiModel bb -> bb.getPeriod();
+            case EfficiencyRatioParamsApiModel er -> er.getPeriod();
             case MacdParamsApiModel macd -> sumOrNull(macd.getSlowPeriod(), macd.getSignalPeriod());
             case StochasticParamsApiModel st ->
                     sumOrNull(sumOrNull(st.getkPeriod(), st.getdPeriod()), st.getSmoothPeriod());
@@ -229,18 +309,42 @@ public class StrategyCreateRequestValidator {
     }
 
     private void validateStructureSetting(StrategyMarketStructureSettingApiModel setting, String path,
-                                          Set<String> keys, List<String> violations) {
+                                          Set<String> keys, Map<String, IndicatorValue.Type> indicatorTypes,
+                                          List<String> violations) {
         if (nonNull(setting.getKey()) && isFalse(keys.add(setting.getKey()))) {
             violations.add(path + ": duplicate market structure setting key " + setting.getKey());
         }
         validateEnum(TimeFrame.class, setting.getTimeframe(), path + ".timeframe", violations);
-        validateEnum(MarketStructure.Type.class, setting.getStructureType(), path + ".structureType", violations);
         validateEnum(Destiny.class, setting.getDestiny(), path + ".destiny", violations);
         validateDuration(setting.getExpirationDuration(), path + ".expirationDuration", violations);
+        if (nonNull(setting.getEfficiencyRatioKey())) {
+            validateIndicatorKeyOfType(setting.getEfficiencyRatioKey(), IndicatorValue.Type.EFFICIENCY_RATIO,
+                    indicatorTypes, path + ".efficiencyRatioKey", violations);
+        }
+        if (nonNull(setting.getAtrKey())) {
+            validateIndicatorKeyOfType(setting.getAtrKey(), IndicatorValue.Type.ATR,
+                    indicatorTypes, path + ".atrKey", violations);
+        }
+    }
+
+    /** Soft-ссылка на каталожный индикатор того же контейнера должна резолвиться и быть нужного типа. */
+    private void validateIndicatorKeyOfType(String key, IndicatorValue.Type expectedType,
+                                            Map<String, IndicatorValue.Type> indicatorTypes, String path,
+                                            List<String> violations) {
+        if (isFalse(indicatorTypes.containsKey(key))) {
+            violations.add(path + " references unknown indicator setting key " + key
+                    + " (must reference an indicator of the same container)");
+            return;
+        }
+        if (isFalse(Objects.equals(indicatorTypes.get(key), expectedType))) {
+            violations.add(path + " must reference an indicator of type " + expectedType + ", but " + key
+                    + " is " + indicatorTypes.get(key));
+        }
     }
 
     private void validateSteps(StrategyDetailApiModel detail, String path,
-                               Set<String> indicatorKeys, Set<String> structureKeys, List<String> violations) {
+                               Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
+                               List<String> violations) {
         Map<String, List<StrategyStepApiModel>> stepsByStatus = detail.getStepsByStatus();
         if (isNull(stepsByStatus)) {
             return;
@@ -250,7 +354,7 @@ public class StrategyCreateRequestValidator {
             validateEnum(Deal.Status.class, status, path + ".stepsByStatus key", violations);
             for (int index = 0; index < steps.size(); index++) {
                 validateStep(steps.get(index), path + ".stepsByStatus[" + status + "][" + index + "]",
-                        indicatorKeys, structureKeys, actionKeys, violations);
+                        indicatorTypes, structureKeys, actionKeys, violations);
             }
         });
     }
@@ -272,8 +376,9 @@ public class StrategyCreateRequestValidator {
         return keys;
     }
 
-    private void validateStep(StrategyStepApiModel step, String path, Set<String> indicatorKeys,
-                              Set<String> structureKeys, Set<String> actionKeys, List<String> violations) {
+    private void validateStep(StrategyStepApiModel step, String path,
+                              Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
+                              Set<String> actionKeys, List<String> violations) {
         validateEnum(StrategyStepType.class, step.getStepType(), path + ".stepType", violations);
         if (nonNull(step.getMarketDataExpiredSetting())) {
             validateEnum(MarketDataExpiredAction.class,
@@ -287,18 +392,19 @@ public class StrategyCreateRequestValidator {
             List<StrategyConditionRuleApiModel> rules = step.getCondition().getRules();
             for (int index = 0; index < rules.size(); index++) {
                 validateRule(rules.get(index), path + ".condition.rules[" + index + "]",
-                        indicatorKeys, structureKeys, violations);
+                        indicatorTypes, structureKeys, violations);
             }
         }
         if (nonNull(step.getActions())) {
             for (int index = 0; index < step.getActions().size(); index++) {
                 validateAction(step.getActions().get(index), path + ".actions[" + index + "]",
-                        indicatorKeys, structureKeys, actionKeys, violations);
+                        indicatorTypes, structureKeys, actionKeys, violations);
             }
         }
     }
 
-    private void validateRule(StrategyConditionRuleApiModel rule, String path, Set<String> indicatorKeys,
+    private void validateRule(StrategyConditionRuleApiModel rule, String path,
+                              Map<String, IndicatorValue.Type> indicatorTypes,
                               Set<String> structureKeys, List<String> violations) {
         validateEnum(StrategyConditionRuleType.class, rule.getRuleType(), path + ".ruleType", violations);
         if (nonNull(rule.getOperator())) {
@@ -307,8 +413,8 @@ public class StrategyCreateRequestValidator {
         if (nonNull(rule.getTimeframe())) {
             validateEnum(TimeFrame.class, rule.getTimeframe(), path + ".timeframe", violations);
         }
-        validateOperand(rule.getLeftOperand(), path + ".leftOperand", indicatorKeys, structureKeys, violations);
-        validateOperand(rule.getRightOperand(), path + ".rightOperand", indicatorKeys, structureKeys, violations);
+        validateOperand(rule.getLeftOperand(), path + ".leftOperand", indicatorTypes, structureKeys, violations);
+        validateOperand(rule.getRightOperand(), path + ".rightOperand", indicatorTypes, structureKeys, violations);
         validateRuleContract(rule, path, violations);
     }
 
@@ -322,7 +428,7 @@ public class StrategyCreateRequestValidator {
             return;
         }
         switch (StrategyConditionRuleType.valueOf(rule.getRuleType())) {
-            case PROFIT_PERCENTS_REACHED, LOSS_PERCENTS_REACHED, RANGE_BREAKOUT_CONFIRMED -> {
+            case PROFIT_PERCENTS_REACHED, LOSS_PERCENTS_REACHED -> {
                 if (isNull(rule.getPercents())) {
                     violations.add(path + ": percents is required for " + rule.getRuleType());
                 }
@@ -332,7 +438,9 @@ public class StrategyCreateRequestValidator {
                     violations.add(path + ": timeframe is required for CANDLE_CLOSED");
                 }
             }
+            case RANGE_BREAKOUT_CONFIRMED -> validateStructureOperandPresent(rule, path, violations);
             case MARKET_PHASE_IS -> validateMarketPhaseIs(rule, path, violations);
+            case MARKET_STRUCTURE_IS -> validateMarketStructureIs(rule, path, violations);
             case INDICATOR_COMPARE -> validateComparing(rule, path,
                     StrategyConditionSourceType.INDICATOR, violations);
             case PRICE_COMPARE -> validateComparing(rule, path, StrategyConditionSourceType.PRICE, violations);
@@ -340,6 +448,49 @@ public class StrategyCreateRequestValidator {
             default -> {
             }
         }
+    }
+
+    /**
+     * RANGE_BREAKOUT_CONFIRMED — структурно-событийное: ссылается на
+     * MarketStructure операндом по structureKey (буфер/подтверждение —
+     * params резолвера, не поле условия; событие пробоя читается готовым).
+     */
+    private void validateStructureOperandPresent(StrategyConditionRuleApiModel rule, String path,
+                                                 List<String> violations) {
+        Boolean hasStructure = hasOperandOfSource(rule, StrategyConditionSourceType.MARKET_STRUCTURE);
+        if (isFalse(hasStructure)) {
+            violations.add(path + ": " + rule.getRuleType()
+                    + " requires a MARKET_STRUCTURE operand (structureKey)");
+        }
+    }
+
+    /** MARKET_STRUCTURE_IS — зеркало MARKET_PHASE_IS: MARKET_STRUCTURE операнд vs CONSTANT ENUM MarketStructure.Type. */
+    private void validateMarketStructureIs(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
+        if (isNull(rule.getOperator()) || isNull(rule.getLeftOperand()) || isNull(rule.getRightOperand())) {
+            violations.add(path + ": MARKET_STRUCTURE_IS requires operator and both operands");
+            return;
+        }
+        if (isFalse(hasOperandOfSource(rule, StrategyConditionSourceType.MARKET_STRUCTURE))) {
+            violations.add(path + ": MARKET_STRUCTURE_IS requires a MARKET_STRUCTURE operand (structureKey)");
+        }
+        StrategyConditionOperandApiModel constant =
+                constantOperand(rule.getLeftOperand(), rule.getRightOperand());
+        if (isNull(constant)) {
+            violations.add(path + ": MARKET_STRUCTURE_IS requires a CONSTANT operand with the structure type");
+            return;
+        }
+        if (Objects.equals(constant.getValueType(), ConstantValueType.ENUM.name())
+                && nonNull(constant.getValue())
+                && isFalse(EnumUtils.isValidEnum(MarketStructure.Type.class, constant.getValue()))) {
+            violations.add(path + ": unknown MarketStructure.Type " + constant.getValue());
+        }
+    }
+
+    private Boolean hasOperandOfSource(StrategyConditionRuleApiModel rule, StrategyConditionSourceType source) {
+        return (nonNull(rule.getLeftOperand())
+                && Objects.equals(rule.getLeftOperand().getSourceType(), source.name()))
+                || (nonNull(rule.getRightOperand())
+                && Objects.equals(rule.getRightOperand().getSourceType(), source.name()));
     }
 
     private void validateMarketPhaseIs(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
@@ -399,7 +550,8 @@ public class StrategyCreateRequestValidator {
     }
 
     private void validateOperand(StrategyConditionOperandApiModel operand, String path,
-                                 Set<String> indicatorKeys, Set<String> structureKeys, List<String> violations) {
+                                 Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
+                                 List<String> violations) {
         if (isNull(operand)) {
             return;
         }
@@ -408,8 +560,11 @@ public class StrategyCreateRequestValidator {
             return;
         }
         switch (StrategyConditionSourceType.valueOf(operand.getSourceType())) {
-            case INDICATOR -> validateReference(operand.getIndicatorKey(), indicatorKeys,
-                    path + ".indicatorKey", "indicator setting", violations);
+            case INDICATOR -> {
+                validateReference(operand.getIndicatorKey(), indicatorTypes.keySet(),
+                        path + ".indicatorKey", "indicator setting", violations);
+                validateIndicatorComponent(operand, indicatorTypes, path, violations);
+            }
             case MARKET_STRUCTURE -> validateReference(operand.getStructureKey(), structureKeys,
                     path + ".structureKey", "market structure setting", violations);
             case PRICE -> validateEnum(StrategyPriceSource.class, operand.getPriceSource(),
@@ -425,8 +580,43 @@ public class StrategyCreateRequestValidator {
         }
     }
 
-    private void validateAction(StrategyActionApiModel action, String path, Set<String> indicatorKeys,
-                                Set<String> structureKeys, Set<String> actionKeys, List<String> violations) {
+    /**
+     * Адресуемый компонент индикаторного операнда (D1): для
+     * многокомпонентных (MACD/Stochastic/Bollinger) обязателен и должен
+     * быть допустим для типа; для одно-компонентных не задаётся.
+     */
+    private void validateIndicatorComponent(StrategyConditionOperandApiModel operand,
+                                            Map<String, IndicatorValue.Type> indicatorTypes, String path,
+                                            List<String> violations) {
+        IndicatorValue.Type type = indicatorTypes.get(operand.getIndicatorKey());
+        if (isNull(type)) {
+            return;
+        }
+        String component = operand.getIndicatorComponent();
+        if (isFalse(IndicatorComponents.isMultiComponent(type))) {
+            if (nonNull(component)) {
+                violations.add(path + ".indicatorComponent must not be set for single-component indicator " + type);
+            }
+            return;
+        }
+        if (isNull(component)) {
+            violations.add(path + ".indicatorComponent is required for multi-component indicator " + type
+                    + " (allowed: " + IndicatorComponents.allowedFor(type) + ")");
+            return;
+        }
+        if (isFalse(EnumUtils.isValidEnum(IndicatorComponent.class, component))) {
+            validateEnum(IndicatorComponent.class, component, path + ".indicatorComponent", violations);
+            return;
+        }
+        if (isFalse(IndicatorComponents.allowedFor(type).contains(IndicatorComponent.valueOf(component)))) {
+            violations.add(path + ".indicatorComponent " + component + " is not valid for indicator " + type
+                    + " (allowed: " + IndicatorComponents.allowedFor(type) + ")");
+        }
+    }
+
+    private void validateAction(StrategyActionApiModel action, String path,
+                                Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
+                                Set<String> actionKeys, List<String> violations) {
         validateEnum(StrategyActionType.class, action.getActionType(), path + ".actionType", violations);
         if (nonNull(action.getTargetActionKey())
                 && isFalse(actionKeys.contains(action.getTargetActionKey()))) {
@@ -435,15 +625,16 @@ public class StrategyCreateRequestValidator {
         }
         switch (action) {
             case StrategyOrderActionApiModel order -> validateOrderAction(order, path,
-                    indicatorKeys, structureKeys, violations);
+                    indicatorTypes, structureKeys, violations);
             case StrategyAlgoOrderActionApiModel algo -> validateAlgoOrderAction(algo, path,
-                    indicatorKeys, structureKeys, violations);
+                    indicatorTypes, structureKeys, violations);
             default -> {
             }
         }
     }
 
-    private void validateOrderAction(StrategyOrderActionApiModel action, String path, Set<String> indicatorKeys,
+    private void validateOrderAction(StrategyOrderActionApiModel action, String path,
+                                     Map<String, IndicatorValue.Type> indicatorTypes,
                                      Set<String> structureKeys, List<String> violations) {
         validateEnum(Order.Type.class, action.getOrderType(), path + ".orderType", violations);
         validateEnum(StrategyTradeDirection.class, action.getDirection(), path + ".direction", violations);
@@ -454,7 +645,7 @@ public class StrategyCreateRequestValidator {
             validateEnum(AttachedAlgoOrder.Type.class, action.getAttachedProtection().getAttachedType(),
                     path + ".attachedProtection.attachedType", violations);
             validateStopLoss(action.getAttachedProtection().getStopLossSettings(),
-                    path + ".attachedProtection.stopLossSettings", indicatorKeys, structureKeys, violations);
+                    path + ".attachedProtection.stopLossSettings", indicatorTypes, structureKeys, violations);
         }
         if (Objects.equals(action.getOrderType(), Order.Type.ENTRY_ATTACHED_STOP_LOSS.name())
                 && isNull(action.getAttachedProtection())) {
@@ -491,7 +682,7 @@ public class StrategyCreateRequestValidator {
     }
 
     private void validateAlgoOrderAction(StrategyAlgoOrderActionApiModel action, String path,
-                                         Set<String> indicatorKeys, Set<String> structureKeys,
+                                         Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
                                          List<String> violations) {
         validateEnum(AlgoOrder.ConditionType.class, action.getConditionType(), path + ".conditionType", violations);
         if (nonNull(action.getTriggerPriceType())) {
@@ -499,11 +690,12 @@ public class StrategyCreateRequestValidator {
                     path + ".triggerPriceType", violations);
         }
         validateStopLoss(action.getStopLossSettings(), path + ".stopLossSettings",
-                indicatorKeys, structureKeys, violations);
+                indicatorTypes, structureKeys, violations);
     }
 
-    private void validateStopLoss(StopLossSettingsApiModel settings, String path, Set<String> indicatorKeys,
-                                  Set<String> structureKeys, List<String> violations) {
+    private void validateStopLoss(StopLossSettingsApiModel settings, String path,
+                                  Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
+                                  List<String> violations) {
         if (isNull(settings)) {
             return;
         }
@@ -512,7 +704,7 @@ public class StrategyCreateRequestValidator {
         validateEnum(AlgoOrder.TriggerPriceType.class, settings.getTriggerPriceType(),
                 path + ".triggerPriceType", violations);
         if (Objects.equals(settings.getCalculationType(), StopLossCalculationType.ATR_PERCENT.name())) {
-            validateReference(settings.getIndicatorKey(), indicatorKeys,
+            validateReference(settings.getIndicatorKey(), indicatorTypes.keySet(),
                     path + ".indicatorKey", "indicator setting", violations);
         }
         if (Objects.equals(settings.getCalculationType(),
@@ -534,12 +726,18 @@ public class StrategyCreateRequestValidator {
         }
     }
 
-    private Set<String> settingKeys(List<StrategyIndicatorSettingApiModel> settings) {
-        Set<String> keys = new HashSet<>();
+    /** Карта key → тип индикатора контейнера (для ref/component/fork-A валидации; невалидные типы пропускаются). */
+    private Map<String, IndicatorValue.Type> indicatorTypes(List<StrategyIndicatorSettingApiModel> settings) {
+        Map<String, IndicatorValue.Type> result = new HashMap<>();
         if (nonNull(settings)) {
-            settings.forEach(setting -> keys.add(setting.getKey()));
+            settings.forEach(setting -> {
+                if (nonNull(setting.getKey())
+                        && EnumUtils.isValidEnum(IndicatorValue.Type.class, setting.getIndicatorType())) {
+                    result.put(setting.getKey(), IndicatorValue.Type.valueOf(setting.getIndicatorType()));
+                }
+            });
         }
-        return keys;
+        return result;
     }
 
     private Set<String> structureSettingKeys(List<StrategyMarketStructureSettingApiModel> settings) {

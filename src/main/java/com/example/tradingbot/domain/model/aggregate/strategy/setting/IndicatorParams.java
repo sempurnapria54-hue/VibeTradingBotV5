@@ -27,7 +27,8 @@ import lombok.Setter;
         @JsonSubTypes.Type(value = MacdParams.class, name = "MACD"),
         @JsonSubTypes.Type(value = ObvParams.class, name = "OBV"),
         @JsonSubTypes.Type(value = StochasticParams.class, name = "STOCHASTIC"),
-        @JsonSubTypes.Type(value = BollingerBandsParams.class, name = "BOLLINGER_BANDS")
+        @JsonSubTypes.Type(value = BollingerBandsParams.class, name = "BOLLINGER_BANDS"),
+        @JsonSubTypes.Type(value = EfficiencyRatioParams.class, name = "EFFICIENCY_RATIO")
 })
 public abstract class IndicatorParams {
 

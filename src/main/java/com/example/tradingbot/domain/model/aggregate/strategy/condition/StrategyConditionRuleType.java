@@ -35,14 +35,14 @@ public enum StrategyConditionRuleType {
     /** Пробой диапазона подтверждён (буфер — поле percents). */
     RANGE_BREAKOUT_CONFIRMED,
 
-    /** Тренд сменился. */
+    /** Тренд сменился (темпоральное; в контексте фазы запрещено — нужна история). */
     TREND_CHANGED,
-
-    /** Эффективность ниже порога. */
-    EFFICIENCY_BELOW_THRESHOLD,
 
     /** Фаза рынка равна заданной (сравнение с CONSTANT ENUM). */
     MARKET_PHASE_IS,
+
+    /** Структура рынка равна заданной (тест MarketStructure.Type, зеркало MARKET_PHASE_IS). */
+    MARKET_STRUCTURE_IS,
 
     /** Сравнение с участием индикаторного операнда. */
     INDICATOR_COMPARE,

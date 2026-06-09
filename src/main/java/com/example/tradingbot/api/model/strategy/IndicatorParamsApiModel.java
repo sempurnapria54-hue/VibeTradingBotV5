@@ -21,7 +21,8 @@ import lombok.Setter;
         @JsonSubTypes.Type(value = MacdParamsApiModel.class, name = "MACD"),
         @JsonSubTypes.Type(value = ObvParamsApiModel.class, name = "OBV"),
         @JsonSubTypes.Type(value = StochasticParamsApiModel.class, name = "STOCHASTIC"),
-        @JsonSubTypes.Type(value = BollingerBandsParamsApiModel.class, name = "BOLLINGER_BANDS")
+        @JsonSubTypes.Type(value = BollingerBandsParamsApiModel.class, name = "BOLLINGER_BANDS"),
+        @JsonSubTypes.Type(value = EfficiencyRatioParamsApiModel.class, name = "EFFICIENCY_RATIO")
 })
 public abstract class IndicatorParamsApiModel {
 

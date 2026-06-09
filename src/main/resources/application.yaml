@@ -30,6 +30,8 @@ okx:
 # Загрузка свечей (docs/processes/candle-loading.md). Числа
 # конфигурируемы, проставляются на CODE.
 candle-loading:
+  # Выключатель джобы загрузки свечей (CandleJob).
+  enabled: ${CANDLE_JOB_ENABLED:true}
   # Период тика CandleJob (CRON), порядка раза в минуту.
   cron: ${CANDLE_JOB_CRON:0 * * * * *}
   # Лимит свечей в одном запросе OKX history-candles (max 100).
@@ -46,6 +48,23 @@ candle-loading:
   # из запрошенных стратегией индикаторов.
   timeframes:
     - ONE_HOUR
+
+# Расчёт производных рыночных данных (docs/processes/market-data-calculation.md):
+# индикаторы → структура → фаза. По джобе — выключатель и CRON;
+# идемпотентность и чтение-последнего обеспечивают сходимость порядка
+# между jobs. candle-window-bars — потолок недавнего окна свечей,
+# грузимого в расчёт (защита от тяжёлых запросов по всей истории).
+market-data:
+  candle-window-bars: ${MARKET_DATA_CANDLE_WINDOW_BARS:1500}
+  indicator:
+    enabled: ${INDICATOR_JOB_ENABLED:true}
+    cron: ${INDICATOR_JOB_CRON:0 * * * * *}
+  structure:
+    enabled: ${MARKET_STRUCTURE_JOB_ENABLED:true}
+    cron: ${MARKET_STRUCTURE_JOB_CRON:0 * * * * *}
+  phase:
+    enabled: ${MARKET_PHASE_JOB_ENABLED:true}
+    cron: ${MARKET_PHASE_JOB_CRON:0 * * * * *}
 
 logging:
   level:

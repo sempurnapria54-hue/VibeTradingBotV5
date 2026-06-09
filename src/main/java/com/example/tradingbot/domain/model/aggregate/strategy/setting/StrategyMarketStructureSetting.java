@@ -1,7 +1,6 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.setting;
 
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
-import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import java.time.Duration;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -31,8 +30,19 @@ public class StrategyMarketStructureSetting {
     /** Доменный таймфрейм серии, по которой считается структура. */
     private TimeFrame timeframe;
 
-    /** Тип рассчитываемой структуры рынка. */
-    private MarketStructure.Type structureType;
+    /**
+     * Ключ настройки каталожного ER-индикатора (того же контейнера),
+     * который резолвер потребляет как готовый вход (fork-A). Null —
+     * резолвер использует внутренний прокси нетто/суммарного хода.
+     */
+    private String efficiencyRatioKey;
+
+    /**
+     * Ключ настройки каталожного ATR-индикатора (того же контейнера) для
+     * волатильность-относительного толеранса кластеризации уровней (D3).
+     * Null — резолвер откатывается на долю цены.
+     */
+    private String atrKey;
 
     /** Параметры расчёта структуры. */
     private MarketStructureParams params;

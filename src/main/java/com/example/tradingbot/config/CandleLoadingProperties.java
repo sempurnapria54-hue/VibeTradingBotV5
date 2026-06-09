@@ -17,6 +17,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "candle-loading")
 public class CandleLoadingProperties {
 
+    /** Выключатель джобы: при false запланированный/ручной тик ничего не делает. */
+    private Boolean enabled = true;
+
     /** CRON-период тика CandleJob. */
     private String cron;
 

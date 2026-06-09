@@ -9,10 +9,12 @@ import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.persistence.model.candle.CandleEntity;
 import com.example.tradingbot.persistence.repository.CandleRepository;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,21 @@ public class CandleDataService {
     @Transactional(readOnly = true)
     public Long count(Long candleGroupId) {
         return repository.countByCandleGroupId(candleGroupId);
+    }
+
+    /**
+     * Ограниченное недавнее окно закрытых свечей группы по возрастанию
+     * открытия — вход расчёта производных данных. Грузит не более
+     * {@code limit} последних свечей (LIMIT в БД), не всю историю.
+     */
+    @Transactional(readOnly = true)
+    public List<Candle> findRecentByGroup(Long candleGroupId, Integer limit) {
+        List<Candle> descending = repository
+                .findByCandleGroupIdOrderByOpenTimestampDesc(candleGroupId, PageRequest.of(0, limit)).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(toList());
+        Collections.reverse(descending);
+        return descending;
     }
 
     @Transactional(readOnly = true)

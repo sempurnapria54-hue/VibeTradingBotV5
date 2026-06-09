@@ -1,5 +1,8 @@
 package com.example.tradingbot.domain.jobs;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
+import com.example.tradingbot.config.CandleLoadingProperties;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.service.core.InstrumentService;
@@ -36,12 +39,23 @@ public class CandleJob {
             CandleGroup.Status.CHECK,
             CandleGroup.Status.REPAIR);
 
+    private static final String JOB_NAME = "candleJob";
+
     private final CandleGroupDataService candleGroupDataService;
     private final CandleLoader candleLoader;
     private final InstrumentService instrumentService;
+    private final CandleLoadingProperties properties;
+    private final JobExecutionGuard executionGuard;
 
     @Scheduled(cron = "${candle-loading.cron}")
     public void tick() {
+        if (isFalse(properties.getEnabled())) {
+            return;
+        }
+        executionGuard.runExclusively(JOB_NAME, this::run);
+    }
+
+    private void run() {
         triggerTailSync();
         advanceWorkingGroups();
         refreshInstrumentReadiness();

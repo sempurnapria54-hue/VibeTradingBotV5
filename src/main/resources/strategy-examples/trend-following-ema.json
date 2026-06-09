@@ -4,12 +4,53 @@
   "name": "EMA trend following (1H phase / 15m signal / 5m timing)",
   "marketPhaseSetting": {
     "timeframe": "ONE_HOUR",
-    "params": {
-      "algorithmType": "STRUCTURE_AND_INDICATORS",
-      "minTrendScore": 60,
-      "minRangeScore": 60,
-      "confirmationBars": 2
-    },
+    "phaseRules": [
+      {
+        "level": 1,
+        "type": "RANGE",
+        "condition": {
+          "rules": [
+            {
+              "level": 1,
+              "ruleType": "MARKET_STRUCTURE_IS",
+              "operator": "EQ",
+              "leftOperand": { "sourceType": "MARKET_STRUCTURE", "structureKey": "phase_structure_1h" },
+              "rightOperand": { "sourceType": "CONSTANT", "valueType": "ENUM", "value": "RANGE" }
+            }
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "type": "BULL_TREND",
+        "condition": {
+          "rules": [
+            {
+              "level": 1,
+              "ruleType": "INDICATOR_COMPARE",
+              "operator": "GT",
+              "leftOperand": { "sourceType": "INDICATOR", "indicatorKey": "phase_ema_fast_1h" },
+              "rightOperand": { "sourceType": "INDICATOR", "indicatorKey": "phase_ema_slow_1h" }
+            }
+          ]
+        }
+      },
+      {
+        "level": 3,
+        "type": "BEAR_TREND",
+        "condition": {
+          "rules": [
+            {
+              "level": 1,
+              "ruleType": "INDICATOR_COMPARE",
+              "operator": "LT",
+              "leftOperand": { "sourceType": "INDICATOR", "indicatorKey": "phase_ema_fast_1h" },
+              "rightOperand": { "sourceType": "INDICATOR", "indicatorKey": "phase_ema_slow_1h" }
+            }
+          ]
+        }
+      }
+    ],
     "indicatorSettings": [
       {
         "key": "phase_ema_fast_1h",
@@ -30,7 +71,6 @@
       {
         "key": "phase_structure_1h",
         "timeframe": "ONE_HOUR",
-        "structureType": "RANGE",
         "params": {
           "lookbackBars": 96,
           "minTouches": 2,
@@ -38,7 +78,9 @@
           "maxRangeWidthPercents": 8.0,
           "breakoutBufferPercents": 15,
           "breakoutConfirmationBars": 2,
-          "swingLookbackBars": 5
+          "swingLookbackBars": 5,
+          "trendEfficiencyThreshold": 0.30,
+          "levelToleranceAtrMultiplier": 0.5
         },
         "destiny": "MARKET_PHASE",
         "expirationDuration": "PT2H"

@@ -29,8 +29,12 @@ public class StrategyMarketPhaseSetting extends Auditable {
     /** Доменный таймфрейм классификации фазы. */
     private TimeFrame timeframe;
 
-    /** Параметры алгоритма классификации. */
-    private MarketPhaseParams params;
+    /**
+     * Авторские правила классификации фазы (упорядоченный first-match-
+     * список клауз «условие → фаза»). Заменяют распущенный скоринговый
+     * MarketPhaseParams (docs/decisions/market-phase-conditional-classification.md).
+     */
+    private List<StrategyMarketPhaseRule> phaseRules;
 
     /** Индикаторы для расчёта фазы (destiny = MARKET_PHASE). */
     private List<StrategyIndicatorSetting> indicatorSettings;

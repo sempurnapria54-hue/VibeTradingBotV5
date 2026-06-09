@@ -1,6 +1,9 @@
 package com.example.tradingbot.api.controller;
 
-import com.example.tradingbot.domain.jobs.CandleJobFacade;
+import com.example.tradingbot.domain.jobs.facade.CandleJobFacade;
+import com.example.tradingbot.domain.jobs.facade.IndicatorJobFacade;
+import com.example.tradingbot.domain.jobs.facade.MarketPhaseJobFacade;
+import com.example.tradingbot.domain.jobs.facade.MarketStructureJobFacade;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -23,11 +26,35 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobController {
 
     private final CandleJobFacade candleJobFacade;
+    private final IndicatorJobFacade indicatorJobFacade;
+    private final MarketStructureJobFacade marketStructureJobFacade;
+    private final MarketPhaseJobFacade marketPhaseJobFacade;
 
     @PostMapping("/candle-loading/trigger")
     @Operation(summary = "Запустить загрузку свечей вне расписания (асинхронно)")
     public ResponseEntity<Void> triggerCandleLoading() {
         candleJobFacade.trigger();
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/indicators/trigger")
+    @Operation(summary = "Запустить расчёт индикаторов вне расписания (асинхронно)")
+    public ResponseEntity<Void> triggerIndicators() {
+        indicatorJobFacade.trigger();
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/market-structure/trigger")
+    @Operation(summary = "Запустить расчёт структуры рынка вне расписания (асинхронно)")
+    public ResponseEntity<Void> triggerMarketStructure() {
+        marketStructureJobFacade.trigger();
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/market-phase/trigger")
+    @Operation(summary = "Запустить расчёт фазы рынка вне расписания (асинхронно)")
+    public ResponseEntity<Void> triggerMarketPhase() {
+        marketPhaseJobFacade.trigger();
         return ResponseEntity.accepted().build();
     }
 }
