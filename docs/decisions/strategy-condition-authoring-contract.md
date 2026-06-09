@@ -189,10 +189,21 @@ StrategyCondition`. Контекст — **классификация фазы**
 `INDICATOR_COMPARE` над ER-операндом каталога `EFFICIENCY_RATIO`,
 выделенного `EFFICIENCY_BELOW_THRESHOLD` нет —
 `docs/decisions/efficiency-ratio-as-catalog-indicator.md`), без
-lifecycle-сделки и `MARKET_PHASE_IS`. Этот
+lifecycle-сделки, `MARKET_PHASE_IS` и `TREND_CHANGED`. Этот
 контекстный whitelist — create-валидация (400). `MarketStructure` тем
 самым **операнд** правил фазы (вычисляемый шаримый результат, на который
 ссылаются), не вход скоринга.
+
+`TREND_CHANGED` исключён из контекста фазы: темпоральное правило
+(«текущее vs прошлое») несовместимо со stateless-контрактом
+`MarketPhaseClassifier` без источника истории, а его документированная
+привязка к `MarketPhase` (`docs/components/StrategyConditionEvaluator.md`)
+— запрещённая в фазе само-референция; структурные переходы выражаются
+`RANGE_BREAKOUT_CONFIRMED` / `MARKET_STRUCTURE_IS` над операндом
+`MARKET_STRUCTURE`. Дверь на будущее (не реализуется): темпоральное
+правило фазы вводится читающим **готовую историю структуры** (не фазы),
+с per-`ruleType` контрактом источника. В entry-контексте `TREND_CHANGED`
+не затронут.
 
 ## Что осталось открытым (контракт не блокирует)
 

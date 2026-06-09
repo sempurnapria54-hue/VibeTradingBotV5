@@ -34,7 +34,25 @@ Java-класс, наследует `Auditable`.
 | `setting` | `StrategyMarketPhaseSetting` | Настройка стратегии, по которой рассчитана фаза. |
 | `type` | `Type` | Тип рассчитанной фазы. |
 | `candleTimestamp` | `OffsetDateTime` | Время свечи расчёта. |
-| `confirmedAt` | `OffsetDateTime` | Время, с которого фазу можно использовать без look-ahead. |
+| `confirmedAt` | `OffsetDateTime` | Время, с которого фазу можно использовать без look-ahead (деривация — ниже). |
+
+## Деривация `confirmedAt`
+
+`MarketPhaseClassifier` выводит `confirmedAt` фазы как консервативный
+`max` по гейт-операндам **сработавшей клаузы** (first-match): структурный
+операнд → его `confirmedAt`; индикаторный → `candleTimestamp`; клауза без
+гейт-операндов → `candleTimestamp` бара оценки. Прежний скоринговый
+`confirmationBars` распущен редизайном условной фазы
+(`docs/decisions/market-phase-conditional-classification.md`) — роль
+«гейта использования без look-ahead» теперь несёт этот производный
+`confirmedAt`.
+
+Свойства: отдельного состояния не вводит, согласуется со
+stateless-контрактом классификатора (история прошлых фаз не нужна).
+Дебаунс-семантику `confirmedAt` фазы **не несёт** — анти-whipsaw остаётся
+операнд-уровневым (сглаживающие периоды индикаторов, структурный
+`breakoutConfirmationBars`). Точная арифметика (какой именно timestamp
+берётся для каждого типа операнда) — деталь реализации (`CODE`).
 
 ## Енум `Type`
 

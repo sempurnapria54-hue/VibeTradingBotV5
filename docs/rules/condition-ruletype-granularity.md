@@ -38,8 +38,10 @@
   до одной. Решение — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`.
 - **Оправданы** (не алиасы): `RANGE_BREAKOUT_CONFIRMED` (предвычисленное
   составное событие структуры — `breakoutEvent`, читается готовым),
-  `TREND_CHANGED` (темпоральное), `CANDLE_CLOSED` (тайминг),
-  lifecycle-предикаты сделки.
+  `TREND_CHANGED` (темпоральное; в контексте классификации фазы **не
+  применяется** — stateless-классификатору нужен источник истории, см.
+  `docs/models/domain/aggregate/Strategy.md` §StrategyMarketPhaseRule),
+  `CANDLE_CLOSED` (тайминг), lifecycle-предикаты сделки.
 - **`MARKET_STRUCTURE_IS` — проверен точечно, остаётся именованным**
   (Н3-структура, гейт `CODE`): enum-равенство `MarketStructure.Type` ≠
   числовой `INDICATOR_COMPARE` (разные валидационные контракты);

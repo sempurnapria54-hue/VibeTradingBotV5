@@ -38,10 +38,14 @@ score. Семантика самого скоринга не была задан
    фазы**: операнды `INDICATOR`/`MARKET_STRUCTURE`/`PRICE`/`CONSTANT`/
    `TIME`, без `MARKET_PHASE` (само-референция) и runtime-источников
    сделки; `ruleType` — сравнивающие и структурно-событийные, без
-   lifecycle-сделки и `MARKET_PHASE_IS` (тест эффективности рынка (ER) —
+   lifecycle-сделки, `MARKET_PHASE_IS` (цикл) и `TREND_CHANGED`
+   (темпоральное «текущее vs прошлое» — несовместимо со
+   stateless-классификатором без источника истории; структурные переходы
+   в фазе выражаются `RANGE_BREAKOUT_CONFIRMED` / `MARKET_STRUCTURE_IS`).
+   Тест эффективности рынка (ER) —
    через `INDICATOR_COMPARE` над ER-операндом каталога `EFFICIENCY_RATIO`;
    выделенного `EFFICIENCY_BELOW_THRESHOLD` нет — fork A,
-   `docs/decisions/efficiency-ratio-as-catalog-indicator.md`). Whitelist —
+   `docs/decisions/efficiency-ratio-as-catalog-indicator.md`. Whitelist —
    create-валидация (400). Детали — `docs/models/domain/aggregate/Strategy.md`
    §StrategyMarketPhaseRule.
 
@@ -57,7 +61,10 @@ score. Семантика самого скоринга не была задан
    (чистый first-match) поверх переиспользуемого
    `StrategyConditionEvaluator`; `MarketPhaseJob` остаётся тонким
    (`docs/components/MarketPhaseClassifier.md`,
-   `docs/components/MarketPhaseJob.md`).
+   `docs/components/MarketPhaseJob.md`). `confirmedAt` фазы классификатор
+   выводит как консервативный `max` по гейт-операндам сработавшей клаузы
+   (роль распущенного `confirmationBars` для гейта без look-ahead; деталь
+   — `docs/models/domain/other/MarketPhase.md` §Деривация `confirmedAt`).
 
 4. **`confidenceScore` удалён** из `MarketPhase` и из контракта job.
    Детерминированный булев исход не даёт непрерывной уверенности; поле

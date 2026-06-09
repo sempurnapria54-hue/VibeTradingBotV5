@@ -112,9 +112,13 @@ first-match-список**: проверяются по `level` ASC, перва�
 и runtime-источники сделки (`POSITION` / `ORDER` / `ALGO_ORDER` /
 `BALANCE`). Допустимые `ruleType` — сравнивающие (`INDICATOR_COMPARE` /
 `PRICE_COMPARE` / `CROSSOVER`) и структурно-событийные
-(`RANGE_BREAKOUT_CONFIRMED` / `TREND_CHANGED` /
-`VOLUME_FILTER_PASSED` / `CANDLE_CLOSED` / `MARKET_STRUCTURE_IS`);
-запрещены lifecycle-сделки и `MARKET_PHASE_IS` (цикл). Тест эффективности
+(`RANGE_BREAKOUT_CONFIRMED` / `VOLUME_FILTER_PASSED` / `CANDLE_CLOSED` /
+`MARKET_STRUCTURE_IS`); запрещены lifecycle-сделки, `MARKET_PHASE_IS`
+(цикл) и `TREND_CHANGED` (темпоральное «текущее vs прошлое» —
+несовместимо со stateless-контрактом `MarketPhaseClassifier` без
+источника истории; структурные переходы в фазе выражаются
+`RANGE_BREAKOUT_CONFIRMED` / `MARKET_STRUCTURE_IS` над операндом
+`MARKET_STRUCTURE`). Тест эффективности
 рынка (ER) — через `INDICATOR_COMPARE` над ER-операндом каталога
 (`EFFICIENCY_RATIO`), в обе стороны (`LT` — шум/range, `GT` — тренд);
 выделенного `EFFICIENCY_BELOW_THRESHOLD` нет (свёрнут как чистый алиас —
@@ -122,6 +126,12 @@ first-match-список**: проверяются по `level` ASC, перва�
 whitelist — create-валидация (400). Анти-whipsaw — операнд-уровневый
 (сглаживающие периоды индикаторов, переиспользуемые по `key`; структурный
 `breakoutConfirmationBars`); отдельного фаза-дебаунса нет.
+
+Темпоральное правило фазы — дверь на будущее (сейчас не реализуется):
+понадобится позже — вводить читающим **готовую историю структуры** (не
+фазы), с явной квалификацией «stateless = без истории фаз» и
+per-`ruleType` контрактом источника. В entry-контексте (где `MarketPhase`
+есть в данных) `TREND_CHANGED` не затронут — там остаётся как есть.
 
 ### StrategyIndicatorSetting
 `key` (стабильный ключ настройки — по нему ссылается индикаторный

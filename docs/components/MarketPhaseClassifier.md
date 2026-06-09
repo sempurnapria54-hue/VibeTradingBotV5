@@ -27,6 +27,14 @@ classify(
   `condition` спрашивается у `docs/components/StrategyConditionEvaluator.md`;
   первая истинная клауза задаёт `type`. Не сработала ни одна → `UNKNOWN`
   (консервативный дефолт).
+- **`confirmedAt` — производный от операндов сработавшей клаузы.**
+  Консервативный `max` по гейт-операндам матча: структурный операнд → его
+  `confirmedAt`, индикаторный → `candleTimestamp`; клауза без
+  гейт-операндов → `candleTimestamp` бара оценки. Это гейт «без
+  look-ahead» (прежний скоринговый `confirmationBars` распущен редизайном),
+  отдельного состояния не вводит — согласуется со stateless-контрактом.
+  Точная арифметика — `CODE`. См.
+  `docs/models/domain/other/MarketPhase.md` §Деривация `confirmedAt`.
 - **Stateless.** Решение — функция только от `phaseRules` и текущего
   `evaluationContext`; история прошлых фаз не читается. Отдельного
   фаза-уровневого дебаунса нет — анти-whipsaw операнд-уровневый
