@@ -9,18 +9,25 @@
 `MarketPhaseJob` определяет фазу рынка и сохраняет `MarketPhase` (см.
 `docs/models/domain/other/MarketPhase.md`). Настройка —
 `StrategyMarketPhaseSetting`; источники данных — готовые `IndicatorValue`
-и `MarketStructure`; параметры — `MarketPhaseParams`.
+и `MarketStructure`; правила классификации — авторские `phaseRules` (см.
+`docs/decisions/market-phase-conditional-classification.md`).
 
 ## Делает
 
 - читает `StrategyMarketPhaseSetting` стратегий **всех статусов кроме
   `DELETED`** (перечень — как в правиле свежести,
   `docs/rules/market-data-freshness.md`);
-- читает готовые `IndicatorValue` и `MarketStructure`;
-- применяет `MarketPhaseParams` (`algorithmType`: `STRUCTURE_ONLY` /
-  `INDICATORS_ONLY` / `STRUCTURE_AND_INDICATORS`);
-- сохраняет актуальный `MarketPhase`;
-- может сохранять confidence/score.
+- читает готовые `IndicatorValue` и `MarketStructure`, собирает контекст
+  оценки (без `Position`-фактов — контекстный whitelist это гарантирует);
+- зовёт `docs/components/MarketPhaseClassifier.md` — stateless first-match
+  по `phaseRules` поверх `StrategyConditionEvaluator` (первая истинная
+  клауза задаёт `Type`, ни одна → `UNKNOWN`);
+- сохраняет актуальный `MarketPhase`.
+
+Job — тонкий: классификацию держит `MarketPhaseClassifier`, истинность
+условий — `StrategyConditionEvaluator`. Скоринга (`trendScore`/
+`rangeScore`/`confidenceScore`) и `algorithmType` нет — заменены
+авторскими условиями.
 
 ## Не делает
 

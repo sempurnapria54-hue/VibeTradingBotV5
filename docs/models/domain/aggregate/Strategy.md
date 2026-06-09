@@ -77,8 +77,9 @@
 
 `Status`: `CREATED`, `ACTIVE`, `INACTIVE`, `DELETED` (значения и
 эффекты — в `docs/lifecycles/Strategy.md`). Одна
-`StrategyMarketPhaseSetting` описывает алгоритм классификации рынка во
-все `MarketPhase.Type` (`BULL_TREND`/`BEAR_TREND`/`RANGE`/`UNKNOWN`);
+`StrategyMarketPhaseSetting` несёт авторские правила классификации
+рынка (`phaseRules`) во все `MarketPhase.Type`
+(`BULL_TREND`/`BEAR_TREND`/`RANGE`/`UNKNOWN`);
 `MarketPhaseJob` сохраняет один актуальный результат, `EntryScannerJob`
 выбирает detail по `MarketPhase.Type → StrategyDetail.marketPhaseType`
 (jobs — форвард-заметки в
@@ -87,15 +88,40 @@
 ## Настройки рыночных данных (разделы)
 
 ### StrategyMarketPhaseSetting
-`timeframe: TimeFrame`, `params: MarketPhaseParams`,
+`timeframe: TimeFrame`, `phaseRules: List<StrategyMarketPhaseRule>`,
 `indicatorSettings: List<StrategyIndicatorSetting>`,
 `marketStructureSettings: List<StrategyMarketStructureSetting>`,
 `expirationDuration: Duration` (срок свежести последней `MarketPhase`).
+Отдельного `params`-объекта у настройки нет: `MarketPhase.Type`
+определяется авторскими условиями (`phaseRules`), не скоринговым
+алгоритмом (см. `docs/decisions/market-phase-conditional-classification.md`).
 
-### MarketPhaseParams
-`algorithmType: AlgorithmType` (`STRUCTURE_ONLY` / `INDICATORS_ONLY` /
-`STRUCTURE_AND_INDICATORS`), `minTrendScore`, `minRangeScore`,
-`confirmationBars`.
+### StrategyMarketPhaseRule
+Клауза «условие → фаза»: `level: Integer`, `type: MarketPhase.Type`,
+`condition: StrategyCondition`. Набор клауз настройки — **упорядоченный
+first-match-список**: проверяются по `level` ASC, первая клауза с
+истинным `condition` задаёт `MarketPhase.Type`; не сработала ни одна →
+`UNKNOWN` (неявный консервативный дефолт, не авторится). Несколько клауз
+на один `type` допустимы (разные паттерны свидетельства → одна фаза).
+
+`condition` — тот же `StrategyCondition` (ниже), но в **контексте
+классификации фазы** (до выбора детали, без сделки): операнды только
+`INDICATOR` / `MARKET_STRUCTURE` (по `key` из `indicatorSettings` /
+`marketStructureSettings` этой же настройки) / `PRICE` / `CONSTANT` /
+`TIME`; **запрещены** `MARKET_PHASE` (само-референция — фаза вычисляется)
+и runtime-источники сделки (`POSITION` / `ORDER` / `ALGO_ORDER` /
+`BALANCE`). Допустимые `ruleType` — сравнивающие (`INDICATOR_COMPARE` /
+`PRICE_COMPARE` / `CROSSOVER`) и структурно-событийные
+(`RANGE_BREAKOUT_CONFIRMED` / `TREND_CHANGED` /
+`VOLUME_FILTER_PASSED` / `CANDLE_CLOSED` / `MARKET_STRUCTURE_IS`);
+запрещены lifecycle-сделки и `MARKET_PHASE_IS` (цикл). Тест эффективности
+рынка (ER) — через `INDICATOR_COMPARE` над ER-операндом каталога
+(`EFFICIENCY_RATIO`), в обе стороны (`LT` — шум/range, `GT` — тренд);
+выделенного `EFFICIENCY_BELOW_THRESHOLD` нет (свёрнут как чистый алиас —
+`docs/decisions/efficiency-ratio-as-catalog-indicator.md`). Контекстный
+whitelist — create-валидация (400). Анти-whipsaw — операнд-уровневый
+(сглаживающие периоды индикаторов, переиспользуемые по `key`; структурный
+`breakoutConfirmationBars`); отдельного фаза-дебаунса нет.
 
 ### StrategyIndicatorSetting
 `key` (стабильный ключ настройки — по нему ссылается индикаторный
@@ -121,7 +147,10 @@ Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup` жив�
 `MacdParams(fastPeriod, slowPeriod, signalPeriod)`,
 `BollingerBandsParams(period, deviationMultiplier)`,
 `StochasticParams(kPeriod, dPeriod, smoothPeriod)`,
-`ObvParams(enabled)`. Волатильность отдельной сущностью не
+`ObvParams(enabled)`, `EfficiencyRatioParams(period)` (ER — оконный,
+`warmup = period`; `EFFICIENCY_RATIO` — fork A,
+`docs/decisions/efficiency-ratio-as-catalog-indicator.md`).
+Волатильность отдельной сущностью не
 моделируется — через индикаторы ATR / Bollinger bandwidth.
 
 `warmup` по умолчанию **выводится** реализацией индикатора из
@@ -247,10 +276,17 @@ rule-level `timeframe`, объектные ссылки `indicatorSetting` /
 `ENTRY_ORDER_FINALIZED`, `POSITION_OPENED`, `ATTACHED_STOP_LOSS_EXISTS`,
 `MAIN_PROTECTION_EXISTS`, `PROFIT_PERCENTS_REACHED`,
 `LOSS_PERCENTS_REACHED`, `RANGE_BREAKOUT_CONFIRMED`, `TREND_CHANGED`,
-`EFFICIENCY_BELOW_THRESHOLD`, `MARKET_PHASE_IS`, `INDICATOR_COMPARE`,
-`PRICE_COMPARE`, `CROSSOVER`, `VOLUME_FILTER_PASSED`, `CANDLE_CLOSED`.
-(`SIGNAL_SCORE_REACHED` удалён —
-`docs/decisions/strategy-signal-is-entry-condition.md`.)
+`MARKET_PHASE_IS`, `MARKET_STRUCTURE_IS`,
+`INDICATOR_COMPARE`, `PRICE_COMPARE`, `CROSSOVER`, `VOLUME_FILTER_PASSED`,
+`CANDLE_CLOSED`. (`SIGNAL_SCORE_REACHED` удалён —
+`docs/decisions/strategy-signal-is-entry-condition.md`;
+`EFFICIENCY_BELOW_THRESHOLD` удалён — чистый алиас, свёрнут в
+`INDICATOR_COMPARE` над ER-операндом каталога,
+`docs/decisions/efficiency-ratio-as-catalog-indicator.md`; критерий
+sugar-vs-алиас — `docs/rules/condition-ruletype-granularity.md`.) `MARKET_STRUCTURE_IS`
+(тест `MarketStructure.Type` равенством, зеркало `MARKET_PHASE_IS`) введён
+редизайном условной фазы; его per-`ruleType` контракт дозаполняется при
+реализации (инкрементально, как у прочих типов).
 
 `StrategyConditionSourceType`: `PRICE`, `INDICATOR`, `MARKET_PHASE`,
 `MARKET_STRUCTURE`, `POSITION`, `ORDER`, `ALGO_ORDER`, `BALANCE`,
@@ -444,10 +480,14 @@ lifecycle).
 коде иерархия типов сохраняется. Дискриминатор подтипа
 `IndicatorParams` в payload не дублируется — тег несёт `indicatorType`
 настройки-владельца (Jackson `EXTERNAL_PROPERTY`, см. §IndicatorParams).
-`MarketPhaseParams` — `params` реляционного контейнера
-`StrategyMarketPhaseSetting`, не часть JSON-массивов листовых настроек:
-JSONB-колонка `params` на строке `strategy_market_phase_settings`.
-Валидацию полей делает приложение. Обоснование (почему настройки не
+`phaseRules` (список клауз `StrategyMarketPhaseRule`, каждая с вложенным
+`condition: StrategyCondition`) — **JSONB-колонка `phase_rules`** на
+реляционной строке `strategy_market_phase_settings` (условие внутри
+клаузы — тот же JSONB, что и `condition` шага, см. ниже §Условие).
+Отдельного `params`-объекта/колонки у контейнера нет — `MarketPhaseParams`
+распущен редизайном условной фазы
+(`docs/decisions/market-phase-conditional-classification.md`). Валидацию
+полей и контекстный whitelist операндов/`ruleType` делает приложение. Обоснование (почему настройки не
 реляционные узлы) — `docs/decisions/strategy-tree-persistence.md`.
 
 ### Действия (`StrategyAction`)

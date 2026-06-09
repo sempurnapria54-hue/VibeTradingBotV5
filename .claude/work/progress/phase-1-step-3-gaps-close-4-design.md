@@ -200,6 +200,20 @@
 
 ## 1.4. Развилки Н3 на валидацию (варианты + рекомендация)
 
+> **Перепрогнано и зафиксировано (fork A re-run + A-bis).** Крен (1)
+> переоценён после роспуска аналитика-скоринга: выбран **(2) ER в
+> каталоге индикаторов** (`EFFICIENCY_RATIO`) — авторски-адресуемый
+> операнд. `MarketStructureAnalyzer` (тесты #4/#6 выше) выжил как
+> вычисляющий компонент, но потребляет **тот же каталожный ER**
+> опциональным `IndicatorValue`-входом (не пересчитывает внутри),
+> fallback на EMA-наклон/ATR (вариант 3) при необъявленной ER-настройке —
+> единый источник ER. ER-условие выражается `INDICATOR_COMPARE` (A-bis:
+> выделенный `EFFICIENCY_BELOW_THRESHOLD` свёрнут как чистый алиас).
+> Решение — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`;
+> проработка — `phase-1-step-3-fork-a-rerun-er-location.md` /
+> `phase-1-step-3-fork-a-bis-rerun-efficiency-ruletype.md`. Варианты ниже
+> — исторические.
+
 **Развилка A — где живёт мера шума (ER).** ER не в каталоге индикаторов
 (`ATR/EMA/RSI/MACD/STOCHASTIC/BOLLINGER_BANDS/OBV`).
 - (1) считать ER **внутри аналитика** (внутренняя мера, не хранимый

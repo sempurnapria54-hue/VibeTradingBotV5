@@ -143,13 +143,40 @@ Create-валидация (400) проверяет авторинг-миниму
   таймфрейм закрыт);
 - `MARKET_PHASE_IS` — operator + оба операнда, один из них `CONSTANT`
   с фазой (`ENUM`-значение валидно по `MarketPhase.Type`);
+- `MARKET_STRUCTURE_IS` — operator + оба операнда, один `CONSTANT` со
+  структурой (`ENUM`-значение валидно по `MarketStructure.Type`);
+  зеркало `MARKET_PHASE_IS`, введён редизайном условной фазы
+  (`docs/decisions/market-phase-conditional-classification.md`) для теста
+  `MarketStructure.Type` равенством; per-`ruleType` минимум
+  дозаполняется при реализации;
 - `INDICATOR_COMPARE` / `PRICE_COMPARE` — operator + оба операнда,
   хотя бы один с требуемым источником (INDICATOR / PRICE);
 - `CROSSOVER` — operator `CROSSED_ABOVE` / `CROSSED_BELOW` + оба
   операнда;
-- операнды: `INDICATOR` → `indicatorKey` существует в настройках той
-  же детали; `MARKET_STRUCTURE` → `structureKey` существует;
+- операнды: `INDICATOR` → `indicatorKey` существует в настройках того же
+  контейнера; `MARKET_STRUCTURE` → `structureKey` существует;
   `PRICE` → валидный `priceSource`; `CONSTANT` → `valueType` + `value`.
+  Контейнер ссылки — `StrategyDetail` для entry-условий, либо
+  `StrategyMarketPhaseSetting` для правил классификации фазы (ниже).
+
+### Переиспользование грамматики в классификации фазы
+
+`MarketPhase.Type` определяется авторскими условиями той же грамматики
+(`docs/decisions/market-phase-conditional-classification.md`): клаузы
+`StrategyMarketPhaseSetting.phaseRules` несут `condition:
+StrategyCondition`. Контекст — **классификация фазы** (до выбора детали,
+без сделки): операнды только `INDICATOR`/`MARKET_STRUCTURE`/`PRICE`/
+`CONSTANT`/`TIME` (по `key` из настроек той же `StrategyMarketPhaseSetting`),
+без `MARKET_PHASE` (само-референция) и runtime-источников сделки;
+`ruleType` — сравнивающие и структурно-событийные (вкл.
+`MARKET_STRUCTURE_IS`; тест эффективности рынка (ER) — через
+`INDICATOR_COMPARE` над ER-операндом каталога `EFFICIENCY_RATIO`,
+выделенного `EFFICIENCY_BELOW_THRESHOLD` нет —
+`docs/decisions/efficiency-ratio-as-catalog-indicator.md`), без
+lifecycle-сделки и `MARKET_PHASE_IS`. Этот
+контекстный whitelist — create-валидация (400). `MarketStructure` тем
+самым **операнд** правил фазы (вычисляемый шаримый результат, на который
+ссылаются), не вход скоринга.
 
 ## Что осталось открытым (контракт не блокирует)
 
@@ -157,9 +184,16 @@ Create-валидация (400) проверяет авторинг-миниму
   свеча / хай): чистая бизнес-семантика, вынесена в открытый вопрос
   **STRAT-Q4** (`.claude/work/questions/open-questions.md`).
 - **Per-`ruleType` контракт остальных типов** (NO_OPEN_POSITION и
-  прочие плоские без полей — тривиальны; EFFICIENCY_BELOW_THRESHOLD,
-  VOLUME_FILTER_PASSED и др.) — дозаполняется при реализации,
-  превентивно не перечисляется.
+  прочие плоские без полей — тривиальны; VOLUME_FILTER_PASSED и др.) —
+  дозаполняется при реализации, превентивно не перечисляется. Заводя
+  новый именованный `ruleType`, проверяем критерий
+  `docs/rules/condition-ruletype-granularity.md`: чистый алиас одного
+  сравнения не заводим — выражаем генериком (`INDICATOR_COMPARE` и др.).
+  `EFFICIENCY_BELOW_THRESHOLD` по этому критерию свёрнут в
+  `INDICATOR_COMPARE` (`docs/decisions/efficiency-ratio-as-catalog-indicator.md`);
+  `VOLUME_FILTER_PASSED` и `MARKET_PHASE_IS`/`MARKET_STRUCTURE_IS` —
+  кандидаты для точечной проверки при фиксации их контрактов, пакетно
+  не сворачиваются.
 
 ## Следствия
 
@@ -185,5 +219,9 @@ Create-валидация (400) проверяет авторинг-миниму
   `docs/decisions/strategy-materialization-and-validation.md`.
 - Потребитель `warmup` — `docs/processes/candle-loading.md`,
   `docs/components/IndicatorJob.md`.
+- Критерий «именованный `ruleType` vs генерик-сравнение» —
+  `docs/rules/condition-ruletype-granularity.md`.
+- ER как операнд каталога (снят `EFFICIENCY_BELOW_THRESHOLD`) —
+  `docs/decisions/efficiency-ratio-as-catalog-indicator.md`.
 - Открытый вопрос percent-anchor — STRAT-Q4
   (`.claude/work/questions/open-questions.md`).

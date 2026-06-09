@@ -38,7 +38,17 @@ Java abstract-класс, наследует `Auditable`.
 
 ## Енум `Type`
 
-`ATR`, `EMA`, `RSI`, `MACD`, `STOCHASTIC`, `BOLLINGER_BANDS`, `OBV`.
+`ATR`, `EMA`, `RSI`, `MACD`, `STOCHASTIC`, `BOLLINGER_BANDS`, `OBV`,
+`EFFICIENCY_RATIO`.
+
+`EFFICIENCY_RATIO` — мера эффективности/шума (Kaufman efficiency ratio):
+скаляр ∈ [0,1] по окну (`= |чистый ход| / Σ|побарных ходов|`), ER→1 —
+тренд, ER→0 — шум/боковик. Авторски-адресуемый операнд каталога (введён
+fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`): на
+него ссылаются условия (классификации фазы и входа) через
+`INDICATOR_COMPARE`, и его же потребляет опциональный
+шумовой-фильтр-вход `MarketStructureAnalyzer` — единый шаримый ER, без
+внутреннего пересчёта.
 
 ## Наследники (значения по типу)
 
@@ -51,6 +61,7 @@ Java abstract-класс, наследует `Auditable`.
 | `BollingerBandsValue` | `upperBand`, `middleBand`, `lowerBand`, `bandwidth`, `percentB` |
 | `StochasticValue` | `k`, `d` |
 | `ObvValue` | `obv` |
+| `EfficiencyRatioValue` | `efficiencyRatio` |
 
 Все числовые поля — `BigDecimal`. Волатильность отдельной сущностью не
 моделируется — через `AtrValue` / `BollingerBandsValue.bandwidth`.

@@ -12,6 +12,13 @@
 `MarketStructure`. Persisted-модель рыночных данных, не про бизнес-цикл
 сделки → `other` (см. `.claude/decisions/models-core-vs-other.md`).
 
+`Type` определяется **авторскими условиями**, не скоринговым алгоритмом:
+`MarketPhaseJob` через `docs/components/MarketPhaseClassifier.md` исполняет
+упорядоченный first-match-список клауз `StrategyMarketPhaseRule`
+(`StrategyMarketPhaseSetting.phaseRules`) — первая клауза с истинным
+`condition` задаёт `Type`, ни одна → `UNKNOWN` (см.
+`docs/decisions/market-phase-conditional-classification.md`).
+
 `EntryScannerJob` по `MarketPhase.Type` выбирает `StrategyDetail`
 (`MarketPhase.Type → StrategyDetail.marketPhaseType`). Раздачей актуальной
 фазы занимается `docs/components/MarketPhaseService.md`.
@@ -28,7 +35,6 @@ Java-класс, наследует `Auditable`.
 | `type` | `Type` | Тип рассчитанной фазы. |
 | `candleTimestamp` | `OffsetDateTime` | Время свечи расчёта. |
 | `confirmedAt` | `OffsetDateTime` | Время, с которого фазу можно использовать без look-ahead. |
-| `confidenceScore` | `BigDecimal` | Уверенность алгоритма в выбранной фазе. |
 
 ## Енум `Type`
 
@@ -53,5 +59,6 @@ Java-класс, наследует `Auditable`.
   моделями результатов (`IndicatorValue`, `MarketStructure` тоже хранят
   ряд, а не правят строку).
 - Одна `StrategyMarketPhaseSetting` (на уровне `Strategy`, т.к. фаза нужна
-  до выбора `StrategyDetail`) описывает классификацию во все `Type`;
-  `MarketPhaseJob` пишет новый актуальный результат поверх истории.
+  до выбора `StrategyDetail`) несёт авторские правила (`phaseRules`)
+  классификации во все `Type`; `MarketPhaseJob` пишет новый актуальный
+  результат поверх истории.

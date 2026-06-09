@@ -22,7 +22,10 @@ canonical-`params`), зарегистрированной в реестре
 breakout-условий и сопровождения позиции. Потребители (evaluator,
 калькуляторы, `MarketPhaseJob`) читают готовую структуру через
 `docs/components/MarketStructureService.md` и сами уровни по свечам не
-ищут.
+ищут. Для классификации фазы `MarketStructure` фигурирует **операндом**
+авторских правил (`MARKET_STRUCTURE`-операнд, в т.ч. тест `Type` через
+`MARKET_STRUCTURE_IS`), не входом скоринга — см.
+`docs/decisions/market-phase-conditional-classification.md`.
 
 ## Структура
 

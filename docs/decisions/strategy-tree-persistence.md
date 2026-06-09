@@ -76,12 +76,16 @@ inheritance-маппинга. Валидацию полей и уникальн�
 FK-целостность внутридеревных ссылок — к ним не применяется.
 Согласуется с тем, что `params` и так JSONB.
 
-**Следствие — `MarketStructureParams` / `MarketPhaseParams`.**
+**Следствие — `MarketStructureParams` / `phaseRules`.**
 `MarketStructureParams` едет внутри JSONB-настройки.
-`MarketPhaseParams` — `params` контейнера `StrategyMarketPhaseSetting`,
-не листовой настройки: JSONB-колонка `params` на его реляционной
-строке (разведено на `GAPS_CLOSE_4`, Н3). Отдельного решения «JSONB vs
-колонки» для них больше нет — представление задаёт общее правило
+У `StrategyMarketPhaseSetting` отдельного `params`-объекта нет —
+`MarketPhaseParams` распущен редизайном условной фазы
+(`docs/decisions/market-phase-conditional-classification.md`). Правила
+классификации фазы `phaseRules` (клаузы `StrategyMarketPhaseRule` с
+вложенным `condition`) едут **JSONB-колонкой `phase_rules`** на
+реляционной строке контейнера (условие внутри клаузы — тот же JSONB, что
+и `condition` шага). Отдельного решения «JSONB vs колонки» для них
+больше нет — представление задаёт общее правило
 (`docs/rules/persistence-representation.md`).
 
 **Сознательный отход от архива (params).** В архиве `IndicatorParams` —
@@ -252,7 +256,10 @@ SQL-запросов по правилам между стратегиями и�
   (родитель) и денормализованный `strategy_detail_id` под
   `UNIQUE(strategy_detail_id, key)` (см. §Действия); Н3 —
   `MarketPhaseParams` разведён с листовыми params (JSONB-колонка
-  контейнера); Н4 — `indicatorType` снят с базы `IndicatorParams`,
+  контейнера) — *тип позже распущен редизайном условной фазы, его слот
+  занял `phaseRules`; см. §Следствие и
+  `docs/decisions/market-phase-conditional-classification.md`*; Н4 —
+  `indicatorType` снят с базы `IndicatorParams`,
   дискриминатор — поле настройки-владельца. Представление условия
   (`StrategyCondition`/`StrategyConditionRule`) сознательно **не**
   закрыто — открытый вопрос STRAT-Q5.
