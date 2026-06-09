@@ -169,11 +169,17 @@ derived`. Create-валидация (шаг 2) проверяет override пр�
 ### StrategyMarketStructureSetting
 `key` (на него ссылаются операнд market-structure и «мягкие» ссылки
 JSON-листьев — поле `structureKey`, см. §StrategyConditionOperand),
-`timeframe`, `structureType:
-MarketStructure.Type`, `params: MarketStructureParams`, `destiny:
+`timeframe`, `params: MarketStructureParams`, `destiny:
 Destiny`, `expirationDuration`. `Destiny`: те же 5 значений, что у
 indicator (MARKET_PHASE / ENTRY_CONDITION / ACTION_PRICE / PROTECTION /
 EXIT_CONDITION).
+
+Поля `structureType` у настройки **нет**: `MarketStructure.Type` —
+**выход** расчёта (`MarketStructureResolver` его выводит), не вход
+настройки; идентичность конфигурации структуры = `timeframe` +
+canonical-`params` (вид расчёта один — см.
+`docs/models/domain/other/MarketStructure.md` §Правила хранения,
+`docs/decisions/market-data-result-identity-keying.md`).
 
 ### MarketStructureParams
 `lookbackBars`, `minTouches`, `minRangeWidthPercents`,
@@ -259,9 +265,11 @@ Per-`ruleType` контракт полей (какие именно поля п�
 — отсутствующий не пишется):
 - `level`, `ruleType: StrategyConditionRuleType`;
 - **доменные правила** — плоские: `ruleType` [+ простые поля:
-  `percents` (PROFIT_/LOSS_PERCENTS_REACHED,
-  RANGE_BREAKOUT_CONFIRMED), `timeframe` (CANDLE_CLOSED — какой
-  таймфрейм закрыт)];
+  `percents` (PROFIT_/LOSS_PERCENTS_REACHED), `timeframe`
+  (CANDLE_CLOSED — какой таймфрейм закрыт)];
+- **структурно-событийные правила** (`RANGE_BREAKOUT_CONFIRMED`,
+  `MARKET_STRUCTURE_IS`) — ссылаются на `MarketStructure` по `structureKey`
+  (см. примечание ниже);
 - **сравнивающие правила** — `operator: StrategyConditionOperator` +
   симметричные структурированные `leftOperand` / `rightOperand:
   StrategyConditionOperand`.
@@ -285,8 +293,21 @@ rule-level `timeframe`, объектные ссылки `indicatorSetting` /
 `docs/decisions/efficiency-ratio-as-catalog-indicator.md`; критерий
 sugar-vs-алиас — `docs/rules/condition-ruletype-granularity.md`.) `MARKET_STRUCTURE_IS`
 (тест `MarketStructure.Type` равенством, зеркало `MARKET_PHASE_IS`) введён
-редизайном условной фазы; его per-`ruleType` контракт дозаполняется при
-реализации (инкрементально, как у прочих типов).
+редизайном условной фазы; **остаётся именованным `ruleType`, не
+сворачивается** (enum-равенство ≠ числовой `INDICATOR_COMPARE`: разные
+валидационные контракты, генерик-`ENUM_COMPARE` в грамматике нет — точечный
+вердикт, `docs/rules/condition-ruletype-granularity.md`). Операнд —
+`MARKET_STRUCTURE` по `structureKey`, `CONSTANT` с `MarketStructure.Type`
+(`ENUM`, валиден по енуму).
+
+`RANGE_BREAKOUT_CONFIRMED` — структурно-событийное: ссылается на
+`MarketStructure` по `structureKey` и **читает готовым** предвычисленное
+событие пробоя (`breakoutEvent`); детекция (буфер + подтверждение) —
+**на стороне резолвера** (`MarketStructureParams.breakoutBufferPercents`/
+`breakoutConfirmationBars`), не поле условия. Точная форма `breakoutEvent`
+и per-`ruleType` поля — `CODE` (см.
+`docs/models/domain/other/MarketStructure.md` §Семантика классификации,
+`docs/components/MarketStructureResolver.md`).
 
 `StrategyConditionSourceType`: `PRICE`, `INDICATOR`, `MARKET_PHASE`,
 `MARKET_STRUCTURE`, `POSITION`, `ORDER`, `ALGO_ORDER`, `BALANCE`,
@@ -310,6 +331,26 @@ sugar-vs-алиас — `docs/rules/condition-ruletype-granularity.md`.) `MARKET
 - Ссылки per-source: индикаторный операнд — `indicatorKey`; операнд
   market-structure — `structureKey`; ценовой операнд несёт
   `priceSource: StrategyPriceSource`.
+
+### Объёмные условия (OBV / `VOLUME_FILTER_PASSED`)
+
+Зафиксировано торговым грунтом (`docs/decisions/volume-condition-semantics.md`):
+
+- **OBV-операнд — только относительные формы.** OBV кумулятивен,
+  абсолютный уровень нестабилен; операнд типа `OBV` допускает
+  `CROSSED_ABOVE`/`CROSSED_BELOW` против серии/своей скользящей и
+  сравнение с другой вычисляемой серией (направление/динамика).
+  **Абсолютный compare OBV с `CONSTANT` не допускается.** Стабильный
+  абсолютный порог по объёму — отдельный нормированный операнд (volume
+  oscillator / нормированный объём), не OBV; по потребности, сейчас не
+  заведён.
+- **Объёмное условие — не единственное основание `ENTRY`.** OBV-операнд
+  и `VOLUME_FILTER_PASSED` — подтверждающий фильтр направления (объём
+  манипулируем, надёжность ниже на тонком объёме); набор entry-условий
+  сопрягает объём с ценовым/структурным свидетельством, не опирается
+  только на объём. Авторинг-правило (чек-лист СТ-1 / контракт авторинга).
+- **Крипто-надёжность объёма — открыта** (IND-Q1): достоверность
+  спот-объёма крипто-CEX в корпусе ∅; докручивается после дообучения.
 
 ## Действия (разделы)
 

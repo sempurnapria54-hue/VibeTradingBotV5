@@ -137,18 +137,26 @@ Create-валидация (400) проверяет авторинг-миниму
 типов; контракт дозаполняется при реализации каждого следующего
 `ruleType`:
 
-- `PROFIT_PERCENTS_REACHED` / `LOSS_PERCENTS_REACHED` /
-  `RANGE_BREAKOUT_CONFIRMED` — требуется `percents`;
+- `PROFIT_PERCENTS_REACHED` / `LOSS_PERCENTS_REACHED` — требуется
+  `percents`;
 - `CANDLE_CLOSED` — требуется простое поле `timeframe` (какой
   таймфрейм закрыт);
+- `RANGE_BREAKOUT_CONFIRMED` — структурно-событийное: ссылается на
+  `MarketStructure` по `structureKey`, **читает готовым** предвычисленное
+  событие пробоя (`breakoutEvent`); `percents` у условия **нет** —
+  детекция (буфер + подтверждение) на стороне резолвера
+  (`MarketStructureParams.breakoutBufferPercents`/`breakoutConfirmationBars`,
+  `docs/components/MarketStructureResolver.md`). Точная форма `breakoutEvent`
+  и per-`ruleType` поля — `CODE`;
 - `MARKET_PHASE_IS` — operator + оба операнда, один из них `CONSTANT`
   с фазой (`ENUM`-значение валидно по `MarketPhase.Type`);
-- `MARKET_STRUCTURE_IS` — operator + оба операнда, один `CONSTANT` со
-  структурой (`ENUM`-значение валидно по `MarketStructure.Type`);
-  зеркало `MARKET_PHASE_IS`, введён редизайном условной фазы
-  (`docs/decisions/market-phase-conditional-classification.md`) для теста
-  `MarketStructure.Type` равенством; per-`ruleType` минимум
-  дозаполняется при реализации;
+- `MARKET_STRUCTURE_IS` — operator + оба операнда, операнд
+  `MARKET_STRUCTURE` по `structureKey` + `CONSTANT` со структурой
+  (`ENUM`-значение валидно по `MarketStructure.Type`); зеркало
+  `MARKET_PHASE_IS`, введён редизайном условной фазы. **Точечный вердикт
+  sugar-vs-алиас: остаётся именованным, не сворачивается** (enum-равенство
+  ≠ числовой `INDICATOR_COMPARE`, генерик-`ENUM_COMPARE` в грамматике нет —
+  `docs/rules/condition-ruletype-granularity.md`);
 - `INDICATOR_COMPARE` / `PRICE_COMPARE` — operator + оба операнда,
   хотя бы один с требуемым источником (INDICATOR / PRICE);
 - `CROSSOVER` — operator `CROSSED_ABOVE` / `CROSSED_BELOW` + оба
@@ -158,6 +166,14 @@ Create-валидация (400) проверяет авторинг-миниму
   `PRICE` → валидный `priceSource`; `CONSTANT` → `valueType` + `value`.
   Контейнер ссылки — `StrategyDetail` для entry-условий, либо
   `StrategyMarketPhaseSetting` для правил классификации фазы (ниже).
+- **OBV-операнд** (`INDICATOR` типа `OBV`) — только относительные формы
+  (`CROSSED_ABOVE`/`CROSSED_BELOW` против серии/своей скользящей,
+  сравнение с другой вычисляемой серией); абсолютный compare OBV с
+  `CONSTANT` отклоняется (OBV кумулятивен, уровень нестабилен). Объёмное
+  условие (OBV / `VOLUME_FILTER_PASSED`) — подтверждающий фильтр, не
+  единственное основание `ENTRY` (авторинг-правило, чек-лист СТ-1).
+  Грунт и альтернативы — `docs/decisions/volume-condition-semantics.md`;
+  крипто-надёжность объёма открыта (IND-Q1).
 
 ### Переиспользование грамматики в классификации фазы
 
@@ -223,5 +239,8 @@ lifecycle-сделки и `MARKET_PHASE_IS`. Этот
   `docs/rules/condition-ruletype-granularity.md`.
 - ER как операнд каталога (снят `EFFICIENCY_BELOW_THRESHOLD`) —
   `docs/decisions/efficiency-ratio-as-catalog-indicator.md`.
+- Семантика объёмных условий (OBV-операнд — относительные формы; объём —
+  не единственное основание `ENTRY`) —
+  `docs/decisions/volume-condition-semantics.md`.
 - Открытый вопрос percent-anchor — STRAT-Q4
   (`.claude/work/questions/open-questions.md`).

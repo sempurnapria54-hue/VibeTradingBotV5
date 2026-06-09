@@ -47,8 +47,19 @@ Java abstract-класс, наследует `Auditable`.
 fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`): на
 него ссылаются условия (классификации фазы и входа) через
 `INDICATOR_COMPARE`, и его же потребляет опциональный
-шумовой-фильтр-вход `MarketStructureAnalyzer` — единый шаримый ER, без
+шумовой-фильтр-вход `MarketStructureResolver` — единый шаримый ER, без
 внутреннего пересчёта.
+
+`OBV` — кумулятивный объёмный индикатор (On-Balance Volume): бегущая
+сумма знакового объёма от старта расчёта. Абсолютный уровень нестабилен
+(зависит от глубины загруженной истории и от масштаба/режима объёма),
+поэтому **OBV-операнд условия ограничен относительными формами**
+(`CROSSED_ABOVE`/`CROSSED_BELOW` против серии/своей скользящей,
+направление/динамика); **абсолютный compare OBV с `CONSTANT` не
+допускается** (`docs/decisions/volume-condition-semantics.md`).
+Стабильный абсолютный порог по объёму, если понадобится, — отдельный
+**нормированный** операнд (volume oscillator / нормированный объём), не
+OBV; сейчас не заведён (каталог расширяем по потребности).
 
 ## Наследники (значения по типу)
 
@@ -80,3 +91,10 @@ fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`): на
   значение шарится между настройками, свежесть оценивается под каждую
   запрашивающую настройку в runtime (правило —
   `docs/rules/market-data-freshness.md`).
+- **Точка отсчёта свежести (`referencePoint`) — `candleTimestamp`.**
+  `expiredAt = candleTimestamp + askingSetting.expirationDuration`
+  считается **на чтение**, не хранится колонкой; на общей строке (ключ по
+  `config_id`) единого `expiredAt` нет — своё под каждую запрашивающую
+  настройку (`docs/rules/market-data-freshness.md`).
+- **Retention:** значения не чистятся (нет потребителя истории) —
+  `docs/rules/market-data-retention.md`.

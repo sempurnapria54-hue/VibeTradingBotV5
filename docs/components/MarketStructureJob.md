@@ -10,7 +10,9 @@
 `MarketStructure` / `MarketPriceLevel` (см.
 `docs/models/domain/other/MarketStructure.md`). Настройки —
 `StrategyMarketStructureSetting`; основной источник данных — закрытые
-свечи; дополнительный (если нужен алгоритму) — `IndicatorValue`.
+свечи; дополнительный — готовые `IndicatorValue` (ER / ATR как шумовой
+фильтр). Вычисление структуры делегирует
+`docs/components/MarketStructureResolver.md` — job **тонкий**.
 
 Данные нужны для входов от диапазона, grid, SL за структурный уровень,
 breakout-условий и сопровождения позиции.
@@ -20,11 +22,16 @@ breakout-условий и сопровождения позиции.
 - читает стратегии **всех статусов кроме `DELETED`** и их
   `StrategyMarketStructureSetting` (перечень — как в правиле свежести,
   `docs/rules/market-data-freshness.md`);
-- ищет swing high / swing low;
-- считает range low / range high;
-- определяет support / resistance;
-- может использовать `IndicatorValue` как фильтр шума;
+- читает закрытые свечи окна и готовые `IndicatorValue` (ER / ATR),
+  объявленные стратегией;
+- зовёт `MarketStructureResolver.resolve(...)` — тот выводит `type`,
+  `levels`, `breakoutEvent`, `confirmedAt`, окно (семантика —
+  `MarketStructure.md` §Семантика классификации; уровни/пробой/шумовой
+  фильтр по свечам сам не ищет);
 - сохраняет `MarketStructure` и `MarketPriceLevel`.
+
+Job — тонкий: классификацию структуры держит `MarketStructureResolver`,
+готовые индикаторы считает `IndicatorJob`.
 
 ## Не делает
 

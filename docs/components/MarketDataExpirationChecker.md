@@ -26,6 +26,16 @@
 `expirationDuration` из `StrategyIndicatorSetting`,
 `StrategyMarketStructureSetting`, `StrategyMarketPhaseSetting`.
 
+## Вычисление свежести (на чтение)
+
+Свежесть вычисляется на чтение, в БД не хранится:
+`expiredAt = referencePoint + askingSetting.expirationDuration`,
+свежо ⟺ `now < expiredAt`. `referencePoint` — `windowEndAt` (структура) /
+`candleTimestamp` (фаза, индикатор); `confirmedAt` — гейт без look-ahead,
+не точка отсчёта. Для шаримых результатов (ключ по `config_id`) свежесть
+оценивается под каждую запрашивающую настройку — единого `expiredAt` на
+общей строке нет. Правило — `docs/rules/market-data-freshness.md`.
+
 ## Граница ответственности
 
 Поведение при expired/missing задаётся не здесь, а в

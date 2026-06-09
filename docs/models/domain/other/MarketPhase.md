@@ -42,8 +42,9 @@ Java-класс, наследует `Auditable`.
 
 Отдельного `Status` нет. При смене фазы создаётся новый актуальный
 результат (например, `type = UNKNOWN`). Актуальность проверяется через
-`StrategyMarketPhaseSetting.expirationDuration` и
-`candleTimestamp` / `confirmedAt` (правило —
+`StrategyMarketPhaseSetting.expirationDuration`: точка отсчёта свежести
+(`referencePoint`) — **`candleTimestamp`**, а `confirmedAt` — гейт
+использования без look-ahead, **не** точка отсчёта (правило —
 `docs/rules/market-data-freshness.md`).
 
 ## Правила хранения
@@ -51,6 +52,18 @@ Java-класс, наследует `Auditable`.
 - Считается только по закрытым свечам (без look-ahead).
 - Уникальность: `UNIQUE(instrument_id, strategy_market_phase_setting_id,
   candle_timestamp)`.
+- **Ключ — контейнер (per-strategy), осознанное исключение** из шаринга
+  результатов по идентичности (по которому индикатор/структура шарятся по
+  `config_id`): правила определения фазы авторские и специфичны для
+  стратегии, фаза тянет меньше данных — выигрыш шаринга не оправдывает
+  усложнение. Основание — `docs/decisions/market-data-result-identity-keying.md`
+  §Исключение — `MarketPhase`.
+- **Свежесть на чтение:** `expiredAt = candleTimestamp +
+  askingSetting.expirationDuration` считается в runtime, колонкой не
+  хранится (единый механизм, без хранимого состояния свежести;
+  `docs/rules/market-data-freshness.md`).
+- **Retention:** результаты не чистятся (нет потребителя истории) —
+  `docs/rules/market-data-retention.md`.
 - Хранится **история** — строка на свечу (`UNIQUE` по `candle_timestamp`),
   а не upsert одной строки. «Актуальная фаза» = **последняя по
   `candle_timestamp`** (её отдаёт `MarketPhaseService.getLatestPhase`).
