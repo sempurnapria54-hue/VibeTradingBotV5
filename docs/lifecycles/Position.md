@@ -117,10 +117,10 @@ Position, Position.dealId = Deal.id
 Если приложение упало, entry order исполнился, позиция открылась и
 закрылась по SL/TP/trailing, после рестарта локальной `Position`
 может ещё не быть. Это не anomaly при active `Deal` и известном entry
-order. Recovery-контур (`REFRESH_ORDER`/`REFRESH_ORDER_HISTORY` →
-`REFRESH_POSITION` (null) → `REFRESH_ALGO_ORDER_HISTORY` →
-`REFRESH_FILLS`) — Deal-lifecycle/orchestration; полный flow —
-`docs/processes/deal-management.md` / `docs/lifecycles/Deal.md` (шаги 6-7).
+order. Recovery-контур (`REFRESH_ORDER` → `REFRESH_POSITION` (null) →
+`REFRESH_ALGO_ORDER` → `REFRESH_FILLS`) — Deal-lifecycle/orchestration;
+полный flow — `docs/processes/deal-management.md` /
+`docs/lifecycles/Deal.md` (шаги 6-7).
 Position-правило: локальную `CLOSED Position` можно не создавать, если
 её ещё не было; `Deal` финализируется по собранным фактам.
 

@@ -6,19 +6,29 @@
 
 ## Назначение
 
-Получает `REFRESH_ORDER`. Загружает локальный order, получает актуальное
-состояние с биржи, обновляет order и статусы исполнения, при
-необходимости обновляет `DealActionState`. Резолвинг внешнего статуса —
-`OrderExternalStatusResolver` (см.
-`docs/rules/external-status-resolution.md`,
-`docs/models/mapping/Order.md`).
+Получает `REFRESH_ORDER`. Загружает локальный order и проходит **order
+evidence-cycle внутри одной команды** (эскалация, обрыв на первом успешном
+эндпоинте; полный обход — только при не-найдено):
 
-Исполняет order-refresh-семейство: `REFRESH_ORDER` + recovery-варианты
-`REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` (отдельных
-executor-файлов не имеют — разные endpoint'ы того же executor'а, см.
-`.claude/decisions/executor-payload-file-granularity.md`). Обновляет
-только `Order`, сделку целиком не сопровождает; cross-entity refresh
-(`REFRESH_FILLS`, `REFRESH_POSITION`) выбирает FSM / `DealOrchestratorJob`.
-`ExternalNotFoundException` — только после полного order evidence-cycle
-(см. `docs/models/mapping/Order.md`).
-Общая семантика `REFRESH_*` — `docs/components/ServiceCommandExecutor.md`.
+```text
+GET /trade/order            (по ordId; нет externalId → по clOrdId)
+  → orders-pending          (не найден среди pending ≠ финал)
+  → orders-history (7d)
+  → orders-history-archive   (если history не покрывает период)
+```
+
+Обновляет order и статусы исполнения через `OrderExternalStatusResolver`,
+при необходимости обновляет `DealActionState` (см.
+`docs/rules/external-status-resolution.md`, `docs/models/mapping/Order.md`).
+
+Сам выносит терминал: не найден после **полного** цикла →
+`ExternalNotFoundException` → `Order.ERROR` + `MISSING_AFTER_REFRESH`
+(пустой ответ одного эндпоинта — не основание). Обновляет только `Order`,
+сделку целиком не сопровождает; cross-entity refresh (`REFRESH_FILLS`,
+`REFRESH_POSITION`) — отдельные команды, выбирает FSM / `DealOrchestratorJob`.
+Pending/history-эндпоинты — звенья этого цикла, не отдельные исполнители
+(`.claude/decisions/executor-payload-file-granularity.md`); их судьба как
+самостоятельных `ServiceCommandType` — CMD-Q3. Владение циклом —
+`docs/decisions/refresh-evidence-cycle-ownership.md`; эндпоинт-механика —
+`docs/integrations/okx/contracts/order.md`. Общая семантика `REFRESH_*` —
+`docs/components/ServiceCommandExecutor.md`.

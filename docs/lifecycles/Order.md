@@ -17,9 +17,8 @@
 `docs/rules/external-status-resolution.md`).
 
 > Resolver'ы, refresh-executors и команды (`REFRESH_ORDER`,
-> `REFRESH_PENDING_ORDERS`, `REFRESH_ORDER_HISTORY`, `REFRESH_FILLS`,
-> `SUBMIT_ORDER`, `AMEND_ORDER`, `CANCEL_ORDER`) — command-подсистема
-> (шаг 4): `docs/components/` (executors, resolver'ы),
+> `REFRESH_FILLS`, `SUBMIT_ORDER`, `AMEND_ORDER`, `CANCEL_ORDER`) —
+> command-подсистема (шаг 4): `docs/components/` (executors, resolver'ы),
 > `docs/rules/command-lifecycle.md`. Здесь — статусная механика,
 > которой владеет сам `Order`.
 
@@ -67,7 +66,7 @@ COMPLETED | CANCELED | ERROR -> (терминальные, переходов н
 ```text
 PENDING -> после SUBMIT_ORDER parent order (attached могла быть
            отправлена вместе с parent, active-факт не подтверждён)
-ACTIVE  -> только после REFRESH_ORDER / REFRESH_PENDING_ORDERS, если
+ACTIVE  -> только после REFRESH_ORDER, если
            attached найдена в OrderExternalSnapshot.attachedAlgoOrders
            по internalId и нет failCode / failReason
 ```
@@ -92,8 +91,8 @@ parent CREATED / PENDING
   -> attached остаётся PENDING; ждём refresh / retry / recovery.
 
 parent ACTIVE / PARTIALLY_COMPLETED
-  -> дополнительный search-cycle (REFRESH_PENDING_ORDERS,
-     REFRESH_ORDER_HISTORY, REFRESH_FILLS, REFRESH_POSITION);
+  -> дополнительный search-cycle (REFRESH_ORDER — внутр. pending/history,
+     REFRESH_FILLS, REFRESH_POSITION);
      не делаем вывод по одному snapshot.
 
 parent COMPLETED
@@ -113,17 +112,18 @@ parent ERROR
 
 ## Exchange facts, обновляющие Order
 
-- **`REFRESH_ORDER`** (`GET /trade/order`): обновляет конкретный
-  parent `Order` из `OrderExternalSnapshot` (externalId,
-  externalStatus, status через resolver, side, price, size,
-  accumulatedFillSize, averagePrice, fee, attachedAlgoOrders).
-- **`REFRESH_PENDING_ORDERS`**: список live/pending по инструменту.
-  Не найден среди pending — **не** финальный факт отмены/исполнения.
-- **`REFRESH_ORDER_HISTORY`**: terminal-факт (COMPLETED / CANCELED /
-  ERROR при нераспознанном статусе), когда не найден среди pending.
-- **`REFRESH_FILLS`**: уточняет execution facts
-  (accumulatedFillSize, averagePrice, fee); `Deal` напрямую не
-  обновляет.
+- **`REFRESH_ORDER`** — обновляет `Order` из `OrderExternalSnapshot`
+  (externalId, externalStatus, status через resolver, side, price, size,
+  accumulatedFillSize, averagePrice, fee, attachedAlgoOrders), проходя
+  evidence-cycle **внутри команды**
+  (`docs/decisions/refresh-evidence-cycle-ownership.md`):
+  - `GET /trade/order` — конкретный parent `Order`;
+  - `orders-pending` — список live/pending по инструменту; не найден среди
+    pending — **не** финальный факт отмены/исполнения;
+  - `orders-history` (+ archive) — terminal-факт (COMPLETED / CANCELED /
+    ERROR при нераспознанном статусе), когда не найден среди pending.
+- **`REFRESH_FILLS`**: уточняет execution facts (accumulatedFillSize,
+  averagePrice, fee); `Deal` напрямую не обновляет.
 
 ## ERROR-переходы (safety cascade)
 

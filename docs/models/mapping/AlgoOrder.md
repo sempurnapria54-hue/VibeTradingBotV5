@@ -170,7 +170,10 @@ market), `tpTriggerPx`/`tpTriggerPxType`/`tpOrdPx` (`-1` = market).
 
 Полный цикл: `GET /trade/order-algo` → `orders-algo-pending` →
 `orders-algo-history`. Поиск: есть `externalId` → по `algoId`; нет →
-по `algoClOrdId`. Пустой `data=[]` одного endpoint — не финал.
+по `algoClOrdId`. Пустой `data=[]` одного endpoint — не финал. Цикл
+обходит `RefreshAlgoOrderExecutor` **внутри одной команды**
+`REFRESH_ALGO_ORDER`; терминал `MISSING_AFTER_REFRESH` выносит он же (см.
+`docs/decisions/refresh-evidence-cycle-ownership.md`).
 
 ## Целевые изменения кода (checklist, не runtime-логика)
 

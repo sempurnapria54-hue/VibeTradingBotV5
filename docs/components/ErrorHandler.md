@@ -42,7 +42,8 @@ steps не выполняются. Safety-команды — без `RiskValidat
 ## Возможные ServiceCommand
 
 `EXECUTE_KILL_SWITCH`, `MARK_DEAL_ERROR`, `REFRESH_POSITION`,
-`REFRESH_PENDING_ORDERS`, `REFRESH_ALGO_ORDERS`, `REFRESH_ORDER_HISTORY`,
-`REFRESH_ALGO_ORDER_HISTORY`, `REFRESH_FILLS`, `CANCEL_ORDER`,
-`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`. Зона `AnomalyJob`/`ReconciliationJob`
-— live risk после terminal (см. `docs/components/AnomalyJob.md`).
+`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_FILLS`, `CANCEL_ORDER`,
+`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`. Перечисление **неизвестных** live
+orders/algo по инструменту (хвосты orphan) — CMD-Q4. Зона
+`AnomalyJob`/`ReconciliationJob` — live risk после terminal (см.
+`docs/components/AnomalyJob.md`).

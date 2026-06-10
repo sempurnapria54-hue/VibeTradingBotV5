@@ -32,11 +32,11 @@ Native response/request поля — `docs/models/integrations/okx/OkxOrderRespo
   ID. Query: `instId` обязателен, одно из `ordId` / `clOrdId`. Если
   оба — биржа возвращает по `ordId`. Если `clOrdId` переиспользован,
   биржа возвращает **последний** ордер с этим `clOrdId`.
-- **Pending** (`REFRESH_PENDING_ORDERS`): `GET /api/v5/trade/orders-pending`.
+- **Pending** (звено цикла `REFRESH_ORDER`): `GET /api/v5/trade/orders-pending`.
   Permission `Read`; rate limit 60 req / 2 s по User ID. Фильтры:
   `instType`, `instId`, `ordType`, `state` (`live`/`partially_filled`),
   пагинация `after`/`before` по `ordId`, `limit` ≤ 100.
-- **History** (`REFRESH_ORDER_HISTORY`):
+- **History** (звено цикла `REFRESH_ORDER`):
   `GET /api/v5/trade/orders-history` (последние 7 дней; permission
   `Read`; rate limit 40 req / 2 s по User ID),
   `GET /api/v5/trade/orders-history-archive` (последние 3 месяца; rate

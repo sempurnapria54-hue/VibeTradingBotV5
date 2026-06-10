@@ -60,7 +60,14 @@ ER/ATR-входы) **закрыт** 2026-06-10 реверсом ключеван
 `GAPS_CLOSE_1` шага 4 решением
 `docs/decisions/service-command-payload-base-type.md` (маркер-база
 `ServiceCommandPayload`, дискриминатор — `ServiceCommandType` на команде,
-файл — дом базового типа).
+файл — дом базового типа). F1 (владение evidence-cycle refresh-команд)
+закрыта 2026-06-10 на `GAPS_CLOSE_2` шага 4 решением
+`docs/decisions/refresh-evidence-cycle-ownership.md` (обход внутри
+исполнителя, вариант (a)). CMD-Q3 (судьба standalone pending/history
+refresh-команд) закрыт 2026-06-10 (steer): refresh-набор — ровно по одной
+команде на сущность, bulk-команды сняты из enum'а; открыт **CMD-Q4**
+(перечисление неизвестных live orders/algo по инструменту — дыра от снятия
+bulk).
 
 История закрытых вопросов пайплайна:
 
@@ -265,6 +272,40 @@ handler'ы по образцу FSM сделки (`docs/components/DealStateMachi
 Связано: `docs/processes/candle-loading.md`,
 `docs/lifecycles/Instrument.md`, `docs/lifecycles/CandleGroup.md`,
 `docs/components/CandleJob.md`.
+
+### CMD-Q4. Перечисление неизвестных live orders/algo по инструменту
+
+CMD-Q3 закрыт (steer, 2026-06-10): refresh-набор — ровно по одной команде
+на сущность (`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_POSITION`,
+`REFRESH_BALANCE`, `REFRESH_FILLS`); bulk-команды `REFRESH_PENDING_ORDERS` /
+`REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY`
+сняты, их эндпоинты живут звеньями внутреннего evidence-cycle
+(`docs/decisions/refresh-evidence-cycle-ownership.md`).
+
+Снятие bulk-команд оставляет **дыру** (подтверждена при чистке, не
+достраивается): per-entity `REFRESH_*` покрывает только **известные**
+сущности сделки. Перечисления **неизвестных** live orders/algo по
+инструменту command-layer больше не предоставляет:
+
+- `PrecheckHandler` — входная проверка «нет чужих live orders/algo» на
+  инструменте перед входом;
+- `AnomalyJob` (шаг 8) — orphan orders/algo (на бирже, нет в БД), хвосты
+  после cleanup, чужой live risk;
+- `ErrorHandler` / `ExitPendingHandler` — неизвестные live-хвосты.
+
+(`REFRESH_POSITION` уже инструмент-скоупный — позиции-orphan покрыты; дыра
+только по orders/algo.)
+
+Варианты: (1) инструмент-скоупный exchange-read **вне command-layer** (read
+в `IntegrationService`, дёргается job'ами/handler'ами для сверки/orphan-скана,
+не `ServiceCommand`); (2) вернуть узкую scoped bulk-scan операцию (не
+per-deal-команду); (3) иное по проработке anomaly / precheck-cleanliness.
+До решения не достраивается. Горизонт — Precheck (шаг 6) / `AnomalyJob`
+(шаг 8). Владелец — `solution-designer`.
+Связано: `docs/decisions/refresh-evidence-cycle-ownership.md`,
+`docs/components/PrecheckHandler.md`, `docs/components/AnomalyJob.md`,
+`docs/components/ServiceCommandExecutor.md`,
+`docs/components/IntegrationService.md`.
 
 ### OKX-Q1. Persisted `TradeFill` модель и executor финализации
 

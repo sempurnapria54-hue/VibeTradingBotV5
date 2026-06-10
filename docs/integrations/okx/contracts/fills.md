@@ -18,9 +18,13 @@ Mapping (стаб, до материализации `TradeFill`) —
 - **Fills 3 дня** (`REFRESH_FILLS`):
   `GET /api/v5/trade/fills`. Permission: Read. Rate limit: 60 req / 2 s
   по User ID.
-- **Fills 3 месяца** (`REFRESH_FILLS_HISTORY` — гипотетический; в коде
-  пока единый `REFRESH_FILLS`): `GET /api/v5/trade/fills-history`.
-  Permission: Read. Rate limit: 10 req / 2 s по User ID.
+- **Fills 3 месяца** (звено `REFRESH_FILLS`, эскалация 3d→3m **внутри
+  команды**): `GET /api/v5/trade/fills-history`. Permission: Read. Rate
+  limit: 10 req / 2 s по User ID. `REFRESH_FILLS` обходит `/trade/fills`
+  (3d) → `/trade/fills-history` (3m) внутри одной команды (см.
+  `docs/decisions/refresh-evidence-cycle-ownership.md`); отдельной
+  `REFRESH_FILLS_HISTORY`-команды нет. Архив 3m+ (`fills-archive`,
+  async-флоу) — `OKX-Q2` (шаг 7).
 
 ## Query (одинаковые для обоих)
 

@@ -36,11 +36,19 @@ ServiceCommandExecutor → конкретный Executor`.
 
 `REFRESH_BALANCE`, `REFRESH_POSITION`, `CLOSE_POSITION`, `CREATE_ORDER`,
 `SUBMIT_ORDER`, `AMEND_ORDER`, `CANCEL_ORDER`, `REFRESH_ORDER`,
-`REFRESH_PENDING_ORDERS`, `REFRESH_ORDER_HISTORY`, `CREATE_ALGO_ORDER`,
-`SUBMIT_ALGO_ORDER`, `AMEND_ALGO_ORDER`, `CANCEL_ALGO_ORDER`,
-`REFRESH_ALGO_ORDER`, `REFRESH_ALGO_ORDERS`, `REFRESH_ALGO_ORDER_HISTORY`,
-`REFRESH_FILLS`, `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`,
-`MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.
+`CREATE_ALGO_ORDER`, `SUBMIT_ALGO_ORDER`, `AMEND_ALGO_ORDER`,
+`CANCEL_ALGO_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_FILLS`,
+`FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`, `MARK_DEAL_CLOSED`,
+`MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.
+
+**Refresh-набор — ровно по одной команде на сущность:** `REFRESH_ORDER`,
+`REFRESH_ALGO_ORDER`, `REFRESH_POSITION`, `REFRESH_BALANCE`,
+`REFRESH_FILLS`. Внутри исполнителя допускается несколько вызовов биржи
+(evidence-cycle, `docs/decisions/refresh-evidence-cycle-ownership.md`).
+Bulk-команды `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` /
+`REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY` сняты — их эндпоинты
+живут только звеньями цикла (CMD-Q3 закрыт). Перечисление **неизвестных**
+сущностей по инструменту (orphan / чужой live risk) — CMD-Q4.
 
 Graceful shutdown, protection switch и safety-flow собираются из
 существующих команд — отдельных типов под них нет. `entryReason` /

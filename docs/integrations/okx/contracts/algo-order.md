@@ -32,10 +32,10 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   Permission `Read`. Query: одно из `algoId` (приоритет) /
   `algoClOrdId`; `instId` опц. Ответ — массив `data`, ожидается 0 или
   1 элемент.
-- **Pending** (`REFRESH_ALGO_ORDERS`): `GET /api/v5/trade/orders-algo-pending`.
+- **Pending** (звено цикла `REFRESH_ALGO_ORDER`): `GET /api/v5/trade/orders-algo-pending`.
   Permission `Read`. Фильтры по `ordType`, `instType`, `instId`,
   `algoId`, пагинация `after`/`before` по `algoId`, `limit` ≤ 100.
-- **History** (`REFRESH_ALGO_ORDER_HISTORY`):
+- **History** (звено цикла `REFRESH_ALGO_ORDER`):
   `GET /api/v5/trade/orders-algo-history`. Permission `Read`; rate
   limit 20 req / 2 s по User ID. История доступна за последние 3
   месяца. Query: **`ordType` обязателен** (вычисляется из

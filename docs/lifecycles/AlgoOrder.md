@@ -18,8 +18,7 @@ handlers **не** используют `externalStatus` напрямую (см.
 
 > Resolver'ы, executors и команды (`CREATE_ALGO_ORDER`,
 > `SUBMIT_ALGO_ORDER`, `AMEND_ALGO_ORDER`, `CANCEL_ALGO_ORDER`,
-> `REFRESH_ALGO_ORDER`, `REFRESH_ALGO_ORDERS`,
-> `REFRESH_ALGO_ORDER_HISTORY`) — command-подсистема (шаг 4):
+> `REFRESH_ALGO_ORDER`) — command-подсистема (шаг 4):
 > `docs/components/` (executors, resolver'ы),
 > `docs/rules/command-lifecycle.md`.
 

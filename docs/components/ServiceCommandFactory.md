@@ -24,7 +24,7 @@ lifecycle, а не пакет (см. `docs/rules/command-lifecycle.md`). За о
 ```text
 DealActionState отсутствует / PLANNED -> CREATE_ORDER
 status = CREATED                       -> SUBMIT_ORDER
-status = SUBMITTED                     -> REFRESH_ORDER / REFRESH_PENDING_ORDERS / ...
+status = SUBMITTED                     -> REFRESH_ORDER / REFRESH_ALGO_ORDER / ...
 ```
 
 (`DealActionState`-статусы — `docs/lifecycles/DealActionState.md`.)

@@ -83,8 +83,8 @@ evidence-cycle (специфика per-source — см. подразделы). �
 
 Один элемент `attachedAlgoOrders[*]` → `AttachedAlgoOrderExternalSnapshot`;
 матчинг по `internalId` (client id вложенного TP/SL). Status: `PENDING`
-после `SUBMIT_ORDER`; `ACTIVE` только после `REFRESH_ORDER`/
-`REFRESH_PENDING_ORDERS`, если найден по `internalId` и нет
+после `SUBMIT_ORDER`; `ACTIVE` только после `REFRESH_ORDER`, если
+найден по `internalId` и нет
 `failCode`/`failReason`; заполненные `failCode`/`failReason` →
 `ERROR`. Missing-policy по статусу parent — `docs/lifecycles/Order.md`.
 
@@ -180,8 +180,11 @@ FUTURES/SWAP — взаимоисключимо с `newTp/SlTriggerPx`). Уда�
 Полный цикл: `GET /trade/order` → `orders-pending` →
 `orders-history` → `orders-history-archive` (если history не
 покрывает период). Поиск: есть `externalId` → по `ordId`; нет → по
-`clOrdId = internalId`. Доп. факты сделки (`REFRESH_FILLS`,
-`REFRESH_POSITION`) запрашиваются отдельными командами;
+`clOrdId = internalId`. Цикл обходит `RefreshOrderExecutor` **внутри одной
+команды** `REFRESH_ORDER` (обрыв на первом успешном эндпоинте; терминал
+`MISSING_AFTER_REFRESH` выносит он же — см.
+`docs/decisions/refresh-evidence-cycle-ownership.md`). Доп. факты сделки
+(`REFRESH_FILLS`, `REFRESH_POSITION`) запрашиваются отдельными командами;
 `RefreshOrderExecutor` не сопровождает сделку целиком.
 
 ### OKX pagination

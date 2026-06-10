@@ -37,15 +37,24 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
 - **`REFRESH_*`** — читает exchange facts через `IntegrationService`, применяет
   status resolver, обновляет сущность, заполняет `closeReason` только если
   текущий `== null`; торговых решений не принимает, cleanup не запускает,
-  audit/history как runtime-source не использует.
+  audit/history как runtime-source не использует. Для сущностей с
+  evidence-cycle (`REFRESH_ORDER` / `REFRESH_ALGO_ORDER` / `REFRESH_FILLS`)
+  исполнитель обходит эндпоинты **внутри одной команды** (эскалация
+  live → pending → history → archive), обрывается на первом успешном,
+  полный обход — только при не-найдено, и сам выносит терминал
+  (`MISSING_AFTER_REFRESH`); владение циклом —
+  `docs/decisions/refresh-evidence-cycle-ownership.md`.
 
-> **Recovery-refresh команды** (`REFRESH_PENDING_ORDERS` /
-> `REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS` /
-> `REFRESH_ALGO_ORDER_HISTORY`) отдельных executor-файлов не имеют (см.
-> `.claude/decisions/executor-payload-file-granularity.md`): их исполняет
-> соответствующий entity-refresh-executor (`RefreshOrderExecutor` /
-> `RefreshAlgoOrderExecutor`) по общей семантике `REFRESH_*`, разными
-> endpoint'ами; выбор команды — за FSM / `DealOrchestratorJob`.
+> **Pending/history эндпоинты** (`orders-pending` / `orders-history` /
+> `orders-algo-pending` / `orders-algo-history`) — звенья evidence-cycle,
+> который entity-refresh-исполнитель (`RefreshOrderExecutor` /
+> `RefreshAlgoOrderExecutor`) обходит **внутри одной команды**
+> (`docs/decisions/refresh-evidence-cycle-ownership.md`). Самостоятельных
+> `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS`
+> / `REFRESH_ALGO_ORDER_HISTORY` **нет** (CMD-Q3 закрыт: refresh-набор —
+> ровно по одной команде на сущность). Перечисление **неизвестных**
+> live-сущностей по инструменту (orphan / чужой риск; Precheck-cleanliness,
+> AnomalyJob) bulk-командой больше не покрыто — **CMD-Q4**.
 
 ACK как runtime truth не считается ни для submit/amend/cancel/close (см.
 `docs/rules/ack-not-runtime-truth.md`). Жизненный цикл команды и принцип

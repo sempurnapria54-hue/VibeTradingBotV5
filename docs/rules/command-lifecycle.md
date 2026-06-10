@@ -22,9 +22,15 @@
 - **Одна актуальная команда за проход.** `ServiceCommandFactory` не
   создаёт всю цепочку заранее: за один проход FSM/handler — один актуальный
   action-state и одна актуальная команда, выбранная по свежим фактам.
-- **Команды атомарны.** Одна команда — одна простая операция; составные
-  процессы (graceful shutdown, protection switch, safety-flow)
-  раскладываются на атомарные команды и переходы FSM.
+- **Команды атомарны — на уровне команды, не HTTP-запроса.** Одна команда
+  — одна простая операция; составные процессы (graceful shutdown,
+  protection switch, safety-flow) раскладываются на атомарные команды и
+  переходы FSM. Атомарность **не** означает «один HTTP-запрос»:
+  refresh-команда может обойти несколько эндпоинтов биржи **внутри себя**
+  (evidence-cycle live → pending → history → archive) и сама вынести
+  терминал (`MISSING_AFTER_REFRESH`). FSM секвенсит *команды*, не эндпоинты
+  внутри refresh-команды (см.
+  `docs/decisions/refresh-evidence-cycle-ownership.md`).
 - **ACK не runtime truth** — факт подтверждается refresh/search/history
   (см. `docs/rules/ack-not-runtime-truth.md`).
 

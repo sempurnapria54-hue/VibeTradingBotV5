@@ -43,5 +43,7 @@ Entry action материализован в локальный `Order`; `DealAc
 ## Допустимые StrategyStep / возможные ServiceCommand
 
 Steps: `ENTRY`, `GRID_ENTRY`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE`,
-`REFRESH_POSITION`, `REFRESH_PENDING_ORDERS`, `CREATE_ORDER`,
-`SUBMIT_ORDER`, `MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.
+`REFRESH_POSITION`, `CREATE_ORDER`, `SUBMIT_ORDER`, `MARK_DEAL_ERROR`,
+`EXECUTE_KILL_SWITCH`. Перечисление **неизвестных** live orders/algo по
+инструменту для входной проверки чистоты (нет чужих live orders/algo)
+bulk-командой больше не покрыто — CMD-Q4.

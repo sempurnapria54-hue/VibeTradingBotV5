@@ -21,10 +21,10 @@ live risk; локальные orders/algo доступны для очистки
 ## Рабочая логика
 
 `REFRESH_POSITION` (подтвердить отсутствие live-risk позиции);
-`REFRESH_PENDING_ORDERS`, `REFRESH_ALGO_ORDERS`; live ordinary orders →
+`REFRESH_ORDER` / `REFRESH_ALGO_ORDER` по известным сущностям сделки
+(каждый внутри себя проходит pending/history); live ordinary orders →
 `CANCEL_ORDER`; live algo → `CANCEL_ALGO_ORDER`; `REFRESH_FILLS` (факты
 для PnL); `REFRESH_BALANCE` после снятия live risk и сопоставления fills;
-при необходимости `REFRESH_ORDER_HISTORY`/`REFRESH_ALGO_ORDER_HISTORY`;
 определить/подтвердить `Deal.CloseReason`; `FINALIZE_DEAL_EXIT` когда
 факты готовы; `MARK_DEAL_CLOSED` когда всё очищено. Cleanup/safety команды
 — без `RiskValidator`.
@@ -41,7 +41,6 @@ entry/exit facts доказывают отсутствие live risk); active po
 ## Допустимые StrategyStep / возможные ServiceCommand
 
 Steps: `FAIL_SAFE` (торговые steps обычно не применяются). Команды:
-`REFRESH_POSITION`, `REFRESH_PENDING_ORDERS`, `REFRESH_ALGO_ORDERS`,
-`CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `REFRESH_FILLS`,
-`REFRESH_ORDER_HISTORY`, `REFRESH_ALGO_ORDER_HISTORY`, `FINALIZE_DEAL_EXIT`,
+`REFRESH_POSITION`, `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`,
+`CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `REFRESH_FILLS`, `FINALIZE_DEAL_EXIT`,
 `MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.

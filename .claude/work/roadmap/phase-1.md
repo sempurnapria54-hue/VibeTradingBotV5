@@ -27,7 +27,7 @@ production-flow одной стратегии.
 | 1 | Поток рыночных данных (коннект к OKX, инструменты, цены/свечи, свежесть) | DONE |
 | 2 | Стратегия (абстракция: объявляет нужные индикаторы и условие сигнала; одна реализация) | DONE |
 | 3 | Производные рыночные данные: индикаторы + структура рынка (`MarketStructure`) + фаза рынка (`MarketPhase`) — jobs, модели, сервисы (расчёт/чтение/сохранение значений, запрошенных стратегией) | DONE |
-| 4 | Команды и их жизненный цикл (ServiceCommand: submit/amend/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DOCS_CHECK_2 |
+| 4 | Команды и их жизненный цикл (ServiceCommand: submit/amend/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | GAPS_CLOSE_2 |
 | 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | HOLD |
 | 6 | FSM (состояния и переходы сущностей — связующее звено) | HOLD |
 | 7 | Сделки и P&L (DealOrchestratorJob — агрегирование в Deal, P&L; он же оркестрирует торговый цикл сигнал→команда→позиция) | HOLD |
@@ -147,6 +147,29 @@ production-flow одной стратегии.
   `CODE` пройден.** Отчёт —
   `.claude/work/progress/phase-1-step-4-docs-check-2.md`. Шаг готов к
   `CODE` — перевод за пользователем.
+- **Шаг 4 → `GAPS_CLOSE_2` (2026-06-10):** закрыта находка **F1** (владение
+  evidence-cycle refresh-команд), всплывшая при выкладке «команды → запросы
+  к OKX» уже после чистого `DOCS_CHECK_2`. Решение — вариант (a)
+  (`docs/decisions/refresh-evidence-cycle-ownership.md`): refresh-исполнители
+  (`REFRESH_ORDER` / `REFRESH_ALGO_ORDER` / `REFRESH_FILLS`) обходят
+  evidence-cycle **внутри одной команды** и сами выносят терминал
+  `MISSING_AFTER_REFRESH`; атомарность — на уровне команды, не HTTP-запроса
+  (переформулировано в `command-lifecycle`). **F2** — той же моделью
+  (`REFRESH_FILLS` 3d→3m внутри команды; архив 3m+ — `OKX-Q2`). Поднят
+  подвопрос **CMD-Q3** (судьба standalone pending/history refresh-команд) —
+  не достраивается. Концепт изменён → перед `CODE` нужны закрытие CMD-Q3 и
+  подтверждающий `DOCS_CHECK_3`.
+- **Шаг 4 → CMD-Q3 закрыт (steer, 2026-06-10):** refresh-набор — ровно по
+  одной команде на сущность (`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`,
+  `REFRESH_POSITION`, `REFRESH_BALANCE`, `REFRESH_FILLS`); bulk-команды
+  `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS`
+  / `REFRESH_ALGO_ORDER_HISTORY` сняты из enum'а, эндпоинты — звенья
+  внутреннего цикла. Обновлены **все** ссылки: `ServiceCommand` (enum),
+  `ServiceCommandFactory`/`Executor`, `risk-validator-scope`, контракты
+  OKX, lifecycles `Order`/`AlgoOrder`/`Position`, mapping `Order`, 7 FSM
+  handlers. Снятие bulk обнажило **CMD-Q4** (перечисление **неизвестных**
+  live orders/algo по инструменту — Precheck-cleanliness / `AnomalyJob`);
+  не достраивается. Перед `CODE` — закрытие CMD-Q4 + `DOCS_CHECK_3`.
 - **Шаг 2, фиксация задним числом:** между `GAPS_CLOSE_7` и
   `DOCS_CHECK_8` пройден повторный под-шаг `TOOLING` (торговый
   совет: агент `trading-specialist`, дистиллят корпуса

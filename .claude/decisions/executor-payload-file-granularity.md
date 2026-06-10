@@ -27,6 +27,10 @@ payload-классов («Сервисные команды» §13, §10). Ра�
   `REFRESH_ALGO_ORDER_HISTORY`), не имевшие отдельных секций в
   источнике, отдельными файлами не заводятся (покрыты общей
   семантикой `REFRESH_*` и `ServiceCommandType`).
+  **Обновление (CMD-Q3, 2026-06-10):** эти четыре команды сняты из
+  `ServiceCommandType` вовсе — их эндпоинты стали звеньями внутреннего
+  evidence-cycle entity-refresh-команд
+  (`docs/decisions/refresh-evidence-cycle-ownership.md`).
 
 ## Обоснование
 

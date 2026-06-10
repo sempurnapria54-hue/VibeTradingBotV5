@@ -26,9 +26,9 @@ risk-creating / risk-increasing / risk-weakening:
 ### Не вызывается
 
 - **refresh/search/history**: `REFRESH_BALANCE`, `REFRESH_POSITION`,
-  `REFRESH_ORDER`, `REFRESH_PENDING_ORDERS`, `REFRESH_ORDER_HISTORY`,
-  `REFRESH_ALGO_ORDER`, `REFRESH_ALGO_ORDERS`,
-  `REFRESH_ALGO_ORDER_HISTORY`, `REFRESH_FILLS` — только обновляют факты;
+  `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_FILLS` — только обновляют
+  факты (evidence-cycle — внутри исполнителя, см.
+  `docs/decisions/refresh-evidence-cycle-ownership.md`);
 - **cleanup / safety**: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`,
   `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH` — снимают/локализуют уже
   существующий риск;
