@@ -22,6 +22,7 @@
 | Торговые развилки | `trading-specialist` |
 | Детали уровня кода | `code-writer` (под-шаг `CODE`) |
 | Проектирование концепции / архитектурные развилки | `solution-designer` |
+| Интеграция (контракты/спеки внешних источников, нативные модели API) | `integrator` |
 
 ## Лестница автономии
 
@@ -65,6 +66,7 @@
 | Классификация | **Автономия** | Доверие заработано рутинной работой curator. |
 | Трейдинг | **Предложение** | Агент новый. |
 | Концепт | **Предложение** | Развилки маршрутизируются к `solution-designer`. Агент новый. |
+| Интеграция | **Предложение** | Развилки маршрутизируются к `integrator`. Агент новый. |
 
 ## Логирование отвязано от уровня
 
@@ -218,4 +220,5 @@
 - Владельцы — `.claude/agents/knowledge-curator.md`,
   `.claude/agents/trading-specialist.md`,
   `.claude/agents/code-writer.md`,
-  `.claude/agents/solution-designer.md`.
+  `.claude/agents/solution-designer.md`,
+  `.claude/agents/integrator.md`.

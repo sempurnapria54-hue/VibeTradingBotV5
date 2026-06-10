@@ -23,11 +23,15 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   Permission `Trade`; rate limit как `cancel-algos`. Body — `instId`,
   `algoId` (если известен), `algoClOrdId`, новые trigger/trailing
   значения.
-- **Cancel** (`CANCEL_ALGO_ORDER`): `POST /api/v5/trade/cancel-algos`.
+- **Cancel — две семьи algo** (`CANCEL_ALGO_ORDER`): у OKX отмена
+  algo разделена по типу. **Ordinary** (trigger / oco / conditional) —
+  `POST /api/v5/trade/cancel-algos`. **Advance** (iceberg / twap /
+  **trailing `move_order_stop`**) — `POST /api/v5/trade/cancel-advance-algos`.
   Permission `Trade`; rate limit 20 req / 2 s по User ID + Instrument
-  ID. Body — `instId` + `algoId` (обязателен; `algoClOrdId` опц.,
-  диагностика). Отказ через `sCode != 0` (algo уже сработал/закрыт/
-  отменён/не найден).
+  ID. Body (оба) — массив `{ instId, algoId }` (`algoId` обязателен;
+  `algoClOrdId` опц., диагностика), до 10 за запрос. Отказ через
+  `sCode != 0` (algo уже сработал/закрыт/отменён/не найден).
+  Подтверждено офдоком (okx.com); реализационная развилка — ниже.
 - **Details** (`REFRESH_ALGO_ORDER`): `GET /api/v5/trade/order-algo`.
   Permission `Read`. Query: одно из `algoId` (приоритет) /
   `algoClOrdId`; `instId` опц. Ответ — массив `data`, ожидается 0 или
@@ -79,6 +83,30 @@ refresh/search/history. Submit использует stable client id
 `closeFraction` (доля позиции при срабатывании, `1` = 100%) на
 первом этапе не используем. Для protective обычно `reduceOnly=true`;
 для SWAP рекомендуется `tpTriggerPxType=mark`.
+
+## Развилка cancel-пути (И-1, на валидации)
+
+**Факт (офдок, okx.com):** trailing `move_order_stop` (и iceberg /
+twap) отменяется через `cancel-advance-algos`, **не** `cancel-algos`.
+Контракт это фиксирует (см. «Cancel — две семьи algo»). Прежняя
+формулировка «cancel всех algo через `cancel-algos`» была неточна.
+
+**Развилка реализации `CANCEL_ALGO_ORDER` — на валидации, не
+финализирована:**
+
+- **(а) ветвление cancel-пути по типу algo:** advance
+  (`move_order_stop` / iceberg / twap) → `cancel-advance-algos`, иначе
+  → `cancel-algos`. Исполнитель выбирает endpoint по типу отменяемого
+  algo.
+- **(б) сузить используемые типы до ordinary** (trigger / oco /
+  conditional): фаза 1 защищается TP/SL, trailing не нужен;
+  `move_order_stop` помечается форвардом, второй cancel-путь не
+  заводится.
+
+**Крен — (б):** убрать риск неверного пути сужением скоупа дешевле
+ветвления под тип, не используемый в фазе 1. Выбор — за пользователем
+(см. отчёт прогона 2,
+`.claude/work/progress/phase-1-step-4-integrator-run-2.md`).
 
 ## Evidence-cycle
 
