@@ -557,7 +557,7 @@ efficiency ratio, Kaufman гл. 17), не в отдельный stateful-деб�
 не stateful debounce. Смягчающий фактор (ТВ-2): перескок фазы влияет только
 на выбор детали при **входе** — открытые сделки идут по pinned detail, не
 «треплются» (`docs/lifecycles/Strategy.md`). Полный разбор —
-`.claude/work/progress/phase-1-docs-check-post-revision-d.md` §Торговый фокус.
+`.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-docs-check-post-revision-d.md` §Торговый фокус.
 
 Владелец — торговый ревью (`trading-review`) со специалистом; горизонт — по
 ходу торговой проработки фазы. До решения дополнительный гистерезис не

@@ -46,7 +46,7 @@ market-data-модели strategy-layer выбран (вариант D), дов�
    - `trading-review` (акцент stateless-фаза): жёсткий торговый гейт пройден —
      анти-whipsaw операнд-уровневый корпусно-грунтован (KAMA-адаптив, медленный
      кроссовер); STRUCT-Q2 устранён как латентная торговая некорректность (ТВ-4).
-   Отчёт — `.claude/work/progress/phase-1-docs-check-post-revision-d.md`.
+   Отчёт — `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-docs-check-post-revision-d.md`.
 7. **GAPS_CLOSE находок:** Г1 (стале-нота `config_id` реконсилирована),
    Ф1 → открытый вопрос **PHASE-Q2** (размещение `MarketPhase`), PHASE-Q1
    дописан торговым грунтом, ТВ-4 — строка в keying-решении.

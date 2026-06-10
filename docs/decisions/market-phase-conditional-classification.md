@@ -22,7 +22,7 @@ score. Семантика самого скоринга не была задан
 (операнды — индикаторы каталога и `MarketStructure`); по определённой
 фазе `EntryScannerJob` выбирает `StrategyDetail`. Проработка с вариантами
 и кренами по пяти подвопросам отвалидирована пользователем
-(`.claude/work/progress/phase-1-step-3-market-phase-conditional-redesign.md`).
+(`.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-market-phase-conditional-redesign.md`).
 
 ## Принятое решение
 
@@ -143,7 +143,7 @@ score. Семантика самого скоринга не была задан
 
 ## Связи
 
-- Проработка с кренами — `.claude/work/progress/phase-1-step-3-market-phase-conditional-redesign.md`.
+- Проработка с кренами — `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-market-phase-conditional-redesign.md`.
 - Модель — `docs/models/domain/aggregate/Strategy.md`
   (§StrategyMarketPhaseRule, §Условия).
 - Контракт авторинга условий — `docs/decisions/strategy-condition-authoring-contract.md`.

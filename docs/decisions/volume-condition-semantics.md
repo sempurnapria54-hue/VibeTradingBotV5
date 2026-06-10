@@ -19,7 +19,7 @@
 Грунт — Kaufman гл. 12 (объём) и Harris гл. 12 (манипуляции), вычитаны из
 корпуса; самодистилляция — `.claude/library/trading/distilled/`
 (`strategy-patterns.md` §4, `microstructure.md` §6/§9). Проработка —
-`.claude/work/progress/phase-1-step-3-tr1-tr2-volume-conditions.md`.
+`.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-tr1-tr2-volume-conditions.md`.
 
 **Крипто-специфика надёжности объёма не входит в это решение** — в
 корпусе ∅, ждёт дообучения (IND-Q1, ниже §Граница).
@@ -134,4 +134,4 @@ AFTS (2023), обе трактуют её как торгуемый инстру
 - Грунт и проработка —
   `.claude/library/trading/distilled/strategy-patterns.md` §4,
   `.claude/library/trading/distilled/microstructure.md` §6/§9,
-  `.claude/work/progress/phase-1-step-3-tr1-tr2-volume-conditions.md`.
+  `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-tr1-tr2-volume-conditions.md`.

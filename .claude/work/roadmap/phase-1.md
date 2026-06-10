@@ -65,7 +65,7 @@ production-flow одной стратегии.
   stateless-классификатор) и Н12 (деривация `confirmedAt`
   условно-классифицированной фазы). Не чисто → нужен узкий `GAPS_CLOSE_5`;
   гейт `CODE` снова закрыт до их закрытия. Отчёт —
-  `.claude/work/progress/phase-1-step-3-docs-check-6.md`.
+  `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-docs-check-6.md`.
 - **Шаг 3 → `GAPS_CLOSE_5` (2026-06-09):** Н11 и Н12 закрыты в доках.
   **Н11** — `TREND_CHANGED` исключён из whitelist правил фазы
   (`StrategyMarketPhaseRule`): темпоральное правило несовместимо со
@@ -81,7 +81,7 @@ production-flow одной стратегии.
   крипто (IND-Q1, запаркован на фазу 4, не гейтит). Концепт-гейт `CODE`
   пройден (правило `roadmap-step-execution.md` §«Гейт `CODE` — чистый
   `DOCS_CHECK`»). Отчёт —
-  `.claude/work/progress/phase-1-step-3-docs-check-7.md`. Шаг готов к
+  `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-docs-check-7.md`. Шаг готов к
   `CODE` (вкл. forward-debt Java step-2) — перевод за пользователем.
 - **Шаг 3 → `SYNC_DOCS_FROM_CODE` (2026-06-09):** доки приведены к
   утверждённому коду (docs←code). Синканы инкременты D1-D3 + fork-A;
@@ -92,7 +92,7 @@ production-flow одной стратегии.
   EMA-наклона) реконсилированы; removal нет. Численные пороги помечены
   провизорными (STRUCT-Q1). Краевой случай идентичности `config_id` vs
   ER/ATR-ключей **не закрыт** — вынесен STRUCT-Q2 (не блокирует sync).
-  Отчёт — `.claude/work/progress/phase-1-step-3-sync-docs-from-code.md`.
+  Отчёт — `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-sync-docs-from-code.md`.
   **Перед `DONE` — пост-хок концепт-гейт (§6a) для D1** (концепт-инкремент
   на CODE): `concept-review` по приведённым докам, в этом прогоне не
   запускался.
@@ -105,7 +105,7 @@ production-flow одной стратегии.
   компилируется). Пост-хок концепт-гейт (§6a, для D1) и торговый гейт
   пройдены **чисто** на пост-ревизионных доках: `DOCS_CHECK` обоих фокусов
   (`concept-review` + `trading-review`) по шагам 1-3 — без блокеров (отчёт
-  `.claude/work/progress/phase-1-docs-check-post-revision-d.md`). Открытый
+  `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-docs-check-post-revision-d.md`). Открытый
   хвост — **non-gating**: PHASE-Q1 (липкость/гистерезис фазы, `trading-review`),
   PHASE-Q2 (размещение `MarketPhase` как computed value), STRUCT-Q1
   (калибровка порогов, фаза 2), IND-Q1 (крипто-объём, фаза 4). Ролляп фазы —

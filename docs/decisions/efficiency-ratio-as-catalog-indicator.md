@@ -22,9 +22,9 @@ BOLLINGER_BANDS/OBV` ER не содержал).
 значения. Носитель прежнего крена («внутри аналитика фазы») исчез;
 одновременно фаза стала **адресовать ER авторским условием**. Fork A
 переоценён в новом контексте
-(`.claude/work/progress/phase-1-step-3-fork-a-rerun-er-location.md`),
+(`.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-fork-a-rerun-er-location.md`),
 под-развилка A-bis — судьба выделенного `EFFICIENCY_BELOW_THRESHOLD`
-(`.claude/work/progress/phase-1-step-3-fork-a-bis-rerun-efficiency-ruletype.md`).
+(`.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-fork-a-bis-rerun-efficiency-ruletype.md`).
 
 ## Принятое решение
 
@@ -105,8 +105,8 @@ BOLLINGER_BANDS/OBV` ER не содержал).
 ## Связи
 
 - Перепрогон fork A / A-bis (проработка-предложение) —
-  `.claude/work/progress/phase-1-step-3-fork-a-rerun-er-location.md`,
-  `.claude/work/progress/phase-1-step-3-fork-a-bis-rerun-efficiency-ruletype.md`.
+  `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-fork-a-rerun-er-location.md`,
+  `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-fork-a-bis-rerun-efficiency-ruletype.md`.
 - Условная фаза (распустила носитель прежнего крена) —
   `docs/decisions/market-phase-conditional-classification.md`.
 - Критерий именованный-`ruleType`-vs-генерик —
