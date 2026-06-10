@@ -48,7 +48,7 @@ contracts = baseQty / ctVal
 
 ## OKX
 
-### `OkxInstrumentResponse` → snapshot
+### `InstrumentOkxResponse` → snapshot
 
 | OKX field | Snapshot field |
 |---|---|

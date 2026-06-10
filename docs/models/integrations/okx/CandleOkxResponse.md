@@ -1,4 +1,4 @@
-# OkxCandleResponse (OKX candle)
+# CandleOkxResponse (OKX candle)
 
 ## На какой вопрос отвечает этот файл
 
@@ -7,7 +7,7 @@
 
 ## Контекст
 
-Нативная модель источника OKX (Java `CandleResponse`).
+Нативная модель источника OKX (Java `CandleOkxResponse`).
 Возвращается `GET /api/v5/market/candles` и
 `GET /api/v5/market/history-candles`. Не выходит за
 `IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
@@ -22,7 +22,7 @@
 На проводе свеча OKX — **позиционный массив из 9 элементов** (не
 объект): `[ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]`.
 Adapter разбирает массив в именованные поля coded DTO
-`CandleResponse`. Размер строго 9 — adapter валидирует длину.
+`CandleOkxResponse`. Размер строго 9 — adapter валидирует длину.
 
 ## Поля DTO
 

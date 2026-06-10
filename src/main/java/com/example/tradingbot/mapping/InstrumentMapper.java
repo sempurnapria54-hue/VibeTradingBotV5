@@ -4,7 +4,7 @@ import com.example.tradingbot.api.model.request.CreateInstrumentApiRequest;
 import com.example.tradingbot.api.model.response.InstrumentApiResponse;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
-import com.example.tradingbot.integration.model.okx.response.InstrumentResponse;
+import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -34,7 +34,7 @@ public interface InstrumentMapper {
     @Mapping(target = "externalContractValue", source = "ctVal")
     @Mapping(target = "externalContractMultiplier", source = "ctMult")
     @Mapping(target = "externalTickSize", source = "tickSz")
-    InstrumentExternalSnapshot integrationToSnapshot(InstrumentResponse response);
+    InstrumentExternalSnapshot integrationToSnapshot(InstrumentOkxResponse response);
 
     /**
      * Частичное обновление инструмента из снапшота: идентичность +

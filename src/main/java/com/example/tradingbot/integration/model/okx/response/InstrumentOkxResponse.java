@@ -7,11 +7,11 @@ import lombok.Setter;
  * Нативный DTO OKX спецификации инструмента (GET /api/v5/public/instruments).
  * Несёт только snapshot-релевантное подмножество полей; все приходят
  * строками. Не выходит за IntegrationService/adapter
- * (docs/models/integrations/okx/OkxInstrumentResponse.md).
+ * (docs/models/integrations/okx/InstrumentOkxResponse.md).
  */
 @Getter
 @Setter
-public class InstrumentResponse {
+public class InstrumentOkxResponse {
 
     /** Имя инструмента на бирже (instId). */
     private String instId;

@@ -8,7 +8,7 @@ import lombok.Getter;
 /**
  * Нативный DTO свечи OKX. На проводе свеча — позиционный массив из 9
  * строк {@code [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]}
- * (docs/models/integrations/okx/OkxCandleResponse.md). Adapter
+ * (docs/models/integrations/okx/CandleOkxResponse.md). Adapter
  * разбирает массив в именованные поля через {@link #of(List)} с
  * валидацией длины (структурная валидация integration-слоя). Индексы
  * позиционного разбора — локальная техническая деталь, осмысленная
@@ -16,7 +16,7 @@ import lombok.Getter;
  * конвертация в BigDecimal/boolean — на маппинге в snapshot.
  */
 @Getter
-public class CandleResponse {
+public class CandleOkxResponse {
 
     private static final int EXPECTED_LENGTH = 9;
     private static final int TS_INDEX = 0;
@@ -56,7 +56,7 @@ public class CandleResponse {
     /** Признак закрытия: "0" — не закрыта, "1" — закрыта (confirm). */
     private final String confirm;
 
-    private CandleResponse(List<String> raw) {
+    private CandleOkxResponse(List<String> raw) {
         this.ts = raw.get(TS_INDEX);
         this.open = raw.get(OPEN_INDEX);
         this.high = raw.get(HIGH_INDEX);
@@ -72,12 +72,12 @@ public class CandleResponse {
      * Разбирает позиционный массив OKX в именованный DTO. Длина строго
      * 9 — защита от несоответствия формату источника.
      */
-    public static CandleResponse of(List<String> raw) {
+    public static CandleOkxResponse of(List<String> raw) {
         if (isEmpty(raw) || raw.size() != EXPECTED_LENGTH) {
             throw new IllegalArgumentException(
                     "OKX candle array must have exactly " + EXPECTED_LENGTH + " elements, got: "
                             + (isEmpty(raw) ? 0 : raw.size()));
         }
-        return new CandleResponse(raw);
+        return new CandleOkxResponse(raw);
     }
 }

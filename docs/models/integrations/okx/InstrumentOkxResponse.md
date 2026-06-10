@@ -1,4 +1,4 @@
-# OkxInstrumentResponse (OKX instrument spec)
+# InstrumentOkxResponse (OKX instrument spec)
 
 ## На какой вопрос отвечает этот файл
 
@@ -7,7 +7,7 @@
 
 ## Контекст
 
-Нативная модель источника OKX (Java `InstrumentResponse`).
+Нативная модель источника OKX (Java `InstrumentOkxResponse`).
 Возвращается `GET /api/v5/public/instruments`. Не выходит за
 `IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
 
@@ -21,7 +21,7 @@ Mapping в `InstrumentExternalSnapshot` и далее в `Instrument`
 
 ## Поля DTO
 
-Coded DTO `InstrumentResponse` несёт подмножество, релевантное
+Coded DTO `InstrumentOkxResponse` несёт подмножество, релевантное
 снапшоту инструмента; все поля маппятся в
 `InstrumentExternalSnapshot`:
 
@@ -57,7 +57,7 @@ sizing/rounding-правила инструмента (`ctType`, `ctValCcy`,
 т. п.) доменно не используются. Биржевые `state`/`lever` теперь
 входят в этот DTO (→ `externalStatus`/`externalLeverage`, см.
 таблицу выше) и в шаге 1 через `InstrumentExternalRules` не идут.
-Coded `InstrumentResponse` несёт только snapshot-релевантное
+Coded `InstrumentOkxResponse` несёт только snapshot-релевантное
 подмножество.
 
 > **Разграничение (шаг 1).** Этот DTO — источник для транзиентного

@@ -7,8 +7,8 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
-import com.example.tradingbot.integration.model.okx.response.CandleResponse;
-import com.example.tradingbot.integration.model.okx.response.InstrumentResponse;
+import com.example.tradingbot.integration.model.okx.response.CandleOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.integration.service.IntegrationService;
@@ -41,14 +41,14 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public InstrumentExternalSnapshot getInstrument(String externalInstrumentId, String externalInstrumentType) {
-        OkxApiResponse<InstrumentResponse> response = execute(
+        OkxApiResponse<InstrumentOkxResponse> response = execute(
                 () -> okxRestClient.getInstruments(externalInstrumentType, externalInstrumentId),
                 "instruments", "instId=" + externalInstrumentId + " instType=" + externalInstrumentType);
         verifyCode(response, "instruments", "instId=" + externalInstrumentId);
         if (isEmpty(response.getData())) {
             return null;
         }
-        InstrumentResponse first = response.getData().getFirst();
+        InstrumentOkxResponse first = response.getData().getFirst();
         return instrumentMapper.integrationToSnapshot(first);
     }
 
@@ -77,7 +77,7 @@ public class OkxIntegrationService implements IntegrationService {
             return List.of();
         }
         return data.stream()
-                .map(CandleResponse::of)
+                .map(CandleOkxResponse::of)
                 .map(candleMapper::integrationToSnapshot)
                 .collect(toList());
     }

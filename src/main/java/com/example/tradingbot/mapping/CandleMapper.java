@@ -4,7 +4,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
-import com.example.tradingbot.integration.model.okx.response.CandleResponse;
+import com.example.tradingbot.integration.model.okx.response.CandleOkxResponse;
 import com.example.tradingbot.persistence.model.candle.CandleEntity;
 import com.example.tradingbot.util.Constants;
 import java.math.BigDecimal;
@@ -17,7 +17,7 @@ import org.mapstruct.ReportingPolicy;
 /**
  * Маппинг свечи между слоями (docs/models/mapping/Candle.md):
  * integration DTO OKX (позиционный массив, уже разобранный в
- * {@link CandleResponse}) → граничный {@link CandleExternalSnapshot},
+ * {@link CandleOkxResponse}) → граничный {@link CandleExternalSnapshot},
  * затем → доменная {@link Candle}. Сырые строки OKX → BigDecimal/Long;
  * confirm — фильтр закрытых свечей, в домен не пишется.
  */
@@ -31,7 +31,7 @@ public interface CandleMapper {
     @Mapping(target = "close", source = "close", qualifiedByName = "toBigDecimal")
     @Mapping(target = "volume", source = "volume", qualifiedByName = "toBigDecimal")
     @Mapping(target = "confirm", source = "confirm", qualifiedByName = "toConfirm")
-    CandleExternalSnapshot integrationToSnapshot(CandleResponse response);
+    CandleExternalSnapshot integrationToSnapshot(CandleOkxResponse response);
 
     Candle snapshotToDomain(CandleExternalSnapshot snapshot);
 

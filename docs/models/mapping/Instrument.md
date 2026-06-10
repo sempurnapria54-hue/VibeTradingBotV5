@@ -17,7 +17,7 @@ Mapping-слой для `Instrument`. Доменная модель —
 `docs/rules/business-logic-on-domain-model.md`. Контракт
 endpoint'а — `docs/integrations/okx/contracts/instrument.md`.
 Инвентарь полей источника —
-`docs/models/integrations/okx/OkxInstrumentResponse.md`.
+`docs/models/integrations/okx/InstrumentOkxResponse.md`.
 
 Текущие источники: **OKX**.
 
@@ -53,7 +53,7 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 
 ## OKX
 
-### `OkxInstrumentResponse` → snapshot → domain (идентичность + биржевые поля, шаг 1)
+### `InstrumentOkxResponse` → snapshot → domain (идентичность + биржевые поля, шаг 1)
 
 | OKX field | Snapshot field | → domain `Instrument` |
 |---|---|---|
@@ -76,7 +76,7 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 (INSTR-Q1). Биржевые `state`/`lever` из этого перечня исключены —
 они персистятся на `Instrument` (`externalStatus`/`externalLeverage`,
 см. таблицу выше). Полный OKX-инвентарь —
-`docs/models/integrations/okx/OkxInstrumentResponse.md`; будущая
+`docs/models/integrations/okx/InstrumentOkxResponse.md`; будущая
 персистентная проекция sizing/rounding-полей —
 `mapping/InstrumentExternalRules.md` (модель отложена).
 

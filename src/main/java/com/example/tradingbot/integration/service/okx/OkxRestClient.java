@@ -3,7 +3,7 @@ package com.example.tradingbot.integration.service.okx;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
-import com.example.tradingbot.integration.model.okx.response.InstrumentResponse;
+import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.util.Constants;
 import java.util.List;
@@ -23,7 +23,7 @@ import org.springframework.web.client.RestClient;
 @RequiredArgsConstructor
 public class OkxRestClient {
 
-    private static final ParameterizedTypeReference<OkxApiResponse<InstrumentResponse>> INSTRUMENT_TYPE =
+    private static final ParameterizedTypeReference<OkxApiResponse<InstrumentOkxResponse>> INSTRUMENT_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<List<String>>> CANDLE_ARRAY_TYPE =
@@ -33,7 +33,7 @@ public class OkxRestClient {
     private final RestClient okxRestClientHttp;
 
     /** Спецификация инструментов: {@code instType} обязателен, {@code instId} опционален. */
-    public OkxApiResponse<InstrumentResponse> getInstruments(String instType, String instId) {
+    public OkxApiResponse<InstrumentOkxResponse> getInstruments(String instType, String instId) {
         return okxRestClientHttp.get()
                 .uri(uriBuilder -> {
                     uriBuilder.path(Constants.Okx.INSTRUMENTS_PATH).queryParam(Constants.Okx.PARAM_INST_TYPE, instType);
