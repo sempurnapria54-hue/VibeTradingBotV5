@@ -13,7 +13,7 @@
 `docs/decisions/market-phase-stateless.md`): собирает текущие (последние
 доступные) `IndicatorValue` / `MarketStructure` по `key`-ссылкам операндов
 `StrategyMarketPhaseSetting.phaseRules` и зовёт
-`docs/components/MarketPhaseClassifier.md` (stateless first-match). Прежний
+`docs/components/MarketPhaseResolver.md` (stateless first-match). Прежний
 `MarketPhaseJob`, писавший `MarketPhase`, удалён.
 
 ## Контракт (пример метода)

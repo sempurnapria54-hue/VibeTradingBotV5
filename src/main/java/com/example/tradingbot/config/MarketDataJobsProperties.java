@@ -25,9 +25,6 @@ public class MarketDataJobsProperties {
     /** Джоба расчёта структуры рынка. */
     private JobProperties structure = new JobProperties();
 
-    /** Джоба расчёта фазы рынка. */
-    private JobProperties phase = new JobProperties();
-
     /** Параметры одной джобы: выключатель и CRON. */
     @Getter
     @Setter

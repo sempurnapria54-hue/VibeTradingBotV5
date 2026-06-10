@@ -9,7 +9,7 @@
 
 Редизайн условной фазы
 (`docs/decisions/market-phase-conditional-classification.md`) уже сделал
-**классификатор** фазы stateless: `MarketPhaseClassifier` — чистый
+**классификатор** фазы stateless: `MarketPhaseResolver` — чистый
 first-match поверх `StrategyConditionEvaluator`, по свечам ничего не
 считает, истории прошлых фаз не читает. Но сам **результат** фазы при этом
 ещё персистировался: `MarketPhaseJob` тикал по CRON и писал `MarketPhase`
@@ -26,7 +26,7 @@ as-of».
 
 `MarketPhase` **не персистируется**. Она вычисляется **по запросу** из
 текущих (последних доступных) `IndicatorValue` / `MarketStructure` через
-`MarketPhaseClassifier` и отдаётся как runtime-значение
+`MarketPhaseResolver` и отдаётся как runtime-значение
 (`docs/components/MarketPhaseService.md`).
 
 **Снимается:**
@@ -99,9 +99,9 @@ Stateless-резолв на лету **не даёт гистерезиса/по
   (`docs/components/models/`) как форвард-заметка.
 - `MarketPhaseJob` — **удалён** (компонент-доку снят; фаза не персистится).
 - `docs/components/MarketPhaseService.md` — вычисляет фазу на чтение через
-  `MarketPhaseClassifier` из последних `IndicatorValue` / `MarketStructure`;
+  `MarketPhaseResolver` из последних `IndicatorValue` / `MarketStructure`;
   устаревший/отсутствующий вход → `UNKNOWN`.
-- `docs/components/MarketPhaseClassifier.md` — контракт возвращает `Type`
+- `docs/components/MarketPhaseResolver.md` — контракт возвращает `Type`
   (без `confirmedAt`); вызывается `MarketPhaseService`, не job.
 - `docs/models/domain/aggregate/Strategy.md` — `StrategyMarketPhaseSetting`
   теряет `timeframe` и `expirationDuration`; `StrategyMarketPhaseRule`
@@ -132,6 +132,6 @@ Stateless-резолв на лету **не даёт гистерезиса/по
   `docs/rules/market-data-retention.md`.
 - Модель — `docs/models/domain/other/MarketPhase.md`; компоненты —
   `docs/components/MarketPhaseService.md`,
-  `docs/components/MarketPhaseClassifier.md`.
+  `docs/components/MarketPhaseResolver.md`.
 - Открытый вопрос липкости — `.claude/work/questions/open-questions.md`
   §PHASE-Q1.

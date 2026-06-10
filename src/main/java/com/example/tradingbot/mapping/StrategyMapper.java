@@ -23,6 +23,7 @@ import com.example.tradingbot.api.model.strategy.StrategyDetailApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyIndicatorSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseRuleApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyPositionActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyStepApiModel;
@@ -46,11 +47,14 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.Stochastic
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseRule;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.persistence.model.strategy.StrategyActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyAlgoOrderActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyDetailEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyIndicatorSettingEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyMarketPhaseSettingEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyMarketStructureSettingEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyOrderActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyPositionActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyStepEntity;
@@ -97,6 +101,8 @@ public interface StrategyMapper {
 
     StrategyIndicatorSetting apiToDomain(StrategyIndicatorSettingApiModel api);
 
+    StrategyMarketStructureSetting apiToDomain(StrategyMarketStructureSettingApiModel api);
+
     @SubclassMapping(source = AtrParamsApiModel.class, target = AtrParams.class)
     @SubclassMapping(source = EmaParamsApiModel.class, target = EmaParams.class)
     @SubclassMapping(source = RsiParamsApiModel.class, target = RsiParams.class)
@@ -138,6 +144,8 @@ public interface StrategyMapper {
 
     StrategyIndicatorSettingApiModel domainToApi(StrategyIndicatorSetting setting);
 
+    StrategyMarketStructureSettingApiModel domainToApi(StrategyMarketStructureSetting setting);
+
     @SubclassMapping(source = AtrParams.class, target = AtrParamsApiModel.class)
     @SubclassMapping(source = EmaParams.class, target = EmaParamsApiModel.class)
     @SubclassMapping(source = RsiParams.class, target = RsiParamsApiModel.class)
@@ -175,6 +183,11 @@ public interface StrategyMapper {
     StrategyEntity domainToPersistence(Strategy strategy);
 
     StrategyMarketPhaseSettingEntity domainToPersistence(StrategyMarketPhaseSetting setting);
+
+    @Mapping(target = "params", source = "params", qualifiedByName = "indicatorParamsToJson")
+    StrategyIndicatorSettingEntity domainToPersistence(StrategyIndicatorSetting setting);
+
+    StrategyMarketStructureSettingEntity domainToPersistence(StrategyMarketStructureSetting setting);
 
     @Mapping(target = "steps", source = "stepsByStatus")
     StrategyDetailEntity domainToPersistence(StrategyDetail detail);
@@ -221,6 +234,12 @@ public interface StrategyMapper {
         if (nonNull(entity.getMarketPhaseSetting())) {
             entity.getMarketPhaseSetting().setStrategy(entity);
         }
+        if (nonNull(entity.getIndicatorSettings())) {
+            entity.getIndicatorSettings().forEach(setting -> setting.setStrategy(entity));
+        }
+        if (nonNull(entity.getMarketStructureSettings())) {
+            entity.getMarketStructureSettings().forEach(setting -> setting.setStrategy(entity));
+        }
         if (isNull(entity.getDetails())) {
             return;
         }
@@ -247,6 +266,8 @@ public interface StrategyMapper {
     /** Entity → domain без дерева (корневые операции: статус, идентичность). */
     @Mapping(target = "marketPhaseSetting", ignore = true)
     @Mapping(target = "details", ignore = true)
+    @Mapping(target = "indicatorSettings", ignore = true)
+    @Mapping(target = "marketStructureSettings", ignore = true)
     Strategy persistenceToDomain(StrategyEntity entity);
 
     /**
@@ -258,28 +279,21 @@ public interface StrategyMapper {
 
     /**
      * Entity → domain только с настройками рыночных данных (для jobs
-     * расчёта): фаза и детали с их JSONB-настройками; шаги не маппятся.
+     * расчёта): фаза (phaseRules) и strategy-scope-настройки
+     * индикаторов/структуры; детали и шаги не маппятся (трек D).
      */
-    @Mapping(target = "details", source = "details", qualifiedByName = "detailsSettingsOnly")
+    @Mapping(target = "details", ignore = true)
     Strategy persistenceToDomainWithSettings(StrategyEntity entity);
 
     StrategyMarketPhaseSetting persistenceToDomain(StrategyMarketPhaseSettingEntity entity);
 
+    @Mapping(target = "params", source = ".", qualifiedByName = "indicatorParamsFromEntity")
+    StrategyIndicatorSetting persistenceToDomain(StrategyIndicatorSettingEntity entity);
+
+    StrategyMarketStructureSetting persistenceToDomain(StrategyMarketStructureSettingEntity entity);
+
     @Mapping(target = "stepsByStatus", source = "steps")
     StrategyDetail persistenceToDomain(StrategyDetailEntity entity);
-
-    /** Деталь только с настройками (шаги игнорируются — нужны лишь indicator/structure settings). */
-    @Named("detailSettingsOnly")
-    @Mapping(target = "stepsByStatus", ignore = true)
-    StrategyDetail detailSettingsOnly(StrategyDetailEntity entity);
-
-    @Named("detailsSettingsOnly")
-    default List<StrategyDetail> detailsSettingsOnly(Set<StrategyDetailEntity> details) {
-        if (isNull(details)) {
-            return null;
-        }
-        return details.stream().map(this::detailSettingsOnly).collect(toList());
-    }
 
     StrategyStep persistenceToDomain(StrategyStepEntity entity);
 

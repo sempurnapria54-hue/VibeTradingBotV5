@@ -24,7 +24,7 @@ public class EmaCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long configId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         EmaParams emaParams = (EmaParams) params;
         int period = emaParams.getPeriod();
@@ -36,7 +36,7 @@ public class EmaCalculator implements IndicatorCalculator {
             if (nonNull(ema[index])) {
                 EmaValue value = new EmaValue();
                 value.setInstrumentId(instrumentId);
-                value.setConfigId(configId);
+                value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
                 value.setCandleTimestamp(candleTimestamp(closedCandles.get(index)));
                 value.setEma(ema[index]);
                 result.add(value);

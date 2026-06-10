@@ -9,24 +9,18 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.config.MarketDataJobsProperties;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
-import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
-import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.service.market.indicator.IndicatorCalculator;
 import com.example.tradingbot.persistence.service.CandleDataService;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
-import com.example.tradingbot.persistence.service.IndicatorConfigDataService;
 import com.example.tradingbot.persistence.service.IndicatorDataService;
 import com.example.tradingbot.persistence.service.StrategyDataService;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -34,11 +28,12 @@ import org.springframework.stereotype.Component;
 /**
  * Производитель технических индикаторов (docs/components/IndicatorJob.md):
  * для стратегий всех статусов кроме DELETED заранее считает объявленные
- * IndicatorValue по закрытым свечам и сохраняет их. Тонкий оркестратор —
- * математику держат IndicatorCalculator'ы, идемпотентность/checkpoint —
- * IndicatorDataService (UNIQUE(instrument, config, candle_timestamp)).
- * Одна конфигурация считается раз на инструмент за тик и шарится. Вне
- * расписания запускается асинхронно через IndicatorJobFacade.
+ * IndicatorValue по закрытым свечам и сохраняет их под настройкой-владельцем
+ * (owner-ключевание, трек D — реестр конфигураций и дедуп убраны). Тонкий
+ * оркестратор — математику держат IndicatorCalculator'ы, идемпотентность/
+ * checkpoint — IndicatorDataService (UNIQUE(instrument,
+ * strategy_indicator_setting_id, candle_timestamp)). Вне расписания —
+ * асинхронно через IndicatorJobFacade.
  */
 @Slf4j
 @Component
@@ -49,7 +44,6 @@ public class IndicatorJob {
     private final StrategyDataService strategyDataService;
     private final CandleGroupDataService candleGroupDataService;
     private final CandleDataService candleDataService;
-    private final IndicatorConfigDataService configDataService;
     private final IndicatorDataService indicatorDataService;
     private final MarketDataJobsProperties properties;
     private final JobExecutionGuard executionGuard;
@@ -58,7 +52,6 @@ public class IndicatorJob {
     public IndicatorJob(StrategyDataService strategyDataService,
                         CandleGroupDataService candleGroupDataService,
                         CandleDataService candleDataService,
-                        IndicatorConfigDataService configDataService,
                         IndicatorDataService indicatorDataService,
                         MarketDataJobsProperties properties,
                         JobExecutionGuard executionGuard,
@@ -66,7 +59,6 @@ public class IndicatorJob {
         this.strategyDataService = strategyDataService;
         this.candleGroupDataService = candleGroupDataService;
         this.candleDataService = candleDataService;
-        this.configDataService = configDataService;
         this.indicatorDataService = indicatorDataService;
         this.properties = properties;
         this.executionGuard = executionGuard;
@@ -82,20 +74,18 @@ public class IndicatorJob {
     }
 
     private void run() {
-        Set<String> processed = new HashSet<>();
         for (Strategy strategy : strategyDataService.findForMarketData()) {
-            for (StrategyIndicatorSetting setting : indicatorSettings(strategy)) {
-                computeIndicator(strategy.getInstrumentId(), setting, processed);
+            if (isEmpty(strategy.getIndicatorSettings())) {
+                continue;
+            }
+            for (StrategyIndicatorSetting setting : strategy.getIndicatorSettings()) {
+                computeIndicator(strategy.getInstrumentId(), setting);
             }
         }
     }
 
-    private void computeIndicator(Long instrumentId, StrategyIndicatorSetting setting, Set<String> processed) {
+    private void computeIndicator(Long instrumentId, StrategyIndicatorSetting setting) {
         try {
-            Long configId = configDataService.resolveConfigId(setting.getIndicatorType(), setting.getParams());
-            if (isFalse(processed.add(instrumentId + ":" + configId))) {
-                return;
-            }
             IndicatorCalculator calculator = calculators.get(setting.getIndicatorType());
             if (isNull(calculator)) {
                 return;
@@ -110,27 +100,12 @@ public class IndicatorJob {
             if (isEmpty(candles)) {
                 return;
             }
-            List<IndicatorValue> values = calculator.calculate(instrumentId, configId, candles, setting.getParams());
-            indicatorDataService.saveValues(instrumentId, configId, values);
+            List<IndicatorValue> values = calculator.calculate(
+                    instrumentId, setting.getId(), candles, setting.getParams());
+            indicatorDataService.saveValues(instrumentId, setting.getId(), values);
         } catch (RuntimeException e) {
             log.error("Indicator calculation failed for instrument {} indicator {}",
-                    instrumentId, setting.getIndicatorType(), e);
+                    instrumentId, nonNull(setting) ? setting.getIndicatorType() : null, e);
         }
-    }
-
-    private List<StrategyIndicatorSetting> indicatorSettings(Strategy strategy) {
-        List<StrategyIndicatorSetting> settings = new ArrayList<>();
-        StrategyMarketPhaseSetting phaseSetting = strategy.getMarketPhaseSetting();
-        if (nonNull(phaseSetting) && nonNull(phaseSetting.getIndicatorSettings())) {
-            settings.addAll(phaseSetting.getIndicatorSettings());
-        }
-        if (nonNull(strategy.getDetails())) {
-            for (StrategyDetail detail : strategy.getDetails()) {
-                if (nonNull(detail.getIndicatorSettings())) {
-                    settings.addAll(detail.getIndicatorSettings());
-                }
-            }
-        }
-        return settings;
     }
 }

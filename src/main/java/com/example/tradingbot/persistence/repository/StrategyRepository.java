@@ -13,12 +13,16 @@ public interface StrategyRepository extends JpaRepository<StrategyEntity, Long> 
 
     /**
      * Стратегия со всем деревом одним запросом (join fetch по
-     * Set-коллекциям — без N+1 и MultipleBagFetch); порядок шагов и
-     * действий восстанавливает маппер (step_index / id ASC).
+     * Set-коллекциям — без N+1 и MultipleBagFetch): настройка фазы,
+     * strategy-scope-настройки индикаторов/структуры, детали с шагами и
+     * действиями. Порядок шагов и действий восстанавливает маппер
+     * (step_index / id ASC).
      */
     @Query("""
             select s from StrategyEntity s
             left join fetch s.marketPhaseSetting
+            left join fetch s.indicatorSettings
+            left join fetch s.marketStructureSettings
             left join fetch s.details d
             left join fetch d.steps st
             left join fetch st.actions
@@ -31,12 +35,15 @@ public interface StrategyRepository extends JpaRepository<StrategyEntity, Long> 
     /**
      * Стратегии всех статусов кроме переданного (для jobs рыночных
      * данных — все, кроме DELETED) с настройками рыночных данных: фаза
-     * (с phaseRules) и детали с их JSONB-настройками; шаги не грузятся.
+     * (с phaseRules) и strategy-scope-настройки индикаторов/структуры
+     * (трек D — настройки на стратегии, не в контейнерах); шаги/детали не
+     * грузятся.
      */
     @Query("""
             select distinct s from StrategyEntity s
             left join fetch s.marketPhaseSetting
-            left join fetch s.details
+            left join fetch s.indicatorSettings
+            left join fetch s.marketStructureSettings
             where s.status <> :status
             """)
     List<StrategyEntity> findAllWithSettingsByStatusNot(@Param("status") String status);

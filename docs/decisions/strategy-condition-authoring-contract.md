@@ -212,7 +212,7 @@ lifecycle-сделки, `MARKET_PHASE_IS` и `TREND_CHANGED`. Этот
 
 `TREND_CHANGED` исключён из контекста фазы: темпоральное правило
 («текущее vs прошлое») несовместимо со stateless-контрактом
-`MarketPhaseClassifier` без источника истории, а его документированная
+`MarketPhaseResolver` без источника истории, а его документированная
 привязка к `MarketPhase` (`docs/components/StrategyConditionEvaluator.md`)
 — запрещённая в фазе само-референция; структурные переходы выражаются
 `RANGE_BREAKOUT_CONFIRMED` / `MARKET_STRUCTURE_IS` над операндом

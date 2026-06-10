@@ -11,7 +11,7 @@
 (последних доступных) `IndicatorValue` и `MarketStructure`. `Type`
 определяется **авторскими условиями** (`StrategyMarketPhaseSetting.phaseRules`):
 `docs/components/MarketPhaseService.md` зовёт
-`docs/components/MarketPhaseClassifier.md` — упорядоченный first-match
+`docs/components/MarketPhaseResolver.md` — упорядоченный first-match
 поверх `StrategyConditionEvaluator` (первая клауза с истинным `condition`
 задаёт `Type`, ни одна → `UNKNOWN`; см.
 `docs/decisions/market-phase-conditional-classification.md`).
@@ -31,8 +31,11 @@
 > (перенос файла) **отложена**: `MarketPhase.Type` — доменный enum,
 > используемый strategy-layer (`StrategyDetail.marketPhaseType`,
 > `phaseRules`), и размещение пары «значение vs его доменный enum» —
-> отдельная классификационная развилка (не угадываем). Пока файл остаётся
-> здесь; содержание описывает вычисляемое, не хранимое.
+> отдельная классификационная развилка (критерии RVO конфликтуют:
+> структурно подходит, но «не доменная сущность» нарушается доменным
+> enum'ом). Оформлено открытым вопросом **PHASE-Q2**
+> (`.claude/work/questions/open-questions.md`), non-gating. Пока файл
+> остаётся здесь; содержание описывает вычисляемое, не хранимое.
 
 ## Структура
 
@@ -55,7 +58,7 @@
 
 - **Вычисляется на чтение.** `MarketPhaseService` собирает текущие
   `IndicatorValue` / `MarketStructure` (по `key`-ссылкам операндов
-  `phaseRules` на strategy-scope-настройки) и зовёт `MarketPhaseClassifier`.
+  `phaseRules` на strategy-scope-настройки) и зовёт `MarketPhaseResolver`.
   Считается только по уже готовым результатам (которые сами посчитаны по
   закрытым свечам — без look-ahead).
 - **Свежесть наследуется от входов.** Своего `expirationDuration` у фазы

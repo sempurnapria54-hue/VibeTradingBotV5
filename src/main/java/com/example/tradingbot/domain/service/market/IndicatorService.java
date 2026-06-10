@@ -5,7 +5,6 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
-import com.example.tradingbot.persistence.service.IndicatorConfigDataService;
 import com.example.tradingbot.persistence.service.IndicatorDataService;
 import java.util.Collection;
 import java.util.List;
@@ -15,24 +14,23 @@ import org.springframework.stereotype.Service;
 
 /**
  * Раздаёт готовые значения индикаторов потребителям (evaluator,
- * калькуляторы, MarketPhaseJob). Сам индикаторы не считает — их заранее
- * считает IndicatorJob. Значение резолвится по идентичности конфигурации
- * запрашивающей настройки (config_id) и отдаётся, только если свежо по
- * её expirationDuration (referencePoint = candleTimestamp). См.
- * docs/components/IndicatorService.md, docs/rules/market-data-freshness.md.
+ * калькуляторы, MarketPhaseResolver). Сам индикаторы не считает — их
+ * заранее считает IndicatorJob. Значение резолвится по
+ * настройке-владельцу (её id — owner-ключевание, трек D) и отдаётся,
+ * только если свежо по её expirationDuration (referencePoint =
+ * candleTimestamp). См. docs/components/IndicatorService.md,
+ * docs/rules/market-data-freshness.md.
  */
 @Service
 @RequiredArgsConstructor
 public class IndicatorService {
 
-    private final IndicatorConfigDataService configDataService;
     private final IndicatorDataService dataService;
     private final MarketDataExpirationChecker expirationChecker;
 
-    /** Последнее свежее значение по запрашивающей настройке (пусто — нет или устарело). */
+    /** Последнее свежее значение по настройке-владельцу (пусто — нет или устарело). */
     public Optional<IndicatorValue> getLatestValue(Long instrumentId, StrategyIndicatorSetting setting) {
-        Long configId = configDataService.resolveConfigId(setting.getIndicatorType(), setting.getParams());
-        return dataService.findLatest(instrumentId, configId)
+        return dataService.findLatest(instrumentId, setting.getId())
                 .filter(value -> isTrue(expirationChecker.isFresh(
                         value.getCandleTimestamp(), setting.getExpirationDuration())));
     }
@@ -52,8 +50,7 @@ public class IndicatorService {
      * crossover; свежесть не гейтит (направление, не точка решения).
      */
     public Optional<IndicatorValue> getPreviousValue(Long instrumentId, StrategyIndicatorSetting setting) {
-        Long configId = configDataService.resolveConfigId(setting.getIndicatorType(), setting.getParams());
-        List<IndicatorValue> recent = dataService.findLatestTwo(instrumentId, configId);
+        List<IndicatorValue> recent = dataService.findLatestTwo(instrumentId, setting.getId());
         return recent.size() < 2 ? Optional.empty() : Optional.of(recent.get(1));
     }
 }

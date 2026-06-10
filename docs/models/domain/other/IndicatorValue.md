@@ -20,7 +20,7 @@
 Потребители читают готовые значения и **не** считают индикаторы сами:
 `StrategyConditionEvaluator` (условия), `StrategyActionCalculator` /
 `PriceCalculator` (цены, например SL = entry − 1.5·ATR),
-`MarketPhaseClassifier` (классификация фазы на чтение через
+`MarketPhaseResolver` (классификация фазы на чтение через
 `MarketPhaseService`). Раздачей готовых значений занимается
 `docs/components/IndicatorService.md`.
 

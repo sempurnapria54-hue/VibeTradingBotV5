@@ -18,9 +18,10 @@ import lombok.Setter;
 /**
  * Persistence-проекция IndicatorValue (таблица indicator_values).
  * Наследники по типам индикатора живут в одной таблице (SINGLE_TABLE,
- * дискриминатор indicator_type) — значения шарятся по config_id, ряд
- * строк (строка на свечу), не upsert. Идемпотентность —
- * UNIQUE(instrument_id, config_id, candle_timestamp) во Flyway. См.
+ * дискриминатор indicator_type) — значения ключуются настройкой-владельцем
+ * (strategy_indicator_setting_id), ряд строк (строка на свечу), не upsert.
+ * Идемпотентность — UNIQUE(instrument_id, strategy_indicator_setting_id,
+ * candle_timestamp) во Flyway (owner-ключевание, трек D). См.
  * docs/models/domain/other/IndicatorValue.md, docs/rules/market-data-retention.md.
  */
 @Getter
@@ -38,8 +39,8 @@ public abstract class IndicatorValueEntity extends AuditableEntity {
     @Column(name = "instrument_id", nullable = false, updatable = false)
     private Long instrumentId;
 
-    @Column(name = "config_id", nullable = false, updatable = false)
-    private Long configId;
+    @Column(name = "strategy_indicator_setting_id", nullable = false, updatable = false)
+    private Long strategyIndicatorSettingId;
 
     @Column(name = "candle_timestamp", nullable = false, updatable = false)
     private OffsetDateTime candleTimestamp;

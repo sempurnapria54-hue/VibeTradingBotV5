@@ -8,21 +8,23 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Объявление расчёта структуры рынка в стратегии. Хранится JSONB
- * внутри строки контейнера (StrategyMarketPhaseSetting /
- * StrategyDetail), своей строки/таблицы не имеет; адресуется по
- * {@code key} (операнд условия {@code structureKey}, «мягкие» ссылки
- * JSON-листьев placement/stopLossSettings). У структуры, в отличие от
- * индикатора, таймфрейм — прямое поле настройки (провизорная
- * асимметрия — docs/decisions/strategy-tree-persistence.md). См.
- * docs/models/domain/aggregate/Strategy.md
- * (§StrategyMarketStructureSetting).
+ * Объявление расчёта структуры рынка в стратегии. Собственная реляционная
+ * строка strategy-scope (таблица strategy_market_structure_settings,
+ * UNIQUE(strategy_id, key)); адресуется по {@code key} (операнд условия
+ * {@code structureKey}, «мягкие» ссылки JSON-листьев placement/stopLossSettings).
+ * Результат расчёта MarketStructure ссылается на её {@code id}
+ * (owner-ключевание, трек D). ER/ATR-входы резолвера — «мягкие» ссылки по
+ * {@code key} на индикаторные настройки стратегии. См.
+ * docs/models/domain/aggregate/Strategy.md (§StrategyMarketStructureSetting).
  */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class StrategyMarketStructureSetting {
+
+    /** Технический ID настройки (strategy-scope-строка; цель FK результата расчёта). */
+    private Long id;
 
     /** Стабильный ключ настройки — по нему ссылается операнд market-structure. */
     private String key;
@@ -31,14 +33,14 @@ public class StrategyMarketStructureSetting {
     private TimeFrame timeframe;
 
     /**
-     * Ключ настройки каталожного ER-индикатора (того же контейнера),
-     * который резолвер потребляет как готовый вход (fork-A). Null —
-     * резолвер использует внутренний прокси нетто/суммарного хода.
+     * Ключ настройки каталожного ER-индикатора стратегии, который резолвер
+     * потребляет как готовый вход (fork-A). Null — резолвер использует
+     * внутренний прокси нетто/суммарного хода.
      */
     private String efficiencyRatioKey;
 
     /**
-     * Ключ настройки каталожного ATR-индикатора (того же контейнера) для
+     * Ключ настройки каталожного ATR-индикатора стратегии для
      * волатильность-относительного толеранса кластеризации уровней (D3).
      * Null — резолвер откатывается на долю цены.
      */

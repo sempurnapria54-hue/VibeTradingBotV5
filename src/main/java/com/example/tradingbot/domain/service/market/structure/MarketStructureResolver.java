@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
  * реализации (CODE) с торговой сверкой в ревью. Готовый ER/ATR
  * потребляются как опциональный вход; при их отсутствии — минимальный
  * внутренний прокси (нетто-ход / суммарный ход окна). Сам не персистит,
- * instrumentId/configId проставляет MarketStructureJob. См.
+ * instrumentId/strategyMarketStructureSettingId проставляет MarketStructureJob. См.
  * docs/components/MarketStructureResolver.md,
  * docs/models/domain/other/MarketStructure.md (§Семантика классификации).
  */
@@ -48,7 +48,7 @@ public class MarketStructureResolver {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100L);
 
     /**
-     * Вычисляет структуру окна; instrumentId/configId не заполняет (это
+     * Вычисляет структуру окна; instrumentId/strategyMarketStructureSettingId не заполняет (это
      * job). Готовые каталожные ER (тренд/шум, fork-A) и ATR (толеранс
      * уровней, D3) потребляются как входы; при отсутствии ER — внутренний
      * прокси, при отсутствии ATR — fallback-толеранс долей цены. Неполные/

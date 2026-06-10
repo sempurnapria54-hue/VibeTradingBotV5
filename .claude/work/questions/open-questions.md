@@ -46,9 +46,12 @@ decision не заводился); CMD-Q1 закрыт решением
 владелец — фаза 2). STRUCT-Q2 (идентичность `config_id` структуры vs разные
 ER/ATR-входы) **закрыт** 2026-06-10 реверсом ключевания
 (`docs/decisions/market-data-result-identity-keying.md`: результаты
-ключуются настройкой-владельцем, разделяемого ряда нет). Открыт PHASE-Q1
+ключуются настройкой-владельцем, разделяемого ряда нет). Открыты PHASE-Q1
 (трек D, 2026-06-10): «липкость» / гистерезис фазы при stateless-резолве —
-владелец — торговый ревью (`trading-review`).
+владелец `trading-review`; и PHASE-Q2 (трек D): размещение `MarketPhase`
+после перехода в вычисляемое значение (RVO vs доменный computed value;
+конфликт критериев из-за доменного enum `Type`) — владелец
+`knowledge-curator`/`solution-designer`. Оба non-gating.
 
 История закрытых вопросов пайплайна:
 
@@ -541,13 +544,58 @@ KAMA), ни конкретного k. Значения — **пользоват�
 Приемлемость остаточного перескока как численный риск-аппетит автора уже
 принята пользователем, но stateless-переход вопрос обостряет.
 
+**Торговый грунт (trading-review пост-D, ТВ-1/ТВ-2).** Корпус: режим
+флип-флопит при слишком отзывчивом дискриминаторе (одиночная быстрая MA
+«дёргается» — Carver AFTS стр. 5), а анти-whipsaw встроен в **конструкцию
+дискриминатора** (медленный кроссовер; KAMA — адаптивная скорость EMA из
+efficiency ratio, Kaufman гл. 17), не в отдельный stateful-дебаунс ярлыка
+режима. ⇒ операнд-уровневый механизм модели корпусно-грунтован; жёсткий гейт
+«не выражает торговое правило» не срабатывает. Если гистерезис понадобится —
+опоры ввода: **KAMA-адаптивная скорость** входов / документированный
+инкремент **`confirmationBars`** на сравнивающее правило
+(`docs/decisions/market-phase-conditional-classification.md` §Анти-whipsaw),
+не stateful debounce. Смягчающий фактор (ТВ-2): перескок фазы влияет только
+на выбор детали при **входе** — открытые сделки идут по pinned detail, не
+«треплются» (`docs/lifecycles/Strategy.md`). Полный разбор —
+`.claude/work/progress/phase-1-docs-check-post-revision-d.md` §Торговый фокус.
+
 Владелец — торговый ревью (`trading-review`) со специалистом; горизонт — по
 ходу торговой проработки фазы. До решения дополнительный гистерезис не
 вводится (S0), анти-whipsaw остаётся операнд-уровневым.
 Связано: `docs/decisions/market-phase-stateless.md`,
 `docs/decisions/market-phase-conditional-classification.md`,
 `docs/models/domain/aggregate/Strategy.md` (§StrategyMarketPhaseRule),
-`docs/components/MarketPhaseClassifier.md`.
+`docs/components/MarketPhaseResolver.md`.
+
+### PHASE-Q2. Размещение `MarketPhase` после перехода в вычисляемое значение (классификация)
+
+Трек D сделал `MarketPhase` вычисляемым на лету (не персистится). По
+структурному критерию RVO (`.claude/decisions/runtime-value-object.md`: не
+persisted / без identity / без lifecycle — носитель данных) он подходит под
+**Runtime value object** (`docs/components/models/`). Но тот же критерий
+требует «не доменная сущность», а `MarketPhase.Type` — **доменный enum**
+рыночного режима, вшитый в strategy-layer (`StrategyDetail.marketPhaseType`,
+`phaseRules`, `MARKET_PHASE_IS`); по codestyle enum'ы живут только в домене.
+Критерии конфликтуют — развилка чисто в доках не снимается.
+
+Варианты: (а) перенести `MarketPhase` в `docs/components/models/` как RVO —
+тогда `MarketPhase.Type` выносится отдельным доменным enum (сопутствующая
+**код-правка**: извлечь enum, иначе домен зависит от компонентного слоя);
+(б) признать `MarketPhase` **доменным вычисляемым value-объектом** и оставить
+в `docs/models/domain/other/` (ось «вычисляемое vs хранимое» — новый тонкий
+признак, по которому `other` пока не дробится,
+`.claude/decisions/models-core-vs-other.md`); (в) новый тип «доменный computed
+value». Не гейтит (модель работает как значение).
+
+До решения файл остаётся `docs/models/domain/other/MarketPhase.md` с
+форвард-заметкой о развилке; владелец — `knowledge-curator` /
+`solution-designer` (классификация + возможная код-правка извлечения enum).
+Горизонт — когда осядет ось «computed domain value» (вероятно, с RVO-кластером
+Deal management, шаг 4+).
+Связано: `docs/models/domain/other/MarketPhase.md`,
+`.claude/decisions/runtime-value-object.md`,
+`.claude/decisions/models-core-vs-other.md`,
+`docs/decisions/market-phase-stateless.md`.
 
 ## Конвенция
 

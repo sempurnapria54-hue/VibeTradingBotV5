@@ -10,25 +10,25 @@ import org.springframework.data.repository.query.Param;
 
 public interface IndicatorValueRepository extends JpaRepository<IndicatorValueEntity, Long> {
 
-    /** Производный checkpoint: «докуда посчитано» = max(candle_timestamp) для (instrument, config). */
+    /** Производный checkpoint: «докуда посчитано» = max(candle_timestamp) для (instrument, setting). */
     @Query("select max(v.candleTimestamp) from IndicatorValueEntity v "
-            + "where v.instrumentId = :instrumentId and v.configId = :configId")
+            + "where v.instrumentId = :instrumentId and v.strategyIndicatorSettingId = :settingId")
     OffsetDateTime findMaxCandleTimestamp(@Param("instrumentId") Long instrumentId,
-                                          @Param("configId") Long configId);
+                                          @Param("settingId") Long settingId);
 
     /** Уже сохранённые candle_timestamp в окне (дедуп при идемпотентном пересчёте). */
     @Query("select v.candleTimestamp from IndicatorValueEntity v "
-            + "where v.instrumentId = :instrumentId and v.configId = :configId "
+            + "where v.instrumentId = :instrumentId and v.strategyIndicatorSettingId = :settingId "
             + "and v.candleTimestamp between :from and :to")
     List<OffsetDateTime> findCandleTimestampsInRange(@Param("instrumentId") Long instrumentId,
-                                                     @Param("configId") Long configId,
+                                                     @Param("settingId") Long settingId,
                                                      @Param("from") OffsetDateTime from,
                                                      @Param("to") OffsetDateTime to);
 
-    Optional<IndicatorValueEntity> findFirstByInstrumentIdAndConfigIdOrderByCandleTimestampDesc(
-            Long instrumentId, Long configId);
+    Optional<IndicatorValueEntity> findFirstByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
+            Long instrumentId, Long strategyIndicatorSettingId);
 
     /** Два последних значения (по убыванию candle_timestamp) — для slope/crossover. */
-    List<IndicatorValueEntity> findFirst2ByInstrumentIdAndConfigIdOrderByCandleTimestampDesc(
-            Long instrumentId, Long configId);
+    List<IndicatorValueEntity> findFirst2ByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
+            Long instrumentId, Long strategyIndicatorSettingId);
 }

@@ -33,6 +33,6 @@ public class ConditionEvaluationContext {
     /** Текущая рыночная цена для PRICE-операндов; null — недоступна. */
     private final BigDecimal price;
 
-    /** Время бара оценки (UTC) — точка отсчёта производного confirmedAt и TIME-операндов. */
+    /** Время оценки (UTC) — точка отсчёта TIME-операндов. */
     private final OffsetDateTime evaluationTime;
 }

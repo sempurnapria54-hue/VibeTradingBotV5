@@ -14,10 +14,10 @@ import lombok.Setter;
 /**
  * Готовый результат расчёта структуры рынка (уровни, диапазоны, тренд),
  * рассчитанный MarketStructureJob (вычисление делегируется
- * MarketStructureResolver) по закрытым свечам для конфигурации расчёта
- * (timeframe + canonical-params) в реестре market_structure_configs.
- * Результат шарится всеми настройками StrategyMarketStructureSetting,
- * которые эту конфигурацию запрашивают (ключ — по configId). Тип
+ * MarketStructureResolver) по закрытым свечам для конкретной
+ * настройки-владельца StrategyMarketStructureSetting. Ключуется
+ * настройкой-владельцем (strategyMarketStructureSettingId), не шарится и не
+ * ключуется по идентичности конфигурации — реестр убран (трек D). Тип
  * структуры — выход расчёта, не вход настройки. Persisted-модель
  * рыночных данных. См. docs/models/domain/other/MarketStructure.md.
  */
@@ -32,8 +32,8 @@ public class MarketStructure extends Auditable {
     /** Внутренний ID инструмента. */
     private Long instrumentId;
 
-    /** Ссылка на конфигурацию расчёта в реестре market_structure_configs (timeframe + canonical-params). */
-    private Long configId;
+    /** FK на настройку-владельца StrategyMarketStructureSetting (owner-ключевание). */
+    private Long strategyMarketStructureSettingId;
 
     /** Тип структуры рынка (выход расчёта). */
     private Type type;

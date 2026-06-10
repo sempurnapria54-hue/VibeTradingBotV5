@@ -20,11 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Граница domain ↔ persistence для IndicatorValue. Запись идемпотентна:
- * значения с уже присутствующим candle_timestamp в (instrument, config)
- * повторно не вставляются (UNIQUE(instrument_id, config_id,
- * candle_timestamp)). Чтение — производный checkpoint и последнее
- * значение. instrumentId/configId уже проставлены на доменном значении
- * (их выставляет job/калькулятор).
+ * значения с уже присутствующим candle_timestamp в (instrument, setting)
+ * повторно не вставляются (UNIQUE(instrument_id,
+ * strategy_indicator_setting_id, candle_timestamp)). Чтение — производный
+ * checkpoint и последнее значение. instrumentId/strategyIndicatorSettingId
+ * уже проставлены на доменном значении (их выставляет job/калькулятор) —
+ * owner-ключевание (трек D).
  */
 @Service
 @RequiredArgsConstructor
@@ -34,13 +35,13 @@ public class IndicatorDataService {
     private final IndicatorValueMapper mapper;
 
     /**
-     * Сохраняет только отсутствующие значения конфигурации (дедуп по
-     * candle_timestamp).
+     * Сохраняет только отсутствующие значения настройки-владельца (дедуп
+     * по candle_timestamp).
      *
      * @return число фактически вставленных значений.
      */
     @Transactional
-    public Integer saveValues(Long instrumentId, Long configId, List<IndicatorValue> values) {
+    public Integer saveValues(Long instrumentId, Long strategyIndicatorSettingId, List<IndicatorValue> values) {
         if (isEmpty(values)) {
             return 0;
         }
@@ -49,7 +50,7 @@ public class IndicatorDataService {
         OffsetDateTime to = values.stream().map(IndicatorValue::getCandleTimestamp)
                 .max(Comparator.naturalOrder()).orElseThrow();
         Set<OffsetDateTime> existing = new HashSet<>(
-                repository.findCandleTimestampsInRange(instrumentId, configId, from, to));
+                repository.findCandleTimestampsInRange(instrumentId, strategyIndicatorSettingId, from, to));
         List<IndicatorValueEntity> toInsert = values.stream()
                 .filter(value -> isFalse(existing.contains(value.getCandleTimestamp())))
                 .map(mapper::domainToPersistence)
@@ -58,23 +59,28 @@ public class IndicatorDataService {
         return toInsert.size();
     }
 
-    /** Производный checkpoint: «докуда посчитано» для (instrument, config), или null. */
+    /** Производный checkpoint: «докуда посчитано» для (instrument, setting), или null. */
     @Transactional(readOnly = true)
-    public OffsetDateTime findCheckpoint(Long instrumentId, Long configId) {
-        return repository.findMaxCandleTimestamp(instrumentId, configId);
+    public OffsetDateTime findCheckpoint(Long instrumentId, Long strategyIndicatorSettingId) {
+        return repository.findMaxCandleTimestamp(instrumentId, strategyIndicatorSettingId);
     }
 
-    /** Последнее по candle_timestamp значение конфигурации (для раздачи потребителям). */
+    /** Последнее по candle_timestamp значение настройки (для раздачи потребителям). */
     @Transactional(readOnly = true)
-    public Optional<IndicatorValue> findLatest(Long instrumentId, Long configId) {
-        return repository.findFirstByInstrumentIdAndConfigIdOrderByCandleTimestampDesc(instrumentId, configId)
+    public Optional<IndicatorValue> findLatest(Long instrumentId, Long strategyIndicatorSettingId) {
+        return repository
+                .findFirstByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
+                        instrumentId, strategyIndicatorSettingId)
                 .map(mapper::persistenceToDomain);
     }
 
-    /** Два последних значения конфигурации (latest, previous) — для slope/crossover. */
+    /** Два последних значения настройки (latest, previous) — для slope/crossover. */
     @Transactional(readOnly = true)
-    public List<IndicatorValue> findLatestTwo(Long instrumentId, Long configId) {
-        return repository.findFirst2ByInstrumentIdAndConfigIdOrderByCandleTimestampDesc(instrumentId, configId).stream()
+    public List<IndicatorValue> findLatestTwo(Long instrumentId, Long strategyIndicatorSettingId) {
+        return repository
+                .findFirst2ByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
+                        instrumentId, strategyIndicatorSettingId)
+                .stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());
     }

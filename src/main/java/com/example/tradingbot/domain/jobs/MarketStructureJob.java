@@ -7,9 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.config.MarketDataJobsProperties;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
-import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
-import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
@@ -21,7 +19,6 @@ import com.example.tradingbot.domain.service.market.IndicatorService;
 import com.example.tradingbot.domain.service.market.structure.MarketStructureResolver;
 import com.example.tradingbot.persistence.service.CandleDataService;
 import com.example.tradingbot.persistence.service.CandleGroupDataService;
-import com.example.tradingbot.persistence.service.MarketStructureConfigDataService;
 import com.example.tradingbot.persistence.service.MarketStructureDataService;
 import com.example.tradingbot.persistence.service.StrategyDataService;
 import java.math.BigDecimal;
@@ -30,11 +27,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -43,10 +38,12 @@ import org.springframework.stereotype.Component;
 /**
  * Производитель структуры рынка (docs/components/MarketStructureJob.md):
  * для стратегий всех статусов кроме DELETED заранее готовит MarketStructure
- * по закрытым свечам окна и сохраняет. Тонкий — классификацию держит
- * MarketStructureResolver; идемпотентность — MarketStructureDataService
- * (UNIQUE(instrument, config, window_end_at)). Готовые каталожные ER/ATR
- * того же контейнера (fork-A / D3) потребляются как входы резолвера; при
+ * по закрытым свечам окна и сохраняет под настройкой-владельцем
+ * (owner-ключевание, трек D — реестр конфигураций и дедуп убраны). Тонкий —
+ * классификацию держит MarketStructureResolver; идемпотентность —
+ * MarketStructureDataService (UNIQUE(instrument,
+ * strategy_market_structure_setting_id, window_end_at)). Готовые каталожные
+ * ER/ATR стратегии (fork-A / D3) потребляются как входы резолвера; при
  * объявленном, но не готовом входе — консервативный UNKNOWN (не proxy).
  * Вне расписания — через фасад.
  */
@@ -60,7 +57,6 @@ public class MarketStructureJob {
     private final StrategyDataService strategyDataService;
     private final CandleGroupDataService candleGroupDataService;
     private final CandleDataService candleDataService;
-    private final MarketStructureConfigDataService configDataService;
     private final MarketStructureDataService structureDataService;
     private final MarketStructureResolver resolver;
     private final IndicatorService indicatorService;
@@ -76,42 +72,21 @@ public class MarketStructureJob {
     }
 
     private void run() {
-        Set<String> processed = new HashSet<>();
         for (Strategy strategy : strategyDataService.findForMarketData()) {
-            Long instrumentId = strategy.getInstrumentId();
-            StrategyMarketPhaseSetting phaseSetting = strategy.getMarketPhaseSetting();
-            if (nonNull(phaseSetting)) {
-                processContainer(instrumentId, phaseSetting.getMarketStructureSettings(),
-                        phaseSetting.getIndicatorSettings(), processed);
+            if (isEmpty(strategy.getMarketStructureSettings())) {
+                continue;
             }
-            if (nonNull(strategy.getDetails())) {
-                for (StrategyDetail detail : strategy.getDetails()) {
-                    processContainer(instrumentId, detail.getMarketStructureSettings(),
-                            detail.getIndicatorSettings(), processed);
-                }
+            Map<String, StrategyIndicatorSetting> indicatorsByKey = indicatorsByKey(strategy.getIndicatorSettings());
+            for (StrategyMarketStructureSetting setting : strategy.getMarketStructureSettings()) {
+                computeStructure(strategy.getInstrumentId(), setting, indicatorsByKey);
             }
-        }
-    }
-
-    private void processContainer(Long instrumentId, List<StrategyMarketStructureSetting> structures,
-                                  List<StrategyIndicatorSetting> indicators, Set<String> processed) {
-        if (isEmpty(structures)) {
-            return;
-        }
-        Map<String, StrategyIndicatorSetting> indicatorsByKey = indicatorsByKey(indicators);
-        for (StrategyMarketStructureSetting setting : structures) {
-            computeStructure(instrumentId, setting, indicatorsByKey, processed);
         }
     }
 
     private void computeStructure(Long instrumentId, StrategyMarketStructureSetting setting,
-                                  Map<String, StrategyIndicatorSetting> indicatorsByKey, Set<String> processed) {
+                                  Map<String, StrategyIndicatorSetting> indicatorsByKey) {
         try {
             if (isNull(setting.getParams()) || isNull(setting.getParams().getLookbackBars())) {
-                return;
-            }
-            Long configId = configDataService.resolveConfigId(setting.getTimeframe(), setting.getParams());
-            if (isFalse(processed.add(instrumentId + ":" + configId))) {
                 return;
             }
             Optional<CandleGroup> group = candleGroupDataService.findByInstrumentIdAndTimeframe(
@@ -124,19 +99,20 @@ public class MarketStructureJob {
             if (isEmpty(window)) {
                 return;
             }
-            saveResult(instrumentId, configId, setting, indicatorsByKey, window);
+            saveResult(instrumentId, setting, indicatorsByKey, window);
         } catch (RuntimeException e) {
             log.error("Market structure calculation failed for instrument {}", instrumentId, e);
         }
     }
 
-    private void saveResult(Long instrumentId, Long configId, StrategyMarketStructureSetting setting,
+    private void saveResult(Long instrumentId, StrategyMarketStructureSetting setting,
                             Map<String, StrategyIndicatorSetting> indicatorsByKey, List<Candle> window) {
+        Long settingId = setting.getId();
         BigDecimal efficiencyRatio = null;
         if (nonNull(setting.getEfficiencyRatioKey())) {
             efficiencyRatio = catalogScalar(instrumentId, setting.getEfficiencyRatioKey(), indicatorsByKey);
             if (isNull(efficiencyRatio)) {
-                structureDataService.saveIfNew(unknownStructure(instrumentId, configId, window));
+                structureDataService.saveIfNew(unknownStructure(instrumentId, settingId, window));
                 return;
             }
         }
@@ -144,17 +120,17 @@ public class MarketStructureJob {
         if (nonNull(setting.getAtrKey())) {
             atr = catalogScalar(instrumentId, setting.getAtrKey(), indicatorsByKey);
             if (isNull(atr)) {
-                structureDataService.saveIfNew(unknownStructure(instrumentId, configId, window));
+                structureDataService.saveIfNew(unknownStructure(instrumentId, settingId, window));
                 return;
             }
         }
         MarketStructure structure = resolver.resolve(window, efficiencyRatio, atr, setting.getParams());
         structure.setInstrumentId(instrumentId);
-        structure.setConfigId(configId);
+        structure.setStrategyMarketStructureSettingId(settingId);
         structureDataService.saveIfNew(structure);
     }
 
-    /** Скаляр готового каталожного ER/ATR по ключу настройки контейнера; null — настройки нет или вход не готов/устарел. */
+    /** Скаляр готового каталожного ER/ATR по ключу настройки стратегии; null — настройки нет или вход не готов/устарел. */
     private BigDecimal catalogScalar(Long instrumentId, String key,
                                      Map<String, StrategyIndicatorSetting> indicatorsByKey) {
         StrategyIndicatorSetting indicatorSetting = indicatorsByKey.get(key);
@@ -177,10 +153,10 @@ public class MarketStructureJob {
     }
 
     /** Консервативный UNKNOWN-результат на окне (объявленный вход не готов) — чтобы потребитель не торговал. */
-    private MarketStructure unknownStructure(Long instrumentId, Long configId, List<Candle> window) {
+    private MarketStructure unknownStructure(Long instrumentId, Long settingId, List<Candle> window) {
         MarketStructure structure = new MarketStructure();
         structure.setInstrumentId(instrumentId);
-        structure.setConfigId(configId);
+        structure.setStrategyMarketStructureSettingId(settingId);
         structure.setType(MarketStructure.Type.UNKNOWN);
         structure.setLevels(new ArrayList<>());
         OffsetDateTime windowEndAt = timestampOf(window.get(window.size() - 1));

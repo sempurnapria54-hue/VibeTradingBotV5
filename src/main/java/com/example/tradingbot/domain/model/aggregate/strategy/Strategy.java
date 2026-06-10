@@ -1,7 +1,9 @@
 package com.example.tradingbot.domain.model.aggregate.strategy;
 
 import com.example.tradingbot.domain.model.Auditable;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import java.util.List;
 import java.util.Objects;
 import lombok.Getter;
@@ -44,6 +46,16 @@ public class Strategy extends Auditable {
 
     /** Детали по фазам рынка: ровно одна на один MarketPhase.Type. */
     private List<StrategyDetail> details;
+
+    /**
+     * Настройки индикаторов стратегии (strategy-scope, объявлены раз;
+     * UNIQUE(strategy_id, key)). Фаза, детали и действия адресуют их по
+     * {@code key} (трек D — настройки в собственные строки).
+     */
+    private List<StrategyIndicatorSetting> indicatorSettings;
+
+    /** Настройки структуры рынка стратегии (strategy-scope, адресуются по {@code key}). */
+    private List<StrategyMarketStructureSetting> marketStructureSettings;
 
     /** Стратегия активна (единственная активная стратегия инструмента). */
     public Boolean isActive() {

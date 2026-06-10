@@ -9,13 +9,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface MarketStructureRepository extends JpaRepository<MarketStructureEntity, Long> {
 
-    /** Производный checkpoint: «докуда посчитано» = max(window_end_at) для (instrument, config). */
+    /** Производный checkpoint: «докуда посчитано» = max(window_end_at) для (instrument, setting). */
     @Query("select max(s.windowEndAt) from MarketStructureEntity s "
-            + "where s.instrumentId = :instrumentId and s.configId = :configId")
-    OffsetDateTime findMaxWindowEndAt(@Param("instrumentId") Long instrumentId, @Param("configId") Long configId);
+            + "where s.instrumentId = :instrumentId and s.strategyMarketStructureSettingId = :settingId")
+    OffsetDateTime findMaxWindowEndAt(@Param("instrumentId") Long instrumentId, @Param("settingId") Long settingId);
 
-    Boolean existsByInstrumentIdAndConfigIdAndWindowEndAt(Long instrumentId, Long configId, OffsetDateTime windowEndAt);
+    Boolean existsByInstrumentIdAndStrategyMarketStructureSettingIdAndWindowEndAt(
+            Long instrumentId, Long strategyMarketStructureSettingId, OffsetDateTime windowEndAt);
 
-    Optional<MarketStructureEntity> findFirstByInstrumentIdAndConfigIdOrderByWindowEndAtDesc(
-            Long instrumentId, Long configId);
+    Optional<MarketStructureEntity> findFirstByInstrumentIdAndStrategyMarketStructureSettingIdOrderByWindowEndAtDesc(
+            Long instrumentId, Long strategyMarketStructureSettingId);
 }

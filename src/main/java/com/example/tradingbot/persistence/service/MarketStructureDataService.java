@@ -13,9 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Граница domain ↔ persistence для MarketStructure. Запись идемпотентна:
- * результат с уже присутствующим window_end_at в (instrument, config)
+ * результат с уже присутствующим window_end_at в (instrument, setting)
  * повторно не вставляется. При сломанной/изменившейся структуре job
  * сохраняет новый результат (новый window_end_at), а не правит старый.
+ * Ключ — настройка-владелец (owner-ключевание, трек D).
  */
 @Service
 @RequiredArgsConstructor
@@ -24,27 +25,30 @@ public class MarketStructureDataService {
     private final MarketStructureRepository repository;
     private final MarketStructureMapper mapper;
 
-    /** Сохраняет результат, если для (instrument, config, window_end_at) его ещё нет. */
+    /** Сохраняет результат, если для (instrument, setting, window_end_at) его ещё нет. */
     @Transactional
     public void saveIfNew(MarketStructure structure) {
-        Boolean exists = repository.existsByInstrumentIdAndConfigIdAndWindowEndAt(
-                structure.getInstrumentId(), structure.getConfigId(), structure.getWindowEndAt());
+        Boolean exists = repository.existsByInstrumentIdAndStrategyMarketStructureSettingIdAndWindowEndAt(
+                structure.getInstrumentId(), structure.getStrategyMarketStructureSettingId(),
+                structure.getWindowEndAt());
         if (isTrue(exists)) {
             return;
         }
         repository.save(mapper.domainToPersistence(structure));
     }
 
-    /** Производный checkpoint: «докуда посчитано» для (instrument, config), или null. */
+    /** Производный checkpoint: «докуда посчитано» для (instrument, setting), или null. */
     @Transactional(readOnly = true)
-    public OffsetDateTime findCheckpoint(Long instrumentId, Long configId) {
-        return repository.findMaxWindowEndAt(instrumentId, configId);
+    public OffsetDateTime findCheckpoint(Long instrumentId, Long strategyMarketStructureSettingId) {
+        return repository.findMaxWindowEndAt(instrumentId, strategyMarketStructureSettingId);
     }
 
-    /** Последняя по window_end_at структура конфигурации (для раздачи потребителям). */
+    /** Последняя по window_end_at структура настройки (для раздачи потребителям). */
     @Transactional(readOnly = true)
-    public Optional<MarketStructure> findLatest(Long instrumentId, Long configId) {
-        return repository.findFirstByInstrumentIdAndConfigIdOrderByWindowEndAtDesc(instrumentId, configId)
+    public Optional<MarketStructure> findLatest(Long instrumentId, Long strategyMarketStructureSettingId) {
+        return repository
+                .findFirstByInstrumentIdAndStrategyMarketStructureSettingIdOrderByWindowEndAtDesc(
+                        instrumentId, strategyMarketStructureSettingId)
                 .map(mapper::persistenceToDomain);
     }
 }

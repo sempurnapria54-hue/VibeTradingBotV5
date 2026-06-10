@@ -17,7 +17,7 @@ BOLLINGER_BANDS/OBV` ER не содержал).
 
 Редизайн условной фазы
 (`docs/decisions/market-phase-conditional-classification.md`) распустил
-скоринг: `MarketPhaseClassifier` стал stateless first-match поверх
+скоринг: `MarketPhaseResolver` стал stateless first-match поверх
 `StrategyConditionEvaluator`, по свечам ничего не считает — читает готовые
 значения. Носитель прежнего крена («внутри аналитика фазы») исчез;
 одновременно фаза стала **адресовать ER авторским условием**. Fork A

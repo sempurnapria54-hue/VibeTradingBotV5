@@ -2,41 +2,24 @@ package com.example.tradingbot.api.model.strategy;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Настройка расчёта фазы рынка (API): одна на стратегию, фаза нужна
- * до выбора детали.
+ * Настройка классификации фазы рынка (API): одна на стратегию, фаза нужна
+ * до выбора детали. Фаза вычисляется на лету и не персистируется — своих
+ * timeframe / expirationDuration у неё нет (трек D).
  */
 @Getter
 @Setter
 public class StrategyMarketPhaseSettingApiModel {
 
-    @NotBlank
-    @Schema(description = "Доменный таймфрейм классификации фазы (имя TimeFrame)",
-            requiredMode = Schema.RequiredMode.REQUIRED)
-    private String timeframe;
-
     @Valid
     @NotEmpty
-    @Schema(description = "Авторские клаузы классификации фазы (first-match по level); "
-            + "не сработала ни одна → UNKNOWN", requiredMode = Schema.RequiredMode.REQUIRED)
-    private List<StrategyMarketPhaseRuleApiModel> phaseRules;
-
-    @Valid
-    @Schema(description = "Индикаторы для расчёта фазы (destiny = MARKET_PHASE)")
-    private List<StrategyIndicatorSettingApiModel> indicatorSettings;
-
-    @Valid
-    @Schema(description = "Структуры рынка для расчёта фазы (destiny = MARKET_PHASE)")
-    private List<StrategyMarketStructureSettingApiModel> marketStructureSettings;
-
-    @NotBlank
-    @Schema(description = "Срок свежести последней рассчитанной фазы, ISO-8601 duration",
+    @Schema(description = "Авторские клаузы классификации фазы (first-match по позиции в списке); "
+            + "не сработала ни одна → UNKNOWN; операнды ссылаются на настройки стратегии по key",
             requiredMode = Schema.RequiredMode.REQUIRED)
-    private String expirationDuration;
+    private List<StrategyMarketPhaseRuleApiModel> phaseRules;
 }

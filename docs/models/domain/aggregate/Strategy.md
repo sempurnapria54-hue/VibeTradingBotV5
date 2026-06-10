@@ -24,7 +24,13 @@
   изменения правил создаётся новая стратегия, а не редактируется
   существующая. Относится ко всем вложенным типам ниже.
 - **Все хранимые модели наследуются от `Auditable`** (единый аудит
-  технических дат).
+  технических дат). **Исключение — листовые настройки**
+  `StrategyIndicatorSetting` / `StrategyMarketStructureSetting` (таблицы
+  `strategy_indicator_settings` / `strategy_market_structure_settings`,
+  трек D): **не `Auditable`**, без аудит-колонок. Сознательное исключение:
+  настройки — неизменяемые части агрегата `Strategy`, их технический аудит
+  покрывается Auditable-корнем агрегата (`Strategy`) — DDD-корректно (аудит
+  на границе агрегата, не на каждом value-листе).
 - **Жизненный цикл задаёт `Strategy.Status`** — у вложенных
   immutable-настроек отдельных статусов нет. Статус административный,
   не runtime-свежесть данных (см. `docs/lifecycles/Strategy.md`).
@@ -131,7 +137,7 @@ first-match-список**: проверяются **по позиции в сп
 (`RANGE_BREAKOUT_CONFIRMED` / `VOLUME_FILTER_PASSED` / `CANDLE_CLOSED` /
 `MARKET_STRUCTURE_IS`); запрещены lifecycle-сделки, `MARKET_PHASE_IS`
 (цикл) и `TREND_CHANGED` (темпоральное «текущее vs прошлое» —
-несовместимо со stateless-контрактом `MarketPhaseClassifier` без
+несовместимо со stateless-контрактом `MarketPhaseResolver` без
 источника истории; структурные переходы в фазе выражаются
 `RANGE_BREAKOUT_CONFIRMED` / `MARKET_STRUCTURE_IS` над операндом
 `MARKET_STRUCTURE`). Тест эффективности
@@ -701,7 +707,7 @@ strategy-tree (`timeframe`-поля). Каноническое определе�
 Стратегия хранит правила расчёта, не готовые значения. Runtime-расчёт,
 jobs (`IndicatorJob`/`MarketStructureJob`/`EntryScannerJob`; фаза —
 не job, а деривация на чтение через `MarketPhaseService`/
-`MarketPhaseClassifier`, `docs/decisions/market-phase-stateless.md`),
+`MarketPhaseResolver`, `docs/decisions/market-phase-stateless.md`),
 evaluator (`StrategyConditionEvaluator`),
 калькуляторы (`StrategyActionCalculator` → `PriceCalculator`/
 `SizeCalculator`), risk-layer (`RiskValidator` → `RiskCheckResult` →

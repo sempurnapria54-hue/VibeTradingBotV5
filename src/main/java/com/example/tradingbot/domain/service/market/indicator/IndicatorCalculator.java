@@ -27,11 +27,11 @@ public interface IndicatorCalculator {
 
     /**
      * Считает значения индикатора по закрытым свечам (по возрастанию
-     * открытия) для конфигурации configId; возвращает только значения
-     * после warmup-зоны. instrumentId/configId/candleTimestamp на
+     * открытия) для конфигурации strategyIndicatorSettingId; возвращает только значения
+     * после warmup-зоны. instrumentId/strategyIndicatorSettingId/candleTimestamp на
      * результатах проставлены.
      */
-    List<IndicatorValue> calculate(Long instrumentId, Long configId, List<Candle> closedCandles,
+    List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
                                    IndicatorParams params);
 
     /** Эффективный warmup: явный override настройки имеет приоритет над выведенным. */

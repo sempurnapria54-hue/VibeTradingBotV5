@@ -52,4 +52,10 @@ public class StrategyEntity extends AuditableEntity {
 
     @OneToMany(mappedBy = "strategy", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<StrategyDetailEntity> details;
+
+    @OneToMany(mappedBy = "strategy", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<StrategyIndicatorSettingEntity> indicatorSettings;
+
+    @OneToMany(mappedBy = "strategy", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<StrategyMarketStructureSettingEntity> marketStructureSettings;
 }

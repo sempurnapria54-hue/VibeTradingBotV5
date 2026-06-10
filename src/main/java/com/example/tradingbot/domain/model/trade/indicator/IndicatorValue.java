@@ -8,12 +8,11 @@ import lombok.Setter;
 
 /**
  * Готовое значение технического индикатора, рассчитанное
- * {@code IndicatorJob} по закрытым свечам для конфигурации расчёта (тип +
- * timeframe + canonical-params), зарегистрированной в реестре
- * indicator_configs. Значение шарится всеми настройками
- * {@code StrategyIndicatorSetting}, которые эту конфигурацию запрашивают
- * (ключ — по идентичности считаемого через {@code configId}, не по
- * настройке). Конкретное значение лежит в наследнике по типу индикатора.
+ * {@code IndicatorJob} по закрытым свечам для конкретной
+ * настройки-владельца {@code StrategyIndicatorSetting}. Ключуется
+ * настройкой-владельцем ({@code strategyIndicatorSettingId}), не шарится и
+ * не ключуется по идентичности конфигурации — реестр убран (трек D).
+ * Конкретное значение лежит в наследнике по типу индикатора.
  * Persisted-модель рыночных данных, не про бизнес-цикл сделки. См.
  * docs/models/domain/other/IndicatorValue.md,
  * docs/decisions/market-data-result-identity-keying.md.
@@ -29,8 +28,8 @@ public abstract class IndicatorValue extends Auditable {
     /** Внутренний ID инструмента. */
     private Long instrumentId;
 
-    /** Ссылка на конфигурацию расчёта в реестре indicator_configs (тип + timeframe + canonical-params). */
-    private Long configId;
+    /** FK на настройку-владельца StrategyIndicatorSetting (owner-ключевание). */
+    private Long strategyIndicatorSettingId;
 
     /** Время свечи, на которой рассчитан индикатор. */
     private OffsetDateTime candleTimestamp;

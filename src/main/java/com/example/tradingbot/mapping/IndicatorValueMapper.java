@@ -27,8 +27,8 @@ import org.mapstruct.SubclassMapping;
  * Маппинг значения индикатора domain ↔ persistence. Полиморфные ветви
  * по типу индикатора — через SubclassMapping (плоская SINGLE_TABLE на
  * стороне persistence, дискриминатор выставляет JPA по подклассу).
- * Базовые поля (instrumentId/configId/candleTimestamp) и значения
- * наследников маппятся по имени.
+ * Базовые поля (instrumentId/strategyIndicatorSettingId/candleTimestamp) и
+ * значения наследников маппятся по имени.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
         subclassExhaustiveStrategy = SubclassExhaustiveStrategy.RUNTIME_EXCEPTION)

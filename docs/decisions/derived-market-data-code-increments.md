@@ -174,8 +174,9 @@ soft-ссылки `efficiencyRatioKey` / `atrKey` жили на
   скаляры ER/ATR; прокси скорректирован; declared-but-stale → `UNKNOWN` в
   job.
 - `docs/components/MarketStructureJob.md` — потребление ER/ATR по soft-ключам;
-  conservative `UNKNOWN` при необъявленной готовности; краевой случай
-  `config_id`.
+  conservative `UNKNOWN` при необъявленной готовности. *(Краевой случай
+  `config_id` — снят треком D: реестр/шаринг убраны, см. §Краевой случай
+  идентичности.)*
 - `docs/decisions/strategy-condition-authoring-contract.md` — §Операнд +=
   контракт `indicatorComponent`.
 - `docs/decisions/efficiency-ratio-as-catalog-indicator.md` — прокси

@@ -18,14 +18,13 @@ import java.math.BigDecimal;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * Persistence-проекция {@link StrategyDetail} (таблица
- * strategy_details) — каркасный реляционный узел. Листовые настройки
- * рыночных данных — JSONB на этой строке; шаги — дочерние строки
- * strategy_steps (cascade ALL). Реальная схема (UNIQUE(strategy_id,
+ * strategy_details) — каркасный реляционный узел. Шаги — дочерние строки
+ * strategy_steps (cascade ALL); индикаторы/структуры детали объявлены на
+ * стратегии (strategy-scope, трек D) и адресуются по key, своих
+ * JSONB-настроек деталь не несёт. Реальная схема (UNIQUE(strategy_id,
  * market_phase_type), FK) — во Flyway. Enum'ы хранятся строкой.
  */
 @Getter
@@ -55,14 +54,6 @@ public class StrategyDetailEntity extends AuditableEntity {
     @Column(name = "target_risk_reward_ratio",
             precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal targetRiskRewardRatio;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "indicator_settings")
-    private String indicatorSettings;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "market_structure_settings")
-    private String marketStructureSettings;
 
     @OneToMany(mappedBy = "detail", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<StrategyStepEntity> steps;

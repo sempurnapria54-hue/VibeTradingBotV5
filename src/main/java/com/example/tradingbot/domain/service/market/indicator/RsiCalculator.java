@@ -25,7 +25,7 @@ public class RsiCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long configId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         RsiParams rsiParams = (RsiParams) params;
         int period = rsiParams.getPeriod();
@@ -46,7 +46,7 @@ public class RsiCalculator implements IndicatorCalculator {
         }
         BigDecimal avgGain = gainSum.divide(periodValue, Constants.Calc.MATH_CONTEXT);
         BigDecimal avgLoss = lossSum.divide(periodValue, Constants.Calc.MATH_CONTEXT);
-        emit(result, instrumentId, configId, closedCandles, period, warmup, rsi(avgGain, avgLoss));
+        emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, period, warmup, rsi(avgGain, avgLoss));
 
         for (int index = period + 1; index < closedCandles.size(); index++) {
             BigDecimal change = closes.get(index).subtract(closes.get(index - 1));
@@ -56,7 +56,7 @@ public class RsiCalculator implements IndicatorCalculator {
                     .divide(periodValue, Constants.Calc.MATH_CONTEXT);
             avgLoss = avgLoss.multiply(periodValue.subtract(BigDecimal.ONE)).add(loss)
                     .divide(periodValue, Constants.Calc.MATH_CONTEXT);
-            emit(result, instrumentId, configId, closedCandles, index, warmup, rsi(avgGain, avgLoss));
+            emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, index, warmup, rsi(avgGain, avgLoss));
         }
         return result;
     }
@@ -69,14 +69,14 @@ public class RsiCalculator implements IndicatorCalculator {
         return HUNDRED.subtract(HUNDRED.divide(BigDecimal.ONE.add(rs), Constants.Calc.MATH_CONTEXT));
     }
 
-    private void emit(List<IndicatorValue> result, Long instrumentId, Long configId, List<Candle> candles,
+    private void emit(List<IndicatorValue> result, Long instrumentId, Long strategyIndicatorSettingId, List<Candle> candles,
                       int index, int warmup, BigDecimal rsi) {
         if (index < warmup) {
             return;
         }
         RsiValue value = new RsiValue();
         value.setInstrumentId(instrumentId);
-        value.setConfigId(configId);
+        value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
         value.setCandleTimestamp(candleTimestamp(candles.get(index)));
         value.setRsi(rsi);
         result.add(value);

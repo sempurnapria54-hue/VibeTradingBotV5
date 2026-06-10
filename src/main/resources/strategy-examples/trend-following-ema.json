@@ -3,10 +3,8 @@
   "instrumentInternalId": "eth-usdt-swap",
   "name": "EMA trend following (1H phase / 15m signal / 5m timing)",
   "marketPhaseSetting": {
-    "timeframe": "ONE_HOUR",
     "phaseRules": [
       {
-        "level": 1,
         "type": "RANGE",
         "condition": {
           "rules": [
@@ -21,7 +19,6 @@
         }
       },
       {
-        "level": 2,
         "type": "BULL_TREND",
         "condition": {
           "rules": [
@@ -36,7 +33,6 @@
         }
       },
       {
-        "level": 3,
         "type": "BEAR_TREND",
         "condition": {
           "rules": [
@@ -50,80 +46,77 @@
           ]
         }
       }
-    ],
-    "indicatorSettings": [
-      {
-        "key": "phase_ema_fast_1h",
-        "indicatorType": "EMA",
-        "params": { "timeframe": "ONE_HOUR", "period": 20 },
-        "destiny": "MARKET_PHASE",
-        "expirationDuration": "PT2H"
-      },
-      {
-        "key": "phase_ema_slow_1h",
-        "indicatorType": "EMA",
-        "params": { "timeframe": "ONE_HOUR", "period": 80 },
-        "destiny": "MARKET_PHASE",
-        "expirationDuration": "PT2H"
-      }
-    ],
-    "marketStructureSettings": [
-      {
-        "key": "phase_structure_1h",
-        "timeframe": "ONE_HOUR",
-        "params": {
-          "lookbackBars": 96,
-          "minTouches": 2,
-          "minRangeWidthPercents": 1.0,
-          "maxRangeWidthPercents": 8.0,
-          "breakoutBufferPercents": 15,
-          "breakoutConfirmationBars": 2,
-          "swingLookbackBars": 5,
-          "trendEfficiencyThreshold": 0.30,
-          "levelToleranceAtrMultiplier": 0.5
-        },
-        "destiny": "MARKET_PHASE",
-        "expirationDuration": "PT2H"
-      }
-    ],
-    "expirationDuration": "PT2H"
+    ]
   },
+  "indicatorSettings": [
+    {
+      "key": "phase_ema_fast_1h",
+      "indicatorType": "EMA",
+      "params": { "timeframe": "ONE_HOUR", "period": 20 },
+      "destiny": "MARKET_PHASE",
+      "expirationDuration": "PT2H"
+    },
+    {
+      "key": "phase_ema_slow_1h",
+      "indicatorType": "EMA",
+      "params": { "timeframe": "ONE_HOUR", "period": 80 },
+      "destiny": "MARKET_PHASE",
+      "expirationDuration": "PT2H"
+    },
+    {
+      "key": "ema_fast_15m",
+      "indicatorType": "EMA",
+      "params": { "timeframe": "FIFTEEN_MINUTES", "period": 10 },
+      "destiny": "ENTRY_CONDITION",
+      "expirationDuration": "PT30M"
+    },
+    {
+      "key": "ema_slow_15m",
+      "indicatorType": "EMA",
+      "params": { "timeframe": "FIFTEEN_MINUTES", "period": 50 },
+      "destiny": "ENTRY_CONDITION",
+      "expirationDuration": "PT30M"
+    },
+    {
+      "key": "rsi_5m",
+      "indicatorType": "RSI",
+      "params": { "timeframe": "FIVE_MINUTES", "period": 14 },
+      "destiny": "ENTRY_CONDITION",
+      "expirationDuration": "PT15M"
+    },
+    {
+      "key": "atr_15m",
+      "indicatorType": "ATR",
+      "params": { "timeframe": "FIFTEEN_MINUTES", "period": 14 },
+      "destiny": "PROTECTION",
+      "expirationDuration": "PT30M"
+    }
+  ],
+  "marketStructureSettings": [
+    {
+      "key": "phase_structure_1h",
+      "timeframe": "ONE_HOUR",
+      "params": {
+        "lookbackBars": 96,
+        "minTouches": 2,
+        "minRangeWidthPercents": 1.0,
+        "maxRangeWidthPercents": 8.0,
+        "breakoutBufferPercents": 15,
+        "breakoutConfirmationBars": 2,
+        "swingLookbackBars": 5,
+        "trendEfficiencyThreshold": 0.30,
+        "levelToleranceAtrMultiplier": 0.5
+      },
+      "destiny": "MARKET_PHASE",
+      "expirationDuration": "PT2H"
+    }
+  ],
   "details": [
     {
       "marketPhaseType": "BULL_TREND",
       "phaseEntryPolicy": "FOLLOW_PHASE",
       "riskPerTradePercent": 1.0,
       "targetRiskRewardRatio": 2.5,
-      "indicatorSettings": [
-        {
-          "key": "ema_fast_15m",
-          "indicatorType": "EMA",
-          "params": { "timeframe": "FIFTEEN_MINUTES", "period": 10 },
-          "destiny": "ENTRY_CONDITION",
-          "expirationDuration": "PT30M"
-        },
-        {
-          "key": "ema_slow_15m",
-          "indicatorType": "EMA",
-          "params": { "timeframe": "FIFTEEN_MINUTES", "period": 50 },
-          "destiny": "ENTRY_CONDITION",
-          "expirationDuration": "PT30M"
-        },
-        {
-          "key": "rsi_5m",
-          "indicatorType": "RSI",
-          "params": { "timeframe": "FIVE_MINUTES", "period": 14 },
-          "destiny": "ENTRY_CONDITION",
-          "expirationDuration": "PT15M"
-        },
-        {
-          "key": "atr_15m",
-          "indicatorType": "ATR",
-          "params": { "timeframe": "FIFTEEN_MINUTES", "period": 14 },
-          "destiny": "PROTECTION",
-          "expirationDuration": "PT30M"
-        }
-      ],
       "stepsByStatus": {
         "PRECHECK": [
           {
@@ -311,36 +304,6 @@
       "phaseEntryPolicy": "FOLLOW_PHASE",
       "riskPerTradePercent": 1.0,
       "targetRiskRewardRatio": 2.5,
-      "indicatorSettings": [
-        {
-          "key": "ema_fast_15m",
-          "indicatorType": "EMA",
-          "params": { "timeframe": "FIFTEEN_MINUTES", "period": 10 },
-          "destiny": "ENTRY_CONDITION",
-          "expirationDuration": "PT30M"
-        },
-        {
-          "key": "ema_slow_15m",
-          "indicatorType": "EMA",
-          "params": { "timeframe": "FIFTEEN_MINUTES", "period": 50 },
-          "destiny": "ENTRY_CONDITION",
-          "expirationDuration": "PT30M"
-        },
-        {
-          "key": "rsi_5m",
-          "indicatorType": "RSI",
-          "params": { "timeframe": "FIVE_MINUTES", "period": 14 },
-          "destiny": "ENTRY_CONDITION",
-          "expirationDuration": "PT15M"
-        },
-        {
-          "key": "atr_15m",
-          "indicatorType": "ATR",
-          "params": { "timeframe": "FIFTEEN_MINUTES", "period": 14 },
-          "destiny": "PROTECTION",
-          "expirationDuration": "PT30M"
-        }
-      ],
       "stepsByStatus": {
         "PRECHECK": [
           {

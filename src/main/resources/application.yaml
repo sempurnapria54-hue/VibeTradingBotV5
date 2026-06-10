@@ -62,9 +62,6 @@ market-data:
   structure:
     enabled: ${MARKET_STRUCTURE_JOB_ENABLED:true}
     cron: ${MARKET_STRUCTURE_JOB_CRON:0 * * * * *}
-  phase:
-    enabled: ${MARKET_PHASE_JOB_ENABLED:true}
-    cron: ${MARKET_PHASE_JOB_CRON:0 * * * * *}
 
 logging:
   level:

@@ -1,7 +1,9 @@
 package com.example.tradingbot.api.model.request;
 
 import com.example.tradingbot.api.model.strategy.StrategyDetailApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyIndicatorSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -46,4 +48,13 @@ public class CreateStrategyApiRequest {
     @Schema(description = "Детали по фазам рынка: ровно одна на каждый MarketPhase.Type",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private List<StrategyDetailApiModel> details;
+
+    @Valid
+    @Schema(description = "Настройки индикаторов стратегии (strategy-scope, объявлены раз; "
+            + "фаза/детали/действия ссылаются по key)")
+    private List<StrategyIndicatorSettingApiModel> indicatorSettings;
+
+    @Valid
+    @Schema(description = "Настройки структуры рынка стратегии (strategy-scope, адресуются по key)")
+    private List<StrategyMarketStructureSettingApiModel> marketStructureSettings;
 }

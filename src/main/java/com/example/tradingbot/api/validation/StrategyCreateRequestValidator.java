@@ -103,8 +103,12 @@ public class StrategyCreateRequestValidator {
 
     public void validateCreate(CreateStrategyApiRequest request) {
         List<String> violations = new ArrayList<>();
-        validateMarketPhaseSetting(request.getMarketPhaseSetting(), violations);
-        validateDetails(request.getDetails(), violations);
+        Map<String, IndicatorValue.Type> indicatorTypes = indicatorTypes(request.getIndicatorSettings());
+        Set<String> structureKeys = structureSettingKeys(request.getMarketStructureSettings());
+        validateSettingsLists(request.getIndicatorSettings(), request.getMarketStructureSettings(),
+                "strategy", indicatorTypes, violations);
+        validateMarketPhaseSetting(request.getMarketPhaseSetting(), indicatorTypes, structureKeys, violations);
+        validateDetails(request.getDetails(), indicatorTypes, structureKeys, violations);
         if (isNotEmpty(violations)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.join("; ", violations));
         }
@@ -121,16 +125,12 @@ public class StrategyCreateRequestValidator {
         return Strategy.Status.valueOf(status);
     }
 
-    private void validateMarketPhaseSetting(StrategyMarketPhaseSettingApiModel setting, List<String> violations) {
+    private void validateMarketPhaseSetting(StrategyMarketPhaseSettingApiModel setting,
+                                            Map<String, IndicatorValue.Type> indicatorTypes,
+                                            Set<String> structureKeys, List<String> violations) {
         if (isNull(setting)) {
             return;
         }
-        validateEnum(TimeFrame.class, setting.getTimeframe(), "marketPhaseSetting.timeframe", violations);
-        validateDuration(setting.getExpirationDuration(), "marketPhaseSetting.expirationDuration", violations);
-        Map<String, IndicatorValue.Type> indicatorTypes = indicatorTypes(setting.getIndicatorSettings());
-        Set<String> structureKeys = structureSettingKeys(setting.getMarketStructureSettings());
-        validateSettingsLists(setting.getIndicatorSettings(), setting.getMarketStructureSettings(),
-                "marketPhaseSetting", indicatorTypes, violations);
         validatePhaseRules(setting.getPhaseRules(), indicatorTypes, structureKeys, violations);
     }
 
@@ -190,13 +190,15 @@ public class StrategyCreateRequestValidator {
         validateOperand(operand, path, indicatorTypes, structureKeys, violations);
     }
 
-    private void validateDetails(List<StrategyDetailApiModel> details, List<String> violations) {
+    private void validateDetails(List<StrategyDetailApiModel> details,
+                                 Map<String, IndicatorValue.Type> indicatorTypes,
+                                 Set<String> structureKeys, List<String> violations) {
         if (isNull(details)) {
             return;
         }
         validatePhaseCoverage(details, violations);
         for (int index = 0; index < details.size(); index++) {
-            validateDetail(details.get(index), "details[" + index + "]", violations);
+            validateDetail(details.get(index), "details[" + index + "]", indicatorTypes, structureKeys, violations);
         }
     }
 
@@ -216,14 +218,12 @@ public class StrategyCreateRequestValidator {
         }
     }
 
-    private void validateDetail(StrategyDetailApiModel detail, String path, List<String> violations) {
+    private void validateDetail(StrategyDetailApiModel detail, String path,
+                                Map<String, IndicatorValue.Type> indicatorTypes,
+                                Set<String> structureKeys, List<String> violations) {
         validateEnum(MarketPhase.Type.class, detail.getMarketPhaseType(), path + ".marketPhaseType", violations);
         validateEnum(PhaseEntryPolicy.class, detail.getPhaseEntryPolicy(), path + ".phaseEntryPolicy", violations);
         validatePolicyMatrix(detail, path, violations);
-        Map<String, IndicatorValue.Type> indicatorTypes = indicatorTypes(detail.getIndicatorSettings());
-        Set<String> structureKeys = structureSettingKeys(detail.getMarketStructureSettings());
-        validateSettingsLists(detail.getIndicatorSettings(), detail.getMarketStructureSettings(),
-                path, indicatorTypes, violations);
         validateSteps(detail, path, indicatorTypes, structureKeys, violations);
     }
 
@@ -327,13 +327,13 @@ public class StrategyCreateRequestValidator {
         }
     }
 
-    /** Soft-ссылка на каталожный индикатор того же контейнера должна резолвиться и быть нужного типа. */
+    /** Soft-ссылка на каталожный индикатор стратегии должна резолвиться и быть нужного типа. */
     private void validateIndicatorKeyOfType(String key, IndicatorValue.Type expectedType,
                                             Map<String, IndicatorValue.Type> indicatorTypes, String path,
                                             List<String> violations) {
         if (isFalse(indicatorTypes.containsKey(key))) {
             violations.add(path + " references unknown indicator setting key " + key
-                    + " (must reference an indicator of the same container)");
+                    + " (must reference an indicator setting of the strategy)");
             return;
         }
         if (isFalse(Objects.equals(indicatorTypes.get(key), expectedType))) {
@@ -717,12 +717,12 @@ public class StrategyCreateRequestValidator {
     private void validateReference(String key, Set<String> knownKeys, String path, String targetName,
                                    List<String> violations) {
         if (isNull(key)) {
-            violations.add(path + " is required and must reference a " + targetName + " of the same detail");
+            violations.add(path + " is required and must reference a " + targetName + " of the strategy");
             return;
         }
         if (isFalse(knownKeys.contains(key))) {
             violations.add(path + " references unknown " + targetName + " key " + key
-                    + " (reference must stay inside the detail)");
+                    + " (reference must stay inside the strategy)");
         }
     }
 

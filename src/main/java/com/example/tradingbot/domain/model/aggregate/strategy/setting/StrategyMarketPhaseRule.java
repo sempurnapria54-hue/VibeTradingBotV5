@@ -10,9 +10,10 @@ import lombok.Setter;
 /**
  * Клауза «условие → фаза» в наборе правил классификации
  * StrategyMarketPhaseSetting.phaseRules. Набор — упорядоченный
- * first-match-список: клаузы проверяются по {@code level} ASC, первая с
- * истинным {@code condition} задаёт MarketPhase.Type; не сработала ни
- * одна → UNKNOWN. Condition — тот же StrategyCondition, но в контексте
+ * first-match-список: клаузы проверяются по позиции в списке (поле
+ * {@code level} снято — трек D, docs/decisions/market-phase-stateless.md),
+ * первая с истинным {@code condition} задаёт MarketPhase.Type; не сработала
+ * ни одна → UNKNOWN. Condition — тот же StrategyCondition, но в контексте
  * классификации фазы (до выбора детали, без сделки): операнды
  * INDICATOR/MARKET_STRUCTURE/PRICE/CONSTANT/TIME, без MARKET_PHASE и
  * runtime-источников сделки (контекстный whitelist — create-валидация).
@@ -25,9 +26,6 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StrategyMarketPhaseRule {
-
-    /** Порядок проверки клаузы (ASC); first-match. */
-    private Integer level;
 
     /** Фаза, назначаемая при истинном condition. */
     private MarketPhase.Type type;

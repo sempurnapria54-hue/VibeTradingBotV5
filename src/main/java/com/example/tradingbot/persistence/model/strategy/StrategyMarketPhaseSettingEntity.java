@@ -19,11 +19,9 @@ import org.hibernate.type.SqlTypes;
 /**
  * Persistence-проекция {@link StrategyMarketPhaseSetting} (таблица
  * strategy_market_phase_settings) — каркасный реляционный узел 1:1 к
- * стратегии. Клаузы классификации (phaseRules) и листовые настройки
- * рыночных данных — JSONB на этой строке (сериализованный доменный JSON,
- * конвертирует маппер). MarketPhaseParams распущен (условная фаза).
- * Таймфрейм и duration — строки (enum'ы только в домене; duration —
- * ISO-8601).
+ * стратегии. Несёт только клаузы классификации (phase_rules JSONB):
+ * листовые настройки рыночных данных переехали в собственные strategy-scope-
+ * таблицы (трек D), фаза не персистируется (нет timeframe/expiration_duration).
  */
 @Getter
 @Setter
@@ -39,21 +37,7 @@ public class StrategyMarketPhaseSettingEntity extends AuditableEntity {
     @JoinColumn(name = "strategy_id", nullable = false, updatable = false)
     private StrategyEntity strategy;
 
-    @Column(name = "timeframe", nullable = false)
-    private String timeframe;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "phase_rules", nullable = false)
     private String phaseRules;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "indicator_settings")
-    private String indicatorSettings;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "market_structure_settings")
-    private String marketStructureSettings;
-
-    @Column(name = "expiration_duration", nullable = false)
-    private String expirationDuration;
 }

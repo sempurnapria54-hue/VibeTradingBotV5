@@ -1,22 +1,21 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.setting;
 
 import com.example.tradingbot.domain.model.Auditable;
-import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
-import java.time.Duration;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Настройка расчёта фазы рынка. Живёт на уровне Strategy (одна на
+ * Настройка классификации фазы рынка. Живёт на уровне Strategy (одна на
  * стратегию), потому что фаза нужна до выбора StrategyDetail: одна
- * настройка описывает классификацию рынка во все MarketPhase.Type;
- * MarketPhaseJob сохраняет один актуальный результат, EntryScannerJob
- * выбирает detail по типу фазы. Каркасный реляционный узел дерева
- * (своя строка/таблица); листовые настройки и params — JSONB на его
- * строке. См. docs/models/domain/aggregate/Strategy.md
- * (§StrategyMarketPhaseSetting).
+ * настройка описывает классификацию рынка во все MarketPhase.Type.
+ * Фаза вычисляется на лету и не персистируется — своих часов (timeframe)
+ * и срока свежести (expirationDuration) у неё нет; свежесть наследуется от
+ * входов (трек D, docs/decisions/market-phase-stateless.md). Каркасный
+ * реляционный узел дерева (своя строка/таблица); phaseRules и листовые
+ * настройки — JSONB на его строке. См.
+ * docs/models/domain/aggregate/Strategy.md (§StrategyMarketPhaseSetting).
  */
 @Getter
 @Setter
@@ -26,22 +25,13 @@ public class StrategyMarketPhaseSetting extends Auditable {
     /** Технический ID узла. */
     private Long id;
 
-    /** Доменный таймфрейм классификации фазы. */
-    private TimeFrame timeframe;
-
     /**
      * Авторские правила классификации фазы (упорядоченный first-match-
-     * список клауз «условие → фаза»). Заменяют распущенный скоринговый
-     * MarketPhaseParams (docs/decisions/market-phase-conditional-classification.md).
+     * список клауз «условие → фаза»; порядок = позиция в списке). Заменяют
+     * распущенный скоринговый MarketPhaseParams
+     * (docs/decisions/market-phase-conditional-classification.md).
+     * Операнды клауз адресуют индикаторы/структуры стратегии по
+     * {@code key} (strategy-scope, трек D).
      */
     private List<StrategyMarketPhaseRule> phaseRules;
-
-    /** Индикаторы для расчёта фазы (destiny = MARKET_PHASE). */
-    private List<StrategyIndicatorSetting> indicatorSettings;
-
-    /** Структуры рынка для расчёта фазы (destiny = MARKET_PHASE). */
-    private List<StrategyMarketStructureSetting> marketStructureSettings;
-
-    /** Срок свежести последней рассчитанной MarketPhase. */
-    private Duration expirationDuration;
 }

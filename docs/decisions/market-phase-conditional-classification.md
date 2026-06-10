@@ -59,9 +59,9 @@ score. Семантика самого скоринга не была задан
    контейнера исчезают; `StrategyMarketPhaseSetting` не несёт ни
    `params`, ни дебаунса.
 
-3. **Исполнение.** Тонкий stateless `MarketPhaseClassifier`
+3. **Исполнение.** Тонкий stateless `MarketPhaseResolver`
    (чистый first-match) поверх переиспользуемого
-   `StrategyConditionEvaluator` (`docs/components/MarketPhaseClassifier.md`).
+   `StrategyConditionEvaluator` (`docs/components/MarketPhaseResolver.md`).
    Ревизией (трек D, `docs/decisions/market-phase-stateless.md`) фаза
    **не персистируется** — классификатор зовётся
    `docs/components/MarketPhaseService.md` **на чтение** (бывший
@@ -132,7 +132,7 @@ score. Семантика самого скоринга не была задан
   убраны. *(Ревизия трек D: компонент удалён — фаза не персистируется,
   классификатор зовётся `MarketPhaseService` на чтение,
   `docs/decisions/market-phase-stateless.md`.)*
-- `docs/components/MarketPhaseClassifier.md` — новый компонент (stateless
+- `docs/components/MarketPhaseResolver.md` — новый компонент (stateless
   first-match поверх `StrategyConditionEvaluator`).
 - `docs/decisions/strategy-tree-persistence.md` — `MarketPhaseParams`
   заменён `phaseRules` (JSONB-колонка контейнера).

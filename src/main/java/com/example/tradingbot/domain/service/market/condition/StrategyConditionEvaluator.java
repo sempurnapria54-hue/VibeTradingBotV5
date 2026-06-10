@@ -23,7 +23,6 @@ import com.example.tradingbot.domain.model.trade.indicator.RsiValue;
 import com.example.tradingbot.domain.model.trade.indicator.StochasticValue;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
@@ -51,23 +50,6 @@ public class StrategyConditionEvaluator {
             return true;
         }
         return condition.getRules().stream().allMatch(rule -> evaluateRule(rule, context));
-    }
-
-    /**
-     * Производный confirmedAt: консервативный max по гейт-операндам
-     * условия (структурный операнд → его confirmedAt; индикаторный →
-     * candleTimestamp значения; без гейт-операндов → время бара оценки).
-     * См. docs/models/domain/other/MarketPhase.md (§Деривация confirmedAt).
-     */
-    public OffsetDateTime deriveConfirmedAt(StrategyCondition condition, ConditionEvaluationContext context) {
-        OffsetDateTime result = null;
-        if (nonNull(condition) && nonNull(condition.getRules())) {
-            for (StrategyConditionRule rule : condition.getRules()) {
-                result = latest(result, gateTimestamp(rule.getLeftOperand(), context));
-                result = latest(result, gateTimestamp(rule.getRightOperand(), context));
-            }
-        }
-        return isNull(result) ? context.getEvaluationTime() : result;
     }
 
     private boolean evaluateRule(StrategyConditionRule rule, ConditionEvaluationContext context) {
@@ -259,30 +241,4 @@ public class StrategyConditionEvaluator {
         return operand.getValue();
     }
 
-    private OffsetDateTime gateTimestamp(StrategyConditionOperand operand, ConditionEvaluationContext context) {
-        if (isNull(operand) || isNull(operand.getSourceType())) {
-            return null;
-        }
-        return switch (operand.getSourceType()) {
-            case MARKET_STRUCTURE -> {
-                MarketStructure structure = structureOfOperand(operand, context);
-                yield nonNull(structure) ? structure.getConfirmedAt() : null;
-            }
-            case INDICATOR -> {
-                IndicatorValue value = indicatorOf(operand, context, true);
-                yield nonNull(value) ? value.getCandleTimestamp() : null;
-            }
-            default -> null;
-        };
-    }
-
-    private OffsetDateTime latest(OffsetDateTime current, OffsetDateTime candidate) {
-        if (isNull(candidate)) {
-            return current;
-        }
-        if (isNull(current) || candidate.isAfter(current)) {
-            return candidate;
-        }
-        return current;
-    }
 }

@@ -39,14 +39,7 @@ public class StrategyDetailApiModel {
     private BigDecimal targetRiskRewardRatio;
 
     @Valid
-    @Schema(description = "Индикаторы детали (после выбора фазы)")
-    private List<StrategyIndicatorSettingApiModel> indicatorSettings;
-
-    @Valid
-    @Schema(description = "Структуры рынка детали (после выбора фазы)")
-    private List<StrategyMarketStructureSettingApiModel> marketStructureSettings;
-
-    @Valid
-    @Schema(description = "Шаги по статусу сделки; ключ — имя Deal.Status (PRECHECK, MANAGING, ...)")
+    @Schema(description = "Шаги по статусу сделки; ключ — имя Deal.Status (PRECHECK, MANAGING, ...). "
+            + "Индикаторы/структуры детали объявлены на стратегии (strategy-scope), адресуются по key")
     private Map<String, List<StrategyStepApiModel>> stepsByStatus;
 }

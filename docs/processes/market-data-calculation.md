@@ -39,7 +39,7 @@ EntryScannerJob / DealOrchestratorJob (FSM)
 Компоненты: `docs/components/IndicatorJob.md`,
 `MarketStructureJob.md`. Фаза **не предрассчитывается job'ом** — она
 вычисляется на чтение через `docs/components/MarketPhaseService.md` /
-`MarketPhaseClassifier.md` (ревизия трек D,
+`MarketPhaseResolver.md` (ревизия трек D,
 `docs/decisions/market-phase-stateless.md`; прежний `MarketPhaseJob`
 удалён). Загрузку свечей ведёт `docs/components/CandleJob.md` в процессе
 `docs/processes/candle-loading.md`.

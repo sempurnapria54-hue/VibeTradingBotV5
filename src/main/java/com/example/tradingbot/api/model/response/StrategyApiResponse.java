@@ -1,7 +1,9 @@
 package com.example.tradingbot.api.model.response;
 
 import com.example.tradingbot.api.model.strategy.StrategyDetailApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyIndicatorSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.Getter;
@@ -33,4 +35,10 @@ public class StrategyApiResponse extends AuditableApiResponse {
 
     @Schema(description = "Детали по фазам рынка")
     private List<StrategyDetailApiModel> details;
+
+    @Schema(description = "Настройки индикаторов стратегии (strategy-scope)")
+    private List<StrategyIndicatorSettingApiModel> indicatorSettings;
+
+    @Schema(description = "Настройки структуры рынка стратегии (strategy-scope)")
+    private List<StrategyMarketStructureSettingApiModel> marketStructureSettings;
 }
