@@ -26,3 +26,12 @@ safety checks, отправляет full close request, сохраняет ACK /
 закрывается весь размер; есть данные для exchange request; команда не
 противоречит known exchange state. ACK не runtime truth (см.
 `docs/rules/ack-not-runtime-truth.md`).
+
+## ClosePositionCommandPayload
+
+`positionId`, `requestedCloseReason` (`Position.CloseReason`). Не содержит
+`closeFraction` — `CLOSE_POSITION` всегда full close (см.
+`docs/rules/no-partial-close.md`). Не содержит `autoCancelOrders`/`autoCxl`
+— это OKX-specific флаг adapter (см. `docs/models/mapping/Position.md`).
+`instrumentExternalId`/`positionSide`/`marginMode` не нужны — приходят из
+`DealContext` / adapter.

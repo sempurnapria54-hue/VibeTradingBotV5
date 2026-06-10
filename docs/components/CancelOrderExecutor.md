@@ -16,3 +16,7 @@ refresh/search/history. Не переводит order в `CANCELED` по ACK;
 собирает факты и решает по ним (см. `docs/rules/command-lifecycle.md`).
 ACK не runtime truth (см. `docs/rules/ack-not-runtime-truth.md`); общая
 семантика `CANCEL_*` — `docs/components/ServiceCommandExecutor.md`.
+
+## CancelOrderCommandPayload
+
+`orderId`, `cancelReason` (`CancelReason`).

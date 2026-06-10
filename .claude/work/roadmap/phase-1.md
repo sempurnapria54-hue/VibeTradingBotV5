@@ -27,7 +27,7 @@ production-flow одной стратегии.
 | 1 | Поток рыночных данных (коннект к OKX, инструменты, цены/свечи, свежесть) | DONE |
 | 2 | Стратегия (абстракция: объявляет нужные индикаторы и условие сигнала; одна реализация) | DONE |
 | 3 | Производные рыночные данные: индикаторы + структура рынка (`MarketStructure`) + фаза рынка (`MarketPhase`) — jobs, модели, сервисы (расчёт/чтение/сохранение значений, запрошенных стратегией) | DONE |
-| 4 | Команды и их жизненный цикл (ServiceCommand: submit/amend/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | HOLD |
+| 4 | Команды и их жизненный цикл (ServiceCommand: submit/amend/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DOCS_CHECK_2 |
 | 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | HOLD |
 | 6 | FSM (состояния и переходы сущностей — связующее звено) | HOLD |
 | 7 | Сделки и P&L (DealOrchestratorJob — агрегирование в Deal, P&L; он же оркестрирует торговый цикл сигнал→команда→позиция) | HOLD |
@@ -110,6 +110,43 @@ production-flow одной стратегии.
   PHASE-Q2 (размещение `MarketPhase` как computed value), STRUCT-Q1
   (калибровка порогов, фаза 2), IND-Q1 (крипто-объём, фаза 4). Ролляп фазы —
   без изменений (`IN_PROGRESS`: шаги 1-3 `DONE`, 4-11 `HOLD`).
+- **Шаг 4 → `DOCS_CHECK_1` (2026-06-10):** стартован шаг команд (`TOOLING`
+  пройден без новых артефактов — concept/trading-фокусы уже есть). Первый
+  прогон сквозной проверки: command-layer **в основном уже материализован**
+  миграцией из архива; обход дошёл до стадии 2 (компоненты+модели). **Не
+  чисто** — гейт `CODE` закрыт. Блокер `CODE` — **N1/DEAL-Q3**
+  (`DealActionState` не материализован: центральная command-модель без
+  структуры/размещения). Прочее: CMD-Q2 (базовый тип payload'ов, гейтит
+  чистоту), N2 (`AttachedAlgoOrderStateResolver` без компонент-дока),
+  N3/N5 (стале-ссылки на несуществующие `tasks/{order,algo-order,position}.md`;
+  исполнитель recovery-refresh команд). Торговый фокус — блокеров нет (модель
+  реконсиляции корпусно-состоятельна). Нужен `GAPS_CLOSE_1`. Отчёт —
+  `.claude/work/progress/phase-1-step-4-docs-check-1.md`.
+- **Шаг 4 → `GAPS_CLOSE_1` (2026-06-10):** пробелы `DOCS_CHECK_1` закрыты.
+  **N1/DEAL-Q3** — `DealActionState` материализован
+  (`docs/models/domain/other/DealActionState.md` +
+  `docs/lifecycles/DealActionState.md`; `RuntimeTarget` объектом, retry через
+  `Retryable`, вложенное — jsonb; решение
+  `docs/decisions/deal-action-state-materialization.md`) — **блокер `CODE`
+  снят**. **N2** — заведён
+  `docs/components/AttachedAlgoOrderStateResolver.md`. **N3/N5** — сняты
+  стале-ссылки на несуществующие `tasks/{order,algo-order,position}.md`;
+  закреплён исполнитель recovery-refresh команд (entity-refresh-executor, без
+  отдельных файлов). **Э3/CMD-Q2** — payload-разделы перенесены к
+  executor'ам; базовый тип payload'ов **не финализирован** (крен разошёлся на
+  валидации): концепт-проектирование дообучено (эвристика 5 — сигнатуры/
+  расширяемость), переоценка базового типа выносится на валидацию, CMD-Q2
+  остаётся открытым. Далее — `DOCS_CHECK_2`.
+- **Шаг 4 → `DOCS_CHECK_2` (2026-06-10):** подтверждающий прогон после
+  `GAPS_CLOSE_1` — **чисто**. Все находки `DOCS_CHECK_1` (N1-N5) и CMD-Q2
+  подтверждены закрытыми; `DealActionState`/`RuntimeTarget`/статусы
+  согласованы между моделью, lifecycle и всеми потребителями (вкл. step-6/7
+  доки); новых doc↔doc несогласованностей и битых ссылок нет. Остаток — 2
+  не-гейтящие CODE-level заметки (`SKIPPED`-рёбра lifecycle, `maxAttempts`
+  на `Retryable` vs политике). Торговый гейт — без блокеров. **Концепт-гейт
+  `CODE` пройден.** Отчёт —
+  `.claude/work/progress/phase-1-step-4-docs-check-2.md`. Шаг готов к
+  `CODE` — перевод за пользователем.
 - **Шаг 2, фиксация задним числом:** между `GAPS_CLOSE_7` и
   `DOCS_CHECK_8` пройден повторный под-шаг `TOOLING` (торговый
   совет: агент `trading-specialist`, дистиллят корпуса

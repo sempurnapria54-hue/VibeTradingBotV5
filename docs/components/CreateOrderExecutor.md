@@ -14,4 +14,25 @@ attached protection внутри order (если есть), обновляет
 ходит, цену не пересчитывает, условия не проверяет.
 
 Общая семантика `CREATE_*` — `docs/components/ServiceCommandExecutor.md`.
-`DealActionState` — DEAL-Q3 (`.claude/work/questions/open-questions.md`).
+`DealActionState` / `RuntimeTarget` — `docs/models/domain/other/DealActionState.md`.
+
+## CreateOrderCommandPayload
+
+`orderType` (`Order.Type`), `strategyDirection` (`StrategyTradeDirection`),
+`side` (buy/sell), `positionSide`, `instrumentExternalId`, `marginMode`,
+`executionType`, `sizeContracts`, `price`, `sendPriceToExchange`,
+`positionReducingOnly` (доменное намерение → OKX `reduceOnly` в adapter),
+`attachedProtection` (`AttachedProtectionPayload`, если order создаётся со
+стартовым SL/TP).
+
+Хранит минимум для создания; client id (`internalId`), external id берутся
+из создаваемой сущности. `positionSide`/`marginMode` — generic command-level
+intent; OKX adapter всё равно ставит `tdMode=isolated`, `posSide=net` и
+валидирует response (см. `docs/models/mapping/Order.md`).
+
+### AttachedProtectionPayload
+
+Параметры attached protection при создании order со стартовым SL/TP
+(вложен в `CreateOrderCommandPayload.attachedProtection`). Структура
+attached protection — `docs/models/domain/core/Order.md`
+(`AttachedAlgoOrder`).

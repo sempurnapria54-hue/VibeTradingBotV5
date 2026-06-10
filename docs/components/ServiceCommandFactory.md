@@ -27,7 +27,7 @@ status = CREATED                       -> SUBMIT_ORDER
 status = SUBMITTED                     -> REFRESH_ORDER / REFRESH_PENDING_ORDERS / ...
 ```
 
-(`DealActionState`-статусы — DEAL-Q3, `.claude/work/questions/open-questions.md`.)
+(`DealActionState`-статусы — `docs/lifecycles/DealActionState.md`.)
 
 ## Связь с risk-layer и freshness
 

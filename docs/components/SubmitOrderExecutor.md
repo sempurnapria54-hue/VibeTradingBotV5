@@ -18,3 +18,8 @@ Recoverability: если приложение упало после отправ
 состояние. ACK не runtime truth (см.
 `docs/rules/ack-not-runtime-truth.md`); общая семантика `SUBMIT_*` —
 `docs/components/ServiceCommandExecutor.md`.
+
+## SubmitOrderCommandPayload
+
+Только `orderId` (executor сам берёт `internalId` как `clOrdId`,
+`externalId` если есть).

@@ -51,16 +51,14 @@ payload-классов («Сервисные команды» §13, §10). Ра�
   прохода 2): хранит payload отдельно от его единственного
   потребителя; отменено этим решением.
 
-## Отложенный подвопрос
+## Отложенный подвопрос (закрыт)
 
-Существует ли у payload'ов общий базовый тип/дискриминатор
-(`ServiceCommandPayload` как база + подтипы) и, если да, где живёт
-описание дискриминатора и какова судьба существующего
-`docs/components/models/ServiceCommandPayload.md` — CMD-Q2
-(`.claude/work/questions/open-questions.md`), горизонт — шаг 4
-(материализация payload-детали). Содержимое payload'ов в любом
-случае едет к своему executor'у; до переноса разделы остаются в
-существующем файле.
+CMD-Q2 (общий базовый тип/дискриминатор payload'ов + судьба
+`ServiceCommandPayload.md`) закрыт на `GAPS_CLOSE_1` шага 4 (2026-06-10)
+решением `docs/decisions/service-command-payload-base-type.md`: маркер-база
+`ServiceCommandPayload` (без поведения), дискриминатор — `ServiceCommandType`
+на команде, `ServiceCommandPayload.md` — дом базового типа. Payload-разделы
+перенесены к своим executor'ам.
 
 ## Закрытие вопроса
 

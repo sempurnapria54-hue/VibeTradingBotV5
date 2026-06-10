@@ -19,9 +19,9 @@ handlers **не** используют `externalStatus` напрямую (см.
 > Resolver'ы, executors и команды (`CREATE_ALGO_ORDER`,
 > `SUBMIT_ALGO_ORDER`, `AMEND_ALGO_ORDER`, `CANCEL_ALGO_ORDER`,
 > `REFRESH_ALGO_ORDER`, `REFRESH_ALGO_ORDERS`,
-> `REFRESH_ALGO_ORDER_HISTORY`) — cross-cutting command-подсистема,
-> мигрируются отдельно (форвард-заметки — в
-> `.claude/work/questions/tasks/algo-order.md`).
+> `REFRESH_ALGO_ORDER_HISTORY`) — command-подсистема (шаг 4):
+> `docs/components/` (executors, resolver'ы),
+> `docs/rules/command-lifecycle.md`.
 
 ## Статусы и live semantics
 

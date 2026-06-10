@@ -15,10 +15,10 @@
 применяет результат. FSM напрямую `Position` не создаёт и не меняет.
 
 > Компоненты `PositionStatusResolver`, `RefreshPositionExecutor`,
-> `ClosePositionExecutor`, `AnomalyJob`, `DealOrchestratorJob` —
-> часть cross-cutting command/orchestration-подсистемы, мигрируются
-> отдельно (форвард-заметки — в `.claude/work/questions/tasks/position.md`).
-> Здесь — только статусная механика, которой владеет сама `Position`.
+> `ClosePositionExecutor` — command-подсистема (шаг 4),
+> `docs/components/`; `AnomalyJob` / `DealOrchestratorJob` —
+> orchestration/anomaly (шаги 6-8). Здесь — только статусная механика,
+> которой владеет сама `Position`.
 
 ## Статусы
 
@@ -120,7 +120,7 @@ Position, Position.dealId = Deal.id
 order. Recovery-контур (`REFRESH_ORDER`/`REFRESH_ORDER_HISTORY` →
 `REFRESH_POSITION` (null) → `REFRESH_ALGO_ORDER_HISTORY` →
 `REFRESH_FILLS`) — Deal-lifecycle/orchestration; полный flow —
-форвард-заметка для миграции Deal (`.claude/work/questions/tasks/position.md`).
+`docs/processes/deal-management.md` / `docs/lifecycles/Deal.md` (шаги 6-7).
 Position-правило: локальную `CLOSED Position` можно не создавать, если
 её ещё не было; `Deal` финализируется по собранным фактам.
 

@@ -14,7 +14,10 @@
 `docs/rules/external-status-resolution.md`,
 `docs/models/mapping/AlgoOrder.md`).
 
-Обновляет только `AlgoOrder`; `REFRESH_ORDER` / `REFRESH_PENDING_ORDERS`
-/ `REFRESH_ORDER_HISTORY` / `REFRESH_FILLS` / `REFRESH_POSITION` выбирает
-FSM / `DealOrchestratorJob`. Общая семантика `REFRESH_*` —
-`docs/components/ServiceCommandExecutor.md`.
+Исполняет algo-refresh-семейство: `REFRESH_ALGO_ORDER` + recovery-варианты
+`REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY` (отдельных
+executor-файлов не имеют — разные endpoint'ы того же executor'а, см.
+`.claude/decisions/executor-payload-file-granularity.md`). Обновляет
+только `AlgoOrder`; cross-entity refresh (`REFRESH_ORDER` / `REFRESH_FILLS`
+/ `REFRESH_POSITION`) выбирает FSM / `DealOrchestratorJob`. Общая семантика
+`REFRESH_*` — `docs/components/ServiceCommandExecutor.md`.

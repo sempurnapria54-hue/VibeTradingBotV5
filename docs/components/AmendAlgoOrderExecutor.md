@@ -23,3 +23,9 @@ partially_effective→PARTIALLY_COMPLETED, order_failed/partially_failed →
 
 ACK не runtime truth (см. `docs/rules/ack-not-runtime-truth.md`); общая
 семантика `AMEND_*` — `docs/components/ServiceCommandExecutor.md`.
+
+## AmendAlgoOrderCommandPayload
+
+`algoOrderId`, `conditionType`, `newStopLossPrice`, `newTakeProfitPrice`,
+`newTrailingPrice`, `newSizeContracts` (доля закрытия пересчитана в размер
+до создания команды).

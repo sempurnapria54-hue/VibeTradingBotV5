@@ -39,6 +39,14 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
   текущий `== null`; торговых решений не принимает, cleanup не запускает,
   audit/history как runtime-source не использует.
 
+> **Recovery-refresh команды** (`REFRESH_PENDING_ORDERS` /
+> `REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS` /
+> `REFRESH_ALGO_ORDER_HISTORY`) отдельных executor-файлов не имеют (см.
+> `.claude/decisions/executor-payload-file-granularity.md`): их исполняет
+> соответствующий entity-refresh-executor (`RefreshOrderExecutor` /
+> `RefreshAlgoOrderExecutor`) по общей семантике `REFRESH_*`, разными
+> endpoint'ами; выбор команды — за FSM / `DealOrchestratorJob`.
+
 ACK как runtime truth не считается ни для submit/amend/cancel/close (см.
 `docs/rules/ack-not-runtime-truth.md`). Жизненный цикл команды и принцип
 «одна команда за проход» — `docs/rules/command-lifecycle.md`.

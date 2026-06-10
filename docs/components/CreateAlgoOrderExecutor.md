@@ -13,4 +13,14 @@ RuntimeTarget(ALGO_ORDER, algoOrderId)` и `DealActionState.status =
 CREATED`. На биржу не ходит.
 
 Общая семантика `CREATE_*` — `docs/components/ServiceCommandExecutor.md`.
-`DealActionState` — DEAL-Q3 (`.claude/work/questions/open-questions.md`).
+`DealActionState` / `RuntimeTarget` — `docs/models/domain/other/DealActionState.md`.
+
+## CreateAlgoOrderCommandPayload
+
+`conditionType` (`ConditionType`: SL/OCO_FULL/PARTIAL_TAKE_PROFIT/TRAILING
+и т.д.), `side`, `positionSide`, `instrumentExternalId`, `marginMode`,
+`positionReducingOnly` (для защитных почти всегда `true`), `sizeContracts`,
+`stopLossPrice` (`ResolvedStopLossPrice`), `takeProfitPrice`
+(`ResolvedTakeProfitPrice`), `trailingPrice` (`ResolvedTrailingPrice`).
+`closeFraction` не передаётся — остаётся sizing intent; command-layer
+получает готовый `sizeContracts`.

@@ -44,7 +44,8 @@ queue. История исполнения команд не становитс�
 
 Правило сквозное по командам/FSM (`.claude/decisions/rule-source-of-truth.md`).
 Связанные инварианты живут у владельцев: `strategyActionId` не в
-`Order`/`AlgoOrder`/`Position` → их модели + `DealActionState` (DEAL-Q3);
+`Order`/`AlgoOrder`/`Position` → их модели +
+`docs/models/domain/other/DealActionState.md`;
 `ServiceCommand` не persisted queue → `docs/rules/command-lifecycle.md`.
 Сами модели истории (`ServiceCommandExecutionHistory`, entity history,
 timeline, snapshot-формат) **не** проектируются в этой миграции — архивный

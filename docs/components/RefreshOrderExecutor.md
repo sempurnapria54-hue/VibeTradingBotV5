@@ -13,9 +13,12 @@
 `docs/rules/external-status-resolution.md`,
 `docs/models/mapping/Order.md`).
 
-Обновляет только `Order`; не сопровождает сделку целиком — другие
-refresh-команды (`REFRESH_FILLS`, `REFRESH_POSITION`,
-`REFRESH_PENDING_ORDERS`, `REFRESH_ORDER_HISTORY`) выбирает FSM /
-`DealOrchestratorJob`. `ExternalNotFoundException` — только после полного
-order evidence-cycle (см. `docs/models/mapping/Order.md`).
+Исполняет order-refresh-семейство: `REFRESH_ORDER` + recovery-варианты
+`REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` (отдельных
+executor-файлов не имеют — разные endpoint'ы того же executor'а, см.
+`.claude/decisions/executor-payload-file-granularity.md`). Обновляет
+только `Order`, сделку целиком не сопровождает; cross-entity refresh
+(`REFRESH_FILLS`, `REFRESH_POSITION`) выбирает FSM / `DealOrchestratorJob`.
+`ExternalNotFoundException` — только после полного order evidence-cycle
+(см. `docs/models/mapping/Order.md`).
 Общая семантика `REFRESH_*` — `docs/components/ServiceCommandExecutor.md`.

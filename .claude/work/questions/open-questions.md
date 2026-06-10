@@ -51,7 +51,16 @@ ER/ATR-входы) **закрыт** 2026-06-10 реверсом ключеван
 владелец `trading-review`; и PHASE-Q2 (трек D): размещение `MarketPhase`
 после перехода в вычисляемое значение (RVO vs доменный computed value;
 конфликт критериев из-за доменного enum `Type`) — владелец
-`knowledge-curator`/`solution-designer`. Оба non-gating.
+`knowledge-curator`/`solution-designer`. Оба non-gating. DEAL-Q3
+(размещение/структура `DealActionState`) закрыт 2026-06-10 на
+`GAPS_CLOSE_1` шага 4 решением
+`docs/decisions/deal-action-state-materialization.md` (материализован:
+`domain/other` + own lifecycle, `RuntimeTarget` объектом, retry через
+`Retryable`). CMD-Q2 (базовый тип payload'ов) закрыт 2026-06-10 на
+`GAPS_CLOSE_1` шага 4 решением
+`docs/decisions/service-command-payload-base-type.md` (маркер-база
+`ServiceCommandPayload`, дискриминатор — `ServiceCommandType` на команде,
+файл — дом базового типа).
 
 История закрытых вопросов пайплайна:
 
@@ -257,24 +266,6 @@ handler'ы по образцу FSM сделки (`docs/components/DealStateMachi
 `docs/lifecycles/Instrument.md`, `docs/lifecycles/CandleGroup.md`,
 `docs/components/CandleJob.md`.
 
-### CMD-Q2. Базовый тип/дискриминатор payload'ов и судьба `ServiceCommandPayload.md`
-
-Вынесен из CMD-Q1 при его закрытии (2026-06-06,
-`.claude/decisions/executor-payload-file-granularity.md`: гранулярность
-command-layer — file-per-executor; payload документируется разделом в
-доке своего executor'а, отдельного агрегирующего файла нет). Не решено:
-существует ли у payload'ов общий базовый тип/дискриминатор
-(`ServiceCommandPayload` как база + подтипы) и, если да, где живёт
-описание дискриминатора и какова судьба существующего
-`docs/components/models/ServiceCommandPayload.md`. Завязано на
-проработку command-layer. Содержимое payload'ов в любом случае едет к
-своему executor'у; до переноса разделы остаются в существующем файле.
-
-Горизонт (взвешивание срока): шаг 4 — материализация payload-детали.
-Связано: `docs/components/models/ServiceCommandPayload.md`,
-`docs/components/models/ServiceCommand.md`,
-`.claude/decisions/executor-payload-file-granularity.md`.
-
 ### OKX-Q1. Persisted `TradeFill` модель и executor финализации
 
 OKX endpoint'ы `GET /trade/fills` и `GET /trade/fills-history`
@@ -394,52 +385,6 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 рыночных данных приведены к REST-first
 (`docs/integrations/okx/contracts/market-price-data.md`,
 `docs/models/mapping/MarketPriceData.md`).
-
-### DEAL-Q3. Размещение `DealActionState` (domain layer + own lifecycle)
-
-`DealActionState` — persisted операционная модель runtime-состояния
-выполнения `StrategyAction`. Не торговая бизнес-сущность в смысле PnL, но
-тесно связана с сопровождением сделки. Не решено: `docs/models/domain/aggregate/`
-(тесная связь с сопровождением сделки) или `docs/models/domain/other/`
-(прочая хранимая); нужен ли отдельный lifecycle (есть status-enum).
-
-Цитаты источника:
-- «Сервисные команды» §6: `public class DealActionState extends Retryable`
-  с полями `id`, `dealId`, `strategyActionId`, `target` (`RuntimeTarget`),
-  `status` (`DealActionStateStatus`); инвариант `UNIQUE(deal_id,
-  strategy_action_id)`; `strategyActionId` не хранится в
-  `Order`/`AlgoOrder`/`Position`. `DealActionStateStatus`: `PLANNED`,
-  `CREATED`, `SUBMITTED`, `COMPLETED`, `RETRY_PENDING`, `FAILED`,
-  `SKIPPED`. `RuntimeTarget`: `entityType` (`TargetEntityType`: ORDER /
-  ALGO_ORDER / POSITION / DEAL / BALANCE / NONE), `entityId`.
-- «Жизненный цикл сделки» §7 — описание `DealActionState` с полями `id`,
-  `dealId`, `strategyActionId`, `targetEntityType` (`TargetEntityType`),
-  `targetEntityId`, `status` (`DealActionStateStatus`), `attemptCount`,
-  `lastError` (`RetryError`). Отличие от СК §6: ЖЦ инлайнит
-  `targetEntityType`/`targetEntityId` и retry-поля прямо в класс, СК §6
-  выносит `RuntimeTarget` объектом и наследует от `Retryable`. Выбор
-  представления — часть DEAL-Q3. Под общее правило персистентности
-  (`docs/rules/persistence-representation.md`, 2026-06-03) вложенные
-  объекты (`RuntimeTarget`, `lastError`/`RetryError`) в БД — JSONB на
-  строке `DealActionState` при любом доменном выборе; открытым
-  остаётся доменное представление (объект vs инлайн-поля), не
-  представление в БД.
-
-Варианты: (1) `docs/models/domain/other/DealActionState.md` + отдельный
-`docs/lifecycles/DealActionState.md` (status-enum как FSM); (2)
-`docs/models/domain/aggregate/DealActionState.md` (тесная связь с
-сопровождением сделки); (3) без отдельного lifecycle (статусы — раздел
-модели).
-До решения файл модели **не материализуется**; в местах использования
-(`ServiceCommand`, executors, FSM handlers) упоминается с пометкой
-«структура и размещение — DEAL-Q3».
-
-Горизонт (взвешивание срока, 2026-06-06): шаг 4 — размещение решается
-штатно при материализации модели (чистая классификация,
-Автономия-рутина `knowledge-curator`), не пре-решается.
-Связано: `docs/components/models/ServiceCommand.md`,
-`docs/components/ServiceCommandFactory.md`, executor-компоненты,
-`docs/components/RetryPolicyService.md` (база `Retryable`).
 
 ### STRAT-Q4. percent-anchor: «−N% относительно чего»
 

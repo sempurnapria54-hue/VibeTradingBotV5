@@ -18,10 +18,10 @@
 
 > Resolver'ы, refresh-executors и команды (`REFRESH_ORDER`,
 > `REFRESH_PENDING_ORDERS`, `REFRESH_ORDER_HISTORY`, `REFRESH_FILLS`,
-> `SUBMIT_ORDER`, `AMEND_ORDER`, `CANCEL_ORDER`) — cross-cutting
-> command-подсистема, мигрируются отдельно (форвард-заметки — в
-> `.claude/work/questions/tasks/order.md`). Здесь — статусная
-> механика, которой владеет сам `Order`.
+> `SUBMIT_ORDER`, `AMEND_ORDER`, `CANCEL_ORDER`) — command-подсистема
+> (шаг 4): `docs/components/` (executors, resolver'ы),
+> `docs/rules/command-lifecycle.md`. Здесь — статусная механика,
+> которой владеет сам `Order`.
 
 ## `Order.Status`
 

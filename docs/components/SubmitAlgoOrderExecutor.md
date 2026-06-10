@@ -14,3 +14,8 @@
 
 ACK не runtime truth (см. `docs/rules/ack-not-runtime-truth.md`); общая
 семантика `SUBMIT_*` — `docs/components/ServiceCommandExecutor.md`.
+
+## SubmitAlgoOrderCommandPayload
+
+Только `algoOrderId` (executor сам берёт internal/client/external id,
+инструмент, параметры).

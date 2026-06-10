@@ -13,3 +13,9 @@
 
 ACK не runtime truth (см. `docs/rules/ack-not-runtime-truth.md`); общая
 семантика `AMEND_*` — `docs/components/ServiceCommandExecutor.md`.
+
+## AmendOrderCommandPayload
+
+`orderId`, `newPrice`, `newSizeContracts`, `cancelOnFail` (опасная
+настройка, задаётся явно execution policy/стратегией). External/client id
+не передаются — executor берёт из order.

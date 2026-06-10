@@ -20,8 +20,8 @@ attached protection (если создана вместе с parent order).
 `StrategyAction` ↔ `Order` хранится через
 `DealActionState` → `RuntimeTarget(entityType = ORDER, entityId)`,
 поэтому `Order` не хранит `strategyActionId`, `strategyActionKey`,
-`role`, `level` стратегии (механизм связи — Deal/Strategy-runtime, см.
-форвард-заметку в `.claude/work/questions/tasks/order.md`).
+`role`, `level` стратегии (механизм связи —
+`docs/models/domain/other/DealActionState.md`).
 
 ## Структура `Order`
 

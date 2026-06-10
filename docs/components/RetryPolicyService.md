@@ -27,8 +27,7 @@ commandType)`.
 ## Retry-состояние (Retryable / RetryError)
 
 Retry-состояние хранится в базовом `Retryable`, от которого наследуется
-persisted `DealActionState` (его структура/размещение — DEAL-Q3,
-`.claude/work/questions/open-questions.md`):
+persisted `DealActionState` (`docs/models/domain/other/DealActionState.md`):
 
 - `Retryable`: `attemptCount`, `maxAttempts`, `nextRetryAt`, `lastError`
   (`RetryError`).

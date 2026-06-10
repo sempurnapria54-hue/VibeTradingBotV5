@@ -21,8 +21,8 @@ order ids).
 `StrategyAction` ↔ `AlgoOrder` — через `DealActionState` →
 `RuntimeTarget(entityType = ALGO_ORDER, entityId)`, поэтому
 `AlgoOrder` не хранит `strategyActionId`, `strategyActionKey`,
-`role`, `level` (механизм связи — Deal/Strategy-runtime, форвард-
-заметка в `.claude/work/questions/tasks/algo-order.md`).
+`role`, `level` (механизм связи —
+`docs/models/domain/other/DealActionState.md`).
 
 ## Структура `AlgoOrder`
 

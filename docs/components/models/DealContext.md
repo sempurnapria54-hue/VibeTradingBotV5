@@ -27,7 +27,7 @@ persisted (см. `.claude/decisions/runtime-value-object.md`); собирает�
 | `instrument` | `Instrument` | Торговый инструмент сделки. |
 | `strategyDetail` | `StrategyDetail` | Pinned-конфигурация сделки. |
 | `balanceContainer` | `BalanceContainer` | Последний persisted snapshot баланса (свежесть **не** гарантирована). |
-| `actionStates` | `List<DealActionState>` | Runtime-состояние выполнения actions (recovery/retry/idempotency/target-resolution; структура/размещение `DealActionState` — DEAL-Q3). |
+| `actionStates` | `List<DealActionState>` | Runtime-состояние выполнения actions (recovery/retry/idempotency/target-resolution; модель — `docs/models/domain/other/DealActionState.md`). |
 
 ## Runtime graph и сборка по фактам
 

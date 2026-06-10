@@ -127,7 +127,7 @@ price, margin, unrealized PnL.
 
 `Position` **не** используется для итогового PnL: `Deal.resultProfit`
 считается через `REFRESH_FILLS` (правило принадлежит `Deal` — см.
-`.claude/decisions/rule-source-of-truth.md`; форвард-заметка для Deal
-— в `.claude/work/questions/tasks/position.md`). Полное закрытие
+`.claude/decisions/rule-source-of-truth.md` и
+`docs/models/domain/aggregate/Deal.md`). Полное закрытие
 подтверждается через `REFRESH_POSITION`, не через ACK (см.
 `docs/rules/ack-not-runtime-truth.md`).

@@ -24,7 +24,7 @@ ServiceCommandExecutor → конкретный Executor`.
 |---|---|---|
 | `type` | `ServiceCommandType` | Тип атомарной операции. |
 | `dealId` | `Long` | Сделка, в рамках которой выполняется команда. |
-| `dealActionStateId` | `Long` | Runtime-состояние action стратегии (связь с `StrategyAction`; структура/размещение `DealActionState` — DEAL-Q3, `.claude/work/questions/open-questions.md`). |
+| `dealActionStateId` | `Long` | Runtime-состояние action стратегии (связь с `StrategyAction`; модель — `docs/models/domain/other/DealActionState.md`). |
 | `payload` | `ServiceCommandPayload` | Параметры выполнения (см. `docs/components/models/ServiceCommandPayload.md`). |
 
 Не обязан хранить `strategyId` / `strategyDetailId`: происхождение
