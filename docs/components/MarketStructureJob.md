@@ -10,8 +10,9 @@
 `MarketStructure` / `MarketPriceLevel` (см.
 `docs/models/domain/other/MarketStructure.md`). Настройки —
 `StrategyMarketStructureSetting`; основной источник данных — закрытые
-свечи; дополнительный — готовые `IndicatorValue` (ER / ATR как шумовой
-фильтр). Вычисление структуры делегирует
+свечи; дополнительный — готовые `IndicatorValue` (ER — тренд/шум; ATR —
+толеранс кластеризации, D3), адресуемые «мягкими» ключами настройки
+`efficiencyRatioKey` / `atrKey` (fork-A). Вычисление структуры делегирует
 `docs/components/MarketStructureResolver.md` — job **тонкий**.
 
 Данные нужны для входов от диапазона, grid, SL за структурный уровень,
@@ -22,13 +23,22 @@ breakout-условий и сопровождения позиции.
 - читает стратегии **всех статусов кроме `DELETED`** и их
   `StrategyMarketStructureSetting` (перечень — как в правиле свежести,
   `docs/rules/market-data-freshness.md`);
-- читает закрытые свечи окна и готовые `IndicatorValue` (ER / ATR),
-  объявленные стратегией;
-- зовёт `MarketStructureResolver.resolve(...)` — тот выводит `type`,
-  `levels`, `breakoutEvent`, `confirmedAt`, окно (семантика —
-  `MarketStructure.md` §Семантика классификации; уровни/пробой/шумовой
-  фильтр по свечам сам не ищет);
+- читает закрытые свечи окна; по ключам `efficiencyRatioKey` / `atrKey`
+  извлекает готовые ER/ATR-скаляры из `IndicatorValue` настроек **того же
+  контейнера** и подаёт их резолверу (fork-A);
+- зовёт `MarketStructureResolver.resolve(window, efficiencyRatio, atr,
+  params)` — тот выводит `type`, `levels`, `breakoutEvent`, `confirmedAt`,
+  окно (семантика — `MarketStructure.md` §Семантика классификации;
+  уровни/пробой по свечам сам не ищет);
 - сохраняет `MarketStructure` и `MarketPriceLevel`.
+
+**Объявленный вход не готов → `UNKNOWN` (на стороне job).** Если ключ
+ER/ATR объявлен, но готового/свежего значения нет — job **не** зовёт
+резолвер: пишет консервативный `UNKNOWN`-результат окна (не proxy), чтобы
+потребитель не торговал по недосчитанной структуре. Необъявленный ключ
+(`null`) → резолвер сам идёт в прокси / fallback. Различие держит job;
+резолвер видит только скаляр или `null` (fork-A —
+`docs/decisions/derived-market-data-code-increments.md`).
 
 Job — тонкий: классификацию структуры держит `MarketStructureResolver`,
 готовые индикаторы считает `IndicatorJob`.
@@ -47,7 +57,16 @@ config_id, window_end_at)` (ключ по идентичности считае�
 конфигураций — см.
 `docs/decisions/market-data-result-identity-keying.md`). Если структура
 сломалась — сохраняет новый результат (например, `type = UNKNOWN`), а не
-правит старый.
+правит старый. В рамках тика расчёт дедупится по `instrumentId:configId`
+(одна конфигурация считается раз, шарится).
+
+**Краевой случай (открыт, STRUCT-Q2).** Дедуп по `config_id` означает:
+две настройки с одинаковыми `timeframe + params`, но разными
+`efficiencyRatioKey` / `atrKey` делят `config_id` — первый обработанный
+писатель выигрывает, второй читает структуру, посчитанную по другому
+ER/ATR-входу. Ключи входов в идентичность не входят; разрешение —
+`docs/decisions/derived-market-data-code-increments.md` §Что осталось
+открытым, `.claude/work/questions/open-questions.md` §STRUCT-Q2.
 
 **Checkpoint — производный, отдельного состояния нет.** «Докуда
 посчитано» = `max(window_end_at)` по таблице результатов для

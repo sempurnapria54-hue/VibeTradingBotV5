@@ -22,29 +22,40 @@
 ```
 resolve(
     closedCandles,                  // окно lookbackBars закрытых свечей
-    optional indicatorValues,       // готовые каталожные IndicatorValue: ER (тренд/шум), ATR (пол свинг-шума)
+    efficiencyRatio: BigDecimal?,   // готовый каталожный ER-скаляр (тренд/шум); null — ER-вход не объявлен
+    atr: BigDecimal?,               // готовый каталожный ATR-скаляр (толеранс кластеризации, D3); null — не объявлен
     params                          // MarketStructureParams
 ) -> (
     type: MarketStructure.Type,
     levels: List<MarketPriceLevel>,
-    breakoutEvent,                  // предвычисленное событие подтверждённого пробоя (сломанный уровень + направление + confirmedAt); форма — CODE
+    breakoutEvent,                  // предвычисленное событие подтверждённого пробоя (сломанный уровень + направление + confirmedAt)
     confirmedAt: OffsetDateTime,
     windowStartAt, windowEndAt: OffsetDateTime
 )
 ```
 
-- **Потребляет готовые `IndicatorValue`, не пересчитывает.** ER — **единый
-  каталожный источник** (fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`):
-  резолвер ER по свечам **не считает**, берёт готовое значение
-  (дискриминатор тренд/шум). ATR (пол свинг-шума) — так же, если объявлен.
-- **Fallback (гибрид).** Объявленные автором каталожные индикаторы (ER
-  предпочтительно; EMA/ATR, если есть) потребляются **готовыми** (единый
-  источник). **Минимальный внутренний прокси** (наклон short-EMA / ATR из
-  окна свечей) резолвер считает сам **только когда не объявлено ничего** —
-  чтобы структуру можно было посчитать без принуждения автора объявлять
-  шумовой индикатор. Объявленные индикаторы повторно не вычисляются.
+- **Потребляет готовые ER/ATR-скаляры, не пересчитывает.** ER — **единый
+  каталожный источник** (fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`,
+  `docs/decisions/derived-market-data-code-increments.md`): резолвер ER по
+  свечам, когда он объявлен, **не считает**, берёт готовый скаляр
+  (дискриминатор тренд/шум). ATR (толеранс кластеризации уровней, D3) — так
+  же. Скаляры извлекает из готового `IndicatorValue` и подаёт
+  `MarketStructureJob` по «мягким» ключам
+  `StrategyMarketStructureSetting.efficiencyRatioKey` / `atrKey`.
+- **Fallback.** `efficiencyRatio == null` (ER-вход не объявлен) → резолвер
+  считает **минимальный внутренний прокси**: нетто-ход окна / суммарный
+  побарный ход по ценам закрытия (мини-ER), чтобы структуру можно было
+  посчитать без принуждения автора объявлять шумовой индикатор. `atr ==
+  null` → толеранс кластеризации откатывается на долю цены. Объявленные
+  индикаторы повторно не вычисляются.
+- **«Объявлено, но не готово» решает job, не резолвер.** Резолвер видит
+  только скаляр или `null`. Различие «не объявлено» (→ прокси) vs
+  «объявлено, но не готово / устарело» (→ консервативный `UNKNOWN`) держит
+  `MarketStructureJob`: при необъявленном ключе он подаёт `null` (резолвер
+  идёт в прокси), при объявленном-но-неготовом пишет `UNKNOWN`-результат
+  сам, резолвер не зовёт.
 - **Stateless по входу.** Результат — функция от окна свечей, `params` и
-  переданных `IndicatorValue`; история прошлых результатов не читается.
+  переданных ER/ATR-скаляров; история прошлых результатов не читается.
   «Докуда посчитано» — производный checkpoint job'а
   (`MarketStructureJob` §Идемпотентность).
 - **Событие пробоя.** Подтверждённый пробой (буфер `breakoutBufferPercents`
@@ -57,16 +68,22 @@ resolve(
 
 - **Не персистит** `MarketStructure`/`MarketPriceLevel` — это
   `MarketStructureJob`.
-- **Не считает каталожные индикаторы** (ER/ATR/EMA), объявленные
-  стратегией, — читает их готовыми (`IndicatorJob` их считает). Внутренний
-  прокси — только last-resort, когда ничего не объявлено.
-- **Численные пороги** (`swingLookbackBars`, `lookbackBars`, `minTouches`,
-  `breakoutBufferPercents`, `breakoutConfirmationBars`, границы ширины
-  диапазона) — вход `MarketStructureParams`, хвост пользователя; резолвер
-  их не дефолтит.
-- **Точная арифметика** (толеранс кластеризации, `k` волатильностного
-  пола, окно/формула ER, критерий «наклон EMA согласен») — деталь
-  реализации (`CODE`) с торговой сверкой множителей по ходу.
+- **Не считает каталожные индикаторы** (ER/ATR), объявленные стратегией, —
+  получает их готовыми скалярами от job (`IndicatorJob` их считает).
+  Внутренний прокси (мини-ER по ценам закрытия) — только когда ER-вход не
+  объявлен.
+- **Геометрические пороги** (`swingLookbackBars`, `lookbackBars`,
+  `minTouches`, `minRangeWidthPercents`/`maxRangeWidthPercents`,
+  `breakoutBufferPercents`, `breakoutConfirmationBars`) — вход
+  `MarketStructureParams`, хвост пользователя; резолвер их не дефолтит
+  (отсутствуют → консервативный `UNKNOWN`).
+- **Калибруемые пороги** `trendEfficiencyThreshold` (D2) и
+  `levelToleranceAtrMultiplier` (D3) — тоже вход `params`, но при `null`
+  резолвер применяет **провизорные дефолты** (значения провизорны,
+  STRUCT-Q1; калибровка — фаза 2).
+- **Точная арифметика** (окно/формула ER, fallback-толеранс долей цены,
+  провизорные дефолты) — деталь реализации (`CODE`) с торговой сверкой
+  множителей по ходу.
 
 ## Связи
 
@@ -76,6 +93,8 @@ resolve(
 - ER как каталожный вход (единый источник) —
   `docs/decisions/efficiency-ratio-as-catalog-indicator.md`,
   `docs/models/domain/other/IndicatorValue.md`.
+- Пороги структуры (D2/D3), проводка ER/ATR-входов (fork-A), краевой случай
+  идентичности — `docs/decisions/derived-market-data-code-increments.md`.
 - `MarketStructure` как операнд правил фазы / `RANGE_BREAKOUT_CONFIRMED` —
   `docs/decisions/market-phase-conditional-classification.md`,
   `docs/decisions/strategy-condition-authoring-contract.md`.

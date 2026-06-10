@@ -42,6 +42,7 @@ Java-класс, наследует `Auditable`.
 | `windowEndAt` | `OffsetDateTime` | Конец окна свечей расчёта. |
 | `confirmedAt` | `OffsetDateTime` | Свеча, на которой структура подтверждена. |
 | `levels` | `List<MarketPriceLevel>` | Ценовые уровни структуры (см. раздел ниже). |
+| `breakoutEvent` | `MarketBreakoutEvent` | Предвычисленное событие подтверждённого пробоя; `null` — пробоя в окне нет (см. раздел ниже). |
 
 ## Енум `Type`
 
@@ -75,27 +76,62 @@ UNKNOWN`). Актуальность проверяется через
 strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 (см. `docs/models/domain/aggregate/Strategy.md`).
 
+## MarketBreakoutEvent (раздел)
+
+Предвычисленное событие подтверждённого пробоя структурного уровня (без
+родителя смысла не имеет → раздел `MarketStructure`, не отдельная модель).
+Детекцию (буфер `breakoutBufferPercents` + удержание
+`breakoutConfirmationBars`, оба из `MarketStructureParams`) делает
+`MarketStructureResolver`; условие `RANGE_BREAKOUT_CONFIRMED` читает событие
+**готовым** (детекция — на стороне резолвера, не в условии). Форма
+зафиксирована на `CODE` шага 3.
+
+| Поле | Тип | Назначение |
+|---|---|---|
+| `brokenLevelType` | `MarketPriceLevel.Type` | Тип сломанного уровня (`RANGE_HIGH`/`RANGE_LOW`/`RESISTANCE`/`SUPPORT`). |
+| `direction` | `Direction` | Направление пробоя (`UP` / `DOWN`). |
+| `levelPrice` | `BigDecimal` | Цена сломанного уровня. |
+| `confirmedAt` | `OffsetDateTime` | Свеча, на которой пробой подтверждён (удержание баров завершилось). |
+
+`Direction`: `UP` (закрытие выше сопротивления / верхней границы), `DOWN`
+(закрытие ниже поддержки / нижней границы).
+
 ## Семантика классификации (как считается)
 
 Вычисляет `MarketStructureResolver`
 (`docs/components/MarketStructureResolver.md`) по закрытым свечам окна
-`lookbackBars`, опционально потребляя готовые каталожные `IndicatorValue`
-(ER — дискриминатор тренд/шум; ATR — пол свинг-шума), и
-`MarketStructureParams`. Численные пороги — **хвост пользователя**
-(per-настройка `MarketStructureParams`); точная арифметика (толерансы,
-окно/формула ER, критерий «наклон EMA согласен») — деталь реализации
-(`CODE`).
+`lookbackBars`, потребляя готовые каталожные скаляры — ER (дискриминатор
+тренд/шум) и ATR (толеранс кластеризации, D3) — по «мягким» ключам
+`StrategyMarketStructureSetting.efficiencyRatioKey` / `atrKey`, и
+`MarketStructureParams`. Скаляры резолверу подаёт `MarketStructureJob`,
+извлекая их из готового `IndicatorValue` (fork-A —
+`docs/decisions/derived-market-data-code-increments.md`):
+
+- **ER-вход не объявлен** (`efficiencyRatioKey` null) → резолвер считает
+  внутренний прокси (нетто-ход окна / суммарный побарный ход — мини-ER по
+  ценам закрытия); **ATR не объявлен** (`atrKey` null) → толеранс
+  кластеризации откатывается на долю цены.
+- **Вход объявлен, но не готов / устарел** → `MarketStructureJob` пишет
+  консервативный `UNKNOWN` (не proxy, не падение): объявление входа —
+  намерение на нём считать.
+
+Численные пороги — **хвост пользователя** (per-настройка
+`MarketStructureParams`), включая `trendEfficiencyThreshold` (D2) и
+`levelToleranceAtrMultiplier` (D3); их значения провизорны (STRUCT-Q1).
+Точная арифметика (окно/формула ER, дефолты при `null`-порогах) — деталь
+реализации (`CODE`).
 
 1. **Свинг-пивоты.** `SWING_HIGH` — бар, чей `high` — локальный максимум в
    окне `swingLookbackBars` баров с каждой стороны; симметрично
-   `SWING_LOW`. Опциональный шумовой фильтр: пивот засчитывается, если
-   экскурсия от соседнего пивота превышает волатильностный пол (`k·ATR`).
-   *Источник говорит* (свинг-фильтр отсекает шум) [Kaufman гл. 5].
+   `SWING_LOW`. *Источник говорит* (свинг-фильтр отсекает шум)
+   [Kaufman гл. 5].
 2. **Кластеризация уровней.** Пивоты группируются в ценовые уровни в
-   пределах толеранса; уровень с `≥ minTouches` касаниями — подтверждён.
-   `SUPPORT` — подтверждённый уровень-пол ниже цены, `RESISTANCE` —
-   потолок выше. *Источник говорит* (уровень = многократно удержанная
-   цена) [Kaufman гл. 8].
+   пределах **волатильность-относительного толеранса** (`k·ATR`, где `k =
+   levelToleranceAtrMultiplier`, D3; при необъявленном ATR — fallback на
+   долю цены); уровень с `≥ minTouches` касаниями — подтверждён. `SUPPORT`
+   — подтверждённый уровень-пол ниже цены, `RESISTANCE` — потолок выше.
+   *Источник говорит* (уровень = многократно удержанная цена; разброс
+   относительно волатильности) [Kaufman гл. 8].
 3. **Диапазон → `RANGE`.** Подтверждённые `RESISTANCE` (верх) и `SUPPORT`
    (низ) окаймляют недавнюю цену; ширина полосы ∈ `[minRangeWidthPercents,
    maxRangeWidthPercents]` от средней цены; цена осциллировала между
@@ -103,9 +139,9 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
    (+ `SWING_*`). *Источник говорит* [Kaufman гл. 8].
 4. **Тренд → `UPTREND` / `DOWNTREND`.** Пивоты дают higher-high+higher-low
    (вверх) или lower-high+lower-low (вниз), и чистый ход доминирует над
-   шумом (ER высок / наклон EMA согласен). Уровни: `SWING_*` (+ последний
-   пробитый уровень как `SUPPORT`/`RESISTANCE`). *Источник говорит* (тренд
-   = персистентность + ER-доминирование чистого хода) [Kaufman гл. 1
+   шумом (`ER ≥ trendEfficiencyThreshold`, D2). Уровни: `SWING_*`
+   (+ граничные `SUPPORT`/`RESISTANCE`). *Источник говорит* (тренд =
+   персистентность + ER-доминирование чистого хода) [Kaufman гл. 1
    «Measuring Noise», гл. 8].
 5. **Пробой.** Уровень пробит, когда цена закрывается за ним на
    `≥ breakoutBufferPercents` и держится `≥ breakoutConfirmationBars`
@@ -150,6 +186,13 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
   Per-настроечный `structureType` **удалён** (`StrategyMarketStructureSetting`
   его не несёт): тип — результат расчёта, не вход настройки (см.
   `docs/decisions/market-data-result-identity-keying.md`).
+  - **Краевой случай (открыт, STRUCT-Q2):** soft-ключи входов резолвера
+    `efficiencyRatioKey` / `atrKey` живут на настройке, а **не** в
+    `params`, и в идентичность **не входят**. Две настройки с одинаковыми
+    `timeframe + params`, но разными ER/ATR-ключами делят один `config_id`
+    и один ряд результатов — первый писатель выигрывает. Разрешение —
+    `docs/decisions/derived-market-data-code-increments.md` §Что осталось
+    открытым.
 - **Свежесть на чтение:** `expiredAt = windowEndAt +
   askingSetting.expirationDuration` считается в runtime, колонкой не
   хранится; на общей строке (ключ по `config_id`) единого `expiredAt` нет

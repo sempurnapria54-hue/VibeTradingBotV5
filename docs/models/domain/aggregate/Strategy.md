@@ -179,10 +179,20 @@ derived`. Create-валидация (шаг 2) проверяет override пр�
 ### StrategyMarketStructureSetting
 `key` (на него ссылаются операнд market-structure и «мягкие» ссылки
 JSON-листьев — поле `structureKey`, см. §StrategyConditionOperand),
-`timeframe`, `params: MarketStructureParams`, `destiny:
-Destiny`, `expirationDuration`. `Destiny`: те же 5 значений, что у
-indicator (MARKET_PHASE / ENTRY_CONDITION / ACTION_PRICE / PROTECTION /
-EXIT_CONDITION).
+`timeframe`, `efficiencyRatioKey`, `atrKey`, `params:
+MarketStructureParams`, `destiny: Destiny`, `expirationDuration`.
+`Destiny`: те же 5 значений, что у indicator (MARKET_PHASE /
+ENTRY_CONDITION / ACTION_PRICE / PROTECTION / EXIT_CONDITION).
+
+`efficiencyRatioKey` / `atrKey` — «мягкие» ссылки (по `key`) на настройки
+каталожных индикаторов **того же контейнера**, которые резолвер
+потребляет готовыми входами (fork-A): ER — дискриминатор тренд/шум, ATR —
+пол толеранса уровней (D3). `null` → резолвер использует внутренний прокси
+(ER) / fallback на долю цены (ATR-толеранс). Объявлен, но не готов /
+устарел → консервативный `UNKNOWN` (job, не proxy). Эти ключи **не входят**
+в идентичность конфигурации структуры (`timeframe` + canonical-`params`) —
+краевой случай STRUCT-Q2; грунт —
+`docs/decisions/derived-market-data-code-increments.md`.
 
 Поля `structureType` у настройки **нет**: `MarketStructure.Type` —
 **выход** расчёта (`MarketStructureResolver` его выводит), не вход
@@ -194,7 +204,19 @@ canonical-`params` (вид расчёта один — см.
 ### MarketStructureParams
 `lookbackBars`, `minTouches`, `minRangeWidthPercents`,
 `maxRangeWidthPercents`, `breakoutBufferPercents`,
-`breakoutConfirmationBars`, `swingLookbackBars`.
+`breakoutConfirmationBars`, `swingLookbackBars`,
+`trendEfficiencyThreshold`, `levelToleranceAtrMultiplier`.
+
+- `trendEfficiencyThreshold: BigDecimal` — порог ER тренда (ER ≥ порога →
+  тренд-сила vs диапазон, D2).
+- `levelToleranceAtrMultiplier: BigDecimal` — множитель `k` в толерансе
+  кластеризации уровней (`толеранс = k·ATR`, D3; при необъявленном ATR —
+  fallback резолвера на долю цены).
+
+Оба — хвост пользователя; значения провизорны (value: бэктест-гейт фазы 2,
+STRUCT-Q1), числом в канон не зашиваются; при `null` резолвер применяет
+провизорные дефолты. Грунт и альтернативы —
+`docs/decisions/derived-market-data-code-increments.md`.
 
 ## StrategyDetail (раздел)
 
@@ -341,6 +363,17 @@ sugar-vs-алиас — `docs/rules/condition-ruletype-granularity.md`.) `MARKET
 - Ссылки per-source: индикаторный операнд — `indicatorKey`; операнд
   market-structure — `structureKey`; ценовой операнд несёт
   `priceSource: StrategyPriceSource`.
+- `indicatorComponent: IndicatorComponent` (только у `INDICATOR`) —
+  адресный компонент многокомпонентного индикатора: какую часть
+  сравнивать. MACD — `MACD_LINE`/`SIGNAL_LINE`/`HISTOGRAM`; Stochastic —
+  `STOCH_K`/`STOCH_D`; Bollinger — `UPPER_BAND`/`MIDDLE_BAND`/`LOWER_BAND`/
+  `BANDWIDTH`/`PERCENT_B`. **Обязателен** для многокомпонентных типов
+  (MACD/Stochastic/Bollinger), **запрещён** для одно-компонентных
+  (EMA/RSI/ATR/OBV/`EFFICIENCY_RATIO`), проверяется на совместимость с
+  типом индикатора (create-валидация, 400; справочник «тип → компоненты» —
+  `util.IndicatorComponents`). Снимает масштаб-зависимость абсолютного
+  compare многокомпонентного индикатора (D1, зеркало OBV-принципа
+  относительных форм — `docs/decisions/derived-market-data-code-increments.md`).
 
 ### Объёмные условия (OBV / `VOLUME_FILTER_PASSED`)
 

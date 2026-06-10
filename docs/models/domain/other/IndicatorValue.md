@@ -77,6 +77,15 @@ OBV; сейчас не заведён (каталог расширяем по п
 Все числовые поля — `BigDecimal`. Волатильность отдельной сущностью не
 моделируется — через `AtrValue` / `BollingerBandsValue.bandwidth`.
 
+**Адресный компонент в условии (D1).** Многокомпонентные типы (`MACD`,
+`STOCHASTIC`, `BOLLINGER_BANDS`) в операнде условия адресуются полем
+`StrategyConditionOperand.indicatorComponent` — автор выбирает осмысленную
+часть (например, `MACD_LINE`/`HISTOGRAM`, `STOCH_K`, `PERCENT_B`); снимает
+масштаб-зависимость абсолютного compare. Одно-компонентные (`EMA`/`RSI`/
+`ATR`/`OBV`/`EFFICIENCY_RATIO`) компонент не несут. Контракт и справочник
+«тип → компоненты» — `docs/decisions/strategy-condition-authoring-contract.md`,
+грунт — `docs/decisions/derived-market-data-code-increments.md`.
+
 ## Правила хранения
 
 - `confirmed` и `warmup` не хранятся: `IndicatorJob` сохраняет только

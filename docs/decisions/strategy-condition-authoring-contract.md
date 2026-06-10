@@ -116,6 +116,18 @@ indicator-vs-indicator допускается — базовый кейс кро
   `priceSource: StrategyPriceSource`. Те же имена ключей-ссылок — у
   «мягких» ссылок JSON-листьев (`StopLossSettings`,
   `StrategyPricePlacement`).
+- `indicatorComponent: IndicatorComponent` (только у `INDICATOR`) —
+  адресный компонент многокомпонентного индикатора (D1,
+  `docs/decisions/derived-market-data-code-increments.md`): автор выбирает,
+  какую часть сравнивать (MACD — `MACD_LINE`/`SIGNAL_LINE`/`HISTOGRAM`;
+  Stochastic — `STOCH_K`/`STOCH_D`; Bollinger — `UPPER_BAND`/`MIDDLE_BAND`/
+  `LOWER_BAND`/`BANDWIDTH`/`PERCENT_B`). **Обязателен** для
+  многокомпонентных типов (MACD/Stochastic/Bollinger), **запрещён** для
+  одно-компонентных (EMA/RSI/ATR/OBV/`EFFICIENCY_RATIO`), проверяется на
+  совместимость с типом. Справочник «тип → компоненты» — единый
+  (`util.IndicatorComponents`), общая опора create-валидации и evaluator'а.
+  Снимает масштаб-зависимость абсолютного compare многокомпонентного
+  индикатора в ценовых единицах (зеркало OBV-принципа относительных форм).
 
 **Отвергнутая альтернатива.** `valueType` на всех операндах —
 избыточен у вычисляемых (`INDICATOR` + `INDICATOR_VALUE` — дубль).
@@ -162,7 +174,9 @@ Create-валидация (400) проверяет авторинг-миниму
 - `CROSSOVER` — operator `CROSSED_ABOVE` / `CROSSED_BELOW` + оба
   операнда;
 - операнды: `INDICATOR` → `indicatorKey` существует в настройках того же
-  контейнера; `MARKET_STRUCTURE` → `structureKey` существует;
+  контейнера **+ `indicatorComponent`** (обязателен для многокомпонентного
+  типа, запрещён для одно-компонентного, совместим с типом — D1);
+  `MARKET_STRUCTURE` → `structureKey` существует;
   `PRICE` → валидный `priceSource`; `CONSTANT` → `valueType` + `value`.
   Контейнер ссылки — `StrategyDetail` для entry-условий, либо
   `StrategyMarketPhaseSetting` для правил классификации фазы (ниже).
@@ -250,6 +264,8 @@ lifecycle-сделки, `MARKET_PHASE_IS` и `TREND_CHANGED`. Этот
   `docs/rules/condition-ruletype-granularity.md`.
 - ER как операнд каталога (снят `EFFICIENCY_BELOW_THRESHOLD`) —
   `docs/decisions/efficiency-ratio-as-catalog-indicator.md`.
+- Адресный компонент операнда (D1), грунт и альтернативы —
+  `docs/decisions/derived-market-data-code-increments.md`.
 - Семантика объёмных условий (OBV-операнд — относительные формы; объём —
   не единственное основание `ENTRY`) —
   `docs/decisions/volume-condition-semantics.md`.

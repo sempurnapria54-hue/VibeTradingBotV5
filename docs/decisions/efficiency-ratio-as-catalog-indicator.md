@@ -48,13 +48,20 @@ BOLLINGER_BANDS/OBV` ER не содержал).
    единообразен и DRY.
 
 3. **Контекст-сплит ролей ER, единый источник.** `MarketStructureResolver`
-   пережил редизайн как **вычисляющий** компонент (`MarketStructureParams`
-   не затронуты); его внутреннее использование ER (тест доминирования
-   чистого хода над шумом / консервативный `UNKNOWN`) **не
-   пересчитывается** — аналитик структуры потребляет **тот же каталожный
-   ER** опциональным `IndicatorValue`-входом (контракт аналитика уже
-   принимает шумовой фильтр), с fallback на прокси EMA-наклон/ATR, когда
-   ER-настройка не объявлена. Один источник ER, без дубль-вычисления.
+   пережил редизайн как **вычисляющий** компонент; его внутреннее
+   использование ER (тест доминирования чистого хода над шумом /
+   консервативный `UNKNOWN`) **не пересчитывается** — резолвер потребляет
+   **тот же каталожный ER** готовым скаляром по «мягкому» ключу
+   `StrategyMarketStructureSetting.efficiencyRatioKey` (того же контейнера),
+   который извлекает `MarketStructureJob`. Один источник ER, без
+   дубль-вычисления. **Fallback на прокси — нетто-ход окна / суммарный
+   побарный ход** (мини-ER по ценам закрытия), считается резолвером **только
+   когда `efficiencyRatioKey` не объявлен** (не EMA-наклон — уточнено на
+   `CODE`/sync). **Объявлен, но не готов / устарел → консервативный
+   `UNKNOWN`** (на стороне job, не proxy). Проводка ER/ATR-входов и пороги
+   структуры (D2/D3) досведены батчем `CODE` —
+   `docs/decisions/derived-market-data-code-increments.md` (где `MarketStructureParams`
+   получили `trendEfficiencyThreshold` / `levelToleranceAtrMultiplier`).
 
 ## Отвергнутые альтернативы
 
@@ -106,3 +113,5 @@ BOLLINGER_BANDS/OBV` ER не содержал).
   `docs/models/domain/aggregate/Strategy.md` §IndicatorParams.
 - Структура рынка (потребитель ER как опционального входа) —
   `docs/models/domain/other/MarketStructure.md`.
+- Досведение проводки ER/ATR-входов (fork-A) и пороги структуры (D2/D3) —
+  `docs/decisions/derived-market-data-code-increments.md`.
