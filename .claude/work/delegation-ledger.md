@@ -37,9 +37,9 @@
 Прогон 3 (2026-06-06, по уточнённому правилу срока): состав пуст —
 0 взято, 1 петля текущего шага, 14 отложено с горизонтами; на
 валидацию идут только состав и горизонты. Отчёт —
-`.claude/work/progress/delegation-rerun-2-open-questions.md`.
+`.claude/work/history/2026-06-06-delegation-validation/delegation-rerun-2-open-questions.md`.
 
 Разборы решений (трейл) —
-`.claude/work/progress/delegation-run-open-questions.md` (прогон 1)
-и `.claude/work/progress/delegation-rerun-open-questions.md`
+`.claude/work/history/2026-06-06-delegation-validation/delegation-run-open-questions.md` (прогон 1)
+и `.claude/work/history/2026-06-06-delegation-validation/delegation-rerun-open-questions.md`
 (прогон 2, правило срока).
