@@ -99,6 +99,22 @@
 (jobs — форвард-заметки в
 `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-strategy.md`).
 
+## Каталог настроек стратегии (реестр настроек)
+
+`Strategy.indicatorSettings` / `marketStructureSettings` — **реестр (каталог)
+настроек конкретной стратегии**: объявлены раз на стратегию,
+`UNIQUE(strategy_id, key)`. Это per-strategy объявление, **принадлежащее
+стратегии**, — его нужно явно отличать от **удалённых глобальных
+config-реестров** (`indicator_configs` / `market_structure_configs`, трек D):
+каталог стратегии — не про общую вычисляемую идентичность ради шаринга между
+стратегиями (шаринга нет, owner-ключевание —
+`docs/decisions/market-data-result-identity-keying.md`), а про то, **какие
+настройки объявила эта стратегия**. Остальные сущности стратегии
+(`StrategyMarketPhaseSetting`, детали, действия, условия) настройки **не
+хранят** — ссылаются на них **по `key`** в пределах стратегии (резолвит
+приложение; необъявленный `key` отвергается create-валидацией —
+strategy-scope ref-resolution, см. §StrategyConditionOperand).
+
 ## Настройки рыночных данных (разделы)
 
 ### StrategyMarketPhaseSetting
@@ -406,7 +422,12 @@ sugar-vs-алиас — `docs/rules/condition-ruletype-granularity.md`.) `MARKET
   источников значение приходит в рантайме (evaluator).
 - Ссылки per-source: индикаторный операнд — `indicatorKey`; операнд
   market-structure — `structureKey`; ценовой операнд несёт
-  `priceSource: StrategyPriceSource`.
+  `priceSource: StrategyPriceSource`. `indicatorKey` / `structureKey`
+  ссылаются на настройку из **каталога стратегии** (§Каталог настроек
+  стратегии) по `key`; использовать необъявленную настройку нельзя — ключ
+  обязан резолвиться в каталог (create-валидация, strategy-scope
+  ref-resolution). Операнд-`CONSTANT` (литерал) и `PRICE` (источник цены) —
+  **не** ссылки на настройку, ограничение их не касается.
 - `indicatorComponent: IndicatorComponent` (только у `INDICATOR`) —
   адресный компонент многокомпонентного индикатора: какую часть
   сравнивать. MACD — `MACD_LINE`/`SIGNAL_LINE`/`HISTOGRAM`; Stochastic —

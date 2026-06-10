@@ -48,13 +48,21 @@ public class Strategy extends Auditable {
     private List<StrategyDetail> details;
 
     /**
-     * Настройки индикаторов стратегии (strategy-scope, объявлены раз;
-     * UNIQUE(strategy_id, key)). Фаза, детали и действия адресуют их по
-     * {@code key} (трек D — настройки в собственные строки).
+     * Реестр (каталог) настроек индикаторов **этой стратегии**: объявлены
+     * раз на стратегию, UNIQUE(strategy_id, key). Принадлежит стратегии —
+     * per-strategy объявление, а **не** общий config-реестр вычисляемой
+     * идентичности (удалённые indicator_configs / market_structure_configs):
+     * шаринга между стратегиями нет (трек D, owner-ключевание). Фаза, детали,
+     * действия и условия настройки не хранят — ссылаются по {@code key} в
+     * пределах стратегии.
      */
     private List<StrategyIndicatorSetting> indicatorSettings;
 
-    /** Настройки структуры рынка стратегии (strategy-scope, адресуются по {@code key}). */
+    /**
+     * Реестр (каталог) настроек структуры рынка **этой стратегии** (объявлены
+     * раз, UNIQUE(strategy_id, key); per-strategy, не общий config-реестр) —
+     * адресуются по {@code key}.
+     */
     private List<StrategyMarketStructureSetting> marketStructureSettings;
 
     /** Стратегия активна (единственная активная стратегия инструмента). */

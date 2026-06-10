@@ -8,12 +8,16 @@ import lombok.Setter;
 
 /**
  * Операнд условия — самоописательный: sourceType + ссылка/значение по
- * источнику. Ссылка на настройку — «мягкая», по ключу настройки
- * (резолвит приложение): индикаторный операнд — indicatorKey, операнд
- * market-structure — structureKey. Литерал (valueType + value) — только
- * у CONSTANT; у вычисляемых источников значение приходит в рантайме.
- * См. docs/models/domain/aggregate/Strategy.md
- * (§StrategyConditionOperand),
+ * источнику. Ссылка на настройку — «мягкая», по ключу настройки из
+ * **каталога стратегии** ({@code Strategy.indicatorSettings} /
+ * {@code marketStructureSettings}): индикаторный операнд — indicatorKey,
+ * операнд market-structure — structureKey; резолвит приложение в пределах
+ * стратегии. Ссылаться на необъявленную настройку нельзя — ключ обязан
+ * резолвиться в каталог (create-валидация, strategy-scope ref-resolution).
+ * Операнд-CONSTANT (литерал valueType + value) и PRICE-операнд (priceSource)
+ * — **не** ссылки на настройку, ограничение их не касается; у вычисляемых
+ * источников значение приходит в рантайме. См.
+ * docs/models/domain/aggregate/Strategy.md (§StrategyConditionOperand),
  * docs/decisions/strategy-condition-authoring-contract.md.
  */
 @Getter
