@@ -8,19 +8,20 @@
 ## Назначение
 
 `IndicatorValue` — готовое значение технического индикатора,
-рассчитанное `IndicatorJob` по закрытым свечам для **конфигурации
-расчёта** (тип + `timeframe` + canonical-`params`), зарегистрированной в
-реестре `indicator_configs`. Значение **шарится** всеми настройками
-`StrategyIndicatorSetting`, которые эту конфигурацию запрашивают (ключ —
-по идентичности считаемого, не по настройке; см.
+рассчитанное `IndicatorJob` по закрытым свечам для конкретной
+**настройки-владельца** `StrategyIndicatorSetting`. Значение ключуется
+настройкой-владельцем (одна типизированная FK `strategyIndicatorSettingId`),
+**не шарится** между настройками и не ключуется по идентичности
+конфигурации — реестр `indicator_configs` убран ревизией трек D (см.
 `docs/decisions/market-data-result-identity-keying.md`). Persisted-модель
 рыночных данных, не про бизнес-цикл сделки → `other` (см.
 `.claude/decisions/models-core-vs-other.md`).
 
 Потребители читают готовые значения и **не** считают индикаторы сами:
 `StrategyConditionEvaluator` (условия), `StrategyActionCalculator` /
-`PriceCalculator` (цены, например SL = entry − 1.5·ATR), `MarketPhaseJob`
-(расчёт фазы). Раздачей готовых значений занимается
+`PriceCalculator` (цены, например SL = entry − 1.5·ATR),
+`MarketPhaseClassifier` (классификация фазы на чтение через
+`MarketPhaseService`). Раздачей готовых значений занимается
 `docs/components/IndicatorService.md`.
 
 ## Структура (abstract база)
@@ -31,7 +32,7 @@ Java abstract-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID значения. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `configId` | `Long` | Ссылка на конфигурацию расчёта (тип + `timeframe` + canonical-`params`) в реестре `indicator_configs` (см. `docs/decisions/market-data-result-identity-keying.md`). |
+| `strategyIndicatorSettingId` | `Long` | FK на настройку-владельца `StrategyIndicatorSetting` (`strategy_indicator_settings.id`) — owner-ключевание (см. `docs/decisions/market-data-result-identity-keying.md`). |
 | `candleTimestamp` | `OffsetDateTime` | Время свечи, на которой рассчитан индикатор. |
 
 Конкретное значение лежит в наследнике (по типу индикатора).
@@ -92,18 +93,16 @@ OBV; сейчас не заведён (каталог расширяем по п
   значения после warmup-зоны (см.
   `docs/components/IndicatorJob.md`).
 - Индикаторы считаются только по закрытым свечам (без look-ahead).
-- Уникальность: `UNIQUE(instrument_id, config_id, candle_timestamp)`
-  (ключ по идентичности считаемого через реестр конфигураций — см.
+- Уникальность: `UNIQUE(instrument_id, strategy_indicator_setting_id,
+  candle_timestamp)` (ключ по настройке-владельцу — owner-ключевание, см.
   `docs/decisions/market-data-result-identity-keying.md`).
 - Свежесть значения проверяет `MarketDataExpirationChecker` по
-  `expirationDuration` **запрашивающей** `StrategyIndicatorSetting`:
-  значение шарится между настройками, свежесть оценивается под каждую
-  запрашивающую настройку в runtime (правило —
-  `docs/rules/market-data-freshness.md`).
+  `expirationDuration` **настройки-владельца** `StrategyIndicatorSetting`:
+  у строки результата ровно один владелец, под него и оценивается
+  свежесть (правило — `docs/rules/market-data-freshness.md`).
 - **Точка отсчёта свежести (`referencePoint`) — `candleTimestamp`.**
-  `expiredAt = candleTimestamp + askingSetting.expirationDuration`
-  считается **на чтение**, не хранится колонкой; на общей строке (ключ по
-  `config_id`) единого `expiredAt` нет — своё под каждую запрашивающую
-  настройку (`docs/rules/market-data-freshness.md`).
+  `expiredAt = candleTimestamp + ownerSetting.expirationDuration`
+  считается **на чтение**, колонкой не хранится (единый механизм без
+  хранимого состояния свежести; `docs/rules/market-data-freshness.md`).
 - **Retention:** значения не чистятся (нет потребителя истории) —
   `docs/rules/market-data-retention.md`.

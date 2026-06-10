@@ -105,9 +105,11 @@ ATR-относительный толеранс сам адаптируется 
 
 **Решение.** `MarketStructureResolver` потребляет **готовые** каталожные
 ER (дискриминатор тренд/шум) и ATR (пол толеранса уровней, D3), а не
-пересчитывает их. Привязка — «мягкие» ссылки на индикаторы того же
-контейнера: `StrategyMarketStructureSetting.efficiencyRatioKey` /
-`atrKey` (ключи настроек `StrategyIndicatorSetting` контейнера). ER-прокси
+пересчитывает их. Привязка — «мягкие» ссылки по `key` на индикаторные
+настройки **стратегии** (strategy-scope после ревизии трек D —
+прежде были настройки того же контейнера):
+`StrategyMarketStructureSetting.efficiencyRatioKey` / `atrKey` (ключи
+`StrategyIndicatorSetting` стратегии). ER-прокси
 (внутренний нетто-ход / суммарный ход окна) резолвер считает **только
 когда ER-вход не объявлен** (`efficiencyRatioKey` null); ATR-fallback на
 долю цены — когда `atrKey` null.
@@ -132,29 +134,28 @@ ER (дискриминатор тренд/шум) и ATR (пол толеран�
 ER/ATR-входа: пока вход не прогрет/устарел, структура консервативно
 `UNKNOWN` (согласуется с матрицей `UNKNOWN → NO_TRADE`).
 
-## Что осталось открытым (краевой случай идентичности)
+## Краевой случай идентичности (STRUCT-Q2) — закрыт реверсом ключевания
 
-**`config_id` не различает `efficiencyRatioKey` / `atrKey`.** Идентичность
-конфигурации структуры = `timeframe` + canonical-`params`
-(`docs/decisions/market-data-result-identity-keying.md`); soft-ссылки
-`efficiencyRatioKey` / `atrKey` живут на `StrategyMarketStructureSetting`,
-а **не** в `MarketStructureParams`, и в идентичность не входят. Значит две
-настройки структуры с одинаковыми `timeframe + params`, но разными
-`efficiencyRatioKey` / `atrKey` резолвятся в **один** `config_id` и
-делят один ряд результатов (`UNIQUE(instrument_id, config_id,
-window_end_at)`). Текущий код дедупит расчёт по `instrumentId:configId`
-(`MarketStructureJob`) — первая обработанная настройка пишет результат, а
-вторая, шарящая `config_id`, читает структуру, посчитанную по **другому**
-ER/ATR-входу. Это нарушает инвариант шаринга «одна конфигурация → идентичный
-результат».
+**Был:** `config_id` не различал `efficiencyRatioKey` / `atrKey`.
+Идентичность конфигурации структуры = `timeframe` + canonical-`params`;
+soft-ссылки `efficiencyRatioKey` / `atrKey` жили на
+`StrategyMarketStructureSetting`, в идентичность не входили. Две настройки
+структуры с одинаковыми `timeframe + params`, но разными ER/ATR-входами
+резолвились в **один** `config_id`, делили один ряд результатов и дедуп по
+`instrumentId:configId` (`MarketStructureJob`) — «первый писатель
+выигрывает» молча, нарушая инвариант шаринга.
 
-**Не закрыт в этом прогоне** (краевой случай, всплывший при сверке
-код↔доки). Кандидаты на разрешение: (а) включить `efficiencyRatioKey` /
-`atrKey` в идентичность конфигурации структуры; (б) объявить, что разные
-шумовые входы при одинаковых `params` запрещены create-валидацией; (в)
-признать вход деталью настройки, не влияющей на разделяемый результат
-(тогда нужно зафиксировать «первый писатель выигрывает» осознанно). Вынесен
-открытым вопросом — `.claude/work/questions/open-questions.md` (STRUCT-Q2).
+**Закрыт (трек D, 2026-06-10).** Реестры конфигураций и шаринг убраны;
+результаты ключуются **настройкой-владельцем**
+(`docs/decisions/market-data-result-identity-keying.md`). Каждая настройка
+структуры (со своими `efficiencyRatioKey` / `atrKey`) пишет в **свою**
+строку под своим `strategy_market_structure_setting_id` —
+разделяемого ряда, на котором возникала коллизия, больше нет. Краевой
+случай снят **по построению**, без отдельного гарда (прежний интерим B —
+запрет на create-валидации — не нужен). STRUCT-Q2 закрыт. Soft-ключи
+`efficiencyRatioKey` / `atrKey` (fork-A) при этом сохраняются — резолвер
+по-прежнему потребляет готовые ER/ATR-входы; в идентичность они входить
+перестали вместе с самой идентичностью.
 
 ## Следствия
 
@@ -197,5 +198,8 @@ ER/ATR-входу. Это нарушает инвариант шаринга «�
 - Модель структуры и семантика классификации —
   `docs/models/domain/other/MarketStructure.md`,
   `docs/components/MarketStructureResolver.md`.
-- Калибровка порогов на бэктесте — STRUCT-Q1; краевой случай идентичности —
-  STRUCT-Q2 (`.claude/work/questions/open-questions.md`).
+- Калибровка порогов на бэктесте — STRUCT-Q1
+  (`.claude/work/questions/open-questions.md`). Краевой случай идентичности
+  (STRUCT-Q2) — **закрыт** реверсом ключевания
+  (`docs/decisions/market-data-result-identity-keying.md`), см. §Краевой
+  случай идентичности выше.

@@ -31,15 +31,17 @@ IndicatorJob
   -> считает IndicatorValue
 MarketStructureJob
   -> считает MarketStructure / MarketPriceLevel
-MarketPhaseJob
-  -> считает MarketPhase
 EntryScannerJob / DealOrchestratorJob (FSM)
-  -> используют готовые данные (уже зона deal-management)
+  -> используют готовые данные (уже зона deal-management);
+     фазу получают через MarketPhaseService (вычисляется на лету)
 ```
 
 Компоненты: `docs/components/IndicatorJob.md`,
-`MarketStructureJob.md`, `MarketPhaseJob.md`. Загрузку свечей ведёт
-`docs/components/CandleJob.md` в процессе
+`MarketStructureJob.md`. Фаза **не предрассчитывается job'ом** — она
+вычисляется на чтение через `docs/components/MarketPhaseService.md` /
+`MarketPhaseClassifier.md` (ревизия трек D,
+`docs/decisions/market-phase-stateless.md`; прежний `MarketPhaseJob`
+удалён). Загрузку свечей ведёт `docs/components/CandleJob.md` в процессе
 `docs/processes/candle-loading.md`.
 
 `InstrumentExternalRulesSyncJob` (подготовка спеков инструмента) в
@@ -67,18 +69,20 @@ Candles + optional IndicatorValue
   -> MarketStructureJob -> MarketStructure -> MarketPriceLevel
 
 IndicatorValue + MarketStructure
-  -> MarketPhaseJob -> MarketPhase
+  -> MarketPhaseService (на чтение) -> MarketPhase (не персистится)
 ```
 
 ## Условия запуска и инварианты
 
 - Все расчёты — только по закрытым свечам, без look-ahead.
-- Jobs идемпотентны (уникальность по instrument + идентичности
-  считаемого — `config_id` для индикатора/структуры, контейнер-настройка
-  для фазы — + candle/window timestamp, см.
-  `docs/decisions/market-data-result-identity-keying.md`; checkpoint
-  **производный** — `max(timestamp)` по таблице результатов на инструмент
-  + идентичность, отдельного состояния не храним).
+- Jobs идемпотентны (уникальность по `instrument` +
+  **настройка-владелец** (`strategy_indicator_setting_id` /
+  `strategy_market_structure_setting_id`) + candle/window timestamp —
+  owner-ключевание, `docs/decisions/market-data-result-identity-keying.md`;
+  checkpoint **производный** — `max(timestamp)` по таблице результатов на
+  (инструмент + настройка-владелец), отдельного состояния не храним). Фаза
+  job'ом не считается (вычисляется на чтение), идемпотентность к ней
+  неприменима.
 - Jobs **не** меняют `Strategy.Status`; для `DELETED`-стратегий новые
   данные не считаются (правило — `docs/rules/market-data-freshness.md`).
 - При отсутствии свежих входных данных job не создаёт новый result;

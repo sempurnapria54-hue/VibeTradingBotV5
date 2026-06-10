@@ -73,7 +73,8 @@ DELETED  -> (терминальный)
 
 Переходы статуса — административное действие (создание/активация/
 деактивация/логическое удаление стратегии). Расчётные jobs
-(`IndicatorJob`/`MarketStructureJob`/`MarketPhaseJob`) `Strategy.Status`
-**не** меняют. Immutability стратегии (см.
+(`IndicatorJob`/`MarketStructureJob`) `Strategy.Status` **не** меняют
+(фаза job'ом не считается — вычисляется на лету,
+`docs/decisions/market-phase-stateless.md`). Immutability стратегии (см.
 `docs/models/domain/aggregate/Strategy.md`) означает, что правила не
 редактируются — меняется только статус контейнера.

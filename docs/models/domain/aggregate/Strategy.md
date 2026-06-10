@@ -36,14 +36,17 @@
   через `strategyActionId` и `RuntimeTarget` (см. §Связь с
   DealActionState).
 - **`key` — у `StrategyAction` и у настроек индикаторов/структур.** У
-  `StrategyAction` `key` работает через `targetActionKey`. У
-  `StrategyIndicatorSetting` (и настройки market-structure) `key`
-  нужен, чтобы на настройку ссылался операнд условия (`indicatorKey` /
-  `structureKey`) и «мягкие» ссылки JSON-листьев
-  (`stopLossSettings`/`placement` — те же поля `indicatorKey` /
-  `structureKey`). Прочие settings — без `key`,
-  связи объектные (контейнмент внутри `StrategyMarketPhaseSetting` /
-  `StrategyDetail`).
+  `StrategyAction` `key` работает через `targetActionKey`.
+  `StrategyIndicatorSetting` / `StrategyMarketStructureSetting`
+  объявляются **раз на уровне стратегии** (strategy-scope) и адресуются
+  **по `key`**: операнд условия (`indicatorKey` / `structureKey`), «мягкие»
+  ссылки JSON-листьев (`stopLossSettings`/`placement` — те же поля), а
+  также `phaseRules` фазы и шаги деталей ссылаются на нужную настройку по
+  её `key`. Уникальность ключа — **`UNIQUE(strategy_id, key)`** (поднята с
+  контейнера до стратегии ревизией трек D — настройки в собственные
+  строки, `docs/decisions/strategy-tree-persistence.md`). Прочие settings
+  (`StrategyMarketPhaseSetting`, `StrategyDetail`, шаги) — без `key`, связи
+  объектные (контейнмент / `marketPhaseType`).
 - **Direct partial close запрещён** как постоянный инвариант (см.
   `docs/rules/no-partial-close.md`): `StrategyPositionAction` только
   `CLOSE_FULL`; частичное уменьшение — только через
@@ -72,42 +75,55 @@
 | `instrumentId` | `Long` | Инструмент стратегии. |
 | `name` | `String` | Человекочитаемое имя. |
 | `status` | `Status` | Административный статус (см. lifecycle). |
-| `marketPhaseSetting` | `StrategyMarketPhaseSetting` | Настройка расчёта фазы рынка (живёт на уровне Strategy, т.к. фаза нужна **до** выбора `StrategyDetail`). |
+| `marketPhaseSetting` | `StrategyMarketPhaseSetting` | Настройка классификации фазы рынка (живёт на уровне Strategy, т.к. фаза нужна **до** выбора `StrategyDetail`). |
 | `details` | `List<StrategyDetail>` | Ровно одна detail на один `MarketPhase.Type` (инвариант): create требует детали всех четырёх типов, неторгуемая фаза объявляется явной `NO_TRADE`-деталью. |
+| `indicatorSettings` | `List<StrategyIndicatorSetting>` | Настройки индикаторов стратегии, объявленные **раз** (strategy-scope, `UNIQUE(strategy_id, key)`); фаза/детали/действия ссылаются по `key` (ревизия трек D). |
+| `marketStructureSettings` | `List<StrategyMarketStructureSetting>` | Настройки структуры стратегии, объявленные **раз** (strategy-scope, `UNIQUE(strategy_id, key)`); адресуются по `key`. |
 
 `Status`: `CREATED`, `ACTIVE`, `INACTIVE`, `DELETED` (значения и
 эффекты — в `docs/lifecycles/Strategy.md`). Одна
 `StrategyMarketPhaseSetting` несёт авторские правила классификации
 рынка (`phaseRules`) во все `MarketPhase.Type`
-(`BULL_TREND`/`BEAR_TREND`/`RANGE`/`UNKNOWN`);
-`MarketPhaseJob` сохраняет один актуальный результат, `EntryScannerJob`
-выбирает detail по `MarketPhase.Type → StrategyDetail.marketPhaseType`
+(`BULL_TREND`/`BEAR_TREND`/`RANGE`/`UNKNOWN`). `MarketPhase`
+**вычисляется на лету и не персистится** (ревизия трек D,
+`docs/decisions/market-phase-stateless.md`): `EntryScannerJob` через
+`MarketPhaseService` получает текущую фазу (классификатор поверх
+последних `IndicatorValue` / `MarketStructure`) и выбирает detail по
+`MarketPhase.Type → StrategyDetail.marketPhaseType`
 (jobs — форвард-заметки в
 `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-strategy.md`).
 
 ## Настройки рыночных данных (разделы)
 
 ### StrategyMarketPhaseSetting
-`timeframe: TimeFrame`, `phaseRules: List<StrategyMarketPhaseRule>`,
-`indicatorSettings: List<StrategyIndicatorSetting>`,
-`marketStructureSettings: List<StrategyMarketStructureSetting>`,
-`expirationDuration: Duration` (срок свежести последней `MarketPhase`).
-Отдельного `params`-объекта у настройки нет: `MarketPhase.Type`
-определяется авторскими условиями (`phaseRules`), не скоринговым
-алгоритмом (см. `docs/decisions/market-phase-conditional-classification.md`).
+`phaseRules: List<StrategyMarketPhaseRule>`. Операнды клауз ссылаются по
+`key` на индикаторные/структурные настройки **стратегии** (strategy-scope,
+объявлены раз — см. §Архитектурные инварианты). Отдельного `params`-объекта
+у настройки нет: `MarketPhase.Type` определяется авторскими условиями
+(`phaseRules`), не скоринговым алгоритмом (см.
+`docs/decisions/market-phase-conditional-classification.md`).
+
+Полей `timeframe` и `expirationDuration` у настройки **больше нет** (ревизия
+трек D, `docs/decisions/market-phase-stateless.md`): `MarketPhase`
+вычисляется на лету и не персистится, поэтому своих часов (`timeframe`
+as-of) и своего срока свежести (`expirationDuration`) у фазы нет — свежесть
+наследуется от входов (устаревший вход → операнд недоступен → `UNKNOWN`).
 
 ### StrategyMarketPhaseRule
-Клауза «условие → фаза»: `level: Integer`, `type: MarketPhase.Type`,
+Клауза «условие → фаза»: `type: MarketPhase.Type`,
 `condition: StrategyCondition`. Набор клауз настройки — **упорядоченный
-first-match-список**: проверяются по `level` ASC, первая клауза с
-истинным `condition` задаёт `MarketPhase.Type`; не сработала ни одна →
-`UNKNOWN` (неявный консервативный дефолт, не авторится). Несколько клауз
-на один `type` допустимы (разные паттерны свидетельства → одна фаза).
+first-match-список**: проверяются **по позиции в списке** (поле `level`
+снято ревизией трек D — очерёдность = позиция, не сортировка;
+`docs/decisions/market-phase-stateless.md`), первая клауза с истинным
+`condition` задаёт `MarketPhase.Type`; не сработала ни одна → `UNKNOWN`
+(неявный консервативный дефолт, не авторится). Несколько клауз на один
+`type` допустимы (разные паттерны свидетельства → одна фаза).
 
 `condition` — тот же `StrategyCondition` (ниже), но в **контексте
 классификации фазы** (до выбора детали, без сделки): операнды только
 `INDICATOR` / `MARKET_STRUCTURE` (по `key` из `indicatorSettings` /
-`marketStructureSettings` этой же настройки) / `PRICE` / `CONSTANT` /
+`marketStructureSettings` **стратегии**, strategy-scope) / `PRICE` /
+`CONSTANT` /
 `TIME`; **запрещены** `MARKET_PHASE` (само-референция — фаза вычисляется)
 и runtime-источники сделки (`POSITION` / `ORDER` / `ALGO_ORDER` /
 `BALANCE`). Допустимые `ruleType` — сравнивающие (`INDICATOR_COMPARE` /
@@ -134,16 +150,25 @@ per-`ruleType` контрактом источника. В entry-контекс�
 есть в данных) `TREND_CHANGED` не затронут — там остаётся как есть.
 
 ### StrategyIndicatorSetting
-`key` (стабильный ключ настройки — по нему ссылается индикаторный
-операнд условия, `indicatorKey`), `indicatorType: IndicatorValue.Type`
-(= `type` в форме ввода; дискриминатор подтипа `params` — см.
-§IndicatorParams), `params: IndicatorParams`, `destiny:
-Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup` живут
-**внутри `params`** (см. §IndicatorParams; контракт —
+`id` (реляционный — цель FK результата, см. ниже), `key` (стабильный ключ
+настройки — по нему ссылается индикаторный операнд условия, `indicatorKey`),
+`indicatorType: IndicatorValue.Type` (= `type` в форме ввода; дискриминатор
+подтипа `params` — см. §IndicatorParams), `params: IndicatorParams`,
+`destiny: Destiny`, `expirationDuration`. Доменный `timeframe` и `warmup`
+живут **внутри `params`** (см. §IndicatorParams; контракт —
 `docs/decisions/strategy-condition-authoring-contract.md`). `Destiny`:
 `MARKET_PHASE`, `ENTRY_CONDITION`, `ACTION_PRICE`, `PROTECTION`,
-`EXIT_CONDITION`. Используется внутри `StrategyMarketPhaseSetting`
-(для фазы) и внутри `StrategyDetail` (после выбора детали).
+`EXIT_CONDITION`.
+
+**Scope — стратегия (ревизия трек D).** Настройка — собственная реляционная
+строка strategy-scope (`UNIQUE(strategy_id, key)`), объявляется **раз**;
+фаза, детали и действия адресуют её по `key`. Результат расчёта
+`IndicatorValue` ссылается на неё **одной типизированной FK**
+(`strategy_indicator_setting_id`) — owner-ключевание
+(`docs/decisions/market-data-result-identity-keying.md`); прежнее inline-JSONB
+размещение пер-контейнер реверснуто
+(`docs/decisions/strategy-tree-persistence.md` §Ревизия — настройки в
+собственные строки). `destiny` остаётся пометкой назначения настройки.
 
 ### IndicatorParams (abstract) + наследники
 База: `timeframe: TimeFrame` (доменный таймфрейм серии), `warmup`
@@ -177,27 +202,35 @@ derived`. Create-валидация (шаг 2) проверяет override пр�
 `docs/decisions/strategy-condition-authoring-contract.md`.
 
 ### StrategyMarketStructureSetting
-`key` (на него ссылаются операнд market-structure и «мягкие» ссылки
-JSON-листьев — поле `structureKey`, см. §StrategyConditionOperand),
-`timeframe`, `efficiencyRatioKey`, `atrKey`, `params:
-MarketStructureParams`, `destiny: Destiny`, `expirationDuration`.
-`Destiny`: те же 5 значений, что у indicator (MARKET_PHASE /
-ENTRY_CONDITION / ACTION_PRICE / PROTECTION / EXIT_CONDITION).
+`id` (реляционный — цель FK результата, см. ниже), `key` (на него
+ссылаются операнд market-structure и «мягкие» ссылки JSON-листьев — поле
+`structureKey`, см. §StrategyConditionOperand), `timeframe`,
+`efficiencyRatioKey`, `atrKey`, `params: MarketStructureParams`, `destiny:
+Destiny`, `expirationDuration`. `Destiny`: те же 5 значений, что у indicator
+(MARKET_PHASE / ENTRY_CONDITION / ACTION_PRICE / PROTECTION /
+EXIT_CONDITION).
+
+**Scope — стратегия (ревизия трек D).** Настройка — собственная реляционная
+строка strategy-scope (`UNIQUE(strategy_id, key)`), объявляется **раз**.
+Результат `MarketStructure` ссылается на неё **одной типизированной FK**
+(`strategy_market_structure_setting_id`) — owner-ключевание
+(`docs/decisions/market-data-result-identity-keying.md`).
 
 `efficiencyRatioKey` / `atrKey` — «мягкие» ссылки (по `key`) на настройки
-каталожных индикаторов **того же контейнера**, которые резолвер
-потребляет готовыми входами (fork-A): ER — дискриминатор тренд/шум, ATR —
-пол толеранса уровней (D3). `null` → резолвер использует внутренний прокси
-(ER) / fallback на долю цены (ATR-толеранс). Объявлен, но не готов /
-устарел → консервативный `UNKNOWN` (job, не proxy). Эти ключи **не входят**
-в идентичность конфигурации структуры (`timeframe` + canonical-`params`) —
-краевой случай STRUCT-Q2; грунт —
-`docs/decisions/derived-market-data-code-increments.md`.
+каталожных индикаторов **стратегии**, которые резолвер потребляет готовыми
+входами (fork-A): ER — дискриминатор тренд/шум, ATR — пол толеранса уровней
+(D3). `null` → резолвер использует внутренний прокси (ER) / fallback на
+долю цены (ATR-толеранс). Объявлен, но не готов / устарел → консервативный
+`UNKNOWN` (job, не proxy). С owner-ключеванием каждая настройка структуры
+(со своими ER/ATR-ключами) пишет в **свою** строку результата —
+прежний краевой случай общего `config_id` (STRUCT-Q2) снят по построению
+(`docs/decisions/derived-market-data-code-increments.md` §Краевой случай
+идентичности).
 
 Поля `structureType` у настройки **нет**: `MarketStructure.Type` —
 **выход** расчёта (`MarketStructureResolver` его выводит), не вход
-настройки; идентичность конфигурации структуры = `timeframe` +
-canonical-`params` (вид расчёта один — см.
+настройки. Реестра конфигураций и «идентичности конфигурации структуры»
+больше нет — результат ключуется настройкой-владельцем (см.
 `docs/models/domain/other/MarketStructure.md` §Правила хранения,
 `docs/decisions/market-data-result-identity-keying.md`).
 
@@ -229,9 +262,14 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 | `phaseEntryPolicy` | `PhaseEntryPolicy` | Как торгуем в этой фазе. |
 | `riskPerTradePercent` | `BigDecimal` | Риск на сделку, % от капитала. |
 | `targetRiskRewardRatio` | `BigDecimal` | High-level ориентир R/R. |
-| `indicatorSettings` | `List<StrategyIndicatorSetting>` | После выбора detail (ATR для SL, RSI для ENTRY и т.д.). |
-| `marketStructureSettings` | `List<StrategyMarketStructureSetting>` | После выбора detail. |
 | `stepsByStatus` | `Map<Deal.Status, List<StrategyStep>>` | Шаги, сгруппированные по статусу сделки. |
+
+Индикаторы/структуры, нужные детали (ATR для SL, RSI для ENTRY и т. д.),
+адресуются **по `key`** на strategy-scope-настройки (`Strategy.indicatorSettings`
+/ `marketStructureSettings`, объявлены раз — ревизия трек D); собственных
+inline-настроек деталь больше не держит. Какие именно ключи задействует
+деталь — выводится из операндов её условий и листьев действий (резолв по
+`key`); точная форма списка ключей на детали — деталь реализации (`CODE`).
 
 `PhaseEntryPolicy`: `FOLLOW_PHASE`, `CONTRARIAN`, `GRID`, `NO_TRADE`.
 Матрица допустимости: `BULL_TREND`/`BEAR_TREND` →
@@ -532,47 +570,58 @@ management, форвард-заметка.)
 дерева целиком — через `@EntityGraph` / `JOIN FETCH` (без N+1).
 Таблицы: `strategies`, `strategy_market_phase_settings`,
 `strategy_details`, `strategy_steps`, `strategy_actions` + таблицы
-видов действий (имена таблиц — во множественном числе, общее правило
+видов действий, плюс strategy-scope-настройки
+`strategy_indicator_settings` / `strategy_market_structure_settings`
+(имена таблиц — во множественном числе, общее правило
 `.claude/rules/codestyle.md` §Схема БД). На `strategies` — частичный
 UNIQUE-индекс «одна `ACTIVE` на инструмент» (БД-страховка инварианта
 lifecycle).
 **Листовые настройки рыночных данных (`StrategyIndicatorSetting`,
-`StrategyMarketStructureSetting`) и их `params` — JSONB** на строке
-своего контейнера, отдельных строк/таблиц у них нет (см. §Настройки
-рыночных данных ниже). **Условие шага (`StrategyCondition` с `rules`
-и операндами) — JSONB** на строке `strategy_steps` (см. §Условие ниже).
-Обоснование развилок и сознательный отход от
-архива — `docs/decisions/strategy-tree-persistence.md`; общее правило
+`StrategyMarketStructureSetting`) — собственные реляционные строки
+strategy-scope** (`UNIQUE(strategy_id, key)`), а их `params` — JSONB на
+этой строке (ревизия трек D — см. §Настройки рыночных данных ниже).
+**Условие шага (`StrategyCondition` с `rules` и операндами) — JSONB** на
+строке `strategy_steps` (см. §Условие ниже). Обоснование развилок и
+сознательный отход от архива —
+`docs/decisions/strategy-tree-persistence.md`; общее правило
 представления сущностей в БД —
 `docs/rules/persistence-representation.md`.
 
 ### Настройки рыночных данных (`StrategyIndicatorSetting` / `StrategyMarketStructureSetting`)
-Хранятся **JSONB**, не реляционными строками: контейнеры
-(`StrategyMarketPhaseSetting`, `StrategyDetail`) несут свои
-`indicatorSettings` / `marketStructureSettings` JSON-массивами на
-собственной строке. Своего `id`/таблицы у настройки нет; на неё
-ссылаются **по `key`** (операнд условия `indicatorKey` / `structureKey`,
-мягкие ссылки JSON-листьев `stopLossSettings`/`placement`) — резолвит
-приложение. `id` настройки в рантайме не используется (там работает
-`StrategyAction.id` через `DealActionState`). Уникальность `key`
-настройки в пределах контейнера — проверка приложения по JSON-массиву,
-не DB-UNIQUE.
+Хранятся **собственными реляционными строками strategy-scope** (ревизия
+трек D — `docs/decisions/strategy-tree-persistence.md` §Ревизия — настройки
+в собственные строки): таблицы `strategy_indicator_settings` /
+`strategy_market_structure_settings`, каждая строка несёт `id`, `strategy_id`
+(FK → `strategies`) и `key`; объявлены **раз** на стратегию,
+`UNIQUE(strategy_id, key)` (DB-страховка, не только проверка приложения).
+На настройку ссылаются **по `key`** (операнд условия `indicatorKey` /
+`structureKey`, мягкие ссылки JSON-листьев `stopLossSettings`/`placement`,
+`efficiencyRatioKey`/`atrKey` структуры) — резолвит приложение.
+`id` настройки — цель **типизированной FK результата расчёта**
+(`IndicatorValue.strategy_indicator_setting_id` /
+`MarketStructure.strategy_market_structure_setting_id`) — owner-ключевание
+(`docs/decisions/market-data-result-identity-keying.md`). Точная форма
+привязки настроек к контейнерам/действиям в объектном графе (плоский
+strategy-scope-список vs key-ref-списки на контейнерах) — деталь `CODE`;
+ревизия фиксирует scope, `UNIQUE(strategy_id, key)` и адресацию по `key`.
 
 `params` настройки (`IndicatorParams` + 7 наследников;
-`MarketStructureParams`) едут внутри того же JSON (только непустые
-значения), без отдельных таблиц params и без inheritance-маппинга — в
-коде иерархия типов сохраняется. Дискриминатор подтипа
-`IndicatorParams` в payload не дублируется — тег несёт `indicatorType`
-настройки-владельца (Jackson `EXTERNAL_PROPERTY`, см. §IndicatorParams).
-`phaseRules` (список клауз `StrategyMarketPhaseRule`, каждая с вложенным
-`condition: StrategyCondition`) — **JSONB-колонка `phase_rules`** на
-реляционной строке `strategy_market_phase_settings` (условие внутри
-клаузы — тот же JSONB, что и `condition` шага, см. ниже §Условие).
-Отдельного `params`-объекта/колонки у контейнера нет — `MarketPhaseParams`
-распущен редизайном условной фазы
+`MarketStructureParams`) — **JSONB-колонка `params`** на строке настройки
+(только непустые значения), без отдельных таблиц params и без
+inheritance-маппинга — в коде иерархия типов сохраняется. Дискриминатор
+подтипа `IndicatorParams` в payload не дублируется — тег несёт
+`indicatorType` строки-владельца (Jackson `EXTERNAL_PROPERTY`, см.
+§IndicatorParams и `docs/rules/persistence-representation.md`).
+`phaseRules` (список клауз `StrategyMarketPhaseRule` — `type` + вложенный
+`condition: StrategyCondition`, **без `level`**) — **JSONB-колонка
+`phase_rules`** на реляционной строке `strategy_market_phase_settings`
+(условие внутри клаузы — тот же JSONB, что и `condition` шага, см. ниже
+§Условие). У `strategy_market_phase_settings` **нет** колонок `timeframe`
+и `expiration_duration` (фаза stateless, не персистится —
+`docs/decisions/market-phase-stateless.md`); `MarketPhaseParams` был
+распущен ещё редизайном условной фазы
 (`docs/decisions/market-phase-conditional-classification.md`). Валидацию
-полей и контекстный whitelist операндов/`ruleType` делает приложение. Обоснование (почему настройки не
-реляционные узлы) — `docs/decisions/strategy-tree-persistence.md`.
+полей и контекстный whitelist операндов/`ruleType` делает приложение.
 
 ### Действия (`StrategyAction`)
 Наследование `JOINED`: базовая таблица `strategy_actions`
@@ -650,8 +699,10 @@ strategy-tree (`timeframe`-поля). Каноническое определе�
 ## Связи (расчёт / jobs / риск)
 
 Стратегия хранит правила расчёта, не готовые значения. Runtime-расчёт,
-jobs (`IndicatorJob`/`MarketStructureJob`/`MarketPhaseJob`/
-`EntryScannerJob`), evaluator (`StrategyConditionEvaluator`),
+jobs (`IndicatorJob`/`MarketStructureJob`/`EntryScannerJob`; фаза —
+не job, а деривация на чтение через `MarketPhaseService`/
+`MarketPhaseClassifier`, `docs/decisions/market-phase-stateless.md`),
+evaluator (`StrategyConditionEvaluator`),
 калькуляторы (`StrategyActionCalculator` → `PriceCalculator`/
 `SizeCalculator`), risk-layer (`RiskValidator` → `RiskCheckResult` →
 `RiskBlockResolver`), `ServiceCommandFactory`, freshness

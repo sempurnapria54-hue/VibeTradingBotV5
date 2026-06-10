@@ -43,10 +43,12 @@ decision не заводился); CMD-Q1 закрыт решением
 стоит на `RISK_CONTROL`). Один вопрос — из закрывающего батча шага 3
 (2026-06-09, торговая валидация): STRUCT-Q1 (калибровка числовых порогов
 структуры — ER-порог тренда и k-толеранс — на бэктест-гейте фазы 2;
-владелец — фаза 2). Ещё один — всплыл на `SYNC_DOCS_FROM_CODE` шага 3
-(2026-06-09, сверка код↔доки): STRUCT-Q2 (идентичность `config_id` структуры
-не различает разные `efficiencyRatioKey`/`atrKey` при одинаковых
-`timeframe + params`; владелец — шаг 3).
+владелец — фаза 2). STRUCT-Q2 (идентичность `config_id` структуры vs разные
+ER/ATR-входы) **закрыт** 2026-06-10 реверсом ключевания
+(`docs/decisions/market-data-result-identity-keying.md`: результаты
+ключуются настройкой-владельцем, разделяемого ряда нет). Открыт PHASE-Q1
+(трек D, 2026-06-10): «липкость» / гистерезис фазы при stateless-резолве —
+владелец — торговый ревью (`trading-review`).
 
 История закрытых вопросов пайплайна:
 
@@ -521,88 +523,31 @@ KAMA), ни конкретного k. Значения — **пользоват�
 `.claude/library/trading/distilled/strategy-patterns.md` §4,
 `.claude/library/trading/distilled/system-design.md` §5.
 
-### STRUCT-Q2. Идентичность `config_id` структуры vs разные ER/ATR-входы (владелец — шаг 3)
+### PHASE-Q1. «Липкость» / гистерезис фазы при stateless-резолве (владелец — `trading-review`)
 
-Всплыл на `SYNC_DOCS_FROM_CODE` шага 3 при сверке код↔доки (2026-06-09).
-Soft-ссылки fork-A `efficiencyRatioKey` / `atrKey` живут на
-`StrategyMarketStructureSetting`, а **не** в `MarketStructureParams`, и в
-идентичность конфигурации структуры (`timeframe` + canonical-`params`,
-`docs/decisions/market-data-result-identity-keying.md`) **не входят**. Две
-настройки структуры с одинаковыми `timeframe + params`, но разными
-`efficiencyRatioKey` / `atrKey` резолвятся в один `config_id` и делят один
-ряд результатов (`UNIQUE(instrument_id, config_id, window_end_at)`); код
-дедупит расчёт по `instrumentId:configId` (`MarketStructureJob`) — первый
-писатель выигрывает, второй читает структуру, посчитанную по другому
-ER/ATR-входу. Нарушает инвариант шаринга «одна конфигурация → идентичный
-результат».
+Трек D (2026-06-10) сделал `MarketPhase` **stateless — вычисляется на лету,
+не персистится** (`docs/decisions/market-phase-stateless.md`). Резолв на
+лету по текущим индикаторам/структурам не даёт **гистерезиса/
+подтверждаемости** фазы: у границы режимов фаза может перескакивать тик за
+тиком. Сейчас анти-whipsaw — только операнд-уровневый (сглаживающие периоды
+индикаторов, структурный `breakoutConfirmationBars`,
+`docs/decisions/market-phase-conditional-classification.md` §Анти-whipsaw).
 
-**Проработано до вариантов на валидацию (2026-06-10). Концепт-выбор — хвост
-пользователя, не финализирован.**
+Не решено: нужна ли фазе **отдельная подтверждаемость / гистерезис** поверх
+операнд-уровневого сглаживания (hold-N-баров на смену фазы и т. п.), и если
+да — как выразить без хранимого состояния истории фаз (источник истории —
+готовая структура, не фаза; см. «дверь на будущее» в
+`docs/models/domain/aggregate/Strategy.md` §StrategyMarketPhaseRule).
+Приемлемость остаточного перескока как численный риск-аппетит автора уже
+принята пользователем, но stateless-переход вопрос обостряет.
 
-**Вердикт достижимости: ДОСТИЖИМО в scope шага 3 (одна стратегия) →
-блокер `DONE`.** Что в surface это определяет:
-- `MarketStructureJob.run()` собирает структурные настройки из
-  `marketPhaseSetting` **и каждого** `StrategyDetail` стратегии → несколько
-  контейнеров на одну стратегию;
-- `config_id` = `(timeframe, canonicalStructureParams(params))`;
-  `MarketDataConfigWriter.canonicalStructureParams` сериализует только
-  `MarketStructureParams` (вкл. пороги D2/D3) — `efficiencyRatioKey` /
-  `atrKey` живут на настройке, не в params → в идентичность не входят;
-- `StrategyCreateRequestValidator.validateStructureSetting` проверяет лишь
-  уникальность `key` **внутри контейнера** и что ER/ATR-ключ резолвится в
-  индикатор того же контейнера нужного типа — **гарда против двух настроек
-  с одинаковыми `timeframe + params` и разными ER/ATR-входами нет**;
-- job дедупит расчёт по `instrumentId:configId`, `saveIfNew` идемпотентен
-  по `(instrument, config, window_end_at)` → первый писатель выигрывает,
-  молча.
-
-⇒ Одна стратегия с двумя контейнерами (например, детали BULL_TREND и
-BEAR_TREND), каждый со структурной настройкой одинаковых `timeframe +
-params`, но разными ER/ATR-ключами (на свои container-local индикаторы),
-авторабельна и проходит 400 → молчаливая коллизия общего результата.
-
-**Варианты разрешения (трейдоффы):**
-- **A. Включить идентичность ER/ATR-входа в `config_id` структуры.**
-  Идентичность = `timeframe + canonical-params + config_id(ER) +
-  config_id(ATR)` (резолвить ER/ATR-конфиги до структурного; nullable-
-  колонки + UNIQUE). (+) восстанавливает инвариант «один `config_id` ⇒ один
-  результат», сохраняет выразительность (разный ER per phase на одной
-  геометрии), честный шаринг. (−) схемная правка + проводка в job; брать
-  resolved indicator config_id, не строку-ключ (иначе фрагментация по
-  именам). Самый дорогой.
-- **B. Запрет на create-валидации (400).** Если две структурные настройки
-  стратегии делят `timeframe + canonical-params`, но различаются
-  эффективным ER/ATR-входом. (+) дёшево, без схемы, убирает молчаливость,
-  полностью закрывает достижимость в scope одной стратегии. (−) частично:
-  межстратегийная коллизия на общем инструменте (фаза 3) create-валидацией
-  одной стратегии не ловится; запрещает легитимный паттерн «одна геометрия
-  + разный ER per phase».
-- **D. Ключевать структуру контейнером (как исключение `MarketPhase`).**
-  Ключ `(instrument, container+structureKey, window_end_at)`, без шаринга
-  по идентичности. (+) полностью корректно, есть прецедент (`MarketPhase`),
-  снимает весь класс. (−) реверс осознанной оптимизации шаринга структуры
-  (структура тянет больше данных, чем фаза — ради чего шаринг и вводили);
-  больше расчёта/хранения.
-- *(C — «принять + детерминированный победитель + задокументировать» —
-  null-baseline; при высокой достижимости оставляет молчаливо-неверную
-  семантику, не рекомендуется.)*
-
-**Крен:** чинить сейчас (блокер `DONE`, не форвард-парк) — достижимость в
-scope одной стратегии реальна и молчалива. Рекомендация: **B сейчас**
-(дёшево закрывает достижимость phase-1 без схемной турбулентности на шаге
-3) + **структурный фикс A заякорить на фазу 3** (портфель/мульти-стратегия,
-где межстратегийный шаринг на общем инструменте реально работает и
-идентичность config честно расширяется). Если важна выразительность «разный
-ER per phase на одной геометрии» уже в фазе 1 — делать **A сразу** (B её
-запрещает). Грунт — `docs/decisions/derived-market-data-code-increments.md`
-§Что осталось открытым.
-
-Связано: `docs/decisions/market-data-result-identity-keying.md`,
-`docs/decisions/derived-market-data-code-increments.md`,
-`docs/models/domain/aggregate/Strategy.md` (§StrategyMarketStructureSetting),
-`docs/components/MarketStructureJob.md`,
-`src/.../api/validation/StrategyCreateRequestValidator.java`,
-`src/.../persistence/service/MarketStructureConfigDataService.java`.
+Владелец — торговый ревью (`trading-review`) со специалистом; горизонт — по
+ходу торговой проработки фазы. До решения дополнительный гистерезис не
+вводится (S0), анти-whipsaw остаётся операнд-уровневым.
+Связано: `docs/decisions/market-phase-stateless.md`,
+`docs/decisions/market-phase-conditional-classification.md`,
+`docs/models/domain/aggregate/Strategy.md` (§StrategyMarketPhaseRule),
+`docs/components/MarketPhaseClassifier.md`.
 
 ## Конвенция
 

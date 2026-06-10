@@ -32,10 +32,12 @@ BOLLINGER_BANDS/OBV` ER не содержал).
    `EFFICIENCY_RATIO`; наследники `EfficiencyRatioParams(period)` (ER —
    оконный, `warmup = period`) и `EfficiencyRatioValue(efficiencyRatio)`
    (скаляр `BigDecimal` ∈ [0,1], нормирован по определению). ER считается
-   `IndicatorJob`'ом по закрытым свечам, шарится по идентичности
-   конфигурации, свежесть — под запрашивающую настройку (как прочие
-   индикаторы). Читается `StrategyConditionEvaluator`'ом как готовое
-   значение — evaluator/classifier индикаторы не считают.
+   `IndicatorJob`'ом по закрытым свечам и ключуется
+   **настройкой-владельцем** (owner-ключевание, как прочие индикаторы —
+   `docs/decisions/market-data-result-identity-keying.md`; прежний шаринг
+   по идентичности конфигурации убран ревизией трек D). Читается
+   `StrategyConditionEvaluator`'ом как готовое значение —
+   evaluator/classifier индикаторы не считают.
 
 2. **ER-условие — через `INDICATOR_COMPARE`, без выделенного `ruleType`.**
    «ER ниже/выше порога» = ER-операнд (по `indicatorKey`) `LT`/`GT`
@@ -52,8 +54,8 @@ BOLLINGER_BANDS/OBV` ER не содержал).
    использование ER (тест доминирования чистого хода над шумом /
    консервативный `UNKNOWN`) **не пересчитывается** — резолвер потребляет
    **тот же каталожный ER** готовым скаляром по «мягкому» ключу
-   `StrategyMarketStructureSetting.efficiencyRatioKey` (того же контейнера),
-   который извлекает `MarketStructureJob`. Один источник ER, без
+   `StrategyMarketStructureSetting.efficiencyRatioKey` (strategy-scope, по
+   `key`), который извлекает `MarketStructureJob`. Один источник ER, без
    дубль-вычисления. **Fallback на прокси — нетто-ход окна / суммарный
    побарный ход** (мини-ER по ценам закрытия), считается резолвером **только
    когда `efficiencyRatioKey` не объявлен** (не EMA-наклон — уточнено на

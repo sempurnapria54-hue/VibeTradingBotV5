@@ -11,17 +11,19 @@
 (уровни, диапазоны, тренд), рассчитанный `MarketStructureJob` (вычисление
 делегируется компоненту `MarketStructureResolver` —
 `docs/components/MarketStructureResolver.md`) по закрытым свечам для
-**конфигурации расчёта** (`timeframe` + canonical-`params`),
-зарегистрированной в реестре `market_structure_configs`. Результат **шарится** всеми настройками
-`StrategyMarketStructureSetting`, которые эту конфигурацию запрашивают
-(ключ — по идентичности считаемого, не по настройке; см.
+конкретной **настройки-владельца** `StrategyMarketStructureSetting`.
+Результат ключуется настройкой-владельцем (одна типизированная FK
+`strategyMarketStructureSettingId`), **не шарится** и не ключуется по
+идентичности конфигурации — реестр `market_structure_configs` убран
+ревизией трек D (см.
 `docs/decisions/market-data-result-identity-keying.md`). Persisted-модель
 рыночных данных, не про бизнес-цикл сделки → `other` (см.
 `.claude/decisions/models-core-vs-other.md`).
 
 Готовит данные для входов от диапазона, grid, SL за структурный уровень,
 breakout-условий и сопровождения позиции. Потребители (evaluator,
-калькуляторы, `MarketPhaseJob`) читают готовую структуру через
+калькуляторы, `MarketPhaseClassifier` при классификации фазы на чтение)
+читают готовую структуру через
 `docs/components/MarketStructureService.md` и сами уровни по свечам не
 ищут. Для классификации фазы `MarketStructure` фигурирует **операндом**
 авторских правил (`MARKET_STRUCTURE`-операнд, в т.ч. тест `Type` через
@@ -36,7 +38,7 @@ Java-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID результата расчёта. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `configId` | `Long` | Ссылка на конфигурацию расчёта (тип + `timeframe` + canonical-`params`) в реестре `market_structure_configs` (см. `docs/decisions/market-data-result-identity-keying.md`). |
+| `strategyMarketStructureSettingId` | `Long` | FK на настройку-владельца `StrategyMarketStructureSetting` (`strategy_market_structure_settings.id`) — owner-ключевание (см. `docs/decisions/market-data-result-identity-keying.md`). |
 | `type` | `Type` | Тип структуры рынка. |
 | `windowStartAt` | `OffsetDateTime` | Начало окна свечей расчёта. |
 | `windowEndAt` | `OffsetDateTime` | Конец окна свечей расчёта. |
@@ -172,31 +174,25 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 ## Правила хранения
 
 - Считается только по закрытым свечам (без look-ahead).
-- Уникальность: `UNIQUE(instrument_id, config_id, window_end_at)`
-  (ключ по идентичности считаемого через реестр конфигураций — см.
+- Уникальность: `UNIQUE(instrument_id, strategy_market_structure_setting_id,
+  window_end_at)` (ключ по настройке-владельцу — owner-ключевание, см.
   `docs/decisions/market-data-result-identity-keying.md`).
-- Каноническая форма `params` вычисляется один раз — при регистрации
-  конфигурации в реестре (не на каждом результате); отдельные `version` /
-  `canonicalJson` на `MarketStructureParams` не нужны (params immutable,
-  см. `docs/models/domain/aggregate/Strategy.md`).
-- **Идентичность конфигурации структуры = `timeframe` +
-  canonical-`params`.** Вид расчёта структуры один (`MarketStructureResolver`
-  выводит `Type` как **выход**), поэтому type-дискриминатора в идентичности
-  нет — в отличие от `IndicatorValue`, где `Type` различает виды.
-  Per-настроечный `structureType` **удалён** (`StrategyMarketStructureSetting`
-  его не несёт): тип — результат расчёта, не вход настройки (см.
-  `docs/decisions/market-data-result-identity-keying.md`).
-  - **Краевой случай (открыт, STRUCT-Q2):** soft-ключи входов резолвера
-    `efficiencyRatioKey` / `atrKey` живут на настройке, а **не** в
-    `params`, и в идентичность **не входят**. Две настройки с одинаковыми
-    `timeframe + params`, но разными ER/ATR-ключами делят один `config_id`
-    и один ряд результатов — первый писатель выигрывает. Разрешение —
-    `docs/decisions/derived-market-data-code-increments.md` §Что осталось
-    открытым.
+- **Per-настроечный `structureType` отсутствует** (`StrategyMarketStructureSetting`
+  его не несёт): `MarketStructure.Type` — **выход** расчёта
+  (`MarketStructureResolver` его выводит), не вход настройки. Реестра
+  конфигураций и «идентичности конфигурации» больше нет — результат
+  ключуется настройкой-владельцем; канонизация `params` не нужна.
+  - **Бывший краевой случай STRUCT-Q2 снят по построению.** Soft-ключи
+    входов резолвера `efficiencyRatioKey` / `atrKey` живут на настройке;
+    при owner-ключевании каждая настройка структуры (со своими ER/ATR-
+    ключами) пишет в **свою** строку под своим
+    `strategy_market_structure_setting_id` — разделяемого ряда, на котором
+    возникала коллизия, нет (см.
+    `docs/decisions/derived-market-data-code-increments.md` §Краевой случай
+    идентичности).
 - **Свежесть на чтение:** `expiredAt = windowEndAt +
-  askingSetting.expirationDuration` считается в runtime, колонкой не
-  хранится; на общей строке (ключ по `config_id`) единого `expiredAt` нет
-  — своё под каждую запрашивающую настройку
-  (`docs/rules/market-data-freshness.md`).
+  ownerSetting.expirationDuration` считается в runtime, колонкой не
+  хранится; у строки результата один владелец, под него и оценивается
+  свежесть (`docs/rules/market-data-freshness.md`).
 - **Retention:** результаты не чистятся (нет потребителя истории) —
   `docs/rules/market-data-retention.md`.

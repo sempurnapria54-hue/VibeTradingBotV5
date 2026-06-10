@@ -24,8 +24,8 @@
 ## Поток во времени
 
 ```text
-IndicatorJob / MarketStructureJob / MarketPhaseJob   (market-data-calculation)
-  -> готовят свежие данные рынка
+IndicatorJob / MarketStructureJob   (market-data-calculation)
+  -> готовят свежие данные рынка (фаза — на лету через MarketPhaseService)
 
 EntryScannerJob
   -> активная Strategy -> freshness (MarketDataExpirationChecker)

@@ -30,9 +30,11 @@ score. Семантика самого скоринга не была задан
 
 1. **Носитель правил.** `StrategyMarketPhaseSetting.phaseRules:
    List<StrategyMarketPhaseRule>` — упорядоченный **first-match-список**
-   клауз `{ level, type, condition: StrategyCondition }`. Проверяются по
-   `level` ASC; первая клауза с истинным `condition` задаёт `Type`; ни
-   одна → `UNKNOWN` (неявный консервативный дефолт). Операндный пул —
+   клауз `{ type, condition: StrategyCondition }`. Проверяются **по позиции
+   в списке** (поле `level` снято ревизией — трек D,
+   `docs/decisions/market-phase-stateless.md`); первая клауза с истинным
+   `condition` задаёт `Type`; ни одна → `UNKNOWN` (неявный консервативный
+   дефолт). Операндный пул —
    существующие `indicatorSettings` / `marketStructureSettings` той же
    настройки (ссылка по `key`). Условия — в **контексте классификации
    фазы**: операнды `INDICATOR`/`MARKET_STRUCTURE`/`PRICE`/`CONSTANT`/
@@ -57,14 +59,16 @@ score. Семантика самого скоринга не была задан
    контейнера исчезают; `StrategyMarketPhaseSetting` не несёт ни
    `params`, ни дебаунса.
 
-3. **Исполнение в job.** Тонкий stateless `MarketPhaseClassifier`
+3. **Исполнение.** Тонкий stateless `MarketPhaseClassifier`
    (чистый first-match) поверх переиспользуемого
-   `StrategyConditionEvaluator`; `MarketPhaseJob` остаётся тонким
-   (`docs/components/MarketPhaseClassifier.md`,
-   `docs/components/MarketPhaseJob.md`). `confirmedAt` фазы классификатор
-   выводит как консервативный `max` по гейт-операндам сработавшей клаузы
-   (роль распущенного `confirmationBars` для гейта без look-ahead; деталь
-   — `docs/models/domain/other/MarketPhase.md` §Деривация `confirmedAt`).
+   `StrategyConditionEvaluator` (`docs/components/MarketPhaseClassifier.md`).
+   Ревизией (трек D, `docs/decisions/market-phase-stateless.md`) фаза
+   **не персистируется** — классификатор зовётся
+   `docs/components/MarketPhaseService.md` **на чтение** (бывший
+   `MarketPhaseJob` удалён). `confirmedAt` у фазы **больше нет** (поле
+   снято вместе с персистом): гейт «без look-ahead» наследуется от готовых
+   входов (структура/индикатор посчитаны по закрытым свечам). Прежний
+   скоринговый `confirmationBars` уже был распущен этим редизайном.
 
 4. **`confidenceScore` удалён** из `MarketPhase` и из контракта job.
    Детерминированный булев исход не даёт непрерывной уверенности; поле
@@ -124,8 +128,10 @@ score. Семантика самого скоринга не была задан
   (`phase_rules` JSONB вместо `params`).
 - `docs/models/domain/other/MarketPhase.md` — `confidenceScore` удалён,
   определение `Type` переформулировано (авторские правила, не скоринг).
-- `docs/components/MarketPhaseJob.md` — исполнение через классификатор;
-  `algorithmType`/score убраны.
+- `MarketPhaseJob` — исполнение через классификатор; `algorithmType`/score
+  убраны. *(Ревизия трек D: компонент удалён — фаза не персистируется,
+  классификатор зовётся `MarketPhaseService` на чтение,
+  `docs/decisions/market-phase-stateless.md`.)*
 - `docs/components/MarketPhaseClassifier.md` — новый компонент (stateless
   first-match поверх `StrategyConditionEvaluator`).
 - `docs/decisions/strategy-tree-persistence.md` — `MarketPhaseParams`

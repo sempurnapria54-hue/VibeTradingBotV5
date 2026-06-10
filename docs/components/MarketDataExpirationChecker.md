@@ -24,17 +24,22 @@
 ## Источник сроков
 
 `expirationDuration` из `StrategyIndicatorSetting`,
-`StrategyMarketStructureSetting`, `StrategyMarketPhaseSetting`.
+`StrategyMarketStructureSetting`. У `StrategyMarketPhaseSetting`
+`expirationDuration` **нет** — `MarketPhase` не персистируется, свежесть
+фазы наследуется от свежести её входов (индикаторов/структур; см.
+`docs/decisions/market-phase-stateless.md`).
 
 ## Вычисление свежести (на чтение)
 
 Свежесть вычисляется на чтение, в БД не хранится:
-`expiredAt = referencePoint + askingSetting.expirationDuration`,
+`expiredAt = referencePoint + ownerSetting.expirationDuration`,
 свежо ⟺ `now < expiredAt`. `referencePoint` — `windowEndAt` (структура) /
-`candleTimestamp` (фаза, индикатор); `confirmedAt` — гейт без look-ahead,
-не точка отсчёта. Для шаримых результатов (ключ по `config_id`) свежесть
-оценивается под каждую запрашивающую настройку — единого `expiredAt` на
-общей строке нет. Правило — `docs/rules/market-data-freshness.md`.
+`candleTimestamp` (индикатор); `confirmedAt` — гейт без look-ahead, не
+точка отсчёта. Результат ключуется настройкой-владельцем (owner-ключевание,
+`docs/decisions/market-data-result-identity-keying.md`): у строки один
+владелец, под его `expirationDuration` и оценивается свежесть — общей
+строки с несколькими запрашивающими больше нет. Правило —
+`docs/rules/market-data-freshness.md`.
 
 ## Граница ответственности
 

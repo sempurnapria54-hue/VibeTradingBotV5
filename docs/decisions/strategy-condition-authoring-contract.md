@@ -61,8 +61,10 @@ candle-loading (схемная валидация / индексированны
 **Отвергнутая альтернатива.** `type`-строкой `"EMA(15, 200)"` —
 stringly-typed: позиционно, требует парсера на тип, не валидируется и
 не индексируется по полю; бьётся с уже принятым (операнды — структурой,
-настройки — JSONB-объекты `{ key, type, params }` внутри контейнера;
-ревизия `GAPS_CLOSE_3` — `strategy-tree-persistence.md`).
+настройки — структурированные объекты `{ key, type, params }`:
+реляционные строки strategy-scope, `params` — JSONB, после ревизии трек D
+— `strategy-tree-persistence.md` §Ревизия — настройки в собственные
+строки).
 
 ### `warmup` — выводимый по умолчанию, с override
 
@@ -173,10 +175,10 @@ Create-валидация (400) проверяет авторинг-миниму
   хотя бы один с требуемым источником (INDICATOR / PRICE);
 - `CROSSOVER` — operator `CROSSED_ABOVE` / `CROSSED_BELOW` + оба
   операнда;
-- операнды: `INDICATOR` → `indicatorKey` существует в настройках того же
-  контейнера **+ `indicatorComponent`** (обязателен для многокомпонентного
-  типа, запрещён для одно-компонентного, совместим с типом — D1);
-  `MARKET_STRUCTURE` → `structureKey` существует;
+- операнды: `INDICATOR` → `indicatorKey` существует в настройках
+  **стратегии** (strategy-scope, ревизия трек D) **+ `indicatorComponent`**
+  (обязателен для многокомпонентного типа, запрещён для одно-компонентного,
+  совместим с типом — D1); `MARKET_STRUCTURE` → `structureKey` существует;
   `PRICE` → валидный `priceSource`; `CONSTANT` → `valueType` + `value`.
   Контейнер ссылки — `StrategyDetail` для entry-условий, либо
   `StrategyMarketPhaseSetting` для правил классификации фазы (ниже).
