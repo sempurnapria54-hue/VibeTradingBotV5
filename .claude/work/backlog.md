@@ -273,6 +273,66 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 (`.claude/skills/security-review.md`), деактивированный на текущих
 шагах.
 
+## Форвард-материал шагов 5 / 7 / 8 (скан интегратора, прогоны 2-3, 2026-06-11)
+
+Кандидаты со скана поверхности OKX против command-layer. Заметки
+владельцам шагов, **не действия сейчас**; решения — на самих шагах.
+Поле-уровневые контракты всех кандидатов готовы (см.
+`docs/integrations/okx/coverage-manifest.md`, прогон 3).
+
+### Шаг 5 (риск-преконтроль)
+
+- **В-2 `order-precheck`** — серверная пре-валидация ордера
+  (`contracts/order-precheck.md`). ⚠ Ограничение офдока: только
+  режимы счёта MCM/PM (`acctLv` 3/4) — для Spot/Futures mode
+  неприменим; не замена собственному преконтролю.
+- **В-8 `mark-price` / `price-limit`** — дистанция ликвидации от
+  mark price; границы допустимой цены ордера до постановки
+  (`contracts/mark-price.md`, `contracts/price-limit.md`).
+- **В-9 `account/config` + `set-leverage`/`set-position-mode`** —
+  bootstrap-валидация посылок адаптера (`isolated`/`net`, плечо):
+  старт-проверка `posMode`/`acctLv`/`perm` вместо принятия как
+  данности (`contracts/account-config.md`); смежно INSTR-Q2 (кто и
+  когда выставляет плечо).
+- Рядом (без номера): `max-size`/`max-avail-size` — серверные
+  потолки размера (`contracts/max-size.md`); `position-tiers` —
+  `maxLever`/`maxSz` по тирам как вход RISK-Q2
+  (`contracts/position-tiers.md`).
+
+### Шаг 7 (сделки и P&L)
+
+- **В-3 `positions-history`** — P&L закрытых позиций с разложением
+  `realizedPnl = pnl + fee + fundingFee + liqPenalty`
+  (`contracts/position.md` §История).
+- **В-6 `funding-rate(-history)`** — funding-компонент P&L SWAP.
+  **Лежит рядом с OKX-Q3:** два пути к funding (bills subType
+  173/174 vs `funding-rate-history.realizedRate`) — шаг 7 выбирает
+  осознанно, не ведёт два параллельных трека
+  (`contracts/funding-rate.md`, `open-questions.md` §OKX-Q3).
+- **В-7 `trade-fee`** — ставки комиссий для прогноза/сверки
+  (фактические комиссии — fills/bills); знак: минус = комиссия
+  (`contracts/trade-fee.md`).
+
+### Шаг 8 (safety / AnomalyJob)
+
+- **В-1 `cancel-all-after`** — dead-man's switch: серверная
+  страховка на потерю связи **поверх** явного
+  `EXECUTE_KILL_SWITCH`, не вместо него
+  (`contracts/cancel-all-after.md`; heartbeat раз в секунду,
+  timeOut 0|[10,120] с). Покрытие algo-ордеров CAA офдоком не
+  специфицировано — уточнить на шаге.
+
+### Рассмотрено, не берём (прогоны 2-3)
+
+- **В-4 batch-write** (`batch-orders`/`cancel-batch-orders`/
+  `amend-batch-orders`) — конфликт с гранулярностью «одна команда —
+  одна сущность» (CMD-Q3); новой фактуры под пересмотр нет.
+  Контракт задокументирован (`contracts/batch-operations.md`),
+  `mass-cancel` ушёл вне периметра (MMP/Option-only).
+- **В-5 STP** (`stpMode`/`stpId`) — сознательно не используется;
+  новой фактуры нет. Действует биржевой default
+  (`acctStpMode=cancel_maker` — `contracts/account-config.md`).
+
 ## Методологические задачи (по итогам миграции)
 
 Не cross-cutting миграции, а ревизии методологии по итогам прогонов.

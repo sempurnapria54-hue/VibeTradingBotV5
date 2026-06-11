@@ -19,10 +19,37 @@
   — источник правды по контрактам, полям, лимитам, ACK-семантике,
   пагинации.
 - **Лог изменений API:** `https://www.okx.com/docs-v5/log_en/` —
-  «Upcoming Changes»; первый ориентир при подозрении на дрейф спеки.
+  «Upcoming Changes» + датированные записи (вкл. «Delisted endpoints
+  from the document»); первый ориентир при подозрении на дрейф спеки.
 - Command-relevant разделы документации: **«Order Book Trading →
-  Trade»** (ordinary order, algo order, fills, close-position) и
-  **«Trading Account»** (balance, positions).
+  Trade / Algo Trading»** (ordinary order, algo order, fills,
+  close-position) и **«Trading Account»** (balance, positions).
+
+## Канал чтения офдока — самообслуживание (решение 2026-06-11)
+
+Обе страницы — **статический HTML** (Slate-разметка, ~5 МБ у корня):
+контент целиком в выдаче, секции под якорями `h1/h2/h3` с `id`,
+поля — HTML-таблицами. Канал: **сырой fetch + локальный
+детерминированный парсинг** (например, `curl` с браузерным UA →
+скрипт по якорям/таблицам → секции в temp), **без
+WebFetch-суммаризатора**. Прежний диагноз «JS-SPA, нечитаем»
+(прогоны 1-2) был свойством инструмента — суммаризатор на гигантской
+странице конфабулировал (выдумал `amend-order-algo` /
+`cancel-order-algo`); сама страница читается надёжно. Если
+конкретная страница всё же упрётся в JS-only рендер — эскалировать с
+фактурой, не конфабулировать.
+
+Сырая выкачка — **временный рабочий материал прогона** (temp вне
+репозитория), в репозиторий не коммитится; хранится только дистиллят
+в доках (решение B —
+`.claude/decisions/integrator-agent.md` §Канал и хранение).
+
+**Самоподдержка актуальности:** перевыкачка + дифф против
+манифеста/доков — при каждом заходе интегратора по источнику и по
+явной задаче «актуализируй»; дрейф фактов — правками, дрейф выборов
+— предложениями по ступени. Дата последней сверки — в шапке
+«Внешний источник правды» каждого контракт-дока (правило
+`.claude/rules/external-source-sync.md`).
 
 ## Command-relevant разделы REST API
 
@@ -38,7 +65,7 @@
 | `REFRESH_ORDER` | `GET /api/v5/trade/order` (+ `orders-pending`, `orders-history`, `orders-history-archive` — звенья evidence-cycle) | Read |
 | `SUBMIT_ALGO_ORDER` | `POST /api/v5/trade/order-algo` | Trade |
 | `AMEND_ALGO_ORDER` | `POST /api/v5/trade/amend-algos` | Trade |
-| `CANCEL_ALGO_ORDER` | `POST /api/v5/trade/cancel-algos` ⚠ см. «две семьи algo-cancel» | Trade |
+| `CANCEL_ALGO_ORDER` | ветвление по семье (И-1 исход (а)): ordinary → `POST /api/v5/trade/cancel-algos`; advance/trailing → `cancel-advance-algos` (⚠ И-2: endpoint вне текущего офдока) | Trade |
 | `REFRESH_ALGO_ORDER` | `GET /api/v5/trade/order-algo` (+ `orders-algo-pending`, `orders-algo-history`) | Read |
 | `CLOSE_POSITION` | `POST /api/v5/trade/close-position` | Trade |
 | `REFRESH_POSITION` | `GET /api/v5/account/positions` | Read |
@@ -63,12 +90,16 @@
 - **Auth (private REST):** заголовки `OK-ACCESS-KEY`,
   `OK-ACCESS-SIGN`, `OK-ACCESS-TIMESTAMP`, `OK-ACCESS-PASSPHRASE`.
   Demo trading — заголовок `x-simulated-trading: 1`.
-- **Две семьи algo-cancel:** `cancel-algos` — для ordinary algo
-  (trigger / oco / conditional); `cancel-advance-algos` — для advance
-  algo (iceberg / twap / **trailing `move_order_stop`**). Это
-  корпусно подтверждённое различие сторонними клиентами; точную
-  принадлежность `move_order_stop` подтверждать официальным доком
-  (см. «Известные ограничения» про дрейф и SPA).
+- **Две семьи algo и cancel-путь:** семьи — ordinary (trigger / oco
+  / conditional; + новый `chase`) и advance (iceberg / `smart_iceberg`
+  / twap / **trailing `move_order_stop`**). Принятое решение И-1
+  (исход (а)) — `CANCEL_ALGO_ORDER` ветвится по семье. ⚠ Свежий
+  офдок (2026-06-11): `cancel-advance-algos` **выведен из
+  документации** (changelog 2025-04-24), норматив `cancel-algos`
+  ограничения семьи не несёт, но SDK-пример страницы — несёт;
+  конфликт поднят находкой **И-2** (runtime-подтверждение в demo
+  trading) — `docs/integrations/okx/contracts/algo-order.md`.
+  Amend advance-семьи биржей не поддерживается (находка **И-3**).
 
 ## Известные ограничения
 
@@ -82,16 +113,16 @@
   60 req/2s по User+Instrument, `account/positions` 10 req/2s,
   `order-algo` 20 req/2s. Точное значение — из раздела конкретного
   endpoint, не обобщать.
-- **⚠ Официальный док OKX — JS-SPA.** Наивный `WebFetch` корня
-  `docs-v5/en/` рендерит ненадёжно: суммаризатор **конфабулирует**
-  (на первом прогоне вернул несуществующие пути
-  `amend-order-algo` / `cancel-order-algo` вместо реальных
-  `amend-algos` / `cancel-algos`). Поэтому: фактические пути/поля
-  **кросс-чекать** (WebSearch, поддерживаемые SDK-списки эндпоинтов,
-  несколько источников); факт, который пишется в док, подтверждать
-  официальным доком, а при невозможности чистого чтения SPA —
-  помечать находкой «требует подтверждения официальным доком», не
-  фиксировать как факт.
+- **⚠ WebFetch-суммаризатор на офдоке ненадёжен.** Страница
+  статическая и читается сырым fetch'ем (см. «Канал чтения офдока»),
+  но прогон суммаризатора по гигантской странице **конфабулирует**
+  (прогон 1: несуществующие `amend-order-algo` / `cancel-order-algo`
+  вместо реальных `amend-algos` / `cancel-algos`). Поэтому факты
+  снимать только с локально распарсенного сырого HTML; okx.com-поиск
+  и сторонние списки — кросс-чек, не факт (поиск может возвращать
+  **устаревший индексированный контент** — так в прогоне 2
+  «подтвердился» уже выведенный из дока `cancel-advance-algos`,
+  см. И-2).
 - **Сторонние списки эндпоинтов = скелет + кросс-чек, не факт.**
   SDK-клиенты (например `tiagosiebler/okx-api`
   `docs/endpointFunctionList.md`, ccxt, nautilus_trader) дают удобный
@@ -102,7 +133,8 @@
 
 ## Пометка
 
-Скилл наполнен на первом прогоне доукомплектации OKX (2026-06-11);
+Скилл наполнен на первом прогоне доукомплектации OKX (2026-06-11),
+дополнен на прогоне 3 (канал чтения, семьи algo, дрейф-уроки);
 далее растёт по мере прогонов. Спекулятивно разделы не достраиваются.
 
 ## Связи
@@ -113,6 +145,7 @@
   `docs/integrations/okx/coverage-manifest.md`.
 - Отчёты прогонов —
   `.claude/work/progress/phase-1-step-4-integrator-run-1.md`,
-  `.claude/work/progress/phase-1-step-4-integrator-run-2.md`.
+  `.claude/work/progress/phase-1-step-4-integrator-run-2.md`,
+  `.claude/work/progress/phase-1-step-4-integrator-run-3.md`.
 - Интеграционные доки OKX — `docs/integrations/okx/`,
   `docs/models/integrations/okx/`.

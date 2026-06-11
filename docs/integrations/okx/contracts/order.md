@@ -5,6 +5,15 @@
 Каков контракт OKX-операций по ordinary order: endpoint'ы, лимиты,
 ACK-семантика, пагинация.
 
+## Внешний источник правды
+
+Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
+раздел «Order Book Trading → Trade»). При расхождении с офдоком
+побеждает офдок; синхронизация — перевыкачка + дифф при каждом
+заходе интегратора (`.claude/processes/api-docs-completion.md` §4a,
+канал — `.claude/skills/integration-okx.md`). Последняя сверка:
+2026-06-11 (прогон 1 — соответствие спеке подтверждено).
+
 ## Контекст
 
 Mapping в `Order` — `docs/models/mapping/Order.md` (раздел `## OKX`).

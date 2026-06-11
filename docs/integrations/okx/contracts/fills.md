@@ -5,6 +5,16 @@
 Каков контракт OKX-операций по fills (3d, 3m): endpoint'ы, query,
 лимиты, пагинация.
 
+## Внешний источник правды
+
+Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
+раздел «Order Book Trading → Trade», секции «GET / Transaction
+details (last 3 days / last 3 months)»). При расхождении с офдоком
+побеждает офдок; синхронизация — перевыкачка + дифф при каждом
+заходе интегратора (`.claude/processes/api-docs-completion.md` §4a,
+канал — `.claude/skills/integration-okx.md`). Последняя сверка:
+2026-06-11 (прогон 1 — соответствие спеке подтверждено).
+
 ## Контекст
 
 Mapping (стаб, до материализации `TradeFill`) —

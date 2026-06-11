@@ -533,6 +533,13 @@ swing/range/support/resistance).
 `activationProfitPercents` (null — сразу), `callbackPercents`
 (callback ratio/percent на биржу), `activationBufferPercents`.
 
+Trailing-защита — заявленная возможность стратегии (продуктовый
+факт, 2026-06-11), не латентное поле: защитный арсенал действий
+включает trailing наравне с TP/SL. Следствие для биржевого слоя —
+cancel-путь algo ветвится по семье (trailing — advance-семья OKX);
+см. `docs/integrations/okx/contracts/algo-order.md` §Ветвление
+cancel-пути (И-1).
+
 ## key / targetActionKey и валидация
 
 `key` — стабильный ключ action внутри одной `StrategyDetail` (задаётся

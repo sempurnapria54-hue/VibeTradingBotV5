@@ -1,0 +1,56 @@
+# OKX contracts: funding rate (текущий и история)
+
+## На какой вопрос отвечает этот файл
+
+Каков контракт OKX-операций чтения funding rate SWAP: текущий/
+прогнозный (`funding-rate`) и история ставок
+(`funding-rate-history`).
+
+## Внешний источник правды
+
+Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
+раздел «Public Data → REST API», секции «Get funding rate», «Get
+funding rate history»). При расхождении с офдоком побеждает офдок;
+синхронизация — перевыкачка + дифф при каждом заходе интегратора по
+источнику и по задаче «актуализируй»
+(`.claude/processes/api-docs-completion.md`, канал чтения —
+`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
+(прогон 3, поле-уровневая дистилляция).
+
+## Статус использования
+
+Не используется. Форвард-кандидат **В-6** (шаг 7, P&L): funding —
+компонент результата SWAP-сделки. **Два пути к funding в P&L** (выбор
+за шагом 7, не вести параллельно — см. OKX-Q3): (1) bills c
+`subType` 173/174 — фактические списания/начисления по аккаунту
+(`account-bills.md`); (2) `funding-rate-history` (`realizedRate`) —
+ставки расчётных периодов (публичные, без привязки к позиции).
+
+## GET /api/v5/public/funding-rate
+
+Rate limit 10 req / 2 s по IP + Instrument ID. Query: `instId`
+(обяз.; SWAP, или `ANY` — все перпы).
+
+### Response (ключевые поля `data[0]`)
+
+| Поле | Семантика |
+|---|---|
+| `fundingRate` | Прогнозная ставка ближайшего расчёта. Знак: положительная — лонги платят шортам; отрицательная — наоборот. Финальная может отличаться (см. `settFundingRate`). |
+| `fundingTime` / `nextFundingTime` | Время ближайшего / следующего расчёта (ms). **Интервал определять разницей этих полей**: типично 8 ч, биржа может сжать до 6/4/2/1 ч (офдок). |
+| `settFundingRate` / `settState` | Ставка текущего/прошлого расчётного цикла и его статус (`processing` / `settled`). |
+| `minFundingRate` / `maxFundingRate` | Границы ставки. |
+| `premium` | Премиальный индекс (формула в офдоке). |
+| `method` | Механизм: `current_period` (/`next_period` — больше не поддерживается). |
+| `formulaType` | Формула: `noRate` / `withRate`. |
+| `interestRate`, `impactValue` | Параметры формулы (могут быть `""`). |
+| `instType` / `instId`, `ts` | Идентификация и время данных. |
+
+## GET /api/v5/public/funding-rate-history
+
+Rate limit 10 req / 2 s по IP + Instrument ID. Глубина — 3 месяца.
+Query: `instId` (обяз.), `after`/`before` — пагинация по
+`fundingTime`, `limit` ≤ 400 (default 400).
+
+Элемент: `instType`, `instId`, `fundingTime`, `fundingRate`
+(прогнозная на тот период), **`realizedRate`** (фактическая),
+`method`, `formulaType`.

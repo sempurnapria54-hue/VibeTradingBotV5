@@ -137,6 +137,22 @@ TRAILING_PERCENTS / TRAILING_VALUE                                -> move_order_
 Маппинг односторонний (`conditionType → ordType`): обратный не
 делаем (`conditional` покрывает несколько `ConditionType`).
 
+### Семья algo и cancel-endpoint (И-1, исход (а))
+
+Из `ordType` выводится семья, по которой ветвится cancel-путь
+(`CANCEL_ALGO_ORDER`):
+
+```text
+conditional / oco / trigger   -> ordinary -> POST /trade/cancel-algos
+move_order_stop (TRAILING_*)  -> advance  -> POST /trade/cancel-advance-algos
+```
+
+Advance-ветка несёт пометку «endpoint вне текущего офдока, требует
+runtime-подтверждения» — находка И-2
+(`docs/integrations/okx/contracts/algo-order.md` §Ветвление
+cancel-пути). Amend advance-семьи биржей не поддерживается (находка
+И-3, там же).
+
 ### OKX status resolver
 
 `externalStatus` → `AlgoOrder.Status` (FSM напрямую не использует):
@@ -160,7 +176,9 @@ OKX-специфичные поля create body (через adapter): `algoClOrd
 market), `tpTriggerPx`/`tpTriggerPxType`/`tpOrdPx` (`-1` = market).
 
 **Amend**: `instId`, `algoId` (если известен), `algoClOrdId`,
-`newSz`, новые trigger/trailing значения.
+`newSz`, новые trigger-значения. Для trailing (`move_order_stop`)
+биржевого amend нет (И-3): ремоделирование trailing — cancel +
+place, не amend.
 
 **Cancel**: `instId`, `algoId` (предпочтительно) / `algoClOrdId`.
 Если `externalId` неизвестен — сначала refresh/search по

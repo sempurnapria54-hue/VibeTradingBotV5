@@ -3,7 +3,21 @@
 ## На какой вопрос отвечает этот файл
 
 Каков контракт OKX-операций по позиции: endpoint'ы, лимиты,
-close-position ACK, подтверждение факта закрытия.
+close-position ACK, подтверждение факта закрытия, история закрытых
+позиций.
+
+## Внешний источник правды
+
+Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
+разделы «Trading Account → REST API» — «Get positions», «Get
+positions history»; «Order Book Trading → Trade» — «POST / Close
+positions»). При расхождении с офдоком побеждает офдок;
+синхронизация — перевыкачка + дифф при каждом заходе интегратора по
+источнику и по задаче «актуализируй»
+(`.claude/processes/api-docs-completion.md`, канал чтения —
+`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
+(прогон 1 — соответствие positions/close-position; прогон 3 —
+positions-history поле-уровнево).
 
 ## Контекст
 
@@ -35,6 +49,33 @@ Mapping в `Position` — `docs/models/mapping/Position.md` (раздел
 
 Ретраи на refresh — только при технических/API проблемах (timeout,
 connection reset, 5xx, rate limit, temporary error).
+
+## История закрытых позиций (не используется; форвард В-3 — шаг 7)
+
+`GET /api/v5/account/positions-history`. Permission `Read`; rate
+limit 10 req / 2 s по User ID. Глубина — 3 месяца, сортировка по
+`uTime` (новые первыми). Офдок: «Get positions history». Статус:
+не используется; форвард-кандидат **В-3** (шаг 7, P&L закрытых
+позиций) — передан владельцу шага заметкой (backlog).
+
+- **Query (все опц.):** `instType`, `instId`, `mgnMode`
+  (`cross`/`isolated`), `type` (тип последнего закрытия: `1`
+  частичное / `2` полное / `3` ликвидация / `4` частичная ликвидация
+  / `5` ADL не полностью / `6` ADL полностью), `posId`,
+  `after`/`before` — пагинация **по `uTime`** (не по id; записи с
+  одинаковым `uTime` приходят одной страницей), `limit` ≤ 100.
+- **P&L-поля элемента:** `realizedPnl` = `pnl` + `fee` +
+  `fundingFee` + `liqPenalty` (+ `settledPnl` cross-FUTURES);
+  `pnl` (без комиссий), `fee` (минус — комиссия, плюс — ребейт),
+  `fundingFee` (накопленный), `liqPenalty`, `pnlRatio`.
+- **Цены/объёмы:** `openAvgPx`, `closeAvgPx`, `openMaxPos`
+  (максимум позиции), `closeTotalPos` (накопленный закрытый объём),
+  `triggerPx` (только для type 3/4/5 — цена триггера
+  ликвидации/ADL), `nonSettleAvgPx`/`settledPnl` (cross FUTURES).
+- **Идентификация:** `posId` (истекает ~через 30 дней после полного
+  закрытия — после этого новая позиция получает новый `posId`),
+  `instType`/`instId`, `mgnMode`, `posSide`, `direction`, `lever`,
+  `ccy`, `uly`, `cTime`/`uTime`.
 
 ## ACK-семантика close-position
 

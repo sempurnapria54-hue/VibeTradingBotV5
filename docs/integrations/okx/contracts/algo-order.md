@@ -3,7 +3,22 @@
 ## На какой вопрос отвечает этот файл
 
 Каков контракт OKX-операций по algo-ордеру: endpoint'ы, лимиты,
-ACK-семантика, ordType-specific body, evidence-cycle.
+ACK-семантика, ordType-specific body, evidence-cycle, ветвление
+cancel-пути по семье algo.
+
+## Внешний источник правды
+
+Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
+раздел «Order Book Trading → Algo Trading», секции «POST / Place
+algo order», «POST / Cancel algo order», «POST / Amend algo order»,
+«GET / Algo order details», «GET / Algo order list», «GET / Algo
+order history»; changelog — `https://www.okx.com/docs-v5/log_en/`).
+При расхождении с офдоком побеждает офдок; синхронизация —
+перевыкачка + дифф при каждом заходе интегратора по источнику и по
+задаче «актуализируй» (`.claude/processes/api-docs-completion.md`,
+канал чтения — `.claude/skills/integration-okx.md`). Последняя
+сверка: 2026-06-11 (прогон 3 — cancel/amend/query поле-уровнево,
+симметрия advance-семейства).
 
 ## Контекст
 
@@ -20,18 +35,26 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   ID. Body — общие поля (`instId`, `tdMode`, `side`, `ordType`, `sz`,
   `posSide`, `reduceOnly`, `algoClOrdId`) + ordType-specific.
 - **Amend** (`AMEND_ALGO_ORDER`): `POST /api/v5/trade/amend-algos`.
-  Permission `Trade`; rate limit как `cancel-algos`. Body — `instId`,
-  `algoId` (если известен), `algoClOrdId`, новые trigger/trailing
-  значения.
-- **Cancel — две семьи algo** (`CANCEL_ALGO_ORDER`): у OKX отмена
-  algo разделена по типу. **Ordinary** (trigger / oco / conditional) —
-  `POST /api/v5/trade/cancel-algos`. **Advance** (iceberg / twap /
-  **trailing `move_order_stop`**) — `POST /api/v5/trade/cancel-advance-algos`.
   Permission `Trade`; rate limit 20 req / 2 s по User ID + Instrument
-  ID. Body (оба) — массив `{ instId, algoId }` (`algoId` обязателен;
-  `algoClOrdId` опц., диагностика), до 10 за запрос. Отказ через
-  `sCode != 0` (algo уже сработал/закрыт/отменён/не найден).
-  Подтверждено офдоком (okx.com); реализационная развилка — ниже.
+  ID. **Только Stop/Trigger-ордера** — офдок («POST / Amend algo
+  order»): «Support Stop order and Trigger order only, not including
+  Move_order_stop order, Iceberg order, TWAP order, Trailing Stop
+  order» — advance-семья (вкл. standalone trailing) **не амендится**
+  (находка И-3 ниже). Body: `instId` (обяз.), `algoId` /
+  `algoClOrdId` (одно обяз.), `cxlOnFail`, `reqId`, `newSz`;
+  TP/SL-ветка: `newTpTriggerPx`/`newTpOrdPx`/`newSlTriggerPx`/
+  `newSlOrdPx`/`new*TriggerPxType` (`0` = удалить ногу); trigger:
+  `newTriggerPx`/`newOrdPx`/`newTriggerPxType` + `attachAlgoOrds`.
+- **Cancel** (`CANCEL_ALGO_ORDER`): `POST /api/v5/trade/cancel-algos`.
+  Permission `Trade`; rate limit 20 **orders** / 2 s по User ID +
+  Instrument ID. Body — массив `{ instId, algoId | algoClOrdId }`
+  (оба → биржа берёт `algoId`), до 10 за запрос. Ответ `data[i]`:
+  `algoId`, `sCode`, `sMsg` (`clOrdId`/`algoClOrdId`/`tag` —
+  deprecated). Отказ через `sCode != 0` (algo уже
+  сработал/закрыт/отменён/не найден). Покрытие advance-семьи этим
+  endpoint'ом — конфликт внутри офдока, см. находку **И-2** ниже;
+  исторический парный endpoint `cancel-advance-algos` выведен из
+  официальной документации (changelog 2025-04-24).
 - **Details** (`REFRESH_ALGO_ORDER`): `GET /api/v5/trade/order-algo`.
   Permission `Read`. Query: одно из `algoId` (приоритет) /
   `algoClOrdId`; `instId` опц. Ответ — массив `data`, ожидается 0 или
@@ -44,8 +67,19 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   limit 20 req / 2 s по User ID. История доступна за последние 3
   месяца. Query: **`ordType` обязателен** (вычисляется из
   `conditionType`); + одно из `state` (`effective`/`canceled`/
-  `order_failed`/`partially_failed`) или `algoId`; опц. `instType`,
+  `order_failed` — `partially_failed` из текущего офдока ушёл,
+  дрейф зафиксирован прогоном 3) или `algoId`; опц. `instType`,
   `instId`, пагинация `after`/`before` по `algoId`, `limit` ≤ 100.
+
+### Видимость advance-семьи в query (симметрия, офдок)
+
+`ordType`-фильтры **pending** и **history** принимают обе семьи:
+`conditional` / `oco` / `trigger` / `chase` (новый тип, FUTURES/SWAP)
+/ `move_order_stop` / `iceberg` / `twap` / `smart_iceberg` —
+advance-algo **виден** в тех же query-звеньях; details (`order-algo`)
+работает по `algoId`/`algoClOrdId` без типового ограничения (ответ
+несёт `szLimit`/`pxLimit` для iceberg/twap, `advanceOrdType`).
+Evidence-cycle `REFRESH_ALGO_ORDER` для trailing не ломается.
 
 ## ACK-семантика
 
@@ -84,29 +118,57 @@ refresh/search/history. Submit использует stable client id
 первом этапе не используем. Для protective обычно `reduceOnly=true`;
 для SWAP рекомендуется `tpTriggerPxType=mark`.
 
-## Развилка cancel-пути (И-1, на валидации)
+## Ветвление cancel-пути по семье (И-1 закрыт — исход (а))
 
-**Факт (офдок, okx.com):** trailing `move_order_stop` (и iceberg /
-twap) отменяется через `cancel-advance-algos`, **не** `cancel-algos`.
-Контракт это фиксирует (см. «Cancel — две семьи algo»). Прежняя
-формулировка «cancel всех algo через `cancel-algos`» была неточна.
+**Решение (пользователь, 2026-06-11):** `CANCEL_ALGO_ORDER` ветвит
+cancel-путь по семье algo — **ordinary** (trigger / oco /
+conditional) → `cancel-algos`; **advance** (trailing
+`move_order_stop` / iceberg / twap) → `cancel-advance-algos`.
+Исполнитель выбирает endpoint по семье отменяемого algo
+(`conditionType → ordType → семья`, маппинг —
+`docs/models/mapping/AlgoOrder.md`).
 
-**Развилка реализации `CANCEL_ALGO_ORDER` — на валидации, не
-финализирована:**
+**Основание** — продуктовый факт: стратегия предусматривает
+trailing-защиту (`TrailingSettings`, `ConditionType.TRAILING_*` —
+`docs/models/domain/aggregate/Strategy.md`,
+`docs/models/domain/core/AlgoOrder.md`); сужение скоупа до ordinary
+(прежний крен (б)) с этим несовместимо.
 
-- **(а) ветвление cancel-пути по типу algo:** advance
-  (`move_order_stop` / iceberg / twap) → `cancel-advance-algos`, иначе
-  → `cancel-algos`. Исполнитель выбирает endpoint по типу отменяемого
-  algo.
-- **(б) сузить используемые типы до ordinary** (trigger / oco /
-  conditional): фаза 1 защищается TP/SL, trailing не нужен;
-  `move_order_stop` помечается форвардом, второй cancel-путь не
-  заводится.
+### Находка И-2 (прогон 3): cancel-advance-algos выведен из офдока
 
-**Крен — (б):** убрать риск неверного пути сужением скоупа дешевле
-ветвления под тип, не используемый в фазе 1. Выбор — за пользователем
-(см. отчёт прогона 2,
-`.claude/work/progress/phase-1-step-4-integrator-run-2.md`).
+Свежая сверка живого офдока (2026-06-11) меняет фактуру прогона 2:
+
+- **Changelog 2025-04-24:** «Delisted endpoints from the document —
+  Cancel Advance Algo Order». В текущем доке `cancel-advance-algos`
+  отсутствует (0 упоминаний на странице); добавлен был ~2021-09/10
+  вместе с WS-каналом advance algo.
+- **Конфликт внутри страницы:** нормативный текст «POST / Cancel
+  algo order» ограничения по семье **не несёт** («Cancel unfilled
+  algo orders»), но Python-пример той же секции комментирует
+  «not including Iceberg order, TWAP order, Trailing Stop order».
+- Фактура прогона 2 («две семьи cancel», офдок-провенанс через
+  okx.com-поиск) опиралась, по-видимому, на устаревший
+  индексированный контент.
+
+**Следствие для решения (а) — на валидацию, не финализируется:**
+если `cancel-algos` теперь отменяет обе семьи, ветвление вырождается
+в один путь; если нет — advance-путь остаётся на выведенном из дока
+(но исторически рабочем) endpoint'е. Чем снять: runtime-проверка в
+demo trading (постановка + отмена `move_order_stop` через
+`cancel-algos`) на `CODE` шага 4 либо повторная сверка офдока
+позже. До снятия ветвление (а) сохраняется как принятое решение;
+advance-ветка помечается «endpoint вне текущего офдока, требует
+runtime-подтверждения».
+
+### Находка И-3 (прогон 3): advance не амендится
+
+`amend-algos` нормативно поддерживает только Stop/Trigger;
+standalone `move_order_stop` / iceberg / twap **не амендятся** (см.
+Endpoints → Amend). Следствие для `AMEND_ALGO_ORDER` по trailing:
+биржевого амендмента нет — доступный паттерн ремоделирования
+trailing-защиты — отмена + новая постановка (cancel + place).
+Решение о паттерне здесь не финализируется — владелец команды /
+шаг реализации; зафиксирован только биржевой факт.
 
 ## Evidence-cycle
 

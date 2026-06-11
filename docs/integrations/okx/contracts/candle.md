@@ -4,6 +4,18 @@
 
 Каков контракт OKX-операций по свечам: endpoint'ы, query, лимиты.
 
+## Внешний источник правды
+
+Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
+раздел «Order Book Trading → Market Data», секции «GET /
+Candlesticks», «GET / Candlesticks history»). При расхождении с
+офдоком побеждает офдок; синхронизация — перевыкачка + дифф при
+каждом заходе интегратора
+(`.claude/processes/api-docs-completion.md` §4a, канал —
+`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
+(существование/путь по манифесту; поле-уровневая перевычитка — при
+заходе по теме).
+
 ## Контекст
 
 Mapping в свечи — `docs/models/mapping/Candle.md` (формат

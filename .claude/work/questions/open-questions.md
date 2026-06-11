@@ -389,8 +389,21 @@ fills (без funding/rebate) — проще, но менее точно; (3) о
 явной потребности. До решения контракт endpoint'ов и поля responses —
 `docs/models/integrations/okx/OkxAccountBillResponse.md` и
 `docs/integrations/okx/contracts/account-bills.md`.
+
+**Смежный вход (В-6, скан интегратора 2026-06-11):** funding в P&L
+достижим **двумя путями** — bills `subType` 173/174 (фактические
+списания/начисления по аккаунту) и публичный
+`funding-rate-history.realizedRate` (ставки расчётных периодов, без
+привязки к позиции) — `docs/integrations/okx/contracts/funding-rate.md`.
+Шаг 7 выбирает один путь осознанно (bills точнее для фактического
+P&L; ставки — для прогноза/сверки), не ведёт два параллельных трека.
+Deep-архив bills с 2021 теперь существует
+(`account-bills.md` §Deep-архив) — снимает прежнее «глубже 3 месяцев
+пути нет».
+
 Связано: `docs/models/integrations/okx/OkxAccountBillResponse.md`,
 `docs/integrations/okx/contracts/account-bills.md`,
+`docs/integrations/okx/contracts/funding-rate.md`,
 `docs/models/domain/aggregate/Deal.md` §Итоговый PnL, DEAL-Q1, DEAL-Q2.
 
 ### OKX-Q4. WS-каналы OKX — отдельный заход

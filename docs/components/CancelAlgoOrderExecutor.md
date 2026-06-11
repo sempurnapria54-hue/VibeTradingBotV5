@@ -7,7 +7,10 @@
 ## Назначение
 
 Получает `CANCEL_ALGO_ORDER`. Загружает algo-order по
-`payload.algoOrderId`, отправляет cancel, сохраняет ACK / command result;
+`payload.algoOrderId`, отправляет cancel — endpoint ветвится по
+семье algo (ordinary → `cancel-algos`, advance/trailing →
+`cancel-advance-algos`; И-1 исход (а), семья из `conditionType` —
+`docs/models/mapping/AlgoOrder.md`), сохраняет ACK / command result;
 `AlgoOrder` в `CANCELED` по ACK не переводит — факт отмены подтверждается
 refresh/search/history. Если refresh/history показывает другой факт,
 верим exchange facts (см.
