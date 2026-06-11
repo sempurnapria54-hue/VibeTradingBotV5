@@ -45,6 +45,7 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `averagePrice` | `BigDecimal` | Средняя цена исполнения. |
 | `fee` | `BigDecimal` | Накопленная комиссия. |
 | `positionReducingOnly` | `Boolean` | Доменное намерение: ордер только уменьшает позицию. |
+| `replacesInternalId` | `String` | `internalId` предшественника в цепочке REPLACE (nullable; append-only след — обратная ссылка не хранится, выводится запросом). См. `docs/decisions/replace-not-amend.md`. |
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Embedded attached protection. |
 
 Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
@@ -68,7 +69,9 @@ invariant-проверка — в `docs/models/mapping/Order.md`.
   описывает strategy role (grid-entry / partial-exit / full-exit).
 - **`Status`**: `CREATED`, `PENDING`, `ACTIVE`, `PARTIALLY_COMPLETED`,
   `COMPLETED`, `CANCELED`, `ERROR` (значения/переходы — в lifecycle).
-- **`CloseReason`**: `FILLED`, `CANCELED_BY_STRATEGY`, `KILL_SWITCH`,
+- **`CloseReason`**: `FILLED`, `CANCELED_BY_STRATEGY`,
+  `REPLACED_BY_STRATEGY` (стратегия заменила другим ордером —
+  REPLACE-ремодел, симметрично `AlgoOrder`), `KILL_SWITCH`,
   `MANUAL_CANCEL`, `CONDITION_EXPIRED` (условие создания/ожидания
   ордера больше неактуально — штатная причина, не ошибка),
   `MISSING_AFTER_REFRESH` (не найден после refresh/search/history

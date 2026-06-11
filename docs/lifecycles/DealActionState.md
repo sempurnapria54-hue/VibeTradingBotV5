@@ -14,7 +14,7 @@
 - **`ServiceCommandFactory`** — **читает** `status` (+ `target`), чтобы
   выбрать одну актуальную команду за проход (`docs/components/ServiceCommandFactory.md`);
   сам статус не пишет.
-- **Executor'ы** (`CREATE_*`/`SUBMIT_*`/`AMEND_*`/`CANCEL_*`/
+- **Executor'ы** (`CREATE_*`/`SUBMIT_*`/`CANCEL_*`/
   `CLOSE_POSITION`/`REFRESH_*`) — **пишут** `status` и `target` по
   результату исполнения и подтверждённым фактам (см.
   `docs/components/ServiceCommandExecutor.md`).

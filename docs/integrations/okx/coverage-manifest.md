@@ -62,7 +62,7 @@
 | Place batch orders | POST `/trade/batch-orders` | **создан** | офдок | `batch-operations.md`; до 20, лимит считается ордерами; **В-4 рассмотрено, не берём** |
 | Cancel order | POST `/trade/cancel-order` | есть-док | офдок | `order.md` |
 | Cancel batch orders | POST `/trade/cancel-batch-orders` | **создан** | офдок | `batch-operations.md`; В-4 |
-| Amend order | POST `/trade/amend-order` | есть-док | офдок | `order.md` |
+| Amend order | POST `/trade/amend-order` | есть-док | офдок | `order.md`; доменом не используется — REPLACE-only (`replace-not-amend`) |
 | Amend batch orders | POST `/trade/amend-batch-orders` | **создан** | офдок | `batch-operations.md`; В-4 |
 | Close position | POST `/trade/close-position` | есть-док | офдок | `position.md` |
 | Order details | GET `/trade/order` | есть-док | офдок | `order.md` |
@@ -84,7 +84,7 @@
 | Place algo order | POST `/trade/order-algo` | есть-док | офдок | `algo-order.md`; ordType: conditional/oco/trigger/`chase`(новый)/move_order_stop/iceberg/`smart_iceberg`/twap |
 | Cancel algo (ordinary) | POST `/trade/cancel-algos` | **обновлён** | офдок | `algo-order.md`; **И-1 закрыт (а)** — ветвление по семье |
 | Cancel advance algo | POST `/trade/cancel-advance-algos` | **обновлён** | офдок | **И-2:** выведен из офдока (changelog 2025-04-24); advance-ветка И-1(а) — runtime-подтверждение |
-| Amend algo | POST `/trade/amend-algos` | **обновлён** | офдок | только Stop/Trigger; advance не амендится — **И-3** |
+| Amend algo | POST `/trade/amend-algos` | **обновлён** | офдок | только Stop/Trigger; advance не амендится — **И-3** (следствие закрыто: REPLACE-only); доменом не используется |
 | Algo details | GET `/trade/order-algo` | есть-док | офдок | `algo-order.md`; обе семьи видны |
 | Algo pending | GET `/trade/orders-algo-pending` | есть-док | офдок | `algo-order.md` (звено); ordType обеих семей |
 | Algo history 3m | GET `/trade/orders-algo-history` | **обновлён** | офдок | `state`: effective/canceled/order_failed (дрейф: `partially_failed` ушёл из офдока) |
@@ -187,8 +187,8 @@ trade: order ops по WS) — `сознательно-вне`, якорь **OKX-
 - Скилл OKX (канал чтения, command-relevant разделы, конвенции,
   ограничения) — `.claude/skills/integration-okx.md`.
 - Отчёт прогона 2 (скан + эскалация источникового дефицита) —
-  `.claude/work/progress/phase-1-step-4-integrator-run-2.md`.
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-2.md`.
 - Отчёт прогона 3 (докачка офдок-grade, находки И-2/И-3) —
-  `.claude/work/progress/phase-1-step-4-integrator-run-3.md`.
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-3.md`.
 - Контракты и нативные модели — `docs/integrations/okx/contracts/`,
   `docs/models/integrations/okx/`.

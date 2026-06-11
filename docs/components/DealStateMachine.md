@@ -30,10 +30,11 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
    kill-switch. В happy-path на следующий этап не переводят (исключение —
    safe forward recovery после рестарта).
 2. **Рабочая логика этапа** — что сделать, чтобы приблизить завершение
-   этапа (refresh / `CREATE_*`/`SUBMIT_*`/`AMEND_*`/`CANCEL_*` /
+   этапа (refresh / `CREATE_*`/`SUBMIT_*`/`CANCEL_*` /
    risk-reducing/cleanup команды; проверка condition; выбор action; вызов
-   калькулятора и `ServiceCommandFactory`). Сама по себе завершение этапа
-   не означает.
+   калькулятора и `ServiceCommandFactory`; REPLACE-действия секвенсятся
+   этими же командами по фактам — `docs/decisions/replace-not-amend.md`).
+   Сама по себе завершение этапа не означает.
 3. **Выходные проверки** — можно ли считать этап завершённым; именно они
    отвечают за обычный переход между этапами.
 

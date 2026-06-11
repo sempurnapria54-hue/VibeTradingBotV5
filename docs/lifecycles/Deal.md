@@ -117,4 +117,5 @@ dependencies `DealContext`, `DealActionState`, exchange refresh/
 search/history facts. `DealActionState` показывает, какой
 `StrategyAction` материализован, какой runtime target создан, какой
 в retry / completed / failed / skipped, какой order/algoOrder нужно
-amend/cancel. Audit/history **не** является runtime-source для FSM.
+заместить (REPLACE-нога) или отменить. Audit/history **не** является
+runtime-source для FSM.

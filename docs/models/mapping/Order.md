@@ -55,11 +55,16 @@ Snapshot — нормализованный граничный объект; е�
   DTO-поле для entry-with-attached-SL). После successful submit
   `ordId` (если вернулся) сохраняется как `Order.externalId`; статус
   — `PENDING` до refresh/search/history.
-- **Amend**: `instId` + одно из `ordId` (предпочтительно) / `clOrdId`;
-  `newPx`, `newSz` (для `partially_filled` — включая уже
-  исполненное; `newSz ≤ filled` может перевести в `filled`).
 - **Cancel**: `instId` + одно из `ordId` (предпочтительно) /
   `clOrdId`.
+
+Амендного request-mapping **нет**: домен не амендит
+(`docs/decisions/replace-not-amend.md`) — ремоделирование ордера =
+REPLACE-оркестрация (cancel-нога → подтверждение терминала с
+разбором fill-race → place новой сущности с `replacesInternalId`).
+Биржевой amend-контракт OKX задокументирован как поверхность
+(`docs/integrations/okx/contracts/order.md` §Amend), доменом не
+используется.
 
 Per-item error классифицируется: retryable → `RETRY_PENDING`;
 non-retryable → `Order.ERROR`/`Deal.ERROR` (`docs/rules/runtime-error-classification.md`).
@@ -154,15 +159,16 @@ default `last`), `sz` (для split-TP), `amendPxOnTriggerType` (`0`/`1`
 cost-price SL для split). `tpTriggerPx` vs `tpTriggerRatio` —
 взаимоисключимо; аналогично SL.
 
-**Amend OKX-specific:** `reqId` (echo в ACK для retry-корреляции);
-`cxlOnFail` (default `false`); `pxAmendType` (default `0`);
-`attachAlgoOrds[*]` — для изменения прикреплённых TP/SL.
-Идентификация attached — `attachAlgoId` или `attachAlgoClOrdId`.
-Поля: `newTpTriggerPx`/`newTpOrdPx`/`newTpTriggerPxType`/`newTpOrdKind`
-(TP), `newSlTriggerPx`/`newSlOrdPx`/`newSlTriggerPxType` (SL),
-`newTpTriggerRatio`/`newSlTriggerRatio` (триггер в доле, только
-FUTURES/SWAP — взаимоисключимо с `newTp/SlTriggerPx`). Удаление TP —
-`newTpTriggerPx="0"` **или** `newTpOrdPx="0"`; SL — аналогично.
+**Amend OKX-specific — доменом не используется** (REPLACE-only,
+`docs/decisions/replace-not-amend.md`): амендные поля биржи
+(`reqId`/`cxlOnFail`/`pxAmendType`/`attachAlgoOrds[*]` с
+`new*`-полями) остаются описанными в контракте поверхности
+(`docs/integrations/okx/contracts/order.md` §Amend,
+`OkxOrderResponse.md`), в request-mapping домена не входят.
+Ремодел attached protection: до fill родителя — REPLACE
+родительского ордера вместе с attach-настройками; после fill
+attached материализуется в standalone algo —
+обычный algo-REPLACE.
 
 ### OKX status resolver
 

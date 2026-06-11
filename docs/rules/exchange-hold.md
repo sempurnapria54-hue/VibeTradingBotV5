@@ -15,9 +15,10 @@
 ```text
 SUBMIT_ORDER
 SUBMIT_ALGO_ORDER
-AMEND_ORDER
-AMEND_ALGO_ORDER
 ```
+
+(Амендных команд нет — REPLACE-ремодел блокируется этой же парой:
+его place-нога — `SUBMIT_*`; `docs/decisions/replace-not-amend.md`.)
 
 **Не блокируются** safety / read commands:
 

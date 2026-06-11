@@ -24,9 +24,9 @@ RVO, не persisted (см. `.claude/decisions/runtime-value-object.md`).
 | `rawPrice` | `BigDecimal` | Сырая цена до округления. |
 | `roundedPrice` | `BigDecimal` | Цена после округления по tick size. |
 | `sendPriceToExchange` | `boolean` | Нужно ли отправлять цену на биржу. |
-| `stopLossPrice` | `ResolvedStopLossPrice` | SL-компонент, если action создаёт/меняет stop-loss. |
-| `takeProfitPrice` | `ResolvedTakeProfitPrice` | TP-компонент, если action создаёт/меняет take-profit. |
-| `trailingPrice` | `ResolvedTrailingPrice` | Trailing-компонент, если action создаёт/меняет trailing stop. |
+| `stopLossPrice` | `ResolvedStopLossPrice` | SL-компонент, если action создаёт/замещает stop-loss. |
+| `takeProfitPrice` | `ResolvedTakeProfitPrice` | TP-компонент, если action создаёт/замещает take-profit. |
+| `trailingPrice` | `ResolvedTrailingPrice` | Trailing-компонент, если action создаёт/замещает trailing stop. |
 | `description` | `String` | Пояснение расчёта (целевое имя; legacy — `explanation`). |
 
 `ResolvedStopLossPrice` / `ResolvedTakeProfitPrice` / `ResolvedTrailingPrice`
@@ -44,7 +44,9 @@ activation/callback); без `CalculatedPrice` смысла не имеют → 
 ## Енум `StrategyPricePurpose`
 
 Назначение рассчитанной цены: `ORDER_LIMIT_PRICE`,
-`ORDER_MARKET_REFERENCE_PRICE`, `ORDER_AMEND_PRICE`, `ENTRY_PLANNED_PRICE`,
+`ORDER_MARKET_REFERENCE_PRICE`, `ORDER_REPLACE_PRICE` (цена новой
+сущности REPLACE-ремодела; прежний `ORDER_AMEND_PRICE` — ренейм по
+`docs/decisions/replace-not-amend.md`), `ENTRY_PLANNED_PRICE`,
 `ENTRY_AVERAGE_PRICE`, `BREAKEVEN_PRICE`,
 `ATTACHED_STOP_LOSS_TRIGGER_PRICE`, `ATTACHED_STOP_LOSS_ORDER_PRICE`,
 `ATTACHED_TAKE_PROFIT_TRIGGER_PRICE`, `ATTACHED_TAKE_PROFIT_ORDER_PRICE`,

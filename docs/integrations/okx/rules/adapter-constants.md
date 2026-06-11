@@ -31,7 +31,7 @@ response (`tdMode == isolated`, `posSide == net`) — invariant check,
 
 ## Где применяется
 
-- `OkxIntegrationService` (создание/amend ордеров, close-position);
+- `OkxIntegrationService` (создание/отмена ордеров, close-position);
 - adapter validation при refresh (request rejected, если received
   значение ≠ ожидаемого).
 

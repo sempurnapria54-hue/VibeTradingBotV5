@@ -30,10 +30,14 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
   восстанавливает факт отправки по stable client id (`internalId →
   clOrdId` / `algoClOrdId`); перед повтором ищет сущность по client id.
   ACK не runtime truth.
-- **`AMEND_*`** — отправляет изменение live-сущности; ACK не truth, факт
-  новых параметров подтверждается refresh.
 - **`CANCEL_*`** — отправляет отмену; ACK не truth; `closeReason` не
   перетирается, если уже установлен.
+
+> **Амендных executor'ов нет.** `AMEND_*`-команды сняты
+> (`docs/decisions/replace-not-amend.md`); ремоделирование — REPLACE-
+> оркестрация существующих `CREATE_*`/`SUBMIT_*`/`REFRESH_*`/`CANCEL_*`
+> (порядок ног по риск-классу действия), новых executor'ов не
+> требуется.
 - **`REFRESH_*`** — читает exchange facts через `IntegrationService`, применяет
   status resolver, обновляет сущность, заполняет `closeReason` только если
   текущий `== null`; торговых решений не принимает, cleanup не запускает,
@@ -56,7 +60,7 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
 > live-сущностей по инструменту (orphan / чужой риск; Precheck-cleanliness,
 > AnomalyJob) bulk-командой больше не покрыто — **CMD-Q4**.
 
-ACK как runtime truth не считается ни для submit/amend/cancel/close (см.
+ACK как runtime truth не считается ни для submit/cancel/close (см.
 `docs/rules/ack-not-runtime-truth.md`). Жизненный цикл команды и принцип
 «одна команда за проход» — `docs/rules/command-lifecycle.md`.
 

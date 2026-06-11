@@ -150,8 +150,9 @@ move_order_stop (TRAILING_*)  -> advance  -> POST /trade/cancel-advance-algos
 Advance-ветка несёт пометку «endpoint вне текущего офдока, требует
 runtime-подтверждения» — находка И-2
 (`docs/integrations/okx/contracts/algo-order.md` §Ветвление
-cancel-пути). Amend advance-семьи биржей не поддерживается (находка
-И-3, там же).
+cancel-пути). Amend advance-семьи биржей не поддерживается (И-3);
+следствие снято решением REPLACE-only — домен не амендит ничего
+(`docs/decisions/replace-not-amend.md`).
 
 ### OKX status resolver
 
@@ -175,10 +176,14 @@ OKX-специфичные поля create body (через adapter): `algoClOrd
 параметры — `slTriggerPx`/`slTriggerPxType`/`slOrdPx` (`-1` =
 market), `tpTriggerPx`/`tpTriggerPxType`/`tpOrdPx` (`-1` = market).
 
-**Amend**: `instId`, `algoId` (если известен), `algoClOrdId`,
-`newSz`, новые trigger-значения. Для trailing (`move_order_stop`)
-биржевого amend нет (И-3): ремоделирование trailing — cancel +
-place, не amend.
+**Amend — доменом не используется** (REPLACE-only,
+`docs/decisions/replace-not-amend.md`): амендного request-mapping
+нет; ремоделирование любого algo — REPLACE-оркестрация
+(place новой с `replacesInternalId` → подтверждение фактом →
+cancel старой, `REPLACED_BY_STRATEGY`). Биржевой amend-контракт
+(только Stop/Trigger; advance не амендится — И-3, исторический
+контекст выбора REPLACE-only) — поверхность,
+`docs/integrations/okx/contracts/algo-order.md` §Amend.
 
 **Cancel**: `instId`, `algoId` (предпочтительно) / `algoClOrdId`.
 Если `externalId` неизвестен — сначала refresh/search по

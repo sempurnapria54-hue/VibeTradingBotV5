@@ -41,6 +41,7 @@ Java-класс `...core.algo_order.AlgoOrder`, расширяет `Auditable`.
 | `size` | `BigDecimal` | Рассчитанный materialized размер (результат `SizeCalculator`; для SWAP/FUTURES — контракты). |
 | `direction` | `Direction` | `BUY` / `SELL` (closing long → SELL, short → BUY). |
 | `positionReducingOnly` | `Boolean` | Доменное намерение: только уменьшать позицию. |
+| `replacesInternalId` | `String` | `internalId` предшественника в цепочке REPLACE (nullable; append-only след — обратная ссылка не хранится, выводится запросом). См. `docs/decisions/replace-not-amend.md`. |
 | `externalStatus` | `String` | Сырой статус биржи (OKX `state`) — диагностика, FSM напрямую не использует. |
 | `failCode` | `String` | Код ошибки биржи (OKX `failCode`). |
 | `externalSize` | `BigDecimal` | Фактический размер срабатывания (OKX `actualSz`) — не исходный `size`. |

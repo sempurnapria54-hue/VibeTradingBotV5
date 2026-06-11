@@ -302,6 +302,13 @@ CMD-Q3 закрыт (steer, 2026-06-10): refresh-набор — ровно по 
 per-deal-команду); (3) иное по проработке anomaly / precheck-cleanliness.
 До решения не достраивается. Горизонт — Precheck (шаг 6) / `AnomalyJob`
 (шаг 8). Владелец — `solution-designer`.
+
+**Смежный вход (REPLACE-only, 2026-06-11):** при проработке
+Precheck/AnomalyJob учесть легитимное **окно двойной reduce-only
+защиты** во время REPLACE-ремодела (protective-порядок: новая
+поставлена, старая ещё не отменена) — намерение видно из
+`DealActionState` / цепочки `replacesInternalId`; не флагать
+аномалией (`docs/decisions/replace-not-amend.md` §Следствия).
 Связано: `docs/decisions/refresh-evidence-cycle-ownership.md`,
 `docs/components/PrecheckHandler.md`, `docs/components/AnomalyJob.md`,
 `docs/components/ServiceCommandExecutor.md`,

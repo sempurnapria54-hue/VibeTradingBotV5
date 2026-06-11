@@ -17,17 +17,18 @@ handlers **не** используют `externalStatus` напрямую (см.
 `docs/rules/external-status-resolution.md`).
 
 > Resolver'ы, executors и команды (`CREATE_ALGO_ORDER`,
-> `SUBMIT_ALGO_ORDER`, `AMEND_ALGO_ORDER`, `CANCEL_ALGO_ORDER`,
-> `REFRESH_ALGO_ORDER`) — command-подсистема (шаг 4):
-> `docs/components/` (executors, resolver'ы),
-> `docs/rules/command-lifecycle.md`.
+> `SUBMIT_ALGO_ORDER`, `CANCEL_ALGO_ORDER`, `REFRESH_ALGO_ORDER`) —
+> command-подсистема (шаг 4): `docs/components/` (executors,
+> resolver'ы), `docs/rules/command-lifecycle.md`. Амендной команды
+> нет — ремоделирование через REPLACE-оркестрацию
+> (`docs/decisions/replace-not-amend.md`).
 
 ## Статусы и live semantics
 
 | Статус | Runtime-live | Live on exchange | Смысл |
 |---|---|---|---|
 | `CREATED` | да | нет | Локальный intent, на бирже не подтверждён. |
-| `PENDING` | да | неизвестно | Submit/amend/cancel мог быть, нужен refresh/search/history. ACK не runtime truth (`docs/rules/ack-not-runtime-truth.md`). |
+| `PENDING` | да | неизвестно | Submit/cancel мог быть, нужен refresh/search/history. ACK не runtime truth (`docs/rules/ack-not-runtime-truth.md`). |
 | `ACTIVE` | да | да | Активен или ожидает срабатывания. |
 | `PARTIALLY_COMPLETED` | да | требует выяснения | Частично сработал — exchange-driven recovery-status, не цель стратегии. |
 | `COMPLETED` | нет | нет | Сработал. |
@@ -95,19 +96,25 @@ safety-каскад (`docs/rules/external-status-resolution.md`).
 рассчитанный intent, `externalSize` (`actualSz`) — внешний факт,
 могут отличаться из-за partial trigger/execution.
 
-## Cancel / amend (по фактам, не по ACK)
+## Cancel / replace (по фактам, не по ACK)
 
-`CANCEL_ALGO_ORDER`/`AMEND_ALGO_ORDER` не финализируют `AlgoOrder`:
-ACK не runtime truth. FSM сначала делает refresh, потом при
-необходимости создаёт cancel; executor отправляет команду, сохраняет
-ACK, не финализирует. После cancel intent верим exchange fact:
-`effective` → `COMPLETED`/`TRIGGERED`; `partially_effective` →
+`CANCEL_ALGO_ORDER` не финализирует `AlgoOrder`: ACK не runtime
+truth. FSM сначала делает refresh, потом при необходимости создаёт
+cancel; executor отправляет команду, сохраняет ACK, не финализирует.
+После cancel intent верим exchange fact: `effective` →
+`COMPLETED`/`TRIGGERED`; `partially_effective` →
 `PARTIALLY_COMPLETED`; `canceled` → `CANCELED` + `closeReason` из
 cancel intent (`CANCELED_BY_STRATEGY` / `REPLACED_BY_STRATEGY` /
 `KILL_SWITCH` / `MANUAL_CANCEL`); `order_failed`/`partially_failed` →
 `ExternalStatusException`. После рестарта: собрать `DealContext`,
 refresh/history, верить фактам; если всё ещё live и cancel нужен —
 повторить.
+
+Ремоделирование (REPLACE) algo-order амендной команды не имеет:
+новая сущность ставится первой (protective-порядок), старая
+отменяется с `closeReason = REPLACED_BY_STRATEGY` после
+подтверждения новой фактом; цепочка — `replacesInternalId`
+(`docs/decisions/replace-not-amend.md`).
 
 ## Граница refresh-executor
 

@@ -27,7 +27,7 @@ production-flow одной стратегии.
 | 1 | Поток рыночных данных (коннект к OKX, инструменты, цены/свечи, свежесть) | DONE |
 | 2 | Стратегия (абстракция: объявляет нужные индикаторы и условие сигнала; одна реализация) | DONE |
 | 3 | Производные рыночные данные: индикаторы + структура рынка (`MarketStructure`) + фаза рынка (`MarketPhase`) — jobs, модели, сервисы (расчёт/чтение/сохранение значений, запрошенных стратегией) | DONE |
-| 4 | Команды и их жизненный цикл (ServiceCommand: submit/amend/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DOCS_CHECK_3 |
+| 4 | Команды и их жизненный цикл (ServiceCommand: submit/replace/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DOCS_CHECK_5 |
 | 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | HOLD |
 | 6 | FSM (состояния и переходы сущностей — связующее звено) | HOLD |
 | 7 | Сделки и P&L (DealOrchestratorJob — агрегирование в Deal, P&L; он же оркестрирует торговый цикл сигнал→команда→позиция) | HOLD |
@@ -121,7 +121,7 @@ production-flow одной стратегии.
   N3/N5 (стале-ссылки на несуществующие `tasks/{order,algo-order,position}.md`;
   исполнитель recovery-refresh команд). Торговый фокус — блокеров нет (модель
   реконсиляции корпусно-состоятельна). Нужен `GAPS_CLOSE_1`. Отчёт —
-  `.claude/work/progress/phase-1-step-4-docs-check-1.md`.
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-docs-check-1.md`.
 - **Шаг 4 → `GAPS_CLOSE_1` (2026-06-10):** пробелы `DOCS_CHECK_1` закрыты.
   **N1/DEAL-Q3** — `DealActionState` материализован
   (`docs/models/domain/other/DealActionState.md` +
@@ -145,7 +145,7 @@ production-flow одной стратегии.
   не-гейтящие CODE-level заметки (`SKIPPED`-рёбра lifecycle, `maxAttempts`
   на `Retryable` vs политике). Торговый гейт — без блокеров. **Концепт-гейт
   `CODE` пройден.** Отчёт —
-  `.claude/work/progress/phase-1-step-4-docs-check-2.md`. Шаг готов к
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-docs-check-2.md`. Шаг готов к
   `CODE` — перевод за пользователем.
 - **Шаг 4 → `GAPS_CLOSE_2` (2026-06-10):** закрыта находка **F1** (владение
   evidence-cycle refresh-команд), всплывшая при выкладке «команды → запросы
@@ -180,7 +180,7 @@ production-flow одной стратегии.
   закрыть CMD-Q4». Концепт-гейт `CODE` пройден при принятии форвард-статуса
   CMD-Q4; финальный «блокер vs форвард» и переход в `CODE` — за
   пользователем. Отчёт —
-  `.claude/work/progress/phase-1-step-4-docs-check-3.md`.
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-docs-check-3.md`.
 - **Шаг 4 → тулинг `integrator` + прогон 1 (2026-06-11):** материализован
   владелец интеграционного знания (`integrator`, процесс
   `api-docs-completion`, скилл `integration-okx`, решение
@@ -195,7 +195,7 @@ production-flow одной стратегии.
   шаг 8, order-precheck → шаг 5, positions-history → шаг 7, batch-write →
   portfolio). Гейт `CODE` этим прогоном **не меняется** — И-1 и кандидаты
   идут на разбор в чат. Отчёт —
-  `.claude/work/progress/phase-1-step-4-integrator-run-1.md`.
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-1.md`.
 - **Шаг 4 → правка процесса + прогон 2 интегратора (2026-06-11):** процесс
   `api-docs-completion` переведён на **полное покрытие периметра** (не
   скоуп шага) + **манифест покрытия** с провенансом per-row; скан — только
@@ -210,7 +210,7 @@ production-flow одной стратегии.
   офдока (выкладка/OpenAPI/интерим с провенансом) — частично новая фактура
   к отвержению «библиотеки выгрузок». Скан с полного манифеста → форвард-
   кандидаты В-1…В-9 (шаги 5/7/8, portfolio). Гейт `CODE` **не меняется**.
-  Отчёт — `.claude/work/progress/phase-1-step-4-integrator-run-2.md`.
+  Отчёт — `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-2.md`.
 - **Шаг 4 → прогон 3 интегратора: докачка офдок-grade (2026-06-11):**
   пакет прогона 2 закрыт в чате и исполнен. **Канал чтения офдока —
   самообслуживание** (страница — статический HTML; сырой fetch +
@@ -227,7 +227,79 @@ production-flow одной стратегии.
   не амендится). Форварды В-1/В-2/В-3/В-6/В-7/В-8/В-9 переданы шагам
   5/7/8 (`backlog.md` §Форвард-материал); В-4/В-5 — «рассмотрено, не
   берём»; В-6 положен рядом с OKX-Q3. Гейт `CODE` **не меняется**.
-  Отчёт — `.claude/work/progress/phase-1-step-4-integrator-run-3.md`.
+  Отчёт — `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-3.md`.
+- **Шаг 4 → валидация И-2 + `DOCS_CHECK_4` (2026-06-11):** И-2
+  провалидирован пользователем (принят без правки): ветвление И-1(а)
+  стоит, advance-ветка с пометкой; снятие — runtime-проверка в demo
+  trading на `CODE`; **кредов demo пока нет** — проверка ждёт их
+  появления (за пользователем), до неё документальная фактура
+  прогона 3 принимается достоверной (зафиксировано в `algo-order.md`
+  и отчёте прогона 3). Прогон `DOCS_CHECK_4` (рябь прогонов
+  интегратора): механика чиста — ветвление разнесено согласованно,
+  link-integrity/манифест↔контракты/форварды без находок, закрытия
+  `DOCS_CHECK_1-3` интактны. **Не чисто** — одна содержательная
+  находка **К-1/Т-1** (обнажена фактом И-3): концепция предлагает
+  амендный путь ремодела trailing (`newTrailingPrice` в payload,
+  «меняет» в `CalculatedPrice`, AMEND с `trailingSettings` в
+  `Strategy.md`), биржа standalone trailing не амендит; торговая
+  грань — окно без защиты при cancel+place [Vince, введ., с. 6].
+  Варианты (а) запрет амендного пути / (б) трансляция в replace-flow
+  / (в) как есть; крен — (а). **Гейт `CODE` перезакрыт** до закрытия
+  К-1 → нужен узкий `GAPS_CLOSE_3` + подтверждающий `DOCS_CHECK_5`.
+  Отчёт — `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-docs-check-4.md`.
+- **Шаг 4 → проработка К-1, расширенная развилка (г) (2026-06-11):**
+  финализации К-1 по (а)/(б)/(в) не было — пользователь расширил
+  развилку вариантом **(г)**: запрет AMEND как доменной операции
+  целиком (ордера и algo), единый replace-путь ремоделирования.
+  `solution-designer` проработал (г) против baseline (а): scope
+  подтверждён полным (вкл. amend-order); торговое правило порядка
+  ног по риск-классу (protective — place-new → факт → cancel-old,
+  двойная reduce-only защита безопасна, обобщение
+  protection-switch; entry — cancel-old → факт → place-new);
+  очередь/rate-limit — нематериальны для класса стратегии;
+  семантика REPLACE: под-развилка (г-1 команда)/(г-2 оркестрация) —
+  **крен (г-2)** (REPLACE — `StrategyActionType`, исполняется
+  оркестрацией атомарных команд; `AMEND_*` уходят из enum;
+  identity — новая сущность + `replacesInternalId` +
+  `REPLACED_BY_STRATEGY` (у algo уже есть); резолюция цели по
+  цепочке). **Крен — принять (г)/(г-2)**; на валидации
+  пользователя. К-1 остаётся открытой до валидации; `GAPS_CLOSE_3`
+  (дельта ~12 доков + decision `replace-not-amend`) и `DOCS_CHECK_5`
+  — после. Статус шага не меняется (`DOCS_CHECK_4`). Проработка —
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-k1-replace-design.md`.
+- **Шаг 4 → `GAPS_CLOSE_3`: REPLACE-only принят и разнесён
+  (2026-06-11):** валидация проработки К-1 — **чистая** (все три
+  пункта крена приняты без правки). Дельта исполнена: `AMEND_ORDER` /
+  `AMEND_ALGO_ORDER` сняты из `ServiceCommandType` (19 → 17), амендные
+  executors/payload'ы удалены; `StrategyActionType` —
+  `CREATE/REPLACE/CANCEL` (+палитра REPLACE = CREATE, правила 4/6/7,
+  резолюция цели по цепочке); identity — `replacesInternalId` на
+  `Order`/`AlgoOrder`, `Order.CloseReason += REPLACED_BY_STRATEGY`;
+  `DealActionState` §REPLACE-действия (две ноги из фактов, без новых
+  статусов); порядок ног по риск-классу в lifecycle/правилах
+  (`risk-validator-scope` — риск-контроль на place-ноге;
+  `exchange-hold`, `ack-not-runtime-truth`, `command-lifecycle`);
+  mapping `Order`/`AlgoOrder` — амендный request-mapping снят;
+  контракты OKX/манифест/скилл — пометки «доменом не используется»;
+  `ORDER_AMEND_PRICE` → `ORDER_REPLACE_PRICE`. Рационал + отвергнутые
+  (а)/(б)/(в)/(г-1) — `docs/decisions/replace-not-amend.md`. К-1/Т-1
+  закрыты, следствие И-3 снято; заметка про окно двойной защиты — у
+  CMD-Q4. Код-дельта (существующие amend-исполнители) — на `CODE`.
+  Далее — подтверждающий `DOCS_CHECK_5`.
+- **Шаг 4 → `DOCS_CHECK_5` (2026-06-11):** подтверждающий прогон после
+  `GAPS_CLOSE_3` (REPLACE-only) — **чисто**. Все закрытия подтверждены
+  (enum 17, executors/payload'ы сняты, `StrategyActionType` REPLACE +
+  правила + резолюция цепочки, `replacesInternalId` +
+  `REPLACED_BY_STRATEGY`, порядок ног, риск-скоуп на place-ноге,
+  пометки поверхности OKX); grep-верификация: амендные токены — только
+  ноты-о-снятии/decision/биржевые DTO-поля, dangling нет; link-integrity
+  31 файла дельты — чисто; закрытия `DOCS_CHECK_1-4` интактны; торговый
+  гейт без блокеров. 3 не-гейтящие CODE-заметки (главная — код-дельта
+  REPLACE-only на `CODE`: Java-енумы, amend-исполнители, пример
+  стратегии). **Концепт-гейт `CODE` вновь пройден** — перевод за
+  пользователем. Вне гейта: И-2 (ждёт кредов demo), CMD-Q4, RISK-Q1/Q2,
+  OKX-Q1/Q2/Q3. Отчёт —
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-docs-check-5.md`.
 - **Шаг 2, фиксация задним числом:** между `GAPS_CLOSE_7` и
   `DOCS_CHECK_8` пройден повторный под-шаг `TOOLING` (торговый
   совет: агент `trading-specialist`, дистиллят корпуса

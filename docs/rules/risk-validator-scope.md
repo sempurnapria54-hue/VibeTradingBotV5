@@ -12,16 +12,23 @@
 
 ### Вызывается
 
-Для `CREATE_ORDER` / `AMEND_ORDER` / `CREATE_ALGO_ORDER` /
-`AMEND_ALGO_ORDER`, только если конкретное рассчитанное действие
-risk-creating / risk-increasing / risk-weakening:
+Для `CREATE_ORDER` / `CREATE_ALGO_ORDER` — включая **place-ногу
+REPLACE-действий** (амендных команд нет, ремоделирование — REPLACE,
+`docs/decisions/replace-not-amend.md`) — только если конкретное
+рассчитанное действие risk-creating / risk-increasing /
+risk-weakening:
 
 - entry order, открывающий позицию;
 - scaling / pyramiding order, увеличивающий позицию;
-- amend, увеличивающий размер live order;
-- amend, ухудшающий защиту (двигает SL дальше от входа);
+- replace, увеличивающий размер замещаемого live order;
+- replace, ухудшающий защиту (новая сущность двигает SL дальше от
+  входа);
 - создание защитного algo-order, не обеспечивающего требуемый контроль
   риска.
+
+Cancel-нога REPLACE отдельной валидации не получает (см. «Не
+вызывается»: cancel снимает риск); риск-контроль ремодела целиком —
+на place-ноге новой сущности.
 
 ### Не вызывается
 

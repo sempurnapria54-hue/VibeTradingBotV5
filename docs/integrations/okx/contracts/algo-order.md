@@ -34,9 +34,11 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   Permission `Trade`; rate limit 20 req / 2 s по User ID + Instrument
   ID. Body — общие поля (`instId`, `tdMode`, `side`, `ordType`, `sz`,
   `posSide`, `reduceOnly`, `algoClOrdId`) + ordType-specific.
-- **Amend** (`AMEND_ALGO_ORDER`): `POST /api/v5/trade/amend-algos`.
-  Permission `Trade`; rate limit 20 req / 2 s по User ID + Instrument
-  ID. **Только Stop/Trigger-ордера** — офдок («POST / Amend algo
+- **Amend** (доменом **не используется** — REPLACE-only,
+  `docs/decisions/replace-not-amend.md`; контракт — поверхность
+  биржи): `POST /api/v5/trade/amend-algos`. Permission `Trade`; rate
+  limit 20 req / 2 s по User ID + Instrument ID.
+  **Только Stop/Trigger-ордера** — офдок («POST / Amend algo
   order»): «Support Stop order and Trigger order only, not including
   Move_order_stop order, Iceberg order, TWAP order, Trailing Stop
   order» — advance-семья (вкл. standalone trailing) **не амендится**
@@ -85,8 +87,7 @@ Evidence-cycle `REFRESH_ALGO_ORDER` для trailing не ломается.
 
 ACK любой create/cancel (`sCode=0`) не runtime truth
 (`docs/rules/ack-not-runtime-truth.md`). `CANCEL_ALGO_ORDER` не
-ставит `CANCELED`; `AMEND_ALGO_ORDER` не подтверждён без
-refresh/search/history. Submit использует stable client id
+ставит `CANCELED`. Submit использует stable client id
 (`internalId → algoClOrdId`); перед retry — refresh/search по
 `algoClOrdId`.
 
@@ -97,8 +98,11 @@ refresh/search/history. Submit использует stable client id
 
 ### Cancel response (ACK)
 
-`POST /trade/cancel-algos` → `data[0]` с `algoId`, `algoClOrdId`,
-`sCode`, `sMsg`.
+`POST /trade/cancel-algos` → `data[0]` с `algoId`, `sCode`, `sMsg`
+(`algoClOrdId` / `clOrdId` / `tag` в cancel-ответе помечены офдоком
+deprecated). Для advance-ветки (`cancel-advance-algos`, И-1(а))
+форма ответа исторически та же; текущим офдоком не специфицирована
+(И-2).
 
 ## ordType-specific create body
 
@@ -150,25 +154,28 @@ trailing-защиту (`TrailingSettings`, `ConditionType.TRAILING_*` —
   okx.com-поиск) опиралась, по-видимому, на устаревший
   индексированный контент.
 
-**Следствие для решения (а) — на валидацию, не финализируется:**
-если `cancel-algos` теперь отменяет обе семьи, ветвление вырождается
-в один путь; если нет — advance-путь остаётся на выведенном из дока
-(но исторически рабочем) endpoint'е. Чем снять: runtime-проверка в
-demo trading (постановка + отмена `move_order_stop` через
-`cancel-algos`) на `CODE` шага 4 либо повторная сверка офдока
-позже. До снятия ветвление (а) сохраняется как принятое решение;
-advance-ветка помечается «endpoint вне текущего офдока, требует
-runtime-подтверждения».
+**Следствие для решения (а) — провалидировано (пользователь,
+2026-06-11, принято без правки по существу):** ветвление (а) стоит
+как есть; advance-ветка сохраняет пометку «endpoint вне текущего
+офдока». Снятие И-2 — **runtime-проверка в demo trading**
+(постановка + отмена `move_order_stop` через `cancel-algos`) на
+`CODE` шага 4. Оговорка по исполнению: кредов demo trading пока нет
+— проверка ждёт их появления (креды — за пользователем); до
+проверки документальная фактура прогона 3 принимается как
+достоверная. Если `cancel-algos` отменит обе семьи — ветвление
+вырождается в один путь; если нет — advance-путь остаётся на
+выведенном из дока (но исторически рабочем) endpoint'е.
 
-### Находка И-3 (прогон 3): advance не амендится
+### Находка И-3 (прогон 3) — следствие закрыто решением REPLACE-only
 
-`amend-algos` нормативно поддерживает только Stop/Trigger;
-standalone `move_order_stop` / iceberg / twap **не амендятся** (см.
-Endpoints → Amend). Следствие для `AMEND_ALGO_ORDER` по trailing:
-биржевого амендмента нет — доступный паттерн ремоделирования
-trailing-защиты — отмена + новая постановка (cancel + place).
-Решение о паттерне здесь не финализируется — владелец команды /
-шаг реализации; зафиксирован только биржевой факт.
+Биржевой факт: `amend-algos` нормативно поддерживает только
+Stop/Trigger; standalone `move_order_stop` / iceberg / twap **не
+амендятся** (см. Endpoints → Amend). Следствие закрыто
+(`GAPS_CLOSE_3`, 2026-06-11): домен не амендит **ничего** —
+ремоделирование любой сущности идёт REPLACE-оркестрацией
+(`docs/decisions/replace-not-amend.md`); амендная асимметрия биржи
+перестала касаться доменного слоя (исторически И-3 — один из
+триггеров выбора REPLACE-only).
 
 ## Evidence-cycle
 

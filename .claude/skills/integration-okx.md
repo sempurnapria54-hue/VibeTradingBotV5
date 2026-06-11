@@ -60,11 +60,9 @@ WebFetch-суммаризатора**. Прежний диагноз «JS-SPA, �
 | Команда | Метод + endpoint | Permission |
 |---|---|---|
 | `SUBMIT_ORDER` | `POST /api/v5/trade/order` | Trade |
-| `AMEND_ORDER` | `POST /api/v5/trade/amend-order` | Trade |
 | `CANCEL_ORDER` | `POST /api/v5/trade/cancel-order` | Trade |
 | `REFRESH_ORDER` | `GET /api/v5/trade/order` (+ `orders-pending`, `orders-history`, `orders-history-archive` — звенья evidence-cycle) | Read |
 | `SUBMIT_ALGO_ORDER` | `POST /api/v5/trade/order-algo` | Trade |
-| `AMEND_ALGO_ORDER` | `POST /api/v5/trade/amend-algos` | Trade |
 | `CANCEL_ALGO_ORDER` | ветвление по семье (И-1 исход (а)): ordinary → `POST /api/v5/trade/cancel-algos`; advance/trailing → `cancel-advance-algos` (⚠ И-2: endpoint вне текущего офдока) | Trade |
 | `REFRESH_ALGO_ORDER` | `GET /api/v5/trade/order-algo` (+ `orders-algo-pending`, `orders-algo-history`) | Read |
 | `CLOSE_POSITION` | `POST /api/v5/trade/close-position` | Trade |
@@ -76,6 +74,10 @@ WebFetch-суммаризатора**. Прежний диагноз «JS-SPA, �
 сущность до отправки), биржевого endpoint не зовут; биржу зовёт
 `SUBMIT_*`. `FINALIZE_DEAL_*` / `MARK_DEAL_*` / `EXECUTE_KILL_SWITCH`
 биржевого endpoint напрямую не имеют (собираются из вышеперечисленных).
+Амендных команд нет — ремоделирование идёт REPLACE-оркестрацией
+существующих команд (`docs/decisions/replace-not-amend.md`); биржевые
+amend-эндпоинты задокументированы как поверхность, доменом не
+используются.
 
 ## Конвенции источника
 
@@ -144,8 +146,8 @@ WebFetch-суммаризатора**. Прежний диагноз «JS-SPA, �
 - Манифест покрытия поверхности OKX —
   `docs/integrations/okx/coverage-manifest.md`.
 - Отчёты прогонов —
-  `.claude/work/progress/phase-1-step-4-integrator-run-1.md`,
-  `.claude/work/progress/phase-1-step-4-integrator-run-2.md`,
-  `.claude/work/progress/phase-1-step-4-integrator-run-3.md`.
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-1.md`,
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-2.md`,
+  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-integrator-run-3.md`.
 - Интеграционные доки OKX — `docs/integrations/okx/`,
   `docs/models/integrations/okx/`.

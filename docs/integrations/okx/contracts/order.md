@@ -26,9 +26,11 @@ Native response/request поля — `docs/models/integrations/okx/OkxOrderRespo
 
 - **Create** (`SUBMIT_ORDER`): `POST /api/v5/trade/order`. Permission
   `Trade`; rate limit 60 req / 2 s по User ID + Instrument ID.
-- **Amend** (`AMEND_ORDER`): `POST /api/v5/trade/amend-order`.
-  Permission `Trade`; rate limit 60 req / 2 s по User ID + Instrument
-  ID. `newPx`/`newSz`/`attachAlgoOrds` — изменения должны включать
+- **Amend** (доменом **не используется** — REPLACE-only,
+  `docs/decisions/replace-not-amend.md`; контракт — поверхность
+  биржи): `POST /api/v5/trade/amend-order`. Permission `Trade`; rate
+  limit 60 req / 2 s по User ID + Instrument ID.
+  `newPx`/`newSz`/`attachAlgoOrds` — изменения должны включать
   уже исполненную часть для `partially_filled`. `cxlOnFail` (boolean)
   — биржа отменит ордер, если amend упал. `pxAmendType=0|1` — `1`
   разрешает автокорректировку цены в допустимый диапазон.

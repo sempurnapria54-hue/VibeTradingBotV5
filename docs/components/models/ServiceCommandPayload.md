@@ -27,13 +27,15 @@ Payload документируется **разделом в доке своег
 |---|---|
 | `CreateOrderCommandPayload` (+ `AttachedProtectionPayload`) | `docs/components/CreateOrderExecutor.md` |
 | `SubmitOrderCommandPayload` | `docs/components/SubmitOrderExecutor.md` |
-| `AmendOrderCommandPayload` | `docs/components/AmendOrderExecutor.md` |
 | `CancelOrderCommandPayload` | `docs/components/CancelOrderExecutor.md` |
 | `CreateAlgoOrderCommandPayload` | `docs/components/CreateAlgoOrderExecutor.md` |
 | `SubmitAlgoOrderCommandPayload` | `docs/components/SubmitAlgoOrderExecutor.md` |
-| `AmendAlgoOrderCommandPayload` | `docs/components/AmendAlgoOrderExecutor.md` |
 | `CancelAlgoOrderCommandPayload` | `docs/components/CancelAlgoOrderExecutor.md` |
 | `ClosePositionCommandPayload` | `docs/components/ClosePositionExecutor.md` |
+
+Амендных payload'ов (`AmendOrderCommandPayload` /
+`AmendAlgoOrderCommandPayload`) нет — сняты вместе с
+`AMEND_*`-командами (`docs/decisions/replace-not-amend.md`).
 
 ## Базовый тип
 

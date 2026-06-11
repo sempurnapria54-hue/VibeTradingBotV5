@@ -65,7 +65,7 @@ algoOrderId)`); `REFRESH_POSITION` — `RuntimeTarget(POSITION, positionId)`
 
 - `PLANNED` — action выбран, команды ещё не было (`target == null`).
 - `CREATED` — `CREATE_*` создал локальную сущность; `target` заполнен.
-- `SUBMITTED` — `SUBMIT_*`/`AMEND_*`/`CANCEL_*`/`CLOSE_POSITION`
+- `SUBMITTED` — `SUBMIT_*`/`CANCEL_*`/`CLOSE_POSITION`
   отправлен на биржу; факт ещё не подтверждён (ACK не runtime truth).
 - `COMPLETED` — факт исполнения подтверждён `REFRESH_*`-контуром.
 - `RETRY_PENDING` — executor упал на retryable-ошибке; ждёт повтора по
@@ -84,6 +84,31 @@ algoOrderId)`); `REFRESH_POSITION` — `RuntimeTarget(POSITION, positionId)`
 - `DEAL` — сама сделка (lifecycle/finalization-action).
 - `BALANCE` — баланс (`REFRESH_BALANCE`).
 - `NONE` — action без runtime-target-сущности (`entityId == null`).
+
+## REPLACE-действия (две ноги, одна запись)
+
+`StrategyActionType.REPLACE` (`docs/decisions/replace-not-amend.md`)
+исполняется как CREATE-надмножество: действие порождает **новую**
+runtime-сущность (`target` = новая, `replacesInternalId` = `internalId`
+замещаемой) плюс cancel-ногу по старой. Новых статусов
+`DealActionStateStatus` нет — `ServiceCommandFactory` выводит
+следующую команду **из фактов** («одна актуальная команда за
+проход»):
+
+- protective (`positionReducingOnly = true`): новой нет →
+  `CREATE_*`; не отправлена → `SUBMIT_*`; новая подтверждена ACTIVE
+  фактом и старая жива → `CANCEL_*` старой
+  (`REPLACED_BY_STRATEGY`); старая терминальна → `COMPLETED`;
+- entry (не reduce-only): зеркально — cancel-нога первой, place
+  после подтверждения терминала старой (fill-race разбирается по
+  фактам: исполнена → действие `SKIPPED`; частично — место
+  пересчёта остатка).
+
+Замещаемая сущность резолвится из `DealContext.actionStates` по
+цепочке замещений от target-action (последнее живое звено по
+`replacesInternalId`). Представление последовательности ног
+(вывод из фактов vs явные фазы) — деталь `CODE`; концептуально
+статусной машине хватает существующих значений.
 
 ## Инварианты
 

@@ -466,11 +466,20 @@ sugar-vs-алиас — `docs/rules/condition-ruletype-granularity.md`.) `MARKET
 описывает ожидаемое действие; runtime-сущность связывается через
 `DealActionState`. JSON-дискриминатор `actionKind` (`ORDER`/
 `ALGO_ORDER`/`POSITION`) — только для сериализации, не поле домена.
-Общий `StrategyActionType`: `CREATE`, `AMEND`, `CANCEL`, `CLOSE_FULL`.
+Общий `StrategyActionType`: `CREATE`, `REPLACE`, `CANCEL`,
+`CLOSE_FULL`.
+
+`REPLACE` — единственная операция ремоделирования: действие задаёт
+**полное новое желаемое состояние** (палитра настроек как у CREATE)
+и исполняется заменой runtime-сущности — новая сущность + отмена
+старой, оркестрацией существующих атомарных команд; порядок ног — по
+риск-классу действия. `AMEND` в доменном словаре отсутствует
+(биржеспецифичная механика; решение —
+`docs/decisions/replace-not-amend.md`).
 
 ### StrategyOrderAction
-`key`, `targetActionKey` (для AMEND/CANCEL; для CREATE null),
-`actionType` (CREATE/AMEND/CANCEL), `orderType: Order.Type`
+`key`, `targetActionKey` (для REPLACE/CANCEL; для CREATE null),
+`actionType` (CREATE/REPLACE/CANCEL), `orderType: Order.Type`
 (ENTRY / ENTRY_ATTACHED_STOP_LOSS), `direction: StrategyTradeDirection`,
 `allocationPercents` (доля расчётного объёма), `positionReducingOnly:
 Boolean` (strategy-intent → `Order.positionReducingOnly` → OKX
@@ -504,7 +513,7 @@ ENTRY_ATTACHED_STOP_LOSS обязательна).
 `stopLossSettings: StopLossSettings`.
 
 ### StrategyAlgoOrderAction
-`key`, `targetActionKey`, `actionType` (CREATE/AMEND/CANCEL),
+`key`, `targetActionKey`, `actionType` (CREATE/REPLACE/CANCEL),
 `conditionType: ConditionType`, `level`, `stopLossSettings`,
 `trailingSettings`, `closeFractionPercents` (доля закрытия; в runtime →
 fraction 0..1), `triggerProfitPercents`, `triggerPriceType:
@@ -544,17 +553,17 @@ cancel-пути (И-1).
 
 `key` — стабильный ключ action внутри одной `StrategyDetail` (задаётся
 в JSON). `targetActionKey` — ключ action, создавшего runtime-сущность
-для AMEND/CANCEL; при сохранении стратегии валидируется и резолвится во
-внутреннюю ссылку. Валидация при создании стратегии (12 правил):
+для REPLACE/CANCEL; при сохранении стратегии валидируется и резолвится
+во внутреннюю ссылку. Валидация при создании стратегии (12 правил):
 
 1. `key` обязателен у каждого `StrategyAction`.
 2. `key` уникален в рамках одной `StrategyDetail`.
 3. `targetActionKey` ссылается на существующий `action.key` в той же
    `StrategyDetail`.
-4. `targetActionKey` обязателен для AMEND/CANCEL у ORDER/ALGO_ORDER.
+4. `targetActionKey` обязателен для REPLACE/CANCEL у ORDER/ALGO_ORDER.
 5. CREATE не имеет `targetActionKey`.
-6. ORDER AMEND/CANCEL ссылаются на ORDER CREATE.
-7. ALGO_ORDER AMEND/CANCEL ссылаются на ALGO_ORDER CREATE.
+6. ORDER REPLACE/CANCEL ссылаются на ORDER CREATE.
+7. ALGO_ORDER REPLACE/CANCEL ссылаются на ALGO_ORDER CREATE.
 8. Нельзя ссылаться на action из другой `StrategyDetail`.
 9. `StrategyPositionAction.actionType` только `CLOSE_FULL`.
 10. Direct partial close через `StrategyPositionAction` запрещён.
@@ -563,12 +572,12 @@ cancel-пути (И-1).
 12. Partial exit action не открывает/не увеличивает позицию.
 
 Допустимые `actionType` по подтипам: ORDER/ALGO_ORDER —
-CREATE/AMEND/CANCEL; POSITION — только CLOSE_FULL.
+CREATE/REPLACE/CANCEL; POSITION — только CLOSE_FULL.
 
 **Линия реза валидатора (create / activate).** Структурно-ссылочные
 пункты (1-3, 8: наличие/уникальность `key`, разрешённость ссылок в
 рамках detail) проверяются на **create (400)** в шаге 2. Пункты
-семантики действий (4-7, 9-12: `targetActionKey` для AMEND/CANCEL,
+семантики действий (4-7, 9-12: `targetActionKey` для REPLACE/CANCEL,
 ORDER↔ORDER / ALGO↔ALGO, `CLOSE_FULL`/partial-exit) опираются на
 незрелую в шаге 2 модель команд/сделок/FSM и отложены — до шагов 4/7
 и/или на **activate (422)** как «готова к запуску». Числовые торговые
@@ -589,11 +598,14 @@ activate, на create не проверяются. Материализация
 RuntimeTarget(entityType, entityId)`. Инварианты:
 `UNIQUE(strategy_detail_id, key)`, `UNIQUE(deal_id,
 strategy_action_id)`. Runtime работает через `strategyActionId`, не
-`strategyActionKey`. AMEND/CANCEL: target StrategyAction →
+`strategyActionKey`. REPLACE/CANCEL: target StrategyAction →
 `DealActionState` → `RuntimeTarget` → `ServiceCommand` с конкретным
-orderId/algoOrderId. `placement` не основной способ идентификации
-runtime-сущности. (`DealActionState`/`RuntimeTarget` — кластер Deal
-management, форвард-заметка.)
+orderId/algoOrderId. **Резолюция цели по цепочке замещений:** после
+REPLACE актуальная сущность — последнее звено цепочки от
+target-action (target-сущность → вперёд по `replacesInternalId`);
+REPLACE/CANCEL всегда целятся в актуальное звено, не в исходную
+сущность CREATE. `placement` не основной способ идентификации
+runtime-сущности.
 
 ## Персистентность
 

@@ -17,10 +17,13 @@
 `docs/rules/external-status-resolution.md`).
 
 > Resolver'ы, refresh-executors и команды (`REFRESH_ORDER`,
-> `REFRESH_FILLS`, `SUBMIT_ORDER`, `AMEND_ORDER`, `CANCEL_ORDER`) —
+> `REFRESH_FILLS`, `SUBMIT_ORDER`, `CANCEL_ORDER`) —
 > command-подсистема (шаг 4): `docs/components/` (executors, resolver'ы),
-> `docs/rules/command-lifecycle.md`. Здесь — статусная механика,
-> которой владеет сам `Order`.
+> `docs/rules/command-lifecycle.md`. Амендной команды нет —
+> ремоделирование через REPLACE-оркестрацию
+> (`docs/decisions/replace-not-amend.md`; для entry-ордера —
+> cancel-нога первой, разбор fill-race по фактам). Здесь — статусная
+> механика, которой владеет сам `Order`.
 
 ## `Order.Status`
 
