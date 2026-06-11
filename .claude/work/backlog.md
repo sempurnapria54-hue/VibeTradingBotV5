@@ -333,6 +333,108 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   новой фактуры нет. Действует биржевой default
   (`acctStpMode=cancel_maker` — `contracts/account-config.md`).
 
+## Хвост шага 4 (CODE-отложения, 2026-06-11)
+
+Refinements, сознательно отложенные при `CODE` шага 4 (код — первый
+проход, доки описывают целевой дизайн). Источник —
+`.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-sync-docs-from-code.md`
+(§DEFER). Не блокируют `DONE` шага 4; берутся при доведении командного
+слоя / на смежных шагах.
+
+- **SUBMIT recovery-by-clientId** — `SubmitOrderExecutor`/
+  `SubmitAlgoOrderExecutor`: при пустом `externalId` искать сущность на
+  бирже по client id (recovery после краха между send и сохранением
+  `externalId`) до повторного place. Сейчас — place-if-blank.
+- **ClosePosition settle ccy** — `ClosePositionExecutor`/
+  `IntegrationService.closePosition`: передавать settle currency в
+  close-request (сейчас `null`).
+- **`ServiceCommandFactory`: REPLACE-оркестрация + CANCEL-резолюция
+  цели.** Порядок ног REPLACE по риск-классу (place→факт→cancel для
+  protective; cancel→факт→place для entry) и резолюция цели CANCEL по
+  цепочке `replacesInternalId` — не реализованы (фабрика покрывает
+  CREATE/SUBMIT/REFRESH/CLOSE). Концепция — `replace-not-amend`,
+  `DealActionState` §REPLACE.
+- **Refresh algo: external-поля дерева `condition`.** `updateFromSnapshot`
+  игнорит `condition`; обновляются только top-level факты срабатывания.
+  Обновление trigger/trailing external-цен из снапшота — добрать.
+- **Evidence-cycle пагинация по `billId`.** `REFRESH_FILLS` и
+  order/algo pending/history — сейчас одна страница на звено; добрать
+  пагинацию назад до пустого `data` (владение циклом —
+  `refresh-evidence-cycle-ownership`).
+- **Рантайм-прогон через `OkxProxyController`** — отдельно, при
+  поднятом PostgreSQL + demo-кредах (вкл. И-2: подтверждение
+  `cancel-advance-algos` для trailing в demo trading).
+
+### Из адверсариального ревью (2026-06-11)
+
+Источник —
+`.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-adversarial-review.md`.
+Деньги-латентные (D-B3, D-M1) материализуются только с оркестрационной
+петлёй — **gating для step-6/7**, не для DONE шага 4.
+
+- **[BLOCKER, gating step-6/7] D-B3 — SUBMIT recovery-by-clientId.** Краш
+  между `placeOrder` и сохранением `externalId` → дубль ордера при
+  ресабмите. `SubmitOrderExecutor`/`SubmitAlgoOrderExecutor`: перед place
+  при пустом `externalId` искать сущность на бирже по client id и
+  принять найденную. Требует `getOrder` null-on-not-found (OKX `51603`).
+  Обязательно **до** включения авто-реплея SUBMIT (FSM/оркестратор).
+- **[MAJOR, gating step-6/7] D-M1 — concurrency-guard исполнения
+  команды.** Перекрытие тика/ручного триггера → двойной SUBMIT.
+  Сериализация per-deal (`JobExecutionGuard` / row-lock на
+  `DealActionState`) или `@Version` оптимистик-лок. Владелец —
+  оркестрационная петля step-6/7.
+- **[MAJOR] D-M5/R5 — fills-пагинация + orders-history-archive.**
+  `RefreshFillsExecutor` берёт одну страницу `getFills`/`getFillsHistory`
+  (недобор fills → искажение PnL, step 7); пагинация назад по `billId`.
+  Плюс order-цикл не доходит до `orders-history-archive` (последнее звено
+  по докам) — добрать.
+- **[MAJOR] perf P-M3 — `getRequiredById` грузит attached** даже для
+  submit/cancel. Разделить: лёгкий load без attached vs граф-load для
+  refresh.
+- **[MAJOR, design] D-M4 — корроборация RefreshPosition.** Пустой
+  positions-ответ → CLOSED от одного чтения (соответствует докам, но
+  транзиентные пустые ответы → ложный CLOSED). Рассмотреть корроборацию
+  (повторное чтение / cross-check fills) до объявления close. Форвард-
+  вопрос дизайна позиции.
+- **[MINOR] perf — батчи/churn.** `saveAll` для attached/balances вместо
+  per-row; upsert баланса вместо delete+insert; собрать изменённые
+  ордера в RefreshFills в один `saveAll`.
+- **[MINOR] D-m1/D-m2 — подпись/эхо.** Clock-skew tolerance подписи OKX;
+  лишние циклы refresh при пустом clOrdId-эхе.
+- **[MINOR] conventions m2 — `getRequiredByInternalId`** (Order/AlgoOrder)
+  сейчас не вызывается; если step-6/7 lookup так и не появится — удалить.
+
+## Ретро-ревью шагов 1-3 (2026-06-11)
+
+Независимый адверсариальный code-review, ретроспективно достроенный по
+шагам 1-3 (источник —
+`.claude/work/history/2026-06-11-phase-1-steps-1-3-retro-adversarial-review.md`).
+Блокеров нет, статусы `DONE` валидны. Неблокирующий форвард-долг:
+
+- **Шаг 1.** `[MAJOR]` SYNC-overlap не реализован (`syncOverlapBars`
+  объявлен, не зовётся; overlap от `pageSize`) — реализовать или удалить
+  свойство. `[MINOR]` `repairAttempts` in-memory → поле на `CandleGroup`
+  (гарантия «N попыток → ERROR» через рестарт); отброшенный return
+  `saveCandles`; двойной `findByStatusIn` за тик.
+- **Шаг 2.** `[MAJOR][PERF]` декартов join-fetch дерева
+  (`StrategyRepository.findByInternalIdWithTree`) — разнести на 2
+  fetch / `@EntityGraph`+`@BatchSize` (should-fix, бьёт с ростом дерева).
+  `[MAJOR, error-convention]` 500 вместо 422 при гонке «одна ACTIVE» и
+  500 вместо 409/идемпотентности при повторном POST — ловить нарушения
+  `uk_strategy_active_per_instrument` / `uk_strategy_internal_id`
+  (развилка 409-vs-идемпотентность — продуктовая). `[MINOR]`
+  неиндексированные FK `strategy_actions.strategy_step_id` /
+  `target_action_id`.
+- **Шаг 3.** `[MINOR]` провизорные пороги-дефолты резолвера применяются
+  молча (сигнал «дефолт применён»); двойная owner-простановка на
+  UNKNOWN-ветке `MarketStructureJob`; `lookbackBars` без нижней границы
+  перед `PageRequest.of`. `[NIT]` N+1 по таймфреймам (повторная загрузка
+  окна для настроек одного инструмента).
+- **Сквозное.** Error-конвенция (`codestyle.md` §«Обработка ошибок —
+  TBD») гейтит часть major'ов шага 2 (и шага 4): коды, `@ControllerAdvice`
+  vs per-endpoint, трансляция нарушений констрейнтов в 4xx. Усиление
+  приоритета существующего TBD.
+
 ## Методологические задачи (по итогам миграции)
 
 Не cross-cutting миграции, а ревизии методологии по итогам прогонов.

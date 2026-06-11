@@ -178,7 +178,7 @@ attached материализуется в standalone algo —
 | `partially_filled` | `PARTIALLY_COMPLETED` | `null` |
 | `filled` | `COMPLETED` | `FILLED` |
 | `canceled` | `CANCELED` | context-dependent |
-| `mmp_canceled` | `CANCELED` | `UNKNOWN` (можно расширить) |
+| `mmp_canceled` | `CANCELED` | context-dependent (резолвер closeReason не ставит — как `canceled`; заполняет handler) |
 | unknown value | — | бросает `ExternalStatusException(UNKNOWN_EXTERNAL_STATUS)` → safety-каскад |
 
 ### OKX evidence-cycle / not found

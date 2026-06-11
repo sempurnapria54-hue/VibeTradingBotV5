@@ -47,15 +47,15 @@ public class CancelOrderExecutor implements CommandExecutor {
         CancelOrderCommandPayload payload = (CancelOrderCommandPayload) command.getPayload();
         Order order = orderDataService.getRequiredById(payload.getOrderId());
         ExchangeAck ack = integrationService.cancelOrder(order, dealContext.getInstrument().getExternalId());
+        if (isFalse(ack.getSuccess())) {
+            return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR, ack.getMessage());
+        }
         if (isNull(order.getCloseReason())) {
             order.setCloseReason(payload.getCancelReason());
             orderDataService.save(order);
         }
         actionState.setStatus(DealActionStateStatus.SUBMITTED);
         dealActionStateDataService.save(actionState);
-        if (isFalse(ack.getSuccess())) {
-            return ServiceCommandExecutionResult.failure(RuntimeErrorCode.EXCHANGE_ERROR, ack.getMessage());
-        }
         return ServiceCommandExecutionResult.ok();
     }
 }

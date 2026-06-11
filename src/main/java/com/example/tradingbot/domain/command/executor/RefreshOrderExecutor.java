@@ -26,6 +26,7 @@ import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,7 +95,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
         }
         return snapshots.stream()
                 .filter(snapshot -> isNotBlank(snapshot.getInternalId())
-                        && snapshot.getInternalId().equals(internalId))
+                        && Objects.equals(internalId, snapshot.getInternalId()))
                 .findFirst()
                 .orElse(null);
     }
@@ -137,7 +138,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
             return null;
         }
         return snapshot.getAttachedAlgoOrders().stream()
-                .filter(item -> isNotBlank(item.getInternalId()) && item.getInternalId().equals(internalId))
+                .filter(item -> isNotBlank(item.getInternalId()) && Objects.equals(internalId, item.getInternalId()))
                 .findFirst()
                 .orElse(null);
     }

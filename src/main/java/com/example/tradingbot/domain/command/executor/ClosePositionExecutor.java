@@ -48,15 +48,15 @@ public class ClosePositionExecutor implements CommandExecutor {
         ClosePositionCommandPayload payload = (ClosePositionCommandPayload) command.getPayload();
         Position position = positionDataService.getRequiredById(payload.getPositionId());
         ExchangeAck ack = integrationService.closePosition(dealContext.getInstrument().getExternalId(), null);
+        if (isFalse(ack.getSuccess())) {
+            return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR, ack.getMessage());
+        }
         if (isNull(position.getCloseReason())) {
             position.setCloseReason(payload.getRequestedCloseReason());
             positionDataService.save(position);
         }
         actionState.setStatus(DealActionStateStatus.SUBMITTED);
         dealActionStateDataService.save(actionState);
-        if (isFalse(ack.getSuccess())) {
-            return ServiceCommandExecutionResult.failure(RuntimeErrorCode.EXCHANGE_ERROR, ack.getMessage());
-        }
         return ServiceCommandExecutionResult.ok();
     }
 }

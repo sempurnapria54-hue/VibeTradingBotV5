@@ -87,13 +87,29 @@ public class KillSwitchExecutor implements CommandExecutor {
     private void cancelLiveOrders(Deal deal, String instId) {
         safe(deal.getOrders()).stream()
                 .filter(order -> isTrue(order.isLive()))
-                .forEach(order -> integrationService.cancelOrder(order, instId));
+                .forEach(order -> cancelOrderBestEffort(order, instId));
+    }
+
+    private void cancelOrderBestEffort(Order order, String instId) {
+        try {
+            integrationService.cancelOrder(order, instId);
+        } catch (RuntimeException e) {
+            log.warn("Kill-switch cancel-order best-effort failure orderId={}: {}", order.getId(), e.getMessage());
+        }
     }
 
     private void cancelLiveAlgoOrders(Deal deal, String instId) {
         safe(deal.getAlgoOrders()).stream()
                 .filter(algoOrder -> isTrue(algoOrder.isLive()))
-                .forEach(algoOrder -> integrationService.cancelAlgoOrder(algoOrder, instId));
+                .forEach(algoOrder -> cancelAlgoBestEffort(algoOrder, instId));
+    }
+
+    private void cancelAlgoBestEffort(AlgoOrder algoOrder, String instId) {
+        try {
+            integrationService.cancelAlgoOrder(algoOrder, instId);
+        } catch (RuntimeException e) {
+            log.warn("Kill-switch cancel-algo best-effort failure algoOrderId={}: {}", algoOrder.getId(), e.getMessage());
+        }
     }
 
     private <T> List<T> safe(List<T> list) {

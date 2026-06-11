@@ -38,3 +38,6 @@ create table balances (
     external_modified_at      timestamptz,
     constraint fk_balance_container foreign key (balance_container_id) references balance_containers (id)
 );
+
+-- Индекс под findByBalanceContainerId / deleteByBalanceContainerId (replace на каждый REFRESH_BALANCE).
+create index ix_balance_container on balances (balance_container_id);

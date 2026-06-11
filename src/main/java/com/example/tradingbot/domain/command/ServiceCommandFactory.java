@@ -18,6 +18,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTra
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.Condition;
 import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.util.Constants;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 
@@ -155,7 +156,7 @@ public class ServiceCommandFactory {
     }
 
     private String toSide(StrategyTradeDirection direction) {
-        return StrategyTradeDirection.LONG.equals(direction) ? "buy" : "sell";
+        return StrategyTradeDirection.LONG.equals(direction) ? Constants.Okx.SIDE_BUY : Constants.Okx.SIDE_SELL;
     }
 
     private AlgoOrder.Direction closeDirection(StrategyTradeDirection dealDirection) {

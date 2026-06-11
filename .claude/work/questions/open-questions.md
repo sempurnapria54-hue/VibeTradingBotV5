@@ -67,7 +67,9 @@ ER/ATR-входы) **закрыт** 2026-06-10 реверсом ключеван
 refresh-команд) закрыт 2026-06-10 (steer): refresh-набор — ровно по одной
 команде на сущность, bulk-команды сняты из enum'а; открыт **CMD-Q4**
 (перечисление неизвестных live orders/algo по инструменту — дыра от снятия
-bulk).
+bulk). Из разбора ревью шага 4 (2026-06-12) открыты **CMD-Q5** (место
+правила порядка ног REPLACE) и **CMD-Q6** (граница «действие стратегии vs
+`ServiceCommand`» + классификация `KILL_SWITCH`) — оба парк на шаги 6-7.
 
 История закрытых вопросов пайплайна:
 
@@ -313,6 +315,48 @@ Precheck/AnomalyJob учесть легитимное **окно двойной 
 `docs/components/PrecheckHandler.md`, `docs/components/AnomalyJob.md`,
 `docs/components/ServiceCommandExecutor.md`,
 `docs/components/IntegrationService.md`.
+
+### CMD-Q5. Место правила порядка ног REPLACE (фабрика vs оркестрационная петля) — решать на 6-7
+
+Правило порядка ног REPLACE по риск-классу (protective: place-new →
+подтверждение фактом → cancel-old; entry: cancel-old → подтверждение
+терминала → place-new) уже зафиксировано в
+`docs/decisions/replace-not-amend.md`. Открыто: **где живёт этот маппинг**
+— в `ServiceCommandFactory` (шаг 4) или появляется вместе с
+оркестрационной петлёй (шаги 6-7).
+
+Отложено к 6-7: без петли правило в командном слое **никто не вызывает**
+(был бы мёртвый код). На `CODE` шага 4 это и отражено —
+`ServiceCommandFactory.initialCommand` для `CANCEL`/`REPLACE` возвращает
+`Optional.empty()` (forward-debt, `.claude/work/backlog.md` §Хвост шага 4).
+
+Развилка для 6-7: (1) правило порядка ног — в `ServiceCommandFactory`;
+(2) правило и петля появляются **вместе** (оркестратор владеет секвенсом
+ног по фактам). Решать на **6-7**, когда оркестрация станет конкретной.
+Связано: `docs/decisions/replace-not-amend.md`,
+`docs/components/ServiceCommandFactory.md`,
+`docs/components/ServiceCommandExecutor.md`,
+`.claude/work/backlog.md` §Хвост шага 4.
+
+### CMD-Q6. Граница «действие стратегии vs `ServiceCommand`»; классификация `KILL_SWITCH` — решать на 6-7
+
+REPLACE смоделирован как **действие стратегии** (оркестрация атомарных
+команд по фактам, `docs/decisions/replace-not-amend.md`), а `KILL_SWITCH`
+— как **одна команда** (`KillSwitchExecutor`) с внутренним многошаговым
+teardown (close → cancel orders → cancel algos → безусловный финальный
+close), хотя по той же логике он тоже **компаунд над атомарными
+командами**. Принцип границы между слоями (что — действие-оркестрация,
+что — команда с внутренними шагами) не сформулирован.
+
+Открыто: сформулировать принцип «действие vs команда» и
+классифицировать `KILL_SWITCH` по нему. Возможное оправдание текущей
+модели — аварийный teardown как **синхронный fire-all** (снять риск
+максимально быстро, без оркестрации по фактам и ожидания подтверждений),
+тогда как REPLACE — оркестрация по фактам. Владелец — `solution-designer`.
+Решать на **6-7**, когда оркестрация станет конкретной.
+Связано: `docs/decisions/replace-not-amend.md`,
+`docs/components/KillSwitchExecutor.md`,
+`docs/components/ServiceCommandFactory.md`, CMD-Q5.
 
 ### OKX-Q1. Persisted `TradeFill` модель и executor финализации
 

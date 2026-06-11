@@ -49,15 +49,15 @@ public class CancelAlgoOrderExecutor implements CommandExecutor {
         AlgoOrder algoOrder = algoOrderDataService.getRequiredById(payload.getAlgoOrderId());
         ExchangeAck ack = integrationService.cancelAlgoOrder(algoOrder,
                 dealContext.getInstrument().getExternalId());
+        if (isFalse(ack.getSuccess())) {
+            return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR, ack.getMessage());
+        }
         if (isNull(algoOrder.getCloseReason())) {
             algoOrder.setCloseReason(payload.getCancelReason());
             algoOrderDataService.save(algoOrder);
         }
         actionState.setStatus(DealActionStateStatus.SUBMITTED);
         dealActionStateDataService.save(actionState);
-        if (isFalse(ack.getSuccess())) {
-            return ServiceCommandExecutionResult.failure(RuntimeErrorCode.EXCHANGE_ERROR, ack.getMessage());
-        }
         return ServiceCommandExecutionResult.ok();
     }
 }

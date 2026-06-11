@@ -36,3 +36,14 @@ calculated-RVO (`CalculatedStrategyAction`, `CalculatedPrice`,
 `CalculatedRiskMetrics`: метрики для решения `ALLOWED / WARNING / BLOCKED`
 считаются внутри risk-layer (см.
 `docs/components/models/RiskCheckResult.md`).
+
+## Статус кода (шаг 4)
+
+На шаге 4 (командный слой) `CalculatedStrategyAction` / `CalculatedPrice`
+/ `CalculatedSize` материализованы в коде как **минимальные
+command-facing заглушки** (`domain.command.calc`) — ровно то, что
+потребляет `ServiceCommandFactory` (sourceAction, цена + sendToExchange,
+sizeContracts). Полная структура (`StrategyPricePurpose`, набор цен,
+разложение sizing) и производящий `StrategyActionCalculator` — **шаг 5**
+(риск-преконтроль/расчёт). До шага 5 фабрика собирает algo-`Condition`
+только с `type`; рассчитанные SL/TP/trailing-цены придут с калькулятором.

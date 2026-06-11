@@ -17,6 +17,7 @@ import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.integration.service.ControlledExchangeException;
+import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,13 @@ public class ServiceCommandExecutor {
     }
 
     private RuntimeErrorCode classify(RuntimeException e) {
+        // ControlledExchangeException (NotFound / Status / InvariantViolation) — внешний факт
+        // говорит «не продолжать»: терминал, не ретраим (см. controlled-exchange-exceptions).
         if (e instanceof ControlledExchangeException) {
+            return RuntimeErrorCode.VALIDATION_ERROR;
+        }
+        // Транспорт / API-сбой биржи — ретраим.
+        if (e instanceof ExchangeIntegrationException) {
             return RuntimeErrorCode.EXCHANGE_ERROR;
         }
         return RuntimeErrorCode.INTERNAL_ERROR;

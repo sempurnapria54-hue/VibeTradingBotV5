@@ -144,7 +144,6 @@ public class OkxIntegrationService implements IntegrationService {
         PlaceOrderOkxRequest request = orderMapper.domainToPlaceRequest(order, externalInstrumentId);
         OkxApiResponse<OrderAckOkxResponse> response = execute(() -> okxRestClient.placeOrder(request),
                 "place-order", "instId=" + externalInstrumentId + " clOrdId=" + order.getInternalId());
-        verifyCode(response, "place-order", "instId=" + externalInstrumentId);
         return toOrderAck(response, "place-order", externalInstrumentId);
     }
 
@@ -153,7 +152,6 @@ public class OkxIntegrationService implements IntegrationService {
         CancelOrderOkxRequest request = orderMapper.domainToCancelRequest(order, externalInstrumentId);
         OkxApiResponse<OrderAckOkxResponse> response = execute(() -> okxRestClient.cancelOrder(request),
                 "cancel-order", "instId=" + externalInstrumentId + " ordId=" + order.getExternalId());
-        verifyCode(response, "cancel-order", "instId=" + externalInstrumentId);
         return toOrderAck(response, "cancel-order", externalInstrumentId);
     }
 
@@ -162,7 +160,6 @@ public class OkxIntegrationService implements IntegrationService {
         PlaceAlgoOrderOkxRequest request = algoOrderMapper.domainToPlaceRequest(algoOrder, externalInstrumentId);
         OkxApiResponse<AlgoOrderAckOkxResponse> response = execute(() -> okxRestClient.placeAlgoOrder(request),
                 "place-algo", "instId=" + externalInstrumentId + " algoClOrdId=" + algoOrder.getInternalId());
-        verifyCode(response, "place-algo", "instId=" + externalInstrumentId);
         return toAlgoAck(response, "place-algo", externalInstrumentId);
     }
 
@@ -175,7 +172,6 @@ public class OkxIntegrationService implements IntegrationService {
                         ? okxRestClient.cancelAdvanceAlgos(body)
                         : okxRestClient.cancelAlgos(body),
                 "cancel-algo", "instId=" + externalInstrumentId + " algoId=" + algoOrder.getExternalId());
-        verifyCode(response, "cancel-algo", "instId=" + externalInstrumentId);
         return toAlgoAck(response, "cancel-algo", externalInstrumentId);
     }
 
@@ -189,8 +185,7 @@ public class OkxIntegrationService implements IntegrationService {
         request.setAutoCxl(Boolean.TRUE);
         OkxApiResponse<OrderAckOkxResponse> response = execute(() -> okxRestClient.closePosition(request),
                 "close-position", "instId=" + externalInstrumentId);
-        verifyCode(response, "close-position", "instId=" + externalInstrumentId);
-        return ExchangeAck.builder().success(Boolean.TRUE).build();
+        return toOrderAck(response, "close-position", externalInstrumentId);
     }
 
     @Override
@@ -205,20 +200,34 @@ public class OkxIntegrationService implements IntegrationService {
         return balanceContainerMapper.integrationToSnapshot(response.getData().getFirst());
     }
 
+    /**
+     * Write-ack из ответа OKX. Пустой {@code data} (или null response) =
+     * transport/system-ошибка (auth/rate-limit/5xx) → бросаем retryable
+     * {@link ExchangeIntegrationException} с реальными code/msg. Непустой
+     * {@code data} = бизнес-исход: {@code success} выводится из
+     * per-order {@code sCode} (бизнес-реджект → success=false ack, не
+     * throw — не runtime truth, см. ack-not-runtime-truth).
+     */
     private ExchangeAck toOrderAck(OkxApiResponse<OrderAckOkxResponse> response, String endpoint, String instId) {
-        if (isEmpty(response.getData())) {
-            log.error("OKX empty ack [{}] instId={}", endpoint, instId);
-            throw new ExchangeIntegrationException("OKX empty ack [" + endpoint + "] instId=" + instId);
+        if (isNull(response) || isEmpty(response.getData())) {
+            throw writeFailure(response, endpoint, instId);
         }
         return orderMapper.integrationToAck(response.getData().getFirst());
     }
 
     private ExchangeAck toAlgoAck(OkxApiResponse<AlgoOrderAckOkxResponse> response, String endpoint, String instId) {
-        if (isEmpty(response.getData())) {
-            log.error("OKX empty ack [{}] instId={}", endpoint, instId);
-            throw new ExchangeIntegrationException("OKX empty ack [" + endpoint + "] instId=" + instId);
+        if (isNull(response) || isEmpty(response.getData())) {
+            throw writeFailure(response, endpoint, instId);
         }
         return algoOrderMapper.integrationToAck(response.getData().getFirst());
+    }
+
+    private ExchangeIntegrationException writeFailure(OkxApiResponse<?> response, String endpoint, String instId) {
+        String code = isNull(response) ? "null" : response.getCode();
+        String msg = isNull(response) ? "null response" : response.getMsg();
+        log.error("OKX write failed [{}] instId={} code={} msg={}", endpoint, instId, code, msg);
+        return new ExchangeIntegrationException("OKX write failed [" + endpoint + "] instId=" + instId
+                + " code=" + code + " msg=" + msg);
     }
 
     /** Advance-семья (trailing/move_order_stop) → cancel-advance-algos; иначе ordinary cancel-algos. */

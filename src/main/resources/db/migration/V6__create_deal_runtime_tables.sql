@@ -151,3 +151,10 @@ create table deal_action_states (
     constraint fk_deal_action_state_strategy_action foreign key (strategy_action_id)
         references strategy_actions (id)
 );
+
+-- Индексы под горячие FK-выборки runtime-графа (загрузка ордеров/algo сделки,
+-- attached по ордеру). positions.deal_id покрыт uk_position_deal;
+-- deal_action_states.deal_id — префиксом uk_deal_action_state_deal_action.
+create index ix_order_deal on orders (deal_id);
+create index ix_attached_algo_order_order on attached_algo_orders (order_id);
+create index ix_algo_order_deal on algo_orders (deal_id);

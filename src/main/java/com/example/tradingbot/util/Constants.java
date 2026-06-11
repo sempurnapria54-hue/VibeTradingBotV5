@@ -134,6 +134,12 @@ public final class Constants {
         /** Adapter-константа стороны позиции (net-режим). */
         public static final String POS_SIDE_NET = "net";
 
+        /** Сторона ордера OKX: покупка. */
+        public static final String SIDE_BUY = "buy";
+
+        /** Сторона ордера OKX: продажа. */
+        public static final String SIDE_SELL = "sell";
+
         /** Тип ордера OKX: лимитный. */
         public static final String ORD_TYPE_LIMIT = "limit";
 

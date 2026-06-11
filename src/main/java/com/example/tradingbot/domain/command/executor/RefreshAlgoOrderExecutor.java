@@ -23,6 +23,7 @@ import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,7 +94,7 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
         }
         return snapshots.stream()
                 .filter(snapshot -> isNotBlank(snapshot.getInternalId())
-                        && snapshot.getInternalId().equals(internalId))
+                        && Objects.equals(internalId, snapshot.getInternalId()))
                 .findFirst()
                 .orElse(null);
     }
