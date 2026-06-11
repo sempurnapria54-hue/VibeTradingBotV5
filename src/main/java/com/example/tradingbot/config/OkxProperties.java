@@ -20,4 +20,16 @@ public class OkxProperties {
 
     /** Демо-флаг: "1" → header x-simulated-trading (demo trading); пусто → production. */
     private String simulated;
+
+    /**
+     * API-ключ OKX для приватных endpoint'ов. Интерим до Vault-
+     * конфигурации шага 9; в коммит не попадает (задаётся локально/env).
+     */
+    private String apiKey;
+
+    /** Секрет API-ключа OKX (HMAC-подпись). Интерим, не коммитится. */
+    private String secret;
+
+    /** Passphrase API-ключа OKX. Интерим, не коммитится. */
+    private String passphrase;
 }

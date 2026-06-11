@@ -26,10 +26,10 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
     /** Стабильный ключ действия в рамках StrategyDetail. */
     private String key;
 
-    /** Ключ target-действия для AMEND/CANCEL; для CREATE null. */
+    /** Ключ target-действия для REPLACE/CANCEL; для CREATE null. */
     private String targetActionKey;
 
-    /** Тип действия: CREATE/AMEND/CANCEL. */
+    /** Тип действия: CREATE/REPLACE/CANCEL. */
     private StrategyActionType actionType;
 
     /** Тип условия срабатывания algo-order. */

@@ -44,6 +44,18 @@ public final class Constants {
         /** Заголовок demo-окружения OKX (header x-simulated-trading). */
         public static final String SIMULATED_HEADER = "x-simulated-trading";
 
+        /** Заголовок OKX: API-ключ (приватные endpoint'ы). */
+        public static final String ACCESS_KEY_HEADER = "OK-ACCESS-KEY";
+
+        /** Заголовок OKX: подпись запроса (base64 HMAC-SHA256). */
+        public static final String ACCESS_SIGN_HEADER = "OK-ACCESS-SIGN";
+
+        /** Заголовок OKX: метка времени запроса (ISO-8601, мс UTC). */
+        public static final String ACCESS_TIMESTAMP_HEADER = "OK-ACCESS-TIMESTAMP";
+
+        /** Заголовок OKX: passphrase API-ключа. */
+        public static final String ACCESS_PASSPHRASE_HEADER = "OK-ACCESS-PASSPHRASE";
+
         /** Путь спецификации инструментов. */
         public static final String INSTRUMENTS_PATH = "/api/v5/public/instruments";
 
@@ -52,6 +64,84 @@ public final class Constants {
 
         /** Путь истории свечей. */
         public static final String HISTORY_CANDLES_PATH = "/api/v5/market/history-candles";
+
+        /** Путь ordinary order (place POST / get GET). Приватный endpoint. */
+        public static final String TRADE_ORDER_PATH = "/api/v5/trade/order";
+
+        /** Путь позиций аккаунта (GET). Приватный endpoint. */
+        public static final String ACCOUNT_POSITIONS_PATH = "/api/v5/account/positions";
+
+        /** Путь отмены ordinary order (POST). Приватный endpoint. */
+        public static final String TRADE_CANCEL_ORDER_PATH = "/api/v5/trade/cancel-order";
+
+        /** Путь закрытия позиции (POST). Приватный endpoint. */
+        public static final String TRADE_CLOSE_POSITION_PATH = "/api/v5/trade/close-position";
+
+        /** Путь баланса аккаунта (GET). Приватный endpoint. */
+        public static final String ACCOUNT_BALANCE_PATH = "/api/v5/account/balance";
+
+        /** Путь исполнений (fills, последние 3 дня, GET). Приватный endpoint. */
+        public static final String TRADE_FILLS_PATH = "/api/v5/trade/fills";
+
+        /** Путь истории исполнений (fills, последние 3 месяца, GET). Приватный endpoint. */
+        public static final String TRADE_FILLS_HISTORY_PATH = "/api/v5/trade/fills-history";
+
+        /** Путь live/pending ordinary orders (GET). Звено order evidence-cycle. */
+        public static final String TRADE_ORDERS_PENDING_PATH = "/api/v5/trade/orders-pending";
+
+        /** Путь истории ordinary orders (GET, 7 дней). Звено order evidence-cycle. */
+        public static final String TRADE_ORDERS_HISTORY_PATH = "/api/v5/trade/orders-history";
+
+        /** Путь live/pending algo orders (GET). Звено algo evidence-cycle. */
+        public static final String TRADE_ORDERS_ALGO_PENDING_PATH = "/api/v5/trade/orders-algo-pending";
+
+        /** Путь истории algo orders (GET). Звено algo evidence-cycle. */
+        public static final String TRADE_ORDERS_ALGO_HISTORY_PATH = "/api/v5/trade/orders-algo-history";
+
+        /** Имя query-параметра ordType (тип algo-order для pending/history). */
+        public static final String PARAM_ORD_TYPE = "ordType";
+
+        /** Путь standalone algo-order (place POST / get GET). Приватный endpoint. */
+        public static final String TRADE_ORDER_ALGO_PATH = "/api/v5/trade/order-algo";
+
+        /** Путь отмены ordinary algo-семьи (conditional/oco/trigger). Приватный endpoint. */
+        public static final String TRADE_CANCEL_ALGOS_PATH = "/api/v5/trade/cancel-algos";
+
+        /** Путь отмены advance algo-семьи (trailing/move_order_stop). Приватный endpoint. */
+        public static final String TRADE_CANCEL_ADVANCE_ALGOS_PATH = "/api/v5/trade/cancel-advance-algos";
+
+        /** Тип algo-order OKX: conditional (SL/TP/partial). */
+        public static final String ALGO_ORD_TYPE_CONDITIONAL = "conditional";
+
+        /** Тип algo-order OKX: OCO. */
+        public static final String ALGO_ORD_TYPE_OCO = "oco";
+
+        /** Тип algo-order OKX: trailing (move_order_stop). */
+        public static final String ALGO_ORD_TYPE_MOVE_STOP = "move_order_stop";
+
+        /** Флаг исполнения ноги market после trigger (slOrdPx/tpOrdPx). */
+        public static final String MARKET_PRICE_FLAG = "-1";
+
+        /** Имя query/body-параметра algoId (биржевой algo id). */
+        public static final String PARAM_ALGO_ID = "algoId";
+
+        /** Имя query/body-параметра algoClOrdId (stable client algo id). */
+        public static final String PARAM_ALGO_CL_ORD_ID = "algoClOrdId";
+
+        /** Adapter-константа режима маржи. */
+        public static final String TD_MODE_ISOLATED = "isolated";
+
+        /** Adapter-константа стороны позиции (net-режим). */
+        public static final String POS_SIDE_NET = "net";
+
+        /** Тип ордера OKX: лимитный. */
+        public static final String ORD_TYPE_LIMIT = "limit";
+
+        /** Тип ордера OKX: рыночный. */
+        public static final String ORD_TYPE_MARKET = "market";
+
+        /** Метка запросов бота (tag). */
+        public static final String ORDER_TAG = "tb";
 
         /** Имя query-параметра instType. */
         public static final String PARAM_INST_TYPE = "instType";
@@ -67,6 +157,15 @@ public final class Constants {
 
         /** Имя query-параметра limit. */
         public static final String PARAM_LIMIT = "limit";
+
+        /** Имя query/body-параметра ordId (биржевой id ордера). */
+        public static final String PARAM_ORD_ID = "ordId";
+
+        /** Имя query/body-параметра clOrdId (stable client id). */
+        public static final String PARAM_CL_ORD_ID = "clOrdId";
+
+        /** Имя query-параметра ccy (валюта). */
+        public static final String PARAM_CCY = "ccy";
 
         /** Таймфрейм OKX: 1 минута. */
         public static final String BAR_ONE_MINUTE = "1m";

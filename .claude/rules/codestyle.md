@@ -232,6 +232,19 @@ audit-поля проставляет persistence (JPA auditing); биржевы
   явный `ignore`. Непокрытые целевые поля гасим на уровне маппера
   `unmappedTargetPolicy = ReportingPolicy.IGNORE`, а не списком
   `@Mapping(..., ignore = true)` для каждого совпадающего поля.
+- **Обновление сущности из снапшота — маппером, не вызывающим
+  кодом.** Перенос полей `*ExternalSnapshot` → доменную сущность (при
+  `REFRESH`-контуре и т. п.) делает маппер методом
+  `updateFromSnapshot(snapshot, @MappingTarget entity)` (MapStruct,
+  `@BeanMapping(nullValuePropertyMappingStrategy = IGNORE)` — не
+  затирать существующие значения null'ами). Исполнитель/сервис не
+  копирует поля сущности вручную (`setX(snapshot.getX())`).
+- **Резолв доменного статуса — не в маппере, а в вызывающем коде.**
+  Перевод внешнего статуса в доменный (`*ExternalStatusResolver`),
+  применение `closeReason` write-once и ERROR-обработка
+  (controlled exceptions) — это интерпретация фактов и оркестрация,
+  остаётся в исполнителе/сервисе. Маппер делает только перенос
+  данных, доменных решений не принимает.
 
 ## Lombok
 

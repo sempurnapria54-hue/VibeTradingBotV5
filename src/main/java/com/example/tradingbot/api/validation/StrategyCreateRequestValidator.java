@@ -72,7 +72,7 @@ import org.springframework.web.server.ResponseStatusException;
  * ключей настроек/действий, разрешённость ссылок в рамках детали,
  * «ровно одна деталь на каждую фазу», матрица политика×фаза,
  * sanity warmup-override, минимальный per-ruleType контракт операндов
- * (дозаполняется инкрементально). Семантика действий (AMEND/CANCEL ↔
+ * (дозаполняется инкрементально). Семантика действий (REPLACE/CANCEL ↔
  * виды, CLOSE_FULL, partial-exit) и торгово-суждённые диапазоны —
  * отложены до шагов 4/7 / activate (422):
  * docs/decisions/strategy-materialization-and-validation.md.

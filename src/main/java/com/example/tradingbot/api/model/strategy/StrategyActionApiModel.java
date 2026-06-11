@@ -30,11 +30,11 @@ public abstract class StrategyActionApiModel {
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String key;
 
-    @Schema(description = "Ключ действия, создавшего runtime-сущность (для AMEND/CANCEL); для CREATE пусто")
+    @Schema(description = "Ключ действия, создавшего runtime-сущность (для REPLACE/CANCEL); для CREATE пусто")
     private String targetActionKey;
 
     @NotBlank
-    @Schema(description = "Тип действия: CREATE/AMEND/CANCEL (POSITION — CLOSE_FULL)",
+    @Schema(description = "Тип действия: CREATE/REPLACE/CANCEL (POSITION — CLOSE_FULL)",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String actionType;
 

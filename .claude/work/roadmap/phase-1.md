@@ -27,7 +27,7 @@ production-flow одной стратегии.
 | 1 | Поток рыночных данных (коннект к OKX, инструменты, цены/свечи, свежесть) | DONE |
 | 2 | Стратегия (абстракция: объявляет нужные индикаторы и условие сигнала; одна реализация) | DONE |
 | 3 | Производные рыночные данные: индикаторы + структура рынка (`MarketStructure`) + фаза рынка (`MarketPhase`) — jobs, модели, сервисы (расчёт/чтение/сохранение значений, запрошенных стратегией) | DONE |
-| 4 | Команды и их жизненный цикл (ServiceCommand: submit/replace/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DOCS_CHECK_5 |
+| 4 | Команды и их жизненный цикл (ServiceCommand: submit/replace/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | CODE |
 | 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | HOLD |
 | 6 | FSM (состояния и переходы сущностей — связующее звено) | HOLD |
 | 7 | Сделки и P&L (DealOrchestratorJob — агрегирование в Deal, P&L; он же оркестрирует торговый цикл сигнал→команда→позиция) | HOLD |
@@ -300,6 +300,21 @@ production-flow одной стратегии.
   пользователем. Вне гейта: И-2 (ждёт кредов demo), CMD-Q4, RISK-Q1/Q2,
   OKX-Q1/Q2/Q3. Отчёт —
   `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-docs-check-5.md`.
+- **Шаг 4 → `CODE` (2026-06-11):** концепт-гейт пройден, шаг переведён в
+  `CODE` (пользователь). CODE-фаза нарезается инкрементами по зависимостям
+  (ревью + компиляция между крупными): **(1) REPLACE-only дельта к
+  существующему коду — исполнена** (`StrategyActionType` AMEND→REPLACE +
+  согласование javadoc/`@Schema`/json-примера; grep — без остаточных
+  amend-токенов кроме note-of-removal в enum; `mvn compile` чисто на
+  JDK 25); (2) командное ядро (`ServiceCommand` / `ServiceCommandType` 17 /
+  `ServiceCommandPayload`-маркер; `DealActionState` + `RuntimeTarget` +
+  `Retryable` / `RetryError` / `RuntimeErrorCode`); (3) дозревание
+  `Order` / `AlgoOrder` / `Position` до полных моделей (сейчас —
+  скелеты-енумы, `Position.java` отсутствует); (4) persistence + mapping +
+  Flyway; (5) `IntegrationService`-команды OKX; (6) резолверы статусов;
+  (7) исполнители + `ServiceCommandExecutor` + `RetryPolicyService`;
+  (8) `ServiceCommandFactory`. FSM-handlers / `DealStateMachine` /
+  оркестратор / risk-преконтроль / `AnomalyJob` — шаги 5-8, не в этом шаге.
 - **Шаг 2, фиксация задним числом:** между `GAPS_CLOSE_7` и
   `DOCS_CHECK_8` пройден повторный под-шаг `TOOLING` (торговый
   совет: агент `trading-specialist`, дистиллят корпуса

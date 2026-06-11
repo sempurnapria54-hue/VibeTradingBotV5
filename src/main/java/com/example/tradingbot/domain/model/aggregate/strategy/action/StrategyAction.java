@@ -20,7 +20,7 @@ public interface StrategyAction {
     String getKey();
 
     /**
-     * Ключ действия, создавшего runtime-сущность, — для AMEND/CANCEL;
+     * Ключ действия, создавшего runtime-сущность, — для REPLACE/CANCEL;
      * для CREATE null. При сохранении резолвится во внутреннюю ссылку.
      */
     String getTargetActionKey();

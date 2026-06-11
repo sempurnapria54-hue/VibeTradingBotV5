@@ -220,7 +220,7 @@
                 "actionKind": "ALGO_ORDER",
                 "key": "bull_sl_to_breakeven",
                 "targetActionKey": "bull_protection_oco",
-                "actionType": "AMEND",
+                "actionType": "REPLACE",
                 "conditionType": "OCO_FULL",
                 "level": 1,
                 "stopLossSettings": {
@@ -407,7 +407,7 @@
                 "actionKind": "ALGO_ORDER",
                 "key": "bear_sl_to_breakeven",
                 "targetActionKey": "bear_protection_oco",
-                "actionType": "AMEND",
+                "actionType": "REPLACE",
                 "conditionType": "OCO_FULL",
                 "level": 1,
                 "stopLossSettings": {

@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Ожидаемое действие над ordinary order (вход / правка / отмена).
+ * Ожидаемое действие над ordinary order (вход / ремодел / отмена).
  * Доменное намерение positionReducingOnly остаётся в strategy-layer;
  * OKX reduceOnly — только client/adapter-поле. См.
  * docs/models/domain/aggregate/Strategy.md (§StrategyOrderAction).
@@ -24,10 +24,10 @@ public class StrategyOrderAction extends Auditable implements StrategyAction {
     /** Стабильный ключ действия в рамках StrategyDetail. */
     private String key;
 
-    /** Ключ target-действия для AMEND/CANCEL; для CREATE null. */
+    /** Ключ target-действия для REPLACE/CANCEL; для CREATE null. */
     private String targetActionKey;
 
-    /** Тип действия: CREATE/AMEND/CANCEL. */
+    /** Тип действия: CREATE/REPLACE/CANCEL. */
     private StrategyActionType actionType;
 
     /** Бизнес-тип ордера: ENTRY / ENTRY_ATTACHED_STOP_LOSS. */
