@@ -1,13 +1,13 @@
 
 # Local env (do not commit)
-.env.local
+.env.prod.local
+.env.test.local
 /target/
 .idea/
 .docs/planing
 .m2/
 
 # Claude Code — user-local settings (per-machine)
-.claude-archive/2026-05-21/.claude/settings.local.json
 .claude-archive/2026-05-21/.claude/settings.local.json
 /.claude/settings.local.json
 /.claude/library/trading/raw/

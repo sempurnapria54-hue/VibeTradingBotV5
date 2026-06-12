@@ -5,10 +5,11 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Конфигурация интеграции с OKX. Шаг 1 использует только публичные
- * endpoint'ы — ключи/секреты не нужны (вводятся с приватными
- * операциями и на шаге 9 «Безопасность»). URL выбирается по региону
- * и конфигурируется извне (docs/integrations/okx/contracts/service-urls.md).
+ * Конфигурация интеграции с OKX. Приватные креды (apiKey/secret/passphrase)
+ * читаются из Vault per-profile (secret/tradingbot/okx[-test]), как
+ * datasource; шаг 9 «Безопасность» — остаточный хардненинг, не ввод
+ * секретов. URL выбирается по региону и конфигурируется извне
+ * (docs/integrations/okx/contracts/service-urls.md).
  */
 @Getter
 @Setter
@@ -22,14 +23,15 @@ public class OkxProperties {
     private String simulated;
 
     /**
-     * API-ключ OKX для приватных endpoint'ов. Интерим до Vault-
-     * конфигурации шага 9; в коммит не попадает (задаётся локально/env).
+     * API-ключ OKX для приватных endpoint'ов. Читается из Vault
+     * (secret/tradingbot/okx[-test], ключ OKX_API_KEY) per-profile; в коммит
+     * не попадает.
      */
     private String apiKey;
 
-    /** Секрет API-ключа OKX (HMAC-подпись). Интерим, не коммитится. */
+    /** Секрет API-ключа OKX (HMAC-подпись). Из Vault (ключ OKX_SECRET_KEY), не коммитится. */
     private String secret;
 
-    /** Passphrase API-ключа OKX. Интерим, не коммитится. */
+    /** Passphrase API-ключа OKX. Из Vault (ключ OKX_PASSPHRASE), не коммитится. */
     private String passphrase;
 }

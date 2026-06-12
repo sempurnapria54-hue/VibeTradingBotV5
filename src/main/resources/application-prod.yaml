@@ -1,0 +1,57 @@
+# Профиль prod: Vault-пути secret/tradingbot/postgres (datasource) +
+# secret/tradingbot/okx (OKX-креды). Ключи секретов (заполняет пользователь):
+# postgres → DATASOURCE_URL / DATASOURCE_USERNAME / DATASOURCE_PASSWORD (URL → :5440);
+# okx → OKX_API_KEY / OKX_SECRET_KEY / OKX_PASSPHRASE.
+spring:
+  config:
+    import:
+      - vault://secret/tradingbot/postgres
+      - vault://secret/tradingbot/okx
+  datasource:
+    url: ${DATASOURCE_URL}
+    username: ${DATASOURCE_USERNAME}
+    password: ${DATASOURCE_PASSWORD}
+
+okx:
+  # prod — реальный трейдинг: simulated пусто (header x-simulated-trading не demo).
+  simulated: ${OKX_SIMULATED:}
+
+# Загрузка свечей (docs/processes/candle-loading.md). Числа
+# конфигурируемы, проставляются на CODE.
+candle-loading:
+  # Выключатель джобы загрузки свечей (CandleJob).
+  enabled: ${CANDLE_JOB_ENABLED:true}
+  # Период тика CandleJob (CRON), порядка раза в минуту.
+  cron: ${CANDLE_JOB_CRON:0 * * * * *}
+  # Лимит свечей в одном запросе OKX history-candles (max 100).
+  page-size: 100
+  # Число попыток REPAIR до перевода группы в ERROR.
+  max-repair-attempts: 5
+  # Перекрытие хвоста при SYNC (число последних баров перезапрашивается).
+  sync-overlap-bars: 3
+  # Дефолтный плановый горизонт истории (UTC мс) при онбординге
+  # инструмента, если не задан явно.
+  default-planned-start-date: ${CANDLE_DEFAULT_PLANNED_START:0}
+  # Таймфреймы, под которые заводятся группы свечей инструмента.
+  # На шаге 1 (без стратегии) — из конфига; со стратегией (шаг 2) —
+  # из запрошенных стратегией индикаторов.
+  timeframes:
+    - ONE_HOUR
+
+# Расчёт производных рыночных данных (docs/processes/market-data-calculation.md):
+# индикаторы → структура → фаза. По джобе — выключатель и CRON;
+# идемпотентность и чтение-последнего обеспечивают сходимость порядка
+# между jobs. candle-window-bars — потолок недавнего окна свечей,
+# грузимого в расчёт (защита от тяжёлых запросов по всей истории).
+market-data:
+  candle-window-bars: ${MARKET_DATA_CANDLE_WINDOW_BARS:1500}
+  indicator:
+    enabled: ${INDICATOR_JOB_ENABLED:true}
+    cron: ${INDICATOR_JOB_CRON:0 * * * * *}
+  structure:
+    enabled: ${MARKET_STRUCTURE_JOB_ENABLED:true}
+    cron: ${MARKET_STRUCTURE_JOB_CRON:0 * * * * *}
+
+logging:
+  level:
+    com.example.tradingbot: INFO

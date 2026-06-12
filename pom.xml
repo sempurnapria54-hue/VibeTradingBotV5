@@ -7,9 +7,12 @@
       Стек по концепции (tech-radar): Java 25 + Spring Boot 4 + PostgreSQL.
       ВНИМАНИЕ: точные координаты SB4 / springdoc / lombok / mapstruct под
       Java 25 подлежат проверке при настройке тулчейна (JDK 25 + SB4 в IDEA).
-      Vault/секреты (spring-cloud-vault) и Spring Security вводятся на шаге 9
-      «Безопасность», здесь намеренно отсутствуют (tech-radar: по потребности
-      шага, не превентивно).
+      spring-cloud-vault введён раньше шага 9 — по потребности: per-profile
+      (prod/test) datasource читает креды из своего KV-пути Vault
+      (tradingbot/postgres, tradingbot/postgres-test). Spring Security и
+      остальная инфраструктура безопасности — по-прежнему на шаге 9.
+      Координаты Spring Cloud под SB4: release train 2025.1.x
+      (2025.1.2 → spring-boot 4.0.x, spring-cloud-vault 5.x).
     -->
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -30,12 +33,54 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <springdoc.version>3.0.0</springdoc.version>
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!--
+          Boot 4.0 разнёс монолитный spring-boot-autoconfigure на модули.
+          RestClient.Builder (клиентский автоконфиг RestClientAutoConfiguration)
+          переехал в spring-boot-restclient и НЕ тянется starter-web (серверный
+          web-mvc). Нужен явно — иначе OkxConfig не получает RestClient.Builder
+          и контекст падает на старте.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+        <!--
+          Boot 4.0 / Spring 7 по умолчанию перешли на Jackson 3 (tools.jackson):
+          spring-boot-jackson (тянется starter-web) автоконфигурирует Jackson 3,
+          бин Jackson 2 com.fasterxml...ObjectMapper больше не создаётся. Кодовая
+          база — на Jackson 2 (RuntimeJsonConverter / StrategyJsonConverter и DTO,
+          com.fasterxml). Модуль spring-boot-jackson2 — совместимостный автоконфиг
+          (Jackson2AutoConfiguration): регистрирует com.fasterxml ObjectMapper +
+          datatype-модули (jdk8 / jsr310 / parameter-names). Отдельного
+          spring-boot-starter-jackson2 нет — подключаем сам модуль.
+          Прочие автоконфиг-бины: RestClient — starter-restclient; validation —
+          starter-validation (→ spring-boot-validation); @Async/@Scheduled —
+          TaskExecution/TaskScheduling в core autoconfigure. Flyway-модуль —
+          ниже (был пропущен первым sweep'ом, добавлен отдельно).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -50,8 +95,22 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-vault-config</artifactId>
+        </dependency>
+        <!--
+          Boot 4.0 разнёс автоконфиги по модулям: flyway-core на classpath даёт
+          биндинг spring.flyway.* и сам Flyway, но FlywayAutoConfiguration (запуск
+          миграций на старте) переехал в модуль spring-boot-flyway и НЕ тянется
+          автоматически. Без него миграции V1-V7 молча не применяются → джобы
+          падают на 42P01 (relation does not exist). starter-flyway приносит
+          spring-boot-flyway (автоконфиг) + flyway-core (+ jdbc), поэтому отдельный
+          flyway-core убран как избыточный. flyway-database-postgresql (PG-диалект,
+          вынесен из ядра во Flyway 10+) держим явно — стартер его не тянет.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

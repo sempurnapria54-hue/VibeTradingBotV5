@@ -1,10 +1,28 @@
+# Корневой конфиг — только общее для всех профилей: имя приложения,
+# подключение к Vault, JPA, Flyway, okx (base-url + мэппинг кредов).
+# Профиле-зависимое (Vault-пути datasource + OKX, джобы candle-loading /
+# market-data, okx.simulated, уровень логов) вынесено в application-prod.yaml
+# / application-test.yaml. Запуск требует активного профиля (prod|test):
+# без него datasource/креды не заданы и приложение не поднимается.
 spring:
   application:
     name: tradingbot
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/tradingbot}
-    username: ${DB_USERNAME:tradingbot}
-    password: ${DB_PASSWORD:tradingbot}
+  # Подключение к Vault — общее; конкретные KV-пути (datasource + OKX-креды)
+  # задаются по профилю через spring.config.import в application-{prod,test}.yaml
+  # (prod → postgres + okx, test → postgres-test + okx-test).
+  cloud:
+    bootstrap:
+      # Используем spring.config.import (vault://), а не bootstrap-контекст.
+      enabled: false
+    vault:
+      enabled: true
+      uri: ${VAULT_URI:http://localhost:8200}
+      authentication: TOKEN
+      token: ${VAULT_TOKEN:}
+      kv:
+        enabled: true
+        backend: secret
+        application-name: tradingbot
   jpa:
     open-in-view: false
     hibernate:
@@ -18,51 +36,16 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
-# Интеграция с OKX. Шаг 1 ходит только в публичные endpoint'ы
-# (instruments/candles) — auth/секреты не нужны. API-ключи и
-# конфигурация секретов (Vault) вводятся с приватными endpoint'ами и
-# на шаге 9 «Безопасность» (tech-radar: по потребности шага).
+# Интеграция с OKX. base-url — общий (env-дефолт). Приватные креды
+# (api-key/secret/passphrase) читаются из Vault per-profile, как datasource:
+# prod → secret/tradingbot/okx, test → secret/tradingbot/okx-test (импорт
+# пути — в application-{prod,test}.yaml). Мэппинг ключей Vault → свойства
+# одинаков для обоих профилей, поэтому здесь, в корне. Шаг 9 «Безопасность» —
+# остаточный хардненинг, не ввод секретов.
+# Демо-флаг simulated — профиле-зависим (prod=real, test=demo), см. профили.
 okx:
   base-url: ${OKX_BASE_URL:https://www.okx.com}
-  # Демо-флаг OKX: "1" — demo trading (header x-simulated-trading), пусто — реальный.
-  simulated: ${OKX_SIMULATED:1}
-
-# Загрузка свечей (docs/processes/candle-loading.md). Числа
-# конфигурируемы, проставляются на CODE.
-candle-loading:
-  # Выключатель джобы загрузки свечей (CandleJob).
-  enabled: ${CANDLE_JOB_ENABLED:true}
-  # Период тика CandleJob (CRON), порядка раза в минуту.
-  cron: ${CANDLE_JOB_CRON:0 * * * * *}
-  # Лимит свечей в одном запросе OKX history-candles (max 100).
-  page-size: 100
-  # Число попыток REPAIR до перевода группы в ERROR.
-  max-repair-attempts: 5
-  # Перекрытие хвоста при SYNC (число последних баров перезапрашивается).
-  sync-overlap-bars: 3
-  # Дефолтный плановый горизонт истории (UTC мс) при онбординге
-  # инструмента, если не задан явно.
-  default-planned-start-date: ${CANDLE_DEFAULT_PLANNED_START:0}
-  # Таймфреймы, под которые заводятся группы свечей инструмента.
-  # На шаге 1 (без стратегии) — из конфига; со стратегией (шаг 2) —
-  # из запрошенных стратегией индикаторов.
-  timeframes:
-    - ONE_HOUR
-
-# Расчёт производных рыночных данных (docs/processes/market-data-calculation.md):
-# индикаторы → структура → фаза. По джобе — выключатель и CRON;
-# идемпотентность и чтение-последнего обеспечивают сходимость порядка
-# между jobs. candle-window-bars — потолок недавнего окна свечей,
-# грузимого в расчёт (защита от тяжёлых запросов по всей истории).
-market-data:
-  candle-window-bars: ${MARKET_DATA_CANDLE_WINDOW_BARS:1500}
-  indicator:
-    enabled: ${INDICATOR_JOB_ENABLED:true}
-    cron: ${INDICATOR_JOB_CRON:0 * * * * *}
-  structure:
-    enabled: ${MARKET_STRUCTURE_JOB_ENABLED:true}
-    cron: ${MARKET_STRUCTURE_JOB_CRON:0 * * * * *}
-
-logging:
-  level:
-    com.example.tradingbot: INFO
+  # Ключи секрета Vault: OKX_API_KEY / OKX_SECRET_KEY / OKX_PASSPHRASE.
+  api-key: ${OKX_API_KEY}
+  secret: ${OKX_SECRET_KEY}
+  passphrase: ${OKX_PASSPHRASE}

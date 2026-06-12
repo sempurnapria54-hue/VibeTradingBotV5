@@ -1,0 +1,42 @@
+# Профиль test: Vault-пути secret/tradingbot/postgres-test (datasource) +
+# secret/tradingbot/okx-test (OKX-креды). Имена ключей — те же, что в prod,
+# в своих путях (datasource URL → :5441).
+spring:
+  config:
+    import:
+      - vault://secret/tradingbot/postgres-test
+      - vault://secret/tradingbot/okx-test
+  datasource:
+    url: ${DATASOURCE_URL}
+    username: ${DATASOURCE_USERNAME}
+    password: ${DATASOURCE_PASSWORD}
+
+okx:
+  # test — demo trading: simulated "1" (header x-simulated-trading).
+  simulated: ${OKX_SIMULATED:1}
+
+# Джобы — те же значения, что в prod; разнесены по профилю, чтобы при
+# необходимости расходиться независимо (смысл см. в application-prod.yaml
+# и docs/processes/{candle-loading,market-data-calculation}.md).
+candle-loading:
+  enabled: ${CANDLE_JOB_ENABLED:true}
+  cron: ${CANDLE_JOB_CRON:0 * * * * *}
+  page-size: 100
+  max-repair-attempts: 5
+  sync-overlap-bars: 3
+  default-planned-start-date: ${CANDLE_DEFAULT_PLANNED_START:0}
+  timeframes:
+    - ONE_HOUR
+
+market-data:
+  candle-window-bars: ${MARKET_DATA_CANDLE_WINDOW_BARS:1500}
+  indicator:
+    enabled: ${INDICATOR_JOB_ENABLED:true}
+    cron: ${INDICATOR_JOB_CRON:0 * * * * *}
+  structure:
+    enabled: ${MARKET_STRUCTURE_JOB_ENABLED:true}
+    cron: ${MARKET_STRUCTURE_JOB_CRON:0 * * * * *}
+
+logging:
+  level:
+    com.example.tradingbot: DEBUG

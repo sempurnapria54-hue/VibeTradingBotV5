@@ -32,7 +32,7 @@ production-flow одной стратегии.
 | 6 | FSM (состояния и переходы сущностей — связующее звено) | HOLD |
 | 7 | Сделки и P&L (DealOrchestratorJob — агрегирование в Deal, P&L; он же оркестрирует торговый цикл сигнал→команда→позиция) | HOLD |
 | 8 | AnomalyJob (полноценный, операционная детекция аномалий состояния/исполнения) | HOLD |
-| 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; конфигурация секретов через Vault; реактивирует фокус `security-review`) | HOLD |
+| 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | HOLD |
 | 10 | Тесты | HOLD |
 | 11 | Фронт | HOLD |
 
@@ -41,11 +41,14 @@ production-flow одной стратегии.
 - **Фронт (шаг 11)** — простой, для прогонов. Полноценный фронт
   появится после архитектурного рубежа.
 - **Безопасность (шаг 9)** — строит auth-инфраструктуру (Spring
-  Security, `@PreAuthorize`, `SecurityFilterChain`) и конфигурацию
-  секретов (Vault). Содержание прорабатывается docs-first на самом
-  шаге. На нём реактивируется фокус `security-review`.
-  Форвард-материал (Vault/секреты) — `.claude/work/backlog.md`
-  (раздел шага «Безопасность»).
+  Security, `@PreAuthorize`, `SecurityFilterChain`). **Vault-привязка
+  секретов введена раньше — на инфра-шаге (2026-06-12, снапшот v47):
+  datasource и OKX-креды читаются из Vault per-profile.** Шаг 9
+  рескоупится на остаточный хардненинг секретов (политики/approle,
+  ротация, unseal) поверх уже подключённого Vault — не на его введение.
+  Содержание прорабатывается docs-first на самом шаге; на нём
+  реактивируется фокус `security-review`. Форвард-материал —
+  `.claude/work/backlog.md` §S1 (рескоуплен) / §S2.
 - **Тесты (шаг 10)** и **Фронт (шаг 11)** — отдельные шаги
   фазы, исполняются по тому же процессу docs-first.
 - Под-шаги внутри каждого шага заранее не дробятся; они
@@ -407,3 +410,18 @@ production-flow одной стратегии.
   TBD error-конвенцией). Зафиксированный исход —
   `.claude/work/history/2026-06-11-phase-1-steps-1-3-retro-adversarial-review.md`.
   Ролляп без изменений (`IN_PROGRESS`).
+- **Шаг 4 → рантайм-хвост закрыт (2026-06-12, инфра-сессия):** первый
+  реальный boot обоих профилей — зелёный. Заведён dev/test-сплит БД
+  (compose `postgres` 5440 / `postgres-test` 5441); `application.yaml`
+  разнесён на базовый + `application-{prod,test}.yaml`; datasource и
+  OKX-креды — per-profile через Vault (`spring.config.import`). Вскрыты и
+  закрыты 3 пробела Boot-4 split-autoconfig (`restclient`, `jackson2`,
+  `flyway` → `pom.xml`; `backlog.md` §Инфра-долг). **Рантайм-подтверждение
+  (снимает v46-хвост шага 4):** Flyway применил `V1`-`V7` на обеих БД
+  (`tradingbot` / `tradingbot_test`), схема создана (закрыт хвост Flyway
+  `V6`/`V7`); OKX-прокси (prod) вернул реальный balance — подпись +
+  Vault-креды + Jackson-сериализация end-to-end. И-2 (demo trailing)
+  разблокирован (у `test` теперь demo-креды); сама demo-проверка —
+  обычный пункт `backlog.md` §Хвост шага 4, не блокирующий хвост. Ролляп
+  фазы без изменений (`IN_PROGRESS`: 1-4 `DONE`, 5-11 `HOLD`). Детали —
+  снапшот v47.

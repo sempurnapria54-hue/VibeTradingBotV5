@@ -256,15 +256,19 @@ REF-Q1 — `.claude/decisions/code-templates-vs-examples.md`.
 прорабатывается docs-first на самом шаге; здесь — что туда заведомо
 идёт.
 
-### S1. Конфигурация секретов через Vault
+### S1. Конфигурация секретов через Vault — ✅ базовая привязка ЗАКРЫТА (2026-06-12)
 
-- Секреты конфигурируются через Vault.
-- В коде и бинах — стандартные Spring properties (бизнес-поля не
-  знают про Vault).
-- `vault://` допускается **только** в `spring.config.import`, не в
-  бизнес-полях.
-- Env-плейсхолдеры для значений.
-- Реальные секреты не коммитим.
+**Сделано на инфра-шаге** (раньше планового шага 9, см. снапшот v47):
+Vault-привязка секретов через `spring.config.import: vault://` per-profile —
+datasource (`tradingbot/postgres[-test]`) и OKX-креды
+(`tradingbot/okx[-test]`); env-плейсхолдеры значений; `vault://` только в
+`spring.config.import` (бизнес-поля Vault не знают); реальные секреты не
+коммитятся (`.env.*.local` gitignored; Vault-токен — через IDEA run-config
+env). Это переносит сюда ранее отложенный тезис «секреты через Vault».
+
+**Остаётся на шаг 9 (остаточный хардненинг):** политики/approle вместо
+root/dev-token, ротация секретов, unseal/инициализация Vault не в dev-режиме,
+вынос Vault-токена из run-config. Auth-инфраструктура (Spring Security) — S2.
 
 ### S2. Auth-инфраструктура
 
@@ -464,6 +468,43 @@ Refinements, сознательно отложенные при `CODE` шага 
 
 В миграции процессов (2026-05-28) разделы «Чего не хранит» в новых
 файлах **не создавались** (новых затронутых моделей нет).
+
+## Инфра-долг (Boot 4 миграция / рантайм-робастность, сессия 2026-06-12)
+
+Вскрыто на первом реальном рантайм-старте (dev/test-сплит БД + Vault,
+снапшот v47). Не cross-cutting миграция из архива — инфра/рантайм-долг
+переезда стека.
+
+### I1. Boot 3→4 split-autoconfig: durable-проверка
+
+Переезд Boot 3→4 / Spring 7 / Hibernate 7 / JDK 25 раньше не гонялся в
+рантайме — компиляция пробелы не ловит. За сессию вскрыто 3 пробела
+split-autoconfig: `RestClient.Builder` (→ `spring-boot-starter-restclient`),
+Jackson 2 `ObjectMapper` (→ `spring-boot-jackson2`), Flyway
+(→ `spring-boot-starter-flyway`) — все по шаблону «библиотека на classpath
+есть, её `spring-boot-*` автоконфиг-модуль не подтянут → бин/фича молча не
+активируется». **Durable-проверка на будущее** (при добавлении/обновлении
+зависимости): «библиотека на classpath → её `spring-boot-*`
+автоконфиг-модуль подтянут?». Особо коварны «тихие» стартовые автоконфиги
+без инжекта бина (Flyway): без модуля не падают, просто ничего не делают.
+
+### I2. Миграция кода на Jackson 3
+
+Код на Jackson 2 (`com.fasterxml.jackson`); Boot 4 / Spring 7 дефолтят
+Jackson 3 (`tools.jackson`). Бин `ObjectMapper` сейчас даём
+совместимостным `spring-boot-jackson2` (интерим-adopt, `tech-radar`).
+**Чистый end-state:** миграция кода (`RuntimeJsonConverter` /
+`StrategyJsonConverter`, DTO-аннотации; `ObjectMapper.copy()` /
+`setDefaultPropertyInclusion`, `JsonProcessingException`) на Jackson 3 и
+снятие `jackson2`. Радар — Jackson 3 = `assess`.
+
+### I3. `OkxSigningInterceptor` — внятная ошибка на пустых кредах
+
+При незаполненных OKX-кредах (`api-key/secret/passphrase` = null)
+интерсептор падает NPE на приватных вызовах вместо внятной ошибки
+«OKX credentials not configured». Добавить fail-fast / осмысленное
+сообщение (валидация при старте либо явная проверка в интерсепторе перед
+подписью).
 
 ## Связанные открытые вопросы
 

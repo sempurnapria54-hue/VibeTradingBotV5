@@ -2,7 +2,7 @@ services:
   vault:
     image: hashicorp/vault:1.15
     container_name: vibetradingbotv5-vault
-    entrypoint: ["vault"]
+    entrypoint: [ "vault" ]
     ports:
       - "8200:18200"
     cap_add:
@@ -10,18 +10,29 @@ services:
     volumes:
       - vault_data:/vault/file
       - ./vault.hcl:/vault/config/vault.hcl:ro
-    command: ["server", "-config=/vault/config/vault.hcl"]
+    command: [ "server", "-config=/vault/config/vault.hcl" ]
 
-  db:
+  postgres:
     image: postgres:16
-    container_name: vibetradingbotv5-db
+    container_name: vibetradingbotv5-postgres
     env_file:
-      - ./.env.local
+      - .env.prod.local
     ports:
       - "5440:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_prod:/var/lib/postgresql/data
+
+  postgres-test:
+    image: postgres:16
+    container_name: vibetradingbotv5-postgres-test
+    env_file:
+      - ./.env.test.local
+    ports:
+      - "5441:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
 
 volumes:
-  pgdata:
+  pgdata_prod:
+  pgdata_test:
   vault_data:

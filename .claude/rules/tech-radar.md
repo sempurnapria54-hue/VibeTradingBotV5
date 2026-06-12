@@ -40,6 +40,9 @@
 | MapStruct | маппинг между слоями (api↔domain↔persistence↔client) | `adopt` |
 | springdoc-openapi | OpenAPI/Swagger-документация нашего API | `adopt` |
 | Spring `@Async` / `@EnableAsync` | асинхронный запуск джоб вне расписания (через фасад, не блокируя HTTP-ответ) | `adopt` |
+| spring-cloud-vault (`spring-cloud-starter-vault-config`) | секреты из Vault через `spring.config.import: vault://` per-profile: datasource (prod→`tradingbot/postgres`, test→`tradingbot/postgres-test`) **и** OKX-креды (prod→`tradingbot/okx`, test→`tradingbot/okx-test`) | `adopt` (введён на инфра-шаге раньше планового шага 9: ввод Vault-привязки секретов закрыт здесь; шаг 9 «Безопасность» рескоупится на остаточный хардненинг — политики/approle, ротация, unseal, Spring Security. BOM `spring-cloud-dependencies:2025.1.x` под SB4) |
+| Jackson 2 (`com.fasterxml.jackson`, модуль `spring-boot-jackson2`) | JSON: сериализация JSONB-навеса (`RuntimeJsonConverter`/`StrategyJsonConverter`), DTO-аннотации, веб-слой | `adopt` (интерим) — кодовая база на Jackson 2; в SB4 дефолт уехал на Jackson 3, поэтому бин `ObjectMapper` даём совместимостным автоконфигом `spring-boot-jackson2` (`Jackson2AutoConfiguration`) |
+| Jackson 3 (`tools.jackson`, модуль `spring-boot-jackson`) | JSON по умолчанию в SB4/Spring 7 (автоконфиг `JacksonAutoConfiguration` из `starter-web`) | `assess` — целевой end-state; миграция кода с Jackson 2 (`ObjectMapper.copy()/setDefaultPropertyInclusion`, `JsonProcessingException`) и снятие `spring-boot-jackson2` — отдельным шагом (`backlog.md` §Инфра-долг I2) |
 
 Прочие модули Spring и библиотеки добавляются по ходу — по
 потребности шага, не превентивно.
