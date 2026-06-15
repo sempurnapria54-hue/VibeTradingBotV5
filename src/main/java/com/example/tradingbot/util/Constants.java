@@ -80,6 +80,9 @@ public final class Constants {
         /** Путь баланса аккаунта (GET). Приватный endpoint. */
         public static final String ACCOUNT_BALANCE_PATH = "/api/v5/account/balance";
 
+        /** Путь конфигурации аккаунта (acctLv/posMode, GET). Приватный endpoint. */
+        public static final String ACCOUNT_CONFIG_PATH = "/api/v5/account/config";
+
         /** Путь исполнений (fills, последние 3 дня, GET). Приватный endpoint. */
         public static final String TRADE_FILLS_PATH = "/api/v5/trade/fills";
 

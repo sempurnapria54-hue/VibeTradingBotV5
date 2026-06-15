@@ -2,6 +2,8 @@
 # Local env (do not commit)
 .env.prod.local
 .env.test.local
+# Shell-sourced Vault token for CC's test-profile boot (.example is committed)
+.env.vault.test.local
 /target/
 .idea/
 .docs/planing

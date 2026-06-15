@@ -18,6 +18,7 @@ import com.example.tradingbot.integration.model.okx.response.OkxAlgoOrderRespons
 import com.example.tradingbot.persistence.model.algoorder.AlgoOrderEntity;
 import com.example.tradingbot.util.Constants;
 import com.example.tradingbot.util.OkxParse;
+import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -35,7 +36,7 @@ import org.mapstruct.ReportingPolicy;
  * docs/models/mapping/AlgoOrder.md.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        uses = {RuntimeJsonConverter.class, OkxResponseConverter.class}, imports = Constants.class)
+        uses = {RuntimeJsonConverter.class, OkxResponseConverter.class}, imports = {Constants.class, StringUtils.class})
 public interface AlgoOrderMapper {
 
     AlgoOrderEntity domainToPersistence(AlgoOrder algoOrder);
@@ -121,12 +122,18 @@ public interface AlgoOrderMapper {
     @Mapping(target = "algoClOrdId", source = "algoOrder.internalId")
     CancelAlgoOrderOkxRequest domainToCancelRequest(AlgoOrder algoOrder, String instId);
 
-    @Mapping(target = "externalId", source = "algoId")
-    @Mapping(target = "internalId", source = "algoClOrdId")
-    @Mapping(target = "code", source = "sCode")
-    @Mapping(target = "message", source = "sMsg")
-    @Mapping(target = "success", source = "sCode", qualifiedByName = "okxAckSuccess")
-    ExchangeAck integrationToAck(AlgoOrderAckOkxResponse response);
+    /**
+     * OKX algo ack → {@link ExchangeAck}. {@code code}/{@code message} —
+     * per-order {@code sCode}/{@code sMsg}; если они пусты (наблюдалось
+     * на реджекте, находка F1), падаем на top-level {@code code}/{@code msg}
+     * ответа, чтобы ack не нёс null на реджекте.
+     */
+    @Mapping(target = "externalId", source = "ack.algoId")
+    @Mapping(target = "internalId", source = "ack.algoClOrdId")
+    @Mapping(target = "code", expression = "java(StringUtils.firstNonBlank(ack.getsCode(), topLevelCode))")
+    @Mapping(target = "message", expression = "java(StringUtils.firstNonBlank(ack.getsMsg(), topLevelMessage))")
+    @Mapping(target = "success", source = "ack.sCode", qualifiedByName = "okxAckSuccess")
+    ExchangeAck integrationToAck(AlgoOrderAckOkxResponse ack, String topLevelCode, String topLevelMessage);
 
     /** OKX algo ordType из conditionType (одностороннe). */
     default String resolveAlgoOrdType(AlgoOrder.ConditionType type) {

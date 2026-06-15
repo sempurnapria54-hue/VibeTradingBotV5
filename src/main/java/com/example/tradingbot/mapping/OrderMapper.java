@@ -15,6 +15,7 @@ import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.persistence.model.order.AttachedAlgoOrderEntity;
 import com.example.tradingbot.persistence.model.order.OrderEntity;
 import com.example.tradingbot.util.Constants;
+import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -32,7 +33,7 @@ import org.mapstruct.ReportingPolicy;
  * docs/models/mapping/Order.md.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        uses = OkxResponseConverter.class, imports = Constants.class)
+        uses = OkxResponseConverter.class, imports = {Constants.class, StringUtils.class})
 public interface OrderMapper {
 
     OrderEntity domainToPersistence(Order order);
@@ -94,12 +95,18 @@ public interface OrderMapper {
     @Mapping(target = "clOrdId", source = "order.internalId")
     CancelOrderOkxRequest domainToCancelRequest(Order order, String instId);
 
-    @Mapping(target = "externalId", source = "ordId")
-    @Mapping(target = "internalId", source = "clOrdId")
-    @Mapping(target = "code", source = "sCode")
-    @Mapping(target = "message", source = "sMsg")
-    @Mapping(target = "success", source = "sCode", qualifiedByName = "okxAckSuccess")
-    ExchangeAck integrationToAck(OrderAckOkxResponse response);
+    /**
+     * OKX ack → {@link ExchangeAck}. {@code code}/{@code message} —
+     * per-order {@code sCode}/{@code sMsg}; если они пусты (наблюдалось
+     * на реджекте, находка F1), падаем на top-level {@code code}/{@code msg}
+     * ответа, чтобы ack не нёс null на реджекте.
+     */
+    @Mapping(target = "externalId", source = "ack.ordId")
+    @Mapping(target = "internalId", source = "ack.clOrdId")
+    @Mapping(target = "code", expression = "java(StringUtils.firstNonBlank(ack.getsCode(), topLevelCode))")
+    @Mapping(target = "message", expression = "java(StringUtils.firstNonBlank(ack.getsMsg(), topLevelMessage))")
+    @Mapping(target = "success", source = "ack.sCode", qualifiedByName = "okxAckSuccess")
+    ExchangeAck integrationToAck(OrderAckOkxResponse ack, String topLevelCode, String topLevelMessage);
 
     /** OKX exec ordType из доменного Order: цена задана → limit, иначе market. */
     default String resolveOrdType(Order order) {

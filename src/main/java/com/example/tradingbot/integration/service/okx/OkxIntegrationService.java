@@ -206,20 +206,23 @@ public class OkxIntegrationService implements IntegrationService {
      * {@link ExchangeIntegrationException} с реальными code/msg. Непустой
      * {@code data} = бизнес-исход: {@code success} выводится из
      * per-order {@code sCode} (бизнес-реджект → success=false ack, не
-     * throw — не runtime truth, см. ack-not-runtime-truth).
+     * throw — не runtime truth, см. ack-not-runtime-truth). Top-level
+     * {@code code}/{@code msg} передаём маппером как fallback для
+     * ack-кода/сообщения, если per-order {@code sCode}/{@code sMsg} пусты
+     * (находка F1: на реджекте они приходили null).
      */
     private ExchangeAck toOrderAck(OkxApiResponse<OrderAckOkxResponse> response, String endpoint, String instId) {
         if (isNull(response) || isEmpty(response.getData())) {
             throw writeFailure(response, endpoint, instId);
         }
-        return orderMapper.integrationToAck(response.getData().getFirst());
+        return orderMapper.integrationToAck(response.getData().getFirst(), response.getCode(), response.getMsg());
     }
 
     private ExchangeAck toAlgoAck(OkxApiResponse<AlgoOrderAckOkxResponse> response, String endpoint, String instId) {
         if (isNull(response) || isEmpty(response.getData())) {
             throw writeFailure(response, endpoint, instId);
         }
-        return algoOrderMapper.integrationToAck(response.getData().getFirst());
+        return algoOrderMapper.integrationToAck(response.getData().getFirst(), response.getCode(), response.getMsg());
     }
 
     private ExchangeIntegrationException writeFailure(OkxApiResponse<?> response, String endpoint, String instId) {

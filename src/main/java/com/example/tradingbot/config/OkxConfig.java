@@ -3,6 +3,7 @@ package com.example.tradingbot.config;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.integration.service.okx.OkxSigningInterceptor;
+import com.example.tradingbot.integration.service.okx.OkxWriteLoggingInterceptor;
 import com.example.tradingbot.util.Constants;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,9 +32,11 @@ public class OkxConfig {
 
     @Bean
     public RestClient okxAuthRestClientHttp(OkxProperties properties, RestClient.Builder builder,
-                                            OkxSigningInterceptor signingInterceptor) {
+                                            OkxSigningInterceptor signingInterceptor,
+                                            OkxWriteLoggingInterceptor writeLoggingInterceptor) {
         RestClient.Builder configured = builder.baseUrl(properties.getBaseUrl())
                 .requestInterceptor(signingInterceptor)
+                .requestInterceptor(writeLoggingInterceptor)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
         if (isNotBlank(properties.getSimulated())) {
             configured = configured.defaultHeader(Constants.Okx.SIMULATED_HEADER, properties.getSimulated());

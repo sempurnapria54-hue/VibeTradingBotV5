@@ -1,5 +1,6 @@
 package com.example.tradingbot.integration.model.okx.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,6 +10,11 @@ import lombok.Setter;
  * orders-algo-pending/history). За adapter не выходит; нормализуется в
  * AlgoOrderExternalSnapshot (плоские поля → дерево condition). См.
  * docs/models/mapping/AlgoOrder.md.
+ *
+ * <p>{@code cTime}/{@code uTime} несут явный {@link JsonProperty}: Lombok
+ * (beanspec) даёт аксессоры {@code getcTime()}/{@code getuTime()}, чьё
+ * выводимое имя свойства Jackson 3 (дефолт RestClient в SB4) НЕ матчит с
+ * ключом → поле биндилось в null (находка F4). Явное имя фиксирует бинд.
  */
 @Getter
 @Setter
@@ -57,8 +63,10 @@ public class OkxAlgoOrderResponse {
     private String moveTriggerPx;
 
     /** Время создания (epoch ms). */
+    @JsonProperty("cTime")
     private String cTime;
 
     /** Время обновления (epoch ms). */
+    @JsonProperty("uTime")
     private String uTime;
 }

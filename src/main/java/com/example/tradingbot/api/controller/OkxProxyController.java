@@ -17,6 +17,7 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.integration.service.IntegrationService;
+import com.example.tradingbot.integration.service.okx.OkxRestClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.math.BigDecimal;
@@ -44,6 +45,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class OkxProxyController {
 
     private final IntegrationService integrationService;
+    private final OkxRestClient okxRestClient;
+
+    /**
+     * Диагностическое чтение account config (acctLv/posMode) — прямой
+     * сырой signed GET через приватный клиент (surface-gap: метода/DTO в
+     * клиентском слое нет; под разовую диагностику F3b). Read-only.
+     */
+    @GetMapping("/account-config")
+    @Operation(summary = "[диагностика] Сырой account config OKX (acctLv/posMode)")
+    public String getAccountConfig() {
+        return okxRestClient.getAccountConfig();
+    }
 
     @GetMapping("/instrument")
     @Operation(summary = "Спецификация инструмента с биржи")

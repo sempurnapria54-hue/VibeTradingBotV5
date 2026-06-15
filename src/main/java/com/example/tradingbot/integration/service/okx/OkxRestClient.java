@@ -295,6 +295,19 @@ public class OkxRestClient {
                 .body(FILL_TYPE);
     }
 
+    /**
+     * Диагностическое чтение конфигурации аккаунта (acctLv/posMode) —
+     * сырое тело. Под разовую диагностику F3b (метода/DTO под этот
+     * endpoint в клиентском слое нет — surface-gap). Read-only,
+     * приватный endpoint (подпись).
+     */
+    public String getAccountConfig() {
+        return okxAuthRestClientHttp.get()
+                .uri(Constants.Okx.ACCOUNT_CONFIG_PATH)
+                .retrieve()
+                .body(String.class);
+    }
+
     /** Баланс аккаунта (опционально по валюте). Приватный endpoint (подпись). */
     public OkxApiResponse<OkxBalanceResponse> getBalance(String ccy) {
         return okxAuthRestClientHttp.get()

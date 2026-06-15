@@ -1,5 +1,6 @@
 package com.example.tradingbot.integration.model.okx.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,6 +9,11 @@ import lombok.Setter;
  * выходит; нормализуется маппером в PositionExternalSnapshot. instId/
  * posSide/mgnMode/lever — adapter validation, в snapshot не маппятся.
  * См. docs/models/mapping/Position.md.
+ *
+ * <p>{@code cTime}/{@code uTime} несут явный {@link JsonProperty}: Lombok
+ * (beanspec) даёт аксессоры {@code getcTime()}/{@code getuTime()}, чьё
+ * выводимое имя свойства Jackson 3 (дефолт RestClient в SB4) НЕ матчит с
+ * ключом → поле биндилось в null (находка F4). Явное имя фиксирует бинд.
  */
 @Getter
 @Setter
@@ -35,9 +41,11 @@ public class OkxPositionResponse {
     private String upl;
 
     /** Время создания (epoch ms). */
+    @JsonProperty("cTime")
     private String cTime;
 
     /** Время обновления (epoch ms). */
+    @JsonProperty("uTime")
     private String uTime;
 
     /** Инструмент (adapter validation). */

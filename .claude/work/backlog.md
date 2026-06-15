@@ -506,6 +506,46 @@ Jackson 3 (`tools.jackson`). Бин `ObjectMapper` сейчас даём
 сообщение (валидация при старте либо явная проверка в интерсепторе перед
 подписью).
 
+### I4. Jackson 3 × Lombok beanspec мангли́нг в OKX-DTO (находка F4)
+
+Системный класс, смежный I2. **Корень:** Jackson 3 (`tools.jackson`,
+дефолт RestClient в SB4/Spring 7) выводит имя свойства из Lombok
+beanspec-аксессора поля «строчная-первая/заглавная-вторая»
+(`sCode`→`getsCode()`, `cTime`→`getcTime()`) иначе, чем JSON-ключ → поле
+биндится в **null**. Jackson 2 (legacy-mangling) с ключом совпадал →
+до перехода стека на Jackson 3 дефект не проявлялся. Подтверждено
+эмпирикой (юнит-срезы десериализации под обоими Jackson).
+
+**Симптом:** write-ack терял per-element `sCode` (реджект-код уходил в
+top-level fallback, F3a); read-снапшоты теряли таймстампы —
+probe-`getBalance → externalUpdatedAt:null` из `uTime`.
+
+**Сделано (interim, сессия 2026-06-12):**
+- **F3a** — `@JsonProperty` на `sCode`/`sMsg` в `OrderAckOkxResponse`/
+  `AlgoOrderAckOkxResponse`; тест `OkxAckDeserializationTest` (Jackson
+  2/3); live re-place подтвердил ack `code="51010"` (per-element), не
+  top-level `"1"`.
+- **F4** — `@JsonProperty` на `cTime`/`uTime` в `OkxBalanceResponse`,
+  `OkxBalanceDetailResponse`, `OkxPositionResponse`, `OrderOkxResponse`,
+  `OkxAlgoOrderResponse`; тест `OkxReadDtoDeserializationTest` (полный
+  per-field бинд каждого DTO под Jackson 3, зелёный).
+- Grep текущих OKX-DTO на точный паттерн lower-upper: ровно эти 7 полей
+  (4 ack + cTime/uTime) — иного остатка по OKX нет (request/response/
+  nested `AttachAlgoOrdOkxResponse` чисты).
+
+**Открыто (integrator, routing — НЕ в этом заходе):**
+- **Защита от рецидива:** глобальный конфиг Jackson 3 (вернуть
+  legacy-мангли́нг — широкий blast radius на всю десериализацию) **vs**
+  конвенция «OKX-DTO аннотируют поля `@JsonProperty` + round-trip тест».
+- **Репо-wide sweep:** эвристика lower-upper по текущим OKX-DTO
+  исчерпана, но (а) не гарантирует все Jackson-3 edge-cases (аббревиатуры
+  / all-caps), (б) будущие и иные источники DTO — на конвенцию/sweep.
+
+**Влияние:** гейтит корректность любого read-снапшота с таймстампами
+(`cTime`/`uTime`) → относится к **Фазе 3** prod read-only. Связано с I2
+(миграция кода на Jackson 3 — целевой end-state; F4 — точечная защита до
+неё). Источник — run-log `source-api-pilot-run-log.md` (F3a/F4).
+
 ## Средовой дефицит автономного RUN тестов (контур source-api, 2026-06-12)
 
 Вскрыто эскалацией RUN пилота `source-api-testing`: `tester` не может
