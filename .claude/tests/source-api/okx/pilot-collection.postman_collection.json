@@ -2,7 +2,7 @@
   "info": {
     "name": "OKX source-api pilot",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Исполняемая тест-коллекция пилотного плана OKX (.claude/tests/source-api/okx/pilot-plan.md), построена по скиллу test-collection.\n\nЧЕРЕЗ НАШ ПРОКСИ: все запросы на /api/proxy/okx/* (OkxProxyController). Подпись и креды — на стороне app (signing interceptor); в Postman подпись не считается, кредов не нужно. demo/prod определяется ПРОФИЛЕМ поднятого app, не тумблером в Postman. base URL — переменная base_url (окружение).\n\nПапка = цепочка плана. WRITE-папки (C, И-2) ставят реальные ордера на бирже (на prod-профиле — реальные деревья). Проверки кодируют ожидание плана; фейл по дизайну показывает находку. id из write-ответов чейнятся переменными коллекции.\n\nSURFACE-РАСХОЖДЕНИЯ (вынесены в описания кейсов): (1) proxy getOrder/getAlgoOrder — одиночный trade-order/order-algo вызов с verifyCode-throw, НЕ доменный evidence-cycle (N2/C4/A4); (2) адаптер-инварианты tdMode/posSide/reduceOnly на OrderExternalSnapshot не выведены — не наблюдаемы через proxy (C2); (3) candle-эндпоинта на proxy нет (P3); (4) уровень (a) N2 (сырой клиент) проксей не покрыт.\n\nЖИЗНЕННЫЙ ЦИКЛ: коллекция ревьюится, аппрувится и правится ВМЕСТЕ С ПЛАНОМ."
+    "description": "Исполняемая тест-коллекция пилотного плана OKX (.claude/tests/source-api/okx/pilot-plan.md), перегенерирована с нуля 2026-06-15 по скиллу test-collection под действующие правила.\n\nЧЕРЕЗ НАШ ПРОКСИ: все запросы на /api/proxy/okx/* (OkxProxyController). Подпись и креды — на стороне app (signing interceptor); в Postman подпись не считается, кредов не нужно. demo/prod определяется ПРОФИЛЕМ поднятого app, не тумблером в Postman. base URL — переменная base_url (окружение).\n\nPRICE-GAP ЗАКРЫТ: цена ордера C1 тянется live с биржи через новый proxy-эндпоинт GET /api/proxy/okx/market-price (C-price) и выводится неисполнимой (~ -50% от last), а не зашивается константой.\n\nПапка = кейс/цепочка плана. WRITE-папки (C, И-2) ставят реальные ордера на бирже (на prod-профиле — реальные деревья). Проверки кодируют ожидание плана; фейл по дизайну показывает находку. id из write-ответов чейнятся переменными коллекции.\n\nSURFACE-РАСХОЖДЕНИЯ (в описаниях кейсов): (1) proxy getOrder/getAlgoOrder — одиночный trade-order/order-algo вызов с verifyCode-throw, НЕ доменный evidence-cycle (N2/C4/A4); (2) адаптер-инварианты tdMode/posSide/reduceOnly на OrderExternalSnapshot не выведены — не наблюдаемы через proxy (C2); (3) сырой клиентский уровень (a) N2 проксей не покрыт; (4) candle-эндпоинта на proxy нет (prod-блок, surface-gap).\n\nЖИЗНЕННЫЙ ЦИКЛ: коллекция ревьюится, аппрувится и правится ВМЕСТЕ С ПЛАНОМ."
   },
   "item": [
     {
@@ -65,7 +65,7 @@
           "response": []
         },
         {
-          "name": "N2. getOrder по фейковому ordId",
+          "name": "N2. getOrder по фейковому ordId (уровень b — прокси)",
           "event": [
             {
               "listen": "test",
@@ -73,7 +73,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "var bodyText = pm.response.text();",
-                  "pm.test('N2 status 200 (резолвится в \\'не найден\\', не throw)', function () {",
+                  "pm.test('N2 status 200 (резолвится в не найден, не throw)', function () {",
                   "  pm.response.to.have.status(200);",
                   "});",
                   "pm.test('N2 нет живого ордера в ответе (MISSING-терминал плана)', function () {",
@@ -110,16 +110,63 @@
                 }
               ]
             },
-            "description": "Кейс N2 плана (уровень b — через клиентский слой).\n\nРАСХОЖДЕНИЕ план ↔ поверхность: proxy getOrder — это ОДИНОЧНЫЙ вызов trade-order с verifyCode-throw на ошибочный top-level code, а НЕ доменный evidence-cycle. Терминал MISSING_AFTER_REFRESH (order-details → pending → history → archive) живёт в refresh-executor и на прокси НЕ воспроизводится.\n\nУровень (a) плана — сырой OkxRestClient.getOrder напрямую — отдельным proxy-эндпоинтом НЕ покрыт (surface-gap), запрос не выдумываем.\n\nПроверка кодирует ожидание плана 'не найден' (HTTP 200, нет живого ордера). Если OKX отдаёт 51603 top-level → verifyCode бросает → HTTP 500: фейл проверки = находка (реджект прокидывается исключением, а не резолюцией 'не найден'; см. backlog 500 вместо 422/409 + gap 'evidence-cycle не на прокси')."
+            "description": "Кейс N2 плана, уровень (b) — через клиентский слой.\n\nSURFACE-РАСХОЖДЕНИЕ 1: proxy getOrder — ОДИНОЧНЫЙ вызов trade-order с verifyCode-throw на ошибочный top-level code, НЕ доменный evidence-cycle. Терминал MISSING_AFTER_REFRESH (order-details → pending → history → archive) живёт в refresh-executor и на прокси НЕ воспроизводится.\n\nУровень (a) плана — сырой OkxRestClient.getOrder напрямую — отдельным proxy-эндпоинтом НЕ покрыт (surface-gap), запрос не выдумываем.\n\nПроверка кодирует ожидание плана не найден (HTTP 200, нет живого ордера). Если OKX отдаёт 51603 top-level → verifyCode бросает → HTTP 500: фейл проверки = находка (реджект исключением, а не резолюцией не найден; backlog 500 вместо 422/409 + gap evidence-cycle не на прокси)."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Цепочка ордера C1→C4 (demo, WRITE)",
-      "description": "Цепочка C плана по графу предусловий: C1 place → C2 getOrder live → C3 cancel → C4 getOrder canceled. Среда — demo.\n\nWRITE-ПАПКА: C1/C3 ставят и отменяют РЕАЛЬНЫЙ ордер на бирже (на prod-профиле — реальные деньги).\n\nTeardown: после C3 ордер отменён. Если прогон прерван между C1 и C3 — отменить повисший ордер (DELETE /order по c_ordId). На случай исполнения (рынок дошёл) — закрыть позицию (POST /position/close) и зафиксировать наблюдением.",
+      "name": "Цепочка ордера C-price→C4 (demo, WRITE)",
+      "description": "Цепочка C плана по графу предусловий: C-price (live-цена) → C1 place → C2 getOrder live → C3 cancel → C4 getOrder canceled. Среда — demo.\n\nPRICE-GAP ЗАКРЫТ: C-price тянет live last через GET /market-price и кладёт c1_px = floor(last*0.5) (limit buy ~ -50%, неисполнимо). C1 берёт c1_px из переменной, цену не выдумывает. ЗАПУСКАТЬ ПАПКУ ЦЕЛИКОМ ПО ПОРЯДКУ (C1 зависит от c1_px из C-price).\n\nWRITE-ПАПКА: C1/C3 ставят и отменяют РЕАЛЬНЫЙ ордер на бирже (на prod-профиле — реальные деньги).\n\nTeardown: после C3 ордер отменён. Если прогон прерван между C1 и C3 — отменить повисший ордер (DELETE /order по c_ordId). На случай исполнения (рынок дошёл) — закрыть позицию (POST /position/close) и зафиксировать наблюдением.",
       "item": [
+        {
+          "name": "C-price. getMarketPriceData — live цена → c1_px",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('C-price status 200', function () { pm.response.to.have.status(200); });",
+                  "var b = pm.response.json();",
+                  "pm.test('C-price externalLastPrice присутствует и > 0', function () {",
+                  "  pm.expect(b).to.have.property('externalLastPrice');",
+                  "  pm.expect(Number(b.externalLastPrice)).to.be.above(0);",
+                  "});",
+                  "var last = Number(b.externalLastPrice);",
+                  "var px = Math.floor(last * 0.5);",
+                  "pm.collectionVariables.set('c1_px', String(px));",
+                  "console.log('C-price live last=' + b.externalLastPrice + ' -> c1_px=' + px + ' (limit buy ~ -50%, неисполнимо; кратно tickSz=0.01)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/proxy/okx/market-price?instId={{inst_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "proxy",
+                "okx",
+                "market-price"
+              ],
+              "query": [
+                {
+                  "key": "instId",
+                  "value": "{{inst_id}}"
+                }
+              ]
+            },
+            "description": "Кейс C-price плана (предусловие цепочки C). Тянет live-цену с биржи через новый proxy-passthrough getMarketPriceData → MarketPriceDataExternalSnapshot.\n\nКодирует правило коллекции цена ордера — live с биржи, минимальный риск: c1_px = floor(externalLastPrice * 0.5) → limit buy ~ -50% от рынка (практически неисполнимо), кратно tickSz=0.01. Цена идёт в переменную c1_px, потребляется C1 — НЕ зашита константой.\n\nRead-only публичный endpoint (на demo работает: market-data общие). Выход → c1_px."
+          },
+          "response": []
+        },
         {
           "name": "C1. placeOrder limit buy (остаётся live)",
           "event": [
@@ -194,7 +241,7 @@
                 }
               ]
             },
-            "description": "Кейс C1 плана. WRITE — РЕАЛЬНЫЙ ОРДЕР НА БИРЖЕ (на prod-профиле — реальные деньги; пилот — demo).\n\nlimit buy: px далеко ниже mark (~ -50 %, переменная c1_px — подставить от текущей цены), sz = минимальный по спеке (min_sz, см. P2 getInstrument.externalMinSize), reduceOnly=false. side='buy' (OKX-формат, копируется маппером без нормализации).\n\nОжидание: ExchangeAck{success:true, code:0}, externalId=ordId. sCode=0 != live — подтверждается в C2. Выход → c_ordId."
+            "description": "Кейс C1 плана. WRITE — РЕАЛЬНЫЙ ОРДЕР НА БИРЖЕ (на prod-профиле — реальные деньги; пилот — demo).\n\nlimit buy: px = c1_px (live из C-price, ~ -50% от mark → практически не исполнится и держится live), sz = min_sz (минимальный по спеке, minSz=0.01), reduceOnly=false. side=buy (OKX-формат, копируется маппером без нормализации).\n\nПРЕДУСЛОВИЕ: C-price отработал и выставил c1_px. Ожидание: ExchangeAck{success:true, code:0}, externalId=ordId. sCode=0 != live — подтверждается в C2. Выход → c_ordId."
           },
           "response": []
         },
@@ -249,7 +296,7 @@
                 }
               ]
             },
-            "description": "Кейс C2 плана. Подтверждает, что ACK из C1 стал live-ордером (ACK != runtime truth), а не повтор параметров запроса.\n\nОжидание: externalStatus='live' (не filled, не canceled).\n\nSURFACE-GAP: адаптер-инварианты (tdMode=isolated, posSide=net, reduceOnly) на OrderExternalSnapshot НЕ выведены — кросс-проверка инвариантов в ответе через proxy-снапшот не наблюдаема; проверяем только выведенные поля (externalStatus/side/size/price)."
+            "description": "Кейс C2 плана. Подтверждает, что ACK из C1 стал live-ордером (ACK != runtime truth), а не повтор параметров запроса.\n\nОжидание: externalStatus=live (не filled, не canceled).\n\nSURFACE-РАСХОЖДЕНИЕ 2: адаптер-инварианты (tdMode=isolated, posSide=net, reduceOnly) на OrderExternalSnapshot НЕ выведены — кросс-проверка инвариантов в ответе через proxy-снапшот не наблюдаема; проверяем только выведенные поля (externalStatus/side/size/price)."
           },
           "response": []
         },
@@ -344,7 +391,7 @@
                 }
               ]
             },
-            "description": "Кейс C4 плана. Подтверждает финал cancel (не ACK).\n\nОжидание: externalStatus='canceled' (не live).\n\nПримечание: формулировка плана 'через evidence-cycle' относится к доменному refresh-executor; proxy getOrder — одиночный trade-order вызов (отменённый ордер ещё запрашивается по ordId)."
+            "description": "Кейс C4 плана. Подтверждает финал cancel (не ACK).\n\nОжидание: externalStatus=canceled (не live).\n\nSURFACE-РАСХОЖДЕНИЕ 1: формулировка плана через evidence-cycle относится к доменному refresh-executor; proxy getOrder — одиночный trade-order вызов (отменённый ордер ещё запрашивается по ordId)."
           },
           "response": []
         }
@@ -352,7 +399,7 @@
     },
     {
       "name": "И-2 trailing cancel-advance A1→A4 (demo, WRITE)",
-      "description": "Цепочка И-2 плана: проверка cancel-пути advance-семьи (cancel-advance-algos), не торговой корректности trailing. Граф: [A0 опц.] → A1 place → A2 getAlgoOrder live → A3 cancel (ядро) → A4 getAlgoOrder canceled → [A-td опц.]. Среда — demo.\n\nWRITE-ПАПКА: A0/A1/A3/A-td ставят/отменяют РЕАЛЬНЫЕ algo/ордера и позицию на бирже (на prod-профиле — реальные деньги).\n\nTeardown: trailing отменён (A3). Если открывалась позиция (A0) — закрыть (A-td). Прогон прерван — отменить trailing и закрыть позицию.",
+      "description": "Цепочка И-2 плана: проверка cancel-пути advance-семьи (cancel-advance-algos), не торговой корректности trailing. Граф: [A0 опц.] → A1 place → A2 getAlgoOrder live → A3 cancel (ядро) → A4 getAlgoOrder canceled → [A-td опц.]. Среда — demo.\n\nTrailing цены с биржи не требует (callback в %, не px) — live-цена в этой цепочке не нужна.\n\nWRITE-ПАПКА: A0/A1/A3/A-td ставят/отменяют РЕАЛЬНЫЕ algo/ордера и позицию на бирже (на prod-профиле — реальные деньги).\n\nTeardown: trailing отменён (A3). Если открывалась позиция (A0) — закрыть (A-td). Прогон прерван — отменить trailing и закрыть позицию.",
       "item": [
         {
           "name": "A0 (опц.). placeOrder market buy — открыть позицию min-size",
@@ -599,7 +646,7 @@
                 }
               ]
             },
-            "description": "Кейс A3 плана — ЯДРО И-2. conditionType=TRAILING_PERCENTS → клиентский слой ветвит cancel на cancel-advance-algos (isAdvanceFamily), а не cancel-algos.\n\nВЕРДИКТ ЧАСТИЧНО НЕИЗВЕСТЕН (рантайм-снятие конфликта спеки). Гипотеза: endpoint существует на demo, sCode=0. Если demo отвечает 'endpoint не существует' / иной ошибкой → спека в сторону делистинга подтверждена = НАХОДКА ИНТЕГРАТОРУ (правка algo-order.md), не pass/fail с готовым ожиданием.\n\nПроверка кодирует гипотезу (success:true); её фейл = СИГНАЛ НАХОДКИ на разбор, не подгоняется. code/message логируются в консоль для фиксации."
+            "description": "Кейс A3 плана — ЯДРО И-2. conditionType=TRAILING_PERCENTS → клиентский слой ветвит cancel на cancel-advance-algos (isAdvanceFamily), а не cancel-algos.\n\nВЕРДИКТ ЧАСТИЧНО НЕИЗВЕСТЕН (рантайм-снятие конфликта спеки). Гипотеза: endpoint существует на demo, sCode=0. Если demo отвечает endpoint не существует / иной ошибкой → спека в сторону делистинга подтверждена = НАХОДКА ИНТЕГРАТОРУ (правка algo-order.md), не pass/fail с готовым ожиданием.\n\nПроверка кодирует гипотезу (success:true); её фейл = СИГНАЛ НАХОДКИ на разбор, не подгоняется. code/message логируются в консоль для фиксации."
           },
           "response": []
         },
@@ -650,7 +697,7 @@
                 }
               ]
             },
-            "description": "Кейс A4 плана. Подтверждает финал cancel trailing.\n\nОжидание: снапшот algo externalStatus='canceled'. Пустой ответ (algo не отдаётся order-algo после отмены) — наблюдение, не молчаливый pass.\n\nПримечание: proxy getAlgoOrder — одиночный order-algo вызов, не доменный evidence-cycle."
+            "description": "Кейс A4 плана. Подтверждает финал cancel trailing.\n\nОжидание: снапшот algo externalStatus=canceled. Пустой ответ (algo не отдаётся order-algo после отмены) — наблюдение, не молчаливый pass.\n\nSURFACE-РАСХОЖДЕНИЕ 1: proxy getAlgoOrder — одиночный order-algo вызов, не доменный evidence-cycle."
           },
           "response": []
         },
@@ -662,7 +709,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('A-td status 200 (позиция закрыта или её нет)', function () {",
+                  "pm.test('A-td status 200/500 (позиция закрыта или её нет)', function () {",
                   "  pm.expect([200, 500]).to.include(pm.response.code);",
                   "});"
                 ]
@@ -716,7 +763,7 @@
                   "pm.test('I3 не 200 (приватный вызов без кредов не проходит)', function () {",
                   "  pm.expect(pm.response.code).to.not.eql(200);",
                   "});",
-                  "pm.test('I3 fail-fast: ответ содержит credentials (целевое; NPE → фейл = I3 открыт)', function () {",
+                  "pm.test('I3 fail-fast: ответ содержит credential (целевое; NPE → фейл = I3 открыт)', function () {",
                   "  pm.expect(pm.response.text().toLowerCase()).to.include('credential');",
                   "});"
                 ]
@@ -744,15 +791,15 @@
                 }
               ]
             },
-            "description": "Кейс I3 плана. Probe известного незакрытого бага.\n\nТРЕБУЕТ ИЗОЛИРОВАННЫЙ ПРОФИЛЬ с пустыми OKX-кредами (api-key/secret/passphrase не заданы) — НЕ demo, НЕ prod. Сети не достигает: OkxSigningInterceptor падает до отправки.\n\nЦелевое (I3 closed): внятная ошибка fail-fast 'OKX credentials not configured'. Текущее (баг I3, backlog §Инфра-долг I3): NPE в OkxSigningInterceptor.sign() (getSecret().getBytes() на null).\n\nПроверка кодирует ЦЕЛЕВОЕ ожидание (сообщение про credentials) → сейчас фейлит на NPE → подтверждает I3 открытым."
+            "description": "Кейс I3 плана. Probe известного незакрытого бага.\n\nТРЕБУЕТ ИЗОЛИРОВАННЫЙ ПРОФИЛЬ с пустыми OKX-кредами (api-key/secret/passphrase не заданы) — НЕ demo, НЕ prod. Сети не достигает: OkxSigningInterceptor падает до отправки.\n\nЦелевое (I3 closed): внятная ошибка fail-fast OKX credentials not configured. Текущее (баг I3, backlog §Инфра-долг I3): NPE в OkxSigningInterceptor.sign() (getSecret().getBytes() на null).\n\nПроверка кодирует ЦЕЛЕВОЕ ожидание (сообщение про credentials) → сейчас фейлит на NPE → подтверждает I3 открытым."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Prod read-only P1/P2/P4 (prod-профиль, только чтения)",
-      "description": "Блок P плана: только чтения на prod-профиле, БЕЗ write-эффектов. Teardown не нужен.\n\nP3 (Candles) — НЕ ПОКРЫТО: на OkxProxyController candle-эндпоинта нет (surface-gap). Чтение свечей идёт прямым клиентским вызовом / market-data путём, не через прокси — запрос НЕ выдумываем. Находка плана: зафиксировать отсутствие proxy-passthrough для свечей.",
+      "name": "Prod read-only P1/P2/P3/P4 (prod-профиль, только чтения)",
+      "description": "Блок P плана: только чтения на prod-профиле, БЕЗ write-эффектов. Teardown не нужен.\n\nP3 — новый эндпоинт getMarketPriceData (standalone read публичного passthrough'а, тот же что в C-price).\n\nСвечи — НЕ ПОКРЫТО (surface-gap 4): на OkxProxyController candle-эндпоинта нет. Чтение свечей идёт market-data путём, не через прокси — запрос НЕ выдумываем. Находка плана: зафиксировать отсутствие proxy-passthrough для свечей (кандидат на закрытие отдельным эндпоинтом, как закрыт price-gap).",
       "item": [
         {
           "name": "P1. getBalance (private read)",
@@ -848,7 +895,57 @@
                 }
               ]
             },
-            "description": "Кейс P2 плана. Среда — prod (public, без кредов).\n\nПримечание: getInstrument требует instType (обязательный param) — instType=SWAP.\n\nОжидание: снапшот инструмента (min size, precision, contract multiplier). externalMinSize отсюда → значение для min_sz в demo-цепочках C/A."
+            "description": "Кейс P2 плана. Среда — prod (public, без кредов).\n\nПримечание: getInstrument требует instType (обязательный param) — instType=SWAP.\n\nОжидание: снапшот инструмента (min size, precision, contract multiplier). externalMinSize отсюда → опора значения min_sz в demo-цепочках C/A."
+          },
+          "response": []
+        },
+        {
+          "name": "P3. getMarketPriceData (public) — новый эндпоинт",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('P3 status 200', function () { pm.response.to.have.status(200); });",
+                  "var b = pm.response.json();",
+                  "pm.test('P3 externalInstrumentId === inst_id', function () {",
+                  "  pm.expect(b.externalInstrumentId).to.eql(pm.collectionVariables.get('inst_id'));",
+                  "});",
+                  "pm.test('P3 live last/ask/bid присутствуют и > 0', function () {",
+                  "  pm.expect(Number(b.externalLastPrice)).to.be.above(0);",
+                  "  pm.expect(Number(b.externalAskPrice)).to.be.above(0);",
+                  "  pm.expect(Number(b.externalBidPrice)).to.be.above(0);",
+                  "});",
+                  "pm.test('P3 externalTimestamp присутствует', function () {",
+                  "  pm.expect(b).to.have.property('externalTimestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/proxy/okx/market-price?instId={{inst_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "proxy",
+                "okx",
+                "market-price"
+              ],
+              "query": [
+                {
+                  "key": "instId",
+                  "value": "{{inst_id}}"
+                }
+              ]
+            },
+            "description": "Кейс P3 плана. Среда — prod (public, без кредов). Standalone-валидация нового proxy-passthrough'а getMarketPriceData → MarketPriceDataExternalSnapshot (тот же эндпоинт, что функционально используется в C-price).\n\nОжидание: снапшот цены с live last/ask/bid (> 0) + externalTimestamp (ms). Read-only, безопасен на prod."
           },
           "response": []
         },
@@ -917,13 +1014,13 @@
     },
     {
       "key": "min_sz",
-      "value": "0.1",
-      "description": "Минимальный размер по спеке (placeholder; подставить P2 getInstrument.externalMinSize)."
+      "value": "0.01",
+      "description": "Минимальный размер по спеке ETH-USDT-SWAP (minSz=0.01, сверка 2026-06-15; опора — P2 getInstrument.externalMinSize)."
     },
     {
       "key": "c1_px",
-      "value": "1000",
-      "description": "limit-цена C1 далеко ниже mark (~ -50 %; placeholder — подставить от текущей цены)."
+      "value": "",
+      "description": "Цена C1. НЕ задаётся вручную — выставляется C-price из live last (floor(last*0.5), неисполнимо). Пусто до прогона C-price."
     },
     {
       "key": "a_trailing",

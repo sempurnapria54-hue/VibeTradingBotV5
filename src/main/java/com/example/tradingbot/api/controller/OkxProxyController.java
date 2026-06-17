@@ -16,6 +16,7 @@ import com.example.tradingbot.domain.model.core.instrument.external_snapshot.Ins
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.trade.market_price_data.external_snapshot.MarketPriceDataExternalSnapshot;
 import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.integration.service.okx.OkxRestClient;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,6 +63,12 @@ public class OkxProxyController {
     @Operation(summary = "Спецификация инструмента с биржи")
     public InstrumentExternalSnapshot getInstrument(@RequestParam String instId, @RequestParam String instType) {
         return integrationService.getInstrument(instId, instType);
+    }
+
+    @GetMapping("/market-price")
+    @Operation(summary = "Рыночная цена (тикер) инструмента — live last/ask/bid")
+    public MarketPriceDataExternalSnapshot getMarketPriceData(@RequestParam String instId) {
+        return integrationService.getMarketPriceData(instId);
     }
 
     @GetMapping("/order")

@@ -15,6 +15,7 @@ import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxBalanceResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxFillResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse;
+import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.util.Constants;
@@ -26,7 +27,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Низкоуровневый HTTP-клиент OKX: публичные endpoint'ы (instruments /
- * candles) через {@code okxRestClientHttp}; приватные (trade / account)
+ * candles / ticker) через {@code okxRestClientHttp}; приватные (trade / account)
  * через подписанный {@code okxAuthRestClientHttp}
  * ({@link OkxSigningInterceptor}). Возвращает сырые DTO источника;
  * доменных моделей не видит (codestyle: слои).
@@ -39,6 +40,9 @@ public class OkxRestClient {
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<List<String>>> CANDLE_ARRAY_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<OkxApiResponse<OkxTickerResponse>> TICKER_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<OrderOkxResponse>> ORDER_TYPE =
@@ -113,6 +117,16 @@ public class OkxRestClient {
                 })
                 .retrieve()
                 .body(CANDLE_ARRAY_TYPE);
+    }
+
+    /** Тикер (рыночная цена: last/ask/bid + ts) инструмента: {@code instId} обязателен. Публичный endpoint. */
+    public OkxApiResponse<OkxTickerResponse> getTicker(String instId) {
+        return okxRestClientHttp.get()
+                .uri(uriBuilder -> uriBuilder.path(Constants.Okx.MARKET_TICKER_PATH)
+                        .queryParam(Constants.Okx.PARAM_INST_ID, instId)
+                        .build())
+                .retrieve()
+                .body(TICKER_TYPE);
     }
 
     /** Live/pending ordinary orders по инструменту (звено evidence-cycle). */

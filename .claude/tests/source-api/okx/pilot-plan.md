@@ -2,42 +2,51 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как проверяем API OKX в пилотном скоупе (цикл ордера, негативный
-слой, trailing-cancel, пустые креды, prod read-only).
+Как проверяем API OKX в пилотном скоупе (live-цена, негативный
+слой, цикл ордера, trailing-cancel, пустые креды, prod read-only).
 
 ## Статус
 
-**Утверждён 2026-06-12** — аппрув пользователя без существенной
-правки (чистая валидация `tester`, счёт гейта 1/3,
-`.claude/work/delegation-ledger.md`). Развилка «нога amend» закрыта
-вариантом (a) — см. ниже. Процесс —
-`.claude/processes/source-api-testing.md`. Фактический результат и
-вердикты по кейсам — в отчёте прогона (`history`).
+**Перегенерирован с нуля 2026-06-15 под действующие правила**
+(`test-design` / `test-collection` / шаблон `test-plan`). Замещает
+интеримную версию (аппрув 2026-06-12), сгенерированную до того, как
+методология тест-коллекций стала правилами. Ключевое изменение:
+**price-gap закрыт** — добавлен proxy-эндпоинт live-цены
+(`GET /api/proxy/okx/market-price` → `getMarketPriceData` →
+`MarketPriceDataExternalSnapshot`), цена ордера теперь тянется с
+биржи, а не выдумывается. Форма кейса приведена к шаблонной (таблица
+на кейс, строка = запрос).
+
+**На аппрув** (DESIGN-only заход: пилот останавливается после этапа
+REVIEW+APPROVE; RUN/разбор — отдельным заходом). Процесс —
+`.claude/processes/source-api-testing.md`. Поле «факт» пустое до RUN.
 
 ## Скоуп
 
 Пилот, обкатка формы плана. Триггер — разовый запуск по запросу
-пользователя (первый план OKX; полный план по всем 26 контрактам —
-вторым заходом после обкатки формы). Покрывает:
+пользователя (регенерация под действующие правила). Покрывает:
 
+- **live-цена** — `getMarketPriceData` (новый proxy-passthrough),
+  источник неисполнимой цены для C и standalone read на prod;
 - **негативный слой** (без состояния) — cancel несуществующего,
   getOrder по фейковому id;
-- **цепочку ордера** по графу предусловий — place → getOrder →
-  cancel → проверка отменённого;
+- **цепочку ордера** по графу предусловий — live-цена → place →
+  getOrder → cancel → проверка отменённого;
 - **И-2** — trailing `move_order_stop` через `cancel-advance-algos`
   на demo (рантайм-снятие конфликта спеки);
 - **I3** — поведение клиентского слоя на пустых OKX-кредах;
-- **prod read-only** — balance, instruments, candles, positions.
+- **prod read-only** — balance, instrument, market-price, position.
 
 Объект — **API OKX через наш клиентский слой** (`IntegrationService`
 / `OkxRestClient`, граничная поверхность `OkxProxyController`).
-Домен (Deal, FSM, executors) вне охвата.
+Домен (Deal, FSM, executors) вне охвата. Пилот — подмножество
+поверхности (полный план по всей поверхности — отдельным заходом).
 
 ## Среда
 
 - **demo** (test-профиль, demo-креды, header `x-simulated-trading:
   1` через `okx.simulated`) — все write-операции (place / cancel
-  ордеров и algo) и их подтверждающие чтения.
+  ордеров и algo) и их подтверждающие чтения, плюс live-цена цепочки.
 - **prod read-only** (prod-профиль, prod read-креды) — отдельный
   блок только чтений; **никаких write-эффектов на prod**.
 - **изолированная конфигурация пустых кредов** (`OkxProperties` без
@@ -45,6 +54,8 @@
 
 Инструмент пилота — `ETH-USDT-SWAP` (адаптер: `tdMode=isolated`,
 `posSide=net` — хардкод, `docs/integrations/okx/rules/adapter-constants.md`).
+Спека (сверка 2026-06-15): `minSz=0.01`, `lotSz=0.01`, `tickSz=0.01`,
+`ctVal=0.1` — целочисленная цена кратна `tickSz`.
 
 ## Сквозные проверки (красная нить)
 
@@ -58,105 +69,82 @@
   несёт `tdMode=isolated`, `posSide=net`, а order — `reduceOnly`,
   совпадающий с запросом; расхождение — `EXCHANGE_INVARIANT_VIOLATION`
   (`docs/integrations/okx/rules/{adapter-constants,reduce-only-invariant}.md`).
-  Фиксируется в наблюдениях.
+  **Surface-gap:** инварианты на `OrderExternalSnapshot` наружу не
+  выведены — через прокси не наблюдаемы (помечено в кейсах, проверка
+  не выдумывается).
 - **Per-element `sCode`.** Реджект приходит в `data[0].sCode`, не
   только в top-level `code`.
+
+## Surface-расхождения прокси (общие для плана)
+
+Граница ревью — прокси-поверхность; ниже неё кейс не лезет:
+
+1. **proxy getOrder/getAlgoOrder — одиночный вызов, не
+   evidence-cycle.** `GET /order` / `/algo-order` зовут один
+   `trade-order` / `order-algo` с `verifyCode`-throw на ошибочный
+   top-level `code`, а **не** доменный refresh evidence-cycle
+   (pending → history → archive). Терминал `MISSING_AFTER_REFRESH`
+   живёт в refresh-executor, на прокси не воспроизводится (N2/C4/A4).
+2. **Адаптер-инварианты** `tdMode`/`posSide`/`reduceOnly` на
+   снапшоте ордера не выведены — не наблюдаемы через прокси (C2).
+3. **Сырой клиентский уровень** (например уровень (a) в N2 —
+   `OkxRestClient.getOrder` напрямую) отдельным proxy-эндпоинтом не
+   покрыт; запрос не выдумывается.
+4. **Свечи на прокси нет** — `OkxProxyController` candle-passthrough'а
+   не несёт; чтение свечей идёт market-data путём, не через прокси
+   (prod-блок, см. ниже).
 
 ## Негативный слой (без состояния) — demo, гоняется первым
 
 ### N1. Cancel несуществующего ордера
 
 - **Объект:** `cancelOrder` (proxy `DELETE /api/proxy/okx/order`).
-- **Предусловие:** отсутствие ордера (заведомо несуществующий
-  `ordId`).
-- **Шаги:** `cancelOrder(instId=ETH-USDT-SWAP, ordId=<несущ.>)`.
-- **Ожидаемый результат:** реджект — `data[0].sCode = 51603` (order
-  does not exist); `ExchangeAck` отражает реджект, а не «успех».
-- **Среда:** demo.
-- **Наблюдения (RUN):** как клиентский слой прокидывает per-element
-  `sCode` 51603 в `ExchangeAck`. _Факт: …_
+- **Предусловие-состояние:** отсутствие ордера (заведомо
+  несуществующий `ordId`).
+- **Среда:** demo. **Teardown:** не требуется (эффекта нет).
+
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| `cancelOrder(instId=ETH-USDT-SWAP, ordId=<несущ.>)` | HTTP 200; `ExchangeAck.success=false`; `ExchangeAck.code=51603`; ack несёт `code` + `message` | Реджект отражён в `ExchangeAck` (не throw): per-element `data[0].sCode=51603` (order does not exist) прокинут в ack с HTTP 200. **Находка по дизайну:** HTTP 500 вместо ack = рассогласование реджект-кодов (`backlog`: 500 вместо 422/409) — проверка фейлит и показывает его | _…_ |
 
 ### N2. getOrder по фейковому id
 
 - **Объект:** `getOrder` — два уровня наблюдения.
-- **Предусловие:** отсутствие ордера (фейковый `ordId`).
-- **Шаги:** (a) `OkxRestClient.getOrder(instId, ordId=<фейк>, null)`
-  напрямую; (b) `IntegrationService.getOrder(...)` /
-  proxy `GET /api/proxy/okx/order` (снапшот через evidence-cycle).
-- **Ожидаемый результат:** (a) сырой клиент — `sCode = 51603`;
-  (b) снапшот-резолюция — evidence-cycle (order details →
-  orders-pending → orders-history → archive) исчерпывается в
-  терминал «не найден» (`MISSING_AFTER_REFRESH` /
-  `docs/decisions/refresh-evidence-cycle-ownership.md`). **Два
-  уровня различаются** — сырой код vs терминал снапшота.
-- **Среда:** demo.
+- **Предусловие-состояние:** отсутствие ордера (фейковый `ordId`).
+- **Среда:** demo. **Teardown:** не требуется.
 - **Связь:** 51603-on-not-found — предпосылка D-B3 (SUBMIT
   recovery-by-clientId, `backlog.md`); пилот фиксирует, как код
-  доходит до клиентского слоя. _Факт: …_
+  доходит до клиентского слоя.
 
-## Цепочка ордера (по графу предусловий) — demo
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| (a) `OkxRestClient.getOrder(instId, ordId=<фейк>, null)` напрямую | — (**surface-gap:** сырой клиент не покрыт прокси) | Сырой клиент: `sCode=51603`. Запрос через прокси не выдумывается — фиксируется как gap | _…_ |
+| (b) proxy `GET /api/proxy/okx/order?ordId=<фейк>` | HTTP 200; тело `null` **или** `externalStatus≠live` | Резолюция «не найден» (HTTP 200, нет живого ордера). **Surface-расхождение 1**: это одиночный `trade-order`, не evidence-cycle. Если OKX отдаёт 51603 top-level → `verifyCode` throw → HTTP 500: фейл проверки = находка (реджект исключением, а не «не найден») | _…_ |
 
-Граф: C1 (place) → C2 (getOrder live) → C3 (cancel) → C4 (getOrder
-canceled). Нога amend убрана (развилка закрыта вариантом (a), аппрув
-2026-06-12) — см. «Закрытая развилка: нога amend».
+## Цепочка ордера (по графу предусловий) — demo, WRITE
 
-### C1. Place limit-ордера (остаётся live)
+Граф: **C-price** (live-цена) → **C1** (place) → **C2** (getOrder
+live) → **C3** (cancel) → **C4** (getOrder canceled). Нога amend
+убрана (развилка закрыта вариантом (a), аппрув 2026-06-12 — см.
+«Закрытая развилка: нога amend»).
 
-- **Объект:** `placeOrder` (proxy `POST /api/proxy/okx/order`).
-- **Предусловие:** достаточный demo-баланс (нет ордеров/позиций).
-- **Шаги:** limit buy, `px` далеко ниже mark (≈ −50 %, чтобы
-  практически исключить исполнение и держать ордер live),
-  `sz` = минимальный по instrument-спеке, `reduceOnly=false`.
-- **Ожидаемый результат:** `data[0].sCode=0`, `ordId` в
-  `ExchangeAck.externalId`. **`sCode=0` ≠ live** — подтверждается в
-  C2.
-- **Среда:** demo.
-- **Выход → предусловие C2/C3.** _Факт: …_
+- **Объект:** цепочка `getMarketPriceData` → `placeOrder` →
+  `getOrder` → `cancelOrder` → `getOrder`.
+- **Предусловие-состояние:** достаточный demo-баланс, нет
+  ордеров/позиций по инструменту.
+- **Среда:** demo. **WRITE — реальный ордер на бирже** (на
+  prod-профиле — реальные деньги; пилот — demo).
 
-### C2. getOrder на размещённом — подтверждение place
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| **C-price.** `getMarketPriceData(instId)` (proxy `GET /market-price`) | HTTP 200; `externalLastPrice` присутствует и `> 0` | Снапшот `MarketPriceDataExternalSnapshot` с live `externalLastPrice`/`Ask`/`Bid`. Коллекция кладёт `last` в переменную и выводит **неисполнимую** цену C1: `c1_px = floor(last · 0.5)` (limit buy ≈ −50 % от рынка — практически не исполнится; кратно `tickSz=0.01`) | _…_ |
+| **C1.** `placeOrder(side=buy, sz=min, px=c1_px, reduceOnly=false)` (proxy `POST /order`) | HTTP 200; `success=true`; `code=0`; `externalId` (ordId) непустой | `data[0].sCode=0`, `ordId` в `ExchangeAck.externalId`. **`sCode=0` ≠ live** — подтверждается в C2. Цена — из C-price, не константа. Выход → `c_ordId` | _…_ |
+| **C2.** `getOrder(instId, ordId=c_ordId)` (proxy `GET /order`) | HTTP 200; `externalId=c_ordId`; `externalStatus=live`; снапшот несёт `side`/`size`/`price`/`externalStatus` | ACK из C1 стал **live**-ордером (не filled/canceled) — ACK ≠ runtime truth, а не эхо запроса. **Surface-расхождение 2:** инварианты `tdMode`/`posSide`/`reduceOnly` на снапшоте не выведены — не проверяются | _…_ |
+| **C3.** `cancelOrder(instId, ordId=c_ordId)` (proxy `DELETE /order`) | HTTP 200; `success=true`; `code=0` | `data[0].sCode=0` в `ExchangeAck`. **Это ACK, не финал** — `CANCELED` подтверждается в C4 | _…_ |
+| **C4.** `getOrder(instId, ordId=c_ordId)` (proxy `GET /order`) | HTTP 200; `externalStatus=canceled` (не `live`) | Финал cancel (не ACK). **Surface-расхождение 1:** одиночный `trade-order` (отменённый ордер ещё доступен по `ordId`), не evidence-cycle | _…_ |
+| **Teardown C.** при исполнении C1 (рынок дошёл) — `closePosition(instId, ccy)`; прогон прерван между C1 и C3 — `cancelOrder` по `c_ordId` | — | После C3 ордер отменён → биржа чистая. Цена C1 далеко от рынка → исполнение практически исключено; исполнение — зафиксировать наблюдением и закрыть позицию | _…_ |
 
-- **Объект:** `getOrder` (proxy / `IntegrationService`).
-- **Предусловие:** живой неисполненный ордер из C1 (`ordId`).
-- **Шаги:** `getOrder(instId, ordId из C1)`.
-- **Ожидаемый результат (не эхо C1):** state = `live` (не `filled`,
-  не `canceled`); адаптер-инварианты в ответе (`tdMode=isolated`,
-  `posSide=net`, `reduceOnly=false` как в запросе). Проверяет, что
-  ACK из C1 действительно стал live-ордером (ACK ≠ runtime truth),
-  плюс инварианты, — а не повтор параметров запроса.
-- **Среда:** demo.
-- **Выход → предусловие C3.** _Факт: …_
-
-### C3. Cancel живого ордера
-
-- **Объект:** `cancelOrder` (proxy `DELETE /api/proxy/okx/order`).
-- **Предусловие:** живой неисполненный ордер из C1/C2 (`ordId`).
-- **Шаги:** `cancelOrder(instId, ordId)`.
-- **Ожидаемый результат:** `data[0].sCode=0` в `ExchangeAck`; **это
-  ACK, не финал** — `CANCELED` подтверждается в C4.
-- **Среда:** demo.
-- **Выход → предусловие C4.** _Факт: …_
-
-### C4. getOrder на отменённом — подтверждение cancel
-
-- **Объект:** `getOrder`.
-- **Предусловие:** отменённый ордер из C3 (`ordId`).
-- **Шаги:** `getOrder(instId, ordId)`.
-- **Ожидаемый результат:** снапшот — state = `canceled` (через
-  evidence-cycle order details / orders-history), **не** `live`.
-  Подтверждает финал cancel, не ACK.
-- **Среда:** demo.
-- **Наблюдения (RUN):** различить, через какое звено evidence-cycle
-  виден `canceled` (details vs history). _Факт: …_
-
-### Teardown цепочки C
-
-- После C3 ордер отменён. Если прогон прерван между C1 и C3 —
-  отменить повисший ордер (`cancelOrder` по сохранённому `ordId`).
-- Limit-цена C1 далеко от рынка → исполнение практически исключено;
-  **на случай исполнения** (рынок дошёл) — закрыть открывшуюся
-  позицию (`closePosition`, demo) и зафиксировать как наблюдение.
-
-## И-2 — trailing `cancel-advance-algos` (demo)
+## И-2 — trailing `cancel-advance-algos` (demo, WRITE)
 
 Снятие конфликта спеки рантаймом: `cancel-advance-algos` выведен из
 офдока 2025-04-24, но `OkxRestClient.cancelAdvanceAlgos` существует
@@ -164,58 +152,21 @@ canceled). Нога amend убрана (развилка закрыта вари
 `docs/integrations/okx/contracts/algo-order.md`). Цель — проверить
 **cancel-путь advance-семьи**, не торговую корректность trailing.
 
-### A1. Place trailing `move_order_stop`
+- **Объект:** цепочка `placeAlgoOrder` → `getAlgoOrder` →
+  `cancelAlgoOrder`(advance) → `getAlgoOrder`.
+- **Предусловие-состояние:** нет — стартуем **без открытой позиции**;
+  рантайм-резолюция A0 (ниже). Trailing цены с биржи не требует
+  (callback в %, не px).
+- **Среда:** demo. **WRITE — реальные algo/ордер/позиция.**
 
-- **Объект:** `placeAlgoOrder` (proxy `POST /api/proxy/okx/algo-order`).
-- **Предусловие:** нет — стартуем **без открытой позиции**.
-  Рантайм-резолюция (решение аппрува): если demo реджектит
-  reduce-only trailing без позиции — открыть позицию min-size
-  (`placeOrder` market buy), затем A1; тогда в цепочку добавляются
-  ноги open-position (до A1) и close-position (teardown).
-- **Шаги:** `placeAlgoOrder(ordType=move_order_stop, callbackRatio,
-  reduceOnly=true)`; при реджекте «нет позиции» — открыть позицию
-  min-size и повторить A1.
-- **Ожидаемый результат:** `data[0].sCode=0`, `algoId` в ack.
-- **Среда:** demo.
-- **Выход → предусловие A2/A3.** _Факт: …_
-
-### A2. getAlgoOrder — подтверждение live
-
-- **Объект:** `getAlgoOrder` (proxy `GET /api/proxy/okx/algo-order`).
-- **Предусловие:** размещённый trailing из A1 (`algoId`).
-- **Шаги:** `getAlgoOrder(instId, algoId, ordType=move_order_stop)`.
-- **Ожидаемый результат:** снапшот — algo `live`/`effective`.
-- **Среда:** demo. _Факт: …_
-
-### A3. Cancel через `cancel-advance-algos` (ядро И-2)
-
-- **Объект:** `cancelAlgoOrder` для advance-семьи → клиентский слой
-  ветвит на `OkxRestClient.cancelAdvanceAlgos`.
-- **Предусловие:** живой trailing из A1/A2 (`algoId`).
-- **Шаги:** `cancelAlgoOrder(algoOrder=move_order_stop, instId)`;
-  проверить, что вызов ушёл на `cancel-advance-algos`, а не
-  `cancel-algos`.
-- **Ожидаемый результат — частично неизвестен (рантайм-снятие И-2).**
-  Гипотеза: эндпоинт существует на demo и отвечает `sCode=0`. **Если
-  demo отвечает «endpoint не существует» / иной ошибкой** — спека в
-  сторону делистинга подтверждена. Незадокументированное **не
-  выдумывается**: вердикт A3 = **находка интегратору** (правка
-  `algo-order.md` в подтверждённую сторону), не pass/fail с заранее
-  известным ожиданием.
-- **Среда:** demo. _Факт: …_
-
-### A4. getAlgoOrder — подтверждение cancel
-
-- **Объект:** `getAlgoOrder` на отменённом.
-- **Предусловие:** отменённый trailing из A3 (`algoId`).
-- **Ожидаемый результат:** снапшот — algo `canceled`.
-- **Среда:** demo. _Факт: …_
-
-### Teardown И-2
-
-- Trailing отменён (A3). Если открывалась позиция под reduce-only —
-  закрыть (`closePosition`, demo). Прогон прерван — отменить trailing
-  (`cancel-advance-algos`) и закрыть позицию.
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| **A0 (опц.).** `placeOrder(side=buy, sz=min, market)` — открыть позицию | HTTP 200; `success=true` | **Условная нога** (рантайм-резолюция аппрува): выполнять только если A1 реджектит reduce-only trailing без позиции. Парная нога — A-td | _…_ |
+| **A1.** `placeAlgoOrder(conditionType=TRAILING_PERCENTS, direction=SELL, sz=min, reduceOnly=true, trailingPercents)` (proxy `POST /algo-order`) | HTTP 200; `success=true`; `code=0`; `externalId` (algoId) непустой | `data[0].sCode=0`, `algoId` в ack. При реджекте «нет позиции» — A0 и повтор A1. Выход → `a_algoId` | _…_ |
+| **A2.** `getAlgoOrder(instId, algoId=a_algoId)` (proxy `GET /algo-order`) | HTTP 200; снапшот несёт `externalId` + `externalStatus`; `externalStatus≠canceled` | Trailing из A1 — `live`/`effective` | _…_ |
+| **A3.** `cancelAlgoOrder(conditionType=TRAILING_PERCENTS, algoId)` → ветвь `cancel-advance-algos` (proxy `DELETE /algo-order`) | HTTP 200; `success=true` (**гипотеза**) — фейл = сигнал находки, не pass/fail | **Ядро И-2. Вердикт частично неизвестен** (рантайм-снятие). Гипотеза: эндпоинт жив на demo, `sCode=0`. Если demo отвечает «endpoint не существует»/иной ошибкой → делистинг подтверждён = **находка интегратору** (правка `algo-order.md`), не заранее известный pass/fail. `code`/`message` логируются | _…_ |
+| **A4.** `getAlgoOrder(instId, algoId=a_algoId)` (proxy `GET /algo-order`) | HTTP 200; `externalStatus=canceled` **или** пустой ответ (наблюдение, не молчаливый pass) | Финал cancel trailing. **Surface-расхождение 1:** одиночный `order-algo`, не evidence-cycle | _…_ |
+| **Teardown И-2.** если открывалась позиция (A0) — `closePosition(instId, ccy)` (A-td); прогон прерван — отменить trailing (`cancel-advance-algos`) и закрыть позицию | — | Trailing отменён (A3) + позиция закрыта → биржа чистая | _…_ |
 
 ## I3 — пустые OKX-креды (клиентский слой)
 
@@ -223,20 +174,14 @@ canceled). Нога amend убрана (развилка закрыта вари
 
 - **Объект:** любой приватный вызов клиентского слоя (например
   `getBalance`) при `OkxProperties` без кредов.
-- **Предусловие:** изолированная конфигурация — `api-key`/`secret`/
-  `passphrase` не заданы (не demo, не prod).
-- **Шаги:** инициировать приватный эндпоинт; `OkxSigningInterceptor`
-  отрабатывает **до** отправки.
-- **Ожидаемый результат (целевой, I3):** внятная ошибка
-  fail-fast — «OKX credentials not configured». **Текущее
-  поведение** (до фикса): NPE в `OkxSigningInterceptor.sign()`
-  (`properties.getSecret().getBytes(...)` на `null`).
-- **Среда:** локально, без сети.
-- **Вердикт (RUN):** NPE → подтверждает баг **I3** (`backlog.md`
-  §Инфра-долг I3, уже заведён) → находка/backlog; внятная ошибка →
-  I3 закрыт. Кейс — **probe известного незакрытого бага**.
-- **Наблюдения:** на каком вызове/строке падает, тип исключения,
-  достигает ли сети. _Факт: …_
+- **Предусловие-состояние:** изолированная конфигурация — `api-key`/
+  `secret`/`passphrase` не заданы (не demo, не prod).
+- **Среда:** локально, без сети. **Teardown:** не требуется.
+- **Тип:** probe известного незакрытого бага I3.
+
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| `getBalance(ccy)` (proxy `GET /balance`) на пустых кредах | HTTP ≠ 200; тело содержит `credential` (целевое fail-fast) | **Целевое (I3 closed):** внятная ошибка «OKX credentials not configured». **Текущее (баг I3, `backlog` §Инфра-долг I3):** NPE в `OkxSigningInterceptor.sign()` (`getSecret().getBytes()` на `null`). `OkxSigningInterceptor` отрабатывает **до** отправки — сети не достигает. NPE → I3 открыт; внятная ошибка → I3 закрыт | _…_ |
 
 ## Prod read-only блок (prod-креды, только чтения)
 
@@ -245,35 +190,36 @@ canceled). Нога amend убрана (развилка закрыта вари
 
 ### P1. getBalance (private read)
 
-- **Объект:** `getBalance` (proxy `GET /api/proxy/okx/balance?ccy=USDT`).
-- **Среда:** prod read-only.
-- **Ожидаемый результат:** снапшот баланса, `code=0`, details по
-  USDT. _Факт: …_
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| `getBalance(ccy=USDT)` (proxy `GET /balance`) | HTTP 200; снапшот несёт `externalTotalEquity` + `balances[]`; есть деталь по `USDT` | Account-level снапшот баланса, `code=0`, details по USDT | _…_ |
 
 ### P2. getInstrument (public)
 
-- **Объект:** `getInstrument` (proxy `GET /api/proxy/okx/instrument`).
-- **Среда:** prod (public, без кредов).
-- **Ожидаемый результат:** снапшот инструмента `ETH-USDT-SWAP`
-  (min/max size, precision, contract multiplier). _Факт: …_
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| `getInstrument(instId=ETH-USDT-SWAP, instType=SWAP)` (proxy `GET /instrument`) | HTTP 200; `externalInstrumentId=ETH-USDT-SWAP`; снапшот несёт `externalMinSize`/`externalTickSize`/`externalContractMultiplier` | Снапшот инструмента (min/max size, precision, contract multiplier). `externalMinSize` — опора `min_sz` demo-цепочек C/A | _…_ |
 
-### P3. Candles (public)
+### P3. getMarketPriceData (public) — новый эндпоинт
 
-- **Объект:** `OkxRestClient.getLatestCandles` / `getHistoryCandles`.
-  **Surface-gap:** на `OkxProxyController` candle-эндпоинта нет —
-  чтение идёт прямым клиентским вызовом / market-data путём.
-- **Среда:** prod (public).
-- **Ожидаемый результат:** список свечей по `instId`/`bar`.
-- **Наблюдения:** зафиксировать отсутствие proxy-passthrough для
-  свечей. _Факт: …_
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| `getMarketPriceData(instId=ETH-USDT-SWAP)` (proxy `GET /market-price`) | HTTP 200; `externalInstrumentId=ETH-USDT-SWAP`; `externalLastPrice`/`externalAskPrice`/`externalBidPrice` присутствуют и `> 0`; `externalTimestamp` присутствует | Снапшот `MarketPriceDataExternalSnapshot` с live last/ask/bid + ts (ms). Standalone-валидация нового passthrough'а (публичный read, без кредов; на prod read-only безопасен). Тот же эндпоинт функционально используется в C-price | _…_ |
 
 ### P4. getPosition (private read)
 
-- **Объект:** `getPosition` (proxy `GET /api/proxy/okx/position?instId=ETH-USDT-SWAP`).
-- **Среда:** prod read-only.
-- **Ожидаемый результат:** снапшот позиции; **пустой / нет
-  позиции — валидный исход** (read-only, ничего не открываем).
-  _Факт: …_
+| Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| `getPosition(instId=ETH-USDT-SWAP)` (proxy `GET /position`) | HTTP 200; тело `null` (нет позиции) **или** снапшот с `externalId` — оба валидны | Снапшот позиции; **пустая/нет позиции — валидный исход** (read-only, ничего не открываем): `getPosition` при пустом `data` → `null` → HTTP 200 с пустым телом | _…_ |
+
+### Surface-gap: свечи (P-candles, не покрыто)
+
+`OkxRestClient.getLatestCandles`/`getHistoryCandles` существуют, но
+**на `OkxProxyController` candle-эндпоинта нет** (surface-расхождение
+4). Чтение свечей идёт market-data путём, не через прокси — запрос
+**не выдумывается**. Находка плана: зафиксировать отсутствие
+proxy-passthrough для свечей (кандидат на закрытие отдельным
+эндпоинтом, как закрыт price-gap).
 
 ## Закрытая развилка: нога amend
 
@@ -302,9 +248,14 @@ REPLACE-оркестрации** в `ServiceCommandFactory` (`backlog.md` §Хв
 
 - Процесс контура — `.claude/processes/source-api-testing.md`.
 - Шаблон — `.claude/templates/docs/test-plan.md`.
+- Скиллы — `.claude/skills/{test-design,test-collection,test-review,test-run}.md`.
 - Роль-автор — `.claude/agents/tester.md`.
 - Контракты OKX — `docs/integrations/okx/contracts/`
   (`order.md`, `algo-order.md`, `position.md`, `balance.md`,
-  `instrument.md`, `candle.md`).
+  `instrument.md`, `market-price-data.md`, `mark-price.md`, `candle.md`).
 - Правила источника — `docs/integrations/okx/rules/`
   (`adapter-constants.md`, `reduce-only-invariant.md`).
+- Модель цены — `docs/components/models/MarketPriceData.md`,
+  `docs/models/mapping/MarketPriceData.md`.
+- Прокси-поверхность —
+  `src/main/java/com/example/tradingbot/api/controller/OkxProxyController.java`.

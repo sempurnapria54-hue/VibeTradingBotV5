@@ -65,6 +65,9 @@ public final class Constants {
         /** Путь истории свечей. */
         public static final String HISTORY_CANDLES_PATH = "/api/v5/market/history-candles";
 
+        /** Путь тикера (рыночная цена: last/ask/bid). Публичный endpoint. */
+        public static final String MARKET_TICKER_PATH = "/api/v5/market/ticker";
+
         /** Путь ordinary order (place POST / get GET). Приватный endpoint. */
         public static final String TRADE_ORDER_PATH = "/api/v5/trade/order";
 
