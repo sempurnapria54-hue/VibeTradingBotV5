@@ -570,6 +570,32 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 пользователем. Источник — пауза RUN пилота (run-log
 `.claude/work/progress/source-api-pilot-run-log.md`; снапшот v48).
 
+> Примечание: ре-база контура на сырьё
+> (`.claude/decisions/source-api-target-rebase.md`) делает контур
+> demo/non-prod и убирает prod из контура; prod read-only — больше не
+> хвост контура, а ад-хок ручная проверка пользователя вне контура.
+> Demo-бут по-прежнему нужен для автономного RUN код-тестов.
+
+## Ре-база source-api: снятие mapped-поверхности (§«Неиспользуемый код»)
+
+При приземлении **A2 raw-passthrough** (новая поверхность контура,
+отдаёт сырой `OkxApiResponse<T>`) — снять mapped-поверхность, ставшую
+неиспользуемой (`codestyle` §«Неиспользуемый код»). Делается **вместе с
+приземлением passthrough** (не раньше — чтобы не снять источник до
+замены), не методологической правкой:
+
+- **mapped-эндпоинты `OkxProxyController`** (отдают снапшоты/`ExchangeAck`)
+  — старая поверхность контура, замещается A2-passthrough'ем;
+- **mapped-цепочка `getMarketPriceData`** (`IntegrationService` →
+  `OkxIntegrationService` → `MarketPriceDataMapper` →
+  `MarketPriceDataExternalSnapshot`) — **нет доменного потребителя**
+  (только прокси; сборка `MarketPriceData` — шаг 5, `HOLD`); под сырьё
+  live-цена цепочки идёт от сырого `getTicker`. **Оговорка:** если шаг 5
+  (доменная сборка `MarketPriceData`) близко — оставить как forward-код;
+  решение — на шаге реализации passthrough.
+
+Источник — `.claude/decisions/source-api-target-rebase.md` §Следствия.
+
 ## Связанные открытые вопросы
 
 `.claude/work/questions/open-questions.md`:
