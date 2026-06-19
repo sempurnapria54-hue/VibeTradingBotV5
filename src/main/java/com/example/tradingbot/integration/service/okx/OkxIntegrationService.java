@@ -15,7 +15,6 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
-import com.example.tradingbot.domain.model.trade.market_price_data.external_snapshot.MarketPriceDataExternalSnapshot;
 import com.example.tradingbot.integration.model.okx.request.CancelAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.CancelOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.ClosePositionOkxRequest;
@@ -29,7 +28,6 @@ import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxBalanceResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxFillResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
@@ -39,7 +37,6 @@ import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.mapping.FillMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
-import com.example.tradingbot.mapping.MarketPriceDataMapper;
 import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.util.Constants;
@@ -67,7 +64,6 @@ public class OkxIntegrationService implements IntegrationService {
     private final OkxRestClient okxRestClient;
     private final InstrumentMapper instrumentMapper;
     private final CandleMapper candleMapper;
-    private final MarketPriceDataMapper marketPriceDataMapper;
     private final OrderMapper orderMapper;
     private final PositionMapper positionMapper;
     private final BalanceContainerMapper balanceContainerMapper;
@@ -105,18 +101,6 @@ public class OkxIntegrationService implements IntegrationService {
                 "candles", "instId=" + externalInstrumentId + " bar=" + externalBar);
         verifyCode(response, "candles", "instId=" + externalInstrumentId);
         return toCandleSnapshots(response.getData());
-    }
-
-    @Override
-    public MarketPriceDataExternalSnapshot getMarketPriceData(String externalInstrumentId) {
-        OkxApiResponse<OkxTickerResponse> response = execute(
-                () -> okxRestClient.getTicker(externalInstrumentId),
-                "market-ticker", "instId=" + externalInstrumentId);
-        verifyCode(response, "market-ticker", "instId=" + externalInstrumentId);
-        if (isEmpty(response.getData())) {
-            return null;
-        }
-        return marketPriceDataMapper.integrationToSnapshot(response.getData().getFirst());
     }
 
     @Override

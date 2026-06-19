@@ -18,6 +18,14 @@ Mapping-слой для `MarketPriceData`. RVO — `docs/components/models/Marke
 планируемый realtime-источник, отложен до рефакторинга на
 микросервисы (OKX-Q4); до тех пор рантайм — REST.
 
+> **Статус кода:** маппинг (`MarketPriceDataMapper`) и снапшот
+> (`MarketPriceDataExternalSnapshot`) **сняты** под §«Неиспользуемый
+> код» при ре-базе контура тестов на сырьё
+> (`.claude/decisions/source-api-target-rebase.md`): единственным
+> потребителем был mapped-прокси, доменной сборки `MarketPriceData`
+> ещё нет. Этот файл — **forward-дизайн шага 5**; код вернётся со
+> сборкой рыночных данных. Сырой `getTicker` остаётся (A2-passthrough).
+
 ## Source-agnostic ядро
 
 ### Поля snapshot

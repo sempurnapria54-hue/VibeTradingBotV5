@@ -7,13 +7,18 @@
 
 ## Контекст
 
-Нативная модель источника OKX (Java `PriceTickerResponse`).
+Нативная модель источника OKX (Java `OkxTickerResponse`).
 Возвращается `GET /api/v5/market/ticker`. Не выходит за
 `IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
 
-Mapping в `MarketPriceDataExternalSnapshot` и далее в
-`MarketPriceData` — `docs/models/mapping/MarketPriceData.md`
-(раздел `## OKX`). Контракт endpoint'а / rate limit —
+`getTicker` (сырой) сейчас потребляется **A2 raw-passthrough**
+контура тестов (`OkxProxyController`). Mapping в
+`MarketPriceDataExternalSnapshot` и далее в `MarketPriceData` —
+forward-дизайн шага 5 (`docs/models/mapping/MarketPriceData.md`,
+раздел `## OKX`); **код маппинга/снапшота снят** под §«Неиспользуемый
+код» при ре-базе контура на сырьё
+(`.claude/decisions/source-api-target-rebase.md`), вернётся со сборкой
+рыночных данных на шаге 5. Контракт endpoint'а / rate limit —
 `docs/integrations/okx/contracts/market-price-data.md`.
 
 > Раздача текущей цены (`MarketPriceDataService`) и тикер-фетч —

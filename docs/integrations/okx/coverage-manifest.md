@@ -41,6 +41,18 @@
 теряется (канон — `cancel-advance-algos` жив на demo вопреки офдоку
 2025-04-24).
 
+**Покрытие** (контуром тестов API источника, метод сырого клиента
+`OkxRestClient` ∩ периметр): `🔴 не в плане` — in-perimeter запрос,
+доступный клиенту, ещё не покрыт; `🟡 в плане` — кейсы в плане
+(этап DESIGN); `🟢 в коде` — есть прошедшие ревью код-тесты (этап
+CODE-тесты); `⚪ gap` — in-perimeter строка **без метода клиента**
+(покрыть нельзя, запрос не выдумывается; кандидат на реализацию —
+отдельное доменное решение); `—` — вне периметра (не покрывается).
+Стадии и продвижение колонки — `.claude/processes/source-api-testing.md`
+§Колонка покрытия. Текущая отметка отражает план
+`.claude/tests/source-api/okx/plan.md` (полное покрытие манифест ∩
+клиент, 2026-06-19).
+
 ### Канал чтения офдока
 
 Источниковый дефицит прогона 2 («SPA нечитаем») закрыт
@@ -62,103 +74,103 @@
 
 ## Trade (`/api/v5/trade/`)
 
-| Операция | Метод · путь | Статус | Провенанс | Примечание |
-|---|---|---|---|---|
-| Place order | POST `/trade/order` | есть-док | офдок | `contracts/order.md`, `OkxOrderResponse` |
-| Place batch orders | POST `/trade/batch-orders` | **создан** | офдок | `batch-operations.md`; до 20, лимит считается ордерами; **В-4 рассмотрено, не берём** |
-| Cancel order | POST `/trade/cancel-order` | есть-док | офдок | `order.md` |
-| Cancel batch orders | POST `/trade/cancel-batch-orders` | **создан** | офдок | `batch-operations.md`; В-4 |
-| Amend order | POST `/trade/amend-order` | есть-док | офдок | `order.md`; доменом не используется — REPLACE-only (`replace-not-amend`) |
-| Amend batch orders | POST `/trade/amend-batch-orders` | **создан** | офдок | `batch-operations.md`; В-4 |
-| Close position | POST `/trade/close-position` | есть-док | офдок | `position.md` |
-| Order details | GET `/trade/order` | есть-док | офдок | `order.md` |
-| Pending orders | GET `/trade/orders-pending` | есть-док | офдок | `order.md` (звено evidence-cycle) |
-| Order history 7d | GET `/trade/orders-history` | есть-док | офдок | `order.md` |
-| Order history 3m | GET `/trade/orders-history-archive` | есть-док | офдок | `order.md` |
-| Fills 3d | GET `/trade/fills` | есть-док | офдок | `fills.md`, `OkxFillResponse` |
-| Fills 3m | GET `/trade/fills-history` | есть-док | офдок | `fills.md` (звено) |
-| Mass cancel | POST `/trade/mass-cancel` | **вне-периметра** | офдок | прогон 3: только MMP-ордера, Option в Portfolio Margin — не кейс SWAP-бота (прежний статус `пробел` снят) |
-| Cancel All After (DMS) | POST `/trade/cancel-all-after` | **создан** | офдок | `cancel-all-after.md`; **В-1** → шаг 8 (safety) |
-| Order precheck | POST `/trade/order-precheck` | **создан** | офдок | `order-precheck.md`; **В-2** → шаг 5; ⚠ только acctLv 3/4 (MCM/PM) |
-| Account rate limit | GET `/trade/account-rate-limit` | **создан** | офдок | `account-rate-limit.md`; fill-ratio-based лимит |
-| Easy convert / one-click repay | GET/POST `/trade/easy-convert*`, `/one-click-repay*` | вне-периметра | офдок | конвертация/репэй, не торговый цикл |
+| Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
+|---|---|---|---|---|---|
+| Place order | POST `/trade/order` | есть-док | 🟡 в плане | офдок | `contracts/order.md`, `OkxOrderResponse`; `placeOrder` (limit/market) |
+| Place batch orders | POST `/trade/batch-orders` | **создан** | ⚪ gap | офдок | `batch-operations.md`; до 20, лимит считается ордерами; **В-4 рассмотрено, не берём** — метода клиента нет |
+| Cancel order | POST `/trade/cancel-order` | есть-док | 🟡 в плане | офдок | `order.md`; `cancelOrder` |
+| Cancel batch orders | POST `/trade/cancel-batch-orders` | **создан** | ⚪ gap | офдок | `batch-operations.md`; В-4 — метода клиента нет |
+| Amend order | POST `/trade/amend-order` | есть-док | ⚪ gap | офдок | `order.md`; доменом не используется — REPLACE-only (`replace-not-amend`); метода клиента нет |
+| Amend batch orders | POST `/trade/amend-batch-orders` | **создан** | ⚪ gap | офдок | `batch-operations.md`; В-4 — метода клиента нет |
+| Close position | POST `/trade/close-position` | есть-док | 🟡 в плане | офдок | `position.md`; `closePosition` |
+| Order details | GET `/trade/order` | есть-док | 🟡 в плане | офдок | `order.md`; `getOrder` |
+| Pending orders | GET `/trade/orders-pending` | есть-док | 🟡 в плане | офдок | `order.md` (звено evidence-cycle); `getPendingOrders` |
+| Order history 7d | GET `/trade/orders-history` | есть-док | 🟡 в плане | офдок | `order.md`; `getOrderHistory` |
+| Order history 3m | GET `/trade/orders-history-archive` | есть-док | ⚪ gap | офдок | `order.md`; архив 3м, метода клиента нет |
+| Fills 3d | GET `/trade/fills` | есть-док | 🟡 в плане | офдок | `fills.md`, `OkxFillResponse`; `getFills` |
+| Fills 3m | GET `/trade/fills-history` | есть-док | 🟡 в плане | офдок | `fills.md` (звено); `getFillsHistory` |
+| Mass cancel | POST `/trade/mass-cancel` | **вне-периметра** | — | офдок | прогон 3: только MMP-ордера, Option в Portfolio Margin — не кейс SWAP-бота (прежний статус `пробел` снят) |
+| Cancel All After (DMS) | POST `/trade/cancel-all-after` | **создан** | ⚪ gap | офдок | `cancel-all-after.md`; **В-1** → шаг 8 (safety); метода клиента нет |
+| Order precheck | POST `/trade/order-precheck` | **создан** | ⚪ gap | офдок | `order-precheck.md`; **В-2** → шаг 5; ⚠ только acctLv 3/4 (MCM/PM); метода клиента нет |
+| Account rate limit | GET `/trade/account-rate-limit` | **создан** | ⚪ gap | офдок | `account-rate-limit.md`; fill-ratio-based лимит; метода клиента нет |
+| Easy convert / one-click repay | GET/POST `/trade/easy-convert*`, `/one-click-repay*` | вне-периметра | — | офдок | конвертация/репэй, не торговый цикл |
 
 ## Algo Trading (`/api/v5/trade/`)
 
-| Операция | Метод · путь | Статус | Провенанс | Примечание |
-|---|---|---|---|---|
-| Place algo order | POST `/trade/order-algo` | есть-док | офдок | `algo-order.md`; ordType: conditional/oco/trigger/`chase`(новый)/move_order_stop/iceberg/`smart_iceberg`/twap |
-| Cancel algo (ordinary) | POST `/trade/cancel-algos` | **обновлён** | офдок | `algo-order.md`; **И-1 закрыт (а)** — ветвление по семье |
-| Cancel advance algo | POST `/trade/cancel-advance-algos` | **обновлён** | офдок | **И-2:** выведен из офдока (changelog 2025-04-24); advance-ветка И-1(а) — runtime-подтверждение |
-| Amend algo | POST `/trade/amend-algos` | **обновлён** | офдок | только Stop/Trigger; advance не амендится — **И-3** (следствие закрыто: REPLACE-only); доменом не используется |
-| Algo details | GET `/trade/order-algo` | есть-док | офдок | `algo-order.md`; обе семьи видны |
-| Algo pending | GET `/trade/orders-algo-pending` | есть-док | офдок | `algo-order.md` (звено); ordType обеих семей |
-| Algo history 3m | GET `/trade/orders-algo-history` | **обновлён** | офдок | `state`: effective/canceled/order_failed (дрейф: `partially_failed` ушёл из офдока) |
+| Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
+|---|---|---|---|---|---|
+| Place algo order | POST `/trade/order-algo` | есть-док | 🟡 в плане | офдок | `algo-order.md`; ordType: conditional/oco/trigger/`chase`(новый)/move_order_stop/iceberg/`smart_iceberg`/twap; `placeAlgoOrder` строит conditional/oco/move_order_stop (вариант-gap: trailing-value `callbackSpread`) |
+| Cancel algo (ordinary) | POST `/trade/cancel-algos` | **обновлён** | 🟡 в плане | офдок | `algo-order.md`; **И-1 закрыт (а)** — ветвление по семье; `cancelAlgos` |
+| Cancel advance algo | POST `/trade/cancel-advance-algos` | **обновлён** | 🟡 в плане | офдок | **И-2:** выведен из офдока (changelog 2025-04-24); advance-ветка И-1(а) — runtime-подтверждение; `cancelAdvanceAlgos` |
+| Amend algo | POST `/trade/amend-algos` | **обновлён** | ⚪ gap | офдок | только Stop/Trigger; advance не амендится — **И-3** (следствие закрыто: REPLACE-only); доменом не используется; метода клиента нет |
+| Algo details | GET `/trade/order-algo` | есть-док | 🟡 в плане | офдок | `algo-order.md`; обе семьи видны; `getAlgoOrder` |
+| Algo pending | GET `/trade/orders-algo-pending` | есть-док | 🟡 в плане | офдок | `algo-order.md` (звено); ordType обеих семей; `getPendingAlgoOrders` |
+| Algo history 3m | GET `/trade/orders-algo-history` | **обновлён** | 🟡 в плане | офдок | `state`: effective/canceled/order_failed (дрейф: `partially_failed` ушёл из офдока); `getAlgoOrderHistory` |
 
 ## Account (`/api/v5/account/`)
 
-| Операция | Метод · путь | Статус | Провенанс | Примечание |
-|---|---|---|---|---|
-| Get balance | GET `/account/balance` | есть-док | офдок | `balance.md`, `OkxBalanceResponse` |
-| Get positions | GET `/account/positions` | есть-док | офдок | `position.md`, `OkxPositionResponse` |
-| Positions history | GET `/account/positions-history` | **обновлён** | офдок | `position.md` §История; **В-3** → шаг 7; пагинация по `uTime`; `realizedPnl=pnl+fee+fundingFee+liqPenalty` |
-| Account & position risk | GET `/account/account-position-risk` | **создан** | офдок | `account-position-risk.md`; единый временной срез |
-| Bills 7d | GET `/account/bills` | есть-док | офдок | `account-bills.md`, `OkxAccountBillResponse` |
-| Bills archive 3m | GET `/account/bills-archive` | **обновлён** | офдок | `account-bills.md`; поле-уровнево сверен (прогон 3) |
-| Bills deep-архив (с 2021) | POST+GET `/account/bills-history-archive` | **создан** | офдок | `account-bills.md` §Deep-архив; поквартально, async-файл; 12 заявок/сутки |
-| Bill types | GET `/account/subtypes` | **создан** | офдок | `account-bills.md` §Справочник bill types |
-| Account config | GET `/account/config` | **создан** | офдок | `account-config.md`; **В-9** → шаг 5 / bootstrap |
-| Set position mode | POST `/account/set-position-mode` | **создан** | офдок | `account-config.md` |
-| Set leverage | POST `/account/set-leverage` | **создан** | офдок | `account-config.md`; INSTR-Q2 |
-| Leverage info | GET `/account/leverage-info` | **создан** | офдок | `account-config.md` |
-| Max order size | GET `/account/max-size` | **создан** | офдок | `max-size.md` |
-| Max avail size | GET `/account/max-avail-size` | **создан** | офдок | `max-size.md` |
-| Fee rates | GET `/account/trade-fee` | **создан** | офдок | `trade-fee.md`; **В-7** → шаг 7; знак: минус = комиссия |
-| Instruments (private) | GET `/account/instruments` | вне-периметра | офдок | инвентарь с учётом режима счёта; используем публичный `public/instruments` |
-| Interest / borrow-repay / VIP loan / spot-margin | various | вне-периметра | офдок | margin/loan вне скоупа SWAP-бота фазы 1 |
-| Greeks / isolated-mode / MMP / move-positions / collateral / account-mode-switch / прочее сервисное | various | вне-периметра | офдок | опционы / PM-сервис / переносы — вне торгового цикла фазы 1 |
+| Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
+|---|---|---|---|---|---|
+| Get balance | GET `/account/balance` | есть-док | 🟡 в плане | офдок | `balance.md`, `OkxBalanceResponse`; `getBalance` |
+| Get positions | GET `/account/positions` | есть-док | 🟡 в плане | офдок | `position.md`, `OkxPositionResponse`; `getPositions` |
+| Positions history | GET `/account/positions-history` | **обновлён** | ⚪ gap | офдок | `position.md` §История; **В-3** → шаг 7; пагинация по `uTime`; `realizedPnl=pnl+fee+fundingFee+liqPenalty`; метода клиента нет |
+| Account & position risk | GET `/account/account-position-risk` | **создан** | ⚪ gap | офдок | `account-position-risk.md`; единый временной срез; метода клиента нет |
+| Bills 7d | GET `/account/bills` | есть-док | ⚪ gap | офдок | `account-bills.md`, `OkxAccountBillResponse`; метода клиента нет |
+| Bills archive 3m | GET `/account/bills-archive` | **обновлён** | ⚪ gap | офдок | `account-bills.md`; поле-уровнево сверен (прогон 3); метода клиента нет |
+| Bills deep-архив (с 2021) | POST+GET `/account/bills-history-archive` | **создан** | ⚪ gap | офдок | `account-bills.md` §Deep-архив; поквартально, async-файл; 12 заявок/сутки; метода клиента нет |
+| Bill types | GET `/account/subtypes` | **создан** | ⚪ gap | офдок | `account-bills.md` §Справочник bill types; метода клиента нет |
+| Account config | GET `/account/config` | **создан** | 🟡 в плане | офдок | `account-config.md`; **В-9** → шаг 5 / bootstrap; `getAccountConfig` (диагностический сырой String) |
+| Set position mode | POST `/account/set-position-mode` | **создан** | ⚪ gap | офдок | `account-config.md`; метода клиента нет |
+| Set leverage | POST `/account/set-leverage` | **создан** | ⚪ gap | офдок | `account-config.md`; INSTR-Q2; метода клиента нет |
+| Leverage info | GET `/account/leverage-info` | **создан** | ⚪ gap | офдок | `account-config.md`; метода клиента нет |
+| Max order size | GET `/account/max-size` | **создан** | ⚪ gap | офдок | `max-size.md`; метода клиента нет |
+| Max avail size | GET `/account/max-avail-size` | **создан** | ⚪ gap | офдок | `max-size.md`; метода клиента нет |
+| Fee rates | GET `/account/trade-fee` | **создан** | ⚪ gap | офдок | `trade-fee.md`; **В-7** → шаг 7; знак: минус = комиссия; метода клиента нет |
+| Instruments (private) | GET `/account/instruments` | вне-периметра | — | офдок | инвентарь с учётом режима счёта; используем публичный `public/instruments` |
+| Interest / borrow-repay / VIP loan / spot-margin | various | вне-периметра | — | офдок | margin/loan вне скоупа SWAP-бота фазы 1 |
+| Greeks / isolated-mode / MMP / move-positions / collateral / account-mode-switch / прочее сервисное | various | вне-периметра | — | офдок | опционы / PM-сервис / переносы — вне торгового цикла фазы 1 |
 
 ## Market Data (`/api/v5/market/`)
 
-| Операция | Метод · путь | Статус | Провенанс | Примечание |
-|---|---|---|---|---|
-| Tickers | GET `/market/tickers` | есть-док | офдок | `market-price-data.md` |
-| Ticker | GET `/market/ticker` | есть-док | офдок | `market-price-data.md`, `OkxTickerResponse` |
-| Candles | GET `/market/candles` | есть-док | офдок | `candle.md`, `CandleOkxResponse` |
-| History candles | GET `/market/history-candles` | есть-док | офдок | `candle.md` |
-| Order book | GET `/market/books` | **создан** | офдок | `order-book.md`; ≤ 400 уровней; фазе 1 не нужен (стратегия на свечах) |
-| Order book full | GET `/market/books-full` | **создан** | офдок | `order-book.md`; ≤ 5000 уровней |
-| Public trades | GET `/market/trades` | **создан** | офдок | `public-trades.md`; ≤ 500 |
-| Trades history | GET `/market/history-trades` | **создан** | офдок | `public-trades.md`; 3 месяца |
-| Index tickers | GET `/market/index-tickers` | **создан** | офдок | `index-data.md` |
-| Index candles | GET `/market/index-candles` | **создан** | офдок | `index-data.md`; 1440 точек |
-| Index candles history | GET `/market/history-index-candles` | **создан** | офдок | `index-data.md` |
-| Mark price candles | GET `/market/mark-price-candles` | **создан** | офдок | `mark-price.md`; релевантно `tpTriggerPxType=mark` |
-| Mark price candles history | GET `/market/history-mark-price-candles` | **создан** | офдок | `mark-price.md` |
-| Platform 24h volume | GET `/market/platform-24-volume` | вне-периметра | офдок | агрегат платформы |
-| Option trades / call auction | various | вне-периметра | офдок | OPTION / аукцион — вне SWAP-скоупа |
-| SBE Market Data | various | вне-периметра | офдок | бинарный фид (HFT) — вне скоупа |
+| Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
+|---|---|---|---|---|---|
+| Tickers | GET `/market/tickers` | есть-док | ⚪ gap | офдок | `market-price-data.md`; клиент строит только одиночный `getTicker`, плюрал-эндпоинта нет |
+| Ticker | GET `/market/ticker` | есть-док | 🟡 в плане | офдок | `market-price-data.md`, `OkxTickerResponse`; `getTicker` |
+| Candles | GET `/market/candles` | есть-док | 🟡 в плане | офдок | `candle.md`, `CandleOkxResponse`; `getLatestCandles` |
+| History candles | GET `/market/history-candles` | есть-док | 🟡 в плане | офдок | `candle.md`; `getHistoryCandles` |
+| Order book | GET `/market/books` | **создан** | ⚪ gap | офдок | `order-book.md`; ≤ 400 уровней; фазе 1 не нужен (стратегия на свечах); метода клиента нет |
+| Order book full | GET `/market/books-full` | **создан** | ⚪ gap | офдок | `order-book.md`; ≤ 5000 уровней; метода клиента нет |
+| Public trades | GET `/market/trades` | **создан** | ⚪ gap | офдок | `public-trades.md`; ≤ 500; метода клиента нет |
+| Trades history | GET `/market/history-trades` | **создан** | ⚪ gap | офдок | `public-trades.md`; 3 месяца; метода клиента нет |
+| Index tickers | GET `/market/index-tickers` | **создан** | ⚪ gap | офдок | `index-data.md`; метода клиента нет |
+| Index candles | GET `/market/index-candles` | **создан** | ⚪ gap | офдок | `index-data.md`; 1440 точек; метода клиента нет |
+| Index candles history | GET `/market/history-index-candles` | **создан** | ⚪ gap | офдок | `index-data.md`; метода клиента нет |
+| Mark price candles | GET `/market/mark-price-candles` | **создан** | ⚪ gap | офдок | `mark-price.md`; релевантно `tpTriggerPxType=mark`; метода клиента нет |
+| Mark price candles history | GET `/market/history-mark-price-candles` | **создан** | ⚪ gap | офдок | `mark-price.md`; метода клиента нет |
+| Platform 24h volume | GET `/market/platform-24-volume` | вне-периметра | — | офдок | агрегат платформы |
+| Option trades / call auction | various | вне-периметра | — | офдок | OPTION / аукцион — вне SWAP-скоупа |
+| SBE Market Data | various | вне-периметра | — | офдок | бинарный фид (HFT) — вне скоупа |
 
 ## Public Data (`/api/v5/public/`)
 
-| Операция | Метод · путь | Статус | Провенанс | Примечание |
-|---|---|---|---|---|
-| Instruments | GET `/public/instruments` | есть-док | офдок | `instrument.md`, `InstrumentOkxResponse` |
-| Mark price | GET `/public/mark-price` | **создан** | офдок | `mark-price.md`; **В-8** → шаг 5 |
-| Price limit | GET `/public/price-limit` | **создан** | офдок | `price-limit.md`; **В-8** → шаг 5 |
-| Funding rate | GET `/public/funding-rate` | **создан** | офдок | `funding-rate.md`; **В-6** → шаг 7; интервал по `fundingTime`↔`nextFundingTime` |
-| Funding rate history | GET `/public/funding-rate-history` | **создан** | офдок | `funding-rate.md`; В-6 — рядом с OKX-Q3 (два пути к funding в P&L) |
-| Open interest | GET `/public/open-interest` | **создан** | офдок | `open-interest.md` |
-| Position tiers | GET `/public/position-tiers` | **создан** | офдок | `position-tiers.md`; **находка прогона 3:** путь public, не `account/` (сторонний скелет ошибался) |
-| Server time | GET `/public/time` | **создан** | офдок | `server-time.md`; синхронизация подписи |
-| Insurance fund | GET `/public/insurance-fund` | **создан** | офдок | `insurance-fund.md` (офдок: «security fund») |
-| Delivery/exercise, settlement, estimated price, underlying, discount-rate, premium history, exchange-rate, index-components, tick bands, series/events/markets (EVENTS), economic calendar, historical market data | various | вне-периметра | офдок | FUTURES delivery / OPTIONS / EVENTS / индекс-сервисы — вне скоупа SWAP |
+| Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
+|---|---|---|---|---|---|
+| Instruments | GET `/public/instruments` | есть-док | 🟡 в плане | офдок | `instrument.md`, `InstrumentOkxResponse`; `getInstruments` |
+| Mark price | GET `/public/mark-price` | **создан** | ⚪ gap | офдок | `mark-price.md`; **В-8** → шаг 5; метода клиента нет |
+| Price limit | GET `/public/price-limit` | **создан** | ⚪ gap | офдок | `price-limit.md`; **В-8** → шаг 5; метода клиента нет |
+| Funding rate | GET `/public/funding-rate` | **создан** | ⚪ gap | офдок | `funding-rate.md`; **В-6** → шаг 7; интервал по `fundingTime`↔`nextFundingTime`; метода клиента нет |
+| Funding rate history | GET `/public/funding-rate-history` | **создан** | ⚪ gap | офдок | `funding-rate.md`; В-6 — рядом с OKX-Q3 (два пути к funding в P&L); метода клиента нет |
+| Open interest | GET `/public/open-interest` | **создан** | ⚪ gap | офдок | `open-interest.md`; метода клиента нет |
+| Position tiers | GET `/public/position-tiers` | **создан** | ⚪ gap | офдок | `position-tiers.md`; **находка прогона 3:** путь public, не `account/` (сторонний скелет ошибался); метода клиента нет |
+| Server time | GET `/public/time` | **создан** | ⚪ gap | офдок | `server-time.md`; синхронизация подписи; метода клиента нет |
+| Insurance fund | GET `/public/insurance-fund` | **создан** | ⚪ gap | офдок | `insurance-fund.md` (офдок: «security fund»); метода клиента нет |
+| Delivery/exercise, settlement, estimated price, underlying, discount-rate, premium history, exchange-rate, index-components, tick bands, series/events/markets (EVENTS), economic calendar, historical market data | various | вне-периметра | — | офдок | FUTURES delivery / OPTIONS / EVENTS / индекс-сервисы — вне скоупа SWAP |
 
 ## Funding / Asset (`/api/v5/asset/`) — по потребности
 
-| Операция | Метод · путь | Статус | Провенанс | Примечание |
-|---|---|---|---|---|
-| Currencies / balances / transfer / transfer-state / asset-bills / deposit-* / withdrawal-* | various | сознательно-вне | сторонний | По потребности. Бот фазы 1 торгует на торговом счёте; фондовые переводы/пополнения/выводы не нужны. Заводить при появлении потребности. |
+| Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
+|---|---|---|---|---|---|
+| Currencies / balances / transfer / transfer-state / asset-bills / deposit-* / withdrawal-* | various | сознательно-вне | — | сторонний | По потребности. Бот фазы 1 торгует на торговом счёте; фондовые переводы/пополнения/выводы не нужны. Заводить при появлении потребности. |
 
 ## Прочие разделы — вне периметра
 

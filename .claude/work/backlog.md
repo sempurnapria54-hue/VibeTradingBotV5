@@ -576,25 +576,24 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 > хвост контура, а ад-хок ручная проверка пользователя вне контура.
 > Demo-бут по-прежнему нужен для автономного RUN код-тестов.
 
-## Ре-база source-api: снятие mapped-поверхности (§«Неиспользуемый код»)
+## Ре-база source-api: снятие mapped-поверхности — ✅ ЗАКРЫТО (2026-06-18)
 
-При приземлении **A2 raw-passthrough** (новая поверхность контура,
-отдаёт сырой `OkxApiResponse<T>`) — снять mapped-поверхность, ставшую
-неиспользуемой (`codestyle` §«Неиспользуемый код»). Делается **вместе с
-приземлением passthrough** (не раньше — чтобы не снять источник до
-замены), не методологической правкой:
+Снято вместе с приземлением A2 raw-passthrough:
 
-- **mapped-эндпоинты `OkxProxyController`** (отдают снапшоты/`ExchangeAck`)
-  — старая поверхность контура, замещается A2-passthrough'ем;
-- **mapped-цепочка `getMarketPriceData`** (`IntegrationService` →
-  `OkxIntegrationService` → `MarketPriceDataMapper` →
-  `MarketPriceDataExternalSnapshot`) — **нет доменного потребителя**
-  (только прокси; сборка `MarketPriceData` — шаг 5, `HOLD`); под сырьё
-  live-цена цепочки идёт от сырого `getTicker`. **Оговорка:** если шаг 5
-  (доменная сборка `MarketPriceData`) близко — оставить как forward-код;
-  решение — на шаге реализации passthrough.
+- **`OkxProxyController`** переписан на A2 raw-passthrough (зовёт
+  `OkxRestClient`, отдаёт сырой `OkxApiResponse<T>`); mapped-эндпоинты
+  (снапшоты/`ExchangeAck`) сняты;
+- **mapped-цепочка `getMarketPriceData`** снята целиком:
+  `IntegrationService.getMarketPriceData` (+ impl), `MarketPriceDataMapper`,
+  `MarketPriceDataExternalSnapshot` (нет доменного потребителя; шаг 5
+  `HOLD`; RVO-класса не было). Live-цена цепочки идёт от сырого
+  `getTicker`. Forward-дизайн шага 5 сохранён в доках
+  (`docs/models/mapping/MarketPriceData.md`, `docs/components/models/MarketPriceData.md`)
+  со «Статус кода» — вернётся со сборкой рыночных данных.
 
-Источник — `.claude/decisions/source-api-target-rebase.md` §Следствия.
+Не верифицировано компиляцией (нет Java/Maven в shell CC) — сверено по
+графу ссылок; компиляция — за пользователем. Источник —
+`.claude/decisions/source-api-target-rebase.md` §Следствия.
 
 ## Связанные открытые вопросы
 

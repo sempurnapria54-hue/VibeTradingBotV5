@@ -10,7 +10,6 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
-import com.example.tradingbot.domain.model.trade.market_price_data.external_snapshot.MarketPriceDataExternalSnapshot;
 import java.util.List;
 
 /**
@@ -48,16 +47,6 @@ public interface IntegrationService {
      * @return снапшоты свечей (пустой список — данных нет).
      */
     List<CandleExternalSnapshot> getLatestCandles(String externalInstrumentId, String externalBar, Integer limit);
-
-    /**
-     * Рыночная цена (тикер) инструмента: last / ask / bid + время тикера.
-     * Live-источник цены для построения заведомо неисполнимых ордеров в
-     * тестах интеграции; домен собирает из снапшота {@code MarketPriceData}
-     * (шаг 5, docs/components/models/MarketPriceData.md).
-     *
-     * @return снапшот; {@code null} — тикер по инструменту не найден.
-     */
-    MarketPriceDataExternalSnapshot getMarketPriceData(String externalInstrumentId);
 
     /**
      * Ordinary order с биржи по {@code externalId} (предпочтительно) или

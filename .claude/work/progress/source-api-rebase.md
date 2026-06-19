@@ -17,11 +17,45 @@ teardown, prod вне контура). Decision зафиксирован —
 `OkxTickerResponse`, снят прокси-граничный пилот, диспозиция
 mapped-поверхности — в `backlog.md`.
 
-**Downstream (отдельным заходом, в `backlog.md`):** реализация
-A2-passthrough контроллера + B1-код-тестов; регенерация пилота под сырьё
-(полный периметр ∩ клиент); снятие mapped-поверхности при приземлении
-passthrough; правка апидоков `integrator`'ом по C3 (вкл. офдок-сверку
-`markPx`/`idxPx` ticker'а, A3 `cancel-advance-algos`).
+**Реализация (2026-06-18):** A2-passthrough — `OkxProxyController`
+переписан на сырьё (зовёт `OkxRestClient`, отдаёт `OkxApiResponse<T>`);
+mapped-поверхность снята (mapped-эндпоинты + цепочка `getMarketPriceData`
+/ `MarketPriceDataMapper` / `MarketPriceDataExternalSnapshot`); пилот
+регенерирован под сырьё (план + коллекция 1:1, бьют в passthrough;
+прямой + негатив; гейт достижимости R5; цепочки C/A + teardown).
+
+**Полное покрытие (2026-06-19) — на аппрув.** Пилотный субсет замещён
+**полным покрытием манифест ∩ клиент** в новой структуре **метод →
+кейсы → таблица** (класс на метод, тест на кейс). Сделано:
+- **методология уточнена:** негатив на каждый запрос (вкл. write);
+  вариант-покрытие по типу-дискриминатору (`ordType`/`conditionType`/
+  семья cancel); инвариант полноты; структура метод→кейсы→таблица в
+  шаблон плана + бланк отчёта (`test-design`/`test-plan`/`test-collection`/
+  `test-code`/`test-run`/`test-review`/`source-api-testing`);
+- **колонка покрытия в манифесте** (`coverage-manifest.md`): метки
+  🔴/🟡/🟢/⚪ по стадии; 21 строка клиента → 🟡 в плане; gap'ы — ⚪;
+  продвижение по стадиям — в процесс;
+- **A2-passthrough расширен** 7 read-эндпоинтами (candles ×2,
+  orders-pending/history, algo-pending/history, fills-history) — чтобы
+  коллекция была 1:1 со всем периметром клиента (все read, write-риска
+  нет; на валидацию);
+- **план + коллекция регенерированы** (`pilot-*` → `plan.md` /
+  `collection.postman_collection.json` / `environment.postman_environment.json`):
+  21 метод клиента, каждый запрос × негатив, варианты типов (limit/market;
+  conditional/oco/move_order_stop; ordinary/advance cancel), цепочки
+  Climit (неисполнимый)/Cmarket (исполняемый → fill/позиция, снимает
+  отказ R5)/M19-варианты + teardown; client-coverage-gap'ы и вариант-gap'ы
+  задокументированы. 112 запросов, 1:1 с планом.
+
+Не компилировалось/не прогонялось (нет Java/Maven в shell CC; live —
+demo) — сверено по графу ссылок; компиляция + live-прогон за
+пользователем (средовой дефицит, `backlog.md`). Нерешённое (на
+валидацию) — `plan.md` §Нерешённое.
+
+**Downstream (после аппрува):** B1-код-тесты (`test-code`, бьют в тот же
+passthrough, класс на метод/тест на кейс) → колонка покрытия 🟢 в коде;
+правка апидоков `integrator`'ом по C3 (вкл. офдок-сверку `markPx`/`idxPx`
+ticker'а, A3 `cancel-advance-algos`, рантайм-факты прогона).
 
 Варианты развилок (с отклонёнными альтернативами) —
 `.claude/work/questions/tasks/source-api-rebase.md` (РЕШЕНО).
