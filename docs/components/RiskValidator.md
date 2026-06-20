@@ -15,15 +15,23 @@
 ## Входы
 
 `CalculatedPrice`, `CalculatedSize`, `DealContext`, `BalanceContainer`,
-`Position`, `InstrumentExternalRules`, `RiskSettings` (структура —
-RISK-Q1, `.claude/work/questions/open-questions.md`).
+`Position`, `InstrumentExternalRules`, `StrategyDetail` (риск-настройки —
+`riskPerTradePercent`; отдельного RVO `RiskSettings` нет, см.
+`docs/decisions/per-trade-risk-policy.md`).
 
 ## Метрики (считает сам)
 
-risk amount; risk percent от депозита; estimated leverage; estimated
-margin; notional; SL distance; liquidation guard distance; position
-exposure после действия. Метрики могут попасть в `RiskCheckResult.details`,
-логи или аудит, но **не** входят в `CalculatedStrategyAction`.
+risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal +
+commissions`); **risk percent от свободного депозита** (база —
+`BalanceContainer.externalAvailableEquity`, не total/adjusted, см.
+`docs/decisions/per-trade-risk-policy.md`); estimated leverage; estimated
+margin; notional; SL distance; liquidation guard distance. Метрики могут
+попасть в `RiskCheckResult.details`, логи или аудит, но **не** входят в
+`CalculatedStrategyAction`.
+
+`position exposure после действия` — метрика **уровня риска на биржу/портфель**
+(форвард к фазе 3); в фазе 1 (только риск на сделку) кода-блокера по экспозиции
+нет (`docs/decisions/per-trade-risk-policy.md`).
 
 ## Границы
 

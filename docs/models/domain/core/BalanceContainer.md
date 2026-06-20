@@ -44,8 +44,8 @@ Java-класс `com.example.tradingbot.domain.model.core.balance.BalanceContain
 | `exchangeId` | `Long` | Биржа / exchange account, которому принадлежит snapshot. На первом этапе — `exchangeId`; при появлении `ExchangeAccount` поле может смениться/дополниться. |
 | `externalUpdatedAt` | `OffsetDateTime` | Время обновления account-level snapshot на стороне биржи. База freshness-check. |
 | `externalTotalEquity` | `BigDecimal` | Total equity аккаунта по данным биржи. |
-| `externalAdjustedEquity` | `BigDecimal` | Adjusted / effective equity. Для risk-policy может быть предпочтительной базой. |
-| `externalAvailableEquity` | `BigDecimal` | Account-level available equity — хватает ли средств перед risk-creating / risk-increasing action. |
+| `externalAdjustedEquity` | `BigDecimal` | Adjusted / effective equity. |
+| `externalAvailableEquity` | `BigDecimal` | Account-level available (свободный) equity — **база риск-политики на сделку** (`docs/decisions/per-trade-risk-policy.md`) и проверки достаточности средств перед risk-creating / risk-increasing action. |
 | `balances` | `List<Balance>` | Балансы по валютам. Для SWAP/USDT обязательна settle currency. |
 
 Метод `replaceBalances(List<Balance>)` — полная замена currency-level

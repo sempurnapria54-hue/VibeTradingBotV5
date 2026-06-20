@@ -282,7 +282,7 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 | `id` | `Long` | Технический ID. |
 | `marketPhaseType` | `MarketPhase.Type` | Для какой фазы работает detail. |
 | `phaseEntryPolicy` | `PhaseEntryPolicy` | Как торгуем в этой фазе. |
-| `riskPerTradePercent` | `BigDecimal` | Риск на сделку, % от капитала. |
+| `riskPerTradePercent` | `BigDecimal` | Риск на сделку, % от **свободного депозита** (`externalAvailableEquity`); см. `docs/decisions/per-trade-risk-policy.md`. |
 | `targetRiskRewardRatio` | `BigDecimal` | High-level ориентир R/R. |
 | `stepsByStatus` | `Map<Deal.Status, List<StrategyStep>>` | Шаги, сгруппированные по статусу сделки. |
 

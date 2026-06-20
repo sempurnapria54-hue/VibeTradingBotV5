@@ -66,8 +66,9 @@ Coded `InstrumentOkxResponse` несёт только snapshot-релевант�
 > персистятся на `Instrument`; справочные sizing-поля в шаге 1
 > персистентно не хранятся (`docs/models/mapping/Instrument.md`).
 > Модель `InstrumentExternalRules` (sizing/rounding, `ctType`,
-> sizes) отложена за пределы шага 1 (backlog п.9) и на
-> base/quote/settle больше не претендует — дубль Н1 снят.
-> Соотнесение снапшота с `InstrumentExternalRules` / возможный
-> ренейм — INSTR-Q1; соотнесение биржевых `externalStatus`/
-> `externalLeverage` с rules-полями и валидация плеча — INSTR-Q2.
+> sizes, per-order max sizes, `lever`/`state`) **материализуется на
+> шаге 5** (риск-преконтроль) — потребляет sizing/rounding-поля и
+> ограничители из этого DTO; на base/quote/settle не претендует (дубль
+> Н1 снят). Снапшот-концепция/ренейм (INSTR-Q1) и роль leverage/HOLD
+> (часть INSTR-Q2) закрыты решением
+> `docs/decisions/instrument-external-rules-materialization.md`.

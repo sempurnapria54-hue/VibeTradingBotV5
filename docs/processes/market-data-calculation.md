@@ -13,7 +13,8 @@ jobs, в какой последовательности, по какой цеп
 жизненного цикла сделки. FSM и калькуляторы не считают эти данные
 сами — jobs готовят их заранее, потребители читают готовые
 результаты. (Подготовка спеков инструмента — `InstrumentExternalRules`
-через `InstrumentExternalRulesSyncJob` — в шаге 1 отложена, см. ниже.)
+через `InstrumentExternalRulesSyncJob` — материализуется на шаге 5, в
+оркестрацию рыночных данных не входит, см. ниже.)
 
 Свечи этот процесс **не добывает** — он вычисляет поверх уже
 загруженных свечей; их добыча и целостность — отдельный процесс
@@ -45,11 +46,11 @@ EntryScannerJob / DealOrchestratorJob (FSM)
 `docs/processes/candle-loading.md`.
 
 `InstrumentExternalRulesSyncJob` (подготовка спеков инструмента) в
-активную оркестрацию шага 1 **не входит**: он готовит
-`InstrumentExternalRules` — модель, отложенную за пределы шага 1
-(backlog п.9 / отложенная rules-подсистема), и материализуется
-вместе с правилами на поздних шагах
-(`docs/components/InstrumentExternalRulesSyncJob.md`).
+активную оркестрацию рыночных данных **не входит**: он готовит
+`InstrumentExternalRules` — модель, материализуемую на шаге 5
+(риск-преконтроль), отдельным от расчёта рыночных данных контуром
+(`docs/components/InstrumentExternalRulesSyncJob.md`,
+`docs/decisions/instrument-external-rules-materialization.md`).
 
 ## Свечи как вход
 
@@ -116,7 +117,6 @@ StrategyActionCalculator -> расчёт цены / размера
   create = структура / activate = готовность-к-запуску). Семантика
   activate (422) отложена до зрелости поздних шагов (4/7); назначать
   владельца проверки на шаге 3 — спекуляция (нет текущего потребителя).
-- **Пункт «есть ли актуальные `InstrumentExternalRules`» — отложен**
-  вместе с самой моделью `InstrumentExternalRules` (backlog п.9 /
-  INSTR-Q1), как и `InstrumentExternalRulesSyncJob` выше; до её
-  материализации активация её не требует.
+- **Пункт «есть ли актуальные `InstrumentExternalRules`» — не на шаге 3**:
+  модель материализуется на шаге 5 (риск-преконтроль), вне расчёта
+  рыночных данных; до её материализации активация её не требует.

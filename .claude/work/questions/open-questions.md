@@ -70,6 +70,15 @@ refresh-команд) закрыт 2026-06-10 (steer): refresh-набор — р
 bulk). Из разбора ревью шага 4 (2026-06-12) открыты **CMD-Q5** (место
 правила порядка ног REPLACE) и **CMD-Q6** (граница «действие стратегии vs
 `ServiceCommand`» + классификация `KILL_SWITCH`) — оба парк на шаги 6-7.
+На `GAPS_CLOSE_1` шага 5 (2026-06-20) закрыты **RISK-Q1** (нет RVO
+`RiskSettings`; риск-настройки — поля `StrategyDetail`) и **RISK-Q2**
+(worst-case guard экспозиции — уровень риска на биржу/портфель, отложен к
+фазе 3; в фазе 1 — только риск на сделку) решением
+`docs/decisions/per-trade-risk-policy.md`; **INSTR-Q1** (материализация
+`InstrumentExternalRules` на шаге 5, JSONB-навес на `Instrument`, без
+ренейма) и большая часть **INSTR-Q2** — решением
+`docs/decisions/instrument-external-rules-materialization.md` (остаток
+INSTR-Q2 — тайминг set-leverage, форвард к шагу 6).
 
 История закрытых вопросов пайплайна:
 
@@ -107,147 +116,25 @@ retry-state, но `DealActionState` относится к `StrategyAction`, а
 operational flag без нарушения terminal semantics.
 Связано: `docs/models/domain/aggregate/Deal.md` §Итоговый PnL.
 
-### RISK-Q1. Структура и материализация `RiskSettings`
+### INSTR-Q2. Тайминг выставления плеча на бирже (set-leverage) — форвард к оркестрации (шаг 6)
 
-`RiskSettings` упомянут как поле `CalculationContext` и как вход
-`RiskValidator`, но нигде в архиве не описан детально — структура полей
-неизвестна. Возможно, это часть `StrategyDetail`
-(`riskPerTradePercent` / `maxLeverage`) или отдельный RVO. Только
-name-level. Материализация под вопросом.
+Большая часть INSTR-Q2 закрыта на `GAPS_CLOSE_1` шага 5: роль биржевого
+потолка плеча (авторитет — `InstrumentExternalRules.externalMaxLeverage`,
+дубль с `Instrument.externalLeverage` — мелкая чистка), отсутствие нашего
+кэпа плеча (плечо связано лимитом риска) и снятие `HOLD`-по-нарушению-плеча
+— решения `docs/decisions/instrument-external-rules-materialization.md` и
+`docs/decisions/per-trade-risk-policy.md`.
 
-Цитаты источника:
-- «Калькуляторы действий стратегии» §4 (`CalculationContext`):
-  `private RiskSettings riskSettings;` (комментарий: «Настройки риска из
-  StrategyDetail или глобальной risk policy»).
-- «Оценка рисков» §2.1 (Strategy-layer) — risk-настройки живут в
-  стратегии: `StrategyDetail.riskPerTradePercent`,
-  `StrategyDetail.maxLeverage`, `StrategyOrderAction.allocationPercents`
-  и др. §2.3 (RiskValidator) — `RiskSettings` указан среди входов
-  `RiskValidator` (структура не приведена).
-
-Варианты: (1) не отдельный RVO — risk-настройки берутся из
-`StrategyDetail` (`riskPerTradePercent`/`maxLeverage`) + глобальная risk
-policy; (2) самостоятельный RVO `docs/components/models/RiskSettings.md`,
-когда станет известна структура.
-До решения отдельный файл не создаётся; упоминается с пометкой «структура
-— RISK-Q1».
-Связано: `docs/components/models/CalculationContext.md`,
-`docs/components/RiskValidator.md`.
-
-### RISK-Q2. Worst-case guard поверх вычисленного плеча/позиции (владелец — шаг 5)
-
-После решения «плечо динамическое» (2026-06-04,
-`docs/rules/trading-constraints.md`) наших потолков плеча/позиции
-нет; единственный жёсткий предел — биржевой максимум
-(`InstrumentExternalRules.externalMaxLeverage`). На крипто-перпах
-биржевой максимум порядка 50-100× и ролью guard rail не обладает.
-Находка ТР1 `DOCS_CHECK_8` (торговый фокус `trading-review`, первый
-прогон): **не пересмотр** решения о динамическом плече — отдельная
-страховка **поверх** вычисленного значения. Формула даёт корректное
-плечо при корректных входах; guard ловит некорректные (ошибка
-данных/расчёта, гэп, jump-риск).
-
-Корпусное обоснование: позиционные лимиты обязательны для автоматики
-— минимум из «позиция при максимальном форкасте ×1.5», лимита плеча
-на инструмент, доли открытого интереса [Carver AFTS, тактика 4, PDF
-с. 651-655]; ни одна позиция не должна обнулять счёт при максимальном
-мыслимом движении [Carver ST, гл. 9, с. 180-181]; кэп экспозиции —
-«единственный форвардный риск-контроль» [Kaufman, гл. 24, PDF
-с. 2188, 2192-2193]; будущий крупнейший убыток больше исторического
-[Vince, гл. 2, с. 30-31].
-
-Варианты на будущее: (1) кэп плеча на инструмент; (2) позиционный
-лимит (нотинал / доля капитала / доля открытого интереса);
-(3) комбинация — минимум из нескольких границ; (4) иное по итогам
-проработки риск-движка. Здесь не решается — владелец **шаг 5**
-(риск-преконтроль); до решения guard не материализуется.
-Связано: `docs/rules/trading-constraints.md`,
-`docs/components/models/RiskCheckResult.md` (`RiskCheckCode`),
-RISK-Q1 (`RiskSettings`), INSTR-Q2 (set-leverage / роль статического
-плеча).
-
-### INSTR-Q1. Как снапшот-концепция ляжет на `InstrumentExternalRules` (и нужен ли ренейм)
-
-Шаг 1 (поток рыночных данных) развёл модель инструмента так: домен
-`Instrument` держит идентичность (+ онбординг-статус,
-`plannedCandleStartDate`, биржевые `externalStatus`/`externalLeverage`
-из снапшота, рабочее `leverage` из создания), а справочные
-sizing/rounding-поля спецификации (base/quote/settle, sizes)
-приходят транзиентно в `InstrumentExternalSnapshot` и в шаге 1
-персистентно **не** хранятся. Биржевые `state`/`lever` (OKX) с
-шага 1 персистятся на `Instrument` (`externalStatus`/
-`externalLeverage`), а не на rules (`GAPS_CLOSE_3`). Модель
-`InstrumentExternalRules` (persisted sizing/rounding-правила) для
-шага 1 отложена (округление/sizing/риск — поздние шаги; backlog
-п.9) и на base/quote/settle больше не претендует — этим снят дубль
-Н1 (`DOCS_CHECK_2`).
-
-Не решено (всплывёт при материализации rules на поздних шагах): как
-именно снапшот-концепция (`InstrumentExternalSnapshot` —
-транзиентная граница) соотнесётся с persisted
-`InstrumentExternalRules` — отдельные ли это сущности, одна ли
-материализуется из другой, где окончательно живёт персистентный дом
-справочных полей; и не потребуется ли в результате **ренейм**
-`InstrumentExternalRules` (например, к снапшот-неймингу).
-
-Под общее правило персистентности
-(`docs/rules/persistence-representation.md`, 2026-06-03) дефолт
-представления материализованных rules — JSONB на строке владельца
-(`Instrument`), пока на них нет FK-ссылок из других мест;
-самостоятельная таблица — только как осознанное исключение. Это вход
-будущего решения, не предрешение.
-
-Варианты на будущее: (1) `InstrumentExternalRules` остаётся
-самостоятельной persisted-моделью, материализуется из снапшота;
-(2) переосмыслить как persisted-проекцию снапшота с ренеймом;
-(3) иное по итогам проработки шагов округления/sizing/риска. До
-решения rules не материализуется; в шаге 1 справочные поля — только
-транзиентный снапшот.
-Связано: `docs/models/domain/core/Instrument.md`,
-`docs/models/mapping/Instrument.md`,
-`docs/models/domain/other/InstrumentExternalRules.md`,
-`docs/models/mapping/InstrumentExternalRules.md`, backlog п.9.
-
-### INSTR-Q2. Роль статического плеча `Instrument` при динамическом рабочем плече
-
-Плечо динамическое (решение чата 2026-06-04,
-`docs/rules/trading-constraints.md`): рабочее значение выводится на
-сделку из торговых правил (риск на сделку, инвариант «ликвидация за
-стопом») и рыночных условий (волатильность); наших потолков нет,
-единственный жёсткий предел — биржевой максимум
-(`InstrumentExternalRules.externalMaxLeverage`). При этом на
-`Instrument` остаются статические поля плеча: рабочее `leverage`
-(`Integer`, задаётся при создании) и сырой биржевой
-`externalLeverage` (OKX `lever`). Шаг 1 (поток рыночных данных,
-онбординг-путь `CREATED → SYNC → CANDLES_LOADING → ACTIVE`) вопросом
-**не блокируется**. Здесь не решается — проработка уходит в
-риск-движок (шаг 5) / торговый совет.
-
-Открытые аспекты:
-- Нужна ли вообще статическому полю `Instrument.leverage` роль
-  рабочего плеча, если рабочее плечо выводится динамически на
-  каждую сделку (переосмысление / удаление / иная роль — не
-  предрешено). Кто и когда выставляет плечо на бирже
-  (set-leverage: при онбординге, перед сделкой, на каждую сделку).
-- Роль биржевого `externalLeverage` (OKX `lever`, сырое значение на
-  `Instrument`) как биржевого потолка плеча: выступает ли он
-  верхней границей для рабочего плеча и как соотносится с
-  rules-полем `externalMaxLeverage`, в т.ч. возможный
-  дубль/удаление (`docs/rules/trading-constraints.md` — предел
-  плеча сослан на `InstrumentExternalRules.externalMaxLeverage`;
-  `docs/models/domain/other/InstrumentExternalRules.md`).
-- Состояние / действие `HOLD` в lifecycle инструмента: в текущем
-  материализованном онбординг-пути шага 1 `HOLD` нет
-  (`docs/lifecycles/Instrument.md`; периферийные статусы отложены —
-  backlog п.9). Нужен ли переход в `HOLD` при нарушении правила
-  плеча (после снятия наших потолков — только превышение биржевого
-  максимума) и кто его инициирует — не решено.
-
-Связано: `docs/models/domain/core/Instrument.md` (`leverage`,
-`externalLeverage`), `docs/lifecycles/Instrument.md`,
-`docs/rules/trading-constraints.md`,
-`docs/models/domain/other/InstrumentExternalRules.md`,
-`docs/models/mapping/InstrumentExternalRules.md`, INSTR-Q1.
+**Остаточный аспект:** кто и когда выставляет рабочее плечо на бирже
+(OKX set-leverage: при онбординге / перед сделкой / на каждую сделку) и
+нужна ли статическому `Instrument.leverage` (`Integer`, задаётся при
+создании) роль при динамическом рабочем плече. Это **исполнение** записи
+плеча (write-действие), а не риск-преконтроль шага 5 (валидация); горизонт
+— оркестрация торгового цикла (шаг 6). Шаг 5 не блокирует.
+Связано: `docs/models/domain/core/Instrument.md` (`leverage`),
+`docs/lifecycles/Instrument.md`,
+`docs/decisions/per-trade-risk-policy.md`,
+`docs/decisions/instrument-external-rules-materialization.md`.
 
 ### ORCH-Q1. Владелец оркестрации онбординга инструмента и загрузки свечей
 

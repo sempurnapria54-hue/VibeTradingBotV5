@@ -34,11 +34,11 @@ StrategyAction + свежие runtime-data` и должен быть собра�
 | `balanceContainer` | `BalanceContainer` | Persisted snapshot баланса для sizing и подготовки risk-policy; context его не обновляет. |
 | `activePosition` | `Position` | Активная позиция, если открыта. |
 | `entryOrder` | `Order` | Entry order, если уже создан. |
-| `riskSettings` | `RiskSettings` | Настройки риска — **структура и материализация под вопросом, см. RISK-Q1**. |
 | `strategyDirection` | `StrategyTradeDirection` | Направление стратегии (`LONG`/`SHORT`). |
 
-`RiskSettings` нигде не описан детально — артефакт не создаётся до
-решения RISK-Q1 (`.claude/work/questions/open-questions.md`).
+Риск-настройки сделки (`riskPerTradePercent`) читаются из присутствующего
+`strategyDetail` (pinned деталь). Отдельного поля/RVO `RiskSettings` нет
+(закрыт RISK-Q1, см. `docs/decisions/per-trade-risk-policy.md`).
 
 ## Scope сборки
 

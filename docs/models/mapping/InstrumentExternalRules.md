@@ -60,33 +60,40 @@ contracts = baseQty / ctVal
 | `ctVal` | `externalContractValue` |
 | `ctValCcy` | `externalContractValueCurrency` |
 | `ctType` | raw → `contractType` (резолв) |
+| `maxLmtSz` | `externalMaxLimitSize` |
+| `maxMktSz` | `externalMaxMarketSize` |
+| `maxTriggerSz` | `externalMaxTriggerSize` |
+| `maxStopSz` | `externalMaxStopSize` |
+| `lever` | `externalMaxLeverage` |
+| `state` | `externalState` → `Status` (резолв) |
+
+Per-order max sizes и `lever`/`state` маппятся на шаге 5 (риск-преконтроль —
+потребитель ограничений: `SIZE_ABOVE_LIMIT`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
+`INSTRUMENT_NOT_LIVE`). Решение —
+`docs/decisions/instrument-external-rules-materialization.md`.
 
 ### Разграничение со снапшотом инструмента (шаг 1)
 
-Биржевые `state`/`lever` в шаге 1 потребляются доменным
-`Instrument` (`externalStatus`/`externalLeverage`) через граничный
-`InstrumentExternalSnapshot` — `docs/models/mapping/Instrument.md`.
-Здесь (rules-маппинг) они больше **не** маппятся: rules отложена за
-пределы шага 1 и описывает sizing/rounding-правила. Поля
-`externalState`/`externalMaxLeverage` и проекция `Status` в модели
-`InstrumentExternalRules` сохранены, но их сорсинг при
-материализации rules и соотнесение с биржевыми полями `Instrument`
-(в т.ч. возможный дубль/удаление) — открытый вопрос INSTR-Q2 (роль
-`externalLeverage` как биржевого потолка плеча, валидация рабочего
-плеча) и INSTR-Q1 (снапшот-концепция rules).
+Биржевые `state`/`lever` приходят и на шаге 1 в доменный `Instrument`
+(`externalStatus`/`externalLeverage`, через `InstrumentExternalSnapshot`,
+`docs/models/mapping/Instrument.md`), и здесь — в rules при материализации
+на шаге 5. **Авторитетный для преконтроля источник** торгуемости и потолка
+плеча — rules (`Status`/`externalState`, `externalMaxLeverage`); одноимённые
+сырые поля на `Instrument` несут то же значение, но для преконтроля не
+авторитетны (дубль; устранение — мелкая чистка). Решение —
+`docs/decisions/instrument-external-rules-materialization.md` (закрыт INSTR-Q1,
+снят leverage/HOLD-под-вопрос INSTR-Q2).
 
 ### Не маппимые поля OKX
 
-`state`/`lever` (в шаге 1 → доменный `Instrument`:
-`externalStatus`/`externalLeverage`, через
-`InstrumentExternalSnapshot`; разграничение выше), `instFamily`,
-`uly`, `baseCcy`/`quoteCcy`/`settleCcy` (приходят в
+`instFamily`, `uly`, `baseCcy`/`quoteCcy`/`settleCcy` (приходят в
 `InstrumentExternalSnapshot` — граничный снапшот инструмента, не в
 этой модели; разграничение —
 `docs/models/domain/core/Instrument.md`), `ctMult`,
-`maxLmtSz`/`maxMktSz`/
-`maxTwapSz`/`maxIcebergSz`/`maxTriggerSz`/`maxStopSz`/`maxLmtAmt`/
-`maxMktAmt` (per-order лимиты — пока не используем),
+`maxTwapSz`/`maxIcebergSz`/`maxLmtAmt`/`maxMktAmt` (per-order лимиты
+неиспользуемых типов ордеров — не используем),
 `listTime`/`expTime`/`openType`/`ruleType` (lifecycle биржи; для
 SWAP `expTime` обычно пусто), `category`/`groupId`/`alias`/`stk`/
-`optType`, `posLmtAmt`/`posLmtPct`/`maxPlatOILmt` (лимиты позиций).
+`optType`, `posLmtAmt`/`posLmtPct`/`maxPlatOILmt` (позиционные лимиты —
+форвард к риску на биржу/портфель, фаза 3,
+`docs/decisions/per-trade-risk-policy.md`).

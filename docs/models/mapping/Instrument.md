@@ -44,12 +44,12 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 Справочные поля спецификации (base/quote/settle currency, `lotSz`,
 `minSz`, `ctVal`, `ctMult`, `tickSz`) приходят в
 `InstrumentExternalSnapshot` **транзиентно** и в шаге 1 в домен
-**не персистятся** — персистентного дома у них нет (модель
-`InstrumentExternalRules` отложена; backlog п.9). Куда они лягут
-персистентно и как снапшот-концепция соотнесётся с
-`InstrumentExternalRules` — открытый вопрос INSTR-Q1. Роль
-`externalLeverage` как биржевого потолка плеча и валидация рабочего
-`leverage` — открытый вопрос INSTR-Q2.
+**не персистятся**. Их персистентный дом — `InstrumentExternalRules`
+(JSONB-навес на `Instrument`), материализуемый **на шаге 5**
+(риск-преконтроль), вне оркестрации рыночных данных шага 1
+(`docs/decisions/instrument-external-rules-materialization.md`, закрыт
+INSTR-Q1). Роль `externalLeverage`/биржевой потолок плеча — там же
+(остаток INSTR-Q2 — только тайминг set-leverage, форвард к шагу 6).
 
 ## OKX
 
@@ -73,19 +73,19 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 
 `baseCcy`/`quoteCcy`/`settleCcy`, `lotSz`, `minSz`, `ctVal`,
 `ctMult`, `tickSz` — приходят в снапшоте, в домен шага 1 не мапятся
-(INSTR-Q1). Биржевые `state`/`lever` из этого перечня исключены —
-они персистятся на `Instrument` (`externalStatus`/`externalLeverage`,
-см. таблицу выше). Полный OKX-инвентарь —
-`docs/models/integrations/okx/InstrumentOkxResponse.md`; будущая
-персистентная проекция sizing/rounding-полей —
-`mapping/InstrumentExternalRules.md` (модель отложена).
+(их дом — `InstrumentExternalRules`, материализуется на шаге 5).
+Биржевые `state`/`lever` из этого перечня исключены — они персистятся
+на `Instrument` (`externalStatus`/`externalLeverage`, см. таблицу выше).
+Полный OKX-инвентарь —
+`docs/models/integrations/okx/InstrumentOkxResponse.md`; персистентная
+проекция sizing/rounding-полей —
+`mapping/InstrumentExternalRules.md` (материализуется на шаге 5).
 
 ## Связи
 
 - Доменная модель — `docs/models/domain/core/Instrument.md`.
 - Lifecycle онбординга — `docs/lifecycles/Instrument.md`.
-- Отложенные торговые правила —
+- Торговые правила инструмента (материализуются на шаге 5) —
   `docs/models/domain/other/InstrumentExternalRules.md`,
-  `docs/models/mapping/InstrumentExternalRules.md`.
-- Открытые вопросы — INSTR-Q1, INSTR-Q2
-  (`.claude/work/questions/open-questions.md`).
+  `docs/models/mapping/InstrumentExternalRules.md`,
+  `docs/decisions/instrument-external-rules-materialization.md`.

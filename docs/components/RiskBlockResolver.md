@@ -32,8 +32,12 @@ RiskBlockAction resolve(
 - `strategyStep` — тип шага (`ENTRY` … `FAIL_SAFE`);
 - `strategyAction` — исходное намерение стратегии (kind, actionType,
   risk-creating vs reduce-only exit, `positionReducingOnly`);
-- `calculatedAction` — рассчитанные цена/размер/направление/reduce-only
-  intent;
+- `calculatedAction` — рассчитанные цена/размер (`calculatedPrice` /
+  `calculatedSize`); reduce-only intent выводится из
+  `CalculatedSize.sizeMode`/`closeFraction`, направление — из
+  `DealContext.deal.direction` (для order-action также доступно на
+  `sourceAction`), отдельных полей направления/reduce-only у
+  `CalculatedStrategyAction` нет;
 - `riskValidationResult` — итоговое решение и конкретные `RiskCheckCode`.
 
 `boolean liveRiskExists` отдельным параметром не передаётся — это

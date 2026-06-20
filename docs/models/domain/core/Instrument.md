@@ -89,16 +89,19 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
 > `InstrumentExternalSnapshot`; персистентного дома у них нет.
 > Модель `InstrumentExternalRules` (sizing/rounding-правила:
 > tick/lot/min sizes, max-order sizes, `ctVal`, max leverage,
-> торгуемость) **отложена** за пределы шага 1 (округление/sizing/
-> риск — поздние шаги; backlog п.9) и на base/quote/settle больше
-> не претендует (`docs/models/domain/other/InstrumentExternalRules.md`).
-> Как снапшот-концепция ляжет на `InstrumentExternalRules` и не
-> потребуется ли ренейм — открытый вопрос INSTR-Q1; как биржевые
-> `externalStatus`/`externalLeverage` на `Instrument` соотносятся с
-> rules-полями (`externalState`/`externalMaxLeverage`/`Status`),
-> роль `externalLeverage` как биржевого потолка плеча и валидация
-> рабочего `leverage` (нарушение → `HOLD`) — открытый вопрос
-> INSTR-Q2 (`.claude/work/questions/open-questions.md`).
+> торгуемость) **материализуется на шаге 5** (риск-преконтроль) и на
+> base/quote/settle не претендует
+> (`docs/models/domain/other/InstrumentExternalRules.md`,
+> `docs/decisions/instrument-external-rules-materialization.md`,
+> закрыт INSTR-Q1). Авторитетный для преконтроля биржевой потолок плеча
+> и торгуемость живут в rules (`externalMaxLeverage`/`Status`);
+> одноимённые сырые поля на `Instrument` (`externalStatus`/
+> `externalLeverage`) несут то же значение, но для преконтроля не
+> авторитетны (дубль — мелкая чистка). Нашего кэпа плеча нет (плечо
+> связано лимитом риска, `docs/decisions/per-trade-risk-policy.md`),
+> поэтому `HOLD` инструмента по нарушению плеча не вводится: единственное
+> правило плеча — биржевой максимум (precontrol-блок
+> `EXCHANGE_MAX_LEVERAGE_EXCEEDED`).
 
 ## Персистентность
 
@@ -129,9 +132,10 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
 - Группы свечей — `docs/models/domain/other/CandleGroup.md`.
 - Lifecycle онбординга — `docs/lifecycles/Instrument.md`.
 - Mapping snapshot↔domain — `docs/models/mapping/Instrument.md`.
-- Торговые правила инструмента (отложены за пределы шага 1) —
-  `docs/models/domain/other/InstrumentExternalRules.md`.
-- Валидация рабочего `leverage` и роль `externalLeverage` как
-  биржевого потолка (отложено за пределы шага 1) — открытый вопрос
-  INSTR-Q2 (`.claude/work/questions/open-questions.md`).
+- Торговые правила инструмента (материализуются на шаге 5) —
+  `docs/models/domain/other/InstrumentExternalRules.md`,
+  `docs/decisions/instrument-external-rules-materialization.md`.
+- Роль `externalLeverage`/потолок плеча, кэп плеча — закрыты решениями
+  выше + `docs/decisions/per-trade-risk-policy.md`; остаточный INSTR-Q2 —
+  только тайминг set-leverage на бирже (форвард к оркестрации, шаг 6).
 - Audit-база — `docs/models/domain/other/Auditable.md`.

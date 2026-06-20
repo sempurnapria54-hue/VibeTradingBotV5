@@ -12,22 +12,20 @@
 бизнес-цикл сделки, а хранимые справочные правила инструмента → модель
 `other` (см. `.claude/decisions/models-core-vs-other.md`).
 
-> **Отложено за пределы шага 1.** Модель нужна поздним шагам
-> (округление цены/размера, sizing в контрактах, риск-преконтроль,
-> проверка торгуемости инструмента) — backlog п.9; в шаге 1 (поток
-> рыночных данных) она не материализуется. Справочные валюты
-> инструмента (base/quote/settle) эта модель **не держит** — они
-> приходят в транзиентном `InstrumentExternalSnapshot` (см.
+> **Материализуется на шаге 5** (риск-преконтроль — первый реальный
+> потребитель ограничений инструмента; решение
+> `docs/decisions/instrument-external-rules-materialization.md`, закрыт
+> INSTR-Q1, ренейм не требуется). Справочные валюты инструмента
+> (base/quote/settle) эта модель **не держит** — они приходят в
+> транзиентном `InstrumentExternalSnapshot` (см.
 > `docs/models/domain/core/Instrument.md`,
-> `docs/models/mapping/Instrument.md`). Биржевые `state`/`lever`
-> (OKX) с шага 1 также живут на `Instrument`
-> (`externalStatus`/`externalLeverage`) и через эту модель не идут;
-> соотнесение с rules-полями `externalState`/`externalMaxLeverage`/
-> `Status` (в т.ч. сорсинг при материализации rules) и роль
-> `externalLeverage` как биржевого потолка плеча — открытый вопрос
-> INSTR-Q2. Как снапшот-концепция ляжет на эту модель и не
-> потребуется ли ренейм — открытый вопрос INSTR-Q1
-> (`.claude/work/questions/open-questions.md`).
+> `docs/models/mapping/Instrument.md`). Авторитетный источник биржевого
+> **потолка плеча** для преконтроля — `externalMaxLeverage` этой модели
+> (из OKX `lever`); одноимённое сырое значение на `Instrument`
+> (`externalLeverage`, заведено на шаге 1) для преконтроля не
+> авторитетно (устранение дубля — мелкая чистка). Нашего кэпа плеча
+> нет (плечо связано лимитом риска,
+> `docs/decisions/per-trade-risk-policy.md`).
 
 Используется для:
 
@@ -45,7 +43,9 @@
 
 ## Структура
 
-Java-класс, наследует `Auditable`.
+Java-класс. Поля `id`/`instrumentId` — логические (модель хранится
+JSONB-навесом на строке `Instrument`, не отдельной таблицей; audit-поля
+наследуются от строки-владельца — см. §Персистентность).
 
 | Поле | Тип | Назначение |
 |---|---|---|
@@ -77,12 +77,9 @@ runtime-логики.
 
 ### `Status`
 `LIVE`, `SUSPEND`, `PREOPEN`, `EXPIRED`, `TEST`, `UNKNOWN`.
-Нормализованный статус инструмента; источник — `externalState`.
-Биржевой `state` в шаге 1 потребляется доменным `Instrument`
-(`externalStatus`, сырой); сорсинг `externalState`/`Status` при
-материализации rules и соотнесение с `Instrument.externalStatus` —
-открытый вопрос INSTR-Q2 (см.
-`docs/models/mapping/InstrumentExternalRules.md`).
+Нормализованный статус инструмента; источник — `externalState` (OKX
+`state`, то же сырое значение, что и `Instrument.externalStatus` с шага 1).
+Используется для проверки торгуемости инструмента (`INSTRUMENT_NOT_LIVE`).
 
 ### `InstrumentType`
 `SWAP` (бессрочный своп / perpetual), `FUTURES` (фьючерс с датой
@@ -105,6 +102,12 @@ enum-полей `instrumentType`/`contractType`/`status` — они резолв
 
 ## Персистентность
 
-Хранится в БД как актуальный snapshot правил инструмента (один актуальный
-набор на инструмент). Наследует `Auditable`. Обновляется только через
+Хранится **JSONB-навесом на строке владельца** (`instruments`), один
+актуальный набор правил на инструмент — по дефолту правила персистентности
+(`docs/rules/persistence-representation.md`): FK-ссылок на rules из других
+мест нет, реляционная строка пользы не несёт. Собственной таблицы/`id` у
+модели нет; доступ — только через `Instrument`. Поля `id`/`instrumentId` в
+структуре выше — логические (часть навеса/ключ владельца), не отдельная
+таблица. Audit-поля наследуются от строки-владельца. Обновляется только через
 `InstrumentExternalRulesSyncJob` по REST (на первом этапе без WebSocket).
+Обоснование — `docs/decisions/instrument-external-rules-materialization.md`.
