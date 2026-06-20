@@ -16,13 +16,6 @@ ask + время тикера). RVO, **не** persisted (см.
 `CalculationContext` (см. `docs/components/models/CalculationContext.md`).
 Раздачей занимается `docs/components/MarketPriceDataService.md`.
 
-> **Статус кода:** RVO `MarketPriceData` — **forward-дизайн шага 5**
-> (Java-класса ещё нет). Граничный `MarketPriceDataExternalSnapshot` и
-> его маппер **сняты** под §«Неиспользуемый код» при ре-базе контура
-> тестов на сырьё (`.claude/decisions/source-api-target-rebase.md`);
-> вернутся со сборкой рыночных данных на шаге 5. Сырой `getTicker`
-> остаётся (A2-passthrough контура).
-
 Flow:
 
 ```text
@@ -44,8 +37,9 @@ Client model OKX ticker
 | `externalBidPrice` | `BigDecimal` | Лучшая цена покупки. |
 | `externalTimestamp` | `OffsetDateTime` | Время тикера на бирже. |
 
-`MID_PRICE` не хранится — вычисляется: `midPrice = (externalBidPrice +
-externalAskPrice) / 2`.
+`MID_PRICE` не хранится — вычисляется методом `midPrice()`:
+`(externalBidPrice + externalAskPrice) / 2`; возвращает `null`, если
+одной из сторон нет.
 
 ## MarketPriceDataExternalSnapshot (boundary)
 

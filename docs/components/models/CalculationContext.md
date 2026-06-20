@@ -30,15 +30,29 @@ StrategyAction + свежие runtime-data` и должен быть собра�
 | `marketPriceData` | `MarketPriceData` | Runtime-цены (не persisted; получаются через REST ticker перед расчётом). |
 | `indicatorValues` | `List<IndicatorValue>` | Готовые значения индикаторов (через `IndicatorService`). |
 | `marketStructures` | `List<MarketStructure>` | Готовые структуры рынка (через `MarketStructureService`). |
-| `marketPhase` | `MarketPhase` | Актуальная фаза рынка, если нужна. |
+| `marketPhase` | `MarketPhase` | Актуальная фаза рынка, если нужна. **В фазе 1 фабрикой не заполняется** (нет потребителя) — остаётся `null`; форвард. |
 | `balanceContainer` | `BalanceContainer` | Persisted snapshot баланса для sizing и подготовки risk-policy; context его не обновляет. |
 | `activePosition` | `Position` | Активная позиция, если открыта. |
 | `entryOrder` | `Order` | Entry order, если уже создан. |
 | `strategyDirection` | `StrategyTradeDirection` | Направление стратегии (`LONG`/`SHORT`). |
+| `indicatorSettings` | `List<StrategyIndicatorSetting>` | Каталог настроек индикаторов стратегии — для резолва готового значения по «мягкому» ключу. |
+| `marketStructureSettings` | `List<StrategyMarketStructureSetting>` | Каталог настроек структуры рынка стратегии — для резолва структуры по «мягкому» ключу. |
 
 Риск-настройки сделки (`riskPerTradePercent`) читаются из присутствующего
 `strategyDetail` (pinned деталь). Отдельного поля/RVO `RiskSettings` нет
 (закрыт RISK-Q1, см. `docs/decisions/per-trade-risk-policy.md`).
+
+## Резолв готовых значений по ключу
+
+Калькуляторы получают готовое значение/структуру по «мягкому» ключу
+настройки через методы контекста:
+
+- `findIndicatorValueByKey(String key)` — находит настройку индикатора
+  по `key` в `indicatorSettings`, затем `IndicatorValue` по её id в
+  `indicatorValues`; `null`, если не найдено.
+- `findMarketStructureByKey(String key)` — то же для структуры рынка
+  (`marketStructureSettings` → `marketStructures`); `null`, если не
+  найдено.
 
 ## Scope сборки
 

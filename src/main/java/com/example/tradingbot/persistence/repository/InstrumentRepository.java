@@ -1,6 +1,7 @@
 package com.example.tradingbot.persistence.repository;
 
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,12 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     Optional<InstrumentEntity> findByInternalId(String internalId);
 
     List<InstrumentEntity> findByStatus(String status);
+
+    List<InstrumentEntity> findByStatusIn(Collection<String> statuses);
+
+    /** Проекция: JSONB-навес внешних правил по id — без вытягивания всей сущности. */
+    @Query("select i.externalRules from InstrumentEntity i where i.id = :id")
+    Optional<String> findExternalRulesById(@Param("id") Long id);
 
     @Query("select distinct i from InstrumentEntity i left join fetch i.candleGroups where i.id = :id")
     Optional<InstrumentEntity> findByIdWithCandleGroups(@Param("id") Long id);

@@ -63,21 +63,37 @@ LONG SL  -> вниз     SHORT SL -> вверх
 LONG TP  -> вверх    SHORT TP -> вниз
 ```
 
-## Вокабуляр источников цены (`StrategyPriceSource`)
+## Что задаёт резолв цены (фактические драйверы)
 
-Расширенный набор источников, из которых калькулятор резолвит цену:
-`LAST_PRICE`, `MARK_PRICE`, `INDEX_PRICE`, `BEST_BID_PRICE`,
-`BEST_ASK_PRICE`, `MID_PRICE`, `RANGE_LOW`, `RANGE_HIGH`, `SWING_LOW`,
-`SWING_HIGH`, `ORDER_LIMIT_PRICE`, `ORDER_MARKET_REFERENCE_PRICE`,
-`ENTRY_PLANNED_PRICE`, `POSITION_AVG_PRICE`, `ENTRY_ORDER_AVG_PRICE`,
-`ENTRY_AVERAGE_PRICE`, `BREAKEVEN_PRICE`, `POSITION_BREAKEVEN_PRICE`,
-`ATR_VALUE`, `TRAILING_SETTINGS`, `TRIGGER_ORDER_TRIGGER_PRICE`,
-`FILL_AVERAGE_PRICE`, `ORDER_AVG_PRICE`, `ALGO_ACTUAL_PRICE`,
-`POSITION_MARK_PRICE`, `POSITION_LIQUIDATION_PRICE`, `INSTRUMENT_MIN_PRICE`,
-`INSTRUMENT_MAX_PRICE`, `INSTRUMENT_TICK_SIZE`.
+Резолв базовой цены в фазе 1 управляется не расширенным
+`StrategyPriceSource`, а связкой:
 
-Конфигурационное подмножество для placement (`LAST_PRICE` … `MID_PRICE`) —
-раздел `StrategyPriceSource` в `docs/models/domain/aggregate/Strategy.md`.
+- **`StrategyPriceBaseType`** (тип базы placement): `RANGE_LOW`,
+  `RANGE_HIGH`, `SWING_LOW`, `SWING_HIGH`, `SUPPORT`, `RESISTANCE`
+  (берутся из `MarketStructure` по `structureKey`), `ENTRY_PRICE`
+  (цена-ориентир входа), `MARKET_PRICE` (рыночная цена по
+  `StrategyPriceSource`);
+- **`StrategyPriceSource`** (подмножество для `MARKET_PRICE`-базы):
+  `LAST_PRICE`, `MARK_PRICE`, `INDEX_PRICE`, `BEST_BID_PRICE`,
+  `BEST_ASK_PRICE`, `MID_PRICE`;
+- **`StopLossCalculationType`** для SL: `ENTRY_PRICE_PERCENT`,
+  `ATR_PERCENT`, `MARKET_STRUCTURE_BUFFER_PERCENT`;
+- **`TrailingSettings`** для активации/callback трейлинга.
+
+`MARK_PRICE`/`INDEX_PRICE` в фазе 1 **проксируются на last price**: OKX
+ticker не несёт mark/index, поэтому обе мапятся на
+`externalLastPrice`.
+
+Расширенный ~30-значный вокабуляр источников цены — **форвард**; в коде
+`StrategyPriceSource` не расширяется. Конфигурационное подмножество для
+placement (`LAST_PRICE` … `MID_PRICE`) — раздел `StrategyPriceSource` в
+`docs/models/domain/aggregate/Strategy.md`.
+
+## Ветки условий algo (`conditionType`)
+
+`PriceCalculator` обрабатывает: `STOP_LOSS`/`PARTIAL_STOP_LOSS` (SL),
+`TAKE_PROFIT`/`PARTIAL_TAKE_PROFIT` (TP), `OCO_FULL` (SL + TP вместе),
+`TRAILING_PERCENTS`/`TRAILING_VALUE` (trailing).
 
 ## Источник цены → тип цены (примеры)
 
@@ -95,6 +111,9 @@ LONG TP  -> вверх    SHORT TP -> вниз
 
 ## Контролируемые ошибки
 
-Возвращает controlled `CalculationError`, если нет актуальной цены / entry
+Сигнализирует контролируемую ошибку расчёта (бросает `CalculationException`,
+которое `StrategyActionCalculator` превращает в `CalculationError` в
+`ERROR`-результате — см. `docs/components/models/CalculationError.md`
+§«Механизм сигнализации»), если нет актуальной цены / entry
 price / ATR / market structure / `tickSize`, либо цена стала невалидной
 после округления (см. `docs/components/models/CalculationError.md`).

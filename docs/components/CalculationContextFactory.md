@@ -14,10 +14,17 @@
 
 ## Источники данных
 
-`MarketPriceDataService`, `InstrumentExternalRulesService`,
-`IndicatorService`, `MarketStructureService`, `MarketPhaseService`,
-balance (из `DealContext` / repository). Тяжёлые данные не считает —
-читает готовые результаты.
+`MarketPriceDataService`, `InstrumentExternalRulesDataService`
+(`findByInstrumentId`), `StrategyDataService`
+(`findActiveByInstrumentIdWithSettings` — каталоги настроек
+индикаторов/структуры стратегии для резолва готовых значений по
+ключу), `IndicatorService`, `MarketStructureService`, balance (из
+`DealContext`). Тяжёлые данные не считает — читает готовые
+результаты.
+
+`MarketPhaseService` фабрика **не** вызывает: фаза 1 `marketPhase`
+не потребляет, поле остаётся `null` (заполнится с появлением
+потребителя — форвард).
 
 ## Границы и защитное поведение
 
@@ -29,6 +36,9 @@ balance (из `DealContext` / repository). Тяжёлые данные не сч
   `REFRESH_BALANCE`.
 - Работает защитно: если обязательное готовое значение отсутствует, явно
   устарело, или сервис рыночных данных не может вернуть актуальную цену —
-  возвращает controlled error/result (`CalculationError`), а не считает по
-  старым данным (см. `docs/components/models/CalculationError.md`,
-  `docs/rules/market-data-freshness.md`).
+  сигнализирует контролируемую ошибку расчёта **броском** `CalculationException`
+  (несёт `CalculationError`; `StrategyActionCalculator` перехватывает →
+  `ERROR`-результат, см. `docs/components/models/CalculationError.md`
+  §«Механизм сигнализации»), а не считает по старым данным
+  (`docs/rules/market-data-freshness.md`). Конкретно: при отсутствии рыночной
+  цены — **temporary** `CalculationException` с кодом `NO_MARKET_PRICE`.

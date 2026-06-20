@@ -50,26 +50,40 @@ contracts = baseQty / ctVal
 
 ### `InstrumentOkxResponse` → snapshot
 
+`integrationToSnapshot` переносит сырые строки 1:1 — **enum'ы на этом
+этапе не резолвятся**, snapshot держит только `external*`-строки:
+
 | OKX field | Snapshot field |
 |---|---|
 | `instId` | `externalInstrumentId` |
-| `instType` | raw → `instrumentType` (резолв) |
+| `instType` | `externalInstrumentType` |
 | `tickSz` | `externalTickSize` |
 | `lotSz` | `externalLotSize` |
 | `minSz` | `externalMinSize` |
 | `ctVal` | `externalContractValue` |
 | `ctValCcy` | `externalContractValueCurrency` |
-| `ctType` | raw → `contractType` (резолв) |
+| `ctType` | `externalContractType` |
 | `maxLmtSz` | `externalMaxLimitSize` |
 | `maxMktSz` | `externalMaxMarketSize` |
 | `maxTriggerSz` | `externalMaxTriggerSize` |
 | `maxStopSz` | `externalMaxStopSize` |
 | `lever` | `externalMaxLeverage` |
-| `state` | `externalState` → `Status` (резолв) |
+| `state` | `externalState` |
 
-Per-order max sizes и `lever`/`state` маппятся на шаге 5 (риск-преконтроль —
-потребитель ограничений: `SIZE_ABOVE_LIMIT`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
-`INSTRUMENT_NOT_LIVE`). Решение —
+### Резолв enum'ов при материализации (`snapshotToDomain`)
+
+Доменные проекции резолвятся **при материализации** модели
+(`snapshotToDomain(snapshot, instrumentId)`), не на этапе snapshot:
+
+| Сырое поле snapshot | Доменная проекция |
+|---|---|
+| `externalInstrumentType` | `instrumentType` (`InstrumentType`) |
+| `externalContractType` | `contractType` (`ContractType`) |
+| `externalState` | `status` (`Status`) |
+
+Неизвестное сырое значение нормализуется в `UNKNOWN`. Per-order max sizes
+и `lever`/`state` потребляет риск-преконтроль шага 5 (`SIZE_ABOVE_LIMIT`,
+`EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `INSTRUMENT_NOT_LIVE`). Решение —
 `docs/decisions/instrument-external-rules-materialization.md`.
 
 ### Разграничение со снапшотом инструмента (шаг 1)

@@ -28,7 +28,9 @@
 
 ## Енум `RiskCheckStatus`
 
-`PASSED`, `WARNING` (не блокирует), `BLOCKED`.
+`PASSED`, `WARNING` (не блокирует), `BLOCKED`. В фазе 1 `RiskValidator`
+строит **только** `BLOCKED`-результаты — `PASSED`/`WARNING` определены,
+но ни одна проверка фазы 1 их не порождает.
 
 ## Енум `RiskCheckCode`
 
@@ -43,6 +45,22 @@
 `MULTIPLE_POSITIONS_DETECTED`, `POSITION_STATE_UNKNOWN`,
 `INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`,
 `CALCULATED_ACTION_INVALID`.
+
+### Эмитятся `RiskValidator`'ом в фазе 1
+
+`RISK_PER_TRADE_EXCEEDED`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
+`MARGIN_MODE_NOT_ISOLATED`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
+`SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`, `TAKE_PROFIT_INVALID_SIDE`,
+`STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `INSTRUMENT_NOT_LIVE`,
+`INSTRUMENT_RULES_MISSING`, `BALANCE_INVALID`, `CALCULATED_ACTION_INVALID`
+(см. `docs/components/RiskValidator.md`).
+
+### Определены, но в фазе 1 не эмитятся
+
+Форвард / handler / аномалия: `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`,
+`BORROW_OR_DEBT_DETECTED`, `MULTIPLE_POSITIONS_DETECTED`,
+`POSITION_STATE_UNKNOWN`, `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
+`PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`.
 
 Часть кодов — не risk-policy проверки `RiskValidator`, а safety/invariant
 violation exit-flow через reduce-only `Order`/`AlgoOrder`:

@@ -18,6 +18,17 @@ SL; невозможно округлить цену по tick size; невоз�
 exceptions в `CalculationError` **не** превращаются — для них коды
 `RuntimeErrorCode` (см. `docs/rules/runtime-error-classification.md`).
 
+## Механизм сигнализации
+
+Контролируемую ошибку расчёта суб-калькуляторы (`CalculationContextFactory`,
+`PriceCalculator`, `SizeCalculator`) сигнализируют **броском** внутреннего
+`CalculationException`, несущего `CalculationError`. `StrategyActionCalculator`
+его перехватывает и возвращает `StrategyActionCalculationResult` со статусом
+`ERROR` и этим `CalculationError` — внешний контракт калькулятор-слоя возвратный
+(Result), не бросковый. Unexpected exceptions так не оборачиваются (ловятся на
+границе FSM, `RuntimeErrorCode`). `code` — freeform-строка; пример
+temporary-кода — `NO_MARKET_PRICE` (нет свежей рыночной цены).
+
 ## Структура
 
 | Поле | Тип | Назначение |
@@ -25,7 +36,7 @@ exceptions в `CalculationError` **не** превращаются — для н
 | `code` | `String` | Машинный код ошибки расчёта. |
 | `type` | `CalculationErrorType` | Тип ошибки расчёта. |
 | `message` | `String` | Человекочитаемое описание. |
-| `retryable` | `boolean` | Можно ли повторить расчёт позже без изменения стратегии. |
+| `retryable` | `Boolean` | Можно ли повторить расчёт позже без изменения стратегии. |
 
 ## Енум `CalculationErrorType`
 

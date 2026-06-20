@@ -22,12 +22,18 @@ lifecycle, а не пакет (см. `docs/rules/command-lifecycle.md`). За о
 `DealContext` / `DealActionState` / runtime-сущностям / exchange facts:
 
 ```text
-DealActionState отсутствует / PLANNED -> CREATE_ORDER
-status = CREATED                       -> SUBMIT_ORDER
-status = SUBMITTED                     -> REFRESH_ORDER / REFRESH_ALGO_ORDER / ...
+DealActionState отсутствует / PLANNED -> CREATE_ORDER / CREATE_ALGO_ORDER
+                                         (CLOSE_FULL -> CLOSE_POSITION)
+status = CREATED                       -> SUBMIT_ORDER / SUBMIT_ALGO_ORDER
+status = SUBMITTED                     -> REFRESH_ORDER / REFRESH_ALGO_ORDER
+                                         / REFRESH_POSITION
 ```
 
 (`DealActionState`-статусы — `docs/lifecycles/DealActionState.md`.)
+
+В шаге 5 `CANCEL` / `REPLACE` команды не порождают (refinement —
+граница со step-5 калькулятором), а algo-`Condition` собирается только с
+`type` (полные SL/TP-цены — refinement).
 
 ## Связь с risk-layer и freshness
 

@@ -31,15 +31,33 @@ contractsRounded = roundByLotSize(contracts)
 `externalLotSize`, `minSz` = `externalMinSize` (см.
 `docs/models/domain/other/InstrumentExternalRules.md`).
 
+### Вход (open/increase)
+
+Желаемый notional берётся от свободного депозита:
+`desiredNotional = externalAvailableEquity × (allocationPercents / 100)`,
+затем `contracts = desiredNotional / (entryPrice × ctVal)`. Если у входа
+есть стоп — `contracts` кэпится лимитом риска на сделку (см. ниже).
+Итог округляется вниз по `lotSz` и снизу ограничен `minSz`. База
+аллокации — `externalAvailableEquity` (якорь процента — открытый вопрос
+STRAT-Q4).
+
+### Reduce-only / algo / full-close
+
+Размер закрытия = `Position.externalSize × fraction` (fraction зажат в
+`[0..1]`), округлён вниз по `lotSz`, снизу ограничен `minSz`. Для
+`StrategyPositionAction` (`CLOSE_FULL`) fraction = 1
+(`externalSize` целиком).
+
 ## Сайзинг под лимит риска на сделку
 
 Для risk-creating входа со стопом размер **ограничен лимитом риска на
 сделку**: подбирается так, чтобы убыток на стопе не превышал
 `StrategyDetail.riskPerTradePercent × BalanceContainer.externalAvailableEquity`
 (`docs/decisions/per-trade-risk-policy.md`). Убыток на стопе для линейного
-контракта — `|entryPrice − stopPrice| × contracts × ctVal + commissions`;
-лимит риска — связывающий потолок над желаемым объёмом (`allocationPercents` —
-желаемая доля, лимит риска — связывающий cap).
+контракта — `|entryPrice − stopPrice| × contracts × ctVal` (**commissions в
+фазе 1 опущены**, учёт — на шаге 7 с fee-моделью,
+`docs/decisions/per-trade-risk-policy.md`); лимит риска — связывающий потолок над желаемым объёмом
+(`allocationPercents` — желаемая доля, лимит риска — связывающий cap).
 
 - размер округляется по `lotSz` и **снизу ограничен** `minSz`;
 - если даже на `minSz` убыток на стопе превышает лимит — `SizeCalculator`
@@ -60,6 +78,8 @@ partial TP / reduce-only; размер закрывающего `Order`/`AlgoOrd
 считается так, чтобы action не увеличивал позицию (`closeFraction` 0..1,
 см. `docs/rules/no-partial-close.md`).
 
-Если размер нельзя безопасно посчитать (нет `lotSz`/`minSz`, нельзя
-привести к минимальной торговой единице) — возвращается controlled
-`CalculationError`.
+Если размер нельзя безопасно посчитать (нет `ctVal`/`lotSz`/`minSz`, нельзя
+привести к минимальной торговой единице) — сигнализируется контролируемая
+ошибка расчёта (бросок `CalculationException` → `CalculationError` в
+`ERROR`-результате `StrategyActionCalculator`, см.
+`docs/components/models/CalculationError.md` §«Механизм сигнализации»).

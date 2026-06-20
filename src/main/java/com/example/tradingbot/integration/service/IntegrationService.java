@@ -5,11 +5,13 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.core.fill.external_snapshot.FillExternalSnapshot;
+import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalRulesExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
+import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
 import java.util.List;
 
 /**
@@ -31,6 +33,27 @@ public interface IntegrationService {
      * @return снапшот; {@code null} — инструмент на бирже не найден.
      */
     InstrumentExternalSnapshot getInstrument(String externalInstrumentId, String externalInstrumentType);
+
+    /**
+     * Внешние правила инструмента (спецификация: tick/lot/min size,
+     * per-order max sizes, ctVal, max leverage, торгуемость) →
+     * нормализованный снапшот. Тот же endpoint спецификации, что и
+     * {@link #getInstrument}, но граничный снапшот несёт ограничители для
+     * риск-преконтроля.
+     *
+     * @return снапшот; {@code null} — инструмент на бирже не найден.
+     */
+    InstrumentExternalRulesExternalSnapshot getInstrumentRules(String externalInstrumentId,
+                                                               String externalInstrumentType);
+
+    /**
+     * Текущие цены инструмента (last/bid/ask + время тикера) →
+     * нормализованный снапшот по REST ticker. Не persisted; нужен прямо
+     * перед расчётом параметров действия.
+     *
+     * @return снапшот; {@code null} — тикера на бирже нет.
+     */
+    MarketPriceDataExternalSnapshot getMarketPriceData(String externalInstrumentId);
 
     /**
      * История свечей (пагинация назад).

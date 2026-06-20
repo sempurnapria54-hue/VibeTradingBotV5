@@ -10,11 +10,13 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.core.fill.external_snapshot.FillExternalSnapshot;
+import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalRulesExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
+import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
 import com.example.tradingbot.integration.model.okx.request.CancelAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.CancelOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.ClosePositionOkxRequest;
@@ -28,6 +30,7 @@ import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxBalanceResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxFillResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse;
+import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
@@ -36,7 +39,9 @@ import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.mapping.FillMapper;
+import com.example.tradingbot.mapping.InstrumentExternalRulesMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
+import com.example.tradingbot.mapping.MarketPriceDataMapper;
 import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.util.Constants;
@@ -63,6 +68,8 @@ public class OkxIntegrationService implements IntegrationService {
 
     private final OkxRestClient okxRestClient;
     private final InstrumentMapper instrumentMapper;
+    private final InstrumentExternalRulesMapper instrumentExternalRulesMapper;
+    private final MarketPriceDataMapper marketPriceDataMapper;
     private final CandleMapper candleMapper;
     private final OrderMapper orderMapper;
     private final PositionMapper positionMapper;
@@ -81,6 +88,31 @@ public class OkxIntegrationService implements IntegrationService {
         }
         InstrumentOkxResponse first = response.getData().getFirst();
         return instrumentMapper.integrationToSnapshot(first);
+    }
+
+    @Override
+    public InstrumentExternalRulesExternalSnapshot getInstrumentRules(String externalInstrumentId,
+                                                                      String externalInstrumentType) {
+        OkxApiResponse<InstrumentOkxResponse> response = execute(
+                () -> okxRestClient.getInstruments(externalInstrumentType, externalInstrumentId),
+                "instruments-rules", "instId=" + externalInstrumentId + " instType=" + externalInstrumentType);
+        verifyCode(response, "instruments-rules", "instId=" + externalInstrumentId);
+        if (isEmpty(response.getData())) {
+            return null;
+        }
+        return instrumentExternalRulesMapper.integrationToSnapshot(response.getData().getFirst());
+    }
+
+    @Override
+    public MarketPriceDataExternalSnapshot getMarketPriceData(String externalInstrumentId) {
+        OkxApiResponse<OkxTickerResponse> response = execute(
+                () -> okxRestClient.getTicker(externalInstrumentId),
+                "market-ticker", "instId=" + externalInstrumentId);
+        verifyCode(response, "market-ticker", "instId=" + externalInstrumentId);
+        if (isEmpty(response.getData())) {
+            return null;
+        }
+        return marketPriceDataMapper.integrationToSnapshot(response.getData().getFirst());
     }
 
     @Override

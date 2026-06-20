@@ -13,6 +13,7 @@ import com.example.tradingbot.persistence.repository.StrategyRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,6 +82,19 @@ public class StrategyDataService {
         return repository.findAllWithSettingsByStatusNot(Strategy.Status.DELETED.name()).stream()
                 .map(mapper::persistenceToDomainWithSettings)
                 .collect(toList());
+    }
+
+    /**
+     * Активная стратегия инструмента с настройками рыночных данных (без
+     * шагов/деталей) — вход калькулятора для резолва индикаторов/структуры/
+     * фазы по ключу. Пусто — активной стратегии у инструмента нет.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Strategy> findActiveByInstrumentIdWithSettings(Long instrumentId) {
+        return repository.findByInstrumentIdAndStatusWithSettings(instrumentId, Strategy.Status.ACTIVE.name())
+                .stream()
+                .findFirst()
+                .map(mapper::persistenceToDomainWithSettings);
     }
 
     private void resolveTargetActions(StrategyEntity saved) {

@@ -22,8 +22,13 @@ Mapping в `InstrumentExternalSnapshot` и далее в `Instrument`
 ## Поля DTO
 
 Coded DTO `InstrumentOkxResponse` несёт подмножество, релевантное
-снапшоту инструмента; все поля маппятся в
-`InstrumentExternalSnapshot`:
+идентичности инструмента (шаг 1) **и** sizing/rounding-правилам
+(шаг 5). Один DTO питает оба снапшота: identity-снапшот
+`InstrumentExternalSnapshot` (шаг 1) и rules-снапшот
+`InstrumentExternalRules` (шаг 5).
+
+Identity/spec-поля, маппящиеся в `InstrumentExternalSnapshot`
+(шаг 1):
 
 | OKX field | Тип (raw) | Snapshot field |
 |---|---|---|
@@ -40,6 +45,18 @@ Coded DTO `InstrumentOkxResponse` несёт подмножество, реле�
 | `state` | string | `externalStatus` |
 | `lever` | string | `externalLeverage` |
 
+Rules-поля (sizing/rounding/ограничители), питающие rules-снапшот
+шага 5 (см. `docs/models/mapping/InstrumentExternalRules.md` §OKX):
+
+| OKX field | Тип (raw) | Назначение |
+|---|---|---|
+| `ctType` | string | тип контракта (linear/inverse) |
+| `ctValCcy` | string | валюта стоимости контракта |
+| `maxLmtSz` | string (decimal) | макс. размер limit-ордера |
+| `maxMktSz` | string (decimal) | макс. размер market-ордера |
+| `maxTriggerSz` | string (decimal) | макс. размер trigger-ордера |
+| `maxStopSz` | string (decimal) | макс. размер stop-ордера |
+
 Числовые spec-поля OKX (`lotSz`/`minSz`/`ctVal`/`ctMult`/`tickSz`)
 приходят строками; в snapshot — `BigDecimal`. Биржевые `state`/
 `lever` остаются сырыми строками (`externalStatus`/
@@ -48,27 +65,26 @@ Coded DTO `InstrumentOkxResponse` несёт подмножество, реле�
 
 ## Поля, которые НЕ входят в этот DTO
 
-OKX `public/instruments` отдаёт больше полей. Часть из них —
-sizing/rounding-правила инструмента (`ctType`, `ctValCcy`,
-`maxLmtSz`/`maxMktSz`/`maxTriggerSz`/`maxStopSz` и др.) —
-потребляются отдельной моделью `InstrumentExternalRules` (см.
-`docs/models/mapping/InstrumentExternalRules.md` §OKX); прочие
-(`instFamily`, `uly`, `listTime`/`expTime`, `category`/`alias` и
-т. п.) доменно не используются. Биржевые `state`/`lever` теперь
-входят в этот DTO (→ `externalStatus`/`externalLeverage`, см.
-таблицу выше) и в шаге 1 через `InstrumentExternalRules` не идут.
-Coded `InstrumentOkxResponse` несёт только snapshot-релевантное
-подмножество.
+OKX `public/instruments` отдаёт больше полей. Sizing/rounding-правила
+инструмента (`ctType`, `ctValCcy`,
+`maxLmtSz`/`maxMktSz`/`maxTriggerSz`/`maxStopSz`) **входят** в этот
+DTO (см. таблицу rules-полей выше) и питают rules-снапшот
+`InstrumentExternalRules` (`docs/models/mapping/InstrumentExternalRules.md`
+§OKX). Не входят прочие поля (`instFamily`, `uly`,
+`listTime`/`expTime`, `category`/`alias` и т. п.) — доменно не
+используются. Coded `InstrumentOkxResponse` несёт только подмножество,
+релевантное идентичности (шаг 1) и правилам (шаг 5).
 
-> **Разграничение (шаг 1).** Этот DTO — источник для транзиентного
-> `InstrumentExternalSnapshot` (граница). Идентичность плюс биржевые
-> `state`/`lever` (→ `externalStatus`/`externalLeverage`)
-> персистятся на `Instrument`; справочные sizing-поля в шаге 1
-> персистентно не хранятся (`docs/models/mapping/Instrument.md`).
-> Модель `InstrumentExternalRules` (sizing/rounding, `ctType`,
-> sizes, per-order max sizes, `lever`/`state`) **материализуется на
-> шаге 5** (риск-преконтроль) — потребляет sizing/rounding-поля и
-> ограничители из этого DTO; на base/quote/settle не претендует (дубль
-> Н1 снят). Снапшот-концепция/ренейм (INSTR-Q1) и роль leverage/HOLD
-> (часть INSTR-Q2) закрыты решением
+> **Разграничение.** Один DTO `InstrumentOkxResponse` питает два
+> снапшота. Шаг 1: identity-снапшот `InstrumentExternalSnapshot`
+> (граница) — идентичность плюс биржевые `state`/`lever`
+> (→ `externalStatus`/`externalLeverage`) персистятся на
+> `Instrument`; справочные sizing-поля в шаге 1 персистентно не
+> хранятся (`docs/models/mapping/Instrument.md`). Шаг 5: rules-снапшот
+> модели `InstrumentExternalRules` (sizing/rounding, `ctType`,
+> sizes, per-order max sizes, `lever`/`state`) — потребляет
+> sizing/rounding-поля и ограничители из этого DTO; на
+> base/quote/settle не претендует (дубль Н1 снят). Снапшот-концепция/
+> ренейм (INSTR-Q1) и роль leverage/HOLD (часть INSTR-Q2) закрыты
+> решением
 > `docs/decisions/instrument-external-rules-materialization.md`.

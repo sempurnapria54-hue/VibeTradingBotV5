@@ -28,7 +28,7 @@ production-flow одной стратегии.
 | 2 | Стратегия (абстракция: объявляет нужные индикаторы и условие сигнала; одна реализация) | DONE |
 | 3 | Производные рыночные данные: индикаторы + структура рынка (`MarketStructure`) + фаза рынка (`MarketPhase`) — jobs, модели, сервисы (расчёт/чтение/сохранение значений, запрошенных стратегией) | DONE |
 | 4 | Команды и их жизненный цикл (ServiceCommand: submit/replace/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DONE |
-| 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | DOCS_CHECK_2 |
+| 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | DONE |
 | 6 | FSM (состояния и переходы сущностей — связующее звено) | HOLD |
 | 7 | Сделки и P&L (DealOrchestratorJob — агрегирование в Deal, P&L; он же оркестрирует торговый цикл сигнал→команда→позиция) | HOLD |
 | 8 | AnomalyJob (полноценный, операционная детекция аномалий состояния/исполнения) | HOLD |
@@ -468,6 +468,89 @@ production-flow одной стратегии.
   месте. **Концепт-гейт `CODE` пройден.** Отчёт —
   `.claude/work/progress/phase-1-step-5-docs-check-2.md`. Готовность к `CODE` —
   перевод за пользователем.
+- **Шаг 5 → `CODE` (2026-06-20):** написан код по утверждённой концепции
+  (47 файлов в working tree, staged; компилируется `clean test-compile`,
+  без deprecation). Материализован: `InstrumentExternalRules` (доменная модель
+  + JSONB-навес на `instruments`, миграция `V8`, маппер + JSON-конвертер,
+  domain↔persistence DataService, `InstrumentExternalRulesSyncJob` + фасад +
+  конфиг + домаппинг OKX-полей max-size/`lever`/`ctType`/`ctValCcy`); расчётный
+  слой (`MarketPriceData`-сборка по REST ticker; `Calculated*`-RVO достроены до
+  полной структуры + enum'ы; `CalculationContext(Factory)`, `PriceCalculator`,
+  `SizeCalculator` с risk-bounded сайзингом, `StrategyActionCalculator`); risk-слой
+  (`RiskValidator`, `RiskBlockResolver`, RVO `RiskValidationResult`/`RiskCheckResult`/
+  `RiskBlockAction` + `RiskCheckCode`). **Аппрув-гейт:** прогнаны три независимых
+  адверсариальных ревьюер-фокуса (`conventions`/`performance`/`disaster`; `security`
+  деактивирован до шага 9) — без блокеров; clean-code находки и реальные
+  safety-фиксы (ctVal=0 → controlled error, `NumberFormatException` на сырьё →
+  null, гард SL/TP/trailing > 0 после округления, clamp reduce-fraction 0..1,
+  устранён дубль чтения фазы) закрыты на месте. Отчёт и форвард-заметки —
+  `.claude/work/progress/phase-1-step-5-code.md`. Финальный аппрув CODE и переход к
+  `SYNC_DOCS_FROM_CODE` — за пользователем. **Концепт-инкременты на CODE**
+  (требуют пост-хок концепт-гейта §6a): `CalculationContext` несёт каталоги
+  настроек индикаторов/структуры для резолва по ключу; внутренний
+  `CalculationException`; `InstrumentExternalRulesDataService` вместо
+  doc-имени `InstrumentExternalRulesService`.
+- **Шаг 5 → `SYNC_DOCS_FROM_CODE` (2026-06-20):** доки приведены к
+  утверждённому коду (docs←code). Независимый фокус `divergence` выписал ~44
+  расхождения по 16 докам; реконсилированы `knowledge-curator`. Ключевое:
+  `InstrumentOkxResponse` — добавлены реально присутствующие поля
+  (`ctType`/`ctValCcy`/`maxLmtSz`/`maxMktSz`/`maxTriggerSz`/`maxStopSz`), снято
+  ложное «не входят»; `MarketPriceData` (модель+маппинг) — снят forward-блок
+  «класса ещё нет» (код есть); `CalculationContextFactory` —
+  `InstrumentExternalRulesService`→`InstrumentExternalRulesDataService`, убран
+  `MarketPhaseService`, добавлен `StrategyDataService`; `RiskValidator` — входы
+  (читает rules сам, сигнатура 2 арг.), фактические проверки, без комиссий
+  (фаза 1); `RiskCheckResult`/`CalculatedPrice` — размечен реально эмитимый/
+  используемый субсет vs forward; `PriceCalculator` — расширенный словарь
+  `StrategyPriceSource` помечен forward (резолв через `baseType`/
+  `StopLossCalculationType`/`TrailingSettings`); `InstrumentExternalRules` —
+  снято фантомное поле `id`. Каскад: doc `InstrumentExternalRulesService.md`
+  (компонента, которой в коде нет) → `git mv` в
+  `InstrumentExternalRulesDataService.md` + переписан. Отчёт —
+  `.claude/work/progress/phase-1-step-5-sync-docs-from-code.md`. **Остаётся до
+  `DONE`:** пост-хок концепт-гейт §6a (`concept-review` по пост-sync докам для
+  концепт-инкрементов CODE: каталоги настроек в `CalculationContext`,
+  внутренний `CalculationException`) — в этом прогоне не запускался.
+- **Шаг 5 → `DOCS_CHECK_3` (пост-хок концепт-гейт §6a, 2026-06-20):**
+  независимый `concept-review` по пост-sync докам — **не чисто**, 2
+  несогласованности doc↔doc, обе гейтят `DONE`. **C1** — механизм
+  controlled-ошибки расчёта описан двумя способами (возврат `CalculationError`
+  в калькулятор-доках vs бросок `CalculationException`/`NO_MARKET_PRICE` в
+  `CalculationContextFactory.md`); `CalculationException` нигде не определён,
+  catch-граница не описана, код не зарегистрирован. Разрешение —
+  docs←code-выравнивание под as-built (слой возвращает Result; суб-калькуляторы
+  бросают внутри, orchestrator ловит), без развилки пользователя. **C2**
+  (явно запрошенный code↔doc-чек) — комиссии: `per-trade-risk-policy.md` числит
+  их входом риск-расчёта, `RiskValidator.md`/`SizeCalculator.md` — «опущены
+  (фаза 1)»; decision откладывает только проскок, не комиссии → прямое
+  расхождение. C2 — policy-развилка пользователя (`trading-specialist`-хвост).
+  Increment 1 (каталоги `CalculationContext`) — когерентен. Отчёт —
+  `.claude/work/progress/phase-1-step-5-docs-check-3.md`. Нужен `GAPS_CLOSE_3`
+  (C1 curator-выравнивание + C2 по решению пользователя), затем `DOCS_CHECK_4`.
+- **Шаг 5 → `GAPS_CLOSE_3` + `DOCS_CHECK_4` (2026-06-20) — чисто.** **C1**
+  закрыт docs←code-выравниванием механизма controlled-ошибки (заведена §«Механизм
+  сигнализации» в `CalculationError.md`: суб-калькуляторы бросают
+  `CalculationException`, `StrategyActionCalculator` ловит → `CalculationError` в
+  `ERROR`-результате; `NO_MARKET_PRICE` как пример кода; формулировки
+  `PriceCalculator`/`SizeCalculator`/`CalculationContextFactory`/
+  `StrategyActionCalculator`/`strategy-action-calculation` выровнены).
+  **C2** — по решению пользователя комиссии отнесены к **шагу 7**: decision держит
+  их концептуальным входом, код-учёт отложен (§«Учёт комиссий — отложен к шагу 7»
+  в `per-trade-risk-policy.md`); `RiskValidator`/`SizeCalculator` ссылаются на
+  отсрочку; форвард-пункт в `backlog.md` §Шаг 7. Подтверждающий `DOCS_CHECK_4`
+  (независимый) — **чисто** (C1/C2 CLOSED-CLEAN, новых doc↔doc-несогласованностей
+  нет). **Все гейты `DONE` (CODE-фокусы / SYNC `divergence` / §6a концепт) пройдены
+  с зафиксированным исходом — перевод в `DONE` за пользователем.** Отчёт —
+  `.claude/work/progress/phase-1-step-5-docs-check-3.md` §Закрытие.
+- **Шаг 5 → `DONE` (2026-06-20).** Все условия §7 выполнены с зафиксированным
+  исходом: CODE (фокусы `conventions`/`performance`/`disaster`, находки закрыты),
+  `SYNC_DOCS_FROM_CODE` (`divergence` прогнан, реконсилировано), пост-хок
+  концепт-гейт §6a (`DOCS_CHECK_3 → GAPS_CLOSE_3 → DOCS_CHECK_4` — чисто).
+  Ролляп фазы — без изменений (`IN_PROGRESS`: шаги 1-5 `DONE`, 6-11 `HOLD`).
+  Открытый хвост — **non-gating форвард**: комиссии в риск-расчёте → шаг 7;
+  бесстоповый risk-creating вход → шаг 6; остаток INSTR-Q2 (тайминг
+  set-leverage) → шаг 6; STRAT-Q4 (якорь allocation %); провизорный численный
+  лимит риска (бэктест/пользователь).
 - **Шаг 4 → рантайм-хвост закрыт (2026-06-12, инфра-сессия):** первый
   реальный boot обоих профилей — зелёный. Заведён dev/test-сплит БД
   (compose `postgres` 5440 / `postgres-test` 5441); `application.yaml`

@@ -59,9 +59,10 @@ transaction.
   `docs/processes/risk-evaluation.md`.
 - **Не** создаёт команды (это `ServiceCommandFactory`) и не вызывает
   `REFRESH_BALANCE`/`IntegrationService`.
-- Controlled calculation errors → `CalculationError`
-  (`TEMPORARY`→RETRY_PENDING / `PERMANENT`→FAILED→Deal ERROR); unexpected
-  exceptions ловятся на границе FSM (см.
+- Controlled calculation errors → `CalculationError` (суб-калькуляторы бросают
+  `CalculationException`, `StrategyActionCalculator` перехватывает →
+  `ERROR`-результат; `TEMPORARY`→RETRY_PENDING / `PERMANENT`→FAILED→Deal ERROR);
+  unexpected exceptions ловятся на границе FSM (см.
   `docs/rules/runtime-error-classification.md`).
 - Для reduce-only partial exit `RiskValidator` не вызывается; handler
   делает safety/invariant checks (`docs/rules/no-partial-close.md`,

@@ -14,6 +14,8 @@ import jakarta.persistence.Table;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Persistence-проекция {@link Instrument} (таблица instruments).
@@ -64,6 +66,10 @@ public class InstrumentEntity extends AuditableEntity {
 
     @Column(name = "planned_candle_start_date")
     private Long plannedCandleStartDate;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "external_rules")
+    private String externalRules;
 
     @OneToMany(mappedBy = "instrument", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CandleGroupEntity> candleGroups;

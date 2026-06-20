@@ -81,8 +81,8 @@ public class ServiceCommandFactory {
                 .side(toSide(action.getDirection()))
                 .instrumentExternalId(instId)
                 .sizeContracts(calc.getCalculatedSize().getSizeContracts())
-                .price(calc.getCalculatedPrice().getPrice())
-                .sendPriceToExchange(calc.getCalculatedPrice().getSendToExchange())
+                .price(calc.getCalculatedPrice().getRoundedPrice())
+                .sendPriceToExchange(calc.getCalculatedPrice().getSendPriceToExchange())
                 .positionReducingOnly(action.getPositionReducingOnly())
                 .build();
     }

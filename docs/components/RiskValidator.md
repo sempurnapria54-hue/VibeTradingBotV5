@@ -14,24 +14,64 @@
 
 ## Входы
 
-`CalculatedPrice`, `CalculatedSize`, `DealContext`, `BalanceContainer`,
-`Position`, `InstrumentExternalRules`, `StrategyDetail` (риск-настройки —
-`riskPerTradePercent`; отдельного RVO `RiskSettings` нет, см.
-`docs/decisions/per-trade-risk-policy.md`).
+Сигнатура — `validate(CalculatedStrategyAction, DealContext)`. Из этих
+двух входов `RiskValidator` сам извлекает цену/размер
+(`CalculatedPrice`/`CalculatedSize` из `CalculatedStrategyAction`),
+баланс/позицию/направление/`StrategyDetail`/`Instrument` (из
+`DealContext`). `InstrumentExternalRules` **не** входной аргумент —
+валидатор сам читает его через
+`InstrumentExternalRulesDataService.findByInstrumentId`. Риск-настройки
+(`riskPerTradePercent`) — из `StrategyDetail`; отдельного RVO
+`RiskSettings` нет (см. `docs/decisions/per-trade-risk-policy.md`).
 
 ## Метрики (считает сам)
 
-risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal +
-commissions`); **risk percent от свободного депозита** (база —
+risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal`;
+**commissions в фазе 1 опущены** — согласовано с `SizeCalculator`; учёт
+комиссий сводится на шаге 7 с fee-моделью, см.
+`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий — отложен к шагу 7»);
+**risk percent от свободного депозита** (база —
 `BalanceContainer.externalAvailableEquity`, не total/adjusted, см.
-`docs/decisions/per-trade-risk-policy.md`); estimated leverage; estimated
-margin; notional; SL distance; liquidation guard distance. Метрики могут
-попасть в `RiskCheckResult.details`, логи или аудит, но **не** входят в
-`CalculatedStrategyAction`.
+`docs/decisions/per-trade-risk-policy.md`); SL distance; liquidation guard
+distance. Метрики могут попасть в `RiskCheckResult.details`, логи или
+аудит, но **не** входят в `CalculatedStrategyAction`.
 
 `position exposure после действия` — метрика **уровня риска на биржу/портфель**
 (форвард к фазе 3); в фазе 1 (только риск на сделку) кода-блокера по экспозиции
 нет (`docs/decisions/per-trade-risk-policy.md`).
+
+## Конкретные проверки (фаза 1)
+
+Fail-fast (возвращают `BLOCKED` сразу, без остальных проверок):
+
+- `CALCULATED_ACTION_INVALID` — размер отсутствует / непозитивен;
+- `INSTRUMENT_RULES_MISSING` — `InstrumentExternalRules` не
+  материализованы;
+- `BALANCE_INVALID` — `externalAvailableEquity` отсутствует /
+  непозитивен.
+
+Далее накапливаются (любой `BLOCKED` ⇒ итог `BLOCKED`):
+
+- `INSTRUMENT_NOT_LIVE` — `rules.isLive()` ложно;
+- `MARGIN_MODE_NOT_ISOLATED` — `Instrument.marginMode != ISOLATED`;
+- `SIZE_BELOW_MIN` — размер ниже `minSize`;
+- `SIZE_LOT_STEP_INVALID` — размер не кратен `lotSize`;
+- `SIZE_ABOVE_LIMIT` — размер выше per-order лимита (лимит по
+  `PriceMode`: `EXPLICIT` → `maxLimitSize`, иначе → `maxMarketSize`);
+- `EXCHANGE_MAX_LEVERAGE_EXCEEDED` — `Instrument.leverage` >
+  `externalMaxLeverage`;
+- `STOP_LOSS_INVALID_SIDE` — стоп на неверной стороне относительно
+  входа;
+- `TAKE_PROFIT_INVALID_SIDE` — тейк на неверной стороне относительно
+  входа;
+- `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION` — стоп за/у цены ликвидации
+  позиции;
+- `RISK_PER_TRADE_EXCEEDED` — риск на сделку (%) выше
+  `StrategyDetail.riskPerTradePercent`.
+
+Агрегация: любой `BLOCKED` ⇒ `BLOCKED`; путь `WARNING` в коде есть
+(аггрегатор его учитывает), но **ни одна проверка фазы 1 `WARNING` не
+порождает** — все проверки строят `BLOCKED`.
 
 ## Границы
 

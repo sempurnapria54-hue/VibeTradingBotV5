@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.persistence.repository.InstrumentRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,14 @@ public class InstrumentDataService {
     @Transactional(readOnly = true)
     public List<Instrument> findByStatus(Instrument.Status status) {
         return repository.findByStatus(status.name()).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Instrument> findByStatusIn(Collection<Instrument.Status> statuses) {
+        List<String> names = statuses.stream().map(Enum::name).collect(toList());
+        return repository.findByStatusIn(names).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());
     }

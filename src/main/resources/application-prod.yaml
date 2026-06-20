@@ -52,6 +52,15 @@ market-data:
     enabled: ${MARKET_STRUCTURE_JOB_ENABLED:true}
     cron: ${MARKET_STRUCTURE_JOB_CRON:0 * * * * *}
 
+# Синхронизация внешних правил инструмента
+# (docs/components/InstrumentExternalRulesSyncJob.md): спецификация
+# биржи (tick/lot/min size, per-order max sizes, ctVal, max leverage,
+# торгуемость) — источник ограничений риск-преконтроля. Меняется редко →
+# тик не частый (по умолчанию раз в час).
+instrument-external-rules-sync:
+  enabled: ${INSTRUMENT_RULES_SYNC_ENABLED:true}
+  cron: ${INSTRUMENT_RULES_SYNC_CRON:0 0 * * * *}
+
 logging:
   level:
     com.example.tradingbot: INFO

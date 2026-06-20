@@ -23,16 +23,25 @@ RVO, не persisted (см. `.claude/decisions/runtime-value-object.md`).
 | `basePrice` | `BigDecimal` | Базовая цена, от которой считали. |
 | `rawPrice` | `BigDecimal` | Сырая цена до округления. |
 | `roundedPrice` | `BigDecimal` | Цена после округления по tick size. |
-| `sendPriceToExchange` | `boolean` | Нужно ли отправлять цену на биржу. |
+| `sendPriceToExchange` | `Boolean` | Нужно ли отправлять цену на биржу. |
 | `stopLossPrice` | `ResolvedStopLossPrice` | SL-компонент, если action создаёт/замещает stop-loss. |
 | `takeProfitPrice` | `ResolvedTakeProfitPrice` | TP-компонент, если action создаёт/замещает take-profit. |
 | `trailingPrice` | `ResolvedTrailingPrice` | Trailing-компонент, если action создаёт/замещает trailing stop. |
 | `description` | `String` | Пояснение расчёта (целевое имя; legacy — `explanation`). |
 
 `ResolvedStopLossPrice` / `ResolvedTakeProfitPrice` / `ResolvedTrailingPrice`
-— под-объекты резолва конкретных защитных цен (trigger/order price,
-activation/callback); без `CalculatedPrice` смысла не имеют → разделы, не
-отдельные RVO (см. `.claude/decisions/model-granularity.md`).
+— под-объекты резолва конкретных защитных цен; без `CalculatedPrice`
+смысла не имеют → разделы, не отдельные RVO (см.
+`.claude/decisions/model-granularity.md`). Поля под-объектов:
+
+- `ResolvedStopLossPrice` / `ResolvedTakeProfitPrice`: `triggerPrice`
+  (trigger срабатывания), `orderPrice` (нога после срабатывания; `null`
+  → рыночное исполнение), `triggerPriceType`
+  (`AlgoOrder.TriggerPriceType`: last/index/mark);
+- `ResolvedTrailingPrice`: `activationPrice` (цена активации; `null` →
+  не отправляется, активен сразу), `callbackRatio` (callback в %),
+  `callbackSpread` (callback абсолютным spread'ом; `null` для
+  процентного режима).
 
 ## Енум `PriceMode`
 
@@ -43,7 +52,13 @@ activation/callback); без `CalculatedPrice` смысла не имеют → 
 
 ## Енум `StrategyPricePurpose`
 
-Назначение рассчитанной цены: `ORDER_LIMIT_PRICE`,
+В фазе 1 `PriceCalculator` эмитит **только** подмножество:
+`ORDER_LIMIT_PRICE`, `ORDER_MARKET_REFERENCE_PRICE`,
+`STOP_LOSS_TRIGGER_PRICE`, `TAKE_PROFIT_TRIGGER_PRICE`,
+`TRAILING_ACTIVATION_PRICE`, `POSITION_CLOSE_REFERENCE_PRICE`. Остальные
+значения каталога определены, но в фазе 1 не порождаются (форвард).
+
+Полный каталог назначений цены: `ORDER_LIMIT_PRICE`,
 `ORDER_MARKET_REFERENCE_PRICE`, `ORDER_REPLACE_PRICE` (цена новой
 сущности REPLACE-ремодела; прежний `ORDER_AMEND_PRICE` — ренейм по
 `docs/decisions/replace-not-amend.md`), `ENTRY_PLANNED_PRICE`,

@@ -37,11 +37,29 @@ public class InstrumentOkxResponse {
     /** Стоимость контракта (ctVal, decimal-строка). */
     private String ctVal;
 
+    /** Валюта стоимости контракта (ctValCcy). */
+    private String ctValCcy;
+
     /** Множитель контракта (ctMult, decimal-строка). */
     private String ctMult;
 
+    /** Тип контракта (ctType): linear/inverse. */
+    private String ctType;
+
     /** Шаг цены (tickSz, decimal-строка). */
     private String tickSz;
+
+    /** Максимальный размер limit-ордера (maxLmtSz, decimal-строка). */
+    private String maxLmtSz;
+
+    /** Максимальный размер market-ордера (maxMktSz, decimal-строка). */
+    private String maxMktSz;
+
+    /** Максимальный размер trigger-ордера (maxTriggerSz, decimal-строка). */
+    private String maxTriggerSz;
+
+    /** Максимальный размер stop-ордера (maxStopSz, decimal-строка). */
+    private String maxStopSz;
 
     /** Биржевой статус инструмента (state). */
     private String state;

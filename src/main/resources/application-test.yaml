@@ -37,6 +37,12 @@ market-data:
     enabled: ${MARKET_STRUCTURE_JOB_ENABLED:true}
     cron: ${MARKET_STRUCTURE_JOB_CRON:0 * * * * *}
 
+# Синхронизация внешних правил инструмента — те же значения, что в prod
+# (см. application-prod.yaml и docs/components/InstrumentExternalRulesSyncJob.md).
+instrument-external-rules-sync:
+  enabled: ${INSTRUMENT_RULES_SYNC_ENABLED:true}
+  cron: ${INSTRUMENT_RULES_SYNC_CRON:0 0 * * * *}
+
 logging:
   level:
     com.example.tradingbot: DEBUG

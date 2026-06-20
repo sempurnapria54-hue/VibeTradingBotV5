@@ -33,6 +33,22 @@
   `docs/models/mapping/InstrumentExternalRules.md`);
 - сохраняет/обновляет актуальный snapshot правил.
 
+## Операционные детали
+
+- **Scope:** синхронизирует инструменты в статусах `SYNC`,
+  `CANDLES_LOADING`, `ACTIVE`.
+- **Расписание:** guarded `@Scheduled`-джоба, CRON из конфигурации
+  (по умолчанию раз в час, `0 0 * * * *`), выключатель `enabled`
+  (`@ConfigurationProperties`) — при `false` запланированный и ручной
+  тик ничего не делают.
+- **Защита от конкурентного запуска:**
+  `JobExecutionGuard.runExclusively` (in-memory на инстанс).
+- **Вне расписания:** асинхронно через фасад
+  `InstrumentExternalRulesSyncJobFacade`.
+- **Изоляция по инструменту:** per-instrument try/catch — сбой одного
+  инструмента не прерывает батч (логируется error); `null`-снапшот
+  (инструмента нет на бирже) → warn + skip.
+
 ## Связи
 
 Результат используется для округления цены/размера, расчёта размера в

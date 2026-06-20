@@ -25,6 +25,11 @@ size  = sizeCalculator.calculate(context, price)
 -> CalculatedStrategyAction(action, price, size)
 ```
 
+Суб-калькуляторы при контролируемой ошибке расчёта бросают
+`CalculationException`; `StrategyActionCalculator` перехватывает его и
+возвращает `ERROR` с `CalculationError` (см.
+`docs/components/models/CalculationError.md` §«Механизм сигнализации»).
+
 ## Границы
 
 - **Не** вызывает `RiskValidator` напрямую и не возвращает
@@ -41,8 +46,9 @@ size  = sizeCalculator.calculate(context, price)
 - **Не** рассчитывает data-dependent action, если FSM уже определила, что
   данные step устарели и `marketDataExpiredSetting` запрещает выполнение
   (см. `docs/rules/market-data-freshness.md`).
-- Controlled calculation errors возвращает как `error`-result; unexpected
-  exceptions в `CalculationError` не превращает — они ловятся на границе
+- Controlled calculation errors возвращает как `error`-result, перехватывая
+  `CalculationException` суб-калькуляторов; unexpected exceptions в
+  `CalculationError` не превращает — они ловятся на границе
   `DealOrchestratorJob` / FSM (см.
   `docs/rules/runtime-error-classification.md`).
 

@@ -47,4 +47,20 @@ public interface StrategyRepository extends JpaRepository<StrategyEntity, Long> 
             where s.status <> :status
             """)
     List<StrategyEntity> findAllWithSettingsByStatusNot(@Param("status") String status);
+
+    /**
+     * Стратегия инструмента в заданном статусе с настройками рыночных
+     * данных (фаза + strategy-scope-настройки индикаторов/структуры; без
+     * шагов/деталей) — вход калькулятора для резолва индикаторов/структуры/
+     * фазы по «мягкому» ключу. Инвариант: не более одной ACTIVE на инструмент.
+     */
+    @Query("""
+            select distinct s from StrategyEntity s
+            left join fetch s.marketPhaseSetting
+            left join fetch s.indicatorSettings
+            left join fetch s.marketStructureSettings
+            where s.instrumentId = :instrumentId and s.status = :status
+            """)
+    List<StrategyEntity> findByInstrumentIdAndStatusWithSettings(@Param("instrumentId") Long instrumentId,
+                                                                 @Param("status") String status);
 }
