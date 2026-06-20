@@ -29,6 +29,7 @@ class Ag8SetLeverageLiveTest extends OkxSourceApiLiveTestBase {
     void ag8_1_setAndRestore() {
         // шаг 1 — прочитать текущий leverage инструмента (isolated).
         RawResponse snapshot = get(LEVERAGE_INFO_PATH, map("instId", INST_ID, "mgnMode", ISOLATED), SIGNED);
+        observe("AG8.snapshot", snapshot);
         assertOk(snapshot);
         final String prevLever = snapshot.d0().path("lever").asText("");
         assertThat(prevLever).as("AG8.snapshot lever").isNotBlank();
@@ -61,6 +62,7 @@ class Ag8SetLeverageLiveTest extends OkxSourceApiLiveTestBase {
         assertRestoredOrHalt("AG8.verify", "lever == " + prevLever,
                 () -> {
                     RawResponse v = get(LEVERAGE_INFO_PATH, map("instId", INST_ID, "mgnMode", ISOLATED), SIGNED);
+                    observe("AG8.verify", v);
                     return v.codeZero() && prevLever.equals(v.d0().path("lever").asText());
                 },
                 () -> post(SET_LEVERAGE_PATH, map("instId", INST_ID, "lever", prevLever, "mgnMode", ISOLATED), SIGNED));
