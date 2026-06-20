@@ -3,6 +3,7 @@ package com.example.tradingbot.integration.sourceapi.okx;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
@@ -59,8 +60,11 @@ class Tg4AmendBatchOrdersLiveTest extends OkxSourceApiLiveTestBase {
             assertThat(amend.at(0).path("sCode").asText()).as("TG4.amend item0 sCode").isEqualTo("0");
             assertThat(amend.at(1).path("sCode").asText()).as("TG4.amend item1 sCode").isEqualTo("0");
 
-            // get1 — amend item1 применён (поллинг до отражения newSz/newPx).
-            waitUntil("TG4.get1 amend reflected", () -> {
+            // get1/get2 — amend применён (поллинг до отражения newSz/newPx).
+            // Amend на OKX асинхронен (ACK ≠ runtime truth): отражение в getOrder
+            // на demo иногда > дефолтных 25с — как у одиночного amend (TG3.1),
+            // даём «медленному» кейсу 60с (план: per-case poll-таймаут длиннее).
+            waitUntil("TG4.get1 amend reflected", Duration.ofSeconds(60), () -> {
                 RawResponse g = get(ORDER_PATH, map("instId", INST_ID, "ordId", captured1), SIGNED);
                 return g.codeZero()
                         && "0.02".equals(g.d0().path("sz").asText())
@@ -68,7 +72,7 @@ class Tg4AmendBatchOrdersLiveTest extends OkxSourceApiLiveTestBase {
             });
 
             // get2 — amend item2 применён (поллинг до отражения newPx).
-            waitUntil("TG4.get2 amend reflected", () -> {
+            waitUntil("TG4.get2 amend reflected", Duration.ofSeconds(60), () -> {
                 RawResponse g = get(ORDER_PATH, map("instId", INST_ID, "ordId", captured2), SIGNED);
                 return g.codeZero() && newPx.equals(g.d0().path("px").asText());
             });

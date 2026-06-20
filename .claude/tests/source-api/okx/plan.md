@@ -23,14 +23,18 @@ A2-passthrough. Структура **эндпоинт → кейсы → таб�
 **RUN прогнан** (2026-06-20, demo/non-prod, `mvn -o test -Dgroups=source-api-live`,
 лог `.claude/work/run-logs/full-05.log`): **200 тестов, 198 pass / 2 fail**,
 BUILD SUCCESS (`-Dmaven.test.failure.ignore=true`). Колонка «Факт +
-наблюдения (RUN)» заполнена по всем 312 строкам. **Группа AG5 после прогона
-пересмотрена** (см. ниже) → остаётся **1 фейл к разбору (TG4.1)**.
+наблюдения (RUN)» заполнена по всем 312 строкам. Изначально **2 фейла**
+(TG4.1, AG5.1) — **оба разобраны и закрыты** (см. ниже); остаточных фейлов
+к разбору нет.
 
-- **Фейл к разбору (1):**
-  - **TG4.1** (amend-batch lifecycle) — place/amend заACKаны (`sCode=0`), но
-    `getOrder` не отразил `newSz`/`newPx` за 25s (poll timeout); teardown
-    cancel-batch очистил биржу. Наблюдение: amend-batch ACK ≠ немедленное
-    отражение на demo (индексинг-задержка / возможно не применился).
+- **Разобрано и закрыто (TG4.1):** amend-batch заACKан (`sCode=0`), но
+  `getOrder` не отразил `newSz`/`newPx` за **25s** poll → таймаут. Причина —
+  **тест-тюнинг, не дефект контракта:** amend на OKX асинхронен (ACK ≠ runtime
+  truth), отражение на demo иногда >25s — что **уже** учтено у одиночного
+  amend (TG3.1: per-case poll 60s), но batch-кейс TG4.1 остался на дефолтных
+  25s. Тест выровнен на 60s (оба `waitUntil`) → перевалидировано **TG4 3/3
+  green** (`.claude/work/run-logs/validate-tg4-02.log`). Не C3 (латентность
+  amend — известное demo-поведение, не новый факт контракта).
 - **Пересмотрена после прогона (группа AG5, лимит 12 заявок/сутки):**
   на прогоне квота была исчерпана → все POST AG5 отдали `b.code=50011` (Too
   Many Requests). Это **предусмотренный планом** rate-limit, а не дефект.
@@ -1052,10 +1056,10 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 | **TG4.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `ab_px=floor(last·0.5)`, `ab_newPx=floor(last·0.4)` (неисполнимы) | RUN 2026-06-20 ✓ — live last получен |
 | **TG4.place.** `POST /raw {POST /api/v5/trade/batch-orders, body:[{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:ab_px,clOrdId:ab_clId1},{…clOrdId:ab_clId2}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | `ordId` → `ab_ordId1`/`ab_ordId2`. Два живых неисполнимых ордера | RUN 2026-06-20 ✓ — http 200, b.code=0, оба data[].sCode=0 (Order placed) — 2 ордера |
 | **TG4.amend.** `POST /raw {POST /api/v5/trade/amend-batch-orders, body:[{instId,ordId:ab_ordId1,newSz:"0.02",newPx:ab_newPx},{instId,ordId:ab_ordId2,newPx:ab_newPx}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | Оба amend приняты (поэлементный ACK). ACK ≠ подтверждение — getOrder | RUN 2026-06-20 ✓ — http 200, b.code=0, оба data[].sCode=0 (amend-batch ACK принят) |
-| **TG4.get1.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId1}, signed:true}` | HTTP 200; `b.data[0].sz="0.02"`; `b.data[0].px=ab_newPx` | Amend item1 применён. RUN: поллинг до отражения | RUN 2026-06-20 ✗ ФЕЙЛ — amend заACKан (data[].sCode=0), но getOrder не отразил newSz/newPx за 25s (poll timeout). Наблюдение: amend-batch ACK ≠ немедленное отражение на demo (индексинг-задержка / возможно не применился); кандидат backlog/C3 |
-| **TG4.get2.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId2}, signed:true}` | HTTP 200; `b.data[0].px=ab_newPx` | Amend item2 применён | RUN 2026-06-20 — не достигнут (цепочка прервана на TG4.get1) |
+| **TG4.get1.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId1}, signed:true}` | HTTP 200; `b.data[0].sz="0.02"`; `b.data[0].px=ab_newPx` | Amend item1 применён. RUN: поллинг до отражения | RUN 2026-06-20 ✓ — amend отражён: `sz=0.02`, `px=newPx`. Изначально фейл (poll-таймаут кейса 25s мал для amend-reflection на demo); тест выровнен на 60s (как одиночный amend TG3.1) → green. Не дефект контракта — известная асинхронность amend (ACK ≠ runtime truth) |
+| **TG4.get2.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId2}, signed:true}` | HTTP 200; `b.data[0].px=ab_newPx` | Amend item2 применён | RUN 2026-06-20 ✓ — amend отражён: `px=newPx` (poll 60s, после выравнивания) |
 | **Teardown TG4.** `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:ab_ordId1},{instId,ordId:ab_ordId2}], signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode="0"` или already-canceled/not-exist) | Оба ордера сняты — биржа чистая | RUN 2026-06-20 ✓ — teardown отработал: cancel-batch b.code=0, оба data[].sCode=0 → биржа очищена |
-| **TG4.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `ab_ordId1`/`ab_ordId2` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | RUN 2026-06-20 — явный verify не достигнут (фейл на TG4.get1); teardown cancel-batch снял оба ордера → биржа чистая |
+| **TG4.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `ab_ordId1`/`ab_ordId2` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | RUN 2026-06-20 ✓ — Verify.end: живых ордеров нет (== Snapshot.start); цепочка зелёная после выравнивания poll (`validate-tg4-02.log`) |
 
 ### TG4.2 негатив — частичный реджект (битый item: несущ. ordId)
 
