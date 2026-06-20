@@ -47,11 +47,15 @@ class Ag3BillsLiveTest extends OkxSourceApiLiveTestBase {
 
     @Test
     @Order(30)
-    @DisplayName("AG3.3 Негатив — битое значение type (вне домена справочника)")
+    @DisplayName("AG3.3 битый type игнорируется (RUN: code=0, фильтр не применён)")
     void ag3_3_typeOutOfDomain() {
+        // RUN-факт (2026-06-19): bills игнорирует невалидный фильтр type (99999)
+        // и отдаёт code=0 с записями (фильтр не применён), а не реджект/пусто.
+        // Находка C3.
         RawResponse r = get(PATH, map("instType", INST_TYPE, "type", 99999), SIGNED);
 
+        assertOk(r);
         observe("AG3.3", r);
-        assertThat(r.businessReject() || r.dataEmpty()).isTrue();
+        assertThat(r.data().isArray()).isTrue();
     }
 }

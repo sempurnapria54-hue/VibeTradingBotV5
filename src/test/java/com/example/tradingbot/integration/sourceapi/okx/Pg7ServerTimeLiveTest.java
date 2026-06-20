@@ -28,11 +28,16 @@ class Pg7ServerTimeLiveTest extends OkxSourceApiLiveTestBase {
 
     @Test
     @Order(20)
-    @DisplayName("PG7.2 Негатив — битый путь (реджект ИЛИ ошибка маршрутизации OKX)")
+    @DisplayName("PG7.2 Негатив — битый путь → non-2xx (OKX 404 нестандартное тело)")
     void pg7_2_brokenPath() {
+        // RUN-факт (2026-06-19): неизвестный путь OKX отдаёт HTTP 404 с
+        // нестандартным телом ({"code":404 (число), "data":{} (объект)}) →
+        // /raw отдаёт non-2xx (как M1.6), а не реджект/пусто 200. Находка C3.
         RawResponse r = get("/api/v5/public/time-WRONG", null, PUBLIC);
 
-        assertRejectOrEmpty("PG7.2", r);
-        observe("PG7.2", r);
+        log.info("[PG7.2] OBSERVE broken-path http={} body={}", r.status(), r.rawBody());
+        assertThat(r.status())
+                .as("broken path → non-2xx (OKX 404 non-standard body)")
+                .isGreaterThanOrEqualTo(400);
     }
 }

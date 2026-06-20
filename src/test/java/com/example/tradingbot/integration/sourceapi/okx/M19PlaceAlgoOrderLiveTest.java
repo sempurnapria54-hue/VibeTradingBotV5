@@ -66,7 +66,10 @@ class M19PlaceAlgoOrderLiveTest extends OkxSourceApiLiveTestBase {
 
             waitUntil("M19cond.canceled", () -> algoCanceledOrGone(algoId));
 
-            RawResponse history = get(ALGO_HISTORY_PATH, map("instId", INST_ID, "ordType", "conditional"), SIGNED);
+            // orders-algo-history требует state|algoId (RUN-факт: иначе 50015).
+            // Алго отменён выше → ищем в state=canceled.
+            RawResponse history = get(ALGO_HISTORY_PATH,
+                    map("instId", INST_ID, "ordType", "conditional", "state", "canceled"), SIGNED);
             assertOk(history);
             observeMissingInHistory("M19cond.history", history, algoId);
         } finally {

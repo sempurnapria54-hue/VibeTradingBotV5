@@ -1,5 +1,6 @@
 package com.example.tradingbot.integration.sourceapi.okx;
 
+import static java.util.Objects.nonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -256,7 +257,11 @@ abstract class OkxSourceApiLiveTestBase {
     }
 
     private boolean isRateLimited(RawResponse r) {
-        return r.status() == 429 || RATE_LIMIT_CODES.contains(r.code());
+        // r.code() == null на ответах без top-level "code" (наш 5xx-эрор,
+        // пустое тело). RATE_LIMIT_CODES — immutable Set.of(...), его
+        // contains(null) бросает NPE, поэтому проверяем code на null.
+        String code = r.code();
+        return r.status() == 429 || (nonNull(code) && RATE_LIMIT_CODES.contains(code));
     }
 
     private JsonNode parse(String raw) {

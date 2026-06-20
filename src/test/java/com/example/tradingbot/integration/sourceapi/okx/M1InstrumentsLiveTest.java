@@ -53,12 +53,15 @@ class M1InstrumentsLiveTest extends OkxSourceApiLiveTestBase {
 
     @Test
     @Order(40)
-    @DisplayName("M1.4 негатив — несущ. instId (пустой data — валидно)")
+    @DisplayName("M1.4 негатив — несущ. instId (реджект 51001 или пустой data)")
     void m1_4_nonexistentInstId() {
+        // RUN-факт (2026-06-19): на несущ. instId instruments отдаёт реджект
+        // b.code=51001 ("Instrument ID ... doesn't exist"), а не пустой data с
+        // code=0 (как предполагал план). Поведение совпадает с ticker (M2.2) и
+        // candles (M3.3). Принимаем реджект-или-пусто. Находка C3 в апидок.
         RawResponse r = get(PATH, map("instType", INST_TYPE, "instId", "FOO-BAR"), PUBLIC);
 
-        assertOk(r);
-        assertThat(r.dataEmpty()).isTrue();
+        assertRejectOrEmpty("M1.4", r);
     }
 
     @Test

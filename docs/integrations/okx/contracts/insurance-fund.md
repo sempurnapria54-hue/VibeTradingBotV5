@@ -13,7 +13,9 @@
 дифф при каждом заходе интегратора по источнику и по задаче
 «актуализируй» (`.claude/processes/api-docs-completion.md`, канал
 чтения — `.claude/skills/integration-okx.md`). Последняя сверка:
-2026-06-11 (прогон 3, поле-уровневая дистилляция).
+2026-06-11 (прогон 3, поле-уровневая дистилляция). Рантайм-сверка:
+2026-06-19 (контур source-api, demo — рантайм-заметка в §GET
+/api/v5/public/insurance-fund; провенанс `рантайм`).
 
 ## Статус использования
 
@@ -28,6 +30,13 @@ FUTURES/SWAP/OPTION), `ccy` (обяз. для MARGIN), `type` (опц.:
 `regular_update` / `liquidation_balance_deposit` / `bankruptcy_loss`
 / `platform_revenue` / `adl`; default — все), `after`/`before` по
 `ts`, `limit` ≤ 100.
+
+**Рантайм (2026-06-19, demo, контур source-api / PG8; провенанс
+`рантайм`):** обязательность подтверждена — без `instType` →
+реджект `50014` «Parameter instType can not be empty»; с `instType`,
+но без `instFamily`/`uly` → `50015` «Either parameter instFamily or
+uly is required». Вне-доменный `type` (например `WRONG`)
+**игнорируется** — биржа отдаёт `code=0` с данными, а не реджект.
 
 ### Response
 

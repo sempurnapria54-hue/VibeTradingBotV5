@@ -28,11 +28,18 @@ class Tg8AccountRateLimitLiveTest extends OkxSourceApiLiveTestBase {
 
     @Test
     @Order(20)
-    @DisplayName("TG8.2 негатив — сломанный конверт (лишний path-сегмент, OKX-слой)")
+    @DisplayName("TG8.2 негатив — битый путь → non-2xx (OKX 404 нестандартное тело)")
     void tg8_2_brokenEnvelope() {
+        // RUN-факт (2026-06-19): неизвестный путь OKX отдаёт HTTP 404 с
+        // нестандартным телом ({"code":404 (число), "data":{} (объект), ...}),
+        // которое не ложится в OkxApiResponse{code:String, data:List} → /raw
+        // отдаёт non-2xx (как M1.6 broken-envelope), а не бизнес-реджект 200.
+        // Находка C3.
         RawResponse r = get("/api/v5/trade/account-rate-limit-bogus", null, SIGNED);
 
-        assertBusinessReject(r);
-        observe("TG8.2", r);
+        log.info("[TG8.2] OBSERVE broken-path http={} body={}", r.status(), r.rawBody());
+        assertThat(r.status())
+                .as("broken path → non-2xx (OKX 404 non-standard body)")
+                .isGreaterThanOrEqualTo(400);
     }
 }

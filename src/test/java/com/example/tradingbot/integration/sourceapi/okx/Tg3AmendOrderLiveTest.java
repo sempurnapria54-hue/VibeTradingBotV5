@@ -3,6 +3,7 @@ package com.example.tradingbot.integration.sourceapi.okx;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -50,8 +51,11 @@ class Tg3AmendOrderLiveTest extends OkxSourceApiLiveTestBase {
             assertFirstElementOk(amend);
             assertThat(amend.d0().path("ordId").asText()).as("TG3.amend ordId").isEqualTo(captured);
 
-            // getOrder — amend отражён (поллинг до newSz/newPx).
-            waitUntil("TG3.get amend reflected", () -> {
+            // getOrder — amend отражён (поллинг до newSz/newPx). Amend на OKX
+            // асинхронен (ACK ≠ runtime truth): отражение px/sz в getOrder на
+            // demo иногда > дефолтных 25с — этому «медленному» кейсу даём 60с
+            // (план: per-case poll-таймаут, медленным кейсам длиннее).
+            waitUntil("TG3.get amend reflected", Duration.ofSeconds(60), () -> {
                 RawResponse g = get(ORDER_PATH, map("instId", INST_ID, "ordId", captured), SIGNED);
                 return g.codeZero()
                         && captured.equals(g.d0().path("ordId").asText())

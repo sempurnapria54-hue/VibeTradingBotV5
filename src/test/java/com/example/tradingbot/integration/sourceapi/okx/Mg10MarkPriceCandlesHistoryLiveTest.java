@@ -63,10 +63,13 @@ class Mg10MarkPriceCandlesHistoryLiveTest extends OkxSourceApiLiveTestBase {
         RawResponse r = get(PATH, map(
                 "instId", INST_ID, "bar", "1m", "after", "99999999999999"), PUBLIC);
 
-        assertHttp200(r);
+        // RUN-факт (2026-06-19): на якорь из будущего OKX отдаёт code=0 с
+        // недавними свечами (data.size=100), а не пустой массив (как у M4.3).
+        // Фиксируем фактом: оба исхода валидны. Находка C3.
+        assertOk(r);
         observe("MG10.3", r);
-        if (r.codeZero()) {
-            assertThat(r.dataEmpty()).isTrue();
+        if (!r.dataEmpty()) {
+            log.info("[MG10.3] non-empty data on future anchor — поведение фиксируем фактом");
         }
     }
 

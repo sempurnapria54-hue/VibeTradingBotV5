@@ -15,7 +15,9 @@ price candlesticks», «Get mark price candlesticks history»). При
 дифф при каждом заходе интегратора по источнику и по задаче
 «актуализируй» (`.claude/processes/api-docs-completion.md`, канал
 чтения — `.claude/skills/integration-okx.md`). Последняя сверка:
-2026-06-11 (прогон 3, поле-уровневая дистилляция).
+2026-06-11 (прогон 3, поле-уровневая дистилляция). Рантайм-сверка:
+2026-06-19 (контур source-api, demo — рантайм-заметка в §GET
+/api/v5/public/mark-price; провенанс `рантайм`).
 
 ## Статус использования
 
@@ -31,6 +33,15 @@ protective algo для SWAP рекомендованы с `tpTriggerPxType=mark`
 Rate limit 10 req / 2 s по IP + Instrument ID. Query: `instType`
 (обяз.: MARGIN/SWAP/FUTURES/OPTION), `instFamily` / `instId` (опц.).
 Ответ: `instType`, `instId`, `markPx`, `ts`.
+
+**Рантайм (2026-06-19, demo, контур source-api / PG1):** `instType`
+фактически **необязателен при заданном `instId`** — запрос
+`?instId=ETH-USDT-SWAP` без `instType` вернул `code=0` с корректным
+элементом (`instType` выводится из `instId`). Офдок помечает `instType`
+обязательным — расхождение зафиксировано прогоном (провенанс
+`рантайм`). Сопутствующие негативы: битый `instType` (с instId) →
+реджект `51000` («Parameter instType error»); несущ. `instId` →
+`51001`.
 
 ## GET /api/v5/market/mark-price-candles
 

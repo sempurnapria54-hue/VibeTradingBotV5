@@ -41,12 +41,16 @@ class Pg5OpenInterestLiveTest extends OkxSourceApiLiveTestBase {
 
     @Test
     @Order(30)
-    @DisplayName("PG5.3 Негатив — пропуск обязательного instType (OKX-реджект)")
+    @DisplayName("PG5.3 instType необязателен при instId (RUN: code=0, не реджект)")
     void pg5_3_missingInstType() {
+        // RUN-факт (2026-06-19): open-interest принимает instId без instType
+        // (b.code=0, instType выводится из instId) — реджекта нет, в отличие от
+        // предположения плана. Находка C3.
         RawResponse r = get(PATH, map("instId", INST_ID), PUBLIC);
 
-        assertBusinessReject(r);
+        assertOk(r);
         observe("PG5.3", r);
+        assertThat(r.d0().path("instId").asText()).isEqualTo(INST_ID);
     }
 
     @Test

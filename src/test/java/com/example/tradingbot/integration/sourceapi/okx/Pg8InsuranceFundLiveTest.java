@@ -50,10 +50,13 @@ class Pg8InsuranceFundLiveTest extends OkxSourceApiLiveTestBase {
 
     @Test
     @Order(40)
-    @DisplayName("PG8.4 Негатив — битое значение type (реджект ИЛИ пустой data)")
+    @DisplayName("PG8.4 битый type игнорируется (RUN: code=0, не реджект)")
     void pg8_4_brokenType() {
+        // RUN-факт (2026-06-19): insurance-fund игнорирует невалидный type
+        // (WRONG) и отдаёт code=0 с данными, а не реджект/пусто. Находка C3.
         RawResponse r = get(PATH, map("instType", INST_TYPE, "instFamily", INST_FAMILY, "type", "WRONG"), PUBLIC);
 
-        assertRejectOrEmpty("PG8.4", r);
+        assertOk(r);
+        observe("PG8.4", r);
     }
 }

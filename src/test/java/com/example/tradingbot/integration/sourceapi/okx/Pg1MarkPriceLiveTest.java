@@ -41,12 +41,16 @@ class Pg1MarkPriceLiveTest extends OkxSourceApiLiveTestBase {
 
     @Test
     @Order(30)
-    @DisplayName("PG1.3 Негатив — пропуск обязательного instType (OKX-реджект)")
+    @DisplayName("PG1.3 instType необязателен при instId (RUN: code=0, не реджект)")
     void pg1_3_missingInstType() {
+        // RUN-факт (2026-06-19): mark-price принимает instId без instType
+        // (b.code=0, instType выводится из instId) — реджекта нет, в отличие от
+        // предположения плана. Находка C3.
         RawResponse r = get(PATH, map("instId", INST_ID), PUBLIC);
 
-        assertBusinessReject(r);
+        assertOk(r);
         observe("PG1.3", r);
+        assertThat(r.d0().path("instId").asText()).isEqualTo(INST_ID);
     }
 
     @Test
