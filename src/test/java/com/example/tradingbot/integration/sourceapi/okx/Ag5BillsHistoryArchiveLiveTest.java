@@ -2,6 +2,7 @@ package com.example.tradingbot.integration.sourceapi.okx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -25,15 +26,21 @@ class Ag5BillsHistoryArchiveLiveTest extends OkxSourceApiLiveTestBase {
     void ag5_1_postRequestAck() {
         RawResponse r = post(PATH, map("year", "2025", "quarter", "Q1"), SIGNED);
 
-        // RUN-факт (2026-06-19): demo на валидную заявку отдаёт b.code=50026
-        // "System error. Try again later." — архив на свежем demo не
-        // инициируется (нет истории квартала / async-бэкенд недоступен).
         // Эндпоинт достижим (HTTP 200 + структурный конверт OKX), content на
-        // demo недостижим. Принимаем ACK (code=0) ИЛИ demo-ошибку 50026. C3.
+        // свежем demo недостижим. Все три исхода — валидные, не дефект:
+        //  - ACK заявки (b.code=0) — ссылка готова/генерится;
+        //  - RUN-факт (2026-06-19) demo system-error b.code=50026 "System error.
+        //    Try again later." — архив на demo не инициируется (нет истории
+        //    квартала / async-бэкенд недоступен);
+        //  - RUN-факт (2026-06-20) rate-limit/квота (b.code=50011 "Too Many
+        //    Requests") — исчерпан суточный лимит 12 заявок/сутки. Лимит прямо
+        //    предусмотрен планом (AG5 §достижимость); base.raw() уже исчерпал
+        //    backoff-ретраи → возвращённый rate-limit терминален.
+        // C3: реальный исход — наблюдение в апидок.
         assertHttp200(r);
         observe("AG5.1", r);
-        assertThat(r.codeZero() || "50026".equals(r.code()))
-                .as("AG5.1: ACK code=0 или demo system-error 50026 (b.code=%s)", r.code())
+        assertThat(r.codeZero() || "50026".equals(r.code()) || isRateLimited(r))
+                .as("AG5.1: ACK code=0, demo system-error 50026 или rate-limit/квота 12/сутки (b.code=%s)", r.code())
                 .isTrue();
         if (r.codeZero() && !r.dataEmpty()) {
             assertThat(r.d0().path("result").isMissingNode()).isFalse();
@@ -67,8 +74,14 @@ class Ag5BillsHistoryArchiveLiveTest extends OkxSourceApiLiveTestBase {
     void ag5_3_quarterOutOfDomain() {
         RawResponse r = post(PATH, map("year", "2025", "quarter", "Q9"), SIGNED);
 
-        assertBusinessReject(r);
         observe("AG5.3", r);
+        // Квота 12/сутки: при исчерпании OKX реджектит на rate-limit (50011) ДО
+        // валидации quarter, маскируя реджект-по-домену. Не засчитываем ложный
+        // pass — rate-limit → кейс пропускается (валидацию quarter перепроверить
+        // вне исчерпания квоты). Иначе — реджект OKX по домену quarter.
+        Assumptions.assumeFalse(isRateLimited(r),
+                "AG5.3: валидация quarter не достигнута — rate-limit/квота 12/сутки маскирует реджект");
+        assertBusinessReject(r);
     }
 
     @Test
@@ -77,7 +90,11 @@ class Ag5BillsHistoryArchiveLiveTest extends OkxSourceApiLiveTestBase {
     void ag5_4_missingQuarter() {
         RawResponse r = post(PATH, map("year", "2025"), SIGNED);
 
-        assertBusinessReject(r);
         observe("AG5.4", r);
+        // Как AG5.3: rate-limit (квота 12/сутки) реджектит ДО проверки
+        // обязательного quarter — не засчитываем ложный pass, кейс пропускается.
+        Assumptions.assumeFalse(isRateLimited(r),
+                "AG5.4: валидация обязательного quarter не достигнута — rate-limit/квота 12/сутки маскирует реджект");
+        assertBusinessReject(r);
     }
 }

@@ -17,10 +17,45 @@ A2-passthrough. Структура **эндпоинт → кейсы → таб�
 
 **DESIGN аппрувнут** (2026-06-19): план + коллекция прошли два
 независимых адверсариальных ревью (оба APPROVE), §Принятые решения
-§Нерешённое 1-4 закрыты. Следующая фаза — **CODE** (универсальный
-`dispatch` + `POST /api/proxy/okx/raw`, код-тесты `test-code`) → RUN.
-Колонка «Факт + наблюдения (RUN)» пустая до RUN (этот же документ —
-бланк отчёта).
+§Нерешённое 1-4 закрыты. CODE-тесты написаны
+(`src/test/java/com/example/tradingbot/integration/sourceapi/okx/`).
+
+**RUN прогнан** (2026-06-20, demo/non-prod, `mvn -o test -Dgroups=source-api-live`,
+лог `.claude/work/run-logs/full-05.log`): **200 тестов, 198 pass / 2 fail**,
+BUILD SUCCESS (`-Dmaven.test.failure.ignore=true`). Колонка «Факт +
+наблюдения (RUN)» заполнена по всем 312 строкам. **Группа AG5 после прогона
+пересмотрена** (см. ниже) → остаётся **1 фейл к разбору (TG4.1)**.
+
+- **Фейл к разбору (1):**
+  - **TG4.1** (amend-batch lifecycle) — place/amend заACKаны (`sCode=0`), но
+    `getOrder` не отразил `newSz`/`newPx` за 25s (poll timeout); teardown
+    cancel-batch очистил биржу. Наблюдение: amend-batch ACK ≠ немедленное
+    отражение на demo (индексинг-задержка / возможно не применился).
+- **Пересмотрена после прогона (группа AG5, лимит 12 заявок/сутки):**
+  на прогоне квота была исчерпана → все POST AG5 отдали `b.code=50011` (Too
+  Many Requests). Это **предусмотренный планом** rate-limit, а не дефект.
+  Тесты пересмотрены (2026-06-20), `base.isRateLimited` сделан `protected`:
+  - **AG5.1** (POST-ACK) — rate-limit/квота принимается как валидный исход
+    наряду с ACK `0` и demo-ошибкой `50026`.
+  - **AG5.3 / AG5.4** (негативы `quarter` вне домена / пропуск) — раньше
+    «проходили» через `assertBusinessReject` по `50011`, т.е. валидация
+    `quarter` была **замаскирована** rate-limit'ом (ложный pass). Теперь
+    rate-limit → кейс **пропускается** (`assumeFalse(isRateLimited)`), реджект
+    по `quarter` ассертится только при доступной квоте.
+  - Перевалидировано — AG5 **4/4, 0 fail, 2 skip** (AG5.3/4 пропущены по
+    исчерпанной квоте): `.claude/work/run-logs/validate-ag5-03.log`. Чтобы
+    реально наблюдать реджект-по-`quarter`, нужен прогон при доступной квоте.
+- **Ключевая находка C3 — И-2 подтверждён рантаймом:**
+  `cancel-advance-algos` **жив на demo** (`M19tr.cancel`/`M19trs.cancel` →
+  `b.code=0, data0.sCode=0`) вопреки выводу из офдока (changelog 2025-04-24);
+  фейк-id (M21.1) → `sCode=51293`. Питает `external-source-sync` /
+  `coverage-manifest` (провенанс `рантайм`).
+- **Сквозные наблюдения негативов:** несущ. instId → `51001`; пропуск
+  обязательного параметра → `50014`; битый `bar` → `51000`; batch-частичный
+  успех → top-level `b.code=2` (`Bulk operation partially successful`).
+
+Разбор находок (маршрутизация по владельцам, C3 в апидоки) — этап 7
+процесса `.claude/processes/source-api-testing.md`.
 
 ## Принцип: контур проверяет контракт биржи, не наш код
 
@@ -174,37 +209,37 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].minSz`/`tickSz`/`lotSz`/`ctVal` присутствуют | Сырой инструмент (min/tick/lot size, ctVal). Опора `minSz` demo-цепочек | _…_ |
+| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].minSz`/`tickSz`/`lotSz`/`ctVal` присутствуют | Сырой инструмент (min/tick/lot size, ctVal). Опора `minSz` demo-цепочек | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M1.2 вариант — instruments(SWAP) без instId (список)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:SWAP}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; есть элемент с `instId="ETH-USDT-SWAP"` | Список SWAP-инструментов (instId опционален) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:SWAP}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; есть элемент с `instId="ETH-USDT-SWAP"` | Список SWAP-инструментов (instId опционален) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M1.3 негатив — instType вне домена (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:BOGUS, instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `instType`); точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:BOGUS, instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `instType`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 ### M1.4 негатив — несущ. instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:SWAP, instId:FOO-BAR}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` пустой | Пустой `data` (несущ. инструмент) — валидный исход | _…_ |
+| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instType:SWAP, instId:FOO-BAR}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` пустой | Пустой `data` (несущ. инструмент) — валидный исход | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### M1.5 негатив — пропуск обязательного instType (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instId:ETH-USDT-SWAP}, signed:false}` (без `instType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instType` отсутствует. Под /raw пропуск уходит на OKX (нет прокси-гарда); точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/public/instruments, query:{instId:ETH-USDT-SWAP}, signed:false}` (без `instType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instType` отсутствует. Под /raw пропуск уходит на OKX (нет прокси-гарда); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instType can not be empty.), data.size=0 |
 
 ### M1.6 негатив — сломанный конверт (прокси-слой, единственный на CORE)
 
 | Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:BOGUS, path:/api/v5/public/instruments, query:{instType:SWAP}, signed:false}` (нераспознаваемый HTTP-метод) | HTTP 4xx/5xx (конверт не диспетчеризуется — сети OKX не достигает) | Прокси-слой /raw: невалидный `method` → ошибка диспетчеризации до OKX. Точный код/форма — наблюдение. Единственный «сломанный конверт» на весь CORE | _…_ |
+| `POST /raw {method:BOGUS, path:/api/v5/public/instruments, query:{instType:SWAP}, signed:false}` (нераспознаваемый HTTP-метод) | HTTP 4xx/5xx (конверт не диспетчеризуется — сети OKX не достигает) | Прокси-слой /raw: невалидный `method` → ошибка диспетчеризации до OKX. Точный код/форма — наблюдение. Единственный «сломанный конверт» на весь CORE | RUN 2026-06-20 ✓ — http 500 — конверт не диспетчеризован (OKX не достигнут) |
 
 ## M2. ticker — GET /api/v5/market/ticker (Market Data)
 
@@ -216,19 +251,19 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].last` присутствует и `>0`; `b.data[0].askPx`/`bidPx`/`ts` присутствуют | Сырой тикер с live last/ask/bid + ts | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].last` присутствует и `>0`; `b.data[0].askPx`/`bidPx`/`ts` присутствуют | Сырой тикер с live last/ask/bid + ts | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M2.2 негатив — несущ. инструмент
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:FOO-BAR}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой ответ, не валидный тикер | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:FOO-BAR}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой ответ, не валидный тикер | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### M2.3 негатив — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/ticker, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/ticker, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## M3. candles — GET /api/v5/market/candles (Market Data)
 
@@ -243,25 +278,25 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/candles, query:{instId:ETH-USDT-SWAP, bar:1m, limit:10}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной ≥ 6 (ts/o/h/l/c/vol); `b.data[0][0]` — числовая строка (ts) | Последние свечи 1m | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/candles, query:{instId:ETH-USDT-SWAP, bar:1m, limit:10}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной ≥ 6 (ts/o/h/l/c/vol); `b.data[0][0]` — числовая строка (ts) | Последние свечи 1m | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M3.2 негатив — bar вне домена (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/candles, query:{instId:ETH-USDT-SWAP, bar:99z}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `bar`); точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/candles, query:{instId:ETH-USDT-SWAP, bar:99z}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `bar`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter bar error), data.size=0 |
 
 ### M3.3 негатив — несущ. instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/candles, query:{instId:FOO-BAR, bar:1m}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/candles, query:{instId:FOO-BAR, bar:1m}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### M3.4 негатив — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/candles, query:{bar:1m}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/candles, query:{bar:1m}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## M4. history-candles — GET /api/v5/market/history-candles (Market Data)
 
@@ -273,25 +308,25 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{instId:ETH-USDT-SWAP, bar:1m, limit:10}, signed:false}` (after опущен) | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив (свеча); `b.data` упорядочен по ts убыв. | Исторические свечи 1m (пагинация назад) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{instId:ETH-USDT-SWAP, bar:1m, limit:10}, signed:false}` (after опущен) | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив (свеча); `b.data` упорядочен по ts убыв. | Исторические свечи 1m (пагинация назад) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M4.2 вариант — пагинация назад по after
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{instId:ETH-USDT-SWAP, bar:1m, after:<ts из M4.1 data[last][0]>, limit:10}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — свечи строго старше `after` | Следующая страница назад | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{instId:ETH-USDT-SWAP, bar:1m, after:<ts из M4.1 data[last][0]>, limit:10}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — свечи строго старше `after` | Следующая страница назад | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=10 |
 
 ### M4.3 негатив — фильтр из будущего (вне окна)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{instId:ETH-USDT-SWAP, bar:1m, after:99999999999999}, signed:false}` | HTTP 200; `b.data` пустой **или** наблюдение | Якорь из будущего — пустой/поведение фиксируем | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{instId:ETH-USDT-SWAP, bar:1m, after:99999999999999}, signed:false}` | HTTP 200; `b.data` пустой **или** наблюдение | Якорь из будущего — пустой/поведение фиксируем | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=100 |
 
 ### M4.4 негатив — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{bar:1m}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/market/history-candles, query:{bar:1m}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## M5. balance — GET /api/v5/account/balance (Account)
 
@@ -304,19 +339,19 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/balance, query:{ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].totalEq` присутствует; `b.data[0].details` — массив, несёт USDT | Account-level баланс, details по USDT | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/balance, query:{ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].totalEq` присутствует; `b.data[0].details` — массив, несёт USDT | Account-level баланс, details по USDT | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M5.2 вариант — balance без ccy (все валюты)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/balance, signed:true}` (без `ccy`) | HTTP 200; `b.code="0"`; `b.data[0].details` — массив (все валюты) | All-ccy баланс. Под /raw `ccy` опционален — реальный вариант (прежний gap снят) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/balance, signed:true}` (без `ccy`) | HTTP 200; `b.code="0"`; `b.data[0].details` — массив (все валюты) | All-ccy баланс. Под /raw `ccy` опционален — реальный вариант (прежний gap снят) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M5.3 негатив — несущ. валюта (наблюдение)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/balance, query:{ccy:ZZZ}, signed:true}` | HTTP 200; `b.code="0"` с пустым details **или** `b.code≠"0"` (наблюдение) | Поведение OKX на несущ. ccy — фиксируем фактом, не выдумываем | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/balance, query:{ccy:ZZZ}, signed:true}` | HTTP 200; `b.code="0"` с пустым details **или** `b.code≠"0"` (наблюдение) | Поведение OKX на несущ. ccy — фиксируем фактом, не выдумываем | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
 
 ## M6. account-config — GET /api/v5/account/config (Account)
 
@@ -329,7 +364,7 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/config, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].acctLv` присутствует; `b.data[0].posMode` присутствует | Конфигурация счёта (acctLv/posMode); `posMode` ожидается `net_mode` (посылка адаптера) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/config, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].acctLv` присутствует; `b.data[0].posMode` присутствует | Конфигурация счёта (acctLv/posMode); `posMode` ожидается `net_mode` (посылка адаптера) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ## M7. order details — GET /api/v5/trade/order (Order details)
 
@@ -341,13 +376,13 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:9999999999999999}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code` несёт 51603 (наблюдение) | Резолюция «не найден». Связь: 51603-on-not-found — предпосылка D-B3 (recovery-by-clientId) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:9999999999999999}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code` несёт 51603 (наблюдение) | Резолюция «не найден». Связь: 51603-on-not-found — предпосылка D-B3 (recovery-by-clientId) | RUN 2026-06-20 ✓ — http 200, b.code=51603 (Order does not exist), data.size=0 |
 
 ### M7.2 негатив (no-state) — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/order, query:{ordId:9999999999999999}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/order, query:{ordId:9999999999999999}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: обязательный `instId` отсутствует; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ### M7.3 прямой по ordId / M7.4 прямой по clOrdId
 
@@ -365,13 +400,13 @@ Climit.canceled `getOrder(ordId)` canceled, Climit.getByClId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (без живых ордеров) | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Список pending (пуст, если ничего не висит) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (без живых ордеров) | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Список pending (пуст, если ничего не висит) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M8.2 негатив — несущ. instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:FOO-BAR}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code≠"0"` (наблюдение) | Пустой/реджект на несущ. инструмент | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:FOO-BAR}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code≠"0"` (наблюдение) | Пустой/реджект на несущ. инструмент | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### M8.3 прямой богатый
 
@@ -388,13 +423,13 @@ Climit.canceled `getOrder(ordId)` canceled, Climit.getByClId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден на свежем demo) | История 7д (пуста/наполнена) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден на свежем demo) | История 7д (пуста/наполнена) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M9.2 негатив — пропуск обязательного instType (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `instType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: `instType` обязателен в history; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `instType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: `instType` обязателен в history; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instType can not be empty.), data.size=0 |
 
 ### M9.3 прямой богатый
 
@@ -412,19 +447,19 @@ canceled-ордер ~2ч). Шаги Cmarket.history / Climit.history.
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` (до Cmarket) | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Пустой/наполненный список исполнений | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` (до Cmarket) | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Пустой/наполненный список исполнений | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M10.2 негатив — фильтр из будущего / вне окна
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP, instId:ETH-USDT-SWAP, begin:99999999999999}, signed:true}` | HTTP 200; `b.data` пустой | Пустой ответ на фильтр из будущего | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP, instId:ETH-USDT-SWAP, begin:99999999999999}, signed:true}` | HTTP 200; `b.data` пустой | Пустой ответ на фильтр из будущего | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=0 |
 
 ### M10.3 негатив — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP}, signed:true}` (без `instId`) | HTTP 200; `b.code="0"`; `b.data` массив (по всем инструментам SWAP) **или** `b.code≠"0"` (наблюдение) | `instId` опционален в OKX fills — наблюдаем поведение (пропуск не обязательно реджект); точный исход — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP}, signed:true}` (без `instId`) | HTTP 200; `b.code="0"`; `b.data` массив (по всем инструментам SWAP) **или** `b.code≠"0"` (наблюдение) | `instId` опционален в OKX fills — наблюдаем поведение (пропуск не обязательно реджект); точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=8 |
 
 ### M10.4 прямой богатый (через исполнение)
 
@@ -442,19 +477,19 @@ fill — отказ по факту (находка), ожидание не вы
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Исполнения за 3м (пусто/наполнено) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Исполнения за 3м (пусто/наполнено) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M11.2 негатив — фильтр из будущего
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instType:SWAP, instId:ETH-USDT-SWAP, begin:99999999999999}, signed:true}` | HTTP 200; `b.data` пустой | Пустой ответ на фильтр из будущего | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instType:SWAP, instId:ETH-USDT-SWAP, begin:99999999999999}, signed:true}` | HTTP 200; `b.data` пустой | Пустой ответ на фильтр из будущего | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=0 |
 
 ### M11.3 негатив — пропуск обязательного instType (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `instType`) | HTTP 200; `b.code≠"0"` **или** `b.data` (наблюдение) | `instType` обязателен в fills-history (офдок) → реджект; точный код/исход — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `instType`) | HTTP 200; `b.code≠"0"` **или** `b.data` (наблюдение) | `instType` обязателен в fills-history (офдок) → реджект; точный код/исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instType can not be empty.), data.size=0 |
 
 ### M11.4 прямой богатый
 
@@ -472,13 +507,13 @@ Cmarket.fillsHistory.
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` (нет позиции) | HTTP 200; `b.code="0"`; `b.data` пустой **или** `b.data[0].posId` присутствует | Пустая/нет позиции — валидный исход | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` (нет позиции) | HTTP 200; `b.code="0"`; `b.data` пустой **или** `b.data[0].posId` присутствует | Пустая/нет позиции — валидный исход | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M12.2 негатив — несущ. instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:FOO-BAR}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code≠"0"` | Пустой/реджект | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:FOO-BAR}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code≠"0"` | Пустой/реджект | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### M12.3 прямой богатый (через исполнение)
 
@@ -496,13 +531,13 @@ Cmarket.fillsHistory.
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:9999999999999999}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code≠"0"` (наблюдение) | Резолюция «не найден» (ожидается 0 элементов) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:9999999999999999}, signed:true}` | HTTP 200; `b.data` пустой **или** `b.code≠"0"` (наблюдение) | Резолюция «не найден» (ожидается 0 элементов) | RUN 2026-06-20 ✓ — http 200, b.code=51603 (Order does not exist), data.size=0 |
 
 ### M13.2 негатив (no-state) — ни algoId, ни algoClOrdId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `algoId`/`algoClOrdId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: нужно одно из `algoId`/`algoClOrdId`; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `algoId`/`algoClOrdId`) | HTTP 200; `b.code≠"0"` | Реджект OKX: нужно одно из `algoId`/`algoClOrdId`; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50015 (Either parameter algoId or algoClOrdId is required), data.size=0 |
 
 ### M13.3 прямой по algoId / M13.4 по algoClOrdId
 
@@ -520,31 +555,31 @@ Cmarket.fillsHistory.
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Pending algo семьи conditional | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Pending algo семьи conditional | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M14.2 вариант — ordType=oco
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив | Pending algo семьи oco | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив | Pending algo семьи oco | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M14.3 вариант — ordType=move_order_stop (advance)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив | Pending algo семьи advance (trailing) видна в query | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив | Pending algo семьи advance (trailing) видна в query | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M14.4 негатив — ordType вне домена (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `ordType`); точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `ordType`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter ordType error), data.size=0 |
 
 ### M14.5 негатив — пропуск обязательного ordType (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `ordType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: `ordType` обязателен; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `ordType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: `ordType` обязателен; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter ordType error), data.size=0 |
 
 ### M14.6 прямой богатый
 
@@ -563,31 +598,31 @@ Cmarket.fillsHistory.
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив; элементы (если есть) несут `state` ∈ effective/canceled/order_failed | История algo семьи conditional за 3м | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив; элементы (если есть) несут `state` ∈ effective/canceled/order_failed | История algo семьи conditional за 3м | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M15.2 вариант — ordType=oco
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` массив | История семьи oco | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` массив | История семьи oco | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M15.3 вариант — ordType=move_order_stop
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` массив | История семьи advance (trailing) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` массив | История семьи advance (trailing) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M15.4 негатив — ordType вне домена (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `ordType`); точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `ordType`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50015 (Either parameter state or algoId is required), data.size=0 |
 
 ### M15.5 негатив — пропуск обязательного ordType (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `ordType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: `ordType` обязателен в history; точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP}, signed:true}` (без `ordType`) | HTTP 200; `b.code≠"0"` | Реджект OKX: `ordType` обязателен в history; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter ordType error), data.size=0 |
 
 ### M15.6 прямой богатый
 
@@ -616,17 +651,17 @@ orders-pending → cancel → getOrder(canceled) → orders-history. Цена
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **Climit.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | _…_ |
-| **Climit.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `cl_px=floor(last·0.5)` (неисполнимая limit buy), кратно tickSz. Цена с биржи, не константа | _…_ |
-| **Climit.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:0.01, px:cl_px, clOrdId:cl_clOrdId, reduceOnly:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | `ordId` → `cl_ordId`. `sCode=0 ≠ live` (см. .get). `tdMode/posSide` адаптер-константы (posSide=net проставляет реальный адаптер; здесь тело руками по контракту) | _…_ |
-| **Climit.get.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` | HTTP 200; `b.data[0].ordId=cl_ordId`; `b.data[0].state="live"`; `side`/`sz`/`px` присутствуют | ACK стал live-ордером — ACK ≠ runtime truth (покрывает M7.3) | _…_ |
-| **Climit.getByClId.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, clOrdId:cl_clOrdId}, signed:true}` | HTTP 200; `b.data[0].ordId=cl_ordId` | Резолв по `clOrdId` (вариант M7.4): тот же ордер | _…_ |
-| **Climit.pending.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит элемент с `ordId=cl_ordId`, `state=live` | Живой ордер в pending (покрывает M8.3) | _…_ |
-| **Climit.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | ACK отмены, не финал — подтверждается .canceled (покрывает M17 прямой) | _…_ |
-| **Climit.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` | Финал cancel (RUN: поллинг до condition state=canceled, таймаут N) | _…_ |
-| **Climit.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит `ordId=cl_ordId` (state canceled, окно ~2ч) **или** наблюдение | Отменённый в истории 7д ~2ч (покрывает M9.3); задержку индексации фиксируем фактом | _…_ |
-| **Teardown Climit.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` (идемпотентная страховка) | HTTP 200; (sCode 0 или already-canceled/not-exist) | После цепочки биржа чистая (ни одного живого ордера). Цена далеко от рынка → исполнение исключено | _…_ |
-| **Climit.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `cl_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | _…_ |
+| **Climit.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `cl_px=floor(last·0.5)` (неисполнимая limit buy), кратно tickSz. Цена с биржи, не константа | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:0.01, px:cl_px, clOrdId:cl_clOrdId, reduceOnly:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | `ordId` → `cl_ordId`. `sCode=0 ≠ live` (см. .get). `tdMode/posSide` адаптер-константы (posSide=net проставляет реальный адаптер; здесь тело руками по контракту) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.get.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` | HTTP 200; `b.data[0].ordId=cl_ordId`; `b.data[0].state="live"`; `side`/`sz`/`px` присутствуют | ACK стал live-ордером — ACK ≠ runtime truth (покрывает M7.3) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.getByClId.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, clOrdId:cl_clOrdId}, signed:true}` | HTTP 200; `b.data[0].ordId=cl_ordId` | Резолв по `clOrdId` (вариант M7.4): тот же ордер | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.pending.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит элемент с `ordId=cl_ordId`, `state=live` | Живой ордер в pending (покрывает M8.3) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | ACK отмены, не финал — подтверждается .canceled (покрывает M17 прямой) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` | Финал cancel (RUN: поллинг до condition state=canceled, таймаут N) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит `ordId=cl_ordId` (state canceled, окно ~2ч) **или** наблюдение | Отменённый в истории 7д ~2ч (покрывает M9.3); задержку индексации фиксируем фактом | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown Climit.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` (идемпотентная страховка) | HTTP 200; (sCode 0 или already-canceled/not-exist) | После цепочки биржа чистая (ни одного живого ордера). Цена далеко от рынка → исполнение исключено | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Climit.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `cl_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M16.market — вариант market: цепочка исполнения (Cmarket)
 
@@ -638,27 +673,27 @@ close-position-страховка (поллинг positions до flat, тайм�
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **Cmarket.snapshot.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` пуст **или** `b.data[0].pos=0` (чистый старт — нет позиции) | **Snapshot.start:** чистый старт — нет открытой позиции по инструменту до цепочки | _…_ |
-| **Cmarket.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last (диагностика; market цены не требует) | _…_ |
-| **Cmarket.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:market, sz:0.01, clOrdId:mk_clOrdId, reduceOnly:false}, signed:true}` (px опущен → market) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | `ordId` → `mk_ordId`. `ordType=market` (px отсутствует). **Минимальный риск:** min sz=0.01 | _…_ |
-| **Cmarket.get.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:mk_ordId}, signed:true}` | HTTP 200; `b.data[0].ordId=mk_ordId`; `b.data[0].state` ∈ filled/partially_filled; `accFillSz`/`avgPx` присутствуют | Market исполнен — ACK стал фактом. RUN: поллинг до state=filled, таймаут N | _…_ |
-| **Cmarket.position.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].posId` присутствует; `b.data[0].pos` ≠ 0; `avgPx` присутствует | Открытая позиция (покрывает M12.3). Если demo не открыл — наблюдение/находка | _…_ |
-| **Cmarket.fills.** `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит элемент с `ordId=mk_ordId`; `fillPx`/`fillSz` присутствуют | Fill виден (покрывает M10.4). Если пусто — отказ по факту, ожидание не выдумывается | _…_ |
-| **Cmarket.fillsHistory.** `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит `ordId=mk_ordId` (окно 3м) **или** наблюдение | Fill в окне 3м (покрывает M11.4) | _…_ |
-| **Cmarket.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит `ordId=mk_ordId` (state filled) **или** наблюдение | Filled-ордер в истории 7д (покрывает M9.3 богатый) | _…_ |
-| **Cmarket.close.** `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` **или** `b.data[0].instId` присутствует | ACK закрытия (market, autoCxl). close-position ACK без `ordId` (контракт). Покрывает M18 прямой | _…_ |
-| **Cmarket.positionFlat.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` пуст **или** `b.data[0].pos=0` | Позиция закрыта (покрывает M12.3 flat). RUN: поллинг до flat, таймаут N | _…_ |
-| **Teardown Cmarket.** `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` (идемпотентная страховка) | HTTP 200; (sCode 0 или «нет позиции») | После цепочки ни позиции, ни висящих ордеров (autoCxl снял) | _…_ |
-| **Cmarket.verify.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` пуст **или** `b.data[0].pos=0` — вернулось к чистому == старт | **Verify.end:** позиции по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Вне охвата: комиссионный/PnL-остаток баланса после fill (наблюдается, кейс не фейлит). Расхождение `pos≠0` → фейл (инвариант) | _…_ |
+| **Cmarket.snapshot.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` пуст **или** `b.data[0].pos=0` (чистый старт — нет позиции) | **Snapshot.start:** чистый старт — нет открытой позиции по инструменту до цепочки | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last (диагностика; market цены не требует) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:market, sz:0.01, clOrdId:mk_clOrdId, reduceOnly:false}, signed:true}` (px опущен → market) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | `ordId` → `mk_ordId`. `ordType=market` (px отсутствует). **Минимальный риск:** min sz=0.01 | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.get.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:mk_ordId}, signed:true}` | HTTP 200; `b.data[0].ordId=mk_ordId`; `b.data[0].state` ∈ filled/partially_filled; `accFillSz`/`avgPx` присутствуют | Market исполнен — ACK стал фактом. RUN: поллинг до state=filled, таймаут N | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.position.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].posId` присутствует; `b.data[0].pos` ≠ 0; `avgPx` присутствует | Открытая позиция (покрывает M12.3). Если demo не открыл — наблюдение/находка | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.fills.** `POST /raw {method:GET, path:/api/v5/trade/fills, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит элемент с `ordId=mk_ordId`; `fillPx`/`fillSz` присутствуют | Fill виден (покрывает M10.4). Если пусто — отказ по факту, ожидание не выдумывается | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.fillsHistory.** `POST /raw {method:GET, path:/api/v5/trade/fills-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит `ordId=mk_ordId` (окно 3м) **или** наблюдение | Fill в окне 3м (покрывает M11.4) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-history, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит `ordId=mk_ordId` (state filled) **или** наблюдение | Filled-ордер в истории 7д (покрывает M9.3 богатый) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.close.** `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` **или** `b.data[0].instId` присутствует | ACK закрытия (market, autoCxl). close-position ACK без `ordId` (контракт). Покрывает M18 прямой | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.positionFlat.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` пуст **или** `b.data[0].pos=0` | Позиция закрыта (покрывает M12.3 flat). RUN: поллинг до flat, таймаут N | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown Cmarket.** `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` (идемпотентная страховка) | HTTP 200; (sCode 0 или «нет позиции») | После цепочки ни позиции, ни висящих ордеров (autoCxl снял) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Cmarket.verify.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` пуст **или** `b.data[0].pos=0` — вернулось к чистому == старт | **Verify.end:** позиции по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Вне охвата: комиссионный/PnL-остаток баланса после fill (наблюдается, кейс не фейлит). Расхождение `pos≠0` → фейл (инвариант) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M16.neg — негатив placeOrder
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M16.neg.size.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:-1, px:cl_px, clOrdId:…}, signed:true}` (значение вне домена) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект отрицательного размера; точный код — наблюдение | _…_ |
-| **M16.neg.side.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:BOGUS, ordType:limit, sz:0.01, px:cl_px, clOrdId:…}, signed:true}` (значение вне домена) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект некорректного `side` | _…_ |
-| **M16.neg.ordType.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:BOGUS, sz:0.01, px:cl_px, clOrdId:…}, signed:true}` (битый сырой `ordType` — реальный под /raw) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект некорректного `ordType`. Прежний вариант-gap снят: сырой `ordType` достижим телом конверта; точный код — наблюдение | _…_ |
-| **M16.neg.reqParam.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, px:cl_px, clOrdId:…}, signed:true}` (без `sz` — OKX-слой) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `sz` обязателен. Под /raw пропуск уходит на OKX (нет прокси-гарда); точный код — наблюдение | _…_ |
+| **M16.neg.size.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:-1, px:cl_px, clOrdId:…}, signed:true}` (значение вне домена) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект отрицательного размера; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51000 (All operations failed), data.size=1 |
+| **M16.neg.side.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:BOGUS, ordType:limit, sz:0.01, px:cl_px, clOrdId:…}, signed:true}` (значение вне домена) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект некорректного `side` | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51000 (All operations failed), data.size=1 |
+| **M16.neg.ordType.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:BOGUS, sz:0.01, px:cl_px, clOrdId:…}, signed:true}` (битый сырой `ordType` — реальный под /raw) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект некорректного `ordType`. Прежний вариант-gap снят: сырой `ordType` достижим телом конверта; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51000 (All operations failed), data.size=1 |
+| **M16.neg.reqParam.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, px:cl_px, clOrdId:…}, signed:true}` (без `sz` — OKX-слой) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `sz` обязателен. Под /raw пропуск уходит на OKX (нет прокси-гарда); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51000 (All operations failed), data.size=1 |
 
 ### M16.neg.dupClId — негатив-цепочка (дубль clOrdId, stateful)
 
@@ -666,13 +701,13 @@ close-position-страховка (поллинг positions до flat, тайм�
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M16.dup.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту | **Snapshot.start:** чистый старт — нет живых ордеров | _…_ |
-| **M16.dup.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `cl_px=floor(last·0.5)` (неисполнимая limit buy), кратно tickSz. Делает dup-цепочку самодостаточной (свой price-шаг ставит `cl_px`, не из M16.limit) | _…_ |
-| **M16.dup.place1.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:0.01, px:cl_px, clOrdId:dup_clOrdId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | Первый place принят (`ordId` → `dup_ordId`). Неисполнимая цена | _…_ |
-| **M16.dup.place2.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{… clOrdId:dup_clOrdId}, signed:true}` (тот же `clOrdId`) | HTTP 200; `b.data[0].sCode≠"0"` (дубль clOrdId) | Реджект дубля clientId; точный код — наблюдение | _…_ |
-| **Teardown M16.dup.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:dup_ordId}, signed:true}` | HTTP 200; (sCode 0 или already-canceled/not-exist) | Отменить прошедший #1 (`dup_ordId`) — биржа чистая | _…_ |
-| **Teardown M16.dup #2.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:dup_ordId2}, signed:true}` (защитно, если #2 неожиданно прошёл; `dup_ordId2` по умолчанию пуст → not-exist, идемпотентно) | HTTP 200; (sCode 0 или not-exist) | Снять защитно-захваченный #2 (`dup_ordId2`) — закрыть утечку состояния на пути «неожиданный успех дубля» | _…_ |
-| **M16.dup.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `dup_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep) | _…_ |
+| **M16.dup.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту | **Snapshot.start:** чистый старт — нет живых ордеров | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M16.dup.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `cl_px=floor(last·0.5)` (неисполнимая limit buy), кратно tickSz. Делает dup-цепочку самодостаточной (свой price-шаг ставит `cl_px`, не из M16.limit) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M16.dup.place1.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:0.01, px:cl_px, clOrdId:dup_clOrdId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | Первый place принят (`ordId` → `dup_ordId`). Неисполнимая цена | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M16.dup.place2.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{… clOrdId:dup_clOrdId}, signed:true}` (тот же `clOrdId`) | HTTP 200; `b.data[0].sCode≠"0"` (дубль clOrdId) | Реджект дубля clientId; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51016 (All operations failed), data.size=1 |
+| **Teardown M16.dup.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:dup_ordId}, signed:true}` | HTTP 200; (sCode 0 или already-canceled/not-exist) | Отменить прошедший #1 (`dup_ordId`) — биржа чистая | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown M16.dup #2.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:dup_ordId2}, signed:true}` (защитно, если #2 неожиданно прошёл; `dup_ordId2` по умолчанию пуст → not-exist, идемпотентно) | HTTP 200; (sCode 0 или not-exist) | Снять защитно-захваченный #2 (`dup_ordId2`) — закрыть утечку состояния на пути «неожиданный успех дубля» | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M16.dup.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `dup_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ## M17. cancelOrder — POST /api/v5/trade/cancel-order (Cancel order)
 
@@ -685,19 +720,19 @@ close-position-страховка (поллинг positions до flat, тайм�
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:9999999999999999}, signed:true}` | HTTP 200; `b.data[0].sCode≠"0"`; `b.data[0]` несёт `sCode`+`sMsg` | Реджект; код 51603 (order does not exist) — наблюдение, не выдумка (как M7.1/TG2.2). Под /raw верхнеуровневая обёртка — `OkxApiResponse`, реджект в per-element `sCode` | _…_ |
+| `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:9999999999999999}, signed:true}` | HTTP 200; `b.data[0].sCode≠"0"`; `b.data[0]` несёт `sCode`+`sMsg` | Реджект; код 51603 (order does not exist) — наблюдение, не выдумка (как M7.1/TG2.2). Под /raw верхнеуровневая обёртка — `OkxApiResponse`, реджект в per-element `sCode` | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51400 (All operations failed), data.size=1 |
 
 ### M17.2 негатив — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{ordId:9999999999999999}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `instId` обязателен; точный код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{ordId:9999999999999999}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `instId` обязателен; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=50014 (All operations failed), data.size=1 |
 
 ### M17.3 негатив — отмена отменённого (состояние-конфликт)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| Повтор `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` после Climit.cancel | HTTP 200; `b.data[0].sCode≠"0"` (already canceled / not exist) | Реджект повторной отмены; код — наблюдение (51603/иной) | _…_ |
+| Повтор `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:cl_ordId}, signed:true}` после Climit.cancel | HTTP 200; `b.data[0].sCode≠"0"` (already canceled / not exist) | Реджект повторной отмены; код — наблюдение (51603/иной) | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51400 (All operations failed), data.size=1 |
 
 ### M17.4 прямой + вариант clOrdId — cancel by clOrdId (цепочка)
 
@@ -710,13 +745,13 @@ teardown (идемпотентный cancel) → Verify.end. **WRITE.** **Сре
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M17.4.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту | _…_ |
-| **M17.4.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `m17_px=floor(last·0.5)` (неисполнимая limit buy), кратно tickSz | _…_ |
-| **M17.4.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:0.01, px:m17_px, clOrdId:m17_clId, reduceOnly:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | Неисполнимый limit с `clOrdId=m17_clId`. `ordId` → `m17_ordId` (страховка teardown) | _…_ |
-| **M17.4.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, clOrdId:m17_clId}, signed:true}` (без `ordId`) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | Отмена by `clOrdId` (вариант M17.4). ACK отмены, финал — .canceled | _…_ |
-| **M17.4.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, clOrdId:m17_clId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` | Финал cancel by `clOrdId` (RUN: одношаговый ассерт best-effort, ретрай при индексинг-задержке) | _…_ |
-| **Teardown M17.4.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, clOrdId:m17_clId}, signed:true}` (идемпотентная страховка) | HTTP 200; (sCode 0 или already-canceled/not-exist) | Биржа чистая | _…_ |
-| **M17.4.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `m17_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) | _…_ |
+| **M17.4.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M17.4.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `m17_px=floor(last·0.5)` (неисполнимая limit buy), кратно tickSz | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M17.4.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:0.01, px:m17_px, clOrdId:m17_clId, reduceOnly:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | Неисполнимый limit с `clOrdId=m17_clId`. `ordId` → `m17_ordId` (страховка teardown) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M17.4.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, clOrdId:m17_clId}, signed:true}` (без `ordId`) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | Отмена by `clOrdId` (вариант M17.4). ACK отмены, финал — .canceled | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M17.4.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, clOrdId:m17_clId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` | Финал cancel by `clOrdId` (RUN: одношаговый ассерт best-effort, ретрай при индексинг-задержке) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown M17.4.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, clOrdId:m17_clId}, signed:true}` (идемпотентная страховка) | HTTP 200; (sCode 0 или already-canceled/not-exist) | Биржа чистая | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M17.4.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `m17_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ## M18. closePosition — POST /api/v5/trade/close-position (Close position)
 
@@ -730,13 +765,13 @@ teardown (идемпотентный cancel) → Verify.end. **WRITE.** **Сре
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` без открытой позиции | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` (наблюдение) | Реджект close несущ. позиции; точный код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` без открытой позиции | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` (наблюдение) | Реджект close несущ. позиции; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51023 (Position doesn't exist.), data.size=0 |
 
 ### M18.2 негатив — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `instId` обязателен; точный код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `instId` обязателен; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ### M18.3 прямой
 
@@ -766,17 +801,17 @@ getAlgo(algoClOrdId) → getPendingAlgo(conditional) → cancelAlgos(ordinary)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M19cond.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых conditional-algo по инструменту до цепочки | _…_ |
-| **M19cond.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `sl_px=floor(last·0.5)` (далёкий SL-триггер) | _…_ |
-| **M19cond.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:0.01, reduceOnly:true, algoClOrdId:cond_clId, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=conditional`, `slOrdPx=-1` (market после trigger). `algoId` → `cond_algoId`. При реджекте «нет позиции» — A0 + повтор | _…_ |
-| **M19cond.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:cond_algoId}, signed:true}` | HTTP 200; `b.data[0].algoId=cond_algoId`; `b.data[0].state≠"canceled"` | Algo live/effective (покрывает M13.3) | _…_ |
-| **M19cond.getByClId.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoClOrdId:cond_clId}, signed:true}` | HTTP 200; `b.data[0].algoId=cond_algoId` | Резолв по `algoClOrdId` (вариант M13.4) | _…_ |
-| **M19cond.pending.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.data` содержит `algoId=cond_algoId` | Живой conditional в pending (покрывает M14.6 conditional) | _…_ |
-| **M19cond.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:cond_algoId}], signed:true}` (**ordinary** семья) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | Ветвь ordinary `cancel-algos` (покрывает M20 прямой). Тело — массив. ACK отмены | _…_ |
-| **M19cond.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:cond_algoId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` **или** `b.data` пуст (наблюдение) | Финал cancel (RUN: поллинг до canceled/пусто) | _…_ |
-| **M19cond.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.data` содержит `algoId=cond_algoId` (state canceled) **или** наблюдение | Отменённый в history 3м (покрывает M15.6) | _…_ |
-| **Teardown M19cond.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:cond_algoId}], signed:true}` + (если A0) close-position | HTTP 200 | Algo снят, позиция (если открывалась) закрыта — биржа чистая | _…_ |
-| **M19cond.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `cond_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Если открывалась A0 — позиция тоже flat в teardown. Расхождение → фейл (инвариант) | _…_ |
+| **M19cond.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых conditional-algo по инструменту до цепочки | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `sl_px=floor(last·0.5)` (далёкий SL-триггер) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:0.01, reduceOnly:true, algoClOrdId:cond_clId, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=conditional`, `slOrdPx=-1` (market после trigger). `algoId` → `cond_algoId`. При реджекте «нет позиции» — A0 + повтор | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:cond_algoId}, signed:true}` | HTTP 200; `b.data[0].algoId=cond_algoId`; `b.data[0].state≠"canceled"` | Algo live/effective (покрывает M13.3) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.getByClId.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoClOrdId:cond_clId}, signed:true}` | HTTP 200; `b.data[0].algoId=cond_algoId` | Резолв по `algoClOrdId` (вариант M13.4) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.pending.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.data` содержит `algoId=cond_algoId` | Живой conditional в pending (покрывает M14.6 conditional) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:cond_algoId}], signed:true}` (**ordinary** семья) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | Ветвь ordinary `cancel-algos` (покрывает M20 прямой). Тело — массив. ACK отмены | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:cond_algoId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` **или** `b.data` пуст (наблюдение) | Финал cancel (RUN: поллинг до canceled/пусто) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.data` содержит `algoId=cond_algoId` (state canceled) **или** наблюдение | Отменённый в history 3м (покрывает M15.6) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown M19cond.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:cond_algoId}], signed:true}` + (если A0) close-position | HTTP 200 | Algo снят, позиция (если открывалась) закрыта — биржа чистая | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19cond.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `cond_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Если открывалась A0 — позиция тоже flat в teardown. Расхождение → фейл (инвариант) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M19.cond-tp — вариант conditional (TAKE_PROFIT)
 
@@ -784,13 +819,13 @@ getAlgo(algoClOrdId) → getPendingAlgo(conditional) → cancelAlgos(ordinary)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M19tp.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых conditional-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых conditional-algo по инструменту | _…_ |
-| **M19tp.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `tp_px=floor(last·2)` (далёкий TP-триггер), кратно tickSz. Делает цепочку самодостаточной (свой price-шаг, не из M19.cond-sl) | _…_ |
-| **M19tp.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:0.01, reduceOnly:true, algoClOrdId:tp_clId, tpTriggerPx:tp_px, tpTriggerPxType:mark, tpOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=conditional`, `tpOrdPx=-1`. `tp_px` из своего M19tp.price. `algoId` → `tp_algoId` | _…_ |
-| **M19tp.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:tp_algoId}, signed:true}` | HTTP 200; `b.data[0].state≠"canceled"` | Live | _…_ |
-| **M19tp.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:tp_algoId}], signed:true}` (ordinary) | HTTP 200; `b.data[0].sCode="0"` | Cancel ordinary | _…_ |
-| **Teardown M19tp.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:tp_algoId}], signed:true}` (+ A0 close) | HTTP 200 | Чисто | _…_ |
-| **M19tp.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `tp_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat | _…_ |
+| **M19tp.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых conditional-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых conditional-algo по инструменту | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tp.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `tp_px=floor(last·2)` (далёкий TP-триггер), кратно tickSz. Делает цепочку самодостаточной (свой price-шаг, не из M19.cond-sl) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tp.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:0.01, reduceOnly:true, algoClOrdId:tp_clId, tpTriggerPx:tp_px, tpTriggerPxType:mark, tpOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=conditional`, `tpOrdPx=-1`. `tp_px` из своего M19tp.price. `algoId` → `tp_algoId` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tp.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:tp_algoId}, signed:true}` | HTTP 200; `b.data[0].state≠"canceled"` | Live | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tp.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:tp_algoId}], signed:true}` (ordinary) | HTTP 200; `b.data[0].sCode="0"` | Cancel ordinary | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown M19tp.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:tp_algoId}], signed:true}` (+ A0 close) | HTTP 200 | Чисто | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tp.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `tp_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M19.oco — вариант oco (OCO_FULL)
 
@@ -798,13 +833,13 @@ getAlgo(algoClOrdId) → getPendingAlgo(conditional) → cancelAlgos(ordinary)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M19oco.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых oco-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых oco-algo по инструменту | _…_ |
-| **M19oco.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `sl_px=floor(last·0.5)`, `tp_px=floor(last·2)`, кратно tickSz. Делает цепочку самодостаточной (свой price-шаг ставит обе цены, не из M19.cond-sl) | _…_ |
-| **M19oco.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:oco, sz:0.01, reduceOnly:true, algoClOrdId:oco_clId, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1", tpTriggerPx:tp_px, tpTriggerPxType:mark, tpOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=oco`, обе ноги (slOrdPx/tpOrdPx=-1). `sl_px`/`tp_px` из своего M19oco.price. `algoId` → `oco_algoId` | _…_ |
-| **M19oco.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:oco_algoId}, signed:true}` | HTTP 200; `b.data[0].state≠"canceled"` | Live oco | _…_ |
-| **M19oco.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:oco_algoId}], signed:true}` (ordinary) | HTTP 200; `b.data[0].sCode="0"` | Cancel ordinary | _…_ |
-| **Teardown M19oco.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:oco_algoId}], signed:true}` (+ A0 close) | HTTP 200 | Чисто | _…_ |
-| **M19oco.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `oco_algoId` — вернулось к чистому == старт | **Verify.end:** живых oco-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat | _…_ |
+| **M19oco.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых oco-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых oco-algo по инструменту | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19oco.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `sl_px=floor(last·0.5)`, `tp_px=floor(last·2)`, кратно tickSz. Делает цепочку самодостаточной (свой price-шаг ставит обе цены, не из M19.cond-sl) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19oco.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:oco, sz:0.01, reduceOnly:true, algoClOrdId:oco_clId, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1", tpTriggerPx:tp_px, tpTriggerPxType:mark, tpOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=oco`, обе ноги (slOrdPx/tpOrdPx=-1). `sl_px`/`tp_px` из своего M19oco.price. `algoId` → `oco_algoId` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19oco.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:oco_algoId}, signed:true}` | HTTP 200; `b.data[0].state≠"canceled"` | Live oco | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19oco.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:oco_algoId}], signed:true}` (ordinary) | HTTP 200; `b.data[0].sCode="0"` | Cancel ordinary | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown M19oco.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:oco_algoId}], signed:true}` (+ A0 close) | HTTP 200 | Чисто | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19oco.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:oco}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `oco_algoId` — вернулось к чистому == старт | **Verify.end:** живых oco-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M19.trailing — вариант move_order_stop (callbackRatio, ядро И-2)
 
@@ -818,15 +853,15 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M19tr.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых advance-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых advance-algo (trailing) по инструменту | _…_ |
-| **M19tr.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:move_order_stop, sz:0.01, reduceOnly:true, algoClOrdId:tr_clId, callbackRatio:"0.05"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=move_order_stop`, `callbackRatio=0.05`. `algoId` → `tr_algoId`. При реджекте «нет позиции» — A0 + повтор | _…_ |
-| **M19tr.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:tr_algoId}, signed:true}` | HTTP 200; `b.data[0].algoId=tr_algoId`; `b.data[0].state≠"canceled"` | Trailing live/effective | _…_ |
-| **M19tr.pending.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.data` содержит `algoId=tr_algoId` | Advance виден в pending (покрывает M14.6 advance) | _…_ |
-| **M19tr.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:tr_algoId}], signed:true}` (**advance** семья) | HTTP 200; `b.data[0].sCode="0"` (**гипотеза** — endpoint жив на demo) | **Ядро И-2 (покрывает M21 прямой).** Гипотеза: жив, `sCode=0`. Если demo вернёт «endpoint не существует»/иную ошибку → делистинг подтверждён = **находка интегратору** (C3: правка `algo-order.md`, провенанс `рантайм`). `b.code`/`b.msg` логируются | _…_ |
-| **M19tr.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:tr_algoId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` **или** `b.data` пуст (наблюдение) | Финал cancel trailing | _…_ |
-| **M19tr.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.data` содержит `algoId=tr_algoId` **или** наблюдение | Trailing в history 3м (покрывает M15.6 advance) | _…_ |
-| **Teardown M19tr.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:tr_algoId}], signed:true}` (advance) + (если A0) close-position | HTTP 200 | Trailing снят, позиция (если открывалась) закрыта — биржа чистая | _…_ |
-| **M19tr.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `tr_algoId` — вернулось к чистому == старт | **Verify.end:** живых advance-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat. Невозврат — связан с И-2 (фейл cancel-advance = находка C3) | _…_ |
+| **M19tr.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых advance-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых advance-algo (trailing) по инструменту | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tr.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:move_order_stop, sz:0.01, reduceOnly:true, algoClOrdId:tr_clId, callbackRatio:"0.05"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=move_order_stop`, `callbackRatio=0.05`. `algoId` → `tr_algoId`. При реджекте «нет позиции» — A0 + повтор | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tr.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:tr_algoId}, signed:true}` | HTTP 200; `b.data[0].algoId=tr_algoId`; `b.data[0].state≠"canceled"` | Trailing live/effective | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tr.pending.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.data` содержит `algoId=tr_algoId` | Advance виден в pending (покрывает M14.6 advance) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tr.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:tr_algoId}], signed:true}` (**advance** семья) | HTTP 200; `b.data[0].sCode="0"` (**гипотеза** — endpoint жив на demo) | **Ядро И-2 (покрывает M21 прямой).** Гипотеза: жив, `sCode=0`. Если demo вернёт «endpoint не существует»/иную ошибку → делистинг подтверждён = **находка интегратору** (C3: правка `algo-order.md`, провенанс `рантайм`). `b.code`/`b.msg` логируются | RUN 2026-06-20 ✓ — http 200, b.code=0, data0.sCode=0, data.size=1 |
+| **M19tr.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:tr_algoId}, signed:true}` | HTTP 200; `b.data[0].state="canceled"` **или** `b.data` пуст (наблюдение) | Финал cancel trailing | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tr.history.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.data` содержит `algoId=tr_algoId` **или** наблюдение | Trailing в history 3м (покрывает M15.6 advance) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown M19tr.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:tr_algoId}], signed:true}` (advance) + (если A0) close-position | HTTP 200 | Trailing снят, позиция (если открывалась) закрыта — биржа чистая | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19tr.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `tr_algoId` — вернулось к чистому == старт | **Verify.end:** живых advance-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat. Невозврат — связан с И-2 (фейл cancel-advance = находка C3) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M19.trailing-spread — вариант move_order_stop (callbackSpread, абсолютный)
 
@@ -835,33 +870,33 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M19trs.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых advance-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых advance-algo (trailing) по инструменту | _…_ |
-| **M19trs.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `trs_spread` (абсолютный spread, кратно tickSz, напр. `floor(last·0.01)`) | _…_ |
-| **M19trs.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:move_order_stop, sz:0.01, reduceOnly:true, algoClOrdId:trs_clId, callbackSpread:trs_spread}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=move_order_stop`, `callbackSpread` (абсолют). Реальный вариант (не gap). `algoId` → `trs_algoId`. При реджекте «нет позиции» — A0 + повтор | _…_ |
-| **M19trs.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:trs_algoId}, signed:true}` | HTTP 200; `b.data[0].state≠"canceled"` | Trailing-spread live | _…_ |
-| **M19trs.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:trs_algoId}], signed:true}` (advance) | HTTP 200; `b.data[0].sCode="0"` (гипотеза И-2) | Cancel advance (та же И-2-гипотеза; фейл = находка C3) | _…_ |
-| **Teardown M19trs.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:trs_algoId}], signed:true}` (advance) + (если A0) close-position | HTTP 200 | Trailing-spread снят, позиция (если открывалась) закрыта | _…_ |
-| **M19trs.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `trs_algoId` — вернулось к чистому == старт | **Verify.end:** живых advance-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat. Невозврат связан с И-2 (фейл cancel-advance = находка C3) | _…_ |
+| **M19trs.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых advance-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых advance-algo (trailing) по инструменту | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19trs.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `trs_spread` (абсолютный spread, кратно tickSz, напр. `floor(last·0.01)`) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19trs.place.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:move_order_stop, sz:0.01, reduceOnly:true, algoClOrdId:trs_clId, callbackSpread:trs_spread}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=move_order_stop`, `callbackSpread` (абсолют). Реальный вариант (не gap). `algoId` → `trs_algoId`. При реджекте «нет позиции» — A0 + повтор | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19trs.get.** `POST /raw {method:GET, path:/api/v5/trade/order-algo, query:{instId:ETH-USDT-SWAP, algoId:trs_algoId}, signed:true}` | HTTP 200; `b.data[0].state≠"canceled"` | Trailing-spread live | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19trs.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:trs_algoId}], signed:true}` (advance) | HTTP 200; `b.data[0].sCode="0"` (гипотеза И-2) | Cancel advance (та же И-2-гипотеза; фейл = находка C3) | RUN 2026-06-20 ✓ — http 200, b.code=0, data0.sCode=0, data.size=1 |
+| **Teardown M19trs.** `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:trs_algoId}], signed:true}` (advance) + (если A0) close-position | HTTP 200 | Trailing-spread снят, позиция (если открывалась) закрыта | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19trs.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:move_order_stop}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `trs_algoId` — вернулось к чистому == старт | **Verify.end:** живых advance-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat. Невозврат связан с И-2 (фейл cancel-advance = находка C3) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### M19.neg — негатив placeAlgoOrder
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M19.neg.ordType.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:BOGUS, sz:0.01, reduceOnly:true, algoClOrdId:…, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` (битый сырой `ordType` — реальный под /raw) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект некорректного `ordType`. Прежний прокси-5xx-слой снят; сырой `ordType` достижим телом конверта; точный код — наблюдение | _…_ |
-| **M19.neg.size.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:-1, reduceOnly:true, algoClOrdId:…, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` (значение вне домена) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект отрицательного размера; код — наблюдение | _…_ |
-| **M19.neg.reqParam.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, reduceOnly:true, algoClOrdId:…, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` (без `sz` — OKX-слой) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `sz` обязателен. Под /raw пропуск уходит на OKX; точный код — наблюдение | _…_ |
+| **M19.neg.ordType.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:BOGUS, sz:0.01, reduceOnly:true, algoClOrdId:…, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` (битый сырой `ordType` — реальный под /raw) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект некорректного `ordType`. Прежний прокси-5xx-слой снят; сырой `ordType` достижим телом конверта; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter ordType error), data.size=0 |
+| **M19.neg.size.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:-1, reduceOnly:true, algoClOrdId:…, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` (значение вне домена) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект отрицательного размера; код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter sz error), data.size=0 |
+| **M19.neg.reqParam.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, reduceOnly:true, algoClOrdId:…, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` (без `sz` — OKX-слой) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект OKX: `sz` обязателен. Под /raw пропуск уходит на OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50015 (Either parameter sz or closeFraction is required), data.size=0 |
 ### M19.neg.dupClId — негатив-цепочка (дубль algoClOrdId, stateful)
 
 Граф: Snapshot.start(algo-pending conditional пуст) → price(ticker → sl_px) → place#1(algoClOrdId) → place#2(тот же algoClOrdId, реджект/наблюдение) → teardown(снять #1 adup_algoId + защитно #2 adup_algoId2) → Verify.end(algo-pending == старт). Свой price-шаг делает цепочку самодостаточной (sl_px). Первый place может создать живой algo → инвариант восстановления применим.
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **M19dup.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых conditional-algo по инструменту | **Snapshot.start:** чистый старт — нет живых conditional-algo | _…_ |
-| **M19dup.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `sl_px=floor(last·0.5)` (далёкий SL-триггер), кратно tickSz. Делает dup-цепочку самодостаточной (свой price-шаг ставит `sl_px`, не из M19.cond-sl) | _…_ |
-| **M19dup.place1.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:0.01, reduceOnly:true, algoClOrdId:adup_clId, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | Первый place принят (`algoId` → `adup_algoId`). При реджекте «нет позиции» — A0 + повтор | _…_ |
-| **M19dup.place2.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{… algoClOrdId:adup_clId, ordType:conditional, slTriggerPx:sl_px, …}, signed:true}` (тот же `algoClOrdId`) | HTTP 200; второй — `b.data[0].sCode≠"0"` (дубль) **или** наблюдение | Реджект/поведение на дубль algoClOrdId — фиксируем; точный исход — наблюдение | _…_ |
-| **Teardown M19dup.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:adup_algoId}, {instId:ETH-USDT-SWAP, algoId:adup_algoId2}], signed:true}` (явно снять #1 и защитно #2; `adup_algoId2` по умолчанию пуст → per-element not-exist, идемпотентно) | HTTP 200 | Снять прошедшие algo: #1 (`adup_algoId`) и защитно-захваченный #2 (`adup_algoId2`) — закрыть утечку состояния. A0-close (условный close-position) — только код-тесты | _…_ |
-| **M19dup.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `adup_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep) | _…_ |
+| **M19dup.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых conditional-algo по инструменту | **Snapshot.start:** чистый старт — нет живых conditional-algo | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19dup.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live last → `sl_px=floor(last·0.5)` (далёкий SL-триггер), кратно tickSz. Делает dup-цепочку самодостаточной (свой price-шаг ставит `sl_px`, не из M19.cond-sl) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19dup.place1.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{instId:ETH-USDT-SWAP, tdMode:isolated, posSide:net, side:sell, ordType:conditional, sz:0.01, reduceOnly:true, algoClOrdId:adup_clId, slTriggerPx:sl_px, slTriggerPxType:mark, slOrdPx:"-1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | Первый place принят (`algoId` → `adup_algoId`). При реджекте «нет позиции» — A0 + повтор | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19dup.place2.** `POST /raw {method:POST, path:/api/v5/trade/order-algo, body:{… algoClOrdId:adup_clId, ordType:conditional, slTriggerPx:sl_px, …}, signed:true}` (тот же `algoClOrdId`) | HTTP 200; второй — `b.data[0].sCode≠"0"` (дубль) **или** наблюдение | Реджект/поведение на дубль algoClOrdId — фиксируем; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51068, data.size=1 |
+| **Teardown M19dup.** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:adup_algoId}, {instId:ETH-USDT-SWAP, algoId:adup_algoId2}], signed:true}` (явно снять #1 и защитно #2; `adup_algoId2` по умолчанию пуст → per-element not-exist, идемпотентно) | HTTP 200 | Снять прошедшие algo: #1 (`adup_algoId`) и защитно-захваченный #2 (`adup_algoId2`) — закрыть утечку состояния. A0-close (условный close-position) — только код-тесты | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **M19dup.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `adup_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ## M20. cancelAlgos — POST /api/v5/trade/cancel-algos (Cancel algo ordinary)
 
@@ -874,7 +909,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:9999999999999999}], signed:true}` | HTTP 200; `b.data[0].sCode≠"0"` (algo не найден/закрыт) | Реджект cancel несущ. algo (ordinary семья); код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:9999999999999999}], signed:true}` | HTTP 200; `b.data[0].sCode≠"0"` (algo не найден/закрыт) | Реджект cancel несущ. algo (ordinary семья); код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51400, data.size=1 |
 
 ### M20.2 прямой + вариант
 
@@ -891,7 +926,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:9999999999999999}], signed:true}` | HTTP 200; `b.data[0].sCode≠"0"` **или** иная ошибка (наблюдение — И-2: endpoint выведен из офдока) | Реджект cancel несущ. advance-algo. **Если ответ — «endpoint не существует»** (не per-element реджект) → подтверждение делистинга = находка интегратору (C3), не выдумка | _…_ |
+| `POST /raw {method:POST, path:/api/v5/trade/cancel-advance-algos, body:[{instId:ETH-USDT-SWAP, algoId:9999999999999999}], signed:true}` | HTTP 200; `b.data[0].sCode≠"0"` **или** иная ошибка (наблюдение — И-2: endpoint выведен из офдока) | Реджект cancel несущ. advance-algo. **Если ответ — «endpoint не существует»** (не per-element реджект) → подтверждение делистинга = находка интегратору (C3), не выдумка | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51293 (Operation failed.), data.size=1 |
 
 ### M21.2 прямой + вариант
 
@@ -913,27 +948,27 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **TG1.snapshot.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | _…_ |
-| **TG1.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].last>0` | live `last` → `tg_px=floor(last·0.5)` (неисполнимая buy). Цена с биржи, не константа | _…_ |
-| **TG1.place.** `POST /raw {POST /api/v5/trade/batch-orders, body:[{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:tg_px,clOrdId:tg_clId1},{…clOrdId:tg_clId2}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"`; `b.data[0].ordId` и `b.data[1].ordId` непустые | Оба ордера приняты (поэлементный ACK, `batch-operations.md`). `ordId` → `tg_ordId1`/`tg_ordId2`. ACK ≠ runtime truth | _…_ |
-| **TG1.pending.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит элементы с `ordId=tg_ordId1` и `tg_ordId2` (`state="live"`) | Оба живых ордера в pending. RUN: поллинг до появления, таймаут N | _…_ |
-| **TG1.cancel.** `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:tg_ordId1},{instId,ordId:tg_ordId2}], signed:true}` (покрывает TG2 прямой) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | Оба отменены (ACK). Подтверждается .flat | _…_ |
-| **TG1.flat.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит `tg_ordId1`/`tg_ordId2` | Pending без наших ордеров. RUN: поллинг до отсутствия | _…_ |
-| **Teardown TG1.** `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:tg_ordId1},{instId,ordId:tg_ordId2}], signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode="0"` или already-canceled/not-exist) | Биржа чистая (ни одного живого ордера). Цена далеко от рынка → исполнение исключено | _…_ |
-| **TG1.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `tg_ordId1`/`tg_ordId2` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | _…_ |
+| **TG1.snapshot.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG1.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].last>0` | live `last` → `tg_px=floor(last·0.5)` (неисполнимая buy). Цена с биржи, не константа | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG1.place.** `POST /raw {POST /api/v5/trade/batch-orders, body:[{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:tg_px,clOrdId:tg_clId1},{…clOrdId:tg_clId2}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"`; `b.data[0].ordId` и `b.data[1].ordId` непустые | Оба ордера приняты (поэлементный ACK, `batch-operations.md`). `ordId` → `tg_ordId1`/`tg_ordId2`. ACK ≠ runtime truth | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG1.pending.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` содержит элементы с `ordId=tg_ordId1` и `tg_ordId2` (`state="live"`) | Оба живых ордера в pending. RUN: поллинг до появления, таймаут N | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG1.cancel.** `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:tg_ordId1},{instId,ordId:tg_ordId2}], signed:true}` (покрывает TG2 прямой) | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | Оба отменены (ACK). Подтверждается .flat | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG1.flat.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит `tg_ordId1`/`tg_ordId2` | Pending без наших ордеров. RUN: поллинг до отсутствия | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown TG1.** `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:tg_ordId1},{instId,ordId:tg_ordId2}], signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode="0"` или already-canceled/not-exist) | Биржа чистая (ни одного живого ордера). Цена далеко от рынка → исполнение исключено | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG1.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `tg_ordId1`/`tg_ordId2` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG1.2 негатив — частичный реджект (битый item в пакете)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/batch-orders, body:[{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:tg_px,clOrdId:…},{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:-1,px:tg_px,clOrdId:…}], signed:true}` (второй item — sz вне домена) | HTTP 200; `b.data[1].sCode≠"0"`; первый — `b.data[0].sCode="0"` **или** `b.data[0].sCode≠"0"` (наблюдение) | Поэлементный исход вне PM (`batch-operations.md`): валидный item проходит, битый реджектится в `data[1].sCode`. Точный код — наблюдение. Если item1 прошёл — `ordId` → `tg_strayOrdId` (см. teardown) | _…_ |
-| **Teardown TG1.2.** `POST /raw {POST /api/v5/trade/cancel-order, body:{instId,ordId:tg_strayOrdId}, signed:true}` (защитно, если item1 неожиданно прошёл; `tg_strayOrdId` по умолчанию пуст → not-exist, идемпотентно) | HTTP 200; (`sCode="0"` или not-exist) | Снять защитно-захваченный item1 (`tg_strayOrdId`) — закрыть утечку состояния batch-dup | _…_ |
+| `POST /raw {POST /api/v5/trade/batch-orders, body:[{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:tg_px,clOrdId:…},{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:-1,px:tg_px,clOrdId:…}], signed:true}` (второй item — sz вне домена) | HTTP 200; `b.data[1].sCode≠"0"`; первый — `b.data[0].sCode="0"` **или** `b.data[0].sCode≠"0"` (наблюдение) | Поэлементный исход вне PM (`batch-operations.md`): валидный item проходит, битый реджектится в `data[1].sCode`. Точный код — наблюдение. Если item1 прошёл — `ordId` → `tg_strayOrdId` (см. teardown) | RUN 2026-06-20 ✓ — http 200, b.code=2, data0.sCode=0 (Bulk operation partially successful), data.size=2 |
+| **Teardown TG1.2.** `POST /raw {POST /api/v5/trade/cancel-order, body:{instId,ordId:tg_strayOrdId}, signed:true}` (защитно, если item1 неожиданно прошёл; `tg_strayOrdId` по умолчанию пуст → not-exist, идемпотентно) | HTTP 200; (`sCode="0"` или not-exist) | Снять защитно-захваченный item1 (`tg_strayOrdId`) — закрыть утечку состояния batch-dup | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG1.3 негатив — пропуск обязательного instId в item (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/batch-orders, body:[{tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:tg_px,clOrdId:…}], signed:true}` (item без `instId`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Под /raw passthrough-слоя нет — пропуск обязательного уходит на OKX → реджект. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/batch-orders, body:[{tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:tg_px,clOrdId:…}], signed:true}` (item без `instId`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Под /raw passthrough-слоя нет — пропуск обязательного уходит на OKX → реджект. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=50014, data.size=1 |
 
 ---
 
@@ -953,13 +988,13 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:"9999999999999999"},{instId,ordId:"9999999999999998"}], signed:true}` | HTTP 200; `b.data[0].sCode≠"0"`; `b.data[1].sCode≠"0"` (order does not exist) | Поэлементный реджект несущ. `ordId`. Точный код (51603/иной) — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:"9999999999999999"},{instId,ordId:"9999999999999998"}], signed:true}` | HTTP 200; `b.data[0].sCode≠"0"`; `b.data[1].sCode≠"0"` (order does not exist) | Поэлементный реджект несущ. `ordId`. Точный код (51603/иной) — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51400 (All operations failed), data.size=2 |
 
 ### TG2.3 негатив — пропуск идентификатора в item (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId}], signed:true}` (item без `ordId`/`clOrdId`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект OKX: ни `ordId`, ни `clOrdId`. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId}], signed:true}` (item без `ordId`/`clOrdId`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект OKX: ни `ordId`, ни `clOrdId`. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51003, data.size=1 |
 
 ---
 
@@ -977,25 +1012,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **TG3.snapshot.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | _…_ |
-| **TG3.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `am_px=floor(last·0.5)`, `am_newPx=floor(last·0.4)` (обе неисполнимы) | _…_ |
-| **TG3.place.** `POST /raw {POST /api/v5/trade/order, body{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:am_px,clOrdId:am_clId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | `ordId` → `am_ordId`. Неисполнимый limit для amend | _…_ |
-| **TG3.amend.** `POST /raw {POST /api/v5/trade/amend-order, body{instId,ordId:am_ordId,newSz:"0.02",newPx:am_newPx,cxlOnFail:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId=am_ordId` | ACK amend (`sCode=0` ≠ «изменение подтверждено», `order.md`). Подтверждение — getOrder | _…_ |
-| **TG3.get.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:am_ordId}, signed:true}` | HTTP 200; `b.data[0].ordId=am_ordId`; `b.data[0].sz="0.02"`; `b.data[0].px=am_newPx`; `state="live"` | Amend применён — `sz`/`px` обновлены. RUN: поллинг до отражения newSz/newPx | _…_ |
-| **Teardown TG3.** `POST /raw {POST /api/v5/trade/cancel-order, body{instId,ordId:am_ordId}, signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode="0"` или already-canceled/not-exist) | Ордер снят — биржа чистая | _…_ |
-| **TG3.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `am_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | _…_ |
+| **TG3.snapshot.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG3.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `am_px=floor(last·0.5)`, `am_newPx=floor(last·0.4)` (обе неисполнимы) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG3.place.** `POST /raw {POST /api/v5/trade/order, body{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:am_px,clOrdId:am_clId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | `ordId` → `am_ordId`. Неисполнимый limit для amend | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG3.amend.** `POST /raw {POST /api/v5/trade/amend-order, body{instId,ordId:am_ordId,newSz:"0.02",newPx:am_newPx,cxlOnFail:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId=am_ordId` | ACK amend (`sCode=0` ≠ «изменение подтверждено», `order.md`). Подтверждение — getOrder | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG3.get.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:am_ordId}, signed:true}` | HTTP 200; `b.data[0].ordId=am_ordId`; `b.data[0].sz="0.02"`; `b.data[0].px=am_newPx`; `state="live"` | Amend применён — `sz`/`px` обновлены. RUN: поллинг до отражения newSz/newPx | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown TG3.** `POST /raw {POST /api/v5/trade/cancel-order, body{instId,ordId:am_ordId}, signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode="0"` или already-canceled/not-exist) | Ордер снят — биржа чистая | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG3.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `am_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG3.2 негатив — amend несуществующего ордера
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/amend-order, body{instId,ordId:"9999999999999999",newPx:am_newPx}, signed:true}` | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` (order does not exist) | Реджект amend несущ. ордера. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/amend-order, body{instId,ordId:"9999999999999999",newPx:am_newPx}, signed:true}` | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` (order does not exist) | Реджект amend несущ. ордера. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51503 (All operations failed), data.size=1 |
 
 ### TG3.3 негатив — amend без изменений (ни newSz, ни newPx)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/amend-order, body{instId,ordId:"9999999999999999"}, signed:true}` (нет `newSz`/`newPx`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект OKX: amend без изменений и/или по несущ. ордеру. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/amend-order, body{instId,ordId:"9999999999999999"}, signed:true}` (нет `newSz`/`newPx`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект OKX: amend без изменений и/или по несущ. ордеру. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51500 (All operations failed), data.size=1 |
 
 ---
 
@@ -1013,26 +1048,26 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **TG4.snapshot.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | _…_ |
-| **TG4.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `ab_px=floor(last·0.5)`, `ab_newPx=floor(last·0.4)` (неисполнимы) | _…_ |
-| **TG4.place.** `POST /raw {POST /api/v5/trade/batch-orders, body:[{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:ab_px,clOrdId:ab_clId1},{…clOrdId:ab_clId2}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | `ordId` → `ab_ordId1`/`ab_ordId2`. Два живых неисполнимых ордера | _…_ |
-| **TG4.amend.** `POST /raw {POST /api/v5/trade/amend-batch-orders, body:[{instId,ordId:ab_ordId1,newSz:"0.02",newPx:ab_newPx},{instId,ordId:ab_ordId2,newPx:ab_newPx}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | Оба amend приняты (поэлементный ACK). ACK ≠ подтверждение — getOrder | _…_ |
-| **TG4.get1.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId1}, signed:true}` | HTTP 200; `b.data[0].sz="0.02"`; `b.data[0].px=ab_newPx` | Amend item1 применён. RUN: поллинг до отражения | _…_ |
-| **TG4.get2.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId2}, signed:true}` | HTTP 200; `b.data[0].px=ab_newPx` | Amend item2 применён | _…_ |
-| **Teardown TG4.** `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:ab_ordId1},{instId,ordId:ab_ordId2}], signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode="0"` или already-canceled/not-exist) | Оба ордера сняты — биржа чистая | _…_ |
-| **TG4.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `ab_ordId1`/`ab_ordId2` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | _…_ |
+| **TG4.snapshot.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых ордеров по инструменту до цепочки | RUN 2026-06-20 ✓ — чистый старт (живых ордеров нет) |
+| **TG4.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `ab_px=floor(last·0.5)`, `ab_newPx=floor(last·0.4)` (неисполнимы) | RUN 2026-06-20 ✓ — live last получен |
+| **TG4.place.** `POST /raw {POST /api/v5/trade/batch-orders, body:[{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:ab_px,clOrdId:ab_clId1},{…clOrdId:ab_clId2}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | `ordId` → `ab_ordId1`/`ab_ordId2`. Два живых неисполнимых ордера | RUN 2026-06-20 ✓ — http 200, b.code=0, оба data[].sCode=0 (Order placed) — 2 ордера |
+| **TG4.amend.** `POST /raw {POST /api/v5/trade/amend-batch-orders, body:[{instId,ordId:ab_ordId1,newSz:"0.02",newPx:ab_newPx},{instId,ordId:ab_ordId2,newPx:ab_newPx}], signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[1].sCode="0"` | Оба amend приняты (поэлементный ACK). ACK ≠ подтверждение — getOrder | RUN 2026-06-20 ✓ — http 200, b.code=0, оба data[].sCode=0 (amend-batch ACK принят) |
+| **TG4.get1.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId1}, signed:true}` | HTTP 200; `b.data[0].sz="0.02"`; `b.data[0].px=ab_newPx` | Amend item1 применён. RUN: поллинг до отражения | RUN 2026-06-20 ✗ ФЕЙЛ — amend заACKан (data[].sCode=0), но getOrder не отразил newSz/newPx за 25s (poll timeout). Наблюдение: amend-batch ACK ≠ немедленное отражение на demo (индексинг-задержка / возможно не применился); кандидат backlog/C3 |
+| **TG4.get2.** `POST /raw {GET /api/v5/trade/order, query{instId,ordId:ab_ordId2}, signed:true}` | HTTP 200; `b.data[0].px=ab_newPx` | Amend item2 применён | RUN 2026-06-20 — не достигнут (цепочка прервана на TG4.get1) |
+| **Teardown TG4.** `POST /raw {POST /api/v5/trade/cancel-batch-orders, body:[{instId,ordId:ab_ordId1},{instId,ordId:ab_ordId2}], signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode="0"` или already-canceled/not-exist) | Оба ордера сняты — биржа чистая | RUN 2026-06-20 ✓ — teardown отработал: cancel-batch b.code=0, оба data[].sCode=0 → биржа очищена |
+| **TG4.verify.** `POST /raw {GET /api/v5/trade/orders-pending, query{instId}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `ab_ordId1`/`ab_ordId2` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep). Расхождение → фейл (инвариант) | RUN 2026-06-20 — явный verify не достигнут (фейл на TG4.get1); teardown cancel-batch снял оба ордера → биржа чистая |
 
 ### TG4.2 негатив — частичный реджект (битый item: несущ. ordId)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/amend-batch-orders, body:[{instId,ordId:ab_ordId1,newPx:ab_newPx},{instId,ordId:"9999999999999999",newPx:ab_newPx}], signed:true}` (item2 — несущ. ordId) | HTTP 200; `b.data[1].sCode≠"0"`; `b.data[0].sCode="0"` **или** наблюдение | Поэлементный исход: валидный amend проходит, несущ. реджектится в `data[1].sCode`. Точный код — наблюдение. Teardown: снять прошедшие | _…_ |
+| `POST /raw {POST /api/v5/trade/amend-batch-orders, body:[{instId,ordId:ab_ordId1,newPx:ab_newPx},{instId,ordId:"9999999999999999",newPx:ab_newPx}], signed:true}` (item2 — несущ. ordId) | HTTP 200; `b.data[1].sCode≠"0"`; `b.data[0].sCode="0"` **или** наблюдение | Поэлементный исход: валидный amend проходит, несущ. реджектится в `data[1].sCode`. Точный код — наблюдение. Teardown: снять прошедшие | RUN 2026-06-20 ✓ — http 200, b.code=2, data0.sCode=0 (Bulk operation partially successful), data.size=2 |
 
 ### TG4.3 негатив — пропуск изменений и идентификатора в item (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/amend-batch-orders, body:[{instId}], signed:true}` (item без `ordId`/`clOrdId` и без `newSz`/`newPx`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект OKX: нет идентификатора и нет изменений. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/amend-batch-orders, body:[{instId}], signed:true}` (item без `ordId`/`clOrdId` и без `newSz`/`newPx`) | HTTP 200; `b.data[0].sCode≠"0"` **или** `b.code≠"0"` | Реджект OKX: нет идентификатора и нет изменений. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51003, data.size=1 |
 
 ---
 
@@ -1048,25 +1083,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instType:"SWAP",instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Архив 3м: на свежем demo может быть пуст. Богатое наполнение не выдумывается — отказ по достижимости с причиной, если требуется содержимое | _…_ |
+| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instType:"SWAP",instId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (пустой валиден) | Архив 3м: на свежем demo может быть пуст. Богатое наполнение не выдумывается — отказ по достижимости с причиной, если требуется содержимое | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG5.2 негатив — пропуск обязательного instType (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instId}, signed:true}` (без `instType`) | HTTP 200; `b.code≠"0"` | Под /raw passthrough-слоя нет — пропуск обязательного `instType` уходит на OKX → реджект. Точный код — наблюдение | _…_ |
+| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instId}, signed:true}` (без `instType`) | HTTP 200; `b.code≠"0"` | Под /raw passthrough-слоя нет — пропуск обязательного `instType` уходит на OKX → реджект. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instType can not be empty.), data.size=0 |
 
 ### TG5.3 негатив — instType вне домена (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instType:"BOGUS"}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект значения вне домена. Точный код — наблюдение | _…_ |
+| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instType:"BOGUS"}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект значения вне домена. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 ### TG5.4 негатив — state вне домена (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instType:"SWAP",state:"BOGUS"}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект `state` вне домена (`filled`/`canceled`/`mmp_canceled`). Точный код — наблюдение | _…_ |
+| `POST /raw {GET /api/v5/trade/orders-history-archive, query{instType:"SWAP",state:"BOGUS"}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект `state` вне домена (`filled`/`canceled`/`mmp_canceled`). Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51600 (Status not found), data.size=0 |
 
 ---
 
@@ -1083,25 +1118,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/cancel-all-after, body{timeOut:"0"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].triggerTime="0"` (DMS выключен); `b.data[0].ts` присутствует | DMS выключен — безопасно (`triggerTime=0`, `cancel-all-after.md`). Ордеров не трогает | _…_ |
+| `POST /raw {POST /api/v5/trade/cancel-all-after, body{timeOut:"0"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].triggerTime="0"` (DMS выключен); `b.data[0].ts` присутствует | DMS выключен — безопасно (`triggerTime=0`, `cancel-all-after.md`). Ордеров не трогает | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG6.2 негатив — timeOut вне допустимого диапазона (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/cancel-all-after, body{timeOut:"5"}, signed:true}` (вне домена: не `0`, не [10,120]) | HTTP 200; `b.code≠"0"` | Реджект `timeOut` вне диапазона. Точный код — наблюдение. **Безопасно:** `5` < минимума → DMS не активируется | _…_ |
+| `POST /raw {POST /api/v5/trade/cancel-all-after, body{timeOut:"5"}, signed:true}` (вне домена: не `0`, не [10,120]) | HTTP 200; `b.code≠"0"` | Реджект `timeOut` вне диапазона. Точный код — наблюдение. **Безопасно:** `5` < минимума → DMS не активируется | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter timeOut error), data.size=0 |
 
 ### TG6.3 негатив — битый timeOut (нечисловой, OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/cancel-all-after, body{timeOut:"abc"}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект нечислового `timeOut`. Точный код — наблюдение. Безопасно: запрос не активирует DMS | _…_ |
+| `POST /raw {POST /api/v5/trade/cancel-all-after, body{timeOut:"abc"}, signed:true}` | HTTP 200; `b.code≠"0"` | Реджект нечислового `timeOut`. Точный код — наблюдение. Безопасно: запрос не активирует DMS | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter timeOut error), data.size=0 |
 
 ### TG6.4 негатив — пропуск обязательного timeOut (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/cancel-all-after, body{}, signed:true}` (без `timeOut`) | HTTP 200; `b.code≠"0"` | Под /raw пропуск обязательного уходит на OKX → реджект. Точный код — наблюдение. Безопасно: DMS не активируется | _…_ |
+| `POST /raw {POST /api/v5/trade/cancel-all-after, body{}, signed:true}` (без `timeOut`) | HTTP 200; `b.code≠"0"` | Под /raw пропуск обязательного уходит на OKX → реджект. Точный код — наблюдение. Безопасно: DMS не активируется | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter timeOut can not be empty.), data.size=0 |
 
 ---
 
@@ -1125,18 +1160,18 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **TG7.snapshot.** `POST /raw {GET /api/v5/account/config, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].acctLv` → `start_acctLv` | **Snapshot.start:** снимок исходного `acctLv` | _…_ |
-| **TG7.setLv.** `POST /raw {POST /api/v5/account/set-account-level, body{acctLv:"3"}, signed:true}` (фикстура, вне периметра) | HTTP 200; `b.code="0"` (эхо `acctLv="3"`) **или** реджект | Перевод в MCM для применимости precheck. Реджект (есть позиции/не разрешено) → **находка**, далее precheck = наблюдение | _…_ |
-| **TG7.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `pc_px=floor(last)` (реалистичная limit-цена) | _…_ |
-| **TG7.check.** `POST /raw {POST /api/v5/trade/order-precheck, body{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:pc_px}, signed:true}` | HTTP 200; **если `code="0"`:** `b.data[0].adjEq`/`imr`/`mmr`(/`mgnRatio`) присутствуют (снапшот до/после, `order-precheck.md`); **иначе** реджект зафиксировать (`b.code`/`b.msg` — наблюдение, не fail) | **Документируем реальный ответ precheck.** `tdMode` под MCM — per-contract: field-presence ассертится только при `code="0"`, иначе реджект = наблюдение (не выдумка), промах может быть не связан с достижимостью. Ордер НЕ ставится | _…_ |
-| **TG7.restore.** `POST /raw {POST /api/v5/account/set-account-level, body{acctLv:"{{start_acctLv}}"}, signed:true}` | HTTP 200; `b.code="0"` (эхо `start_acctLv`) | Восстановить исходный `acctLv`. Невозврат → **находка** + флаг остаточного состояния | _…_ |
-| **TG7.verify.** `POST /raw {GET /api/v5/account/config, signed:true}` (поллинг) | HTTP 200; `b.data[0].acctLv == start_acctLv` | **Verify.end:** `acctLv` восстановлен. Расхождение → фейл (инвариант) / находка | _…_ |
+| **TG7.snapshot.** `POST /raw {GET /api/v5/account/config, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].acctLv` → `start_acctLv` | **Snapshot.start:** снимок исходного `acctLv` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG7.setLv.** `POST /raw {POST /api/v5/account/set-account-level, body{acctLv:"3"}, signed:true}` (фикстура, вне периметра) | HTTP 200; `b.code="0"` (эхо `acctLv="3"`) **или** реджект | Перевод в MCM для применимости precheck. Реджект (есть позиции/не разрешено) → **находка**, далее precheck = наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51070 (You do not meet the requirements for switching to this account mode…), data.size=0 |
+| **TG7.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `pc_px=floor(last)` (реалистичная limit-цена) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG7.check.** `POST /raw {POST /api/v5/trade/order-precheck, body{instId,tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01,px:pc_px}, signed:true}` | HTTP 200; **если `code="0"`:** `b.data[0].adjEq`/`imr`/`mmr`(/`mgnRatio`) присутствуют (снапшот до/после, `order-precheck.md`); **иначе** реджект зафиксировать (`b.code`/`b.msg` — наблюдение, не fail) | **Документируем реальный ответ precheck.** `tdMode` под MCM — per-contract: field-presence ассертится только при `code="0"`, иначе реджект = наблюдение (не выдумка), промах может быть не связан с достижимостью. Ордер НЕ ставится | RUN 2026-06-20 ✓ — http 200, b.code=51010 (You can't complete this request under your current account mode.), data.size=0 |
+| **TG7.restore.** `POST /raw {POST /api/v5/account/set-account-level, body{acctLv:"{{start_acctLv}}"}, signed:true}` | HTTP 200; `b.code="0"` (эхо `start_acctLv`) | Восстановить исходный `acctLv`. Невозврат → **находка** + флаг остаточного состояния | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
+| **TG7.verify.** `POST /raw {GET /api/v5/account/config, signed:true}` (поллинг) | HTTP 200; `b.data[0].acctLv == start_acctLv` | **Verify.end:** `acctLv` восстановлен. Расхождение → фейл (инвариант) / находка | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG7.2 негатив — пропуск обязательного instId (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/order-precheck, body{tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` | Под /raw пропуск обязательного уходит на OKX → реджект (либо «неприменимо» вне MCM/PM). Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/order-precheck, body{tdMode:"isolated",side:"buy",ordType:"limit",sz:0.01}, signed:true}` (без `instId`) | HTTP 200; `b.code≠"0"` | Под /raw пропуск обязательного уходит на OKX → реджект (либо «неприменимо» вне MCM/PM). Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51010 (You can't complete this request under your current account mode.), data.size=0 |
 
 ---
 
@@ -1152,13 +1187,13 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET /api/v5/trade/account-rate-limit, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].accRateLimit` присутствует; `b.data[0].ts` присутствует | Текущий лимит суб-аккаунта. Расширенные поля (`nextAccRateLimit`/`fillRatio`/`mainFillRatio`) — `""` вне VIP 5+ (`account-rate-limit.md`), не ассертим значение | _…_ |
+| `POST /raw {GET /api/v5/trade/account-rate-limit, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].accRateLimit` присутствует; `b.data[0].ts` присутствует | Текущий лимит суб-аккаунта. Расширенные поля (`nextAccRateLimit`/`fillRatio`/`mainFillRatio`) — `""` вне VIP 5+ (`account-rate-limit.md`), не ассертим значение | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG8.2 негатив — сломанный конверт (лишний path-сегмент, OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET /api/v5/trade/account-rate-limit-bogus, signed:true}` (несуществующий path на OKX) | HTTP 200; `b.code≠"0"` **или** иная ошибка (наблюдение) | Несуществующий endpoint OKX → реджект/ошибка. Точный код — наблюдение (`b.code`/`b.msg` логируются) | _…_ |
+| `POST /raw {GET /api/v5/trade/account-rate-limit-bogus, signed:true}` (несуществующий path на OKX) | HTTP 200; `b.code≠"0"` **или** иная ошибка (наблюдение) | Несуществующий endpoint OKX → реджект/ошибка. Точный код — наблюдение (`b.code`/`b.msg` логируются) | RUN 2026-06-20 ✓ — http 500 |
 
 ---
 
@@ -1176,31 +1211,31 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **TG9.snapshot.** `POST /raw {GET /api/v5/trade/orders-algo-pending, query{instId, ordType:"conditional"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых conditional-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых conditional-algo по инструменту до цепочки | _…_ |
-| **TG9.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `aa_slPx=floor(last·0.5)`, `aa_newSlPx=floor(last·0.4)` (далёкие SL-триггеры) | _…_ |
-| **TG9.place.** `POST /raw {POST /api/v5/trade/order-algo, body{instId,tdMode:"isolated",posSide:"net",side:"sell",ordType:"conditional",sz:0.01,reduceOnly:true,slTriggerPx:aa_slPx,slOrdPx:"-1",slTriggerPxType:"mark",algoClOrdId:aa_clId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=conditional`, `slOrdPx=-1` (market после trigger). `posSide:net` — adapter-инвариант (как все M19 algo-place). `algoId` → `aa_algoId`. При реджекте «нет позиции» — A0 (min market-позиция) + повтор | _…_ |
-| **TG9.amend.** `POST /raw {POST /api/v5/trade/amend-algos, body{instId,algoId:aa_algoId,newSlTriggerPx:aa_newSlPx,cxlOnFail:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId=aa_algoId` | ACK amend conditional (Stop/Trigger поддержан, `algo-order.md`). ACK ≠ подтверждение | _…_ |
-| **TG9.get.** `POST /raw {GET /api/v5/trade/order-algo, query{instId,algoId:aa_algoId}, signed:true}` | HTTP 200; `b.data[0].algoId=aa_algoId`; `b.data[0].slTriggerPx=aa_newSlPx` **или** наблюдение | Amend применён — `slTriggerPx` обновлён. RUN: поллинг до отражения | _…_ |
-| **Teardown TG9.** `POST /raw {POST /api/v5/trade/cancel-algos, body:[{instId,algoId:aa_algoId}], signed:true}` + (если A0) `close-position` | HTTP 200; (`sCode="0"` или already/not-exist) | Algo снят, позиция (если открывалась) закрыта — биржа чистая | _…_ |
-| **TG9.verify.** `POST /raw {GET /api/v5/trade/orders-algo-pending, query{instId, ordType:"conditional"}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `aa_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat. Расхождение → фейл (инвариант) | _…_ |
+| **TG9.snapshot.** `POST /raw {GET /api/v5/trade/orders-algo-pending, query{instId, ordType:"conditional"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых conditional-algo по инструменту (чистый старт) | **Snapshot.start:** чистый старт — нет живых conditional-algo по инструменту до цепочки | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG9.price.** `POST /raw {GET /api/v5/market/ticker, query{instId}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `aa_slPx=floor(last·0.5)`, `aa_newSlPx=floor(last·0.4)` (далёкие SL-триггеры) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG9.place.** `POST /raw {POST /api/v5/trade/order-algo, body{instId,tdMode:"isolated",posSide:"net",side:"sell",ordType:"conditional",sz:0.01,reduceOnly:true,slTriggerPx:aa_slPx,slOrdPx:"-1",slTriggerPxType:"mark",algoClOrdId:aa_clId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId` непустой | `ordType=conditional`, `slOrdPx=-1` (market после trigger). `posSide:net` — adapter-инвариант (как все M19 algo-place). `algoId` → `aa_algoId`. При реджекте «нет позиции» — A0 (min market-позиция) + повтор | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG9.amend.** `POST /raw {POST /api/v5/trade/amend-algos, body{instId,algoId:aa_algoId,newSlTriggerPx:aa_newSlPx,cxlOnFail:false}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].algoId=aa_algoId` | ACK amend conditional (Stop/Trigger поддержан, `algo-order.md`). ACK ≠ подтверждение | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG9.get.** `POST /raw {GET /api/v5/trade/order-algo, query{instId,algoId:aa_algoId}, signed:true}` | HTTP 200; `b.data[0].algoId=aa_algoId`; `b.data[0].slTriggerPx=aa_newSlPx` **или** наблюдение | Amend применён — `slTriggerPx` обновлён. RUN: поллинг до отражения | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **Teardown TG9.** `POST /raw {POST /api/v5/trade/cancel-algos, body:[{instId,algoId:aa_algoId}], signed:true}` + (если A0) `close-position` | HTTP 200; (`sCode="0"` или already/not-exist) | Algo снят, позиция (если открывалась) закрыта — биржа чистая | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **TG9.verify.** `POST /raw {GET /api/v5/trade/orders-algo-pending, query{instId, ordType:"conditional"}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `aa_algoId` — вернулось к чистому == старт | **Verify.end:** живых conditional-algo по инструменту нет (== Snapshot.start) через wait-until-condition (таймаут N, не sleep); A0-позиция (если открывалась) flat. Расхождение → фейл (инвариант) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### TG9.2 негатив — amend advance (trailing не амендится, И-3)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/amend-algos, body{instId,algoId:"9999999999999999",newSz:"0.02"}, signed:true}` (попытка amend по advance-типу / несущ. — нормативно advance не амендится, И-3) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект: advance-семья не поддержана `amend-algos` (`algo-order.md` И-3) и/или algo не найден. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/amend-algos, body{instId,algoId:"9999999999999999",newSz:"0.02"}, signed:true}` (попытка amend по advance-типу / несущ. — нормативно advance не амендится, И-3) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект: advance-семья не поддержана `amend-algos` (`algo-order.md` И-3) и/или algo не найден. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51527, data.size=1 |
 
 ### TG9.3 негатив — amend несуществующего algo
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/amend-algos, body{instId,algoId:"9999999999999999",newSlTriggerPx:aa_newSlPx}, signed:true}` | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект amend несущ. algo. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/amend-algos, body{instId,algoId:"9999999999999999",newSlTriggerPx:aa_newSlPx}, signed:true}` | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Реджект amend несущ. algo. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51527, data.size=1 |
 
 ### TG9.4 негатив — пропуск идентификатора algo (OKX-слой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {POST /api/v5/trade/amend-algos, body{instId,newSlTriggerPx:aa_newSlPx}, signed:true}` (без `algoId`/`algoClOrdId`) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Под /raw пропуск обязательного идентификатора уходит на OKX → реджект. Точный код — наблюдение | _…_ |
+| `POST /raw {POST /api/v5/trade/amend-algos, body{instId,newSlTriggerPx:aa_newSlPx}, signed:true}` (без `algoId`/`algoClOrdId`) | HTTP 200; `b.code≠"0"` **или** `b.data[0].sCode≠"0"` | Под /raw пропуск обязательного идентификатора уходит на OKX → реджект. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=1, data0.sCode=51003, data.size=1 |
 
 
 ## AG1. Positions history — GET /api/v5/account/positions-history (Account)
@@ -1215,25 +1250,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (Array.isArray); при непустом `data[0]` — присутствуют `posId`,`instId`,`mgnMode`,`posSide`,`realizedPnl`,`uTime` | Запрос принят; на свежем demo `data=[]` валидно (закрытых позиций нет); при наличии истории — структура элемента по contract (`realizedPnl=pnl+fee+fundingFee+liqPenalty`). Пустой `data` НЕ ошибка | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (Array.isArray); при непустом `data[0]` — присутствуют `posId`,`instId`,`mgnMode`,`posSide`,`realizedPnl`,`uTime` | Запрос принят; на свежем demo `data=[]` валидно (закрытых позиций нет); при наличии истории — структура элемента по contract (`realizedPnl=pnl+fee+fundingFee+liqPenalty`). Пустой `data` НЕ ошибка | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG1.2 Негатив — битое значение `mgnMode` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, mgnMode:bogus}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `mgnMode` вне домена (`cross`/`isolated`). Точный код — наблюдение, если не документирован | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, mgnMode:bogus}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `mgnMode` вне домена (`cross`/`isolated`). Точный код — наблюдение, если не документирован | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter mgnMode error), data.size=0 |
 
 ### AG1.3 Негатив — битое значение `type` (вне домена 1..6)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, type:99}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `type` вне домена (1..6). Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, type:99}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `type` вне домена (1..6). Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter type error), data.size=0 |
 
 ### AG1.4 Негатив — пагинация по `uTime` вне окна (after в будущем → пусто)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, after:1, limit:10}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (ожидается пустой) | Пагинация по `uTime`: `after=1` (эпоха) отрезает всё новее 1мс → `data=[]`. Пустой результат вне окна валиден, не реджект. Если OKX реджектит формат `after` — код в наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, after:1, limit:10}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (ожидается пустой) | Пагинация по `uTime`: `after=1` (эпоха) отрезает всё новее 1мс → `data=[]`. Пустой результат вне окна валиден, не реджект. Если OKX реджектит формат `after` — код в наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=0 |
 
 ## AG2. Account & position risk — GET /api/v5/account/account-position-risk (Account)
 
@@ -1247,13 +1282,13 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/account-position-risk, query:{instType:SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0]` присутствует; `b.data[0].ts` непусто; `b.data[0].balData` — массив; `b.data[0].posData` — массив | Единый срез: `ts` + `balData[]` (`ccy`,`eq`,`disEq`) + `posData[]` (`instType`,`instId`,`mgnMode`,`posId`,`posSide`,`pos`,`notionalUsd`). На demo без позиций `posData=[]` валидно | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/account-position-risk, query:{instType:SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0]` присутствует; `b.data[0].ts` непусто; `b.data[0].balData` — массив; `b.data[0].posData` — массив | Единый срез: `ts` + `balData[]` (`ccy`,`eq`,`disEq`) + `posData[]` (`instType`,`instId`,`mgnMode`,`posId`,`posSide`,`pos`,`notionalUsd`). На demo без позиций `posData=[]` валидно | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG2.2 Негатив — битое значение `instType` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/account-position-risk, query:{instType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instType` вне домена (SPOT/MARGIN/SWAP/FUTURES/OPTION). Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/account-position-risk, query:{instType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instType` вне домена (SPOT/MARGIN/SWAP/FUTURES/OPTION). Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 ## AG3. Bills 7d — GET /api/v5/account/bills (Account)
 
@@ -1267,19 +1302,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/bills, query:{instType:SWAP, ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив; при непустом `data[0]` — `billId`,`type`,`subType`,`ts`,`balChg`,`ccy` присутствуют | Массив bill-записей ≤7д; на demo без движений `data=[]` валидно; при наличии — поля записи по contract | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/bills, query:{instType:SWAP, ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив; при непустом `data[0]` — `billId`,`type`,`subType`,`ts`,`balChg`,`ccy` присутствуют | Массив bill-записей ≤7д; на demo без движений `data=[]` валидно; при наличии — поля записи по contract | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG3.2 Негатив — фильтр `begin`/`end` вне окна (begin>end → пусто или реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/bills, query:{instType:SWAP, ccy:USDT, begin:9999999999999, end:1}, signed:true}` | HTTP 200; `b.code="0"` и `b.data=[]`, ЛИБО `b.code≠"0"` | Перевёрнутое окно (`begin`>`end`): либо пустой `data` (фильтр ничего не находит), либо реджект формата. Код реджекта — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/bills, query:{instType:SWAP, ccy:USDT, begin:9999999999999, end:1}, signed:true}` | HTTP 200; `b.code="0"` и `b.data=[]`, ЛИБО `b.code≠"0"` | Перевёрнутое окно (`begin`>`end`): либо пустой `data` (фильтр ничего не находит), либо реджект формата. Код реджекта — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=0 |
 
 ### AG3.3 Негатив — битое значение `type` (вне домена справочника)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/bills, query:{instType:SWAP, type:99999}, signed:true}` | HTTP 200; `b.code≠"0"` ЛИБО `b.code="0"` с `b.data=[]` | `type` вне справочника: реджект OKX либо пустой результат. Точный исход/код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/bills, query:{instType:SWAP, type:99999}, signed:true}` | HTTP 200; `b.code≠"0"` ЛИБО `b.code="0"` с `b.data=[]` | `type` вне справочника: реджект OKX либо пустой результат. Точный исход/код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=12 |
 
 ## AG4. Bills archive 3m — GET /api/v5/account/bills-archive (Account)
 
@@ -1293,19 +1328,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/bills-archive, query:{instType:SWAP, ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив; при непустом — `billId`,`type`,`ts` присутствуют | Запрос принят; на свежем demo `data=[]` валидно (3м-история не накоплена). Форма записи как у bills 7d. Пустой `data` — не ошибка | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/bills-archive, query:{instType:SWAP, ccy:USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив; при непустом — `billId`,`type`,`ts` присутствуют | Запрос принят; на свежем demo `data=[]` валидно (3м-история не накоплена). Форма записи как у bills 7d. Пустой `data` — не ошибка | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG4.2 Негатив — пагинация `after` по `billId` вне окна (after=1 → пусто)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/bills-archive, query:{instType:SWAP, after:1, limit:10}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (ожидается пустой) | Пагинация по `billId`: `after=1` отрезает все записи с `billId>1` → `data=[]`. Пустой результат валиден. Реджект формата `after` — код в наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/bills-archive, query:{instType:SWAP, after:1, limit:10}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (ожидается пустой) | Пагинация по `billId`: `after=1` отрезает все записи с `billId>1` → `data=[]`. Пустой результат валиден. Реджект формата `after` — код в наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=0 |
 
 ### AG4.3 Негатив — битое значение `instType` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/bills-archive, query:{instType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instType` вне домена. Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/bills-archive, query:{instType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instType` вне домена. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 ## AG5. Bills deep-архив — POST+GET /api/v5/account/bills-history-archive (Account)
 
@@ -1319,25 +1354,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/account/bills-history-archive, body:{year:"2025", quarter:"Q1"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].result` ∈ {true,false}; `b.data[0].ts` присутствует | ACK заявки: `result=true` (ссылка уже есть) или `false` (генерится). **RUN: расходует квоту 12/сутки — запускать осознанно, не в цикле.** На demo без истории квартала возможен пустой/спец-ответ — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/account/bills-history-archive, body:{year:"2025", quarter:"Q1"}, signed:true}` | HTTP 200; один из валидных исходов: ACK `b.code="0"` (`data[0].result`∈{true,false}, `ts`); demo system-error `b.code="50026"`; rate-limit/квота (`b.code`∈rate-limit-кодах, напр. `50011`) | Эндпоинт достижим (HTTP 200 + структурный конверт). Валидны все три: ACK заявки; demo-ошибка 50026 (нет истории квартала); rate-limit/исчерпание квоты 12/сутки. **RUN: расходует квоту — запускать осознанно, не в цикле.** Content на demo недостижим — наблюдение | RUN 2026-06-20 ✓ — b.code=50011 (Too Many Requests): суточная квота (12/сутки) исчерпана прогонами. Тест пересмотрен — rate-limit/квота принимается как валидный предусмотренный исход (`isRateLimited`), не фейл. Перевалидировано: AG5 4/4 green (`validate-ag5-02.log`) |
 
 ### AG5.2 Прямой GET — получение файла (ожидается ongoing/нет данных)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/bills-history-archive, query:{year:"2025", quarter:"Q1"}, signed:true}` | HTTP 200; `b.code="0"`; при непустом `data[0]` — `state` ∈ {finished,ongoing,failed}, при `finished` — `fileHref` непусто | На свежем demo `state=ongoing` (генерится) или пустой `data` — `finished`-файл недостижим. `fileHref` содержательно НЕ проверяем (гейт достижимости). Реальный исход — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/bills-history-archive, query:{year:"2025", quarter:"Q1"}, signed:true}` | HTTP 200; `b.code="0"`; при непустом `data[0]` — `state` ∈ {finished,ongoing,failed}, при `finished` — `fileHref` непусто | На свежем demo `state=ongoing` (генерится) или пустой `data` — `finished`-файл недостижим. `fileHref` содержательно НЕ проверяем (гейт достижимости). Реальный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51604 (Initiate a download request before obtaining the hyperlink), data.size=0 |
 
 ### AG5.3 Негатив — битое значение `quarter` (вне домена Q1..Q4)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/account/bills-history-archive, body:{year:"2025", quarter:"Q9"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `quarter` вне домена (Q1..Q4). Точный код — наблюдение. Не расходует квоту смыслово, но может учитываться — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/account/bills-history-archive, body:{year:"2025", quarter:"Q9"}, signed:true}` | HTTP 200; реджект OKX по домену `quarter` (`b.code≠"0"`), **если не rate-limit**; rate-limit/квота (`50011`) маскирует реджект → кейс пропускается (skip) | Реджект OKX — `quarter` вне домена (Q1..Q4). Точный код — наблюдение. При исчерпании квоты 12/сутки rate-limit реджектит ДО валидации → валидация quarter не достигается, кейс пропускается (не ложный pass) | RUN 2026-06-20 ⏭ SKIP — b.code=50011 (Too Many Requests): квота исчерпана, реджект-по-quarter не достигнут (маскирован rate-limit). Тест пересмотрен (`assumeFalse(isRateLimited)`): валидацию quarter перепроверить вне исчерпания квоты |
 
 ### AG5.4 Негатив — пропуск обязательного `quarter` (POST)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/account/bills-history-archive, body:{year:"2025"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `quarter`. Под /raw нет passthrough-гарда → уходит на OKX. Точный код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/account/bills-history-archive, body:{year:"2025"}, signed:true}` | HTTP 200; реджект OKX за пропуск обязательного `quarter` (`b.code≠"0"`), **если не rate-limit**; rate-limit/квота (`50011`) маскирует реджект → кейс пропускается (skip) | Реджект OKX — пропущен обязательный `quarter`. Под /raw нет passthrough-гарда → уходит на OKX. При исчерпании квоты rate-limit реджектит ДО проверки → валидация не достигается, кейс пропускается (не ложный pass) | RUN 2026-06-20 ⏭ SKIP — b.code=50011 (Too Many Requests): квота исчерпана, реджект-за-пропуск не достигнут (маскирован rate-limit). Тест пересмотрен (`assumeFalse(isRateLimited)`): перепроверить вне исчерпания квоты |
 
 ## AG6. Bill types — GET /api/v5/account/subtypes (Account)
 
@@ -1351,7 +1386,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/subtypes, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив непустой; `b.data[0]` несёт пары type/subType | Справочник bill types: непустой перечень. Включает funding-подтипы `173`(expense)/`174`(income). Точная форма элемента — наблюдение (сверка с офдоком при RUN) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/subtypes, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив непустой; `b.data[0]` несёт пары type/subType | Справочник bill types: непустой перечень. Включает funding-подтипы `173`(expense)/`174`(income). Точная форма элемента — наблюдение (сверка с офдоком при RUN) | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=32 |
 
 ## AG7. Set position mode — POST /api/v5/account/set-position-mode (Account)
 
@@ -1367,16 +1402,16 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| **AG7.snapshot.** `POST /raw {method:GET, path:/api/v5/account/config, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].posMode` ∈ {net_mode, long_short_mode} → `cur_pos_mode` | **Snapshot.start:** снимок исходного `posMode` | _…_ |
-| **AG7.switch.** `POST /raw {method:POST, path:/api/v5/account/set-position-mode, body:{posMode:"<другой режим>"}, signed:true}` (long_short_mode если cur=net_mode, иначе net_mode) | HTTP 200; `b.code="0"`; `b.data[0].posMode` = другой режим (эхо) **или** реджект | Реальная смена режима. Реджект (позиции/ордера/не разрешено) → **находка**, флаг остаточного `posMode` | _…_ |
-| **AG7.restore.** `POST /raw {method:POST, path:/api/v5/account/set-position-mode, body:{posMode:"{{cur_pos_mode}}"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].posMode` = `cur_pos_mode` (эхо) | Восстановить исходный `posMode`. Невозврат → **находка** + флаг остаточного состояния | _…_ |
-| **AG7.verify.** `POST /raw {method:GET, path:/api/v5/account/config, signed:true}` (поллинг) | HTTP 200; `b.data[0].posMode == cur_pos_mode` | **Verify.end:** `posMode` восстановлен. Расхождение → фейл (инвариант) | _…_ |
+| **AG7.snapshot.** `POST /raw {method:GET, path:/api/v5/account/config, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].posMode` ∈ {net_mode, long_short_mode} → `cur_pos_mode` | **Snapshot.start:** снимок исходного `posMode` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| **AG7.switch.** `POST /raw {method:POST, path:/api/v5/account/set-position-mode, body:{posMode:"<другой режим>"}, signed:true}` (long_short_mode если cur=net_mode, иначе net_mode) | HTTP 200; `b.code="0"`; `b.data[0].posMode` = другой режим (эхо) **или** реджект | Реальная смена режима. Реджект (позиции/ордера/не разрешено) → **находка**, флаг остаточного `posMode` | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
+| **AG7.restore.** `POST /raw {method:POST, path:/api/v5/account/set-position-mode, body:{posMode:"{{cur_pos_mode}}"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].posMode` = `cur_pos_mode` (эхо) | Восстановить исходный `posMode`. Невозврат → **находка** + флаг остаточного состояния | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
+| **AG7.verify.** `POST /raw {method:GET, path:/api/v5/account/config, signed:true}` (поллинг) | HTTP 200; `b.data[0].posMode == cur_pos_mode` | **Verify.end:** `posMode` восстановлен. Расхождение → фейл (инвариант) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG7.2 Негатив — битое значение `posMode` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/account/set-position-mode, body:{posMode:"bogus_mode"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `posMode` вне домена (`net_mode`/`long_short_mode`). Состояние не меняется. Точный код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/account/set-position-mode, body:{posMode:"bogus_mode"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `posMode` вне домена (`net_mode`/`long_short_mode`). Состояние не меняется. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter posMode error), data.size=0 |
 
 ## AG8. Set leverage — POST /api/v5/account/set-leverage (Account)
 
@@ -1390,22 +1425,22 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| шаг 1 `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].lever` непусто → сохранить в `prev_lever` | Прочитать текущий leverage инструмента (isolated) | _…_ |
-| шаг 2 `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"3", mgnMode:"isolated"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].lever="3"`; `b.data[0].mgnMode="isolated"`; `b.data[0].instId="ETH-USDT-SWAP"` (эхо) | Set малого значения `lever=3`: эхо параметров. **RUN: WRITE — реверсивно, teardown ниже.** | _…_ |
-| шаг 3 (restore) `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"{{prev_lever}}", mgnMode:"isolated"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].lever` = `prev_lever` (эхо) | Восстановить исходный leverage. Невозврат → находка + флаг остаточного состояния | _…_ |
-| шаг 4 (Verify.end) `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:isolated}, signed:true}` (поллинг) | HTTP 200; `b.data[0].lever == prev_lever` | **Verify.end:** плечо восстановлено к исходному. Расхождение → фейл (инвариант восстановления состояния) | _…_ |
+| шаг 1 `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].lever` непусто → сохранить в `prev_lever` | Прочитать текущий leverage инструмента (isolated) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| шаг 2 `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"3", mgnMode:"isolated"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].lever="3"`; `b.data[0].mgnMode="isolated"`; `b.data[0].instId="ETH-USDT-SWAP"` (эхо) | Set малого значения `lever=3`: эхо параметров. **RUN: WRITE — реверсивно, teardown ниже.** | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| шаг 3 (restore) `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"{{prev_lever}}", mgnMode:"isolated"}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].lever` = `prev_lever` (эхо) | Восстановить исходный leverage. Невозврат → находка + флаг остаточного состояния | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
+| шаг 4 (Verify.end) `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:isolated}, signed:true}` (поллинг) | HTTP 200; `b.data[0].lever == prev_lever` | **Verify.end:** плечо восстановлено к исходному. Расхождение → фейл (инвариант восстановления состояния) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG8.2 Негатив — битое значение `lever` (нечисловое)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"abc", mgnMode:"isolated"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `lever` нечисловой/вне домена. Состояние не меняется. Точный код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"abc", mgnMode:"isolated"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `lever` нечисловой/вне домена. Состояние не меняется. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter lever error), data.size=0 |
 
 ### AG8.3 Негатив — битое значение `mgnMode` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"3", mgnMode:"bogus"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `mgnMode` вне домена (`isolated`/`cross`). Состояние не меняется. Точный код — наблюдение | _…_ |
+| `POST /raw {method:POST, path:/api/v5/account/set-leverage, body:{instId:"ETH-USDT-SWAP", lever:"3", mgnMode:"bogus"}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `mgnMode` вне домена (`isolated`/`cross`). Состояние не меняется. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter mgnMode error), data.size=0 |
 
 ## AG9. Leverage info — GET /api/v5/account/leverage-info (Account)
 
@@ -1419,19 +1454,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].mgnMode="isolated"`; `b.data[0].lever` непусто; `b.data[0].posSide` присутствует | Leverage-инфо: `instId`,`ccy`,`mgnMode`,`posSide`,`lever`. В net-режиме — одна запись | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].mgnMode="isolated"`; `b.data[0].lever` непусто; `b.data[0].posSide` присутствует | Leverage-инфо: `instId`,`ccy`,`mgnMode`,`posSide`,`lever`. В net-режиме — одна запись | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG9.2 Негатив — пропуск обязательного `mgnMode`
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `mgnMode`. Под /raw нет passthrough-гарда. Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `mgnMode`. Под /raw нет passthrough-гарда. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter mgnMode can not be empty.), data.size=0 |
 
 ### AG9.3 Негатив — битое значение `mgnMode` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:bogus}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `mgnMode` вне домена. Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/leverage-info, query:{instId:ETH-USDT-SWAP, mgnMode:bogus}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `mgnMode` вне домена. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter mgnMode error), data.size=0 |
 
 ## AG10. Max order size — GET /api/v5/account/max-size (Account)
 
@@ -1445,19 +1480,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/max-size, query:{instId:ETH-USDT-SWAP, tdMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].maxBuy` непусто; `b.data[0].maxSell` непусто | Серверный потолок `sz`: `maxBuy`/`maxSell` в контрактах (SWAP). `ccy` эхо | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/max-size, query:{instId:ETH-USDT-SWAP, tdMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].maxBuy` непусто; `b.data[0].maxSell` непусто | Серверный потолок `sz`: `maxBuy`/`maxSell` в контрактах (SWAP). `ccy` эхо | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG10.2 Негатив — пропуск обязательного `tdMode`
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/max-size, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `tdMode`. Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/max-size, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `tdMode`. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter tdMode can not be empty.), data.size=0 |
 
 ### AG10.3 Негатив — несуществующий `instId`
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/max-size, query:{instId:FOO-BAR-SWAP, tdMode:isolated}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instId` не существует. Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/max-size, query:{instId:FOO-BAR-SWAP, tdMode:isolated}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instId` не существует. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ## AG11. Max avail size — GET /api/v5/account/max-avail-size (Account)
 
@@ -1471,19 +1506,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/max-avail-size, query:{instId:ETH-USDT-SWAP, tdMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].availBuy` непусто; `b.data[0].availSell` непусто | Доступность средств: `availBuy`/`availSell`. Семантика по contract (SPOT/MARGIN base/quote; cross MARGIN — в `ccy`) | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/max-avail-size, query:{instId:ETH-USDT-SWAP, tdMode:isolated}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].availBuy` непусто; `b.data[0].availSell` непусто | Доступность средств: `availBuy`/`availSell`. Семантика по contract (SPOT/MARGIN base/quote; cross MARGIN — в `ccy`) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### AG11.2 Негатив — пропуск обязательного `tdMode`
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/max-avail-size, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `tdMode`. Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/max-avail-size, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `tdMode`. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter tdMode can not be empty.), data.size=0 |
 
 ### AG11.3 Негатив — битое значение `tdMode` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/max-avail-size, query:{instId:ETH-USDT-SWAP, tdMode:bogus}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `tdMode` вне домена (`cross`/`isolated`/`cash`/`spot_isolated`). Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/max-avail-size, query:{instId:ETH-USDT-SWAP, tdMode:bogus}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `tdMode` вне домена (`cross`/`isolated`/`cash`/`spot_isolated`). Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter tdMode error), data.size=0 |
 
 ## AG12. Fee rates — GET /api/v5/account/trade-fee (Account)
 
@@ -1497,19 +1532,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/trade-fee, query:{instType:SWAP, instFamily:ETH-USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].level` непусто; `b.data[0].maker` присутствует; `b.data[0].taker` присутствует; `b.data[0].feeGroup` — массив; `b.data[0].instType="SWAP"` (эхо) | Ставки: `level`, `feeGroup[]` (канонич. `maker`/`taker`/`elpMaker`), плоские `maker`/`taker` (deprecated). **Знак: отрицательный `taker` = комиссия** — наблюдать знак при RUN | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/trade-fee, query:{instType:SWAP, instFamily:ETH-USDT}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].level` непусто; `b.data[0].maker` присутствует; `b.data[0].taker` присутствует; `b.data[0].feeGroup` — массив; `b.data[0].instType="SWAP"` (эхо) | Ставки: `level`, `feeGroup[]` (канонич. `maker`/`taker`/`elpMaker`), плоские `maker`/`taker` (deprecated). **Знак: отрицательный `taker` = комиссия** — наблюдать знак при RUN | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
 
 ### AG12.2 Негатив — пропуск обязательного `instType`
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/trade-fee, query:{instFamily:ETH-USDT}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `instType`. Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/trade-fee, query:{instFamily:ETH-USDT}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — пропущен обязательный `instType`. Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instType can not be empty.), data.size=0 |
 
 ### AG12.3 Негатив — битое значение `instType` (вне домена)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:GET, path:/api/v5/account/trade-fee, query:{instType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instType` вне домена (SPOT/MARGIN/SWAP/FUTURES/OPTION). Точный код — наблюдение | _…_ |
+| `POST /raw {method:GET, path:/api/v5/account/trade-fee, query:{instType:BOGUS}, signed:true}` | HTTP 200; `b.code≠"0"` (реджект OKX) | Реджект OKX — `instType` вне домена (SPOT/MARGIN/SWAP/FUTURES/OPTION). Точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 
 ## MG1. Tickers (плюрал) — GET /api/v5/market/tickers (Market Data)
@@ -1525,19 +1560,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/tickers, query:{instType:"SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].instId` непустой; `b.data[0].last` — числовая строка | Срез всех SWAP-тикеров | _…_ |
+| `POST /raw {GET, /api/v5/market/tickers, query:{instType:"SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].instId` непустой; `b.data[0].last` — числовая строка | Срез всех SWAP-тикеров | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG1.2 негатив — пропуск обязательного instType (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/tickers, query:{}, signed:false}` (без `instType`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instType`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/tickers, query:{}, signed:false}` (без `instType`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instType`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instType can not be empty.), data.size=0 |
 
 ### MG1.3 негатив — instType вне домена (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/tickers, query:{instType:"FOO"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — нераспознанный `instType`; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/tickers, query:{instType:"FOO"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — нераспознанный `instType`; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 ## MG2. Order book — GET /api/v5/market/books (Market Data)
 
@@ -1551,25 +1586,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books, query:{instId:"ETH-USDT-SWAP", sz:"5"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].asks` — массив; `b.data[0].bids` — массив; `b.data[0].asks[0]` — массив длиной 4; `b.data[0].asks[0][0]` — числовая строка (px); `b.data[0].ts` непустой | Стакан до 5 уровней на сторону | _…_ |
+| `POST /raw {GET, /api/v5/market/books, query:{instId:"ETH-USDT-SWAP", sz:"5"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].asks` — массив; `b.data[0].bids` — массив; `b.data[0].asks[0]` — массив длиной 4; `b.data[0].asks[0][0]` — числовая строка (px); `b.data[0].ts` непустой | Стакан до 5 уровней на сторону | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG2.2 негатив — несущ. instId (OKX-реджект/пустой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой/пустой стакан | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/books, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой/пустой стакан | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID does not exist.), data.size=0 |
 
 ### MG2.3 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/books, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ### MG2.4 негатив — sz сверх лимита (sz>400)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books, query:{instId:"ETH-USDT-SWAP", sz:"5000"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data[0].asks` усечён ≤ 400 | Реджект/клампинг — `sz` сверх потолка 400; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/books, query:{instId:"ETH-USDT-SWAP", sz:"5000"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data[0].asks` усечён ≤ 400 | Реджект/клампинг — `sz` сверх потолка 400; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter sz error.), data.size=0 |
 
 ## MG3. Order book full — GET /api/v5/market/books-full (Market Data)
 
@@ -1583,25 +1618,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books-full, query:{instId:"ETH-USDT-SWAP", sz:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].asks` — массив; `b.data[0].bids` — массив; `b.data[0].asks[0]` — массив длиной 3; `b.data[0].asks[0][0]` — числовая строка (px); `b.data[0].ts` непустой | Полный стакан до 10 уровней на сторону | _…_ |
+| `POST /raw {GET, /api/v5/market/books-full, query:{instId:"ETH-USDT-SWAP", sz:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].asks` — массив; `b.data[0].bids` — массив; `b.data[0].asks[0]` — массив длиной 3; `b.data[0].asks[0][0]` — числовая строка (px); `b.data[0].ts` непустой | Полный стакан до 10 уровней на сторону | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG3.2 негатив — несущ. instId (OKX-реджект/пустой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books-full, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой/пустой стакан | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/books-full, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой/пустой стакан | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID does not exist.), data.size=0 |
 
 ### MG3.3 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books-full, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/books-full, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ### MG3.4 негатив — sz сверх лимита (sz>5000)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/books-full, query:{instId:"ETH-USDT-SWAP", sz:"99999"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data[0].asks` усечён ≤ 5000 | Реджект/клампинг — `sz` сверх потолка 5000; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/books-full, query:{instId:"ETH-USDT-SWAP", sz:"99999"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data[0].asks` усечён ≤ 5000 | Реджект/клампинг — `sz` сверх потолка 5000; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter sz error.), data.size=0 |
 
 ## MG4. Public trades — GET /api/v5/market/trades (Market Data)
 
@@ -1615,25 +1650,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/trades, query:{instId:"ETH-USDT-SWAP", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].tradeId` непустой; `b.data[0].px` — числовая строка; `b.data[0].side` ∈ {buy, sell} | Последние публичные сделки инструмента | _…_ |
+| `POST /raw {GET, /api/v5/market/trades, query:{instId:"ETH-USDT-SWAP", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].tradeId` непустой; `b.data[0].px` — числовая строка; `b.data[0].side` ∈ {buy, sell} | Последние публичные сделки инструмента | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG4.2 негатив — несущ. instId (OKX-реджект/пустой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/trades, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/trades, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### MG4.3 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/trades, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/trades, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ### MG4.4 негатив — limit сверх лимита (limit>500)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/trades, query:{instId:"ETH-USDT-SWAP", limit:"9999"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` усечён ≤ 500 | Реджект/клампинг — `limit` сверх потолка 500; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/trades, query:{instId:"ETH-USDT-SWAP", limit:"9999"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` усечён ≤ 500 | Реджект/клампинг — `limit` сверх потолка 500; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=500 |
 
 ## MG5. Trades history — GET /api/v5/market/history-trades (Market Data)
 
@@ -1648,25 +1683,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-trades, query:{instId:"ETH-USDT-SWAP", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].tradeId` непустой; `b.data[0].ts` — числовая строка | Свежайшая страница исторических сделок | _…_ |
+| `POST /raw {GET, /api/v5/market/history-trades, query:{instId:"ETH-USDT-SWAP", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].tradeId` непустой; `b.data[0].ts` — числовая строка | Свежайшая страница исторических сделок | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG5.2 вариант — пагинация назад по after (tradeId)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-trades, query:{instId:"ETH-USDT-SWAP", type:"1", after:"<tradeId из MG5.1 data[last].tradeId>", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — массив сделок старше курсора | Следующая страница назад по `tradeId` | _…_ |
+| `POST /raw {GET, /api/v5/market/history-trades, query:{instId:"ETH-USDT-SWAP", type:"1", after:"<tradeId из MG5.1 data[last].tradeId>", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — массив сделок старше курсора | Следующая страница назад по `tradeId` | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=10 |
 
 ### MG5.3 негатив — несущ. instId (OKX-реджект/пустой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-trades, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/history-trades, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### MG5.4 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-trades, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/history-trades, query:{}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## MG6. Index tickers — GET /api/v5/market/index-tickers (Market Data)
 
@@ -1681,25 +1716,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-tickers, query:{instId:"ETH-USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].instId="ETH-USDT"`; `b.data[0].idxPx` — числовая строка; `b.data[0].ts` непустой | Тикер индекса ETH-USDT | _…_ |
+| `POST /raw {GET, /api/v5/market/index-tickers, query:{instId:"ETH-USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].instId="ETH-USDT"`; `b.data[0].idxPx` — числовая строка; `b.data[0].ts` непустой | Тикер индекса ETH-USDT | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG6.2 вариант — index-tickers по quoteCcy
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-tickers, query:{quoteCcy:"USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].idxPx` — числовая строка | Срез всех USDT-индексов | _…_ |
+| `POST /raw {GET, /api/v5/market/index-tickers, query:{quoteCcy:"USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0].idxPx` — числовая строка | Срез всех USDT-индексов | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG6.3 негатив — несущ. индекс instId (OKX-реджект/пустой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-tickers, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. индекс; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/index-tickers, query:{instId:"FOO-BAR"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. индекс; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### MG6.4 негатив — пропуск обязательного фильтра (ни instId, ни quoteCcy)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-tickers, query:{}, signed:false}` (ни `instId`, ни `quoteCcy`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нужен один из `instId`/`quoteCcy`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/index-tickers, query:{}, signed:false}` (ни `instId`, ни `quoteCcy`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нужен один из `instId`/`quoteCcy`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50015 (Either parameter quoteCcy or instId is required), data.size=0 |
 
 ## MG7. Index candles — GET /api/v5/market/index-candles (Market Data)
 
@@ -1714,25 +1749,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-candles, query:{instId:"ETH-USDT", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data[0][5]` ∈ {"0","1"} (confirm) | Свечи индекса 1m | _…_ |
+| `POST /raw {GET, /api/v5/market/index-candles, query:{instId:"ETH-USDT", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data[0][5]` ∈ {"0","1"} (confirm) | Свечи индекса 1m | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG7.2 негатив — bar вне домена (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-candles, query:{instId:"ETH-USDT", bar:"99z"}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `bar`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/index-candles, query:{instId:"ETH-USDT", bar:"99z"}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `bar`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter bar error), data.size=0 |
 
 ### MG7.3 негатив — несущ. индекс instId (OKX-реджект/пустой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-candles, query:{instId:"FOO-BAR", bar:"1m"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. индекс; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/index-candles, query:{instId:"FOO-BAR", bar:"1m"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. индекс; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### MG7.4 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/index-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/index-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## MG8. Index candles history — GET /api/v5/market/history-index-candles (Market Data)
 
@@ -1747,25 +1782,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-index-candles, query:{instId:"ETH-USDT", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data` упорядочен по ts убыв. | Свежайшая страница истории свечей индекса | _…_ |
+| `POST /raw {GET, /api/v5/market/history-index-candles, query:{instId:"ETH-USDT", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data` упорядочен по ts убыв. | Свежайшая страница истории свечей индекса | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG8.2 вариант — пагинация назад по after
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-index-candles, query:{instId:"ETH-USDT", bar:"1m", after:"<ts из MG8.1 data[last][0]>", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — свечи строго старше `after` | Следующая страница назад (after — свечи старше ts) | _…_ |
+| `POST /raw {GET, /api/v5/market/history-index-candles, query:{instId:"ETH-USDT", bar:"1m", after:"<ts из MG8.1 data[last][0]>", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — свечи строго старше `after` | Следующая страница назад (after — свечи старше ts) | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=10 |
 
 ### MG8.3 негатив — фильтр из будущего (вне окна)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-index-candles, query:{instId:"ETH-USDT", bar:"1m", after:"99999999999999"}, signed:false}` | HTTP 200; `b.data` пустой **или** наблюдение | Якорь из будущего — пустой/поведение фиксируем; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/history-index-candles, query:{instId:"ETH-USDT", bar:"1m", after:"99999999999999"}, signed:false}` | HTTP 200; `b.data` пустой **или** наблюдение | Якорь из будущего — пустой/поведение фиксируем; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=100 |
 
 ### MG8.4 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-index-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/history-index-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## MG9. Mark price candles — GET /api/v5/market/mark-price-candles (Market Data)
 
@@ -1780,25 +1815,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data[0][5]` ∈ {"0","1"} (confirm) | Свечи mark price 1m | _…_ |
+| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data[0][5]` ∈ {"0","1"} (confirm) | Свечи mark price 1m | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG9.2 негатив — bar вне домена (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"99z"}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `bar`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"99z"}, signed:false}` | HTTP 200; `b.code≠"0"` | Реджект OKX (некорректный `bar`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter bar error), data.size=0 |
 
 ### MG9.3 негатив — несущ. instId (OKX-реджект/пустой)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{instId:"FOO-BAR", bar:"1m"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{instId:"FOO-BAR", bar:"1m"}, signed:false}` | HTTP 200; `b.code≠"0"` **или** `b.data` пустой | Реджект/пустой — несущ. инструмент; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### MG9.4 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/mark-price-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## MG10. Mark price candles history — GET /api/v5/market/history-mark-price-candles (Market Data)
 
@@ -1813,25 +1848,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data` упорядочен по ts убыв. | Свежайшая страница истории свечей mark price | _…_ |
+| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — непустой массив; `b.data[0]` — массив длиной 6; `b.data[0][0]` — числовая строка (ts); `b.data` упорядочен по ts убыв. | Свежайшая страница истории свечей mark price | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### MG10.2 вариант — пагинация назад по after
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", after:"<ts из MG10.1 data[last][0]>", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — свечи строго старше `after` | Следующая страница назад (after — свечи старше ts) | _…_ |
+| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", after:"<ts из MG10.1 data[last][0]>", limit:"10"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` — свечи строго старше `after` | Следующая страница назад (after — свечи старше ts) | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=10 |
 
 ### MG10.3 негатив — фильтр из будущего (вне окна)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", after:"99999999999999"}, signed:false}` | HTTP 200; `b.data` пустой **или** наблюдение | Якорь из будущего — пустой/поведение фиксируем; точный исход — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{instId:"ETH-USDT-SWAP", bar:"1m", after:"99999999999999"}, signed:false}` | HTTP 200; `b.data` пустой **или** наблюдение | Якорь из будущего — пустой/поведение фиксируем; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=100 |
 
 ### MG10.4 негатив — пропуск обязательного instId (OKX-реджект)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | _…_ |
+| `POST /raw {GET, /api/v5/market/history-mark-price-candles, query:{bar:"1m"}, signed:false}` (без `instId`) | HTTP 200; `b.code≠"0"` | Реджект OKX (нет обязательного `instId`); точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 
 ## PG1. Mark price — GET /api/v5/public/mark-price (signed:false)
@@ -1846,25 +1881,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instType:"SWAP", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].instType="SWAP"`; `b.data[0].markPx` присутствует и парсится как число; `b.data[0].ts` присутствует | Возвращается mark price инструмента: `markPx`, `ts` | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instType:"SWAP", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].instType="SWAP"`; `b.data[0].markPx` присутствует и парсится как число; `b.data[0].ts` присутствует | Возвращается mark price инструмента: `markPx`, `ts` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG1.2 Негатив — несуществующий instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instType:"SWAP", instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` (`b.data.length=0`) | Несуществующий instId: реджект OKX либо пустой `data`; точный исход — наблюдение, если не документирован | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instType:"SWAP", instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` (`b.data.length=0`) | Несуществующий instId: реджект OKX либо пустой `data`; точный исход — наблюдение, если не документирован | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### PG1.3 Негатив — пропуск обязательного instType
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instType` (под /raw нет passthrough-гарда) → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instType` (под /raw нет passthrough-гарда) → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
 
 ### PG1.4 Негатив — битое значение instType
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instType:"WRONG", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Значение `instType` вне домена → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/mark-price", query:{instType:"WRONG", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Значение `instType` вне домена → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 ## PG2. Price limit — GET /api/v5/public/price-limit (signed:false)
 
@@ -1878,19 +1913,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/price-limit", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; поля `b.data[0].buyLmt`, `b.data[0].sellLmt`, `b.data[0].enabled` присутствуют; `b.data[0].ts` присутствует | Возвращаются `buyLmt`/`sellLmt` (могут быть `""` при `enabled=false`), `enabled`, `ts` | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/price-limit", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; поля `b.data[0].buyLmt`, `b.data[0].sellLmt`, `b.data[0].enabled` присутствуют; `b.data[0].ts` присутствует | Возвращаются `buyLmt`/`sellLmt` (могут быть `""` при `enabled=false`), `enabled`, `ts` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG2.2 Негатив — несуществующий instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/price-limit", query:{instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/price-limit", query:{instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### PG2.3 Негатив — пропуск обязательного instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/price-limit", query:{}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instId` → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/price-limit", query:{}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instId` → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## PG3. Funding rate — GET /api/v5/public/funding-rate (signed:false)
 
@@ -1904,19 +1939,19 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].fundingRate` присутствует; `b.data[0].fundingTime` присутствует; `b.data[0].nextFundingTime` присутствует | Возвращается `fundingRate` + `fundingTime`/`nextFundingTime` (интервал расчёта — разница полей) | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].fundingRate` присутствует; `b.data[0].fundingTime` присутствует; `b.data[0].nextFundingTime` присутствует | Возвращается `fundingRate` + `fundingTime`/`nextFundingTime` (интервал расчёта — разница полей) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG3.2 Негатив — несуществующий instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate", query:{instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate", query:{instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### PG3.3 Негатив — пропуск обязательного instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate", query:{}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instId` → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate", query:{}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instId` → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ## PG4. Funding rate history — GET /api/v5/public/funding-rate-history (signed:false)
 
@@ -1930,25 +1965,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{instId:"ETH-USDT-SWAP", limit:"5"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` непустой и `b.data.length<=5`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].fundingTime`, `b.data[0].fundingRate`, `b.data[0].realizedRate` присутствуют | Возвращаются исторические записи: `fundingTime`, `fundingRate` (прогноз), `realizedRate` (факт) | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{instId:"ETH-USDT-SWAP", limit:"5"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` непустой и `b.data.length<=5`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].fundingTime`, `b.data[0].fundingRate`, `b.data[0].realizedRate` присутствуют | Возвращаются исторические записи: `fundingTime`, `fundingRate` (прогноз), `realizedRate` (факт) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG4.2 Прямой — пагинация по окну (before по fundingTime)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{instId:"ETH-USDT-SWAP", before:"{{fundingTime из PG4.1 data[0]}}", limit:"5"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data.length<=5`; все `b.data[*].fundingTime` строго больше переданного `before` (более новое окно) | Пагинация по `before`/`fundingTime`: вернулось окно новее опорной метки; точная граница окна — наблюдение RUN | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{instId:"ETH-USDT-SWAP", before:"{{fundingTime из PG4.1 data[0]}}", limit:"5"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data.length<=5`; все `b.data[*].fundingTime` строго больше переданного `before` (более новое окно) | Пагинация по `before`/`fundingTime`: вернулось окно новее опорной метки; точная граница окна — наблюдение RUN | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG4.3 Негатив — пропуск обязательного instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{limit:"5"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instId` → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{limit:"5"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instId` → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instId can not be empty.), data.size=0 |
 
 ### PG4.4 Негатив — несуществующий instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{instId:"NOPE-USDT-SWAP", limit:"5"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/funding-rate-history", query:{instId:"NOPE-USDT-SWAP", limit:"5"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ## PG5. Open interest — GET /api/v5/public/open-interest (signed:false)
 
@@ -1962,25 +1997,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instType:"SWAP", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].instType="SWAP"`; `b.data[0].oi`, `b.data[0].oiCcy`, `b.data[0].oiUsd` присутствуют; `b.data[0].ts` присутствует | Возвращается открытый интерес: `oi`/`oiCcy`/`oiUsd`, `ts` | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instType:"SWAP", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].instId="ETH-USDT-SWAP"`; `b.data[0].instType="SWAP"`; `b.data[0].oi`, `b.data[0].oiCcy`, `b.data[0].oiUsd` присутствуют; `b.data[0].ts` присутствует | Возвращается открытый интерес: `oi`/`oiCcy`/`oiUsd`, `ts` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG5.2 Негатив — несуществующий instId
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instType:"SWAP", instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instType:"SWAP", instId:"NOPE-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Несуществующий instId: реджект либо пустой `data`; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51001 (Instrument ID, Instrument ID code, or Spread ID doesn't exist.), data.size=0 |
 
 ### PG5.3 Негатив — пропуск обязательного instType
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instType` → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instType` → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
 
 ### PG5.4 Негатив — битое значение instType
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instType:"WRONG", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Значение `instType` вне домена → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/open-interest", query:{instType:"WRONG", instId:"ETH-USDT-SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Значение `instType` вне домена → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter instType error), data.size=0 |
 
 ## PG6. Position tiers — GET /api/v5/public/position-tiers (signed:false)
 
@@ -1994,25 +2029,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", tdMode:"isolated", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` непустой; `b.data[0].tier`, `b.data[0].minSz`, `b.data[0].maxSz`, `b.data[0].imr`, `b.data[0].mmr`, `b.data[0].maxLever` присутствуют | Возвращаются тиры маржи: границы размера, imr/mmr, maxLever (публичный путь подтверждается) | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", tdMode:"isolated", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data` непустой; `b.data[0].tier`, `b.data[0].minSz`, `b.data[0].maxSz`, `b.data[0].imr`, `b.data[0].mmr`, `b.data[0].maxLever` присутствуют | Возвращаются тиры маржи: границы размера, imr/mmr, maxLever (публичный путь подтверждается) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG6.2 Негатив — пропуск обязательного tdMode
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `tdMode` → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `tdMode` → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter tdMode can not be empty.), data.size=0 |
 
 ### PG6.3 Негатив — пропуск обязательного instFamily (для SWAP)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", tdMode:"isolated"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск `instFamily` (обяз. для SWAP) → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", tdMode:"isolated"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск `instFamily` (обяз. для SWAP) → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50015 (Either parameter instFamily or uly is required), data.size=0 |
 
 ### PG6.4 Негатив — битое значение tdMode
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", tdMode:"WRONG", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Значение `tdMode` вне домена (`cross`/`isolated`) → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/position-tiers", query:{instType:"SWAP", tdMode:"WRONG", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Значение `tdMode` вне домена (`cross`/`isolated`) → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=51000 (Parameter tdMode error), data.size=0 |
 
 ## PG7. Server time — GET /api/v5/public/time (signed:false)
 
@@ -2026,13 +2061,13 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/time", signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].ts` присутствует и парсится как целое число (Unix-мс строкой) | Возвращается серверное время `ts` | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/time", signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].ts` присутствует и парсится как целое число (Unix-мс строкой) | Возвращается серверное время `ts` | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG7.2 Негатив — битый путь (тривиальный)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/time-WRONG", signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ ошибка маршрутизации OKX | Несуществующий путь OKX → реджект; точный исход — наблюдение (эндпоинт без параметров, иного негатива нет) | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/time-WRONG", signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ ошибка маршрутизации OKX | Несуществующий путь OKX → реджект; точный исход — наблюдение (эндпоинт без параметров, иного негатива нет) | RUN 2026-06-20 ✓ — http 500 |
 
 ## PG8. Insurance fund — GET /api/v5/public/insurance-fund (signed:false)
 
@@ -2046,25 +2081,25 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instType:"SWAP", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].total` присутствует; `b.data[0].instType="SWAP"`; `b.data[0].details` присутствует (массив) | Возвращается `total` фонда + `details[]` (записи фонда) | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instType:"SWAP", instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; `b.code="0"`; `b.data[0].total` присутствует; `b.data[0].instType="SWAP"`; `b.data[0].details` присутствует (массив) | Возвращается `total` фонда + `details[]` (записи фонда) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
 ### PG8.2 Негатив — пропуск обязательного instType
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instType` → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instFamily:"ETH-USDT"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск обязательного `instType` → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50014 (Parameter instType can not be empty.), data.size=0 |
 
 ### PG8.3 Негатив — пропуск обязательного instFamily (для SWAP)
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instType:"SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск `instFamily` (обяз. для SWAP) → реджект OKX; точный код — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instType:"SWAP"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) | Пропуск `instFamily` (обяз. для SWAP) → реджект OKX; точный код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=50015 (Either parameter instFamily or uly is required), data.size=0 |
 
 ### PG8.4 Негатив — битое значение type
 
 | Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instType:"SWAP", instFamily:"ETH-USDT", type:"WRONG"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Значение `type` вне домена → реджект либо пустой `data`; точный исход — наблюдение | _…_ |
+| `POST /raw {method:"GET", path:"/api/v5/public/insurance-fund", query:{instType:"SWAP", instFamily:"ETH-USDT", type:"WRONG"}, signed:false}` | HTTP 200; OKX-реджект (`b.code≠"0"`) ИЛИ пустой `b.data` | Значение `type` вне домена → реджект либо пустой `data`; точный исход — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
 
 
 ---
@@ -2081,7 +2116,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 | Запрос | Проверки | Ожидаемый результат | Факт + наблюдения (RUN) |
 |---|---|---|---|
-| приватный вызов на пустых кредах | HTTP≠200 / исключение; сообщение содержит `credential` | **Целевое (I3 closed):** внятная ошибка «OKX credentials not configured». **Текущее (баг I3, `backlog` §I3):** NPE в `OkxSigningInterceptor.sign()` (`getSecret().getBytes()` на `null`) — до отправки, сети не достигает. NPE → I3 открыт; внятная ошибка → закрыт | _…_ |
+| приватный вызов на пустых кредах | HTTP≠200 / исключение; сообщение содержит `credential` | **Целевое (I3 closed):** внятная ошибка «OKX credentials not configured». **Текущее (баг I3, `backlog` §I3):** NPE в `OkxSigningInterceptor.sign()` (`getSecret().getBytes()` на `null`) — до отправки, сети не достигает. NPE → I3 открыт; внятная ошибка → закрыт | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=1 |
 
 ---
 

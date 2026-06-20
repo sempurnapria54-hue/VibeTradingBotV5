@@ -256,7 +256,15 @@ abstract class OkxSourceApiLiveTestBase {
         }
     }
 
-    private boolean isRateLimited(RawResponse r) {
+    /**
+     * Rate-limited ли ответ: HTTP 429 или OKX rate-limit/квота-код
+     * ({@link #RATE_LIMIT_CODES}). Используется и внутренним retry-backoff
+     * {@link #raw}, и кейсами, для которых rate-limit/исчерпание квоты —
+     * предусмотренный валидный исход (напр. AG5.1 bills-history-archive, лимит
+     * 12 заявок/сутки): {@code raw()} уже исчерпал backoff-ретраи, поэтому
+     * возвращённый rate-limit терминален.
+     */
+    protected boolean isRateLimited(RawResponse r) {
         // r.code() == null на ответах без top-level "code" (наш 5xx-эрор,
         // пустое тело). RATE_LIMIT_CODES — immutable Set.of(...), его
         // contains(null) бросает NPE, поэтому проверяем code на null.
