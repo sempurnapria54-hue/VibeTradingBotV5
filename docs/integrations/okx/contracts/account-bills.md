@@ -118,6 +118,13 @@ download request before obtaining the hyperlink». Негативы конвер
 quarter error». Эндпоинт **достижим** (HTTP 200 + структурный конверт
 OKX); неполнота — ограничение demo, не дефект контракта.
 
+**Success-контракт — проверяется на проде (ад-хок, вне контура
+source-api).** Полный happy-path (заявка → `result`-ACK → `GET` →
+`fileHref` при `state=finished` → CSV) на demo неверифицируем: demo не
+инициирует архив (заявка → `50026`, `GET` → `51604`). Зелёный AG5-кейс
+контура подтверждает только demo-реджект и негативы конверта, **не**
+success — его верификация выполняется ад-хок на проде вне контура.
+
 Файл — CSV (zip), записи в обратном хронологическом порядке по
 `billId`; состав колонок — как у bill-записи (instType, billId,
 subType, ts, balChg/posBalChg, bal/posBal, sz, px (семантика зависит

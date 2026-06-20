@@ -498,13 +498,18 @@ Jackson 3 (`tools.jackson`). Бин `ObjectMapper` сейчас даём
 `setDefaultPropertyInclusion`, `JsonProcessingException`) на Jackson 3 и
 снятие `jackson2`. Радар — Jackson 3 = `assess`.
 
-### I3. `OkxSigningInterceptor` — внятная ошибка на пустых кредах
+### I3. `OkxSigningInterceptor` — внятная ошибка на пустых кредах — ✅ ЗАКРЫТО (2026-06-20)
 
 При незаполненных OKX-кредах (`api-key/secret/passphrase` = null)
-интерсептор падает NPE на приватных вызовах вместо внятной ошибки
-«OKX credentials not configured». Добавить fail-fast / осмысленное
-сообщение (валидация при старте либо явная проверка в интерсепторе перед
-подписью).
+интерсептор падал NPE на приватных вызовах вместо внятной ошибки
+«OKX credentials not configured».
+
+**Сделано (2026-06-20):** в `OkxSigningInterceptor.intercept` добавлен
+fail-fast `requireCredentials()` — при пустом любом из
+apiKey/secret/passphrase бросает `IllegalStateException` «OKX credentials
+not configured» до подписи и сети (не голый NPE на `secret.getBytes()`).
+Тест `ICredEmptyCredentialsLiveTest` переведён с наблюдения бага на
+ожидание внятной ошибки (ждёт `IllegalStateException` с этим сообщением).
 
 ### I4. Jackson 3 × Lombok beanspec мангли́нг в OKX-DTO (находка F4)
 

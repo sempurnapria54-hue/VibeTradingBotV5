@@ -123,7 +123,7 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 | Account & position risk | GET `/account/account-position-risk` | **создан** | 🟢 в коде | офдок | `account-position-risk.md`; единый временной срез; метода клиента нет |
 | Bills 7d | GET `/account/bills` | есть-док | 🟢 в коде | офдок | `account-bills.md`, `OkxAccountBillResponse`; метода клиента нет |
 | Bills archive 3m | GET `/account/bills-archive` | **обновлён** | 🟢 в коде | офдок | `account-bills.md`; поле-уровнево сверен (прогон 3); метода клиента нет |
-| Bills deep-архив (с 2021) | POST+GET `/account/bills-history-archive` | **создан** | 🟢 в коде | офдок | `account-bills.md` §Deep-архив; поквартально, async-файл; 12 заявок/сутки; метода клиента нет |
+| Bills deep-архив (с 2021) | POST+GET `/account/bills-history-archive` | **создан** | 🟢 в коде | офдок | `account-bills.md` §Deep-архив; поквартально, async-файл; 12 заявок/сутки; метода клиента нет. **Success-контракт на demo неверифицируем** (заявка → `50026`, GET → `51604`): прямой кейс проверяется **на проде ад-хок, вне контура** — зелёный контур-тест подтверждает только demo-реджект, не success |
 | Bill types | GET `/account/subtypes` | **создан** | 🟢 в коде | офдок | `account-bills.md` §Справочник bill types; метода клиента нет |
 | Account config | GET `/account/config` | **создан** | 🟢 в коде | офдок | `account-config.md`; **В-9** → шаг 5 / bootstrap; `getAccountConfig` (диагностический сырой String) |
 | Set position mode | POST `/account/set-position-mode` | **создан** | 🟢 в коде | офдок | `account-config.md`; метода клиента нет |

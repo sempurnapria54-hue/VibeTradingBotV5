@@ -22,11 +22,10 @@ import org.springframework.mock.http.client.MockClientHttpRequest;
  * поэтому это offline-юнит-тест над {@link OkxSigningInterceptor}, не
  * {@code @SpringBootTest} (контур, не сетевой кейс).
  *
- * <p>Целевое (I3 closed): внятная ошибка «OKX credentials not configured».
- * Текущее (баг I3, {@code backlog} §I3): NPE в {@code sign()}
- * ({@code getSecret().getBytes()} на {@code null}) — до отправки, сети не
- * достигает. Тест фиксирует факт (исключение до сети) и наблюдает, открыт ли
- * I3 (NPE) или закрыт (внятная ошибка про credentials), не подгоняя вердикт.
+ * <p>I3 закрыт ({@code backlog} §I3): приватный вызов на пустых кредах
+ * fail-fast'ит внятной {@link IllegalStateException} «OKX credentials not
+ * configured» до подписи и сети — не голый NPE ({@code getSecret().getBytes()}
+ * на {@code null}). Тест ждёт это поведение.
  */
 @Tag("source-api-live")
 class ICredEmptyCredentialsLiveTest {
@@ -34,7 +33,7 @@ class ICredEmptyCredentialsLiveTest {
     private static final Logger log = LoggerFactory.getLogger(ICredEmptyCredentialsLiveTest.class);
 
     @Test
-    @DisplayName("I-cred — приватный вызов на пустых OKX-кредах (probe I3)")
+    @DisplayName("I-cred — приватный вызов на пустых OKX-кредах: внятная ошибка до сети (I3 closed)")
     void privateCallWithEmptyCredentialsFailsBeforeNetwork() {
         OkxProperties properties = new OkxProperties();
         // apiKey/secret/passphrase не заданы — изолированная конфигурация без кредов.
@@ -48,17 +47,12 @@ class ICredEmptyCredentialsLiveTest {
 
         Throwable thrown = catchThrowable(() -> interceptor.intercept(request, new byte[0], execution));
 
+        // I3 closed: fail-fast внятной ошибкой про credentials ДО сети — не голый
+        // NPE и не достижение сети (network-stub бросил бы иное сообщение).
         assertThat(thrown)
-                .as("private call on empty credentials must fail before reaching the network")
-                .isNotNull();
-
-        String message = thrown.getMessage();
-        boolean clearCredentialError = message != null && message.toLowerCase().contains("credential");
-        if (clearCredentialError) {
-            log.info("[I-cred] I3 CLOSED: clear credentials error — {}", thrown.toString());
-        } else {
-            log.info("[I-cred] I3 OPEN (bug §I3): {} — {} (target: clear 'OKX credentials not configured')",
-                    thrown.getClass().getSimpleName(), message);
-        }
+                .as("private call on empty credentials must fail fast with a clear credentials error before the network")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("OKX credentials not configured");
+        log.info("[I-cred] I3 CLOSED: {}", thrown.toString());
     }
 }
