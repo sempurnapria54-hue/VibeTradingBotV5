@@ -61,8 +61,10 @@ ServiceCommandExecutor -> конкретный Executor
 переходов, graceful shutdown, live risk и recovery — у
 `docs/lifecycles/Deal.md` (здесь не дублируются). Ключевое: `ERROR` —
 non-terminal; `ERROR → CLOSED` запрещён; `ERROR → EMERGENCY_CLOSED` —
-после подтверждения отсутствия live risk; для terminal обязательны
-`resultProfit`/`resultProfitCurrency`.
+после подтверждения отсутствия live risk; для **чистого** terminal
+`CLOSED` обязательны `resultProfit`/`resultProfitCurrency`, для ошибочного
+`EMERGENCY_CLOSED` — по терминальному контракту (`docs/lifecycles/Deal.md`
+§«Терминальный контракт финализации», DEAL-Q2).
 
 После рестарта pending `ServiceCommand` как очередь не восстанавливаются
 (см. `docs/rules/command-lifecycle.md`): FSM пересобирает состояние по

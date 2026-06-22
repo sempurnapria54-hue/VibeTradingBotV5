@@ -29,7 +29,7 @@ production-flow одной стратегии.
 | 3 | Производные рыночные данные: индикаторы + структура рынка (`MarketStructure`) + фаза рынка (`MarketPhase`) — jobs, модели, сервисы (расчёт/чтение/сохранение значений, запрошенных стратегией) | DONE |
 | 4 | Команды и их жизненный цикл (ServiceCommand: submit/replace/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DONE |
 | 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | DONE |
-| 6 | FSM + живая оркестрация (состояния и переходы сущностей + handler'ы; живая оркестрационная петля `DealOrchestratorJob` (driving), REPLACE-оркестрация, per-deal concurrency-guard, механика финализации — финализационные executor'ы / терминальные рёбра / retry-state финализации) | GAPS_CLOSE_1 |
+| 6 | FSM + живая оркестрация (состояния и переходы сущностей + handler'ы; живая оркестрационная петля `DealOrchestratorJob` (driving), REPLACE-оркестрация, per-deal concurrency-guard, механика финализации — финализационные executor'ы / терминальные рёбра / retry-state финализации) | DOCS_CHECK_3 |
 | 7 | Сделки и P&L (`DealOrchestratorJob` — агрегирование в `Deal`, расчёт `resultProfit` / P&L) | HOLD |
 | 8 | AnomalyJob (полноценный, операционная детекция аномалий состояния/исполнения) | HOLD |
 | 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | HOLD |
@@ -616,3 +616,37 @@ production-flow одной стратегии.
   CMD-Q5/CMD-Q6; продвинуты INSTR-Q2/CMD-Q4. Далее — подтверждающий
   `DOCS_CHECK_2`. Закрытие — `.claude/work/progress/phase-1-step-6-docs-check-1.md`
   §Закрытие.
+- **Шаг 6 → `DOCS_CHECK_2` (2026-06-22):** подтверждающий прогон после
+  `GAPS_CLOSE_1` — три независимых ревьюер-субагента (concept ×2 + trading).
+  **Все 15 пробелов `DOCS_CHECK_1` (N1-N15) + торговый блокер TR1 +
+  DEAL-Q1/DEAL-Q2/CMD-Q5/CMD-Q6 подтверждены закрытыми чисто** (верификация
+  атрибуции по каждому целевому доку; ripple-проверки финализации (a/b/c)
+  пройдены; гейтящих open-questions нет; TR2-TR4 остаются forward, не
+  регрессировали). **Почти чисто — одна минорная негейтящая гигиена-рябь R1:**
+  `deal-management.md:63-64` несёт устаревший безусловный инвариант
+  `resultProfit` для всех terminal — расходится с DEAL-Q2-контрактом
+  (обязателен только для чистого `CLOSED`, `EMERGENCY_CLOSED` освобождён);
+  правки DEAL-Q2 не пробросились в обзорный процесс-док (исполнительные доки
+  контракт несут верно). По строгому гейту «чистый `DOCS_CHECK`» R1 держит
+  прогон формально не-чистым. Нужен микро-`GAPS_CLOSE_2` (одна строка) +
+  подтверждающий `DOCS_CHECK_3` (либо принять R1 как гигиену в составе
+  `GAPS_CLOSE_2`); затем гейт `CODE` чист. Отчёт —
+  `.claude/work/progress/phase-1-step-6-docs-check-2.md`.
+- **Шаг 6 → `GAPS_CLOSE_2` (2026-06-22):** закрыта единственная находка
+  `DOCS_CHECK_2` — **R1** (реконсиляция формулировки). `deal-management.md`
+  §«Статусная механика и recovery»: обязательность `resultProfit`/
+  `resultProfitCurrency` ограничена **чистым** terminal `CLOSED`, ошибочный
+  `EMERGENCY_CLOSED` — по терминальному контракту (`docs/lifecycles/Deal.md`
+  §«Терминальный контракт финализации», DEAL-Q2). Правка-cleanup (выводима из
+  принятого DEAL-Q2-контракта, без вариантов). Далее — подтверждающий
+  `DOCS_CHECK_3`.
+- **Шаг 6 → `DOCS_CHECK_3` (2026-06-22):** узкий подтверждающий прогон после
+  `GAPS_CLOSE_2` (независимый ревьюер-субагент, concept-фокус) — **чисто**.
+  **R1** подтверждён закрытым чисто (`deal-management.md` согласован с
+  DEAL-Q2-контрактом `Deal.md`); sweep по `docs/` — других стале-копий
+  безусловного `resultProfit`-инварианта нет; новой ряби нет. **Гейт `CODE`
+  пройден** (`roadmap-step-execution.md` §«Гейт `CODE` — чистый `DOCS_CHECK`»):
+  concept — этот прогон, trading — чисто на `DOCS_CHECK_2` (поверхность не
+  менялась). Шаг 6 готов к `CODE`; перевод за пользователем. Жёсткие гейты
+  `DONE` (D-B3 / реализация D-M1) — на `CODE`/`DONE`. Отчёт —
+  `.claude/work/progress/phase-1-step-6-docs-check-3.md`.
