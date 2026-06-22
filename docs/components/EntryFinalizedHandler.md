@@ -36,11 +36,13 @@ main protection (`CANCEL_*`). Если switch не нужен — провери
 
 ## Выходные проверки
 
-Позиция активна; entry финализирован; требования strategy/risk policy по
-защите выполнены (активная защита подтверждена либо её отсутствие явно
-разрешено); нет дублирующей/конфликтующей защиты и orphan algo-orders; нет
-риска под kill-switch. → `ENTRY_FINALIZED → PROTECTION_SWITCHED` (если
-switch реально нужен) или `→ MANAGING`.
+Позиция активна; entry финализирован; **защита позиции с live risk
+подтверждена** — attached SL держится, пока main protection не подтверждена
+(голого окна без защиты для risk-creating позиции нет, инвариант
+`docs/rules/risk-creating-entry-protection.md`); нет дублирующей/
+конфликтующей защиты и orphan algo-orders; нет риска под kill-switch.
+→ `ENTRY_FINALIZED → PROTECTION_SWITCHED` (если switch реально нужен) или
+`→ MANAGING`.
 
 ## Допустимые StrategyStep / возможные ServiceCommand
 

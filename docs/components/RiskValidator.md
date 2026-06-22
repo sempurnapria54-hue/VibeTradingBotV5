@@ -66,6 +66,13 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   входа;
 - `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION` — стоп за/у цены ликвидации
   позиции;
+- `RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход
+  (открытие/наращивание позиции) без **резолвимого стопа**: `BLOCKED`,
+  **без** fail-open allocation-сайзинга в обход `RISK_PER_TRADE`
+  (инвариант `docs/rules/risk-creating-entry-protection.md`). Проверяется
+  до риск-на-сделку: нет стопа → risk-amount нечем посчитать → блок, не
+  сайзинг по allocation. Reduce-only/закрывающие действия не затрагивает
+  (риск снимают);
 - `RISK_PER_TRADE_EXCEEDED` — риск на сделку (%) выше
   `StrategyDetail.riskPerTradePercent`.
 

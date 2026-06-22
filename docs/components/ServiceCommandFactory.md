@@ -31,9 +31,39 @@ status = SUBMITTED                     -> REFRESH_ORDER / REFRESH_ALGO_ORDER
 
 (`DealActionState`-статусы — `docs/lifecycles/DealActionState.md`.)
 
-В шаге 5 `CANCEL` / `REPLACE` команды не порождают (refinement —
-граница со step-5 калькулятором), а algo-`Condition` собирается только с
-`type` (полные SL/TP-цены — refinement).
+В шаге 5 `CANCEL` / `REPLACE` команды не порождались (refinement —
+граница со step-5 калькулятором); их оркестрация — скоуп шага 6 (см.
+§«REPLACE и финализация» ниже). Algo-`Condition` собирается только с `type`
+(полные SL/TP-цены — refinement).
+
+## REPLACE и финализация (эмиссия за пределами action-маппинга)
+
+Фабрика остаётся **«одна атомарная команда за проход»** и секвенс в себя не
+берёт. Две оси выходят за прямой `DealActionState`-маппинг выше:
+
+- **REPLACE-ноги.** Порядок ног REPLACE по риск-классу
+  (`docs/decisions/replace-not-amend.md`) оркеструет **петля /
+  `DealStateMachine`** по подтверждённым фактам, а не фабрика: фабрика на
+  каждом проходе порождает одну атомарную ногу (`CREATE_*`/`SUBMIT_*`/
+  `CANCEL_*`) для текущего звена цепочки замещений по фактам
+  (`docs/components/DealStateMachine.md`, владелец секвенса;
+  `docs/decisions/action-orchestration-vs-command.md`).
+- **Финализационные команды** (`FINALIZE_DEAL_*`/`MARK_DEAL_*`) не имеют
+  `dealActionStateId` (нет `StrategyAction`). Когда handler решил
+  финализировать, command-layer материализует строку
+  `DealFinalizationState(deal, type)` (upsert по `UNIQUE(deal_id,
+  finalization_type)`); фабрика читает её статус, привязывает команду к
+  `dealFinalizationStateId` и эмитит **одну** финализационную команду за
+  проход (статус сам не пишет — паритет с `DealActionState`):
+
+```text
+DealFinalizationState отсутствует / PENDING -> FINALIZE_DEAL_* / MARK_DEAL_*
+                                               (по type)
+status = COMPLETED                          -> финализация type закрыта
+```
+
+(Статусы/тип — `docs/lifecycles/DealFinalizationState.md`; дом retry-state —
+`docs/decisions/deal-finalization-state-materialization.md`.)
 
 ## Связь с risk-layer и freshness
 

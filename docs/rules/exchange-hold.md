@@ -62,4 +62,7 @@ TP/SL/trailing actions, pyramid/scaling и любые действия, увел
 ## Связанное
 
 - `docs/rules/external-status-resolution.md` (источник перехода в HOLD).
+- `docs/rules/error-handling-policy.md` — exchange-HOLD = **уровень 4**
+  error-градации (нарушение контракта интеграции / инвариантов системы);
+  инструмент-scope холд (уровень 3) — `docs/rules/instrument-hold.md`.
 - `docs/lifecycles/Order.md`.

@@ -82,9 +82,17 @@ Native responses —
 
 4. Сохранить как DealCashFlow.
 
-5. FINALIZE_DEAL_EXIT считает:
+5. Расчёт итога (шаг 7):
    Deal.resultProfit = sum(DealCashFlow.amount)
 ```
+
+> **Граница 6 ↔ 7.** *Расчёт* `Deal.resultProfit` относится к **шагу 7**
+> (P&L, OKX-Q3), **не** внутрь `FINALIZE_DEAL_EXIT`. Механика финализации
+> шага 6 (`docs/components/FinalizeDealExitExecutor.md`,
+> `docs/components/MarkDealClosedExecutor.md`) консолидирует факты и ставит
+> терминал; саму сумму считает шаг 7. Терминальный контракт (что с числом
+> при неисчислимой прибыли) — `docs/lifecycles/Deal.md` §«Терминальный
+> контракт финализации» (DEAL-Q2).
 
 Применимо к окнам ≤ 3 месяцев (`bills-archive`).
 

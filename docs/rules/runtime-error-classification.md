@@ -56,4 +56,7 @@ VALIDATION / DATABASE / UNKNOWN_RESULT / UNKNOWN) — исторический �
 `RuntimeErrorCode`. Граница controlled vs unexpected ошибок —
 `docs/components/models/CalculationError.md`,
 `docs/components/models/RiskValidationResult.md`. Retry-механика —
-`docs/components/RetryPolicyService.md`.
+`docs/components/RetryPolicyService.md`. Эта классификация — **уровни 1-2**
+внутренней error-градации (`docs/rules/error-handling-policy.md`); уровни 3-4
+(холд инструмента / биржи) — `docs/rules/instrument-hold.md`,
+`docs/rules/exchange-hold.md`.

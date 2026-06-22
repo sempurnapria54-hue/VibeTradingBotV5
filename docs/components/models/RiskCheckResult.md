@@ -36,6 +36,7 @@
 
 Стартовый набор кодов:
 `RISK_PER_TRADE_EXCEEDED`,
+`RISK_CREATING_ENTRY_WITHOUT_STOP`,
 `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `MARGIN_MODE_NOT_ISOLATED`,
 `BORROW_OR_DEBT_DETECTED`, `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`,
 `BALANCE_INVALID`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
@@ -48,12 +49,19 @@
 
 ### Эмитятся `RiskValidator`'ом в фазе 1
 
-`RISK_PER_TRADE_EXCEEDED`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
+`RISK_PER_TRADE_EXCEEDED`, `RISK_CREATING_ENTRY_WITHOUT_STOP`,
+`EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
 `MARGIN_MODE_NOT_ISOLATED`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
 `SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`, `TAKE_PROFIT_INVALID_SIDE`,
 `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `INSTRUMENT_NOT_LIVE`,
 `INSTRUMENT_RULES_MISSING`, `BALANCE_INVALID`, `CALCULATED_ACTION_INVALID`
 (см. `docs/components/RiskValidator.md`).
+
+`RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход (открытие/наращивание
+позиции) без резолвимого стопа: `BLOCKED` вместо fail-open
+allocation-сайзинга в обход `RISK_PER_TRADE` (инвариант
+`docs/rules/risk-creating-entry-protection.md`). Reduce-only/закрывающие
+действия не затрагивает.
 
 ### Определены, но в фазе 1 не эмитятся
 

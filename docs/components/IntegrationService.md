@@ -29,6 +29,25 @@ snapshot не найден (успех)       -> null
 evidence-cycle может быть error/recovery (см.
 `docs/rules/external-status-resolution.md`).
 
+## Инструмент-скоупный read (чистота / orphan) — вне command-layer
+
+Перечисление **всего живого на инструменте** (позиции, live orders, live
+algo — включая **незнакомые** боту сущности) — отдельный
+инструмент-скоупный exchange-read **в `IntegrationService`**, **не**
+`ServiceCommand` (CMD-Q4: bulk-команды сняты, в command-layer не
+возвращаются — `docs/components/models/ServiceCommand.md`). Дёргается:
+
+- **`PrecheckHandler`** (шаг 6) — чистота инструмента перед входом: нет
+  открытой сделки → биржа по инструменту должна быть пуста
+  (`docs/components/PrecheckHandler.md`);
+- **`AnomalyJob`** (шаг 8) — orphan / чужой live risk при уже открытой
+  сделке и по неведомым инструментам (`docs/components/AnomalyJob.md`).
+
+Per-entity `REFRESH_*` покрывает только **известные** сущности сделки;
+этот read видит и **неизвестные**. Возвращает validated snapshot'ы
+(сырой DTO за границу не выходит). Закрывает Precheck-часть CMD-Q4;
+orphan-часть — шаг 8.
+
 ## Исключение: balance
 
 Для `REFRESH_BALANCE` normal `null` contract не используется: успешный

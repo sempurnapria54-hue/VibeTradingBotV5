@@ -11,11 +11,10 @@
 
 `Deal` управляется FSM. Per-status handlers (`PrecheckHandler`,
 `EntrySubmittedHandler`, …, `ErrorHandler`) и оркестратор
-`DealStateMachine` — компоненты кластера процессов Deal management
-(`.claude-archive/.../processes/Deal management/`), мигрируются
-отдельно (форвард-заметки — в `.claude/work/questions/tasks/deal.md`;
+`DealStateMachine` **материализованы** как компоненты (`docs/components/`;
 размещение handler'ов — `.claude/decisions/fsm-handler-as-component.md`).
-Здесь — статусная механика, которой владеет сам `Deal`.
+Живую петлю гоняет `docs/components/DealOrchestratorJob.md`. Здесь —
+статусная механика, которой владеет сам `Deal`.
 
 ## Статусы
 
@@ -43,8 +42,10 @@
   сделка). Обычные strategy steps не выполняются; разрешены только
   safety / recovery / refresh / kill-switch действия.
 - **`EMERGENCY_CLOSED`** — аварийный terminal-финал после safety-flow
-  (сделка была в `ERROR`, live risk снят/доказано отсутствие,
-  `resultProfit` рассчитан).
+  (сделка была в `ERROR`, live risk снят/доказано отсутствие). Это и есть
+  **ошибочный терминал** контракта финализации; число `resultProfit` —
+  по §«Терминальный контракт финализации» (DEAL-Q2; деталь шага 7), не
+  блокируется инвариантом чистого закрытия.
 
 ## Группы статусов
 
@@ -64,7 +65,7 @@ CLOSED            — только штатное завершение.
 EMERGENCY_CLOSED  — только аварийное завершение после safety-flow.
 ERROR -> CLOSED   — запрещён.
 ERROR -> EMERGENCY_CLOSED — только после подтверждения отсутствия live
-                  risk и расчёта resultProfit.
+                  risk (resultProfit — по терминальному контракту).
 Terminal statuses не имеют FSM handlers.
 Live risk после terminal status -> зона AnomalyJob / ReconciliationJob,
                   не обычный FSM-flow.
@@ -90,8 +91,10 @@ risk → `CLOSED` + `RISK_CONTROL`.
 ## Terminal semantics и live risk
 
 `Deal` active, если не в terminal status (`ERROR` — active, не
-terminal). Terminal — `CLOSED`/`EMERGENCY_CLOSED`: нет FSM handler,
-обязательны `resultProfit`/`resultProfitCurrency`.
+terminal). Terminal — `CLOSED`/`EMERGENCY_CLOSED`: нет FSM handler. Для
+**чистого** `CLOSED` `resultProfit`/`resultProfitCurrency` обязательны; для
+ошибочного `EMERGENCY_CLOSED` — по §«Терминальный контракт финализации»
+(не блокируется инвариантом чистого закрытия).
 
 Live risk сделки (не хранится boolean-полем; вычисляется через
 runtime graph, `DealActionState`, refresh/search/history facts,
@@ -107,6 +110,28 @@ unknown external live-сущность на бирже
 
 Если после terminal status найден live risk — зона `AnomalyJob /
 ReconciliationJob`.
+
+## Терминальный контракт финализации (DEAL-Q2)
+
+Финализация использует **общий механизм повторов**
+(`DealFinalizationState`, `docs/models/domain/other/DealFinalizationState.md`).
+Граничный контракт между механикой финализации (шаг 6) и расчётом прибыли
+(шаг 7):
+
+- Прибыль посчиталась → `MARK_DEAL_CLOSED` ставит **чистый терминал
+  `CLOSED`** с числом (`resultProfit`/`resultProfitCurrency`).
+- Прибыль не посчиталась после исчерпания retry → это **ошибка** →
+  `DealFinalizationState(MARK_CLOSED) = FAILED`, сделка уходит ошибочной
+  тропой (`MarkDealErrorExecutor`/`ErrorHandler`) и доходит до **ошибочного
+  терминала** (`EMERGENCY_CLOSED`). Сделка **всегда доходит до терминала, не
+  зависает живым риском**.
+- Инвариант «`resultProfit`/`resultProfitCurrency` обязательны» — про
+  **чистое закрытие** (`CLOSED`). Ошибочный терминал на нём **не
+  блокируется**: что именно с числом прибыли на ошибочном терминале — деталь
+  **шага 7** (здесь не решается).
+
+DEAL-Q2 закрыт этим контрактом на `GAPS_CLOSE_1` шага 6 (2026-06-22);
+*расчёт* прибыли — шаг 7.
 
 ## Restart / recovery
 

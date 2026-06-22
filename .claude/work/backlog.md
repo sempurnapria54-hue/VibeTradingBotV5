@@ -54,9 +54,11 @@ per-status (`PrecheckHandler`…`ErrorHandler`), `DealStateMachine` (+3
 `controlled-exchange-exceptions`, `trading-constraints`. Master-index
 «Статусы торговых сущностей» разобран по владельцам. Детали —
 `history/2026-05-28-миграция-процессов.md`.
-**Осталось:** финализационные executor'ы (`FINALIZE_*`/`MARK_*`) — DEAL-Q1;
-`DealActionState`/`Retryable`/`RuntimeTarget` модель — DEAL-Q3
-(`open-questions.md`).
+**Закрыто:** `DealActionState`/`Retryable`/`RuntimeTarget` модель (DEAL-Q3,
+`GAPS_CLOSE_1` шага 4); финализационные executor'ы (`FINALIZE_*`/`MARK_*`) +
+дом retry-state `DealFinalizationState` (DEAL-Q1, `GAPS_CLOSE_1` шага 6,
+`docs/decisions/deal-finalization-state-materialization.md`). Код executor'ов
+— на `CODE` шага 6.
 
 ### 2. Resolver / mapper / checker компоненты — частично
 
@@ -317,28 +319,18 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 
 ### Шаг 6 (FSM)
 
-- **Бесстоповый risk-creating вход не размещаем; отсутствие защиты =
-  аномалия (форвард со `CODE` шага 5, 2026-06-20).** Правило: risk-creating
-  вход без резолвимого стопа (ни attached-SL, ни иной защиты на момент
-  постановки) не доходит до размещения. Сейчас (шаг 5) `RiskValidator` на
-  бесстоповом входе **молча** считает размер по `allocationPercents` и
-  пропускает `RISK_PER_TRADE` (без стопа риск нечем связать) — fail-open в
-  сторону большего риска. В коде фазы 5 сознательно **не over-блокируем**:
-  риск-политика обуславливает сайзинг «входом **со стопом**»
-  (`docs/decisions/per-trade-risk-policy.md`), а risk-managed входы фазы 1 —
-  через `ENTRY_ATTACHED_STOP_LOSS` (attached SL даёт стоп). На шаге 6
-  зафиксировать так, чтобы шаг подхватил:
-  1. **проверить, что правило зафиксировано** — вероятно, в жизненном цикле
-     сделки (`docs/lifecycles/Deal.md` / `docs/rules/`); если нет — завести
-     явно (защита обязательна для risk-creating входа);
-  2. **подтвердить, что бесстоповый risk-creating вход в фазе 1 не может
-     дойти до постановки** (PRECHECK/handler не выпускает entry без
-     резолвимой защиты);
-  3. **enforcement аномалии** — прекек (шаг 6) / AnomalyJob (шаг 8):
-     молчаливый allocation-сайзинг валидатора не должен пропускать такой
-     вход (явный блок/аномалия либо гарантия инварианта выше по FSM).
-  Источник — `.claude/work/progress/phase-1-step-5-code.md` §Форвард-концепт
-  (disaster-фокус `CODE` шага 5).
+- **Бесстоповый risk-creating вход — ✅ ЗАКРЫТО в доках (`GAPS_CLOSE_1`
+  шага 6, 2026-06-22).** Заведён инвариант
+  `docs/rules/risk-creating-entry-protection.md`: risk-creating вход без
+  резолвимого стопа не доходит до постановки — `PRECHECK` блокирует (`CLOSED`
+  + `RISK_CONTROL`), до live risk. Снят fail-open `RiskValidator` (новый код
+  `RISK_CREATING_ENTRY_WITHOUT_STOP` вместо allocation-сайзинга в обход
+  `RISK_PER_TRADE`); `EntryFinalizedHandler` больше не допускает позицию с
+  live risk без защиты; нарушение постфактум → реакция уровня 4 (холд биржи +
+  kill-switch + `AnomalyReport`). Закрывает TR1 `DOCS_CHECK_1` шага 6.
+  **Код-снятие fail-open** (`RiskValidator`/`SizeCalculator`,
+  `PrecheckHandler` + set-leverage) — на `CODE` шага 6. Источник —
+  `.claude/work/progress/phase-1-step-5-code.md` §Форвард-концепт.
 
 ### Шаг 7 (сделки и P&L)
 
@@ -400,8 +392,11 @@ Refinements, сознательно отложенные при `CODE` шага 
   цели.** Порядок ног REPLACE по риск-классу (place→факт→cancel для
   protective; cancel→факт→place для entry) и резолюция цели CANCEL по
   цепочке `replacesInternalId` — не реализованы (фабрика покрывает
-  CREATE/SUBMIT/REFRESH/CLOSE). Концепция — `replace-not-amend`,
-  `DealActionState` §REPLACE.
+  CREATE/SUBMIT/REFRESH/CLOSE). **Владелец оркестрации решён (`GAPS_CLOSE_1`
+  шага 6, CMD-Q5/CMD-Q6):** секвенс ног ведёт петля/`DealStateMachine` по
+  фактам, фабрика остаётся «одна команда за проход»
+  (`docs/decisions/action-orchestration-vs-command.md`). Реализация — на
+  `CODE` шага 6. Концепция — `replace-not-amend`, `DealActionState` §REPLACE.
 - **Refresh algo: external-поля дерева `condition`.** `updateFromSnapshot`
   игнорит `condition`; обновляются только top-level факты срабатывания.
   Обновление trigger/trailing external-цен из снапшота — добрать.
@@ -428,9 +423,12 @@ Refinements, сознательно отложенные при `CODE` шага 
   Обязательно **до** включения авто-реплея SUBMIT (FSM/оркестратор).
 - **[MAJOR, gating step-6/7] D-M1 — concurrency-guard исполнения
   команды.** Перекрытие тика/ручного триггера → двойной SUBMIT.
-  Сериализация per-deal (`JobExecutionGuard` / row-lock на
-  `DealActionState`) или `@Version` оптимистик-лок. Владелец —
-  оркестрационная петля step-6/7.
+  **Спека выбрана (`GAPS_CLOSE_1` шага 6, 2026-06-22):** блокировка на
+  уровне базы на **весь проход** `DealOrchestratorJob` (и таймерный, и
+  ручной заход под одну блокировку) — сериализует проходы, per-deal-защита
+  не нужна; in-memory guard отвергнут как небезопасный на мультиинстансе
+  (`docs/components/DealOrchestratorJob.md` §Concurrency-guard). **Реализация
+  — на `CODE`/`DONE` шага 6** (жёсткий гейт `DONE`).
 - **[MAJOR] D-M5/R5 — fills-пагинация + orders-history-archive.**
   `RefreshFillsExecutor` берёт одну страницу `getFills`/`getFillsHistory`
   (недобор fills → искажение PnL, step 7); пагинация назад по `billId`.
@@ -647,8 +645,11 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 ## Связанные открытые вопросы
 
 `.claude/work/questions/open-questions.md`:
-- **Продуктовые финализации `Deal`:** DEAL-Q1 (retry-state финализации;
-  п.1/п.6), DEAL-Q2 (resultProfit при исчерпании retry; п.6).
+- **Продуктовые финализации `Deal`:** DEAL-Q1 (retry-state финализации) и
+  DEAL-Q2 (resultProfit при исчерпании retry) **закрыты** на `GAPS_CLOSE_1`
+  шага 6 (`docs/decisions/deal-finalization-state-materialization.md`,
+  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»). Расчёт
+  PnL (п.6) — шаг 7.
 - **Из миграции процессов:** RISK-Q1 (`RiskSettings`; п.3/п.4), DEAL-Q3
   (`DealActionState` core/other + lifecycle; п.1), CMD-Q2 (базовый
   тип/дискриминатор payload'ов, судьба `ServiceCommandPayload.md`; п.1).

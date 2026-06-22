@@ -142,6 +142,9 @@ STRUCT-Q1). Поле — `StrategyDetail.riskPerTradePercent`.
 ## Связи
 
 - Правило торговых ограничений — `docs/rules/trading-constraints.md`.
+- Обязательная защита risk-creating входа (сайзинг обусловлен «входом со
+  стопом») — `docs/rules/risk-creating-entry-protection.md` (закрыто на
+  `GAPS_CLOSE_1` шага 6).
 - Поток и реакция на BLOCKED — `docs/processes/risk-evaluation.md`.
 - Валидатор и метрики — `docs/components/RiskValidator.md`.
 - Коды проверок — `docs/components/models/RiskCheckResult.md`

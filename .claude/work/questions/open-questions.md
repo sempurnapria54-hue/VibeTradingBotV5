@@ -79,6 +79,19 @@ bulk). Из разбора ревью шага 4 (2026-06-12) открыты **C
 ренейма) и большая часть **INSTR-Q2** — решением
 `docs/decisions/instrument-external-rules-materialization.md` (остаток
 INSTR-Q2 — тайминг set-leverage, форвард к шагу 6).
+На `GAPS_CLOSE_1` шага 6 (2026-06-22) закрыты **DEAL-Q1** (дом retry-state
+финализации — отдельная сущность `DealFinalizationState`, решение
+`docs/decisions/deal-finalization-state-materialization.md`), **DEAL-Q2**
+(терминальный контракт при неисчислимой прибыли —
+`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»), **CMD-Q5**
+и **CMD-Q6** (владелец оркестрации REPLACE + принцип «действие vs команда»,
+решение `docs/decisions/action-orchestration-vs-command.md`). Сняты с TBD
+error-политика (`docs/rules/error-handling-policy.md`) и форвард-долг
+бесстопового risk-creating входа
+(`docs/rules/risk-creating-entry-protection.md`). **Продвинуты**:
+INSTR-Q2-остаток (тайминг/владелец set-leverage решены — `PRECHECK` перед
+ордером, idempotent) и CMD-Q4 (Precheck-часть закрыта инструмент-скоупным
+read вне command-layer; orphan-часть — шаг 8).
 
 История закрытых вопросов пайплайна:
 
@@ -95,28 +108,7 @@ INSTR-Q2 — тайминг set-leverage, форвард к шагу 6).
 
 ## Открытые продуктовые вопросы
 
-### DEAL-Q1. Где хранить persisted retry-state финализации сделки
-
-Lifecycle/finalization commands (`REFRESH_FILLS`, `FINALIZE_DEAL_EXIT`,
-`MARK_DEAL_CLOSED`, emergency finalization) нуждаются в persisted
-retry-state, но `DealActionState` относится к `StrategyAction`, а
-финализация сделки — это lifecycle/system action. Audit/history не
-должен быть runtime-source, поэтому retry-state финализации нельзя
-хранить только в истории. Где его хранить — не решено.
-Связано: `docs/models/domain/aggregate/Deal.md`, `docs/lifecycles/Deal.md`.
-
-### DEAL-Q2. Что делать, если resultProfit нельзя посчитать после исчерпания retry
-
-Зафиксировано: `resultProfit`/`resultProfitCurrency` обязательны для
-`CLOSED`/`EMERGENCY_CLOSED`; `resultProfit = 0` допустим только как
-результат расчёта, не fallback. Не решено, что делать, если после
-всех retry итоговый PnL всё ещё нельзя безопасно посчитать. Варианты
-на будущее: отдельный finalization state; перевод в `ERROR`;
-отдельный `DealFinalizationState`; ручной разбор; специальный
-operational flag без нарушения terminal semantics.
-Связано: `docs/models/domain/aggregate/Deal.md` §Итоговый PnL.
-
-### INSTR-Q2. Тайминг выставления плеча на бирже (set-leverage) — форвард к оркестрации (шаг 6)
+### INSTR-Q2. Тайминг выставления плеча на бирже (set-leverage) — продвинут (шаг 6)
 
 Большая часть INSTR-Q2 закрыта на `GAPS_CLOSE_1` шага 5: роль биржевого
 потолка плеча (авторитет — `InstrumentExternalRules.externalMaxLeverage`,
@@ -125,13 +117,21 @@ operational flag без нарушения terminal semantics.
 — решения `docs/decisions/instrument-external-rules-materialization.md` и
 `docs/decisions/per-trade-risk-policy.md`.
 
-**Остаточный аспект:** кто и когда выставляет рабочее плечо на бирже
-(OKX set-leverage: при онбординге / перед сделкой / на каждую сделку) и
-нужна ли статическому `Instrument.leverage` (`Integer`, задаётся при
-создании) роль при динамическом рабочем плече. Это **исполнение** записи
-плеча (write-действие), а не риск-преконтроль шага 5 (валидация); горизонт
-— оркестрация торгового цикла (шаг 6). Шаг 5 не блокирует.
+**Продвинут на `GAPS_CLOSE_1` шага 6 (2026-06-22).** Тайминг/владелец
+решены: рабочее плечо пишется на биржу **перед каждой сделкой, на этапе
+`PRECHECK`, прямо перед постановкой ордера** (idempotent: совпадает →
+пустая операция; динамическое плечо иначе уйдёт стейл). Владелец write —
+`PrecheckHandler` через `IntegrationService`. Хранимое
+`Instrument.leverage` (`Integer`) — **потолок/умолчание**, не источник
+рабочего плеча (`docs/components/PrecheckHandler.md`,
+`docs/decisions/per-trade-risk-policy.md`).
+
+**Остаток (CODE-деталь):** конкретное представление write плеча —
+отдельная команда `SET_LEVERAGE` vs inline-write адаптера в entry-flow — и
+судьба поля `Instrument.leverage` (оставить как потолок или снять). Шаг 6 не
+блокирует.
 Связано: `docs/models/domain/core/Instrument.md` (`leverage`),
+`docs/components/PrecheckHandler.md`,
 `docs/lifecycles/Instrument.md`,
 `docs/decisions/per-trade-risk-policy.md`,
 `docs/decisions/instrument-external-rules-materialization.md`.
@@ -189,8 +189,16 @@ CMD-Q3 закрыт (steer, 2026-06-10): refresh-набор — ровно по 
 в `IntegrationService`, дёргается job'ами/handler'ами для сверки/orphan-скана,
 не `ServiceCommand`); (2) вернуть узкую scoped bulk-scan операцию (не
 per-deal-команду); (3) иное по проработке anomaly / precheck-cleanliness.
-До решения не достраивается. Горизонт — Precheck (шаг 6) / `AnomalyJob`
-(шаг 8). Владелец — `solution-designer`.
+
+**Продвинут на `GAPS_CLOSE_1` шага 6 (2026-06-22): принят вариант (1),
+Precheck-часть закрыта.** Чистота инструмента перед входом берётся из
+стартового инструмент-скоупного exchange-read **вне command-layer**
+(`docs/components/IntegrationService.md` §«Инструмент-скоупный read»,
+`docs/components/PrecheckHandler.md`); «оптовую команду» в command-layer не
+возвращаем (вариант (2) отвергнут — отменил бы снятие bulk CMD-Q3). **Остаток
+— orphan-скан шага 8** (`AnomalyJob`: чужие сущности при уже открытой сделке
+и по неведомым инструментам). Владелец orphan-части — `solution-designer` /
+шаг 8.
 
 **Смежный вход (REPLACE-only, 2026-06-11):** при проработке
 Precheck/AnomalyJob учесть легитимное **окно двойной reduce-only
@@ -202,48 +210,6 @@ Precheck/AnomalyJob учесть легитимное **окно двойной 
 `docs/components/PrecheckHandler.md`, `docs/components/AnomalyJob.md`,
 `docs/components/ServiceCommandExecutor.md`,
 `docs/components/IntegrationService.md`.
-
-### CMD-Q5. Место правила порядка ног REPLACE (фабрика vs оркестрационная петля) — решать на 6-7
-
-Правило порядка ног REPLACE по риск-классу (protective: place-new →
-подтверждение фактом → cancel-old; entry: cancel-old → подтверждение
-терминала → place-new) уже зафиксировано в
-`docs/decisions/replace-not-amend.md`. Открыто: **где живёт этот маппинг**
-— в `ServiceCommandFactory` (шаг 4) или появляется вместе с
-оркестрационной петлёй (шаги 6-7).
-
-Отложено к 6-7: без петли правило в командном слое **никто не вызывает**
-(был бы мёртвый код). На `CODE` шага 4 это и отражено —
-`ServiceCommandFactory.initialCommand` для `CANCEL`/`REPLACE` возвращает
-`Optional.empty()` (forward-debt, `.claude/work/backlog.md` §Хвост шага 4).
-
-Развилка для 6-7: (1) правило порядка ног — в `ServiceCommandFactory`;
-(2) правило и петля появляются **вместе** (оркестратор владеет секвенсом
-ног по фактам). Решать на **6-7**, когда оркестрация станет конкретной.
-Связано: `docs/decisions/replace-not-amend.md`,
-`docs/components/ServiceCommandFactory.md`,
-`docs/components/ServiceCommandExecutor.md`,
-`.claude/work/backlog.md` §Хвост шага 4.
-
-### CMD-Q6. Граница «действие стратегии vs `ServiceCommand`»; классификация `KILL_SWITCH` — решать на 6-7
-
-REPLACE смоделирован как **действие стратегии** (оркестрация атомарных
-команд по фактам, `docs/decisions/replace-not-amend.md`), а `KILL_SWITCH`
-— как **одна команда** (`KillSwitchExecutor`) с внутренним многошаговым
-teardown (close → cancel orders → cancel algos → безусловный финальный
-close), хотя по той же логике он тоже **компаунд над атомарными
-командами**. Принцип границы между слоями (что — действие-оркестрация,
-что — команда с внутренними шагами) не сформулирован.
-
-Открыто: сформулировать принцип «действие vs команда» и
-классифицировать `KILL_SWITCH` по нему. Возможное оправдание текущей
-модели — аварийный teardown как **синхронный fire-all** (снять риск
-максимально быстро, без оркестрации по фактам и ожидания подтверждений),
-тогда как REPLACE — оркестрация по фактам. Владелец — `solution-designer`.
-Решать на **6-7**, когда оркестрация станет конкретной.
-Связано: `docs/decisions/replace-not-amend.md`,
-`docs/components/KillSwitchExecutor.md`,
-`docs/components/ServiceCommandFactory.md`, CMD-Q5.
 
 ### OKX-Q1. Persisted `TradeFill` модель и executor финализации
 
@@ -342,7 +308,11 @@ Deep-архив bills с 2021 теперь существует
 Связано: `docs/models/integrations/okx/OkxAccountBillResponse.md`,
 `docs/integrations/okx/contracts/account-bills.md`,
 `docs/integrations/okx/contracts/funding-rate.md`,
-`docs/models/domain/aggregate/Deal.md` §Итоговый PnL, DEAL-Q1, DEAL-Q2.
+`docs/models/domain/aggregate/Deal.md` §Итоговый PnL. (Финализационная
+механика и терминальный контракт — DEAL-Q1/DEAL-Q2 **закрыты** на шаге 6:
+`docs/decisions/deal-finalization-state-materialization.md`,
+`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»; здесь —
+*расчёт* PnL, шаг 7.)
 
 ### OKX-Q4. WS-каналы OKX — отдельный заход
 

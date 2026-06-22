@@ -24,12 +24,21 @@ ServiceCommandExecutor → конкретный Executor`.
 |---|---|---|
 | `type` | `ServiceCommandType` | Тип атомарной операции. |
 | `dealId` | `Long` | Сделка, в рамках которой выполняется команда. |
-| `dealActionStateId` | `Long` | Runtime-состояние action стратегии (связь с `StrategyAction`; модель — `docs/models/domain/other/DealActionState.md`). |
+| `dealActionStateId` | `Long` | Runtime-состояние **action стратегии** (связь с `StrategyAction`; модель — `docs/models/domain/other/DealActionState.md`). `null` для финализационных команд. |
+| `dealFinalizationStateId` | `Long` | Runtime-состояние **финализационной** команды (lifecycle/system action без `StrategyAction`; модель — `docs/models/domain/other/DealFinalizationState.md`). `null` для action-команд. |
 | `payload` | `ServiceCommandPayload` | Параметры выполнения (см. `docs/components/models/ServiceCommandPayload.md`). |
 
+Retry-anchor команды — ровно один из `dealActionStateId` /
+`dealFinalizationStateId`: action-команды (`CREATE_*`/`SUBMIT_*`/`CANCEL_*`/
+`CLOSE_POSITION`/`REFRESH_*`) ведутся `DealActionState`; финализационные
+(`FINALIZE_DEAL_*`/`MARK_DEAL_*`) — `DealFinalizationState` (нет
+`StrategyAction`, поэтому `dealActionStateId` им не подходит; см.
+`docs/decisions/deal-finalization-state-materialization.md`). Safety-команда
+без retry-state (`EXECUTE_KILL_SWITCH`) может не нести ни того, ни другого.
+
 Не обязан хранить `strategyId` / `strategyDetailId`: происхождение
-команды восстанавливается через `DealActionState` и историю исполнения.
-Аудит/история не источник runtime-логики FSM (см.
+команды восстанавливается через `DealActionState` / `DealFinalizationState`
+и историю исполнения. Аудит/история не источник runtime-логики FSM (см.
 `docs/rules/audit-not-runtime-source.md`).
 
 ## Енум `ServiceCommandType`
@@ -58,6 +67,14 @@ Bulk-команды `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` /
 `REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY` сняты — их эндпоинты
 живут только звеньями цикла (CMD-Q3 закрыт). Перечисление **неизвестных**
 сущностей по инструменту (orphan / чужой live risk) — CMD-Q4.
+
+**Финализационные команды** `FINALIZE_DEAL_ENTRY` / `FINALIZE_DEAL_EXIT` /
+`MARK_DEAL_CLOSED` / `MARK_DEAL_ERROR` — lifecycle/system actions без
+`StrategyAction`: их retry-state живёт в `DealFinalizationState` (не
+`DealActionState`), а эмитятся они по статусу `DealFinalizationState`
+(`docs/decisions/deal-finalization-state-materialization.md`,
+`docs/components/ServiceCommandFactory.md`). Семантика executor'ов —
+`docs/components/FinalizeDealEntryExecutor.md` и др.
 
 Graceful shutdown, protection switch, REPLACE-ремодел и safety-flow
 собираются из существующих команд — отдельных типов под них нет.

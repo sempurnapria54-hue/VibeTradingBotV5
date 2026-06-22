@@ -24,13 +24,30 @@ commandType)`.
 
 `RetryBackoffType`: `FIXED`, `EXPONENTIAL`.
 
+## Авторитет `maxAttempts` (policy, читается живьём)
+
+`maxAttempts` определён в двух местах — поле `ServiceCommandRetryPolicy`
+(из конфига, per-command) и поле базы `Retryable` (на `DealActionState` /
+`DealFinalizationState`). **Авторитет — policy (настройка), читается
+живьём** каждый тик: предел повторов — операционная крутилка, правка должна
+браться сразу везде. Поле на сущности, **если оставляем**, — **снимок для
+истории** (что было лимитом на момент попытки), не операторное значение;
+retry-петля сверяет `attemptCount >= maxAttempts` по **policy**, а не по
+снимку на сущности.
+
+Альтернатива (авторитет — поле сущности, фиксируется при создании)
+**отвергнута**: тогда правка предела не бралась бы вживую (N11,
+`DOCS_CHECK_2` шага 4).
+
 ## Retry-состояние (Retryable / RetryError)
 
-Retry-состояние хранится в базовом `Retryable`, от которого наследуется
-persisted `DealActionState` (`docs/models/domain/other/DealActionState.md`):
+Retry-состояние хранится в базовом `Retryable`, от которого наследуются
+persisted `DealActionState` (`docs/models/domain/other/DealActionState.md`)
+и `DealFinalizationState`
+(`docs/models/domain/other/DealFinalizationState.md`):
 
-- `Retryable`: `attemptCount`, `maxAttempts`, `nextRetryAt`, `lastError`
-  (`RetryError`).
+- `Retryable`: `attemptCount`, `maxAttempts` (снимок; авторитет — policy,
+  см. выше), `nextRetryAt`, `lastError` (`RetryError`).
 - `RetryError`: `code` (`String`), `message` (`String`), `type`. Хранится
   объектом, а не парой строк `lastErrorCode`/`lastError`. Legacy-enum
   `RetryErrorType` (NETWORK / EXCHANGE_TIMEOUT / EXCHANGE_REJECTED /

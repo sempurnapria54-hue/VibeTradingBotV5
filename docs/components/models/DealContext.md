@@ -28,6 +28,7 @@ persisted (см. `.claude/decisions/runtime-value-object.md`); собирает�
 | `strategyDetail` | `StrategyDetail` | Pinned-конфигурация сделки. |
 | `balanceContainer` | `BalanceContainer` | Последний persisted snapshot баланса (свежесть **не** гарантирована). |
 | `actionStates` | `List<DealActionState>` | Runtime-состояние выполнения actions (recovery/retry/idempotency/target-resolution; модель — `docs/models/domain/other/DealActionState.md`). |
+| `finalizationStates` | `List<DealFinalizationState>` | Runtime-состояние финализационных команд (`FINALIZE_*`/`MARK_*`) сделки — recovery/retry/idempotency финализации; модель — `docs/models/domain/other/DealFinalizationState.md`. По нему `ServiceCommandFactory` выбирает финализационную команду за проход. |
 
 ## Runtime graph и сборка по фактам
 

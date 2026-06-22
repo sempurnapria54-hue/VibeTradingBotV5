@@ -45,5 +45,7 @@ ACK (успешный response команды, `code = 0`) подтвержда�
 ## Связанное
 
 - `docs/lifecycles/Position.md`, `docs/rules/no-partial-close.md`.
-- Подсистема `ServiceCommand` / executors — форвард-заметки в
-  task-вопросах соответствующих сущностей.
+- Подсистема `ServiceCommand` / executors —
+  `docs/components/models/ServiceCommand.md`,
+  `docs/components/ServiceCommandExecutor.md`,
+  `docs/rules/command-lifecycle.md`.

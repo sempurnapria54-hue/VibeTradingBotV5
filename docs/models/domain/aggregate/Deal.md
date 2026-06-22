@@ -45,9 +45,8 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 | `algoOrders` | `List<AlgoOrder>` | Standalone algo-orders сделки. |
 | `position` | `Position` | Текущая позиция (≤1 на `Deal`). |
 
-`Deal.direction` имеет тип `StrategyTradeDirection` (енум Strategy;
-мигрируется с `Strategy` — форвард-заметка в
-`.claude/work/questions/tasks/deal.md`).
+`Deal.direction` имеет тип `StrategyTradeDirection` (енум `Strategy`,
+`docs/models/domain/aggregate/Strategy.md`).
 
 ## Енумы
 
@@ -89,19 +88,23 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 - `resultProfit` считается через `REFRESH_FILLS` / `TradeFill` facts,
   **не** через `BalanceContainer` diff. `REFRESH_BALANCE` после
   выхода нужен для актуального account snapshot, не для PnL сделки.
-- Для terminal statuses `CLOSED` / `EMERGENCY_CLOSED` `resultProfit`
-  и `resultProfitCurrency` обязательны.
+- Для **чистого** terminal `CLOSED` `resultProfit` и
+  `resultProfitCurrency` обязательны; для ошибочного `EMERGENCY_CLOSED` —
+  по терминальному контракту финализации (не блокируется инвариантом
+  чистого закрытия; `docs/lifecycles/Deal.md` §«Терминальный контракт
+  финализации», DEAL-Q2).
 - `resultProfit = 0` допустим только как результат расчёта, **не**
   как fallback при ошибке. Если временно нельзя посчитать —
-  финализация retry-ится по общей retry-policy. (Поведение при
-  исчерпании retry — открытый вопрос, см.
-  `.claude/work/questions/open-questions.md`.)
+  финализация retry-ится по общему механизму (`DealFinalizationState`,
+  `docs/models/domain/other/DealFinalizationState.md`). Поведение при
+  исчерпании retry — **DEAL-Q2, закрыт**: сделка всегда доходит до
+  терминала (чистый `CLOSED` с числом либо ошибочный терминал), см.
+  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации».
 
 Детальный breakdown (fees, fundingFee, gross/netProfit, entry/exit
 fills, average prices, partial exits) в `Deal` не хранится —
 восстанавливается через `TradeFill` facts / финализационный расчёт /
-audit (`TradeFill` и `REFRESH_FILLS` — форвард-заметка в
-task-вопросах).
+audit (`TradeFill` и `REFRESH_FILLS` — шаг 7, OKX-Q1/OKX-Q3).
 
 ## Runtime graph
 
@@ -133,6 +136,8 @@ task-вопросах).
   `StrategyDetail`, последний persisted `BalanceContainer`,
   `DealActionState` list).
 
-Полные модели `DealActionState` / `DealContext`, FSM-handlers и
-правила сборки — в кластере процессов Deal management (форвард-
-заметки в `.claude/work/questions/tasks/deal.md`).
+Полные модели — `docs/models/domain/other/DealActionState.md`,
+`docs/components/models/DealContext.md`; FSM-handlers (материализованы) —
+`docs/components/` (`PrecheckHandler` … `ErrorHandler`,
+`.claude/decisions/fsm-handler-as-component.md`); правила сборки —
+`docs/processes/deal-management.md`.

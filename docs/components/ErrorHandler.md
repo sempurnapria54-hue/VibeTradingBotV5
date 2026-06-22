@@ -36,8 +36,10 @@ steps не выполняются. Safety-команды — без `RiskValidat
 отсутствует; нет live ordinary orders и algo-orders; attached protection
 отсутствует/не влияет; нет pending сущностей, способных создать риск;
 финальные exchange facts подтверждены; сделка не требует FSM-сопровождения.
-Иначе остаётся в `ERROR`. `EMERGENCY_CLOSED` — terminal, handler'а не
-имеет; обязательны `resultProfit`/`resultProfitCurrency`.
+Иначе остаётся в `ERROR`. `EMERGENCY_CLOSED` — terminal (ошибочный),
+handler'а не имеет; число `resultProfit` — по терминальному контракту
+финализации (`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»,
+DEAL-Q2), не блокируется инвариантом чистого закрытия.
 
 ## Возможные ServiceCommand
 

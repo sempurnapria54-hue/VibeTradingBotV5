@@ -70,5 +70,8 @@ lifecycle `docs/lifecycles/DealActionState.md`. Выбор (валидирова
 ## Закрытие вопроса
 
 DEAL-Q3 закрыт на `GAPS_CLOSE_1` шага 4 фазы 1 (2026-06-10). Смежный
-DEAL-Q1 (persisted retry-state финализации сделки) — **не** этим решением;
-финализация-команды — шаг 7, вопрос остаётся открытым.
+DEAL-Q1 (persisted retry-state финализации сделки) — **не** этим решением:
+финализация получила собственный дом — отдельную сущность
+`DealFinalizationState` (DEAL-Q1 закрыт на `GAPS_CLOSE_1` шага 6,
+`docs/decisions/deal-finalization-state-materialization.md`), а не
+обобщение `DealActionState`.

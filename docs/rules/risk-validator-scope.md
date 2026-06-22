@@ -39,8 +39,10 @@ Cancel-нога REPLACE отдельной валидации не получа�
 - **cleanup / safety**: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`,
   `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH` — снимают/локализуют уже
   существующий риск;
-- **finalization**: `MARK_DEAL_ERROR`, `MARK_DEAL_CLOSED`,
-  `FINALIZE_DEAL_EXIT`;
+- **finalization**: `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`,
+  `MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR` (lifecycle/system actions без
+  `StrategyAction`; retry-state — `DealFinalizationState`,
+  `docs/decisions/deal-finalization-state-materialization.md`);
 - **reduce-only partial exit** через `Order`/`AlgoOrder` — это exit-flow.
 
 Для exit / cleanup / safety / reduce-only partial exit handler выполняет

@@ -41,7 +41,9 @@ Java-модель, наследует retry-состояние от базово
 
 Retry-поля из базы `Retryable` (`docs/components/RetryPolicyService.md`):
 `attemptCount`, `maxAttempts`, `nextRetryAt`, `lastError` (`RetryError`,
-jsonb).
+jsonb). Авторитет предела повторов — **policy (читается живьём)**;
+`maxAttempts` на сущности — снимок для истории, не операторное значение
+(см. `docs/components/RetryPolicyService.md` §«Авторитет `maxAttempts`»).
 
 ## `RuntimeTarget` (раздел `DealActionState`)
 
@@ -81,7 +83,12 @@ algoOrderId)`); `REFRESH_POSITION` — `RuntimeTarget(POSITION, positionId)`
 - `ORDER` — ordinary order.
 - `ALGO_ORDER` — standalone algo-order.
 - `POSITION` — позиция.
-- `DEAL` — сама сделка (lifecycle/finalization-action).
+- `DEAL` — сама сделка (lifecycle/system action на самой сделке).
+  **Финализация** (`FINALIZE_DEAL_*`/`MARK_DEAL_*`) с шага 6 ведётся
+  отдельной сущностью `DealFinalizationState`
+  (`docs/models/domain/other/DealFinalizationState.md`), **не**
+  `DealActionState` (финализация не привязана к `StrategyAction`; см.
+  `docs/decisions/deal-finalization-state-materialization.md`).
 - `BALANCE` — баланс (`REFRESH_BALANCE`).
 - `NONE` — action без runtime-target-сущности (`entityId == null`).
 
