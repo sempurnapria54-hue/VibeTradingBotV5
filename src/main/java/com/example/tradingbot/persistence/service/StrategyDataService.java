@@ -97,6 +97,17 @@ public class StrategyDataService {
                 .map(mapper::persistenceToDomainWithSettings);
     }
 
+    /**
+     * Активная стратегия инструмента со всем деревом (детали + шаги +
+     * действия) — вход entry-скана и сборки pinned StrategyDetail сделки.
+     * Пусто — активной стратегии у инструмента нет.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Strategy> findActiveByInstrumentIdWithTree(Long instrumentId) {
+        return repository.findByInstrumentIdAndStatusWithTree(instrumentId, Strategy.Status.ACTIVE.name())
+                .map(mapper::persistenceToDomainWithTree);
+    }
+
     private void resolveTargetActions(StrategyEntity saved) {
         if (isNull(saved.getDetails())) {
             return;

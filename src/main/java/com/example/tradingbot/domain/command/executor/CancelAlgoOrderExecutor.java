@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.command.executor;
 
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.command.DealActionState;
@@ -56,8 +57,10 @@ public class CancelAlgoOrderExecutor implements CommandExecutor {
             algoOrder.setCloseReason(payload.getCancelReason());
             algoOrderDataService.save(algoOrder);
         }
-        actionState.setStatus(DealActionStateStatus.SUBMITTED);
-        dealActionStateDataService.save(actionState);
+        if (nonNull(actionState)) {
+            actionState.setStatus(DealActionStateStatus.SUBMITTED);
+            dealActionStateDataService.save(actionState);
+        }
         return ServiceCommandExecutionResult.ok();
     }
 }

@@ -31,6 +31,14 @@ public final class Constants {
         public static final int SCALE = 18;
     }
 
+    /** Машинные коды причин реактивного safety-холда (попадают в AnomalyReport.code). */
+    @UtilityClass
+    public class Hold {
+
+        /** L4: контролируемое нарушение биржевого факта/инварианта (ControlledExchangeException → VALIDATION_ERROR). */
+        public static final String EXCHANGE_CONTROLLED_VIOLATION = "EXCHANGE_CONTROLLED_VIOLATION";
+    }
+
     /** Константы интеграции с OKX: коды, флаги, заголовки, пути и имена полей запроса, таймфреймы. */
     @UtilityClass
     public class Okx {
@@ -85,6 +93,9 @@ public final class Constants {
 
         /** Путь конфигурации аккаунта (acctLv/posMode, GET). Приватный endpoint. */
         public static final String ACCOUNT_CONFIG_PATH = "/api/v5/account/config";
+
+        /** Путь выставления плеча инструмента (POST). Приватный endpoint. */
+        public static final String ACCOUNT_SET_LEVERAGE_PATH = "/api/v5/account/set-leverage";
 
         /** Путь исполнений (fills, последние 3 дня, GET). Приватный endpoint. */
         public static final String TRADE_FILLS_PATH = "/api/v5/trade/fills";

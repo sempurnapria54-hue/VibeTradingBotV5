@@ -80,6 +80,11 @@ public class Instrument extends Auditable {
         return isNotEmpty(candleGroups) && candleGroups.stream().allMatch(CandleGroup::isActive);
     }
 
+    /** Инструмент заморожен реактивным safety-холдом (уровень 3, docs/rules/instrument-hold.md). */
+    public Boolean isTradeBlocked() {
+        return Objects.equals(status, Status.TRADE_BLOCKED);
+    }
+
     /** Онбординг-статус инструмента в системе (готовность к торговле). */
     public enum Status {
 
@@ -88,6 +93,15 @@ public class Instrument extends Auditable {
 
         /** Инструмент придержан (не вовлекается в онбординг). */
         HOLD,
+
+        /**
+         * Торговля по инструменту заморожена реактивным safety-холдом
+         * (уровень 3 error-градации, docs/rules/instrument-hold.md): новые
+         * сделки/наращивание запрещены, safety/read разрешены. Вход — только
+         * из {@code ACTIVE} по аварии; снятие — вручную в {@code ACTIVE}.
+         * Отдельный смысл от онбординг-{@code HOLD}.
+         */
+        TRADE_BLOCKED,
 
         /** Идёт синхронизация спецификации с биржей. */
         SYNC,

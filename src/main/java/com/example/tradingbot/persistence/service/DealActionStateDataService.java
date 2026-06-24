@@ -3,7 +3,9 @@ package com.example.tradingbot.persistence.service;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.mapping.DealActionStateMapper;
 import com.example.tradingbot.persistence.repository.DealActionStateRepository;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,5 +31,12 @@ public class DealActionStateDataService {
     public Optional<DealActionState> findByDealIdAndStrategyActionId(Long dealId, Long strategyActionId) {
         return repository.findByDealIdAndStrategyActionId(dealId, strategyActionId)
                 .map(mapper::persistenceToDomain);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DealActionState> findByDealId(Long dealId) {
+        return repository.findByDealId(dealId).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
     }
 }

@@ -331,6 +331,32 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   **Код-снятие fail-open** (`RiskValidator`/`SizeCalculator`,
   `PrecheckHandler` + set-leverage) — на `CODE` шага 6. Источник —
   `.claude/work/progress/phase-1-step-5-code.md` §Форвард-концепт.
+- **Error-градация уровни 3-4: реактивный enforcement холдов — ✅ ПОСТРОЕН
+  (CODE-делта холдов шага 6, 2026-06-23; D2-реактивный снят).** Реактивный
+  CRITICAL-холд L3/L4 построен по `phase-1-step-6-holds-design.md`: новый
+  `Status.TRADE_BLOCKED` (Instrument+Exchange, только из ACTIVE) + `HoldSignal` в
+  `DealTransition` + `SafetyHoldCoordinator` (в проходе `DealOrchestratorJob` под
+  D-M1: TRADE_BLOCKED первым → `AnomalyReport` CREATED/before → kill-switch →
+  KILL_SWITCH_EXECUTED/after → COMPLETED) + `KillSwitchService` (L3 граф сделки /
+  L4 каскадный sweep, эмитент `EXECUTE_KILL_SWITCH`) + `AnomalyReport` Java-стек
+  (модель/entity/repo/dataservice/mapper/`V10`, явный `scope`) + enforcement
+  (`EntryScannerJob` фильтр инструмент+биржа; `enforceHold` активных сделок →
+  ERROR со shutdownReason). Триггеры: L3 = бесстоповая позиция постфактум
+  (`markErrorStopless`, §8.C); L4 = controlled-violation (`VALIDATION_ERROR` ⟺
+  `ControlledExchangeException`). Сверка — `phase-1-step-6-code.md` §Реактивные
+  холды. **Остаётся форвардом (узко):** (1) **проактивная детекция** аномалий
+  (`AnomalyJob`/`TradeRuleValidator` + численный порог «серия неудач» STRUCT-Q1)
+  — **шаг 8**; (2) **внешние (биржевые) слепки** `AnomalyReport.external_*` +
+  точный after через REFRESH_* — реконсиляционный read биржи, **шаг 8**;
+  (3) **ops ручного un-hold** (`TRADE_BLOCKED → ACTIVE` + аудит кем/когда) —
+  **шаг 9 / п.9** (statusный гард обратного перехода готов). Доки
+  (`instrument-hold.md`/`exchange-hold.md`/`error-handling-policy.md`,
+  `risk-creating-entry-protection.md` §2 → L3, §8.C) выравниваются общим
+  `SYNC_DOCS_FROM_CODE`.
+- **`EXECUTE_KILL_SWITCH` — эмиссия команды — ✅ ПОДКЛЮЧЕНА** (CODE-делта холдов,
+  2026-06-23). Тонкий эмиттер — `KillSwitchService` (вызывается из
+  `SafetyHoldCoordinator`); заменил удалённый орфан
+  `DealFsmSupport.killSwitchCommand()`. `KillSwitchExecutor` без изменений.
 
 ### Шаг 7 (сделки и P&L)
 
@@ -395,8 +421,13 @@ Refinements, сознательно отложенные при `CODE` шага 
   CREATE/SUBMIT/REFRESH/CLOSE). **Владелец оркестрации решён (`GAPS_CLOSE_1`
   шага 6, CMD-Q5/CMD-Q6):** секвенс ног ведёт петля/`DealStateMachine` по
   фактам, фабрика остаётся «одна команда за проход»
-  (`docs/decisions/action-orchestration-vs-command.md`). Реализация — на
-  `CODE` шага 6. Концепция — `replace-not-amend`, `DealActionState` §REPLACE.
+  (`docs/decisions/action-orchestration-vs-command.md`). Концепция —
+  `replace-not-amend`, `DealActionState` §REPLACE. **Re-deferred за `CODE`
+  шага 6 (deferral D1, 2026-06-22):** на `CODE` шага 6 фабрика REPLACE-ног
+  оставлена возвращающей `empty`, `ManagingHandler` стоит в `MANAGING`;
+  обоснование — самостоятельный объёмный refinement, не нужен базовой петле
+  фазы 1, `DONE` шага 6 не гейтит. Сверка —
+  `.claude/work/progress/phase-1-step-6-code.md` §Сверка scope.
 - **Refresh algo: external-поля дерева `condition`.** `updateFromSnapshot`
   игнорит `condition`; обновляются только top-level факты срабатывания.
   Обновление trigger/trailing external-цен из снапшота — добрать.

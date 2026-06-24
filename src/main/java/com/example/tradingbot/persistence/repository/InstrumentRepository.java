@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,6 +16,11 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     List<InstrumentEntity> findByStatus(String status);
 
     List<InstrumentEntity> findByStatusIn(Collection<String> statuses);
+
+    /** Гардированный statusный переход (только из ожидаемого {@code from}); возвращает число затронутых строк. */
+    @Modifying
+    @Query("update InstrumentEntity i set i.status = :to where i.id = :id and i.status = :from")
+    int updateStatus(@Param("id") Long id, @Param("from") String from, @Param("to") String to);
 
     /** Проекция: JSONB-навес внешних правил по id — без вытягивания всей сущности. */
     @Query("select i.externalRules from InstrumentEntity i where i.id = :id")

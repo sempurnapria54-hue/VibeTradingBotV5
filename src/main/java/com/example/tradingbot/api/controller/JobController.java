@@ -1,6 +1,8 @@
 package com.example.tradingbot.api.controller;
 
 import com.example.tradingbot.domain.jobs.facade.CandleJobFacade;
+import com.example.tradingbot.domain.jobs.facade.DealOrchestratorJobFacade;
+import com.example.tradingbot.domain.jobs.facade.EntryScannerJobFacade;
 import com.example.tradingbot.domain.jobs.facade.IndicatorJobFacade;
 import com.example.tradingbot.domain.jobs.facade.MarketStructureJobFacade;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +31,8 @@ public class JobController {
     private final CandleJobFacade candleJobFacade;
     private final IndicatorJobFacade indicatorJobFacade;
     private final MarketStructureJobFacade marketStructureJobFacade;
+    private final EntryScannerJobFacade entryScannerJobFacade;
+    private final DealOrchestratorJobFacade dealOrchestratorJobFacade;
 
     @PostMapping("/candle-loading/trigger")
     @Operation(summary = "Запустить загрузку свечей вне расписания (асинхронно)")
@@ -48,6 +52,20 @@ public class JobController {
     @Operation(summary = "Запустить расчёт структуры рынка вне расписания (асинхронно)")
     public ResponseEntity<Void> triggerMarketStructure() {
         marketStructureJobFacade.trigger();
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/entry-scanner/trigger")
+    @Operation(summary = "Запустить поиск входов вне расписания (асинхронно)")
+    public ResponseEntity<Void> triggerEntryScanner() {
+        entryScannerJobFacade.trigger();
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/deal-orchestrator/trigger")
+    @Operation(summary = "Запустить проход сопровождения сделок вне расписания (асинхронно)")
+    public ResponseEntity<Void> triggerDealOrchestrator() {
+        dealOrchestratorJobFacade.trigger();
         return ResponseEntity.accepted().build();
     }
 }

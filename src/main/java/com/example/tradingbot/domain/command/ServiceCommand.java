@@ -23,8 +23,11 @@ public class ServiceCommand {
     /** Сделка, в рамках которой выполняется команда. */
     Long dealId;
 
-    /** Runtime-состояние action стратегии (связь со StrategyAction); null для не-action команд. */
+    /** Runtime-состояние action стратегии (связь со StrategyAction); null для финализационных/не-action команд. */
     Long dealActionStateId;
+
+    /** Runtime-состояние финализационной команды (lifecycle/system action без StrategyAction); null для action-команд. */
+    Long dealFinalizationStateId;
 
     /** Параметры выполнения. */
     ServiceCommandPayload payload;

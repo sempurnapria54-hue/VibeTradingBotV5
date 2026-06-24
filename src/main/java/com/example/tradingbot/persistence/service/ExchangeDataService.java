@@ -3,6 +3,7 @@ package com.example.tradingbot.persistence.service;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.persistence.repository.ExchangeRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,32 @@ public class ExchangeDataService {
         return repository.findByInternalId(internalId)
                 .map(mapper::persistenceToDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Exchange not found: " + internalId));
+    }
+
+    @Transactional(readOnly = true)
+    public Exchange getRequiredById(Long id) {
+        return repository.findById(id)
+                .map(mapper::persistenceToDomain)
+                .orElseThrow(() -> new IllegalArgumentException("Exchange not found: " + id));
+    }
+
+    /** Проекция id бирж в статусе — каскадный фильтр входов по TRADE_BLOCKED-биржам. */
+    @Transactional(readOnly = true)
+    public List<Long> findIdsByStatus(Exchange.Status status) {
+        return repository.findIdsByStatus(status.name());
+    }
+
+    /**
+     * Заморозка торговли по аварии: ACTIVE → TRADE_BLOCKED (гардирована статусом,
+     * только из ACTIVE — decision B). Возвращает {@code true}, если переход
+     * применился (биржа была ACTIVE) — анкер идемпотентности реакции холда.
+     * Обратный переход (ручная разморозка TRADE_BLOCKED → ACTIVE) — с операцией
+     * un-hold (step 9 / backlog п.9), здесь не вводится превентивно.
+     */
+    @Transactional
+    public Boolean blockTrade(Long id) {
+        return repository.updateStatus(id, Exchange.Status.ACTIVE.name(),
+                Exchange.Status.TRADE_BLOCKED.name()) > 0;
     }
 
     /** Проекция: только internalId по id — без вытягивания всей сущности. */

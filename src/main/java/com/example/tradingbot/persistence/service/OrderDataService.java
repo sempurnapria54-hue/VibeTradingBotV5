@@ -55,6 +55,17 @@ public class OrderDataService {
         return order;
     }
 
+    @Transactional(readOnly = true)
+    public List<Order> findByDealId(Long dealId) {
+        return repository.findByDealId(dealId).stream()
+                .map(entity -> {
+                    Order order = mapper.persistenceToDomain(entity);
+                    order.setAttachedAlgoOrders(loadAttached(entity.getId()));
+                    return order;
+                })
+                .collect(Collectors.toList());
+    }
+
     private List<AttachedAlgoOrder> saveAttached(Long orderId, List<AttachedAlgoOrder> attached) {
         if (isEmpty(attached)) {
             return null;

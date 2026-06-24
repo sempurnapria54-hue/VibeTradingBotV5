@@ -99,6 +99,9 @@ public class RiskCheckResult {
         /** Стоп-лосс слишком близко к цене ликвидации. */
         STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
 
+        /** Risk-creating вход (открытие/наращивание) без резолвимого стопа (docs/rules/risk-creating-entry-protection.md). */
+        RISK_CREATING_ENTRY_WITHOUT_STOP,
+
         /** Частичный выход не reduce-only (safety/invariant). */
         PARTIAL_EXIT_NOT_REDUCE_ONLY,
 

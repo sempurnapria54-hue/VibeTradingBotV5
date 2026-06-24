@@ -160,6 +160,16 @@ public interface IntegrationService {
     ExchangeAck closePosition(String externalInstrumentId, String settleCurrency);
 
     /**
+     * Выставление рабочего плеча инструмента на бирже перед постановкой
+     * entry-ордера (idempotent: совпадает с уже выставленным → биржа
+     * подтверждает без изменения). См.
+     * docs/components/PrecheckHandler.md (set-leverage перед постановкой).
+     *
+     * @return нормализованный ACK биржи (успех при code OK).
+     */
+    ExchangeAck setLeverage(String externalInstrumentId, Integer leverage);
+
+    /**
      * Баланс аккаунта по settle currency. Normal null-контракт не
      * применяется: пустой/невалидный ответ — controlled error.
      *

@@ -29,7 +29,7 @@ production-flow одной стратегии.
 | 3 | Производные рыночные данные: индикаторы + структура рынка (`MarketStructure`) + фаза рынка (`MarketPhase`) — jobs, модели, сервисы (расчёт/чтение/сохранение значений, запрошенных стратегией) | DONE |
 | 4 | Команды и их жизненный цикл (ServiceCommand: submit/replace/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DONE |
 | 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | DONE |
-| 6 | FSM + живая оркестрация (состояния и переходы сущностей + handler'ы; живая оркестрационная петля `DealOrchestratorJob` (driving), REPLACE-оркестрация, per-deal concurrency-guard, механика финализации — финализационные executor'ы / терминальные рёбра / retry-state финализации) | DOCS_CHECK_3 |
+| 6 | FSM + живая оркестрация (состояния и переходы сущностей + handler'ы; живая оркестрационная петля `DealOrchestratorJob` (driving), REPLACE-оркестрация, per-deal concurrency-guard, механика финализации — финализационные executor'ы / терминальные рёбра / retry-state финализации) | CODE |
 | 7 | Сделки и P&L (`DealOrchestratorJob` — агрегирование в `Deal`, расчёт `resultProfit` / P&L) | HOLD |
 | 8 | AnomalyJob (полноценный, операционная детекция аномалий состояния/исполнения) | HOLD |
 | 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | HOLD |
@@ -650,3 +650,43 @@ production-flow одной стратегии.
   менялась). Шаг 6 готов к `CODE`; перевод за пользователем. Жёсткие гейты
   `DONE` (D-B3 / реализация D-M1) — на `CODE`/`DONE`. Отчёт —
   `.claude/work/progress/phase-1-step-6-docs-check-3.md`.
+- **Шаг 6 → `CODE` (2026-06-22):** написан код по утверждённой концепции
+  (~50 файлов в working tree, staged; `mvn clean compile` чисто на JDK 25,
+  без deprecation/warnings). Материализованы: финализационная под-спина
+  (`DealFinalizationState` + entity/repo/dataservice/mapper, миграция `V9`;
+  4 финализационных executor'а; эмиссия через фабрику + retry-anchor в
+  диспетчере), FSM (`DealStateMachine` + 7 handler'ов + `DealFsmSupport`/
+  `DealActionPlanner`/`MarketConditionContextFactory`), оболочка петли
+  (`DealOrchestratorJob` + `EntryScannerJob` + фасады + конфиг + триггеры),
+  **D-M1** (`OrchestratorPassLock` — БД advisory lock на проход), **D-B3**
+  (recovery-by-clientId в submit-executor'ах), N9/TR1 (защита бесстопового
+  входа), set-leverage, error-политика (`@RestControllerAdvice` +
+  `ErrorApiResponse`). **Аппрув-гейт:** три независимых адверсариальных
+  фокуса (`conventions` 0/2/9, `performance` 0/2/3, `disaster` 2/4/3;
+  `security` деактивирован до шага 9) + независимая верификация фиксов.
+  Закрыты оба disaster-blocker'а (B1 RETRY_PENDING зависание action-команд;
+  B2 несоблюдение `nextRetryAt`), major'ы M3 (финализация FAILED → ошибочная
+  тропа), M4 (терминальный гейт по live orders/algo), M5 (частичный
+  unique-index «одна сделка на инструмент»), perf-M1 (индексы `deals`), все
+  conventions-находки. Форвард (осознанно, фаза 1): REPLACE-leg-оркестрация,
+  биржевой REST в `@Transactional` (M6), перф M2-M5, tech-radar-запись по
+  raw-JDBC advisory lock. Отчёт и концепт-инкременты для пост-хок гейта §6a —
+  `.claude/work/progress/phase-1-step-6-code.md`. Финальный аппрув `CODE` и
+  переход к `SYNC_DOCS_FROM_CODE` — за пользователем.
+- **Шаг 6 → сверка scope `CODE` на полноту (2026-06-22):** поставленный `CODE`
+  сверён построчно со scope (роадмап-строка + граница 6↔7 + закрытия
+  `GAPS_CLOSE_1` N1-N15 + жёсткие гейты), не только на качество. **Весь scope —
+  built**, кроме двух **обоснованных deferral'ов** (зафиксированы с владельцами и
+  треком, не молча): **D1** REPLACE-leg-оркестрация (фабрика ног возвращает
+  empty; самостоятельный refinement, базовой петле фазы 1 не нужен; `backlog.md`
+  §Хвост шага 4) и **D2** error-градация уровни 3-4 — реактивный enforcement
+  холдов instrument/exchange + `AnomalyReport`-реакция (зависит от `AnomalyReport`
+  ops шага 8 и status-lifecycle backlog п.9; порог серии неудач — провизорный;
+  `backlog.md` §Шаг 6). Внешняя поверхность + уровни 1-2 + `KillSwitchExecutor` +
+  преконтроль N9/TR1 — построены. На сверке снят один дефект: орфан-метод
+  `DealFsmSupport.killSwitchCommand()` (эмиссия `EXECUTE_KILL_SWITCH` без
+  вызовов; конвенц-фокус пропустил) удалён. **set-leverage** — намеренное сужение
+  «каждый ордер → открывающий» в submit-executor'е подтверждено как
+  §6a-инкремент (доки сами отнесли тайминг к шагу 6). Жёсткие гейты `DONE`
+  (D-B3 / D-M1) — оба built. Сверка — `phase-1-step-6-code.md` §Сверка scope;
+  финальный аппрув `CODE` за пользователем.

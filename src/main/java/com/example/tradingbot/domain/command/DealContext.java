@@ -38,4 +38,7 @@ public class DealContext {
 
     /** Runtime-состояние выполнения actions (recovery/retry/idempotency/target). */
     List<DealActionState> actionStates;
+
+    /** Runtime-состояние финализационных команд (FINALIZE_* / MARK_*) сделки — recovery/retry/idempotency финализации. */
+    List<DealFinalizationState> finalizationStates;
 }

@@ -43,6 +43,17 @@ instrument-external-rules-sync:
   enabled: ${INSTRUMENT_RULES_SYNC_ENABLED:true}
   cron: ${INSTRUMENT_RULES_SYNC_CRON:0 0 * * * *}
 
+# Поиск входов и сопровождение сделок — те же значения, что в prod
+# (см. application-prod.yaml, docs/components/{EntryScannerJob,DealOrchestratorJob}.md).
+entry-scanner:
+  enabled: ${ENTRY_SCANNER_ENABLED:true}
+  cron: ${ENTRY_SCANNER_CRON:0 * * * * *}
+
+deal-orchestrator:
+  enabled: ${DEAL_ORCHESTRATOR_ENABLED:true}
+  cron: ${DEAL_ORCHESTRATOR_CRON:0 * * * * *}
+  batch-size: ${DEAL_ORCHESTRATOR_BATCH_SIZE:100}
+
 logging:
   level:
     com.example.tradingbot: DEBUG

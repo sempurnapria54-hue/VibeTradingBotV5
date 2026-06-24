@@ -63,4 +63,22 @@ public interface StrategyRepository extends JpaRepository<StrategyEntity, Long> 
             """)
     List<StrategyEntity> findByInstrumentIdAndStatusWithSettings(@Param("instrumentId") Long instrumentId,
                                                                  @Param("status") String status);
+
+    /**
+     * Стратегия инструмента в заданном статусе со всем деревом (детали с
+     * шагами и действиями) — для сборки pinned StrategyDetail сделки и
+     * entry-скана. Инвариант: не более одной ACTIVE на инструмент.
+     */
+    @Query("""
+            select distinct s from StrategyEntity s
+            left join fetch s.marketPhaseSetting
+            left join fetch s.indicatorSettings
+            left join fetch s.marketStructureSettings
+            left join fetch s.details d
+            left join fetch d.steps st
+            left join fetch st.actions
+            where s.instrumentId = :instrumentId and s.status = :status
+            """)
+    Optional<StrategyEntity> findByInstrumentIdAndStatusWithTree(@Param("instrumentId") Long instrumentId,
+                                                                 @Param("status") String status);
 }

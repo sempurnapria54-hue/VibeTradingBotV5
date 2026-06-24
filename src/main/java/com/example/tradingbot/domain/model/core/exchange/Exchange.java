@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.model.core.exchange;
 
 import com.example.tradingbot.domain.model.Auditable;
+import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -32,6 +33,11 @@ public class Exchange extends Auditable {
     /** Текущий статус подключения/использования биржи. */
     private Status status;
 
+    /** Биржа заморожена реактивным safety-холдом (уровень 4, docs/rules/exchange-hold.md). */
+    public Boolean isTradeBlocked() {
+        return Objects.equals(status, Status.TRADE_BLOCKED);
+    }
+
     /** Статус подключения/использования биржи. */
     public enum Status {
 
@@ -43,6 +49,14 @@ public class Exchange extends Auditable {
 
         /** Биржа активна, доступна для работы. */
         ACTIVE,
+
+        /**
+         * Торговля по бирже заморожена реактивным safety-холдом (уровень 4
+         * error-градации, docs/rules/exchange-hold.md): каскадно блокирует
+         * входы по всем инструментам биржи, safety/read разрешены. Вход —
+         * только из {@code ACTIVE} по аварии; снятие — вручную в {@code ACTIVE}.
+         */
+        TRADE_BLOCKED,
 
         /** Биржа выведена из использования. */
         CLOSED,

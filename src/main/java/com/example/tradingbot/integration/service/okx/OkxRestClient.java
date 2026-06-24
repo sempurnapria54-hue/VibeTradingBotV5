@@ -10,6 +10,7 @@ import com.example.tradingbot.integration.model.okx.request.CancelOrderOkxReques
 import com.example.tradingbot.integration.model.okx.request.ClosePositionOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceOrderOkxRequest;
+import com.example.tradingbot.integration.model.okx.request.SetLeverageOkxRequest;
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxAlgoOrderResponse;
@@ -20,6 +21,7 @@ import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse
 import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.SetLeverageOkxResponse;
 import com.example.tradingbot.util.Constants;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,6 +75,9 @@ public class OkxRestClient {
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<AlgoOrderAckOkxResponse>> ALGO_ACK_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<OkxApiResponse<SetLeverageOkxResponse>> SET_LEVERAGE_TYPE =
             new ParameterizedTypeReference<>() {
             };
 
@@ -251,6 +256,12 @@ public class OkxRestClient {
         query.put(Constants.Okx.PARAM_AFTER, after);
         query.put(Constants.Okx.PARAM_LIMIT, limit);
         return dispatch(HttpMethod.GET, Constants.Okx.TRADE_FILLS_PATH, query, null, true, FILL_TYPE);
+    }
+
+    /** Выставление плеча инструмента (POST). Приватный endpoint (подпись). */
+    public OkxApiResponse<SetLeverageOkxResponse> setLeverage(SetLeverageOkxRequest request) {
+        return dispatch(HttpMethod.POST, Constants.Okx.ACCOUNT_SET_LEVERAGE_PATH, null, request, true,
+                SET_LEVERAGE_TYPE);
     }
 
     /** Баланс аккаунта (опционально по валюте). Приватный endpoint (подпись). */

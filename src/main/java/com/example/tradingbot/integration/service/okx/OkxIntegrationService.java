@@ -22,6 +22,7 @@ import com.example.tradingbot.integration.model.okx.request.CancelOrderOkxReques
 import com.example.tradingbot.integration.model.okx.request.ClosePositionOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceOrderOkxRequest;
+import com.example.tradingbot.integration.model.okx.request.SetLeverageOkxRequest;
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.CandleOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
@@ -33,6 +34,7 @@ import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse
 import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.SetLeverageOkxResponse;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
@@ -218,6 +220,24 @@ public class OkxIntegrationService implements IntegrationService {
         OkxApiResponse<OrderAckOkxResponse> response = execute(() -> okxRestClient.closePosition(request),
                 "close-position", "instId=" + externalInstrumentId);
         return toOrderAck(response, "close-position", externalInstrumentId);
+    }
+
+    @Override
+    public ExchangeAck setLeverage(String externalInstrumentId, Integer leverage) {
+        SetLeverageOkxRequest request = new SetLeverageOkxRequest();
+        request.setInstId(externalInstrumentId);
+        request.setLever(String.valueOf(leverage));
+        request.setMgnMode(Constants.Okx.TD_MODE_ISOLATED);
+        request.setPosSide(Constants.Okx.POS_SIDE_NET);
+        OkxApiResponse<SetLeverageOkxResponse> response = execute(() -> okxRestClient.setLeverage(request),
+                "set-leverage", "instId=" + externalInstrumentId + " lever=" + leverage);
+        verifyCode(response, "set-leverage", "instId=" + externalInstrumentId);
+        return ExchangeAck.builder()
+                .success(Boolean.TRUE)
+                .internalId(externalInstrumentId)
+                .code(response.getCode())
+                .message(response.getMsg())
+                .build();
     }
 
     @Override

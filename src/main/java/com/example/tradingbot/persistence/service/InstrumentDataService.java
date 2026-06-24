@@ -64,6 +64,19 @@ public class InstrumentDataService {
                 .collect(toList());
     }
 
+    /**
+     * Заморозка торговли по аварии: ACTIVE → TRADE_BLOCKED (гардирована статусом,
+     * только из ACTIVE — decision B). Возвращает {@code true}, если переход
+     * применился (инструмент был ACTIVE) — анкер идемпотентности реакции холда.
+     * Обратный переход (ручная разморозка TRADE_BLOCKED → ACTIVE) — с операцией
+     * un-hold (step 9 / backlog п.9), здесь не вводится превентивно.
+     */
+    @Transactional
+    public Boolean blockTrade(Long id) {
+        return repository.updateStatus(id, Instrument.Status.ACTIVE.name(),
+                Instrument.Status.TRADE_BLOCKED.name()) > 0;
+    }
+
     @Transactional(readOnly = true)
     public List<Instrument> findByStatusIn(Collection<Instrument.Status> statuses) {
         List<String> names = statuses.stream().map(Enum::name).collect(toList());

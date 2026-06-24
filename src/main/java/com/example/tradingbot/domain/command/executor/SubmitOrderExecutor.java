@@ -1,6 +1,9 @@
 package com.example.tradingbot.domain.command.executor;
 
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.command.DealActionState;
@@ -13,6 +16,8 @@ import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.domain.command.payload.SubmitOrderCommandPayload;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
@@ -22,10 +27,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Исполняет SUBMIT_ORDER: загружает локальный Order; если externalId
- * пуст — отправляет на биржу (placeOrder), на successful ACK сохраняет
- * externalId + PENDING; обновляет DealActionState = SUBMITTED. ACK не
- * runtime truth — факт подтверждает REFRESH_ORDER. (Recovery-поиск по
- * client id — refinement.) См. docs/components/SubmitOrderExecutor.md.
+ * пуст — перед повторным submit ищет факт по stable client id (D-B3:
+ * place мог реально пройти, ответ потерян — не плодим дубль), иначе
+ * выставляет рабочее плечо (для открывающего ордера, idempotent) и
+ * отправляет на биржу; на successful ACK сохраняет externalId + PENDING;
+ * обновляет DealActionState = SUBMITTED. ACK не runtime truth — факт
+ * подтверждает REFRESH_ORDER. См. docs/components/SubmitOrderExecutor.md.
  */
 @Component
 @RequiredArgsConstructor
@@ -46,8 +53,10 @@ public class SubmitOrderExecutor implements CommandExecutor {
                                                  DealContext dealContext) {
         SubmitOrderCommandPayload payload = (SubmitOrderCommandPayload) command.getPayload();
         Order order = orderDataService.getRequiredById(payload.getOrderId());
-        if (isBlank(order.getExternalId())) {
-            ExchangeAck ack = integrationService.placeOrder(order, dealContext.getInstrument().getExternalId());
+        String instId = dealContext.getInstrument().getExternalId();
+        if (isBlank(order.getExternalId()) && isFalse(recoverByClientId(order, instId, actionState))) {
+            ensureLeverage(order, dealContext);
+            ExchangeAck ack = integrationService.placeOrder(order, instId);
             if (isFalse(ack.getSuccess())) {
                 return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR, ack.getMessage());
             }
@@ -58,5 +67,44 @@ public class SubmitOrderExecutor implements CommandExecutor {
         actionState.setStatus(DealActionStateStatus.SUBMITTED);
         dealActionStateDataService.save(actionState);
         return ServiceCommandExecutionResult.ok();
+    }
+
+    /**
+     * D-B3: только перед ПОВТОРНЫМ submit ищем ордер по stable client id —
+     * предыдущий place мог реально выполниться, даже если ответ не получен.
+     * Найден → восстанавливаем externalId, второй раз не отправляем.
+     */
+    private Boolean recoverByClientId(Order order, String instId, DealActionState actionState) {
+        if (isFalse(isRetry(actionState))) {
+            return false;
+        }
+        OrderExternalSnapshot existing = integrationService.getOrder(instId, null, order.getInternalId());
+        if (isNull(existing) || isBlank(existing.getExternalId())) {
+            return false;
+        }
+        order.setExternalId(existing.getExternalId());
+        order.setStatus(Order.Status.PENDING);
+        orderDataService.save(order);
+        return true;
+    }
+
+    /** Рабочее плечо на бирже перед постановкой открывающего ордера (idempotent); reduce-only не трогаем. */
+    private void ensureLeverage(Order order, DealContext dealContext) {
+        if (isTrue(order.getPositionReducingOnly())) {
+            return;
+        }
+        Integer leverage = dealContext.getInstrument().getLeverage();
+        if (isNull(leverage)) {
+            return;
+        }
+        String instId = dealContext.getInstrument().getExternalId();
+        ExchangeAck ack = integrationService.setLeverage(instId, leverage);
+        if (isFalse(ack.getSuccess())) {
+            throw new ExchangeIntegrationException("set-leverage rejected instId=" + instId);
+        }
+    }
+
+    private Boolean isRetry(DealActionState actionState) {
+        return nonNull(actionState) && nonNull(actionState.getAttemptCount()) && actionState.getAttemptCount() > 0;
     }
 }

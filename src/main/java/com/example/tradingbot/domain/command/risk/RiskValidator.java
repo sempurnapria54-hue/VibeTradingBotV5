@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.command.risk;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.calc.CalculatedPrice;
@@ -15,6 +16,8 @@ import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckStatus;
 import com.example.tradingbot.domain.command.risk.RiskValidationResult.RiskDecision;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
@@ -80,6 +83,7 @@ public class RiskValidator {
         checkMarginMode(dealContext.getInstrument(), checks);
         checkSizeBounds(rules, sizeContracts, price, checks);
         checkExchangeMaxLeverage(dealContext.getInstrument(), rules, checks);
+        checkRiskCreatingEntryProtection(calculatedAction, checks);
         checkStopLossSide(price.getStopLossPrice(), entryReference, direction, checks);
         checkTakeProfitSide(price.getTakeProfitPrice(), entryReference, direction, checks);
         checkLiquidationGuard(price.getStopLossPrice(), position, direction, checks);
@@ -133,6 +137,33 @@ public class RiskValidator {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.EXCHANGE_MAX_LEVERAGE_EXCEEDED,
                     "Leverage above exchange max " + maxLeverage, leverage));
         }
+    }
+
+    /**
+     * Инвариант docs/rules/risk-creating-entry-protection.md: risk-creating вход
+     * (открытие/наращивание позиции, не reduce-only) без резолвимого стопа
+     * блокируется — без fail-open allocation-сайзинга в обход RISK_PER_TRADE.
+     * Резолвимый стоп = attached SL / иной механизм, давший цену стопа в
+     * CalculatedPrice. Reduce-only/закрывающие действия правило не трогает.
+     */
+    private void checkRiskCreatingEntryProtection(CalculatedStrategyAction calculatedAction,
+                                                  List<RiskCheckResult> checks) {
+        if (isFalse(isRiskCreatingEntry(calculatedAction.getSourceAction()))) {
+            return;
+        }
+        ResolvedStopLossPrice stopLoss = calculatedAction.getCalculatedPrice().getStopLossPrice();
+        if (isNull(stopLoss) || isNull(stopLoss.getTriggerPrice())) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_CREATING_ENTRY_WITHOUT_STOP,
+                    "Risk-creating entry without resolvable stop-loss", null));
+        }
+    }
+
+    /** Risk-creating вход — order-action, открывающий/наращивающий позицию (не reduce-only). */
+    private Boolean isRiskCreatingEntry(StrategyAction action) {
+        if (action instanceof StrategyOrderAction orderAction) {
+            return isNotTrue(orderAction.getPositionReducingOnly());
+        }
+        return false;
     }
 
     private void checkStopLossSide(ResolvedStopLossPrice stopLoss, BigDecimal entryReference,

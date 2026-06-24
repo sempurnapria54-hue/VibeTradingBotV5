@@ -61,6 +61,22 @@ instrument-external-rules-sync:
   enabled: ${INSTRUMENT_RULES_SYNC_ENABLED:true}
   cron: ${INSTRUMENT_RULES_SYNC_CRON:0 0 * * * *}
 
+# Поиск входов (docs/components/EntryScannerJob.md): сканирует активные
+# инструменты под ENTRY/GRID_ENTRY condition активной стратегии. Частота —
+# провизорное число (бэктест/наблюдения).
+entry-scanner:
+  enabled: ${ENTRY_SCANNER_ENABLED:true}
+  cron: ${ENTRY_SCANNER_CRON:0 * * * * *}
+
+# Сопровождение сделок (docs/components/DealOrchestratorJob.md): гоняет
+# активные Deal через FSM. Concurrency-guard прохода — БД advisory lock
+# (D-M1). batch-size — окно выборки активных сделок за проход. Частота —
+# провизорное число.
+deal-orchestrator:
+  enabled: ${DEAL_ORCHESTRATOR_ENABLED:true}
+  cron: ${DEAL_ORCHESTRATOR_CRON:0 * * * * *}
+  batch-size: ${DEAL_ORCHESTRATOR_BATCH_SIZE:100}
+
 logging:
   level:
     com.example.tradingbot: INFO
