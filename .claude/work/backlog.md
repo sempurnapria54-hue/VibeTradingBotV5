@@ -344,15 +344,31 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   ERROR со shutdownReason). Триггеры: L3 = бесстоповая позиция постфактум
   (`markErrorStopless`, §8.C); L4 = controlled-violation (`VALIDATION_ERROR` ⟺
   `ControlledExchangeException`). Сверка — `phase-1-step-6-code.md` §Реактивные
-  холды. **Остаётся форвардом (узко):** (1) **проактивная детекция** аномалий
+  холды. **Доработка дельты (2026-06-24):** два сужения сняты — (A) **внешние
+  (биржевые) слепки `AnomalyReport.external_*` теперь собираются** (`getPosition`+
+  `getPendingOrders` по instId триггера, before при CREATED / after после
+  kill-switch, best-effort, схема открытая/аддитивная); (B) **ручной un-hold
+  `TRADE_BLOCKED → ACTIVE` построен через REST** (`trade-unblock` на
+  instrument+exchange, L4 — одно снятие отпускает каскад). Плюс хардненинг
+  `SafetyHoldCoordinator` (exception-total, журнал не гейтит kill-switch).
+  **Остаётся форвардом (узко):** (1) **проактивная детекция** аномалий
   (`AnomalyJob`/`TradeRuleValidator` + численный порог «серия неудач» STRUCT-Q1)
-  — **шаг 8**; (2) **внешние (биржевые) слепки** `AnomalyReport.external_*` +
-  точный after через REFRESH_* — реконсиляционный read биржи, **шаг 8**;
-  (3) **ops ручного un-hold** (`TRADE_BLOCKED → ACTIVE` + аудит кем/когда) —
-  **шаг 9 / п.9** (statusный гард обратного перехода готов). Доки
+  — **шаг 8**; (2) **точный локальный after через REFRESH_*** + **биржа-широкая
+  L4-реконсиляция** (внешний слепок читает только instId триггера) — **шаг 8**;
+  (3) **аудит ручного un-hold** (кем/когда) — **шаг 9 / п.9** (сама операция
+  un-hold построена). Доки
   (`instrument-hold.md`/`exchange-hold.md`/`error-handling-policy.md`,
   `risk-creating-entry-protection.md` §2 → L3, §8.C) выравниваются общим
   `SYNC_DOCS_FROM_CODE`.
+- **[MAJOR, perf] L4 `fireExchange` — небанженный O(сделок) burst под D-M1
+  (ревью холд-дельты, 2026-06-24).** `KillSwitchService.fireExchange` итерирует
+  небанженный `DealDataService.findActiveByExchangeId` и на **каждую** сделку
+  строит `DealContext` (~9 запросов) + kill-switch REST — под advisory-локом
+  прохода (держит соединение). Стоимость линейна по числу активных сделок биржи,
+  без потолка; хуже принятого M4 (REST под локом на одну сделку). **Усечение
+  `LIMIT`'ом небезопасно** (несвёрнутый live risk). Варианты владельца: пагинация-
+  петля (бандженные запросы, полное покрытие) либо off-lock dispatch L4-teardown.
+  Источник — `phase-1-step-6-code.md` §Доработка холд-дельты.
 - **`EXECUTE_KILL_SWITCH` — эмиссия команды — ✅ ПОДКЛЮЧЕНА** (CODE-делта холдов,
   2026-06-23). Тонкий эмиттер — `KillSwitchService` (вызывается из
   `SafetyHoldCoordinator`); заменил удалённый орфан

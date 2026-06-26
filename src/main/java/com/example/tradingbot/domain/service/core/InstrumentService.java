@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.service.core;
 
 import static java.util.Objects.isNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.config.CandleLoadingProperties;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
@@ -54,6 +55,21 @@ public class InstrumentService {
 
     public Instrument getRequiredByInternalId(String internalId) {
         return instrumentDataService.getRequiredByInternalId(internalId);
+    }
+
+    /**
+     * Ручная разморозка safety-холда инструмента (L3): TRADE_BLOCKED → ACTIVE.
+     * Гардирована статусом; если инструмент не в TRADE_BLOCKED — переход не
+     * применяется (IllegalStateException → 409). Снимает только этот инструмент;
+     * L4-холд его биржи (если есть) снимается отдельно разморозкой биржи.
+     */
+    public Instrument unblockTrade(String internalId) {
+        Instrument instrument = instrumentDataService.getRequiredByInternalId(internalId);
+        if (isFalse(instrumentDataService.unblockTrade(instrument.getId()))) {
+            throw new IllegalStateException("Instrument is not trade-blocked: " + internalId);
+        }
+        instrument.setStatus(Instrument.Status.ACTIVE);
+        return instrument;
     }
 
     /** Резолв internalId инструмента по числовому id (для api-ответов смежных сущностей). */

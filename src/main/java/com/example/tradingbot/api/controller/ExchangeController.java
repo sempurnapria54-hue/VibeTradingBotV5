@@ -48,4 +48,12 @@ public class ExchangeController {
             @PathVariable @NotBlank String internalId) {
         return mapper.domainToApi(exchangeService.getRequiredByInternalId(internalId));
     }
+
+    @PostMapping("/{internalId}/trade-unblock")
+    @Operation(summary = "Снять safety-холд биржи (TRADE_BLOCKED → ACTIVE; каскадно отпускает инструменты)")
+    public ExchangeApiResponse unblockTrade(
+            @Parameter(description = "Межсервисный идентификатор биржи", required = true)
+            @PathVariable @NotBlank String internalId) {
+        return mapper.domainToApi(exchangeService.unblockTrade(internalId));
+    }
 }

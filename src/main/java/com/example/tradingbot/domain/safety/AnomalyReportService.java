@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.persistence.service.AnomalyReportDataService;
 import com.example.tradingbot.util.ClientIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -18,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +30,14 @@ import org.springframework.stereotype.Service;
  * Ведёт {@link AnomalyReport} по lifecycle реактивной реакции холда:
  * CREATED (before-слепок) → IN_PROGRESS → KILL_SWITCH_EXECUTED → COMPLETED
  * (after-слепок), либо ERROR при сбое обработки. Severity в реактивном
- * контуре всегда CRITICAL (граница захода). Внешние (биржевые) слепки —
- * форвард (реконсиляционный read биржи операционализируется проактивным
- * AnomalyJob, шаг 8); здесь собираются локальные (БД) слепки из
- * {@link DealContext}. См. docs/lifecycles/AnomalyReport.md.
+ * контуре всегда CRITICAL (граница захода). Слепок двухносительный: локальное
+ * (БД) состояние из {@link DealContext} + внешнее (биржа) состояние по instId
+ * триггера (позиция + pending-ордера), читаемое через {@link IntegrationService}.
+ * Чтение биржи best-effort: сбой read'а не валит реакцию — фиксируется маркером
+ * в слепке. Схема внешнего слепка открытая/аддитивная (не финальная): поля
+ * доливаются позже без переформатирования (PnL — шаг 7; биржа-широкая
+ * реконсиляция и orphan/algo-сущности по всей бирже — проактивный AnomalyJob,
+ * шаг 8). См. docs/lifecycles/AnomalyReport.md.
  */
 @Slf4j
 @Service
@@ -42,9 +48,10 @@ public class AnomalyReportService {
     private static final int MESSAGE_MAX_LENGTH = 1024;
 
     private final AnomalyReportDataService dataService;
+    private final IntegrationService integrationService;
     private final ObjectMapper objectMapper;
 
-    /** Создать отчёт в CREATED с before-слепком локального состояния. */
+    /** Создать отчёт в CREATED с before-слепками (локальный БД + внешний биржевой). */
     public AnomalyReport open(DealContext dealContext, HoldSignal signal) {
         AnomalyReport report = new AnomalyReport();
         report.setInternalId(ClientIdGenerator.generate());
@@ -55,6 +62,7 @@ public class AnomalyReportService {
         report.setStatus(AnomalyReport.Status.CREATED);
         report.setCode(signal.getCode());
         report.setInternalBefore(internalSnapshot(dealContext));
+        report.setExternalBefore(externalSnapshot(dealContext));
         return dataService.save(report);
     }
 
@@ -64,9 +72,14 @@ public class AnomalyReportService {
         return dataService.save(report);
     }
 
-    /** Завершить отчёт: after-слепок локального состояния + COMPLETED. */
+    /**
+     * Завершить отчёт: after-слепки (локальный БД + внешний биржевой, читается
+     * после kill-switch — остаточный риск частичного teardown виден в нём) +
+     * COMPLETED.
+     */
     public AnomalyReport complete(AnomalyReport report, DealContext dealContext) {
         report.setInternalAfter(internalSnapshot(dealContext));
+        report.setExternalAfter(externalSnapshot(dealContext));
         report.setStatus(AnomalyReport.Status.COMPLETED);
         return dataService.save(report);
     }
@@ -113,12 +126,39 @@ public class AnomalyReportService {
         return algoOrders.stream().map(AlgoOrder::getId).collect(Collectors.toList());
     }
 
+    /**
+     * Слепок внешнего (биржевого) состояния по instId триггера: реальная позиция
+     * и pending-ордера на стороне биржи. Открытая/аддитивная схема (не финальная):
+     * orphan/algo-сущности и биржа-широкая реконсиляция (L4) — проактивный контур
+     * шага 8.
+     */
+    private String externalSnapshot(DealContext dealContext) {
+        String externalInstrumentId = dealContext.getInstrument().getExternalId();
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("instrumentExternalId", externalInstrumentId);
+        snapshot.put("position", readExchange(externalInstrumentId,
+                () -> integrationService.getPosition(externalInstrumentId)));
+        snapshot.put("pendingOrders", readExchange(externalInstrumentId,
+                () -> integrationService.getPendingOrders(externalInstrumentId)));
+        return writeJson(snapshot);
+    }
+
+    /** Best-effort чтение биржи: сбой read'а не валит реакцию холда — фиксируется маркером в слепке. */
+    private Object readExchange(String externalInstrumentId, Supplier<Object> read) {
+        try {
+            return read.get();
+        } catch (RuntimeException e) {
+            log.error("Anomaly external snapshot read failed instId={}", externalInstrumentId, e);
+            return Map.of("readError", e.getClass().getSimpleName());
+        }
+    }
+
     /** Сериализация слепка best-effort: сбой сериализации не валит реакцию холда. */
     private String writeJson(Map<String, Object> snapshot) {
         try {
             return objectMapper.writeValueAsString(snapshot);
         } catch (JsonProcessingException e) {
-            log.error("Anomaly snapshot serialization failed dealId={}", snapshot.get("dealId"), e);
+            log.error("Anomaly snapshot serialization failed snapshotKeys={}", snapshot.keySet(), e);
             return null;
         }
     }

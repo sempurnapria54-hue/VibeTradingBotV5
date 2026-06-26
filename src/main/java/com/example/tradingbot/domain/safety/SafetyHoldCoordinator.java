@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.safety;
 
+import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.command.DealContext;
@@ -23,6 +24,9 @@ import org.springframework.stereotype.Service;
  * scope: TRADE_BLOCKED ставится только из ACTIVE — повторный сигнал того же
  * scope (или scope не-ACTIVE) пропускается. Реакция не пробрасывает исключение
  * наружу: сбой обработки фиксируется в AnomalyReport (ERROR), проход живёт.
+ * Журналирование инцидента — <b>best-effort и не гейтит kill-switch</b>: сбой
+ * любой записи отчёта (включая создание) логируется, но не подавляет teardown
+ * риска и не выходит наружу — снятие риска приоритетнее журнала.
  */
 @Slf4j
 @Service
@@ -59,15 +63,62 @@ public class SafetyHoldCoordinator {
     }
 
     private void runReaction(HoldSignal signal, DealContext dealContext, Runnable killSwitch) {
-        AnomalyReport report = anomalyReportService.open(dealContext, signal);
+        AnomalyReport report = openSafely(signal, dealContext);
+        advanceSafely(report, AnomalyReport.Status.IN_PROGRESS);
         try {
-            report = anomalyReportService.advance(report, AnomalyReport.Status.IN_PROGRESS);
             killSwitch.run();
-            report = anomalyReportService.advance(report, AnomalyReport.Status.KILL_SWITCH_EXECUTED);
+            advanceSafely(report, AnomalyReport.Status.KILL_SWITCH_EXECUTED);
+            completeSafely(report, dealContext);
+        } catch (RuntimeException e) {
+            log.error("Safety hold kill-switch failed scope={}", signal.getScope(), e);
+            failSafely(report, e.getMessage());
+        }
+    }
+
+    /**
+     * Создать отчёт инцидента best-effort. Сбой создания журнала <b>не</b>
+     * подавляет kill-switch: возвращаем {@code null}, дальнейшие записи журнала
+     * становятся no-op, teardown риска продолжается.
+     */
+    private AnomalyReport openSafely(HoldSignal signal, DealContext dealContext) {
+        try {
+            return anomalyReportService.open(dealContext, signal);
+        } catch (RuntimeException e) {
+            log.error("Anomaly report open failed scope={} code={}", signal.getScope(), signal.getCode(), e);
+            return null;
+        }
+    }
+
+    private void advanceSafely(AnomalyReport report, AnomalyReport.Status status) {
+        if (isNull(report)) {
+            return;
+        }
+        try {
+            anomalyReportService.advance(report, status);
+        } catch (RuntimeException e) {
+            log.error("Anomaly report advance failed anomalyReportId={} status={}", report.getId(), status, e);
+        }
+    }
+
+    private void completeSafely(AnomalyReport report, DealContext dealContext) {
+        if (isNull(report)) {
+            return;
+        }
+        try {
             anomalyReportService.complete(report, dealContext);
         } catch (RuntimeException e) {
-            log.error("Safety hold reaction failed anomalyReportId={} scope={}", report.getId(), signal.getScope(), e);
-            anomalyReportService.fail(report, e.getMessage());
+            log.error("Anomaly report complete failed anomalyReportId={}", report.getId(), e);
+        }
+    }
+
+    private void failSafely(AnomalyReport report, String message) {
+        if (isNull(report)) {
+            return;
+        }
+        try {
+            anomalyReportService.fail(report, message);
+        } catch (RuntimeException e) {
+            log.error("Anomaly report fail-write failed anomalyReportId={}", report.getId(), e);
         }
     }
 }

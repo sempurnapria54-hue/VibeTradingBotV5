@@ -77,6 +77,17 @@ public class InstrumentDataService {
                 Instrument.Status.TRADE_BLOCKED.name()) > 0;
     }
 
+    /**
+     * Ручная разморозка торговли: TRADE_BLOCKED → ACTIVE (гардирована статусом,
+     * только из TRADE_BLOCKED — обратная сторона {@link #blockTrade}). Возвращает
+     * {@code true}, если переход применился (инструмент был TRADE_BLOCKED).
+     */
+    @Transactional
+    public Boolean unblockTrade(Long id) {
+        return repository.updateStatus(id, Instrument.Status.TRADE_BLOCKED.name(),
+                Instrument.Status.ACTIVE.name()) > 0;
+    }
+
     @Transactional(readOnly = true)
     public List<Instrument> findByStatusIn(Collection<Instrument.Status> statuses) {
         List<String> names = statuses.stream().map(Enum::name).collect(toList());

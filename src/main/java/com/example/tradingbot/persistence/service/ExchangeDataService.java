@@ -57,6 +57,19 @@ public class ExchangeDataService {
                 Exchange.Status.TRADE_BLOCKED.name()) > 0;
     }
 
+    /**
+     * Ручная разморозка торговли: TRADE_BLOCKED → ACTIVE (гардирована статусом,
+     * только из TRADE_BLOCKED — обратная сторона {@link #blockTrade}). Одно действие
+     * отпускает весь L4-каскад: enforcement читает статус биржи живьём, поэтому
+     * возврат биржи в ACTIVE снимает блок входов по всем её инструментам (per-instrument
+     * холды L4 не пишутся). Возвращает {@code true}, если переход применился.
+     */
+    @Transactional
+    public Boolean unblockTrade(Long id) {
+        return repository.updateStatus(id, Exchange.Status.TRADE_BLOCKED.name(),
+                Exchange.Status.ACTIVE.name()) > 0;
+    }
+
     /** Проекция: только internalId по id — без вытягивания всей сущности. */
     @Transactional(readOnly = true)
     public String getRequiredInternalIdById(Long id) {

@@ -232,17 +232,53 @@ ops ручного un-hold — **backlog п.9 / шаг 9**.
 - TRADE_BLOCKED-enum миграции **не требуют** (статус-колонки `varchar(32)` без
   CHECK-constraint).
 
-### Документированные края scope (форвард, не дострой)
-- **Внешние (биржевые) слепки** `external_before/after` — **не собираются** (остаются
-  null): реконсиляционный read биржи (позиции/ордера/algos/orphan по instId) — это
-  проактивный контур **шага 8**. Собираются локальные (БД) слепки из `DealContext`.
-- **After-слепок** строится из того же in-memory `DealContext` (без REFRESH_*-re-read
-  после kill-switch) → приближённый. Точный after через REFRESH_*-подтверждение — с
-  внешними слепками (шаг 8).
-- **Ручной un-hold** (`TRADE_BLOCKED → ACTIVE` + аудит «кем/когда») — операция шага 9 /
-  backlog п.9; statusный гард обратного перехода готов (общий `updateStatus`).
+### Доработка холд-дельты (2026-06-24): два сужения сняты + ревью
+
+Два сужения дельты, сужавшие утверждённый дизайн, **сняты** (решение в чате):
+
+- **A. Внешние (биржевые) слепки `external_before/after` — теперь собираются.**
+  `AnomalyReportService.externalSnapshot` читает реальное биржевое состояние по
+  instId триггера (`getPosition` + `getPendingOrders` через `IntegrationService`)
+  в обе точки: `externalBefore` при CREATED (`open`), `externalAfter` перед
+  COMPLETED (`complete`, читается **после** kill-switch → остаточный риск виден).
+  Чтение биржи best-effort (`readExchange` ловит `RuntimeException` → маркер
+  `readError`, не валит реакцию). Схема **открытая/аддитивная** (не финальная):
+  PnL — шаг 7; биржа-широкая реконсиляция и orphan/algo по всей бирже (L4) —
+  проактивный `AnomalyJob` шаг 8.
+- **B. Ручной un-hold `TRADE_BLOCKED → ACTIVE` — построен через REST.**
+  `unblockTrade` (гардированный обратный `updateStatus`, только из TRADE_BLOCKED) в
+  `Instrument/ExchangeDataService` + `Instrument/ExchangeService` +
+  `POST /api/{instruments|exchanges}/{internalId}/trade-unblock`. Не в TRADE_BLOCKED →
+  `IllegalStateException` → 409. **L4: одно снятие биржи отпускает весь каскад**
+  (enforcement читает статус биржи живьём); per-instrument un-hold для L4 не вводится
+  (собственные L3-холды инструментов снимаются отдельно). Аудит «кем/когда» —
+  по-прежнему форвард (шаг 9 / backlog п.9), не вводится превентивно.
+
+**Хардненинг по ревью (MAJOR, correctness-фокус):** `SafetyHoldCoordinator.runReaction`
+сделан **exception-total** и расцеплён с журналом — `open/advance/complete/fail`
+обёрнуты best-effort (`openSafely`/…); сбой записи журнала (включая `open`, который
+раньше был **вне** try) больше не подавляет kill-switch и не выходит наружу. Снятие
+риска приоритетнее журнала.
+
+**Открытая находка на валидацию — `open-questions.md` HOLD-Q1** (не закрыта): код
+поднимает L4-холд+flatten всей биржи на **любой** `ControlledExchangeException`
+(`VALIDATION_ERROR`) одной сделки, доминируя над L3, и теряет квалификатор офдока
+«по severity / safetyImpact» для `ExternalStatusException`. Поведение в коде **не
+менялось** — на решение владельца риск-семантики.
+
+### Остаточные форварды (не дострой)
+- **After-слепок (локальный, БД)** по-прежнему строится из in-memory `DealContext`
+  (без REFRESH_*-re-read после kill-switch) → приближённый. Точный after через
+  REFRESH_*-подтверждение — шаг 8. (Внешний after уже читается живьём с биржи — A.)
+- **Внешний слепок для L4** читает только instId триггера (как и локальный) —
+  биржа-широкая реконсиляция всех инструментов биржи — проактивный шаг 8.
 - **Проактивный L4-путь** (паттерн «много бесстоповых / обойдён гард» = control-plane
   failure) — шаг 8; реактивный контур поднимает L3 на одну обнаруженную позицию.
+- **Перф-форвард (ревью):** L4 `KillSwitchService.fireExchange` — небанженный
+  `findActiveByExchangeId` × per-deal `DealContext` rebuild + kill-switch REST под
+  advisory-локом D-M1 (O(сделок) burst). Усечение LIMIT'ом **небезопасно** (несвёрнутый
+  live risk); фикс — пагинация-петля (бандженные запросы, полное покрытие) либо
+  off-lock dispatch — на решение владельца. Трек: `backlog.md`.
 
 ### Сборка
 `mvn`/`java` в среде недоступны — прогон сборки не выполнялся; проведена ручная

@@ -69,6 +69,14 @@ public class InstrumentController {
         return toResponse(instrumentService.startCandlesLoading(internalId));
     }
 
+    @PostMapping("/{internalId}/trade-unblock")
+    @Operation(summary = "Снять safety-холд инструмента (TRADE_BLOCKED → ACTIVE)")
+    public InstrumentApiResponse unblockTrade(
+            @Parameter(description = "Межсервисный идентификатор инструмента", required = true)
+            @PathVariable @NotBlank String internalId) {
+        return toResponse(instrumentService.unblockTrade(internalId));
+    }
+
     private InstrumentApiResponse toResponse(Instrument instrument) {
         String exchangeInternalId = exchangeService.getRequiredInternalIdById(instrument.getExchangeId());
         return mapper.domainToApi(instrument, exchangeInternalId);
