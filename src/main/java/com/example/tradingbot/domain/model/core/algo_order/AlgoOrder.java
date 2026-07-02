@@ -97,11 +97,6 @@ public class AlgoOrder extends Auditable {
         return LIVE_STATUSES.contains(status);
     }
 
-    /** Не live (терминальный статус). */
-    public Boolean isNotLive() {
-        return isFalse(isLive());
-    }
-
     /** Отправлен на биржу; факт не подтверждён. */
     public void toPending() {
         transitTo(Status.PENDING);
@@ -110,11 +105,6 @@ public class AlgoOrder extends Auditable {
     /** Подтверждён активным фактом refresh (не по ACK). */
     public void toActive() {
         transitTo(Status.ACTIVE);
-    }
-
-    /** Частично сработал (recovery-status). */
-    public void toPartiallyComplete() {
-        transitTo(Status.PARTIALLY_COMPLETED);
     }
 
     /** Сработал полностью: COMPLETED + closeReason TRIGGERED (write-once). */

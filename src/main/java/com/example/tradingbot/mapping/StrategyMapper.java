@@ -133,7 +133,6 @@ public interface StrategyMapper {
 
     // ===== domain -> api =====
 
-    @Mapping(target = "instrumentInternalId", source = "instrumentInternalId")
     StrategyApiResponse domainToApi(Strategy strategy, String instrumentInternalId);
 
     StrategyMarketPhaseSettingApiModel domainToApi(StrategyMarketPhaseSetting setting);

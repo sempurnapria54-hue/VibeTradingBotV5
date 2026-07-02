@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealActionState;
@@ -61,10 +62,18 @@ public class ServiceCommandExecutor {
         }
         DealActionState actionState = resolveActionState(command, dealContext);
         try {
-            return executor.execute(command, actionState, dealContext);
+            ServiceCommandExecutionResult result = executor.execute(command, actionState, dealContext);
+            if (isFalse(result.getSuccess())) {
+                // Реджект биржи, возвращённый (не брошенный) executor'ом, тоже проходит через
+                // retry/terminal-учёт — иначе retry-anchor завис бы (сделка пере-сабмитит каждый тик).
+                applyFailureAccounting(command, actionState, result.getErrorCode(), result.getMessage());
+            }
+            return result;
         } catch (RuntimeException e) {
             log.error("Command execution failed [{}] dealId={}", command.getType(), command.getDealId(), e);
-            return handleFailure(command, actionState, e);
+            RuntimeErrorCode errorCode = classify(e);
+            applyFailureAccounting(command, actionState, errorCode, e.getMessage());
+            return ServiceCommandExecutionResult.failure(errorCode, e.getMessage());
         }
     }
 
@@ -78,15 +87,13 @@ public class ServiceCommandExecutor {
                 .orElse(null);
     }
 
-    private ServiceCommandExecutionResult handleFailure(ServiceCommand command, DealActionState actionState,
-                                                        RuntimeException e) {
-        RuntimeErrorCode errorCode = classify(e);
+    private void applyFailureAccounting(ServiceCommand command, DealActionState actionState,
+                                        RuntimeErrorCode errorCode, String message) {
         if (nonNull(actionState)) {
-            applyActionRetryState(command, actionState, errorCode, e);
+            applyActionRetryState(command, actionState, errorCode, message);
         } else if (nonNull(command.getDealFinalizationStateId())) {
-            applyFinalizationRetryState(command, errorCode, e);
+            applyFinalizationRetryState(command, errorCode, message);
         }
-        return ServiceCommandExecutionResult.failure(errorCode, e.getMessage());
     }
 
     private RuntimeErrorCode classify(RuntimeException e) {
@@ -103,29 +110,29 @@ public class ServiceCommandExecutor {
     }
 
     private void applyActionRetryState(ServiceCommand command, DealActionState actionState, RuntimeErrorCode errorCode,
-                                       RuntimeException e) {
-        boolean retryable = recordAttempt(actionState, command.getType(), errorCode, e);
+                                       String message) {
+        boolean retryable = recordAttempt(actionState, command.getType(), errorCode, message);
         actionState.setStatus(retryable ? DealActionStateStatus.RETRY_PENDING : DealActionStateStatus.FAILED);
         dealActionStateDataService.save(actionState);
     }
 
-    private void applyFinalizationRetryState(ServiceCommand command, RuntimeErrorCode errorCode, RuntimeException e) {
+    private void applyFinalizationRetryState(ServiceCommand command, RuntimeErrorCode errorCode, String message) {
         DealFinalizationState state = dealFinalizationStateDataService
                 .findById(command.getDealFinalizationStateId())
                 .orElse(null);
         if (isNull(state)) {
             return;
         }
-        boolean retryable = recordAttempt(state, command.getType(), errorCode, e);
+        boolean retryable = recordAttempt(state, command.getType(), errorCode, message);
         state.setStatus(retryable ? DealFinalizationStateStatus.RETRY_PENDING : DealFinalizationStateStatus.FAILED);
         dealFinalizationStateDataService.save(state);
     }
 
     private boolean recordAttempt(Retryable retryable, ServiceCommandType commandType, RuntimeErrorCode errorCode,
-                                  RuntimeException e) {
+                                  String message) {
         Integer attemptCount = isNull(retryable.getAttemptCount()) ? 0 : retryable.getAttemptCount();
         retryable.setAttemptCount(attemptCount + 1);
-        retryable.setLastError(new RetryError(null, e.getMessage(), errorCode));
+        retryable.setLastError(new RetryError(null, message, errorCode));
         boolean canRetry = RuntimeErrorCode.EXCHANGE_ERROR.equals(errorCode)
                 && isTrue(retryPolicyService.canRetry(retryable, commandType));
         if (canRetry) {

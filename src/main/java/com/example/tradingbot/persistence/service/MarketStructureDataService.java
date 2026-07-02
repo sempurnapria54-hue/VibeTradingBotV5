@@ -5,7 +5,6 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import com.example.tradingbot.mapping.MarketStructureMapper;
 import com.example.tradingbot.persistence.repository.MarketStructureRepository;
-import java.time.OffsetDateTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,12 +34,6 @@ public class MarketStructureDataService {
             return;
         }
         repository.save(mapper.domainToPersistence(structure));
-    }
-
-    /** Производный checkpoint: «докуда посчитано» для (instrument, setting), или null. */
-    @Transactional(readOnly = true)
-    public OffsetDateTime findCheckpoint(Long instrumentId, Long strategyMarketStructureSettingId) {
-        return repository.findMaxWindowEndAt(instrumentId, strategyMarketStructureSettingId);
     }
 
     /** Последняя по window_end_at структура настройки (для раздачи потребителям). */

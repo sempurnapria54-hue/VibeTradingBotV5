@@ -5,12 +5,9 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.RuntimeErrorCode;
-import com.example.tradingbot.domain.command.calc.CalculatedStrategyAction;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckStatus;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
-import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.util.EnumSet;
 import java.util.Objects;
@@ -36,8 +33,7 @@ public class RiskBlockResolver {
             Deal.Status.MANAGING,
             Deal.Status.EXIT_PENDING);
 
-    public RiskBlockAction resolve(DealContext dealContext, Deal.Status currentStatus, StrategyStep strategyStep,
-                                   StrategyAction strategyAction, CalculatedStrategyAction calculatedAction,
+    public RiskBlockAction resolve(DealContext dealContext, Deal.Status currentStatus,
                                    RiskValidationResult riskValidationResult) {
         return switch (riskValidationResult.getDecision()) {
             case ALLOWED -> RiskBlockAction.builder()

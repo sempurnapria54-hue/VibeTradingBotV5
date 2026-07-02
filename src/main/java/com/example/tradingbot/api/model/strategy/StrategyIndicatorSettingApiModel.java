@@ -24,7 +24,7 @@ public class StrategyIndicatorSettingApiModel {
 
     @NotBlank
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-    @Schema(description = "Тип индикатора: ATR/EMA/RSI/MACD/STOCHASTIC/BOLLINGER_BANDS/OBV; "
+    @Schema(description = "Тип индикатора: ATR/EMA/RSI/MACD/STOCHASTIC/BOLLINGER_BANDS/OBV/EFFICIENCY_RATIO; "
             + "в ответе пишется один раз — как внешний тег params",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String indicatorType;

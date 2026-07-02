@@ -18,10 +18,7 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
-import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.service.market.condition.ConditionEvaluationContext;
-import com.example.tradingbot.integration.service.IntegrationService;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +40,6 @@ public class PrecheckHandler implements FsmHandler {
 
     private final DealFsmSupport support;
     private final StrategyActionOrchestrator actionOrchestrator;
-    private final IntegrationService integrationService;
 
     @Override
     public Deal.Status supportedStatus() {
@@ -55,7 +51,7 @@ public class PrecheckHandler implements FsmHandler {
         if (isFalse(support.balanceUsable(dealContext))) {
             return Optional.of(DealTransition.command(support.refreshBalanceCommand(dealContext)));
         }
-        if (isTrue(foreignLiveRisk(dealContext))) {
+        if (isTrue(support.foreignLiveRisk(dealContext))) {
             return Optional.of(support.markError(dealContext));
         }
         if (isEmpty(entrySteps(dealContext))) {
@@ -127,20 +123,6 @@ public class PrecheckHandler implements FsmHandler {
                 .nextStatus(Deal.Status.CLOSED)
                 .closeReason(Deal.CloseReason.ENTRY_CONDITION_EXPIRED)
                 .build();
-    }
-
-    /** Чужой live risk на инструменте при отсутствии локальной позиции (Precheck-чистота). */
-    private Boolean foreignLiveRisk(DealContext dealContext) {
-        if (nonNull(dealContext.getDeal().getPosition())) {
-            return false;
-        }
-        PositionExternalSnapshot snapshot = integrationService.getPosition(
-                dealContext.getInstrument().getExternalId());
-        return nonNull(snapshot) && hasLiveSize(snapshot.getExternalSize());
-    }
-
-    private boolean hasLiveSize(BigDecimal size) {
-        return nonNull(size) && size.signum() > 0;
     }
 
     private boolean isActiveStage(DealActionStateStatus status) {

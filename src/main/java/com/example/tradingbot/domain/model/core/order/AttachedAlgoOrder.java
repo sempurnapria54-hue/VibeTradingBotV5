@@ -2,7 +2,6 @@ package com.example.tradingbot.domain.model.core.order;
 
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.domain.model.Auditable;
 import java.math.BigDecimal;
@@ -64,9 +63,6 @@ public class AttachedAlgoOrder extends Auditable {
 
     private static final Set<Status> ACTIVE_LIKE_STATUSES = EnumSet.of(Status.PENDING, Status.ACTIVE);
 
-    private static final Set<Status> TERMINAL_STATUSES =
-            EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR);
-
     private static final Map<Status, Set<Status>> ALLOWED_TRANSITIONS = Map.of(
             Status.CREATED, EnumSet.of(Status.PENDING, Status.ERROR),
             Status.PENDING, EnumSet.of(Status.ACTIVE, Status.CANCELED, Status.ERROR),
@@ -75,16 +71,6 @@ public class AttachedAlgoOrder extends Auditable {
     /** Active-like (PENDING/ACTIVE): ещё существует, влияет на защиту. */
     public Boolean isActiveLike() {
         return ACTIVE_LIKE_STATUSES.contains(status);
-    }
-
-    /** Терминальный статус (COMPLETED/CANCELED/ERROR). */
-    public Boolean isTerminal() {
-        return TERMINAL_STATUSES.contains(status);
-    }
-
-    /** Биржевой тип attached задан. */
-    public Boolean hasExternalType() {
-        return isNotBlank(externalType);
     }
 
     /** Допустим ли переход в target по матрице. */

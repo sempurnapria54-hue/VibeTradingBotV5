@@ -8,6 +8,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.config.DealOrchestratorProperties;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.ServiceCommand;
+import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingbot.domain.deal.DealContextService;
 import com.example.tradingbot.domain.deal.DealStateMachine;
@@ -73,7 +74,12 @@ public class DealOrchestratorJob {
             }
             DealTransition transition = dealStateMachine.advance(dealContext);
             for (ServiceCommand command : transition.getCommands()) {
-                serviceCommandExecutor.execute(command, dealContext);
+                ServiceCommandExecutionResult result = serviceCommandExecutor.execute(command, dealContext);
+                if (isFalse(result.getSuccess())) {
+                    // Команда провалилась (учёт retry/terminal сделал диспетчер) — остальные команды
+                    // перехода в этом проходе не гоним; handler разберёт FAILED-якорь на следующем тике.
+                    break;
+                }
             }
             applyTransition(deal, transition);
             reactToHoldSignal(transition, dealContext);

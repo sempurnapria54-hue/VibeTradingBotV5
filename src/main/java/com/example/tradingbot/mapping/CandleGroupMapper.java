@@ -24,6 +24,5 @@ public interface CandleGroupMapper {
     @Mapping(target = "instrument", ignore = true)
     CandleGroupEntity domainToPersistence(CandleGroup group);
 
-    @Mapping(target = "instrumentInternalId", source = "instrumentInternalId")
     CandleGroupApiResponse domainToApi(CandleGroup group, String instrumentInternalId);
 }

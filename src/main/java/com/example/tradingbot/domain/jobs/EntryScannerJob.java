@@ -94,7 +94,7 @@ public class EntryScannerJob {
         if (isNull(strategy)) {
             return;
         }
-        MarketPhase phase = marketPhaseService.getCurrentPhase(strategy).orElse(null);
+        MarketPhase phase = marketPhaseService.getCurrentPhase(instrument, strategy).orElse(null);
         if (isNull(phase)) {
             return;
         }

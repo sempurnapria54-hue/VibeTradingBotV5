@@ -1,5 +1,7 @@
 package com.example.tradingbot.api;
 
+import static java.util.Objects.isNull;
+
 import com.example.tradingbot.api.model.response.ErrorApiResponse;
 import com.example.tradingbot.integration.service.ControlledExchangeException;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Единый глобальный обработчик ошибок внешней поверхности
@@ -65,6 +68,18 @@ public class GlobalExceptionHandler {
                                                            HttpServletRequest request) {
         log.error("Exchange integration error on {}", request.getRequestURI(), e);
         return build(HttpStatus.BAD_GATEWAY, e.getMessage(), request);
+    }
+
+    /**
+     * Явно проброшенный контроллером/сервисом статус (validator → 400,
+     * activate-семантика → 422): статус и reason сохраняются, иначе
+     * catch-all Exception ниже превратил бы их в 500.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorApiResponse> handleResponseStatus(ResponseStatusException e,
+                                                                 HttpServletRequest request) {
+        HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
+        return build(isNull(status) ? HttpStatus.INTERNAL_SERVER_ERROR : status, e.getReason(), request);
     }
 
     /** Непредвиденная ошибка — наружу тонко (без утечки внутренностей), в лог — полностью. */

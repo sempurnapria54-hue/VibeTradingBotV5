@@ -56,22 +56,21 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     @Override
     public ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext) {
         return switch (state.getStatus()) {
-            case PLANNED -> initialCommand(step, (StrategyOrderAction) action, state, dealContext);
+            case PLANNED -> initialCommand((StrategyOrderAction) action, state, dealContext);
             case CREATED -> submitCommand(state, dealContext);
             case SUBMITTED -> refreshCommand(state, dealContext);
             default -> ActionPlan.empty();
         };
     }
 
-    private ActionPlan initialCommand(StrategyStep step, StrategyOrderAction action, DealActionState state,
-                                      DealContext dealContext) {
+    private ActionPlan initialCommand(StrategyOrderAction action, DealActionState state, DealContext dealContext) {
         StrategyActionCalculationResult calculation = calculator.calculate(action, dealContext);
         if (StrategyActionCalculationResult.Status.ERROR.equals(calculation.getStatus())) {
             return ActionPlan.calcError(calculation.getError());
         }
         CalculatedStrategyAction calculated = calculation.getCalculatedAction();
         if (isRiskCreating(action)) {
-            ActionPlan blocked = applyRisk(step, action, calculated, dealContext);
+            ActionPlan blocked = applyRisk(calculated, dealContext);
             if (nonNull(blocked)) {
                 return blocked;
             }
@@ -80,14 +79,12 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     }
 
     /** null = риск разрешил продолжить; иначе — блокирующая реакция risk-layer. */
-    private ActionPlan applyRisk(StrategyStep step, StrategyAction action, CalculatedStrategyAction calculated,
-                                 DealContext dealContext) {
+    private ActionPlan applyRisk(CalculatedStrategyAction calculated, DealContext dealContext) {
         RiskValidationResult risk = riskValidator.validate(calculated, dealContext);
         if (RiskValidationResult.RiskDecision.ALLOWED.equals(risk.getDecision())) {
             return null;
         }
-        RiskBlockAction blockAction = riskBlockResolver.resolve(dealContext, dealContext.getDeal().getStatus(),
-                step, action, calculated, risk);
+        RiskBlockAction blockAction = riskBlockResolver.resolve(dealContext, dealContext.getDeal().getStatus(), risk);
         if (isBlocking(blockAction.getType())) {
             return ActionPlan.blocked(blockAction);
         }

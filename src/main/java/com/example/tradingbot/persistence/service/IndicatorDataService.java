@@ -59,12 +59,6 @@ public class IndicatorDataService {
         return toInsert.size();
     }
 
-    /** Производный checkpoint: «докуда посчитано» для (instrument, setting), или null. */
-    @Transactional(readOnly = true)
-    public OffsetDateTime findCheckpoint(Long instrumentId, Long strategyIndicatorSettingId) {
-        return repository.findMaxCandleTimestamp(instrumentId, strategyIndicatorSettingId);
-    }
-
     /** Последнее по candle_timestamp значение настройки (для раздачи потребителям). */
     @Transactional(readOnly = true)
     public Optional<IndicatorValue> findLatest(Long instrumentId, Long strategyIndicatorSettingId) {

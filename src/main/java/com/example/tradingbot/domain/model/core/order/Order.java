@@ -1,7 +1,8 @@
 package com.example.tradingbot.domain.model.core.order;
 
 import static java.util.Objects.isNull;
-import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
 import java.math.BigDecimal;
@@ -85,9 +86,10 @@ public class Order extends Auditable {
         return LIVE_STATUSES.contains(status);
     }
 
-    /** Не live (терминальный статус). */
-    public Boolean isNotLive() {
-        return isFalse(isLive());
+    /** Есть хотя бы одна active-like (PENDING/ACTIVE) attached-защита. */
+    public Boolean hasActiveAttachedProtection() {
+        return isNotEmpty(attachedAlgoOrders)
+                && attachedAlgoOrders.stream().anyMatch(protection -> isTrue(protection.isActiveLike()));
     }
 
     /** Полностью исполнен: COMPLETED + closeReason FILLED (write-once). */

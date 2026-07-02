@@ -48,7 +48,10 @@ public class RetryPolicyService {
             return initial;
         }
         int attempts = isNull(attemptCount) ? 1 : Math.max(1, attemptCount);
-        Duration scaled = initial.multipliedBy(1L << (attempts - 1));
+        // Экспонента ограничена, чтобы сдвиг не переполнил long в отрицательное (обход maxDelay-cap);
+        // множитель 2^30 заведомо упирается в maxDelay для любого реального конфига backoff.
+        long multiplier = 1L << Math.min(attempts - 1, 30);
+        Duration scaled = initial.multipliedBy(multiplier);
         Duration maxDelay = policy.getMaxDelay();
         return nonNull(maxDelay) && scaled.compareTo(maxDelay) > 0 ? maxDelay : scaled;
     }

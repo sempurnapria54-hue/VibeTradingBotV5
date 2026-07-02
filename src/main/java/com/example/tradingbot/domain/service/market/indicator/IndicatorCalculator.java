@@ -35,7 +35,7 @@ public interface IndicatorCalculator {
                                    IndicatorParams params);
 
     /** Эффективный warmup: явный override настройки имеет приоритет над выведенным. */
-    default int effectiveWarmup(Integer override, int derived) {
+    default Integer effectiveWarmup(Integer override, Integer derived) {
         return nonNull(override) ? override : derived;
     }
 

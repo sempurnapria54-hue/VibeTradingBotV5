@@ -6,9 +6,9 @@ import lombok.Setter;
 
 /**
  * Базовое retry-состояние операции, наследуемое persisted-моделями
- * (DealActionState). Несёт счётчик попыток, лимит, момент следующего
- * допустимого повтора и последнюю ошибку. Механика повтора —
- * docs/components/RetryPolicyService.md.
+ * (DealActionState, DealFinalizationState). Несёт счётчик попыток, лимит,
+ * момент следующего допустимого повтора и последнюю ошибку. Механика
+ * повтора — docs/components/RetryPolicyService.md.
  */
 @Getter
 @Setter

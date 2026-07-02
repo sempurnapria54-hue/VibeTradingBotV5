@@ -70,6 +70,5 @@ public interface InstrumentMapper {
      */
     Instrument apiToDomain(CreateInstrumentApiRequest request);
 
-    @Mapping(target = "exchangeInternalId", source = "exchangeInternalId")
     InstrumentApiResponse domainToApi(Instrument instrument, String exchangeInternalId);
 }

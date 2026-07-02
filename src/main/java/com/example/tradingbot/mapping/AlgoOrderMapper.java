@@ -96,7 +96,6 @@ public interface AlgoOrderMapper {
                 .build();
     }
 
-    @Mapping(target = "instId", source = "instId")
     @Mapping(target = "tdMode", expression = "java(Constants.Okx.TD_MODE_ISOLATED)")
     @Mapping(target = "posSide", expression = "java(Constants.Okx.POS_SIDE_NET)")
     @Mapping(target = "algoClOrdId", source = "algoOrder.internalId")
@@ -117,7 +116,6 @@ public interface AlgoOrderMapper {
     @Mapping(target = "activePx", source = "algoOrder.condition.trailing.activationPrice.value")
     PlaceAlgoOrderOkxRequest domainToPlaceRequest(AlgoOrder algoOrder, String instId);
 
-    @Mapping(target = "instId", source = "instId")
     @Mapping(target = "algoId", source = "algoOrder.externalId")
     @Mapping(target = "algoClOrdId", source = "algoOrder.internalId")
     CancelAlgoOrderOkxRequest domainToCancelRequest(AlgoOrder algoOrder, String instId);

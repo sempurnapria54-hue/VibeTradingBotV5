@@ -78,7 +78,6 @@ public interface OrderMapper {
     @Mapping(target = "attachedAlgoOrders", ignore = true)
     void updateFromSnapshot(OrderExternalSnapshot snapshot, @MappingTarget Order order);
 
-    @Mapping(target = "instId", source = "instId")
     @Mapping(target = "tdMode", expression = "java(Constants.Okx.TD_MODE_ISOLATED)")
     @Mapping(target = "posSide", expression = "java(Constants.Okx.POS_SIDE_NET)")
     @Mapping(target = "tag", expression = "java(Constants.Okx.ORDER_TAG)")
@@ -90,7 +89,6 @@ public interface OrderMapper {
     @Mapping(target = "reduceOnly", source = "order.positionReducingOnly")
     PlaceOrderOkxRequest domainToPlaceRequest(Order order, String instId);
 
-    @Mapping(target = "instId", source = "instId")
     @Mapping(target = "ordId", source = "order.externalId")
     @Mapping(target = "clOrdId", source = "order.internalId")
     CancelOrderOkxRequest domainToCancelRequest(Order order, String instId);

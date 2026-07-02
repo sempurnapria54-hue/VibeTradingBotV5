@@ -10,12 +10,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface IndicatorValueRepository extends JpaRepository<IndicatorValueEntity, Long> {
 
-    /** Производный checkpoint: «докуда посчитано» = max(candle_timestamp) для (instrument, setting). */
-    @Query("select max(v.candleTimestamp) from IndicatorValueEntity v "
-            + "where v.instrumentId = :instrumentId and v.strategyIndicatorSettingId = :settingId")
-    OffsetDateTime findMaxCandleTimestamp(@Param("instrumentId") Long instrumentId,
-                                          @Param("settingId") Long settingId);
-
     /** Уже сохранённые candle_timestamp в окне (дедуп при идемпотентном пересчёте). */
     @Query("select v.candleTimestamp from IndicatorValueEntity v "
             + "where v.instrumentId = :instrumentId and v.strategyIndicatorSettingId = :settingId "

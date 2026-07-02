@@ -125,7 +125,7 @@ public class EntryFinalizedHandler implements FsmHandler {
     /** В MANAGING только если live risk покрыт защитой (attached SL входа); иначе ERROR + L3-холд. */
     private DealTransition toManagingIfProtected(DealContext dealContext) {
         Order entry = support.entryOrder(dealContext.getDeal());
-        if (nonNull(entry) && isNotEmpty(entry.getAttachedAlgoOrders())) {
+        if (nonNull(entry) && isTrue(entry.hasActiveAttachedProtection())) {
             return DealTransition.transition(Deal.Status.MANAGING);
         }
         // Live risk без резолвимой защиты = бесстоповая позиция постфактум → L3 (§8.C).

@@ -34,9 +34,11 @@ import com.example.tradingbot.domain.model.core.balance.Balance;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.safety.HoldSignal;
 import com.example.tradingbot.domain.service.market.condition.ConditionEvaluationContext;
 import com.example.tradingbot.domain.service.market.condition.StrategyConditionEvaluator;
+import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.util.Constants;
 import java.util.List;
@@ -61,6 +63,7 @@ public class DealFsmSupport {
     private final StrategyConditionEvaluator conditionEvaluator;
     private final MarketConditionContextFactory conditionContextFactory;
     private final DealFinalizationCommandFactory finalizationFactory;
+    private final IntegrationService integrationService;
 
     /** Допустимые шаги стратегии для текущего статуса сделки (упорядочены = приоритет). */
     public List<StrategyStep> stepsFor(DealContext dealContext, Deal.Status status) {
@@ -130,7 +133,7 @@ public class DealFsmSupport {
         }
         return dealContext.getFinalizationStates().stream()
                 .anyMatch(state -> Objects.equals(type, state.getType())
-                        && DealFinalizationStateStatus.FAILED.equals(state.getStatus()));
+                        && Objects.equals(DealFinalizationStateStatus.FAILED, state.getStatus()));
     }
 
     /** Системный REFRESH_POSITION (без action-state): обновить/обнаружить позицию по фактам. */
@@ -147,11 +150,6 @@ public class DealFsmSupport {
     public ServiceCommand refreshAlgoOrderCommand(DealContext dealContext, Long algoOrderId) {
         return systemCommand(ServiceCommandType.REFRESH_ALGO_ORDER, dealContext,
                 new RefreshAlgoOrderCommandPayload(algoOrderId));
-    }
-
-    /** Системный REFRESH_FILLS (факты исполнения для PnL/реконсиляции). */
-    public ServiceCommand refreshFillsCommand(DealContext dealContext) {
-        return systemCommand(ServiceCommandType.REFRESH_FILLS, dealContext, null);
     }
 
     /** Cleanup CLOSE_POSITION (full close, reduce-only) без action-state. */
@@ -189,8 +187,8 @@ public class DealFsmSupport {
             return null;
         }
         return deal.getOrders().stream()
-                .filter(order -> Order.Type.ENTRY.equals(order.getType())
-                        || Order.Type.ENTRY_ATTACHED_STOP_LOSS.equals(order.getType()))
+                .filter(order -> Objects.equals(Order.Type.ENTRY, order.getType())
+                        || Objects.equals(Order.Type.ENTRY_ATTACHED_STOP_LOSS, order.getType()))
                 .findFirst()
                 .orElse(null);
     }
@@ -214,6 +212,17 @@ public class DealFsmSupport {
     public Boolean balanceUsable(DealContext dealContext) {
         BalanceContainer balance = dealContext.getBalanceContainer();
         return nonNull(balance) && nonNull(balance.getExternalAvailableEquity());
+    }
+
+    /** Чужой live risk на инструменте при отсутствии локальной позиции сделки (Precheck-чистота). */
+    public Boolean foreignLiveRisk(DealContext dealContext) {
+        if (nonNull(dealContext.getDeal().getPosition())) {
+            return false;
+        }
+        PositionExternalSnapshot snapshot = integrationService.getPosition(
+                dealContext.getInstrument().getExternalId());
+        return nonNull(snapshot) && nonNull(snapshot.getExternalSize())
+                && snapshot.getExternalSize().signum() > 0;
     }
 
     /**
@@ -280,7 +289,7 @@ public class DealFsmSupport {
             return false;
         }
         return retryables.stream().anyMatch(retryable -> nonNull(retryable.getLastError())
-                && RuntimeErrorCode.VALIDATION_ERROR.equals(retryable.getLastError().getType()));
+                && Objects.equals(RuntimeErrorCode.VALIDATION_ERROR, retryable.getLastError().getType()));
     }
 
     private DealTransition reactToBlock(RiskBlockAction block, DealContext dealContext) {

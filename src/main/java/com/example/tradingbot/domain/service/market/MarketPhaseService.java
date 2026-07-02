@@ -7,8 +7,10 @@ import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import com.example.tradingbot.domain.service.market.condition.ConditionEvaluationContext;
 import com.example.tradingbot.domain.service.market.phase.MarketPhaseResolver;
@@ -39,22 +41,23 @@ public class MarketPhaseService {
 
     private final IndicatorService indicatorService;
     private final MarketStructureService marketStructureService;
+    private final MarketPriceDataService marketPriceDataService;
     private final MarketPhaseResolver resolver;
 
     /** Текущая фаза, вычисленная на лету по свежим входам (пусто — нет правил классификации). */
-    public Optional<MarketPhase> getCurrentPhase(Strategy strategy) {
+    public Optional<MarketPhase> getCurrentPhase(Instrument instrument, Strategy strategy) {
         StrategyMarketPhaseSetting setting = strategy.getMarketPhaseSetting();
         if (isNull(setting) || isEmpty(setting.getPhaseRules())) {
             return Optional.empty();
         }
-        ConditionEvaluationContext context = buildContext(strategy);
+        ConditionEvaluationContext context = buildContext(instrument, strategy);
         MarketPhase phase = new MarketPhase();
         phase.setInstrumentId(strategy.getInstrumentId());
         phase.setType(resolver.resolve(setting.getPhaseRules(), context));
         return Optional.of(phase);
     }
 
-    private ConditionEvaluationContext buildContext(Strategy strategy) {
+    private ConditionEvaluationContext buildContext(Instrument instrument, Strategy strategy) {
         Long instrumentId = strategy.getInstrumentId();
         Map<String, IndicatorValue> latestIndicators = new HashMap<>();
         Map<String, IndicatorValue> previousIndicators = new HashMap<>();
@@ -69,10 +72,13 @@ public class MarketPhaseService {
             marketStructureService.getLatestStructure(instrumentId, structureSetting)
                     .ifPresent(structure -> structures.put(structureSetting.getKey(), structure));
         }
+        MarketPriceData marketPriceData = marketPriceDataService.getMarketPriceData(
+                instrumentId, instrument.getExternalId());
         return ConditionEvaluationContext.builder()
                 .latestIndicators(latestIndicators)
                 .previousIndicators(previousIndicators)
                 .structures(structures)
+                .price(isNull(marketPriceData) ? null : marketPriceData.getExternalLastPrice())
                 .evaluationTime(OffsetDateTime.now(ZoneOffset.UTC))
                 .build();
     }

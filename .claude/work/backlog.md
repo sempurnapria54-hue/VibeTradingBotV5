@@ -373,6 +373,18 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   скорость, а ограниченный аппетит (память/стоимость). **`LIMIT` небезопасен**
   (отрезал бы несвёрнутый live risk); альтернатива — off-lock dispatch
   L4-teardown. Источник — `phase-1-step-6-code.md` §Доработка холд-дельты.
+- **[MINOR, perf] Дублирующий тикер-REST в entry-скане (повторное ревью фикс-дельты
+  M4, 2026-07-02).** После фикса M4 `MarketPhaseService.buildContext` тянет тикер
+  (`MarketPriceDataService.getMarketPriceData`) для классификации фазы по каждому
+  ACTIVE-инструменту без активной сделки за проход; квалифицированный инструмент
+  затем тянет тот же тикер повторно в `MarketConditionContextFactory.build`. Итог:
+  +1 тикер-REST на каждый скан-инструмент, 2 идентичных вызова на квалифицированный
+  — линейно к числу инструментов, давление на rate-limit OKX. Функционально
+  корректно, согласуется с stage-1 no-cache. **Починка:** тянуть `MarketPriceData`
+  один раз в `EntryScannerJob.scanInstrument` и прокинуть в оба контекста (фазовый +
+  condition), либо короткоживущий per-tick кэш в `MarketPriceDataService`.
+  Кросс-коллаборатор: `MarketConditionContextFactory.build` шарится с FSM
+  (`DealFsmSupport.conditionContext`). Источник — повторное ревью фикс-дельты (v63).
 - **`EXECUTE_KILL_SWITCH` — эмиссия команды — ✅ ПОДКЛЮЧЕНА** (CODE-делта холдов,
   2026-06-23). Тонкий эмиттер — `KillSwitchService` (вызывается из
   `SafetyHoldCoordinator`); заменил удалённый орфан
