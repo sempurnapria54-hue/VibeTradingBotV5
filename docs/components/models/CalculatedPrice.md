@@ -3,8 +3,7 @@
 ## На какой вопрос отвечает этот файл
 
 Что это за runtime value object `CalculatedPrice`: структура, енумы
-`PriceMode` / `StrategyPricePurpose`, под-объекты resolved-цен, политика
-округления.
+`PriceMode` / `StrategyPricePurpose`, под-объекты resolved-цен.
 
 ## Назначение
 
@@ -55,7 +54,7 @@ RVO, не persisted (см. `.claude/decisions/runtime-value-object.md`).
 В фазе 1 `PriceCalculator` эмитит **только** подмножество:
 `ORDER_LIMIT_PRICE`, `ORDER_MARKET_REFERENCE_PRICE`,
 `STOP_LOSS_TRIGGER_PRICE`, `TAKE_PROFIT_TRIGGER_PRICE`,
-`TRAILING_ACTIVATION_PRICE`, `POSITION_CLOSE_REFERENCE_PRICE`. Остальные
+`TRAILING_ACTIVATION_PRICE`. Остальные
 значения каталога определены, но в фазе 1 не порождаются (форвард).
 
 Полный каталог назначений цены: `ORDER_LIMIT_PRICE`,
@@ -69,17 +68,17 @@ RVO, не persisted (см. `.claude/decisions/runtime-value-object.md`).
 `TAKE_PROFIT_TRIGGER_PRICE`, `TAKE_PROFIT_ORDER_PRICE`,
 `TRAILING_ACTIVATION_PRICE`, `TRAILING_CALLBACK_SPREAD`,
 `TRAILING_CALLBACK_RATIO`, `TRIGGER_ORDER_TRIGGER_PRICE`,
-`TRIGGER_ORDER_EXECUTION_PRICE`, `POSITION_CLOSE_REFERENCE_PRICE`,
+`TRIGGER_ORDER_EXECUTION_PRICE`,
 `ACTUAL_EXECUTION_PRICE`, `POSITION_RISK_REFERENCE_PRICE`,
 `LIQUIDATION_GUARD_PRICE`, `PRICE_VALIDATION_MIN_PRICE`,
 `PRICE_VALIDATION_MAX_PRICE`, `PRICE_ROUNDING_STEP`.
 
-## Енум `PriceRoundingPolicy`
+## Округление цены
 
-`CONSERVATIVE` (безопасное округление, не ухудшает смысл защитной цены;
-используется на первом этапе), `AGGRESSIVE` (для повышения шанса
-исполнения), `NEAREST` (к ближайшему tick). Конкретные правила сторон
-округления — у `docs/components/PriceCalculator.md`.
+Отдельного enum политики округления нет: `PriceCalculator` округляет
+цену по tick size **напрямую** через `RoundingMode` (DOWN/UP по
+направлению), консервативно — защитная цена не ухудшается. Конкретные
+правила сторон округления — у `docs/components/PriceCalculator.md`.
 
 ## Источник цены
 

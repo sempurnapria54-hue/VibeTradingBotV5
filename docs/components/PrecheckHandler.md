@@ -24,7 +24,12 @@
 **Чистота инструмента берётся из стартового инструмент-скоупного сбора
 итерации** (запрос биржи «что живо на инструменте» — видит и **незнакомые**
 сущности), а не серией рефрешей только по известным
-(`docs/components/IntegrationService.md`). Нет открытой сделки → биржа по
+(`docs/components/IntegrationService.md`). **As-built (шаг 6):** проверка
+чужого риска — узкая: `foreignLiveRisk` в фасаде `DealFsmSupport` (handler
+`IntegrationService` напрямую не инъектит) читает позицию по инструменту
+(`IntegrationService.getPosition`) при отсутствии локальной позиции сделки, и
+чужой live risk (позиция с size > 0) уводит сделку в `ERROR`
+(`MARK_DEAL_ERROR`, `markError`). Форвард: нет открытой сделки → биржа по
 инструменту должна быть пуста; не пуста (чужой/висящий live order/algo) →
 `AnomalyReport` + холд инструмента (`docs/rules/instrument-hold.md`). «Оптовую
 команду» в command-layer не возвращаем (CMD-Q4: read **вне** command-layer).
@@ -78,8 +83,8 @@ risk-creating входа подтверждена** (attached SL / иной ст
 ## Допустимые StrategyStep / возможные ServiceCommand
 
 Steps: `ENTRY`, `GRID_ENTRY`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE`,
-`REFRESH_POSITION`, `CREATE_ORDER`, `SUBMIT_ORDER`, `MARK_DEAL_ERROR`,
-`EXECUTE_KILL_SWITCH`. Перечисление **неизвестных** live orders/algo по
+`REFRESH_POSITION`, `CREATE_ORDER`, `SUBMIT_ORDER`, `MARK_DEAL_ERROR`.
+Перечисление **неизвестных** live orders/algo по
 инструменту для входной проверки чистоты берётся из стартового
 инструмент-скоупного exchange-read **вне command-layer**
 (`docs/components/IntegrationService.md`), не bulk-командой — Precheck-часть

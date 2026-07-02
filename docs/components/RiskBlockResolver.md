@@ -18,9 +18,6 @@
 RiskBlockAction resolve(
     DealContext dealContext,
     Deal.Status currentStatus,
-    StrategyStep strategyStep,
-    StrategyAction strategyAction,
-    CalculatedStrategyAction calculatedAction,
     RiskValidationResult riskValidationResult
 );
 ```
@@ -29,16 +26,13 @@ RiskBlockAction resolve(
   `DealActionState`, active risk);
 - `currentStatus` — различить `PRECHECK` и этапы, где live risk уже есть
   или мог появиться;
-- `strategyStep` — тип шага (`ENTRY` … `FAIL_SAFE`);
-- `strategyAction` — исходное намерение стратегии (kind, actionType,
-  risk-creating vs reduce-only exit, `positionReducingOnly`);
-- `calculatedAction` — рассчитанные цена/размер (`calculatedPrice` /
-  `calculatedSize`); reduce-only intent выводится из
-  `CalculatedSize.sizeMode`/`closeFraction`, направление — из
-  `DealContext.deal.direction` (для order-action также доступно на
-  `sourceAction`), отдельных полей направления/reduce-only у
-  `CalculatedStrategyAction` нет;
 - `riskValidationResult` — итоговое решение и конкретные `RiskCheckCode`.
+
+Параметры `strategyStep` / `strategyAction` / `calculatedAction` **не**
+передаются: маппинг кода риска в действие опирается только на
+`riskValidationResult`, `dealContext` и `currentStatus`. Reduce-only intent
+и направление, если нужны, доступны из `dealContext` (`deal.direction`,
+runtime graph) — отдельных параметров под них нет.
 
 `boolean liveRiskExists` отдельным параметром не передаётся — это
 производное состояние, выводится из `DealContext + currentStatus + runtime

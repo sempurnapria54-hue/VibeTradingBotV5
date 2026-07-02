@@ -14,10 +14,15 @@ concurrency-guard, границы.
 1. находит сделки в работе (критерии выборки — ниже);
 2. для каждой загружает `DealContext` (`DealContextService`);
 3. запускает `DealStateMachine` (см. `docs/components/DealStateMachine.md`);
-4. получает `TransitionResult`;
-5. передаёт команды в `ServiceCommandExecutor`;
-6. перезагружает `DealContext` после выполнения команд;
-7. сохраняет новый статус сделки.
+4. получает `DealTransition` (команды + опц. целевой статус / hold-сигнал);
+5. передаёт команды в `ServiceCommandExecutor`, прерывая цикл при первом
+   неуспешном результате (остальные команды перехода в этом проходе не
+   гонятся — handler разберёт FAILED-якорь на следующем тике);
+6. применяет переход: сохраняет новый статус сделки (если задан) и реагирует
+   на поднятый handler'ом safety-hold-сигнал.
+
+Свежий runtime-граф сделки перечитывается из БД в начале следующего прохода
+(`DealContextService.build`), не внутри текущего.
 
 Это также execution boundary, на которой ловятся unexpected exceptions
 (`RuntimeErrorCode`, см. `docs/rules/runtime-error-classification.md`).

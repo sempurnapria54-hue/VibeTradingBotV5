@@ -19,9 +19,12 @@
   id (`internalId → clOrdId`/`algoClOrdId`); `REFRESH_*` подтверждает
   фактическое состояние. FSM двигает статус сделки только после
   подтверждения фактов.
-- **Одна актуальная команда за проход.** `ServiceCommandFactory` не
-  создаёт всю цепочку заранее: за один проход FSM/handler — один актуальный
-  action-state и одна актуальная команда, выбранная по свежим фактам.
+- **Одна актуальная команда за проход.** Всю цепочку заранее никто не
+  создаёт: за один проход FSM/handler — один актуальный action-state и одна
+  актуальная команда, выбранная по свежим фактам. Action-команды эмитит
+  per-type `StrategyActionExecutor` под диспетчером
+  `StrategyActionOrchestrator`; финализационные —
+  `DealFinalizationCommandFactory`.
 - **Команды атомарны — на уровне команды, не HTTP-запроса.** Одна команда
   — одна простая операция; составные процессы (graceful shutdown,
   protection switch, **REPLACE-ремодел** (амендных команд нет —
@@ -41,7 +44,9 @@
 Правило сквозное по командам (`.claude/decisions/rule-source-of-truth.md`).
 Структура самого `ServiceCommand` (поля, `ServiceCommandType`) — в
 `docs/components/models/ServiceCommand.md` (здесь не дублируется).
-Поведение фабрики/executor'ов — `docs/components/ServiceCommandFactory.md`,
-`docs/components/ServiceCommandExecutor.md`. Retry опасных команд —
+Эмиссия команд — `docs/components/StrategyActionOrchestrator.md` +
+`docs/components/StrategyActionExecutor.md` (action-команды) и
+`docs/components/DealFinalizationCommandFactory.md` (финализация);
+исполнение — `docs/components/ServiceCommandExecutor.md`. Retry опасных команд —
 `docs/components/RetryPolicyService.md`. Recovery по статусам —
 `docs/lifecycles/Deal.md`, `docs/processes/deal-management.md`.

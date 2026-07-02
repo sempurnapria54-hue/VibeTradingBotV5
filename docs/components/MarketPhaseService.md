@@ -12,14 +12,16 @@
 сервис **вычисляет её на лету** на момент запроса (ревизия трек D,
 `docs/decisions/market-phase-stateless.md`): собирает текущие (последние
 доступные) `IndicatorValue` / `MarketStructure` по `key`-ссылкам операндов
-`StrategyMarketPhaseSetting.phaseRules` и зовёт
-`docs/components/MarketPhaseResolver.md` (stateless first-match). Прежний
-`MarketPhaseJob`, писавший `MarketPhase`, удалён.
+`StrategyMarketPhaseSetting.phaseRules`, а также **текущую цену** по
+тикеру инструмента (`MarketPriceDataService`, для PRICE-операндов правил
+фазы) и зовёт `docs/components/MarketPhaseResolver.md` (stateless
+first-match). Прежний `MarketPhaseJob`, писавший `MarketPhase`, удалён.
 
 ## Контракт (пример метода)
 
-- `MarketPhase getCurrentPhase(Long instrumentId,
-  StrategyMarketPhaseSetting setting)` — вычисляет фазу из текущих входов.
+- `Optional<MarketPhase> getCurrentPhase(Instrument instrument,
+  Strategy strategy)` — вычисляет фазу из текущих входов (`Instrument`
+  нужен для резолва цены по внешнему тикеру).
 
 ## Использование
 

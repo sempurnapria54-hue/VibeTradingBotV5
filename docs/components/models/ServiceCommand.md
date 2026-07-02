@@ -14,9 +14,13 @@ durable command queue (см. `.claude/decisions/runtime-value-object.md` и
 
 Отвечает на вопрос «какую простую операцию выполнить над runtime-
 сущностью?»; executor — «как технически выполнить»; FSM — «зачем сейчас и
-можно ли после результата перейти дальше». Flow: `StrategyAction →
-StrategyActionCalculator → ServiceCommandFactory → ServiceCommand →
-ServiceCommandExecutor → конкретный Executor`.
+можно ли после результата перейти дальше». Flow action-команды:
+`StrategyAction → StrategyActionOrchestrator → StrategyActionExecutor
+(per type, зовёт StrategyActionCalculator) → ServiceCommand →
+ServiceCommandExecutor → конкретный Executor`. Финализационные команды
+эмитит `DealFinalizationCommandFactory` (см.
+`docs/components/StrategyActionOrchestrator.md`,
+`docs/components/DealFinalizationCommandFactory.md`).
 
 ## Структура
 
@@ -33,8 +37,11 @@ Retry-anchor команды — ровно один из `dealActionStateId` /
 `CLOSE_POSITION`/`REFRESH_*`) ведутся `DealActionState`; финализационные
 (`FINALIZE_DEAL_*`/`MARK_DEAL_*`) — `DealFinalizationState` (нет
 `StrategyAction`, поэтому `dealActionStateId` им не подходит; см.
-`docs/decisions/deal-finalization-state-materialization.md`). Safety-команда
-без retry-state (`EXECUTE_KILL_SWITCH`) может не нести ни того, ни другого.
+`docs/decisions/deal-finalization-state-materialization.md`). Системная/
+cleanup-команда без action-state (`REFRESH_*` / `CANCEL_*` / `CLOSE_POSITION`,
+эмитируемые как safety/cleanup вне strategy-action) может не нести ни того,
+ни другого. Kill-switch командой не является — он реактивен (`HoldSignal` →
+`SafetyHoldCoordinator`, см. `docs/components/KillSwitchExecutor.md`).
 
 Не обязан хранить `strategyId` / `strategyDetailId`: происхождение
 команды восстанавливается через `DealActionState` / `DealFinalizationState`
@@ -47,10 +54,11 @@ Retry-anchor команды — ровно один из `dealActionStateId` /
 `SUBMIT_ORDER`, `CANCEL_ORDER`, `REFRESH_ORDER`, `CREATE_ALGO_ORDER`,
 `SUBMIT_ALGO_ORDER`, `CANCEL_ALGO_ORDER`, `REFRESH_ALGO_ORDER`,
 `REFRESH_FILLS`, `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`,
-`MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.
+`MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`.
 
 **Амендных команд нет:** `AMEND_ORDER` / `AMEND_ALGO_ORDER` сняты из
-enum'а (19 → 17) решением
+enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SWITCH`
+текущий enum — 16 значений) решением
 `docs/decisions/replace-not-amend.md` — AMEND ушёл из доменного
 словаря целиком. Ремоделирование — действие стратегии
 `StrategyActionType.REPLACE`, исполняемое **оркестрацией
@@ -73,7 +81,7 @@ Bulk-команды `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` /
 `StrategyAction`: их retry-state живёт в `DealFinalizationState` (не
 `DealActionState`), а эмитятся они по статусу `DealFinalizationState`
 (`docs/decisions/deal-finalization-state-materialization.md`,
-`docs/components/ServiceCommandFactory.md`). Семантика executor'ов —
+`docs/components/DealFinalizationCommandFactory.md`). Семантика executor'ов —
 `docs/components/FinalizeDealEntryExecutor.md` и др.
 
 Graceful shutdown, protection switch, REPLACE-ремодел и safety-flow

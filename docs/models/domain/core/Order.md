@@ -49,7 +49,8 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Embedded attached protection. |
 
 Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
-`isNotLive()`, `toCancel(reason)`, `toComplete()` (→ COMPLETED/FILLED),
+`hasActiveAttachedProtection()` (есть ≥1 active-like (PENDING/ACTIVE)
+attached-защита), `toCancel(reason)`, `toComplete()` (→ COMPLETED/FILLED),
 `toError(reason)`.
 
 ### `positionReducingOnly`
@@ -105,10 +106,9 @@ Java-класс `...core.order.AttachedAlgoOrder`, расширяет `Auditable
 | `size` | `BigDecimal` | Размер. |
 | `stopLossTriggerPrice` | `BigDecimal` | Триггерная цена SL (текущий проект — attached SL). |
 
-Доменные методы: `isActiveLike()` (PENDING/ACTIVE), `isTerminal()`
-(COMPLETED/CANCELED/ERROR), `canTransitionTo(target)` (явная
-матрица — см. lifecycle), `toPending/toActive/toComplete/toCancel/
-toError`, `hasExternalType()`.
+Доменные методы: `isActiveLike()` (PENDING/ACTIVE),
+`canTransitionTo(target)` (явная матрица — см. lifecycle),
+`toPending/toActive/toComplete/toCancel/toError`.
 
 ### Енумы `AttachedAlgoOrder`
 

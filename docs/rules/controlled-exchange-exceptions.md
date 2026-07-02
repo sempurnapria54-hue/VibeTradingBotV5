@@ -20,7 +20,7 @@ problem-state. `reasonCode`: `UNKNOWN_EXTERNAL_STATUS`, `ORDER_FAILED`,
 
 ```text
 entity -> ERROR; closeReason = reasonCode
-Deal -> ERROR; Exchange -> HOLD по severity / safetyImpact
+Deal -> ERROR; Exchange -> HOLD
 ```
 
 ### ExternalInvariantViolationException
@@ -47,6 +47,19 @@ Deal -> ERROR; Exchange -> HOLD
 entity -> ERROR; closeReason = MISSING_AFTER_REFRESH
 Deal -> ERROR; Exchange -> HOLD
 ```
+
+## Эскалация — безусловный L4 (все три категории)
+
+`Exchange -> HOLD` во всех трёх блоках — **безусловный L4-холд биржи**,
+единообразный для всех трёх категорий (HOLD-Q1,
+`docs/decisions/controlled-violation-exchange-wide-hold.md`): один
+controlled-эксепшн на одной сделке → flatten всех активных сделок биржи
+(`KillSwitchService.fireExchange`) + `Exchange.TRADE_BLOCKED`. Квалификатор
+«по severity / safetyImpact» для `ExternalStatusException` **снят** —
+эскалация безусловна и **доминирует над L3** (бесстоповая позиция
+постфактум). Обоснование: контролируемая биржевая ошибка — сигнал
+недоверенной интеграции, истинный радиус поражения неизвестен, потому
+тормозим консервативно (вся биржа).
 
 ## Разделение ответственности
 

@@ -51,8 +51,7 @@
 | `CANCELED` | нет | да | Отменена/снята. |
 | `ERROR` | — | problem-final | Ошибочное состояние. |
 
-`isActiveLike()` = PENDING/ACTIVE; `isTerminal()` = COMPLETED/CANCELED/
-ERROR. Допустимые переходы (`canTransitionTo`):
+`isActiveLike()` = PENDING/ACTIVE. Допустимые переходы (`canTransitionTo`):
 
 ```text
 null     -> CREATED

@@ -52,9 +52,10 @@ Callback — ratio/percent на биржу.
 
 ## Округление по tick size
 
-Цена округляется по `InstrumentExternalRules.externalTickSize`. На первом
-этапе политика `CONSERVATIVE` (см. `PriceRoundingPolicy` в
-`docs/components/models/CalculatedPrice.md`):
+Цена округляется по `InstrumentExternalRules.externalTickSize`
+**напрямую** через `RoundingMode` (DOWN/UP по направлению) —
+консервативно, защитная цена не ухудшается (отдельного enum политики
+округления нет):
 
 ```text
 LIMIT BUY conservative  -> вниз

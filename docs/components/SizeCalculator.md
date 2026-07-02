@@ -7,7 +7,7 @@
 
 ## Назначение
 
-`SizeCalculator` рассчитывает размер order/algo/position action и
+`SizeCalculator` рассчитывает размер order/algo action и
 возвращает `CalculatedSize` (см.
 `docs/components/models/CalculatedSize.md`). Цену не считает, но может
 использовать `CalculatedPrice` как входной параметр.
@@ -41,12 +41,15 @@ contractsRounded = roundByLotSize(contracts)
 аллокации — `externalAvailableEquity` (якорь процента — открытый вопрос
 STRAT-Q4).
 
-### Reduce-only / algo / full-close
+### Reduce-only / algo
 
 Размер закрытия = `Position.externalSize × fraction` (fraction зажат в
 `[0..1]`), округлён вниз по `lotSz`, снизу ограничен `minSz`. Для
-`StrategyPositionAction` (`CLOSE_FULL`) fraction = 1
-(`externalSize` целиком).
+не-частичных algo (`STOP_LOSS`/`TAKE_PROFIT`/`OCO_FULL`/trailing)
+fraction = 1 (`externalSize` целиком); для частичных (`PARTIAL_*`) —
+`closeFractionPercents`. Полного закрытия позиции как **действия** нет —
+market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION`, вне
+`SizeCalculator`.
 
 ## Сайзинг под лимит риска на сделку
 
@@ -71,8 +74,9 @@ STRAT-Q4).
 
 ## Инвариант partial exit
 
-`SizeCalculator` **не** рассчитывает direct partial close для
-`StrategyPositionAction` (только `CLOSE_FULL`). Частичное уменьшение —
+`SizeCalculator` **не** рассчитывает direct partial close позиции
+(полного закрытия позиции как действия нет — market-close ведёт
+`ExitPendingHandler`). Частичное уменьшение —
 только через `StrategyOrderAction` reduce-only или `StrategyAlgoOrderAction`
 partial TP / reduce-only; размер закрывающего `Order`/`AlgoOrder`
 считается так, чтобы action не увеличивал позицию (`closeFraction` 0..1,

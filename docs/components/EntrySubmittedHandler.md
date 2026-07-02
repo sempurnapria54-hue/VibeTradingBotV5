@@ -41,5 +41,4 @@ Entry order финализирован; позиция открыта (чере�
 
 Steps: `FAIL_SAFE` (новые торговые actions обычно не выбираются). Команды:
 `SUBMIT_ORDER`, `REFRESH_ORDER`, `REFRESH_POSITION`, `REFRESH_FILLS`,
-`REFRESH_BALANCE`, `FINALIZE_DEAL_ENTRY`, `MARK_DEAL_ERROR`,
-`EXECUTE_KILL_SWITCH`.
+`REFRESH_BALANCE`, `FINALIZE_DEAL_ENTRY`, `MARK_DEAL_ERROR`.

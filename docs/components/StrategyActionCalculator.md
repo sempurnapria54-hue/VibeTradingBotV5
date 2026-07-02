@@ -36,8 +36,12 @@ size  = sizeCalculator.calculate(context, price)
   `RiskValidationResult` / `CalculatedRiskMetrics` как часть успешного
   расчёта. После успешного расчёта handler/orchestration решает, нужна ли
   risk-policy validation (см. `docs/processes/risk-evaluation.md`).
-- **Не** создаёт `ServiceCommand` — на базе параметров команды создаёт
-  `ServiceCommandFactory`.
+- **Не** создаёт `ServiceCommand` — на базе рассчитанных параметров команду
+  собирает per-type `StrategyActionExecutor` (`CreateOrderActionExecutor` /
+  `CreateAlgoOrderActionExecutor`) под диспетчером
+  `StrategyActionOrchestrator` (см.
+  `docs/components/StrategyActionExecutor.md`,
+  `docs/components/StrategyActionOrchestrator.md`).
 - **Не** считает тяжёлые данные (индикаторы, структуру) — читает готовые
   результаты через сервисы (см.
   `docs/processes/market-data-calculation.md`).

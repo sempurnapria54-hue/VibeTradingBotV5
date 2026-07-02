@@ -32,7 +32,9 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
 2. **Рабочая логика этапа** — что сделать, чтобы приблизить завершение
    этапа (refresh / `CREATE_*`/`SUBMIT_*`/`CANCEL_*` /
    risk-reducing/cleanup команды; проверка condition; выбор action; вызов
-   калькулятора и `ServiceCommandFactory`; REPLACE-действия секвенсятся
+   калькулятора и эмиссия команд (action-команды —
+   `StrategyActionOrchestrator`, финализационные —
+   `DealFinalizationCommandFactory`); REPLACE-действия секвенсятся
    этими же командами по фактам — `docs/decisions/replace-not-amend.md`).
    Сама по себе завершение этапа не означает.
 3. **Выходные проверки** — можно ли считать этап завершённым; именно они
@@ -42,10 +44,13 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
 
 `DealStateMachine` / петля — **владелец оркестрации порядка ног REPLACE**:
 вычисляет следующую ногу по **подтверждённым фактам** (не ACK), по
-риск-классу действия (`docs/decisions/replace-not-amend.md`).
-`ServiceCommandFactory` остаётся «одна атомарная команда за проход» и секвенс
-в себя не берёт (`docs/components/ServiceCommandFactory.md`). Без петли,
-реагирующей на факты, правило ног было бы мёртвым кодом (CMD-Q5).
+риск-классу действия (`docs/decisions/replace-not-amend.md`). Эмиссия команд
+остаётся «одна атомарная команда за проход»: action-команды даёт
+`StrategyActionOrchestrator` (`docs/components/StrategyActionOrchestrator.md`),
+финализационные — `DealFinalizationCommandFactory`
+(`docs/components/DealFinalizationCommandFactory.md`); секвенс ног в себя ни
+та, ни другая не берут. Без петли, реагирующей на факты, правило ног было бы
+мёртвым кодом (CMD-Q5).
 
 Принцип границы (CMD-Q6, `docs/decisions/action-orchestration-vs-command.md`):
 *действие-оркестрация* (REPLACE) — многошаговая последовательность, ведомая

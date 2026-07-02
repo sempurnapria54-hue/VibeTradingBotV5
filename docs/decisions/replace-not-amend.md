@@ -35,7 +35,7 @@ amend/replace порождает разный разбор кейсов по б�
    (`docs/integrations/okx/contracts/order.md` §Amend,
    `algo-order.md` §Amend) с пометкой «доменом не используется».
 2. **REPLACE — операция словаря стратегии, не команда:**
-   `StrategyActionType: CREATE / REPLACE / CANCEL / CLOSE_FULL`.
+   `StrategyActionType: CREATE / REPLACE / CANCEL`.
    REPLACE-действие задаёт полное новое желаемое состояние (палитра
    как у CREATE) и исполняется **оркестрацией существующих атомарных
    команд** (`CREATE_*`/`SUBMIT_*`/`REFRESH_*`/`CANCEL_*`);

@@ -43,4 +43,4 @@ entry/exit facts доказывают отсутствие live risk); active po
 Steps: `FAIL_SAFE` (торговые steps обычно не применяются). Команды:
 `REFRESH_POSITION`, `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`,
 `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`, `REFRESH_FILLS`, `FINALIZE_DEAL_EXIT`,
-`MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.
+`MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`.

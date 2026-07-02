@@ -8,7 +8,8 @@ command-слоем.
 
 ## Назначение
 
-Между выбором действия (FSM) и созданием команды (`ServiceCommandFactory`)
+Между выбором действия (FSM) и созданием команды
+(`StrategyActionOrchestrator` через per-type `StrategyActionExecutor`)
 находится расчёт параметров. FSM выбирает допустимое действие, но не
 считает цену/размер/риск; executor исполняет команду, но не пересчитывает
 параметры. Процесс — точка композиции, вызывается из
@@ -27,7 +28,7 @@ FSM / StateHandler
      -> StrategyActionCalculationResult (SUCCESS: CalculatedStrategyAction)
   -> handler решает, нужна ли risk-policy validation
   -> RiskValidator, если action создаёт / увеличивает риск или ослабляет контроль
-  -> ServiceCommandFactory -> ServiceCommand
+  -> StrategyActionOrchestrator (per-type StrategyActionExecutor) -> ServiceCommand
 ```
 
 Компоненты: `docs/components/StrategyActionCalculator.md`,
@@ -57,7 +58,8 @@ transaction.
 - Калькулятор **не** вызывает `RiskValidator`, не возвращает risk-policy
   результат и risk-метрики; решение `ALLOWED/WARNING/BLOCKED` — у
   `docs/processes/risk-evaluation.md`.
-- **Не** создаёт команды (это `ServiceCommandFactory`) и не вызывает
+- **Не** создаёт команды (это `StrategyActionOrchestrator` через per-type
+  `StrategyActionExecutor`) и не вызывает
   `REFRESH_BALANCE`/`IntegrationService`.
 - Controlled calculation errors → `CalculationError` (суб-калькуляторы бросают
   `CalculationException`, `StrategyActionCalculator` перехватывает →

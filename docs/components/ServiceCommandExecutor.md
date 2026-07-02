@@ -91,8 +91,15 @@ runtime-сущность и отдаёт факты FSM/handler'у (таксон
 
 ## Retry
 
-При падении executor'а — через `docs/components/RetryPolicyService.md`:
+При неуспехе executor'а — через `docs/components/RetryPolicyService.md`:
 `attemptCount`++, `nextRetryAt`, `lastError`, retry-anchor → `RETRY_PENDING`;
 при исчерпании попыток → `FAILED`. Retry-anchor — `DealActionState` для
 action-команд, `DealFinalizationState` для финализационных
 (`docs/decisions/deal-finalization-state-materialization.md`).
+
+Через этот retry/terminal-учёт проходит **и** брошенное executor'ом
+исключение, **и** возвращённый (не брошенный) неуспешный результат —
+`ServiceCommandExecutionResult.failure(...)` (ACK-реджект биржи). Иначе
+retry-anchor завис бы: сделка пере-сабмитила бы команду каждый тик. При
+неуспешном результате `DealOrchestratorJob` прерывает цикл команд текущего
+прохода (см. `docs/components/DealOrchestratorJob.md`).

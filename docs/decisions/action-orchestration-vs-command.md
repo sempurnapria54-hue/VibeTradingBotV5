@@ -13,10 +13,12 @@
 
 - **REPLACE-ремодел** (`docs/decisions/replace-not-amend.md`) — место
   оркестрации порядка ног было открыто (**CMD-Q5**): фабрика или петля.
-- **`EXECUTE_KILL_SWITCH`** — одна команда с внутренним многошаговым
-  teardown (close → cancel orders → cancel algos → безусловный финальный
-  close), хотя сам компаунд над атомарными операциями; принцип границы был
-  не сформулирован (**CMD-Q6**).
+- **Kill-switch** — не команда (`ServiceCommandType`), а side-executor
+  `KillSwitchExecutor` вне реестра команд, исполняемый реактивно через
+  `SafetyHoldCoordinator`. Несёт внутренний многошаговый teardown (close →
+  cancel orders → cancel algos → безусловный финальный close) над атомарными
+  операциями, доводимый им самим (self-contained синхронный teardown, не
+  ведомый петлёй); принцип границы был не сформулирован (**CMD-Q6**).
 
 Оба парк на шаги 6-7; петля — теперь шаг 6.
 
@@ -39,14 +41,15 @@
 
 Секвенс ног REPLACE по риск-классу (`docs/decisions/replace-not-amend.md`)
 вычисляет **петля / `DealStateMachine`** по подтверждённым фактам, выбирая
-следующую ногу. `ServiceCommandFactory` остаётся «одна атомарная команда за
-проход» и секвенс в себя **не** берёт (`docs/components/ServiceCommandFactory.md`,
+следующую ногу. Per-pass эмиттер команды (per-type `StrategyActionExecutor`
+под `StrategyActionOrchestrator`) остаётся «одна атомарная команда за проход»
+и секвенс в себя **не** берёт (`docs/components/StrategyActionExecutor.md`,
 `docs/components/DealStateMachine.md`).
 
-Альтернатива — правило порядка ног **в `ServiceCommandFactory`** —
-отвергнута: без петли, реагирующей на факты, правило **мёртвое** (фабрике
-некого спросить, подтвердилась ли предыдущая нога; `CANCEL`/`REPLACE` фабрика
-на шаге 4 и не порождала — forward-debt, `.claude/work/backlog.md` §Хвост
+Альтернатива — правило порядка ног **в per-pass эмиттере команды** —
+отвергнута: без петли, реагирующей на факты, правило **мёртвое** (эмиттеру
+некого спросить, подтвердилась ли предыдущая нога; `CANCEL`/`REPLACE` на
+шаге 4 и не порождались — forward-debt, `.claude/work/backlog.md` §Хвост
 шага 4).
 
 ### `KILL_SWITCH` — отдельная команда (не петля)
@@ -60,9 +63,10 @@
 
 ## Альтернативы (отвергнуты)
 
-- **Правило ног REPLACE в `ServiceCommandFactory`** — без петли правило
-  никем не вызывается (мёртвый код); факт-driven секвенс — природа
-  оркестратора, не фабрики.
+- **Правило ног REPLACE в per-pass эмиттере команды
+  (`StrategyActionExecutor`)** — без петли правило никем не вызывается
+  (мёртвый код); факт-driven секвенс — природа оркестратора петли, не
+  per-pass эмиттера.
 - **`KILL_SWITCH` как действие-оркестрация** (секвенс ведёт петля) —
   отвергнуто: аварийный teardown не должен зависеть от исправности петли;
   fire-all быстрее снимает риск.
@@ -76,8 +80,9 @@ CMD-Q5 (владелец оркестрации REPLACE) и CMD-Q6 (принци
 ## Связи
 
 - REPLACE-ремодел и порядок ног — `docs/decisions/replace-not-amend.md`.
-- Владелец секвенса — `docs/components/DealStateMachine.md`,
-  `docs/components/ServiceCommandFactory.md`.
+- Владелец секвенса — `docs/components/DealStateMachine.md`; per-pass
+  эмиссия команды — `docs/components/StrategyActionExecutor.md`,
+  `docs/components/StrategyActionOrchestrator.md`.
 - Команда-тормоз — `docs/components/KillSwitchExecutor.md`.
 - Канон командного слоя — `docs/rules/command-lifecycle.md`,
   `docs/components/models/ServiceCommand.md`.

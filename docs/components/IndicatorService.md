@@ -13,10 +13,13 @@
 
 ## Контракт (примеры методов)
 
-- `AtrValue getLatestAtr(Long instrumentId, StrategyIndicatorSetting
-  setting)`;
+- `Optional<IndicatorValue> getLatestValue(Long instrumentId,
+  StrategyIndicatorSetting setting)`;
 - `List<IndicatorValue> getLatestValues(Long instrumentId,
-  Collection<StrategyIndicatorSetting> settings)`.
+  Collection<StrategyIndicatorSetting> settings)`;
+- `Optional<IndicatorValue> getPreviousValue(Long instrumentId,
+  StrategyIndicatorSetting setting)` — предыдущее значение (slope/
+  crossover); свежесть не гейтит.
 
 ## Поведение при отсутствии / устаревании
 

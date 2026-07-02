@@ -26,10 +26,12 @@ kill-switch на прошлом заходе завёл слой `StrategyAction
 ```
 DealOrchestratorJob — петля по активным сделкам; на Deal.Status выбирает Handler.
 Handler (на статус)  — «рулит ситуацией» по статусу; 3 метода (ниже).
-  └─ Оркестратор действия — решает, какое объявленное StrategyAction применимо
-       сейчас (условие сработало? risk ok?), и на этом проходе дёргает executor.
+  └─ StrategyActionOrchestrator — для выбранного handler'ом StrategyAction гейтит
+       повтор (RETRY_PENDING) и маршрутизирует по типу действия (supports); на этом
+       проходе дёргает нужный executor.
        └─ StrategyActionExecutor (на тип действия) — per-pass: следующая команда
-            действия за проход (или «готово»), состояние в DealActionState.
+            действия за проход (или «готово»), состояние в DealActionState; risk
+            risk-creating действия ведёт сам executor (CreateOrderActionExecutor).
             └─ CommandExecutor — 1 атомарная команда.
 
 Kill-switch — СБОКУ: аварийный executor вне слоёв StrategyAction/Command.
@@ -60,8 +62,8 @@ Kill-switch — СБОКУ: аварийный executor вне слоёв Strate
 смотрит стадию действия (`DealActionState`) и выдаёт **следующую** команду
 (place → refresh-подтверждение по фактам → следующая) либо сигнал «готово».
 Секвенс ведёт **петля по подтверждённым фактам** (не ACK) — сохраняем принцип
-CMD-Q6. Это обобщение нынешних `DealActionPlanner` + `ServiceCommandFactory`,
-разложенных по типам действий.
+CMD-Q6. Это обобщение прежних `DealActionPlanner` + `ServiceCommandFactory`
+(оба удалены), разложенных по типам действий.
 
 Многопроходность обязательна: ордер/algo — place-и-подтвердить за один
 синхронный вызов нельзя (recovery — штатный, по фактам).
@@ -95,8 +97,8 @@ executor'а по условию риска, а не объявление kill-sw
 оправдано только при кастомном закрывающем ордере (тип/цена сверх
 market-close) — пока не требуется.
 
-Следствие: `CLOSE_FULL` (`StrategyPositionAction`) становится избыточным
-(вырожденный подтип + пустая подтаблица) — снять отдельным заходом.
+Следствие: `CLOSE_FULL` (`StrategyPositionAction`) — избыточный подтип
+(вырожденный подтип + пустая подтаблица) — **снят**.
 
 ## Альтернативы (отвергнуты)
 

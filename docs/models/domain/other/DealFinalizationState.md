@@ -110,8 +110,8 @@ jsonb). Авторитет предела повторов — policy (живь�
 
 ## Связи
 
-- Читается `ServiceCommandFactory` (выбор финализационной команды по
-  `status`) и финализационными executor'ами; пишется ими и
+- Читается `DealFinalizationCommandFactory` (выбор финализационной команды
+  по `status`) и финализационными executor'ами; пишется ими и
   `RetryPolicyService`.
 - Финализационные executor'ы — `docs/components/FinalizeDealEntryExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,

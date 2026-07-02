@@ -28,8 +28,12 @@ SEARCH / HISTORY
 CANCEL_ORDER
 CANCEL_ALGO_ORDER
 CLOSE_POSITION
-EXECUTE_KILL_SWITCH
 ```
+
+(Kill-switch teardown командой **не** является — тип `EXECUTE_KILL_SWITCH`
+убран; аварийное снятие риска идёт вне реестра команд через
+`docs/components/KillSwitchExecutor.md` теми же `CANCEL_*` / `CLOSE_POSITION`
+/ `REFRESH_*`, которые здесь и так не блокируются.)
 
 Также `HOLD` блокирует создание новых `ENTRY`/`GRID_ENTRY`, normal-flow
 TP/SL/trailing actions, pyramid/scaling и любые действия, увеличивающие

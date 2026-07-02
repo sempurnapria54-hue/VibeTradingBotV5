@@ -39,4 +39,4 @@ protection; если attached ещё активна, а main подтвержд�
 
 Steps: `FAIL_SAFE` (этап технический). Команды: `REFRESH_POSITION`,
 `REFRESH_ALGO_ORDER`, `REFRESH_ORDER`, `CANCEL_ALGO_ORDER`,
-`CANCEL_ORDER`, `MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.
+`CANCEL_ORDER`, `MARK_DEAL_ERROR`.

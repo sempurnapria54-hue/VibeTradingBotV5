@@ -42,7 +42,7 @@ DealStateMachine / handler
   -> этап сделки, freshness step, StrategyCondition, выбор StrategyAction
   -> strategy-action-calculation: CalculationContext -> Price -> Size
   -> risk-evaluation: RiskValidator -> RiskBlockResolver (для risk-creating)
-  -> ServiceCommandFactory -> ServiceCommand
+  -> StrategyActionOrchestrator (per-type StrategyActionExecutor) -> ServiceCommand
 
 ServiceCommandExecutor -> конкретный Executor
   -> исполняет атомарную операцию, обновляет DealActionState
@@ -51,8 +51,9 @@ ServiceCommandExecutor -> конкретный Executor
 
 Компоненты: `EntryScannerJob`, `DealOpeningService`,
 `DealOrchestratorJob`, `DealStateMachine`, FSM handlers,
-`StrategyActionCalculator`, `ServiceCommandFactory`,
-`ServiceCommandExecutor`, executors (см. `docs/components/`). Контекст
+`StrategyActionCalculator`, `StrategyActionOrchestrator`,
+`DealFinalizationCommandFactory`, `ServiceCommandExecutor`, executors
+(см. `docs/components/`). Контекст
 прохода — `DealContext` (`docs/components/models/DealContext.md`).
 
 ## Статусная механика и recovery

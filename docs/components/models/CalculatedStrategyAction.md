@@ -15,7 +15,8 @@
 Описывает именно **успешный** расчёт параметров команды. Risk-policy
 результат в него не входит: после успешного расчёта price/size handler
 отдельно решает, нужен ли `RiskValidator` (см.
-`docs/processes/risk-evaluation.md`). На вход `ServiceCommandFactory` идёт
+`docs/processes/risk-evaluation.md`). На вход per-type
+`StrategyActionExecutor` (под `StrategyActionOrchestrator`) идёт
 уже рассчитанное действие.
 
 ## Структура
@@ -24,7 +25,7 @@
 |---|---|---|
 | `sourceAction` | `StrategyAction` | Исходное действие стратегии (см. `docs/models/domain/aggregate/Strategy.md`). |
 | `calculatedPrice` | `CalculatedPrice` | Рассчитанная цена / набор цен (см. `docs/components/models/CalculatedPrice.md`). |
-| `calculatedSize` | `CalculatedSize` | Рассчитанный размер order/algo/position action (см. `docs/components/models/CalculatedSize.md`). |
+| `calculatedSize` | `CalculatedSize` | Рассчитанный размер order/algo action (см. `docs/components/models/CalculatedSize.md`). |
 | `description` | `String` | Комментарий/пояснение расчёта для логов и аудита. |
 
 `description` — целевое имя поля; в legacy-коде/тексте встречается

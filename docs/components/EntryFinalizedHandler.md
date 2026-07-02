@@ -31,22 +31,29 @@ steps.
 actions → `DealActionState` → `StrategyActionCalculator` →
 `CREATE_ALGO_ORDER` → `SUBMIT_ALGO_ORDER` → refresh для подтверждения
 active protection. Снять attached protection — только после подтверждения
-main protection (`CANCEL_*`). Если switch не нужен — проверить безопасное
-состояние позиции для перехода в `MANAGING`.
+main protection (`CANCEL_*`). Если switch не нужен (нет `MAIN_PROTECTION`
+step или его условие не сработало) — переход в `MANAGING` **только если entry
+order несёт активную приложенную защиту** (`Order.hasActiveAttachedProtection()`
+— active-like состояние защиты, не просто наличие attached algo). Иначе
+позиция с live risk без резолвимой защиты = бесстоповая постфактум → `ERROR`
++ L3-холд инструмента (`markErrorStopless`, §8.C
+`docs/rules/instrument-hold.md`).
 
 ## Выходные проверки
 
 Позиция активна; entry финализирован; **защита позиции с live risk
-подтверждена** — attached SL держится, пока main protection не подтверждена
+подтверждена активной** — attached SL держится в active-like состоянии
+(`Order.hasActiveAttachedProtection()`), пока main protection не подтверждена
 (голого окна без защиты для risk-creating позиции нет, инвариант
 `docs/rules/risk-creating-entry-protection.md`); нет дублирующей/
 конфликтующей защиты и orphan algo-orders; нет риска под kill-switch.
 → `ENTRY_FINALIZED → PROTECTION_SWITCHED` (если switch реально нужен) или
-`→ MANAGING`.
+`→ MANAGING`. Живой риск без активной резолвимой защиты (ни main, ни
+active-attached) → `ERROR` + L3-холд инструмента.
 
 ## Допустимые StrategyStep / возможные ServiceCommand
 
 Steps: `MAIN_PROTECTION`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE`,
 `CREATE_ALGO_ORDER`, `SUBMIT_ALGO_ORDER`, `REFRESH_ALGO_ORDER`,
 `CANCEL_ALGO_ORDER`, `CANCEL_ORDER`, `REFRESH_POSITION`,
-`MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`.
+`MARK_DEAL_ERROR`.

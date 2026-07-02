@@ -22,13 +22,15 @@ orders/algo без связи со сделкой; расхождение БД/�
 
 ## Рабочая логика
 
-Refresh при неактуальном состоянии; активный риск → `EXECUTE_KILL_SWITCH`
-или конкретные safety-команды; live ordinary orders → `CANCEL_ORDER`; live
-algo → `CANCEL_ALGO_ORDER`; открытая позиция → `CLOSE_POSITION`; после
-safety-flow заново загрузить exchange facts; если live risk отсутствует и
-подтверждён — подготовить переход в `EMERGENCY_CLOSED`. Обычные strategy
-steps не выполняются. Safety-команды — без `RiskValidator` (см.
-`docs/rules/risk-validator-scope.md`).
+Refresh при неактуальном состоянии; активный риск снимается риск-минимизирующим
+порядком cleanup-командами (открытая позиция → `CLOSE_POSITION`; live ordinary
+orders → `CANCEL_ORDER`; live algo → `CANCEL_ALGO_ORDER`), затем факт снятия
+подтверждается через `REFRESH_*` (ACK не truth); после safety-flow заново
+загрузить exchange facts; если live risk отсутствует и подтверждён — подготовить
+переход в `EMERGENCY_CLOSED`. Обычные strategy steps не выполняются. Kill-switch
+ErrorHandler командой не эмитит: kill-switch — реактивный путь (`HoldSignal` →
+`SafetyHoldCoordinator` в проходе оркестратора), не команда. Safety-команды —
+без `RiskValidator` (см. `docs/rules/risk-validator-scope.md`).
 
 ## Выходные проверки
 
@@ -43,9 +45,11 @@ DEAL-Q2), не блокируется инвариантом чистого за
 
 ## Возможные ServiceCommand
 
-`EXECUTE_KILL_SWITCH`, `MARK_DEAL_ERROR`, `REFRESH_POSITION`,
+`MARK_DEAL_ERROR`, `REFRESH_POSITION`,
 `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_FILLS`, `CANCEL_ORDER`,
-`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`. Перечисление **неизвестных** live
+`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`. Kill-switch не эмитится ErrorHandler'ом
+как команда — реактивный side-executor вне реестра (`HoldSignal` →
+`SafetyHoldCoordinator`). Перечисление **неизвестных** live
 orders/algo по инструменту (хвосты orphan) — CMD-Q4. Зона
 `AnomalyJob`/`ReconciliationJob` — live risk после terminal (см.
 `docs/components/AnomalyJob.md`).

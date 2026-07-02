@@ -98,9 +98,9 @@ algoOrderId)`); `REFRESH_POSITION` — `RuntimeTarget(POSITION, positionId)`
 исполняется как CREATE-надмножество: действие порождает **новую**
 runtime-сущность (`target` = новая, `replacesInternalId` = `internalId`
 замещаемой) плюс cancel-ногу по старой. Новых статусов
-`DealActionStateStatus` нет — `ServiceCommandFactory` выводит
-следующую команду **из фактов** («одна актуальная команда за
-проход»):
+`DealActionStateStatus` нет — `StrategyActionOrchestrator` (через per-type
+`StrategyActionExecutor`) выводит следующую команду **из фактов** («одна
+актуальная команда за проход»):
 
 - protective (`positionReducingOnly = true`): новой нет →
   `CREATE_*`; не отправлена → `SUBMIT_*`; новая подтверждена ACTIVE
@@ -155,9 +155,9 @@ runtime-сущность (`target` = новая, `replacesInternalId` = `interna
 
 - Держатель связи для `Order` / `AlgoOrder` / `Position`
   (`docs/models/domain/core/`).
-- Читается `ServiceCommandFactory` (выбор команды по `status`) и
-  `DealContext.actionStates`; пишется executor'ами и
-  `RetryPolicyService`.
+- Читается `StrategyActionOrchestrator` (выбор команды по `status` через
+  per-type `StrategyActionExecutor`) и `DealContext.actionStates`; пишется
+  executor'ами и `RetryPolicyService`.
 - Retry-база — `docs/components/RetryPolicyService.md` (`Retryable`,
   `RetryError`).
 - Решение о материализации/представлении —

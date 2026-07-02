@@ -7,7 +7,7 @@
 
 ## Назначение
 
-`CalculatedSize` — рассчитанный размер order/algo/position action,
+`CalculatedSize` — рассчитанный размер order/algo action,
 результат `SizeCalculator` (см. `docs/components/SizeCalculator.md`). RVO,
 не persisted (см. `.claude/decisions/runtime-value-object.md`).
 
@@ -16,7 +16,7 @@
 | Поле | Тип | Назначение |
 |---|---|---|
 | `sizeContracts` | `BigDecimal` | Размер в контрактах после округления по lot size. |
-| `closeFraction` | `BigDecimal` | Доля уменьшения позиции 0..1; только для reduce-only `Order`/`AlgoOrder`, не для direct `PositionAction`. |
+| `closeFraction` | `BigDecimal` | Доля уменьшения позиции 0..1; только для reduce-only `Order`/`AlgoOrder`. |
 | `notionalUsdt` | `BigDecimal` | Номинал позиции в USDT, если рассчитывался. |
 | `description` | `String` | Пояснение расчёта (целевое имя; legacy — `explanation`). |
 | `sizeMode` | `SizeMode` | Режим размера (уточнённая модель). |
@@ -32,6 +32,7 @@
 
 `sz` в OKX API для SWAP/FUTURES — это контракты, не USDT. Формула расчёта
 контрактов через `ctVal`/`lotSz`/`minSz` — у `docs/components/SizeCalculator.md`.
-Direct partial close через `StrategyPositionAction` не рассчитывается
-(только `CLOSE_FULL`); частичное уменьшение — через reduce-only
-`Order`/`AlgoOrder` (см. `docs/rules/no-partial-close.md`).
+Direct partial close позиции не рассчитывается; полного закрытия позиции
+как действия нет (market-close ведёт `ExitPendingHandler`), частичное
+уменьшение — через reduce-only `Order`/`AlgoOrder` (см.
+`docs/rules/no-partial-close.md`).

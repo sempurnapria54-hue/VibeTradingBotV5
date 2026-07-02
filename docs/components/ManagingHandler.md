@@ -50,7 +50,7 @@ Steps: `PROTECTION_ADJUSTMENT`, `PARTIAL_EXIT`, `GRID_MANAGEMENT`, `EXIT`,
 `SUBMIT_ALGO_ORDER`, `CANCEL_ALGO_ORDER`, `CREATE_ORDER`,
 `SUBMIT_ORDER`, `CANCEL_ORDER`, `CLOSE_POSITION`, `REFRESH_POSITION`,
 `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_FILLS`,
-`MARK_DEAL_ERROR`, `EXECUTE_KILL_SWITCH`. Ремодел защиты
+`MARK_DEAL_ERROR`. Ремодел защиты
 (`PROTECTION_ADJUSTMENT`) — REPLACE-оркестрацией из этого же набора
 (place-new → факт → cancel-old; `docs/decisions/replace-not-amend.md`),
 амендных команд нет.

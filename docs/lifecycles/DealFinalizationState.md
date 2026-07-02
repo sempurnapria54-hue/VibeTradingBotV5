@@ -11,9 +11,9 @@
 
 Статус ведёт command-layer финализационного контура, не FSM напрямую:
 
-- **`ServiceCommandFactory`** — **читает** `status` (+ `type`), чтобы
-  выбрать одну актуальную финализационную команду за проход
-  (`docs/components/ServiceCommandFactory.md`); сам статус не пишет.
+- **`DealFinalizationCommandFactory`** — **читает** `status` (+ `type`),
+  чтобы выбрать одну актуальную финализационную команду за проход
+  (`docs/components/DealFinalizationCommandFactory.md`); сам статус не пишет.
 - **Финализационные executor'ы** (`FinalizeDealEntryExecutor`,
   `FinalizeDealExitExecutor`, `MarkDealClosedExecutor`,
   `MarkDealErrorExecutor`) — **пишут** `status` по результату исполнения и

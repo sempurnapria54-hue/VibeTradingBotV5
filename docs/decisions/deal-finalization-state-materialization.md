@@ -28,9 +28,12 @@
 ретрай — по-командно через `Retryable`.
 
 Финализационные `ServiceCommand` несут `dealFinalizationStateId` (не
-`dealActionStateId`); путь эмиссии — `ServiceCommandFactory` по статусу
-`DealFinalizationState`, аналогично action-командам по `DealActionState`
-(`docs/components/ServiceCommandFactory.md`).
+`dealActionStateId`); путь эмиссии — `DealFinalizationCommandFactory` по
+статусу `DealFinalizationState`, аналогично action-командам, которые
+эмитят per-type `StrategyActionExecutor`'ы под `StrategyActionOrchestrator`
+по статусу `DealActionState`
+(`docs/components/DealFinalizationCommandFactory.md`,
+`docs/decisions/fsm-execution-layering.md`).
 
 ## Обоснование
 
@@ -73,7 +76,8 @@ DEAL-Q1 закрыт на `GAPS_CLOSE_1` шага 6 фазы 1 (2026-06-22). Г�
   `docs/components/FinalizeDealExitExecutor.md`,
   `docs/components/MarkDealClosedExecutor.md`,
   `docs/components/MarkDealErrorExecutor.md`.
-- Эмиссия команд — `docs/components/ServiceCommandFactory.md`,
+- Эмиссия команд — `docs/components/DealFinalizationCommandFactory.md`,
+  `docs/components/StrategyActionOrchestrator.md`,
   `docs/components/models/ServiceCommand.md`.
 - Прецедент материализации операционной модели —
   `docs/decisions/deal-action-state-materialization.md`.

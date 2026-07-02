@@ -32,5 +32,6 @@ risk-policy проверки; unexpected exceptions в него не превр�
 Реакция на `decision` принимается не здесь: `RiskBlockResolver` маппит
 `BLOCKED` в `RiskBlockAction`, FSM handler исполняет (см.
 `docs/processes/risk-evaluation.md`). `WARNING` не блокирует и сам в
-`ERROR` не переводит; `ALLOWED` разрешает переход к
-`ServiceCommandFactory`.
+`ERROR` не переводит; `ALLOWED` разрешает per-type
+`StrategyActionExecutor` (`CreateOrderActionExecutor`) собрать команду
+действия (см. `docs/components/StrategyActionExecutor.md`).

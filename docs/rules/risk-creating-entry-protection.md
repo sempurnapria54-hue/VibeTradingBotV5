@@ -31,13 +31,17 @@ live risk, а не после.
    (`docs/components/PrecheckHandler.md`, `docs/processes/risk-evaluation.md`).
    Выходная проверка `PRECHECK` не выпускает entry без резолвимой защиты;
    `ENTRY_FINALIZED` не уводит в `MANAGING` позицию с live risk без
-   подтверждённой защиты (`docs/components/EntryFinalizedHandler.md`).
+   подтверждённой **active-like** защиты (attached SL входа в active-like
+   состоянии, `Order.hasActiveAttachedProtection()`); иначе — L3-холд
+   (`docs/components/EntryFinalizedHandler.md`).
 2. **Реакция на нарушение постфактум.** Если бесстоповая risk-creating позиция
    обнаружится **иным путём** (восстановление после перезапуска, фоновый скан)
-   — это нарушение инварианта → **реакция уровня 4** error-градации (холд
-   биржи + kill-switch + `AnomalyReport`,
-   `docs/rules/error-handling-policy.md`, `docs/rules/exchange-hold.md`). На
-   входе нарушение не должно случаться (п.1); п.2 — страховка инварианта.
+   — это нарушение инварианта → **реакция уровня 3** error-градации (холд
+   инструмента + kill-switch + `AnomalyReport`,
+   `docs/rules/error-handling-policy.md`, `docs/rules/instrument-hold.md`).
+   Сопутствующий controlled-violation доминирует и поднимает L4
+   (`docs/decisions/controlled-violation-exchange-wide-hold.md`). На входе
+   нарушение не должно случаться (п.1); п.2 — страховка инварианта.
 
 ## Что правило не трогает
 
@@ -68,7 +72,9 @@ live risk, а не после.
   код — `docs/components/models/RiskCheckResult.md`
   (`RISK_CREATING_ENTRY_WITHOUT_STOP`).
 - Защита в `MANAGING`/switch — `docs/components/EntryFinalizedHandler.md`.
-- Реакция уровня 4 — `docs/rules/error-handling-policy.md`,
-  `docs/rules/exchange-hold.md`.
+- Реакция уровня 3 — `docs/rules/error-handling-policy.md`,
+  `docs/rules/instrument-hold.md` (сопутствующий controlled-violation
+  доминирует L4 — `docs/rules/exchange-hold.md`,
+  `docs/decisions/controlled-violation-exchange-wide-hold.md`).
 - Торговый грунт — `docs/decisions/per-trade-risk-policy.md`,
   `docs/rules/trading-constraints.md`.

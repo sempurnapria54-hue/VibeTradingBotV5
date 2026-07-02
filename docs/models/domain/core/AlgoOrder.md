@@ -50,10 +50,11 @@ Java-класс `...core.algo_order.AlgoOrder`, расширяет `Auditable`.
 | `linkedOrderExternalIds` | `List<String>` | Связанные ordinary order ids (OKX `ordId`/`ordIdList`) — храним как внешний факт, runtime на них не опирается. |
 
 Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
-`isNotLive()`, `toPending/toActive/toPartiallyComplete/toComplete/
-toCancel(reason)/toError(reason)` (через строгий `transitTo` с
-матрицей переходов — см. lifecycle), `validateConditionProjection()`
-(сверяет `conditionType == condition.type`, оба не null).
+`toPending/toActive/toComplete/toCancel(reason)/toError(reason)` (через
+строгий `transitTo` с матрицей переходов — см. lifecycle),
+`validateConditionProjection()` (сверяет `conditionType == condition.type`,
+оба не null). Статус `PARTIALLY_COMPLETED` достижим только по матрице
+переходов (exchange-driven recovery), отдельного transition-хелпера нет.
 
 ### Енумы `AlgoOrder`
 

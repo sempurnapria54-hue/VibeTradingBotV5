@@ -37,8 +37,9 @@ Cancel-нога REPLACE отдельной валидации не получа�
   факты (evidence-cycle — внутри исполнителя, см.
   `docs/decisions/refresh-evidence-cycle-ownership.md`);
 - **cleanup / safety**: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`,
-  `CLOSE_POSITION`, `EXECUTE_KILL_SWITCH` — снимают/локализуют уже
-  существующий риск;
+  `CLOSE_POSITION` — снимают/локализуют уже существующий риск (kill-switch
+  снимает риск отдельно — реактивный side-executor вне реестра команд, тоже
+  не проходит RiskValidator);
 - **finalization**: `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`,
   `MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR` (lifecycle/system actions без
   `StrategyAction`; retry-state — `DealFinalizationState`,

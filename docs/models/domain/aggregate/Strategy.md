@@ -54,15 +54,18 @@
   (`StrategyMarketPhaseSetting`, `StrategyDetail`, шаги) — без `key`, связи
   объектные (контейнмент / `marketPhaseType`).
 - **Direct partial close запрещён** как постоянный инвариант (см.
-  `docs/rules/no-partial-close.md`): `StrategyPositionAction` только
-  `CLOSE_FULL`; частичное уменьшение — только через
+  `docs/rules/no-partial-close.md`): полного закрытия позиции как
+  **действия** нет — выход выражается условием-перехода
+  `MANAGING → EXIT_PENDING` (market-close ведёт `ExitPendingHandler`);
+  частичное уменьшение — только через
   `StrategyOrderAction`/`StrategyAlgoOrderAction` с
   position-reducing-only semantics.
 - **`positionReducingOnly`** — доменное намерение strategy-layer;
   OKX `reduceOnly` — только client/adapter field, в strategy-модели
   не используется как имя.
-- **Risk-check** — после расчёта `CalculatedStrategyAction` и до
-  `ServiceCommandFactory`; не выполняется перед `REFRESH_*`/search/
+- **Risk-check** — после расчёта `CalculatedStrategyAction` и до эмиссии
+  команды per-type `StrategyActionExecutor`'ом (под
+  `StrategyActionOrchestrator`); не выполняется перед `REFRESH_*`/search/
   history (они не создают новый риск).
 - **`CalculationContext`** собирается отдельно для каждого
   `StrategyAction` (один action = один свежий context; не
@@ -196,8 +199,10 @@ per-`ruleType` контрактом источника. В entry-контекс�
 База: `timeframe: TimeFrame` (доменный таймфрейм серии), `warmup`
 (опциональный override — см. ниже). Собственного поля-типа у базы
 нет: дискриминатор подтипа — `indicatorType` настройки-владельца
-(`StrategyIndicatorSetting`), маппится Jackson `EXTERNAL_PROPERTY`
-и в JSON-payload `params` не дублируется (единственный источник
+(`StrategyIndicatorSetting`), резолвится **вручную в
+`StrategyJsonConverter`** (сериализация — конкретным подтипом без тега,
+десериализация — в конкретный класс по `indicator_type`), и в
+JSON-payload `params` не дублируется (единственный источник
 тега — `docs/rules/persistence-representation.md`). Наследники несут
 только математические параметры по типу: `AtrParams(period)`,
 `EmaParams(period)`, `RsiParams(period)`,
@@ -465,9 +470,15 @@ sugar-vs-алиас — `docs/rules/condition-ruletype-granularity.md`.) `MARKET
 `StrategyAction` — интерфейс с `getKey()`. Это **не** `ServiceCommand`:
 описывает ожидаемое действие; runtime-сущность связывается через
 `DealActionState`. JSON-дискриминатор `actionKind` (`ORDER`/
-`ALGO_ORDER`/`POSITION`) — только для сериализации, не поле домена.
-Общий `StrategyActionType`: `CREATE`, `REPLACE`, `CANCEL`,
-`CLOSE_FULL`.
+`ALGO_ORDER`) — только для сериализации, не поле домена.
+Общий `StrategyActionType`: `CREATE`, `REPLACE`, `CANCEL`.
+
+Полного закрытия позиции как **действия** нет: выход из позиции
+выражается условием-перехода `MANAGING → EXIT_PENDING` (market-close
+ведёт `ExitPendingHandler`, `docs/decisions/fsm-execution-layering.md`);
+частичное уменьшение — через reduce-only `Order`/`AlgoOrder` (инвариант
+`docs/rules/no-partial-close.md`). Позиционного подтипа действия
+(`POSITION`) в модели нет.
 
 `REPLACE` — единственная операция ремоделирования: действие задаёт
 **полное новое желаемое состояние** (палитра настроек как у CREATE)
@@ -525,11 +536,6 @@ closing, не открывают позицию). Для `OCO_FULL`: SL из
 `stopLossSettings`, TP из `triggerProfitPercents`+`triggerPriceType`,
 `closeFractionPercents` = доля (обычно 100 для полного).
 
-### StrategyPositionAction
-`key`, `actionType` (только `CLOSE_FULL`), `level`. `CLOSE_PARTIAL`
-запрещён всегда (инвариант). Частичное уменьшение — через
-Order/AlgoOrder reduce-only.
-
 ### StopLossSettings
 `calculationType: StopLossCalculationType` (`ENTRY_PRICE_PERCENT` /
 `ATR_PERCENT` (150 = 1.5 ATR) / `MARKET_STRUCTURE_BUFFER_PERCENT`),
@@ -554,7 +560,7 @@ cancel-пути (И-1).
 `key` — стабильный ключ action внутри одной `StrategyDetail` (задаётся
 в JSON). `targetActionKey` — ключ action, создавшего runtime-сущность
 для REPLACE/CANCEL; при сохранении стратегии валидируется и резолвится
-во внутреннюю ссылку. Валидация при создании стратегии (12 правил):
+во внутреннюю ссылку. Валидация при создании стратегии (11 правил):
 
 1. `key` обязателен у каждого `StrategyAction`.
 2. `key` уникален в рамках одной `StrategyDetail`.
@@ -565,20 +571,22 @@ cancel-пути (И-1).
 6. ORDER REPLACE/CANCEL ссылаются на ORDER CREATE.
 7. ALGO_ORDER REPLACE/CANCEL ссылаются на ALGO_ORDER CREATE.
 8. Нельзя ссылаться на action из другой `StrategyDetail`.
-9. `StrategyPositionAction.actionType` только `CLOSE_FULL`.
-10. Direct partial close через `StrategyPositionAction` запрещён.
-11. Partial exit — через `StrategyOrderAction`/`StrategyAlgoOrderAction`
+9. Полного закрытия позиции как действия нет: выход — переход
+   `MANAGING → EXIT_PENDING` (`CLOSE_POSITION` через `ExitPendingHandler`);
+   direct partial close позиции запрещён.
+10. Partial exit — через `StrategyOrderAction`/`StrategyAlgoOrderAction`
     с position-reducing-only.
-12. Partial exit action не открывает/не увеличивает позицию.
+11. Partial exit action не открывает/не увеличивает позицию.
 
 Допустимые `actionType` по подтипам: ORDER/ALGO_ORDER —
-CREATE/REPLACE/CANCEL; POSITION — только CLOSE_FULL.
+CREATE/REPLACE/CANCEL.
 
 **Линия реза валидатора (create / activate).** Структурно-ссылочные
 пункты (1-3, 8: наличие/уникальность `key`, разрешённость ссылок в
 рамках detail) проверяются на **create (400)** в шаге 2. Пункты
-семантики действий (4-7, 9-12: `targetActionKey` для REPLACE/CANCEL,
-ORDER↔ORDER / ALGO↔ALGO, `CLOSE_FULL`/partial-exit) опираются на
+семантики действий (4-7, 9-11: `targetActionKey` для REPLACE/CANCEL,
+ORDER↔ORDER / ALGO↔ALGO, отсутствие полного закрытия как действия /
+partial-exit) опираются на
 незрелую в шаге 2 модель команд/сделок/FSM и отложены — до шагов 4/7
 и/или на **activate (422)** как «готова к запуску». Числовые торговые
 поля (`riskPerTradePercent`, `allocationPercents`, …) на create
@@ -656,7 +664,8 @@ strategy-scope-список vs key-ref-списки на контейнерах)
 (только непустые значения), без отдельных таблиц params и без
 inheritance-маппинга — в коде иерархия типов сохраняется. Дискриминатор
 подтипа `IndicatorParams` в payload не дублируется — тег несёт
-`indicatorType` строки-владельца (Jackson `EXTERNAL_PROPERTY`, см.
+`indicatorType` строки-владельца (резолвится вручную в
+`StrategyJsonConverter`, см.
 §IndicatorParams и `docs/rules/persistence-representation.md`).
 `phaseRules` (список клауз `StrategyMarketPhaseRule` — `type` + вложенный
 `condition: StrategyCondition`, **без `level`**) — **JSONB-колонка
@@ -674,8 +683,7 @@ inheritance-маппинга — в коде иерархия типов сох�
 (`id`, `strategy_step_id`, `strategy_detail_id`, `action_kind`, `key`,
 `action_type`, `level`, `target_action_key`, `target_action_id`) +
 таблицы по видам: `strategy_order_actions`,
-`strategy_algo_order_actions`, `strategy_position_actions` (у позиции
-собственных полей нет). Родитель действия — `strategy_step_id`
+`strategy_algo_order_actions`. Родитель действия — `strategy_step_id`
 (FK → `strategy_steps`); `strategy_detail_id` — денормализованный FK →
 `strategy_details` ради DB-`UNIQUE(strategy_detail_id, key)`
 (уникальность `key` действия — в рамках `StrategyDetail`, через
@@ -751,7 +759,8 @@ jobs (`IndicatorJob`/`MarketStructureJob`/`EntryScannerJob`; фаза —
 evaluator (`StrategyConditionEvaluator`),
 калькуляторы (`StrategyActionCalculator` → `PriceCalculator`/
 `SizeCalculator`), risk-layer (`RiskValidator` → `RiskCheckResult` →
-`RiskBlockResolver`), `ServiceCommandFactory`, freshness
+`RiskBlockResolver`), `StrategyActionOrchestrator` +
+`DealFinalizationCommandFactory`, freshness
 (`MarketDataExpirationChecker`), модели рыночных данных
 (`IndicatorValue`/`MarketStructure`/`MarketPhase`/`MarketPriceLevel`),
 RVO (`CalculationContext`/`MarketPriceData`/`CalculatedStrategyAction`/

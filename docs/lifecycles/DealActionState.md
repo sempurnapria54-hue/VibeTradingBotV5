@@ -11,9 +11,15 @@
 
 Статус ведёт command-layer, не FSM напрямую:
 
-- **`ServiceCommandFactory`** — **читает** `status` (+ `target`), чтобы
-  выбрать одну актуальную команду за проход (`docs/components/ServiceCommandFactory.md`);
-  сам статус не пишет.
+- **`StrategyActionOrchestrator`** (диспетчер) — **читает** `status` (+
+  `target`) и через per-type `StrategyActionExecutor`
+  (`CreateOrderActionExecutor` / `CreateAlgoOrderActionExecutor`) выбирает
+  одну актуальную команду за проход
+  (`docs/components/StrategyActionOrchestrator.md`,
+  `docs/decisions/fsm-execution-layering.md`). Статус исполнения не пишет;
+  единственное исключение — re-arm `RETRY_PENDING` на стадию пере-эмиссии
+  (`target == null` → `PLANNED`, `target` есть → `CREATED`), чтобы команда
+  повторилась.
 - **Executor'ы** (`CREATE_*`/`SUBMIT_*`/`CANCEL_*`/
   `CLOSE_POSITION`/`REFRESH_*`) — **пишут** `status` и `target` по
   результату исполнения и подтверждённым фактам (см.
@@ -23,8 +29,9 @@
   либо в `FAILED` при исчерпании попыток (`docs/components/RetryPolicyService.md`).
 
 Матрица собрана из установленного: flow выбора команды
-(`ServiceCommandFactory`), retry-политика (`RetryPolicyService`),
-классификация ошибок (`docs/rules/runtime-error-classification.md`).
+(`StrategyActionOrchestrator` + per-type `StrategyActionExecutor`),
+retry-политика (`RetryPolicyService`), классификация ошибок
+(`docs/rules/runtime-error-classification.md`).
 
 ## Статусы
 
@@ -39,7 +46,7 @@ Live (не финальные): `PLANNED`, `CREATED`, `SUBMITTED`, `RETRY_PENDIN
 PLANNED        -> CREATED | SKIPPED
 CREATED        -> SUBMITTED | RETRY_PENDING | FAILED | SKIPPED
 SUBMITTED      -> COMPLETED | RETRY_PENDING | FAILED
-RETRY_PENDING  -> CREATED | SUBMITTED | COMPLETED | FAILED
+RETRY_PENDING  -> PLANNED | CREATED | FAILED
 COMPLETED | FAILED | SKIPPED -> (терминальные, переходов нет)
 ```
 
@@ -52,8 +59,10 @@ COMPLETED | FAILED | SKIPPED -> (терминальные, переходов н
 - `* → RETRY_PENDING` — executor упал на retryable `EXCHANGE_ERROR`;
   опасные команды (`SUBMIT_*`/`CANCEL_*`/`CLOSE_POSITION`) перед повтором
   делают refresh/search (`docs/components/RetryPolicyService.md`).
-- `RETRY_PENDING → CREATED|SUBMITTED|COMPLETED` — повтор возобновляет
-  нужную команду по фактам; если факт уже подтверждён — сразу
+- `RETRY_PENDING → PLANNED|CREATED` — `StrategyActionOrchestrator` re-arm'ит
+  на стадию пере-эмиссии (`target == null` → `PLANNED`, `target` есть →
+  `CREATED`); следующий проход возобновляет нужную команду по фактам. Если
+  факт уже подтверждён на re-arm'нутой стадии — executor сразу пишет
   `COMPLETED`.
 - `* → FAILED` — retry исчерпан либо `INTERNAL_ERROR`/`VALIDATION_ERROR`
   (non-retryable); сделка идёт в `ERROR`/safety-flow через `ErrorHandler`.

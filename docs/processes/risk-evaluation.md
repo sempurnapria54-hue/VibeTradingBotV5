@@ -22,7 +22,7 @@ FSM handler
   -> StrategyActionCalculator -> CalculatedPrice / CalculatedSize
   -> RiskValidator -> RiskValidationResult
   -> RiskBlockResolver -> RiskBlockAction (если BLOCKED)
-  -> ServiceCommandFactory -> одна актуальная ServiceCommand, если разрешено
+  -> StrategyActionOrchestrator -> одна актуальная ServiceCommand, если разрешено
 ```
 
 Компоненты: `docs/components/RiskValidator.md`,
@@ -49,7 +49,7 @@ ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING + BLOCKED
   -> Deal.status = ERROR -> ErrorHandler / safety-flow
 
 WARNING  -> action не блокируется; фиксируется в логах / истории
-ALLOWED  -> ServiceCommandFactory создаёт команду
+ALLOWED  -> StrategyActionOrchestrator создаёт команду
 ```
 
 `RISK_CONTROL` отличается от `ENTRY_CONDITION_EXPIRED`: первое — вход
