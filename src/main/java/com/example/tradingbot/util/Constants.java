@@ -37,6 +37,9 @@ public final class Constants {
 
         /** L4: контролируемое нарушение биржевого факта/инварианта (ControlledExchangeException → VALIDATION_ERROR). */
         public static final String EXCHANGE_CONTROLLED_VIOLATION = "EXCHANGE_CONTROLLED_VIOLATION";
+
+        /** L4-эскалация: kill-switch не подтвердил flat в пределах лимита попыток (остаточный риск, HOLD-Q1). */
+        public static final String EXCHANGE_KILL_SWITCH_RESIDUAL = "EXCHANGE_KILL_SWITCH_RESIDUAL";
     }
 
     /** Константы интеграции с OKX: коды, флаги, заголовки, пути и имена полей запроса, таймфреймы. */

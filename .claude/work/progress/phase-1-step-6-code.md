@@ -354,9 +354,10 @@ orchestrator не перезагружает `DealContext` после коман
 
 ## Форвард / на разбор
 
-- **tech-radar:** `OrchestratorPassLock` — первый прямой raw-JDBC
-  (`DataSource`/`Connection`) ради same-connection advisory lock; нужна
-  запись в `tech-radar` (статус) либо ратификация подхода — на чат.
+- **tech-radar:** `OrchestratorPassLock` raw-JDBC (`DataSource`/`Connection`)
+  ради same-connection advisory lock — **зафиксирован** на заходе 1 разбора
+  находок (2026-06-30): запись в `tech-radar` (`adopt`, ограничено назначением,
+  несущий с фазы 3; raw-JDBC только ради advisory-замка на одном соединении).
 - **REPLACE-оркестрация ног** (PROTECTION_ADJUSTMENT) — **обоснованный deferral
   D1** (см. §Сверка scope): фабрика REPLACE-ног возвращает empty, handler
   остаётся в `MANAGING`. Полный секвенс — форвард-refinement, `backlog.md`
@@ -374,6 +375,69 @@ orchestrator не перезагружает `DealContext` после коман
   гонке вставки сделки — `.claude/work/backlog.md`.
 - Численные провизорности (частоты джоб, batch-size, порог серии неудач
   уровня 3) — бэктест/наблюдения.
+
+## Заход 1 разбора находок ревью (2026-06-30)
+
+Первый из двух заходов разбора находок ревью холд-дельты. Здесь — правки кода
+(№2, №3) и фиксации решений (№1, №4, HOLD-Q1) поверх холд-дельты. **Заход 2**
+(финальный аппрув `CODE` + `SYNC_DOCS_FROM_CODE` + выравнивание **продуктовых**
+доков под изменившийся код) — за пользователем.
+
+### №2 — сборка `DealContext` открытой сделки не зависит от живой стратегии (код)
+**Дефект подтверждён.** `DealContextService.resolvePinnedDetail` перерезолвил
+pinned `StrategyDetail` через `findActiveByInstrumentIdWithTree` (живое дерево
+**активной** стратегии) → бросал `IllegalStateException` при
+`Strategy.INACTIVE`/`DELETED`. Падало бы **и сопровождение** INACTIVE-сделок, и
+аварийное закрытие (kill-switch строит `DealContext`) — проблема общая, не про
+kill-switch. **Выправлена сборка** (не точечный обход): pinned detail тянется по
+`deal.strategyDetailId` со своим поддеревом, **без привязки к статусу**
+родительской стратегии — новый `StrategyDetailRepository.findByIdWithTree` +
+`StrategyDataService.getRequiredDetailByIdWithTree`. `DealContext.strategyDetail`
+эквивалентен (старый путь и так брал только одну pinned-деталь, strategy-scope
+настройки отбрасывал), но работает при INACTIVE/DELETED и тянет меньше данных.
+`findActiveByInstrumentIdWithTree` остаётся входом entry-скана.
+
+### №3 — терминал `AnomalyReport` гейтится фактом закрытия (код)
+Раньше результат kill-switch выбрасывался → отчёт уходил в COMPLETED независимо
+от того, закрылось ли. Теперь **узкий гейт на доступных данных** (отчёт самого
+kill-switch): `KillSwitchExecutor` возвращает `success` = подтверждение закрытия
+доминирующего риска (close live-risk позиции дал успешный ACK; нет live-risk
+позиции → закрывать нечего → подтверждено); `KillSwitchService.fireInstrument/
+fireExchange` пробрасывают подтверждение (L4 — `true` только если подтверждено по
+**каждой** сделке каскада); `SafetyHoldCoordinator.completeIfClosed` доводит до
+COMPLETED **только при подтверждении**, иначе отчёт остаётся открытым
+(KILL_SWITCH_EXECUTED). Отмена ordinary/algo-ордеров и финальный безусловный
+close — best-effort, в подтверждение не входят. **Форвард (шаг 8, ANOM-Q2):**
+ретрай-до-закрытия + сверка реального состояния биржи (поймать sneak-позицию,
+которую финальный безусловный close скрыл) — `backlog.md` §Шаг 8.
+
+### №1 — перф-форвард L4 `fireExchange` (фаза 3) — фиксация
+Существующая backlog-запись обогащена: порог актуальности — **фаза 3** (реальный
+объём одновременных сделок); починка = перебор пачками (bounded, полный свип
+сохранён) — режется аппетит (память/стоимость запроса), не скорость; `LIMIT`
+небезопасен. Поведение **не менялось**.
+
+### №4 — tech-radar: advisory-замок через raw-JDBC (фаза 3) — фиксация
+Заведена запись в `tech-radar`: raw-JDBC (`DataSource`/`Connection`) допустим
+**только** ради advisory-замка на одном соединении (`OrchestratorPassLock`), не
+для обычного доступа к данным; несущий с фазы 3 (в фазе 1 хватило бы
+in-process-замка, advisory уже готов и оставлен).
+
+### HOLD-Q1 — закрыт решением (1) + принцип
+Закрыт решением `docs/decisions/controlled-violation-exchange-wide-hold.md`:
+controlled-violation = безусловный L4 (доминирует L3); квалификатор офдока «по
+severity/safetyImpact» снят. Поведение кода **не менялось** (уже (1)).
+Зафиксирован **переиспользуемый принцип** (консервативное широкое торможение под
+неизвестный радиус незрелой интеграции направляет будущие развилки того же
+класса). Выравнивание текста `controlled-exchange-exceptions.md` под (1) — на
+`SYNC`. Удалён из `open-questions.md`.
+
+### Сборка
+`mvn`/`java` в среде недоступны — прогон сборки не выполнялся; проведена ручная
+кросс-сверка символов/сигнатур (новый репозиторий/метод, overload
+`persistenceToDomain(StrategyDetailEntity)`, `ExchangeAck.getSuccess`,
+`Supplier<Boolean>`) по кодовой базе. `mvn clean compile` + ревью-фокусы — за
+пользователем (заход 2).
 
 ## Следующий шаг
 

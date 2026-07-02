@@ -10,10 +10,10 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.deal.DealActionPlanner;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
 import com.example.tradingbot.domain.deal.DealTransition;
 import com.example.tradingbot.domain.deal.FsmHandler;
+import com.example.tradingbot.domain.deal.action.StrategyActionOrchestrator;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
@@ -23,6 +23,7 @@ import com.example.tradingbot.domain.service.market.condition.ConditionEvaluatio
 import com.example.tradingbot.integration.service.IntegrationService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -41,7 +42,7 @@ import org.springframework.stereotype.Component;
 public class PrecheckHandler implements FsmHandler {
 
     private final DealFsmSupport support;
-    private final DealActionPlanner planner;
+    private final StrategyActionOrchestrator actionOrchestrator;
     private final IntegrationService integrationService;
 
     @Override
@@ -50,18 +51,42 @@ public class PrecheckHandler implements FsmHandler {
     }
 
     @Override
-    public DealTransition handle(DealContext dealContext) {
+    public Optional<DealTransition> checkEntry(DealContext dealContext) {
         if (isFalse(support.balanceUsable(dealContext))) {
-            return DealTransition.command(support.refreshBalanceCommand(dealContext));
+            return Optional.of(DealTransition.command(support.refreshBalanceCommand(dealContext)));
         }
         if (isTrue(foreignLiveRisk(dealContext))) {
-            return support.markError(dealContext);
+            return Optional.of(support.markError(dealContext));
         }
-        List<StrategyStep> entrySteps = support.stepsOfType(support.stepsFor(dealContext, Deal.Status.PRECHECK),
-                StrategyStepType.ENTRY, StrategyStepType.GRID_ENTRY);
-        if (isEmpty(entrySteps)) {
-            return DealTransition.stay();
+        if (isEmpty(entrySteps(dealContext))) {
+            // Нет entry-шагов на этом статусе — делать нечего.
+            return Optional.of(DealTransition.stay());
         }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<DealTransition> checkTransition(DealContext dealContext) {
+        for (StrategyStep step : entrySteps(dealContext)) {
+            for (StrategyAction action : nullSafe(step)) {
+                DealActionState state = support.findActionState(dealContext, action).orElse(null);
+                if (isNull(state)) {
+                    continue;
+                }
+                if (DealActionStateStatus.SUBMITTED.equals(state.getStatus())) {
+                    return Optional.of(DealTransition.transition(Deal.Status.ENTRY_SUBMITTED));
+                }
+                if (DealActionStateStatus.FAILED.equals(state.getStatus())) {
+                    return Optional.of(support.markError(dealContext));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public DealTransition handle(DealContext dealContext) {
+        List<StrategyStep> entrySteps = entrySteps(dealContext);
         DealTransition inProgress = continueInProgressEntry(entrySteps, dealContext);
         if (nonNull(inProgress)) {
             return inProgress;
@@ -69,23 +94,18 @@ public class PrecheckHandler implements FsmHandler {
         return evaluateEntry(entrySteps, dealContext);
     }
 
-    /** Выходная проверка + продолжение уже начатого entry-действия (create→submit). */
+    private List<StrategyStep> entrySteps(DealContext dealContext) {
+        return support.stepsOfType(support.stepsFor(dealContext, Deal.Status.PRECHECK),
+                StrategyStepType.ENTRY, StrategyStepType.GRID_ENTRY);
+    }
+
+    /** Прогресс уже начатого (active) entry-действия; переходы (SUBMITTED/FAILED) отсеяны в checkTransition. */
     private DealTransition continueInProgressEntry(List<StrategyStep> entrySteps, DealContext dealContext) {
         for (StrategyStep step : entrySteps) {
             for (StrategyAction action : nullSafe(step)) {
                 DealActionState state = support.findActionState(dealContext, action).orElse(null);
-                if (isNull(state)) {
-                    continue;
-                }
-                DealActionStateStatus status = state.getStatus();
-                if (DealActionStateStatus.SUBMITTED.equals(status)) {
-                    return DealTransition.transition(Deal.Status.ENTRY_SUBMITTED);
-                }
-                if (DealActionStateStatus.FAILED.equals(status)) {
-                    return support.markError(dealContext);
-                }
-                if (isActiveStage(status)) {
-                    return support.reactToPlan(planner.plan(step, action, state, dealContext), dealContext);
+                if (nonNull(state) && isActiveStage(state.getStatus())) {
+                    return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
                 }
             }
         }
@@ -99,7 +119,7 @@ public class PrecheckHandler implements FsmHandler {
             if (isTrue(support.conditionMet(step, conditionContext)) && isNotEmpty(step.getActions())) {
                 StrategyAction action = step.getActions().getFirst();
                 DealActionState state = support.findOrCreateActionState(dealContext, action);
-                return support.reactToPlan(planner.plan(step, action, state, dealContext), dealContext);
+                return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
             }
         }
         // Условие входа не выполнено, live risk ещё нет — закрыть кандидата без ошибки.

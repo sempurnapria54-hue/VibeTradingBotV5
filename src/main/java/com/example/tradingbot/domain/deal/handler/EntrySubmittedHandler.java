@@ -12,6 +12,7 @@ import com.example.tradingbot.domain.deal.FsmHandler;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -37,12 +38,18 @@ public class EntrySubmittedHandler implements FsmHandler {
     }
 
     @Override
+    public Optional<DealTransition> checkEntry(DealContext dealContext) {
+        // Субъект статуса — entry-ордер; его нет → рассинхрон, на ошибочную тропу.
+        if (isNull(support.entryOrder(dealContext.getDeal()))) {
+            return Optional.of(support.markError(dealContext));
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public DealTransition handle(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         Order entry = support.entryOrder(deal);
-        if (isNull(entry)) {
-            return support.markError(dealContext);
-        }
         if (isTrue(entry.isLive())) {
             return DealTransition.command(support.refreshOrderCommand(dealContext, entry.getId()));
         }

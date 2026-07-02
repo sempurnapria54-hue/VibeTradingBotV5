@@ -1,11 +1,18 @@
 package com.example.tradingbot.domain.model.aggregate.strategy;
 
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
+
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -41,4 +48,28 @@ public class StrategyDetail extends Auditable {
 
     /** Шаги, сгруппированные по статусу сделки. */
     private Map<Deal.Status, List<StrategyStep>> stepsByStatus;
+
+    /**
+     * Entry-шаги детали: шаги PRECHECK-группы типов ENTRY/GRID_ENTRY в
+     * порядке объявления; пусто — entry-шагов нет.
+     */
+    public List<StrategyStep> entrySteps() {
+        if (isNull(stepsByStatus)) {
+            return List.of();
+        }
+        List<StrategyStep> precheckSteps = stepsByStatus.get(Deal.Status.PRECHECK);
+        if (isEmpty(precheckSteps)) {
+            return List.of();
+        }
+        return precheckSteps.stream()
+                .filter(step -> isTrue(step.isEntryStep()))
+                .collect(Collectors.toList());
+    }
+
+    /** Разрешён ли вход в фазе: политика задана, не NO_TRADE и допускает фазу. */
+    public Boolean allowsEntryFor(MarketPhase.Type phase) {
+        return nonNull(phaseEntryPolicy)
+                && isFalse(PhaseEntryPolicy.NO_TRADE.equals(phaseEntryPolicy))
+                && isTrue(phaseEntryPolicy.isAllowedFor(phase));
+    }
 }

@@ -64,9 +64,6 @@ public enum StrategyPricePurpose {
     /** Цена исполнения trigger-ордера. */
     TRIGGER_ORDER_EXECUTION_PRICE,
 
-    /** Reference-цена для полного закрытия позиции. */
-    POSITION_CLOSE_REFERENCE_PRICE,
-
     /** Фактическая цена исполнения (по fills). */
     ACTUAL_EXECUTION_PRICE,
 

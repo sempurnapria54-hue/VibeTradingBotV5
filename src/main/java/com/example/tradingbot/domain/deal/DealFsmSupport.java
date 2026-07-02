@@ -8,12 +8,12 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.command.DealFinalizationCommandFactory;
 import com.example.tradingbot.domain.command.DealFinalizationStateStatus;
 import com.example.tradingbot.domain.command.DealFinalizationType;
 import com.example.tradingbot.domain.command.Retryable;
 import com.example.tradingbot.domain.command.RuntimeErrorCode;
 import com.example.tradingbot.domain.command.ServiceCommand;
-import com.example.tradingbot.domain.command.ServiceCommandFactory;
 import com.example.tradingbot.domain.command.ServiceCommandPayload;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.domain.command.calc.CalculationError;
@@ -60,7 +60,7 @@ public class DealFsmSupport {
     private final DealActionStateDataService dealActionStateDataService;
     private final StrategyConditionEvaluator conditionEvaluator;
     private final MarketConditionContextFactory conditionContextFactory;
-    private final ServiceCommandFactory commandFactory;
+    private final DealFinalizationCommandFactory finalizationFactory;
 
     /** Допустимые шаги стратегии для текущего статуса сделки (упорядочены = приоритет). */
     public List<StrategyStep> stepsFor(DealContext dealContext, Deal.Status status) {
@@ -120,7 +120,7 @@ public class DealFsmSupport {
 
     /** Эмиссия финализационной команды (FINALIZE_* / MARK_*) через фабрику. */
     public Optional<ServiceCommand> finalizationCommand(DealFinalizationType type, DealContext dealContext) {
-        return commandFactory.finalizationCommand(type, dealContext);
+        return finalizationFactory.finalizationCommand(type, dealContext);
     }
 
     /** Финализация type исчерпала повторы (FAILED) — сделку на ошибочную тропу (DEAL-Q2). */
@@ -197,24 +197,17 @@ public class DealFsmSupport {
 
     /** Позиция сделки несёт live market risk. */
     public Boolean positionLiveRisk(Deal deal) {
-        Position position = deal.getPosition();
-        return nonNull(position) && isTrue(position.hasLiveRisk());
+        return deal.hasLivePositionRisk();
     }
 
     /** Live ordinary orders сделки. */
     public List<Order> liveOrders(Deal deal) {
-        if (isEmpty(deal.getOrders())) {
-            return List.of();
-        }
-        return deal.getOrders().stream().filter(order -> isTrue(order.isLive())).collect(Collectors.toList());
+        return deal.liveOrders();
     }
 
     /** Live algo orders сделки. */
     public List<AlgoOrder> liveAlgoOrders(Deal deal) {
-        if (isEmpty(deal.getAlgoOrders())) {
-            return List.of();
-        }
-        return deal.getAlgoOrders().stream().filter(algo -> isTrue(algo.isLive())).collect(Collectors.toList());
+        return deal.liveAlgoOrders();
     }
 
     /** Баланс пригоден к risk-sensitive flow (присутствует с доступным капиталом). */

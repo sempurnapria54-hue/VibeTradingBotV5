@@ -49,3 +49,9 @@ okx:
   api-key: ${OKX_API_KEY}
   secret: ${OKX_SECRET_KEY}
   passphrase: ${OKX_PASSPHRASE}
+
+# Аварийный kill-switch (KillSwitchExecutor). max-teardown-attempts — лимит
+# попыток teardown «снять риск → сверить flat рефрешем» до эскалации на биржевой
+# холд (HOLD-Q1); значение — риск-владельца.
+kill-switch:
+  max-teardown-attempts: 3

@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.deal.handler;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
@@ -14,6 +15,7 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -39,6 +41,18 @@ public class ErrorHandler implements FsmHandler {
     }
 
     @Override
+    public Optional<DealTransition> checkTransition(DealContext dealContext) {
+        Deal deal = dealContext.getDeal();
+        if (isTrue(support.positionLiveRisk(deal))
+                || isNotEmpty(support.liveOrders(deal))
+                || isNotEmpty(support.liveAlgoOrders(deal))) {
+            return Optional.empty();
+        }
+        // Live risk снят и подтверждён фактами — аварийный терминал.
+        return Optional.of(DealTransition.transition(Deal.Status.EMERGENCY_CLOSED));
+    }
+
+    @Override
     public DealTransition handle(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         if (isTrue(support.positionLiveRisk(deal))) {
@@ -52,8 +66,7 @@ public class ErrorHandler implements FsmHandler {
         if (nonNull(algoSafety)) {
             return algoSafety;
         }
-        // Live risk снят и подтверждён фактами — аварийный терминал.
-        return DealTransition.transition(Deal.Status.EMERGENCY_CLOSED);
+        return DealTransition.stay();
     }
 
     private DealTransition reduceOrConfirmPosition(DealContext dealContext, Position position) {

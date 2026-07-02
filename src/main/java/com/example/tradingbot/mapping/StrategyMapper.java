@@ -25,7 +25,6 @@ import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseRuleApiModel
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
-import com.example.tradingbot.api.model.strategy.StrategyPositionActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyStepApiModel;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
@@ -34,7 +33,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.AtrParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.BollingerBandsParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.EfficiencyRatioParams;
@@ -56,7 +54,6 @@ import com.example.tradingbot.persistence.model.strategy.StrategyIndicatorSettin
 import com.example.tradingbot.persistence.model.strategy.StrategyMarketPhaseSettingEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyMarketStructureSettingEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyOrderActionEntity;
-import com.example.tradingbot.persistence.model.strategy.StrategyPositionActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyStepEntity;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -121,7 +118,6 @@ public interface StrategyMapper {
 
     @SubclassMapping(source = StrategyOrderActionApiModel.class, target = StrategyOrderAction.class)
     @SubclassMapping(source = StrategyAlgoOrderActionApiModel.class, target = StrategyAlgoOrderAction.class)
-    @SubclassMapping(source = StrategyPositionActionApiModel.class, target = StrategyPositionAction.class)
     StrategyAction apiToDomain(StrategyActionApiModel api);
 
     /** stepsByStatus формы ввода → доменная map (порядок запроса сохраняется). */
@@ -164,7 +160,6 @@ public interface StrategyMapper {
 
     @SubclassMapping(source = StrategyOrderAction.class, target = StrategyOrderActionApiModel.class)
     @SubclassMapping(source = StrategyAlgoOrderAction.class, target = StrategyAlgoOrderActionApiModel.class)
-    @SubclassMapping(source = StrategyPositionAction.class, target = StrategyPositionActionApiModel.class)
     StrategyActionApiModel domainToApi(StrategyAction action);
 
     /** Доменная map шагов → форма ответа (порядок ключей сохраняется). */
@@ -196,7 +191,6 @@ public interface StrategyMapper {
 
     @SubclassMapping(source = StrategyOrderAction.class, target = StrategyOrderActionEntity.class)
     @SubclassMapping(source = StrategyAlgoOrderAction.class, target = StrategyAlgoOrderActionEntity.class)
-    @SubclassMapping(source = StrategyPositionAction.class, target = StrategyPositionActionEntity.class)
     StrategyActionEntity domainToPersistence(StrategyAction action);
 
     /**
@@ -299,7 +293,6 @@ public interface StrategyMapper {
 
     @SubclassMapping(source = StrategyOrderActionEntity.class, target = StrategyOrderAction.class)
     @SubclassMapping(source = StrategyAlgoOrderActionEntity.class, target = StrategyAlgoOrderAction.class)
-    @SubclassMapping(source = StrategyPositionActionEntity.class, target = StrategyPositionAction.class)
     StrategyAction persistenceToDomain(StrategyActionEntity entity);
 
     /** Детали из БД → список, отсортированный по фазе (стабильный порядок ответа). */

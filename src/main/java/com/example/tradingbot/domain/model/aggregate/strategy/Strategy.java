@@ -1,11 +1,15 @@
 package com.example.tradingbot.domain.model.aggregate.strategy;
 
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
+import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -90,6 +94,19 @@ public class Strategy extends Auditable {
             case DELETED -> true;
             case CREATED -> false;
         };
+    }
+
+    /**
+     * Деталь для типа фазы рынка (инвариант — ровно одна на MarketPhase.Type);
+     * пусто, если детали под эту фазу нет.
+     */
+    public Optional<StrategyDetail> detailForPhase(MarketPhase.Type phaseType) {
+        if (isEmpty(details)) {
+            return Optional.empty();
+        }
+        return details.stream()
+                .filter(detail -> Objects.equals(phaseType, detail.getMarketPhaseType()))
+                .findFirst();
     }
 
     /**

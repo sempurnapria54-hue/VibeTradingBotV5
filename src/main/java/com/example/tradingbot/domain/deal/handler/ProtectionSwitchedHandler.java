@@ -10,6 +10,7 @@ import com.example.tradingbot.domain.deal.FsmHandler;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -34,23 +35,34 @@ public class ProtectionSwitchedHandler implements FsmHandler {
     }
 
     @Override
-    public DealTransition handle(DealContext dealContext) {
+    public Optional<DealTransition> checkEntry(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         if (isFalse(support.positionLiveRisk(deal))) {
-            return DealTransition.transition(Deal.Status.EXIT_PENDING);
+            return Optional.of(DealTransition.transition(Deal.Status.EXIT_PENDING));
         }
-        List<AlgoOrder> liveAlgoOrders = support.liveAlgoOrders(deal);
-        if (isEmpty(liveAlgoOrders)) {
+        if (isEmpty(support.liveAlgoOrders(deal))) {
             // Позиция с live risk, но main protection не подтверждена live — защита потеряна
             // → бесстоповая позиция постфактум → L3-холд инструмента (§8.C).
-            return support.markErrorStopless(dealContext);
+            return Optional.of(support.markErrorStopless(dealContext));
         }
-        for (AlgoOrder algoOrder : liveAlgoOrders) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<DealTransition> checkTransition(DealContext dealContext) {
+        boolean allActive = support.liveAlgoOrders(dealContext.getDeal()).stream()
+                .allMatch(algoOrder -> AlgoOrder.Status.ACTIVE.equals(algoOrder.getStatus()));
+        // Main protection активна и подтверждена → сделка готова к сопровождению.
+        return allActive ? Optional.of(DealTransition.transition(Deal.Status.MANAGING)) : Optional.empty();
+    }
+
+    @Override
+    public DealTransition handle(DealContext dealContext) {
+        for (AlgoOrder algoOrder : support.liveAlgoOrders(dealContext.getDeal())) {
             if (isFalse(AlgoOrder.Status.ACTIVE.equals(algoOrder.getStatus()))) {
                 return DealTransition.command(support.refreshAlgoOrderCommand(dealContext, algoOrder.getId()));
             }
         }
-        // Main protection активна и подтверждена → сделка готова к сопровождению.
-        return DealTransition.transition(Deal.Status.MANAGING);
+        return DealTransition.stay();
     }
 }

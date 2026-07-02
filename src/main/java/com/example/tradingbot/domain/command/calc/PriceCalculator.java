@@ -6,7 +6,6 @@ import static java.util.Objects.nonNull;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossSettings;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceBaseType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceOffsetSide;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPricePlacement;
@@ -50,7 +49,6 @@ public class PriceCalculator {
         return switch (context.getAction()) {
             case StrategyOrderAction orderAction -> orderPrice(orderAction, context);
             case StrategyAlgoOrderAction algoAction -> algoPrice(algoAction, context);
-            case StrategyPositionAction ignored -> closeReferencePrice(context);
             default -> CalculatedPrice.builder()
                     .priceMode(PriceMode.NOT_REQUIRED)
                     .sendPriceToExchange(Boolean.FALSE)
@@ -119,19 +117,6 @@ public class PriceCalculator {
                     .trailingPrice(resolveTrailing(action.getTrailingSettings(), entryPrice, direction, context));
         }
         return builder.build();
-    }
-
-    private CalculatedPrice closeReferencePrice(CalculationContext context) {
-        BigDecimal reference = marketReference(context);
-        return CalculatedPrice.builder()
-                .purpose(StrategyPricePurpose.POSITION_CLOSE_REFERENCE_PRICE)
-                .priceMode(PriceMode.NOT_REQUIRED)
-                .basePrice(reference)
-                .rawPrice(reference)
-                .roundedPrice(reference)
-                .sendPriceToExchange(Boolean.FALSE)
-                .description("full position close; reference price")
-                .build();
     }
 
     private ResolvedStopLossPrice resolveStopLoss(StopLossSettings settings, BigDecimal entryPrice,

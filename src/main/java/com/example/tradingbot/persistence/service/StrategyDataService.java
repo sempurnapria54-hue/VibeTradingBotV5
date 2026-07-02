@@ -5,10 +5,12 @@ import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.toList;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.mapping.StrategyMapper;
 import com.example.tradingbot.persistence.model.strategy.StrategyActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyDetailEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyEntity;
+import com.example.tradingbot.persistence.repository.StrategyDetailRepository;
 import com.example.tradingbot.persistence.repository.StrategyRepository;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StrategyDataService {
 
     private final StrategyRepository repository;
+    private final StrategyDetailRepository detailRepository;
     private final StrategyMapper mapper;
 
     /** Сохраняет полное дерево и резолвит target-ссылки действий (в одной транзакции). */
@@ -99,13 +102,27 @@ public class StrategyDataService {
 
     /**
      * Активная стратегия инструмента со всем деревом (детали + шаги +
-     * действия) — вход entry-скана и сборки pinned StrategyDetail сделки.
-     * Пусто — активной стратегии у инструмента нет.
+     * действия) — вход entry-скана. Пусто — активной стратегии у инструмента
+     * нет.
      */
     @Transactional(readOnly = true)
     public Optional<Strategy> findActiveByInstrumentIdWithTree(Long instrumentId) {
         return repository.findByInstrumentIdAndStatusWithTree(instrumentId, Strategy.Status.ACTIVE.name())
                 .map(mapper::persistenceToDomainWithTree);
+    }
+
+    /**
+     * Запиненная {@link StrategyDetail} сделки по id со своим деревом (шаги +
+     * действия), <b>без</b> привязки к статусу родительской стратегии. Сборка
+     * контекста уже открытой сделки опирается на снимок настроек, запиненный
+     * при открытии, а не на живую активную стратегию: сопровождение и аварийное
+     * закрытие работают одинаково при {@code Strategy.INACTIVE} и {@code DELETED}.
+     */
+    @Transactional(readOnly = true)
+    public StrategyDetail getRequiredDetailByIdWithTree(Long detailId) {
+        return detailRepository.findByIdWithTree(detailId)
+                .map(mapper::persistenceToDomain)
+                .orElseThrow(() -> new IllegalStateException("Pinned StrategyDetail not found: " + detailId));
     }
 
     private void resolveTargetActions(StrategyEntity saved) {

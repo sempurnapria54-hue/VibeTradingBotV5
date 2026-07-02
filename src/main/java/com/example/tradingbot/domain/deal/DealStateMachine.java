@@ -1,15 +1,16 @@
 package com.example.tradingbot.domain.deal;
 
+import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+
 import static java.util.Objects.isNull;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
-
-import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.model.aggregate.deal.Deal;
-import java.util.List;
-import java.util.Map;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 /**
  * Оркестратор FSM сделки: выбирает {@link FsmHandler} по текущему
@@ -28,17 +29,24 @@ public class DealStateMachine {
     private final Map<Deal.Status, FsmHandler> handlers;
 
     public DealStateMachine(List<FsmHandler> handlers) {
-        this.handlers = handlers.stream().collect(toMap(FsmHandler::supportedStatus, identity()));
+        this.handlers = handlers.stream()
+                                .collect(toMap(FsmHandler::supportedStatus, identity()));
     }
 
-    /** Один проход FSM по сделке: handler текущего статуса → команды/переход. */
+    /**
+     * Один проход FSM по сделке: handler текущего статуса → команды/переход.
+     */
     public DealTransition advance(DealContext dealContext) {
-        Deal.Status status = dealContext.getDeal().getStatus();
+        Deal.Status status = dealContext.getDeal()
+                                        .getStatus();
         FsmHandler handler = handlers.get(status);
         if (isNull(handler)) {
-            log.debug("No FSM handler for status {} dealId={}", status, dealContext.getDeal().getId());
+            log.debug("No FSM handler for status {} dealId={}", status, dealContext.getDeal()
+                                                                                   .getId());
             return DealTransition.stay();
         }
-        return handler.handle(dealContext);
+        return handler.checkEntry(dealContext)
+                      .or(() -> handler.checkTransition(dealContext))
+                      .orElseGet(() -> handler.handle(dealContext));
     }
 }

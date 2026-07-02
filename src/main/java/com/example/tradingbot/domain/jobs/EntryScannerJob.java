@@ -1,7 +1,6 @@
 package com.example.tradingbot.domain.jobs;
 
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
@@ -11,7 +10,6 @@ import com.example.tradingbot.config.EntryScannerProperties;
 import com.example.tradingbot.domain.deal.DealOpeningService;
 import com.example.tradingbot.domain.deal.MarketConditionContextFactory;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
-import com.example.tradingbot.domain.model.aggregate.strategy.PhaseEntryPolicy;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
@@ -29,9 +27,7 @@ import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.StrategyDataService;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -102,15 +98,15 @@ public class EntryScannerJob {
         if (isNull(phase)) {
             return;
         }
-        StrategyDetail detail = detailForPhase(strategy, phase.getType());
-        if (isNull(detail) || isFalse(entryAllowed(detail.getPhaseEntryPolicy(), phase.getType()))) {
+        StrategyDetail detail = strategy.detailForPhase(phase.getType()).orElse(null);
+        if (isNull(detail) || isFalse(detail.allowsEntryFor(phase.getType()))) {
             return;
         }
         evaluateEntry(instrument, detail);
     }
 
     private void evaluateEntry(Instrument instrument, StrategyDetail detail) {
-        List<StrategyStep> entrySteps = entrySteps(detail);
+        List<StrategyStep> entrySteps = detail.entrySteps();
         if (isEmpty(entrySteps)) {
             return;
         }
@@ -119,7 +115,7 @@ public class EntryScannerJob {
             if (isNotTrue(conditionEvaluator.evaluate(step.getCondition(), conditionContext))) {
                 continue;
             }
-            StrategyOrderAction entryAction = firstOrderAction(step);
+            StrategyOrderAction entryAction = step.firstOrderAction().orElse(null);
             if (isNull(entryAction)) {
                 continue;
             }
@@ -127,44 +123,6 @@ public class EntryScannerJob {
                     Deal.EntryReason.STRATEGY, entryStepType(step.getStepType()));
             return;
         }
-    }
-
-    private Boolean entryAllowed(PhaseEntryPolicy policy, MarketPhase.Type phase) {
-        return nonNull(policy)
-                && isFalse(PhaseEntryPolicy.NO_TRADE.equals(policy))
-                && isTrue(policy.isAllowedFor(phase));
-    }
-
-    private StrategyDetail detailForPhase(Strategy strategy, MarketPhase.Type phase) {
-        if (isEmpty(strategy.getDetails())) {
-            return null;
-        }
-        return strategy.getDetails().stream()
-                .filter(detail -> Objects.equals(phase, detail.getMarketPhaseType()))
-                .findFirst()
-                .orElse(null);
-    }
-
-    private List<StrategyStep> entrySteps(StrategyDetail detail) {
-        List<StrategyStep> precheckSteps = detail.getStepsByStatus().get(Deal.Status.PRECHECK);
-        if (isEmpty(precheckSteps)) {
-            return List.of();
-        }
-        return precheckSteps.stream()
-                .filter(step -> StrategyStepType.ENTRY.equals(step.getStepType())
-                        || StrategyStepType.GRID_ENTRY.equals(step.getStepType()))
-                .collect(Collectors.toList());
-    }
-
-    private StrategyOrderAction firstOrderAction(StrategyStep step) {
-        if (isEmpty(step.getActions())) {
-            return null;
-        }
-        return step.getActions().stream()
-                .filter(action -> action instanceof StrategyOrderAction)
-                .map(StrategyOrderAction.class::cast)
-                .findFirst()
-                .orElse(null);
     }
 
     private Deal.EntryStepType entryStepType(StrategyStepType stepType) {

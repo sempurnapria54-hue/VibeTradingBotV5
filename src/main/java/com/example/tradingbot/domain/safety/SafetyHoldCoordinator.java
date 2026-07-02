@@ -2,10 +2,13 @@ package com.example.tradingbot.domain.safety;
 
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
+import com.example.tradingbot.util.Constants;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,7 +23,13 @@ import org.springframework.stereotype.Service;
  * <p>Последовательность (L3 и L4 одной формы, дизайн холдов шага 6 §2-3):
  * TRADE_BLOCKED scope <b>первым</b> (gate + анкер идемпотентности) →
  * AnomalyReport CREATED с before-слепком → IN_PROGRESS → kill-switch (scope) →
- * KILL_SWITCH_EXECUTED → after-слепок → COMPLETED. Идемпотентно по статусу
+ * KILL_SWITCH_EXECUTED → after-слепок → COMPLETED. <b>Терминал COMPLETED
+ * гейтится подтверждением закрытия сверкой реального состояния биржи</b> (отчёт
+ * самого kill-switch, bounded ретраем teardown внутри него): не подтверждено на
+ * L3 (инструмент) → эскалация на биржевой холд + общебиржевой kill-switch
+ * (HOLD-Q1); на L4 (биржа) отчёт остаётся открытым (KILL_SWITCH_EXECUTED),
+ * досверка орфанов вне модели сделки — AnomalyJob (ANOM-Q2, шаг 8).
+ * Идемпотентно по статусу
  * scope: TRADE_BLOCKED ставится только из ACTIVE — повторный сигнал того же
  * scope (или scope не-ACTIVE) пропускается. Реакция не пробрасывает исключение
  * наружу: сбой обработки фиксируется в AnomalyReport (ERROR), проход живёт.
@@ -62,17 +71,42 @@ public class SafetyHoldCoordinator {
         runReaction(signal, dealContext, () -> killSwitchService.fireExchange(exchangeId));
     }
 
-    private void runReaction(HoldSignal signal, DealContext dealContext, Runnable killSwitch) {
+    private void runReaction(HoldSignal signal, DealContext dealContext, Supplier<Boolean> killSwitch) {
         AnomalyReport report = openSafely(signal, dealContext);
         advanceSafely(report, AnomalyReport.Status.IN_PROGRESS);
         try {
-            killSwitch.run();
+            Boolean closeConfirmed = killSwitch.get();
             advanceSafely(report, AnomalyReport.Status.KILL_SWITCH_EXECUTED);
-            completeSafely(report, dealContext);
+            completeOrEscalate(report, signal, dealContext, closeConfirmed);
         } catch (RuntimeException e) {
             log.error("Safety hold kill-switch failed scope={}", signal.getScope(), e);
             failSafely(report, e.getMessage());
         }
+    }
+
+    /**
+     * Терминал COMPLETED — только при подтверждённом (сверкой реального
+     * состояния биржи) закрытии. Не подтверждено на L3 (инструмент) → эскалация
+     * на биржевой холд + общебиржевой kill-switch (HOLD-Q1: неустранимый
+     * остаток = интеграции нельзя доверять, радиус неизвестен → консервативно
+     * тормозим биржу). На L4 (биржа) эскалировать дальше некуда — отчёт остаётся
+     * открытым (KILL_SWITCH_EXECUTED); досверка реального состояния — AnomalyJob
+     * (ANOM-Q2, шаг 8).
+     */
+    private void completeOrEscalate(AnomalyReport report, HoldSignal signal, DealContext dealContext,
+                                    Boolean closeConfirmed) {
+        if (isTrue(closeConfirmed)) {
+            completeSafely(report, dealContext);
+            return;
+        }
+        if (HoldScope.INSTRUMENT.equals(signal.getScope())) {
+            log.error("L3 kill-switch not confirmed flat; escalating to exchange-wide hold exchangeId={}",
+                    dealContext.getExchange().getId());
+            reactExchange(HoldSignal.exchange(Constants.Hold.EXCHANGE_KILL_SWITCH_RESIDUAL), dealContext);
+            return;
+        }
+        log.warn("Exchange kill-switch not confirmed flat; anomaly report kept open anomalyReportId={}",
+                isNull(report) ? null : report.getId());
     }
 
     /**

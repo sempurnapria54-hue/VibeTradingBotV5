@@ -6,9 +6,9 @@ import lombok.Value;
 
 /**
  * Результат успешного расчёта параметров действия стратегии — вход
- * ServiceCommandFactory. Risk-policy в него не входит. Производит
- * StrategyActionCalculator (шаг 5); здесь — контракт, потребляемый
- * command-фабрикой. RVO. См.
+ * StrategyActionExecutor'а (эмиссия CREATE-команды). Risk-policy в него не
+ * входит. Производит StrategyActionCalculator (шаг 5); здесь — контракт,
+ * потребляемый per-type executor'ом действия. RVO. См.
  * docs/components/models/CalculatedStrategyAction.md.
  */
 @Value

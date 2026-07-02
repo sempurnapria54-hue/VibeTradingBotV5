@@ -361,18 +361,40 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   `risk-creating-entry-protection.md` §2 → L3, §8.C) выравниваются общим
   `SYNC_DOCS_FROM_CODE`.
 - **[MAJOR, perf] L4 `fireExchange` — небанженный O(сделок) burst под D-M1
-  (ревью холд-дельты, 2026-06-24).** `KillSwitchService.fireExchange` итерирует
-  небанженный `DealDataService.findActiveByExchangeId` и на **каждую** сделку
-  строит `DealContext` (~9 запросов) + kill-switch REST — под advisory-локом
-  прохода (держит соединение). Стоимость линейна по числу активных сделок биржи,
-  без потолка; хуже принятого M4 (REST под локом на одну сделку). **Усечение
-  `LIMIT`'ом небезопасно** (несвёрнутый live risk). Варианты владельца: пагинация-
-  петля (бандженные запросы, полное покрытие) либо off-lock dispatch L4-teardown.
-  Источник — `phase-1-step-6-code.md` §Доработка холд-дельты.
+  (ревью холд-дельты, 2026-06-24; порог актуальности — фаза 3).**
+  `KillSwitchService.fireExchange` итерирует небанженный
+  `DealDataService.findActiveByExchangeId` и на **каждую** сделку строит
+  `DealContext` (~9 запросов) + kill-switch REST — под advisory-локом прохода
+  (держит соединение). Распухает по **памяти / стоимости запроса** линейно по
+  числу одновременных сделок биржи, без потолка; хуже принятого M4 (REST под
+  локом на одну сделку). **Порог актуальности — фаза 3** (реальный объём
+  одновременных сделок); в фазе 1 объём мал — не нагружено. **Починка (когда
+  возьмём): перебор пачками (bounded) — полный свип сохранён**, режется не
+  скорость, а ограниченный аппетит (память/стоимость). **`LIMIT` небезопасен**
+  (отрезал бы несвёрнутый live risk); альтернатива — off-lock dispatch
+  L4-teardown. Источник — `phase-1-step-6-code.md` §Доработка холд-дельты.
 - **`EXECUTE_KILL_SWITCH` — эмиссия команды — ✅ ПОДКЛЮЧЕНА** (CODE-делта холдов,
   2026-06-23). Тонкий эмиттер — `KillSwitchService` (вызывается из
   `SafetyHoldCoordinator`); заменил удалённый орфан
   `DealFsmSupport.killSwitchCommand()`. `KillSwitchExecutor` без изменений.
+- **Унификация инфраструктуры джоб — форвард, горизонт фаза 3 (код-ревью заход 2,
+  2026-07-01).** Ревью-замечания «общий родитель джоб» (п.4) и «единый механизм
+  локов» (п.5) — доработка механизма замыкания под мультиинстанс/микросервисы,
+  относится к фазе 3. Состав: абстрактный `ScheduledJob`-родитель (шаблон
+  `enabled → lock → run`) + единый `JobLock`-интерфейс с двумя реализациями
+  (`InProcessJobLock` поверх `JobExecutionGuard`, `AdvisoryJobLock` — БД
+  advisory-замок) — единый API замыкания. **В фазе 1 оркестратор выровнен на
+  `JobExecutionGuard`** (как остальные 5 джоб): единственное требование фазы 1 —
+  внутрипроцессная не-реентрантность, один экземпляр монолита, межэкземплярной
+  конкуренции нет. Прежний `OrchestratorPassLock` (БД advisory-замок, raw-JDBC)
+  **удалён как преждевременный** (2026-07-01) — advisory несущий только с фазы 3
+  (мультиинстанс), вернётся тогда (код в git-истории). Тем самым п.6 «SQL только
+  в репозиториях» снят из фазы 1 (raw-SQL ушёл); при возврате в фазе 3 raw-JDBC
+  advisory — ратифицированное исключение (замок держит **одно соединение** весь
+  проход, JPA-репозиторий этого не гарантирует). **Спека D-M1 пересмотрена:**
+  фаза 1 — in-process guard; БД-замок — форвард фазы 3 (см.
+  `.claude/rules/tech-radar.md` строка Raw-JDBC → `hold`,
+  `docs/components/DealOrchestratorJob.md` §Concurrency-guard).
 
 ### Шаг 7 (сделки и P&L)
 
@@ -403,6 +425,52 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   (`contracts/cancel-all-after.md`; heartbeat раз в секунду,
   timeOut 0|[10,120] с). Покрытие algo-ордеров CAA офдоком не
   специфицировано — уточнить на шаге.
+- **Kill-switch: ретрай-до-закрытия + сверка реального состояния биржи
+  (ANOM-Q2).** На холд-дельте шага 6 построен **узкий гейт** терминала
+  `AnomalyReport`: COMPLETED только при подтверждённом закрытии. **Per-инструмент
+  контур — ✅ ПОСТРОЕН (код-ревью заход 2, 2026-07-01):** `KillSwitchExecutor` —
+  **аварийный executor** (не команда, не действие стратегии): teardown прямыми
+  best-effort вызовами `IntegrationService`; **подтверждение — дёрганьем
+  `REFRESH_POSITION/ORDER/ALGO_ORDER` через диспетчер** +
+  `DealContextService.reloadRuntimeGraph` + проверка flat по доменным моделям
+  (`hasLivePositionRisk`/`isLive`). Bounded ретрай — лимит из
+  `kill-switch.max-teardown-attempts` (`KillSwitchProperties`). Не подтверждён flat
+  в пределах лимита → `failure`, `SafetyHoldCoordinator` эскалирует L3 на
+  **биржевой холд + `fireExchange`** (HOLD-Q1). Вызывающие — **только программно:**
+  `SafetyHoldCoordinator` (построен) и `AnomalyJob` (форвард, шаг 8). Компиляция —
+  JDK 25, зелёная.
+  **Декларативный kill-switch (Scope A/B) — ✅ ОТКАЧЁН (2026-07-01):** kill-switch —
+  аварийный выход, а не плановое действие стратегии; заводить его как `StrategyAction`
+  (подтип + условие в стратегии) — смешение emergency-response со стратегической
+  логикой (ровно эту цену показало ревью: валидация subtype↔actionType, роутинг,
+  тихий залип). Удалены `StrategyActionType.KILL_SWITCH`, `StrategyKillSwitchAction`
+  (+entity/`V11`/api/4×маппинг), ветка `ManagingHandler` + `DealFsmSupport.executeKillSwitch`,
+  интерфейс `StrategyActionExecutor` (без реализаций после ухода kill-switch),
+  `StrategyActionRetryProperties`. `KillSwitchActionExecutor` → `KillSwitchExecutor`
+  (обычный аварийный, не `StrategyActionExecutor`); retry-лимит → свой
+  `kill-switch`-конфиг.
+  **Остаётся форвардом:** (1) **AnomalyJob-путь** (проактивная детекция → зов
+  executor'а) + общебиржевая **orphan-сверка** (сущности вне модели сделки) +
+  перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 — **шаг 8**; (2)
+  **PnL-финализация `EMERGENCY_CLOSED`** (DEAL-Q2, resultProfit не блокирует, шаг 7);
+  (3) доки — общим `SYNC_DOCS_FROM_CODE` после апрува. Связано с **ANOM-Q2**
+  (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`). Источник —
+  `phase-1-step-6-code.md` §Заход 2 разбора находок.
+- **FSM/action слоистость — decision + Stage 1 готовы (2026-07-01).** Решение —
+  `docs/decisions/fsm-execution-layering.md` (слои: петля → handler → оркестратор
+  действия → `StrategyActionExecutor` → `CommandExecutor`; kill-switch сбоку; exit —
+  условием-перехода). **Stage 1 (handler = 3 метода) — ✅ ПОСТРОЕН:** `FsmHandler` =
+  `checkEntry` (субъект + среда) / `checkTransition` (этап завершён → статус) /
+  `handle` (прогресс действия); default-методы для инкрементальной миграции;
+  `DealStateMachine` = `checkEntry.or(checkTransition).orElseGet(handle)`. Все 7
+  handler'ов разложены (6 с `checkEntry`/`checkTransition`; `ExitPending` — handle-only
+  cleanup без входного условия). Компиляция JDK 25 + **boot test-профиля зелёные**
+  (Flyway up-to-date, контекст стартует за ~7с). **Форвардом (следующие заходы шага 6):**
+  **Stage 2** — per-pass `StrategyActionExecutor` на тип действия (обобщает
+  `DealActionPlanner`+фабрику, сохраняет CMD-Q6); **Stage 3** — transition-conditions
+  в модели стратегии + exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) +
+  снять вырожденный `CLOSE_FULL`. Доки (компонент-доки handler'ов, `DealStateMachine.md`)
+  — общим `SYNC_DOCS_FROM_CODE` после апрува.
 
 ### Рассмотрено, не берём (прогоны 2-3)
 

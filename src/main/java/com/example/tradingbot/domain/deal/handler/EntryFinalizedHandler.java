@@ -10,10 +10,10 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.deal.DealActionPlanner;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
 import com.example.tradingbot.domain.deal.DealTransition;
 import com.example.tradingbot.domain.deal.FsmHandler;
+import com.example.tradingbot.domain.deal.action.StrategyActionOrchestrator;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
@@ -21,6 +21,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAct
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.service.market.condition.ConditionEvaluationContext;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -39,7 +40,7 @@ import org.springframework.stereotype.Component;
 public class EntryFinalizedHandler implements FsmHandler {
 
     private final DealFsmSupport support;
-    private final DealActionPlanner planner;
+    private final StrategyActionOrchestrator actionOrchestrator;
 
     @Override
     public Deal.Status supportedStatus() {
@@ -47,15 +48,39 @@ public class EntryFinalizedHandler implements FsmHandler {
     }
 
     @Override
-    public DealTransition handle(DealContext dealContext) {
+    public Optional<DealTransition> checkEntry(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         if (isFalse(support.positionLiveRisk(deal))) {
-            return nonNull(deal.getPosition())
+            // Нет живой позиции — защиту финализировать не над чем.
+            return Optional.of(nonNull(deal.getPosition())
                     ? DealTransition.transition(Deal.Status.EXIT_PENDING)
-                    : support.markError(dealContext);
+                    : support.markError(dealContext));
         }
-        List<StrategyStep> protectionSteps = support.stepsOfType(
-                support.stepsFor(dealContext, Deal.Status.ENTRY_FINALIZED), StrategyStepType.MAIN_PROTECTION);
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<DealTransition> checkTransition(DealContext dealContext) {
+        for (StrategyStep step : protectionSteps(dealContext)) {
+            for (StrategyAction action : nullSafe(step)) {
+                DealActionState state = support.findActionState(dealContext, action).orElse(null);
+                if (isNull(state)) {
+                    continue;
+                }
+                if (DealActionStateStatus.SUBMITTED.equals(state.getStatus())) {
+                    return Optional.of(DealTransition.transition(Deal.Status.PROTECTION_SWITCHED));
+                }
+                if (DealActionStateStatus.FAILED.equals(state.getStatus())) {
+                    return Optional.of(support.markError(dealContext));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public DealTransition handle(DealContext dealContext) {
+        List<StrategyStep> protectionSteps = protectionSteps(dealContext);
         if (isEmpty(protectionSteps)) {
             return toManagingIfProtected(dealContext);
         }
@@ -66,22 +91,18 @@ public class EntryFinalizedHandler implements FsmHandler {
         return startProtection(protectionSteps, dealContext);
     }
 
+    private List<StrategyStep> protectionSteps(DealContext dealContext) {
+        return support.stepsOfType(
+                support.stepsFor(dealContext, Deal.Status.ENTRY_FINALIZED), StrategyStepType.MAIN_PROTECTION);
+    }
+
+    /** Прогресс уже начатого (active) protection-действия; переходы (SUBMITTED/FAILED) отсеяны в checkTransition. */
     private DealTransition continueProtection(List<StrategyStep> protectionSteps, DealContext dealContext) {
         for (StrategyStep step : protectionSteps) {
             for (StrategyAction action : nullSafe(step)) {
                 DealActionState state = support.findActionState(dealContext, action).orElse(null);
-                if (isNull(state)) {
-                    continue;
-                }
-                DealActionStateStatus status = state.getStatus();
-                if (DealActionStateStatus.SUBMITTED.equals(status)) {
-                    return DealTransition.transition(Deal.Status.PROTECTION_SWITCHED);
-                }
-                if (DealActionStateStatus.FAILED.equals(status)) {
-                    return support.markError(dealContext);
-                }
-                if (isActiveStage(status)) {
-                    return support.reactToPlan(planner.plan(step, action, state, dealContext), dealContext);
+                if (nonNull(state) && isActiveStage(state.getStatus())) {
+                    return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
                 }
             }
         }
@@ -94,7 +115,7 @@ public class EntryFinalizedHandler implements FsmHandler {
             if (isTrue(support.conditionMet(step, conditionContext)) && isNotEmpty(step.getActions())) {
                 StrategyAction action = step.getActions().getFirst();
                 DealActionState state = support.findOrCreateActionState(dealContext, action);
-                return support.reactToPlan(planner.plan(step, action, state, dealContext), dealContext);
+                return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
             }
         }
         // MAIN_PROTECTION есть, но условие не сработало — attached защита держит → MANAGING.

@@ -91,10 +91,13 @@ error-политика (`docs/rules/error-handling-policy.md`) и форвард
 (`docs/rules/risk-creating-entry-protection.md`). **Продвинуты**:
 INSTR-Q2-остаток (тайминг/владелец set-leverage решены — `PRECHECK` перед
 ордером, idempotent) и CMD-Q4 (Precheck-часть закрыта инструмент-скоупным
-read вне command-layer; orphan-часть — шаг 8). На доработке холд-дельты
-шага 6 (2026-06-24) открыт **HOLD-Q1** (L4-доминирование controlled-violation:
-любой `ControlledExchangeException` на одной сделке гасит всю биржу) — на
-валидацию, не закрыт.
+read вне command-layer; orphan-часть — шаг 8). **HOLD-Q1**
+(L4-доминирование controlled-violation: любой `ControlledExchangeException`
+на одной сделке гасит всю биржу), открытый на доработке холд-дельты шага 6
+(2026-06-24), **закрыт** на заходе 1 разбора находок (2026-06-30) решением
+`docs/decisions/controlled-violation-exchange-wide-hold.md` (вариант (1):
+безусловный L4, доминирует L3; + переиспользуемый принцип консервативного
+торможения под неизвестный радиус незрелой интеграции).
 
 История закрытых вопросов пайплайна:
 
@@ -506,68 +509,6 @@ Deal management, шаг 4+).
 `.claude/decisions/runtime-value-object.md`,
 `.claude/decisions/models-core-vs-other.md`,
 `docs/decisions/market-phase-stateless.md`.
-
-### HOLD-Q1. L4-доминирование controlled-violation: один controlled-эксепшн на одной сделке гасит всю биржу (владелец — `trading-specialist` / `solution-designer`)
-
-Доработка холд-дельты шага 6 (2026-06-24) подсветила: введённая в коде
-L4-классификация **отсутствует в утверждённом отчёте дизайнера** — на
-валидацию, не утверждённое решение.
-
-**Что делает код.** `DealFsmSupport.controlledViolationHold()` поднимает
-**L4-холд биржи** (`HoldSignal.exchange(EXCHANGE_CONTROLLED_VIOLATION)`),
-если среди retry-anchor'ов сделки (action- **или** finalization-states) есть
-хоть одна ошибка класса `VALIDATION_ERROR`. По
-`ServiceCommandExecutor.classify` `VALIDATION_ERROR` ⟺ **любой**
-`ControlledExchangeException` — то есть все три категории
-(`ExternalStatusException`, `ExternalInvariantViolationException`,
-`ExternalNotFoundException`, `docs/rules/controlled-exchange-exceptions.md`).
-Этот L4 **безусловно доминирует над L3** (`markErrorStopless`: при наличии
-controlled-violation L3-сигнал бесстоповой позиции вытесняется L4). Реакция
-L4 = `KillSwitchService.fireExchange` (**flatten всех активных сделок биржи**)
-+ `Exchange.TRADE_BLOCKED` (**каскадная блокировка входов по всем
-инструментам**).
-
-**Следствие.** Один `ControlledExchangeException` на **одной** сделке
-(например, `ExternalNotFoundException` после evidence-cycle одного ордера, или
-неизвестный внешний статус одной сущности) → **flatten всей биржи + холд всей
-биржи**. Радиус реакции (вся площадка) может быть несоразмерен радиусу факта
-(одна сущность одной сделки).
-
-**Расхождение с офдоком.** `controlled-exchange-exceptions.md` для
-`ExternalStatusException` пишет «Deal → ERROR; Exchange → HOLD **по severity /
-safetyImpact**» (условно), а код эскалирует все три категории **единообразно
-и безусловно** к flatten-всей-биржи, квалификатор severity/safetyImpact
-теряется. Для `ExternalInvariantViolationException` / `ExternalNotFoundException`
-док пишет «Exchange → HOLD» без квалификатора — но и там «HOLD» в доке не
-расшифрован как «flatten всей биржи».
-
-**Варианты:**
-- (1) Принять как есть: controlled-violation = безусловный L4, доминирует L3.
-  Требует явной валидации, что flatten всей биржи на единичный
-  controlled-эксепшн — намеренная политика.
-- (2) Различить три категории: `ExternalStatusException` → условно по
-  severity/safetyImpact (как в доке: L3/лог), только инвариант-нарушение /
-  not-after-refresh → L4. Снимает потерю квалификатора.
-- (3) L4 не доминирует L3 безусловно — скоуп по радиусу: нарушение биржевого
-  инварианта (cross-маржа, posSide, ordType) = L4; локализованный на
-  инструменте статус/not-found = L3 (по логике §8.C дизайна холдов: радиус
-  поражения определяет уровень).
-- (4) иное по проработке владельца.
-
-**Крен (CC, на валидацию):** склоняюсь к (2)+(3) — единообразная эскалация
-всех controlled-категорий к flatten-всей-биржи выглядит шире, чем риск-радиус
-факта, и роняет квалификатор `по severity / safetyImpact` из офдока. Но это
-**риск-семантика** (хвост `trading-specialist` / `solution-designer`), не
-деталь кода — поведение в коде **не меняю**, оставляю на валидацию. Не гейтит
-работу холд-дельты (реакция функционально замкнута); решает корректность
-**границы** L3/L4.
-
-Связано: `docs/rules/controlled-exchange-exceptions.md`,
-`docs/rules/exchange-hold.md`, `docs/rules/instrument-hold.md`,
-`.claude/work/progress/phase-1-step-6-holds-design.md` (§8.C — радиус
-определяет уровень), `src/.../domain/deal/DealFsmSupport.java`
-(`controlledViolationHold` / `markError` / `markErrorStopless`),
-`src/.../domain/safety/KillSwitchService.java` (`fireExchange`).
 
 ## Конвенция
 

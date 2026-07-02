@@ -10,18 +10,19 @@ import lombok.Setter;
 
 /**
  * Базовое действие шага стратегии (API). Вид определяется JSON-
- * дискриминатором actionKind: ORDER/ALGO_ORDER/POSITION (только форма
- * сериализации, не поле домена).
+ * дискриминатором actionKind: ORDER/ALGO_ORDER (только форма
+ * сериализации, не поле домена). Позиционного действия нет: выход из
+ * позиции — условие-перехода MANAGING → EXIT_PENDING, не действие
+ * (docs/decisions/fsm-execution-layering.md).
  */
 @Getter
 @Setter
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "actionKind")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = StrategyOrderActionApiModel.class, name = "ORDER"),
-        @JsonSubTypes.Type(value = StrategyAlgoOrderActionApiModel.class, name = "ALGO_ORDER"),
-        @JsonSubTypes.Type(value = StrategyPositionActionApiModel.class, name = "POSITION")
+        @JsonSubTypes.Type(value = StrategyAlgoOrderActionApiModel.class, name = "ALGO_ORDER")
 })
-@Schema(description = "Действие шага; вид задаёт дискриминатор actionKind (ORDER/ALGO_ORDER/POSITION)",
+@Schema(description = "Действие шага; вид задаёт дискриминатор actionKind (ORDER/ALGO_ORDER)",
         discriminatorProperty = "actionKind")
 public abstract class StrategyActionApiModel {
 
@@ -34,7 +35,7 @@ public abstract class StrategyActionApiModel {
     private String targetActionKey;
 
     @NotBlank
-    @Schema(description = "Тип действия: CREATE/REPLACE/CANCEL (POSITION — CLOSE_FULL)",
+    @Schema(description = "Тип действия: CREATE/REPLACE/CANCEL",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String actionType;
 

@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.command;
 
 /**
- * Тип атомарной операции команды над runtime-сущностью (17 значений).
+ * Тип атомарной операции команды над runtime-сущностью (16 значений).
  * Амендных команд нет: AMEND_* сняты, ремоделирование — REPLACE-
  * оркестрация существующих команд (docs/decisions/replace-not-amend.md).
  * Refresh-набор — ровно по одной команде на сущность (bulk-команды
@@ -57,8 +57,5 @@ public enum ServiceCommandType {
     MARK_DEAL_CLOSED,
 
     /** Пометить сделку в ошибке. */
-    MARK_DEAL_ERROR,
-
-    /** Исполнить kill-switch (аварийный safety-flow). */
-    EXECUTE_KILL_SWITCH
+    MARK_DEAL_ERROR
 }

@@ -1,5 +1,9 @@
 package com.example.tradingbot.domain.model.aggregate.deal;
 
+import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
+
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
@@ -7,6 +11,7 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -70,6 +75,25 @@ public class Deal extends Auditable {
 
     /** Текущая позиция (≤1 на Deal). */
     private Position position;
+
+    /** Live ordinary orders сделки (остаточный live-risk для teardown); пусто — нет. */
+    public List<Order> liveOrders() {
+        return emptyIfNull(orders).stream()
+                .filter(order -> isTrue(order.isLive()))
+                .collect(Collectors.toList());
+    }
+
+    /** Live standalone algo-orders сделки (остаточный live-risk для teardown); пусто — нет. */
+    public List<AlgoOrder> liveAlgoOrders() {
+        return emptyIfNull(algoOrders).stream()
+                .filter(algoOrder -> isTrue(algoOrder.isLive()))
+                .collect(Collectors.toList());
+    }
+
+    /** Позиция сделки несёт live market risk (есть и в статусе с живым риском). */
+    public Boolean hasLivePositionRisk() {
+        return nonNull(position) && isTrue(position.hasLiveRisk());
+    }
 
     /**
      * FSM-статус сделки: бизнес-этап, не статус Order/AlgoOrder/Position

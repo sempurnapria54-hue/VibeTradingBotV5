@@ -27,9 +27,11 @@ import org.springframework.stereotype.Component;
  * DealContext → DealStateMachine → исполнить команды → применить переход.
  * Это execution boundary: unexpected exceptions ловятся здесь, сделка
  * уводится в ERROR (docs/rules/runtime-error-classification.md).
- * Concurrency-guard (D-M1) — БД-блок на весь проход через
- * {@link OrchestratorPassLock}: и таймерный, и ручной заход под одной
- * блокировкой. CRON/enabled — конвенция джоб
+ * Concurrency-guard (D-M1) — in-process не-реентрантность через
+ * {@link JobExecutionGuard} (как остальные джобы): таймерный и ручной заход
+ * сериализуются по имени джобы. БД advisory-замок (мультиинстанс) отложен на
+ * фазу 3 — в фазе 1 один экземпляр, межэкземплярной конкуренции нет. CRON/enabled
+ * — конвенция джоб
  * (.claude/rules/codestyle.md §Джобы). См.
  * docs/components/DealOrchestratorJob.md.
  */
@@ -38,8 +40,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DealOrchestratorJob {
 
+    private static final String JOB_NAME = "dealOrchestratorJob";
+
     private final DealOrchestratorProperties properties;
-    private final OrchestratorPassLock passLock;
+    private final JobExecutionGuard executionGuard;
     private final DealDataService dealDataService;
     private final DealContextService dealContextService;
     private final DealStateMachine dealStateMachine;
@@ -51,10 +55,7 @@ public class DealOrchestratorJob {
         if (isFalse(properties.getEnabled())) {
             return;
         }
-        Boolean ran = passLock.runExclusively(this::run);
-        if (isFalse(ran)) {
-            log.debug("Deal orchestrator pass skipped: overlapping run");
-        }
+        executionGuard.runExclusively(JOB_NAME, this::run);
     }
 
     private void run() {

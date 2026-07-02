@@ -5,11 +5,11 @@ import lombok.Builder;
 import lombok.Value;
 
 /**
- * Рассчитанный размер order/algo/position action — результат
- * SizeCalculator. RVO, не persisted. {@code sz} в OKX API для
- * SWAP/FUTURES — это контракты, не USDT. Direct partial close через
- * StrategyPositionAction не рассчитывается (только CLOSE_FULL); частичное
- * уменьшение — через reduce-only Order/AlgoOrder ({@code closeFraction}).
+ * Рассчитанный размер order/algo action — результат SizeCalculator.
+ * RVO, не persisted. {@code sz} в OKX API для SWAP/FUTURES — это
+ * контракты, не USDT. Полного закрытия позиции как действия нет (выход —
+ * условие-перехода MANAGING → EXIT_PENDING); частичное уменьшение —
+ * через reduce-only Order/AlgoOrder ({@code closeFraction}).
  * См. docs/components/models/CalculatedSize.md.
  */
 @Value

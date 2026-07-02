@@ -8,7 +8,6 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.util.Constants;
@@ -17,16 +16,17 @@ import java.math.RoundingMode;
 import org.springframework.stereotype.Component;
 
 /**
- * Рассчитывает размер order/algo/position action и возвращает
+ * Рассчитывает размер order/algo action и возвращает
  * {@link CalculatedSize} (docs/components/SizeCalculator.md). Для
  * risk-creating входа со стопом размер ограничен лимитом риска на сделку:
  * убыток на стопе ≤ riskPerTradePercent × externalAvailableEquity; размер
  * округляется по lotSz и снизу ограничен minSz (если даже на minSz убыток
  * превышает лимит — возвращается minSz-пол, блокирует RiskValidator).
- * Direct partial close через StrategyPositionAction не считается (только
- * CLOSE_FULL); частичное уменьшение — через reduce-only Order/AlgoOrder
- * ({@code closeFraction}). Нельзя безопасно посчитать (нет lotSz/minSz/
- * ctVal/позиции) → controlled {@link CalculationException}.
+ * Полного закрытия позиции как действия нет: выход — условие-перехода,
+ * market-close ведёт ExitPendingHandler; частичное уменьшение — через
+ * reduce-only Order/AlgoOrder ({@code closeFraction}). Нельзя безопасно
+ * посчитать (нет lotSz/minSz/ctVal/позиции) → controlled
+ * {@link CalculationException}.
  */
 @Component
 public class SizeCalculator {
@@ -41,7 +41,6 @@ public class SizeCalculator {
 
     public CalculatedSize calculate(CalculationContext context, CalculatedPrice calculatedPrice) {
         return switch (context.getAction()) {
-            case StrategyPositionAction ignored -> fullClose(context);
             case StrategyAlgoOrderAction algoAction -> algoSize(algoAction, context);
             case StrategyOrderAction orderAction -> orderSize(orderAction, context, calculatedPrice);
             default -> CalculatedSize.builder()
@@ -130,16 +129,6 @@ public class SizeCalculator {
                 .closeFraction(fraction)
                 .sizeMode(SizeMode.REDUCE_ONLY)
                 .description("reduce-only algo size for " + action.getConditionType())
-                .build();
-    }
-
-    private CalculatedSize fullClose(CalculationContext context) {
-        Position position = requirePosition(context);
-        return CalculatedSize.builder()
-                .sizeContracts(position.getExternalSize())
-                .closeFraction(BigDecimal.ONE)
-                .sizeMode(SizeMode.FULL_CLOSE)
-                .description("full position close size")
                 .build();
     }
 
