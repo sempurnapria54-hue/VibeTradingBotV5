@@ -30,7 +30,7 @@ production-flow одной стратегии.
 | 4 | Команды и их жизненный цикл (ServiceCommand: submit/replace/cancel/close/REFRESH; исполнители; lifecycle; факт и реконсиляция через REFRESH, не ACK; ведение Position/Order) | DONE |
 | 5 | Риск-преконтроль (валидация перед отправкой: размер, ограничения инструмента, reduce-only, лимиты) | DONE |
 | 6 | FSM + живая оркестрация (состояния и переходы сущностей + handler'ы; живая оркестрационная петля `DealOrchestratorJob` (driving), REPLACE-оркестрация, per-deal concurrency-guard, механика финализации — финализационные executor'ы / терминальные рёбра / retry-state финализации) | DONE |
-| 7 | Сделки и P&L (`DealOrchestratorJob` — агрегирование в `Deal`, расчёт `resultProfit` / P&L) | HOLD |
+| 7 | Сделки и P&L (`DealOrchestratorJob` — агрегирование в `Deal`, расчёт `resultProfit` / P&L) | DOCS_CHECK_1 |
 | 8 | AnomalyJob (полноценный, операционная детекция аномалий состояния/исполнения) | HOLD |
 | 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | HOLD |
 | 10 | Тесты | HOLD |
@@ -690,3 +690,44 @@ production-flow одной стратегии.
   §6a-инкремент (доки сами отнесли тайминг к шагу 6). Жёсткие гейты `DONE`
   (D-B3 / D-M1) — оба built. Сверка — `phase-1-step-6-code.md` §Сверка scope;
   финальный аппрув `CODE` за пользователем.
+- **Шаг 6 → `SYNC_DOCS_FROM_CODE` → §6a → `DONE` (2026-07-01…03):** аппрув
+  `CODE` дан; `SYNC_DOCS_FROM_CODE` (фокус `divergence`, docs←code) выровнял 52
+  дока под as-built (Stage 2/3-рефактор + фиксы ревью): `ServiceCommandFactory`
+  распилен на `StrategyActionOrchestrator`+per-type executor'ы +
+  `DealFinalizationCommandFactory`; `OrchestratorPassLock`→`JobExecutionGuard`;
+  kill-switch package-move + реактивность через `HoldSignal`→`SafetyHoldCoordinator`
+  (снапшот v64). **Пост-хок концепт-гейт §6a** (концепт-инкременты на CODE):
+  `DOCS_CHECK_4` — 6 пробелов (2 блокера: таксономия kill-switch «команда» vs
+  side-executor, частичный unique-index `uk_deal_active_instrument`; 4 не-блокера:
+  inline set-leverage у owner-дока, спека `SafetyHoldCoordinator`/`HoldSignal`,
+  placeholder-ZERO, ссылка §8.C). `GAPS_CLOSE_4` закрыл все 6 docs←code
+  (kill-switch→side-executor; §Персистентность `Deal.md` + `trading-constraints.md`
+  app-gatekeeper+DB defense-in-depth; inline set-leverage, **INSTR-Q2 закрыт**;
+  новые `SafetyHoldCoordinator.md`/`HoldSignal.md`/`KillSwitchService.md`;
+  placeholder-ZERO примирён; §8.C). `DOCS_CHECK_5` — подтверждено, 1 остаток
+  (`AnomalyReport.scope` docs↔code-лаг); `GAPS_CLOSE_5` — `scope: HoldScope`
+  добавлено. **§6a ПРОЙДЕН** — все гейты `DONE` (CODE-фокусы / `divergence` /
+  §6a; жёсткие D-B3/D-M1 built) удовлетворены с зафиксированным исходом. Ролляп
+  фазы без изменений (`IN_PROGRESS`: шаги 1-6 `DONE`, 7-11 `HOLD`). Отчёт §6a —
+  `.claude/work/progress/phase-1-step-6-docs-check-4.md`. Дельта `GAPS_CLOSE_4/5`
+  — staged для коммита в IDEA.
+- **Шаг 7 → `DOCS_CHECK_1` (2026-07-03):** стартован шаг «Сделки и P&L»
+  (`TOOLING` без новых артефактов — фокусы `concept`/`trading` активны). Scope
+  (граница 6↔7): расчёт числа `resultProfit` на терминале (вкл. PnL
+  `EMERGENCY_CLOSED`) + агрегация фактов в `Deal`; заменяет placeholder-ZERO
+  шага 6. Форвард-долг на шаг 7: комиссии в риск-расчёте (§6a шага 5),
+  `positions-history` realizedPnl-разложение (В-3), funding SWAP (В-6/OKX-Q3 —
+  выбор пути), `trade-fee` (В-7), граница audit/история (шаг 8) vs PnL-число.
+  Прогон — три независимых ревьюер-субагента (concept ×2 + trading); CC
+  верифицировал ключевые атрибуции грепом. **Не чисто — 6 пробелов, все сходятся
+  к центральному блокеру G1** (стадия 0): источник данных `resultProfit` не выбран,
+  три дока противоречат (fills/`TradeFill` `Deal.md` ↔ bills/`DealCashFlow`
+  `account-bills.md` ↔ positions-history/`realizedPnl` `position.md`); OKX-Q1/Q3
+  открыты. Торговый инвариант (TR-1/TR-2/TR-3, блокеры) задаёт направление: число =
+  **net** realized P&L (комиссии+funding+liqPenalty) на любом терминале →
+  fills-only исключён (fills не несут funding/liqPenalty). G2 (агрегирующая модель
+  name-level), G3 (компонент-расчёта не назначен), G4 (fills не агрегирует
+  algo-exit) — на выбранном пути G1; G5 (число `EMERGENCY_CLOSED`), G6 (комиссии в
+  сайзинге — policy + нюанс скоупа) — отдельные хвосты. Обход остановлен на стадии
+  0. **Исход → `GAPS_CLOSE_1`** (после решений пользователя по G1-пути и G6-policy).
+  Отчёт — `.claude/work/progress/phase-1-step-7-docs-check-1.md`.
