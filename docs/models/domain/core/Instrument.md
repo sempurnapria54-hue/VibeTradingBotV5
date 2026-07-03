@@ -136,6 +136,7 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
   `docs/models/domain/other/InstrumentExternalRules.md`,
   `docs/decisions/instrument-external-rules-materialization.md`.
 - Роль `externalLeverage`/потолок плеча, кэп плеча — закрыты решениями
-  выше + `docs/decisions/per-trade-risk-policy.md`; остаточный INSTR-Q2 —
-  только тайминг set-leverage на бирже (форвард к оркестрации, шаг 6).
+  выше + `docs/decisions/per-trade-risk-policy.md`; INSTR-Q2 закрыт на
+  шаге 6: рабочее плечо пишется inline в `SubmitOrderExecutor` перед
+  постановкой открывающего ордера (`docs/components/SubmitOrderExecutor.md`).
 - Audit-база — `docs/models/domain/other/Auditable.md`.

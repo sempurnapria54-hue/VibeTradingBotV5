@@ -29,6 +29,16 @@ live risk (иначе — не терминализирует, остаётся 
 - *Сам расчёт* `resultProfit` — **шаг 7** (граница 6 ↔ 7); `MARK_DEAL_CLOSED`
   механики шага 6 обязан **удовлетворить инвариант** наличия числа на
   чистом терминале, не вычислять его внутри себя.
+- **Как шаг 6 удовлетворяет инвариант — интерим-placeholder ZERO.** Executor
+  пишет **явный механический placeholder** `resultProfit = BigDecimal.ZERO` +
+  `resultProfitCurrency = settleCurrency` (settle-валюта резолвится из
+  `BalanceContainer`), чтобы на чистом терминале было число до расчёта шага 7.
+  Placeholder помечен как интерим; **шаг 7** (`REFRESH_FILLS` / `TradeFill`)
+  **заменит** его расчётным PnL. Это задокументированный интерим, **не**
+  молчаливый ZERO-fallback: если settle-валюта **не резолвится** — executor
+  **кидает failure** (`VALIDATION_ERROR`), а не садит тихий ZERO (уход на
+  retry/ошибочную тропу — ниже). Разграничение placeholder vs error-fallback —
+  `docs/models/domain/aggregate/Deal.md` §«Итоговый PnL».
 - Если число временно нельзя получить — финализация **ретраится** по общему
   механизму (`DealFinalizationState`).
 - Если после исчерпания retry прибыль всё ещё неисчислима —

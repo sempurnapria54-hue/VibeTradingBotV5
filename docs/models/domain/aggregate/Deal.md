@@ -93,13 +93,27 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
   по терминальному контракту финализации (не блокируется инвариантом
   чистого закрытия; `docs/lifecycles/Deal.md` §«Терминальный контракт
   финализации», DEAL-Q2).
-- `resultProfit = 0` допустим только как результат расчёта, **не**
-  как fallback при ошибке. Если временно нельзя посчитать —
+- `resultProfit = 0` допустим только как результат расчёта **либо как
+  явный step-6 интерим-placeholder** (см. ниже), **не** как молчаливый
+  fallback при ошибке. Если временно нельзя посчитать —
   финализация retry-ится по общему механизму (`DealFinalizationState`,
   `docs/models/domain/other/DealFinalizationState.md`). Поведение при
   исчерпании retry — **DEAL-Q2, закрыт**: сделка всегда доходит до
   терминала (чистый `CLOSED` с числом либо ошибочный терминал), см.
   `docs/lifecycles/Deal.md` §«Терминальный контракт финализации».
+- **Step-6 интерим-placeholder ZERO.** Терминальное ребро чистого
+  закрытия (`MARK_DEAL_CLOSED`, `MarkDealClosedExecutor`) — механика
+  **шага 6**, а сам PnL-расчёт — **шаг 7** (граница 6 ↔ 7). Чтобы
+  удовлетворить инвариант «на чистом `CLOSED` число обязательно» до того,
+  как шаг 7 посчитает реальный PnL, executor пишет **явный механический
+  placeholder** `resultProfit = BigDecimal.ZERO` + `resultProfitCurrency =
+  settleCurrency` (резолвится из `BalanceContainer`). Это
+  **задокументированный интерим**, помеченный как placeholder: шаг 7
+  (`REFRESH_FILLS` / `TradeFill`) заменит его расчётным числом. Он **отличен
+  от** запрещённого молчаливого error-fallback: settle-валюта
+  **обязательна** — если она не резолвится, executor **кидает failure**
+  (`VALIDATION_ERROR`, уход на retry/ошибочную тропу DEAL-Q2), а не садит
+  тихий ZERO. См. `docs/components/MarkDealClosedExecutor.md`.
 
 Детальный breakdown (fees, fundingFee, gross/netProfit, entry/exit
 fills, average prices, partial exits) в `Deal` не хранится —
@@ -123,6 +137,49 @@ audit (`TradeFill` и `REFRESH_FILLS` — шаг 7, OKX-Q1/OKX-Q3).
 выводится через `StrategyDetail.marketPhaseType`), `openedAt`/
 `closedAt`/`errorAt` (даты записи — `Auditable`; торговые моменты —
 через `Order`/`Position`/`TradeFill`/audit).
+
+## Персистентность
+
+Хранится в БД (entity `DealEntity`, таблица `deals`), наследует
+audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
+`position`) — отдельные таблицы по `deal_id`, не cascade-коллекции этой
+строки. Ограничения схемы:
+
+- `id` — identity (autoincrement).
+- `internal_id`, `instrument_id`, `strategy_detail_id`, `status`,
+  `direction` — `NOT NULL`; `entry_reason`, `entry_step_type`,
+  `shutdown_reason`, `close_reason`, `result_profit`,
+  `result_profit_currency` — nullable.
+- `internal_id` — `updatable = false` (неизменен после создания).
+- Enum-поля (`status`, `direction`, `entry_reason`, `entry_step_type`,
+  `shutdown_reason`, `close_reason`) хранятся строкой (имя enum); enum —
+  только в домене (codestyle: enum'ы — в доменном слое).
+
+Ключевые индексы/constraints (миграция
+`V9__create_deal_finalization_states.sql`):
+
+- **`uk_deal_active_instrument`** — частичный уникальный индекс
+  `on deals (instrument_id) where status not in ('CLOSED',
+  'EMERGENCY_CLOSED')`. DB-уровень инварианта «одна незакрытая сделка на
+  инструмент» — **defense-in-depth** к app-gatekeeper'у (`EntryScannerJob`/
+  `DealOpeningService`; см. `docs/rules/trading-constraints.md`). Предикат
+  «активная/незакрытая» = любой `Status` **кроме** `CLOSED` и
+  `EMERGENCY_CLOSED`: `PRECHECK`, `ENTRY_SUBMITTED`, `ENTRY_FINALIZED`,
+  `PROTECTION_SWITCHED`, `MANAGING`, `EXIT_PENDING` **и `ERROR`** считаются
+  активными — сделка в `ERROR` всё ещё блокирует новую сделку по
+  инструменту, пока не дойдёт до терминала `CLOSED`/`EMERGENCY_CLOSED`.
+- **`ix_deal_status`** `on deals (status)` — support-индекс под горячую
+  выборку активных сделок за проход оркестратора (`DealOrchestratorJob`).
+- **`ix_deal_instrument_status`** `on deals (instrument_id, status)` —
+  support-индекс под gatekeeper входа по инструменту (`EntryScannerJob`/
+  `DealOpeningService`). Таблица `deals` не пруним — индексы по
+  `status`/`instrument_id` держат выборку активных дешёвой по мере роста
+  истории закрытых сделок.
+- **Benign insert-race:** вставку новой сделки `EntryScannerJob` делает в
+  try/catch — конкурентная вставка, нарушающая `uk_deal_active_instrument`,
+  ловится как benign skip (лог по инструменту, не фатальная ошибка прохода),
+  а не как сбой. Гонку между двумя проходами закрывает DB-инвариант, приложение
+  её не эскалирует.
 
 ## Границы с DealActionState / DealContext
 

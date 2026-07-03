@@ -47,8 +47,9 @@ Orphan-скан при уже открытой сделке и по неведо
 candidate Deal без ошибки (`CLOSED` + `ENTRY_CONDITION_EXPIRED`); если live
 risk есть/неизвестно → recovery/safety. Если condition true → взять
 action, проверить `DealActionState`, вызвать `StrategyActionCalculator`,
-выставить рабочее плечо на бирже (см. ниже), создать `CREATE_ORDER` →
-`SUBMIT_ORDER`. Risk-check entry action — через
+создать `CREATE_ORDER` → `SUBMIT_ORDER` (рабочее плечо на биржу пишет inline
+`SubmitOrderExecutor` перед постановкой открывающего ордера — см. ниже; сам
+handler плечо не пишет). Risk-check entry action — через
 risk-layer (`docs/processes/risk-evaluation.md`): BLOCKED в PRECHECK без
 live risk → `CLOSED` + `RISK_CONTROL`.
 
@@ -60,14 +61,21 @@ live risk → `CLOSED` + `RISK_CONTROL`.
 `RISK_CONTROL` (инвариант `docs/rules/risk-creating-entry-protection.md`).
 Reduce-only/закрывающие действия правило не трогает.
 
-**Set-leverage перед постановкой (INSTR-Q2).** Рабочее плечо пишется на
-биржу **перед каждой сделкой, прямо перед `SUBMIT_ORDER`** (рабочее плечо
-динамическое — зажато лимитом риска, меняется от сделки к сделке; без записи
-ордер уйдёт со стейл-плечом). Операция **idempotent**: совпадает с уже
-выставленным → пустая. Хранимое `Instrument.leverage` — потолок/умолчание,
-не источник рабочего. Запись плеча — через `IntegrationService` (граница к
-бирже); конкретное представление (отдельная команда `SET_LEVERAGE` vs
-inline-write адаптера) — деталь `CODE`. Остаток INSTR-Q2 продвинут
+**Set-leverage перед постановкой (INSTR-Q2 — закрыт).** Рабочее плечо пишется
+на биржу **перед постановкой открывающего ордера** (рабочее плечо динамическое —
+зажато лимитом риска, меняется от сделки к сделке; без записи ордер уйдёт со
+стейл-плечом). Операция **idempotent**: совпадает с уже выставленным → пустая.
+Хранимое `Instrument.leverage` — потолок/умолчание. Запись — через
+`IntegrationService` (граница к бирже).
+
+**Представление решено (as-built шага 6): inline-write в submit-executor'е — не
+отдельная команда `SET_LEVERAGE` и не запись в handler'е.** Плечо пишет
+`SubmitOrderExecutor` (`ensureLeverage`) прямо перед place-вызовом: co-located с
+постановкой (атомарно, непропускаемо, покрывает и наращивание позиции в
+`MANAGING`); только для открывающих ордеров (reduce-only пропускается); из
+`Instrument.leverage` (null → пропуск); неуспех → `ExchangeIntegrationException`.
+**Сам `PrecheckHandler` плечо не пишет.** Спецификация —
+`docs/components/SubmitOrderExecutor.md`. INSTR-Q2 закрыт
 (`docs/decisions/instrument-external-rules-materialization.md`,
 `docs/decisions/per-trade-risk-policy.md`).
 
@@ -76,8 +84,10 @@ inline-write адаптера) — деталь `CODE`. Остаток INSTR-Q2 
 Entry action материализован в локальный `Order`; **резолвимая защита
 risk-creating входа подтверждена** (attached SL / иной стоп — без неё entry
 не выпускается, `docs/rules/risk-creating-entry-protection.md`); рабочее
-плечо выставлено на бирже под расчёт; `DealActionState` →
-`RuntimeTarget(ORDER, orderId)`; order создан/отправлен; нет критичных
+плечо под расчёт пишет inline `SubmitOrderExecutor` перед постановкой
+открывающего ордера (не handler — см. §«Set-leverage перед постановкой»);
+`DealActionState` → `RuntimeTarget(ORDER, orderId)`; order создан/отправлен;
+нет критичных
 конфликтов; нет риска под kill-switch. → `PRECHECK → ENTRY_SUBMITTED`.
 
 ## Допустимые StrategyStep / возможные ServiceCommand

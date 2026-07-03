@@ -54,9 +54,11 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
 
 Принцип границы (CMD-Q6, `docs/decisions/action-orchestration-vs-command.md`):
 *действие-оркестрация* (REPLACE) — многошаговая последовательность, ведомая
-петлёй по фактам; *команда-с-внутренними-шагами* (`KILL_SWITCH`) — доводит
-свой teardown сама, не завися от исправности петли, и потому остаётся
-**командой** (`docs/components/KillSwitchExecutor.md`), а не действием петли.
+петлёй по фактам; *kill-switch* — не команда петли и не действие-оркестрация,
+а аварийный side-executor вне реестра (`KillSwitchExecutor`), исполняемый
+реактивно через `SafetyHoldCoordinator`: синхронный self-contained teardown,
+не завися от исправности петли (природа CMD-Q6-исключения —
+`docs/components/KillSwitchExecutor.md`).
 
 ## Влияние стратегии
 

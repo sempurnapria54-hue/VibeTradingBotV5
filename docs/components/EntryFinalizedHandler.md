@@ -36,8 +36,8 @@ step или его условие не сработало) — переход в
 order несёт активную приложенную защиту** (`Order.hasActiveAttachedProtection()`
 — active-like состояние защиты, не просто наличие attached algo). Иначе
 позиция с live risk без резолвимой защиты = бесстоповая постфактум → `ERROR`
-+ L3-холд инструмента (`markErrorStopless`, §8.C
-`docs/rules/instrument-hold.md`).
++ L3-холд инструмента (`markErrorStopless`;
+`docs/rules/instrument-hold.md`, `docs/rules/risk-creating-entry-protection.md`).
 
 ## Выходные проверки
 

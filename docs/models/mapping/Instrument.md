@@ -49,7 +49,9 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 (риск-преконтроль), вне оркестрации рыночных данных шага 1
 (`docs/decisions/instrument-external-rules-materialization.md`, закрыт
 INSTR-Q1). Роль `externalLeverage`/биржевой потолок плеча — там же
-(остаток INSTR-Q2 — только тайминг set-leverage, форвард к шагу 6).
+(INSTR-Q2 закрыт на шаге 6: рабочее плечо пишется inline в
+`SubmitOrderExecutor` перед постановкой открывающего ордера,
+`docs/components/SubmitOrderExecutor.md`).
 
 ## OKX
 

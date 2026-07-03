@@ -32,6 +32,13 @@ Enforcement: проверки плеча/маржи/borrow — risk-layer (`Risk
 `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
 `MARGIN_MODE_NOT_ISOLATED`, `BORROW_OR_DEBT_DETECTED`, см.
 `docs/components/models/RiskCheckResult.md`); «одна позиция/инструмент»,
-«чужой live risk» — `docs/components/AnomalyJob.md`. OKX-константы
+«чужой live risk» — `docs/components/AnomalyJob.md`. «Одна активная сделка
+на инструмент» энфорсится двухуровнево: **app-gatekeeper (primary)** —
+`EntryScannerJob`/`DealOpeningService` (проверка `existsActiveByInstrumentId`
+перед открытием) — плюс **DB partial-unique (defense-in-depth)** — частичный
+уникальный индекс `uk_deal_active_instrument` по активным статусам (любой
+`Deal.Status` кроме `CLOSED`/`EMERGENCY_CLOSED`; см.
+`docs/models/domain/aggregate/Deal.md` §Персистентность); нарушения инварианта
+детектит `AnomalyJob`. OKX-константы
 `tdMode=isolated`/`posSide=net` — adapter (см.
 `docs/models/mapping/Order.md`).

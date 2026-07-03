@@ -88,10 +88,13 @@ INSTR-Q2 — тайминг set-leverage, форвард к шагу 6).
 решение `docs/decisions/action-orchestration-vs-command.md`). Сняты с TBD
 error-политика (`docs/rules/error-handling-policy.md`) и форвард-долг
 бесстопового risk-creating входа
-(`docs/rules/risk-creating-entry-protection.md`). **Продвинуты**:
-INSTR-Q2-остаток (тайминг/владелец set-leverage решены — `PRECHECK` перед
-ордером, idempotent) и CMD-Q4 (Precheck-часть закрыта инструмент-скоупным
-read вне command-layer; orphan-часть — шаг 8). **HOLD-Q1**
+(`docs/rules/risk-creating-entry-protection.md`). **Закрыт INSTR-Q2**
+(остаток — представление write плеча: решено — inline-write в
+`SubmitOrderExecutor` перед постановкой открывающего ордера, только для
+открывающих, reduce-only пропускается, idempotent; as-built шага 6,
+`docs/components/SubmitOrderExecutor.md`). **Продвинут CMD-Q4** (Precheck-часть
+закрыта инструмент-скоупным read вне command-layer; orphan-часть — шаг 8).
+**HOLD-Q1**
 (L4-доминирование controlled-violation: любой `ControlledExchangeException`
 на одной сделке гасит всю биржу), открытый на доработке холд-дельты шага 6
 (2026-06-24), **закрыт** на заходе 1 разбора находок (2026-06-30) решением
@@ -113,34 +116,6 @@ read вне command-layer; orphan-часть — шаг 8). **HOLD-Q1**
   `.claude/decisions/master-index-not-fixated.md` (2026-05-27).
 
 ## Открытые продуктовые вопросы
-
-### INSTR-Q2. Тайминг выставления плеча на бирже (set-leverage) — продвинут (шаг 6)
-
-Большая часть INSTR-Q2 закрыта на `GAPS_CLOSE_1` шага 5: роль биржевого
-потолка плеча (авторитет — `InstrumentExternalRules.externalMaxLeverage`,
-дубль с `Instrument.externalLeverage` — мелкая чистка), отсутствие нашего
-кэпа плеча (плечо связано лимитом риска) и снятие `HOLD`-по-нарушению-плеча
-— решения `docs/decisions/instrument-external-rules-materialization.md` и
-`docs/decisions/per-trade-risk-policy.md`.
-
-**Продвинут на `GAPS_CLOSE_1` шага 6 (2026-06-22).** Тайминг/владелец
-решены: рабочее плечо пишется на биржу **перед каждой сделкой, на этапе
-`PRECHECK`, прямо перед постановкой ордера** (idempotent: совпадает →
-пустая операция; динамическое плечо иначе уйдёт стейл). Владелец write —
-`PrecheckHandler` через `IntegrationService`. Хранимое
-`Instrument.leverage` (`Integer`) — **потолок/умолчание**, не источник
-рабочего плеча (`docs/components/PrecheckHandler.md`,
-`docs/decisions/per-trade-risk-policy.md`).
-
-**Остаток (CODE-деталь):** конкретное представление write плеча —
-отдельная команда `SET_LEVERAGE` vs inline-write адаптера в entry-flow — и
-судьба поля `Instrument.leverage` (оставить как потолок или снять). Шаг 6 не
-блокирует.
-Связано: `docs/models/domain/core/Instrument.md` (`leverage`),
-`docs/components/PrecheckHandler.md`,
-`docs/lifecycles/Instrument.md`,
-`docs/decisions/per-trade-risk-policy.md`,
-`docs/decisions/instrument-external-rules-materialization.md`.
 
 ### ORCH-Q1. Владелец оркестрации онбординга инструмента и загрузки свечей
 

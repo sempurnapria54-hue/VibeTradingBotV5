@@ -27,6 +27,7 @@ Java-модель, наследует поля аудита от `Auditable`.
 | `internalId` | `String` | да | Межсервисный идентификатор отчёта. |
 | `exchangeId` | `Long` | да | Биржа, на которой обнаружена аномалия. |
 | `instrumentId` | `Long` | нет | Инструмент; `null`, если однозначно не определён. |
+| `scope` | `HoldScope` | да | Скоуп реакции: `INSTRUMENT` (L3) / `EXCHANGE` (L4); снимает неоднозначность `instrumentId = null`. Общий enum с `HoldSignal` (дом — `docs/components/models/HoldSignal.md`). |
 | `status` | `Status` | да | Текущий статус обработки (см. lifecycle). |
 | `severity` | `Severity` | да | Критичность аномалии. |
 | `code` | `String` | да | Машинно-читаемый код аномалии. |
@@ -60,6 +61,10 @@ Enforcement — на стороне Instrument/Exchange-слоя (форвард
   бирже.
 - `instrumentId` nullable — аномалия может относиться к внешней
   сущности, для которой локальный инструмент не определён.
+- `scope` (`HoldScope`: `INSTRUMENT` = L3 / `EXCHANGE` = L4) явно кодирует
+  уровень реакции и снимает неоднозначность `instrumentId = null` (биржа-
+  широкий скоуп vs неопределённый инструмент). Enum общий с `HoldSignal`
+  (сигнал из прохода) — дом енума `docs/components/models/HoldSignal.md`.
 - `severity` и `code` — независимые измерения: `severity` —
   уровень опасности, `code` — конкретный тип аномалии.
 - `message` заполняется только одновременно с `status = ERROR`,
