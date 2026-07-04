@@ -21,17 +21,24 @@ deep-архив дистиллирован).
 ## Контекст
 
 Native responses —
-`docs/models/integrations/okx/OkxAccountBillResponse.md`. Persisted
-сущность `AccountBill` / `DealCashFlow` не введена — см. **OKX-Q3** в
-`.claude/work/questions/open-questions.md`.
+`docs/models/integrations/okx/OkxAccountBillResponse.md`. Доменный носитель
+разбивки — `DealCashFlow` (**OKX-Q3 закрыт**: bills — **категорийная разбивка
++ сверка**, не первоисточник числа; заголовочное `Deal.resultProfit` = net из
+positions-history, `docs/decisions/result-profit-source.md`). Структура
+`DealCashFlow` и маппинг bills → домен —
+`docs/models/domain/other/DealCashFlow.md`,
+`docs/models/mapping/DealCashFlow.md`.
 
 Различие fills и bills:
 - **Fill** — факт исполнения ордера (что произошло на рынке).
 - **Bill** — запись движения денег по аккаунту (что изменило баланс).
 
-Для финального PnL сделки bills могут быть **полнее**, потому что
-покрывают и funding, и rebate, и другие cashflow, не привязанные
-напрямую к executions.
+Bills покрывают и funding, и rebate, и другие cashflow, не привязанные
+напрямую к executions — поэтому дают **категорийную разбивку** результата
+(торговая комиссия / funding / rebate / ликвидационный штраф). Само
+**число** `resultProfit` берётся готовым net'ом из positions-history
+(`realizedPnl`), а сумма bills-flows **сверяется** с ним (контроль
+целостности), не подменяет его.
 
 ## Endpoints
 
@@ -67,32 +74,46 @@ Native responses —
 
 ## Использование (намерение, не текущая реализация)
 
+Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsExecutor`):
+пагинация `7d → 3m` (`bills` → `bills-archive`) проходится **внутри
+команды**; результат наполняет доменный носитель разбивки `DealCashFlow`
+(`docs/models/domain/other/DealCashFlow.md`).
+
 ```text
 1. Определить окно сделки:
    - begin = время первого подтверждённого entry/execution/cashflow факта;
    - end   = время последнего exit/finalization факта.
 
-2. Запросить bills:
+2. Запросить bills (пагинация 7d→3m внутри REFRESH_BILLS):
    GET /api/v5/account/bills?instType=SWAP&ccy=USDT&begin=...&end=...
 
-3. Отфильтровать в коде:
+3. Линковка к сделке (bills НЕ несут dealId) — по окну + инструменту + валюте:
+   - ts   ∈ [begin, end] окна сделки;
    - instId == Deal.instrument.externalId;
-   - ccy   == Deal.resultProfitCurrency;
-   - type/subType относятся к PnL / fee / rebate / funding.
+   - ccy   == Deal.resultProfitCurrency.
+   Выход матчинга закрепляется как DealCashFlow.deal_id при сохранении.
 
-4. Сохранить как DealCashFlow.
+4. Сохранить как DealCashFlow (категорийная разбивка); резолв категории
+   (type/subType → CashFlowCategory) — при финализации, в вызывающем коде.
 
-5. Расчёт итога (шаг 7):
-   Deal.resultProfit = sum(DealCashFlow.amount)
+5. Сверка (при финализации):
+   sum(DealCashFlow.amount) сверяется с net из positions-history
+   (realizedPnl). Заголовочное Deal.resultProfit = net из positions-history,
+   НЕ sum(bills); bills — разбивка + контроль целостности.
+   Расхождение сверх epsilon и cross-ccy (например комиссия в OKB,
+   ccy != resultProfitCurrency) → AnomalyReport (аудит-аномалия, НЕ блок
+   финализации; см. pnl-finalization-mechanics.md реш.5). Cross-ccy движение
+   не отбрасывается молча фильтром — помечается.
 ```
 
-> **Граница 6 ↔ 7.** *Расчёт* `Deal.resultProfit` относится к **шагу 7**
-> (P&L, OKX-Q3), **не** внутрь `FINALIZE_DEAL_EXIT`. Механика финализации
-> шага 6 (`docs/components/FinalizeDealExitExecutor.md`,
-> `docs/components/MarkDealClosedExecutor.md`) консолидирует факты и ставит
-> терминал; саму сумму считает шаг 7. Терминальный контракт (что с числом
-> при неисчислимой прибыли) — `docs/lifecycles/Deal.md` §«Терминальный
-> контракт финализации» (DEAL-Q2).
+> **Граница 6 ↔ 7 и источник числа.** Само **число** `Deal.resultProfit` =
+> net из positions-history (`realizedPnl`), **не** `sum(DealCashFlow.amount)`
+> (`docs/decisions/result-profit-source.md`). *Расчёт* (число + разбивка +
+> сверка) — **шаг 7**, владелец `FinalizeDealExitExecutor`; запись на
+> терминале — `MarkDealClosedExecutor`. Механика финализации шага 6 поставила
+> ребро/retry/placeholder ZERO; шаг 7 наделяет её расчётом. Терминальный
+> контракт (число на аварийном терминале — фактический net) —
+> `docs/lifecycles/Deal.md` §«Терминальный контракт финализации» (DEAL-Q2).
 
 Применимо к окнам ≤ 3 месяцев (`bills-archive`).
 

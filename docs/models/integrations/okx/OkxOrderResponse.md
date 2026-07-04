@@ -74,9 +74,10 @@ Mapping в `OrderExternalSnapshot` и далее в `Order` —
 
 `ccy` (валюта маржи; adapter использует USDT-policy), `lever` (плечо;
 сверка против биржевого максимума `externalMaxLeverage`), `fillPx`/`fillSz`/`fillTime`/
-`tradeId` (поля «последнего исполнения» — факт собирается через
-fills, `docs/models/mapping/TradeFill.md`), `feeCcy`/`rebate`/
-`rebateCcy`/`pnl` (для итоговой аналитики через fills/finalization),
+`tradeId` (поля «последнего исполнения»; order-level fill-факты берутся из
+used-полей `accFillSz`/`avgPx`, отдельный fills-DTO не нужен),
+`feeCcy`/`rebate`/`rebateCcy`/`pnl` (realized-аналитика — из
+positions-history/bills, не из этого DTO),
 `tag` (метка; диагностика), `source`/`cancelSource`/
 `cancelSourceReason`/`category` (`normal`/`adl`/`liquidation`/
 `delivery`/`twap`/...; диагностика), `stpMode`/`stpId` (self-trade

@@ -16,8 +16,8 @@ DEAL-Q1).
 `DealFinalizationState` — **persisted** операционная модель
 runtime-состояния выполнения одной **финализационной команды**
 (lifecycle/system action) в рамках `Deal`: `FINALIZE_DEAL_ENTRY`,
-`FINALIZE_DEAL_EXIT`, `MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`
-(`docs/components/models/ServiceCommand.md`). Несёт
+`FINALIZE_DEAL_EXIT`, `MARK_DEAL_CLOSED`, `MARK_DEAL_EMERGENCY_CLOSED`,
+`MARK_DEAL_ERROR` (`docs/components/models/ServiceCommand.md`). Несёт
 идемпотентность/recovery/retry финализационного контура там, где
 `DealActionState` не подходит: финализация **не привязана к
 `StrategyAction`** (нет `strategyActionId`), а её команды многокомандны и
@@ -56,8 +56,12 @@ jsonb). Авторитет предела повторов — policy (живь�
 ### `DealFinalizationType`
 
 - `FINALIZE_ENTRY` — консолидация результата входа (`FINALIZE_DEAL_ENTRY`).
-- `FINALIZE_EXIT` — консолидация фактов штатного выхода (`FINALIZE_DEAL_EXIT`).
+- `FINALIZE_EXIT` — консолидация фактов штатного выхода **и расчёт числа
+  `resultProfit`** (`FINALIZE_DEAL_EXIT`; шаг 7 — см. §«Чего не хранит»).
 - `MARK_CLOSED` — терминальное ребро штатного закрытия (`MARK_DEAL_CLOSED`).
+- `MARK_EMERGENCY_CLOSED` — терминальное ребро аварийного закрытия
+  `ERROR → EMERGENCY_CLOSED` (`MARK_DEAL_EMERGENCY_CLOSED`, симметрично
+  `MARK_CLOSED`; `docs/decisions/pnl-finalization-mechanics.md` реш.3).
 - `MARK_ERROR` — пометка ошибочного состояния сделки (`MARK_DEAL_ERROR`).
 
 (1:1 с финализационными значениями `ServiceCommandType`.)
@@ -101,8 +105,14 @@ jsonb). Авторитет предела повторов — policy (живь�
 
 ## Чего не хранит
 
-- Расчёт `resultProfit`/breakdown PnL — у `Deal` (поле) и контура шага 7;
-  `DealFinalizationState` несёт только retry-state механики финализации.
+- Расчёт `resultProfit`/breakdown PnL — у `FinalizeDealExitExecutor` (шаг 7,
+  `docs/decisions/result-profit-source.md`). **Число durable-хранится полем
+  `Deal.resultProfit`** — `FINALIZE_DEAL_EXIT` пишет его на `Deal` в **одной
+  транзакции** с `DealFinalizationState(FINALIZE_EXIT) = COMPLETED` (носитель
+  staged-числа = само поле `Deal`, рестарт-safe; N7,
+  `docs/decisions/pnl-finalization-mechanics.md` реш.2).
+  `DealFinalizationState` P&L-число **не несёт** — только retry-state механики
+  финализации.
 - Историю исполнения команд (audit/timeline — отдельный слой, не runtime,
   `docs/rules/audit-not-runtime-source.md`).
 - Параметры команды (живут в `ServiceCommandPayload` runtime, не

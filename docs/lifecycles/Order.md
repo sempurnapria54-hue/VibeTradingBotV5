@@ -17,7 +17,7 @@
 `docs/rules/external-status-resolution.md`).
 
 > Resolver'ы, refresh-executors и команды (`REFRESH_ORDER`,
-> `REFRESH_FILLS`, `SUBMIT_ORDER`, `CANCEL_ORDER`) —
+> `SUBMIT_ORDER`, `CANCEL_ORDER`) —
 > command-подсистема (шаг 4): `docs/components/` (executors, resolver'ы),
 > `docs/rules/command-lifecycle.md`. Амендной команды нет —
 > ремоделирование через REPLACE-оркестрацию
@@ -94,13 +94,13 @@ parent CREATED / PENDING
 
 parent ACTIVE / PARTIALLY_COMPLETED
   -> дополнительный search-cycle (REFRESH_ORDER — внутр. pending/history,
-     REFRESH_FILLS, REFRESH_POSITION);
+     REFRESH_POSITION);
      не делаем вывод по одному snapshot.
 
 parent COMPLETED
   -> если позиция active и standalone main protection отсутствует:
        attached -> ERROR, closeReason = PROTECTION_LOST, Deal -> ERROR.
-  -> если позиция закрыта — анализ fills/history:
+  -> если позиция закрыта — анализ order-history / фактов позиции:
        attached сработал -> COMPLETED / TRIGGERED;
        закрыта иначе      -> CANCELED / UNKNOWN;
        непонятно          -> ERROR / UNKNOWN.
@@ -124,8 +124,10 @@ parent ERROR
     pending — **не** финальный факт отмены/исполнения;
   - `orders-history` (+ archive) — terminal-факт (COMPLETED / CANCELED /
     ERROR при нераспознанном статусе), когда не найден среди pending.
-- **`REFRESH_FILLS`**: уточняет execution facts (accumulatedFillSize,
-  averagePrice, fee); `Deal` напрямую не обновляет.
+
+  Order-fill-метрики (`accumulatedFillSize`, `averagePrice`, `fee`)
+  приходят в `Order` этим же `REFRESH_ORDER` — готовыми агрегатами из
+  `OkxOrderResponse` (`accFillSz`/`avgPx`); отдельной fill-команды нет.
 
 ## ERROR-переходы (safety cascade)
 

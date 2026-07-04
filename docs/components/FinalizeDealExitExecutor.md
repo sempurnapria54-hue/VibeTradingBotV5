@@ -8,22 +8,39 @@
 ## Назначение
 
 Получает `FINALIZE_DEAL_EXIT` — консолидацию фактов штатного выхода после
-того, как live risk снят. **Читает** подтверждённые факты выхода (`Position`
-закрыта/отсутствует по `REFRESH_POSITION`; нет live orders/algo; fills
-загружены по `REFRESH_FILLS`, если нужны для PnL; `Deal.CloseReason`
-определён). **Пишет** консолидированный результат выхода на runtime graph
-сделки (готовит её к терминальному `MARK_DEAL_CLOSED`) и
-`DealFinalizationState(FINALIZE_EXIT).status = COMPLETED`. На биржу сам не
-ходит; `RiskValidator` не вызывается (`docs/rules/risk-validator-scope.md`).
+того, как live risk снят, **и расчёт итогового `resultProfit`** (шаг 7).
+**Читает** подтверждённые факты выхода (`Position` закрыта/отсутствует по
+`REFRESH_POSITION`; нет live orders/algo; `Deal.CloseReason` определён) плюс
+P&L-факты, добытые **до него** командами (реш.1
+`docs/decisions/pnl-finalization-mechanics.md`): `PositionCloseResultExternalSnapshot`
+(готовый net `realizedPnl` — `REFRESH_POSITIONS_HISTORY`) и `DealCashFlow`
+(категорийная разбивка — `REFRESH_BILLS`). **Вычисляет** net-число + сверяет
+сумму `DealCashFlow` с net (`docs/decisions/result-profit-source.md`); **пишет
+`resultProfit`/`resultProfitCurrency` прямо на `Deal`** (persisted) в **одной
+транзакции** с `DealFinalizationState(FINALIZE_EXIT).status = COMPLETED` (N7 —
+durable-носитель числа = поле `Deal`, рестарт-safe). На биржу **сам не ходит**
+— P&L-факты приходят готовыми снапшотами от refresh-команд; `RiskValidator` не
+вызывается (`docs/rules/risk-validator-scope.md`).
 
-## Граница 6 ↔ 7 (расчёт прибыли)
+## Расчёт прибыли (шаг 7) и сверка
 
-**Расчёт `Deal.resultProfit` сюда не входит** — он отнесён к **шагу 7**
-(граница 6 ↔ 7, 2026-06-21; `docs/lifecycles/Deal.md` §Терминальный
-контракт финализации, `docs/integrations/okx/contracts/account-bills.md`).
-Шаг 6 — *механика* финализации (retry-state, терминальное ребро, триггер,
-идемпотентность); сам PnL-расчёт (`sum(DealCashFlow.amount)` и т. п.) — шаг
-7 (OKX-Q3 / DEAL-Q2).
+**Расчёт `Deal.resultProfit` — здесь.** Шаг 6 поставил *механику* финализации
+(retry-state, терминальное ребро, триггер, идемпотентность) и
+интерим-placeholder ZERO; шаг 7 наделяет `FINALIZE_DEAL_EXIT` **расчётом и
+записью числа** на `Deal`: net из `PositionCloseResultExternalSnapshot` +
+разбивка из `DealCashFlow` + сверка. `MARK_DEAL_CLOSED`
+(`MarkDealClosedExecutor`) число **не пишет** — читает готовое `Deal.resultProfit`,
+ассертит непустоту и ставит терминал `CLOSED` (N7). Placeholder ZERO снят.
+- **Сверка bills ↔ net (N10):** число **всегда** = positions-history net (bills
+  его не подменяют). Расхождение **сверх epsilon** или cross-ccy движение
+  (`ccy ≠ resultProfitCurrency`, напр. комиссия в OKB) → **`AnomalyReport`**
+  (аудит-аномалия, `scope = INSTRUMENT`) — **не блокирует** финализацию, сделка
+  идёт в `CLOSED` с net-числом (`docs/decisions/pnl-finalization-mechanics.md`
+  реш.5).
+- Внутренняя декомпозиция расчёта (выделять ли отдельный калькулятор) — деталь
+  CODE шага 7. Структуры носителей —
+  `docs/models/mapping/PositionCloseResult.md`,
+  `docs/models/domain/other/DealCashFlow.md`.
 
 ## Терминальное ребро
 

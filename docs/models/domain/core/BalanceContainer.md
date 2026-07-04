@@ -184,9 +184,9 @@ normalized snapshot → domain.
 
 ## Расчёт PnL — не здесь
 
-Итоговый `Deal.resultProfit` **не** считается по balance diff; он
-считается через `REFRESH_FILLS` и факты исполнений (правило
-принадлежит `Deal` — см. `.claude/decisions/rule-source-of-truth.md`;
-форвард-заметка для миграции Deal — в task-вопросах).
-`REFRESH_BALANCE` после выхода из сделки нужен для актуального account
-snapshot, а не для расчёта PnL сделки.
+Итоговый `Deal.resultProfit` **не** считается по balance diff;
+заголовочное число = net `realizedPnl` из positions-history, категорийная
+разбивка — из bills (правило принадлежит `Deal` — см.
+`.claude/decisions/rule-source-of-truth.md`,
+`docs/decisions/result-profit-source.md`). `REFRESH_BALANCE` после выхода из
+сделки нужен для актуального account snapshot, а не для расчёта PnL сделки.

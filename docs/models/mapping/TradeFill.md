@@ -1,21 +1,23 @@
-# TradeFill — mapping между слоями (стаб)
+# TradeFill — mapping между слоями (стаб; OKX-Q1 закрыт — не вводится)
 
 ## На какой вопрос отвечает этот файл
 
-Как нативные fills источников ложатся на доменный `TradeFill`,
-если он будет введён.
+Как нативные fills источников легли бы на доменный `TradeFill`,
+если бы он вводился (в фазе 1 — не вводится).
 
 ## Статус
 
-**Стаб.** `TradeFill` как persisted entity на первом этапе **не
-введён** (см. **OKX-Q1** в
-`.claude/work/questions/open-questions.md`). `RefreshFillsExecutor`
-агрегирует filled-метрики в существующие `Order`/`AlgoOrder`/
-`Position` без отдельной persisted-сущности
-(`docs/components/RefreshFillsExecutor.md`).
+**Закрыт (не вводится).** `TradeFill` как persisted entity в фазе 1 **не
+материализуется** — **OKX-Q1 закрыт** на `GAPS_CLOSE_1` шага 7 (2026-07-03,
+`docs/decisions/result-profit-source.md`): пофилловый аудит вне фазы 1;
+число `resultProfit` берётся net'ом из positions-history, разбивка — из bills
+(`DealCashFlow`), fills для этого не нужны. Order-fill-метрики
+(`accFillSz`/`avgPx`) агрегируются в `Order` прямо из `OkxOrderResponse` при
+`REFRESH_ORDER`; отдельная команда `REFRESH_FILLS` и её executor **сняты** на
+шаге 7 (`docs/decisions/pnl-finalization-mechanics.md` реш.1).
 
-Файл создан как placeholder для будущего mapping при материализации
-`TradeFill` (после закрытия OKX-Q1).
+Файл оставлен как исторический стаб; при будущей потребности в пофилловой
+модели (вне фазы 1) mapping заполняется здесь.
 
 ## Контекст
 
@@ -32,13 +34,11 @@
 - `ordId` ↔ известный `Order.externalId` /
   `AlgoOrder.linkedOrderExternalIds`;
 - `clOrdId` ↔ `Order.internalId`;
-- Совокупный `fillSz`, `fillPx`, `fee` по `ordId` агрегируется в
-  `Order` (`accumulatedFillSize`, `averagePrice`, накопленная `fee`)
-  при refresh-контуре; ack-not-runtime-truth применяется
+- Order-fill-метрики (`accumulatedFillSize`, `averagePrice`, `fee`)
+  приходят в `Order` **готовыми агрегатами** прямо из `OkxOrderResponse`
+  (`accFillSz`/`avgPx`/`fee`) при `REFRESH_ORDER` — отдельного прохода по
+  fills не нужно; ack-not-runtime-truth применяется
   (`docs/rules/ack-not-runtime-truth.md`).
-- Идемпотентность `RefreshFillsExecutor` гарантирует, что повторный
-  вызов не задваивает агрегаты
-  (`docs/components/RefreshFillsExecutor.md`).
 
 ## OKX (отложено)
 

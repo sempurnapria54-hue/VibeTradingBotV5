@@ -23,9 +23,12 @@ GET /trade/order            (по ordId; нет externalId → по clOrdId)
 
 Сам выносит терминал: не найден после **полного** цикла →
 `ExternalNotFoundException` → `Order.ERROR` + `MISSING_AFTER_REFRESH`
-(пустой ответ одного эндпоинта — не основание). Обновляет только `Order`,
-сделку целиком не сопровождает; cross-entity refresh (`REFRESH_FILLS`,
-`REFRESH_POSITION`) — отдельные команды, выбирает FSM / `DealOrchestratorJob`.
+(пустой ответ одного эндпоинта — не основание). Обновляет только `Order` —
+включая order-fill-метрики (`accFillSz` → `accumulatedFillSize`, `avgPx` →
+`averagePrice`, `fee`), которые приходят готовыми из самого этого refresh
+(`OkxOrderResponse`), отдельной fill-команды нет. Сделку целиком не
+сопровождает; cross-entity refresh (`REFRESH_POSITION`) — отдельная команда,
+выбирает FSM / `DealOrchestratorJob`.
 Pending/history-эндпоинты — звенья этого цикла, не отдельные исполнители
 (`.claude/decisions/executor-payload-file-granularity.md`); их судьба как
 самостоятельных `ServiceCommandType` — CMD-Q3. Владение циклом —

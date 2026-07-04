@@ -33,7 +33,7 @@ Cancel-нога REPLACE отдельной валидации не получа�
 ### Не вызывается
 
 - **refresh/search/history**: `REFRESH_BALANCE`, `REFRESH_POSITION`,
-  `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_FILLS` — только обновляют
+  `REFRESH_ORDER`, `REFRESH_ALGO_ORDER` — только обновляют
   факты (evidence-cycle — внутри исполнителя, см.
   `docs/decisions/refresh-evidence-cycle-ownership.md`);
 - **cleanup / safety**: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`,

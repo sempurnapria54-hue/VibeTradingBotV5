@@ -26,8 +26,11 @@ Refresh при неактуальном состоянии; активный р�
 порядком cleanup-командами (открытая позиция → `CLOSE_POSITION`; live ordinary
 orders → `CANCEL_ORDER`; live algo → `CANCEL_ALGO_ORDER`), затем факт снятия
 подтверждается через `REFRESH_*` (ACK не truth); после safety-flow заново
-загрузить exchange facts; если live risk отсутствует и подтверждён — подготовить
-переход в `EMERGENCY_CLOSED`. Обычные strategy steps не выполняются. Kill-switch
+загрузить exchange facts; если live risk отсутствует и подтверждён — **добыть
+P&L-факты best-effort** (`REFRESH_POSITIONS_HISTORY` — число; опц. `REFRESH_BILLS`
+— разбивка) и терминализировать через **`MARK_DEAL_EMERGENCY_CLOSED`**
+(best-effort число, `docs/decisions/pnl-finalization-mechanics.md` реш.3).
+Обычные strategy steps не выполняются. Kill-switch
 ErrorHandler командой не эмитит: kill-switch — реактивный путь (`HoldSignal` →
 `SafetyHoldCoordinator` в проходе оркестратора), не команда. Safety-команды —
 без `RiskValidator` (см. `docs/rules/risk-validator-scope.md`).
@@ -39,15 +42,19 @@ ErrorHandler командой не эмитит: kill-switch — реактив�
 отсутствует/не влияет; нет pending сущностей, способных создать риск;
 финальные exchange facts подтверждены; сделка не требует FSM-сопровождения.
 Иначе остаётся в `ERROR`. `EMERGENCY_CLOSED` — terminal (ошибочный),
-handler'а не имеет; число `resultProfit` — по терминальному контракту
-финализации (`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»,
-DEAL-Q2), не блокируется инвариантом чистого закрытия.
+handler'а не имеет; терминал ставит `MARK_DEAL_EMERGENCY_CLOSED`
+(`docs/components/MarkDealEmergencyClosedExecutor.md`) с **best-effort числом**:
+фактический realized net если доступен из positions-history, иначе `resultProfit
+= null` с семантикой «неисчислимо» (**не ноль**) — сделка терминализуется всё
+равно, факт помечается (`docs/lifecycles/Deal.md` §«Терминальный контракт
+финализации», DEAL-Q2 / G5).
 
 ## Возможные ServiceCommand
 
 `MARK_DEAL_ERROR`, `REFRESH_POSITION`,
-`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_FILLS`, `CANCEL_ORDER`,
-`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`. Kill-switch не эмитится ErrorHandler'ом
+`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `CANCEL_ORDER`,
+`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`, `REFRESH_POSITIONS_HISTORY`,
+`REFRESH_BILLS`, `MARK_DEAL_EMERGENCY_CLOSED`. Kill-switch не эмитится ErrorHandler'ом
 как команда — реактивный side-executor вне реестра (`HoldSignal` →
 `SafetyHoldCoordinator`). Перечисление **неизвестных** live
 orders/algo по инструменту (хвосты orphan) — CMD-Q4. Зона

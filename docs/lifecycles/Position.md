@@ -118,9 +118,12 @@ Position, Position.dealId = Deal.id
 закрылась по SL/TP/trailing, после рестарта локальной `Position`
 может ещё не быть. Это не anomaly при active `Deal` и известном entry
 order. Recovery-контур (`REFRESH_ORDER` → `REFRESH_POSITION` (null) →
-`REFRESH_ALGO_ORDER` → `REFRESH_FILLS`) — Deal-lifecycle/orchestration;
+`REFRESH_ALGO_ORDER`) — Deal-lifecycle/orchestration;
 полный flow — `docs/processes/deal-management.md` /
-`docs/lifecycles/Deal.md` (шаги 6-7).
+`docs/lifecycles/Deal.md` (шаги 6-7). P&L сделки финализация собирает
+не через fills (число — net из positions-history, разбивка — из bills;
+`docs/decisions/result-profit-source.md`,
+`docs/decisions/pnl-finalization-mechanics.md`).
 Position-правило: локальную `CLOSED Position` можно не создавать, если
 её ещё не было; `Deal` финализируется по собранным фактам.
 

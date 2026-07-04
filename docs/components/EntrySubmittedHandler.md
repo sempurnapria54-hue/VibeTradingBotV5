@@ -22,7 +22,8 @@ attached protection ожидалась — она в entry `Order` или ест
 
 Создан, но не отправлен → `SUBMIT_ORDER`; отправлен, не подтверждён →
 `REFRESH_ORDER` (внутр. цикл order → pending → history); мог исполниться →
-`REFRESH_POSITION`; нужны факты исполнения → `REFRESH_FILLS`. Перед повторным submit — поиск по client id. Если
+`REFRESH_POSITION`. Факты исполнения ордера (`accFillSz`/`avgPx`) — из
+`REFRESH_ORDER`, отдельной fill-команды нет. Перед повторным submit — поиск по client id. Если
 `REFRESH_POSITION` нашёл позицию, а локальной нет — `RefreshPositionExecutor`
 создаёт `Position` и привязывает к `Deal`. Missing attached protection —
 policy по статусу parent `Order` (см. `docs/lifecycles/Order.md`).
@@ -40,5 +41,5 @@ Entry order финализирован; позиция открыта (чере�
 ## Допустимые StrategyStep / возможные ServiceCommand
 
 Steps: `FAIL_SAFE` (новые торговые actions обычно не выбираются). Команды:
-`SUBMIT_ORDER`, `REFRESH_ORDER`, `REFRESH_POSITION`, `REFRESH_FILLS`,
+`SUBMIT_ORDER`, `REFRESH_ORDER`, `REFRESH_POSITION`,
 `REFRESH_BALANCE`, `FINALIZE_DEAL_ENTRY`, `MARK_DEAL_ERROR`.

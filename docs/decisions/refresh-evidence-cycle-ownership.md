@@ -41,6 +41,14 @@ FSM-секвенс отдельных команд.
   3m (`/trade/fills-history`) **внутри команды**. Архив 3m+ (async-флоу) —
   остаётся `OKX-Q2` (шаг 7), не трогаем.
 
+  > **Обновление (шаг 7, `docs/decisions/pnl-finalization-mechanics.md`
+  > реш.1):** `REFRESH_FILLS` **снят** — order-fill-метрики идут из
+  > `OkxOrderResponse` через `REFRESH_ORDER`, fills для P&L не нужны;
+  > его within-command 3d→3m-обход больше не актуален. Ту же within-command
+  > модель **наследует новая `REFRESH_BILLS`**: пагинация bills 7d
+  > (`/account/bills`) → 3m (`/account/bills-archive`) **внутри одной
+  > команды**.
+
 ## Обоснование
 
 - Терминал `MISSING` требует знания «полный цикл исчерпан» — держать это в

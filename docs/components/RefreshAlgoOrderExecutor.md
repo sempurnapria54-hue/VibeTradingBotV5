@@ -25,7 +25,7 @@ GET /trade/order-algo        (по algoId; нет externalId → по algoClOrdI
 Сам выносит терминал: не найден после **полного** цикла →
 `ExternalNotFoundException` → `AlgoOrder.ERROR` + `MISSING_AFTER_REFRESH`
 (архива глубже 3m у algo нет). Обновляет только `AlgoOrder`; cross-entity
-refresh (`REFRESH_ORDER` / `REFRESH_FILLS` / `REFRESH_POSITION`) — отдельные
+refresh (`REFRESH_ORDER` / `REFRESH_POSITION`) — отдельные
 команды, выбирает FSM. Pending/history-эндпоинты — звенья цикла; их судьба
 как самостоятельных `ServiceCommandType` — CMD-Q3. Владение циклом —
 `docs/decisions/refresh-evidence-cycle-ownership.md`. Общая семантика

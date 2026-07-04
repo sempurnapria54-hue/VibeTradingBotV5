@@ -93,8 +93,8 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 | Pending orders | GET `/trade/orders-pending` | есть-док | 🟢 в коде | офдок | `order.md` (звено evidence-cycle); `getPendingOrders` |
 | Order history 7d | GET `/trade/orders-history` | есть-док | 🟢 в коде | офдок | `order.md`; `getOrderHistory` |
 | Order history 3m | GET `/trade/orders-history-archive` | есть-док | 🟢 в коде | офдок | `order.md`; архив 3м, метода клиента нет |
-| Fills 3d | GET `/trade/fills` | есть-док | 🟢 в коде | офдок | `fills.md`, `OkxFillResponse`; `getFills` |
-| Fills 3m | GET `/trade/fills-history` | есть-док | 🟢 в коде | офдок | `fills.md` (звено); `getFillsHistory` |
+| Fills 3d | GET `/trade/fills` | есть-док | ⚪ не-runtime | офдок | `fills.md`, `OkxFillResponse`; **`REFRESH_FILLS` снят** (шаг 7, `pnl-finalization-mechanics.md`) — эндпоинт runtime фазы 1 не используется (order-fill-метрики из `OkxOrderResponse`); контракт справочно |
+| Fills 3m | GET `/trade/fills-history` | есть-док | ⚪ не-runtime | офдок | `fills.md`; **не используется** (`REFRESH_FILLS` снят); справочно |
 | Mass cancel | POST `/trade/mass-cancel` | **вне-периметра** | — | офдок | прогон 3: только MMP-ордера, Option в Portfolio Margin — не кейс SWAP-бота (прежний статус `пробел` снят) |
 | Cancel All After (DMS) | POST `/trade/cancel-all-after` | **создан** | 🟢 в коде | офдок | `cancel-all-after.md`; **В-1** → шаг 8 (safety); метода клиента нет |
 | Order precheck | POST `/trade/order-precheck` | **создан** | 🟢 в коде | офдок | `order-precheck.md`; **В-2** → шаг 5; ⚠ только acctLv 3/4 (MCM/PM); метода клиента нет |
@@ -119,9 +119,9 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 |---|---|---|---|---|---|
 | Get balance | GET `/account/balance` | есть-док | 🟢 в коде | офдок | `balance.md`, `OkxBalanceResponse`; `getBalance` |
 | Get positions | GET `/account/positions` | есть-док | 🟢 в коде | офдок | `position.md`, `OkxPositionResponse`; `getPositions` |
-| Positions history | GET `/account/positions-history` | **обновлён** | 🟢 в коде | офдок | `position.md` §История; **В-3** → шаг 7; пагинация по `uTime`; `realizedPnl=pnl+fee+fundingFee+liqPenalty`; метода клиента нет |
+| Positions history | GET `/account/positions-history` | **обновлён** | 🟢 в коде | офдок | `position.md` §История; **В-3 закрыт**: источник числа `resultProfit` (net `realizedPnl`, + `closeAvgPx`); **`GAPS_CLOSE_2`:** native `OkxPositionsHistoryResponse` создан, снапшот `PositionCloseResult`, команда **`REFRESH_POSITIONS_HISTORY`** (`pnl-finalization-mechanics.md`); инвариант агрегации — рантайм-верификация (N11, `.claude/tests/source-api/okx/plan.md` §AG1); пагинация по `uTime`; метода клиента нет |
 | Account & position risk | GET `/account/account-position-risk` | **создан** | 🟢 в коде | офдок | `account-position-risk.md`; единый временной срез; метода клиента нет |
-| Bills 7d | GET `/account/bills` | есть-док | 🟢 в коде | офдок | `account-bills.md`, `OkxAccountBillResponse`; метода клиента нет |
+| Bills 7d | GET `/account/bills` | есть-док | 🟢 в коде | офдок | `account-bills.md`, `OkxAccountBillResponse`; **`GAPS_CLOSE_2`:** команда **`REFRESH_BILLS`** → `DealCashFlow` (разбивка P&L; `DealCashFlow.md`), линковка по окну+`instId`+`ccy`, дедуп по `billId`; метода клиента нет |
 | Bills archive 3m | GET `/account/bills-archive` | **обновлён** | 🟢 в коде | офдок | `account-bills.md`; поле-уровнево сверен (прогон 3); метода клиента нет |
 | Bills deep-архив (с 2021) | POST+GET `/account/bills-history-archive` | **создан** | 🟢 в коде | офдок | `account-bills.md` §Deep-архив; поквартально, async-файл; 12 заявок/сутки; метода клиента нет. **Success-контракт на demo неверифицируем** (заявка → `50026`, GET → `51604`): прямой кейс проверяется **на проде ад-хок, вне контура** — зелёный контур-тест подтверждает только demo-реджект, не success |
 | Bill types | GET `/account/subtypes` | **создан** | 🟢 в коде | офдок | `account-bills.md` §Справочник bill types; метода клиента нет |
@@ -131,7 +131,7 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 | Leverage info | GET `/account/leverage-info` | **создан** | 🟢 в коде | офдок | `account-config.md`; метода клиента нет |
 | Max order size | GET `/account/max-size` | **создан** | 🟢 в коде | офдок | `max-size.md`; метода клиента нет |
 | Max avail size | GET `/account/max-avail-size` | **создан** | 🟢 в коде | офдок | `max-size.md`; метода клиента нет |
-| Fee rates | GET `/account/trade-fee` | **создан** | 🟢 в коде | офдок | `trade-fee.md`; **В-7** → шаг 7; знак: минус = комиссия; метода клиента нет |
+| Fee rates | GET `/account/trade-fee` | **создан** | 🟢 в коде | офдок | `trade-fee.md`; **В-7 активирован** (G6): ставка прогнозной комиссии в риск-сайзинге; **`GAPS_CLOSE_2`:** дом ставки — `InstrumentExternalRules` (навес, `externalTakerFeeRate`), дочитывает `InstrumentExternalRulesSyncJob`, калькуляторы читают через `CalculationContext` (N9); знак: минус = комиссия; wiring — шаг 7 CODE |
 | Instruments (private) | GET `/account/instruments` | вне-периметра | — | офдок | инвентарь с учётом режима счёта; используем публичный `public/instruments` |
 | Interest / borrow-repay / VIP loan / spot-margin | various | вне-периметра | — | офдок | margin/loan вне скоупа SWAP-бота фазы 1 |
 | Greeks / isolated-mode / MMP / move-positions / collateral / account-mode-switch / прочее сервисное | various | вне-периметра | — | офдок | опционы / PM-сервис / переносы — вне торгового цикла фазы 1 |
@@ -164,8 +164,8 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 | Instruments | GET `/public/instruments` | есть-док | 🟢 в коде | офдок | `instrument.md`, `InstrumentOkxResponse`; `getInstruments` |
 | Mark price | GET `/public/mark-price` | **создан** | 🟢 в коде | офдок | `mark-price.md`; **В-8** → шаг 5; метода клиента нет |
 | Price limit | GET `/public/price-limit` | **создан** | 🟢 в коде | офдок | `price-limit.md`; **В-8** → шаг 5; метода клиента нет |
-| Funding rate | GET `/public/funding-rate` | **создан** | 🟢 в коде | офдок | `funding-rate.md`; **В-6** → шаг 7; интервал по `fundingTime`↔`nextFundingTime`; метода клиента нет |
-| Funding rate history | GET `/public/funding-rate-history` | **создан** | 🟢 в коде | офдок | `funding-rate.md`; В-6 — рядом с OKX-Q3 (два пути к funding в P&L); метода клиента нет |
+| Funding rate | GET `/public/funding-rate` | **создан** | 🟢 в коде | офдок | `funding-rate.md`; **В-6/OKX-Q3 разрешены** (GAPS_CLOSE_1 шага 7): funding в P&L — через bills + positions-history, не через ставки; интервал по `fundingTime`↔`nextFundingTime`; метода клиента нет |
+| Funding rate history | GET `/public/funding-rate-history` | **создан** | 🟢 в коде | офдок | `funding-rate.md`; **не источник числа** `resultProfit` (funding — через bills/positions-history, `result-profit-source.md`); лишь прогноз/сверка; метода клиента нет |
 | Open interest | GET `/public/open-interest` | **создан** | 🟢 в коде | офдок | `open-interest.md`; метода клиента нет |
 | Position tiers | GET `/public/position-tiers` | **создан** | 🟢 в коде | офдок | `position-tiers.md`; **находка прогона 3:** путь public, не `account/` (сторонний скелет ошибался); метода клиента нет |
 | Server time | GET `/public/time` | **создан** | 🟢 в коде | офдок | `server-time.md`; синхронизация подписи; метода клиента нет |

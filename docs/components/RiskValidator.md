@@ -26,10 +26,11 @@
 
 ## Метрики (считает сам)
 
-risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal`;
-**commissions в фазе 1 опущены** — согласовано с `SizeCalculator`; учёт
-комиссий сводится на шаге 7 с fee-моделью, см.
-`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий — отложен к шагу 7»);
+risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal +
+commissions`, где `commissions` — прогноз вход+выход по taker-ставке из
+`instrumentExternalRules.takerFeeRate()` (навес инструмента, N9 — не отдельный
+fetch); **включён с шага 7** (G6), согласовано с `SizeCalculator`, см.
+`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий (включён на шаге 7)»);
 **risk percent от свободного депозита** (база —
 `BalanceContainer.externalAvailableEquity`, не total/adjusted, см.
 `docs/decisions/per-trade-risk-policy.md`); SL distance; liquidation guard

@@ -9,11 +9,12 @@
 ## Назначение
 
 Получает `MARK_DEAL_CLOSED` — **терминальное ребро штатного закрытия**.
-**Читает** подтверждённое отсутствие live risk и готовый результат
-финализации выхода (`FinalizeDealExitExecutor`). **Пишет** терминал
-`Deal.status = CLOSED` с обязательными `resultProfit` /
-`resultProfitCurrency` и `DealFinalizationState(MARK_CLOSED).status =
-COMPLETED`. `RiskValidator` не вызывается
+**Читает** подтверждённое отсутствие live risk и **уже записанное на `Deal`**
+число `resultProfit`/`resultProfitCurrency` (его пишет `FinalizeDealExitExecutor`
+на шаге 7 — N7). **Ассертит** непустоту числа (инвариант чистого `CLOSED`) и
+**пишет** терминал `Deal.status = CLOSED` + `DealFinalizationState(MARK_CLOSED).status =
+COMPLETED`. Само число `MARK_DEAL_CLOSED` **не вычисляет и не пишет** — оно
+durable-живёт полем `Deal` от `FINALIZE_EXIT`. `RiskValidator` не вызывается
 (`docs/rules/risk-validator-scope.md`).
 
 ## Терминальное ребро
@@ -24,31 +25,32 @@ handler'а не имеет; обязательны `resultProfit`/`resultProfitC
 live risk (иначе — не терминализирует, остаётся в `EXIT_PENDING`/уходит в
 `ERROR`).
 
-## Обязательный resultProfit и контракт неисчислимой прибыли (DEAL-Q2)
+## resultProfit на терминальном ребре и контракт неисчислимой прибыли (DEAL-Q2)
 
-- *Сам расчёт* `resultProfit` — **шаг 7** (граница 6 ↔ 7); `MARK_DEAL_CLOSED`
-  механики шага 6 обязан **удовлетворить инвариант** наличия числа на
-  чистом терминале, не вычислять его внутри себя.
-- **Как шаг 6 удовлетворяет инвариант — интерим-placeholder ZERO.** Executor
-  пишет **явный механический placeholder** `resultProfit = BigDecimal.ZERO` +
-  `resultProfitCurrency = settleCurrency` (settle-валюта резолвится из
-  `BalanceContainer`), чтобы на чистом терминале было число до расчёта шага 7.
-  Placeholder помечен как интерим; **шаг 7** (`REFRESH_FILLS` / `TradeFill`)
-  **заменит** его расчётным PnL. Это задокументированный интерим, **не**
-  молчаливый ZERO-fallback: если settle-валюта **не резолвится** — executor
-  **кидает failure** (`VALIDATION_ERROR`), а не садит тихий ZERO (уход на
-  retry/ошибочную тропу — ниже). Разграничение placeholder vs error-fallback —
-  `docs/models/domain/aggregate/Deal.md` §«Итоговый PnL».
+- **Расчёт и запись числа** `resultProfit` — **шаг 7**, владелец
+  `FinalizeDealExitExecutor` (net из `PositionCloseResultExternalSnapshot` +
+  разбивка `DealCashFlow` + сверка; пишет число **на `Deal`**,
+  `docs/decisions/result-profit-source.md`,
+  `docs/decisions/pnl-finalization-mechanics.md` реш.2). `MARK_DEAL_CLOSED`
+  **число не считает и не пишет** — **читает `Deal.resultProfit`, ассертит
+  непустоту** и ставит терминал `CLOSED` (N7).
+- **Step-6 → step-7 переход (placeholder снят).** Механика шага 6 писала
+  на терминале интерим-placeholder `resultProfit = BigDecimal.ZERO`, чтобы
+  удовлетворить инвариант «на чистом `CLOSED` число обязательно» до расчёта
+  шага 7. **Шаг 7 снимает placeholder**: число считает и пишет `FINALIZE_EXIT`
+  (реальный net), а `MARK_DEAL_CLOSED` его лишь ассертит. Инвариант непустоты —
+  теперь ассерт на `Deal.resultProfit`, а не запись ZERO.
 - Если число временно нельзя получить — финализация **ретраится** по общему
   механизму (`DealFinalizationState`).
 - Если после исчерпания retry прибыль всё ещё неисчислима —
   `DealFinalizationState(MARK_CLOSED) = FAILED`: чистый терминал `CLOSED`
   **не** ставится; сделка уходит ошибочной тропой
   (`MarkDealErrorExecutor`/`ErrorHandler`) и доходит до **ошибочного
-  терминала**, не зависает живым риском. Инвариант «прибыль обязательна» —
-  про чистое закрытие; ошибочный терминал на нём не блокируется. Что именно
-  с числом прибыли на ошибочном терминале — деталь **шага 7**. Полный
-  контракт — `docs/lifecycles/Deal.md` §«Терминальный контракт финализации».
+  терминала** (`EMERGENCY_CLOSED`), не зависает живым риском. Инвариант
+  «прибыль обязательна» — про чистое закрытие; ошибочный терминал на нём не
+  блокируется, **но число всё равно проставляется** — фактический realized net
+  (вкл. `liqPenalty`), не ноль/null (G5). Полный контракт —
+  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации».
 
 ## Идемпотентность и retry
 

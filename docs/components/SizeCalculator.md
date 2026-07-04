@@ -57,9 +57,13 @@ market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION`, 
 сделку**: подбирается так, чтобы убыток на стопе не превышал
 `StrategyDetail.riskPerTradePercent × BalanceContainer.externalAvailableEquity`
 (`docs/decisions/per-trade-risk-policy.md`). Убыток на стопе для линейного
-контракта — `|entryPrice − stopPrice| × contracts × ctVal` (**commissions в
-фазе 1 опущены**, учёт — на шаге 7 с fee-моделью,
-`docs/decisions/per-trade-risk-policy.md`); лимит риска — связывающий потолок над желаемым объёмом
+контракта — `|entryPrice − stopPrice| × contracts × ctVal + commissions`
+(прогнозная комиссия вход+выход; **включена с шага 7** — G6,
+`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»). **Ставка** —
+`context.instrumentExternalRules.takerFeeRate()` (навес инструмента, N9; без
+отдельного поля контекста и без exchange-вызова из калькулятора,
+`docs/decisions/pnl-finalization-mechanics.md` реш.4); лимит риска — связывающий
+потолок над желаемым объёмом
 (`allocationPercents` — желаемая доля, лимит риска — связывающий cap).
 
 - размер округляется по `lotSz` и **снизу ограничен** `minSz`;

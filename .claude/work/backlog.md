@@ -124,9 +124,12 @@ market-data модели `InstrumentExternalRules`, `IndicatorValue`,
 (аудит не runtime-source FSM; `REFRESH_BALANCE` в истории; CLOSED vs
 EMERGENCY_CLOSED различимы; partial exit объясним).
 **Осталось:** модели `ServiceCommandExecutionHistory`, entity history,
-timeline, snapshot-формат; breakdown PnL (fees/fundingFee/gross-net/
-fills/avg prices/partial exits); `TradeFill`/`TradeFillsArchive` +
-`REFRESH_FILLS`; ~30 подвопросов. Связано с DEAL-Q1/DEAL-Q2.
+timeline, snapshot-формат; ~30 подвопросов. Связано с DEAL-Q1/DEAL-Q2.
+**Финализация PnL — закрыта отдельно** на `GAPS_CLOSE_1` шага 7
+(`docs/decisions/result-profit-source.md`): число = net `realizedPnl` из
+positions-history, breakdown = `DealCashFlow` (bills); **OKX-Q1 закрыт**
+(persisted `TradeFill` не вводится), `REFRESH_FILLS` — кандидат на снятие.
+Пофилловый аудит (`TradeFill`/`TradeFillsArchive`) — вне фазы 1.
 **Форвард-заметки:** `2026-05-28-.../tasks-аудит-и-история-исполнения.md`
 (§5/§8 подвопросы + Решения прохода 2); `2026-05-27-.../tasks-deal.md`
 (DEAL-FW5, FW9), `tasks-balance.md` (BAL-Q7), `tasks-order.md` (ORD-Q7),
@@ -224,10 +227,11 @@ connectivity (`okx-ws-limits.md` + `okx-service-urls.md`). Не
 мигрировано: устаревший раздел «Реализация в коде (Stage 02)» обзорного
 файла; полноценная WS-документация (OKX-Q4). Playbooks v1 — вне
 скоупа. Детали — `history/2026-05-28-миграция-api-okx.md`.
-**Связанные open-questions:** OKX-Q1 (persisted `TradeFill`),
-OKX-Q2 (`TradeFillsArchive` + async-флоу), OKX-Q3 (bills как источник
-`DealCashFlow` / финализации `Deal`), OKX-Q4 (WS-каналы отдельным
-заходом).
+**Связанные open-questions:** OKX-Q1 (persisted `TradeFill`) — **закрыт**
+(GAPS_CLOSE_1 шага 7: не вводится, `docs/decisions/result-profit-source.md`);
+OKX-Q2 (`TradeFillsArchive` + async-флоу) — открыт; OKX-Q3 (bills как источник
+`DealCashFlow` / финализации `Deal`) — **закрыт** (там же: bills — разбивка +
+сверка); OKX-Q4 (WS-каналы отдельным заходом) — открыт.
 
 ### Отложенные продуктовые вопросы (future)
 
@@ -410,24 +414,32 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 
 ### Шаг 7 (сделки и P&L)
 
-- **В-3 `positions-history`** — P&L закрытых позиций с разложением
-  `realizedPnl = pnl + fee + fundingFee + liqPenalty`
-  (`contracts/position.md` §История).
-- **В-6 `funding-rate(-history)`** — funding-компонент P&L SWAP.
-  **Лежит рядом с OKX-Q3:** два пути к funding (bills subType
-  173/174 vs `funding-rate-history.realizedRate`) — шаг 7 выбирает
-  осознанно, не ведёт два параллельных трека
-  (`contracts/funding-rate.md`, `open-questions.md` §OKX-Q3).
-- **В-7 `trade-fee`** — ставки комиссий для прогноза/сверки
-  (фактические комиссии — fills/bills); знак: минус = комиссия
-  (`contracts/trade-fee.md`).
-- **Комиссии в расчёте риска на сделку (со §6a шага 5, 2026-06-20).** Свести
-  учёт комиссий вместе с fee-моделью (В-7 `trade-fee`): включать комиссии
-  (вход+выход) в risk-amount и risk-bounded сайзинг (`RiskValidator`/
-  `SizeCalculator`, формула `+ commissions`) либо оставить вне с обоснованием.
-  В фазе 1 опущены; decision держит их концептуальным входом
-  (`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий — отложен к
-  шагу 7»). Развилка отнесена к шагу 7 пользователем.
+**Концепция закрыта:** источник числа — `GAPS_CLOSE_1` (2026-07-03,
+`docs/decisions/result-profit-source.md`); механика/носители стадий 1-2 —
+`GAPS_CLOSE_2` (2026-07-04, `docs/decisions/pnl-finalization-mechanics.md`).
+Ниже — **исполнительный хвост (CODE) + рантайм-верификация + форвард**, не выбор
+пути. Гейт `CODE` — после чистого `DOCS_CHECK_3`.
+
+- **CODE стадий 1-2 (доспецифицировано, писать код):** носители
+  `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
+  (`mapping/PositionCloseResult.md`) + `DealCashFlow` (модель+mapping+таблица
+  `deal_cash_flows`); команды/executor'ы `REFRESH_POSITIONS_HISTORY` /
+  `REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED`; расчёт+запись `resultProfit` на
+  `Deal` в `FinalizeDealExitExecutor` (N7); сверка bills↔net → `AnomalyReport`
+  (N10); ставка `trade-fee` на `InstrumentExternalRules` + wiring сайзинга (N9);
+  снятие `REFRESH_FILLS` (N12, доки закрыты — код-удаление на CODE).
+- **N11 — рантайм-верификация инварианта агрегации positions-history** (гейтит
+  корректность числа, **до CODE**): партиал-выходы одного `posId` → одна
+  финализированная запись, `realizedPnl` кумулятивен. Test-план —
+  `.claude/tests/source-api/okx/plan.md` §AG1.5 (⏳ PENDING; интегратор/тестер:
+  фикстура-цепочка на demo). Если OKX не агрегирует — путь корректируется.
+- **N13 — funding как holding-cost (форвард, фаза 2 / шаг ожидаемости):** в
+  число funding учтён; на форварде издержка удержания без дома — разделяющий
+  довод «комиссию в R, funding в post-cost expectancy» зафиксирован
+  (`per-trade-risk-policy.md` §«Учёт комиссий»); завести форвард-дом на шаге
+  ожидаемости/бэктеста. Scope (фаза 2 vs step-7-adjacent) — хвост пользователя.
+- **Epsilon сверки bills↔net (N10)** — провизорная величина
+  (max(0.01 settle-ccy, 0.5%·|net|)); подтверждение/калибровка — пользователь/бэктест.
 
 ### Шаг 8 (safety / AnomalyJob)
 
@@ -464,7 +476,8 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   **Остаётся форвардом:** (1) **AnomalyJob-путь** (проактивная детекция → зов
   executor'а) + общебиржевая **orphan-сверка** (сущности вне модели сделки) +
   перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 — **шаг 8**; (2)
-  **PnL-финализация `EMERGENCY_CLOSED`** (DEAL-Q2, resultProfit не блокирует, шаг 7);
+  **PnL-финализация `EMERGENCY_CLOSED`** (остаток DEAL-Q2 закрыт G5: число =
+  фактический realized net вкл. `liqPenalty`; расчёт — шаг 7);
   (3) доки — общим `SYNC_DOCS_FROM_CODE` после апрува. Связано с **ANOM-Q2**
   (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`). Источник —
   `phase-1-step-6-code.md` §Заход 2 разбора находок.
@@ -776,18 +789,22 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
   DEAL-Q2 (resultProfit при исчерпании retry) **закрыты** на `GAPS_CLOSE_1`
   шага 6 (`docs/decisions/deal-finalization-state-materialization.md`,
   `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»). Расчёт
-  PnL (п.6) — шаг 7.
+  PnL — **источник закрыт** на `GAPS_CLOSE_1` шага 7 (число = net из
+  positions-history, breakdown = `DealCashFlow`; остаток DEAL-Q2 = число на
+  `EMERGENCY_CLOSED`, закрыт; `docs/decisions/result-profit-source.md`); CODE —
+  шаг 7.
 - **Из миграции процессов:** RISK-Q1 (`RiskSettings`; п.3/п.4), DEAL-Q3
   (`DealActionState` core/other + lifecycle; п.1), CMD-Q2 (базовый
   тип/дискриминатор payload'ов, судьба `ServiceCommandPayload.md`; п.1).
   PROC-Q1 закрыт 2026-06-06 (рудимент), CMD-Q1 закрыт 2026-06-06
   (`.claude/decisions/executor-payload-file-granularity.md`), ENUM-Q1
   снят 2026-06-06 (архивный артефакт).
-- **Из миграции API-кластера OKX (п.10):** OKX-Q1 (persisted
-  `TradeFill` модель и executor финализации; п.6), OKX-Q2
-  (`TradeFillsArchive` async-флоу), OKX-Q3 (bills как источник
-  `DealCashFlow` / финализации `Deal`; п.6, DEAL-Q1/Q2), OKX-Q4
-  (WS-каналы OKX отдельным заходом).
+- **Из миграции API-кластера OKX (п.10):** OKX-Q1 (persisted `TradeFill`) —
+  **закрыт** (GAPS_CLOSE_1 шага 7: не вводится); OKX-Q2 (`TradeFillsArchive`
+  async-флоу) — открыт; OKX-Q3 (bills как источник `DealCashFlow`) — **закрыт**
+  (там же: bills — разбивка + сверка, число — positions-history;
+  `docs/decisions/result-profit-source.md`); OKX-Q4 (WS-каналы OKX отдельным
+  заходом) — открыт.
 - **Из шага 1 Фазы 1 (поток рыночных данных):** INSTR-Q1
   (соотнесение снапшот-концепции с `InstrumentExternalRules` /
   возможный ренейм; п.9); ORCH-Q1 (владелец оркестрации онбординга

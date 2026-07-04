@@ -50,15 +50,18 @@ cleanup-команда без action-state (`REFRESH_*` / `CANCEL_*` / `CLOSE_PO
 
 ## Енум `ServiceCommandType`
 
-`REFRESH_BALANCE`, `REFRESH_POSITION`, `CLOSE_POSITION`, `CREATE_ORDER`,
-`SUBMIT_ORDER`, `CANCEL_ORDER`, `REFRESH_ORDER`, `CREATE_ALGO_ORDER`,
-`SUBMIT_ALGO_ORDER`, `CANCEL_ALGO_ORDER`, `REFRESH_ALGO_ORDER`,
-`REFRESH_FILLS`, `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`,
-`MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`.
+`REFRESH_BALANCE`, `REFRESH_POSITION`, `REFRESH_POSITIONS_HISTORY`,
+`REFRESH_BILLS`, `CLOSE_POSITION`, `CREATE_ORDER`, `SUBMIT_ORDER`,
+`CANCEL_ORDER`, `REFRESH_ORDER`, `CREATE_ALGO_ORDER`, `SUBMIT_ALGO_ORDER`,
+`CANCEL_ALGO_ORDER`, `REFRESH_ALGO_ORDER`, `FINALIZE_DEAL_ENTRY`,
+`FINALIZE_DEAL_EXIT`, `MARK_DEAL_CLOSED`, `MARK_DEAL_EMERGENCY_CLOSED`,
+`MARK_DEAL_ERROR`.
 
 **Амендных команд нет:** `AMEND_ORDER` / `AMEND_ALGO_ORDER` сняты из
-enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SWITCH`
-текущий enum — 16 значений) решением
+enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SWITCH` — 16;
+на шаге 7 снят `REFRESH_FILLS` и добавлены `REFRESH_POSITIONS_HISTORY` /
+`REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED` → **18**,
+`docs/decisions/pnl-finalization-mechanics.md`) решением
 `docs/decisions/replace-not-amend.md` — AMEND ушёл из доменного
 словаря целиком. Ремоделирование — действие стратегии
 `StrategyActionType.REPLACE`, исполняемое **оркестрацией
@@ -69,17 +72,24 @@ enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SW
 
 **Refresh-набор — ровно по одной команде на сущность:** `REFRESH_ORDER`,
 `REFRESH_ALGO_ORDER`, `REFRESH_POSITION`, `REFRESH_BALANCE`,
-`REFRESH_FILLS`. Внутри исполнителя допускается несколько вызовов биржи
-(evidence-cycle, `docs/decisions/refresh-evidence-cycle-ownership.md`).
+`REFRESH_POSITIONS_HISTORY` (positions-history-снапшот — число P&L),
+`REFRESH_BILLS` (`DealCashFlow` — разбивка). `REFRESH_FILLS` **снят** на
+шаге 7 (его order-fill-метрики покрыты `REFRESH_ORDER`;
+`docs/decisions/pnl-finalization-mechanics.md` реш.1). Внутри исполнителя
+допускается несколько вызовов биржи (evidence-cycle,
+`docs/decisions/refresh-evidence-cycle-ownership.md`).
 Bulk-команды `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` /
 `REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY` сняты — их эндпоинты
 живут только звеньями цикла (CMD-Q3 закрыт). Перечисление **неизвестных**
 сущностей по инструменту (orphan / чужой live risk) — CMD-Q4.
 
 **Финализационные команды** `FINALIZE_DEAL_ENTRY` / `FINALIZE_DEAL_EXIT` /
-`MARK_DEAL_CLOSED` / `MARK_DEAL_ERROR` — lifecycle/system actions без
-`StrategyAction`: их retry-state живёт в `DealFinalizationState` (не
-`DealActionState`), а эмитятся они по статусу `DealFinalizationState`
+`MARK_DEAL_CLOSED` / `MARK_DEAL_EMERGENCY_CLOSED` / `MARK_DEAL_ERROR` —
+lifecycle/system actions без `StrategyAction`: их retry-state живёт в
+`DealFinalizationState` (не `DealActionState`), а эмитятся они по статусу
+`DealFinalizationState` (`MARK_DEAL_EMERGENCY_CLOSED` — терминал аварийной
+тропы `ERROR → EMERGENCY_CLOSED`, симметричен `MARK_DEAL_CLOSED`,
+`docs/decisions/pnl-finalization-mechanics.md` реш.3)
 (`docs/decisions/deal-finalization-state-materialization.md`,
 `docs/components/DealFinalizationCommandFactory.md`). Семантика executor'ов —
 `docs/components/FinalizeDealEntryExecutor.md` и др.

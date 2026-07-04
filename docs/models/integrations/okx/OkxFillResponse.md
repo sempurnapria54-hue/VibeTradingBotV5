@@ -8,23 +8,24 @@
 
 Raw OKX `FillResponse` — элемент `data[]` ответов
 `GET /api/v5/trade/fills` (последние 3 дня) и
-`GET /api/v5/trade/fills-history` (последние 3 месяца). Используется
-client-layer для последующего матчинга с известными `Order` /
-`AlgoOrder` / `Position` facts через `RefreshFillsExecutor`
-(`docs/components/RefreshFillsExecutor.md`).
+`GET /api/v5/trade/fills-history` (последние 3 месяца). Эти fills-эндпоинты
+в runtime фазы 1 **не используются**: команда `REFRESH_FILLS` снята на шаге 7
+(`docs/decisions/pnl-finalization-mechanics.md` реш.1) — order-fill-метрики
+(`accFillSz`/`avgPx`) идут прямо из `OkxOrderResponse` (`REFRESH_ORDER`), а
+число P&L — из positions-history/bills. Поля ниже оставлены как справка
+(deep-архив — `OKX-Q2`).
 
-`Fill` как persisted entity на первом этапе **не вводим** (см.
-`docs/components/RefreshFillsExecutor.md`; материализация `TradeFill`
-— OKX-Q1 в `.claude/work/questions/open-questions.md`). Поэтому ниже
-описаны поля DTO биржи, а не маппинг в доменную сущность.
+`Fill` как persisted entity в фазе 1 **не вводим** — **OKX-Q1 закрыт**
+(persisted `TradeFill` не материализуется,
+`docs/decisions/result-profit-source.md`). Поэтому ниже описаны поля DTO
+биржи, а не маппинг в доменную сущность.
 
 Раw OKX DTO не выходит за adapter-layer
 (`docs/rules/raw-exchange-dto-boundary.md`).
 
-Mapping (когда `TradeFill` материализуется) —
-`docs/models/mapping/TradeFill.md` (стаб, ссылка на OKX-Q1). Контракт
-endpoint'ов / rate limits / пагинация —
-`docs/integrations/okx/contracts/fills.md`.
+Mapping — `docs/models/mapping/TradeFill.md` (стаб, **OKX-Q1 закрыт**:
+`TradeFill` в фазе 1 не вводится). Контракт endpoint'ов / rate limits /
+пагинация — `docs/integrations/okx/contracts/fills.md`.
 
 ## Различие fills и orders
 
@@ -35,8 +36,8 @@ endpoint'ов / rate limits / пагинация —
 
 ## Поля одного fill (по архивному источнику)
 
-Поля документированы; сужение до used отложено до материализации
-`TradeFill` (см. OKX-Q1).
+Поля документированы; сужение до used не выполняется — **OKX-Q1 закрыт**
+(`TradeFill` в фазе 1 не вводится, fills не персистятся отдельно).
 
 | OKX field | Назначение |
 |---|---|

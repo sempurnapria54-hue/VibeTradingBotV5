@@ -19,12 +19,13 @@ funding rate history»). При расхождении с офдоком поб�
 
 ## Статус использования
 
-Не используется. Форвард-кандидат **В-6** (шаг 7, P&L): funding —
-компонент результата SWAP-сделки. **Два пути к funding в P&L** (выбор
-за шагом 7, не вести параллельно — см. OKX-Q3): (1) bills c
-`subType` 173/174 — фактические списания/начисления по аккаунту
-(`account-bills.md`); (2) `funding-rate-history` (`realizedRate`) —
-ставки расчётных периодов (публичные, без привязки к позиции).
+**В-6 / OKX-Q3 разрешены (шаг 7, `GAPS_CLOSE_1`).** Funding в число
+`resultProfit` идёт через positions-history (внутри готового net
+`realizedPnl`) + bills (`subType` 173/174 — категорийная разбивка,
+`account-bills.md`) — путь (1). `funding-rate-history` (`realizedRate`,
+путь (2)) для числа **не ведётся**: ставки расчётных периодов без привязки к
+позиции — годятся лишь для прогноза/сверки
+(`docs/decisions/result-profit-source.md`).
 
 ## GET /api/v5/public/funding-rate
 

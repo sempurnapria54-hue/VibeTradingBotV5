@@ -34,6 +34,8 @@ FAILED                -> empty (исчерпано; сделку на ошибо
 
 Маппинг type → команда: `FINALIZE_ENTRY → FINALIZE_DEAL_ENTRY`,
 `FINALIZE_EXIT → FINALIZE_DEAL_EXIT`, `MARK_CLOSED → MARK_DEAL_CLOSED`,
+`MARK_EMERGENCY_CLOSED → MARK_DEAL_EMERGENCY_CLOSED` (терминал аварийной
+тропы, `docs/decisions/pnl-finalization-mechanics.md` реш.3),
 `MARK_ERROR → MARK_DEAL_ERROR`. Статус состояния сам не пишет (паритет с
 `DealActionState`) — его двигают executor'ы / retry-учёт
 (`docs/decisions/deal-finalization-state-materialization.md`,

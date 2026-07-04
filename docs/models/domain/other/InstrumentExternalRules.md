@@ -34,12 +34,18 @@
 - расчёта размера в контрактах;
 - проверки min/max limits;
 - проверки биржевого max leverage;
-- проверки, можно ли торговать инструмент (`status`).
+- проверки, можно ли торговать инструмент (`status`);
+- **прогноза комиссии в риск-сайзинге** (`externalTakerFeeRate`; N9, шаг 7 —
+  `docs/decisions/pnl-finalization-mechanics.md` реш.4). Ставка едет тем же
+  навесом, поэтому доступна калькуляторам через уже присутствующий
+  `CalculationContext.instrumentExternalRules` — без отдельного поля контекста
+  и без exchange-вызова из калькулятора.
 
 Правила меняются редко, поэтому хранение актуального snapshot в БД
 оправдано. Обновляется `InstrumentExternalRulesSyncJob` (см.
-`docs/components/InstrumentExternalRulesSyncJob.md`). OKX-маппинг —
-`docs/models/mapping/InstrumentExternalRules.md`.
+`docs/components/InstrumentExternalRulesSyncJob.md`) — на шаге 7 он **дочитывает
+`trade-fee`** для инструмента и кладёт ставки в навес (wiring — CODE шага 7).
+OKX-маппинг — `docs/models/mapping/InstrumentExternalRules.md`.
 
 ## Структура
 
@@ -67,6 +73,8 @@ Java-класс. Собственного `id` у класса нет — еди
 | `externalMaxTriggerSize` | `String` | Максимальный размер trigger-ордера. |
 | `externalMaxStopSize` | `String` | Максимальный размер stop-ордера. |
 | `externalMaxLeverage` | `String` | Биржевой максимум плеча. |
+| `externalTakerFeeRate` | `String` | Ставка taker-комиссии (`trade-fee`; знак «минус = комиссия, плюс = ребейт»). Источник прогнозной комиссии в риск-сайзинге (N9, шаг 7). |
+| `externalMakerFeeRate` | `String` | Ставка maker-комиссии (`trade-fee`). Хранится; в фазе 1 прогноз сайзинга берёт taker (worst-case). |
 | `externalState` | `String` | Сырой статус инструмента биржи. |
 
 `external*`-поля хранят сырые строковые значения биржи; нормализованные
@@ -81,7 +89,9 @@ runtime-логики.
 - числовые аксессоры сырых строк (пусто/нечисловое → `null`):
   `contractValue()` (`ctVal`), `tickSize()` (`tickSz`), `lotSize()`
   (`lotSz`), `minSize()` (`minSz`), `maxLimitSize()` (`maxLmtSz`),
-  `maxMarketSize()` (`maxMktSz`), `maxLeverage()` (`lever`).
+  `maxMarketSize()` (`maxMktSz`), `maxLeverage()` (`lever`),
+  `takerFeeRate()` / `makerFeeRate()` (`trade-fee` ставки; taker — прогноз
+  комиссии в сайзинге, N9).
 
 Числовых аксессоров `maxTriggerSize()` / `maxStopSize()` **нет**: сырые
 `externalMaxTriggerSize` / `externalMaxStopSize` хранятся, но проверками

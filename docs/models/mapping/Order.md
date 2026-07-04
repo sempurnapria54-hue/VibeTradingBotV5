@@ -189,8 +189,10 @@ attached материализуется в standalone algo —
 `clOrdId = internalId`. Цикл обходит `RefreshOrderExecutor` **внутри одной
 команды** `REFRESH_ORDER` (обрыв на первом успешном эндпоинте; терминал
 `MISSING_AFTER_REFRESH` выносит он же — см.
-`docs/decisions/refresh-evidence-cycle-ownership.md`). Доп. факты сделки
-(`REFRESH_FILLS`, `REFRESH_POSITION`) запрашиваются отдельными командами;
+`docs/decisions/refresh-evidence-cycle-ownership.md`). Order-fill-метрики
+(`accFillSz` → `accumulatedFillSize`, `avgPx` → `averagePrice`, `fee`)
+приходят готовыми из того же `OkxOrderResponse` — отдельной fill-команды нет.
+Доп. факты сделки (`REFRESH_POSITION`) запрашиваются отдельной командой;
 `RefreshOrderExecutor` не сопровождает сделку целиком.
 
 ### OKX pagination

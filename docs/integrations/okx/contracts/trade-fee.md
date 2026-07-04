@@ -17,10 +17,17 @@
 
 ## Статус использования
 
-Не используется. Форвард-кандидат **В-7** (шаг 7, P&L): точность
-комиссий в расчёте результата сделки. Фактические комиссии исполнения
-живут в fills/bills (`fills.md`, `account-bills.md`); `trade-fee` —
-ставки для прогноза/сверки.
+Используется с шага 7 (**В-7 активирован**): ставки `trade-fee` — источник
+**прогнозной комиссии в риск-сайзинге** (G6, `GAPS_CLOSE_1` шага 7,
+`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»). **Дом ставки —
+`InstrumentExternalRules`** (навес инструмента, поля `externalTakerFeeRate`/
+`externalMakerFeeRate`): `InstrumentExternalRulesSyncJob` дочитывает `trade-fee`
+и кладёт ставку в навес; калькуляторы читают её через уже присутствующий
+`CalculationContext.instrumentExternalRules` — без отдельного поля контекста и
+exchange-вызова из калькулятора (N9, `docs/decisions/pnl-finalization-mechanics.md`
+реш.4). Фактические комиссии исполнения (для `resultProfit`) живут в
+bills/positions-history (`account-bills.md`, `docs/decisions/result-profit-source.md`);
+`trade-fee` — ставки для **прогноза** (сайзинг до входа) и сверки. Wiring — шаг 7 CODE.
 
 ## GET /api/v5/account/trade-fee
 

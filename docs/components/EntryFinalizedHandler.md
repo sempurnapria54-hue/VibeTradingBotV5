@@ -19,8 +19,8 @@ MANAGING`, `→ ERROR`. Конструкция — `docs/components/DealStateMac
 
 `Deal.status = ENTRY_FINALIZED`; pinned `StrategyDetail`; позиция активна
 и соответствует сделке/инструменту/направлению; entry order финализирован
-(или есть достаточные fills facts); известна цена входа (или путь через
-`REFRESH_FILLS`); ≤1 позиция; нет критичного риска без возможности защиты;
+(факты исполнения — `accFillSz`/`avgPx` из `REFRESH_ORDER`); известна цена
+входа; ≤1 позиция; нет критичного риска без возможности защиты;
 если `Strategy.DELETED` → graceful shutdown, не обычные data-dependent
 steps.
 

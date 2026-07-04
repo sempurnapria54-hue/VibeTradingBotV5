@@ -19,10 +19,12 @@ ERROR` (non-terminal runtime status для `ErrorHandler`/safety-flow) и
 ## Ребро статуса
 
 `* → ERROR` (любой active runtime status). `ERROR` — **не** terminal:
-дальнейший разбор и переход в `EMERGENCY_CLOSED` (ошибочный терминал) ведёт
-`docs/components/ErrorHandler.md` после подтверждённого снятия live risk.
-`MARK_DEAL_ERROR` сам терминал не ставит — он переводит сделку под
-safety-flow. Сюда же сходится ошибочная тропа неисчислимой финализации
+дальнейший разбор ведёт `docs/components/ErrorHandler.md`; аварийный терминал
+`ERROR → EMERGENCY_CLOSED` после подтверждённого снятия live risk ставит
+**`MARK_DEAL_EMERGENCY_CLOSED`** (`docs/components/MarkDealEmergencyClosedExecutor.md`,
+best-effort число, шаг 7 — `docs/decisions/pnl-finalization-mechanics.md` реш.3).
+`MARK_DEAL_ERROR` сам терминал не ставит — он переводит сделку под safety-flow.
+Сюда же сходится ошибочная тропа неисчислимой финализации
 (`MarkDealClosedExecutor` после исчерпания retry — DEAL-Q2,
 `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»).
 

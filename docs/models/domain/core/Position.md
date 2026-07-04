@@ -125,9 +125,11 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 размер, направление, средняя цена входа, mark price, liquidation
 price, margin, unrealized PnL.
 
-`Position` **не** используется для итогового PnL: `Deal.resultProfit`
-считается через `REFRESH_FILLS` (правило принадлежит `Deal` — см.
-`.claude/decisions/rule-source-of-truth.md` и
-`docs/models/domain/aggregate/Deal.md`). Полное закрытие
+`Position` (live `/positions`) **не** используется для итогового PnL:
+заголовочное `Deal.resultProfit` = net `realizedPnl` из **positions-history**
+(закрытые позиции), разбивка — из bills; правило принадлежит `Deal`
+(`.claude/decisions/rule-source-of-truth.md`,
+`docs/models/domain/aggregate/Deal.md` §Итоговый PnL,
+`docs/decisions/result-profit-source.md`). Полное закрытие
 подтверждается через `REFRESH_POSITION`, не через ACK (см.
 `docs/rules/ack-not-runtime-truth.md`).

@@ -12,64 +12,58 @@ Raw OKX response endpoint'ов `GET /api/v5/account/bills` (последние 7
 
 В отличие от fills (факт исполнения ордера) bills показывают **изменение
 денег на аккаунте**: realized PnL, комиссии, rebate, funding fee и
-прочие cashflow-события. Для итогового финансового результата сделки
-(`Deal.resultProfit`) bills могут быть более полным источником, чем
-fills (включают funding).
+прочие cashflow-события. В расчёте `Deal.resultProfit` bills дают
+**категорийную разбивку** (торговая комиссия / funding / rebate /
+ликвидационный штраф) и **сверку** — само заголовочное число берётся
+net'ом из positions-history (`realizedPnl`), **не** из `sum(bills)`
+(`docs/decisions/result-profit-source.md`).
 
-Доменно `AccountBill` / `DealCashFlow` как persisted-сущность на первом
-этапе **не вводим** — нет executor'а и нет домена; вопрос целесообразности
-— OKX-Q3 в `.claude/work/questions/open-questions.md`. Контракт
-endpoint'ов и поток применения — `docs/integrations/okx/contracts/account-bills.md`.
+Доменный носитель разбивки — `DealCashFlow` (**OKX-Q3 закрыт** на
+`GAPS_CLOSE_1` шага 7; `docs/decisions/result-profit-source.md`); структура
+`DealCashFlow` и маппинг bills → домен —
+`docs/models/domain/other/DealCashFlow.md`,
+`docs/models/mapping/DealCashFlow.md`. Контракт endpoint'ов и поток
+применения — `docs/integrations/okx/contracts/account-bills.md`.
 
 Raw OKX DTO не выходит за adapter-layer
 (`docs/rules/raw-exchange-dto-boundary.md`).
 
-## Поля одного bill (по архивному источнику)
+## Инвентарь полей
 
-Поля документированы; сужение до used отложено до закрытия OKX-Q3.
+Сужение до used **зафиксировано** (шаг 7, `GAPS_CLOSE_2`; ранее было отложено
+на стадию 2 / `DOCS_CHECK_2`) — при специфицировании структуры `DealCashFlow`
+(`docs/models/domain/other/DealCashFlow.md`,
+`docs/models/mapping/DealCashFlow.md`).
 
-### Идентификация
+### Используемые (под `DealCashFlow`)
 
-| OKX field | Назначение |
+| OKX field | Назначение → DealCashFlow |
 |---|---|
-| `billId` | id записи; **якорь пагинации** через `after`/`before`; используется для идемпотентности |
-| `type` | тип bill-записи |
-| `subType` | подтип. Для funding: `173` (expense) / `174` (income). Актуальный список — справочник OKX |
-| `ts` | время bill-события (Unix ms) |
+| `billId` | id записи; **якорь пагинации** (`after`/`before`) + **дедуп/идемпотентность** → `externalBillId` (`UNIQUE`) |
+| `type` | тип bill-записи → резолв `CashFlowCategory`; сырой → `externalType` |
+| `subType` | подтип; funding `173` (expense) / `174` (income) → резолв `FUNDING`; сырой → `externalSubType`. Актуальный список — справочник OKX |
+| `ts` | время bill-события (Unix ms) → `externalTs` |
+| `balChg` | изменение баланса (знаковое) → `amount` |
+| `ccy` | валюта движения (`USDT`) → `ccy` (обязательно — cross-ccy guard) |
+| `ordId` | id ордера, если bill связан с ордером → `externalOrderId` (nullable) |
 
-### Инструмент и валюта
+### Не используется runtime фазы 1 (отбрасывается на маппинге)
 
-| OKX field | Назначение |
-|---|---|
-| `instType` | тип инструмента (`SWAP`/`FUTURES`/`SPOT`/...) |
-| `instId` | инструмент (`ETH-USDT-SWAP`) |
-| `ccy` | валюта движения баланса (`USDT`) |
-| `mgnMode` | режим маржи (`isolated`/`cross`/`cash`) |
+Разбивке `DealCashFlow` не нужны (число — net из positions-history; категория
+и сумма — из used-полей выше):
 
-### Денежные поля
+- **Прочие денежные / балансовые:** `bal` (баланс после события), `pnl`
+  (pnl события), `fee` (отдельная fee/rebate-компонента — знак несёт уже
+  `balChg` → `amount`).
+- **Инструмент / режим** (инструмент и валюта берутся для линковки из окна
+  сделки, `instId`/`ccy` матчинга — на уровне контракта, не тела bill):
+  `instType`, `instId` (участвует в матчинге как фильтр, в поле не пишется),
+  `mgnMode`.
+- **Позиция:** `sz` (размер), `posBalChg` (изменение баланса позиции),
+  `posBal` (баланс позиции после события).
+- **Переводы / примечания:** `from`, `to`, `notes`.
 
-| OKX field | Назначение |
-|---|---|
-| `balChg` | изменение баланса (главный кандидат для `DealCashFlow.amount`) |
-| `bal` | баланс после события |
-| `pnl` | profit/loss в рамках события (если применимо) |
-| `fee` | комиссия / rebate (отрицательное — списание, положительное — rebate) |
+## Конвертация
 
-### Позиция / ордер
-
-| OKX field | Назначение |
-|---|---|
-| `ordId` | id ордера, если bill связан с ордером |
-| `sz` | размер (если применимо) |
-| `posBalChg` | изменение баланса позиции |
-| `posBal` | баланс позиции после события |
-
-### Переводы / примечания
-
-| OKX field | Назначение |
-|---|---|
-| `from` | откуда переведены средства (если bill — перевод) |
-| `to` | куда переведены |
-| `notes` | текстовое примечание |
-
-Все числа приходят строками; numeric → `BigDecimal` при парсинге.
+Все числа приходят строками; numeric → `BigDecimal`, `ts` (Unix ms) →
+доменное время при парсинге.

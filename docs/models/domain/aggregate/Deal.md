@@ -83,42 +83,44 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 ## Итоговый PnL (resultProfit)
 
 Первоисточник правила — здесь (`Deal` владеет полем,
-`.claude/decisions/rule-source-of-truth.md`):
+`.claude/decisions/rule-source-of-truth.md`); источник данных числа и
+разбивки — `docs/decisions/result-profit-source.md`:
 
-- `resultProfit` считается через `REFRESH_FILLS` / `TradeFill` facts,
-  **не** через `BalanceContainer` diff. `REFRESH_BALANCE` после
-  выхода нужен для актуального account snapshot, не для PnL сделки.
+- **Число** `resultProfit` = **net realized P&L**, берётся **готовым** из
+  positions-history (`realizedPnl = pnl + fee + fundingFee + liqPenalty`,
+  посчитан биржей), **не** через fills/`TradeFill` и **не** через
+  `BalanceContainer` diff. `REFRESH_BALANCE` после выхода нужен для
+  актуального account snapshot, не для PnL сделки.
+- **Категорийная разбивка** (торговая комиссия / funding / rebate /
+  ликвидационный штраф) — из bills (`DealCashFlow`); сумма bills-flows
+  сверяется с net из positions-history (контроль целостности). В `Deal`
+  разбивка не хранится (см. ниже).
 - Для **чистого** terminal `CLOSED` `resultProfit` и
-  `resultProfitCurrency` обязательны; для ошибочного `EMERGENCY_CLOSED` —
-  по терминальному контракту финализации (не блокируется инвариантом
-  чистого закрытия; `docs/lifecycles/Deal.md` §«Терминальный контракт
-  финализации», DEAL-Q2).
-- `resultProfit = 0` допустим только как результат расчёта **либо как
-  явный step-6 интерим-placeholder** (см. ниже), **не** как молчаливый
-  fallback при ошибке. Если временно нельзя посчитать —
-  финализация retry-ится по общему механизму (`DealFinalizationState`,
-  `docs/models/domain/other/DealFinalizationState.md`). Поведение при
-  исчерпании retry — **DEAL-Q2, закрыт**: сделка всегда доходит до
-  терминала (чистый `CLOSED` с числом либо ошибочный терминал), см.
-  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации».
-- **Step-6 интерим-placeholder ZERO.** Терминальное ребро чистого
-  закрытия (`MARK_DEAL_CLOSED`, `MarkDealClosedExecutor`) — механика
-  **шага 6**, а сам PnL-расчёт — **шаг 7** (граница 6 ↔ 7). Чтобы
-  удовлетворить инвариант «на чистом `CLOSED` число обязательно» до того,
-  как шаг 7 посчитает реальный PnL, executor пишет **явный механический
-  placeholder** `resultProfit = BigDecimal.ZERO` + `resultProfitCurrency =
-  settleCurrency` (резолвится из `BalanceContainer`). Это
-  **задокументированный интерим**, помеченный как placeholder: шаг 7
-  (`REFRESH_FILLS` / `TradeFill`) заменит его расчётным числом. Он **отличен
-  от** запрещённого молчаливого error-fallback: settle-валюта
-  **обязательна** — если она не резолвится, executor **кидает failure**
-  (`VALIDATION_ERROR`, уход на retry/ошибочную тропу DEAL-Q2), а не садит
-  тихий ZERO. См. `docs/components/MarkDealClosedExecutor.md`.
+  `resultProfitCurrency` обязательны; для аварийного `EMERGENCY_CLOSED`
+  число — **best-effort**: фактический realized net если доступен, иначе
+  `resultProfit = null` c маркером «неисчислимо» (**не ноль**;
+  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»; DEAL-Q2
+  закрыт). На `EMERGENCY_CLOSED` `null` = «число не достать» (отличимо от нуля).
+- `resultProfit = 0` допустим только как **результат расчёта** (net вышел
+  нулевым), **не** как молчаливый fallback при ошибке. Если временно нельзя
+  посчитать — финализация retry-ится по общему механизму
+  (`DealFinalizationState`, `docs/models/domain/other/DealFinalizationState.md`);
+  при исчерпании retry сделка уходит ошибочной тропой к терминалу — сделка
+  всегда доходит до терминала, не зависает живым риском (**DEAL-Q2, закрыт**,
+  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»).
+- **Расчёт и запись (N7).** Число вычисляет и **пишет прямо на `Deal`**
+  `FinalizeDealExitExecutor` (net из `PositionCloseResultExternalSnapshot` +
+  разбивка из `DealCashFlow` + сверка; в одной транзакции с его `COMPLETED` —
+  durable-носитель числа = само поле `Deal`, рестарт-safe). `MarkDealClosedExecutor`
+  **ассертит** непустоту и ставит терминал `CLOSED` (число не пишет). Step-6
+  писал интерим-placeholder `ZERO` (граница 6 ↔ 7); шаг 7 его снял (реальный
+  net). Механика — `docs/decisions/pnl-finalization-mechanics.md` реш.2.
 
 Детальный breakdown (fees, fundingFee, gross/netProfit, entry/exit
-fills, average prices, partial exits) в `Deal` не хранится —
-восстанавливается через `TradeFill` facts / финализационный расчёт /
-audit (`TradeFill` и `REFRESH_FILLS` — шаг 7, OKX-Q1/OKX-Q3).
+fills, average prices, partial exits) в `Deal` не хранится: число берётся
+готовым из positions-history, категорийная разбивка живёт как `DealCashFlow`
+(bills), пофилловая детализация — вне фазы 1 (**OKX-Q1 закрыт**: persisted
+`TradeFill` не вводится).
 
 ## Runtime graph
 
@@ -143,7 +145,11 @@ audit (`TradeFill` и `REFRESH_FILLS` — шаг 7, OKX-Q1/OKX-Q3).
 Хранится в БД (entity `DealEntity`, таблица `deals`), наследует
 audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
 `position`) — отдельные таблицы по `deal_id`, не cascade-коллекции этой
-строки. Ограничения схемы:
+строки. Категорийная разбивка P&L (`DealCashFlow`) — тоже **отдельная
+таблица `deal_cash_flows` по `deal_id`** (не поле `Deal`; число
+`resultProfit`/`resultProfitCurrency` — поля `Deal`, разбивка — строки
+`deal_cash_flows`; `docs/models/domain/other/DealCashFlow.md`). Ограничения
+схемы:
 
 - `id` — identity (autoincrement).
 - `internal_id`, `instrument_id`, `strategy_detail_id`, `status`,

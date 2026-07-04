@@ -1274,6 +1274,15 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 |---|---|---|---|
 | `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, after:1, limit:10}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (ожидается пустой) | Пагинация по `uTime`: `after=1` (эпоха) отрезает всё новее 1мс → `data=[]`. Пустой результат вне окна валиден, не реджект. Если OKX реджектит формат `after` — код в наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=0 |
 
+### AG1.5 Содержательный (шаг 7, N11) — семантика агрегации partial-close ⏳ PENDING
+
+**Гейтит корректность числа `Deal.resultProfit`** (`docs/decisions/pnl-finalization-mechanics.md` реш.6). Форм-кейсы AG1.1-1.4 проверяют структуру пустого/битого ответа; здесь — **содержательный инвариант агрегации**, который выбранный путь берёт на веру.
+
+- **Что верифицировать:** после позиции с **частичным выходом** (partial TP `type` 1) и последующим **полным закрытием** (SL/close `type` 2) — отдаёт ли OKX **ОДНУ финализированную запись на `posId`**, чей `realizedPnl` **кумулятивен по обоим слайсам** (не только по последнему), и **в какой момент** запись финализирована (риск чтения послайсовой/нефинализированной записи → систематический недосчёт realized, усечение левого хвоста R).
+- **Требует фикстуры-цепочки** (не form-only): open position → partial reduce-only close → full close (или SL-триггер) → `REFRESH_POSITION` подтверждает flat → read `positions-history` по `posId`. На свежем demo нужна реальная закрытая позиция в окне — содержательный прогон, не пустой массив AG1.1.
+- **Ожидание (проверяется, не предполагается):** `Array.isArray(data)`; для `posId` сделки — **ровно одна** запись; `realizedPnl ≈ Σ(pnl+fee+fundingFee+liqPenalty)` по всей жизни позиции (сверить с суммой bills за окно); `closeTotalPos` = полный закрытый объём.
+- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (интегратор/тестер: собрать фикстуру, прогнать на demo, зафиксировать факт; если OKX **не** агрегирует в одну запись — путь числа корректируется, эскалация на `solution-designer`). Провенанс — N11 отчёта `phase-1-step-7-docs-check-2.md`.
+
 ## AG2. Account & position risk — GET /api/v5/account/account-position-risk (Account)
 
 - **Объект:** OKX `GET /api/v5/account/account-position-risk`, `signed:true`. Через `/raw`.

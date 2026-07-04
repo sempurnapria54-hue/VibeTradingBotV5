@@ -42,7 +42,7 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
   status resolver, обновляет сущность, заполняет `closeReason` только если
   текущий `== null`; торговых решений не принимает, cleanup не запускает,
   audit/history как runtime-source не использует. Для сущностей с
-  evidence-cycle (`REFRESH_ORDER` / `REFRESH_ALGO_ORDER` / `REFRESH_FILLS`)
+  evidence-cycle (`REFRESH_ORDER` / `REFRESH_ALGO_ORDER`)
   исполнитель обходит эндпоинты **внутри одной команды** (эскалация
   live → pending → history → archive), обрывается на первом успешном,
   полный обход — только при не-найдено, и сам выносит терминал
@@ -62,7 +62,8 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
 
 - **`FINALIZE_*` / `MARK_*`** — финализационные lifecycle/system actions
   над самой `Deal` (`FINALIZE_DEAL_ENTRY` / `FINALIZE_DEAL_EXIT` /
-  `MARK_DEAL_CLOSED` / `MARK_DEAL_ERROR`): консолидируют подтверждённые
+  `MARK_DEAL_CLOSED` / `MARK_DEAL_EMERGENCY_CLOSED` / `MARK_DEAL_ERROR`):
+  консолидируют подтверждённые
   факты входа/выхода и делают терминальные/статусные рёбра сделки. На биржу
   сами не ходят (опираются на уже добытые `REFRESH_*`-факты), торговых
   решений не принимают, `RiskValidator` не вызывают

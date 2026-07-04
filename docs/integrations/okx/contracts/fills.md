@@ -17,23 +17,26 @@ details (last 3 days / last 3 months)»). При расхождении с оф�
 
 ## Контекст
 
-Mapping (стаб, до материализации `TradeFill`) —
+Mapping (стаб, **OKX-Q1 закрыт**: `TradeFill` в фазе 1 не вводится) —
 `docs/models/mapping/TradeFill.md`. Native response —
-`docs/models/integrations/okx/OkxFillResponse.md`. Использует
-`RefreshFillsExecutor` (`docs/components/RefreshFillsExecutor.md`).
-Глубже 3 месяцев — `docs/integrations/okx/contracts/fills-archive.md`.
+`docs/models/integrations/okx/OkxFillResponse.md`. Команда `REFRESH_FILLS`
+**снята** на шаге 7 (`docs/decisions/pnl-finalization-mechanics.md` реш.1) —
+эти fills-эндпоинты в runtime фазы 1 **не используются** (order-fill-метрики
+идут из `OkxOrderResponse` через `REFRESH_ORDER`; число P&L — из
+positions-history/bills). Контракт оставлен справочно. Глубже 3 месяцев —
+`docs/integrations/okx/contracts/fills-archive.md`.
 
 ## Endpoints
 
-- **Fills 3 дня** (`REFRESH_FILLS`):
+> Эндпоинты ниже в runtime фазы 1 **не используются** (`REFRESH_FILLS`
+> снят, `docs/decisions/pnl-finalization-mechanics.md` реш.1); оставлены
+> справочно.
+
+- **Fills 3 дня**:
   `GET /api/v5/trade/fills`. Permission: Read. Rate limit: 60 req / 2 s
   по User ID.
-- **Fills 3 месяца** (звено `REFRESH_FILLS`, эскалация 3d→3m **внутри
-  команды**): `GET /api/v5/trade/fills-history`. Permission: Read. Rate
-  limit: 10 req / 2 s по User ID. `REFRESH_FILLS` обходит `/trade/fills`
-  (3d) → `/trade/fills-history` (3m) внутри одной команды (см.
-  `docs/decisions/refresh-evidence-cycle-ownership.md`); отдельной
-  `REFRESH_FILLS_HISTORY`-команды нет. Архив 3m+ (`fills-archive`,
+- **Fills 3 месяца**: `GET /api/v5/trade/fills-history`. Permission: Read.
+  Rate limit: 10 req / 2 s по User ID. Архив 3m+ (`fills-archive`,
   async-флоу) — `OKX-Q2` (шаг 7).
 
 ## Query (одинаковые для обоих)

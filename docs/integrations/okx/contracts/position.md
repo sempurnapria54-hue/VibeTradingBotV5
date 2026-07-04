@@ -50,13 +50,22 @@ Mapping в `Position` — `docs/models/mapping/Position.md` (раздел
 Ретраи на refresh — только при технических/API проблемах (timeout,
 connection reset, 5xx, rate limit, temporary error).
 
-## История закрытых позиций (не используется; форвард В-3 — шаг 7)
+## История закрытых позиций (источник числа `resultProfit` — шаг 7)
 
 `GET /api/v5/account/positions-history`. Permission `Read`; rate
 limit 10 req / 2 s по User ID. Глубина — 3 месяца, сортировка по
 `uTime` (новые первыми). Офдок: «Get positions history». Статус:
-не используется; форвард-кандидат **В-3** (шаг 7, P&L закрытых
-позиций) — передан владельцу шага заметкой (backlog).
+**источник заголовочного числа** `Deal.resultProfit` (готовый net
+`realizedPnl`) — выбран на `GAPS_CLOSE_1` шага 7 (2026-07-03; **В-3
+закрыт**, `docs/decisions/result-profit-source.md`). `closeAvgPx`/
+`openAvgPx` покрывают среднюю цену выхода/входа (fills для этого не
+нужны).
+
+**Добыча:** эндпоинт добывается командой **`REFRESH_POSITIONS_HISTORY`**
+(наполняет транзитный `PositionCloseResultExternalSnapshot` — число
+`Deal.resultProfit`; `docs/decisions/pnl-finalization-mechanics.md`
+реш.1). Native-модель — `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`;
+mapping native→snapshot→`Deal` — `docs/models/mapping/PositionCloseResult.md`.
 
 - **Query (все опц.):** `instType`, `instId`, `mgnMode`
   (`cross`/`isolated`), `type` (тип последнего закрытия: `1`
@@ -76,6 +85,22 @@ limit 10 req / 2 s по User ID. Глубина — 3 месяца, сортир
   закрытия — после этого новая позиция получает новый `posId`),
   `instType`/`instId`, `mgnMode`, `posSide`, `direction`, `lever`,
   `ccy`, `uly`, `cTime`/`uTime`.
+
+### Инвариант агрегации (N11, требует рантайм-верификации)
+
+**Инвариант:** одна сделка ↔ один `posId` ↔ **одна финализированная**
+запись positions-history, чей `realizedPnl` **кумулятивен по ВСЕМ**
+partial-закрытиям и доборам за жизнь позиции; читается **финализированной**
+(позиция полностью закрыта / flat по `REFRESH_POSITION`).
+
+**Помечено как предположение** до рантайм-верификации (контур source-api,
+demo, `.claude/tests/source-api/okx/plan.md` §AG1). Верифицировать:
+агрегирует ли OKX partial-выходы (partial TP `type` 1 → SL `type` 2) в
+**одну** запись на `posId`, и в какой момент запись **финализирована**.
+Риск чтения нефинализированной / послайсовой записи → **систематический
+недосчёт realized** (левый хвост R-распределения усечён молча). **Гейтит
+корректность числа** `Deal.resultProfit` → верификация до `CODE`
+(`docs/decisions/pnl-finalization-mechanics.md` реш.6).
 
 ## ACK-семантика close-position
 

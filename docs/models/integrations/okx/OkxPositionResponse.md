@@ -50,9 +50,11 @@ close-position ACK — `docs/integrations/okx/contracts/position.md`.
   `hedgedPos`, `last`, `idxPx`, `usdPx`, `bePx`, `nonSettleAvgPx`,
   `uplRatio`, `uplLastPx`, `uplRatioLastPx`.
 - **Risk-метрики:** `imr`, `mmr`, `mgnRatio`, `notionalUsd`, `adl`.
-- **Реализованный PnL и комиссии** (агрегация через fills/finalization,
-  не через `Position`): `realizedPnl`, `settledPnl`, `pnl`, `fee`,
-  `fundingFee`, `liqPenalty`.
+- **Реализованный PnL и комиссии** (не у live `/positions` — приходят из
+  **positions-history**, native `OkxPositionsHistoryResponse`
+  (`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`); число
+  `Deal.resultProfit` = net `realizedPnl` оттуда, не из этого DTO):
+  `realizedPnl`, `settledPnl`, `pnl`, `fee`, `fundingFee`, `liqPenalty`.
 - **Margin / debt / interest** (margin-режимы, для USDT-SWAP не
   применимо): `ccy`, `interest`, `liab`, `liabCcy`,
   `pendingCloseOrdLiabVal`.
@@ -72,9 +74,10 @@ close-position ACK — `docs/integrations/okx/contracts/position.md`.
 
 Причины фильтра: `availPos` не нужен (partial exit — через
 reduce-only `Order`/`AlgoOrder`, не close-position); `bePx` не нужен
-для live-risk; `realizedPnl`/`fee`/`fundingFee`/`pnl` —
-агрегация в `Deal.resultProfit` через fills/finalization, не через
-`Position`.
+для live-risk; `realizedPnl`/`fee`/`fundingFee`/`pnl` — realized-факты
+закрытой позиции, живут в **positions-history** (число `Deal.resultProfit`
+= net `realizedPnl` оттуда, `docs/decisions/result-profit-source.md`), а не
+в live `/positions`.
 
 ## Close-position response
 

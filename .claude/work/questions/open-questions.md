@@ -101,6 +101,17 @@ error-политика (`docs/rules/error-handling-policy.md`) и форвард
 `docs/decisions/controlled-violation-exchange-wide-hold.md` (вариант (1):
 безусловный L4, доминирует L3; + переиспользуемый принцип консервативного
 торможения под неизвестный радиус незрелой интеграции).
+На `GAPS_CLOSE_1` шага 7 (2026-07-03) закрыты **OKX-Q1** (persisted `TradeFill`
+не вводится; пофилловый аудит вне фазы 1) и **OKX-Q3** (bills — разбивка +
+сверка, не первоисточник числа; funding в P&L — через bills/positions-history,
+не через `funding-rate-history`) решением
+`docs/decisions/result-profit-source.md`: заголовочное `Deal.resultProfit` =
+net `realizedPnl` из positions-history (**В-3 закрыт**), `REFRESH_FILLS` — кандидат
+на снятие (stage-1, `DOCS_CHECK_2`). Закрыт **остаток DEAL-Q2** (число на
+`EMERGENCY_CLOSED` = фактический realized net вкл. `liqPenalty`, G5;
+`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»). **В-7
+активирован**: прогнозная комиссия включена в риск-сайзинг (G6,
+`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»).
 
 История закрытых вопросов пайплайна:
 
@@ -192,37 +203,6 @@ Precheck/AnomalyJob учесть легитимное **окно двойной 
 `docs/components/ServiceCommandExecutor.md`,
 `docs/components/IntegrationService.md`.
 
-### OKX-Q1. Persisted `TradeFill` модель и executor финализации
-
-OKX endpoint'ы `GET /trade/fills` и `GET /trade/fills-history`
-обеспечивают факты исполнения. На первом этапе `Fill` как persisted
-entity не введён: `RefreshFillsExecutor` агрегирует filled-метрики в
-существующие `Order`/`AlgoOrder`/`Position`. Не решено, нужна ли
-отдельная persisted-сущность `TradeFill` (для аудита / detailed PnL /
-recovery) и как именно она ложится на `Deal.resultProfit`.
-
-Цитаты источника (архив, `Получить сделки за последние 3 дня REST.md`):
-- «**fills ≠ ордера**: Order = заявка ... Fill = конкретная сделка
-  (каждое исполнение ордера порождает 1 или несколько fills).»
-- «`billId` — внутренний ID записи (используется как **якорь для
-  пагинации** через `after/before`).»
-
-Также в `docs/components/RefreshFillsExecutor.md` зафиксировано:
-«`Fill` как отдельную persisted entity на первом этапе не вводим
-(один общий `RefreshFillsExecutor`; материализация `TradeFill` —
-backlog).»
-
-Варианты: (1) ввести `docs/models/domain/other/TradeFill.md` + lifecycle (по
-аналогии с `Order`/`AlgoOrder`) — даёт source-of-truth для PnL и
-аудита; (2) оставить агрегацию в `Order`/`AlgoOrder`/`Position`, без
-TradeFill — проще, но fills не персистятся отдельно. До решения
-поля DTO зафиксированы в `docs/models/integrations/okx/OkxFillResponse.md`;
-маппинг → snapshot не описан (откладывается).
-Связано: `docs/models/integrations/okx/OkxFillResponse.md`,
-`docs/models/mapping/TradeFill.md`,
-`docs/components/RefreshFillsExecutor.md`,
-`docs/models/domain/aggregate/Deal.md` §Итоговый PnL.
-
 ### OKX-Q2. Persisted `TradeFillsArchive` и async-флоу выгрузки
 
 OKX endpoint'ы `POST/GET /trade/fills-archive` дают доступ к fills
@@ -247,53 +227,9 @@ polling state) и persisted-модель `TradeFillsArchive`.
 зафиксированы в `docs/models/integrations/okx/OkxFillsArchiveResponse.md` и
 `docs/integrations/okx/contracts/fills-archive.md`.
 Связано: `docs/models/integrations/okx/OkxFillsArchiveResponse.md`,
-`docs/integrations/okx/contracts/fills-archive.md`, OKX-Q1.
-
-### OKX-Q3. Bills (`account/bills`) как источник `DealCashFlow`
-
-OKX endpoint'ы `GET /account/bills` (7d) и `/account/bills-archive`
-(3m) дают записи движения денег по аккаунту: realized PnL,
-комиссии/rebate, funding, прочие cashflow-события. Для итогового
-`Deal.resultProfit` bills могут быть **полнее** fills, потому что
-включают funding и rebate, не привязанные к конкретному ордеру.
-Доменно `AccountBill` / `DealCashFlow` не введены; вопрос — нужны ли
-сейчас.
-
-Цитаты источника (архив, `Получить bill-записи аккаунта за последние 7 дней REST.md`):
-- «В отличие от fills, bills показывают именно **изменение денег на
-  аккаунте**, а не только факт исполнения ордера.»
-- «Для финального `Deal.resultProfit` bills могут быть точнее, потому
-  что туда попадают не только trade executions, но и funding.»
-- Рекомендуемая логика (архив): «Запросить bills ... Сохранить как
-  DealCashFlow ... `Deal.resultProfit = sum(DealCashFlow.amount)`.»
-
-Варианты: (1) ввести `docs/models/domain/other/DealCashFlow.md` + executor
-`RefreshDealCashFlowExecutor` (или общий `RefreshDealFinalizationExecutor`
-с fills + bills) — даёт самый точный PnL; (2) считать PnL только через
-fills (без funding/rebate) — проще, но менее точно; (3) отложить до
-явной потребности. До решения контракт endpoint'ов и поля responses —
-`docs/models/integrations/okx/OkxAccountBillResponse.md` и
-`docs/integrations/okx/contracts/account-bills.md`.
-
-**Смежный вход (В-6, скан интегратора 2026-06-11):** funding в P&L
-достижим **двумя путями** — bills `subType` 173/174 (фактические
-списания/начисления по аккаунту) и публичный
-`funding-rate-history.realizedRate` (ставки расчётных периодов, без
-привязки к позиции) — `docs/integrations/okx/contracts/funding-rate.md`.
-Шаг 7 выбирает один путь осознанно (bills точнее для фактического
-P&L; ставки — для прогноза/сверки), не ведёт два параллельных трека.
-Deep-архив bills с 2021 теперь существует
-(`account-bills.md` §Deep-архив) — снимает прежнее «глубже 3 месяцев
-пути нет».
-
-Связано: `docs/models/integrations/okx/OkxAccountBillResponse.md`,
-`docs/integrations/okx/contracts/account-bills.md`,
-`docs/integrations/okx/contracts/funding-rate.md`,
-`docs/models/domain/aggregate/Deal.md` §Итоговый PnL. (Финализационная
-механика и терминальный контракт — DEAL-Q1/DEAL-Q2 **закрыты** на шаге 6:
-`docs/decisions/deal-finalization-state-materialization.md`,
-`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»; здесь —
-*расчёт* PnL, шаг 7.)
+`docs/integrations/okx/contracts/fills-archive.md`,
+`docs/decisions/result-profit-source.md` (OKX-Q1 закрыт — persisted `TradeFill`
+не вводится).
 
 ### OKX-Q4. WS-каналы OKX — отдельный заход
 
