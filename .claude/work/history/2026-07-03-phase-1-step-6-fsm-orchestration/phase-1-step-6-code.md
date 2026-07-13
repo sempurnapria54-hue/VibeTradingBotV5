@@ -447,3 +447,52 @@ Scope `CODE` сверён на полноту (§Сверка scope): весь s
 снята. Финальный аппрув `CODE` (за пользователем) → `SYNC_DOCS_FROM_CODE`
 (`divergence` docs←code) → пост-хок концепт-гейт §6a по концепт-инкрементам
 выше → `DONE`. Жёсткие гейты `DONE` (D-B3 / D-M1) — оба built.
+
+## Заход 2 разбора находок ревью (2026-07-01)
+
+Раздел дописан 2026-07-06 при чистке `backlog.md`: детали захода 2 жили
+только в backlog, в архив прогресс-файла не попали. Перенесено без
+переработки.
+
+### Kill-switch: per-инструмент контур ретрая-до-закрытия — построен
+
+`KillSwitchExecutor` — **аварийный executor** (не команда, не действие
+стратегии): teardown прямыми best-effort вызовами `IntegrationService`;
+подтверждение — дёрганьем `REFRESH_POSITION/ORDER/ALGO_ORDER` через
+диспетчер + `DealContextService.reloadRuntimeGraph` + проверка flat по
+доменным моделям (`hasLivePositionRisk`/`isLive`). Bounded ретрай — лимит
+из `kill-switch.max-teardown-attempts` (`KillSwitchProperties`). Не
+подтверждён flat в пределах лимита → `failure`, `SafetyHoldCoordinator`
+эскалирует L3 на биржевой холд + `fireExchange` (HOLD-Q1). Вызывающие —
+только программно: `SafetyHoldCoordinator` (построен) и `AnomalyJob`
+(форвард, шаг 8). Компиляция — JDK 25, зелёная. Актуальная семантика —
+`docs/components/KillSwitchExecutor.md`.
+
+### Декларативный kill-switch (Scope A/B) — откачён
+
+Kill-switch — аварийный выход, а не плановое действие стратегии; заводить
+его как `StrategyAction` (подтип + условие в стратегии) — смешение
+emergency-response со стратегической логикой (ровно эту цену показало
+ревью: валидация subtype↔actionType, роутинг, тихий залип). Удалены:
+`StrategyActionType.KILL_SWITCH`, `StrategyKillSwitchAction`
+(+entity/`V11`/api/4×маппинг), ветка `ManagingHandler` +
+`DealFsmSupport.executeKillSwitch`, интерфейс `StrategyActionExecutor`
+(без реализаций после ухода kill-switch), `StrategyActionRetryProperties`.
+`KillSwitchActionExecutor` → `KillSwitchExecutor` (обычный аварийный, не
+`StrategyActionExecutor`); retry-лимит → свой `kill-switch`-конфиг.
+
+### FSM/action слоистость — decision + Stage 1 построены
+
+Решение — `docs/decisions/fsm-execution-layering.md` (слои: петля →
+handler → оркестратор действия → `StrategyActionExecutor` →
+`CommandExecutor`; kill-switch сбоку; exit — условием-перехода). Stage 1
+(handler = 3 метода): `FsmHandler` = `checkEntry` (субъект + среда) /
+`checkTransition` (этап завершён → статус) / `handle` (прогресс действия);
+default-методы для инкрементальной миграции; `DealStateMachine` =
+`checkEntry.or(checkTransition).orElseGet(handle)`. Все 7 handler'ов
+разложены (6 с `checkEntry`/`checkTransition`; `ExitPending` — handle-only
+cleanup без входного условия). Компиляция JDK 25 + boot test-профиля
+зелёные (Flyway up-to-date, контекст стартует за ~7с). Stage 2/3-рефактор
+(`StrategyActionOrchestrator` + per-type executor'ы +
+`DealFinalizationCommandFactory`) выполнен далее на `SYNC_DOCS_FROM_CODE`
+— см. `history/2026-07-03-phase-1-step-6-fsm-orchestration.md`.

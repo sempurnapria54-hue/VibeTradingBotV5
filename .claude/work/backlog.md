@@ -20,45 +20,24 @@
 
 ## Статус
 
-- Миграция 6 торговых сущностей в `docs/` **завершена и закрыта**
-  (`.claude/work/history/2026-05-27-миграция-торговых-сущностей.md`).
-- Миграция архивных процессов (8 доков `Audit/`/`Calculation/`/`Deal
-  management/`) **завершена и закрыта 2026-05-28**
-  (`.claude/work/history/2026-05-28-миграция-процессов.md`). Покрытые
-  cross-cutting пункты ниже свёрнуты как закрытые; частично покрытые —
-  обновлены.
-- Миграция API-кластера OKX (26 REST endpoint-доков) **завершена и
-  закрыта 2026-05-28**
-  (`.claude/work/history/2026-05-28-миграция-api-okx.md`). П.10 ниже
-  свёрнут как закрытый.
-
-**Как читать пункты.** Каждый пункт — будущая или завершённая миграция
-кластера: источник + суть + указатель на архивные форвард-заметки. Полные
-форвард-заметки разворачиваются из соответствующей подпапки `history/`:
-`2026-05-27-миграция-торговых-сущностей/tasks-<сущность>.md` (модельный
-кластер) или `2026-05-28-миграция-процессов/tasks-<док>.md` (процессы).
-Архивные модели и процессные доки в `.claude-archive/` **не удалены** —
-источник для оставшихся миграций.
+Миграции 2026-05-27/28 (торговые сущности; архивные процессы; API-кластер
+OKX) **завершены и закрыты** —
+`history/2026-05-27-миграция-торговых-сущностей.md`,
+`2026-05-28-миграция-процессов.md`, `2026-05-28-миграция-api-okx.md`.
+Полные форвард-заметки пунктов — в одноимённых подпапках `history/`
+(`tasks-<сущность>.md` / `tasks-<док>.md`); архивные доки в
+`.claude-archive/` не удалены — источник для оставшихся миграций.
 
 ## Cross-cutting миграции
 
 ### 1. Deal management: lifecycle, FSM, команды — ✅ ЗАКРЫТО (2026-05-28)
 
-Мигрировано: `DealContext` (RVO) + `DealContextService`; FSM handlers
-per-status (`PrecheckHandler`…`ErrorHandler`), `DealStateMachine` (+3
-проверки), `StrategyConditionEvaluator`; подсистема `ServiceCommand`
-(`ServiceCommand`+`ServiceCommandType`, `ServiceCommandPayload`,
-`ServiceCommandExecutor`, `ServiceCommandFactory`, `ClientService`,
-`RetryPolicyService`, 14 executor'ов); процесс `deal-management`; правила
-`command-lifecycle`, `runtime-error-classification`,
-`controlled-exchange-exceptions`, `trading-constraints`. Master-index
-«Статусы торговых сущностей» разобран по владельцам. Детали —
-`history/2026-05-28-миграция-процессов.md`.
-**Закрыто:** `DealActionState`/`Retryable`/`RuntimeTarget` модель (DEAL-Q3,
-`GAPS_CLOSE_1` шага 4); финализационные executor'ы (`FINALIZE_*`/`MARK_*`) +
-дом retry-state `DealFinalizationState` (DEAL-Q1, `GAPS_CLOSE_1` шага 6,
-`docs/decisions/deal-finalization-state-materialization.md`). Код executor'ов
-— на `CODE` шага 6.
+FSM, command-layer, процесс `deal-management` и правила мигрированы —
+детали в `history/2026-05-28-миграция-процессов.md`. Хвосты закрыты:
+DEAL-Q3 (`docs/decisions/deal-action-state-materialization.md`), DEAL-Q1 +
+финализационные executor'ы
+(`docs/decisions/deal-finalization-state-materialization.md`; код — на
+`CODE` шага 6).
 
 ### 2. Resolver / mapper / checker компоненты — частично
 
@@ -75,41 +54,26 @@ per-status (`PrecheckHandler`…`ErrorHandler`), `DealStateMachine` (+3
 
 ### 3. Калькуляторы действий стратегии + RVO — ✅ ЗАКРЫТО (2026-05-28)
 
-Мигрировано: `StrategyActionCalculator`, `CalculationContextFactory`,
-`PriceCalculator`, `SizeCalculator`, `MarketPriceDataService`,
-`InstrumentExternalRulesService`; RVO `CalculationContext`,
-`MarketPriceData`, `CalculatedStrategyAction`,
-`StrategyActionCalculationResult`, `CalculationError`, `CalculatedPrice`,
-`CalculatedSize`; процесс `strategy-action-calculation`.
-`StrategyConditionEvaluator` — в п.1. `InstrumentExternalRules` модель — в
-п.5. **Осталось:** `RiskSettings` (RISK-Q1) — `open-questions.md`
-(`PositionContext` — PROC-Q1 закрыт 2026-06-06: рудимент, не
-материализуется).
+Калькуляторы, RVO и процесс `strategy-action-calculation` мигрированы —
+детали в `history/2026-05-28-миграция-процессов.md`. Хвосты закрыты:
+RISK-Q1 (`docs/decisions/per-trade-risk-policy.md`), PROC-Q1 — рудимент
+`PositionContext` не материализуется
+(`history/2026-06-06-delegation-validation.md`).
 
 ### 4. Risk-слой — ✅ ЗАКРЫТО (2026-05-28)
 
-Мигрировано: `RiskValidator`, `RiskBlockResolver`; RVO
-`RiskValidationResult`, `RiskCheckResult` (+ `RiskCheckCode`),
-`RiskBlockAction`; правило `risk-validator-scope`; процесс
-`risk-evaluation`. `TradeRuleValidator` (контекст-док) — см. п.7.
+Risk-слой (валидатор, resolver, RVO, правило, процесс `risk-evaluation`)
+мигрирован — детали в `history/2026-05-28-миграция-процессов.md`.
+`TradeRuleValidator` (контекст-док) — см. п.7.
 
 ### 5. Расчёт индикаторов и рыночных данных — ✅ ЗАКРЫТО (2026-05-28)
 
-Мигрировано: jobs `CandleJob`, `InstrumentExternalRulesSyncJob`,
-`IndicatorJob`, `MarketStructureJob`, `MarketPhaseJob`; сервисы
-`Indicator`/`MarketStructure`/`MarketPhase` Service;
-`MarketDataExpirationChecker` (+ RVO `MarketDataExpirationResult`);
-market-data модели `InstrumentExternalRules`, `IndicatorValue`,
-`MarketStructure` (+ `MarketPriceLevel`), `MarketPhase`; правило
-`market-data-freshness`; процесс `market-data-calculation`; OKX
-`okx-timeframe-mapping`/`okx-instrument-mapping`/`okx-market-price-data-mapping`.
-**Осталось (вне процессных доков):** standalone модели `Candle` и
-`Instrument` материализованы в `GAPS_CLOSE_1` шага 1
-(`docs/models/domain/other/Candle.md`, `.../CandleGroup.md` +
-`docs/lifecycles/CandleGroup.md`; `docs/models/domain/core/Instrument.md`);
-`TimeFrame` размещён в `CandleGroup.md` (TIME-Q1 закрыт на
-`GAPS_CLOSE_1` шага 2: раздел в `Strategy.md` сведён к ссылке).
-Архивный исходник (легаси) —
+Jobs, сервисы, market-data модели, правило и процесс
+`market-data-calculation` мигрированы — детали в
+`history/2026-05-28-миграция-процессов.md`. Хвосты закрыты: standalone
+`Candle`/`CandleGroup`/`Instrument` материализованы на `GAPS_CLOSE_1`
+шага 1 (`docs/models/domain/other/Candle.md` и соседние), `TimeFrame`
+размещён в `CandleGroup.md` (TIME-Q1). Архивный легаси-исходник —
 `.claude-archive/2026-05-21/docs/deprecated/models/domain/old/Candle.md`.
 
 ### 6. Аудит и история исполнения; финализация PnL — частично
@@ -204,34 +168,24 @@ base/quote/settle больше не претендует — снят дубль
 `docs/models/mapping/Instrument.md`). **Осталось:** полный lifecycle
 `Exchange` (`HOLD`/`DISABLED` среди состояний), периферийные статусы
 `Instrument` (`HOLD`, `ERROR`-recovery, повторный онбординг,
-`CLOSED`), `Account`; материализация отложенной rules-подсистемы
-(`InstrumentExternalRules` + `InstrumentExternalRulesSyncJob`;
-округление/sizing/риск — поздние шаги) и её соотнесение со
-снапшот-концепцией / возможный ренейм — INSTR-Q1
-(`open-questions.md`).
+`CLOSED`), `Account`. Соотнесение rules-подсистемы со
+снапшот-концепцией — INSTR-Q1 — **закрыто** на `GAPS_CLOSE_1` шага 5
+(материализована JSONB-навесом на `Instrument`, без ренейма —
+`docs/decisions/instrument-external-rules-materialization.md`).
+Связанный открытый вопрос: ORCH-Q1 (владелец оркестрации онбординга
+инструмента и загрузки свечей; ось владения `Instrument.Status`) —
+`open-questions.md`.
 
 **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
 `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q4).
 
 ### 10. API-кластер OKX — ✅ ЗАКРЫТО (2026-05-28)
 
-REST endpoint-доки из `.claude-archive/2026-05-21/docs/api/okx/*`
-мигрированы в `docs/integrations/okx/`. Что покрыто: order/algo/position/
-balance/instrument/market-price-data — дополнены endpoint'ами,
-rate-limit, permission, response-полями (`cTime`/`uTime` и др.);
-candle (`okx-candle-mapping.md`), fills (`okx-fills-mapping.md` +
-`OkxFillResponse`), fills-archive async-флоу
-(`okx-fills-archive-mapping.md` + `OkxFillsArchiveResponse`), bills
-(`okx-account-bills-mapping.md` + `OkxAccountBillResponse`),
-connectivity (`okx-ws-limits.md` + `okx-service-urls.md`). Не
-мигрировано: устаревший раздел «Реализация в коде (Stage 02)» обзорного
-файла; полноценная WS-документация (OKX-Q4). Playbooks v1 — вне
-скоупа. Детали — `history/2026-05-28-миграция-api-okx.md`.
-**Связанные open-questions:** OKX-Q1 (persisted `TradeFill`) — **закрыт**
-(GAPS_CLOSE_1 шага 7: не вводится, `docs/decisions/result-profit-source.md`);
-OKX-Q2 (`TradeFillsArchive` + async-флоу) — открыт; OKX-Q3 (bills как источник
-`DealCashFlow` / финализации `Deal`) — **закрыт** (там же: bills — разбивка +
-сверка); OKX-Q4 (WS-каналы отдельным заходом) — открыт.
+26 REST endpoint-доков мигрированы в `docs/integrations/okx/` — детали в
+`history/2026-05-28-миграция-api-okx.md`. Открытые хвосты: OKX-Q2
+(`TradeFillsArchive` async-флоу) и OKX-Q4 (WS-документация) —
+`open-questions.md`; OKX-Q1/OKX-Q3 закрыты
+(`docs/decisions/result-profit-source.md`). Playbooks v1 — вне скоупа.
 
 ### Отложенные продуктовые вопросы (future)
 
@@ -246,14 +200,10 @@ OKX-Q2 (`TradeFillsArchive` + async-флоу) — открыт; OKX-Q3 (bills к
 
 ### P1. Код-шаблоны для `code-writer` — ✅ ЗАКРЫТО (2026-05-31)
 
-Прежняя формулировка (отложенные «референс-доки» как источник
-примеров для `code-writer`) пересмотрена. Решённая модель:
-код-шаблоны (абстрактные паттерны) — тир `.claude/templates/code/`,
-вход для написания; `find-code-examples` — пост-код-скилл подбора
-примеров из реального кода для доков. Отдельного слоя «референс-доков»
-нет. Материализован первый шаблон —
-`.claude/templates/code/Java/Controller.md`. Обоснование и закрытие
-REF-Q1 — `.claude/decisions/code-templates-vs-examples.md`.
+Решённая модель: код-шаблоны — тир `.claude/templates/code/` (вход для
+письма), `find-code-examples` — пост-код-скилл; отдельного слоя
+«референс-доков» нет. Обоснование и закрытие REF-Q1 —
+`.claude/decisions/code-templates-vs-examples.md`.
 
 ## Шаг «Безопасность» (Фаза 1, шаг 9) — форвард-материал
 
@@ -264,13 +214,10 @@ REF-Q1 — `.claude/decisions/code-templates-vs-examples.md`.
 
 ### S1. Конфигурация секретов через Vault — ✅ базовая привязка ЗАКРЫТА (2026-06-12)
 
-**Сделано на инфра-шаге** (раньше планового шага 9, см. снапшот v47):
-Vault-привязка секретов через `spring.config.import: vault://` per-profile —
-datasource (`tradingbot/postgres[-test]`) и OKX-креды
-(`tradingbot/okx[-test]`); env-плейсхолдеры значений; `vault://` только в
-`spring.config.import` (бизнес-поля Vault не знают); реальные секреты не
-коммитятся (`.env.*.local` gitignored; Vault-токен — через IDEA run-config
-env). Это переносит сюда ранее отложенный тезис «секреты через Vault».
+**Сделано на инфра-шаге** (раньше планового шага 9): Vault-привязка
+секретов per-profile (`spring.config.import: vault://` — datasource и
+OKX-креды) — детали в снапшоте v47 и `.claude/rules/tech-radar.md`
+(строка spring-cloud-vault).
 
 **Остаётся на шаг 9 (остаточный хардненинг):** политики/approle вместо
 root/dev-token, ротация секретов, unseal/инициализация Vault не в dev-режиме,
@@ -324,46 +271,21 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 ### Шаг 6 (FSM)
 
 - **Бесстоповый risk-creating вход — ✅ ЗАКРЫТО в доках (`GAPS_CLOSE_1`
-  шага 6, 2026-06-22).** Заведён инвариант
-  `docs/rules/risk-creating-entry-protection.md`: risk-creating вход без
-  резолвимого стопа не доходит до постановки — `PRECHECK` блокирует (`CLOSED`
-  + `RISK_CONTROL`), до live risk. Снят fail-open `RiskValidator` (новый код
-  `RISK_CREATING_ENTRY_WITHOUT_STOP` вместо allocation-сайзинга в обход
-  `RISK_PER_TRADE`); `EntryFinalizedHandler` больше не допускает позицию с
-  live risk без защиты; нарушение постфактум → реакция уровня 4 (холд биржи +
-  kill-switch + `AnomalyReport`). Закрывает TR1 `DOCS_CHECK_1` шага 6.
-  **Код-снятие fail-open** (`RiskValidator`/`SizeCalculator`,
-  `PrecheckHandler` + set-leverage) — на `CODE` шага 6. Источник —
-  `.claude/work/progress/phase-1-step-5-code.md` §Форвард-концепт.
+  шага 6, 2026-06-22).** Инвариант —
+  `docs/rules/risk-creating-entry-protection.md` (`PRECHECK` блокирует вход
+  без резолвимого стопа; закрыл TR1 `DOCS_CHECK_1` шага 6). **Код-снятие
+  fail-open** (`RiskValidator`/`SizeCalculator`, `PrecheckHandler` +
+  set-leverage) — на `CODE` шага 6.
 - **Error-градация уровни 3-4: реактивный enforcement холдов — ✅ ПОСТРОЕН
-  (CODE-делта холдов шага 6, 2026-06-23; D2-реактивный снят).** Реактивный
-  CRITICAL-холд L3/L4 построен по `phase-1-step-6-holds-design.md`: новый
-  `Status.TRADE_BLOCKED` (Instrument+Exchange, только из ACTIVE) + `HoldSignal` в
-  `DealTransition` + `SafetyHoldCoordinator` (в проходе `DealOrchestratorJob` под
-  D-M1: TRADE_BLOCKED первым → `AnomalyReport` CREATED/before → kill-switch →
-  KILL_SWITCH_EXECUTED/after → COMPLETED) + `KillSwitchService` (L3 граф сделки /
-  L4 каскадный sweep, эмитент `EXECUTE_KILL_SWITCH`) + `AnomalyReport` Java-стек
-  (модель/entity/repo/dataservice/mapper/`V10`, явный `scope`) + enforcement
-  (`EntryScannerJob` фильтр инструмент+биржа; `enforceHold` активных сделок →
-  ERROR со shutdownReason). Триггеры: L3 = бесстоповая позиция постфактум
-  (`markErrorStopless`, §8.C); L4 = controlled-violation (`VALIDATION_ERROR` ⟺
-  `ControlledExchangeException`). Сверка — `phase-1-step-6-code.md` §Реактивные
-  холды. **Доработка дельты (2026-06-24):** два сужения сняты — (A) **внешние
-  (биржевые) слепки `AnomalyReport.external_*` теперь собираются** (`getPosition`+
-  `getPendingOrders` по instId триггера, before при CREATED / after после
-  kill-switch, best-effort, схема открытая/аддитивная); (B) **ручной un-hold
-  `TRADE_BLOCKED → ACTIVE` построен через REST** (`trade-unblock` на
-  instrument+exchange, L4 — одно снятие отпускает каскад). Плюс хардненинг
-  `SafetyHoldCoordinator` (exception-total, журнал не гейтит kill-switch).
-  **Остаётся форвардом (узко):** (1) **проактивная детекция** аномалий
-  (`AnomalyJob`/`TradeRuleValidator` + численный порог «серия неудач» STRUCT-Q1)
-  — **шаг 8**; (2) **точный локальный after через REFRESH_*** + **биржа-широкая
-  L4-реконсиляция** (внешний слепок читает только instId триггера) — **шаг 8**;
-  (3) **аудит ручного un-hold** (кем/когда) — **шаг 9 / п.9** (сама операция
-  un-hold построена). Доки
-  (`instrument-hold.md`/`exchange-hold.md`/`error-handling-policy.md`,
-  `risk-creating-entry-protection.md` §2 → L3, §8.C) выравниваются общим
-  `SYNC_DOCS_FROM_CODE`.
+  (CODE-делта холдов шага 6, 2026-06-23/24; D2-реактивный снят).** Детали —
+  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-holds-design.md`
+  и там же `phase-1-step-6-code.md` (§Реактивные холды L3/L4, §Доработка
+  холд-дельты). **Остаётся форвардом (узко):** (1) **проактивная детекция**
+  аномалий (`AnomalyJob`/`TradeRuleValidator` + численный порог «серия
+  неудач» STRUCT-Q1) — **шаг 8**; (2) **точный локальный after через
+  REFRESH_*** + **биржа-широкая L4-реконсиляция** (внешний слепок читает
+  только instId триггера) — **шаг 8**; (3) **аудит ручного un-hold**
+  (кем/когда) — **шаг 9 / п.9** (сама операция un-hold построена).
 - **[MAJOR, perf] L4 `fireExchange` — небанженный O(сделок) burst под D-M1
   (ревью холд-дельты, 2026-06-24; порог актуальности — фаза 3).**
   `KillSwitchService.fireExchange` итерирует небанженный
@@ -389,10 +311,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   condition), либо короткоживущий per-tick кэш в `MarketPriceDataService`.
   Кросс-коллаборатор: `MarketConditionContextFactory.build` шарится с FSM
   (`DealFsmSupport.conditionContext`). Источник — повторное ревью фикс-дельты (v63).
-- **`EXECUTE_KILL_SWITCH` — эмиссия команды — ✅ ПОДКЛЮЧЕНА** (CODE-делта холдов,
-  2026-06-23). Тонкий эмиттер — `KillSwitchService` (вызывается из
-  `SafetyHoldCoordinator`); заменил удалённый орфан
-  `DealFsmSupport.killSwitchCommand()`. `KillSwitchExecutor` без изменений.
+- **`EXECUTE_KILL_SWITCH` — эмиссия — ✅ ПОДКЛЮЧЕНА** (CODE-делта холдов,
+  2026-06-23; позже на §6a kill-switch перестал быть командой — тип
+  `EXECUTE_KILL_SWITCH` убран, side-executor зовётся из `KillSwitchService`;
+  см. `docs/components/KillSwitchExecutor.md`).
 - **Унификация инфраструктуры джоб — форвард, горизонт фаза 3 (код-ревью заход 2,
   2026-07-01).** Ревью-замечания «общий родитель джоб» (п.4) и «единый механизм
   локов» (п.5) — доработка механизма замыкания под мультиинстанс/микросервисы,
@@ -450,52 +372,30 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   timeOut 0|[10,120] с). Покрытие algo-ордеров CAA офдоком не
   специфицировано — уточнить на шаге.
 - **Kill-switch: ретрай-до-закрытия + сверка реального состояния биржи
-  (ANOM-Q2).** На холд-дельте шага 6 построен **узкий гейт** терминала
-  `AnomalyReport`: COMPLETED только при подтверждённом закрытии. **Per-инструмент
-  контур — ✅ ПОСТРОЕН (код-ревью заход 2, 2026-07-01):** `KillSwitchExecutor` —
-  **аварийный executor** (не команда, не действие стратегии): teardown прямыми
-  best-effort вызовами `IntegrationService`; **подтверждение — дёрганьем
-  `REFRESH_POSITION/ORDER/ALGO_ORDER` через диспетчер** +
-  `DealContextService.reloadRuntimeGraph` + проверка flat по доменным моделям
-  (`hasLivePositionRisk`/`isLive`). Bounded ретрай — лимит из
-  `kill-switch.max-teardown-attempts` (`KillSwitchProperties`). Не подтверждён flat
-  в пределах лимита → `failure`, `SafetyHoldCoordinator` эскалирует L3 на
-  **биржевой холд + `fireExchange`** (HOLD-Q1). Вызывающие — **только программно:**
-  `SafetyHoldCoordinator` (построен) и `AnomalyJob` (форвард, шаг 8). Компиляция —
-  JDK 25, зелёная.
-  **Декларативный kill-switch (Scope A/B) — ✅ ОТКАЧЁН (2026-07-01):** kill-switch —
-  аварийный выход, а не плановое действие стратегии; заводить его как `StrategyAction`
-  (подтип + условие в стратегии) — смешение emergency-response со стратегической
-  логикой (ровно эту цену показало ревью: валидация subtype↔actionType, роутинг,
-  тихий залип). Удалены `StrategyActionType.KILL_SWITCH`, `StrategyKillSwitchAction`
-  (+entity/`V11`/api/4×маппинг), ветка `ManagingHandler` + `DealFsmSupport.executeKillSwitch`,
-  интерфейс `StrategyActionExecutor` (без реализаций после ухода kill-switch),
-  `StrategyActionRetryProperties`. `KillSwitchActionExecutor` → `KillSwitchExecutor`
-  (обычный аварийный, не `StrategyActionExecutor`); retry-лимит → свой
-  `kill-switch`-конфиг.
+  (ANOM-Q2).** **Per-инструмент контур — ✅ ПОСТРОЕН**, **декларативный
+  kill-switch (Scope A/B) — ✅ ОТКАЧЁН** (код-ревью заход 2, 2026-07-01):
+  kill-switch — аварийный side-executor с bounded-ретраем и подтверждением
+  flat, не команда и не действие стратегии. Семантика —
+  `docs/components/KillSwitchExecutor.md`; детали захода —
+  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
+  §Заход 2 разбора находок.
   **Остаётся форвардом:** (1) **AnomalyJob-путь** (проактивная детекция → зов
   executor'а) + общебиржевая **orphan-сверка** (сущности вне модели сделки) +
-  перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 — **шаг 8**; (2)
-  **PnL-финализация `EMERGENCY_CLOSED`** (остаток DEAL-Q2 закрыт G5: число =
-  фактический realized net вкл. `liqPenalty`; расчёт — шаг 7);
-  (3) доки — общим `SYNC_DOCS_FROM_CODE` после апрува. Связано с **ANOM-Q2**
-  (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`). Источник —
-  `phase-1-step-6-code.md` §Заход 2 разбора находок.
-- **FSM/action слоистость — decision + Stage 1 готовы (2026-07-01).** Решение —
-  `docs/decisions/fsm-execution-layering.md` (слои: петля → handler → оркестратор
-  действия → `StrategyActionExecutor` → `CommandExecutor`; kill-switch сбоку; exit —
-  условием-перехода). **Stage 1 (handler = 3 метода) — ✅ ПОСТРОЕН:** `FsmHandler` =
-  `checkEntry` (субъект + среда) / `checkTransition` (этап завершён → статус) /
-  `handle` (прогресс действия); default-методы для инкрементальной миграции;
-  `DealStateMachine` = `checkEntry.or(checkTransition).orElseGet(handle)`. Все 7
-  handler'ов разложены (6 с `checkEntry`/`checkTransition`; `ExitPending` — handle-only
-  cleanup без входного условия). Компиляция JDK 25 + **boot test-профиля зелёные**
-  (Flyway up-to-date, контекст стартует за ~7с). **Форвардом (следующие заходы шага 6):**
-  **Stage 2** — per-pass `StrategyActionExecutor` на тип действия (обобщает
-  `DealActionPlanner`+фабрику, сохраняет CMD-Q6); **Stage 3** — transition-conditions
-  в модели стратегии + exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) +
-  снять вырожденный `CLOSE_FULL`. Доки (компонент-доки handler'ов, `DealStateMachine.md`)
-  — общим `SYNC_DOCS_FROM_CODE` после апрува.
+  перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 — **шаг 8**;
+  (2) **PnL-финализация `EMERGENCY_CLOSED`** (остаток DEAL-Q2 закрыт G5:
+  число = фактический realized net вкл. `liqPenalty`; расчёт — шаг 7).
+  Связано с **ANOM-Q2**
+  (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`).
+- **FSM/action слоистость — decision + Stage 1 — ✅ ПОСТРОЕНЫ (2026-07-01).**
+  Решение — `docs/decisions/fsm-execution-layering.md` (в т.ч. §Handler — 3
+  метода); детали Stage 1 —
+  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
+  §Заход 2 разбора находок. Stage 2/3-рефактор (`StrategyActionOrchestrator`
+  + per-type executor'ы) выполнен на `SYNC_DOCS_FROM_CODE` шага 6 —
+  `history/2026-07-03-phase-1-step-6-fsm-orchestration.md`. **Форвардом
+  (остаток Stage 3):** transition-conditions в модели стратегии +
+  exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) + снять
+  вырожденный `CLOSE_FULL` — сверить остаток с as-built шага 6.
 
 ### Рассмотрено, не берём (прогоны 2-3)
 
@@ -536,7 +436,8 @@ Refinements, сознательно отложенные при `CODE` шага 
   оставлена возвращающей `empty`, `ManagingHandler` стоит в `MANAGING`;
   обоснование — самостоятельный объёмный refinement, не нужен базовой петле
   фазы 1, `DONE` шага 6 не гейтит. Сверка —
-  `.claude/work/progress/phase-1-step-6-code.md` §Сверка scope.
+  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
+  §Сверка scope.
 - **Refresh algo: external-поля дерева `condition`.** `updateFromSnapshot`
   игнорит `condition`; обновляются только top-level факты срабатывания.
   Обновление trigger/trailing external-цен из снапшота — добрать.
@@ -682,16 +583,9 @@ Jackson 3 (`tools.jackson`). Бин `ObjectMapper` сейчас даём
 
 ### I3. `OkxSigningInterceptor` — внятная ошибка на пустых кредах — ✅ ЗАКРЫТО (2026-06-20)
 
-При незаполненных OKX-кредах (`api-key/secret/passphrase` = null)
-интерсептор падал NPE на приватных вызовах вместо внятной ошибки
-«OKX credentials not configured».
-
-**Сделано (2026-06-20):** в `OkxSigningInterceptor.intercept` добавлен
-fail-fast `requireCredentials()` — при пустом любом из
-apiKey/secret/passphrase бросает `IllegalStateException` «OKX credentials
-not configured» до подписи и сети (не голый NPE на `secret.getBytes()`).
-Тест `ICredEmptyCredentialsLiveTest` переведён с наблюдения бага на
-ожидание внятной ошибки (ждёт `IllegalStateException` с этим сообщением).
+Fail-fast `requireCredentials()` в `OkxSigningInterceptor.intercept` +
+тест `ICredEmptyCredentialsLiveTest` переведён на ожидание внятной ошибки
+— детали в `history/2026-06-20-source-api-contour.md`.
 
 ### I4. Jackson 3 × Lombok beanspec мангли́нг в OKX-DTO (находка F4)
 
@@ -755,7 +649,8 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 
 Снимает зависимость demo-прогонов от ручного бута; prod-фаза остаётся за
 пользователем. Источник — пауза RUN пилота (run-log
-`.claude/work/progress/source-api-pilot-run-log.md`; снапшот v48).
+`history/2026-06-20-source-api-contour/source-api-pilot-run-log.md`;
+снапшот v48).
 
 > Примечание: ре-база контура на сырьё
 > (`.claude/decisions/source-api-target-rebase.md`) делает контур
@@ -765,47 +660,8 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 
 ## Ре-база source-api: снятие mapped-поверхности — ✅ ЗАКРЫТО (2026-06-18)
 
-Снято вместе с приземлением A2 raw-passthrough:
-
-- **`OkxProxyController`** переписан на A2 raw-passthrough (зовёт
-  `OkxRestClient`, отдаёт сырой `OkxApiResponse<T>`); mapped-эндпоинты
-  (снапшоты/`ExchangeAck`) сняты;
-- **mapped-цепочка `getMarketPriceData`** снята целиком:
-  `IntegrationService.getMarketPriceData` (+ impl), `MarketPriceDataMapper`,
-  `MarketPriceDataExternalSnapshot` (нет доменного потребителя; шаг 5
-  `HOLD`; RVO-класса не было). Live-цена цепочки идёт от сырого
-  `getTicker`. Forward-дизайн шага 5 сохранён в доках
-  (`docs/models/mapping/MarketPriceData.md`, `docs/components/models/MarketPriceData.md`)
-  со «Статус кода» — вернётся со сборкой рыночных данных.
-
-Не верифицировано компиляцией (нет Java/Maven в shell CC) — сверено по
-графу ссылок; компиляция — за пользователем. Источник —
+`OkxProxyController` переписан на A2 raw-passthrough, mapped-цепочка
+`getMarketPriceData` снята (forward-дизайн шага 5 сохранён в
+`docs/models/mapping/MarketPriceData.md`) — детали и следствия —
 `.claude/decisions/source-api-target-rebase.md` §Следствия.
 
-## Связанные открытые вопросы
-
-`.claude/work/questions/open-questions.md`:
-- **Продуктовые финализации `Deal`:** DEAL-Q1 (retry-state финализации) и
-  DEAL-Q2 (resultProfit при исчерпании retry) **закрыты** на `GAPS_CLOSE_1`
-  шага 6 (`docs/decisions/deal-finalization-state-materialization.md`,
-  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»). Расчёт
-  PnL — **источник закрыт** на `GAPS_CLOSE_1` шага 7 (число = net из
-  positions-history, breakdown = `DealCashFlow`; остаток DEAL-Q2 = число на
-  `EMERGENCY_CLOSED`, закрыт; `docs/decisions/result-profit-source.md`); CODE —
-  шаг 7.
-- **Из миграции процессов:** RISK-Q1 (`RiskSettings`; п.3/п.4), DEAL-Q3
-  (`DealActionState` core/other + lifecycle; п.1), CMD-Q2 (базовый
-  тип/дискриминатор payload'ов, судьба `ServiceCommandPayload.md`; п.1).
-  PROC-Q1 закрыт 2026-06-06 (рудимент), CMD-Q1 закрыт 2026-06-06
-  (`.claude/decisions/executor-payload-file-granularity.md`), ENUM-Q1
-  снят 2026-06-06 (архивный артефакт).
-- **Из миграции API-кластера OKX (п.10):** OKX-Q1 (persisted `TradeFill`) —
-  **закрыт** (GAPS_CLOSE_1 шага 7: не вводится); OKX-Q2 (`TradeFillsArchive`
-  async-флоу) — открыт; OKX-Q3 (bills как источник `DealCashFlow`) — **закрыт**
-  (там же: bills — разбивка + сверка, число — positions-history;
-  `docs/decisions/result-profit-source.md`); OKX-Q4 (WS-каналы OKX отдельным
-  заходом) — открыт.
-- **Из шага 1 Фазы 1 (поток рыночных данных):** INSTR-Q1
-  (соотнесение снапшот-концепции с `InstrumentExternalRules` /
-  возможный ренейм; п.9); ORCH-Q1 (владелец оркестрации онбординга
-  инструмента и загрузки свечей — `candle-loading`).

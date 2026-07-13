@@ -18,8 +18,10 @@ Code.
 
 ## Принятое решение
 
-- `chat-project-instructions.md` — единственный файл,
-  адресованный чату.
+- Файлы, адресованные чату, живут в `.claude/chat/`
+  (`chat-project-instructions.md`, PK-дайджесты; изначально —
+  единственный файл `chat-project-instructions.md` в `rules/`,
+  переехал по `.claude/decisions/context-cost-diet.md`).
 - Всё остальное в `.claude/` (скиллы, агенты, правила, процессы,
   решения, заметки, снапшоты) — адресовано Claude Code.
 - Чат может читать файлы для CC как справку через Project

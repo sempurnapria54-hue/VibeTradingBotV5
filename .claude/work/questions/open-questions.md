@@ -4,128 +4,6 @@
 
 Что мы ещё не решили (общие вопросы — пайплайн и продукт).
 
-## Статус
-
-Открыты продуктовые вопросы по финализации `Deal` (перенесены из
-архивного `Deal.md` §15 при миграции, 2026-05-27), один вопрос,
-обнаруженный при составлении карты артефактов миграции процессов
-(проход 1, 2026-05-27), и четыре вопроса от миграции API-кластера OKX
-(2026-05-28; OKX-Q1..Q4 — TradeFill, TradeFillsArchive, AccountBill /
-DealCashFlow, WS-каналы как отдельный заход). Три вопроса — из шага 1
-Фазы 1 (2026-05-30): INSTR-Q1 (`GAPS_CLOSE_2` — разграничение
-`Instrument` / снапшот / `InstrumentExternalRules`), INSTR-Q2
-(`GAPS_CLOSE_3` — изначально валидация рабочего плеча; освежён
-2026-06-04 на `GAPS_CLOSE_7` шага 2 под решение «плечо динамическое»
-— теперь роль статического плеча `Instrument` при динамическом
-рабочем) и ORCH-Q1 (вынос процесса `candle-loading` — владелец
-оркестрации онбординга и загрузки свечей). Один вопрос — из шага 2 Фазы 1:
-STRAT-Q4 (`GAPS_CLOSE_2`, 2026-06-02 — percent-anchor, якорь
-процент-смещения).
-STRAT-Q1/Q2/Q3 закрыты 2026-06-02 решениями
-`docs/decisions/strategy-condition-authoring-contract.md` (STRAT-Q1),
-`strategy-signal-is-entry-condition.md` (STRAT-Q2),
-`strategy-materialization-and-validation.md` (STRAT-Q3). STRAT-Q5
-(представление условия в БД) закрыт 2026-06-03 на `GAPS_CLOSE_5`:
-условие — JSONB на строке `strategy_step` по дефолту правила
-персистентности (`docs/decisions/strategy-tree-persistence.md`
-§Условие). Два вопроса — из `DOCS_CHECK_8` шага 2 (2026-06-05,
-первый прогон торгового фокуса `trading-review`): RISK-Q2
-(worst-case guard поверх вычисленного плеча; владелец — шаг 5) и
-IND-Q1 (надёжность биржевого объёма / wash trading; владелец —
-шаг 3). По итогам валидации делегирования 2026-06-06: PROC-Q1
-закрыт (рудимент `PositionContext` снят из `CalculationContext.md`
-применением инварианта «одна `Deal` — максимум одна `Position`»;
-decision не заводился); CMD-Q1 закрыт решением
-`.claude/decisions/executor-payload-file-granularity.md`
-(file-per-executor; payload — раздел у своего executor'а), его
-отложенный подвопрос вынесен в CMD-Q2; ENUM-Q1 снят без решения
-как архивный артефакт (конфликт двух архивных доков; канон уже
-стоит на `RISK_CONTROL`). Один вопрос — из закрывающего батча шага 3
-(2026-06-09, торговая валидация): STRUCT-Q1 (калибровка числовых порогов
-структуры — ER-порог тренда и k-толеранс — на бэктест-гейте фазы 2;
-владелец — фаза 2). STRUCT-Q2 (идентичность `config_id` структуры vs разные
-ER/ATR-входы) **закрыт** 2026-06-10 реверсом ключевания
-(`docs/decisions/market-data-result-identity-keying.md`: результаты
-ключуются настройкой-владельцем, разделяемого ряда нет). Открыты PHASE-Q1
-(трек D, 2026-06-10): «липкость» / гистерезис фазы при stateless-резолве —
-владелец `trading-review`; и PHASE-Q2 (трек D): размещение `MarketPhase`
-после перехода в вычисляемое значение (RVO vs доменный computed value;
-конфликт критериев из-за доменного enum `Type`) — владелец
-`knowledge-curator`/`solution-designer`. Оба non-gating. DEAL-Q3
-(размещение/структура `DealActionState`) закрыт 2026-06-10 на
-`GAPS_CLOSE_1` шага 4 решением
-`docs/decisions/deal-action-state-materialization.md` (материализован:
-`domain/other` + own lifecycle, `RuntimeTarget` объектом, retry через
-`Retryable`). CMD-Q2 (базовый тип payload'ов) закрыт 2026-06-10 на
-`GAPS_CLOSE_1` шага 4 решением
-`docs/decisions/service-command-payload-base-type.md` (маркер-база
-`ServiceCommandPayload`, дискриминатор — `ServiceCommandType` на команде,
-файл — дом базового типа). F1 (владение evidence-cycle refresh-команд)
-закрыта 2026-06-10 на `GAPS_CLOSE_2` шага 4 решением
-`docs/decisions/refresh-evidence-cycle-ownership.md` (обход внутри
-исполнителя, вариант (a)). CMD-Q3 (судьба standalone pending/history
-refresh-команд) закрыт 2026-06-10 (steer): refresh-набор — ровно по одной
-команде на сущность, bulk-команды сняты из enum'а; открыт **CMD-Q4**
-(перечисление неизвестных live orders/algo по инструменту — дыра от снятия
-bulk). Из разбора ревью шага 4 (2026-06-12) открыты **CMD-Q5** (место
-правила порядка ног REPLACE) и **CMD-Q6** (граница «действие стратегии vs
-`ServiceCommand`» + классификация `KILL_SWITCH`) — оба парк на шаги 6-7.
-На `GAPS_CLOSE_1` шага 5 (2026-06-20) закрыты **RISK-Q1** (нет RVO
-`RiskSettings`; риск-настройки — поля `StrategyDetail`) и **RISK-Q2**
-(worst-case guard экспозиции — уровень риска на биржу/портфель, отложен к
-фазе 3; в фазе 1 — только риск на сделку) решением
-`docs/decisions/per-trade-risk-policy.md`; **INSTR-Q1** (материализация
-`InstrumentExternalRules` на шаге 5, JSONB-навес на `Instrument`, без
-ренейма) и большая часть **INSTR-Q2** — решением
-`docs/decisions/instrument-external-rules-materialization.md` (остаток
-INSTR-Q2 — тайминг set-leverage, форвард к шагу 6).
-На `GAPS_CLOSE_1` шага 6 (2026-06-22) закрыты **DEAL-Q1** (дом retry-state
-финализации — отдельная сущность `DealFinalizationState`, решение
-`docs/decisions/deal-finalization-state-materialization.md`), **DEAL-Q2**
-(терминальный контракт при неисчислимой прибыли —
-`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»), **CMD-Q5**
-и **CMD-Q6** (владелец оркестрации REPLACE + принцип «действие vs команда»,
-решение `docs/decisions/action-orchestration-vs-command.md`). Сняты с TBD
-error-политика (`docs/rules/error-handling-policy.md`) и форвард-долг
-бесстопового risk-creating входа
-(`docs/rules/risk-creating-entry-protection.md`). **Закрыт INSTR-Q2**
-(остаток — представление write плеча: решено — inline-write в
-`SubmitOrderExecutor` перед постановкой открывающего ордера, только для
-открывающих, reduce-only пропускается, idempotent; as-built шага 6,
-`docs/components/SubmitOrderExecutor.md`). **Продвинут CMD-Q4** (Precheck-часть
-закрыта инструмент-скоупным read вне command-layer; orphan-часть — шаг 8).
-**HOLD-Q1**
-(L4-доминирование controlled-violation: любой `ControlledExchangeException`
-на одной сделке гасит всю биржу), открытый на доработке холд-дельты шага 6
-(2026-06-24), **закрыт** на заходе 1 разбора находок (2026-06-30) решением
-`docs/decisions/controlled-violation-exchange-wide-hold.md` (вариант (1):
-безусловный L4, доминирует L3; + переиспользуемый принцип консервативного
-торможения под неизвестный радиус незрелой интеграции).
-На `GAPS_CLOSE_1` шага 7 (2026-07-03) закрыты **OKX-Q1** (persisted `TradeFill`
-не вводится; пофилловый аудит вне фазы 1) и **OKX-Q3** (bills — разбивка +
-сверка, не первоисточник числа; funding в P&L — через bills/positions-history,
-не через `funding-rate-history`) решением
-`docs/decisions/result-profit-source.md`: заголовочное `Deal.resultProfit` =
-net `realizedPnl` из positions-history (**В-3 закрыт**), `REFRESH_FILLS` — кандидат
-на снятие (stage-1, `DOCS_CHECK_2`). Закрыт **остаток DEAL-Q2** (число на
-`EMERGENCY_CLOSED` = фактический realized net вкл. `liqPenalty`, G5;
-`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»). **В-7
-активирован**: прогнозная комиссия включена в риск-сайзинг (G6,
-`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»).
-
-История закрытых вопросов пайплайна:
-
-- Q1, Q2, Q3 закрыты решением
-  `.claude/decisions/rule-source-of-truth.md` (2026-05-26).
-- Q4 закрыт решением
-  `.claude/decisions/chat-vs-cc-knowledge-split.md`.
-- NQ-F закрыт решениями `.claude/decisions/runtime-value-object.md`
-  и `.claude/decisions/models-core-vs-other.md` (2026-05-26).
-- NQ-H закрыт решением
-  `.claude/decisions/fsm-handler-as-component.md` (2026-05-27).
-- NQ-G закрыт решением
-  `.claude/decisions/master-index-not-fixated.md` (2026-05-27).
-
 ## Открытые продуктовые вопросы
 
 ### ORCH-Q1. Владелец оркестрации онбординга инструмента и загрузки свечей
@@ -156,11 +34,8 @@ handler'ы по образцу FSM сделки (`docs/components/DealStateMachi
 
 ### CMD-Q4. Перечисление неизвестных live orders/algo по инструменту
 
-CMD-Q3 закрыт (steer, 2026-06-10): refresh-набор — ровно по одной команде
-на сущность (`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_POSITION`,
-`REFRESH_BALANCE`, `REFRESH_FILLS`); bulk-команды `REFRESH_PENDING_ORDERS` /
-`REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY`
-сняты, их эндпоинты живут звеньями внутреннего evidence-cycle
+Контекст: CMD-Q3 закрыт (steer, 2026-06-10) — refresh-набор по одной
+команде на сущность, bulk-команды сняты
 (`docs/decisions/refresh-evidence-cycle-ownership.md`).
 
 Снятие bulk-команд оставляет **дыру** (подтверждена при чистке, не
@@ -182,15 +57,13 @@ CMD-Q3 закрыт (steer, 2026-06-10): refresh-набор — ровно по 
 не `ServiceCommand`); (2) вернуть узкую scoped bulk-scan операцию (не
 per-deal-команду); (3) иное по проработке anomaly / precheck-cleanliness.
 
-**Продвинут на `GAPS_CLOSE_1` шага 6 (2026-06-22): принят вариант (1),
-Precheck-часть закрыта.** Чистота инструмента перед входом берётся из
-стартового инструмент-скоупного exchange-read **вне command-layer**
-(`docs/components/IntegrationService.md` §«Инструмент-скоупный read»,
-`docs/components/PrecheckHandler.md`); «оптовую команду» в command-layer не
-возвращаем (вариант (2) отвергнут — отменил бы снятие bulk CMD-Q3). **Остаток
-— orphan-скан шага 8** (`AnomalyJob`: чужие сущности при уже открытой сделке
-и по неведомым инструментам). Владелец orphan-части — `solution-designer` /
-шаг 8.
+**Precheck-часть закрыта (`GAPS_CLOSE_1` шага 6, 2026-06-22, вариант (1);
+вариант (2) отвергнут):** инструмент-скоупный exchange-read вне
+command-layer — `docs/components/IntegrationService.md`
+§«Инструмент-скоупный read», `docs/components/PrecheckHandler.md`.
+**Остаток — orphan-скан шага 8** (`AnomalyJob`: чужие сущности при уже
+открытой сделке и по неведомым инструментам); владелец —
+`solution-designer` / шаг 8.
 
 **Смежный вход (REPLACE-only, 2026-06-11):** при проработке
 Precheck/AnomalyJob учесть легитимное **окно двойной reduce-only
@@ -283,14 +156,10 @@ polling state) и persisted-модель `TradeFillsArchive`.
 
 ### IND-Q1. Надёжность биржевого объёма для volume-условий (wash trading) (владелец — шаг 3)
 
-**Частично закрыт (2026-06-09) — книжная часть.** `VOLUME_FILTER_PASSED`
-и OBV опираются на биржевой объём. Книжная часть закрыта решением
-`docs/decisions/volume-condition-semantics.md` (грунт Kaufman гл. 12 /
-Harris гл. 12, провалидировано): объём манипулируем (wash trades / «paint
-the tape» [Harris, гл. 12, с. 259-260, 273-274]) → объёмное условие —
-**подтверждающий фильтр, не единственное основание `ENTRY`**; OBV-операнд
-ограничен **относительными формами** (абсолютный `CONSTANT`-compare
-исключён — OBV кумулятивен, ТР2).
+**Книжная часть закрыта (2026-06-09)** решением
+`docs/decisions/volume-condition-semantics.md`: объёмное условие —
+подтверждающий фильтр, не единственное основание `ENTRY`; OBV — только
+относительные формы.
 
 **Остаётся открытой крипто-часть.** Крипто-специфика надёжности
 **спот-объёма CEX** (накрутка / фейковый объём на нерегулируемых биржах,
@@ -420,6 +289,48 @@ Deal management, шаг 4+).
 `.claude/decisions/runtime-value-object.md`,
 `.claude/decisions/models-core-vs-other.md`,
 `docs/decisions/market-phase-stateless.md`.
+
+## Открытые вопросы пайплайна
+
+### PROC-Q2. Кросс-файловый дедуп скиллов vs принцип «скиллы самодостаточны»
+
+Аудит контекстной стоимости
+(`.claude/notes/2026-07-06-аудит-контекстной-стоимости.md`,
+решение — `.claude/decisions/context-cost-diet.md`) нашёл плотное
+дублирование знания между скиллами: тестовый кластер (teardown — в
+5 файлах, «цена live с `getTicker`» — в 4, passthrough-конверт — в
+4), адверсариальная стойка reviewer — повторена в 7 фокус-скиллах,
+`classify-type.md` §Перечень типов (~4 KB) — пересказ таблицы
+`structure.md`, копия таблицы статусов в
+`update-roadmap-progress.md`. Дедуп сэкономил бы ~10–15K токенов
+на прогонах и снял бы риск рассинхрона (один случай уже был:
+протухшая метка coverage-gap в `source-api-testing.md`), но
+конфликтует с принципом `structure.md` «скиллы самодостаточны —
+не ссылаются на справочники и другие скиллы».
+
+Варианты:
+
+- **A. Статус-кво**: самодостаточность сохраняется, дубли
+  остаются. Платим контекстом и риском рассинхрона.
+- **B. Ослабить принцип точечно**: разрешить скиллу ссылаться на
+  канон, когда канон и так в контексте читателя. Кейсы:
+  `classify-type` → таблица `structure.md` (инжектится в каждую
+  сессию); фокус-скиллы → стойка в `reviewer.md` (reviewer всегда
+  читает свой файл роли). Экономия без реальной потери
+  самодостаточности; принцип в `structure.md` уточняется
+  оговоркой.
+- **C. Дубли с меткой канона**: дубль остаётся, но помечается
+  «копия, канон — X»; правка канона обязана обновить копии
+  (проверка на ревью). Снимает рассинхрон, не экономит контекст.
+- **D. B + C гибрид**: B — где канон гарантированно в контексте;
+  C — для тестового кластера (скиллы этапов используются порознь,
+  канон `test-design` не всегда загружен).
+
+Крен CC: **D** — B закрывает classify-type и фокус-скиллы без
+потери самодостаточности по факту, C страхует тестовый кластер от
+повторного рассинхрона; чистый B для тестового кластера заставил
+бы каждый этап тянуть `test-design` целиком (15 KB) ради пары
+правил.
 
 ## Конвенция
 

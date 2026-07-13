@@ -36,4 +36,4 @@
   `.claude/skills/place-knowledge.md`.
 - Project Instructions для claude.ai (текст из Settings → Custom
   Instructions) — резервная копия в
-  `.claude/rules/chat-project-instructions.md`.
+  `.claude/chat/chat-project-instructions.md`.
