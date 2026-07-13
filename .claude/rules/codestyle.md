@@ -345,8 +345,8 @@ audit-поля проставляет persistence (JPA auditing); биржевы
 
 ## Обработка ошибок
 
-Полная error-политика — `docs/rules/error-handling-policy.md` (закрыто на
-`GAPS_CLOSE_1` шага 6, 2026-06-22; TBD снят). Кратко для кода:
+Полная error-политика — `docs/rules/error-handling-policy.md`.
+Кратко для кода:
 
 - **Внешняя поверхность — единый глобальный `@ControllerAdvice` + единый
   error-DTO** (не per-endpoint). FSM/оркестрация наружу не торчат.

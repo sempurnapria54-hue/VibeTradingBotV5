@@ -40,16 +40,15 @@
 - **безопасность** → `.claude/skills/security-review.md` —
   **деактивирован** до шага «Безопасность» (под-шаг `CODE`,
   реактивируется там);
-- **конвенции** → `.claude/skills/conventions-review.md` — наполнен
-  по первому реальному `CODE`-ревью (шаг 1), под-шаг `CODE`;
+- **конвенции** → `.claude/skills/conventions-review.md` — наполнен,
+  под-шаг `CODE`;
 - **производительность** → `.claude/skills/performance-review.md` —
   стаб, под-шаг `CODE`;
 - **устойчивость к сбоям** → `.claude/skills/disaster-review.md` —
   стаб, под-шаг `CODE`;
 - **расхождения** → `.claude/skills/divergence-review.md` — стаб,
   под-шаг `SYNC_DOCS_FROM_CODE`;
-- **тесты** → `.claude/skills/test-review.md` — **активен** (фокус
-  материализован 2026-06-12 под контур тестов API источника): этапы
+- **тесты** → `.claude/skills/test-review.md` — **активен**: этапы
   REVIEW плана и REVIEW отчёта процесса
   `.claude/processes/source-api-testing.md`; автор плана/отчёта —
   роль `tester`. Привязан к этапам процесса контура, не к под-шагу

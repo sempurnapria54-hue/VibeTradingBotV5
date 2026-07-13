@@ -53,69 +53,30 @@ production-flow одной стратегии.
   фазы, исполняются по тому же процессу docs-first.
 - Под-шаги внутри каждого шага заранее не дробятся; они
   появляются в процессе исполнения (см. процесс).
-- **Граница шага 6 ↔ 7 уточнена (2026-06-21).** Живая оркестрация
-  отнесена к **шагу 6**, не 7. Шаг 6 — «FSM + живая оркестрация»: помимо
-  статусной механики (состояния и переходы сущностей) и конструкции
-  handler'ов в него входят живая оркестрационная петля
-  (`DealOrchestratorJob` driving), REPLACE-оркестрация, per-deal
-  concurrency-guard (D-M1) и механика финализации (финализационные
-  executor'ы, терминальные рёбра, retry-state финализации). Шаг 7 —
-  «Сделки и P&L» — сужен до расчёта `resultProfit` и агрегации `Deal`
-  (DEAL-Q2 закрыт как терминальный контракт на шаге 6; остаётся лишь
-  *число* прибыли на ошибочном терминале — деталь шага 7); формулировка «он
-  же оркестрирует торговый цикл сигнал→команда→позиция» из строки шага 7
-  снята (петля уехала в шаг 6). Жёсткие гейты D-B3/D-M1 привязаны к шагу 6
-  (петля включается там; см. примечание ниже).
-- **Жёсткие гейты `DONE` шага 6 (2026-06-12, из разбора ревью шага
-  4; привязка к шагу 6 уточнена 2026-06-21 вместе с границей 6 ↔ 7 —
-  петля включается на шаге 6).** **D-B3** (SUBMIT recovery-by-clientId —
-  дубль ордера при ресабмите после краша между place и сохранением
-  `externalId`) и **D-M1** (concurrency-guard вокруг исполнения команды —
-  двойной SUBMIT при перекрытии триггеров) — деньги-дубли, латентны до
-  включения оркестрационной петли. **Блокирующее условие:**
-  оркестрационную петлю **нельзя включать** и шаг 6 **не уходит в `DONE`**,
-  пока оба не закрыты. Это жёсткий гейт шага (проверяется при переходе
-  шага 6 в `DONE`), не просто форвард-долг. Детали —
-  `.claude/work/backlog.md` §Хвост шага 4.
-- **Error-политика — ✅ зафиксирована на `GAPS_CLOSE_1` шага 6
-  (2026-06-22).** Единая политика исключений спроектирована docs-first:
-  `docs/rules/error-handling-policy.md` (внешняя поверхность — единый
-  `@ControllerAdvice` + error-DTO; async-фасад 202/409; внутренняя градация
-  4 уровней — лог / ретрай / холд инструмента / холд биржи) + новое правило
-  `docs/rules/instrument-hold.md` (уровень 3). **TBD error-конвенции в
-  `codestyle.md` §«Обработка ошибок» снят.** Неблокирующие майоры шагов 2 и
-  4 (500 вместо 422/409, невыровненные коды реджектов) ретро-закрываются по
-  этой политике; конкретный набор HTTP-кодов и 409-vs-идемпотентность —
-  провизорный хвост пользователя.
 - **Шаг 3 — `DONE` (2026-06-10).** Построены производные рыночные данные:
-  индикаторы, структура рынка (`MarketStructureResolver`), stateless-фаза
-  (`MarketPhaseResolver`), owner-ключевание результатов (ревизия D), миграции
-  `V4`/`V5`. Хроника под-шагов (DOCS_CHECK_6/7, GAPS_CLOSE_4/5, CODE, SYNC,
-  ревизия D) — `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/phase-1-step-3-chronicle.md`;
-  артефакты шага — в той же папке.
-- **Шаг 4 — `DONE` (2026-06-11, повторно через гейт; рантайм-хвост закрыт
-  2026-06-12).** Построен command-layer: `ServiceCommand`/`DealActionState`,
-  REPLACE-only (AMEND снят), 13 исполнителей + диспетчер + retry,
-  evidence-cycle REFRESH, OKX-интеграция, миграции `V6`/`V7`; тулинг
-  `integrator` + офдок-докачка OKX; адверсариальное ревью закрыло
-  деньги-блокеры; ретро-ревью шагов 1-3 — без блокеров. Хроника (вкл.
-  ретро-ревью и рантайм-хвост) —
-  `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-chronicle.md`;
-  артефакты шага — в той же папке.
+  индикаторы, структура рынка, stateless-фаза, owner-ключевание (ревизия D),
+  миграции `V4`/`V5`. Хроника и артефакты —
+  `.claude/work/history/2026-06-10-phase-1-step-3-derived-market-data/`
+  (`phase-1-step-3-chronicle.md`).
+- **Шаг 4 — `DONE` (2026-06-11; рантайм-хвост закрыт 2026-06-12).** Построен
+  command-layer: `ServiceCommand`/`DealActionState`, REPLACE-only, 13
+  исполнителей + диспетчер + retry, evidence-cycle REFRESH, OKX-интеграция,
+  миграции `V6`/`V7`. Хроника (вкл. адверсариальное и ретро-ревью) и
+  артефакты — `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/`
+  (`phase-1-step-4-chronicle.md`).
 - **Шаг 5 — `DONE` (2026-06-20).** Построен риск-преконтроль: риск-политика
-  на сделку (`docs/decisions/per-trade-risk-policy.md`),
-  `InstrumentExternalRules` (JSONB-навес, миграция `V8`, sync-job), расчётный
-  слой (`PriceCalculator`/`SizeCalculator` с risk-bounded сайзингом),
-  `RiskValidator`/`RiskBlockResolver`. Хроника —
-  `.claude/work/history/2026-06-20-phase-1-step-5-risk-precontrol/phase-1-step-5-chronicle.md`;
-  артефакты шага — в той же папке.
+  на сделку, `InstrumentExternalRules` (JSONB-навес, `V8`),
+  `PriceCalculator`/`SizeCalculator`, `RiskValidator`/`RiskBlockResolver`.
+  Хроника и артефакты —
+  `.claude/work/history/2026-06-20-phase-1-step-5-risk-precontrol/`
+  (`phase-1-step-5-chronicle.md`).
 - **Шаг 6 — `DONE` (2026-07-03).** Построены FSM + живая оркестрация:
-  `DealStateMachine` + 7 handler'ов, петля `DealOrchestratorJob` +
-  `EntryScannerJob`, финализационная под-спина `DealFinalizationState`
-  (миграция `V9`), жёсткие гейты D-B3/D-M1 закрыты, error-политика
-  (`@RestControllerAdvice`), kill-switch → `SafetyHoldCoordinator`. Хроника —
-  `.claude/work/history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-chronicle.md`;
-  артефакты шага — в той же папке.
+  `DealStateMachine` + 7 handler'ов, `DealOrchestratorJob` +
+  `EntryScannerJob`, `DealFinalizationState` (`V9`), жёсткие гейты
+  D-B3/D-M1 закрыты, error-политика, kill-switch → `SafetyHoldCoordinator`.
+  Хроника (вкл. границу 6↔7, гейты, error-политику) и артефакты —
+  `.claude/work/history/2026-07-03-phase-1-step-6-fsm-orchestration/`
+  (`phase-1-step-6-chronicle.md`).
 - **Шаг 7 → `DOCS_CHECK_1` (2026-07-03):** стартован шаг «Сделки и P&L»
   (`TOOLING` без новых артефактов — фокусы `concept`/`trading` активны). Scope
   (граница 6↔7): расчёт числа `resultProfit` на терминале (вкл. PnL

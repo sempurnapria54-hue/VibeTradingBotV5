@@ -20,24 +20,13 @@
 
 ## Статус
 
-Миграции 2026-05-27/28 (торговые сущности; архивные процессы; API-кластер
-OKX) **завершены и закрыты** —
-`history/2026-05-27-миграция-торговых-сущностей.md`,
-`2026-05-28-миграция-процессов.md`, `2026-05-28-миграция-api-okx.md`.
-Полные форвард-заметки пунктов — в одноимённых подпапках `history/`
+Полные форвард-заметки пунктов миграций — в подпапках `history/`
 (`tasks-<сущность>.md` / `tasks-<док>.md`); архивные доки в
 `.claude-archive/` не удалены — источник для оставшихся миграций.
+Закрытые пункты вычищены — их итоги в `history/` и `decisions/`
+(нумерация оставшихся секций сохранена, с пропусками).
 
 ## Cross-cutting миграции
-
-### 1. Deal management: lifecycle, FSM, команды — ✅ ЗАКРЫТО (2026-05-28)
-
-FSM, command-layer, процесс `deal-management` и правила мигрированы —
-детали в `history/2026-05-28-миграция-процессов.md`. Хвосты закрыты:
-DEAL-Q3 (`docs/decisions/deal-action-state-materialization.md`), DEAL-Q1 +
-финализационные executor'ы
-(`docs/decisions/deal-finalization-state-materialization.md`; код — на
-`CODE` шага 6).
 
 ### 2. Resolver / mapper / checker компоненты — частично
 
@@ -51,30 +40,6 @@ DEAL-Q3 (`docs/decisions/deal-action-state-materialization.md`), DEAL-Q1 +
 `tasks-position.md` (POS-Q2), `tasks-algo-order.md` (ALGO-Q2),
 `tasks-balance.md` (BAL-Q6); `2026-05-28-.../tasks-статусы-торговых-сущностей.md`
 (Mappers — Решения прохода 2).
-
-### 3. Калькуляторы действий стратегии + RVO — ✅ ЗАКРЫТО (2026-05-28)
-
-Калькуляторы, RVO и процесс `strategy-action-calculation` мигрированы —
-детали в `history/2026-05-28-миграция-процессов.md`. Хвосты закрыты:
-RISK-Q1 (`docs/decisions/per-trade-risk-policy.md`), PROC-Q1 — рудимент
-`PositionContext` не материализуется
-(`history/2026-06-06-delegation-validation.md`).
-
-### 4. Risk-слой — ✅ ЗАКРЫТО (2026-05-28)
-
-Risk-слой (валидатор, resolver, RVO, правило, процесс `risk-evaluation`)
-мигрирован — детали в `history/2026-05-28-миграция-процессов.md`.
-`TradeRuleValidator` (контекст-док) — см. п.7.
-
-### 5. Расчёт индикаторов и рыночных данных — ✅ ЗАКРЫТО (2026-05-28)
-
-Jobs, сервисы, market-data модели, правило и процесс
-`market-data-calculation` мигрированы — детали в
-`history/2026-05-28-миграция-процессов.md`. Хвосты закрыты: standalone
-`Candle`/`CandleGroup`/`Instrument` материализованы на `GAPS_CLOSE_1`
-шага 1 (`docs/models/domain/other/Candle.md` и соседние), `TimeFrame`
-размещён в `CandleGroup.md` (TIME-Q1). Архивный легаси-исходник —
-`.claude-archive/2026-05-21/docs/deprecated/models/domain/old/Candle.md`.
 
 ### 6. Аудит и история исполнения; финализация PnL — частично
 
@@ -148,8 +113,7 @@ Exchange/Instrument/Account. **Суть:** полная модель/lifecycle `
 (`HOLD` среди прочих), `Instrument`, `Account`. Сюда же — enforcement
 `AnomalyReport.Severity` (CRITICAL → торговля по инструменту запрещена;
 NON_CRITICAL → после kill-switch может быть разрешена; блокировка в
-статусе инструмента) и standalone модель `Instrument` для market-data
-(из п.5).
+статусе инструмента) и standalone модель `Instrument` для market-data.
 
 **Статус (GAPS_CLOSE_1, 2026-05-29):** материализованы минимальные
 доменные модели под шаг 1 — `Instrument`
@@ -179,14 +143,6 @@ base/quote/settle больше не претендует — снят дубль
 **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
 `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q4).
 
-### 10. API-кластер OKX — ✅ ЗАКРЫТО (2026-05-28)
-
-26 REST endpoint-доков мигрированы в `docs/integrations/okx/` — детали в
-`history/2026-05-28-миграция-api-okx.md`. Открытые хвосты: OKX-Q2
-(`TradeFillsArchive` async-флоу) и OKX-Q4 (WS-документация) —
-`open-questions.md`; OKX-Q1/OKX-Q3 закрыты
-(`docs/decisions/result-profit-source.md`). Playbooks v1 — вне скоупа.
-
 ### Отложенные продуктовые вопросы (future)
 
 - `linkedOrderExternalIds` — использование для fills/recovery/audit
@@ -196,15 +152,6 @@ base/quote/settle больше не претендует — снят дубль
   др.). Шире одной модели.
   (`2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` ANOM-Q5).
 
-## Подготовка перед написанием кода
-
-### P1. Код-шаблоны для `code-writer` — ✅ ЗАКРЫТО (2026-05-31)
-
-Решённая модель: код-шаблоны — тир `.claude/templates/code/` (вход для
-письма), `find-code-examples` — пост-код-скилл; отдельного слоя
-«референс-доков» нет. Обоснование и закрытие REF-Q1 —
-`.claude/decisions/code-templates-vs-examples.md`.
-
 ## Шаг «Безопасность» (Фаза 1, шаг 9) — форвард-материал
 
 Материал, отложенный до шага «Безопасность» роадмапа
@@ -212,12 +159,10 @@ base/quote/settle больше не претендует — снят дубль
 прорабатывается docs-first на самом шаге; здесь — что туда заведомо
 идёт.
 
-### S1. Конфигурация секретов через Vault — ✅ базовая привязка ЗАКРЫТА (2026-06-12)
+### S1. Конфигурация секретов через Vault — остаточный хардненинг
 
-**Сделано на инфра-шаге** (раньше планового шага 9): Vault-привязка
-секретов per-profile (`spring.config.import: vault://` — datasource и
-OKX-креды) — детали в снапшоте v47 и `.claude/rules/tech-radar.md`
-(строка spring-cloud-vault).
+Vault-привязка секретов per-profile введена
+(`.claude/rules/tech-radar.md`, строка spring-cloud-vault).
 
 **Остаётся на шаг 9 (остаточный хардненинг):** политики/approle вместо
 root/dev-token, ротация секретов, unseal/инициализация Vault не в dev-режиме,
@@ -270,12 +215,6 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 
 ### Шаг 6 (FSM)
 
-- **Бесстоповый risk-creating вход — ✅ ЗАКРЫТО в доках (`GAPS_CLOSE_1`
-  шага 6, 2026-06-22).** Инвариант —
-  `docs/rules/risk-creating-entry-protection.md` (`PRECHECK` блокирует вход
-  без резолвимого стопа; закрыл TR1 `DOCS_CHECK_1` шага 6). **Код-снятие
-  fail-open** (`RiskValidator`/`SizeCalculator`, `PrecheckHandler` +
-  set-leverage) — на `CODE` шага 6.
 - **Error-градация уровни 3-4: реактивный enforcement холдов — ✅ ПОСТРОЕН
   (CODE-делта холдов шага 6, 2026-06-23/24; D2-реактивный снят).** Детали —
   `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-holds-design.md`
@@ -311,10 +250,6 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   condition), либо короткоживущий per-tick кэш в `MarketPriceDataService`.
   Кросс-коллаборатор: `MarketConditionContextFactory.build` шарится с FSM
   (`DealFsmSupport.conditionContext`). Источник — повторное ревью фикс-дельты (v63).
-- **`EXECUTE_KILL_SWITCH` — эмиссия — ✅ ПОДКЛЮЧЕНА** (CODE-делта холдов,
-  2026-06-23; позже на §6a kill-switch перестал быть командой — тип
-  `EXECUTE_KILL_SWITCH` убран, side-executor зовётся из `KillSwitchService`;
-  см. `docs/components/KillSwitchExecutor.md`).
 - **Унификация инфраструктуры джоб — форвард, горизонт фаза 3 (код-ревью заход 2,
   2026-07-01).** Ревью-замечания «общий родитель джоб» (п.4) и «единый механизм
   локов» (п.5) — доработка механизма замыкания под мультиинстанс/микросервисы,
@@ -517,10 +452,12 @@ Refinements, сознательно отложенные при `CODE` шага 
   UNKNOWN-ветке `MarketStructureJob`; `lookbackBars` без нижней границы
   перед `PageRequest.of`. `[NIT]` N+1 по таймфреймам (повторная загрузка
   окна для настроек одного инструмента).
-- **Сквозное.** Error-конвенция (`codestyle.md` §«Обработка ошибок —
-  TBD») гейтит часть major'ов шага 2 (и шага 4): коды, `@ControllerAdvice`
-  vs per-endpoint, трансляция нарушений констрейнтов в 4xx. Усиление
-  приоритета существующего TBD.
+- **Сквозное.** Error-политика зафиксирована
+  (`docs/rules/error-handling-policy.md`; кратко — `codestyle.md`
+  §«Обработка ошибок»): коды, единый `@ControllerAdvice`, трансляция
+  нарушений констрейнтов в 4xx. Ретро-майоры шагов 2 и 4 закрываются
+  в одном месте по этой политике; конкретный набор HTTP-кодов и
+  409-vs-идемпотентность — провизорны (хвост пользователя).
 
 ## Методологические задачи (по итогам миграции)
 
@@ -580,12 +517,6 @@ Jackson 3 (`tools.jackson`). Бин `ObjectMapper` сейчас даём
 `StrategyJsonConverter`, DTO-аннотации; `ObjectMapper.copy()` /
 `setDefaultPropertyInclusion`, `JsonProcessingException`) на Jackson 3 и
 снятие `jackson2`. Радар — Jackson 3 = `assess`.
-
-### I3. `OkxSigningInterceptor` — внятная ошибка на пустых кредах — ✅ ЗАКРЫТО (2026-06-20)
-
-Fail-fast `requireCredentials()` в `OkxSigningInterceptor.intercept` +
-тест `ICredEmptyCredentialsLiveTest` переведён на ожидание внятной ошибки
-— детали в `history/2026-06-20-source-api-contour.md`.
 
 ### I4. Jackson 3 × Lombok beanspec мангли́нг в OKX-DTO (находка F4)
 
@@ -657,11 +588,4 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 > demo/non-prod и убирает prod из контура; prod read-only — больше не
 > хвост контура, а ад-хок ручная проверка пользователя вне контура.
 > Demo-бут по-прежнему нужен для автономного RUN код-тестов.
-
-## Ре-база source-api: снятие mapped-поверхности — ✅ ЗАКРЫТО (2026-06-18)
-
-`OkxProxyController` переписан на A2 raw-passthrough, mapped-цепочка
-`getMarketPriceData` снята (forward-дизайн шага 5 сохранён в
-`docs/models/mapping/MarketPriceData.md`) — детали и следствия —
-`.claude/decisions/source-api-target-rebase.md` §Следствия.
 
