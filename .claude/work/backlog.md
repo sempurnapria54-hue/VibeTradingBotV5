@@ -13,29 +13,24 @@
 `.claude/processes/roadmap-step-execution.md` он порождает
 конкретные задачи в этот backlog. Backlog шире роадмапа: помимо
 шагов фаз сюда попадают cross-cutting миграции из архива,
-методологические ревизии и пайплайн-задачи. Сверка существующих
-пунктов backlog с шагами роадмапа («где мы сейчас по карте») —
-отдельная будущая активность, пока не выполнена. Обоснование
+методологические ревизии и пайплайн-задачи. Обоснование
 связи — `.claude/decisions/product-roadmap-type.md`.
 
-## Статус
-
-Полные форвард-заметки пунктов миграций — в подпапках `history/`
+Файл держит только живое (правило —
+`.claude/rules/closed-work-transfer.md`); итоги закрытого — в
+`history/` (последние чистки:
+`2026-07-13-backlog-phase-1-closed-cleanup.md`,
+`2026-07-14-claude-docs-curation.md`). Нумерация секций — с
+пропусками (номера закрытых не переиспользуются). Полные
+форвард-заметки миграций — в подпапках `history/`
 (`tasks-<сущность>.md` / `tasks-<док>.md`); архивные доки в
 `.claude-archive/` не удалены — источник для оставшихся миграций.
-Закрытые пункты перенесены в
-`history/2026-07-13-backlog-phase-1-closed-cleanup.md` (правило
-переноса — `.claude/rules/closed-work-transfer.md`); нумерация
-оставшихся секций сохранена, с пропусками.
 
 ## Cross-cutting миграции
 
 ### 2. Resolver / mapper / checker компоненты — частично
 
-**Мигрировано:** `OrderExternalStatusResolver`,
-`AlgoOrderExternalStatusResolver`, `PositionStatusResolver` (+
-`PositionStatusResolveResult` RVO), refresh/close executor'ы.
-**Осталось (backlog):** `*Mapper` (`OrderMapper`, `PositionMapper`,
+**Осталось:** `*Mapper` (`OrderMapper`, `PositionMapper`,
 `AlgoOrderMapper`, `BalanceContainerMapper`), `BalanceFreshnessChecker`,
 `OkxAlgoOrderTypeResolver`, `AttachedAlgoOrderStateResolver`.
 **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q2),
@@ -43,7 +38,7 @@
 `tasks-balance.md` (BAL-Q6); `2026-05-28-.../tasks-статусы-торговых-сущностей.md`
 (Mappers — Решения прохода 2).
 
-### 6. Аудит и история исполнения; финализация PnL — частично
+### 6. Аудит и история исполнения — частично
 
 **Источник:** `.claude-archive/.../processes/Audit/Аудит и история
 исполнения.md`;
@@ -51,16 +46,11 @@
 `TradeFillsArchive.md`. Архивный док — рабочий каркас, **выведен из
 миграции процессов** (`.claude/decisions/process-materialization-criterion.md`):
 модели истории/timeline не спроектированы, ~30 подвопросов.
-**Мигрировано:** только сквозное правило `docs/rules/audit-not-runtime-source.md`
-(аудит не runtime-source FSM; `REFRESH_BALANCE` в истории; CLOSED vs
-EMERGENCY_CLOSED различимы; partial exit объясним).
 **Осталось:** модели `ServiceCommandExecutionHistory`, entity history,
 timeline, snapshot-формат; ~30 подвопросов. Связано с DEAL-Q1/DEAL-Q2.
-**Финализация PnL — закрыта отдельно** на `GAPS_CLOSE_1` шага 7
-(`docs/decisions/result-profit-source.md`): число = net `realizedPnl` из
-positions-history, breakdown = `DealCashFlow` (bills); **OKX-Q1 закрыт**
-(persisted `TradeFill` не вводится), `REFRESH_FILLS` — кандидат на снятие.
-Пофилловый аудит (`TradeFill`/`TradeFillsArchive`) — вне фазы 1.
+Финализация PnL закрыта отдельно
+(`docs/decisions/result-profit-source.md`); пофилловый аудит
+(`TradeFill`/`TradeFillsArchive`) — вне фазы 1.
 **Форвард-заметки:** `2026-05-28-.../tasks-аудит-и-история-исполнения.md`
 (§5/§8 подвопросы + Решения прохода 2); `2026-05-27-.../tasks-deal.md`
 (DEAL-FW5, FW9), `tasks-balance.md` (BAL-Q7), `tasks-order.md` (ORD-Q7),
@@ -68,10 +58,7 @@ positions-history, breakdown = `DealCashFlow` (bills); **OKX-Q1 закрыт**
 
 ### 7. Anomaly / safety / kill-switch — частично
 
-**Источник:** `docs/context/Аварийные executors …`, `KillSwitchService …`,
-`After-snapshot …`. **Мигрировано:** `AnomalyReport` модель+lifecycle
-(2026-05-27); `AnomalyJob`, `KillSwitchExecutor` (компоненты,
-2026-05-28). **Осталось:** `ReconciliationJob` (в архиве только название —
+**Осталось:** `ReconciliationJob` (в архиве только название —
 live risk после terminal / позиция без active Deal), полный kill-switch
 flow (`KillSwitchService`, kill-switch report, after-snapshot,
 `Position.CloseReason = KILL_SWITCH`), `TradeRuleValidator`.
@@ -82,62 +69,35 @@ flow (`KillSwitchService`, kill-switch report, after-snapshot,
 
 ### 8. Strategy: enforcement, валидатор, примеры — частично
 
-**Мигрировано:** enforcement `Strategy.INACTIVE`/`DELETED` (блок новых /
-graceful shutdown) — в `docs/lifecycles/Strategy.md` (+ проверка в
-`EntryScannerJob`, реакция в `deal-management`/lifecycle Deal).
-**Scope валидатора/материализации решён (STRAT-Q3, 2026-06-02):**
-материализация «одной реализации» — через Strategy API
-(`POST`/`GET`/`PUT`); валидатор расщеплён по линии create
-(структурно-ссылочные пункты, 400) / activate (семантика действий,
-422 — отложено); см.
-`docs/decisions/strategy-materialization-and-validation.md`.
-**Построено (`CODE` шага 2, DONE 2026-06-05):** Strategy API
-(`StrategyController`: `POST`/`GET`/`PUT …/status`), create-валидатор
-(`StrategyCreateRequestValidator`), полное дерево домен/persistence/
-маппинг (Flyway `V2`), «одна реализация»
-(`src/main/resources/strategy-examples/trend-following-ema.json`).
-Детали — `history/2026-06-05-phase-1-step-2-strategy.md`.
 **Осталось:**
 - **runtime-прогон Strategy API** (хвост scope шага 2, PostgreSQL не
   был поднят): миграция `V2` → `POST` `trend-following-ema.json` →
-  `GET` → `PUT`-переходы статуса. Выполнить при поднятом PostgreSQL;
-  естественная точка — старт шага 3 (ему нужна живая стратегия).
+  `GET` → `PUT`-переходы статуса. Выполнить при поднятом PostgreSQL.
 - `Strategy API examples.md` (JSON-примеры, тип reference —
   воспроизводить ли как файл знания) — **остаётся открытым**.
+
+Построенное (Strategy API, create-валидатор, «одна реализация») и
+scope-решения — `history/2026-06-05-phase-1-step-2-strategy.md`,
+`docs/decisions/strategy-materialization-and-validation.md`.
 **Форвард-заметки:** `2026-05-27-.../tasks-strategy.md` (STR-FW8, FW9,
 FW10), `tasks-deal.md` (DEAL-FW8).
 
 ### 9. Exchange модель/lifecycle
 
-**Источник:** `Exchange.HOLD`/`DISABLED` (правило —
-`docs/rules/exchange-hold.md`, дополнено DISABLED 2026-05-28); статусы
-Exchange/Instrument/Account. **Суть:** полная модель/lifecycle `Exchange`
-(`HOLD` среди прочих), `Instrument`, `Account`. Сюда же — enforcement
-`AnomalyReport.Severity` (CRITICAL → торговля по инструменту запрещена;
-NON_CRITICAL → после kill-switch может быть разрешена; блокировка в
-статусе инструмента) и standalone модель `Instrument` для market-data.
+**Суть:** полная модель/lifecycle `Exchange` (`HOLD`/`DISABLED` среди
+прочих; правило — `docs/rules/exchange-hold.md`), `Instrument`,
+`Account`. Сюда же — enforcement `AnomalyReport.Severity` (CRITICAL →
+торговля по инструменту запрещена; NON_CRITICAL → после kill-switch
+может быть разрешена; блокировка в статусе инструмента) и standalone
+модель `Instrument` для market-data.
 
-**Статус (GAPS_CLOSE_1, 2026-05-29):** материализованы минимальные
-доменные модели под шаг 1 — `Instrument`
-(`docs/models/domain/core/Instrument.md`) и `Exchange`
-(`docs/models/domain/core/Exchange.md`), набор статусов обеих как в
-классах.
-
-**Статус (GAPS_CLOSE_2, 2026-05-30):** материализован онбординг-путь
-lifecycle `Instrument` (`docs/lifecycles/Instrument.md`:
-`CREATED → SYNC → CANDLES_LOADING → ACTIVE` + координация
-`Instrument.Status` ↔ `CandleGroup.Status`); разграничение
-`Instrument` ↔ `InstrumentExternalSnapshot` ↔ `InstrumentExternalRules`
-для шага 1 **закрыто** (справочные поля живут только в транзиентном
-снапшоте; `InstrumentExternalRules` отложена за пределы шага 1 и на
-base/quote/settle больше не претендует — снят дубль Н1; см.
-`docs/models/mapping/Instrument.md`). **Осталось:** полный lifecycle
-`Exchange` (`HOLD`/`DISABLED` среди состояний), периферийные статусы
+**Осталось:** полный lifecycle `Exchange`, периферийные статусы
 `Instrument` (`HOLD`, `ERROR`-recovery, повторный онбординг,
-`CLOSED`), `Account`. Соотнесение rules-подсистемы со
-снапшот-концепцией — INSTR-Q1 — **закрыто** на `GAPS_CLOSE_1` шага 5
-(материализована JSONB-навесом на `Instrument`, без ренейма —
-`docs/decisions/instrument-external-rules-materialization.md`).
+`CLOSED`), `Account`. Минимальные модели `Instrument`/`Exchange` и
+онбординг-путь lifecycle уже материализованы
+(`docs/models/domain/core/`, `docs/lifecycles/Instrument.md`);
+INSTR-Q1 закрыт
+(`docs/decisions/instrument-external-rules-materialization.md`).
 Связанный открытый вопрос: ORCH-Q1 (владелец оркестрации онбординга
 инструмента и загрузки свечей; ось владения `Instrument.Status`) —
 `open-questions.md`.
@@ -177,14 +137,15 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 (`.claude/skills/security-review.md`), деактивированный на текущих
 шагах.
 
-## Форвард-материал шагов 5 / 6 / 7 / 8 (скан интегратора, прогоны 2-3, 2026-06-11)
+## Форвард-материал шагов 7 / 8 и фазы 3 (скан интегратора + ревью)
 
-Кандидаты со скана поверхности OKX против command-layer. Заметки
-владельцам шагов, **не действия сейчас**; решения — на самих шагах.
-Поле-уровневые контракты всех кандидатов готовы (см.
-`docs/integrations/okx/coverage-manifest.md`, прогон 3).
+Заметки владельцам шагов, **не действия сейчас**; решения — на самих
+шагах. Поле-уровневые контракты кандидатов скана готовы (см.
+`docs/integrations/okx/coverage-manifest.md`, прогон 3). Кандидаты,
+рассмотренные и не взятые (В-4 batch-write, В-5 STP), — итог в
+`history/2026-07-14-claude-docs-curation.md`.
 
-### Шаг 5 (риск-преконтроль)
+### Риск-преконтроль — остаточные кандидаты (вернуться по наблюдениям)
 
 - **В-2 `order-precheck`** — серверная пре-валидация ордера
   (`contracts/order-precheck.md`). ⚠ Ограничение офдока: только
@@ -205,79 +166,91 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   `docs/decisions/per-trade-risk-policy.md`), не в валидаторе фазы 1
   (`contracts/position-tiers.md`).
 - **Простой жёсткий предел плеча на сделку — отложен (ратифицировано
-  2026-06-20).** На `GAPS_CLOSE_1` шага 5 принят вариант (а): в фазе 1
-  отдельного потолка по плечу/экспозиции нет, плечо связано лимитом риска
-  на сделку (`docs/decisions/per-trade-risk-policy.md`). При этом виден
-  остаточный зазор: **узкий стоп → высокое плечо** при малом денежном
+  2026-06-20,** `docs/decisions/per-trade-risk-policy.md`**).**
+  Остаточный зазор: **узкий стоп → высокое плечо** при малом денежном
   убытке по стопу (риск на сделку умещается в лимит, но нотинал/плечо
-  большие). Простой жёсткий кэп плеча на сделку этот зазор закрыл бы; в
-  фазе 1 сознательно отложен. **Вернуться после наблюдений** (бэктест /
-  живые прогоны), когда станет видно, материализуется ли зазор на
-  практике.
+  большие). **Вернуться после наблюдений** (бэктест / живые прогоны),
+  когда станет видно, материализуется ли зазор на практике.
 
-### Шаг 6 (FSM)
+### Шаг 8 (safety / AnomalyJob)
 
-- **Error-градация уровни 3-4: реактивный enforcement холдов — ✅ ПОСТРОЕН
-  (CODE-делта холдов шага 6, 2026-06-23/24; D2-реактивный снят).** Детали —
-  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-holds-design.md`
-  и там же `phase-1-step-6-code.md` (§Реактивные холды L3/L4, §Доработка
-  холд-дельты). **Остаётся форвардом (узко):** (1) **проактивная детекция**
-  аномалий (`AnomalyJob`/`TradeRuleValidator` + численный порог «серия
-  неудач» STRUCT-Q1) — **шаг 8**; (2) **точный локальный after через
-  REFRESH_*** + **биржа-широкая L4-реконсиляция** (внешний слепок читает
-  только instId триггера) — **шаг 8**; (3) **аудит ручного un-hold**
-  (кем/когда) — **шаг 9 / п.9** (сама операция un-hold построена).
-- **[MAJOR, perf] L4 `fireExchange` — небанженный O(сделок) burst под D-M1
-  (ревью холд-дельты, 2026-06-24; порог актуальности — фаза 3).**
+- **Остаток холдов L3/L4** (реактивный enforcement построен на шаге 6 —
+  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-holds-design.md`):
+  (1) **проактивная детекция** аномалий (`AnomalyJob`/`TradeRuleValidator`
+  + численный порог «серия неудач» STRUCT-Q1) — **шаг 8**;
+  (2) **точный локальный after через REFRESH_*** + **биржа-широкая
+  L4-реконсиляция** (внешний слепок читает только instId триггера) —
+  **шаг 8**; (3) **аудит ручного un-hold** (кем/когда) — **шаг 9 / п.9**
+  (сама операция un-hold построена).
+- **В-1 `cancel-all-after`** — dead-man's switch: серверная
+  страховка на потерю связи **поверх** явного kill-switch, не вместо
+  него (`contracts/cancel-all-after.md`; heartbeat раз в секунду,
+  timeOut 0|[10,120] с). Покрытие algo-ордеров CAA офдоком не
+  специфицировано — уточнить на шаге.
+- **Остаток kill-switch (ANOM-Q2):** per-инструмент контур построен,
+  декларативный kill-switch откачён (семантика —
+  `docs/components/KillSwitchExecutor.md`). **Остаётся форвардом:**
+  (1) **AnomalyJob-путь** (проактивная детекция → зов executor'а) +
+  общебиржевая **orphan-сверка** (сущности вне модели сделки) +
+  перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 —
+  **шаг 8**; (2) **PnL-финализация `EMERGENCY_CLOSED`** (остаток
+  DEAL-Q2 закрыт G5: число = фактический realized net вкл.
+  `liqPenalty`; расчёт — шаг 7). Связано с **ANOM-Q2**
+  (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`).
+- **Остаток Stage 3 FSM/action слоистости** (решение —
+  `docs/decisions/fsm-execution-layering.md`; Stage 1-2 построены на
+  шаге 6): transition-conditions в модели стратегии +
+  exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) + снять
+  вырожденный `CLOSE_FULL` — сверить остаток с as-built шага 6.
+
+### Перф-форвард (порог актуальности — фаза 3)
+
+- **[MAJOR, perf] L4 `fireExchange` — небанженный O(сделок) burst под
+  guard прохода (ревью холд-дельты, 2026-06-24).**
   `KillSwitchService.fireExchange` итерирует небанженный
   `DealDataService.findActiveByExchangeId` и на **каждую** сделку строит
-  `DealContext` (~9 запросов) + kill-switch REST — под advisory-локом прохода
-  (держит соединение). Распухает по **памяти / стоимости запроса** линейно по
-  числу одновременных сделок биржи, без потолка; хуже принятого M4 (REST под
-  локом на одну сделку). **Порог актуальности — фаза 3** (реальный объём
-  одновременных сделок); в фазе 1 объём мал — не нагружено. **Починка (когда
-  возьмём): перебор пачками (bounded) — полный свип сохранён**, режется не
-  скорость, а ограниченный аппетит (память/стоимость). **`LIMIT` небезопасен**
-  (отрезал бы несвёрнутый live risk); альтернатива — off-lock dispatch
-  L4-teardown. Источник — `phase-1-step-6-code.md` §Доработка холд-дельты.
-- **[MINOR, perf] Дублирующий тикер-REST в entry-скане (повторное ревью фикс-дельты
-  M4, 2026-07-02).** После фикса M4 `MarketPhaseService.buildContext` тянет тикер
-  (`MarketPriceDataService.getMarketPriceData`) для классификации фазы по каждому
-  ACTIVE-инструменту без активной сделки за проход; квалифицированный инструмент
-  затем тянет тот же тикер повторно в `MarketConditionContextFactory.build`. Итог:
-  +1 тикер-REST на каждый скан-инструмент, 2 идентичных вызова на квалифицированный
-  — линейно к числу инструментов, давление на rate-limit OKX. Функционально
-  корректно, согласуется с stage-1 no-cache. **Починка:** тянуть `MarketPriceData`
-  один раз в `EntryScannerJob.scanInstrument` и прокинуть в оба контекста (фазовый +
-  condition), либо короткоживущий per-tick кэш в `MarketPriceDataService`.
-  Кросс-коллаборатор: `MarketConditionContextFactory.build` шарится с FSM
-  (`DealFsmSupport.conditionContext`). Источник — повторное ревью фикс-дельты (v63).
-- **Унификация инфраструктуры джоб — форвард, горизонт фаза 3 (код-ревью заход 2,
-  2026-07-01).** Ревью-замечания «общий родитель джоб» (п.4) и «единый механизм
-  локов» (п.5) — доработка механизма замыкания под мультиинстанс/микросервисы,
-  относится к фазе 3. Состав: абстрактный `ScheduledJob`-родитель (шаблон
-  `enabled → lock → run`) + единый `JobLock`-интерфейс с двумя реализациями
-  (`InProcessJobLock` поверх `JobExecutionGuard`, `AdvisoryJobLock` — БД
-  advisory-замок) — единый API замыкания. **В фазе 1 оркестратор выровнен на
-  `JobExecutionGuard`** (как остальные 5 джоб): единственное требование фазы 1 —
-  внутрипроцессная не-реентрантность, один экземпляр монолита, межэкземплярной
-  конкуренции нет. Прежний `OrchestratorPassLock` (БД advisory-замок, raw-JDBC)
-  **удалён как преждевременный** (2026-07-01) — advisory несущий только с фазы 3
-  (мультиинстанс), вернётся тогда (код в git-истории). Тем самым п.6 «SQL только
-  в репозиториях» снят из фазы 1 (raw-SQL ушёл); при возврате в фазе 3 raw-JDBC
-  advisory — ратифицированное исключение (замок держит **одно соединение** весь
-  проход, JPA-репозиторий этого не гарантирует). **Спека D-M1 пересмотрена:**
-  фаза 1 — in-process guard; БД-замок — форвард фазы 3 (см.
+  `DealContext` (~9 запросов) + kill-switch REST — внутри guard-прохода.
+  Распухает по **памяти / стоимости запроса** линейно по числу
+  одновременных сделок биржи, без потолка. В фазе 1 объём мал — не
+  нагружено. **Починка (когда возьмём): перебор пачками (bounded) —
+  полный свип сохранён**, режется не скорость, а ограниченный аппетит
+  (память/стоимость). **`LIMIT` небезопасен** (отрезал бы несвёрнутый
+  live risk); альтернатива — off-lock dispatch L4-teardown. Источник —
+  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
+  §Доработка холд-дельты.
+- **[MINOR, perf] Дублирующий тикер-REST в entry-скане (повторное ревью
+  фикс-дельты M4, 2026-07-02).** `MarketPhaseService.buildContext` тянет
+  тикер (`MarketPriceDataService.getMarketPriceData`) для классификации
+  фазы по каждому ACTIVE-инструменту без активной сделки за проход;
+  квалифицированный инструмент затем тянет тот же тикер повторно в
+  `MarketConditionContextFactory.build`. Итог: +1 тикер-REST на каждый
+  скан-инструмент, 2 идентичных вызова на квалифицированный — линейно к
+  числу инструментов, давление на rate-limit OKX. Функционально
+  корректно, согласуется с stage-1 no-cache. **Починка:** тянуть
+  `MarketPriceData` один раз в `EntryScannerJob.scanInstrument` и
+  прокинуть в оба контекста (фазовый + condition), либо короткоживущий
+  per-tick кэш в `MarketPriceDataService`. Кросс-коллаборатор:
+  `MarketConditionContextFactory.build` шарится с FSM
+  (`DealFsmSupport.conditionContext`).
+- **Унификация инфраструктуры джоб — горизонт фаза 3 (код-ревью заход 2,
+  2026-07-01).** Доработка механизма замыкания под
+  мультиинстанс/микросервисы. Состав: абстрактный `ScheduledJob`-родитель
+  (шаблон `enabled → lock → run`) + единый `JobLock`-интерфейс с двумя
+  реализациями (`InProcessJobLock` поверх `JobExecutionGuard`,
+  `AdvisoryJobLock` — БД advisory-замок; raw-JDBC advisory —
+  ратифицированное исключение: замок держит **одно соединение** весь
+  проход). В фазе 1 все джобы — на in-process `JobExecutionGuard`;
+  БД-замок вернётся с мультиинстансом (см.
   `.claude/rules/tech-radar.md` строка Raw-JDBC → `hold`,
   `docs/components/DealOrchestratorJob.md` §Concurrency-guard).
 
-### Шаг 7 (сделки и P&L)
+## Шаг 7 (сделки и P&L) — исполнительный хвост
 
-**Концепция закрыта:** источник числа — `GAPS_CLOSE_1` (2026-07-03,
-`docs/decisions/result-profit-source.md`); механика/носители стадий 1-2 —
-`GAPS_CLOSE_2` (2026-07-04, `docs/decisions/pnl-finalization-mechanics.md`).
-Ниже — **исполнительный хвост (CODE) + рантайм-верификация + форвард**, не выбор
-пути. Гейт `CODE` — после чистого `DOCS_CHECK_3`.
+**Концепция закрыта:** источник числа —
+`docs/decisions/result-profit-source.md`; механика/носители стадий 1-2 —
+`docs/decisions/pnl-finalization-mechanics.md`. Ниже — **исполнительный
+хвост (CODE) + рантайм-верификация + форвард**, не выбор пути. Гейт
+`CODE` — после чистого `DOCS_CHECK_3`.
 
 - **CODE стадий 1-2 (доспецифицировано, писать код):** носители
   `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
@@ -300,63 +273,16 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **Epsilon сверки bills↔net (N10)** — провизорная величина
   (max(0.01 settle-ccy, 0.5%·|net|)); подтверждение/калибровка — пользователь/бэктест.
 
-### Шаг 8 (safety / AnomalyJob)
-
-- **В-1 `cancel-all-after`** — dead-man's switch: серверная
-  страховка на потерю связи **поверх** явного
-  `EXECUTE_KILL_SWITCH`, не вместо него
-  (`contracts/cancel-all-after.md`; heartbeat раз в секунду,
-  timeOut 0|[10,120] с). Покрытие algo-ордеров CAA офдоком не
-  специфицировано — уточнить на шаге.
-- **Kill-switch: ретрай-до-закрытия + сверка реального состояния биржи
-  (ANOM-Q2).** **Per-инструмент контур — ✅ ПОСТРОЕН**, **декларативный
-  kill-switch (Scope A/B) — ✅ ОТКАЧЁН** (код-ревью заход 2, 2026-07-01):
-  kill-switch — аварийный side-executor с bounded-ретраем и подтверждением
-  flat, не команда и не действие стратегии. Семантика —
-  `docs/components/KillSwitchExecutor.md`; детали захода —
-  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
-  §Заход 2 разбора находок.
-  **Остаётся форвардом:** (1) **AnomalyJob-путь** (проактивная детекция → зов
-  executor'а) + общебиржевая **orphan-сверка** (сущности вне модели сделки) +
-  перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 — **шаг 8**;
-  (2) **PnL-финализация `EMERGENCY_CLOSED`** (остаток DEAL-Q2 закрыт G5:
-  число = фактический realized net вкл. `liqPenalty`; расчёт — шаг 7).
-  Связано с **ANOM-Q2**
-  (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`).
-- **FSM/action слоистость — decision + Stage 1 — ✅ ПОСТРОЕНЫ (2026-07-01).**
-  Решение — `docs/decisions/fsm-execution-layering.md` (в т.ч. §Handler — 3
-  метода); детали Stage 1 —
-  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
-  §Заход 2 разбора находок. Stage 2/3-рефактор (`StrategyActionOrchestrator`
-  + per-type executor'ы) выполнен на `SYNC_DOCS_FROM_CODE` шага 6 —
-  `history/2026-07-03-phase-1-step-6-fsm-orchestration.md`. **Форвардом
-  (остаток Stage 3):** transition-conditions в модели стратегии +
-  exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) + снять
-  вырожденный `CLOSE_FULL` — сверить остаток с as-built шага 6.
-
-### Рассмотрено, не берём (прогоны 2-3)
-
-- **В-4 batch-write** (`batch-orders`/`cancel-batch-orders`/
-  `amend-batch-orders`) — конфликт с гранулярностью «одна команда —
-  одна сущность» (CMD-Q3); новой фактуры под пересмотр нет.
-  Контракт задокументирован (`contracts/batch-operations.md`),
-  `mass-cancel` ушёл вне периметра (MMP/Option-only).
-- **В-5 STP** (`stpMode`/`stpId`) — сознательно не используется;
-  новой фактуры нет. Действует биржевой default
-  (`acctStpMode=cancel_maker` — `contracts/account-config.md`).
-
 ## Хвост шага 4 (CODE-отложения, 2026-06-11)
 
 Refinements, сознательно отложенные при `CODE` шага 4 (код — первый
 проход, доки описывают целевой дизайн). Источник —
 `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-sync-docs-from-code.md`
-(§DEFER). Не блокируют `DONE` шага 4; берутся при доведении командного
-слоя / на смежных шагах.
+(§DEFER). Берутся при доведении командного слоя / на смежных шагах.
+Гейтовые D-B3 (SUBMIT recovery-by-clientId) и D-M1 (concurrency-guard)
+закрыты на шаге 6 — итог в
+`history/2026-07-14-claude-docs-curation.md`.
 
-- **SUBMIT recovery-by-clientId** — `SubmitOrderExecutor`/
-  `SubmitAlgoOrderExecutor`: при пустом `externalId` искать сущность на
-  бирже по client id (recovery после краха между send и сохранением
-  `externalId`) до повторного place. Сейчас — place-if-blank.
 - **ClosePosition settle ccy** — `ClosePositionExecutor`/
   `IntegrationService.closePosition`: передавать settle currency в
   close-request (сейчас `null`).
@@ -364,54 +290,37 @@ Refinements, сознательно отложенные при `CODE` шага 
   цели.** Порядок ног REPLACE по риск-классу (place→факт→cancel для
   protective; cancel→факт→place для entry) и резолюция цели CANCEL по
   цепочке `replacesInternalId` — не реализованы (фабрика покрывает
-  CREATE/SUBMIT/REFRESH/CLOSE). **Владелец оркестрации решён (`GAPS_CLOSE_1`
-  шага 6, CMD-Q5/CMD-Q6):** секвенс ног ведёт петля/`DealStateMachine` по
-  фактам, фабрика остаётся «одна команда за проход»
-  (`docs/decisions/action-orchestration-vs-command.md`). Концепция —
-  `replace-not-amend`, `DealActionState` §REPLACE. **Re-deferred за `CODE`
-  шага 6 (deferral D1, 2026-06-22):** на `CODE` шага 6 фабрика REPLACE-ног
-  оставлена возвращающей `empty`, `ManagingHandler` стоит в `MANAGING`;
-  обоснование — самостоятельный объёмный refinement, не нужен базовой петле
-  фазы 1, `DONE` шага 6 не гейтит. Сверка —
-  `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
-  §Сверка scope.
+  CREATE/SUBMIT/REFRESH/CLOSE). Владелец оркестрации: секвенс ног ведёт
+  петля/`DealStateMachine` по фактам, фабрика остаётся «одна команда за
+  проход» (`docs/decisions/action-orchestration-vs-command.md`);
+  концепция — `replace-not-amend`, `DealActionState` §REPLACE.
+  **Re-deferred за `CODE` шага 6 (deferral D1, 2026-06-22):** фабрика
+  REPLACE-ног возвращает `empty`, `ManagingHandler` стоит в `MANAGING`;
+  самостоятельный объёмный refinement, не нужен базовой петле фазы 1.
 - **Refresh algo: external-поля дерева `condition`.** `updateFromSnapshot`
   игнорит `condition`; обновляются только top-level факты срабатывания.
   Обновление trigger/trailing external-цен из снапшота — добрать.
-- **Evidence-cycle пагинация по `billId`.** `REFRESH_FILLS` и
-  order/algo pending/history — сейчас одна страница на звено; добрать
-  пагинацию назад до пустого `data` (владение циклом —
-  `refresh-evidence-cycle-ownership`).
+- **Evidence-cycle пагинация.** Order/algo pending/history — сейчас одна
+  страница на звено; добрать пагинацию назад до пустого `data`
+  (владение циклом — `refresh-evidence-cycle-ownership`). Плюс
+  order-цикл не доходит до `orders-history-archive` (последнее звено по
+  докам) — добрать. Актуально и для новых `REFRESH_POSITIONS_HISTORY` /
+  `REFRESH_BILLS` (шаг 7; `REFRESH_FILLS` снят).
 - **Рантайм-прогон через `OkxProxyController`** — отдельно, при
   поднятом PostgreSQL + demo-кредах (вкл. И-2: подтверждение
   `cancel-advance-algos` для trailing в demo trading).
 
-### Из адверсариального ревью (2026-06-11)
+### Из адверсариального ревью (2026-06-11) — неблокирующий остаток
 
 Источник —
 `.claude/work/history/2026-06-11-phase-1-step-4-concept-review/phase-1-step-4-adversarial-review.md`.
-Деньги-латентные (D-B3, D-M1) материализуются только с оркестрационной
-петлёй — **gating для step-6/7**, не для DONE шага 4.
+Гейтовые D-B3/D-M1 закрыты на шаге 6 (итог —
+`history/2026-07-14-claude-docs-curation.md`).
 
-- **[BLOCKER, gating step-6/7] D-B3 — SUBMIT recovery-by-clientId.** Краш
-  между `placeOrder` и сохранением `externalId` → дубль ордера при
-  ресабмите. `SubmitOrderExecutor`/`SubmitAlgoOrderExecutor`: перед place
-  при пустом `externalId` искать сущность на бирже по client id и
-  принять найденную. Требует `getOrder` null-on-not-found (OKX `51603`).
-  Обязательно **до** включения авто-реплея SUBMIT (FSM/оркестратор).
-- **[MAJOR, gating step-6/7] D-M1 — concurrency-guard исполнения
-  команды.** Перекрытие тика/ручного триггера → двойной SUBMIT.
-  **Спека выбрана (`GAPS_CLOSE_1` шага 6, 2026-06-22):** блокировка на
-  уровне базы на **весь проход** `DealOrchestratorJob` (и таймерный, и
-  ручной заход под одну блокировку) — сериализует проходы, per-deal-защита
-  не нужна; in-memory guard отвергнут как небезопасный на мультиинстансе
-  (`docs/components/DealOrchestratorJob.md` §Concurrency-guard). **Реализация
-  — на `CODE`/`DONE` шага 6** (жёсткий гейт `DONE`).
-- **[MAJOR] D-M5/R5 — fills-пагинация + orders-history-archive.**
-  `RefreshFillsExecutor` берёт одну страницу `getFills`/`getFillsHistory`
-  (недобор fills → искажение PnL, step 7); пагинация назад по `billId`.
-  Плюс order-цикл не доходит до `orders-history-archive` (последнее звено
-  по докам) — добрать.
+- **[MAJOR] D-M5/R5 — пагинация evidence-цикла + orders-history-archive.**
+  Одна страница на звено цикла (недобор фактов → искажение P&L-разбивки);
+  пагинация назад по `billId` / добрать archive-звено (см. «Evidence-cycle
+  пагинация» выше; fills-часть снята вместе с `REFRESH_FILLS`).
 - **[MAJOR] perf P-M3 — `getRequiredById` грузит attached** даже для
   submit/cancel. Разделить: лёгкий load без attached vs граф-load для
   refresh.
@@ -422,18 +331,18 @@ Refinements, сознательно отложенные при `CODE` шага 
   вопрос дизайна позиции.
 - **[MINOR] perf — батчи/churn.** `saveAll` для attached/balances вместо
   per-row; upsert баланса вместо delete+insert; собрать изменённые
-  ордера в RefreshFills в один `saveAll`.
+  ордера в один `saveAll`.
 - **[MINOR] D-m1/D-m2 — подпись/эхо.** Clock-skew tolerance подписи OKX;
   лишние циклы refresh при пустом clOrdId-эхе.
 - **[MINOR] conventions m2 — `getRequiredByInternalId`** (Order/AlgoOrder)
   сейчас не вызывается; если step-6/7 lookup так и не появится — удалить.
 
-## Ретро-ревью шагов 1-3 (2026-06-11)
+## Ретро-ревью шагов 1-3 (2026-06-11) — неблокирующий форвард-долг
 
 Независимый адверсариальный code-review, ретроспективно достроенный по
 шагам 1-3 (источник —
 `.claude/work/history/2026-06-11-phase-1-steps-1-3-retro-adversarial-review.md`).
-Блокеров нет, статусы `DONE` валидны. Неблокирующий форвард-долг:
+Блокеров нет, статусы `DONE` валидны.
 
 - **Шаг 1.** `[MAJOR]` SYNC-overlap не реализован (`syncOverlapBars`
   объявлен, не зовётся; overlap от `pageSize`) — реализовать или удалить
@@ -454,12 +363,10 @@ Refinements, сознательно отложенные при `CODE` шага 
   UNKNOWN-ветке `MarketStructureJob`; `lookbackBars` без нижней границы
   перед `PageRequest.of`. `[NIT]` N+1 по таймфреймам (повторная загрузка
   окна для настроек одного инструмента).
-- **Сквозное.** Error-политика зафиксирована
-  (`docs/rules/error-handling-policy.md`; кратко — `codestyle.md`
-  §«Обработка ошибок»): коды, единый `@ControllerAdvice`, трансляция
-  нарушений констрейнтов в 4xx. Ретро-майоры шагов 2 и 4 закрываются
-  в одном месте по этой политике; конкретный набор HTTP-кодов и
-  409-vs-идемпотентность — провизорны (хвост пользователя).
+- **Сквозное.** Ретро-майоры шагов 2 и 4 (коды ошибок) закрываются в
+  одном месте по error-политике (`docs/rules/error-handling-policy.md`;
+  кратко — `codestyle.md` §«Обработка ошибок»); конкретный набор
+  HTTP-кодов и 409-vs-идемпотентность — провизорны (хвост пользователя).
 
 ## Методологические задачи (по итогам миграции)
 
@@ -488,19 +395,16 @@ Refinements, сознательно отложенные при `CODE` шага 
   архитектурные инварианты);
 - `docs/models/domain/other/AnomalyReport.md` (§Чего не хранит).
 
-В миграции процессов (2026-05-28) разделы «Чего не хранит» в новых
-файлах **не создавались** (новых затронутых моделей нет).
-
-## Инфра-долг (Boot 4 миграция / рантайм-робастность, сессия 2026-06-12)
+## Инфра-долг (Boot 4 миграция / рантайм-робастность)
 
 Вскрыто на первом реальном рантайм-старте (dev/test-сплит БД + Vault,
-снапшот v47). Не cross-cutting миграция из архива — инфра/рантайм-долг
+2026-06-12). Не cross-cutting миграция из архива — инфра/рантайм-долг
 переезда стека.
 
 ### I1. Boot 3→4 split-autoconfig: durable-проверка
 
 Переезд Boot 3→4 / Spring 7 / Hibernate 7 / JDK 25 раньше не гонялся в
-рантайме — компиляция пробелы не ловит. За сессию вскрыто 3 пробела
+рантайме — компиляция пробелы не ловит. Вскрыто 3 пробела
 split-autoconfig: `RestClient.Builder` (→ `spring-boot-starter-restclient`),
 Jackson 2 `ObjectMapper` (→ `spring-boot-jackson2`), Flyway
 (→ `spring-boot-starter-flyway`) — все по шаблону «библиотека на classpath
@@ -520,32 +424,17 @@ Jackson 3 (`tools.jackson`). Бин `ObjectMapper` сейчас даём
 `setDefaultPropertyInclusion`, `JsonProcessingException`) на Jackson 3 и
 снятие `jackson2`. Радар — Jackson 3 = `assess`.
 
-### I4. Jackson 3 × Lombok beanspec мангли́нг в OKX-DTO (находка F4)
+### I4. Jackson 3 × Lombok beanspec мангли́нг в OKX-DTO — защита от рецидива
 
 Системный класс, смежный I2. **Корень:** Jackson 3 (`tools.jackson`,
 дефолт RestClient в SB4/Spring 7) выводит имя свойства из Lombok
 beanspec-аксессора поля «строчная-первая/заглавная-вторая»
 (`sCode`→`getsCode()`, `cTime`→`getcTime()`) иначе, чем JSON-ключ → поле
-биндится в **null**. Jackson 2 (legacy-mangling) с ключом совпадал →
-до перехода стека на Jackson 3 дефект не проявлялся. Подтверждено
-эмпирикой (юнит-срезы десериализации под обоими Jackson).
-
-**Симптом:** write-ack терял per-element `sCode` (реджект-код уходил в
-top-level fallback, F3a); read-снапшоты теряли таймстампы —
-probe-`getBalance → externalUpdatedAt:null` из `uTime`.
-
-**Сделано (interim, сессия 2026-06-12):**
-- **F3a** — `@JsonProperty` на `sCode`/`sMsg` в `OrderAckOkxResponse`/
-  `AlgoOrderAckOkxResponse`; тест `OkxAckDeserializationTest` (Jackson
-  2/3); live re-place подтвердил ack `code="51010"` (per-element), не
-  top-level `"1"`.
-- **F4** — `@JsonProperty` на `cTime`/`uTime` в `OkxBalanceResponse`,
-  `OkxBalanceDetailResponse`, `OkxPositionResponse`, `OrderOkxResponse`,
-  `OkxAlgoOrderResponse`; тест `OkxReadDtoDeserializationTest` (полный
-  per-field бинд каждого DTO под Jackson 3, зелёный).
-- Grep текущих OKX-DTO на точный паттерн lower-upper: ровно эти 7 полей
-  (4 ack + cTime/uTime) — иного остатка по OKX нет (request/response/
-  nested `AttachAlgoOrdOkxResponse` чисты).
+биндится в **null**. Точечная защита текущих OKX-DTO поставлена
+(`@JsonProperty` на 7 полях + round-trip тесты `OkxAckDeserializationTest` /
+`OkxReadDtoDeserializationTest`; итог —
+`history/2026-07-14-claude-docs-curation.md`, run-log
+`history/2026-06-20-source-api-contour/source-api-pilot-run-log.md` F3a/F4).
 
 **Открыто (integrator, routing — НЕ в этом заходе):**
 - **Защита от рецидива:** глобальный конфиг Jackson 3 (вернуть
@@ -557,15 +446,14 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 
 **Влияние:** гейтит корректность любого read-снапшота с таймстампами
 (`cTime`/`uTime`) → относится к **Фазе 3** prod read-only. Связано с I2
-(миграция кода на Jackson 3 — целевой end-state; F4 — точечная защита до
-неё). Источник — run-log `source-api-pilot-run-log.md` (F3a/F4).
+(миграция кода на Jackson 3 — целевой end-state).
 
-## Средовой дефицит автономного RUN тестов (контур source-api, 2026-06-12)
+## Средовой дефицит автономного RUN тестов (контур source-api)
 
-Вскрыто эскалацией RUN пилота `source-api-testing`: `tester` не может
-прогнать demo-фазу автономно из shell CC — нет headless-бута приложения
-и нет доступа к Vault-токену. Снять дефицит, чтобы demo-прогоны не
-зависели от ручного бута. Состав:
+Вскрыто эскалацией RUN пилота `source-api-testing` (2026-06-12):
+`tester` не может прогнать demo-фазу автономно из shell CC — нет
+headless-бута приложения и нет доступа к Vault-токену. Снять дефицит,
+чтобы demo-прогоны не зависели от ручного бута. Состав:
 
 - **`mvnw`/wrapper в репо** — headless-бут из shell (сейчас нет
   `mvn`/`mvnw`/собранного jar — приложение поднимает только пользователь
@@ -577,17 +465,14 @@ probe-`getBalance → externalUpdatedAt:null` из `uTime`.
 - **Правило безопасности (инвариант роли `tester`):** автономно
   бутается **только `test`-профиль** (demo-креды, `x-simulated-trading=1`
   — prod-write технически невозможен). **`prod`-профиль — никогда
-  автономно**, только под пользователем (prod read-only остаётся хвостом
-  пользователя навсегда).
+  автономно**, только под пользователем.
 
-Снимает зависимость demo-прогонов от ручного бута; prod-фаза остаётся за
-пользователем. Источник — пауза RUN пилота (run-log
-`history/2026-06-20-source-api-contour/source-api-pilot-run-log.md`;
-снапшот v48).
+Снимает зависимость demo-прогонов от ручного бута. Источник — пауза RUN
+пилота (run-log
+`history/2026-06-20-source-api-contour/source-api-pilot-run-log.md`).
 
 > Примечание: ре-база контура на сырьё
 > (`.claude/decisions/source-api-target-rebase.md`) делает контур
-> demo/non-prod и убирает prod из контура; prod read-only — больше не
-> хвост контура, а ад-хок ручная проверка пользователя вне контура.
-> Demo-бут по-прежнему нужен для автономного RUN код-тестов.
-
+> demo/non-prod и убирает prod из контура; prod read-only — ад-хок
+> ручная проверка пользователя вне контура. Demo-бут по-прежнему нужен
+> для автономного RUN код-тестов.

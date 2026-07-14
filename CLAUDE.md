@@ -9,7 +9,9 @@
 ## Где что лежит
 
 Структура каталогов и правила размещения — в
-`.claude/rules/structure.md`.
+`.claude/rules/structure.md`. Дерево-индекс каталогов и файлов
+(с вопросом каждого узла) — `.claude/knowledge-tree.md`;
+поддержание порядка — `.claude/rules/curation.md`.
 
 Краткое:
 - `src/` — Java-код.

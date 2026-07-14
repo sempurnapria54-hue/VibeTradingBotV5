@@ -240,8 +240,8 @@ Surface-вопрос не идёт пользователю напрямую. М
 ## Выход
 
 Gap-отчёт — progress-файл активной задачи (название итерации
-включает номер `N`, например
-`.claude/work/progress/phase-1-step-1-docs-check-1.md`).
+включает номер `N`, по образцу
+`.claude/work/progress/phase-<N>-step-<M>-docs-check-<K>.md`).
 
 Структура отчёта:
 

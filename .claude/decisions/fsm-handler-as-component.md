@@ -8,7 +8,7 @@ lifecycle.
 ## Контекст
 
 NQ-H третьей обкатки (отчёт
-`.claude/work/progress/обкатка-классификации-процессы.md`, Ф40). В
+`.claude/work/history/2026-05-27-третья-обкатка-классификации-процессы.md`, Ф40). В
 `Deal management/FSM этапы сделки.md` всплыли per-status handler'ы
 Deal (PrecheckHandler, EntrySubmittedHandler, EntryFinalizedHandler,
 ProtectionSwitchedHandler, ManagingHandler, ExitPendingHandler,

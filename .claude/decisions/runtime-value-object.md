@@ -7,7 +7,7 @@
 ## Контекст
 
 NQ-F третьей обкатки (отчёт
-`.claude/work/progress/обкатка-классификации-процессы.md`).
+`.claude/work/history/2026-05-27-третья-обкатка-классификации-процессы.md`).
 Процессные доки полны объектов вроде `CalculationContext`,
 `DealContext`, `MarketPriceData`, `Calculated*`,
 `RiskValidationResult`. Они не persisted, не имеют identity и

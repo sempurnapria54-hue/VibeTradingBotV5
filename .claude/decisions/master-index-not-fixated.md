@@ -8,7 +8,7 @@
 ## Контекст
 
 NQ-G третьей обкатки (отчёт
-`.claude/work/progress/обкатка-классификации-процессы.md`, Ф30).
+`.claude/work/history/2026-05-27-третья-обкатка-классификации-процессы.md`, Ф30).
 Документ `Deal management/Статусы торговых сущностей.md` объявляет
 себя «основным источником истины по статусам», охватывая Deal,
 Order, AlgoOrder, Position, BalanceContainer, DealActionState,

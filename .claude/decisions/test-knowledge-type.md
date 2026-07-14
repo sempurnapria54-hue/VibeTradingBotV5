@@ -76,7 +76,7 @@ per-source тест-планы и библиотека кейсов.
   `docs/integrations/...` в секцию `.claude/...`.
 - Каталог наполняется через процесс
   `.claude/processes/source-api-testing.md` (этап DESIGN); первый
-  файл — пилотный план `.claude/tests/source-api/okx/pilot-plan.md`.
+  файл — пилотный план, ныне `.claude/tests/source-api/okx/plan.md`.
 - Планы — файлы знания: раздел «На какой вопрос отвечает этот файл»
   обязателен (вопрос плана — «как проверяем API `{source}` в
   таком-то скоупе?»).

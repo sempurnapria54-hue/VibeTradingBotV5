@@ -295,4 +295,4 @@ Prod убран из контура целиком: **нет prod-кейсов, 
 - Контур доукомплектации (C3) — `.claude/processes/api-docs-completion.md`,
   `.claude/rules/external-source-sync.md`.
 - Тип знания планов — `.claude/decisions/test-knowledge-type.md`.
-- Разбор/проработка — `.claude/work/progress/source-api-rebase.md`.
+- Разбор/проработка — `.claude/work/history/2026-06-20-source-api-contour/source-api-rebase.md`.

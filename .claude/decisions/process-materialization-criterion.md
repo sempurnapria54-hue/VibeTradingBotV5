@@ -8,7 +8,7 @@
 ## Контекст
 
 При подготовке миграции архивных процессов составлена карта артефактов
-(`.claude/work/progress/progress-карта-артефактов.md`, проход 1). Из 5
+(`.claude/work/history/2026-05-28-миграция-процессов/progress-карта-артефактов.md`, проход 1). Из 5
 кандидатов в процессы (`deal-lifecycle`, `market-data-calculation`,
 `strategy-action-calculation`, `risk-evaluation`,
 `audit-execution-history`) карта пометила три как «возможно сольётся с

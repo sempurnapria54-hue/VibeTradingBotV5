@@ -20,8 +20,10 @@ A2-passthrough. Структура **эндпоинт → кейсы → таб�
 §Нерешённое 1-4 закрыты. CODE-тесты написаны
 (`src/test/java/com/example/tradingbot/integration/sourceapi/okx/`).
 
-**RUN прогнан** (2026-06-20, demo/non-prod, `mvn -o test -Dgroups=source-api-live`,
-лог `.claude/work/run-logs/full-05.log`): **200 тестов, 198 pass / 2 fail**,
+**RUN прогнан** (2026-06-20, demo/non-prod, `mvn -o test -Dgroups=source-api-live`;
+сырые логи не сохранены, итоговый отчёт —
+`.claude/work/history/2026-06-20-source-api-contour/REPORT-2026-06-19-source-api-stabilization.md`):
+**200 тестов, 198 pass / 2 fail**,
 BUILD SUCCESS (`-Dmaven.test.failure.ignore=true`). Колонка «Факт +
 наблюдения (RUN)» заполнена по всем 312 строкам. Изначально **2 фейла**
 (TG4.1, AG5.1) — **оба разобраны и закрыты** (см. ниже); остаточных фейлов
@@ -33,7 +35,7 @@ BUILD SUCCESS (`-Dmaven.test.failure.ignore=true`). Колонка «Факт +
   truth), отражение на demo иногда >25s — что **уже** учтено у одиночного
   amend (TG3.1: per-case poll 60s), но batch-кейс TG4.1 остался на дефолтных
   25s. Тест выровнен на 60s (оба `waitUntil`) → перевалидировано **TG4 3/3
-  green** (`.claude/work/run-logs/validate-tg4-02.log`). Не C3 (латентность
+  green**. Не C3 (латентность
   amend — известное demo-поведение, не новый факт контракта).
 - **Пересмотрена после прогона (группа AG5, лимит 12 заявок/сутки):**
   на прогоне квота была исчерпана → все POST AG5 отдали `b.code=50011` (Too
@@ -47,8 +49,8 @@ BUILD SUCCESS (`-Dmaven.test.failure.ignore=true`). Колонка «Факт +
     rate-limit → кейс **пропускается** (`assumeFalse(isRateLimited)`), реджект
     по `quarter` ассертится только при доступной квоте.
   - Перевалидировано — AG5 **4/4, 0 fail, 2 skip** (AG5.3/4 пропущены по
-    исчерпанной квоте): `.claude/work/run-logs/validate-ag5-03.log`. Чтобы
-    реально наблюдать реджект-по-`quarter`, нужен прогон при доступной квоте.
+    исчерпанной квоте). Чтобы реально наблюдать реджект-по-`quarter`,
+    нужен прогон при доступной квоте.
 - **Ключевая находка C3 — И-2 подтверждён рантаймом:**
   `cancel-advance-algos` **жив на demo** (`M19tr.cancel`/`M19trs.cancel` →
   `b.code=0, data0.sCode=0`) вопреки выводу из офдока (changelog 2025-04-24);
