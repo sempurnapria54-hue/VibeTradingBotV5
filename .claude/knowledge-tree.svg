@@ -1,0 +1,227 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1900 1350" font-family="Segoe UI, Arial, sans-serif">
+  <title>Дерево базы знания VibeTradingBotV5</title>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#edf5f9"/>
+      <stop offset="1" stop-color="#fcfcfb"/>
+    </linearGradient>
+    <radialGradient id="aquaG" cx="0.4" cy="0.35" r="0.9">
+      <stop offset="0" stop-color="#4cc79a"/>
+      <stop offset="1" stop-color="#149067"/>
+    </radialGradient>
+    <radialGradient id="greenG" cx="0.4" cy="0.35" r="0.9">
+      <stop offset="0" stop-color="#3fa53f"/>
+      <stop offset="1" stop-color="#0a7010"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#22432f" flood-opacity="0.18"/>
+    </filter>
+    <!-- листовой кластер единичного радиуса 100 -->
+    <g id="blobA">
+      <circle cx="-55" cy="6" r="62" class="a-dk"/>
+      <circle cx="56" cy="9" r="60" class="a-dk"/>
+      <circle cx="-30" cy="-45" r="55" class="a-md"/>
+      <circle cx="33" cy="-42" r="52" class="a-md"/>
+      <circle cx="0" cy="0" r="100" fill="url(#aquaG)"/>
+      <circle cx="-26" cy="-32" r="36" class="a-lt" opacity="0.55"/>
+    </g>
+    <g id="blobG">
+      <circle cx="-55" cy="6" r="62" class="g-dk"/>
+      <circle cx="56" cy="9" r="60" class="g-dk"/>
+      <circle cx="-30" cy="-45" r="55" class="g-md"/>
+      <circle cx="33" cy="-42" r="52" class="g-md"/>
+      <circle cx="0" cy="0" r="100" fill="url(#greenG)"/>
+      <circle cx="-26" cy="-32" r="36" class="g-lt" opacity="0.55"/>
+    </g>
+    <g id="leaf">
+      <path d="M0,0 C-11,-14 -8,-34 0,-42 C8,-34 11,-14 0,0 Z"/>
+    </g>
+    <style>
+      .a-dk{fill:#0e6b4c}.a-md{fill:#17966a}.a-lt{fill:#8fe0c0}
+      .g-dk{fill:#045604}.g-md{fill:#2c8f2c}.g-lt{fill:#8fd48f}
+      .ink{fill:#0b0b0b}.ink2{fill:#52514e}
+      .pill{fill:#ffffff;fill-opacity:0.94;stroke:#0b0b0b;stroke-opacity:0.10}
+      .nm{font-size:14.5px;font-weight:600;fill:#0b0b0b;text-anchor:middle}
+      .q{font-size:12px;fill:#3f3e3b;text-anchor:middle;paint-order:stroke;stroke:#f7fafa;stroke-width:4px;stroke-linejoin:round}
+      .twig{fill:none;stroke:#6b4a2f;stroke-width:5;stroke-linecap:round}
+      .gl{font-size:14px;font-weight:600;fill:#0b0b0b;paint-order:stroke;stroke:#f2f6ee;stroke-width:4px;stroke-linejoin:round}
+      .gq{font-size:12px;fill:#52514e;paint-order:stroke;stroke:#f2f6ee;stroke-width:4px;stroke-linejoin:round}
+    </style>
+  </defs>
+
+  <!-- небо и земля -->
+  <rect width="1900" height="1350" fill="url(#sky)"/>
+  <ellipse cx="950" cy="1175" rx="870" ry="95" fill="#e3ecd8"/>
+  <ellipse cx="950" cy="1192" rx="620" ry="62" fill="#d6e3c6"/>
+
+  <!-- заголовок -->
+  <text x="70" y="88" class="ink" font-size="38" font-weight="700">Дерево базы знания</text>
+  <text x="70" y="118" class="ink2" font-size="16">VibeTradingBotV5 · каждая ветвь — каталог со своим вопросом · листва — файлы</text>
+
+  <!-- легенда -->
+  <g>
+    <rect x="1500" y="52" width="345" height="118" rx="14" class="pill"/>
+    <circle cx="1526" cy="80" r="9" fill="#1baf7a"/>
+    <text x="1544" y="85" class="gl">.claude/ — пайплайн (как работаем)</text>
+    <circle cx="1526" cy="110" r="9" fill="#008300"/>
+    <text x="1544" y="115" class="gl">docs/ — продукт (как устроен бот)</text>
+    <text x="1517" y="148" class="gq">размер листвы ∝ числу файлов · подписи — вопросы</text>
+  </g>
+
+  <!-- птицы -->
+  <path d="M1062 160 q9 -10 18 0 q9 -10 18 0" fill="none" stroke="#52514e" stroke-width="2" opacity="0.45"/>
+  <path d="M1122 122 q7 -8 14 0 q7 -8 14 0" fill="none" stroke="#52514e" stroke-width="2" opacity="0.35"/>
+
+  <!-- ствол, корни, сучья -->
+  <path d="M890 1172 C860 1180 822 1174 792 1182 C832 1192 872 1193 902 1188 Z" fill="#5d3f26"/>
+  <path d="M1010 1172 C1040 1180 1078 1174 1108 1182 C1068 1192 1028 1193 998 1188 Z" fill="#5d3f26"/>
+  <path d="M890 1172 C898 1030 906 905 926 800 L976 800 C994 905 1000 1030 1010 1172 C970 1180 930 1180 890 1172 Z" fill="#7a5636"/>
+  <path d="M898 1160 C905 1035 912 915 928 812 L942 812 C930 915 924 1035 918 1160 Z" fill="#96714b" opacity="0.55"/>
+  <path d="M925 815 C840 770 720 705 590 640 C585 630 590 618 600 612 C725 672 852 738 948 782 Z" fill="#6b4a2f"/>
+  <path d="M975 815 C1060 770 1180 705 1310 645 C1318 634 1314 622 1305 615 C1180 672 1050 738 952 782 Z" fill="#6b4a2f"/>
+  <path d="M946 800 C942 650 946 480 951 340 L959 340 C963 480 966 650 968 800 Z" fill="#6b4a2f"/>
+
+  <!-- ветки к листве: .claude -->
+  <path class="twig" d="M640 640 C480 560 330 430 240 315"/>
+  <path class="twig" d="M660 650 C560 540 480 420 448 318"/>
+  <path class="twig" d="M700 670 C660 550 620 420 602 312"/>
+  <path class="twig" d="M760 700 C745 570 735 430 731 322"/>
+  <path class="twig" d="M620 635 C470 590 320 520 210 480"/>
+  <path class="twig" d="M650 655 C560 600 460 530 385 488"/>
+  <path class="twig" d="M690 668 C640 610 580 530 542 485"/>
+  <path class="twig" d="M770 705 C740 630 710 545 692 492"/>
+  <path class="twig" d="M620 690 C500 675 370 660 262 652"/>
+  <path class="twig" d="M650 700 C570 685 490 668 428 658"/>
+  <path class="twig" d="M700 710 C655 690 605 668 570 652"/>
+  <path class="twig" d="M790 730 C760 705 725 675 703 660"/>
+  <!-- ветки к листве: docs -->
+  <path class="twig" d="M1270 640 C1290 520 1285 400 1281 320"/>
+  <path class="twig" d="M1300 630 C1400 510 1480 400 1517 316"/>
+  <path class="twig" d="M1310 640 C1470 540 1620 420 1720 330"/>
+  <path class="twig" d="M1240 630 C1210 550 1185 470 1172 405"/>
+  <path class="twig" d="M1250 655 C1235 600 1220 550 1212 512"/>
+  <path class="twig" d="M1290 660 C1330 610 1370 555 1397 518"/>
+  <path class="twig" d="M1310 655 C1400 600 1500 540 1565 505"/>
+  <path class="twig" d="M1320 660 C1450 610 1590 545 1705 512"/>
+  <path class="twig" d="M1288 690 C1292 680 1296 672 1300 665"/>
+
+  <!-- ===== ЛИСТВА .claude (аква) ===== -->
+  <g filter="url(#soft)">
+    <use href="#blobA" transform="translate(235,300) scale(0.49)"/>
+    <use href="#blobA" transform="translate(445,300) scale(0.36)"/>
+    <use href="#blobA" transform="translate(600,295) scale(0.36)"/>
+    <use href="#blobA" transform="translate(730,305) scale(0.30)"/>
+    <use href="#blobA" transform="translate(200,475) scale(0.47)"/>
+    <use href="#blobA" transform="translate(380,478) scale(0.38)"/>
+    <use href="#blobA" transform="translate(540,472) scale(0.355)"/>
+    <use href="#blobA" transform="translate(690,480) scale(0.30)"/>
+    <use href="#blobA" transform="translate(250,650) scale(0.40)"/>
+    <use href="#blobA" transform="translate(420,655) scale(0.34)"/>
+    <use href="#blobA" transform="translate(565,648) scale(0.31)"/>
+    <use href="#blobA" transform="translate(700,655) scale(0.275)"/>
+  </g>
+
+  <!-- ===== ЛИСТВА docs (зелёный) ===== -->
+  <g filter="url(#soft)">
+    <use href="#blobG" transform="translate(1280,305) scale(0.66)"/>
+    <use href="#blobG" transform="translate(1520,300) scale(0.60)"/>
+    <use href="#blobG" transform="translate(1725,315) scale(0.54)"/>
+    <use href="#blobG" transform="translate(1170,390) scale(0.44)"/>
+    <use href="#blobG" transform="translate(1210,500) scale(0.48)"/>
+    <use href="#blobG" transform="translate(1400,505) scale(0.48)"/>
+    <use href="#blobG" transform="translate(1570,495) scale(0.39)"/>
+    <use href="#blobG" transform="translate(1710,505) scale(0.34)"/>
+  </g>
+  <!-- почка dictionary -->
+  <circle cx="1300" cy="660" r="12" fill="#8fd48f" stroke="#045604" stroke-width="2.5"/>
+
+  <!-- плашки и вопросы: .claude -->
+  <rect x="170" y="287" width="130" height="26" rx="13" class="pill"/><text x="235" y="305" class="nm">decisions · 24</text>
+  <text x="235" y="367" class="q">Почему мы решили</text><text x="235" y="382" class="q">так, а не иначе?</text>
+  <rect x="385" y="287" width="120" height="26" rx="13" class="pill"/><text x="445" y="305" class="nm">processes · 7</text>
+  <text x="445" y="355" class="q">Как устроен</text><text x="445" y="370" class="q">метод-процесс?</text>
+  <rect x="549" y="282" width="102" height="26" rx="13" class="pill"/><text x="600" y="300" class="nm">agents · 7</text>
+  <text x="600" y="350" class="q">Что делает Claude</text><text x="600" y="365" class="q">в роли X?</text>
+  <rect x="687" y="292" width="86" height="26" rx="13" class="pill"/><text x="730" y="310" class="nm">chat · 2</text>
+  <text x="730" y="354" class="q">Что вшивается</text><text x="730" y="369" class="q">в чат claude.ai?</text>
+  <rect x="147" y="462" width="106" height="26" rx="13" class="pill"/><text x="200" y="480" class="nm">skills · 21</text>
+  <text x="200" y="540" class="q">Как именно</text><text x="200" y="555" class="q">делать X?</text>
+  <rect x="333" y="465" width="94" height="26" rx="13" class="pill"/><text x="380" y="483" class="nm">rules · 9</text>
+  <text x="380" y="535" class="q">Какое у нас</text><text x="380" y="550" class="q">правило?</text>
+  <rect x="493" y="459" width="94" height="26" rx="13" class="pill"/><text x="540" y="477" class="nm">notes · 6</text>
+  <text x="540" y="526" class="q">Что я наблюдал /</text><text x="540" y="541" class="q">разведал?</text>
+  <rect x="627" y="467" width="126" height="26" rx="13" class="pill"/><text x="690" y="485" class="nm">templates · 2</text>
+  <text x="690" y="529" class="q">Каков шаблон</text><text x="690" y="544" class="q">кода / дока?</text>
+  <rect x="201" y="637" width="98" height="26" rx="13" class="pill"/><text x="250" y="655" class="nm">work · 11</text>
+  <text x="250" y="709" class="q">Что с исполнительной</text><text x="250" y="724" class="q">работой?</text>
+  <rect x="366" y="642" width="108" height="26" rx="13" class="pill"/><text x="420" y="660" class="nm">library · 5</text>
+  <text x="420" y="708" class="q">Что говорит торговый</text><text x="420" y="723" class="q">первоисточник?</text>
+  <rect x="519" y="635" width="92" height="26" rx="13" class="pill"/><text x="565" y="653" class="nm">tests · 3</text>
+  <text x="565" y="698" class="q">Как проверяем</text><text x="565" y="713" class="q">API источника?</text>
+  <rect x="637" y="642" width="126" height="26" rx="13" class="pill"/><text x="700" y="660" class="nm">snapshots · 1</text>
+  <text x="700" y="612" class="q">Где мы сейчас?</text>
+
+  <!-- плашки и вопросы: docs -->
+  <rect x="1207" y="292" width="146" height="26" rx="13" class="pill"/><text x="1280" y="310" class="nm">components · 65</text>
+  <text x="1285" y="389" class="q">Кто выполняет?</text>
+  <rect x="1462" y="287" width="116" height="26" rx="13" class="pill"/><text x="1520" y="305" class="nm">models · 47</text>
+  <text x="1520" y="378" class="q">Что это за модель</text><text x="1520" y="393" class="q">(по слоям)?</text>
+  <rect x="1633" y="302" width="184" height="26" rx="13" class="pill"/><text x="1725" y="320" class="nm">integrations/okx · 34</text>
+  <text x="1725" y="387" class="q">Каков контракт и</text><text x="1725" y="402" class="q">правила источника?</text>
+  <rect x="1095" y="377" width="150" height="26" rx="13" class="pill"/><text x="1170" y="395" class="nm">models (RVO) · 16</text>
+  <text x="1170" y="452" class="q">Что это за</text><text x="1170" y="467" class="q">runtime-объект?</text>
+  <rect x="1158" y="487" width="104" height="26" rx="13" class="pill"/><text x="1210" y="505" class="nm">rules · 22</text>
+  <text x="1210" y="566" class="q">Какое правило</text><text x="1210" y="581" class="q">действует в системе?</text>
+  <rect x="1335" y="492" width="130" height="26" rx="13" class="pill"/><text x="1400" y="510" class="nm">decisions · 22</text>
+  <text x="1400" y="571" class="q">Почему решили так?</text><text x="1400" y="586" class="q">(продукт)</text>
+  <rect x="1500" y="482" width="140" height="26" rx="13" class="pill"/><text x="1570" y="500" class="nm">lifecycles · 10</text>
+  <text x="1570" y="552" class="q">Через какие состояния</text><text x="1570" y="567" class="q">проходит объект?</text>
+  <rect x="1649" y="492" width="122" height="26" rx="13" class="pill"/><text x="1710" y="510" class="nm">processes · 5</text>
+  <text x="1710" y="557" class="q">Как устроен</text><text x="1710" y="572" class="q">процесс?</text>
+  <text x="1330" y="666" class="gl" font-size="13">dictionary · 0</text>
+  <text x="1330" y="683" class="gq">Что означает термин? (почка — пока пусто)</text>
+
+  <!-- золотой лист CLAUDE.md -->
+  <g filter="url(#soft)">
+    <path d="M952 332 C928 302 934 258 952 240 C970 258 976 302 952 332 Z" fill="#eda100"/>
+    <path d="M952 326 L952 252" stroke="#b97e00" stroke-width="2.5" fill="none"/>
+  </g>
+  <text x="952" y="212" class="nm" font-size="16">CLAUDE.md</text>
+  <text x="952" y="230" class="q">Каковы базовые правила проекта?</text>
+
+  <!-- опавшие листья: work/history -->
+  <g>
+    <use href="#leaf" transform="translate(235,1150) rotate(96) scale(0.8)" fill="#c98500"/>
+    <use href="#leaf" transform="translate(270,1160) rotate(75) scale(0.7)" fill="#d95926"/>
+    <use href="#leaf" transform="translate(305,1148) rotate(112) scale(0.85)" fill="#a8642e"/>
+    <use href="#leaf" transform="translate(340,1162) rotate(60) scale(0.65)" fill="#c98500"/>
+    <use href="#leaf" transform="translate(372,1150) rotate(100) scale(0.75)" fill="#8a6240"/>
+    <use href="#leaf" transform="translate(268,1136) rotate(140) scale(0.6)" fill="#d95926"/>
+    <text x="300" y="1215" class="gl" text-anchor="middle">work/history — опавшая листва</text>
+    <text x="300" y="1233" class="gq" text-anchor="middle">Что мы уже сделали? (архив задач + снапшоты v1–v65)</text>
+  </g>
+
+  <!-- камень: src -->
+  <g>
+    <ellipse cx="1075" cy="1152" rx="48" ry="24" fill="#b6b6ae" stroke="#8f8f86" stroke-width="2"/>
+    <ellipse cx="1062" cy="1144" rx="18" ry="8" fill="#d0d0c9"/>
+    <text x="1075" y="1215" class="gl" text-anchor="middle">src/ — камень</text>
+    <text x="1075" y="1233" class="gq" text-anchor="middle">код, не документация</text>
+  </g>
+
+  <!-- бревно: .claude-archive -->
+  <g>
+    <rect x="1420" y="1124" width="176" height="38" rx="17" fill="#6b4a2f"/>
+    <ellipse cx="1420" cy="1143" rx="15" ry="19" fill="#9a7550"/>
+    <ellipse cx="1420" cy="1143" rx="8" ry="10" fill="#b98f66"/>
+    <path d="M1460 1132 h100 M1450 1152 h120" stroke="#5d3f26" stroke-width="2" opacity="0.7"/>
+    <text x="1508" y="1215" class="gl" text-anchor="middle">.claude-archive — бревно</text>
+    <text x="1508" y="1233" class="gq" text-anchor="middle">снимок старой инфраструктуры (не источник истины)</text>
+  </g>
+
+  <!-- табличка у корней -->
+  <text x="950" y="1268" class="nm" font-size="18">VibeTradingBotV5 — корень репозитория</text>
+
+  <!-- подвал -->
+  <text x="70" y="1322" class="gq">Канон вопросов и полный пофайловый индекс — .claude/knowledge-tree.md · ведёт knowledge-curator (.claude/rules/curation.md) · 2026-07-14</text>
+</svg>
