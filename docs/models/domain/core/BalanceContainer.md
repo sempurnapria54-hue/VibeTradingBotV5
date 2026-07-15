@@ -88,7 +88,7 @@ Java-класс `com.example.tradingbot.domain.model.core.balance.Balance`,
 - Обновление — только через `REFRESH_BALANCE` (единственный
   runtime-flow обновления контейнера; см. форвард-заметку про
   подсистему ServiceCommand в
-  `.claude/work/questions/tasks/balance.md`).
+  `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-balance.md`).
 
 ## Свежесть (freshness)
 
@@ -103,7 +103,7 @@ externalUpdatedAt / updatedAt + balanceExpirationDuration -> fresh / stale
   это precondition problem перед risk-sensitive flow.
 - Проверку свежести выполняет FSM / handler перед risk-sensitive
   flow (входной владелец — Deal-lifecycle; форвард-заметка для
-  миграции Deal — в `.claude/work/questions/tasks/balance.md`).
+  миграции Deal — в `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-balance.md`).
 - Если balance absent/stale перед risk-check — handler создаёт
   `REFRESH_BALANCE` и не вызывает `RiskValidator` на этой итерации;
   после успешного refresh следующая итерация FSM пересобирает
@@ -153,7 +153,7 @@ API / parse / invariant   -> exception / controlled error
 
 Везде ниже `BalanceContainer` упоминается как input; владельцы этих
 компонентов мигрируются отдельно (форвард-заметки — в
-`.claude/work/questions/tasks/balance.md`).
+`.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-balance.md`).
 
 - **DealContext** содержит последний persisted `BalanceContainer` по
   exchange account — это не гарантия свежести (свежесть проверяет

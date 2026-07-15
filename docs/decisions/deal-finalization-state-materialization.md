@@ -75,7 +75,9 @@ DEAL-Q1 закрыт на `GAPS_CLOSE_1` шага 6 фазы 1 (2026-06-22). Г�
 - Финализационные executor'ы — `docs/components/FinalizeDealEntryExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,
   `docs/components/MarkDealClosedExecutor.md`,
-  `docs/components/MarkDealErrorExecutor.md`.
+  `docs/components/MarkDealErrorExecutor.md`,
+  `docs/components/MarkDealEmergencyClosedExecutor.md` (введён на шаге 7, N8 —
+  `docs/decisions/pnl-finalization-mechanics.md` реш.3).
 - Эмиссия команд — `docs/components/DealFinalizationCommandFactory.md`,
   `docs/components/StrategyActionOrchestrator.md`,
   `docs/components/models/ServiceCommand.md`.

@@ -32,11 +32,12 @@ durable-носитель числа = поле `Deal`, рестарт-safe). Н�
 (`MarkDealClosedExecutor`) число **не пишет** — читает готовое `Deal.resultProfit`,
 ассертит непустоту и ставит терминал `CLOSED` (N7). Placeholder ZERO снят.
 - **Сверка bills ↔ net (N10):** число **всегда** = positions-history net (bills
-  его не подменяют). Расхождение **сверх epsilon** или cross-ccy движение
-  (`ccy ≠ resultProfitCurrency`, напр. комиссия в OKB) → **`AnomalyReport`**
-  (аудит-аномалия, `scope = INSTRUMENT`) — **не блокирует** финализацию, сделка
-  идёт в `CLOSED` с net-числом (`docs/decisions/pnl-finalization-mechanics.md`
-  реш.5).
+  его не подменяют). Расхождение **сверх epsilon** (якорь — валовой оборот
+  Σ`|amount|`, не `|net|`) или cross-ccy движение (`ccy ≠ resultProfitCurrency`
+  — **нарушение инварианта** «комиссии в settle-ccy»,
+  `docs/rules/trading-constraints.md`) → **`AnomalyReport`** (аудит-аномалия,
+  `scope = INSTRUMENT`) — **не блокирует** финализацию, сделка идёт в `CLOSED` с
+  net-числом (`docs/decisions/pnl-finalization-mechanics.md` реш.5).
 - Внутренняя декомпозиция расчёта (выделять ли отдельный калькулятор) — деталь
   CODE шага 7. Структуры носителей —
   `docs/models/mapping/PositionCloseResult.md`,

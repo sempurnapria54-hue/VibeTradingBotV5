@@ -108,7 +108,8 @@ L3.** Эскалация **единообразна и безусловна дл
 - `docs/rules/exchange-hold.md` (что блокирует L4-холд),
   `docs/rules/instrument-hold.md` (L3),
   `docs/rules/error-handling-policy.md` (уровни 3-4 градации).
-- `.claude/work/progress/phase-1-step-6-holds-design.md` (§8.C — радиус
+- `.claude/work/history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-holds-design.md`
+  (§8.C — радиус
   определяет уровень).
 - `src/.../domain/deal/DealFsmSupport.java`
   (`controlledViolationHold` / `markError` / `markErrorStopless`),

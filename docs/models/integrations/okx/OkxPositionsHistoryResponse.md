@@ -63,4 +63,5 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 ## Конвертация
 
 `empty string → null`; numeric string → `BigDecimal`; timestamp string →
-epoch millis / `Instant`.
+epoch millis → `OffsetDateTime` (конвенция типов времени проекта;
+`docs/models/mapping/PositionCloseResult.md`).

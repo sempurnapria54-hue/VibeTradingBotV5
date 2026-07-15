@@ -100,8 +100,10 @@ Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsEx
    sum(DealCashFlow.amount) сверяется с net из positions-history
    (realizedPnl). Заголовочное Deal.resultProfit = net из positions-history,
    НЕ sum(bills); bills — разбивка + контроль целостности.
-   Расхождение сверх epsilon и cross-ccy (например комиссия в OKB,
-   ccy != resultProfitCurrency) → AnomalyReport (аудит-аномалия, НЕ блок
+   Расхождение сверх epsilon (якорь — валовой оборот sum(|amount|), не |net|)
+   и cross-ccy (ccy != resultProfitCurrency — нарушение инварианта «комиссии
+   только в settle-ccy», оплата в OKB запрещена конфигурацией; см.
+   docs/rules/trading-constraints.md) → AnomalyReport (аудит-аномалия, НЕ блок
    финализации; см. pnl-finalization-mechanics.md реш.5). Cross-ccy движение
    не отбрасывается молча фильтром — помечается.
 ```

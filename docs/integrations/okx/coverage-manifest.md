@@ -31,6 +31,11 @@
 задокументирован) · `вне-периметра` (док не заводим, с причиной) ·
 `сознательно-вне` (в периметре, отложено решением, с якорем).
 
+Дата сверки в шапке — дата **полного** свипа поверхности (прогон 3). Точечные
+заходы по теме её не двигают и помечаются в примечании своей строки: заход
+`GAPS_CLOSE_3` шага 7 (**2026-07-14**, пробел H1 — fee-wiring) поле-уровнево
+сверил строки `Fee rates` и `Instruments`, полного свипа не делал.
+
 **Провенанс:** `офдок` — подтверждено официальным источником OKX
 (прямое чтение docs-v5 / changelog); `сторонний` — пока только из
 скелета/стороннего источника, официальным доком не подтверждено;
@@ -131,7 +136,7 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 | Leverage info | GET `/account/leverage-info` | **создан** | 🟢 в коде | офдок | `account-config.md`; метода клиента нет |
 | Max order size | GET `/account/max-size` | **создан** | 🟢 в коде | офдок | `max-size.md`; метода клиента нет |
 | Max avail size | GET `/account/max-avail-size` | **создан** | 🟢 в коде | офдок | `max-size.md`; метода клиента нет |
-| Fee rates | GET `/account/trade-fee` | **создан** | 🟢 в коде | офдок | `trade-fee.md`; **В-7 активирован** (G6): ставка прогнозной комиссии в риск-сайзинге; **`GAPS_CLOSE_2`:** дом ставки — `InstrumentExternalRules` (навес, `externalTakerFeeRate`), дочитывает `InstrumentExternalRulesSyncJob`, калькуляторы читают через `CalculationContext` (N9); знак: минус = комиссия; wiring — шаг 7 CODE |
+| Fee rates | GET `/account/trade-fee` | **обновлён** | 🟢 в коде | офдок | `trade-fee.md`; **В-7 активирован** (G6): ставка прогнозной комиссии в риск-сайзинге; **`GAPS_CLOSE_3` (H1, сверка 2026-07-14):** native `OkxTradeFeeResponse` создан, дом ставки — **`TradeFeeRate`** (отдельная модель, строка на группу; на навесе остался лишь ключ `externalFeeGroupId`), ось запроса — группа (`instType`), резолв — пара (`instType`,`groupId`), перечень групп не хардкодим; дочитывает `InstrumentExternalRulesSyncJob`, seam чтения через `CalculationContext` (N9); знак: минус = комиссия; дрейф офдока: `instType` включает EVENTS, поле `settle` (EVENTS-only), «Open API will not reflect zero-fee trading», инвариант organic-base-rates; upcoming `elpMaker`→`rpiMaker` (прод 2026-07-28) — unused, не гейтит; wiring — шаг 7 CODE |
 | Instruments (private) | GET `/account/instruments` | вне-периметра | — | офдок | инвентарь с учётом режима счёта; используем публичный `public/instruments` |
 | Interest / borrow-repay / VIP loan / spot-margin | various | вне-периметра | — | офдок | margin/loan вне скоупа SWAP-бота фазы 1 |
 | Greeks / isolated-mode / MMP / move-positions / collateral / account-mode-switch / прочее сервисное | various | вне-периметра | — | офдок | опционы / PM-сервис / переносы — вне торгового цикла фазы 1 |
@@ -161,7 +166,7 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 
 | Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
 |---|---|---|---|---|---|
-| Instruments | GET `/public/instruments` | есть-док | 🟢 в коде | офдок | `instrument.md`, `InstrumentOkxResponse`; `getInstruments` |
+| Instruments | GET `/public/instruments` | **обновлён** | 🟢 в коде | офдок | `instrument.md`, `InstrumentOkxResponse`; `getInstruments`; **`GAPS_CLOSE_3` (H1):** `groupId` переведён в used — ключ комиссионной группы (пара `instType`+`groupId` резолвит ставку `trade-fee`); прежде числился среди неиспользуемых |
 | Mark price | GET `/public/mark-price` | **создан** | 🟢 в коде | офдок | `mark-price.md`; **В-8** → шаг 5; метода клиента нет |
 | Price limit | GET `/public/price-limit` | **создан** | 🟢 в коде | офдок | `price-limit.md`; **В-8** → шаг 5; метода клиента нет |
 | Funding rate | GET `/public/funding-rate` | **создан** | 🟢 в коде | офдок | `funding-rate.md`; **В-6/OKX-Q3 разрешены** (GAPS_CLOSE_1 шага 7): funding в P&L — через bills + positions-history, не через ставки; интервал по `fundingTime`↔`nextFundingTime`; метода клиента нет |

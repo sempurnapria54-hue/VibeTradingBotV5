@@ -28,8 +28,10 @@
 
 risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal +
 commissions`, где `commissions` — прогноз вход+выход по taker-ставке из
-`instrumentExternalRules.takerFeeRate()` (навес инструмента, N9 — не отдельный
-fetch); **включён с шага 7** (G6), согласовано с `SizeCalculator`, см.
+`instrumentExternalRules.takerFeeRate()` (N9 — не отдельный fetch; **дом
+ставки** — `docs/models/domain/other/TradeFeeRate.md`, на инструменте только
+ключ группы `externalFeeGroupId`, аксессор гидрируется при материализации);
+**включён с шага 7** (G6), согласовано с `SizeCalculator`, см.
 `docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий (включён на шаге 7)»);
 **risk percent от свободного депозита** (база —
 `BalanceContainer.externalAvailableEquity`, не total/adjusted, см.
@@ -74,12 +76,39 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   до риск-на-сделку: нет стопа → risk-amount нечем посчитать → блок, не
   сайзинг по allocation. Reduce-only/закрывающие действия не затрагивает
   (риск снимают);
+- `FEE_RATE_UNAVAILABLE` — прогнозная ставка комиссии не резолвится
+  (`instrumentExternalRules.takerFeeRate()` → `null`): `BLOCKED`. Проверяется
+  до риск-на-сделку — комиссия входит в убыток на стопе, без ставки
+  risk-amount неполон. Только для risk-creating / risk-increasing действий (там,
+  где прогноз комиссии входит в сайзинг, `docs/rules/risk-validator-scope.md`);
+  reduce-only/закрывающие не затрагивает;
 - `RISK_PER_TRADE_EXCEEDED` — риск на сделку (%) выше
   `StrategyDetail.riskPerTradePercent`.
 
 Агрегация: любой `BLOCKED` ⇒ `BLOCKED`; путь `WARNING` в коде есть
 (аггрегатор его учитывает), но **ни одна проверка фазы 1 `WARNING` не
 порождает** — все проверки строят `BLOCKED`.
+
+## Null-политика ставки комиссии
+
+Два разных «нет ставки» — два разных ответа:
+
+- **Ставка была, но чтение упало** → последняя известная **не затирается**:
+  `updateFromSnapshot` с IGNORE-null на синке (codestyle §Маппинг), null поверх
+  факта не пишется. Устаревание известной ставки ведёт к **холду биржи**, не к
+  реджекту (`docs/rules/exchange-hold.md`).
+- **Ставки не было никогда** (ни одной строки `TradeFeeRate` по группе
+  инструмента либо у инструмента нет `externalFeeGroupId`) → **реджект**
+  `FEE_RATE_UNAVAILABLE`.
+
+**Почему реджект, а не fallback-ставка из конфига.** Fallback отвергнут:
+подставленное число **выглядит фактом, не будучи им**, и ошибается
+асимметрично — заниженная ставка даёт заниженный прогноз комиссии → бюджет
+риска «свободнее» → позиция **больше положенной**. Это та же болезнь, что H6
+(null-drop в ожидаемости) и H2 (недосчёт комиссии): тихое **оптимистичное
+смещение**, которое не видно ни в одном логе. Цена реджекта — пропуск одной
+сделки с громкой причиной; цена fallback'а — тихо превышенный риск на
+**каждой**.
 
 ## Границы
 

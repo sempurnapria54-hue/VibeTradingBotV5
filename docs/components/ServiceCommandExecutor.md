@@ -75,7 +75,8 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
   каждого — `docs/components/FinalizeDealEntryExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,
   `docs/components/MarkDealClosedExecutor.md`,
-  `docs/components/MarkDealErrorExecutor.md`. Граница 6 ↔ 7: расчёт
+  `docs/components/MarkDealErrorExecutor.md`,
+  `docs/components/MarkDealEmergencyClosedExecutor.md`. Граница 6 ↔ 7: расчёт
   `resultProfit` — шаг 7, механика финализации — шаг 6.
 
 ACK как runtime truth не считается ни для submit/cancel/close (см.

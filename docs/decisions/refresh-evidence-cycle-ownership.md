@@ -72,21 +72,31 @@ FSM-секвенс отдельных команд.
   (команда ≠ один HTTP-запрос; refresh-команда может обходить эндпоинты
   внутри себя).
 - `docs/components/ServiceCommandExecutor.md`,
-  `RefreshOrderExecutor.md`, `RefreshAlgoOrderExecutor.md`,
-  `RefreshFillsExecutor.md` — явная within-command-семантика обхода +
-  терминал.
+  `RefreshOrderExecutor.md`, `RefreshAlgoOrderExecutor.md` — явная
+  within-command-семантика обхода + терминал. (Тогда же — док
+  `RefreshFillsExecutor`; **впоследствии снят вместе с командой**, см. ноту о
+  `REFRESH_FILLS` ниже.)
 - `docs/integrations/okx/contracts/fills.md` — `REFRESH_FILLS` эскалирует
-  3d→3m внутри команды.
+  3d→3m внутри команды. **Устарело:** `REFRESH_FILLS` снят на `GAPS_CLOSE_2`
+  шага 7 (N12); within-command-эскалация 7d→3m живёт теперь в `REFRESH_BILLS`
+  (`docs/decisions/pnl-finalization-mechanics.md` реш.1) — сам паттерн
+  «обход внутри команды» решение пережил, сменился лишь его носитель.
 - `docs/models/mapping/Order.md`, `AlgoOrder.md` — обход цикла атрибутирован
   исполнителю.
 - **CMD-Q3 закрыт** (steer, 2026-06-10): refresh-набор — ровно по одной
-  команде на сущность (`REFRESH_ORDER` / `REFRESH_ALGO_ORDER` /
-  `REFRESH_POSITION` / `REFRESH_BALANCE` / `REFRESH_FILLS`); bulk-команды
-  `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS`
-  / `REFRESH_ALGO_ORDER_HISTORY` сняты из `ServiceCommandType`, их эндпоинты
-  — звенья внутреннего цикла. Снятие обнажило **CMD-Q4** (перечисление
-  **неизвестных** live orders/algo по инструменту — Precheck-cleanliness /
-  `AnomalyJob`; см. `.claude/work/questions/open-questions.md`).
+  команде на сущность; bulk-команды `REFRESH_PENDING_ORDERS` /
+  `REFRESH_ORDER_HISTORY` / `REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY`
+  сняты из `ServiceCommandType`, их эндпоинты — звенья внутреннего цикла.
+  Снятие обнажило **CMD-Q4** (перечисление **неизвестных** live orders/algo по
+  инструменту — Precheck-cleanliness / `AnomalyJob`; см.
+  `.claude/work/questions/open-questions.md`).
+  - **Живёт принцип** «одна команда на сущность», не конкретный состав набора:
+    состав меняется с сущностями. Слепок на 2026-06-10 был `REFRESH_ORDER` /
+    `REFRESH_ALGO_ORDER` / `REFRESH_POSITION` / `REFRESH_BALANCE` /
+    `REFRESH_FILLS`; на шаге 7 (N12/N6) `REFRESH_FILLS` снят, добавлены
+    `REFRESH_POSITIONS_HISTORY` и `REFRESH_BILLS` — **по тому же принципу**, по
+    одной на новую сущность (`docs/decisions/pnl-finalization-mechanics.md`
+    реш.1). Актуальный состав — `docs/components/models/ServiceCommand.md`.
 
 ## Закрытие
 

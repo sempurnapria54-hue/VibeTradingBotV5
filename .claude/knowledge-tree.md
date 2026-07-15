@@ -123,7 +123,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v66.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v67.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -143,7 +143,8 @@
 │       │   ├── phase-1-step-7-docs-check-2.md — Каков исход DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-docs-check-3.md — Каков исход DOCS_CHECK_3 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
-│       │   └── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
+│       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
+│       │   └── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -254,6 +255,7 @@
 │   │   ├── replace-not-amend.md — Почему домен ремоделирует через REPLACE, а не амендит?
 │   │   ├── result-profit-source.md — Откуда берётся Deal.resultProfit и почему?
 │   │   ├── service-command-payload-base-type.md — Почему у payload'ов общий маркер-базовый тип?
+│   │   ├── source-model-change-absorption.md — Как мы обходимся с известным заранее изменением модели источника?
 │   │   ├── strategy-condition-authoring-contract.md — Почему контракт авторинга условия — объектная settings-модель?
 │   │   ├── strategy-materialization-and-validation.md — Как материализуется «одна реализация» и scope валидатора?
 │   │   ├── strategy-signal-is-entry-condition.md — Почему «сигнал» — это условие входного шага стратегии?
@@ -335,7 +337,8 @@
 │   │   │       ├── IndicatorValue.md — Что это за модель IndicatorValue?
 │   │   │       ├── InstrumentExternalRules.md — Что это за модель InstrumentExternalRules?
 │   │   │       ├── MarketPhase.md — Что это за MarketPhase и почему вычисляется на лету?
-│   │   │       └── MarketStructure.md — Что это за модель MarketStructure?
+│   │   │       ├── MarketStructure.md — Что это за модель MarketStructure?
+│   │   │       └── TradeFeeRate.md — Что это за модель TradeFeeRate?
 │   │   ├── externalSnapshot/ — Какая структура нормализованного граничного объекта *ExternalSnapshot?
 │   │   │   └── README.md — Что это за слой и когда здесь появляются файлы?
 │   │   ├── integrations/ — Какие поля у нативной модели источника {name}?
@@ -350,7 +353,8 @@
 │   │   │       ├── OkxOrderResponse.md — Какие поля у OKX ordinary order response?
 │   │   │       ├── OkxPositionResponse.md — Какие поля у OKX positions response?
 │   │   │       ├── OkxPositionsHistoryResponse.md — Какие поля у OKX positions-history response?
-│   │   │       └── OkxTickerResponse.md — Какие поля у OKX ticker response?
+│   │   │       ├── OkxTickerResponse.md — Какие поля у OKX ticker response?
+│   │   │       └── OkxTradeFeeResponse.md — Какие поля у OKX trade-fee response?
 │   │   ├── mapping/ — Как сущность переходит между слоями?
 │   │   │   ├── AlgoOrder.md — Как AlgoOrder ложится на нативные модели и нормализуется?
 │   │   │   ├── Balance.md — Как BalanceContainer/Balance ложатся на нативные модели?
@@ -364,6 +368,7 @@
 │   │   │   ├── PositionCloseResult.md — Как positions-history нормализуется в PositionCloseResult-снапшот?
 │   │   │   ├── Strategy.md — Как Strategy переходит между слоями (api ↔ domain ↔ persistence)?
 │   │   │   ├── TimeFrame.md — Как enum TimeFrame маппится в строки таймфреймов источников?
+│   │   │   ├── TradeFeeRate.md — Как ставка комиссии источника ложится на TradeFeeRate?
 │   │   │   └── TradeFill.md — Как fills легли бы на TradeFill, если бы он вводился?
 │   │   └── persistence/ — Что это за модель хранимого слоя?
 │   │       └── README.md — Что это за слой и когда здесь появляются файлы?

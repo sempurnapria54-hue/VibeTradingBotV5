@@ -7,8 +7,8 @@
 
 ## Правило
 
-`Exchange.HOLD` — safety-состояние биржи, выставляемое safety-каскадом
-(см. `docs/rules/external-status-resolution.md`). В состоянии `HOLD`:
+`Exchange.HOLD` — safety-состояние биржи. Что блокируется — одинаково для
+любого триггера (триггеры — см. §«Что переводит в HOLD»). В состоянии `HOLD`:
 
 **Блокируются** normal trading commands:
 
@@ -39,6 +39,27 @@ CLOSE_POSITION
 TP/SL/trailing actions, pyramid/scaling и любые действия, увеличивающие
 торговое намерение вне safety-flow.
 
+## Что переводит в HOLD
+
+- **Safety-каскад** по внешнему статусу биржи — первичный триггер
+  (`docs/rules/external-status-resolution.md`).
+- **Несвежесть ставки комиссии** — возраст `modifiedAt` актуальной строки
+  `TradeFeeRate` больше **порога свежести** (конфиг, стартовое значение
+  **24 ч**). Выставляет `InstrumentExternalRulesSyncJob`
+  (`docs/components/InstrumentExternalRulesSyncJob.md`); дом факта —
+  `docs/models/domain/other/TradeFeeRate.md` §«Свежесть → холд биржи».
+
+  **Почему это холд, а не тихая торговля по старой ставке.** `modifiedAt`
+  двигается при **каждом успешном** чтении, поэтому при часовом такте синка
+  возраст 24 ч = **24 неудачи подряд**. Это не сетевая икота, а поломка
+  интеграции (права / эндпоинт / подпись). Торговать по ставке неизвестной
+  давности нельзя — прогноз комиссии входит в риск-сайзинг
+  (`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»); рвать живые
+  сделки при этом незачем — холд блокирует **вход** (`SUBMIT_*`), не мешая
+  `REFRESH_*` / `CANCEL_*` / `CLOSE_POSITION`, и сделки доживают. Отсутствие
+  ставки **вовсе** — другой случай: это реджект `FEE_RATE_UNAVAILABLE` на
+  `RiskValidator`, не холд (`docs/components/models/RiskCheckResult.md`).
+
 ## DISABLED (Exchange / Instrument)
 
 `HOLD` — safety-пауза; `DISABLED` — конфигурационное отключение
@@ -65,7 +86,10 @@ TP/SL/trailing actions, pyramid/scaling и любые действия, увел
 
 ## Связанное
 
-- `docs/rules/external-status-resolution.md` (источник перехода в HOLD).
+- `docs/rules/external-status-resolution.md` (safety-каскад — первичный
+  триггер перехода в HOLD).
+- `docs/models/domain/other/TradeFeeRate.md` (несвежесть ставки — второй
+  триггер); выставляет — `docs/components/InstrumentExternalRulesSyncJob.md`.
 - `docs/rules/error-handling-policy.md` — exchange-HOLD = **уровень 4**
   error-градации (нарушение контракта интеграции / инвариантов системы);
   инструмент-scope холд (уровень 3) — `docs/rules/instrument-hold.md`.

@@ -16,8 +16,8 @@
   (`docs/components/DealFinalizationCommandFactory.md`); сам статус не пишет.
 - **Финализационные executor'ы** (`FinalizeDealEntryExecutor`,
   `FinalizeDealExitExecutor`, `MarkDealClosedExecutor`,
-  `MarkDealErrorExecutor`) — **пишут** `status` по результату исполнения и
-  подтверждённым фактам.
+  `MarkDealErrorExecutor`, `MarkDealEmergencyClosedExecutor`) — **пишут**
+  `status` по результату исполнения и подтверждённым фактам.
 - **`RetryPolicyService`** — при падении executor'а переводит в
   `RETRY_PENDING` (инкремент `attemptCount`, `nextRetryAt`, `lastError`)
   либо в `FAILED` при исчерпании попыток
@@ -66,6 +66,11 @@ Audit/история источником не является
 
 ## Связи
 
+- Финализационные executor'ы — `docs/components/FinalizeDealEntryExecutor.md`,
+  `docs/components/FinalizeDealExitExecutor.md`,
+  `docs/components/MarkDealClosedExecutor.md`,
+  `docs/components/MarkDealErrorExecutor.md`,
+  `docs/components/MarkDealEmergencyClosedExecutor.md`.
 - Жизненный цикл команды — `docs/rules/command-lifecycle.md`.
 - Retry-механика — `docs/components/RetryPolicyService.md`.
 - Классификация runtime-ошибок —

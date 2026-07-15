@@ -126,7 +126,8 @@ jsonb). Авторитет предела повторов — policy (живь�
 - Финализационные executor'ы — `docs/components/FinalizeDealEntryExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,
   `docs/components/MarkDealClosedExecutor.md`,
-  `docs/components/MarkDealErrorExecutor.md`.
+  `docs/components/MarkDealErrorExecutor.md`,
+  `docs/components/MarkDealEmergencyClosedExecutor.md`.
 - Retry-база — `docs/components/RetryPolicyService.md` (`Retryable`,
   `RetryError`).
 - Решение о доме retry-state —

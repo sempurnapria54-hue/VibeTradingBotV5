@@ -62,10 +62,12 @@ snapshot. Snapshot **транзитный** — не персистится; ч�
 | `externalTriggerPx` | `BigDecimal` | цена триггера ликвидации/ADL (только при `type` 3–6; иначе null) |
 | `externalCloseType` | `String` | тип последнего закрытия (`1`–`6`; ликвидация/ADL = `3`–`6`) |
 | `externalPosId` | `String` | биржевой id позиции (ключ агрегации записи) |
-| `externalUpdatedAt` | `Instant` | время обновления записи positions-history |
+| `externalUpdatedAt` | `OffsetDateTime` | время обновления записи positions-history |
 
 Числовые/временные поля нормализуются при построении снапшота (string →
-`BigDecimal`/`Instant`, empty → null), уже провалидированные как parseable.
+`BigDecimal`/`OffsetDateTime`, empty → null), уже провалидированные как
+parseable. Тип времени — `OffsetDateTime` по конвенции проекта (как
+`docs/models/mapping/Balance.md`, `DealCashFlow.externalTs`, `Auditable`).
 
 ### snapshot → `Deal`
 
@@ -128,9 +130,9 @@ snapshot. Snapshot **транзитный** — не персистится; ч�
 | `triggerPx` | `externalTriggerPx` |
 | `type` | `externalCloseType` |
 | `posId` | `externalPosId` |
-| `uTime` | `externalUpdatedAt` (epoch millis → `Instant`) |
+| `uTime` | `externalUpdatedAt` (epoch millis → `OffsetDateTime`) |
 
-Числовые поля парсятся в `BigDecimal`, `uTime` — в `Instant`; `empty
+Числовые поля парсятся в `BigDecimal`, `uTime` — в `OffsetDateTime`; `empty
 string → null`. Список не маппимых полей (`pnl`, `fee`, `fundingFee`,
 `liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide` и др.) — в
 `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.

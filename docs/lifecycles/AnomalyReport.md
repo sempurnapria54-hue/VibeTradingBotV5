@@ -23,7 +23,7 @@
 
 > `TradeRuleValidator`, `AnomalyJob`, `KillSwitchExecutor` —
 > компоненты anomaly/safety-кластера, мигрируются отдельно
-> (форвард-заметки — `.claude/work/questions/tasks/anomaly-report.md`;
+> (форвард-заметки — `.claude/work/history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`;
 > backlog «Anomaly / safety / kill-switch»). Здесь — статусная
 > механика, которой владеет сам `AnomalyReport`.
 

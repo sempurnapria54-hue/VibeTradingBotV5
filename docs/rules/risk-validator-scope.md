@@ -33,16 +33,17 @@ Cancel-нога REPLACE отдельной валидации не получа�
 ### Не вызывается
 
 - **refresh/search/history**: `REFRESH_BALANCE`, `REFRESH_POSITION`,
-  `REFRESH_ORDER`, `REFRESH_ALGO_ORDER` — только обновляют
-  факты (evidence-cycle — внутри исполнителя, см.
-  `docs/decisions/refresh-evidence-cycle-ownership.md`);
+  `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `REFRESH_POSITIONS_HISTORY`,
+  `REFRESH_BILLS` — только обновляют факты (evidence-cycle — внутри
+  исполнителя, см. `docs/decisions/refresh-evidence-cycle-ownership.md`);
 - **cleanup / safety**: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`,
   `CLOSE_POSITION` — снимают/локализуют уже существующий риск (kill-switch
   снимает риск отдельно — реактивный side-executor вне реестра команд, тоже
   не проходит RiskValidator);
 - **finalization**: `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`,
-  `MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR` (lifecycle/system actions без
-  `StrategyAction`; retry-state — `DealFinalizationState`,
+  `MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`, `MARK_DEAL_EMERGENCY_CLOSED`
+  (lifecycle/system actions без `StrategyAction`; retry-state —
+  `DealFinalizationState`,
   `docs/decisions/deal-finalization-state-materialization.md`);
 - **reduce-only partial exit** через `Order`/`AlgoOrder` — это exit-flow.
 

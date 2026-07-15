@@ -13,9 +13,10 @@
 расхождении с офдоком побеждает офдок; синхронизация — перевыкачка +
 дифф при каждом заходе интегратора
 (`.claude/processes/api-docs-completion.md` §4a, канал —
-`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
-(существование/путь + пример офдока по манифесту; поле-уровневая
-перевычитка — при заходе по теме).
+`.claude/skills/integration-okx.md`). Последняя сверка: **2026-07-14**
+(прогон интегратора, `GAPS_CLOSE_3` шага 7 — сверка fee-полей
+`groupId`; прежняя сверка 2026-06-11 — существование/путь + пример
+офдока по манифесту).
 
 ## Контекст
 
@@ -23,6 +24,26 @@ Mapping в `InstrumentExternalRules` —
 `docs/models/mapping/InstrumentExternalRules.md` (раздел `## OKX`).
 Доменная модель — `docs/models/domain/other/InstrumentExternalRules.md`.
 Обновляет правила — `docs/components/InstrumentExternalRulesSyncJob.md`.
+Native-поля ответа — `docs/models/integrations/okx/InstrumentOkxResponse.md`.
+
+## `groupId` — ключ комиссионной группы инструмента
+
+`public/instruments` отдаёт `groupId` — «Instrument trading fee group ID»
+(офдок: Get instruments → Response Parameters). Это **ключ**, по которому
+резолвится ставка комиссии, а не сама ставка: ставку отдаёт отдельный
+эндпоинт `GET /api/v5/account/trade-fee`
+(`docs/integrations/okx/contracts/trade-fee.md`).
+
+Офдок там же: «instType and groupId should be used together to determine a
+trading fee group. Users should use this endpoint together with fee rates
+endpoint to get the trading fee of a specific symbol». Отсюда **ось резолва —
+пара (`instType`, `groupId`)**, не голый `groupId`: одно и то же число значит
+разное при разном `instType`.
+
+На инструменте оседает только ключ (`InstrumentExternalRules.externalFeeGroupId`);
+дом ставки — `TradeFeeRate`, одна строка на группу
+(`docs/models/domain/other/TradeFeeRate.md`,
+`docs/decisions/pnl-finalization-mechanics.md` реш.4).
 
 ## Endpoint
 

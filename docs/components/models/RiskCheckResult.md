@@ -44,7 +44,7 @@
 `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 `PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`,
 `MULTIPLE_POSITIONS_DETECTED`, `POSITION_STATE_UNKNOWN`,
-`INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`,
+`INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`,
 `CALCULATED_ACTION_INVALID`.
 
 ### Эмитятся `RiskValidator`'ом в фазе 1
@@ -54,14 +54,21 @@
 `MARGIN_MODE_NOT_ISOLATED`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
 `SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`, `TAKE_PROFIT_INVALID_SIDE`,
 `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `INSTRUMENT_NOT_LIVE`,
-`INSTRUMENT_RULES_MISSING`, `BALANCE_INVALID`, `CALCULATED_ACTION_INVALID`
-(см. `docs/components/RiskValidator.md`).
+`INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`, `BALANCE_INVALID`,
+`CALCULATED_ACTION_INVALID` (см. `docs/components/RiskValidator.md`).
 
 `RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход (открытие/наращивание
 позиции) без резолвимого стопа: `BLOCKED` вместо fail-open
 allocation-сайзинга в обход `RISK_PER_TRADE` (инвариант
 `docs/rules/risk-creating-entry-protection.md`). Reduce-only/закрывающие
 действия не затрагивает.
+
+`FEE_RATE_UNAVAILABLE` — прогнозная ставка комиссии недоступна: ставки не было
+**никогда** (ни одной строки `TradeFeeRate` по комиссионной группе инструмента
+либо у инструмента нет `externalFeeGroupId`) → `BLOCKED`. Не путать с
+**несвежей** ставкой: устаревание известной ставки ведёт к холду биржи, не к
+этому коду (`docs/rules/exchange-hold.md`). Fallback-ставка из конфига вместо
+реджекта отвергнута — довод в `docs/components/RiskValidator.md`.
 
 ### Определены, но в фазе 1 не эмитятся
 

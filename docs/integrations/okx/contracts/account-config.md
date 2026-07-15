@@ -43,8 +43,8 @@ Permission `Read`; rate limit 5 req / 2 s по User ID. Без параметр�
 | `autoLoan` | Авто-заём в мульти-валютной марже. |
 | `ctIsoMode` / `mgnIsoMode` | Режим переводов маржи isolated-деривативов / isolated-маржи (automatic / autonomy / quick_margin...). |
 | `greeksType` | Формат греков (PA/BS) — OPTION. |
-| `feeType` | Валюта списания комиссии: `0` валюта получения / `1` котируемая. |
-| `level` / `levelTmp` | Fee tier (и временный). |
+| `feeType` | Валюта списания комиссии: `0` валюта получения / `1` котируемая. **Only effective for Spot** (офдок: Set fee type; changelog 2025-09-17) — для SWAP-контура неприменим; **не рычаг OKB** (см. ниже). |
+| `level` / `levelTmp` | Fee tier аккаунта и **временный/промо-тир** (офдок: «Temporary experience user level of special users») — ось тира двигается не только объёмом. |
 | `kycLv` | KYC-уровень главного аккаунта. |
 | `label` | Метка текущего API-ключа. |
 | `liquidationGear` | Порог алертов margin ratio. |
@@ -54,6 +54,27 @@ Permission `Read`; rate limit 5 req / 2 s по User ID. Без параметр�
 | `type` | Тип аккаунта (main / sub-варианты). |
 | `settleCcy` / `settleCcyList` | Валюта (и список) расчёта USD-маржинальных контрактов. |
 | `stgyType` | Тип стратегии счёта: general / delta neutral. |
+
+### `feeType` — не рычаг OKB (сверка 2026-07-14)
+
+Инвариант «комиссии только в settle-ccy»
+(`docs/rules/trading-constraints.md` §«Валюта комиссии») формулировался с
+посылкой, что режим оплаты комиссии сторонним токеном (`OKB`) **отключается в
+конфигурации аккаунта**. Поле-уровневая сверка (`GAPS_CLOSE_3` шага 7, пробел
+H1) эту посылку **не подтверждает**:
+
+- `feeType` — **не** тот рычаг: офдок (Set fee type; changelog 2025-09-17)
+  оговаривает «only effective for Spot», и его семантика — «валюта получения
+  vs котируемая», а не «платить в OKB». Для SWAP-контура поле неприменимо.
+- **Настройки «платить комиссию в OKB» в API v5 нет вообще** — ни поля в
+  `account/config`, ни `set-*`-операции. Офдок такого рычага не содержит.
+
+**Следствие (важно для следующего захода): проактивный детект нарушения
+инварианта невозможен** — наблюдать нечего, выключать нечем. Остаётся только
+**постфактум**: по `ccy` движения в bills (движение с валютой ≠ settle-ccy —
+аномалия, `docs/integrations/okx/contracts/account-bills.md`,
+`docs/models/mapping/DealCashFlow.md`). Искать несуществующую настройку в
+`account/config` повторно не нужно.
 
 ## POST /api/v5/account/set-position-mode
 

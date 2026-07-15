@@ -58,5 +58,6 @@ PERMANENT
   -> дальше ErrorHandler / safety-flow
 ```
 
-`DealActionState`-статусы — см. `docs/components/models/DealActionState.md`;
-реакция FSM — `docs/processes/deal-management.md`.
+`DealActionState`-статусы — см. `docs/models/domain/other/DealActionState.md`
+(lifecycle — `docs/lifecycles/DealActionState.md`); реакция FSM —
+`docs/processes/deal-management.md`.

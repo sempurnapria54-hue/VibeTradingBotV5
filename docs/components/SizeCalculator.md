@@ -58,13 +58,19 @@ market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION`, 
 `StrategyDetail.riskPerTradePercent × BalanceContainer.externalAvailableEquity`
 (`docs/decisions/per-trade-risk-policy.md`). Убыток на стопе для линейного
 контракта — `|entryPrice − stopPrice| × contracts × ctVal + commissions`
-(прогнозная комиссия вход+выход; **включена с шага 7** — G6,
-`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»). **Ставка** —
-`context.instrumentExternalRules.takerFeeRate()` (навес инструмента, N9; без
-отдельного поля контекста и без exchange-вызова из калькулятора,
-`docs/decisions/pnl-finalization-mechanics.md` реш.4); лимит риска — связывающий
-потолок над желаемым объёмом
-(`allocationPercents` — желаемая доля, лимит риска — связывающий cap).
+(прогнозная комиссия вход+выход по **taker**-ставке — worst-case; **включена с
+шага 7** — G6, `docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»).
+**Ставка** читается через `context.instrumentExternalRules.takerFeeRate()` —
+без отдельного поля контекста и без exchange-вызова из калькулятора (N9,
+`docs/decisions/pnl-finalization-mechanics.md` реш.4). **Дом ставки** — не
+навес: ставка живёт в `TradeFeeRate` (одна строка на комиссионную группу,
+`docs/models/domain/other/TradeFeeRate.md`), на навесе инструмента — только
+**ключ группы** `externalFeeGroupId`, а аксессор гидрируется из `TradeFeeRate`
+при материализации. Для калькулятора seam тот же — поверхность чтения не
+изменилась. Ставка не резолвится → вход блокирует `RiskValidator`
+(`FEE_RATE_UNAVAILABLE`), калькулятор ставку не выдумывает. Лимит риска —
+связывающий потолок над желаемым объёмом (`allocationPercents` — желаемая доля,
+лимит риска — связывающий cap).
 
 - размер округляется по `lotSz` и **снизу ограничен** `minSz`;
 - если даже на `minSz` убыток на стопе превышает лимит — `SizeCalculator`

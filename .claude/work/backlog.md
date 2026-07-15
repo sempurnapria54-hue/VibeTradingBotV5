@@ -248,30 +248,67 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 
 **Концепция закрыта:** источник числа —
 `docs/decisions/result-profit-source.md`; механика/носители стадий 1-2 —
-`docs/decisions/pnl-finalization-mechanics.md`. Ниже — **исполнительный
-хвост (CODE) + рантайм-верификация + форвард**, не выбор пути. Гейт
-`CODE` — после чистого `DOCS_CHECK_3`.
+`docs/decisions/pnl-finalization-mechanics.md`. **Доковых гейтов не осталось**
+(H1-H8 закрыты на `GAPS_CLOSE_3`, 2026-07-15 —
+`progress/phase-1-step-7-gaps-close-3.md`). Ниже — **исполнительный хвост
+(CODE) + рантайм-верификация + форвард**, не выбор пути. Гейт `CODE` — после
+чистого `DOCS_CHECK_4`.
 
 - **CODE стадий 1-2 (доспецифицировано, писать код):** носители
   `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
   (`mapping/PositionCloseResult.md`) + `DealCashFlow` (модель+mapping+таблица
-  `deal_cash_flows`); команды/executor'ы `REFRESH_POSITIONS_HISTORY` /
-  `REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED`; расчёт+запись `resultProfit` на
-  `Deal` в `FinalizeDealExitExecutor` (N7); сверка bills↔net → `AnomalyReport`
-  (N10); ставка `trade-fee` на `InstrumentExternalRules` + wiring сайзинга (N9);
-  снятие `REFRESH_FILLS` (N12, доки закрыты — код-удаление на CODE).
+  `deal_cash_flows`, включая компоненту `externalFee`); команды/executor'ы
+  `REFRESH_POSITIONS_HISTORY` / `REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED`;
+  расчёт+запись `resultProfit` на `Deal` в `FinalizeDealExitExecutor` (N7);
+  сверка bills↔net → `AnomalyReport` (N10); снятие `REFRESH_FILLS` (N12, доки
+  закрыты — код-удаление на CODE).
+- **CODE fee-wiring (N9, доспецифицирован на `GAPS_CLOSE_3`):** новая модель
+  **`TradeFeeRate`** + таблица `trade_fee_rates` (одна строка на группу,
+  история: значение изменилось → новая строка, совпало → `modifiedAt`) + native
+  `OkxTradeFeeResponse` + `mapping/TradeFeeRate`; `externalFeeGroupId` на навесе
+  `InstrumentExternalRules` (**не сама ставка**); `InstrumentExternalRulesSyncJob`
+  — второй источник `trade-fee`, **один вызов на тик** до цикла (A′);
+  гидрация `takerFeeRate()`/`makerFeeRate()` по ключу группы (seam не двинулся);
+  реджект `FEE_RATE_UNAVAILABLE` в `RiskValidator`; **холд биржи по несвежести**
+  ставки (порог в конфиг, стартово 24 ч).
 - **N11 — рантайм-верификация инварианта агрегации positions-history** (гейтит
   корректность числа, **до CODE**): партиал-выходы одного `posId` → одна
   финализированная запись, `realizedPnl` кумулятивен. Test-план —
   `.claude/tests/source-api/okx/plan.md` §AG1.5 (⏳ PENDING; интегратор/тестер:
   фикстура-цепочка на demo). Если OKX не агрегирует — путь корректируется.
+- **Рантайм-хвост на той же фикстуре §AG1.5** (один прогон, **после чистого
+  `DOCS_CHECK_4`** — порядок последовательный): **H2** гранулярность bills
+  (§AG3.5), **RQ-3** ставка группы ↔ фактическая комиссия (§AG12.5), **RQ-4**
+  `ccy` fee-bills = USDT (§AG3.4). Без фикстуры: **RQ-1** покрытие `feeGroup[]`
+  (§AG12.4), **RQ-2** `groupId` непуст (§M1.7).
 - **N13 — funding как holding-cost (форвард, фаза 2 / шаг ожидаемости):** в
   число funding учтён; на форварде издержка удержания без дома — разделяющий
   довод «комиссию в R, funding в post-cost expectancy» зафиксирован
   (`per-trade-risk-policy.md` §«Учёт комиссий»); завести форвард-дом на шаге
   ожидаемости/бэктеста. Scope (фаза 2 vs step-7-adjacent) — хвост пользователя.
-- **Epsilon сверки bills↔net (N10)** — провизорная величина
-  (max(0.01 settle-ccy, 0.5%·|net|)); подтверждение/калибровка — пользователь/бэктест.
+- **Epsilon сверки bills↔net (N10)** — провизорная **величина**
+  (max(0.01 settle-ccy, 0.5%·Σ`|amount|`)); подтверждение/калибровка —
+  пользователь/бэктест. **Якорь** (Σ`|amount|`, не `|net|`) провизорным больше
+  не является — закрыт на `GAPS_CLOSE_3` (H7).
+- **H6 — добор недостающего числа на `EMERGENCY_CLOSED` (форвард, фаза 2 / шаг
+  ожидаемости):** null = «неисчислимо» — не финальный вердикт, а **отложенный
+  долг**; направление принято (добор до истечения окна positions-history, ~3 мес),
+  **материализация** (кто дочитывает, на каком такте, что с просроченным окном) —
+  за шагом ожидаемости (`pnl-finalization-mechanics.md` реш.3). Пометки
+  недостаточно: пропуск outcome-коррелирован, drop завышает ожидаемость.
+- **Конвергенция оптимистичных смещений левого хвоста (торговый форвард-фокус):**
+  H6 null-drop + N11 недосчёт агрегации + опущенный гэп-проскок (TR2) смещают
+  ожидаемость в одну сторону; каждое учтено/отложено по отдельности, но их
+  **совокупность** — единый фокус фазы ожидаемости
+  (`progress/phase-1-step-7-docs-check-3.md` §Сводка, Lens C).
+- **Вход в market-maker-программу → пересмотр оси запроса `trade-fee`**
+  (инвариант organic-base-rates, `pnl-finalization-mechanics.md` реш.4): запрос
+  без `instId`/`instFamily` даёт organic base rates — валидный ответ, но не тот,
+  если аккаунт станет участником программы.
+- **`elpMaker` → `rpiMaker`** (прод OKX **2026-07-28**, параллельные имена до
+  2026-10-31): поле **unused**, механики нет по
+  `docs/decisions/source-model-change-absorption.md`; переоценка — только если
+  поле станет used до конца окна.
 
 ## Хвост шага 4 (CODE-отложения, 2026-06-11)
 

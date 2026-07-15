@@ -53,7 +53,7 @@ Java-модель, наследует поля аудита от `Auditable`.
 Фактическая блокировка/разблокировка торговли живёт в статусе
 инструмента (не в `AnomalyReport`); `severity` задаёт политику.
 Enforcement — на стороне Instrument/Exchange-слоя (форвард-заметка в
-`.claude/work/questions/tasks/anomaly-report.md`).
+`.claude/work/history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`).
 
 ## Инварианты структуры
 

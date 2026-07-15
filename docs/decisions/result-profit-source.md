@@ -107,8 +107,10 @@ fills-путь торгово неполон.
   `docs/models/integrations/okx/OkxFillResponse.md`,
   `docs/components/MarkDealClosedExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,
-  `docs/components/RefreshFillsExecutor.md`,
-  `docs/models/mapping/TradeFill.md`.
+  `docs/models/mapping/TradeFill.md`. (Тогда же был реконсилирован док
+  `RefreshFillsExecutor`; **впоследствии снят вместе с командой** —
+  `REFRESH_FILLS` упразднён на `GAPS_CLOSE_2` шага 7, N12, его функцию несёт
+  `REFRESH_ORDER`: `docs/decisions/pnl-finalization-mechanics.md` реш.1.)
 - Закрыты **OKX-Q1**, **OKX-Q3**; остаток **DEAL-Q2** (число на
   `EMERGENCY_CLOSED`) закрыт вместе с G5.
 - **G4** (fills не агрегируют exit-fills algo-ордеров) — **resolved-by-path**:

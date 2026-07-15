@@ -16,6 +16,13 @@ Mapping-слой для `InstrumentExternalRules`. Доменная модель
 `docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'а —
 `docs/integrations/<name>/contracts/instrument.md`.
 
+**Ставка комиссии здесь не маппится — только ключ её группы.** Значение ставки
+приходит **другим эндпоинтом** (`trade-fee`) и едет своим снапшотом в
+`TradeFeeRate` (`docs/models/mapping/TradeFeeRate.md`,
+`docs/models/domain/other/TradeFeeRate.md`); в этой модели живёт
+`externalFeeGroupId` — ось резолва. Один mapping-док — один источник; синк у
+них общий (`InstrumentExternalRulesSyncJob`), но модели и такт разные.
+
 Текущие источники: **OKX**.
 
 ## Source-agnostic ядро
@@ -68,6 +75,7 @@ contracts = baseQty / ctVal
 | `maxTriggerSz` | `externalMaxTriggerSize` |
 | `maxStopSz` | `externalMaxStopSize` |
 | `lever` | `externalMaxLeverage` |
+| `groupId` | `externalFeeGroupId` |
 | `state` | `externalState` |
 
 ### Резолв enum'ов при материализации (`snapshotToDomain`)
@@ -107,7 +115,18 @@ contracts = baseQty / ctVal
 `maxTwapSz`/`maxIcebergSz`/`maxLmtAmt`/`maxMktAmt` (per-order лимиты
 неиспользуемых типов ордеров — не используем),
 `listTime`/`expTime`/`openType`/`ruleType` (lifecycle биржи; для
-SWAP `expTime` обычно пусто), `category`/`groupId`/`alias`/`stk`/
+SWAP `expTime` обычно пусто), `category`/`alias`/`stk`/
 `optType`, `posLmtAmt`/`posLmtPct`/`maxPlatOILmt` (позиционные лимиты —
 форвард к риску на биржу/портфель, фаза 3,
 `docs/decisions/per-trade-risk-policy.md`).
+
+**`groupId` из этого списка снят** (шаг 7, `GAPS_CLOSE_3`, H1). Он не «прочее
+поле биржи», а **ключ резолва ставки комиссии**: офдок OKX прямо предписывает
+брать его отсюда — «instType and groupId should be used together to determine a
+trading fee group. Users should use this endpoint together with fee rates
+endpoint to get the trading fee of a specific symbol» (Get instruments →
+Response Parameters). Отброс был сделан до changelog OKX **2025-11-21**,
+который ввёл `groupId` в Get instruments и `feeGroup` в Get fee rates,
+задепрекейтив флэт `maker`/`taker` для SWAP/FUTURES; с этого момента резолв
+ставки SWAP **завязан именно на `groupId`**, и его отброс оставлял `CODE` без
+ключа группы (прогноз комиссии молча выпадал в null).

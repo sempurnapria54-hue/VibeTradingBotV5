@@ -56,6 +56,20 @@ Rules-поля (sizing/rounding/ограничители), питающие rule
 | `maxMktSz` | string (decimal) | макс. размер market-ордера |
 | `maxTriggerSz` | string (decimal) | макс. размер trigger-ордера |
 | `maxStopSz` | string (decimal) | макс. размер stop-ордера |
+| `groupId` | string | id комиссионной группы инструмента; **ключ резолва ставки** — пара (`instType`, `groupId`) |
+
+**`groupId` — ключ, а не ставка.** Инструмент несёт только id своей
+комиссионной группы; сама ставка приходит отдельным эндпоинтом
+`GET /api/v5/account/trade-fee` и живёт в своей модели `TradeFeeRate` (одна
+строка на группу), не копией на инструменте
+(`docs/models/domain/other/TradeFeeRate.md` §«Масштаб модели»,
+`docs/decisions/pnl-finalization-mechanics.md` реш.4). Офдок (Get instruments
+→ Response Parameters, «Instrument trading fee group ID»): «instType and
+groupId should be used together to determine a trading fee group. Users should
+use this endpoint together with fee rates endpoint to get the trading fee of a
+specific symbol». Native-поля ставки —
+`docs/models/integrations/okx/OkxTradeFeeResponse.md`; контракт —
+`docs/integrations/okx/contracts/trade-fee.md`.
 
 Числовые spec-поля OKX (`lotSz`/`minSz`/`ctVal`/`ctMult`/`tickSz`)
 приходят строками; в snapshot — `BigDecimal`. Биржевые `state`/
@@ -70,7 +84,9 @@ OKX `public/instruments` отдаёт больше полей. Sizing/rounding-�
 `maxLmtSz`/`maxMktSz`/`maxTriggerSz`/`maxStopSz`) **входят** в этот
 DTO (см. таблицу rules-полей выше) и питают rules-снапшот
 `InstrumentExternalRules` (`docs/models/mapping/InstrumentExternalRules.md`
-§OKX). Не входят прочие поля (`instFamily`, `uly`,
+§OKX). **`groupId` тоже входит** (шаг 7, `GAPS_CLOSE_3`): прежде он числился
+среди неиспользуемых — ошибочно, ключ fee-группы нужен для резолва ставки
+(см. таблицу rules-полей выше). Не входят прочие поля (`instFamily`, `uly`,
 `listTime`/`expTime`, `category`/`alias` и т. п.) — доменно не
 используются. Coded `InstrumentOkxResponse` несёт только подмножество,
 релевантное идентичности (шаг 1) и правилам (шаг 5).
