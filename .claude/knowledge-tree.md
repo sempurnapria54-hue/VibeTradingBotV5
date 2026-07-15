@@ -123,7 +123,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v67.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v68.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -142,9 +142,11 @@
 │       │   ├── phase-1-step-7-docs-check-1.md — Каков исход DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-docs-check-2.md — Каков исход DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-docs-check-3.md — Каков исход DOCS_CHECK_3 шага 7?
+│       │   ├── phase-1-step-7-docs-check-4.md — Каков исход DOCS_CHECK_4 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
-│       │   └── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
+│       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
+│       │   └── phase-1-step-7-gaps-close-4.md — Как закрыты пробелы DOCS_CHECK_4 шага 7?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -386,10 +388,10 @@
 │       ├── condition-ruletype-granularity.md — Когда заводить выделенный StrategyConditionRuleType?
 │       ├── controlled-exchange-exceptions.md — Какие категории controlled exchange exceptions и реакции?
 │       ├── error-handling-policy.md — Как ошибки выходят наружу и градируются внутри?
-│       ├── exchange-hold.md — Какие команды блокирует статус Exchange.HOLD?
+│       ├── exchange-hold.md — Какое правило определяет exchange-scope холд?
 │       ├── external-status-resolution.md — Как работать с сырым внешним статусом сущности?
 │       ├── idempotency-via-unique.md — Как обеспечивается уникальность и идемпотентность сущностей?
-│       ├── instrument-hold.md — Как устроен инструмент-scope холд (уровень 3)?
+│       ├── instrument-hold.md — Какое правило определяет инструмент-scope холд?
 │       ├── market-data-freshness.md — Какое правило свежести рыночных данных?
 │       ├── market-data-retention.md — Какое правило хранения/чистки результатов расчёта?
 │       ├── no-partial-close.md — Почему запрещено частичное закрытие через close-position?

@@ -24,20 +24,37 @@
 (`riskPerTradePercent`) — из `StrategyDetail`; отдельного RVO
 `RiskSettings` нет (см. `docs/decisions/per-trade-risk-policy.md`).
 
+**Отсюда — владелец гидрации ставки** (H1, `GAPS_CLOSE_4`). `CalculationContext`
+у валидатора нет: тропа чтения навеса у него **своя**, прямая. Поэтому ставку
+наливает `InstrumentExternalRulesDataService` (граница domain ↔ persistence,
+через которую проходят обе тропы), а не `CalculationContextFactory`: гидрация в
+фабрике накрыла бы только тропу калькуляторов, валидатор получал бы
+негидрированный навес → `takerFeeRate()` = `null` → `FEE_RATE_UNAVAILABLE`
+блокировал бы **каждый** risk-creating вход. Разбор —
+`docs/components/InstrumentExternalRulesDataService.md` §«Гидрация ставки
+комиссии».
+
 ## Метрики (считает сам)
 
 risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal +
 commissions`, где `commissions` — прогноз вход+выход по taker-ставке из
 `instrumentExternalRules.takerFeeRate()` (N9 — не отдельный fetch; **дом
 ставки** — `docs/models/domain/other/TradeFeeRate.md`, на инструменте только
-ключ группы `externalFeeGroupId`, аксессор гидрируется при материализации);
-**включён с шага 7** (G6), согласовано с `SizeCalculator`, см.
-`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий (включён на шаге 7)»);
+ключ группы `externalFeeGroupId`; аксессор гидрирует хранилищный слой —
+`docs/components/InstrumentExternalRulesDataService.md` §«Гидрация ставки
+комиссии», H1, `GAPS_CLOSE_4`); **включён с шага 7** (G6), согласовано с
+`SizeCalculator`, см. `docs/decisions/per-trade-risk-policy.md` §«Учёт
+комиссий (включён на шаге 7)»);
 **risk percent от свободного депозита** (база —
 `BalanceContainer.externalAvailableEquity`, не total/adjusted, см.
 `docs/decisions/per-trade-risk-policy.md`); SL distance; liquidation guard
 distance. Метрики могут попасть в `RiskCheckResult.details`, логи или
 аудит, но **не** входят в `CalculatedStrategyAction`.
+
+Аксессор отдаёт ставку **издержкой** — знак биржевой конвенции снят при
+маппинге (`docs/models/domain/other/TradeFeeRate.md` §«Знак ставки»). Поэтому
+`+ commissions` верно как написано, `abs` вызывающему не нужен: положительная
+издержка увеличивает убыток на стопе, отрицательная (ребейт) уменьшает.
 
 `position exposure после действия` — метрика **уровня риска на биржу/портфель**
 (форвард к фазе 3); в фазе 1 (только риск на сделку) кода-блокера по экспозиции
@@ -94,9 +111,12 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 Два разных «нет ставки» — два разных ответа:
 
 - **Ставка была, но чтение упало** → последняя известная **не затирается**:
-  `updateFromSnapshot` с IGNORE-null на синке (codestyle §Маппинг), null поверх
-  факта не пишется. Устаревание известной ставки ведёт к **холду биржи**, не к
-  реджекту (`docs/rules/exchange-hold.md`).
+  на отказе синк **не пишет ничего** — история `TradeFeeRate` append-only,
+  актуальная = последняя строка по `createdAt`, она просто остаётся последней и
+  стареет (H10, `GAPS_CLOSE_4`; дом — `docs/models/mapping/TradeFeeRate.md`
+  §«Error policy»). Устаревание известной ставки ведёт к **холду инструментов
+  группы** (`docs/rules/instrument-hold.md` §«Несвежесть ставки комиссии»), не к
+  реджекту.
 - **Ставки не было никогда** (ни одной строки `TradeFeeRate` по группе
   инструмента либо у инструмента нет `externalFeeGroupId`) → **реджект**
   `FEE_RATE_UNAVAILABLE`.

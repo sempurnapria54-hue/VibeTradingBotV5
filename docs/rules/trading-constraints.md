@@ -7,7 +7,25 @@
 
 ## Правило
 
-- **Контур:** OKX SWAP/FUTURES.
+- **Контур:** OKX **SWAP**. FUTURES из контура фазы 1 **вынесен** (H8,
+  `GAPS_CLOSE_4`) — решение пользователя, не умолчание.
+  - **Почему вынесен.** Ни один док шага 7 FUTURES не специфицирует, а
+    fee-путь построен под SWAP предметно: синк читает ставки одним вызовом
+    `trade-fee(instType=SWAP)` на тик
+    (`docs/components/InstrumentExternalRulesSyncJob.md` §Такт). FUTURES в
+    контуре при таком чтении дал бы одно из двух — либо матч на SWAP-группу по
+    голому `groupId` (**молча неверная ставка**), либо
+    `FEE_RATE_UNAVAILABLE` на каждом FUTURES-входе. Объявлять в контуре то,
+    что контур не обслуживает, — способ получить первое.
+  - **Горизонт возврата — шаг с отдельными биржами** (мультибиржевой этап;
+    точная фаза не зафиксирована — `docs/decisions/per-trade-risk-policy.md`
+    §«Трёхуровневая модель риска»). Там же встаёт обобщение оси `instType`:
+    чтение ставок по нескольким типам, экспирация FUTURES, delivery-ставки.
+    Форвард — `.claude/work/backlog.md`.
+  - **Что это не значит.** Доменный `InstrumentType.FUTURES` и
+    `delivery`-поля контракта `trade-fee` **остаются** — модель шире контура,
+    и это норма (`.claude/decisions/negative-statements-not-fixated.md`).
+    Вынесен **торговый контур**, не enum.
 - **Только свои средства:** без margin borrow, без loan/debt-логики
   (признаки borrow/debt — anomaly, см. `docs/components/AnomalyJob.md`).
 - **Режим маржи:** isolated.

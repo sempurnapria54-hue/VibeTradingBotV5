@@ -27,14 +27,23 @@
 (`externalFeeGroupId`), не ставка: ставка — атрибут комиссионного уровня
 аккаунта, а не справочника инструмента. `InstrumentExternalRulesSyncJob`
 дочитывает `trade-fee` **раз на тик по `instType`** (не по инструменту) и
-пишет строку на группу; резолв ставки — по паре (`instType`, `groupId`).
-Seam чтения не двинулся — калькуляторы получают ставку через уже
-присутствующий `CalculationContext.instrumentExternalRules`, без отдельного
+пишет строку на группу; резолв ставки — по паре (`instType`, `groupId`), обе
+половины ключа — **сырые значения источника**, не доменные проекции (H7,
+`GAPS_CLOSE_4`; довод — `docs/models/domain/other/TradeFeeRate.md` §«Масштаб
+модели»). **Поверхность чтения не двинулась** — калькуляторы берут ставку
+прежним аксессором `InstrumentExternalRules.takerFeeRate()`, без отдельного
 поля контекста и exchange-вызова из калькулятора (N9,
-`docs/decisions/pnl-finalization-mechanics.md` реш.4). Фактические комиссии
-исполнения (для `resultProfit`) живут в bills/positions-history
-(`account-bills.md`, `docs/decisions/result-profit-source.md`); `trade-fee` —
-ставки для **прогноза** (сайзинг до входа) и сверки. Wiring — шаг 7 CODE.
+`docs/decisions/pnl-finalization-mechanics.md` реш.4). Троп чтения навеса
+**две** (`CalculationContext` у калькуляторов; прямая, через
+`findByInstrumentId`, — у `RiskValidator`), поэтому аксессор гидрирует
+**хранилищный слой** — `docs/components/InstrumentExternalRulesDataService.md`,
+единственная граница domain ↔ persistence навеса, через которую проходят обе
+тропы (H1, `GAPS_CLOSE_4`).
+
+Фактические комиссии исполнения (для `resultProfit`) живут в
+bills/positions-history (`account-bills.md`,
+`docs/decisions/result-profit-source.md`); `trade-fee` — ставки для
+**прогноза** (сайзинг до входа) и сверки. Wiring — шаг 7 CODE.
 
 Native-инвентарь полей (used/unused) —
 `docs/models/integrations/okx/OkxTradeFeeResponse.md`; маппинг →
@@ -53,6 +62,12 @@ Query: `instType` (обяз.: SPOT/MARGIN/SWAP/FUTURES/OPTION/**EVENTS**),
 `trade-fee(instType=SWAP)` на тик даёт `feeGroup[]` по всем группам типа; N
 вызовов на N инструментов не делаются (при лимите 5 req / 2 s это и дешевле,
 и не размножает ставку по инструментам).
+
+Перечень `instType` выше — офдок; **наш контур фазы 1 — SWAP-only**, поэтому
+вызов ровно один (`instType=SWAP`). FUTURES вынесен из контура до шага с
+отдельными биржами (H8, `GAPS_CLOSE_4`; `docs/rules/trading-constraints.md`
+§Правило) — на ось запроса это влияет так: второго вызова
+(`instType=FUTURES`) в фазе 1 нет.
 
 ### Response (`data[0]`)
 
@@ -112,3 +127,16 @@ base rates. **Мы не участники программы → base rates к�
 = ребейт**. Исключение: `delivery`/`exercise` — положительные числа
 как ставка комиссии. Совпадает со знаком `fee` в fills/bills
 (отрицательный `fee` — списание).
+
+**Дальше границы конвенция не течёт** (H2, `GAPS_CLOSE_4`). Знак снимается
+при маппинге — `× −1` в per-source-секции
+`docs/models/mapping/TradeFeeRate.md` §«Знак ставки — снимается здесь»; ниже
+маппинга ставка есть **издержка** (комиссия положительна, ребейт отрицателен),
+и `abs` в формулах не появляется. Довод —
+`docs/models/domain/other/TradeFeeRate.md` §«Знак ставки».
+
+Оговорка про `fee` в bills: там знак — **факт движения** и **не
+нормализуется** (он участвует в арифметике `amount − externalFee = pnl`,
+`docs/models/mapping/DealCashFlow.md` §«Знак `externalFee` — сырой,
+нормализации нет»). Асимметрия сознательная: нормализуется прогнозная
+**ставка**, не фактическое движение.

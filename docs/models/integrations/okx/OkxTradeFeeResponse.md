@@ -38,16 +38,21 @@ Mapping в `TradeFeeRateExternalSnapshot` и далее в доменную `Tra
 
 | OKX field | Тип (raw) | Семантика |
 |---|---|---|
-| `feeGroup[].groupId` | string | id комиссионной группы — **ось группы**; вместе с `instType` образует ключ резолва ставки |
-| `feeGroup[].taker` | string-decimal | ставка taker-комиссии группы (знак: минус = комиссия, плюс = ребейт) |
-| `feeGroup[].maker` | string-decimal | ставка maker-комиссии группы |
-| `level` | string | комиссионный уровень аккаунта (например `Lv1`) — **датчик оси тира**: отвечает «из-за чего» скакнула ставка |
-| `ts` | string-ms | время данных источника |
-| `instType` | string | эхо типа инструмента — **вторая ось группы** (одно и то же число `groupId` значит разное при разном `instType`) |
+| `feeGroup[].groupId` | string | id комиссионной группы — **ось группы**; вместе с `instType` образует ключ резолва ставки. Едет в снапшот **сырым** (`externalFeeGroupId`) |
+| `feeGroup[].taker` | string-decimal | ставка taker-комиссии группы (знак источника: минус = комиссия, плюс = ребейт). При маппинге — **`× −1`**: знак снимается, ниже маппинга ставка есть издержка (H2, `GAPS_CLOSE_4`; `docs/models/mapping/TradeFeeRate.md` §«Знак ставки — снимается здесь») |
+| `feeGroup[].maker` | string-decimal | ставка maker-комиссии группы; та же знаковая конвенция и тот же **`× −1`** при маппинге |
+| `level` | string | комиссионный уровень аккаунта (например `Lv1`) — **часть значения группы**: его смена рождает новую строку `TradeFeeRate`, а не переписывает `level` на месте (H11, `GAPS_CLOSE_4`; `docs/models/domain/other/TradeFeeRate.md` §Запись). Отсюда же и датчик: отвечает «из-за чего» скакнула ставка |
+| `ts` | string-ms | время данных источника. Значением группы **не является** — метка ответа, обновляется на месте и строки не рождает (`docs/models/domain/other/TradeFeeRate.md` §Запись) |
+| `instType` | string | эхо типа инструмента — **вторая ось группы** (одно и то же число `groupId` значит разное при разном `instType`). Едет в снапшот **сырым** (`externalInstrumentType`) |
 
 **Ось резолва — пара (`instType`, `groupId`), не голый `groupId`.** Офдок Get
 instruments: «instType and groupId should be used together to determine a
 trading fee group».
+
+**Обе половины ключа — сырые, не доменные проекции** (H7, `GAPS_CLOSE_4`).
+Ключ группы — (`externalInstrumentType`, `externalFeeGroupId`), а не доменный
+`instrumentType`: довод (коллизия `UNKNOWN`) — в
+`docs/models/domain/other/TradeFeeRate.md` §«Масштаб модели».
 
 **Перечень групп не хардкодится.** Офдок сам предписывает не полагаться на
 свой enum-список групп («actual return values shall prevail»), и список
@@ -86,4 +91,8 @@ trading fee group».
 external error (`docs/models/mapping/TradeFeeRate.md` §Validation).
 
 Знаковая конвенция `taker`/`maker`: **минус = комиссия, плюс = ребейт**
-(офдок; совпадает со знаком `fee` в fills/bills).
+(офдок; совпадает со знаком `fee` в fills/bills). Конвенция **не выходит за
+маппинг**: `× −1` в `docs/models/mapping/TradeFeeRate.md` §«Знак ставки —
+снимается здесь» переводит её в проектную нормаль «издержка» (H2,
+`GAPS_CLOSE_4`). Инвентарь used/unused от этого не меняется — снятие знака
+происходит после переноса поля.

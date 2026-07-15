@@ -65,9 +65,14 @@ market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION`, 
 `docs/decisions/pnl-finalization-mechanics.md` реш.4). **Дом ставки** — не
 навес: ставка живёт в `TradeFeeRate` (одна строка на комиссионную группу,
 `docs/models/domain/other/TradeFeeRate.md`), на навесе инструмента — только
-**ключ группы** `externalFeeGroupId`, а аксессор гидрируется из `TradeFeeRate`
-при материализации. Для калькулятора seam тот же — поверхность чтения не
-изменилась. Ставка не резолвится → вход блокирует `RiskValidator`
+**ключ группы** `externalFeeGroupId`, а аксессор гидрирует хранилищный слой —
+`docs/components/InstrumentExternalRulesDataService.md` §«Гидрация ставки
+комиссии» (H1, `GAPS_CLOSE_4`). Для калькулятора seam тот же — поверхность
+чтения не изменилась. Аксессор отдаёт **издержку** (знак биржевой конвенции
+снят при маппинге, `docs/models/domain/other/TradeFeeRate.md` §«Знак ставки»),
+поэтому `+ commissions` верно как написано и `abs` не нужен: ребейт уезжает
+отрицательной издержкой и корректно уменьшает убыток на стопе. Ставка не
+резолвится → вход блокирует `RiskValidator`
 (`FEE_RATE_UNAVAILABLE`), калькулятор ставку не выдумывает. Лимит риска —
 связывающий потолок над желаемым объёмом (`allocationPercents` — желаемая доля,
 лимит риска — связывающий cap).

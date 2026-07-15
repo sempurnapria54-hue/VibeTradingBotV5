@@ -39,9 +39,9 @@
   `docs/decisions/pnl-finalization-mechanics.md` реш.4). Сама ставка **на
   навесе не хранится** — здесь только **ключ группы**
   (`externalFeeGroupId`), по которому она резолвится; см. §«Ставка комиссии».
-  Калькуляторам она по-прежнему доступна через уже присутствующий
-  `CalculationContext.instrumentExternalRules` — без отдельного поля контекста
-  и без exchange-вызова из калькулятора.
+  Читателям она доступна тем же аксессором на этой модели — гидрацию делает
+  хранилищный слой (`docs/components/InstrumentExternalRulesDataService.md`),
+  без отдельного поля контекста и без exchange-вызова из калькулятора.
 
 Правила меняются редко, поэтому хранение актуального snapshot в БД
 оправдано. Обновляется `InstrumentExternalRulesSyncJob` (см.
@@ -76,7 +76,7 @@ Java-класс. Собственного `id` у класса нет — еди
 | `externalMaxTriggerSize` | `String` | Максимальный размер trigger-ордера. |
 | `externalMaxStopSize` | `String` | Максимальный размер stop-ордера. |
 | `externalMaxLeverage` | `String` | Биржевой максимум плеча. |
-| `externalFeeGroupId` | `String` | **Ключ комиссионной группы** инструмента (OKX `groupId`, из `/public/instruments`). Не ставка, а ось её резолва: пара (`instrumentType`, `externalFeeGroupId`) → строка `TradeFeeRate`. См. §«Ставка комиссии». |
+| `externalFeeGroupId` | `String` | **Ключ комиссионной группы** инструмента (OKX `groupId`, из `/public/instruments`). Не ставка, а ось её резолва: пара (`externalInstrumentType`, `externalFeeGroupId`) → строка `TradeFeeRate`. Обе половины — **сырые** поля (доменный `instrumentType` осью не является: `UNKNOWN` схлопнул бы разные группы в один ключ — `docs/models/domain/other/TradeFeeRate.md` §«Масштаб модели»). См. §«Ставка комиссии». |
 | `externalState` | `String` | Сырой статус инструмента биржи. |
 
 `external*`-поля хранят сырые строковые значения биржи; нормализованные
@@ -97,18 +97,28 @@ runtime-логики.
 строка на группу делает смену тира одной записью. Подробный довод и механика
 записи/свежести — `docs/models/domain/other/TradeFeeRate.md`.
 
-**Seam при этом не двинулся.** `SizeCalculator`/`RiskValidator` читают ставку
-там же, где и раньше — через `CalculationContext.instrumentExternalRules`
-(нового поля контекста и exchange-вызова из калькулятора не нужно, N9).
+**Поверхность чтения не двинулась.** `SizeCalculator` и `RiskValidator` читают
+ставку тем же аксессором `takerFeeRate()` на этой модели, что и раньше;
+нового поля контекста и exchange-вызова из калькулятора не нужно (N9).
 Изменилось только **место хранения**, не поверхность чтения.
 
-**Гидрация.** Ставка подгружается в модель **при материализации**
-спец-запросом по `externalFeeGroupId` (codestyle §Вложенность и rich-модели:
-если для проверки нужны связанные сущности — грузим их в эту модель
-спец-запросом, а метод модели работает со своими данными; не тащим значение
-параметром через сервис). Аксессоры `takerFeeRate()`/`makerFeeRate()` —
-поверхность чтения, делегируют в подгруженный `TradeFeeRate`; **на навесе
-ставка не персистится**.
+**Гидрация — на хранилищном слое** (H1, `GAPS_CLOSE_4`). Ставку в модель
+наливает `docs/components/InstrumentExternalRulesDataService.md` — граница
+domain ↔ persistence: отдавая навес, он резолвит актуальную строку
+`TradeFeeRate` по паре (`externalInstrumentType`, `externalFeeGroupId`) и
+кладёт её в возвращаемый инстанс. Аксессоры
+`takerFeeRate()`/`makerFeeRate()` делегируют в подгруженную строку; **на
+навесе ставка не персистится**.
+
+**Обе тропы чтения гидрированы — это и есть довод за такого владельца.**
+Навес читают двое: `CalculationContextFactory` (кладёт в
+`CalculationContext`) и `RiskValidator` (**напрямую** — его сигнатура
+`validate(CalculatedStrategyAction, DealContext)`, `CalculationContext` у
+него нет; `docs/components/RiskValidator.md` §Входы). Гидрируй фабрика — у
+`RiskValidator` аксессор отдавал бы `null`, и `FEE_RATE_UNAVAILABLE`
+блокировал бы **каждый** risk-creating вход. Хранилищный слой — единственная
+точка, через которую проходят обе тропы; читатели о `TradeFeeRate` при этом
+не знают вовсе.
 
 **Null-политика.** Ставка не резолвится (нет `externalFeeGroupId` либо нет ни
 одной строки `TradeFeeRate` по группе) → `takerFeeRate()` = `null` → это
@@ -116,8 +126,13 @@ runtime-логики.
 прогноза комиссии и **не** fallback-число из конфига (подставленное число
 выглядит фактом, не будучи им; заниженная ставка → позиция больше положенной —
 та же болезнь, что H6/H2). Синк при этом последнюю известную ставку **не
-затирает** (IGNORE-null). См. `docs/components/RiskValidator.md`,
-`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий».
+затирает** — на отказе чтения он просто **не пишет** (история append-only;
+атрибуция «IGNORE-null» снята как рудимент редакции «ставка на навесе» — H10,
+`GAPS_CLOSE_4`, `docs/models/mapping/TradeFeeRate.md` §«Error policy»). Ставка
+**известная, но несвежая** — другой случай: не реджект, а **холд инструментов
+группы** (`docs/rules/instrument-hold.md` §«Несвежесть ставки комиссии»). См.
+`docs/components/RiskValidator.md`, `docs/decisions/per-trade-risk-policy.md`
+§«Учёт комиссий».
 
 ## Rich-модель (методы)
 
@@ -130,7 +145,10 @@ runtime-логики.
   `maxMarketSize()` (`maxMktSz`), `maxLeverage()` (`lever`);
 - `takerFeeRate()` / `makerFeeRate()` — `BigDecimal`, ставка комиссии из
   подгруженного `TradeFeeRate` (не с навеса; taker — прогноз комиссии в
-  сайзинге, N9). Не резолвится → `null` → реджект (см. §«Ставка комиссии»).
+  сайзинге, N9). Отдают **издержку**: знак биржевой конвенции снят при
+  маппинге (`docs/models/domain/other/TradeFeeRate.md` §«Знак ставки»),
+  комиссия положительна — вызывающему `abs` не нужен. Не резолвится → `null`
+  → реджект (см. §«Ставка комиссии»).
 
 Числовых аксессоров `maxTriggerSize()` / `maxStopSize()` **нет**: сырые
 `externalMaxTriggerSize` / `externalMaxStopSize` хранятся, но проверками

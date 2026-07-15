@@ -81,10 +81,25 @@ Precheck/AnomalyJob учесть легитимное **окно двойной 
 OKX endpoint'ы `POST/GET /trade/fills-archive` дают доступ к fills
 старше 3 месяцев и до ~2 лет через двухшаговый async-флоу (генерация
 файла → polling state → скачивание `fileHref`). На первом этапе ни
-executor, ни persisted-сущность `TradeFillsArchive` не введены: текущий
-runtime использует только `RefreshFillsExecutor` за последние 3
-месяца. Не решено: нужен ли async-executor под архив (с long-running
-polling state) и persisted-модель `TradeFillsArchive`.
+executor, ни persisted-сущность `TradeFillsArchive` не введены. Не
+решено: нужен ли async-executor под архив (с long-running polling
+state) и persisted-модель `TradeFillsArchive`.
+
+**Обоснование пересобрано (`GAPS_CLOSE_4`, вслед за `GAPS_CLOSE_2`).**
+Прежняя опора («текущий runtime использует только `RefreshFillsExecutor`
+за последние 3 месяца») устарела: `REFRESH_FILLS` и её executor **сняты**
+(N12) — число P&L идёт из positions-history, разбивка из bills
+(`REFRESH_POSITIONS_HISTORY` / `REFRESH_BILLS`), order-fill-метрики
+(`accFillSz`/`avgPx`) — из `REFRESH_ORDER`. ⇒ runtime фазы 1 **не читает
+fills вообще** — ни 3d, ни 3m (`docs/integrations/okx/coverage-manifest.md`:
+⚪ не-runtime, контракты справочно).
+
+Вопрос это **не закрывает, а сужает**: отпадает мотив «архив как
+продолжение runtime-контура fills» (его больше нет), остаётся чистый
+вопрос **off-band-аудита**. Пофилловый аудит вынесен за фазу 1 при
+закрытии OKX-Q1 (`docs/decisions/result-profit-source.md` §«Персист
+fills») — это отложение, не отказ; решения «нужен ли архив вообще» ни
+один decision не несёт. Де-факто действует вариант (3).
 
 Цитаты источника (архив, `Запрос генерации файла из архива сделок REST.md`):
 - «**последние 3 месяца** — берёшь обычным `GET /api/v5/trade/fills-history`;

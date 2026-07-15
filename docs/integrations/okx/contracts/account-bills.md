@@ -108,6 +108,13 @@ Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsEx
    не отбрасывается молча фильтром — помечается.
 ```
 
+**Область суммирования — не одна** (H9, `GAPS_CLOSE_4`). Σ`amount` в п.5 идёт
+по **всем** строкам сделки, включая `FUNDING` (net из positions-history его
+содержит), — это сумма-сверка. Realized-слагаемое разбивки, наоборот,
+считается **только** по строкам `REALIZED_PNL`, `FUNDING` из него исключён
+(holding-cost, не realized pnl). Три суммы и их области —
+`docs/models/mapping/DealCashFlow.md` §«Область суммирования — задаётся явно».
+
 > **Граница 6 ↔ 7 и источник числа.** Само **число** `Deal.resultProfit` =
 > net из positions-history (`realizedPnl`), **не** `sum(DealCashFlow.amount)`
 > (`docs/decisions/result-profit-source.md`). *Расчёт* (число + разбивка +

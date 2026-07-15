@@ -20,8 +20,15 @@ Mapping-слой для `InstrumentExternalRules`. Доменная модель
 приходит **другим эндпоинтом** (`trade-fee`) и едет своим снапшотом в
 `TradeFeeRate` (`docs/models/mapping/TradeFeeRate.md`,
 `docs/models/domain/other/TradeFeeRate.md`); в этой модели живёт
-`externalFeeGroupId` — ось резолва. Один mapping-док — один источник; синк у
-них общий (`InstrumentExternalRulesSyncJob`), но модели и такт разные.
+`externalFeeGroupId` — половина ключа резолва. Один mapping-док — один
+источник; синк у них общий (`InstrumentExternalRulesSyncJob`), но модели и
+такт разные.
+
+**Ось резолва — пара, и обе её половины сырые** (H7, `GAPS_CLOSE_4`):
+(`externalInstrumentType`, `externalFeeGroupId`), а **не** доменная проекция
+`instrumentType`, которая резолвится ниже по этому же файлу
+(§«Резолв enum'ов при материализации»). Довод — коллизия `UNKNOWN`:
+`docs/models/domain/other/TradeFeeRate.md` §«Масштаб модели».
 
 Текущие источники: **OKX**.
 
