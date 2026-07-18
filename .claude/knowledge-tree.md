@@ -125,7 +125,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v69.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v70.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -147,6 +147,7 @@
 │       │   ├── phase-1-step-7-docs-check-3.md — Каков исход DOCS_CHECK_3 шага 7?
 │       │   ├── phase-1-step-7-docs-check-4.md — Каков исход DOCS_CHECK_4 шага 7?
 │       │   ├── phase-1-step-7-docs-check-5.md — Каков исход DOCS_CHECK_5 шага 7?
+│       │   ├── phase-1-step-7-docs-check-6.md — Каков исход DOCS_CHECK_6 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
