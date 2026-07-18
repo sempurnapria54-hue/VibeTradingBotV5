@@ -26,7 +26,8 @@ REPLACE (действие-оркестрация петлёй по фактам)
 и проверкой flat по доменным моделям. Не подтверждено flat — teardown
 повторяется, **bounded** лимитом попыток
 `KillSwitchProperties.maxTeardownAttempts` (дефолт 3); лимит исчерпан →
-`failure` (эскалацию L3→биржа держит `SafetyHoldCoordinator`, HOLD-Q1).
+`failure` (эскалацию инструмент→биржа держит `SafetyHoldCoordinator`,
+HOLD-Q1).
 Жёсткое правило порядка (ниже): защиту снимать **последней** и только
 после подтверждённого закрытия позиции — никогда не оголять живую позицию.
 
@@ -62,7 +63,7 @@ runtime truth).
 ## Статус миграции
 
 Полный kill-switch flow построен: триггер — `KillSwitchService`
-(`fireInstrument` L3 / `fireExchange` L4 каскадом по сделкам биржи),
+(`fireInstrument` / `fireExchange` каскадом по сделкам биржи),
 оркестрация отчёта и слепков — `SafetyHoldCoordinator` (по сигналу холда
 в проходе `DealOrchestratorJob`; журнал —
 `docs/models/domain/other/AnomalyReport.md`). Здесь зафиксирована

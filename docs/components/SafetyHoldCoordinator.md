@@ -28,9 +28,10 @@
 
 ## Последовательность реакции
 
-L3 (инструмент) и L4 (биржа) — **одной формы**, различаются только
+Инструмент-scope и биржа-scope — **одной формы**, различаются только
 scope-исполнителями (`InstrumentDataService`/`fireInstrument` vs
-`ExchangeDataService`/`fireExchange`). Дизайн холдов шага 6:
+`ExchangeDataService`/`fireExchange`); ярлыки уровня со scope сняты (H6,
+`GAPS_CLOSE_5`; уровень — ось error-политики). Дизайн холдов шага 6:
 
 1. **`TRADE_BLOCKED` scope первым** (`blockTrade`) — gate и анкер
    идемпотентности. Ставится **только из ACTIVE**; повторный сигнал того
@@ -53,7 +54,7 @@ after-слепок.
 
 Не подтверждено:
 
-- **L3 (инструмент) не подтверждён → ЭСКАЛАЦИЯ** на биржевой холд +
+- **Инструмент-scope не подтверждён → ЭСКАЛАЦИЯ** на биржевой холд +
   общебиржевой kill-switch: тем же контуром `reactExchange` с сигналом
   `HoldSignal.exchange(EXCHANGE_KILL_SWITCH_RESIDUAL)` (code
   `EXCHANGE_KILL_SWITCH_RESIDUAL`). Обоснование (HOLD-Q1): неустранимый
@@ -61,7 +62,7 @@ after-слепок.
   консервативно тормозим биржу (см.
   `docs/decisions/controlled-violation-exchange-wide-hold.md`,
   `docs/rules/controlled-exchange-exceptions.md`).
-- **L4 (биржа) не подтверждён → эскалировать некуда**: отчёт **остаётся
+- **Биржа-scope не подтверждён → эскалировать некуда**: отчёт **остаётся
   открытым** (`KILL_SWITCH_EXECUTED`, не `COMPLETED`). Досверка орфанов
   вне модели сделки — проактивный `AnomalyJob` (ANOM-Q2, шаг 8; см.
   `docs/components/AnomalyJob.md`).
@@ -87,7 +88,7 @@ after-слепок.
 ## Связи
 
 - `docs/rules/instrument-hold.md`, `docs/rules/exchange-hold.md` —
-  уровни L3/L4 error-градации.
+  правила холдов по scope (уровни — ось error-политики).
 - `docs/rules/controlled-exchange-exceptions.md`,
   `docs/rules/error-handling-policy.md` — контур контролируемых
   исключений и общая error-политика.

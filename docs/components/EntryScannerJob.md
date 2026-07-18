@@ -40,5 +40,6 @@ context для аудита.
 
 Не создаёт order/algo-order, не открывает позицию, не исполняет
 `StrategyAction`, не запускает FSM, не ходит на биржу за выставлением
-ордеров. Gatekeeper по `Exchange HOLD` / `Instrument` / `Strategy` /
-risk — см. `docs/rules/exchange-hold.md`, `docs/lifecycles/Strategy.md`.
+ордеров. Gatekeeper по `Exchange HOLD` / `Instrument HOLD` / `Strategy` /
+risk — см. `docs/rules/exchange-hold.md`, `docs/rules/instrument-hold.md`,
+`docs/lifecycles/Strategy.md`.

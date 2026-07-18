@@ -3,8 +3,8 @@
 ## На какой вопрос отвечает этот файл
 
 Кто триггерит аварийный kill-switch для реактивной реакции холда
-(компонент-триггер): scope по уровню, каскад L4, агрегация подтверждения,
-границы.
+(компонент-триггер): scope-исполнители, каскад биржи, агрегация
+подтверждения, границы.
 
 ## Назначение
 
@@ -17,15 +17,19 @@
 который подключает hold-подсистема (раньше — орфан
 `DealFsmSupport.killSwitchCommand()`, удалён на сверке `CODE`).
 
-## Scope по уровню
+## Scope-исполнители
 
-- **L3 `fireInstrument(dealContext)`** — kill-switch по графу **триггерной
-  сделки** (её runtime graph + instId). Возвращает подтверждение закрытия
-  риска (отчёт kill-switch): `true` — закрытие подтверждено, гейтит
-  терминал `AnomalyReport`.
-- **L4 `fireExchange(exchangeId)`** — **каскадный sweep** по всем активным
-  сделкам биржи (`DealDataService.findActiveByExchangeId`), по вызову
-  `KillSwitchExecutor` на каждую сделку (контекст строится
+Ярлыки уровня со scope-API сняты (H6, `GAPS_CLOSE_5`): scope описывает
+радиус, уровень серьёзности — отдельная ось
+(`docs/rules/error-handling-policy.md` §«Радиус ущерба задаёт scope»).
+
+- **Инструмент-scope `fireInstrument(dealContext)`** — kill-switch по графу
+  **триггерной сделки** (её runtime graph + instId). Возвращает
+  подтверждение закрытия риска (отчёт kill-switch): `true` — закрытие
+  подтверждено, гейтит терминал `AnomalyReport`.
+- **Биржа-scope `fireExchange(exchangeId)`** — **каскадный sweep** по всем
+  активным сделкам биржи (`DealDataService.findActiveByExchangeId`), по
+  вызову `KillSwitchExecutor` на каждую сделку (контекст строится
   `DealContextService.build`). **Per-deal best-effort:** сбой/исключение по
   одной сделке не срывает каскад — логируется, помечает результат
   неподтверждённым, обход продолжается. Возвращает `true` **только если
@@ -36,7 +40,7 @@
 
 Не решает «как технически» снять риск и не ретраит teardown (это
 `KillSwitchExecutor`, bounded внутри него). Не выставляет `TRADE_BLOCKED`,
-не ведёт журнал, не эскалирует L3→биржа — это оркестрация
+не ведёт журнал, не эскалирует инструмент→биржа — это оркестрация
 `SafetyHoldCoordinator`. Возвращает наверх только `Boolean`-подтверждение,
 которым координатор гейтит терминал отчёта.
 
@@ -45,6 +49,6 @@
 - `docs/components/SafetyHoldCoordinator.md` — координатор, вызывающий
   триггер и трактующий подтверждение.
 - `docs/components/KillSwitchExecutor.md` — исполнитель teardown и сверки.
-- `docs/components/models/HoldSignal.md` — сигнал холда (scope L3/L4).
-- `docs/rules/instrument-hold.md`, `docs/rules/exchange-hold.md` — уровни
-  L3/L4.
+- `docs/components/models/HoldSignal.md` — сигнал холда (scope).
+- `docs/rules/instrument-hold.md`, `docs/rules/exchange-hold.md` — правила
+  холдов по scope.

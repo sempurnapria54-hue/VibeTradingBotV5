@@ -143,10 +143,12 @@
 │       │   ├── phase-1-step-7-docs-check-2.md — Каков исход DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-docs-check-3.md — Каков исход DOCS_CHECK_3 шага 7?
 │       │   ├── phase-1-step-7-docs-check-4.md — Каков исход DOCS_CHECK_4 шага 7?
+│       │   ├── phase-1-step-7-docs-check-5.md — Каков исход DOCS_CHECK_5 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
-│       │   └── phase-1-step-7-gaps-close-4.md — Как закрыты пробелы DOCS_CHECK_4 шага 7?
+│       │   ├── phase-1-step-7-gaps-close-4.md — Как закрыты пробелы DOCS_CHECK_4 шага 7?
+│       │   └── phase-1-step-7-gaps-close-5.md — Как закрыты пробелы DOCS_CHECK_5 шага 7 (и что withhold)?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
