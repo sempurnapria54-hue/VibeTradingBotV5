@@ -76,15 +76,21 @@ per-instrument чтение упирается в него на росте чи�
   затем в `InstrumentExternalRules` (OKX-маппинг —
   `docs/models/mapping/InstrumentExternalRules.md`);
 - сохраняет/обновляет актуальный snapshot правил и **подтверждает навес**:
-  инкремент `refreshCount` + обновление `confirmedAt` на каждом успешном
-  чтении `instruments` — измеритель свежести **ключа группы**
+  на каждом успешном чтении `instruments` **явно проставляет
+  `Instrument.externalModifiedAt` = момент подтверждения** — это и есть
+  измеритель свежести **ключа группы**
   (`docs/models/domain/other/InstrumentExternalRules.md` §«Свежесть ключа
-  группы», H9 `GAPS_CLOSE_6`);
+  группы», H11 `GAPS_CLOSE_7`). Собственных `refreshCount`/`confirmedAt` у
+  навеса **нет** — они сняты: метка живёт колонкой строки-владельца и
+  переживает перезапись JSONB. Запись метки **явная** (биржевые `external*`
+  пишет код, производящий данные, а не JPA auditing), поэтому
+  dirty-проблема, из-за которой понадобился `TradeFeeRate.refreshCount`,
+  здесь не возникает;
 - читает ставки комиссии одним вызовом `trade-fee` на тик и **пишет
   `TradeFeeRate`** по правилу
   `docs/models/domain/other/TradeFeeRate.md` §«Запись: история значением,
   свежесть счётчиком»: значение группы (taker/maker/`level`) изменилось →
-  новая строка; совпало → инкремент `refreshCount` + обновление `externalTs`
+  новая строка; совпало → инкремент `refreshCount` + обновление `externalModifiedAt`
   последней строки. Механику записи здесь не дублируем — дом правила там
   (mapping — `docs/models/mapping/TradeFeeRate.md`);
 - при исчерпании **порога свежести** — ставки группы **или** ключа группы на
@@ -139,8 +145,8 @@ per-instrument чтение упирается в него на росте чи�
   затронуты инструменты, чей ключ (`exchangeId` + пара
   (`externalInstrumentType`, `externalFeeGroupId`) навеса) резолвится в
   устаревшую строку;
-- `confirmedAt` навеса (ключ группы, H9 `GAPS_CLOSE_6`) — затронут сам
-  инструмент.
+- `externalModifiedAt` строки инструмента (ключ группы, H11
+  `GAPS_CLOSE_7`) — затронут сам инструмент.
 
 **Реакция мягкая: kill-switch не применяется, живые сделки доживают под
 своим стопом** и сопровождаются штатно (H2, `GAPS_CLOSE_5`;

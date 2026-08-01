@@ -58,6 +58,15 @@ severity задаётся на границе захода в `AnomalyReportServ
 живёт он на `AnomalyReport.scope` (H4, `GAPS_CLOSE_6`). Значение не
 «неиспользуемое»: у него другой производитель, не другой енум.
 
+Отсюда следствие для поверхности создания отчёта (H23, `GAPS_CLOSE_7`):
+журнальная тропа заводит `AnomalyReport` **без `HoldSignal`** — она не
+рождена проходом над сделкой, `DealContext` у неё может не быть вовсе
+(`InstrumentExternalRulesSyncJob`), и severity она задаёт сама
+(`NON_CRITICAL`). Фабрика `instrumentGroup(code)` в `HoldSignal` **не
+заводится**: это был бы сигнал без адресата — реактивный координатор
+групповым радиусом не оперирует
+(`docs/models/domain/other/AnomalyReport.md` §«Производящая поверхность»).
+
 Scope описывает **радиус**, не уровень серьёзности: уровень — отдельная
 ось, живёт в error-политике (`docs/rules/error-handling-policy.md`
 §«Радиус ущерба задаёт scope»), и одному уровню могут соответствовать

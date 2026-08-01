@@ -12,14 +12,35 @@ concurrency-guard, границы.
 через FSM. Цикл (один проход):
 
 1. находит сделки в работе (критерии выборки — ниже);
-2. для каждой загружает `DealContext` (`DealContextService`);
-3. запускает `DealStateMachine` (см. `docs/components/DealStateMachine.md`);
-4. получает `DealTransition` (команды + опц. целевой статус / hold-сигнал);
-5. передаёт команды в `ServiceCommandExecutor`, прерывая цикл при первом
+2. **энфорсит холд инструмента** (см. §«Enforcement холда»): активные сделки
+   инструментов в `TRADE_BLOCKED` уводятся в `ERROR`;
+3. для каждой загружает `DealContext` (`DealContextService`);
+4. запускает `DealStateMachine` (см. `docs/components/DealStateMachine.md`);
+5. получает `DealTransition` (команды + опц. целевой статус / hold-сигнал);
+6. передаёт команды в `ServiceCommandExecutor`, прерывая цикл при первом
    неуспешном результате (остальные команды перехода в этом проходе не
    гонятся — handler разберёт FAILED-якорь на следующем тике);
-6. применяет переход: сохраняет новый статус сделки (если задан) и реагирует
+7. применяет переход: сохраняет новый статус сделки (если задан) и реагирует
    на поднятый handler'ом safety-hold-сигнал.
+
+## Enforcement холда
+
+**Оркестратор — точка enforcement жёсткого холда** (H20, `GAPS_CLOSE_7`;
+спецификация компонента этого требования не несла, хотя
+`docs/rules/instrument-hold.md` §Enforcement атрибутирует его именно сюда, и
+в коде оно есть):
+
+- `Instrument.Status.TRADE_BLOCKED` (и каскадно
+  `Exchange.Status.TRADE_BLOCKED`) → **каждая** активная сделка held-scope
+  уводится в `ERROR` с `shutdownReason = RISK_POLICY` (для биржевого
+  каскада — `EXCHANGE_HOLD`), дальше её разбирает `ErrorHandler` (teardown
+  live risk);
+- `Instrument.Status.ENTRY_BLOCKED` **не перехватывается** — мягкий класс
+  запрещает только **новые входы**, а живые сделки доживают под своим стопом
+  и ведутся штатным FSM. Запрет входов даёт выборка `EntryScannerJob`
+  (`findByStatus(ACTIVE)`), не оркестратор. Это несущее требование шага 7:
+  перехват мягкого класса воскресил бы снятую kill-switch-политику
+  (`docs/rules/instrument-hold.md` §Enforcement, H3 `GAPS_CLOSE_6`).
 
 Свежий runtime-граф сделки перечитывается из БД в начале следующего прохода
 (`DealContextService.build`), не внутри текущего.

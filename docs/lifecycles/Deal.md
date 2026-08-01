@@ -79,10 +79,23 @@ Live risk после terminal status -> зона AnomalyJob / ReconciliationJob,
 shutdown / controlled close активной сделки:
 
 ```text
-Strategy.DELETED                 -> shutdownReason = STRATEGY_DELETED
-Exchange/Instrument/Account HOLD -> shutdownReason = EXCHANGE_HOLD
-Market data expired (по policy)  -> shutdownReason = MARKET_DATA_EXPIRED
+Strategy.DELETED                    -> shutdownReason = STRATEGY_DELETED
+Instrument.TRADE_BLOCKED (холд      -> shutdownReason = RISK_POLICY
+  инструмента, риск-триггер)
+Exchange.TRADE_BLOCKED / DISABLED   -> shutdownReason = EXCHANGE_HOLD
+  (биржевой холд, каскад)
+Market data expired (по policy)     -> shutdownReason = MARKET_DATA_EXPIRED
 ```
+
+**Инструмент-холд и биржевой холд разведены** (H21, `GAPS_CLOSE_7`).
+Прежняя строка склеивала «Exchange/Instrument/Account HOLD» в один
+`EXCHANGE_HOLD` — это расходилось и с правилом
+(`docs/rules/instrument-hold.md` §Enforcement,
+`docs/models/domain/core/Instrument.md` §Енумы), и с кодом
+(`DealOrchestratorJob.enforceHold`), где холд **инструмента** проставляет
+`RISK_POLICY`, а `EXCHANGE_HOLD` приходит только каскадом от биржевой
+строки. Эта таблица — носитель, в который полезет писатель шага 7, поэтому
+расхождение снято здесь, а не «где-нибудь ещё».
 
 **Не** заполняется (`shutdownReason = null`) при обычном выходе:
 strategy exit → `closeReason = STRATEGY_EXIT`; TP/SL → `TAKE_PROFIT`/
@@ -121,10 +134,10 @@ ReconciliationJob`.
 (шаг 7):
 
 - **Чистое закрытие.** Число считает и **пишет на `Deal`** `FINALIZE_DEAL_EXIT`
-  (net из positions-history + разбивка bills, в одной транзакции с его
-  `COMPLETED`; N7). `MARK_DEAL_CLOSED` **ассертит** непустоту `Deal.resultProfit`
-  и ставит **чистый терминал `CLOSED`** (число сам не пишет —
-  `docs/decisions/pnl-finalization-mechanics.md` реш.2).
+  (net из положения закрытия на `Position` + разбивка bills, в одной
+  транзакции с его `COMPLETED`; N7). `MARK_DEAL_CLOSED` **ассертит** непустоту
+  `Deal.resultProfit` и ставит **чистый терминал `CLOSED`** (число сам не
+  пишет — `docs/decisions/pnl-finalization-mechanics.md` реш.2).
 - Прибыль не посчиталась после исчерпания retry → это **ошибка** →
   `DealFinalizationState(MARK_CLOSED) = FAILED`, сделка уходит ошибочной
   тропой (`MarkDealErrorExecutor`/`ErrorHandler`) и доходит до **ошибочного
@@ -134,14 +147,20 @@ ReconciliationJob`.
   (`docs/components/MarkDealEmergencyClosedExecutor.md`, симметрично
   `MARK_DEAL_CLOSED`) с **best-effort числом** — **два провенанса разведены**
   (`docs/decisions/pnl-finalization-mechanics.md` реш.3):
-  - **(a) ликвидация/ADL** (позицию закрыла биржа): `realizedPnl`+`liqPenalty`
-    доступны (`type` 3-6) → пишем **фактический realized net**;
-  - **(b) отказ расчёта** (чистая тропа не смогла): терминальное действие
-    `MARK_DEAL_EMERGENCY_CLOSED` **вложенным шагом** ещё раз пробует добыть
-    (`REFRESH_POSITIONS_HISTORY`, H13 `GAPS_CLOSE_6`); net доступен
-    → пишем; **genuinely недоступен** → `resultProfit = null` c семантикой
+  - **(a) ликвидация/ADL** (позицию закрыла биржа —
+    `Position.externalCloseType ∈ 3..6`): net доступен полем
+    `Position.externalRealizedProfit` → пишем **фактический realized net**;
+  - **(b) отказ расчёта** (чистая тропа не смогла): перед терминалом
+    `ErrorHandler` гоняет `REFRESH_POSITION`, и её **вторая нога**
+    (positions-history) ещё раз пробует добыть положение закрытия на
+    `Position` (H1/H3 `GAPS_CLOSE_7`); net есть → пишем;
+    **genuinely недоступен** → `resultProfit = null` c семантикой
     **«неисчислимо»** (**не ноль**), сделка терминализуется всё равно, факт
-    помечается (лог/`AnomalyReport`).
+    помечается (лог/`AnomalyReport`). **Жёсткий отказ чтения на этой тропе
+    приравнивается к «недоступно»**, а не к провалу действия — иначе сделка
+    зависает в `ERROR` вопреки инварианту «всегда доходит до терминала»
+    (H15, `GAPS_CLOSE_7`; `docs/decisions/pnl-finalization-mechanics.md`
+    §«Асимметрия троп отказа добычи»).
   - **Маркер:** на `EMERGENCY_CLOSED` `resultProfit != null` = фактический net;
     `null` = «неисчислимо» — **отличимо от нуля** (ноль = посчитанный нулевой
     P&L). Инвариант «`resultProfit` обязателен» — только про **чистое** закрытие.

@@ -54,12 +54,27 @@ market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION`, 
 ## Сайзинг под лимит риска на сделку
 
 Для risk-creating входа со стопом размер **ограничен лимитом риска на
-сделку**: подбирается так, чтобы убыток на стопе не превышал
+сделку**: убыток на стопе не должен превышать
 `StrategyDetail.riskPerTradePercent × BalanceContainer.externalAvailableEquity`
 (`docs/decisions/per-trade-risk-policy.md`). Убыток на стопе для линейного
 контракта — `|entryPrice − stopPrice| × contracts × ctVal + commissions`
 (прогнозная комиссия вход+выход по **taker**-ставке — worst-case; **включена с
 шага 7** — G6, `docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»).
+
+**Считается закрытой формой, не подбором** (H10, `GAPS_CLOSE_7`) — комиссия
+пропорциональна размеру, поэтому размер решается из неравенства, а не
+итерируется:
+
+```text
+contracts ≤ budget / ( ctVal × ( |entryPrice − stopPrice|
+                               + rate × (entryPrice + stopPrice) ) )
+```
+
+Каждая нога комиссии — **по своей цене** (вход по `entryPrice`, выход по
+`stopPrice`): оценка обеих по цене входа занижала бы комиссию выхода для
+SHORT и давала бы шортам систематически больший размер. Формула одна на оба
+направления. Полный довод и отвергнутые альтернативы —
+`docs/decisions/per-trade-risk-policy.md` §«Закрытая форма сайзинга».
 **Ставка** читается через `context.instrumentExternalRules.takerFeeRate()` —
 без отдельного поля контекста и без exchange-вызова из калькулятора (N9,
 `docs/decisions/pnl-finalization-mechanics.md` реш.4). **Дом ставки** — не

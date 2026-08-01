@@ -98,6 +98,16 @@ FW10), `tasks-deal.md` (DEAL-FW8).
 > статус scope (`docs/models/domain/other/AnomalyReport.md` §Енумы,
 > `docs/rules/error-handling-policy.md` §«Перечень scope и реакций»).
 
+> **Множество входа `Exchange.TRADE_BLOCKED` — не пересмотрено** (свип
+> `GAPS_CLOSE_7`, H13). Для `Instrument` ратифицировано: `TRADE_BLOCKED` /
+> `CLOSED` / `ERROR` достижимы **из любого статуса** (авария застаёт
+> сущность в любом состоянии; ограничение входа делает реакцию
+> пропускаемой — тот же отказ маскировки, ради которого менялся анкер
+> координатора). `docs/models/domain/core/Exchange.md` по-прежнему говорит
+> «вход — только из `ACTIVE`»: тот же вопрос для биржи **не обсуждался**,
+> решение за владельцем. Взвесить вместе с полным lifecycle `Exchange` и
+> разнобоем имён `HOLD`/`TRADE_BLOCKED`.
+
 **Осталось:** полный lifecycle `Exchange`, периферийные статусы
 `Instrument` (`HOLD`, `ERROR`-recovery, повторный онбординг,
 `CLOSED`), `Account`. Минимальные модели `Instrument`/`Exchange` и
@@ -298,11 +308,62 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **CODE стадий 1-2 (доспецифицировано, писать код):** носители
   `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
   (`mapping/PositionCloseResult.md`) + `DealCashFlow` (модель+mapping+таблица
-  `deal_cash_flows`, включая компоненту `externalFee`); команды/executor'ы
-  `REFRESH_POSITIONS_HISTORY` / `REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED`;
+  `deal_cash_flows`, включая компоненту `externalFee` и `applied_rate`);
+  команды/executor'ы `REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED`;
   расчёт+запись `resultProfit` на `Deal` в `FinalizeDealExitExecutor` (N7);
   сверка bills↔net → `AnomalyReport` (N10); снятие `REFRESH_FILLS` (N12, доки
   закрыты — код-удаление на CODE).
+- **CODE узла добычи положения закрытия (`GAPS_CLOSE_7`, H1/H3):**
+  - `RefreshPositionExecutor` — **вторая нога evidence-cycle**: при not-found
+    live-позиции запрос `/account/positions-history` по `posId`, маппинг в
+    `PositionCloseResultExternalSnapshot`, запись полей на `Position`.
+    Терминала цикл не выносит; запись не найдена — поля `null`, статус
+    `CLOSED` (`docs/components/RefreshPositionExecutor.md`);
+  - `Position`/`PositionEntity` + миграция: колонки
+    `external_realized_profit`, `external_result_currency`,
+    `external_close_type`;
+  - **`REFRESH_POSITIONS_HISTORY` в `ServiceCommandType` не заводить** (её нет
+    в целевом составе — 17, `docs/components/models/ServiceCommand.md`);
+    handler'ы её не эмитят;
+  - финализаторы (`FinalizeDealExitExecutor`,
+    `MarkDealEmergencyClosedExecutor`) читают число **со строки `Position`**,
+    вложенных команд не исполняют;
+  - `RefreshBillsExecutor` — окно `[Position.externalCreatedAt,
+    Position.externalModifiedAt]`, инструмент из `DealContext`, **guard
+    «сделка удерживает слот»** (статус вне `CLOSED`/`EMERGENCY_CLOSED`) перед
+    линковкой.
+- **CODE R-слота и формулы риска (`GAPS_CLOSE_7`, H9/H10):**
+  - `Deal.plannedRiskAmount` / `plannedRiskCurrency` + миграция; пишет
+    `CreateOrderExecutor` **входного** действия в одной транзакции с
+    созданием сущности, write-once (REPLACE-ремодел стопа не перетирает);
+  - `SizeCalculator` — **закрытая форма**
+    `contracts ≤ budget / (ctVal × (|entry−stop| + rate × (entryPx + stopPx)))`;
+    итеративного подбора и «вычитания комиссии из бюджета» отдельным шагом
+    нет;
+  - `RiskValidator` — та же база нотинала каждой ноги (вход по цене входа,
+    выход по цене стопа), чтобы шорты не сайзились крупнее.
+- **CODE retry-анкера добывающих команд (`GAPS_CLOSE_7`, H15):**
+  `REFRESH_POSITION` / `REFRESH_BILLS` на штатной тропе `EXIT_PENDING`
+  эмитить **под анкером** `DealActionState` (сегодня системные `REFRESH_*`
+  строятся без него, `applyFailureAccounting` — no-op); нового
+  finalization-типа `FETCH_*` **не заводить**. На аварийном терминале —
+  жёсткий отказ чтения приравнять к «недоступно» (пустой результат +
+  терминал), чтобы `MARK_DEAL_EMERGENCY_CLOSED` не уходил в `FAILED`.
+- **CODE журнальных аномалий (`GAPS_CLOSE_7`, H19/H23):** вторая точка входа
+  `AnomalyReportService` — **без `DealContext`**, с явными
+  `scope`/`severity`/`code` (`NON_CRITICAL`); анкер идемпотентности — нет
+  незакрытого отчёта по тройке (`scope`, `code`, ключ группы/инструмента);
+  коды шага 7 — по реестру `docs/models/domain/other/AnomalyReport.md`
+  §«Производящая поверхность и коды шага 7».
+- **CODE cross-ccy (`GAPS_CLOSE_7`, H4; CCY-Q1 закрыт):** сравнение `ccy`
+  движения с **расчётной валютой инструмента** (не с
+  `Deal.resultProfitCurrency` — на записи оно `null`); при несовпадении —
+  персист + линковка + запрос курса отдельным вызовом биржи + запись
+  `DealCashFlow.appliedRate` + `AnomalyReport`; слагаемое числа
+  Σ(`amount` × `appliedRate`) считает финализатор.
+  ⚠ **Блокировано хвостом:** носитель расчётной валюты инструмента —
+  предложение на валидации (`GAPS_CLOSE_7` §Предложения); до его выбора
+  операнд дома не имеет.
 - **CODE fee-wiring (N9, доспецифицирован на `GAPS_CLOSE_3`, доведён на
   `GAPS_CLOSE_4`):** новая модель **`TradeFeeRate`** + таблица
   `trade_fee_rates` (одна строка на группу; ключ группы — **сырая** пара
@@ -331,12 +392,29 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     маскирует последующий kill-switch-триггер (H3, эскалация
     `ENTRY_BLOCKED → TRADE_BLOCKED`);
   - javadoc `Instrument.Status.TRADE_BLOCKED` / `Instrument.isTradeBlocked()`
-    сужает класс до «уровень 3» — расширить (тропа несвежести приезжает с
-    уровня 4 по радиусу);
+    сужает класс до «уровень 3» — **переформулировать без расширения на
+    мягкий класс** (H14, `GAPS_CLOSE_7`). Прежняя формулировка пункта
+    («расширить — тропа несвежести приезжает с уровня 4 по радиусу»)
+    противоречила первому буллету этой же секции: несвежесть уводит в
+    `ENTRY_BLOCKED`, а не в `TRADE_BLOCKED`. Исполнение как было написано
+    расширило бы `isTradeBlocked()` на мягкий класс — и оркестратор снова
+    начал бы уводить живые сделки в `ERROR` по несвежести, воскресив снятую
+    политику. Задача: javadoc описывает **kill-switch-класс** (перехват
+    активных сделок), мягкий класс — отдельный предикат под `ENTRY_BLOCKED`;
+  - **множества входа safety-статусов** (H13, `GAPS_CLOSE_7`): охраняемое
+    обновление `InstrumentDataService.blockTrade` требует `status = 'ACTIVE'`
+    — из `ENTRY_BLOCKED` вернёт «не применено» и **замаскирует**
+    kill-switch-реакцию. Привести к решению: `TRADE_BLOCKED`/`CLOSED`/`ERROR`
+    — из **любого** статуса; `ENTRY_BLOCKED` — только из `ACTIVE`
+    (`docs/rules/instrument-hold.md` §«Множества входа»);
   - **раздельные счётчики серии неудач** вход-сайд / управление-сайд (H7) —
     класс определяет реакцию (мягкая vs полная);
-  - **счётчик подтверждений навеса** `InstrumentExternalRules` (свежесть
-    ключа группы, H9) — по образцу `TradeFeeRate.refreshCount`;
+  - **измеритель свежести ключа группы** (H11, `GAPS_CLOSE_7` — ревизует H9
+    `GAPS_CLOSE_6`): собственных `refreshCount`/`confirmedAt` у навеса **не
+    заводить**; синк на каждом успешном чтении `/public/instruments` **явно
+    проставляет `Instrument.externalModifiedAt`** (колонка
+    `instruments.external_modified_at` уже есть — `V1`, сегодня никем не
+    заполняется). Возраст этой метки и есть возраст ключа группы;
   - `AnomalyReport.scope` — значение **`INSTRUMENT_GROUP`** в `HoldScope`
     (H4); `HoldSignal`-фабрики его не производят.
 - **Форвард (не сейчас): авто-снятие мягкого холда по предикату свежести.**
@@ -381,10 +459,11 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     опущенный гэп-проскок (TR2, `per-trade-risk-policy.md` §«Без поправки на
     проскок»). **H16 из клетки выведен** (`GAPS_CLOSE_6`, H5): cross-ccy
     движение больше не помечается-и-забывается — оно персистится, линкуется
-    и **входит в число USDT-эквивалентом по курсу на момент закрытия
-    сделки** (`pnl-finalization-mechanics.md` реш.5). Урок H6 («пометка
-    фиксирует факт, но не устраняет смещение») к нему **применён**. Остаток
-    механизма — точность курса, не факт молчаливого завышения.
+    и **входит в число эквивалентом по курсу на момент обработки движения**
+    (курс записан полем `appliedRate`; `pnl-finalization-mechanics.md`
+    реш.5, H4 `GAPS_CLOSE_7`). Урок H6 («пометка фиксирует факт, но не
+    устраняет смещение») к нему **применён**; остаток «точность курса»
+    закрыт записью применённого курса — величина воспроизводима.
   - **Исходы × пессимистично:** клетка **непуста** (H8, `DOCS_CHECK_6` →
     `GAPS_CLOSE_6`). Механизм — **L4-flatten чужих здоровых сделок**:
     controlled-violation на **одной** сделке безусловно поднимает биржевой
@@ -484,8 +563,10 @@ Refinements, сознательно отложенные при `CODE` шага 
   страница на звено; добрать пагинацию назад до пустого `data`
   (владение циклом — `refresh-evidence-cycle-ownership`). Плюс
   order-цикл не доходит до `orders-history-archive` (последнее звено по
-  докам) — добрать. Актуально и для новых `REFRESH_POSITIONS_HISTORY` /
-  `REFRESH_BILLS` (шаг 7; `REFRESH_FILLS` снят).
+  докам) — добрать. Актуально и для звеньев шага 7: **вторая нога
+  `REFRESH_POSITION`** (positions-history, пагинация по `uTime`) и
+  `REFRESH_BILLS` (7d→3m); `REFRESH_FILLS` снят, отдельной команды
+  `REFRESH_POSITIONS_HISTORY` нет (H1/H3 `GAPS_CLOSE_7`).
 - **Рантайм-прогон через `OkxProxyController`** — отдельно, при
   поднятом PostgreSQL + demo-кредах (вкл. И-2: подтверждение
   `cancel-advance-algos` для trailing в demo trading).
@@ -574,6 +655,25 @@ Refinements, сознательно отложенные при `CODE` шага 
 - `docs/models/domain/aggregate/Strategy.md` (§Что Strategy не хранит — через
   архитектурные инварианты);
 - `docs/models/domain/other/AnomalyReport.md` (§Чего не хранит).
+
+### M2. `BalanceContainer.externalUpdatedAt` → конвенционное имя
+
+**Суть.** `GAPS_CLOSE_7` (H25) свёл имя «время события источника» к
+конвенции `Auditable` (`externalCreatedAt`/`externalModifiedAt`) и запретил
+заводить собственные имена под этот факт: `DealCashFlow.externalTs` →
+`externalCreatedAt`, `TradeFeeRate.externalTs` → `externalModifiedAt`,
+снапшот положения закрытия → `externalModifiedAt`. **`BalanceContainer`
+намеренно не тронут**: его `externalUpdatedAt` введён на шаге 4, живёт в
+домене, персистенции и api-ответе, на нём стоит freshness-check баланса —
+переименование к шагу 7 отношения не имеет и тянет свою миграцию.
+
+**Задача:** привести `BalanceContainer.externalUpdatedAt` (account-level и
+currency-level) и его снапшоты к `externalModifiedAt`, либо зафиксировать
+исключение решением. Носители: `docs/models/domain/core/BalanceContainer.md`,
+`docs/models/mapping/Balance.md`, entity/api/миграция.
+
+**Тип:** чистка именования, неблокирующая. Провенанс — H25
+`DOCS_CHECK_7`.
 
 ## Инфра-долг (Boot 4 миграция / рантайм-робастность)
 

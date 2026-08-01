@@ -39,6 +39,8 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 | `entryStepType` | `EntryStepType` | Тип entry-step (`ENTRY`/`GRID_ENTRY`/null; не управляет FSM). |
 | `shutdownReason` | `ShutdownReason` | Причина graceful shutdown / controlled close (если запущен). Не заменяет `closeReason`. |
 | `closeReason` | `CloseReason` | Итоговая бизнес-причина завершения. |
+| `plannedRiskAmount` | `BigDecimal` | **Плановый риск сделки (`R`)** — убыток на стопе, посчитанный при постановке входа. Знаменатель R-мультипликатора (см. §«Плановый риск»). |
+| `plannedRiskCurrency` | `String` | Валюта планового риска (та же, что у `resultProfitCurrency` — иначе отношение не считается). |
 | `resultProfit` | `BigDecimal` | Итоговый PnL (см. ниже). |
 | `resultProfitCurrency` | `String` | Валюта результата (для `ETH-USDT-SWAP` обычно `USDT`). |
 | `orders` | `List<Order>` | Ordinary orders сделки (attached protection — внутри `Order`). |
@@ -116,6 +118,39 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
   писал интерим-placeholder `ZERO` (граница 6 ↔ 7); шаг 7 его снял (реальный
   net). Механика — `docs/decisions/pnl-finalization-mechanics.md` реш.2.
 
+## Плановый риск (`R`)
+
+**`plannedRiskAmount` — знаменатель R-мультипликатора** (H9,
+`GAPS_CLOSE_7`). Шаг 7 персистит числитель (`resultProfit`) и обязан
+персистить знаменатель: без него отношение «сколько R заработала сделка» не
+считается, а система в торговом смысле **и есть** распределение
+R-мультипликаторов [Tharp гл.6 с.144-146].
+
+- **Что это за число.** Убыток на стопе, посчитанный при постановке входа, —
+  та же величина `risk amount`, которую считает `RiskValidator`
+  (`|entry − stop| × contracts × ctVal + commissions`,
+  `docs/decisions/per-trade-risk-policy.md` §«Закрытая форма сайзинга»).
+  Прогнозная комиссия в него **входит** — иначе знаменатель отличался бы от
+  величины, под которую подбирался размер.
+- **Кто и когда пишет.** Исполнитель `CREATE_ORDER` входного действия
+  (`docs/components/CreateOrderExecutor.md`) — в одной транзакции с созданием
+  сущности входа. Риск-преконтроль и создание идут **одним проходом**
+  (`docs/rules/risk-validator-scope.md`: `RiskValidator` вызывается после
+  расчёта цены/размера и **до** создания команды), поэтому метрика доезжает
+  до писателя без durable-слота между проходами.
+- **Write-once.** Пишется при постановке входа и **не переписывается**:
+  трейлинг двигает стоп, но `R` — риск **на входе**, бенчмарк измерения
+  [Tharp гл.9 с.234-236]. Текущее состояние защиты знаменателя не даёт.
+- **Почему не реконструкция.** Формально `R` восстановим через append-only
+  REPLACE-цепочку (`docs/decisions/replace-not-amend.md` §4) + `avgPx`/
+  `accFillSz` + `ctVal` — но это join через три носителя, прогнозная комиссия
+  в него уже не входит, и получается не то число, под которое сайзились.
+- **Незакрытый смежный вопрос.** При многоногом входе
+  (`GRID_ENTRY`/пирамидинг) `R` сделки не определён: лимит риска проверяется
+  **по действию**, агрегата по сделке нет. Вопрос открыт (`RISK-Q3`,
+  `.claude/work/questions/open-questions.md`); поле планового риска его **не
+  закрывает** — оно даёт слот, а не правило агрегации.
+
 Детальный breakdown (fees, fundingFee, gross/netProfit, entry/exit
 fills, average prices, partial exits) в `Deal` не хранится: число берётся
 готовым из positions-history, категорийная разбивка живёт как `DealCashFlow`
@@ -138,8 +173,8 @@ fills, average prices, partial exits) в `Deal` не хранится: числ�
 `ServiceCommand`. Также не хранятся `marketPhaseId` (фаза входа
 выводится через `StrategyDetail.marketPhaseType`), `openedAt`/
 `closedAt`/`errorAt` (даты записи — `Auditable`; торговые моменты —
-через `Order`/`Position`/audit и `externalUpdatedAt` снапшота
-positions-history). `TradeFill` из перечня носителей **убран** (H14,
+через `Order`/`Position`/audit, в том числе `Position.externalModifiedAt`
+— `uTime` записи закрытия). `TradeFill` из перечня носителей **убран** (H14,
 `GAPS_CLOSE_6`): persisted `TradeFill` в проекте не вводится (§выше,
 OKX-Q1 закрыт), то есть ссылаться на него как на носитель торгового
 момента было нельзя. Операнды окна сделки, собираемые из этих носителей, —
@@ -159,8 +194,10 @@ audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
 - `id` — identity (autoincrement).
 - `internal_id`, `instrument_id`, `strategy_detail_id`, `status`,
   `direction` — `NOT NULL`; `entry_reason`, `entry_step_type`,
-  `shutdown_reason`, `close_reason`, `result_profit`,
-  `result_profit_currency` — nullable.
+  `shutdown_reason`, `close_reason`, `planned_risk_amount`,
+  `planned_risk_currency`, `result_profit`,
+  `result_profit_currency` — nullable (`planned_risk_*` пусты до постановки
+  входа — у сделки, не доехавшей до `CREATE_ORDER`, планового риска нет).
 - `internal_id` — `updatable = false` (неизменен после создания).
 - Enum-поля (`status`, `direction`, `entry_reason`, `entry_step_type`,
   `shutdown_reason`, `close_reason`) хранятся строкой (имя enum); enum —

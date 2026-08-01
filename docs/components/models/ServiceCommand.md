@@ -40,7 +40,12 @@ Retry-anchor команды — ровно один из `dealActionStateId` /
 `docs/decisions/deal-finalization-state-materialization.md`). Системная/
 cleanup-команда без action-state (`REFRESH_*` / `CANCEL_*` / `CLOSE_POSITION`,
 эмитируемые как safety/cleanup вне strategy-action) может не нести ни того,
-ни другого. Kill-switch командой не является — он реактивен (`HoldSignal` →
+ни другого. **Оговорка не распространяется на добывающие команды штатной
+тропы** (H15, `GAPS_CLOSE_7`): `REFRESH_POSITION` и `REFRESH_BILLS` в
+`EXIT_PENDING` влияют на **число** сделки, поэтому идут под анкером
+`DealActionState` — иначе `applyFailureAccounting` на них no-op, и
+устойчивый отказ не даёт ни попыток, ни `FAILED`
+(`docs/decisions/pnl-finalization-mechanics.md` §5a). Kill-switch командой не является — он реактивен (`HoldSignal` →
 `SafetyHoldCoordinator`, см. `docs/components/KillSwitchExecutor.md`).
 
 Не обязан хранить `strategyId` / `strategyDetailId`: происхождение
@@ -50,7 +55,7 @@ cleanup-команда без action-state (`REFRESH_*` / `CANCEL_*` / `CLOSE_PO
 
 ## Енум `ServiceCommandType`
 
-`REFRESH_BALANCE`, `REFRESH_POSITION`, `REFRESH_POSITIONS_HISTORY`,
+`REFRESH_BALANCE`, `REFRESH_POSITION`,
 `REFRESH_BILLS`, `CLOSE_POSITION`, `CREATE_ORDER`, `SUBMIT_ORDER`,
 `CANCEL_ORDER`, `REFRESH_ORDER`, `CREATE_ALGO_ORDER`, `SUBMIT_ALGO_ORDER`,
 `CANCEL_ALGO_ORDER`, `REFRESH_ALGO_ORDER`, `FINALIZE_DEAL_ENTRY`,
@@ -59,9 +64,8 @@ cleanup-команда без action-state (`REFRESH_*` / `CANCEL_*` / `CLOSE_PO
 
 **Амендных команд нет:** `AMEND_ORDER` / `AMEND_ALGO_ORDER` сняты из
 enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SWITCH` — 16;
-на шаге 7 снимается `REFRESH_FILLS` и добавляются
-`REFRESH_POSITIONS_HISTORY` / `REFRESH_BILLS` /
-`MARK_DEAL_EMERGENCY_CLOSED` → **18** целевых (в коде пока 16),
+на шаге 7 снимается `REFRESH_FILLS` и добавляются `REFRESH_BILLS` /
+`MARK_DEAL_EMERGENCY_CLOSED` → **17** целевых (в коде пока 16),
 `docs/decisions/pnl-finalization-mechanics.md`) решением
 `docs/decisions/replace-not-amend.md` — AMEND ушёл из доменного
 словаря целиком. Ремоделирование — действие стратегии
@@ -73,14 +77,25 @@ enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SW
 
 **Refresh-набор — ровно по одной команде на сущность:** `REFRESH_ORDER`,
 `REFRESH_ALGO_ORDER`, `REFRESH_POSITION`, `REFRESH_BALANCE`,
-`REFRESH_POSITIONS_HISTORY` (positions-history-снапшот — число P&L),
 `REFRESH_BILLS` (`DealCashFlow` — разбивка). `REFRESH_FILLS` **снимается** на
 `CODE` шага 7 (его order-fill-метрики покрыты `REFRESH_ORDER`;
 `docs/decisions/pnl-finalization-mechanics.md` реш.1) — состав выше
-**целевой**, в коде enum пока несёт `REFRESH_FILLS` и не несёт трёх новых
+**целевой**, в коде enum пока несёт `REFRESH_FILLS` и не несёт двух новых
 команд (H15, `GAPS_CLOSE_6`). Внутри исполнителя
 допускается несколько вызовов биржи (evidence-cycle,
 `docs/decisions/refresh-evidence-cycle-ownership.md`).
+
+**`REFRESH_POSITIONS_HISTORY` командой не вводится** (H1/H3,
+`GAPS_CLOSE_7`; ревизует реш.1 `pnl-finalization-mechanics`).
+positions-history описывает **ту же сущность** `Position` после закрытия,
+а не новую, поэтому по принципу «одна команда на сущность» это **вторая
+нога evidence-cycle `REFRESH_POSITION`** (live → history), а не отдельный
+тип. Промежуточная редакция (`GAPS_CLOSE_6`, H13) вводила её как команду и
+исполняла **вложенным шагом** финализирующего действия — конструкции
+«команда внутри команды» канон не знает (`docs/rules/command-lifecycle.md`
+ослабляет атомарность только до «несколько **эндпоинтов** внутри
+команды»), и канала возврата снапшота у `ServiceCommandExecutionResult`
+нет. С приземлением факта на `Position` обе проблемы отпадают вместе.
 Bulk-команды `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` /
 `REFRESH_ALGO_ORDERS` / `REFRESH_ALGO_ORDER_HISTORY` сняты — их эндпоинты
 живут только звеньями цикла (CMD-Q3 закрыт). Перечисление **неизвестных**

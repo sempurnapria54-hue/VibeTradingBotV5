@@ -42,7 +42,7 @@ Raw OKX DTO не выходит за adapter-layer
 | `billId` | id записи; **якорь пагинации** (`after`/`before`) + **дедуп/идемпотентность** → `externalBillId` (`UNIQUE`) |
 | `type` | тип bill-записи → резолв `CashFlowCategory`; сырой → `externalType` |
 | `subType` | подтип; funding `173` (expense) / `174` (income) → резолв `FUNDING`; сырой → `externalSubType`. Актуальный список — справочник OKX |
-| `ts` | время bill-события (Unix ms) → `externalTs` |
+| `ts` | время bill-события (Unix ms) → `DealCashFlow.externalCreatedAt` (конвенция `Auditable`, H25 `GAPS_CLOSE_7`) |
 | `balChg` | изменение баланса (знаковое) → `amount` |
 | `fee` | комиссионная/rebate-компонента записи (знаковая: минус = комиссия, плюс = ребейт) → `externalFee` — **число** комиссии; категорию **не определяет**: `TRADE_FEE`/`REBATE`, как и остальные категории, резолвятся из `type`/`subType` (H9) |
 | `ccy` | валюта движения (`USDT`) → `ccy` (обязательно — cross-ccy guard) |

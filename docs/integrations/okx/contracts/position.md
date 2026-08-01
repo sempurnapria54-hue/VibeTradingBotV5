@@ -32,9 +32,11 @@ Mapping в `Position` — `docs/models/mapping/Position.md` (раздел
 - **Получить позиции** (`REFRESH_POSITION`):
   `GET /api/v5/account/positions?instType=SWAP&instId={...}`.
   Permission `Read`; rate limit 10 req / 2 s по User ID. Один
-  логический запрос по инструменту; дополнительно по `posId` не
-  ищем — цель в наличии/отсутствии live position по инструменту, не
-  в доказательстве старого `posId` (биржа держит ~30 дней).
+  логический запрос по инструменту; дополнительно по `posId` в **live**-ноге
+  не ищем — её цель в наличии/отсутствии live position по инструменту, не
+  в доказательстве старого `posId` (биржа держит ~30 дней). При not-found
+  команда переходит на **вторую ногу** — positions-history по `posId`
+  (§«История закрытых позиций»).
   Query (все опц.): `instType`, `instId` (до 10 через запятую),
   `posId` (до 20). В net-режиме на инструмент ожидается одна запись
   с `posSide=net`; в long/short — отдельные `posSide=long`/`short`.
@@ -61,11 +63,18 @@ limit 10 req / 2 s по User ID. Глубина — 3 месяца, сортир
 `openAvgPx` покрывают среднюю цену выхода/входа (fills для этого не
 нужны).
 
-**Добыча:** эндпоинт добывается командой **`REFRESH_POSITIONS_HISTORY`**
-(наполняет транзитный `PositionCloseResultExternalSnapshot` — число
-`Deal.resultProfit`; `docs/decisions/pnl-finalization-mechanics.md`
-реш.1). Native-модель — `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`;
-mapping native→snapshot→`Deal` — `docs/models/mapping/PositionCloseResult.md`.
+**Добыча:** эндпоинт — **вторая нога evidence-cycle команды
+`REFRESH_POSITION`** (live `/account/positions` → при not-found
+`/account/positions-history`, внутри одной команды; H1/H3 `GAPS_CLOSE_7`,
+`docs/decisions/pnl-finalization-mechanics.md` реш.1,
+`docs/components/RefreshPositionExecutor.md`). Наполняет
+`PositionCloseResultExternalSnapshot`, который приземляется **полями
+положения закрытия на `Position`** (`docs/models/domain/core/Position.md`),
+откуда число читает финализатор. Отдельной команды
+`REFRESH_POSITIONS_HISTORY` нет.
+Native-модель — `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`;
+mapping native→snapshot→`Position`→`Deal` —
+`docs/models/mapping/PositionCloseResult.md`.
 
 - **Query (все опц.):** `instType`, `instId`, `mgnMode`
   (`cross`/`isolated`), `type` (тип последнего закрытия: `1`
@@ -90,17 +99,31 @@ mapping native→snapshot→`Deal` — `docs/models/mapping/PositionCloseResult.
 > positions-history — дефицит `грунт`, владелец сверки — `integrator`
 > (`.claude/processes/api-docs-completion.md`).
 >
-> **Расхождение обезврежено контрактно:** поле объявляется **всегда
-> опциональным** и **ни при каком `type` не требуется присутствующим**
-> (`docs/models/mapping/PositionCloseResult.md` §Validation). Ликвидационные
-> и ADL-типы — `3`–`6`; на каком именно поднаборе биржа заполняет
-> `triggerPx`, число `resultProfit` не затрагивает (оно берётся готовым
-> `realizedPnl`) — затрагивалась бы только структурная валидация
-> погранслучая ADL, а она теперь на присутствие поля не опирается.
-- **Идентификация:** `posId` (истекает ~через 30 дней после полного
+> **Расхождение обесточено окончательно** (H22, `GAPS_CLOSE_7`): поле
+> **выведено из маппинга** — потребителя у него в фазе 1 нет, снапшот его
+> не несёт, валидация его не рассматривает
+> (`docs/models/mapping/PositionCloseResult.md`). Открытая сверка остаётся
+> у `integrator` как справочная; ни число `resultProfit`, ни структурная
+> валидация от неё больше не зависят. Поле вернётся в маппинг вместе с
+> потребителем — провенансом ликвидации/ADL (`PNL-Q1`).
+- **Идентификация записи:** `posId` (истекает ~через 30 дней после полного
   закрытия — после этого новая позиция получает новый `posId`),
   `instType`/`instId`, `mgnMode`, `posSide`, `direction`, `lever`,
-  `ccy`, `uly`, `cTime`/`uTime`.
+  `uly`, `cTime`/`uTime`.
+- **`ccy` — не идентификация, а семантика числа** (H28, `GAPS_CLOSE_7`):
+  это **валюта, в которой посчитан `realizedPnl`** данной записи. Прежняя
+  редакция перечисляла её в блоке идентификации рядом с `mgnMode`/`posSide`,
+  и утверждение «валюта результата» стояло только на моделях
+  (`OkxPositionsHistoryResponse.md`, `mapping/PositionCloseResult.md`) —
+  тогда как на этом поле держится cross-ccy-инвариант
+  (`docs/rules/trading-constraints.md` §«Валюта комиссии»). Носитель
+  выровнен: семантику утверждает контракт-док.
+  - **Оговорка контура.** Для USDT-SWAP-only контура `ccy` записи и
+    расчётная валюта инструмента совпадают всегда. Если контур перестанет
+    быть USDT-SWAP-only (или появится inverse-контракт), совпадение
+    перестанет быть автоматическим — сравнение с расчётной валютой
+    инструмента (`docs/models/mapping/DealCashFlow.md` §«Guard оживлён»)
+    рассчитано и на этот случай.
 
 ### Инвариант агрегации (N11, требует рантайм-верификации)
 

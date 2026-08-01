@@ -37,7 +37,14 @@
 ## Метрики (считает сам)
 
 risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal +
-commissions`, где `commissions` — прогноз вход+выход по taker-ставке из
+commissions`, где `commissions` = `rate × sizeContracts × ctVal ×
+(entryPrice + stopPrice)` — **каждая нога по своей цене**, вход по цене
+входа, выход по цене стопа (H10, `GAPS_CLOSE_7`: единая оценка по цене входа
+занижала комиссию выхода для SHORT). Валидатор проверяет **уже посчитанный**
+размер, поэтому решает то же неравенство в проверочной форме; сайзинг
+`SizeCalculator` решает его относительно `contracts` — закрытой формой
+(`docs/decisions/per-trade-risk-policy.md` §«Закрытая форма сайзинга»).
+Ставка — прогноз вход+выход по taker-ставке из
 `instrumentExternalRules.takerFeeRate()` (N9 — не отдельный fetch; **дом
 ставки** — `docs/models/domain/other/TradeFeeRate.md`, на инструменте только
 ключ группы `externalFeeGroupId`; аксессор гидрирует хранилищный слой —
@@ -50,6 +57,13 @@ commissions`, где `commissions` — прогноз вход+выход по t
 `docs/decisions/per-trade-risk-policy.md`); SL distance; liquidation guard
 distance. Метрики могут попасть в `RiskCheckResult.details`, логи или
 аудит, но **не** входят в `CalculatedStrategyAction`.
+
+**Исключение — risk amount входного действия** (H9, `GAPS_CLOSE_7`): он
+**персистится** как `Deal.plannedRiskAmount` (знаменатель `R`), писатель —
+`docs/components/CreateOrderExecutor.md`, тот же проход. Это не отменяет
+правила выше: метрика по-прежнему не едет в `CalculatedStrategyAction` —
+она уходит в **поле сделки**, у которого свой торговый смысл
+(`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).
 
 Аксессор отдаёт ставку **издержкой** — знак биржевой конвенции снят при
 маппинге (`docs/models/domain/other/TradeFeeRate.md` §«Знак ставки»). Поэтому

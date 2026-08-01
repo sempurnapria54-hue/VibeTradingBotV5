@@ -80,12 +80,18 @@ Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsEx
 (`docs/models/domain/other/DealCashFlow.md`).
 
 ```text
-1. Определить окно сделки:
-   - begin = externalCreatedAt позиции сделки (биржевое cTime открытия);
+0. Предусловие: сделка УДЕРЖИВАЕТ слот по инструменту (Deal.status вне
+   CLOSED/EMERGENCY_CLOSED). Только это делает матчинг по окну + instId
+   однозначным — второй сделки по инструменту в это время не существует
+   (uk_deal_active_instrument). После терминала линковка не выполняется.
+
+1. Определить окно сделки (обе границы — из дат, уже лежащих на Deal/Position):
+   - begin = Position.externalCreatedAt (биржевое cTime открытия позиции);
             позиции нет — externalCreatedAt первого отправленного Order;
-   - end   = externalUpdatedAt снапшота positions-history (uTime
-            финализированной записи); недоступен — момент терминализации.
-   Границы включительные.
+   - end   = Position.externalModifiedAt (uTime записи закрытия, приземлённой
+            второй ногой REFRESH_POSITION); нет — Deal.modifiedAt.
+   Границы включительные. Верхняя граница нужна, чтобы не тянуть лишнего;
+   разделяет сделки инвариант слота (п.0), а не она.
 
 2. Запросить bills (пагинация 7d→3m внутри REFRESH_BILLS):
    GET /api/v5/account/bills?instType=SWAP&begin=...&end=...
@@ -94,42 +100,47 @@ Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsEx
 
 3. Линковка к сделке (bills НЕ несут dealId) — по окну + инструменту:
    - ts     ∈ [begin, end] окна сделки;
-   - instId == Deal.instrument.externalId.
+   - instId == externalId инструмента сделки (Instrument резолвится из
+     DealContext: в runtime graph Deal он не входит).
    Валюта критерием матчинга НЕ является — она проверяемый атрибут (п.4).
    Выход матчинга закрепляется как DealCashFlow.deal_id при сохранении.
 
 4. Сохранить как DealCashFlow (категорийная разбивка); резолв категории
    (type/subType → CashFlowCategory) — при финализации, в вызывающем коде.
-   Ветка по валюте НА ЗАПИСИ:
-   - ccy == Deal.resultProfitCurrency  -> штатно;
-   - ccy != Deal.resultProfitCurrency  -> персист + линковка (deal_id
-     проставляется так же) + AnomalyReport (нарушение инварианта «комиссии
-     только в settle-ccy», docs/rules/trading-constraints.md).
+   Ветка по валюте НА ЗАПИСИ (операнд — РАСЧЁТНАЯ ВАЛЮТА ИНСТРУМЕНТА,
+   не Deal.resultProfitCurrency: последнее пишет FINALIZE_DEAL_EXIT, то есть
+   ПОСЛЕ этого прохода, и здесь оно всегда null — H4):
+   - ccy == расчётная валюта инструмента -> штатно;
+   - ccy != расчётная валюта инструмента -> персист + линковка (deal_id
+     проставляется так же) + ПЕРЕСЧЁТ СРАЗУ (курс — отдельным вызовом биржи
+     на момент обработки, кладётся в DealCashFlow.appliedRate) +
+     AnomalyReport (нарушение инварианта «комиссии только в settle-ccy»,
+     docs/rules/trading-constraints.md).
      Запись НЕ отбрасывается и НЕ теряется.
 
 5. Сверка (при финализации):
-   sum(DealCashFlow.amount) по строкам settle-ccy сверяется с net из
+   sum(DealCashFlow.amount) по строкам расчётной валюты сверяется с net из
    positions-history (realizedPnl). Строки чужой ccy в эту сумму не
-   складываются (разные валюты), они входят в число USDT-эквивалентом —
-   см. п.6. Расхождение сверх epsilon (якорь — валовой оборот sum(|amount|),
+   складываются (разные валюты), они входят в число эквивалентом — см. п.6.
+   Расхождение сверх epsilon (якорь — валовой оборот sum(|amount|),
    не |net|) → AnomalyReport (аудит-аномалия, НЕ блок финализации; см.
    pnl-finalization-mechanics.md реш.5).
 
 6. Итоговое число — в settle-ccy (USDT):
    Deal.resultProfit = net из positions-history
-                     + USDT-эквивалент движений чужой ccy по курсу на
-                       момент закрытия сделки.
+                     + sum(amount × appliedRate) по строкам чужой ccy.
    Не-settle-ccy издержка в биржевой net не входит, поэтому без этого
-   слагаемого число завышало бы результат молча (H5, реш.5).
+   слагаемого число завышало бы результат молча (H5, реш.5). Курс уже
+   зафиксирован на записи (п.4) — финализация его не запрашивает.
 ```
 
 **Область суммирования — не одна** (H9, `GAPS_CLOSE_4`). Σ`amount` в п.5 идёт
-по **всем** строкам сделки **в settle-ccy**, включая `FUNDING` (net из
+по **всем** строкам сделки **в расчётной валюте**, включая `FUNDING` (net из
 positions-history его содержит), — это сумма-сверка. Realized-слагаемое
 разбивки, наоборот, считается **только** по строкам `REALIZED_PNL`, `FUNDING`
 из него исключён (holding-cost, не realized pnl). Строки чужой `ccy` — своя,
 четвёртая область (H5, `GAPS_CLOSE_6`): в валютные суммы они не складываются,
-а конвертируются в settle-ccy и входят слагаемым в число (п.6). Области —
+а входят слагаемым в число по зафиксированному `appliedRate` (п.6). Области —
 `docs/models/mapping/DealCashFlow.md` §«Область суммирования — задаётся явно».
 
 > **Граница 6 ↔ 7 и источник числа.** Само **число** `Deal.resultProfit` =

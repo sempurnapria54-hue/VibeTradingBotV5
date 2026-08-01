@@ -32,10 +32,20 @@
   секвенс по фактам), safety-flow) раскладываются на атомарные команды и
   переходы FSM. Атомарность **не** означает «один HTTP-запрос»:
   refresh-команда может обойти несколько эндпоинтов биржи **внутри себя**
-  (evidence-cycle live → pending → history → archive) и сама вынести
-  терминал (`MISSING_AFTER_REFRESH`). FSM секвенсит *команды*, не эндпоинты
-  внутри refresh-команды (см.
+  (evidence-cycle live → pending → history → archive; у `REFRESH_POSITION`
+  — live → positions-history) и сама вынести терминал
+  (`MISSING_AFTER_REFRESH`), если исчерпанный цикл и есть его основание.
+  FSM секвенсит *команды*, не эндпоинты внутри refresh-команды (см.
   `docs/decisions/refresh-evidence-cycle-ownership.md`).
+  - **Послабление — про эндпоинты, не про команды.** «Команда внутри
+    команды» каноном **не допускается**: вложенная команда не имеет ни
+    своего прохода FSM, ни канала возврата данных
+    (`ServiceCommandExecutionResult` несёт только `success`/`errorCode`/
+    `message`, `docs/components/ServiceCommandExecutor.md`). Если факту
+    нужно доехать до потребителя — он едет **durable-носителем** (строка
+    сущности), а добыча оформляется ногой цикла своей команды. Кейс, на
+    котором граница проведена, — положение закрытия позиции (H1/H3
+    `GAPS_CLOSE_7`).
 - **ACK не runtime truth** — факт подтверждается refresh/search/history
   (см. `docs/rules/ack-not-runtime-truth.md`).
 

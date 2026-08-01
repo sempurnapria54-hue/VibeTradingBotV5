@@ -3,16 +3,18 @@
 ## На какой вопрос отвечает этот файл
 
 Как положение закрытой позиции (positions-history OKX) нормализуется
-через транзитный `PositionCloseResultExternalSnapshot` и как его число
-ложится на `Deal.resultProfit`.
+через `PositionCloseResultExternalSnapshot` и приземляется на `Position`.
 
 ## Контекст
 
-Mapping-слой носителя числа `Deal.resultProfit`. Здесь **нет отдельной
-persisted доменной сущности**: net realized P&L уходит в поле
-`Deal.resultProfit`, категорийная разбивка — в `DealCashFlow`
+Mapping-слой **второй ноги `REFRESH_POSITION`** (live → positions-history,
+`docs/components/RefreshPositionExecutor.md` §Evidence-cycle). Здесь **нет
+отдельной persisted доменной сущности**: положение закрытия ложится
+полями на **`Position`** (`docs/models/domain/core/Position.md`
+§«Положение закрытия»), откуда его читает финализатор и пишет число в
+`Deal.resultProfit`; категорийная разбивка — в `DealCashFlow`
 (`docs/models/mapping/DealCashFlow.md`). Граничный объект —
-**транзитный `PositionCloseResultExternalSnapshot`** (не persisted; как
+`PositionCloseResultExternalSnapshot` (не persisted; как
 `PositionExternalSnapshot`), единственное, что выходит за
 `IntegrationService`/adapter (`docs/rules/raw-exchange-dto-boundary.md`).
 
@@ -20,16 +22,15 @@ Native-модель — `docs/models/integrations/okx/OkxPositionsHistoryRespons
 Контракт endpoint'а — `docs/integrations/okx/contracts/position.md`
 §«История закрытых позиций». Источник числа (что за данные и почему
 positions-history) — `docs/decisions/result-profit-source.md`; механика
-финализации и добыча факта — `docs/decisions/pnl-finalization-mechanics.md`.
+финализации — `docs/decisions/pnl-finalization-mechanics.md`.
 Доменное число и правила PnL — `docs/models/domain/aggregate/Deal.md`
 §«Итоговый PnL». Сквозные правила —
 `docs/rules/raw-exchange-dto-boundary.md`,
 `docs/rules/business-logic-on-domain-model.md`.
 
-Транзитный снапшот, как `PositionExternalSnapshot`, **не требует
-отдельного `*ExternalSnapshot.md`** (нет самостоятельного persisted
-содержания; `docs/models/externalSnapshot/README.md`) — его поля
-зафиксированы ниже.
+Снапшот, как `PositionExternalSnapshot`, **не требует отдельного
+`*ExternalSnapshot.md`** (нет самостоятельного persisted содержания;
+`docs/models/externalSnapshot/README.md`) — его поля зафиксированы ниже.
 
 Текущие источники: **OKX**.
 
@@ -41,58 +42,79 @@ positions-history) — `docs/decisions/result-profit-source.md`; механик�
 positions-history REST response -> raw OkxPositionsHistoryResponse
   -> IntegrationService validation
   -> PositionCloseResultMapper -> PositionCloseResultExternalSnapshot
-  -> RefreshPositionsHistoryExecutor (вложенный шаг действия, снапшот in-memory)
+  -> RefreshPositionExecutor (нога 2 evidence-cycle)
+  -> Position (поля положения закрытия, persisted)
   -> FinalizeDealExitExecutor | MarkDealEmergencyClosedExecutor
   -> Deal.resultProfit
 ```
 
 Raw DTO не выходит за пределы `IntegrationService` / adapter-layer;
-`RefreshPositionsHistoryExecutor` работает только с validated normalized
-snapshot. Snapshot **транзитный** — не персистится.
+executor работает только с validated normalized snapshot.
 
-**Где он живёт между добычей и потреблением** (H13, `GAPS_CLOSE_6`): **в
-памяти внутри одного действия**. У транзитного снапшота durable-дома нет, а
-значит границу прохода FSM он пересечь не может — поэтому
-`REFRESH_POSITIONS_HISTORY` исполняется **вложенным шагом** финализирующего
-действия (`FINALIZE_DEAL_EXIT` штатно, `MARK_DEAL_EMERGENCY_CLOSED`
-аварийно), а не отдельным предшествующим проходом. Идемпотентность — на
-уровне действия (анкер `DealFinalizationState`); рестарт до его `COMPLETED`
-перезапускает действие целиком. Число на `Deal` пишет **финализатор**
-(`docs/decisions/pnl-finalization-mechanics.md` реш.2), не refresh-executor.
+**Где факт живёт между добычей и потреблением** (H1/H3, `GAPS_CLOSE_7`,
+ревизует H13 `GAPS_CLOSE_6`): **на строке `Position`**. Прежняя редакция
+объявляла снапшот транзитным без durable-дома и потому уводила добычу во
+**вложенный шаг** финализирующего действия — конструкция, которой канон
+командного слоя не знает, и которая оставляла окно линковки bills без
+верхней границы (у `REFRESH_BILLS`, идущей отдельным проходом, доступа к
+чужой памяти нет). Посылка снята: добытое **персистится на `Position`**,
+границу прохода FSM пересекает штатно, вложенность не нужна вовсе.
+Число на `Deal` по-прежнему пишет **финализатор**
+(`docs/decisions/pnl-finalization-mechanics.md` реш.2), не refresh-executor:
+`Position` несёт **биржевой факт**, `Deal` — **посчитанное число**.
 
-### `PositionCloseResultExternalSnapshot` (транзитный)
+### `PositionCloseResultExternalSnapshot`
 
 | Snapshot field | Тип | Семантика |
 |---|---|---|
 | `externalRealizedPnl` | `BigDecimal` | готовый net realized P&L (net от всех издержек, посчитан биржей) |
-| `externalResultCurrency` | `String` | валюта результата (`USDT` для `ETH-USDT-SWAP`) |
-| `externalCloseAvgPx` | `BigDecimal` | средняя цена выхода (закрытия) |
+| `externalResultCurrency` | `String` | валюта, в которой посчитан `realizedPnl` |
 | `externalOpenAvgPx` | `BigDecimal` | средняя цена входа |
-| `externalTriggerPx` | `BigDecimal` | цена триггера ликвидации/ADL; **всегда опционально** (null допустим при любом `type` — применимость держит `docs/integrations/okx/contracts/position.md` §История, H19) |
 | `externalCloseType` | `String` | тип последнего закрытия (`1`–`6`; ликвидация/ADL = `3`–`6`) |
-| `externalPosId` | `String` | биржевой id позиции (ключ агрегации записи) |
-| `externalUpdatedAt` | `OffsetDateTime` | время обновления записи positions-history |
+| `externalPosId` | `String` | биржевой id позиции (ключ адресации записи) |
+| `externalModifiedAt` | `OffsetDateTime` | время обновления записи positions-history |
 
 Числовые/временные поля нормализуются при построении снапшота (string →
 `BigDecimal`/`OffsetDateTime`, empty → null), уже провалидированные как
-parseable. Тип времени — `OffsetDateTime` по конвенции проекта (как
-`docs/models/mapping/Balance.md`, `DealCashFlow.externalTs`, `Auditable`).
+parseable. Тип времени — `OffsetDateTime` по конвенции проекта; **имя** поля
+времени источника — конвенционное `externalModifiedAt` (симметрично
+`PositionExternalSnapshot`), собственного `externalUpdatedAt` снапшот больше
+не заводит (H25, `GAPS_CLOSE_7`;
+`docs/models/domain/other/Auditable.md` §«Единое имя времени источника»).
 
-### snapshot → `Deal`
+**Состав сужен до полей с названным потребителем** (H22, `GAPS_CLOSE_7`;
+codestyle §«Неиспользуемый код»). Выведены из снапшота: `closeAvgPx`
+(средняя цена выхода) и `triggerPx` (цена триггера ликвидации/ADL) —
+потребителя в фазе 1 у обоих нет, оба остаются кандидатами в носители
+измеримости искажений (`PNL-Q1`). Побочно это **обесточивает H19**:
+расхождение доков о применимости `triggerPx` больше не нагружено ничем —
+поле не маппится вовсе.
 
-`RefreshPositionsHistoryExecutor` отдаёт снапшот вызывающему действию;
-на `Deal` финализатор пишет:
+### snapshot → `Position`
+
+Применяет `RefreshPositionExecutor` (нога 2) на **той же** `Position`,
+статус которой нога 1 уже перевела в `CLOSED`:
 
 | Snapshot field | Domain | Семантика |
 |---|---|---|
-| `externalRealizedPnl` | `Deal.resultProfit` | заголовочное число net realized P&L |
-| `externalResultCurrency` | `Deal.resultProfitCurrency` | валюта результата |
+| `externalRealizedPnl` | `Position.externalRealizedProfit` | биржевой net realized P&L закрытой позиции |
+| `externalResultCurrency` | `Position.externalResultCurrency` | валюта, в которой он посчитан |
+| `externalCloseType` | `Position.externalCloseType` | провенанс закрытия (`3`–`6` = закрыла биржа) |
+| `externalOpenAvgPx` | `Position.externalAverageEntryPrice` | средняя цена входа (то же поле, что у live-ноги) |
+| `externalModifiedAt` | `Position.externalModifiedAt` | `uTime` записи закрытия (конвенция `Auditable`, H25) |
+| `externalPosId` | сверка с `Position.externalId` | не перезаписывает: адресация, а не данные |
 
-Остальные поля снапшота (`externalCloseAvgPx`, `externalOpenAvgPx`,
-`externalTriggerPx`, `externalCloseType`, `externalPosId`,
-`externalUpdatedAt`) — **вход финализации / аудита** (сверка bills↔net,
-провенанс аварийного терминала по `type`/`triggerPx`, сопоставление по
-`posId`), в `Deal` напрямую **не пишутся**.
+### `Position` → `Deal` (финализатор)
+
+| `Position` | `Deal` | Кто пишет |
+|---|---|---|
+| `externalRealizedProfit` | `resultProfit` (слагаемое net) | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` |
+| `externalResultCurrency` | `resultProfitCurrency` | они же |
+
+`externalCloseType` в `Deal` **не пишется** — он вход провенанса
+аварийного терминала (`docs/decisions/pnl-finalization-mechanics.md`
+реш.3), читается со строки `Position`. Запрашиваемость провенанса
+ликвидации/ADL на уровне `Deal` — открытый вопрос `PNL-Q1`.
 
 ### Validation (структурная, до маппинга)
 
@@ -106,28 +128,33 @@ parseable. Тип времени — `OffsetDateTime` по конвенции п
   молчаливое взятие слайса.
 - **Numeric:** числа приходят строками; обязательные (`realizedPnl`, `ccy`)
   заполнены и парсятся; для **чистого** закрытия `realizedPnl` присутствует
-  (пустое `realizedPnl` при чистом закрытии недопустимо). **`triggerPx`
-  присутствующим не требуется ни при каком `type`** (H19, `GAPS_CLOSE_6`):
-  валидация проверяет только парсимость, если поле пришло. Так расхождение
-  доков о применимости (`3/4/5` vs `3–6`) перестаёт быть нагруженным —
-  валидация на присутствие поля не опирается; единственный носитель
-  формулировки применимости — `docs/integrations/okx/contracts/position.md`
-  §История, сверка с офдоком открыта.
+  (пустое `realizedPnl` при чистом закрытии недопустимо). `triggerPx`
+  валидацией не рассматривается вовсе — поле из снапшота выведено (H22,
+  `GAPS_CLOSE_7`), поэтому расхождение доков о его применимости больше
+  ничего не нагружает (закрывает остаток H19; единственный носитель
+  формулировки — `docs/integrations/okx/contracts/position.md` §История,
+  сверка с офдоком остаётся открытой у `integrator`).
 - **Аварийный контур:** для `EMERGENCY_CLOSED` при genuinely недоступном
-  net снапшот числа не даёт → `resultProfit = null` с семантикой
+  net запись закрытия не найдена / числа не даёт → поля положения закрытия
+  на `Position` остаются `null` → `Deal.resultProfit = null` с семантикой
   «неисчислимо» (не ноль), терминал всё равно проходит
   (`docs/decisions/pnl-finalization-mechanics.md` реш.3).
 
 ### Error policy
 
-- **Temporary API problem** (timeout, connection reset, 5xx): команда
-  `REFRESH_POSITIONS_HISTORY` retryable через командную машинерию;
-  финализация ждёт факта.
+- **Temporary API problem** (timeout, connection reset, 5xx): нога 2
+  наследует retry **своей команды** `REFRESH_POSITION` (командная
+  машинерия, анкер — `DealActionState`); финализация ждёт факта.
 - **Invalid response / инвариант агрегации нарушен** (`code != 0`,
   множественная/нефинализированная запись на `posId`, обязательные не
-  парсятся): controlled external error; число не стейджится; финализация
-  не завершает чистый `CLOSED` без числа (инвариант непустоты
-  `resultProfit`, `docs/models/domain/aggregate/Deal.md`).
+  парсятся): controlled external error; поля положения закрытия не
+  пишутся; финализация не завершает чистый `CLOSED` без числа (инвариант
+  непустоты `resultProfit`, `docs/models/domain/aggregate/Deal.md`).
+- **Запись не найдена** — не ошибка команды: статус `CLOSED` уже поставлен
+  ногой 1, поля остаются `null`, сделка уходит тропой «неисчислимо».
+  Различение «жёсткий отказ чтения» vs «пусто» и реакция на каждой тропе —
+  `docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия троп отказа
+  добычи».
 
 ## OKX
 
@@ -139,16 +166,15 @@ parseable. Тип времени — `OffsetDateTime` по конвенции п
 |---|---|
 | `realizedPnl` | `externalRealizedPnl` |
 | `ccy` | `externalResultCurrency` |
-| `closeAvgPx` | `externalCloseAvgPx` |
 | `openAvgPx` | `externalOpenAvgPx` |
-| `triggerPx` | `externalTriggerPx` |
 | `type` | `externalCloseType` |
 | `posId` | `externalPosId` |
-| `uTime` | `externalUpdatedAt` (epoch millis → `OffsetDateTime`) |
+| `uTime` | `externalModifiedAt` (epoch millis → `OffsetDateTime`) |
 
 Числовые поля парсятся в `BigDecimal`, `uTime` — в `OffsetDateTime`; `empty
 string → null`. Список не маппимых полей (`pnl`, `fee`, `fundingFee`,
-`liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide` и др.) — в
+`liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide`, а также
+`closeAvgPx`/`triggerPx` — выведены H22) — в
 `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.
 
 ### OKX validation notes

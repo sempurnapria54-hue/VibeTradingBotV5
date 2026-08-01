@@ -9,14 +9,17 @@
 
 ## Назначение
 
-`Position` — runtime-сущность позиции внутри `Deal`. Отражает текущее
-состояние сопровождаемой позиции и отвечает на вопрос: «есть ли
-live-risk позиция по сделке прямо сейчас». Хранит **только** данные,
-нужные для сопровождения live-risk позиции.
+`Position` — runtime-сущность позиции внутри `Deal`. Отражает состояние
+сопровождаемой позиции и отвечает на вопрос: «есть ли live-risk позиция
+по сделке прямо сейчас», а после закрытия — **несёт положение закрытия**
+(realized-факты закрытой позиции, добытые второй ногой `REFRESH_POSITION`,
+см. §«Положение закрытия»). Хранит **только** данные, нужные для
+сопровождения live-risk позиции и для финализации сделки по ней.
 
-`Position` **не** отвечает за: итоговый profit/loss сделки, историю
-команд, историю strategy actions, сырые exchange responses, полную
-копию response биржи.
+`Position` **не** отвечает за: итоговый profit/loss сделки (число живёт
+полем `Deal`, здесь — **биржевой факт**, из которого его считает
+финализатор), историю команд, историю strategy actions, сырые exchange
+responses, полную копию response биржи.
 
 ## Структура
 
@@ -38,6 +41,16 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
 | `externalLiquidationPrice` | `BigDecimal` | Расчётная цена ликвидации. |
 | `externalMargin` | `BigDecimal` | Маржа позиции. |
 | `externalUnrealizedProfit` | `BigDecimal` | Нереализованный PnL. |
+| `externalRealizedProfit` | `BigDecimal` | **Положение закрытия:** готовый net realized P&L закрытой позиции, посчитанный биржей (`realizedPnl` positions-history). `null`, пока позиция жива или запись закрытия не добыта. |
+| `externalResultCurrency` | `String` | **Положение закрытия:** валюта, в которой посчитан `externalRealizedProfit` (`ccy` записи positions-history). |
+| `externalCloseType` | `String` | **Положение закрытия:** сырой тип последнего закрытия источника (OKX `type`: `1`–`2` торговое, `3`–`6` ликвидация/ADL). Провенанс аварийного терминала (`docs/decisions/pnl-finalization-mechanics.md` реш.3). |
+
+Поля §«Положение закрытия» пишет **вторая нога `REFRESH_POSITION`**
+(positions-history), не финализатор; наследуемый `externalModifiedAt`
+принимает `uTime` записи закрытия, `externalAverageEntryPrice` —
+`openAvgPx`. Состав ограничен полями с **названным потребителем**
+(codestyle §«Неиспользуемый код»); что осталось за бортом и почему —
+§«Что `Position` не хранит».
 
 ## Инварианты
 
@@ -47,10 +60,14 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
   `strategyActionId`, `strategyActionKey`. Эти данные приходят через
   `DealContext` (Exchange / Instrument), см. lifecycle.
 - `Position` создаётся и обновляется только через `REFRESH_POSITION`
-  executor; FSM напрямую `Position` не создаёт и поля не заполняет.
+  executor (**обе ноги** — live и positions-history); FSM напрямую
+  `Position` не создаёт и поля не заполняет.
 - `Position` не client-created entity, не имеет stable client id.
   `externalId` (OKX `posId`) не вечен: биржа может очистить id после
-  закрытия — поэтому не единственный источник идемпотентности.
+  закрытия — поэтому не единственный источник идемпотентности. Точная
+  адресация записи positions-history при **переиспользовании** `posId`
+  — открытый вопрос (H6 `DOCS_CHECK_7`; предложение владельцу вынесено
+  `GAPS_CLOSE_7`).
 
 ## Енумы
 
@@ -117,18 +134,63 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 `Position` — в snapshot не попадает. OKX mapping — в
 `docs/models/mapping/Position.md`.
 
+Вторая нога `REFRESH_POSITION` (positions-history) нормализуется
+**своим** граничным объектом `PositionCloseResultExternalSnapshot` и
+обновляет ту же `Position` полями §«Положение закрытия»
+(`docs/models/mapping/PositionCloseResult.md`). Два снапшота — потому
+что это два разных ответа источника об одной сущности, а не потому что
+сущностей две.
+
+## Положение закрытия
+
+**Добывается второй ногой `REFRESH_POSITION`** (H1/H3, `GAPS_CLOSE_7`).
+`REFRESH_POSITION` проходит evidence-cycle **внутри одной команды**: live
+`/account/positions` → при not-found (позиция закрыта)
+`/account/positions-history` по `posId`. Это тот же within-command-обход,
+которым `REFRESH_ORDER` эскалирует live → pending → history
+(`docs/decisions/refresh-evidence-cycle-ownership.md`,
+`docs/rules/command-lifecycle.md` §«Команды атомарны»); отдельной команды
+`REFRESH_POSITIONS_HISTORY` **не вводится** — сущность одна (`Position`),
+а refresh-набор держит по одной команде на сущность.
+
+Добытое **приземляется на `Position`** (persisted), а не живёт транзитно:
+`externalRealizedProfit`, `externalResultCurrency`, `externalCloseType`,
+`externalModifiedAt` (`uTime` записи закрытия),
+`externalAverageEntryPrice` (`openAvgPx`). Следствия:
+
+- у факта закрытия есть **durable-дом** ⇒ он пересекает границу прохода
+  FSM штатно, и потребители (финализатор штатной тропы, аварийный
+  терминал, окно линковки bills) читают его со строки, а не из памяти
+  чужого действия;
+- **идемпотентность — командная**, как у любого `REFRESH_*`: повторное
+  чтение приводит поля к состоянию биржи; вложенности «команда внутри
+  команды» не возникает вовсе;
+- поля пишутся **write-once по факту**: повторный проход перезаписывает их
+  тем же значением записи (адресация по `posId`), а не накапливает.
+
+Нормализация ответа и per-source-маппинг —
+`docs/models/mapping/PositionCloseResult.md`; контракт эндпоинта —
+`docs/integrations/okx/contracts/position.md` §«История закрытых позиций».
+
 ## Что Position не хранит
 
-`Position` не хранит fills, `realizedPnl`, `fee`, `fundingFee`,
-`closePrice`, strategy/action/audit history, raw exchange response.
-Отвечает только за live-risk состояние: наличие/отсутствие позиции,
-размер, направление, средняя цена входа, mark price, liquidation
-price, margin, unrealized PnL.
+`Position` не хранит fills, слагаемые net (`pnl`, `fee`, `fundingFee`,
+`liqPenalty` — категорийная разбивка живёт в `DealCashFlow`),
+strategy/action/audit history, raw exchange response.
 
-`Position` (live `/positions`) **не** используется для итогового PnL:
+**Из положения закрытия не заводятся полями** (нет потребителя в фазе 1 —
+codestyle §«Неиспользуемый код»; H22, `GAPS_CLOSE_7`): средняя цена выхода
+(`closeAvgPx`) и цена триггера ликвидации/ADL (`triggerPx`). Оба —
+кандидаты в носители **измеримости искажений** (провенанс ликвидации/ADL);
+вопрос открыт (`PNL-Q1`, `.claude/work/questions/open-questions.md`) и
+заводит поле вместе с потребителем, а не раньше. В инвентаре источника они
+числятся неиспользуемыми
+(`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`).
+
+`Position` (live `/positions`) **сам по себе не считает** итоговый PnL:
 заголовочное `Deal.resultProfit` = net `realizedPnl` из **positions-history**
-(закрытые позиции), разбивка — из bills; правило принадлежит `Deal`
-(`.claude/decisions/rule-source-of-truth.md`,
+(поле `externalRealizedProfit` этой модели), разбивка — из bills; правило
+принадлежит `Deal` (`.claude/decisions/rule-source-of-truth.md`,
 `docs/models/domain/aggregate/Deal.md` §Итоговый PnL,
 `docs/decisions/result-profit-source.md`). Полное закрытие
 подтверждается через `REFRESH_POSITION`, не через ACK (см.

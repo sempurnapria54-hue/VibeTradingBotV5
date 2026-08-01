@@ -109,7 +109,9 @@ severity / safetyImpact**» (условно); для
 - `.claude/work/questions/open-questions.md` — HOLD-Q1 (закрыт этим
   решением).
 - `docs/rules/controlled-exchange-exceptions.md` — три категории
-  controlled exceptions (текст квалификатора выравнивается на `SYNC`).
+  controlled exceptions (§«Эскалация — безусловный L4»; выравнивание
+  **выполнено**, см. §выше — стейл-хвост «выравнивается на `SYNC`» снят,
+  H27 `GAPS_CLOSE_7`).
 - `docs/rules/exchange-hold.md` (что блокирует L4-холд),
   `docs/rules/instrument-hold.md` (инструмент-scope; ключуется scope'ом, а
   не уровнем),

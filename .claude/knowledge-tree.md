@@ -126,7 +126,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v71.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v72.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -150,12 +150,14 @@
 │       │   ├── phase-1-step-7-docs-check-5.md — Каков исход DOCS_CHECK_5 шага 7?
 │       │   ├── phase-1-step-7-docs-check-6.md — Каков исход DOCS_CHECK_6 шага 7?
 │       │   ├── phase-1-step-7-docs-check-7.md — Каков исход DOCS_CHECK_7 шага 7?
+│       │   ├── phase-1-step-7-docs-check-8.md — Каков исход DOCS_CHECK_8 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-4.md — Как закрыты пробелы DOCS_CHECK_4 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-5.md — Как закрыты пробелы DOCS_CHECK_5 шага 7 (и что withhold)?
-│       │   └── phase-1-step-7-gaps-close-6.md — Как закрыты пробелы DOCS_CHECK_6 шага 7?
+│       │   ├── phase-1-step-7-gaps-close-6.md — Как закрыты пробелы DOCS_CHECK_6 шага 7?
+│       │   └── phase-1-step-7-gaps-close-7.md — Как закрыты пробелы DOCS_CHECK_7 шага 7?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -163,7 +165,7 @@
 │       │   ├── roadmap.md — Какими фазами продукт движется к бизнес-ценности?
 │       │   └── phase-1.md — В каком статусе каждый шаг Фазы 1?
 │       └── history/ — Что мы уже сделали? (архив; содержимое не индексируется)
-│           └── snapshots/ — Где мы были раньше? (снапшоты v1–v70)
+│           └── snapshots/ — Где мы были раньше? (снапшоты v1–v71)
 ├── docs/ — Как устроен продукт (продуктовая документация)?
 │   ├── components/ — Кто выполняет?
 │   │   ├── models/ — Что это за runtime-объект?
@@ -235,7 +237,6 @@
 │   │   ├── RefreshBillsExecutor.md — Кто исполняет REFRESH_BILLS?
 │   │   ├── RefreshOrderExecutor.md — Кто исполняет REFRESH_ORDER?
 │   │   ├── RefreshPositionExecutor.md — Кто исполняет REFRESH_POSITION?
-│   │   ├── RefreshPositionsHistoryExecutor.md — Кто исполняет REFRESH_POSITIONS_HISTORY?
 │   │   ├── RetryPolicyService.md — Кто управляет retry-политикой исполнения команд?
 │   │   ├── RiskBlockResolver.md — Кто превращает результат risk-проверки в действие handler'а?
 │   │   ├── RiskValidator.md — Кто проверяет рассчитанное действие по risk-policy?

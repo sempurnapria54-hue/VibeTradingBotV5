@@ -50,6 +50,17 @@ FSM-секвенс отдельных команд.
   > (`/account/bills`) → 3m (`/account/bills-archive`) **внутри одной
   > команды**.
 
+  > **Обновление (шаг 7, H1/H3 `GAPS_CLOSE_7`): `REFRESH_POSITION` тоже
+  > становится многоэндпоинтной.** Цикл — live `/account/positions` → при
+  > not-found `/account/positions-history` по `posId`; вторая нога
+  > наполняет поля положения закрытия на той же `Position`
+  > (`docs/models/domain/core/Position.md` §«Положение закрытия»).
+  > Отличие от `REFRESH_ORDER`: **терминала цикл не выносит** — статус
+  > позиции определяет уже первая нога, а пустая вторая — легитимный
+  > исход «число недоступно», не `MISSING_AFTER_REFRESH`. Прежняя
+  > редакция шага 7 заводила под этот эндпоинт **отдельную команду**
+  > `REFRESH_POSITIONS_HISTORY`; она снята — сущность одна.
+
 ## Обоснование
 
 - Терминал `MISSING` требует знания «полный цикл исчерпан» — держать это в
@@ -95,10 +106,13 @@ FSM-секвенс отдельных команд.
   - **Живёт принцип** «одна команда на сущность», не конкретный состав набора:
     состав меняется с сущностями. Слепок на 2026-06-10 был `REFRESH_ORDER` /
     `REFRESH_ALGO_ORDER` / `REFRESH_POSITION` / `REFRESH_BALANCE` /
-    `REFRESH_FILLS`; на шаге 7 (N12/N6) `REFRESH_FILLS` снимается, добавляются
-    `REFRESH_POSITIONS_HISTORY` и `REFRESH_BILLS` — **по тому же принципу**, по
-    одной на новую сущность (`docs/decisions/pnl-finalization-mechanics.md`
-    реш.1). Актуальный состав — `docs/components/models/ServiceCommand.md`.
+    `REFRESH_FILLS`; на шаге 7 (N12/N6) `REFRESH_FILLS` снимается, добавляется
+    `REFRESH_BILLS` — **по тому же принципу**, по одной на новую сущность
+    (`DealCashFlow`; `docs/decisions/pnl-finalization-mechanics.md` реш.1).
+    positions-history новой сущности **не даёт** — это та же `Position` после
+    закрытия, поэтому эндпоинт лёг **ногой цикла**, а не командой (H1/H3
+    `GAPS_CLOSE_7`); тот же принцип, применённый к обратному случаю.
+    Актуальный состав — `docs/components/models/ServiceCommand.md`.
 
 ## Закрытие
 

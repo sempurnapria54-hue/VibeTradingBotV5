@@ -39,14 +39,17 @@ fills-путь торгово неполон.
   авторитетно = net; N10, `docs/decisions/pnl-finalization-mechanics.md`
   реш.5).
 - **Валюта** — `resultProfitCurrency` (для `ETH-USDT-SWAP` — `USDT`).
-- **Число — в settle-ccy целиком** (H5, `GAPS_CLOSE_6`): `resultProfit` =
-  net из positions-history **+ USDT-эквивалент движений чужой `ccy`** по
-  курсу на **момент закрытия сделки**. Биржевой net считается в settle-ccy и
-  издержку, уплаченную вне неё, не содержит — без этого слагаемого число
-  завышало бы результат молча. Cross-ccy — нарушение инварианта
-  (`docs/rules/trading-constraints.md` §«Валюта комиссии»), поэтому
-  слагаемое **сопровождается** `AnomalyReport`, а не заменяет его. Механизм
-  курса — открытая развилка CCY-Q1.
+- **Число — в settle-ccy целиком** (H5, `GAPS_CLOSE_6`; момент курса
+  уточнён H4, `GAPS_CLOSE_7`): `resultProfit` = net из positions-history
+  **+ эквивалент движений чужой `ccy`**, пересчитанных по курсу на **момент
+  обработки движения** (курс фиксируется полем `DealCashFlow.appliedRate`;
+  редакция «по курсу на момент закрытия» снята). Биржевой net считается в
+  settle-ccy и издержку, уплаченную вне неё, не содержит — без этого
+  слагаемого число завышало бы результат молча. Cross-ccy — нарушение
+  инварианта (`docs/rules/trading-constraints.md` §«Валюта комиссии»),
+  поэтому слагаемое **сопровождается** `AnomalyReport`, а не заменяет его.
+  Механизм курса — **CCY-Q1 закрыт** (`docs/decisions/pnl-finalization-mechanics.md`
+  реш.5).
 - **Аварийный/ликвидационный терминал (`EMERGENCY_CLOSED`, G5):** число =
   **фактический realized net** (вкл. `liqPenalty`) если доступен из
   positions-history (`realizedPnl`; провенанс ликвидации/ADL — по `type` и
@@ -58,7 +61,8 @@ fills-путь торгово неполон.
   `docs/decisions/pnl-finalization-mechanics.md` реш.3,
   `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»).
 - **Целевые носители пути (G2) — материализованы (`GAPS_CLOSE_2`):**
-  positions-history-снапшот `PositionCloseResultExternalSnapshot`
+  граничный `PositionCloseResultExternalSnapshot`, приземляющийся полями
+  положения закрытия на **`Position`**
   (`docs/models/mapping/PositionCloseResult.md`, число) + `DealCashFlow`
   (`docs/models/domain/other/DealCashFlow.md` + `docs/models/mapping/DealCashFlow.md`,
   разбивка); native — `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.
@@ -67,7 +71,8 @@ fills-путь торгово неполон.
   и **пишет `resultProfit` прямо на `Deal`** (в одной транзакции с `COMPLETED` —
   durable-носитель = поле `Deal`, N7); `MarkDealClosedExecutor` **ассертит** и
   ставит терминал `CLOSED` (число не пишет; **placeholder-ZERO снят**). Добыча
-  фактов — refresh-команды `REFRESH_POSITIONS_HISTORY`/`REFRESH_BILLS`. Полная
+  фактов — вторая нога `REFRESH_POSITION` (положение закрытия → поля
+  `Position`) и команда `REFRESH_BILLS` (разбивка → `DealCashFlow`). Полная
   механика — `docs/decisions/pnl-finalization-mechanics.md`.
 
 ## Отвергнутые источники / альтернативы
@@ -106,8 +111,8 @@ fills-путь торгово неполон.
   `RefreshFillsExecutor`, провести каскад по handler'ам/evidence-cycle/`fills.md`.
   В коде на момент записи команда и executor **ещё живы** (`ServiceCommandType.java`,
   `RefreshFillsExecutor.java`) — формулировка целевая, не свершившаяся
-  (H15, `GAPS_CLOSE_6`). P&L-факты добывают новые
-  `REFRESH_POSITIONS_HISTORY`/`REFRESH_BILLS`
+  (H15, `GAPS_CLOSE_6`). P&L-факты добывают вторая нога `REFRESH_POSITION`
+  (положение закрытия) и новая `REFRESH_BILLS`
   (`docs/decisions/pnl-finalization-mechanics.md` реш.1).
 
 ## Следствия

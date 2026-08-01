@@ -38,7 +38,7 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 | `externalTakerFeeRate` | `String` | ставка taker как **издержка** (знак источника уже снят, см. §«Знак ставки») |
 | `externalMakerFeeRate` | `String` | ставка maker как **издержка** (то же) |
 | `externalFeeLevel` | `String` | комиссионный уровень аккаунта (датчик тира) |
-| `externalTs` | `OffsetDateTime` | время данных источника |
+| `externalModifiedAt` | `OffsetDateTime` | время данных источника |
 
 Транзитный снапшот, как `PositionCloseResultExternalSnapshot`, **не требует
 отдельного `*ExternalSnapshot.md`** (нет самостоятельного persisted
@@ -61,7 +61,7 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 `refreshCount` маппером **не переносится** — его ведёт синк (см. §Запись).
 
 **Запись — не маппинг.** Правило «значение группы изменилось → новая строка,
-совпало → инкремент `refreshCount` + обновление `externalTs` последней»
+совпало → инкремент `refreshCount` + обновление `externalModifiedAt` последней»
 (`docs/models/domain/other/TradeFeeRate.md` §Запись) исполняет
 синк/DataService, не маппер: это доменное решение о версионировании, а маппер
 только переносит данные (codestyle §Маппинг).
@@ -117,7 +117,7 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 | `feeGroup[].maker` | `externalMakerFeeRate` (**× −1**, там же) |
 | `instType` | `externalInstrumentType` |
 | `level` | `externalFeeLevel` |
-| `ts` | `externalTs` (epoch millis → `OffsetDateTime`) |
+| `ts` | `externalModifiedAt` (epoch millis → `OffsetDateTime`) |
 
 **Ось резолва — пара (`instType`, `groupId`)**, не голый `groupId`: одно и то
 же число значит разное при разном `instType`. **Полный ключ строки —

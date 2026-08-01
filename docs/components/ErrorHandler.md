@@ -27,9 +27,13 @@ Refresh при неактуальном состоянии; активный р�
 orders → `CANCEL_ORDER`; live algo → `CANCEL_ALGO_ORDER`), затем факт снятия
 подтверждается через `REFRESH_*` (ACK не truth); после safety-flow заново
 загрузить exchange facts; если live risk отсутствует и подтверждён — **добыть
-P&L-факты best-effort** (`REFRESH_POSITIONS_HISTORY` — число; опц. `REFRESH_BILLS`
-— разбивка) и терминализировать через **`MARK_DEAL_EMERGENCY_CLOSED`**
+P&L-факты best-effort** (положение закрытия приезжает **второй ногой того же
+`REFRESH_POSITION`**, которым подтверждено отсутствие позиции, и ложится на
+`Position`, H1/H3 `GAPS_CLOSE_7`; опц. `REFRESH_BILLS` — разбивка) и
+терминализировать через **`MARK_DEAL_EMERGENCY_CLOSED`**
 (best-effort число, `docs/decisions/pnl-finalization-mechanics.md` реш.3).
+Отдельной команды `REFRESH_POSITIONS_HISTORY` handler не эмитит — её нет
+в реестре.
 Обычные strategy steps не выполняются. Kill-switch
 ErrorHandler командой не эмитит: kill-switch — реактивный путь (`HoldSignal` →
 `SafetyHoldCoordinator` в проходе оркестратора), не команда. Safety-команды —
@@ -53,7 +57,7 @@ handler'а не имеет; терминал ставит `MARK_DEAL_EMERGENCY_C
 
 `MARK_DEAL_ERROR`, `REFRESH_POSITION`,
 `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`, `CANCEL_ORDER`,
-`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`, `REFRESH_POSITIONS_HISTORY`,
+`CANCEL_ALGO_ORDER`, `CLOSE_POSITION`,
 `REFRESH_BILLS`, `MARK_DEAL_EMERGENCY_CLOSED`. Kill-switch не эмитится ErrorHandler'ом
 как команда — реактивный side-executor вне реестра (`HoldSignal` →
 `SafetyHoldCoordinator`). Перечисление **неизвестных** live

@@ -12,13 +12,12 @@
 `ERROR → EMERGENCY_CLOSED`, **симметрично `MARK_DEAL_CLOSED`** (штатному
 терминалу). **Читает** подтверждённое отсутствие live risk (снято/доказано
 `ErrorHandler` перед терминалом, `docs/components/ErrorHandler.md`) и
-`PositionCloseResultExternalSnapshot`, добываемый **вложенным шагом самого
-действия** (`REFRESH_POSITIONS_HISTORY` внутри выполнения, снапшот
-in-memory — H13, `GAPS_CLOSE_6`; симметрично
-`docs/components/FinalizeDealExitExecutor.md` §«Снапшот числа — вложенный
-шаг, in-memory»). Транзитный снапшот durable-дома не имеет и границу прохода
-FSM не пересекает, поэтому его добывает **потребляющее действие**, а не
-отдельный предшествующий проход. **Пишет** терминал
+**положение закрытия на `Position`** — persisted-поля, наполненные второй
+ногой `REFRESH_POSITION` (H1/H3, `GAPS_CLOSE_7`; симметрично
+`docs/components/FinalizeDealExitExecutor.md` §«Положение закрытия —
+читается со строки»). Вложенной команды нет: факт durable, границу прохода
+FSM пересекает штатно, добыл его тот же `REFRESH_POSITION`, которым
+`ErrorHandler` доказывал отсутствие позиции. **Пишет** терминал
 `Deal.status = EMERGENCY_CLOSED` +
 `closeReason = EMERGENCY_CLOSE` + **best-effort число** `resultProfit`/
 `resultProfitCurrency` + `DealFinalizationState(MARK_EMERGENCY_CLOSED).status =
@@ -31,15 +30,22 @@ COMPLETED`. Торговых решений не принимает; `RiskValida
 (`docs/decisions/pnl-finalization-mechanics.md` §3, `docs/lifecycles/Deal.md`
 §«Терминальный контракт финализации»):
 
-- **(a) реальная ликвидация/ADL** (позицию закрыла биржа, `type` 3-6):
-  `realizedPnl` + `liqPenalty` доступны из positions-history-снапшота → пишем
-  **фактический realized net**.
+- **(a) реальная ликвидация/ADL** (позицию закрыла биржа —
+  `Position.externalCloseType ∈ 3..6`): `realizedPnl` доступен полем
+  `Position.externalRealizedProfit` → пишем **фактический realized net**.
 - **(b) net недоступен** (чистая тропа не смогла посчитать → ушла в `ERROR`;
-  вложенная добыча тоже пуста): `resultProfit = null` с семантикой
+  поля положения закрытия на `Position` пусты — записи нет либо `Position`
+  локально не заводилась): `resultProfit = null` с семантикой
   **«неисчислимо»** (**НЕ ноль**); сделка терминализуется **всё равно** (не
   зависает живым риском), факт помечается лог + `AnomalyReport`
   (`severity = NON_CRITICAL` — журнальная тропа без kill-switch,
   `docs/lifecycles/AnomalyReport.md`).
+- **Жёсткий отказ чтения приравнивается к «пусто»** на этой тропе — не к
+  провалу действия (H15, `GAPS_CLOSE_7`;
+  `docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия троп отказа
+  добычи»). Иначе `MARK_DEAL_EMERGENCY_CLOSED` уходит в `FAILED`, фабрика
+  команду больше не эмитит, и сделка зависает в `ERROR` вопреки инварианту
+  «сделка всегда доходит до терминала».
 
 **Маркер — nullability** (без нового поля): на `EMERGENCY_CLOSED` `resultProfit
 != null` = фактический net; `resultProfit == null` = «неисчислимо» — **отличимо
