@@ -135,9 +135,18 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 - **Не** переводит сделку в другой статус и **не** создаёт
   `ServiceCommand`.
 - **Не** обновляет баланс: не вызывает `REFRESH_BALANCE`, `IntegrationService`
-  или OKX adapter. При absent/stale/invalid `BalanceContainer` возвращает
-  `BLOCKED` (коды `BALANCE_NOT_FRESH` / `BALANCE_INVALID`), а не чинит
-  snapshot сам.
+  или OKX adapter. При absent/stale/invalid `BalanceContainer` он **по
+  контракту** возвращает `BLOCKED` (коды `BALANCE_NOT_FRESH` /
+  `BALANCE_INVALID`), а не чинит snapshot сам.
+  - **В фазе 1 эти коды фактически не эмитятся** (H17, `GAPS_CLOSE_6`):
+    свежесть баланса обеспечивает handler **до** вызова — при absent/stale он
+    эмитит `REFRESH_BALANCE` и уходит на новый проход FSM, на котором
+    валидатор не вызывается (`docs/processes/risk-evaluation.md` §«Когда
+    вызывается»; реестр кодов —
+    `docs/components/models/RiskCheckResult.md` §«Определены, но в фазе 1 не
+    эмитятся»). Противоречия между «возвращает» и «не эмитится» нет:
+    здесь — **граница ответственности** (валидатор снапшот не чинит), там —
+    фактическая достижимость ветки при текущем порядке вызова.
 - Вызывается только для risk-creating / risk-increasing / risk-weakening
   actions, после расчёта цены/размера и до создания торговой команды (см.
   `docs/rules/risk-validator-scope.md`).

@@ -41,15 +41,24 @@ positions-history) — `docs/decisions/result-profit-source.md`; механик�
 positions-history REST response -> raw OkxPositionsHistoryResponse
   -> IntegrationService validation
   -> PositionCloseResultMapper -> PositionCloseResultExternalSnapshot
-  -> RefreshPositionsHistoryExecutor -> Deal.resultProfit
+  -> RefreshPositionsHistoryExecutor (вложенный шаг действия, снапшот in-memory)
+  -> FinalizeDealExitExecutor | MarkDealEmergencyClosedExecutor
+  -> Deal.resultProfit
 ```
 
 Raw DTO не выходит за пределы `IntegrationService` / adapter-layer;
 `RefreshPositionsHistoryExecutor` работает только с validated normalized
-snapshot. Snapshot **транзитный** — не персистится; число из него
-`RefreshPositionsHistoryExecutor` доводит до `Deal` (финализация пишет
-`resultProfit` на `Deal`, `docs/decisions/pnl-finalization-mechanics.md`
-реш.2).
+snapshot. Snapshot **транзитный** — не персистится.
+
+**Где он живёт между добычей и потреблением** (H13, `GAPS_CLOSE_6`): **в
+памяти внутри одного действия**. У транзитного снапшота durable-дома нет, а
+значит границу прохода FSM он пересечь не может — поэтому
+`REFRESH_POSITIONS_HISTORY` исполняется **вложенным шагом** финализирующего
+действия (`FINALIZE_DEAL_EXIT` штатно, `MARK_DEAL_EMERGENCY_CLOSED`
+аварийно), а не отдельным предшествующим проходом. Идемпотентность — на
+уровне действия (анкер `DealFinalizationState`); рестарт до его `COMPLETED`
+перезапускает действие целиком. Число на `Deal` пишет **финализатор**
+(`docs/decisions/pnl-finalization-mechanics.md` реш.2), не refresh-executor.
 
 ### `PositionCloseResultExternalSnapshot` (транзитный)
 
@@ -59,7 +68,7 @@ snapshot. Snapshot **транзитный** — не персистится; ч�
 | `externalResultCurrency` | `String` | валюта результата (`USDT` для `ETH-USDT-SWAP`) |
 | `externalCloseAvgPx` | `BigDecimal` | средняя цена выхода (закрытия) |
 | `externalOpenAvgPx` | `BigDecimal` | средняя цена входа |
-| `externalTriggerPx` | `BigDecimal` | цена триггера ликвидации/ADL (только при `type` 3–6; иначе null) |
+| `externalTriggerPx` | `BigDecimal` | цена триггера ликвидации/ADL; **всегда опционально** (null допустим при любом `type` — применимость держит `docs/integrations/okx/contracts/position.md` §История, H19) |
 | `externalCloseType` | `String` | тип последнего закрытия (`1`–`6`; ликвидация/ADL = `3`–`6`) |
 | `externalPosId` | `String` | биржевой id позиции (ключ агрегации записи) |
 | `externalUpdatedAt` | `OffsetDateTime` | время обновления записи positions-history |
@@ -71,8 +80,8 @@ parseable. Тип времени — `OffsetDateTime` по конвенции п
 
 ### snapshot → `Deal`
 
-`RefreshPositionsHistoryExecutor` доводит снапшот до финализации;
-на `Deal` пишутся:
+`RefreshPositionsHistoryExecutor` отдаёт снапшот вызывающему действию;
+на `Deal` финализатор пишет:
 
 | Snapshot field | Domain | Семантика |
 |---|---|---|
@@ -97,8 +106,13 @@ parseable. Тип времени — `OffsetDateTime` по конвенции п
   молчаливое взятие слайса.
 - **Numeric:** числа приходят строками; обязательные (`realizedPnl`, `ccy`)
   заполнены и парсятся; для **чистого** закрытия `realizedPnl` присутствует
-  (пустое `realizedPnl` при чистом закрытии недопустимо). `triggerPx` —
-  только для `type` 3–6.
+  (пустое `realizedPnl` при чистом закрытии недопустимо). **`triggerPx`
+  присутствующим не требуется ни при каком `type`** (H19, `GAPS_CLOSE_6`):
+  валидация проверяет только парсимость, если поле пришло. Так расхождение
+  доков о применимости (`3/4/5` vs `3–6`) перестаёт быть нагруженным —
+  валидация на присутствие поля не опирается; единственный носитель
+  формулировки применимости — `docs/integrations/okx/contracts/position.md`
+  §История, сверка с офдоком открыта.
 - **Аварийный контур:** для `EMERGENCY_CLOSED` при genuinely недоступном
   net снапшот числа не даёт → `resultProfit = null` с семантикой
   «неисчислимо» (не ноль), терминал всё равно проходит

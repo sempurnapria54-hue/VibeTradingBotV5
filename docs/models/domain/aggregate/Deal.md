@@ -138,7 +138,12 @@ fills, average prices, partial exits) в `Deal` не хранится: числ�
 `ServiceCommand`. Также не хранятся `marketPhaseId` (фаза входа
 выводится через `StrategyDetail.marketPhaseType`), `openedAt`/
 `closedAt`/`errorAt` (даты записи — `Auditable`; торговые моменты —
-через `Order`/`Position`/`TradeFill`/audit).
+через `Order`/`Position`/audit и `externalUpdatedAt` снапшота
+positions-history). `TradeFill` из перечня носителей **убран** (H14,
+`GAPS_CLOSE_6`): persisted `TradeFill` в проекте не вводится (§выше,
+OKX-Q1 закрыт), то есть ссылаться на него как на носитель торгового
+момента было нельзя. Операнды окна сделки, собираемые из этих носителей, —
+`docs/models/domain/other/DealCashFlow.md` §«Линковка к `Deal`».
 
 ## Персистентность
 

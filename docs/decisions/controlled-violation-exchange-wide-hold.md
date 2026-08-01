@@ -88,16 +88,21 @@ L3.** Эскалация **единообразна и безусловна дл
   радиус важнее соразмерности, пока интеграция не дозрела. Поведение в
   коде CC не менял — оставлял на валидацию; владелец утвердил (1).
 
-## Расхождение с офдоком (выравнивание — на SYNC)
+## Расхождение с внутренним доком — выровнено
 
-`controlled-exchange-exceptions.md` для `ExternalStatusException` пишет
-«Deal → ERROR; Exchange → HOLD **по severity / safetyImpact**»
-(условно); для `ExternalInvariantViolationException` /
-`ExternalNotFoundException` — «Exchange → HOLD» без расшифровки «HOLD» как
-«flatten всей биржи». Решением (1) условный квалификатор **снят** —
-эскалация безусловна для всех трёх категорий, а «HOLD» = flatten всей
-биржи + `Exchange.TRADE_BLOCKED`. **Выравнивание текста офдока под (1)
-делается на `SYNC_DOCS_FROM_CODE`**, не этим решением.
+Прежняя редакция `controlled-exchange-exceptions.md` для
+`ExternalStatusException` писала «Deal → ERROR; Exchange → HOLD **по
+severity / safetyImpact**» (условно); для
+`ExternalInvariantViolationException` / `ExternalNotFoundException` —
+«Exchange → HOLD» без расшифровки «HOLD» как «flatten всей биржи».
+Решением (1) условный квалификатор **снят** — эскалация безусловна для всех
+трёх категорий, а «HOLD» = flatten всей биржи + `Exchange.TRADE_BLOCKED`.
+
+**Выравнивание выполнено** (H18, `GAPS_CLOSE_6`):
+`docs/rules/controlled-exchange-exceptions.md` несёт §«Эскалация —
+безусловный L4 (все три категории)» с ровно этой формулировкой. Клауза
+«выравнивание делается на `SYNC_DOCS_FROM_CODE`» устарела и снята — работа
+уже сделана, задачи на `SYNC` по этому пункту нет.
 
 ## Связи
 
@@ -106,7 +111,8 @@ L3.** Эскалация **единообразна и безусловна дл
 - `docs/rules/controlled-exchange-exceptions.md` — три категории
   controlled exceptions (текст квалификатора выравнивается на `SYNC`).
 - `docs/rules/exchange-hold.md` (что блокирует L4-холд),
-  `docs/rules/instrument-hold.md` (L3),
+  `docs/rules/instrument-hold.md` (инструмент-scope; ключуется scope'ом, а
+  не уровнем),
   `docs/rules/error-handling-policy.md` (уровни 3-4 градации).
 - `.claude/work/history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-holds-design.md`
   (§8.C — радиус

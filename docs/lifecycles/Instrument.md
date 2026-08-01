@@ -11,8 +11,16 @@
 
 Материализован **только онбординг-путь шага 1**:
 `CREATED → SYNC → CANDLES_LOADING → ACTIVE`. Периферийные статусы
-(`HOLD`, `ERROR`-recovery, повторный онбординг, `CLOSED`) для
+(онбординговый `HOLD`, `ERROR`-recovery, повторный онбординг, `CLOSED`) для
 шага 1 **отложены** — backlog п.9; здесь не описываются.
+
+**Safety-статусы вне этого охвата.** `TRADE_BLOCKED` (холд с kill-switch) и
+`ENTRY_BLOCKED` (мягкий запрет новых входов) — не онбординговые: вход в них
+только из `ACTIVE` по аварии, снятие — вручную в `ACTIVE`, писатель —
+реактивный/safety-контур, а не онбординг. Их рёбра и семантика —
+`docs/rules/instrument-hold.md` §Enforcement и
+`docs/models/domain/core/Instrument.md` §Енумы; координация всех троп в
+одном lifecycle — backlog п.9.
 
 ## Кто управляет
 

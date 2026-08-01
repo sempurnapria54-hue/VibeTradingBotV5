@@ -12,8 +12,14 @@
 `ERROR → EMERGENCY_CLOSED`, **симметрично `MARK_DEAL_CLOSED`** (штатному
 терминалу). **Читает** подтверждённое отсутствие live risk (снято/доказано
 `ErrorHandler` перед терминалом, `docs/components/ErrorHandler.md`) и
-`PositionCloseResultExternalSnapshot` (добыт `REFRESH_POSITIONS_HISTORY` на
-аварийной тропе). **Пишет** терминал `Deal.status = EMERGENCY_CLOSED` +
+`PositionCloseResultExternalSnapshot`, добываемый **вложенным шагом самого
+действия** (`REFRESH_POSITIONS_HISTORY` внутри выполнения, снапшот
+in-memory — H13, `GAPS_CLOSE_6`; симметрично
+`docs/components/FinalizeDealExitExecutor.md` §«Снапшот числа — вложенный
+шаг, in-memory»). Транзитный снапшот durable-дома не имеет и границу прохода
+FSM не пересекает, поэтому его добывает **потребляющее действие**, а не
+отдельный предшествующий проход. **Пишет** терминал
+`Deal.status = EMERGENCY_CLOSED` +
 `closeReason = EMERGENCY_CLOSE` + **best-effort число** `resultProfit`/
 `resultProfitCurrency` + `DealFinalizationState(MARK_EMERGENCY_CLOSED).status =
 COMPLETED`. Торговых решений не принимает; `RiskValidator` не вызывается
@@ -29,9 +35,11 @@ COMPLETED`. Торговых решений не принимает; `RiskValida
   `realizedPnl` + `liqPenalty` доступны из positions-history-снапшота → пишем
   **фактический realized net**.
 - **(b) net недоступен** (чистая тропа не смогла посчитать → ушла в `ERROR`;
-  повторная добыча `ErrorHandler`'ом тоже пуста): `resultProfit = null` с
-  семантикой **«неисчислимо»** (**НЕ ноль**); сделка терминализуется **всё
-  равно** (не зависает живым риском), факт помечается лог + `AnomalyReport`.
+  вложенная добыча тоже пуста): `resultProfit = null` с семантикой
+  **«неисчислимо»** (**НЕ ноль**); сделка терминализуется **всё равно** (не
+  зависает живым риском), факт помечается лог + `AnomalyReport`
+  (`severity = NON_CRITICAL` — журнальная тропа без kill-switch,
+  `docs/lifecycles/AnomalyReport.md`).
 
 **Маркер — nullability** (без нового поля): на `EMERGENCY_CLOSED` `resultProfit
 != null` = фактический net; `resultProfit == null` = «неисчислимо» — **отличимо

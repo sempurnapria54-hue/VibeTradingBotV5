@@ -33,15 +33,26 @@ fills-путь торгово неполон.
 - **Категорийная разбивка** (торговая комиссия / funding / rebate /
   ликвидационный штраф) — из bills (`GET /api/v5/account/bills[-archive]`),
   доменно `DealCashFlow`.
-- **Контроль целостности:** сумма bills-flows сверяется с net из
-  positions-history. Расхождение сверх epsilon (и cross-ccy движение) →
-  **`AnomalyReport`**, **не блокирует** финализацию (число авторитетно = net;
-  N10, `docs/decisions/pnl-finalization-mechanics.md` реш.5).
+- **Контроль целостности:** сумма bills-flows **в settle-ccy** сверяется с net
+  из positions-history. Расхождение сверх epsilon (и наличие cross-ccy
+  движения) → **`AnomalyReport`**, **не блокирует** финализацию (число
+  авторитетно = net; N10, `docs/decisions/pnl-finalization-mechanics.md`
+  реш.5).
 - **Валюта** — `resultProfitCurrency` (для `ETH-USDT-SWAP` — `USDT`).
+- **Число — в settle-ccy целиком** (H5, `GAPS_CLOSE_6`): `resultProfit` =
+  net из positions-history **+ USDT-эквивалент движений чужой `ccy`** по
+  курсу на **момент закрытия сделки**. Биржевой net считается в settle-ccy и
+  издержку, уплаченную вне неё, не содержит — без этого слагаемого число
+  завышало бы результат молча. Cross-ccy — нарушение инварианта
+  (`docs/rules/trading-constraints.md` §«Валюта комиссии»), поэтому
+  слагаемое **сопровождается** `AnomalyReport`, а не заменяет его. Механизм
+  курса — открытая развилка CCY-Q1.
 - **Аварийный/ликвидационный терминал (`EMERGENCY_CLOSED`, G5):** число =
   **фактический realized net** (вкл. `liqPenalty`) если доступен из
-  positions-history (`realizedPnl` + `triggerPx`, `type` 3/4/5/6 —
-  ликвидация/ADL); если недоступен (провенанс отказа расчёта) —
+  positions-history (`realizedPnl`; провенанс ликвидации/ADL — по `type` и
+  опциональному `triggerPx`, применимость которого держит единственный
+  носитель `docs/integrations/okx/contracts/position.md` §История);
+  если недоступен (провенанс отказа расчёта) —
   best-effort **`null` с маркером «неисчислимо»**, **не ноль**
   (провенанс-контракт разведён на `GAPS_CLOSE_2`, N8 —
   `docs/decisions/pnl-finalization-mechanics.md` реш.3,
@@ -90,9 +101,13 @@ fills-путь торгово неполон.
   цена выхода) и `openAvgPx` (`docs/integrations/okx/contracts/position.md`
   §История) → fills для avg-цены выхода **не нужны**; order-level fill-метрики
   (`accFillSz`/`avgPx`) доступны прямо из `OkxOrderResponse` (`REFRESH_ORDER`).
-  ⇒ `REFRESH_FILLS` **снят на `GAPS_CLOSE_2`** (N12): убран из `ServiceCommandType`,
-  удалён `RefreshFillsExecutor`, каскад по handler'ам/evidence-cycle/`fills.md`;
-  P&L-факты добывают новые `REFRESH_POSITIONS_HISTORY`/`REFRESH_BILLS`
+  ⇒ `REFRESH_FILLS` **снимается** — решение принято на `GAPS_CLOSE_2` (N12),
+  **исполнение — на `CODE` шага 7**: убрать из `ServiceCommandType`, удалить
+  `RefreshFillsExecutor`, провести каскад по handler'ам/evidence-cycle/`fills.md`.
+  В коде на момент записи команда и executor **ещё живы** (`ServiceCommandType.java`,
+  `RefreshFillsExecutor.java`) — формулировка целевая, не свершившаяся
+  (H15, `GAPS_CLOSE_6`). P&L-факты добывают новые
+  `REFRESH_POSITIONS_HISTORY`/`REFRESH_BILLS`
   (`docs/decisions/pnl-finalization-mechanics.md` реш.1).
 
 ## Следствия

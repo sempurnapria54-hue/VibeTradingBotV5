@@ -85,9 +85,14 @@ TP/SL/trailing actions, pyramid/scaling и любые действия, увел
 запрет новых сделок; разрешение safety/read операций зависит от причины
 отключения и задаётся отдельно (в отличие от `HOLD`, где safety/read
 всегда разрешены). Статус инструмента — также точка enforcement
-блокировки торговли после `AnomalyReport` (severity `CRITICAL` →
-торговля остаётся запрещённой; см. `docs/models/domain/other/AnomalyReport.md`).
-Полная модель/lifecycle `Exchange`/`Instrument` — backlog п.9.
+блокировки торговли: `TRADE_BLOCKED` (холд с kill-switch) /
+`ENTRY_BLOCKED` (мягкий запрет входов), оба снимаются вручную
+(`docs/rules/instrument-hold.md` §Enforcement). Блокировку задаёт **состав
+реакции** error-политики, **не** `severity` отчёта — прежняя формулировка
+(«severity `CRITICAL` → торговля остаётся запрещённой») выводила её из
+severity и снята (H6, `GAPS_CLOSE_6`;
+`docs/models/domain/other/AnomalyReport.md` §Енумы). Полная
+модель/lifecycle `Exchange`/`Instrument` — backlog п.9.
 
 ## Почему
 

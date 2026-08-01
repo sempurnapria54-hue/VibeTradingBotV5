@@ -33,35 +33,51 @@
 
 ### `Status`
 
-`CREATED`, `PENDING`, `ACTIVE`, `CLOSED`, `ERROR`. Статус
+`CREATED`, `PENDING`, `ACTIVE`, `TRADE_BLOCKED`, `CLOSED`, `ERROR`. Статус
 подключения/использования биржи.
 
-> Сквозное правило `Exchange.HOLD`/`DISABLED` (блокировка создания
-> новых `Deal` при проблемах биржи) — `docs/rules/exchange-hold.md`.
-> Полный lifecycle `Exchange` (включая `HOLD`/`DISABLED` среди
-> прочих состояний) — backlog п.9; здесь зафиксирован набор
-> статусов доменного класса как есть.
+`TRADE_BLOCKED` — **safety-холд биржи** (уровень 4,
+`docs/rules/exchange-hold.md`): каскадно блокирует входы по всем
+инструментам биржи, safety/read разрешены; вход — только из `ACTIVE` по
+аварии, снятие — **вручную** в `ACTIVE`.
+
+> **Мягким классом холда `Exchange.TRADE_BLOCKED` не используется**
+> (H3, `GAPS_CLOSE_6`). Аккаунт-радиус мягкой реакции (несвежесть ставки,
+> режим «вызов не прошёл») выражается набором строк инструментов
+> (`Instrument.Status.ENTRY_BLOCKED` по всем инструментам контура), а не
+> биржевой строкой: биржевой статус несёт биржевой блок-сет и каскадный
+> перехват активных сделок — превышение радиуса
+> (`docs/rules/instrument-hold.md` §Enforcement).
+
+> Сквозное правило блокировки создания новых `Deal` при проблемах биржи —
+> `docs/rules/exchange-hold.md`. Полный lifecycle `Exchange` (включая
+> `DISABLED` среди прочих состояний) — backlog п.9.
 >
 > **Известный разнобой имён safety-статуса биржи — запаркован до
-> backlog п.9, не пропущен.** Три источника расходятся:
+> backlog п.9, не пропущен.** Источники расходятся:
 > (1) часть доков зовёт статус `Exchange.HOLD`
 > (`docs/rules/exchange-hold.md`, `docs/rules/external-status-resolution.md`,
 > `docs/lifecycles/Order.md`, `docs/lifecycles/AlgoOrder.md`,
 > `docs/models/mapping/AlgoOrder.md`, `docs/models/mapping/Balance.md`,
 > `docs/integrations/okx/rules/reduce-only-invariant.md`);
-> (2) аппарат шага 6 зовёт его `Exchange.TRADE_BLOCKED`
+> (2) аппарат шага 6 и **код** зовут его `Exchange.TRADE_BLOCKED`
 > (`docs/decisions/controlled-violation-exchange-wide-hold.md`,
 > `docs/rules/controlled-exchange-exceptions.md`,
-> `docs/components/SafetyHoldCoordinator.md`);
-> (3) в енуме выше **нет ни того, ни другого**.
+> `docs/components/SafetyHoldCoordinator.md`; `Exchange.java` —
+> `TRADE_BLOCKED` + `isTradeBlocked()`).
+>
+> Прежняя редакция этой ноты добавляла третьим источником «в енуме нет ни
+> того, ни другого» — **инвентарь был стейл**: статус в коде есть,
+> перечень выше приведён к коду на `GAPS_CLOSE_6` (H3). Долг сузился до
+> **переименования `Exchange.HOLD` → `TRADE_BLOCKED` в доках группы (1)**.
 >
 > **Имя в обороте — `TRADE_BLOCKED`.** Долг **унаследованный** (шагом 7
 > не введён и не расширен): шаг 7 писателя `Exchange.HOLD` **не
 > вводит** — холд по несвежести ставки комиссии уехал на **инструмент**
 > (`GAPS_CLOSE_4`, `docs/rules/instrument-hold.md` §«Несвежесть ставки
 > комиссии»; критерий — `docs/rules/error-handling-policy.md`
-> §«Радиус ущерба задаёт scope»). Сведение имени и материализация
-> статуса — **сознательно оставлены** на backlog п.9 (полный lifecycle
+> §«Радиус ущерба задаёт scope»). Сведение имени — **сознательно
+> оставлено** на backlog п.9 (полный lifecycle
 > `Exchange`), где решается весь набор состояний разом; точечное
 > переименование до того расщепило бы долг.
 

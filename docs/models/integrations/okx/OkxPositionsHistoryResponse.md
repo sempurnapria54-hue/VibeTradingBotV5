@@ -39,7 +39,7 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 | `ccy` | string | валюта результата → `Deal.resultProfitCurrency` (для `ETH-USDT-SWAP` — `USDT`) |
 | `closeAvgPx` | string-decimal | средняя цена выхода (закрытия позиции) |
 | `openAvgPx` | string-decimal | средняя цена входа |
-| `triggerPx` | string-decimal | цена триггера ликвидации/ADL (только `type` 3–6) |
+| `triggerPx` | string-decimal | цена триггера ликвидации/ADL. **Опционально всегда**; точный поднабор ликвидационных/ADL-`type`, при котором биржа его заполняет, — открытая сверка с офдоком, единственный носитель формулировки: `docs/integrations/okx/contracts/position.md` §История (H19, `GAPS_CLOSE_6`) |
 | `type` | string | тип последнего закрытия (`1` частичное / `2` полное / `3` ликвидация / `4` частичная ликвидация / `5` ADL не полностью / `6` ADL полностью) |
 | `posId` | string | биржевой id позиции (ключ агрегации записи; истекает ~30 дней после полного закрытия) |
 | `uTime` | string-ms | время обновления записи (сортировка/пагинация positions-history — по `uTime`) |

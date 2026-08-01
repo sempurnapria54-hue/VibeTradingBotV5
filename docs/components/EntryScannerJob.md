@@ -40,6 +40,15 @@ context для аудита.
 
 Не создаёт order/algo-order, не открывает позицию, не исполняет
 `StrategyAction`, не запускает FSM, не ходит на биржу за выставлением
-ордеров. Gatekeeper по `Exchange HOLD` / `Instrument HOLD` / `Strategy` /
-risk — см. `docs/rules/exchange-hold.md`, `docs/rules/instrument-hold.md`,
+ордеров. Gatekeeper по холдам биржи/инструмента, `Strategy` и risk — см.
+`docs/rules/exchange-hold.md`, `docs/rules/instrument-hold.md`,
 `docs/lifecycles/Strategy.md`.
+
+**Механика гейта холдов — выборка скана.** Скан идёт по инструментам в
+статусе `ACTIVE`, поэтому оба safety-статуса (`TRADE_BLOCKED` — холд с
+kill-switch; `ENTRY_BLOCKED` — мягкий запрет новых входов, H3
+`GAPS_CLOSE_6`) выпадают из скана **самой выборкой**, отдельной проверки не
+требуют. Биржевой холд (`Exchange.TRADE_BLOCKED`) режется каскадом:
+инструменты такой биржи пропускаются. Это и есть точка enforcement запрета
+новых входов для мягкого класса (`docs/rules/instrument-hold.md`
+§Enforcement).

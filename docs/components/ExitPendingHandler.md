@@ -29,7 +29,8 @@ P&L-факты** — `REFRESH_POSITIONS_HISTORY` (positions-history-снапшо
 и `REFRESH_BILLS` (`DealCashFlow` — разбивка); `FINALIZE_DEAL_EXIT` когда факты
 готовы (считает `resultProfit` из снапшота+bills и **пишет его на `Deal`**,
 `docs/decisions/pnl-finalization-mechanics.md`); `MARK_DEAL_CLOSED` когда всё
-очищено (ассертит число, ставит терминал). `REFRESH_FILLS` **снят** (шаг 7).
+очищено (ассертит число, ставит терминал). `REFRESH_FILLS` **снимается** на
+`CODE` шага 7 (в коде пока жив — H15, `GAPS_CLOSE_6`).
 Cleanup/safety команды — без `RiskValidator`.
 
 ## Выходные проверки

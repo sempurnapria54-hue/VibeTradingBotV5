@@ -20,16 +20,18 @@ details (last 3 days / last 3 months)»). При расхождении с оф�
 Mapping (стаб, **OKX-Q1 закрыт**: `TradeFill` в фазе 1 не вводится) —
 `docs/models/mapping/TradeFill.md`. Native response —
 `docs/models/integrations/okx/OkxFillResponse.md`. Команда `REFRESH_FILLS`
-**снята** на шаге 7 (`docs/decisions/pnl-finalization-mechanics.md` реш.1) —
-эти fills-эндпоинты в runtime фазы 1 **не используются** (order-fill-метрики
+**снимается** на `CODE` шага 7 (`docs/decisions/pnl-finalization-mechanics.md`
+реш.1; в коде пока жива — H15, `GAPS_CLOSE_6`) —
+эти fills-эндпоинты в целевом runtime фазы 1 **не используются** (order-fill-метрики
 идут из `OkxOrderResponse` через `REFRESH_ORDER`; число P&L — из
 positions-history/bills). Контракт оставлен справочно. Глубже 3 месяцев —
 `docs/integrations/okx/contracts/fills-archive.md`.
 
 ## Endpoints
 
-> Эндпоинты ниже в runtime фазы 1 **не используются** (`REFRESH_FILLS`
-> снят, `docs/decisions/pnl-finalization-mechanics.md` реш.1); оставлены
+> Эндпоинты ниже в целевом runtime фазы 1 **не используются**
+> (`REFRESH_FILLS` снимается на `CODE` шага 7,
+> `docs/decisions/pnl-finalization-mechanics.md` реш.1); оставлены
 > справочно.
 
 - **Fills 3 дня**:

@@ -120,7 +120,10 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 | `ts` | `externalTs` (epoch millis → `OffsetDateTime`) |
 
 **Ось резолва — пара (`instType`, `groupId`)**, не голый `groupId`: одно и то
-же число значит разное при разном `instType`. Ключ группы инструмента приходит
+же число значит разное при разном `instType`. **Полный ключ строки —
+тройка** с `exchangeId` (`docs/models/domain/other/TradeFeeRate.md`
+§Персистентность): биржу подставляет вызывающий, в источнике её нет, поэтому
+на оси маппинга речь о паре (H12, `GAPS_CLOSE_6`). Ключ группы инструмента приходит
 `GET /api/v5/public/instruments` (`groupId` →
 `InstrumentExternalRules.externalFeeGroupId`,
 `docs/models/mapping/InstrumentExternalRules.md`).
@@ -132,6 +135,17 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 (`docs/integrations/okx/contracts/trade-fee.md` §«Знаковая конвенция»).
 Проектная нормаль — **издержка**: комиссия положительна, ребейт отрицателен.
 `× −1` переводит одно в другое.
+
+**Носитель — строка, поэтому негация не «сама собой»** (H20, `GAPS_CLOSE_6`).
+`externalTakerFeeRate`/`externalMakerFeeRate` — `String` и в снапшоте, и на
+модели (сырые ставки приходят строками, §Конвертация нативного дока). Значит
+`× −1` — не арифметика над полем, а **шаг маппинга**: строка парсится в
+`BigDecimal`, отрицается и сериализуется обратно в строку носителя. Место —
+per-source-секция маппера (доменное решение о конвенции здесь не
+принимается, переносится только значение, codestyle §Маппинг); непарсящаяся
+ставка до негации не доходит — это controlled external error (§Validation).
+Числовые аксессоры модели (`takerFeeRate()`) парсят **уже нормализованную**
+строку и `abs` не делают.
 
 **Это место — единственное** (H2, `GAPS_CLOSE_4`). Конвенция знака —
 свойство **источника**, поэтому и снимается в per-source-секции маппинга:

@@ -30,8 +30,12 @@ domain ↔ persistence): что возвращает, как хранит.
 поэтому кто-то обязан её подгрузить.
 
 - **Что делает:** отдавая `InstrumentExternalRules`, резолвит актуальную
-  строку ставки по паре (`externalInstrumentType`, `externalFeeGroupId`)
-  навеса — ограниченным запросом (последняя по `created_at`, limit 1;
+  строку ставки по **тройке** (`exchangeId`, `externalInstrumentType`,
+  `externalFeeGroupId`) — биржу сервис знает через инструмент-владельца
+  навеса, поэтому в тексте «по паре» она подразумевалась; ключ и индекс
+  `trade_fee_rates` — тройка (H12, `GAPS_CLOSE_6`;
+  `docs/models/domain/other/TradeFeeRate.md` §Персистентность). Запрос
+  ограниченный (последняя по `created_at`, limit 1;
   `docs/models/domain/other/TradeFeeRate.md` §Персистентность) — и кладёт её
   в возвращаемую модель. Ставка не резолвится → аксессоры отдают `null` →
   реджект `FEE_RATE_UNAVAILABLE` у `RiskValidator` (null-политика —

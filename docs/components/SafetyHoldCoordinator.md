@@ -34,9 +34,18 @@ scope-исполнителями (`InstrumentDataService`/`fireInstrument` vs
 `GAPS_CLOSE_5`; уровень — ось error-политики). Дизайн холдов шага 6:
 
 1. **`TRADE_BLOCKED` scope первым** (`blockTrade`) — gate и анкер
-   идемпотентности. Ставится **только из ACTIVE**; повторный сигнал того
-   же scope (или scope уже не в ACTIVE) → реакция **пропускается** (ранний
-   `return`, kill-switch не гоняется повторно).
+   идемпотентности. Повторный сигнал того же scope, когда scope **уже в
+   `TRADE_BLOCKED`**, → реакция **пропускается** (ранний `return`,
+   kill-switch не гоняется повторно).
+   - **Анкер — `TRADE_BLOCKED`, а не «scope не в `ACTIVE`»** (H3,
+     `GAPS_CLOSE_6`). С появлением мягкого класса холда
+     (`Instrument.Status.ENTRY_BLOCKED`, `docs/rules/instrument-hold.md`
+     §Enforcement) буквальное «ставится только из `ACTIVE`» маскировало бы
+     аварию: инструмент под **мягким** холдом не в `ACTIVE`, kill-switch по
+     нему не гонялся — и последующий риск-триггер уровня 3 был бы молча
+     пропущен. Переход `ENTRY_BLOCKED → TRADE_BLOCKED` **разрешён** и
+     реакцию не пропускает (эскалация мягкого класса в полный); обратной
+     эскалации нет.
 2. `AnomalyReport` `CREATED` + **before-слепок** (локальный БД-граф +
    внешний биржевой).
 3. `IN_PROGRESS`.

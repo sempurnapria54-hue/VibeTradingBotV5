@@ -27,7 +27,7 @@ Java-модель, наследует поля аудита от `Auditable`.
 | `internalId` | `String` | да | Межсервисный идентификатор отчёта. |
 | `exchangeId` | `Long` | да | Биржа, на которой обнаружена аномалия. |
 | `instrumentId` | `Long` | нет | Инструмент; `null`, если однозначно не определён. |
-| `scope` | `HoldScope` | да | Скоуп реакции: `INSTRUMENT` (L3) / `EXCHANGE` (L4); снимает неоднозначность `instrumentId = null`. Общий enum с `HoldSignal` (дом — `docs/components/models/HoldSignal.md`). |
+| `scope` | `HoldScope` | да | **Радиус** инцидента: `INSTRUMENT` / `INSTRUMENT_GROUP` / `EXCHANGE`; снимает неоднозначность `instrumentId = null`. Ярлыки уровня (L3/L4) с енума сняты — уровень живёт в error-политике, одному уровню отвечают разные радиусы (H6 `GAPS_CLOSE_5`, реконсилировано здесь H4 `GAPS_CLOSE_6`). Общий enum с `HoldSignal` (дом — `docs/components/models/HoldSignal.md`). |
 | `status` | `Status` | да | Текущий статус обработки (см. lifecycle). |
 | `severity` | `Severity` | да | Критичность аномалии. |
 | `code` | `String` | да | Машинно-читаемый код аномалии. |
@@ -45,15 +45,32 @@ Java-модель, наследует поля аудита от `Auditable`.
 в `docs/lifecycles/AnomalyReport.md`.
 
 ### `Severity`
-- `CRITICAL` — критичная аномалия. После обработки торговля по
-  инструменту должна оставаться **запрещённой** до ручного разбора.
-- `NON_CRITICAL` — некритичная. После kill-switch торговля по
-  инструменту может быть снова разрешена.
 
-Фактическая блокировка/разблокировка торговли живёт в статусе
-инструмента (не в `AnomalyReport`); `severity` задаёт политику.
-Enforcement — на стороне Instrument/Exchange-слоя (форвард-заметка в
-`.claude/work/history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`).
+**Одна сущность, две тропы обработки; разводит их `severity`** (H6,
+`GAPS_CLOSE_6`). Отдельной «журнальной» сущности не заводим: аудит-аномалия
+и инцидент реактивной обработки — один объект расследования, различается
+**поведение**, а не онтология.
+
+- `CRITICAL` — критичная аномалия: реактивный контур **гоняет kill-switch**
+  (`docs/components/SafetyHoldCoordinator.md`), отчёт проходит
+  `KILL_SWITCH_EXECUTED` и терминализуется только по подтверждённому
+  снятию риска.
+- `NON_CRITICAL` — некритичная: kill-switch **не гоняется**, процесс
+  завершается **штатно** (`CREATED → COMPLETED` для журнальной аномалии,
+  либо через `IN_PROGRESS`, если обработка есть). Типичные производители —
+  сверка bills↔net и cross-ccy на финализации, несвежесть ставки/ключа
+  группы, пометка «неисчислимо» на аварийном терминале.
+
+**Severity не задаёт блокировку торговли.** Она отвечает **только** на
+«отрабатывает ли kill-switch». Блокировку задаёт **состав реакции**
+error-политики (`docs/rules/error-handling-policy.md` §«Перечень scope и
+реакций»), а несёт её **статус scope** (`Instrument.Status.TRADE_BLOCKED` /
+`ENTRY_BLOCKED`, `docs/rules/instrument-hold.md` §Enforcement). Прежняя
+формулировка («`CRITICAL` → торговля остаётся запрещённой; `NON_CRITICAL` →
+после kill-switch может быть разрешена») выводила блокировку из severity и
+описывала обе ветки в kill-switch-терминах — снята: `NON_CRITICAL`-тропа
+kill-switch не проходит вовсе, а мягкий холд ставится при
+`NON_CRITICAL`-аномалии и снимается вручную.
 
 ## Инварианты структуры
 
@@ -61,10 +78,19 @@ Enforcement — на стороне Instrument/Exchange-слоя (форвард
   бирже.
 - `instrumentId` nullable — аномалия может относиться к внешней
   сущности, для которой локальный инструмент не определён.
-- `scope` (`HoldScope`: `INSTRUMENT` = L3 / `EXCHANGE` = L4) явно кодирует
-  уровень реакции и снимает неоднозначность `instrumentId = null` (биржа-
-  широкий скоуп vs неопределённый инструмент). Enum общий с `HoldSignal`
-  (сигнал из прохода) — дом енума `docs/components/models/HoldSignal.md`.
+- `scope` (`HoldScope`: `INSTRUMENT` / `INSTRUMENT_GROUP` / `EXCHANGE`)
+  явно кодирует **радиус** инцидента и снимает неоднозначность
+  `instrumentId = null` — которая **трёхзначна**: биржа-широкий радиус vs
+  радиус комиссионной группы vs неопределённый инструмент. Ровно поэтому
+  групповой радиус получил своё значение енума, а не выражается через
+  `INSTRUMENT` + перечень в слепке (H4, `GAPS_CLOSE_6`). Enum общий с
+  `HoldSignal` (сигнал из прохода) — дом енума
+  `docs/components/models/HoldSignal.md`.
+- **Одна аномалия — один отчёт на факт, не на инструмент.** Инцидент
+  «строка ставки / ключ группы протухли» относится к **группе**: отчёт
+  один, `scope = INSTRUMENT_GROUP`, `instrumentId = null`, идентификация
+  группы — в `code` и слепке. N отчётов на N инструментов группы
+  задваивали бы один факт.
 - `severity` и `code` — независимые измерения: `severity` —
   уровень опасности, `code` — конкретный тип аномалии.
 - `message` заполняется только одновременно с `status = ERROR`,

@@ -79,8 +79,24 @@ mapping native→snapshot→`Deal` — `docs/models/mapping/PositionCloseResult.
   `fundingFee` (накопленный), `liqPenalty`, `pnlRatio`.
 - **Цены/объёмы:** `openAvgPx`, `closeAvgPx`, `openMaxPos`
   (максимум позиции), `closeTotalPos` (накопленный закрытый объём),
-  `triggerPx` (только для type 3/4/5 — цена триггера
-  ликвидации/ADL), `nonSettleAvgPx`/`settledPnl` (cross FUTURES).
+  `triggerPx` (цена триггера ликвидации/ADL — **опционально**, см. ниже),
+  `nonSettleAvgPx`/`settledPnl` (cross FUTURES).
+
+> **`triggerPx` — единственный носитель применимости; точный поднабор
+> `type` открыт** (H19, `GAPS_CLOSE_6`). Доки проекта разошлись на трёх
+> формулировках («3/4/5», «3–6», «3/4/5/6»); прочие носители приведены к
+> ссылке сюда, чтобы версия была одна. **Сверка с офдоком не выполнена:**
+> заход CC по каналу чтения вернул страницу, усечённую до раздела
+> positions-history — дефицит `грунт`, владелец сверки — `integrator`
+> (`.claude/processes/api-docs-completion.md`).
+>
+> **Расхождение обезврежено контрактно:** поле объявляется **всегда
+> опциональным** и **ни при каком `type` не требуется присутствующим**
+> (`docs/models/mapping/PositionCloseResult.md` §Validation). Ликвидационные
+> и ADL-типы — `3`–`6`; на каком именно поднаборе биржа заполняет
+> `triggerPx`, число `resultProfit` не затрагивает (оно берётся готовым
+> `realizedPnl`) — затрагивалась бы только структурная валидация
+> погранслучая ADL, а она теперь на присутствие поля не опирается.
 - **Идентификация:** `posId` (истекает ~через 30 дней после полного
   закрытия — после этого новая позиция получает новый `posId`),
   `instType`/`instId`, `mgnMode`, `posSide`, `direction`, `lever`,

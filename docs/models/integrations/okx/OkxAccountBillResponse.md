@@ -58,7 +58,7 @@ H14/H15).** Ранее `fee` отбрасывался с доводом «зна
 **realized-слагаемого** (`balChg − fee`). Для **суммы комиссии**
 (Σ`externalFee`) гранулярность-независимости нет: что несёт `fee` на
 самостоятельной fee-записи — рантайм-вопрос (контур source-api,
-`.claude/tests/source-api/okx/plan.md` §AG1.5;
+`.claude/tests/source-api/okx/plan.md` **§AG3.5**, фикстура общая с §AG1.5;
 `docs/models/mapping/DealCashFlow.md` §«Число комиссии»). Категорию `fee`
 не определяет — резолв категории идёт по `type`/`subType` (H9,
 `docs/models/mapping/DealCashFlow.md` §«Резолв категории»).

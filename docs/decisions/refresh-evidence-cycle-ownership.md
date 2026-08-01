@@ -42,7 +42,8 @@ FSM-секвенс отдельных команд.
   остаётся `OKX-Q2` (шаг 7), не трогаем.
 
   > **Обновление (шаг 7, `docs/decisions/pnl-finalization-mechanics.md`
-  > реш.1):** `REFRESH_FILLS` **снят** — order-fill-метрики идут из
+  > реш.1):** `REFRESH_FILLS` **снимается** на `CODE` шага 7 (в коде пока
+  > жив — H15, `GAPS_CLOSE_6`) — order-fill-метрики идут из
   > `OkxOrderResponse` через `REFRESH_ORDER`, fills для P&L не нужны;
   > его within-command 3d→3m-обход больше не актуален. Ту же within-command
   > модель **наследует новая `REFRESH_BILLS`**: пагинация bills 7d
@@ -77,8 +78,9 @@ FSM-секвенс отдельных команд.
   `RefreshFillsExecutor`; **впоследствии снят вместе с командой**, см. ноту о
   `REFRESH_FILLS` ниже.)
 - `docs/integrations/okx/contracts/fills.md` — `REFRESH_FILLS` эскалирует
-  3d→3m внутри команды. **Устарело:** `REFRESH_FILLS` снят на `GAPS_CLOSE_2`
-  шага 7 (N12); within-command-эскалация 7d→3m живёт теперь в `REFRESH_BILLS`
+  3d→3m внутри команды. **Устарело:** `REFRESH_FILLS` снимается решением
+  `GAPS_CLOSE_2` шага 7 (N12; исполнение — `CODE`);
+  within-command-эскалация 7d→3m живёт теперь в `REFRESH_BILLS`
   (`docs/decisions/pnl-finalization-mechanics.md` реш.1) — сам паттерн
   «обход внутри команды» решение пережил, сменился лишь его носитель.
 - `docs/models/mapping/Order.md`, `AlgoOrder.md` — обход цикла атрибутирован
@@ -93,7 +95,7 @@ FSM-секвенс отдельных команд.
   - **Живёт принцип** «одна команда на сущность», не конкретный состав набора:
     состав меняется с сущностями. Слепок на 2026-06-10 был `REFRESH_ORDER` /
     `REFRESH_ALGO_ORDER` / `REFRESH_POSITION` / `REFRESH_BALANCE` /
-    `REFRESH_FILLS`; на шаге 7 (N12/N6) `REFRESH_FILLS` снят, добавлены
+    `REFRESH_FILLS`; на шаге 7 (N12/N6) `REFRESH_FILLS` снимается, добавляются
     `REFRESH_POSITIONS_HISTORY` и `REFRESH_BILLS` — **по тому же принципу**, по
     одной на новую сущность (`docs/decisions/pnl-finalization-mechanics.md`
     реш.1). Актуальный состав — `docs/components/models/ServiceCommand.md`.

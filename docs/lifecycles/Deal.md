@@ -136,8 +136,9 @@ ReconciliationJob`.
   (`docs/decisions/pnl-finalization-mechanics.md` реш.3):
   - **(a) ликвидация/ADL** (позицию закрыла биржа): `realizedPnl`+`liqPenalty`
     доступны (`type` 3-6) → пишем **фактический realized net**;
-  - **(b) отказ расчёта** (чистая тропа не смогла): `ErrorHandler` перед
-    терминалом ещё раз пробует добыть (`REFRESH_POSITIONS_HISTORY`); net доступен
+  - **(b) отказ расчёта** (чистая тропа не смогла): терминальное действие
+    `MARK_DEAL_EMERGENCY_CLOSED` **вложенным шагом** ещё раз пробует добыть
+    (`REFRESH_POSITIONS_HISTORY`, H13 `GAPS_CLOSE_6`); net доступен
     → пишем; **genuinely недоступен** → `resultProfit = null` c семантикой
     **«неисчислимо»** (**не ноль**), сделка терминализуется всё равно, факт
     помечается (лог/`AnomalyReport`).

@@ -59,8 +59,9 @@ cleanup-команда без action-state (`REFRESH_*` / `CANCEL_*` / `CLOSE_PO
 
 **Амендных команд нет:** `AMEND_ORDER` / `AMEND_ALGO_ORDER` сняты из
 enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SWITCH` — 16;
-на шаге 7 снят `REFRESH_FILLS` и добавлены `REFRESH_POSITIONS_HISTORY` /
-`REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED` → **18**,
+на шаге 7 снимается `REFRESH_FILLS` и добавляются
+`REFRESH_POSITIONS_HISTORY` / `REFRESH_BILLS` /
+`MARK_DEAL_EMERGENCY_CLOSED` → **18** целевых (в коде пока 16),
 `docs/decisions/pnl-finalization-mechanics.md`) решением
 `docs/decisions/replace-not-amend.md` — AMEND ушёл из доменного
 словаря целиком. Ремоделирование — действие стратегии
@@ -73,9 +74,11 @@ enum'а (снятие AMEND: 19 → 17; после снятия `EXECUTE_KILL_SW
 **Refresh-набор — ровно по одной команде на сущность:** `REFRESH_ORDER`,
 `REFRESH_ALGO_ORDER`, `REFRESH_POSITION`, `REFRESH_BALANCE`,
 `REFRESH_POSITIONS_HISTORY` (positions-history-снапшот — число P&L),
-`REFRESH_BILLS` (`DealCashFlow` — разбивка). `REFRESH_FILLS` **снят** на
-шаге 7 (его order-fill-метрики покрыты `REFRESH_ORDER`;
-`docs/decisions/pnl-finalization-mechanics.md` реш.1). Внутри исполнителя
+`REFRESH_BILLS` (`DealCashFlow` — разбивка). `REFRESH_FILLS` **снимается** на
+`CODE` шага 7 (его order-fill-метрики покрыты `REFRESH_ORDER`;
+`docs/decisions/pnl-finalization-mechanics.md` реш.1) — состав выше
+**целевой**, в коде enum пока несёт `REFRESH_FILLS` и не несёт трёх новых
+команд (H15, `GAPS_CLOSE_6`). Внутри исполнителя
 допускается несколько вызовов биржи (evidence-cycle,
 `docs/decisions/refresh-evidence-cycle-ownership.md`).
 Bulk-команды `REFRESH_PENDING_ORDERS` / `REFRESH_ORDER_HISTORY` /
