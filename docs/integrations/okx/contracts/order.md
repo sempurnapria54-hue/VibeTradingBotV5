@@ -24,7 +24,7 @@ Native response/request поля — `docs/models/integrations/okx/OkxOrderRespo
 
 ## Endpoints
 
-- **Create** (`SUBMIT_ORDER`): `POST /api/v5/trade/order`. Permission
+- **Create** (`SUBMIT_ORDER_COMMAND`): `POST /api/v5/trade/order`. Permission
   `Trade`; rate limit 60 req / 2 s по User ID + Instrument ID.
 - **Amend** (доменом **не используется** — REPLACE-only,
   `docs/decisions/replace-not-amend.md`; контракт — поверхность
@@ -34,20 +34,20 @@ Native response/request поля — `docs/models/integrations/okx/OkxOrderRespo
   уже исполненную часть для `partially_filled`. `cxlOnFail` (boolean)
   — биржа отменит ордер, если amend упал. `pxAmendType=0|1` — `1`
   разрешает автокорректировку цены в допустимый диапазон.
-- **Cancel** (`CANCEL_ORDER`): `POST /api/v5/trade/cancel-order`.
+- **Cancel** (`CANCEL_ORDER_COMMAND`): `POST /api/v5/trade/cancel-order`.
   Permission `Trade`; rate limit 60 req / 2 s по User ID + Instrument
   ID. Body: `instId` + одно из `ordId` / `clOrdId` (если оба — биржа
   использует `ordId`).
-- **Order details** (`REFRESH_ORDER`): `GET /api/v5/trade/order`.
+- **Order details** (`REFRESH_ORDER_COMMAND`): `GET /api/v5/trade/order`.
   Permission `Read`; rate limit 60 req / 2 s по User ID + Instrument
   ID. Query: `instId` обязателен, одно из `ordId` / `clOrdId`. Если
   оба — биржа возвращает по `ordId`. Если `clOrdId` переиспользован,
   биржа возвращает **последний** ордер с этим `clOrdId`.
-- **Pending** (звено цикла `REFRESH_ORDER`): `GET /api/v5/trade/orders-pending`.
+- **Pending** (звено цикла `REFRESH_ORDER_COMMAND`): `GET /api/v5/trade/orders-pending`.
   Permission `Read`; rate limit 60 req / 2 s по User ID. Фильтры:
   `instType`, `instId`, `ordType`, `state` (`live`/`partially_filled`),
   пагинация `after`/`before` по `ordId`, `limit` ≤ 100.
-- **History** (звено цикла `REFRESH_ORDER`):
+- **History** (звено цикла `REFRESH_ORDER_COMMAND`):
   `GET /api/v5/trade/orders-history` (последние 7 дней; permission
   `Read`; rate limit 40 req / 2 s по User ID),
   `GET /api/v5/trade/orders-history-archive` (последние 3 месяца; rate
@@ -79,7 +79,7 @@ refresh/search/history.
 `POST /trade/amend-order` → `data[0]` с `ordId`, `clOrdId`, `reqId`
 (если был передан), `ts`, `sCode`, `sMsg`. `sCode=0` — запрос
 принят, не «изменение подтверждено». Подтверждение — через
-`REFRESH_ORDER` или WS `orders`.
+`REFRESH_ORDER_COMMAND` или WS `orders`.
 
 ### Cancel response (ACK)
 

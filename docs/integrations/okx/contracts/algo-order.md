@@ -36,7 +36,7 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
 
 ## Endpoints
 
-- **Create** (`SUBMIT_ALGO_ORDER`): `POST /api/v5/trade/order-algo`.
+- **Create** (`SUBMIT_ALGO_ORDER_COMMAND`): `POST /api/v5/trade/order-algo`.
   Permission `Trade`; rate limit 20 req / 2 s по User ID + Instrument
   ID. Body — общие поля (`instId`, `tdMode`, `side`, `ordType`, `sz`,
   `posSide`, `reduceOnly`, `algoClOrdId`) + ordType-specific.
@@ -53,7 +53,7 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   TP/SL-ветка: `newTpTriggerPx`/`newTpOrdPx`/`newSlTriggerPx`/
   `newSlOrdPx`/`new*TriggerPxType` (`0` = удалить ногу); trigger:
   `newTriggerPx`/`newOrdPx`/`newTriggerPxType` + `attachAlgoOrds`.
-- **Cancel** (`CANCEL_ALGO_ORDER`): `POST /api/v5/trade/cancel-algos`.
+- **Cancel** (`CANCEL_ALGO_ORDER_COMMAND`): `POST /api/v5/trade/cancel-algos`.
   Permission `Trade`; rate limit 20 **orders** / 2 s по User ID +
   Instrument ID. Body — массив `{ instId, algoId | algoClOrdId }`
   (оба → биржа берёт `algoId`), до 10 за запрос. Ответ `data[i]`:
@@ -63,14 +63,14 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   endpoint'ом — конфликт внутри офдока, см. находку **И-2** ниже;
   исторический парный endpoint `cancel-advance-algos` выведен из
   официальной документации (changelog 2025-04-24).
-- **Details** (`REFRESH_ALGO_ORDER`): `GET /api/v5/trade/order-algo`.
+- **Details** (`REFRESH_ALGO_ORDER_COMMAND`): `GET /api/v5/trade/order-algo`.
   Permission `Read`. Query: одно из `algoId` (приоритет) /
   `algoClOrdId`; `instId` опц. Ответ — массив `data`, ожидается 0 или
   1 элемент.
-- **Pending** (звено цикла `REFRESH_ALGO_ORDER`): `GET /api/v5/trade/orders-algo-pending`.
+- **Pending** (звено цикла `REFRESH_ALGO_ORDER_COMMAND`): `GET /api/v5/trade/orders-algo-pending`.
   Permission `Read`. Фильтры по `ordType`, `instType`, `instId`,
   `algoId`, пагинация `after`/`before` по `algoId`, `limit` ≤ 100.
-- **History** (звено цикла `REFRESH_ALGO_ORDER`):
+- **History** (звено цикла `REFRESH_ALGO_ORDER_COMMAND`):
   `GET /api/v5/trade/orders-algo-history`. Permission `Read`; rate
   limit 20 req / 2 s по User ID. История доступна за последние 3
   месяца. Query: **`ordType` обязателен** (вычисляется из
@@ -87,12 +87,12 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
 advance-algo **виден** в тех же query-звеньях; details (`order-algo`)
 работает по `algoId`/`algoClOrdId` без типового ограничения (ответ
 несёт `szLimit`/`pxLimit` для iceberg/twap, `advanceOrdType`).
-Evidence-cycle `REFRESH_ALGO_ORDER` для trailing не ломается.
+Evidence-cycle `REFRESH_ALGO_ORDER_COMMAND` для trailing не ломается.
 
 ## ACK-семантика
 
 ACK любой create/cancel (`sCode=0`) не runtime truth
-(`docs/rules/ack-not-runtime-truth.md`). `CANCEL_ALGO_ORDER` не
+(`docs/rules/ack-not-runtime-truth.md`). `CANCEL_ALGO_ORDER_COMMAND` не
 ставит `CANCELED`. Submit использует stable client id
 (`internalId → algoClOrdId`); перед retry — refresh/search по
 `algoClOrdId`.
@@ -130,7 +130,7 @@ deprecated). Для advance-ветки (`cancel-advance-algos`, И-1(а))
 
 ## Ветвление cancel-пути по семье (И-1 закрыт — исход (а))
 
-**Решение (пользователь, 2026-06-11):** `CANCEL_ALGO_ORDER` ветвит
+**Решение (пользователь, 2026-06-11):** `CANCEL_ALGO_ORDER_COMMAND` ветвит
 cancel-путь по семье algo — **ordinary** (trigger / oco /
 conditional) → `cancel-algos`; **advance** (trailing
 `move_order_stop` / iceberg / twap) → `cancel-advance-algos`.

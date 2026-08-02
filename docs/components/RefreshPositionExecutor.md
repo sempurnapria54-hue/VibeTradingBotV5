@@ -2,12 +2,12 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `REFRESH_POSITION` (компонент-executor): что делает,
+Кто исполняет `REFRESH_POSITION_COMMAND` (компонент-executor): что делает,
 политика null/externalSize, evidence-cycle live → positions-history.
 
 ## Назначение
 
-Получает `REFRESH_POSITION`. Берёт `Exchange`/`Instrument` из
+Получает `REFRESH_POSITION_COMMAND`. Берёт `Exchange`/`Instrument` из
 `DealContext` / command context, вызывает `IntegrationService` для текущей
 позиции по инструменту, получает `PositionExternalSnapshot` или `null`,
 прогоняет через `PositionStatusResolver`, применяет `status`, заполняет
@@ -18,28 +18,39 @@
 ## Evidence-cycle: live → positions-history
 
 **Обход внутри одной команды** (H1/H3, `GAPS_CLOSE_7`), по той же модели,
-которой `REFRESH_ORDER` эскалирует live → pending → history
+которой `REFRESH_ORDER_COMMAND` эскалирует live → pending → history
 (`docs/decisions/refresh-evidence-cycle-ownership.md`;
 `docs/rules/command-lifecycle.md` §«Команды атомарны — на уровне команды,
 не HTTP-запроса»):
 
 ```text
 1) GET /account/positions            (live)
-   найдено       -> Position.status = ACTIVE, обновить external-поля -> стоп
+   найдено       -> Position.status = ACTIVE, обновить external-поля;
+                    первое наблюдение позиции -> Deal.billsWindowBegin = cTime -> стоп
    не найдено    -> Position.status = CLOSED -> нога 2
 2) GET /account/positions-history    (положение закрытия, по posId)
    найдено       -> наполнить поля §«Положение закрытия» на той же Position
-   не найдено    -> поля остаются null (тропа «неисчислимо»), статус CLOSED
+                    + Deal.billsWindowEnd = uTime записи (одной транзакцией)
+   не найдено    -> поля и billsWindowEnd остаются null -> привязка bills и
+                    число ждут (ретрай добычи), статус CLOSED
 ```
 
 - **Нога 2 идёт только при not-found ноги 1** и только когда локальная
   `Position` есть (иначе `posId` не наблюдался — развилка H6/H7
   `DOCS_CHECK_7`, в `GAPS_CLOSE_7` не закрыта).
+- **Окно линковки bills пишет наблюдатель** (узел 1 `DOCS_CHECK_8`):
+  live-нога при первом наблюдении позиции — `Deal.billsWindowBegin`
+  (write-once, `cTime`); нога 2 при приземлении записи закрытия —
+  `Deal.billsWindowEnd` (`uTime` записи, той же транзакцией, что поля
+  положения закрытия). Прежняя реконструкция окна из
+  `Position.externalModifiedAt` снята — колонку писали обе ноги, предикат
+  добытости был невыразим.
 - **Терминал команды нога 2 не выносит.** Отсутствие записи закрытия —
   не `MISSING_AFTER_REFRESH`: статус позиции уже определён ногой 1, а
-  пустое число — легитимный исход (`docs/lifecycles/Deal.md` §«Терминальный
-  контракт финализации»). Этим `REFRESH_POSITION` отличается от
-  `REFRESH_ORDER`, где исчерпанный цикл и есть основание терминала.
+  недобытый факт ретраится бюджетом `REFRESH_DEAL_CONTEXT_ACTION`
+  (`docs/components/SystemActionExecutor.md`; узел 4 `DOCS_CHECK_8`,
+  вариант (а)). Этим `REFRESH_POSITION_COMMAND` отличается от
+  `REFRESH_ORDER_COMMAND`, где исчерпанный цикл и есть основание терминала.
 - **Отдельной команды `REFRESH_POSITIONS_HISTORY` нет** — сущность одна
   (`Position`), refresh-набор держит по одной команде на сущность
   (`docs/components/models/ServiceCommand.md`).

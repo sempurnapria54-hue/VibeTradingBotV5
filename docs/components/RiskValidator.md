@@ -148,13 +148,13 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 
 - **Не** переводит сделку в другой статус и **не** создаёт
   `ServiceCommand`.
-- **Не** обновляет баланс: не вызывает `REFRESH_BALANCE`, `IntegrationService`
+- **Не** обновляет баланс: не вызывает `REFRESH_BALANCE_COMMAND`, `IntegrationService`
   или OKX adapter. При absent/stale/invalid `BalanceContainer` он **по
   контракту** возвращает `BLOCKED` (коды `BALANCE_NOT_FRESH` /
   `BALANCE_INVALID`), а не чинит snapshot сам.
   - **В фазе 1 эти коды фактически не эмитятся** (H17, `GAPS_CLOSE_6`):
     свежесть баланса обеспечивает handler **до** вызова — при absent/stale он
-    эмитит `REFRESH_BALANCE` и уходит на новый проход FSM, на котором
+    эмитит `REFRESH_BALANCE_COMMAND` и уходит на новый проход FSM, на котором
     валидатор не вызывается (`docs/processes/risk-evaluation.md` §«Когда
     вызывается»; реестр кодов —
     `docs/components/models/RiskCheckResult.md` §«Определены, но в фазе 1 не

@@ -22,7 +22,9 @@ live orders/algo; нет критичного расхождения и borrow/d
 
 ## Рабочая логика
 
-Обновить позицию/live-сущности при необходимости; взять
+Обновить позицию/live-сущности при необходимости — добывающие
+`REFRESH_*` идут звеньями `REFRESH_DEAL_CONTEXT_ACTION`
+(`docs/components/SystemActionExecutor.md`), не прямой эмиссией; взять
 `stepsByStatus[MANAGING]` (`PROTECTION_ADJUSTMENT`, `PARTIAL_EXIT`,
 `GRID_MANAGEMENT`, `EXIT`, `FAIL_SAFE`); для data-dependent step —
 freshness (`checkForStep`) → при устаревании `marketDataExpiredSetting`;
@@ -30,15 +32,15 @@ freshness (`checkForStep`) → при устаревании `marketDataExpiredS
 `DealActionState` → `StrategyActionCalculator` → нужные `ServiceCommand`.
 Risk-creating actions — через risk-layer; reduce-only partial exit — без
 `RiskValidator`, через safety/invariant checks (см.
-`docs/rules/risk-validator-scope.md`). Полный выход → `CLOSE_POSITION` /
-cancel-команды. `REFRESH_POSITION` без позиции → `EXIT_PENDING`;
+`docs/rules/risk-validator-scope.md`). Полный выход → `CLOSE_POSITION_COMMAND` /
+cancel-команды. `REFRESH_POSITION_COMMAND` без позиции → `EXIT_PENDING`;
 `ACTIVE && externalSize==0` → cleanup/retry/anomaly; fail-safe → emergency.
 
 ## Выходные проверки
 
 `→ EXIT_PENDING`, если стратегия инициировала выход / позиция
 закрывается или закрыта / есть команда закрытия или факт через
-`REFRESH_POSITION` / нужно дочистить хвосты. `→ ERROR`, если защита
+`REFRESH_POSITION_COMMAND` / нужно дочистить хвосты. `→ ERROR`, если защита
 потеряна без безопасного восстановления, активный риск без контроля,
 опасное расхождение, >1 позиция, borrow/debt, небезопасный recovery.
 Иначе остаётся в `MANAGING`.
@@ -46,11 +48,11 @@ cancel-команды. `REFRESH_POSITION` без позиции → `EXIT_PENDIN
 ## Допустимые StrategyStep / возможные ServiceCommand
 
 Steps: `PROTECTION_ADJUSTMENT`, `PARTIAL_EXIT`, `GRID_MANAGEMENT`, `EXIT`,
-`FAIL_SAFE`. Команды: `REFRESH_BALANCE`, `CREATE_ALGO_ORDER`,
-`SUBMIT_ALGO_ORDER`, `CANCEL_ALGO_ORDER`, `CREATE_ORDER`,
-`SUBMIT_ORDER`, `CANCEL_ORDER`, `CLOSE_POSITION`, `REFRESH_POSITION`,
-`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`,
-`MARK_DEAL_ERROR`. Ремодел защиты
+`FAIL_SAFE`. Команды: `REFRESH_BALANCE_COMMAND`, `CREATE_ALGO_ORDER_COMMAND`,
+`SUBMIT_ALGO_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`, `CREATE_ORDER_COMMAND`,
+`SUBMIT_ORDER_COMMAND`, `CANCEL_ORDER_COMMAND`, `CLOSE_POSITION_COMMAND`, `REFRESH_POSITION_COMMAND`,
+`REFRESH_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`,
+`MARK_DEAL_ERROR_COMMAND`. Ремодел защиты
 (`PROTECTION_ADJUSTMENT`) — REPLACE-оркестрацией из этого же набора
 (place-new → факт → cancel-old; `docs/decisions/replace-not-amend.md`),
 амендных команд нет.

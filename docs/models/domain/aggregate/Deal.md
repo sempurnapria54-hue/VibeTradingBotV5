@@ -43,6 +43,8 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 | `plannedRiskCurrency` | `String` | Валюта планового риска (та же, что у `resultProfitCurrency` — иначе отношение не считается). |
 | `resultProfit` | `BigDecimal` | Итоговый PnL (см. ниже). |
 | `resultProfitCurrency` | `String` | Валюта результата (для `ETH-USDT-SWAP` обычно `USDT`). |
+| `billsWindowBegin` | `OffsetDateTime` | **Нижняя граница окна линковки bills** — собственное поле сделки, заполняет наблюдатель факта открытия (см. §«Окно линковки bills»). |
+| `billsWindowEnd` | `OffsetDateTime` | **Верхняя граница окна линковки bills** — заполняет наблюдатель факта закрытия (вторая нога `REFRESH_POSITION_COMMAND`). Пусто = факт закрытия не добыт → привязка ждёт. |
 | `orders` | `List<Order>` | Ordinary orders сделки (attached protection — внутри `Order`). |
 | `algoOrders` | `List<AlgoOrder>` | Standalone algo-orders сделки. |
 | `position` | `Position` | Текущая позиция (≤1 на `Deal`). |
@@ -91,7 +93,7 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 - **Число** `resultProfit` = **net realized P&L**, берётся **готовым** из
   positions-history (`realizedPnl = pnl + fee + fundingFee + liqPenalty`,
   посчитан биржей), **не** через fills/`TradeFill` и **не** через
-  `BalanceContainer` diff. `REFRESH_BALANCE` после выхода нужен для
+  `BalanceContainer` diff. `REFRESH_BALANCE_COMMAND` после выхода нужен для
   актуального account snapshot, не для PnL сделки.
 - **Категорийная разбивка** (торговая комиссия / funding / rebate /
   ликвидационный штраф) — из bills (`DealCashFlow`); сумма bills-flows
@@ -105,17 +107,20 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
   закрыт). На `EMERGENCY_CLOSED` `null` = «число не достать» (отличимо от нуля).
 - `resultProfit = 0` допустим только как **результат расчёта** (net вышел
   нулевым), **не** как молчаливый fallback при ошибке. Если временно нельзя
-  посчитать — финализация retry-ится по общему механизму
-  (`DealFinalizationState`, `docs/models/domain/other/DealFinalizationState.md`);
-  при исчерпании retry сделка уходит ошибочной тропой к терминалу — сделка
-  всегда доходит до терминала, не зависает живым риском (**DEAL-Q2, закрыт**,
-  `docs/lifecycles/Deal.md` §«Терминальный контракт финализации»).
+  посчитать — добыча и финализация ретраятся бюджетом своих **системных
+  действий** (`REFRESH_DEAL_CONTEXT_ACTION` / `FINALIZE_DEAL_EXIT_ACTION`,
+  `docs/models/domain/other/DealActionState.md`); при исчерпании сделка
+  уходит ошибочной тропой к терминалу — всегда доходит до терминала, не
+  зависает живым риском (**DEAL-Q2, закрыт**, `docs/lifecycles/Deal.md`
+  §«Терминальный контракт финализации»).
 - **Расчёт и запись (N7).** Число вычисляет и **пишет прямо на `Deal`**
-  `FinalizeDealExitExecutor` (net из `PositionCloseResultExternalSnapshot` +
-  разбивка из `DealCashFlow` + сверка; в одной транзакции с его `COMPLETED` —
-  durable-носитель числа = само поле `Deal`, рестарт-safe). `MarkDealClosedExecutor`
-  **ассертит** непустоту и ставит терминал `CLOSED` (число не пишет). Step-6
-  писал интерим-placeholder `ZERO` (граница 6 ↔ 7); шаг 7 его снял (реальный
+  `FinalizeDealExitExecutor` (net из **`Position.externalRealizedProfit`** —
+  положения закрытия, приземлённого второй ногой `REFRESH_POSITION_COMMAND`,
+  — плюс разбивка из `DealCashFlow` + сверка; в одной транзакции с
+  продвижением своего исполнения — durable-носитель числа = само поле
+  `Deal`, рестарт-safe). `MarkDealClosedExecutor` **ассертит** непустоту и
+  ставит терминал `CLOSED` (число не пишет). Step-6 писал
+  интерим-placeholder `ZERO` (граница 6 ↔ 7); шаг 7 его снял (реальный
   net). Механика — `docs/decisions/pnl-finalization-mechanics.md` реш.2.
 
 ## Плановый риск (`R`)
@@ -132,7 +137,7 @@ R-мультипликаторов [Tharp гл.6 с.144-146].
   `docs/decisions/per-trade-risk-policy.md` §«Закрытая форма сайзинга»).
   Прогнозная комиссия в него **входит** — иначе знаменатель отличался бы от
   величины, под которую подбирался размер.
-- **Кто и когда пишет.** Исполнитель `CREATE_ORDER` входного действия
+- **Кто и когда пишет.** Исполнитель `CREATE_ORDER_COMMAND` входного действия
   (`docs/components/CreateOrderExecutor.md`) — в одной транзакции с созданием
   сущности входа. Риск-преконтроль и создание идут **одним проходом**
   (`docs/rules/risk-validator-scope.md`: `RiskValidator` вызывается после
@@ -157,6 +162,32 @@ fills, average prices, partial exits) в `Deal` не хранится: числ�
 (bills), пофилловая детализация — вне фазы 1 (**OKX-Q1 закрыт**: persisted
 `TradeFill` не вводится).
 
+## Окно линковки bills (`billsWindowBegin` / `billsWindowEnd`)
+
+Границы окна, по которому `RefreshBillsExecutor` матчит движения к сделке,
+— **собственные поля `Deal`**; из чужих колонок
+(`Position.externalModifiedAt`) окно **не реконструируется** — та колонка
+писалась обеими ногами `REFRESH_POSITION_COMMAND` и предиката «запись
+закрытия добыта» не выражала (узел 1 `DOCS_CHECK_8`;
+`docs/decisions/command-action-boundary.md` §7). Заполняет **наблюдатель
+факта**, write-once:
+
+- `billsWindowBegin` — биржевое время открытия: `cTime` позиции при её
+  материализации (пишет live-нога `REFRESH_POSITION_COMMAND`); вопрос
+  §AG1.5 (entry-fee раньше `cTime`) может сдвинуть дефолт на
+  `externalCreatedAt` первого отправленного `Order` — тогда писатель
+  меняется, дом поля нет.
+- `billsWindowEnd` — `uTime` записи закрытия positions-history; пишет
+  **вторая нога** `REFRESH_POSITION_COMMAND` в одной транзакции с полями
+  положения закрытия на `Position`.
+
+`billsWindowEnd` пуст (факт закрытия не добыт) → **привязка bills ждёт**,
+окно не закрывается; исчерпание бюджета добычи → ошибочная тропа + холд
+инструмента. **Цена решения:** после терминала линковка запрещена
+(`docs/models/domain/other/DealCashFlow.md` §«Линковка») ⇒ неподобранные к
+этому моменту движения не подберутся никогда — разбивка неполна, сверка
+даёт `AnomalyReport` при, возможно, верном числе.
+
 ## Runtime graph
 
 `Deal` содержит runtime graph: `orders` (см.
@@ -173,12 +204,12 @@ fills, average prices, partial exits) в `Deal` не хранится: числ�
 `ServiceCommand`. Также не хранятся `marketPhaseId` (фаза входа
 выводится через `StrategyDetail.marketPhaseType`), `openedAt`/
 `closedAt`/`errorAt` (даты записи — `Auditable`; торговые моменты —
-через `Order`/`Position`/audit, в том числе `Position.externalModifiedAt`
-— `uTime` записи закрытия). `TradeFill` из перечня носителей **убран** (H14,
-`GAPS_CLOSE_6`): persisted `TradeFill` в проекте не вводится (§выше,
-OKX-Q1 закрыт), то есть ссылаться на него как на носитель торгового
-момента было нельзя. Операнды окна сделки, собираемые из этих носителей, —
-`docs/models/domain/other/DealCashFlow.md` §«Линковка к `Deal`».
+через `Order`/`Position`/audit). `TradeFill` из перечня носителей
+**убран** (H14, `GAPS_CLOSE_6`): persisted `TradeFill` в проекте не
+вводится (§выше, OKX-Q1 закрыт). Окно линковки bills из чужих носителей
+больше не собирается — его границы суть собственные поля сделки (§«Окно
+линковки bills» выше; `docs/models/domain/other/DealCashFlow.md`
+§«Линковка к `Deal`»).
 
 ## Персистентность
 
@@ -195,9 +226,14 @@ audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
 - `internal_id`, `instrument_id`, `strategy_detail_id`, `status`,
   `direction` — `NOT NULL`; `entry_reason`, `entry_step_type`,
   `shutdown_reason`, `close_reason`, `planned_risk_amount`,
-  `planned_risk_currency`, `result_profit`,
-  `result_profit_currency` — nullable (`planned_risk_*` пусты до постановки
-  входа — у сделки, не доехавшей до `CREATE_ORDER`, планового риска нет).
+  `planned_risk_currency`, `result_profit`, `result_profit_currency`,
+  `bills_window_begin`, `bills_window_end` — nullable (`planned_risk_*`
+  пусты до постановки входа; `bills_window_*` — до наблюдения фактов
+  открытия/закрытия).
+- **Колонки шага 7 — `ALTER`, в `V6`/`V9` их нет** (H21, `DOCS_CHECK_8`):
+  `planned_risk_amount`, `planned_risk_currency`, `bills_window_begin`,
+  `bills_window_end` добавляются миграцией шага 7; полная schema-дельта
+  шага — `docs/decisions/pnl-finalization-mechanics.md` §Следствия.
 - `internal_id` — `updatable = false` (неизменен после создания).
 - Enum-поля (`status`, `direction`, `entry_reason`, `entry_step_type`,
   `shutdown_reason`, `close_reason`) хранятся строкой (имя enum); enum —
@@ -231,15 +267,15 @@ audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
 
 ## Границы с DealActionState / DealContext
 
-- `DealActionState` **не** поле `Deal`: persisted operational
-  FSM-state конкретного `StrategyAction` (recovery/retry/idempotency/
-  связь `StrategyAction → runtime target`). Связь: `Deal.id →
-  DealActionState.dealId → strategyActionId →
-  RuntimeTarget(entityType, entityId)`.
+- `DealActionState` **не** поле `Deal`: persisted строка **исполнения
+  действия** (оба вида — STRATEGY и SYSTEM; recovery/retry/idempotency,
+  для STRATEGY — связь `StrategyAction → runtime target`). Связь:
+  `Deal.id → DealActionState.dealId → strategyActionId | systemActionType
+  → (targetEntityType, targetEntityId)`.
 - `DealContext` **не** часть модели `Deal`: процессный runtime-context
   одного прохода FSM (добавляет `Exchange`, `Instrument`, pinned
-  `StrategyDetail`, последний persisted `BalanceContainer`,
-  `DealActionState` list).
+  `StrategyDetail`, последний persisted `BalanceContainer`, список строк
+  исполнений).
 
 Полные модели — `docs/models/domain/other/DealActionState.md`,
 `docs/components/models/DealContext.md`; FSM-handlers (материализованы) —

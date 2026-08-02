@@ -30,7 +30,7 @@ bills REST -> raw OkxAccountBillResponse -> IntegrationService validation
 
 Raw OKX DTO не выходит за пределы `IntegrationService` / adapter-layer
 (`docs/rules/raw-exchange-dto-boundary.md`). Наполняется командой
-`REFRESH_BILLS` (`RefreshBillsExecutor`): пагинация bills (7d → 3m archive)
+`REFRESH_BILLS_COMMAND` (`RefreshBillsExecutor`): пагинация bills (7d → 3m archive)
 внутри команды, матчинг к сделке и проставление `deal_id` — при сохранении
 (`docs/models/domain/other/DealCashFlow.md` §Линковка к `Deal`).
 
@@ -254,7 +254,7 @@ positions-history. Расхождение **сверх epsilon** и наличи
 (`ccy` ≠ расчётной валюты инструмента) → `AnomalyReport` (audit-аномалия,
 `severity = NON_CRITICAL`, **не** блок финализации;
 `docs/decisions/pnl-finalization-mechanics.md` реш.5). Аномалию по валюте
-ставит **`REFRESH_BILLS` на записи** (там же, где движение пересчитывается),
+ставит **`REFRESH_BILLS_COMMAND` на записи** (там же, где движение пересчитывается),
 сверку суммы — финализатор.
 
 - **Epsilon якорится на оборот, не на итог:** max(0.01 settle-ccy, 0.5% от
@@ -286,8 +286,8 @@ positions-history. Расхождение **сверх epsilon** и наличи
 ### Операнд сравнения — расчётная валюта инструмента (H4, `GAPS_CLOSE_7`)
 
 **Сравнивать с `Deal.resultProfitCurrency` нельзя** — на момент записи
-движения это поле **пусто**: его пишет `FINALIZE_DEAL_EXIT`, то есть **после**
-прохода `REFRESH_BILLS` (`docs/models/domain/aggregate/Deal.md`
+движения это поле **пусто**: его пишет `FINALIZE_DEAL_EXIT_COMMAND`, то есть **после**
+прохода `REFRESH_BILLS_COMMAND` (`docs/models/domain/aggregate/Deal.md`
 §Персистентность — колонка nullable;
 `docs/decisions/pnl-finalization-mechanics.md` реш.2). Предикат сравнивал бы с
 `null` — cross-ccy guard снова был бы мёртв, ровно тем же отказом, который
@@ -323,7 +323,7 @@ positions-history. Расхождение **сверх epsilon** и наличи
 закрытия», которая теперь снята — редакция одна). Механика:
 
 - нарушающее движение **сохраняется и пересчитывается сразу**, на записи —
-  тем же проходом `REFRESH_BILLS`, который его добыл;
+  тем же проходом `REFRESH_BILLS_COMMAND`, который его добыл;
 - курс берётся **отдельным вызовом биржи на момент обработки**;
 - применённый курс **фиксируется полем** `DealCashFlow.appliedRate` (`null`
   для строк расчётной валюты — пересчёт им не нужен). Число, полученное

@@ -7,12 +7,12 @@ close-position и где выполняется частичный выход.
 
 ## Правило
 
-- `CLOSE_POSITION` используется только для **полного** закрытия
-  позиции. Direct partial close через `Position` / `CLOSE_POSITION`
+- `CLOSE_POSITION_COMMAND` используется только для **полного** закрытия
+  позиции. Direct partial close через `Position` / `CLOSE_POSITION_COMMAND`
   запрещён.
 - Полное закрытие — **не** отдельное действие стратегии
   (`StrategyAction`), а переход `MANAGING → EXIT_PENDING`: market-close
-  исполняет `ExitPendingHandler` командой `CLOSE_POSITION`.
+  исполняет `ExitPendingHandler` командой `CLOSE_POSITION_COMMAND`.
 - Частичное уменьшение (partial exit) выполняется только через
   reduce-only `Order` / `AlgoOrder` actions.
 - Частичное уменьшение — это `Position.status == ACTIVE` с
@@ -35,10 +35,10 @@ Partial exit идёт через трассируемые runtime-сущност
 Нарушения partial-exit инварианта — safety/invariant violation (не
 risk-policy check `RiskValidator`): `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 `PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`
-(direct partial close через `CLOSE_POSITION`).
+(direct partial close через `CLOSE_POSITION_COMMAND`).
 Коды — `docs/components/models/RiskCheckResult.md` (`RiskCheckCode`).
 Полного закрытия позиции как действия нет — выход выражается
-условием-перехода `MANAGING → EXIT_PENDING`, `CLOSE_POSITION` исполняет
+условием-перехода `MANAGING → EXIT_PENDING`, `CLOSE_POSITION_COMMAND` исполняет
 `ExitPendingHandler` (full close, reduce-only; см.
 `docs/models/domain/aggregate/Strategy.md`).
 

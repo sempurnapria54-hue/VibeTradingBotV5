@@ -49,7 +49,7 @@ rules-модели (backlog п.9).
 
 ### Balance — без normal null
 
-Для `REFRESH_BALANCE` normal `null` contract не применяется: успешный
+Для `REFRESH_BALANCE_COMMAND` normal `null` contract не применяется: успешный
 refresh обязан вернуть валидный `BalanceContainerExternalSnapshot` с
 обязательной `settleCurrency`; пустой response / нет settleCurrency /
 invalid fields → controlled external/account error (не `null`). См.

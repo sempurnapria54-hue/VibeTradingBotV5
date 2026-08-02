@@ -12,7 +12,7 @@
 `Position` — runtime-сущность позиции внутри `Deal`. Отражает состояние
 сопровождаемой позиции и отвечает на вопрос: «есть ли live-risk позиция
 по сделке прямо сейчас», а после закрытия — **несёт положение закрытия**
-(realized-факты закрытой позиции, добытые второй ногой `REFRESH_POSITION`,
+(realized-факты закрытой позиции, добытые второй ногой `REFRESH_POSITION_COMMAND`,
 см. §«Положение закрытия»). Хранит **только** данные, нужные для
 сопровождения live-risk позиции и для финализации сделки по ней.
 
@@ -45,12 +45,16 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
 | `externalResultCurrency` | `String` | **Положение закрытия:** валюта, в которой посчитан `externalRealizedProfit` (`ccy` записи positions-history). |
 | `externalCloseType` | `String` | **Положение закрытия:** сырой тип последнего закрытия источника (OKX `type`: `1`–`2` торговое, `3`–`6` ликвидация/ADL). Провенанс аварийного терминала (`docs/decisions/pnl-finalization-mechanics.md` реш.3). |
 
-Поля §«Положение закрытия» пишет **вторая нога `REFRESH_POSITION`**
+Поля §«Положение закрытия» пишет **вторая нога `REFRESH_POSITION_COMMAND`**
 (positions-history), не финализатор; наследуемый `externalModifiedAt`
-принимает `uTime` записи закрытия, `externalAverageEntryPrice` —
-`openAvgPx`. Состав ограничен полями с **названным потребителем**
-(codestyle §«Неиспользуемый код»); что осталось за бортом и почему —
-§«Что `Position` не хранит».
+принимает `uTime` записи закрытия (той же транзакцией нога пишет
+`Deal.billsWindowEnd` — верхнюю границу окна линковки bills; из
+`externalModifiedAt` окно **не реконструируется**, узел 1
+`DOCS_CHECK_8`). `externalAverageEntryPrice` пишет **только live-нога**
+(`avgPx`); `openAvgPx` записи закрытия не маппится (H23 —
+`docs/models/mapping/PositionCloseResult.md`). Состав ограничен полями с
+**названным потребителем** (codestyle §«Неиспользуемый код»); что
+осталось за бортом и почему — §«Что `Position` не хранит».
 
 ## Инварианты
 
@@ -59,7 +63,7 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
 - `Position` **не** хранит `instrumentId`, `exchangeId`, `internalId`,
   `strategyActionId`, `strategyActionKey`. Эти данные приходят через
   `DealContext` (Exchange / Instrument), см. lifecycle.
-- `Position` создаётся и обновляется только через `REFRESH_POSITION`
+- `Position` создаётся и обновляется только через `REFRESH_POSITION_COMMAND`
   executor (**обе ноги** — live и positions-history); FSM напрямую
   `Position` не создаёт и поля не заполняет.
 - `Position` не client-created entity, не имеет stable client id.
@@ -134,7 +138,7 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 `Position` — в snapshot не попадает. OKX mapping — в
 `docs/models/mapping/Position.md`.
 
-Вторая нога `REFRESH_POSITION` (positions-history) нормализуется
+Вторая нога `REFRESH_POSITION_COMMAND` (positions-history) нормализуется
 **своим** граничным объектом `PositionCloseResultExternalSnapshot` и
 обновляет ту же `Position` полями §«Положение закрытия»
 (`docs/models/mapping/PositionCloseResult.md`). Два снапшота — потому
@@ -143,11 +147,11 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 
 ## Положение закрытия
 
-**Добывается второй ногой `REFRESH_POSITION`** (H1/H3, `GAPS_CLOSE_7`).
-`REFRESH_POSITION` проходит evidence-cycle **внутри одной команды**: live
+**Добывается второй ногой `REFRESH_POSITION_COMMAND`** (H1/H3, `GAPS_CLOSE_7`).
+`REFRESH_POSITION_COMMAND` проходит evidence-cycle **внутри одной команды**: live
 `/account/positions` → при not-found (позиция закрыта)
 `/account/positions-history` по `posId`. Это тот же within-command-обход,
-которым `REFRESH_ORDER` эскалирует live → pending → history
+которым `REFRESH_ORDER_COMMAND` эскалирует live → pending → history
 (`docs/decisions/refresh-evidence-cycle-ownership.md`,
 `docs/rules/command-lifecycle.md` §«Команды атомарны»); отдельной команды
 `REFRESH_POSITIONS_HISTORY` **не вводится** — сущность одна (`Position`),
@@ -155,8 +159,8 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 
 Добытое **приземляется на `Position`** (persisted), а не живёт транзитно:
 `externalRealizedProfit`, `externalResultCurrency`, `externalCloseType`,
-`externalModifiedAt` (`uTime` записи закрытия),
-`externalAverageEntryPrice` (`openAvgPx`). Следствия:
+`externalModifiedAt` (`uTime` записи закрытия; на `Deal` та же транзакция
+пишет `billsWindowEnd`). Следствия:
 
 - у факта закрытия есть **durable-дом** ⇒ он пересекает границу прохода
   FSM штатно, и потребители (финализатор штатной тропы, аварийный
@@ -193,5 +197,5 @@ codestyle §«Неиспользуемый код»; H22, `GAPS_CLOSE_7`): ср�
 принадлежит `Deal` (`.claude/decisions/rule-source-of-truth.md`,
 `docs/models/domain/aggregate/Deal.md` §Итоговый PnL,
 `docs/decisions/result-profit-source.md`). Полное закрытие
-подтверждается через `REFRESH_POSITION`, не через ACK (см.
+подтверждается через `REFRESH_POSITION_COMMAND`, не через ACK (см.
 `docs/rules/ack-not-runtime-truth.md`).

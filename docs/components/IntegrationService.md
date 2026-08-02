@@ -50,7 +50,7 @@ orphan-часть — шаг 8.
 
 ## Исключение: balance
 
-Для `REFRESH_BALANCE` normal `null` contract не используется: успешный
+Для `REFRESH_BALANCE_COMMAND` normal `null` contract не используется: успешный
 refresh обязан вернуть валидный `BalanceContainerExternalSnapshot` с
 обязательной `settleCurrency`; пустой response / нет settleCurrency /
 invalid fields → controlled external/account error (см.

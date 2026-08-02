@@ -11,7 +11,7 @@ Raw OKX `FillResponse` — элемент `data[]` ответов
 `GET /api/v5/trade/fills-history` (последние 3 месяца). Эти fills-эндпоинты
 в runtime фазы 1 **не используются**: команда `REFRESH_FILLS` снята на шаге 7
 (`docs/decisions/pnl-finalization-mechanics.md` реш.1) — order-fill-метрики
-(`accFillSz`/`avgPx`) идут прямо из `OkxOrderResponse` (`REFRESH_ORDER`), а
+(`accFillSz`/`avgPx`) идут прямо из `OkxOrderResponse` (`REFRESH_ORDER_COMMAND`), а
 число P&L — из positions-history/bills. Поля ниже оставлены как справка
 (deep-архив — `OKX-Q2`).
 

@@ -13,7 +13,7 @@
 число `resultProfit` берётся net'ом из positions-history, разбивка — из bills
 (`DealCashFlow`), fills для этого не нужны. Order-fill-метрики
 (`accFillSz`/`avgPx`) агрегируются в `Order` прямо из `OkxOrderResponse` при
-`REFRESH_ORDER`; отдельная команда `REFRESH_FILLS` и её executor **сняты** на
+`REFRESH_ORDER_COMMAND`; отдельная команда `REFRESH_FILLS` и её executor **сняты** на
 шаге 7 (`docs/decisions/pnl-finalization-mechanics.md` реш.1).
 
 Файл оставлен как исторический стаб; при будущей потребности в пофилловой
@@ -36,7 +36,7 @@
 - `clOrdId` ↔ `Order.internalId`;
 - Order-fill-метрики (`accumulatedFillSize`, `averagePrice`, `fee`)
   приходят в `Order` **готовыми агрегатами** прямо из `OkxOrderResponse`
-  (`accFillSz`/`avgPx`/`fee`) при `REFRESH_ORDER` — отдельного прохода по
+  (`accFillSz`/`avgPx`/`fee`) при `REFRESH_ORDER_COMMAND` — отдельного прохода по
   fills не нужно; ack-not-runtime-truth применяется
   (`docs/rules/ack-not-runtime-truth.md`).
 

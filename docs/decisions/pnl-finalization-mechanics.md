@@ -24,14 +24,14 @@ staged-числа между двумя финализационными ком�
 ### 1. Добыча P&L-фактов — нога цикла + новая команда, замена `REFRESH_FILLS` (N6, N12)
 
 - **Положение закрытия** (число) добывается **второй ногой evidence-cycle
-  `REFRESH_POSITION`**: live `/account/positions` → при not-found
+  `REFRESH_POSITION_COMMAND`**: live `/account/positions` → при not-found
   `/account/positions-history` по `posId`. Отдельная команда
   `REFRESH_POSITIONS_HISTORY` **не вводится** — positions-history описывает
   **ту же сущность** `Position` после закрытия, а refresh-набор держит по
   одной команде на сущность (CMD-Q3). Добытое **приземляется полями на
   `Position`** (`docs/models/domain/core/Position.md` §«Положение
   закрытия»).
-- **`REFRESH_BILLS`** вводится как новая команда — под **новую** сущность
+- **`REFRESH_BILLS_COMMAND`** вводится как новая команда — под **новую** сущность
   `DealCashFlow` (разбивка), по тому же принципу. Эмитится handler'ами
   (`ExitPendingHandler` штатно, `ErrorHandler` аварийно) **до**
   финализации/терминала отдельным проходом: её факт durable — строки
@@ -40,7 +40,7 @@ staged-числа между двумя финализационными ком�
   (`refresh-evidence-cycle-ownership.md`).
 - `REFRESH_FILLS` **снимается** (N12): его единственная функция (пересчёт
   order-fill-метрик `accumulatedFillSize`/`averagePrice`/`fee` ordinary `Order`)
-  покрыта `REFRESH_ORDER` (`OkxOrderResponse.accFillSz`/`avgPx`). Swap
+  покрыта `REFRESH_ORDER_COMMAND` (`OkxOrderResponse.accFillSz`/`avgPx`). Swap
   1-out-1-in в refresh-вокабуляре (целевой состав — 17,
   `docs/components/models/ServiceCommand.md`).
 - **Оба факта durable ⇒ границу прохода FSM пересекают штатно**, и
@@ -60,7 +60,7 @@ staged-числа между двумя финализационными ком�
 > редакция объявляла `PositionCloseResultExternalSnapshot` **транзитным без
 > durable-дома** и потому уводила его добычу во **вложенный шаг**
 > финализирующего действия (`REFRESH_POSITIONS_HISTORY` внутри
-> `FINALIZE_DEAL_EXIT` / `MARK_DEAL_EMERGENCY_CLOSED`), а снапшот держала
+> `FINALIZE_DEAL_EXIT_COMMAND` / `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`), а снапшот держала
 > **в памяти действия**. Обе посылки сняты:
 >
 > - **«негде хранить» ложно** — у факта есть естественный владелец,
@@ -73,7 +73,7 @@ staged-числа между двумя финализационными ком�
 >   проходам** (`action-orchestration-vs-command.md`), а `replace-not-amend.md`
 >   §Отвергнутые прямо отвергает «executor с двумя ногами».
 >
-> Цена промежуточной редакции была **исполнимой**: `REFRESH_BILLS` идёт
+> Цена промежуточной редакции была **исполнимой**: `REFRESH_BILLS_COMMAND` идёт
 > отдельным проходом и к памяти чужого действия доступа не имеет, поэтому
 > операнд `end` окна линковки, объявленный через «`externalUpdatedAt`
 > снапшота», не существовал в момент, когда линковка исполняется (H1). С
@@ -84,10 +84,13 @@ staged-числа между двумя финализационными ком�
 - **Разрыв GAPS_CLOSE_1:** число считалось в `FINALIZE_EXIT`, писалось
   `MARK_CLOSED` — durable-слот между двумя командами (разные проходы FSM, разные
   строки `DealFinalizationState`) не назначен; ломалось об идемпотентность/рестарт.
-- **Решение:** `FINALIZE_DEAL_EXIT` **пишет `resultProfit`/`resultProfitCurrency`
-  прямо на `Deal`** (persisted) в **одной транзакции** с
-  `DealFinalizationState(FINALIZE_EXIT) = COMPLETED` (+ персистит `DealCashFlow`).
-  `MARK_DEAL_CLOSED` **читает `Deal.resultProfit`, ассертит непустоту** (инвариант
+- **Решение:** `FINALIZE_DEAL_EXIT_COMMAND` **пишет `resultProfit`/`resultProfitCurrency`
+  прямо на `Deal`** (persisted) в **одной транзакции** с durable-продвижением
+  своего звена в исполнении `FINALIZE_DEAL_EXIT_ACTION` (+ персистит
+  `DealCashFlow`; носитель исполнений —
+  `docs/models/domain/other/DealActionState.md`, транзакционная клауза
+  обобщена — `docs/decisions/command-action-boundary.md` §5).
+  `MARK_DEAL_CLOSED_COMMAND` **читает `Deal.resultProfit`, ассертит непустоту** (инвариант
   чистого `CLOSED`), ставит `status = CLOSED`.
 - **Durable-носитель = сами поля `Deal.resultProfit`** (nullable; заполнены на
   `FINALIZE_EXIT`, ассертятся на терминале). Рестарт-safe: после `COMPLETED` число
@@ -102,12 +105,12 @@ staged-числа между двумя финализационными ком�
 
 - **Владелец (part 1):** step-6 не назначил **запись** `EMERGENCY_CLOSED` —
   команды-терминала нет (`MarkDealErrorExecutor` пишет только `ERROR`;
-  `MARK_DEAL_EMERGENCY_CLOSED` в enum отсутствовал). Вводится
-  **`MARK_DEAL_EMERGENCY_CLOSED`** (команда + `MarkDealEmergencyClosedExecutor` +
-  `DealFinalizationType.MARK_EMERGENCY_CLOSED`), терминальное ребро
-  `ERROR → EMERGENCY_CLOSED`, **симметрично `MARK_DEAL_CLOSED`**. Эмитит
+  `MARK_DEAL_EMERGENCY_CLOSED_COMMAND` в enum отсутствовал). Вводится
+  **`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`** (команда + `MarkDealEmergencyClosedExecutor`;
+  звено `FINALIZE_DEAL_ERROR_ACTION`), терминальное ребро
+  `ERROR → EMERGENCY_CLOSED`, **симметрично `MARK_DEAL_CLOSED_COMMAND`**. Эмитит
   `ErrorHandler` после подтверждённого снятия live risk. Best-effort число —
-  из полей положения закрытия на `Position` (их наполнил `REFRESH_POSITION`
+  из полей положения закрытия на `Position` (их наполнил `REFRESH_POSITION_COMMAND`
   второй ногой; на аварийной тропе `ErrorHandler` его и так гоняет, чтобы
   доказать отсутствие live risk).
 - **Провенанс-контракт (part 2) — best-effort, два провенанса разведены:**
@@ -115,7 +118,7 @@ staged-числа между двумя финализационными ком�
     `liqPenalty` доступны (`type` 3-6) → пишем **фактический realized net**.
   - **(b) отказ расчёта после исчерпания retry** (чистая тропа не смогла
     посчитать → ушла в `ERROR`): `ErrorHandler` перед терминалом гоняет
-    `REFRESH_POSITION`, и её вторая нога ещё раз пробует добыть положение
+    `REFRESH_POSITION_COMMAND`, и её вторая нога ещё раз пробует добыть положение
     закрытия; net на `Position` есть → пишем его; **genuinely недоступен** →
     `resultProfit = null` с семантикой **«неисчислимо»** (НЕ ноль),
     сделка терминализуется **всё равно**, факт помечается (лог +
@@ -253,7 +256,7 @@ staged-числа между двумя финализационными ком�
     инструменты этой группы (`docs/rules/error-handling-policy.md` §«Радиус
     ущерба задаёт scope»). Формулировка «холд биржи, сделки доживают»
     **снята**: она была вдобавок внутренне противоречива —
-    exchange-блок-сет рубит `SUBMIT_ALGO_ORDER`, то есть `MAIN_PROTECTION`,
+    exchange-блок-сет рубит `SUBMIT_ALGO_ORDER_COMMAND`, то есть `MAIN_PROTECTION`,
     ремодел трейлинга и reduce-only partial exit, так что «доживающие»
     сделки лишались управления.
   - **Реакция — мягкая, kill-switch снят** (H2, `GAPS_CLOSE_5`;
@@ -406,7 +409,7 @@ staged-числа между двумя финализационными ком�
   - **Операнд сравнения — расчётная валюта инструмента** (H4,
     `GAPS_CLOSE_7`; ревизует редакцию `GAPS_CLOSE_6`). Сравнение с
     `Deal.resultProfitCurrency` **неисполнимо**: это поле пишет
-    `FINALIZE_DEAL_EXIT`, то есть **после** прохода `REFRESH_BILLS`, и на
+    `FINALIZE_DEAL_EXIT_COMMAND`, то есть **после** прохода `REFRESH_BILLS_COMMAND`, и на
     момент записи оно `null` — guard сравнивал бы с пустым и снова был бы
     мёртв, ровно тем же отказом, который `GAPS_CLOSE_6` чинил. Settle-ccy —
     свойство **инструмента**: известно до входа и не зависит от исхода
@@ -427,7 +430,7 @@ staged-числа между двумя финализационными ком�
     (`docs/models/mapping/DealCashFlow.md` §«Область суммирования»).
   - **Механизм курса — CCY-Q1 закрыт** (`GAPS_CLOSE_7`, решение
     пользователя): курс берётся **отдельным вызовом биржи на момент
-    обработки** движения (то есть на записи, проходом `REFRESH_BILLS`), и
+    обработки** движения (то есть на записи, проходом `REFRESH_BILLS_COMMAND`), и
     **применённый курс сохраняется** полем `DealCashFlow.appliedRate` —
     число, посчитанное по внешней котировке, обязано быть воспроизводимым
     (тот же принцип, по которому отвергнут fallback-ставки: подставленное
@@ -441,7 +444,7 @@ staged-числа между двумя финализационными ком�
       ещё одного read-пути. **Отвергнут и перенос ветки на финализацию:**
       пересчёт на записи снимает зависимость guard'а от факта закрытия —
       ровно того дефекта, из-за которого операнд был мёртв (H4).
-    - **Цена принятого решения названа:** `REFRESH_BILLS` получает
+    - **Цена принятого решения названа:** `REFRESH_BILLS_COMMAND` получает
       exchange-вызов котировки на редкой ветке. Контракт «финализация
       off-exchange» при этом **не нарушен** — вызов живёт в
       refresh-команде, а не в финализаторе.
@@ -456,7 +459,7 @@ staged-числа между двумя финализационными ком�
 
 | Тропа | Отказ добычи | Реакция |
 |---|---|---|
-| Штатная (`EXIT_PENDING` → `CLOSED`) | `REFRESH_POSITION` / `REFRESH_BILLS` не смогли прочитать | **ретрай/провал по счётчику попыток**, исчерпание уводит сделку ошибочной тропой в `ERROR` |
+| Штатная (`EXIT_PENDING` → `CLOSED`) | `REFRESH_POSITION_COMMAND` / `REFRESH_BILLS_COMMAND` не смогли прочитать | **ретрай по бюджету исполнения `REFRESH_DEAL_CONTEXT_ACTION`**; исчерпание уводит сделку ошибочной тропой в `ERROR` + **холд инструмента** (управление-сайд серия, `docs/rules/instrument-hold.md` §«Серия неудач» — с доводом отладки и условием пересмотра) |
 | Аварийный терминал (`ERROR` → `EMERGENCY_CLOSED`) | **жёсткий** отказ чтения (controlled/parse), не «пусто» | **приравнивается к «недоступно»** → пустой результат → `resultProfit = null` «неисчислимо» → **терминал всё равно ставится** |
 
 - **Почему асимметрия, а не единообразие.** На штатной тропе отказ означает
@@ -464,28 +467,35 @@ staged-числа между двумя финализационными ком�
   неверного числа. На аварийном терминале ждать **нельзя**: сделка уже в
   `ERROR`, live risk снят, и единственное, что осталось, — довести её до
   терминала. Если жёсткий отказ там трактовать как провал действия,
-  `MARK_DEAL_EMERGENCY_CLOSED` уходит в `FAILED`,
-  `DealFinalizationCommandFactory` перестаёт эмитить команду, и сделка
-  **зависает в `ERROR` вопреки инварианту** «сделка всегда доходит до
-  терминала» (`docs/lifecycles/Deal.md`).
-- **Нового якоря попыток не заводится.** Счётчик попыток уже есть —
-  существующий механизм `StrategyAction` (`DealActionState`, база
-  `Retryable`) для `REFRESH_*` и `DealFinalizationState` для терминальных
-  команд. Отдельная finalization-строка типа `FETCH_*` **не вводится**: она
-  дублировала бы существующий механизм.
-  - **CODE-следствие:** добывающие `REFRESH_*` штатной тропы обязаны идти
-    **под этим анкером**. Сегодня системные `REFRESH_*` строятся без
-    action-state (`DealFsmSupport`), и `applyFailureAccounting` на них —
-    no-op: ни попыток, ни `FAILED`. Оговорка
-    `docs/components/models/ServiceCommand.md` («системная/cleanup-команда
-    может не нести ни того, ни другого») остаётся верной для **cleanup**, но
-    к добывающим командам штатной тропы не применяется — у них исход влияет
-    на число. Пункт — в `.claude/work/backlog.md` §Шаг 7.
-- **Bills не гейтят выход.** Разбивка — **best-effort**: её отсутствие даёт
-  `AnomalyReport`, а не удержание сделки в `EXIT_PENDING`
-  (`docs/components/ExitPendingHandler.md` §«Выходные проверки»). Это
-  согласуется с уже записанной семантикой «сверка — аудит-аномалия, не блок
-  финализации» (реш.5).
+  исполнение уходит в `FAILED`, `SystemActionExecutor` перестаёт эмитить
+  команду, и сделка **зависает в `ERROR` вопреки инварианту** «сделка
+  всегда доходит до терминала» (`docs/lifecycles/Deal.md`).
+- **Якорь попыток добычи — строка исполнения `REFRESH_DEAL_CONTEXT_ACTION`**
+  (вид SYSTEM, `docs/models/domain/other/DealActionState.md`; закрытие
+  узла 3 `DOCS_CHECK_8`, `docs/decisions/command-action-boundary.md`).
+  Прежнее предписание «добывающие `REFRESH_*` — под анкером
+  `DealActionState` действия стратегии» было структурно неисполнимо
+  (`strategy_action_id NOT NULL` + `UNIQUE(deal_id, strategy_action_id)`
+  при эмиссии handler'ом вне strategy-action). Отдельная
+  finalization-строка типа `FETCH_*` по-прежнему **не вводится** — сущность
+  финализации упразднена вовсе, анкер даёт общая таблица исполнений.
+  - **CODE-следствие:** handler'ы перестают эмитить добывающие `REFRESH_*`
+    напрямую через `DealFsmSupport.systemCommand(...)` — только звеньями
+    действия (иначе `applyFailureAccounting` остаётся no-op). Оговорка
+    `docs/components/models/ServiceCommand.md` («без анкера») остаётся
+    верной **только для cleanup**. Пункт — в `.claude/work/backlog.md`
+    §Шаг 7.
+- **`FINALIZE_DEAL_EXIT_COMMAND` не завершается без числа** (узел 4 `DOCS_CHECK_8`,
+  вариант (а)): звено эмитится по терминальному исходу добычи и без числа
+  не завершается; прежняя клауза исполнителя «пустота фактов — легитимная
+  тропа "неисчислимо" на штатной тропе» снята — «неисчислимо» остаётся
+  только аварийному контуру.
+- **Полнота разбивки bills не гейтит выход.** Разбивка — **best-effort**:
+  недобранные движения дают `AnomalyReport` на сверке, а не удержание
+  сделки в `EXIT_PENDING` (`docs/components/ExitPendingHandler.md`
+  §«Выходные проверки»); согласуется с «сверка — аудит-аномалия» (реш.5).
+  Гейтит число (и окно линковки — `Deal.billsWindowEnd`) факт **закрытия**,
+  добываемый `REFRESH_POSITION_COMMAND`.
 - **Различение «пусто» vs «жёсткий отказ» — только на аварийной тропе.** На
   штатной различать незачем: оба исхода ведут в ретрай, а исчерпание — в
   `ERROR`, откуда работает аварийное правило.
@@ -495,7 +505,7 @@ staged-числа между двумя финализационными ком�
 - **Инвариант:** одна сделка ↔ один `posId` ↔ **одна финализированная** запись
   positions-history, чей `realizedPnl` **кумулятивен по ВСЕМ** partial-закрытиям и
   доборам за жизнь позиции; читается **финализированной** (позиция полностью
-  закрыта — `REFRESH_POSITION` показал flat/отсутствие).
+  закрыта — `REFRESH_POSITION_COMMAND` показал flat/отсутствие).
 - **Требует рантайм-верификации** (контур source-api, demo,
   `.claude/tests/source-api/okx/plan.md`): агрегирует ли OKX partial-выходы
   (partial TP `type` 1 → SL `type` 2) в **одну** запись на `posId`, и в какой
@@ -518,17 +528,33 @@ staged-числа между двумя финализационными ком�
 ## Следствия
 
 - **Новые команды/executor'ы (целевая дельта `CODE` шага 7, в коде их ещё
-  нет):** `REFRESH_BILLS`/`RefreshBillsExecutor`,
-  `MARK_DEAL_EMERGENCY_CLOSED`/`MarkDealEmergencyClosedExecutor`; **снимается**
+  нет):** `REFRESH_BILLS_COMMAND`/`RefreshBillsExecutor`,
+  `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`/`MarkDealEmergencyClosedExecutor`; **снимается**
   `REFRESH_FILLS`/`RefreshFillsExecutor` (в коде пока присутствуют — H15,
-  `GAPS_CLOSE_6`: формулировать целевым временем, не свершившимся).
+  `GAPS_CLOSE_6`: формулировать целевым временем, не свершившимся); плюс
+  `SystemActionExecutor` и переименование enum'ов
+  (`docs/decisions/command-action-boundary.md`).
+- **Полная schema-дельта шага 7** (H21, `DOCS_CHECK_8`; всё — `ALTER` /
+  новые объекты, в `V1-V10` их **нет**):
+  - `deals`: `ALTER` + `planned_risk_amount`, `planned_risk_currency`,
+    `bills_window_begin`, `bills_window_end` (nullable);
+  - `positions`: `ALTER` + `external_realized_profit`,
+    `external_result_currency`, `external_close_type`;
+  - `deal_action_states`: `ALTER` — `strategy_action_id` → nullable,
+    `+action_kind`, `+system_action_type`, `+target_entity_type`,
+    `+target_entity_id`; снятие `uk_deal_action_state_deal_action`,
+    частичные уникальные индексы живых исполнений; перенос строк
+    `deal_finalization_states` (вид SYSTEM) + `DROP TABLE
+    deal_finalization_states`;
+  - новые таблицы: `deal_cash_flows` (вкл. `applied_rate`,
+    `UNIQUE(external_bill_id)`), `trade_fee_rates`;
+  - `strategy_actions`: миграция **значений** `action_type`
+    (`CREATE→CREATE_ACTION` и т. д., суффиксное правило).
 - **Дельта существующего executor'а:** `RefreshPositionExecutor` получает
-  вторую ногу цикла (positions-history) и запись полей положения закрытия
-  на `Position`; `Position`/`PositionEntity` — три новых колонки
-  (`external_realized_profit`, `external_result_currency`,
-  `external_close_type`), миграция шага 7.
-- **Реконсиляция:** `ServiceCommand` enum, `DealFinalizationCommandFactory`
-  (+`MARK_EMERGENCY_CLOSED`), `DealFinalizationState` (тип + N7-нота),
+  вторую ногу цикла (positions-history), запись полей положения закрытия
+  на `Position` и запись `Deal.billsWindowBegin`/`billsWindowEnd`.
+- **Реконсиляция:** `ServiceCommand` enum, `SystemActionExecutor`,
+  `DealActionState` (вид SYSTEM + N7-нота),
   `FinalizeDealExitExecutor` (N6/N7/N10), `MarkDealClosedExecutor` (N7),
   `MarkDealErrorExecutor`/`ErrorHandler`/`ExitPendingHandler` (N6/N8/N12),
   `Deal.md` + `lifecycles/Deal.md` (N7/N8), `InstrumentExternalRules`/

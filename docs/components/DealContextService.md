@@ -11,7 +11,15 @@
 `docs/components/models/DealContext.md`) для одного прохода FSM: `Deal` с
 runtime graph (orders/algoOrders/position), `Exchange`, `Instrument`,
 pinned `StrategyDetail`, последний persisted `BalanceContainer`, список
-`DealActionState`.
+строк исполнений `DealActionState` (оба вида — STRATEGY и SYSTEM).
+
+**Служебная сборка — не действие.** Сборка объекта `DealContext` перед
+проходом читает уже приземлённое и между проходами не переживает ничего —
+действием она **не материализуется**. Действие — только **добыча
+наружу** (`REFRESH_DEAL_CONTEXT_ACTION`,
+`docs/components/SystemActionExecutor.md`): поход на биржу и приземление
+фактов, чьи попытки и исход durable. Одноимённость «контекста» эти два
+смысла не склеивает: сборка потребляет то, что добыча приземлила.
 
 ## Границы
 

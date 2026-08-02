@@ -158,6 +158,11 @@ INSTR-Q1 закрыт
 
 ### Отложенные продуктовые вопросы (future)
 
+- **Политика очистки накопленных строк исполнений `deal_action_states`**
+  — фаза 3. Строки копятся by design (`COMPLETED` жёстко терминален,
+  слот-переиспользования нет — В2.1 развилки «команда ↔ действие»);
+  ретеншен — цена, явно отложенная за границу фазы
+  (`docs/decisions/command-action-boundary.md` §Отложено).
 - `linkedOrderExternalIds` — использование для fills/recovery/audit
   (`2026-05-27-.../tasks-algo-order.md` ALGO-Q6).
 - Стандарт описания персистентности доменных моделей: формат и
@@ -328,10 +333,15 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   - финализаторы (`FinalizeDealExitExecutor`,
     `MarkDealEmergencyClosedExecutor`) читают число **со строки `Position`**,
     вложенных команд не исполняют;
-  - `RefreshBillsExecutor` — окно `[Position.externalCreatedAt,
-    Position.externalModifiedAt]`, инструмент из `DealContext`, **guard
-    «сделка удерживает слот»** (статус вне `CLOSED`/`EMERGENCY_CLOSED`) перед
-    линковкой.
+  - `RefreshBillsExecutor` — окно `[Deal.billsWindowBegin,
+    Deal.billsWindowEnd]` (собственные поля сделки, узел 1 `DOCS_CHECK_8`;
+    `billsWindowEnd` пуст → привязка ждёт), инструмент из `DealContext`,
+    **guard «сделка удерживает слот»** (статус вне
+    `CLOSED`/`EMERGENCY_CLOSED`) перед линковкой;
+  - `Deal`/`DealEntity` + миграция: колонки `bills_window_begin`,
+    `bills_window_end`; писатели окна — `RefreshPositionExecutor`
+    (live-нога: begin по `cTime`; нога 2: end по `uTime` записи закрытия,
+    одной транзакцией с полями положения закрытия).
 - **CODE R-слота и формулы риска (`GAPS_CLOSE_7`, H9/H10):**
   - `Deal.plannedRiskAmount` / `plannedRiskCurrency` + миграция; пишет
     `CreateOrderExecutor` **входного** действия в одной транзакции с
@@ -342,13 +352,42 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     нет;
   - `RiskValidator` — та же база нотинала каждой ноги (вход по цене входа,
     выход по цене стопа), чтобы шорты не сайзились крупнее.
-- **CODE retry-анкера добывающих команд (`GAPS_CLOSE_7`, H15):**
-  `REFRESH_POSITION` / `REFRESH_BILLS` на штатной тропе `EXIT_PENDING`
-  эмитить **под анкером** `DealActionState` (сегодня системные `REFRESH_*`
-  строятся без него, `applyFailureAccounting` — no-op); нового
-  finalization-типа `FETCH_*` **не заводить**. На аварийном терминале —
-  жёсткий отказ чтения приравнять к «недоступно» (пустой результат +
-  терминал), чтобы `MARK_DEAL_EMERGENCY_CLOSED` не уходил в `FAILED`.
+- **CODE границы «команда ↔ действие»
+  (`docs/decisions/command-action-boundary.md`; замещает прежний пункт
+  «retry-анкера добывающих команд»):**
+  - **носитель:** `deal_action_states` — `ALTER` (nullable
+    `strategy_action_id`, `+action_kind`, `+system_action_type`,
+    `+target_entity_type`, `+target_entity_id`; снятие
+    `uk_deal_action_state_deal_action`, частичные уникальные индексы живых
+    исполнений); перенос строк `deal_finalization_states` (вид SYSTEM) +
+    `DROP TABLE`; удаление `DealFinalizationState`-стека
+    (модель/entity/mapper/repository/dataservice);
+  - **`SystemActionExecutor`** вместо `DealFinalizationCommandFactory`;
+    handler'ы перестают эмитить добывающие `REFRESH_*` напрямую через
+    `DealFsmSupport.systemCommand(...)` — только звеньями
+    `REFRESH_DEAL_CONTEXT_ACTION` (иначе `applyFailureAccounting` —
+    no-op); cleanup (`CANCEL_*`/`CLOSE_POSITION`) — напрямую, без анкера;
+  - **`ServiceCommandExecutor`** — одна ветка учёта (анкер один);
+    `DealActionStateDataService` — резолв живого исполнения по частичному
+    ключу вместо `findByDealIdAndStrategyActionId` (ключ дефектен для
+    грида: второму исполнению узла некуда лечь);
+  - **транзакционные связки:** `ENTRY_FINALIZED` — одной транзакцией с
+    завершением `FINALIZE_DEAL_ENTRY_ACTION` (В4.1); терминалы — с
+    продвижением своих звеньев (обобщение N7);
+  - **переименование enum'ов** — `ServiceCommandType` → `*_COMMAND`
+    (в БД не хранится), `StrategyActionType` → `*_ACTION` + **миграция
+    значений `strategy_actions.action_type`** + правка примера
+    `strategy-examples/trend-following-ema.json`; свип по
+    switch/equals/конфиг-ключам;
+  - **retry-конфиг:** завести секцию `service-command-retry`
+    (`default-policy` + per-command `policies`) — сегодня её **нет ни в
+    одном конфиге**, `getPolicy` возвращает `null` и `canRetry` падает
+    NPE в catch-ветке учёта отказа, подменяя исходную ошибку; защитить
+    `getPolicy` от пустого default'а;
+  - нового finalization-типа `FETCH_*` **не заводить** (сущность
+    финализации упразднена). На аварийном терминале — жёсткий отказ
+    чтения приравнять к «недоступно» (пустой результат + терминал), чтобы
+    `MARK_DEAL_EMERGENCY_CLOSED` не уходил в `FAILED`.
 - **CODE журнальных аномалий (`GAPS_CLOSE_7`, H19/H23):** вторая точка входа
   `AnomalyReportService` — **без `DealContext`**, с явными
   `scope`/`severity`/`code` (`NON_CRITICAL`); анкер идемпотентности — нет

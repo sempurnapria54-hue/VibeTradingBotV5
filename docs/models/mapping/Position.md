@@ -84,7 +84,7 @@ lever     <= биржевой максимум (externalMaxLeverage)
 ERROR`, `closeReason = EXCHANGE_INVARIANT_VIOLATION`, `Deal → ERROR /
 safety-flow`. `lever` не хранится в `Position` /
 `PositionExternalSnapshot`. Проверка leverage может выполняться при
-создании сделки/расчёте action и дополнительно при `REFRESH_POSITION`.
+создании сделки/расчёте action и дополнительно при `REFRESH_POSITION_COMMAND`.
 
 ### Close-position request
 
@@ -103,7 +103,7 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 
 ### Close reason при close-position
 
-`CLOSE_POSITION` payload несёт `requestedCloseReason`. Допустимы:
+`CLOSE_POSITION_COMMAND` payload несёт `requestedCloseReason`. Допустимы:
 `CLOSED_BY_STRATEGY`, `KILL_SWITCH`, `MANUAL_CLOSE`. Не используются
 как requested reason: `EXTERNAL_CLOSE` (закрытие на стороне источника
 без команды), `EXCHANGE_INVARIANT_VIOLATION` (problem reason),

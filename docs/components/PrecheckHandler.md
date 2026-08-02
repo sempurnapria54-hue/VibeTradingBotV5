@@ -15,7 +15,7 @@
 ## Входные проверки
 
 `Deal.status = PRECHECK`; есть pinned `StrategyDetail` и `Instrument`;
-есть `BalanceContainer` или можно создать `REFRESH_BALANCE`; refresh/search
+есть `BalanceContainer` или можно создать `REFRESH_BALANCE_COMMAND`; refresh/search
 не показывают >1 позиции; нет активной позиции/сделки (при максимуме
 одной); **чистота инструмента** — нет чужого/висящего на инструменте (см.
 ниже); нет borrow/debt; режим isolated. Не прошли безопасно → refresh /
@@ -29,7 +29,7 @@
 `IntegrationService` напрямую не инъектит) читает позицию по инструменту
 (`IntegrationService.getPosition`) при отсутствии локальной позиции сделки, и
 чужой live risk (позиция с size > 0) уводит сделку в `ERROR`
-(`MARK_DEAL_ERROR`, `markError`). Форвард: нет открытой сделки → биржа по
+(`MARK_DEAL_ERROR_COMMAND`, `markError`). Форвард: нет открытой сделки → биржа по
 инструменту должна быть пуста; не пуста (чужой/висящий live order/algo) →
 `AnomalyReport` + холд инструмента (`docs/rules/instrument-hold.md`). «Оптовую
 команду» в command-layer не возвращаем (CMD-Q4: read **вне** command-layer).
@@ -40,14 +40,14 @@ Orphan-скан при уже открытой сделке и по неведо
 ## Рабочая логика
 
 Сначала обеспечить fresh `BalanceContainer` (absent/stale →
-`REFRESH_BALANCE`, остаться, не вызывать `RiskValidator`/`CREATE_ORDER` на
+`REFRESH_BALANCE_COMMAND`, остаться, не вызывать `RiskValidator`/`CREATE_ORDER_COMMAND` на
 этой итерации). Затем: найти `ENTRY`/`GRID_ENTRY` step → freshness
 (`checkForStep`) → при устаревании `marketDataExpiredSetting` → проверить
 `StrategyCondition`. Если condition false и live risk нет → закрыть
 candidate Deal без ошибки (`CLOSED` + `ENTRY_CONDITION_EXPIRED`); если live
 risk есть/неизвестно → recovery/safety. Если condition true → взять
 action, проверить `DealActionState`, вызвать `StrategyActionCalculator`,
-создать `CREATE_ORDER` → `SUBMIT_ORDER` (рабочее плечо на биржу пишет inline
+создать `CREATE_ORDER_COMMAND` → `SUBMIT_ORDER_COMMAND` (рабочее плечо на биржу пишет inline
 `SubmitOrderExecutor` перед постановкой открывающего ордера — см. ниже; сам
 handler плечо не пишет). Risk-check entry action — через
 risk-layer (`docs/processes/risk-evaluation.md`): BLOCKED в PRECHECK без
@@ -92,8 +92,8 @@ risk-creating входа подтверждена** (attached SL / иной ст
 
 ## Допустимые StrategyStep / возможные ServiceCommand
 
-Steps: `ENTRY`, `GRID_ENTRY`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE`,
-`REFRESH_POSITION`, `CREATE_ORDER`, `SUBMIT_ORDER`, `MARK_DEAL_ERROR`.
+Steps: `ENTRY`, `GRID_ENTRY`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE_COMMAND`,
+`REFRESH_POSITION_COMMAND`, `CREATE_ORDER_COMMAND`, `SUBMIT_ORDER_COMMAND`, `MARK_DEAL_ERROR_COMMAND`.
 Перечисление **неизвестных** live orders/algo по
 инструменту для входной проверки чистоты берётся из стартового
 инструмент-скоупного exchange-read **вне command-layer**

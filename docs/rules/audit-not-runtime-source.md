@@ -28,7 +28,7 @@ queue. История исполнения команд не становитс�
 
 ### Что аудит фиксирует (инварианты отображения)
 
-- `REFRESH_BALANCE` попадает в историю исполнения команд (баланс влияет на
+- `REFRESH_BALANCE_COMMAND` попадает в историю исполнения команд (баланс влияет на
   risk decisions).
 - `shutdownReason` виден в timeline, но **не** заменяет `closeReason` (см.
   `docs/models/domain/aggregate/Deal.md`).

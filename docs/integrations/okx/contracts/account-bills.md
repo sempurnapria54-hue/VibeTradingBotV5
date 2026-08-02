@@ -74,7 +74,7 @@ Bills покрывают и funding, и rebate, и другие cashflow, не �
 
 ## Использование (намерение, не текущая реализация)
 
-Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsExecutor`):
+Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`RefreshBillsExecutor`):
 пагинация `7d → 3m` (`bills` → `bills-archive`) проходится **внутри
 команды**; результат наполняет доменный носитель разбивки `DealCashFlow`
 (`docs/models/domain/other/DealCashFlow.md`).
@@ -89,11 +89,11 @@ Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsEx
    - begin = Position.externalCreatedAt (биржевое cTime открытия позиции);
             позиции нет — externalCreatedAt первого отправленного Order;
    - end   = Position.externalModifiedAt (uTime записи закрытия, приземлённой
-            второй ногой REFRESH_POSITION); нет — Deal.modifiedAt.
+            второй ногой REFRESH_POSITION_COMMAND); нет — Deal.modifiedAt.
    Границы включительные. Верхняя граница нужна, чтобы не тянуть лишнего;
    разделяет сделки инвариант слота (п.0), а не она.
 
-2. Запросить bills (пагинация 7d→3m внутри REFRESH_BILLS):
+2. Запросить bills (пагинация 7d→3m внутри REFRESH_BILLS_COMMAND):
    GET /api/v5/account/bills?instType=SWAP&begin=...&end=...
    ccy в запрос НЕ идёт (H5): фильтр по валюте убивал бы cross-ccy guard —
    нарушающая запись не приходила бы в ответ вовсе.
@@ -108,7 +108,7 @@ Bills добываются командой **`REFRESH_BILLS`** (`RefreshBillsEx
 4. Сохранить как DealCashFlow (категорийная разбивка); резолв категории
    (type/subType → CashFlowCategory) — при финализации, в вызывающем коде.
    Ветка по валюте НА ЗАПИСИ (операнд — РАСЧЁТНАЯ ВАЛЮТА ИНСТРУМЕНТА,
-   не Deal.resultProfitCurrency: последнее пишет FINALIZE_DEAL_EXIT, то есть
+   не Deal.resultProfitCurrency: последнее пишет FINALIZE_DEAL_EXIT_COMMAND, то есть
    ПОСЛЕ этого прохода, и здесь оно всегда null — H4):
    - ccy == расчётная валюта инструмента -> штатно;
    - ccy != расчётная валюта инструмента -> персист + линковка (deal_id

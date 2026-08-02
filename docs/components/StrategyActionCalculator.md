@@ -45,7 +45,7 @@ size  = sizeCalculator.calculate(context, price)
 - **Не** считает тяжёлые данные (индикаторы, структуру) — читает готовые
   результаты через сервисы (см.
   `docs/processes/market-data-calculation.md`).
-- **Не** вызывает `REFRESH_BALANCE` / `IntegrationService` / OKX adapter;
+- **Не** вызывает `REFRESH_BALANCE_COMMAND` / `IntegrationService` / OKX adapter;
   freshness баланса обеспечивает FSM/handler.
 - **Не** рассчитывает data-dependent action, если FSM уже определила, что
   данные step устарели и `marketDataExpiredSetting` запрещает выполнение

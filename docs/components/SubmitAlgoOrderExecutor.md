@@ -2,11 +2,11 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `SUBMIT_ALGO_ORDER` (компонент-executor): что делает.
+Кто исполняет `SUBMIT_ALGO_ORDER_COMMAND` (компонент-executor): что делает.
 
 ## Назначение
 
-Получает `SUBMIT_ALGO_ORDER`. Загружает локальный `AlgoOrder`; если
+Получает `SUBMIT_ALGO_ORDER_COMMAND`. Загружает локальный `AlgoOrder`; если
 `externalId` есть — команда выполнена или требует refresh; если пуст —
 ищет на бирже по `algoClOrdId = algoOrder.internalId`. Найден → обновляет
 локальное состояние; не найден → отправляет на биржу. Обновляет

@@ -450,7 +450,12 @@ indicator-vs-indicator допускается — базовый кейс кро
 описывает ожидаемое действие; runtime-сущность связывается через
 `DealActionState`. JSON-дискриминатор `actionKind` (`ORDER`/
 `ALGO_ORDER`) — только для сериализации, не поле домена.
-Общий `StrategyActionType`: `CREATE`, `REPLACE`, `CANCEL`.
+Общий `StrategyActionType`: `CREATE_ACTION`, `REPLACE_ACTION`,
+`CANCEL_ACTION` (суффикс уровня — `.claude/rules/naming.md` §«Разведение
+уровней абстракции»; значения персистятся в
+`strategy_actions.action_type` и видны в Strategy API — переименование со
+значений без суффикса идёт миграцией значений, потребителей API вне
+репозитория нет; в прозе ниже — короткие CREATE/REPLACE/CANCEL).
 
 Полного закрытия позиции как **действия** нет, позиционного подтипа
 действия (`POSITION`) в модели нет: выход — условие-переход
@@ -548,7 +553,7 @@ cancel-пути (И-1).
 7. ALGO_ORDER REPLACE/CANCEL ссылаются на ALGO_ORDER CREATE.
 8. Нельзя ссылаться на action из другой `StrategyDetail`.
 9. Полного закрытия позиции как действия нет: выход — переход
-   `MANAGING → EXIT_PENDING` (`CLOSE_POSITION` через `ExitPendingHandler`);
+   `MANAGING → EXIT_PENDING` (`CLOSE_POSITION_COMMAND` через `ExitPendingHandler`);
    direct partial close позиции запрещён.
 10. Partial exit — через `StrategyOrderAction`/`StrategyAlgoOrderAction`
     с position-reducing-only.
@@ -578,12 +583,15 @@ activate, на create не проверяются. Материализация
 Стратегия не хранит runtime-состояние выполнения. `StrategyAction.key`
 — для валидации/резолва `targetActionKey` при сохранении;
 `StrategyAction.id` — в runtime: `DealActionState.strategyActionId →
-RuntimeTarget(entityType, entityId)`. Инварианты:
-`UNIQUE(strategy_detail_id, key)`, `UNIQUE(deal_id,
-strategy_action_id)`. Runtime работает через `strategyActionId`, не
-`strategyActionKey`. REPLACE/CANCEL: target StrategyAction →
-`DealActionState` → `RuntimeTarget` → `ServiceCommand` с конкретным
-orderId/algoOrderId. **Резолюция цели по цепочке замещений:** после
+(targetEntityType, targetEntityId)`. Инварианты:
+`UNIQUE(strategy_detail_id, key)` на дереве; на исполнениях — **частичные
+ключи живых строк с целью в ключе** (`docs/models/domain/other/
+DealActionState.md` §Инварианты: узел исполняется в сделке многократно —
+грид, параллельные ноги, — поэтому жёсткого `UNIQUE(deal_id,
+strategy_action_id)` больше нет). Runtime работает через
+`strategyActionId`, не `strategyActionKey`. REPLACE/CANCEL: target
+StrategyAction → `DealActionState` → target-колонки → `ServiceCommand` с
+конкретным orderId/algoOrderId. **Резолюция цели по цепочке замещений:** после
 REPLACE актуальная сущность — последнее звено цепочки от
 target-action (target-сущность → вперёд по `replacesInternalId`);
 REPLACE/CANCEL всегда целятся в актуальное звено, не в исходную
@@ -664,7 +672,7 @@ evaluator (`StrategyConditionEvaluator`),
 калькуляторы (`StrategyActionCalculator` → `PriceCalculator`/
 `SizeCalculator`), risk-layer (`RiskValidator` → `RiskCheckResult` →
 `RiskBlockResolver`), `StrategyActionOrchestrator` +
-`DealFinalizationCommandFactory`, freshness
+`SystemActionExecutor`, freshness
 (`MarketDataExpirationChecker`), модели рыночных данных
 (`IndicatorValue`/`MarketStructure`/`MarketPhase`/`MarketPriceLevel`),
 RVO (`CalculationContext`/`MarketPriceData`/`CalculatedStrategyAction`/

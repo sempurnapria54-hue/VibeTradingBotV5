@@ -19,7 +19,7 @@ MANAGING`, `→ ERROR`. Конструкция — `docs/components/DealStateMac
 
 `Deal.status = ENTRY_FINALIZED`; pinned `StrategyDetail`; позиция активна
 и соответствует сделке/инструменту/направлению; entry order финализирован
-(факты исполнения — `accFillSz`/`avgPx` из `REFRESH_ORDER`); известна цена
+(факты исполнения — `accFillSz`/`avgPx` из `REFRESH_ORDER_COMMAND`); известна цена
 входа; ≤1 позиция; нет критичного риска без возможности защиты;
 если `Strategy.DELETED` → graceful shutdown, не обычные data-dependent
 steps.
@@ -29,7 +29,7 @@ steps.
 Определить, нужен ли реальный protection switch. Если есть
 `MAIN_PROTECTION` step → freshness → `StrategyCondition` → protection
 actions → `DealActionState` → `StrategyActionCalculator` →
-`CREATE_ALGO_ORDER` → `SUBMIT_ALGO_ORDER` → refresh для подтверждения
+`CREATE_ALGO_ORDER_COMMAND` → `SUBMIT_ALGO_ORDER_COMMAND` → refresh для подтверждения
 active protection. Снять attached protection — только после подтверждения
 main protection (`CANCEL_*`). Если switch не нужен (нет `MAIN_PROTECTION`
 step или его условие не сработало) — переход в `MANAGING` **только если entry
@@ -53,7 +53,7 @@ active-attached) → `ERROR` + L3-холд инструмента.
 
 ## Допустимые StrategyStep / возможные ServiceCommand
 
-Steps: `MAIN_PROTECTION`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE`,
-`CREATE_ALGO_ORDER`, `SUBMIT_ALGO_ORDER`, `REFRESH_ALGO_ORDER`,
-`CANCEL_ALGO_ORDER`, `CANCEL_ORDER`, `REFRESH_POSITION`,
-`MARK_DEAL_ERROR`.
+Steps: `MAIN_PROTECTION`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE_COMMAND`,
+`CREATE_ALGO_ORDER_COMMAND`, `SUBMIT_ALGO_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`,
+`CANCEL_ALGO_ORDER_COMMAND`, `CANCEL_ORDER_COMMAND`, `REFRESH_POSITION_COMMAND`,
+`MARK_DEAL_ERROR_COMMAND`.

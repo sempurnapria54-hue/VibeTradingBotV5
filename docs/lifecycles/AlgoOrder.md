@@ -16,8 +16,8 @@ executor применяет результат через строгие transit
 handlers **не** используют `externalStatus` напрямую (см.
 `docs/rules/external-status-resolution.md`).
 
-> Resolver'ы, executors и команды (`CREATE_ALGO_ORDER`,
-> `SUBMIT_ALGO_ORDER`, `CANCEL_ALGO_ORDER`, `REFRESH_ALGO_ORDER`) —
+> Resolver'ы, executors и команды (`CREATE_ALGO_ORDER_COMMAND`,
+> `SUBMIT_ALGO_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`) —
 > command-подсистема (шаг 4): `docs/components/` (executors,
 > resolver'ы), `docs/rules/command-lifecycle.md`. Амендной команды
 > нет — ремоделирование через REPLACE-оркестрацию
@@ -98,7 +98,7 @@ safety-каскад (`docs/rules/external-status-resolution.md`).
 
 ## Cancel / replace (по фактам, не по ACK)
 
-`CANCEL_ALGO_ORDER` не финализирует `AlgoOrder`: ACK не runtime
+`CANCEL_ALGO_ORDER_COMMAND` не финализирует `AlgoOrder`: ACK не runtime
 truth. FSM сначала делает refresh, потом при необходимости создаёт
 cancel; executor отправляет команду, сохраняет ACK, не финализирует.
 После cancel intent верим exchange fact: `effective` →

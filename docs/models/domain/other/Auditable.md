@@ -98,13 +98,17 @@ Auditable заводится **в каждом слое отдельно, с п�
 
 ## Связи
 
-- Модели-наследники: `docs/models/domain/core/Instrument.md`,
+- Модели-наследники (список согласован с §Назначение; H19,
+  `DOCS_CHECK_8`): `docs/models/domain/core/Instrument.md`,
   `docs/models/domain/core/Exchange.md`,
+  `docs/models/domain/core/Position.md`,
+  `docs/models/domain/aggregate/Deal.md`,
   `docs/models/domain/other/Candle.md`,
   `docs/models/domain/other/CandleGroup.md`,
-  `docs/models/domain/other/InstrumentExternalRules.md`,
   `docs/models/domain/other/TradeFeeRate.md`,
   `docs/models/domain/other/DealCashFlow.md`.
+  `InstrumentExternalRules` наследником **не является** (§Назначение:
+  JSONB-навес без своей строки).
 - Опора на движение `modifiedAt` как на измеритель свежести:
   `docs/models/domain/other/TradeFeeRate.md` §«Свежесть измеряется, а не
   предполагается» — метку двигает JPA auditing, поэтому строка обязана

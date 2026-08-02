@@ -140,7 +140,7 @@ TRAILING_PERCENTS / TRAILING_VALUE                                -> move_order_
 ### Семья algo и cancel-endpoint (И-1, исход (а))
 
 Из `ordType` выводится семья, по которой ветвится cancel-путь
-(`CANCEL_ALGO_ORDER`):
+(`CANCEL_ALGO_ORDER_COMMAND`):
 
 ```text
 conditional / oco / trigger   -> ordinary -> POST /trade/cancel-algos
@@ -195,7 +195,7 @@ cancel старой, `REPLACED_BY_STRATEGY`). Биржевой amend-контр�
 `orders-algo-history`. Поиск: есть `externalId` → по `algoId`; нет →
 по `algoClOrdId`. Пустой `data=[]` одного endpoint — не финал. Цикл
 обходит `RefreshAlgoOrderExecutor` **внутри одной команды**
-`REFRESH_ALGO_ORDER`; терминал `MISSING_AFTER_REFRESH` выносит он же (см.
+`REFRESH_ALGO_ORDER_COMMAND`; терминал `MISSING_AFTER_REFRESH` выносит он же (см.
 `docs/decisions/refresh-evidence-cycle-ownership.md`).
 
 ## Целевые изменения кода (checklist, не runtime-логика)

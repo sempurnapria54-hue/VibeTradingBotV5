@@ -88,7 +88,7 @@ reduce-only `Order`/`AlgoOrder`, не close-position); `bePx` не нужен
 `code = 0` → ACK success; `code != 0` → command failed. ACK не
 является runtime truth (`docs/rules/ack-not-runtime-truth.md`); в
 ответе **нет `ordId`** и нет финального статуса позиции —
-подтверждение через `REFRESH_POSITION` (+ опционально `fills`, WS).
+подтверждение через `REFRESH_POSITION_COMMAND` (+ опционально `fills`, WS).
 
 ## Конвертация
 

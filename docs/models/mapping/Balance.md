@@ -93,7 +93,7 @@ snapshot полностью заменяет старый список currency 
 ### Error policy
 
 - **Temporary API problem** (timeout, connection reset, 5xx, gateway
-  недоступен): `REFRESH_BALANCE` retry; risk-creating action не
+  недоступен): `REFRESH_BALANCE_COMMAND` retry; risk-creating action не
   выполняется; `Deal` остаётся в текущем статусе, если нет другой
   опасной аномалии.
 - **Invalid response / account invariant violation** (`code != "0"`,

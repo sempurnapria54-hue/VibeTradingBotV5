@@ -19,8 +19,8 @@ error-градации): чем триггерится, что блокируе�
 **Блокируются** normal trading commands:
 
 ```text
-SUBMIT_ORDER
-SUBMIT_ALGO_ORDER
+SUBMIT_ORDER_COMMAND
+SUBMIT_ALGO_ORDER_COMMAND
 ```
 
 (Амендных команд нет — REPLACE-ремодел блокируется этой же парой:
@@ -31,14 +31,14 @@ SUBMIT_ALGO_ORDER
 ```text
 REFRESH_*
 SEARCH / HISTORY
-CANCEL_ORDER
-CANCEL_ALGO_ORDER
-CLOSE_POSITION
+CANCEL_ORDER_COMMAND
+CANCEL_ALGO_ORDER_COMMAND
+CLOSE_POSITION_COMMAND
 ```
 
 (Kill-switch teardown командой **не** является — тип `EXECUTE_KILL_SWITCH`
 убран; аварийное снятие риска идёт вне реестра команд через
-`docs/components/KillSwitchExecutor.md` теми же `CANCEL_*` / `CLOSE_POSITION`
+`docs/components/KillSwitchExecutor.md` теми же `CANCEL_*` / `CLOSE_POSITION_COMMAND`
 / `REFRESH_*`, которые здесь и так не блокируются.)
 
 Также `HOLD` блокирует создание новых `ENTRY`/`GRID_ENTRY`, normal-flow
@@ -64,7 +64,7 @@ TP/SL/trailing actions, pyramid/scaling и любые действия, увел
 > этой группы ⇒ холд **инструмент-scope**
 > (`docs/rules/instrument-hold.md` §«Несвежесть ставки комиссии»). Прежняя
 > редакция вешала этот триггер сюда — и тем самым подключала его к блок-сету,
-> спроектированному под «биржа сломана»: `SUBMIT_ALGO_ORDER` ниже — это не
+> спроектированному под «биржа сломана»: `SUBMIT_ALGO_ORDER_COMMAND` ниже — это не
 > только вход, но и `MAIN_PROTECTION`, ремодел трейлинга и reduce-only
 > partial exit, так что устаревшее справочное число деградировало **боевой
 > контур управления позицией**. Разбор — §«Радиус ущерба задаёт scope» в

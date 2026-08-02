@@ -2,12 +2,11 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как положение закрытой позиции (positions-history OKX) нормализуется
-через `PositionCloseResultExternalSnapshot` и приземляется на `Position`.
+Как положение закрытой позиции источника ложится на `Position`.
 
 ## Контекст
 
-Mapping-слой **второй ноги `REFRESH_POSITION`** (live → positions-history,
+Mapping-слой **второй ноги `REFRESH_POSITION_COMMAND`** (live → positions-history,
 `docs/components/RefreshPositionExecutor.md` §Evidence-cycle). Здесь **нет
 отдельной persisted доменной сущности**: положение закрытия ложится
 полями на **`Position`** (`docs/models/domain/core/Position.md`
@@ -56,7 +55,7 @@ executor работает только с validated normalized snapshot.
 объявляла снапшот транзитным без durable-дома и потому уводила добычу во
 **вложенный шаг** финализирующего действия — конструкция, которой канон
 командного слоя не знает, и которая оставляла окно линковки bills без
-верхней границы (у `REFRESH_BILLS`, идущей отдельным проходом, доступа к
+верхней границы (у `REFRESH_BILLS_COMMAND`, идущей отдельным проходом, доступа к
 чужой памяти нет). Посылка снята: добытое **персистится на `Position`**,
 границу прохода FSM пересекает штатно, вложенность не нужна вовсе.
 Число на `Deal` по-прежнему пишет **финализатор**
@@ -69,7 +68,6 @@ executor работает только с validated normalized snapshot.
 |---|---|---|
 | `externalRealizedPnl` | `BigDecimal` | готовый net realized P&L (net от всех издержек, посчитан биржей) |
 | `externalResultCurrency` | `String` | валюта, в которой посчитан `realizedPnl` |
-| `externalOpenAvgPx` | `BigDecimal` | средняя цена входа |
 | `externalCloseType` | `String` | тип последнего закрытия (`1`–`6`; ликвидация/ADL = `3`–`6`) |
 | `externalPosId` | `String` | биржевой id позиции (ключ адресации записи) |
 | `externalModifiedAt` | `OffsetDateTime` | время обновления записи positions-history |
@@ -84,11 +82,17 @@ parseable. Тип времени — `OffsetDateTime` по конвенции п
 
 **Состав сужен до полей с названным потребителем** (H22, `GAPS_CLOSE_7`;
 codestyle §«Неиспользуемый код»). Выведены из снапшота: `closeAvgPx`
-(средняя цена выхода) и `triggerPx` (цена триггера ликвидации/ADL) —
-потребителя в фазе 1 у обоих нет, оба остаются кандидатами в носители
-измеримости искажений (`PNL-Q1`). Побочно это **обесточивает H19**:
-расхождение доков о применимости `triggerPx` больше не нагружено ничем —
-поле не маппится вовсе.
+(средняя цена выхода), `triggerPx` (цена триггера ликвидации/ADL) — и
+**`openAvgPx`** (H23, `DOCS_CHECK_8`): потребителя в фазе 1 нет ни у
+одного, а маппинг `openAvgPx → Position.externalAverageEntryPrice` делал
+колонку двуписьменной (live `avgPx` — текущая средняя, `openAvgPx` —
+средняя за жизнь позиции; при доборах они расходятся, провенанс поля
+становился неоднозначным). `Position.externalAverageEntryPrice` пишет
+**только live-нога**; понадобится средняя за жизнь — заводится отдельное
+поле, не перегружается это. Выведенные поля остаются кандидатами в
+носители измеримости искажений (`PNL-Q1`). Побочно это **обесточивает
+H19**: расхождение доков о применимости `triggerPx` больше не нагружено
+ничем — поле не маппится вовсе.
 
 ### snapshot → `Position`
 
@@ -100,8 +104,7 @@ codestyle §«Неиспользуемый код»). Выведены из сн
 | `externalRealizedPnl` | `Position.externalRealizedProfit` | биржевой net realized P&L закрытой позиции |
 | `externalResultCurrency` | `Position.externalResultCurrency` | валюта, в которой он посчитан |
 | `externalCloseType` | `Position.externalCloseType` | провенанс закрытия (`3`–`6` = закрыла биржа) |
-| `externalOpenAvgPx` | `Position.externalAverageEntryPrice` | средняя цена входа (то же поле, что у live-ноги) |
-| `externalModifiedAt` | `Position.externalModifiedAt` | `uTime` записи закрытия (конвенция `Auditable`, H25) |
+| `externalModifiedAt` | `Position.externalModifiedAt` + **`Deal.billsWindowEnd`** | `uTime` записи закрытия (конвенция `Auditable`, H25). На `Deal` — верхняя граница окна линковки bills, пишется той же транзакцией (узел 1 `DOCS_CHECK_8`; окно из `Position.externalModifiedAt` больше не реконструируется) |
 | `externalPosId` | сверка с `Position.externalId` | не перезаписывает: адресация, а не данные |
 
 ### `Position` → `Deal` (финализатор)
@@ -143,7 +146,7 @@ codestyle §«Неиспользуемый код»). Выведены из сн
 ### Error policy
 
 - **Temporary API problem** (timeout, connection reset, 5xx): нога 2
-  наследует retry **своей команды** `REFRESH_POSITION` (командная
+  наследует retry **своей команды** `REFRESH_POSITION_COMMAND` (командная
   машинерия, анкер — `DealActionState`); финализация ждёт факта.
 - **Invalid response / инвариант агрегации нарушен** (`code != 0`,
   множественная/нефинализированная запись на `posId`, обязательные не
@@ -166,7 +169,6 @@ codestyle §«Неиспользуемый код»). Выведены из сн
 |---|---|
 | `realizedPnl` | `externalRealizedPnl` |
 | `ccy` | `externalResultCurrency` |
-| `openAvgPx` | `externalOpenAvgPx` |
 | `type` | `externalCloseType` |
 | `posId` | `externalPosId` |
 | `uTime` | `externalModifiedAt` (epoch millis → `OffsetDateTime`) |
@@ -174,7 +176,8 @@ codestyle §«Неиспользуемый код»). Выведены из сн
 Числовые поля парсятся в `BigDecimal`, `uTime` — в `OffsetDateTime`; `empty
 string → null`. Список не маппимых полей (`pnl`, `fee`, `fundingFee`,
 `liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide`, а также
-`closeAvgPx`/`triggerPx` — выведены H22) — в
+`closeAvgPx`/`triggerPx` — выведены H22; `openAvgPx` — выведен H23
+`DOCS_CHECK_8`) — в
 `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.
 
 ### OKX validation notes
@@ -185,6 +188,6 @@ string → null`. Список не маппимых полей (`pnl`, `fee`, `
   `docs/integrations/okx/contracts/position.md` §«История закрытых позиций».
 - **Инвариант агрегации (N11):** `realizedPnl` кумулятивен по всем
   partial-закрытиям и доборам за жизнь `posId`; читается финализированной
-  записью (позиция flat по `REFRESH_POSITION`). До рантайм-верификации —
+  записью (позиция flat по `REFRESH_POSITION_COMMAND`). До рантайм-верификации —
   **предположение** (контур source-api, `.claude/tests/source-api/okx/plan.md`
   §AG1); гейтит корректность числа до `CODE`.

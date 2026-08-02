@@ -2,12 +2,12 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `SUBMIT_ORDER` (компонент-executor): что делает,
+Кто исполняет `SUBMIT_ORDER_COMMAND` (компонент-executor): что делает,
 recoverability.
 
 ## Назначение
 
-Получает `SUBMIT_ORDER`. Загружает локальный `Order`; если `externalId`
+Получает `SUBMIT_ORDER_COMMAND`. Загружает локальный `Order`; если `externalId`
 есть — команда выполнена или требует refresh; если пуст — ищет order на
 бирже по `clOrdId = order.internalId`. Найден → обновляет локальный order
 из snapshot; не найден → отправляет на биржу. Обновляет

@@ -12,7 +12,7 @@
 
 ### Вызывается
 
-Для `CREATE_ORDER` / `CREATE_ALGO_ORDER` — включая **place-ногу
+Для `CREATE_ORDER_COMMAND` / `CREATE_ALGO_ORDER_COMMAND` — включая **place-ногу
 REPLACE-действий** (амендных команд нет, ремоделирование — REPLACE,
 `docs/decisions/replace-not-amend.md`) — только если конкретное
 рассчитанное действие risk-creating / risk-increasing /
@@ -32,19 +32,19 @@ Cancel-нога REPLACE отдельной валидации не получа�
 
 ### Не вызывается
 
-- **refresh/search/history**: `REFRESH_BALANCE`, `REFRESH_POSITION`
-  (включая ногу positions-history), `REFRESH_ORDER`, `REFRESH_ALGO_ORDER`,
-  `REFRESH_BILLS` — только обновляют факты (evidence-cycle — внутри
+- **refresh/search/history**: `REFRESH_BALANCE_COMMAND`, `REFRESH_POSITION_COMMAND`
+  (включая ногу positions-history), `REFRESH_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`,
+  `REFRESH_BILLS_COMMAND` — только обновляют факты (evidence-cycle — внутри
   исполнителя, см. `docs/decisions/refresh-evidence-cycle-ownership.md`);
-- **cleanup / safety**: `CANCEL_ORDER`, `CANCEL_ALGO_ORDER`,
-  `CLOSE_POSITION` — снимают/локализуют уже существующий риск (kill-switch
+- **cleanup / safety**: `CANCEL_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`,
+  `CLOSE_POSITION_COMMAND` — снимают/локализуют уже существующий риск (kill-switch
   снимает риск отдельно — реактивный side-executor вне реестра команд, тоже
   не проходит RiskValidator);
-- **finalization**: `FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`,
-  `MARK_DEAL_CLOSED`, `MARK_DEAL_ERROR`, `MARK_DEAL_EMERGENCY_CLOSED`
-  (lifecycle/system actions без `StrategyAction`; retry-state —
-  `DealFinalizationState`,
-  `docs/decisions/deal-finalization-state-materialization.md`);
+- **finalization**: `FINALIZE_DEAL_ENTRY_COMMAND`, `FINALIZE_DEAL_EXIT_COMMAND`,
+  `MARK_DEAL_CLOSED_COMMAND`, `MARK_DEAL_ERROR_COMMAND`, `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`
+  (звенья системных действий без `StrategyAction`; retry-anchor — строка
+  исполнения SYSTEM-вида,
+  `docs/decisions/command-action-boundary.md`);
 - **reduce-only partial exit** через `Order`/`AlgoOrder` — это exit-flow.
 
 Для exit / cleanup / safety / reduce-only partial exit handler выполняет

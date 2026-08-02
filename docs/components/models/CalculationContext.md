@@ -64,5 +64,5 @@ StrategyAction + свежие runtime-data` и должен быть собра�
 
 `MarketPriceData` в рамках одного context получается один раз и
 переиспользуется. `CalculationContextFactory` не вызывает `IntegrationService`
-и не создаёт `REFRESH_BALANCE`; freshness баланса обеспечивает FSM/handler
+и не создаёт `REFRESH_BALANCE_COMMAND`; freshness баланса обеспечивает FSM/handler
 до запуска калькулятора.

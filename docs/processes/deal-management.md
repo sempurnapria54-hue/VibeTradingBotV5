@@ -52,7 +52,7 @@ ServiceCommandExecutor -> конкретный Executor
 Компоненты: `EntryScannerJob`, `DealOpeningService`,
 `DealOrchestratorJob`, `DealStateMachine`, FSM handlers,
 `StrategyActionCalculator`, `StrategyActionOrchestrator`,
-`DealFinalizationCommandFactory`, `ServiceCommandExecutor`, executors
+`SystemActionExecutor`, `ServiceCommandExecutor`, executors
 (см. `docs/components/`). Контекст
 прохода — `DealContext` (`docs/components/models/DealContext.md`).
 

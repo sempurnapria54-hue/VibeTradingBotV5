@@ -88,7 +88,7 @@ evidence-cycle (специфика per-source — см. подразделы). �
 
 Один элемент `attachedAlgoOrders[*]` → `AttachedAlgoOrderExternalSnapshot`;
 матчинг по `internalId` (client id вложенного TP/SL). Status: `PENDING`
-после `SUBMIT_ORDER`; `ACTIVE` только после `REFRESH_ORDER`, если
+после `SUBMIT_ORDER_COMMAND`; `ACTIVE` только после `REFRESH_ORDER_COMMAND`, если
 найден по `internalId` и нет
 `failCode`/`failReason`; заполненные `failCode`/`failReason` →
 `ERROR`. Missing-policy по статусу parent — `docs/lifecycles/Order.md`.
@@ -187,12 +187,12 @@ attached материализуется в standalone algo —
 `orders-history` → `orders-history-archive` (если history не
 покрывает период). Поиск: есть `externalId` → по `ordId`; нет → по
 `clOrdId = internalId`. Цикл обходит `RefreshOrderExecutor` **внутри одной
-команды** `REFRESH_ORDER` (обрыв на первом успешном эндпоинте; терминал
+команды** `REFRESH_ORDER_COMMAND` (обрыв на первом успешном эндпоинте; терминал
 `MISSING_AFTER_REFRESH` выносит он же — см.
 `docs/decisions/refresh-evidence-cycle-ownership.md`). Order-fill-метрики
 (`accFillSz` → `accumulatedFillSize`, `avgPx` → `averagePrice`, `fee`)
 приходят готовыми из того же `OkxOrderResponse` — отдельной fill-команды нет.
-Доп. факты сделки (`REFRESH_POSITION`) запрашиваются отдельной командой;
+Доп. факты сделки (`REFRESH_POSITION_COMMAND`) запрашиваются отдельной командой;
 `RefreshOrderExecutor` не сопровождает сделку целиком.
 
 ### OKX pagination

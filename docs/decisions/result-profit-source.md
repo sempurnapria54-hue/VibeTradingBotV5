@@ -71,8 +71,8 @@ fills-путь торгово неполон.
   и **пишет `resultProfit` прямо на `Deal`** (в одной транзакции с `COMPLETED` —
   durable-носитель = поле `Deal`, N7); `MarkDealClosedExecutor` **ассертит** и
   ставит терминал `CLOSED` (число не пишет; **placeholder-ZERO снят**). Добыча
-  фактов — вторая нога `REFRESH_POSITION` (положение закрытия → поля
-  `Position`) и команда `REFRESH_BILLS` (разбивка → `DealCashFlow`). Полная
+  фактов — вторая нога `REFRESH_POSITION_COMMAND` (положение закрытия → поля
+  `Position`) и команда `REFRESH_BILLS_COMMAND` (разбивка → `DealCashFlow`). Полная
   механика — `docs/decisions/pnl-finalization-mechanics.md`.
 
 ## Отвергнутые источники / альтернативы
@@ -105,14 +105,14 @@ fills-путь торгово неполон.
   fills. Инспекция native: positions-history несёт **`closeAvgPx`** (средняя
   цена выхода) и `openAvgPx` (`docs/integrations/okx/contracts/position.md`
   §История) → fills для avg-цены выхода **не нужны**; order-level fill-метрики
-  (`accFillSz`/`avgPx`) доступны прямо из `OkxOrderResponse` (`REFRESH_ORDER`).
+  (`accFillSz`/`avgPx`) доступны прямо из `OkxOrderResponse` (`REFRESH_ORDER_COMMAND`).
   ⇒ `REFRESH_FILLS` **снимается** — решение принято на `GAPS_CLOSE_2` (N12),
   **исполнение — на `CODE` шага 7**: убрать из `ServiceCommandType`, удалить
   `RefreshFillsExecutor`, провести каскад по handler'ам/evidence-cycle/`fills.md`.
   В коде на момент записи команда и executor **ещё живы** (`ServiceCommandType.java`,
   `RefreshFillsExecutor.java`) — формулировка целевая, не свершившаяся
-  (H15, `GAPS_CLOSE_6`). P&L-факты добывают вторая нога `REFRESH_POSITION`
-  (положение закрытия) и новая `REFRESH_BILLS`
+  (H15, `GAPS_CLOSE_6`). P&L-факты добывают вторая нога `REFRESH_POSITION_COMMAND`
+  (положение закрытия) и новая `REFRESH_BILLS_COMMAND`
   (`docs/decisions/pnl-finalization-mechanics.md` реш.1).
 
 ## Следствия
@@ -120,7 +120,9 @@ fills-путь торгово неполон.
 - Реконсилированы под выбранный путь: `docs/models/domain/aggregate/Deal.md`
   §Итоговый PnL, `docs/integrations/okx/contracts/account-bills.md`
   §Использование, `docs/integrations/okx/contracts/position.md` §История,
-  `docs/models/domain/other/DealFinalizationState.md`,
+  `docs/models/domain/other/DealActionState.md` (носитель исполнений;
+  прежний `DealFinalizationState.md` упразднён —
+  `docs/decisions/command-action-boundary.md`),
   `docs/models/domain/core/Position.md`,
   `docs/models/integrations/okx/OkxPositionResponse.md`,
   `docs/models/integrations/okx/OkxAccountBillResponse.md`,
@@ -130,7 +132,7 @@ fills-путь торгово неполон.
   `docs/models/mapping/TradeFill.md`. (Тогда же был реконсилирован док
   `RefreshFillsExecutor`; **впоследствии снят вместе с командой** —
   `REFRESH_FILLS` упразднён на `GAPS_CLOSE_2` шага 7, N12, его функцию несёт
-  `REFRESH_ORDER`: `docs/decisions/pnl-finalization-mechanics.md` реш.1.)
+  `REFRESH_ORDER_COMMAND`: `docs/decisions/pnl-finalization-mechanics.md` реш.1.)
 - Закрыты **OKX-Q1**, **OKX-Q3**; остаток **DEAL-Q2** (число на
   `EMERGENCY_CLOSED`) закрыт вместе с G5.
 - **G4** (fills не агрегируют exit-fills algo-ордеров) — **resolved-by-path**:

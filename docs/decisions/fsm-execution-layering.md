@@ -26,20 +26,28 @@ kill-switch на прошлом заходе завёл слой `StrategyAction
 ```
 DealOrchestratorJob — петля по активным сделкам; на Deal.Status выбирает Handler.
 Handler (на статус)  — «рулит ситуацией» по статусу; 3 метода (ниже).
-  └─ StrategyActionOrchestrator — для выбранного handler'ом StrategyAction гейтит
-       повтор (RETRY_PENDING) и маршрутизирует по типу действия (supports); на этом
-       проходе дёргает нужный executor.
-       └─ StrategyActionExecutor (на тип действия) — per-pass: следующая команда
-            действия за проход (или «готово»), состояние в DealActionState; risk
-            risk-creating действия ведёт сам executor (CreateOrderActionExecutor).
-            └─ CommandExecutor — 1 атомарная команда.
+  ├─ StrategyActionOrchestrator — для выбранного handler'ом StrategyAction гейтит
+  │    повтор (RETRY_PENDING) и маршрутизирует по типу действия (supports); на этом
+  │    проходе дёргает нужный executor.
+  │    └─ StrategyActionExecutor (на тип действия) — per-pass: следующая команда
+  │         действия за проход (или «готово»), состояние в DealActionState (вид
+  │         STRATEGY); risk risk-creating действия ведёт сам executor.
+  │         └─ CommandExecutor — 1 атомарная команда.
+  └─ SystemActionExecutor — per-pass эмиттер СИСТЕМНЫХ действий (добыча
+       REFRESH_DEAL_CONTEXT_ACTION, финализация FINALIZE_DEAL_*_ACTION):
+       следующая команда по подтверждённым фактам звеньев, состояние в
+       DealActionState (вид SYSTEM). Handler добывающие REFRESH_* напрямую
+       не эмитит; cleanup (CANCEL_*/CLOSE_POSITION_COMMAND) — напрямую, без анкера.
+       └─ CommandExecutor — 1 атомарная команда.
 
-Kill-switch — СБОКУ: аварийный executor вне слоёв StrategyAction/Command.
+Kill-switch — СБОКУ: аварийный executor вне слоёв StrategyAction/Command;
+действием не материализуется (наблюдается AnomalyReport,
+docs/decisions/command-action-boundary.md §2).
 ```
 
-Зависимости сверху вниз: handler знает про оркестратор действия и
+Зависимости сверху вниз: handler знает про оркестраторы действий и
 исполнителей; `CommandExecutor` не знает про вызывающих (его могут дёргать
-`StrategyActionExecutor`, `DealContextService`, kill-switch и др.).
+`StrategyActionExecutor`, `SystemActionExecutor`, kill-switch и др.).
 
 ### Handler — 3 метода
 
@@ -47,11 +55,17 @@ Kill-switch — СБОКУ: аварийный executor вне слоёв Strate
 
 - **условия входа** — предусловия работы этого прохода (напр. `MANAGING`:
   позиция жива; свежесть рыночных данных). Не выполнены → переход/`stay`.
-- **handle** — работа: через оркестратор действия исполняет применимые
-  `StrategyAction`; может звать risk/price-калькуляторы и `CommandExecutor`'ы.
+- **handle** — работа: через оркестраторы действий исполняет применимые
+  `StrategyAction` и системные действия; может звать risk/price-калькуляторы
+  и `CommandExecutor`'ы.
 - **условия перехода** — по **transition-условиям стратегии** + подтверждённым
   фактам решает `nextStatus`. Сменил статус → на следующей итерации петля
-  возьмёт другой handler.
+  возьмёт другой handler. **Статусные рёбра, являющиеся исходом системного
+  действия, пишет звено, а не handler** — терминалы (`MARK_*`) и
+  `ENTRY_FINALIZED` (валидация 4 развилки «команда ↔ действие»): handler
+  своими проверками **гейтит эмиссию** завершающего звена, ребро едет в
+  транзакции его завершения
+  (`docs/decisions/command-action-boundary.md` §5).
 
 Стратегия задаёт статусы-переходы и условия переходов; handler'ы ими
 пользуются. Handler не хардкодит переходы, а читает их из стратегии.

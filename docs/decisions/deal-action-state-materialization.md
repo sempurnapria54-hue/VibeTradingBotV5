@@ -6,6 +6,17 @@
 отдельным объектом, retry через базу `Retryable`, отдельный lifecycle,
 вложенные объекты в БД как jsonb, размещение в `domain/other`.
 
+> **Ревизовано (шаг 7, развилка «команда ↔ действие»,
+> `docs/decisions/command-action-boundary.md`):** (1) ключ
+> `UNIQUE(deal_id, strategy_action_id)` заменён частичными ключами живых
+> исполнений — строка теперь **исполнение**, не действие (посылка
+> однократности опровергнута: грид); (2) `RuntimeTarget` в БД — больше не
+> jsonb, а колонки `target_entity_type`/`target_entity_id` (поля стали
+> операндами ключа, исключение в
+> `docs/rules/persistence-representation.md`); (3) сущность обобщена на
+> вид SYSTEM (упразднение `DealFinalizationState`). Retry-база,
+> отдельный lifecycle и размещение в `other` — в силе.
+
 ## Контекст
 
 `DealActionState` — центральная для command-layer операционная модель:

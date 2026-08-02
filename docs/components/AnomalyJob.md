@@ -28,7 +28,7 @@ entities. Фиксирует anomaly/safety report (`AnomalyReport`, см.
 ## Исключение (не anomaly)
 
 Entry order исполнился → exchange position появилась → локальной
-`Position` ещё нет → следующий `REFRESH_POSITION` создаёт `Position` и
+`Position` ещё нет → следующий `REFRESH_POSITION_COMMAND` создаёт `Position` и
 привязывает к `Deal`. Это не anomaly при наличии active `Deal` и
 известного entry flow.
 

@@ -2,11 +2,11 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `REFRESH_ORDER` (компонент-executor): что делает, границы.
+Кто исполняет `REFRESH_ORDER_COMMAND` (компонент-executor): что делает, границы.
 
 ## Назначение
 
-Получает `REFRESH_ORDER`. Загружает локальный order и проходит **order
+Получает `REFRESH_ORDER_COMMAND`. Загружает локальный order и проходит **order
 evidence-cycle внутри одной команды** (эскалация, обрыв на первом успешном
 эндпоинте; полный обход — только при не-найдено):
 
@@ -27,7 +27,7 @@ GET /trade/order            (по ordId; нет externalId → по clOrdId)
 включая order-fill-метрики (`accFillSz` → `accumulatedFillSize`, `avgPx` →
 `averagePrice`, `fee`), которые приходят готовыми из самого этого refresh
 (`OkxOrderResponse`), отдельной fill-команды нет. Сделку целиком не
-сопровождает; cross-entity refresh (`REFRESH_POSITION`) — отдельная команда,
+сопровождает; cross-entity refresh (`REFRESH_POSITION_COMMAND`) — отдельная команда,
 выбирает FSM / `DealOrchestratorJob`.
 Pending/history-эндпоинты — звенья этого цикла, не отдельные исполнители
 (`.claude/decisions/executor-payload-file-granularity.md`); их судьба как

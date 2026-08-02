@@ -27,8 +27,7 @@ persisted (см. `.claude/decisions/runtime-value-object.md`); собирает�
 | `instrument` | `Instrument` | Торговый инструмент сделки. |
 | `strategyDetail` | `StrategyDetail` | Pinned-конфигурация сделки. |
 | `balanceContainer` | `BalanceContainer` | Последний persisted snapshot баланса (свежесть **не** гарантирована). |
-| `actionStates` | `List<DealActionState>` | Runtime-состояние выполнения actions (recovery/retry/idempotency/target-resolution; модель — `docs/models/domain/other/DealActionState.md`). |
-| `finalizationStates` | `List<DealFinalizationState>` | Runtime-состояние финализационных команд (`FINALIZE_*`/`MARK_*`) сделки — recovery/retry/idempotency финализации; модель — `docs/models/domain/other/DealFinalizationState.md`. По нему `DealFinalizationCommandFactory` выбирает финализационную команду за проход. |
+| `actionStates` | `List<DealActionState>` | Строки **исполнений действий** сделки — обоих видов (STRATEGY и SYSTEM; recovery/retry/idempotency/target-resolution; модель — `docs/models/domain/other/DealActionState.md`). Одна коллекция: прежний отдельный список финализационных состояний упразднён вместе с `DealFinalizationState` (`docs/decisions/command-action-boundary.md`). По SYSTEM-строкам `SystemActionExecutor` выбирает команду системного действия за проход. |
 
 ## Runtime graph и сборка по фактам
 
@@ -50,7 +49,7 @@ ACTIVE && externalSize > 0` (см. `docs/models/domain/core/Position.md`).
 
 Наличие `balanceContainer` не означает свежесть — её проверяет
 FSM/handler перед risk-sensitive flow; при absent/stale handler создаёт
-`REFRESH_BALANCE` и пересобирает `DealContext` (см.
+`REFRESH_BALANCE_COMMAND` и пересобирает `DealContext` (см.
 `docs/models/domain/core/BalanceContainer.md`). Свежие `InstrumentExternalRules`,
 `MarketPriceData`, `IndicatorValue`, `MarketStructure`, `MarketPhase`,
 `CalculationContext` в `DealContext` не входят — собираются в

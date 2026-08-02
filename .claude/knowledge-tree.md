@@ -126,7 +126,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v74.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v75.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -152,13 +152,15 @@
 │       │   ├── phase-1-step-7-docs-check-6.md — Каков исход DOCS_CHECK_6 шага 7?
 │       │   ├── phase-1-step-7-docs-check-7.md — Каков исход DOCS_CHECK_7 шага 7?
 │       │   ├── phase-1-step-7-docs-check-8.md — Каков исход DOCS_CHECK_8 шага 7?
+│       │   ├── phase-1-step-7-docs-check-9.md — Каков исход DOCS_CHECK_9 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-4.md — Как закрыты пробелы DOCS_CHECK_4 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-5.md — Как закрыты пробелы DOCS_CHECK_5 шага 7 (и что withhold)?
 │       │   ├── phase-1-step-7-gaps-close-6.md — Как закрыты пробелы DOCS_CHECK_6 шага 7?
-│       │   └── phase-1-step-7-gaps-close-7.md — Как закрыты пробелы DOCS_CHECK_7 шага 7?
+│       │   ├── phase-1-step-7-gaps-close-7.md — Как закрыты пробелы DOCS_CHECK_7 шага 7?
+│       │   └── phase-1-step-7-gaps-close-8.md — Как закрыты пробелы DOCS_CHECK_8 шага 7 (в объёме решённого)?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -166,7 +168,7 @@
 │       │   ├── roadmap.md — Какими фазами продукт движется к бизнес-ценности?
 │       │   └── phase-1.md — В каком статусе каждый шаг Фазы 1?
 │       └── history/ — Что мы уже сделали? (архив; содержимое не индексируется)
-│           └── snapshots/ — Где мы были раньше? (снапшоты v1–v73)
+│           └── snapshots/ — Где мы были раньше? (снапшоты v1–v74)
 ├── docs/ — Как устроен продукт (продуктовая документация)?
 │   ├── components/ — Кто выполняет?
 │   │   ├── models/ — Что это за runtime-объект?
@@ -199,7 +201,6 @@
 │   │   ├── CreateOrderActionExecutor.md — Кто планирует CREATE-действие над ordinary order?
 │   │   ├── CreateOrderExecutor.md — Кто исполняет CREATE_ORDER?
 │   │   ├── DealContextService.md — Кто собирает DealContext для прохода FSM?
-│   │   ├── DealFinalizationCommandFactory.md — Кто эмитит финализационную команду сделки за проход?
 │   │   ├── DealOpeningService.md — Кто атомарно создаёт Deal?
 │   │   ├── DealOrchestratorJob.md — Кто сопровождает уже созданные сделки?
 │   │   ├── DealStateMachine.md — Кто управляет статусами сделки (FSM)?
@@ -248,10 +249,12 @@
 │   │   ├── StrategyActionExecutor.md — Кто выдаёт следующую команду одного типа действия за проход?
 │   │   ├── StrategyActionOrchestrator.md — Кто диспетчеризует планирование действия стратегии за проход?
 │   │   ├── StrategyConditionEvaluator.md — Кто проверяет применимость StrategyCondition?
-│   │   ├── SubmitAlgoOrderExecutor.md — Кто исполняет SUBMIT_ALGO_ORDER?
-│   │   └── SubmitOrderExecutor.md — Кто исполняет SUBMIT_ORDER?
+│   │   ├── SubmitAlgoOrderExecutor.md — Кто исполняет SUBMIT_ALGO_ORDER_COMMAND?
+│   │   ├── SubmitOrderExecutor.md — Кто исполняет SUBMIT_ORDER_COMMAND?
+│   │   └── SystemActionExecutor.md — Кто выдаёт следующую команду системного действия за проход?
 │   ├── decisions/ — Почему мы решили так, а не иначе? (продукт)
 │   │   ├── action-orchestration-vs-command.md — Чем действие-оркестрация отличается от аварийного teardown?
+│   │   ├── command-action-boundary.md — Почему командный слой — атомарные команды + системные действия?
 │   │   ├── controlled-violation-exchange-wide-hold.md — Почему контролируемая биржевая ошибка поднимает L4-холд биржи?
 │   │   ├── deal-action-state-materialization.md — Почему DealActionState материализован именно так?
 │   │   ├── deal-finalization-state-materialization.md — Почему retry-state финализации — отдельная сущность?
@@ -318,8 +321,7 @@
 │   │   ├── AnomalyReport.md — Через какие статусы проходит AnomalyReport?
 │   │   ├── CandleGroup.md — Через какие статусы проходит загрузка свечей группы?
 │   │   ├── Deal.md — Через какие FSM-статусы проходит Deal?
-│   │   ├── DealActionState.md — Через какие статусы проходит DealActionState?
-│   │   ├── DealFinalizationState.md — Через какие статусы проходит DealFinalizationState?
+│   │   ├── DealActionState.md — Через какие статусы проходит исполнение действия (DealActionState)?
 │   │   ├── Instrument.md — Через какие статусы проходит онбординг инструмента?
 │   │   ├── Order.md — Через какие статусы проходят Order и AttachedAlgoOrder?
 │   │   ├── Position.md — Через какие статусы проходит Position?
@@ -344,9 +346,8 @@
 │   │   │       ├── Auditable.md — Какие общие audit-поля несут доменные сущности?
 │   │   │       ├── Candle.md — Что это за доменная модель Candle?
 │   │   │       ├── CandleGroup.md — Что это за доменная модель CandleGroup?
-│   │   │       ├── DealActionState.md — Что это за модель DealActionState?
+│   │   │       ├── DealActionState.md — Что это за модель DealActionState (строка-исполнение действия)?
 │   │   │       ├── DealCashFlow.md — Что это за модель DealCashFlow?
-│   │   │       ├── DealFinalizationState.md — Что это за модель DealFinalizationState?
 │   │   │       ├── IndicatorValue.md — Что это за модель IndicatorValue?
 │   │   │       ├── InstrumentExternalRules.md — Что это за модель InstrumentExternalRules?
 │   │   │       ├── MarketPhase.md — Что это за MarketPhase и почему вычисляется на лету?

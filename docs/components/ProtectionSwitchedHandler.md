@@ -24,7 +24,7 @@ standalone main protection подтверждена active → attached снят
 
 ## Рабочая логика
 
-`REFRESH_POSITION` (если давно не обновлялась); `REFRESH_ALGO_ORDER` для
+`REFRESH_POSITION_COMMAND` (если давно не обновлялась); `REFRESH_ALGO_ORDER_COMMAND` для
 подтверждения active main protection; проверить, осталась ли attached
 protection; если attached ещё активна, а main подтверждена — `CANCEL_*`;
 проверить конфликтующие pending orders (cancel или `ERROR` по риску).
@@ -37,6 +37,6 @@ protection; если attached ещё активна, а main подтвержд�
 
 ## Допустимые StrategyStep / возможные ServiceCommand
 
-Steps: `FAIL_SAFE` (этап технический). Команды: `REFRESH_POSITION`,
-`REFRESH_ALGO_ORDER`, `REFRESH_ORDER`, `CANCEL_ALGO_ORDER`,
-`CANCEL_ORDER`, `MARK_DEAL_ERROR`.
+Steps: `FAIL_SAFE` (этап технический). Команды: `REFRESH_POSITION_COMMAND`,
+`REFRESH_ALGO_ORDER_COMMAND`, `REFRESH_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`,
+`CANCEL_ORDER_COMMAND`, `MARK_DEAL_ERROR_COMMAND`.

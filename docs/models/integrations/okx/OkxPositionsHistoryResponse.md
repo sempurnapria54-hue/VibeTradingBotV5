@@ -11,7 +11,7 @@
 /api/v5/account/positions-history` (элемент `data[]`). Не выходит за
 `IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
 
-Добывается **второй ногой команды `REFRESH_POSITION`** (evidence-cycle
+Добывается **второй ногой команды `REFRESH_POSITION_COMMAND`** (evidence-cycle
 live → positions-history внутри одной команды; наполняет
 `PositionCloseResultExternalSnapshot`, который приземляется полями
 положения закрытия на `Position` — H1/H3 `GAPS_CLOSE_7`,

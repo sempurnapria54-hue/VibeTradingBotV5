@@ -27,9 +27,9 @@ commandType)`.
 ## Авторитет `maxAttempts` (policy, читается живьём)
 
 `maxAttempts` определён в двух местах — поле `ServiceCommandRetryPolicy`
-(из конфига, per-command) и поле базы `Retryable` (на `DealActionState` /
-`DealFinalizationState`). **Авторитет — policy (настройка), читается
-живьём** каждый тик: предел повторов — операционная крутилка, правка должна
+(из конфига, per-command) и поле базы `Retryable` (на строке исполнения
+`DealActionState`). **Авторитет — policy (настройка), читается живьём**
+каждый тик: предел повторов — операционная крутилка, правка должна
 браться сразу везде. Поле на сущности, **если оставляем**, — **снимок для
 истории** (что было лимитом на момент попытки), не операторное значение;
 retry-петля сверяет `attemptCount >= maxAttempts` по **policy**, а не по
@@ -39,12 +39,31 @@ retry-петля сверяет `attemptCount >= maxAttempts` по **policy**, �
 **отвергнута**: тогда правка предела не бралась бы вживую (N11,
 `DOCS_CHECK_2` шага 4).
 
+## Предел — по команде, счётчик — по исполнению
+
+**Предел** (`maxAttempts`) резолвится **по типу текущей команды**;
+**счётчик** (`attemptCount`) — сквозной бюджет отказов **одного
+исполнения действия** (β, `docs/decisions/command-action-boundary.md`
+§4), без обнуления при продвижении стадии. У многозвенного системного
+действия предел, применимый к текущей попытке, меняется со звеном — это
+намеренно: звенья одного действия однородны по цене отказа (добыча и
+завершение разнесены по разным действиям), а клауза записана здесь, чтобы
+не читаться как дефект.
+
+**Расхождение доков с кодом (находка `DOCS_CHECK_8`-развилки, пункт
+`CODE`).** Механизм конфигурации построен (`ServiceCommandRetryProperties`:
+`default-policy` + per-command `policies`, чтение живьём), но **секции
+`service-command-retry` нет ни в одном конфиге** — `getPolicy` возвращает
+`null`, и `canRetry` падает NPE в catch-ветке учёта отказа, подменяя
+исходную ошибку. `CODE`: завести секцию + защитить `getPolicy` от
+отсутствующего default'а (`.claude/work/backlog.md` §Шаг 7).
+
 ## Retry-состояние (Retryable / RetryError)
 
-Retry-состояние хранится в базовом `Retryable`, от которого наследуются
-persisted `DealActionState` (`docs/models/domain/other/DealActionState.md`)
-и `DealFinalizationState`
-(`docs/models/domain/other/DealFinalizationState.md`):
+Retry-состояние хранится в базовом `Retryable`, от которого наследуется
+persisted строка исполнения `DealActionState`
+(`docs/models/domain/other/DealActionState.md`; оба вида — STRATEGY и
+SYSTEM):
 
 - `Retryable`: `attemptCount`, `maxAttempts` (снимок; авторитет — policy,
   см. выше), `nextRetryAt`, `lastError` (`RetryError`).
@@ -67,14 +86,14 @@ attemptCount >= maxAttempts -> DealActionState = FAILED -> FSM решает
 
 ## Опасные команды: refresh перед retry
 
-Для `SUBMIT_*`, `CANCEL_*`, `CLOSE_POSITION` перед повтором обязателен
+Для `SUBMIT_*`, `CANCEL_*`, `CLOSE_POSITION_COMMAND` перед повтором обязателен
 refresh/search на бирже — предыдущий запрос мог реально выполниться, даже
 если ответ не получен:
 
 ```text
 SUBMIT retry  -> найти по client id; найден -> восстановить; нет -> отправить заново
 CANCEL retry  -> refresh; уже terminal -> cancel успешен; live -> повторить
-CLOSE retry   -> REFRESH_POSITION; позиции нет -> close успешен; active -> повторить
+CLOSE retry   -> REFRESH_POSITION_COMMAND; позиции нет -> close успешен; active -> повторить
 ```
 
 После рестарта pending-команды как очередь не восстанавливаются (см.

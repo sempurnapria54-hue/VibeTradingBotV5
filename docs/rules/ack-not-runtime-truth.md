@@ -11,9 +11,9 @@ ACK (успешный response команды, `code = 0`) подтвержда�
 биржа приняла команду, — но **не** является runtime truth о
 фактическом состоянии сущности.
 
-- ACK от `CLOSE_POSITION` не закрывает `Position` и не меняет
+- ACK от `CLOSE_POSITION_COMMAND` не закрывает `Position` и не меняет
   `Position.status` на `CLOSED`. Факт закрытия подтверждается
-  отдельным `REFRESH_POSITION`.
+  отдельным `REFRESH_POSITION_COMMAND`.
 - Аналогично для других команд: фактическое состояние сущности
   подтверждается соответствующим `REFRESH_*`, а не ACK-ом.
 - Executor после ACK не переводит сущность в финальный статус.
@@ -27,12 +27,12 @@ ACK (успешный response команды, `code = 0`) подтвержда�
   `docs/decisions/replace-not-amend.md`) это правило секвенсит ноги:
   следующая нога идёт только после подтверждения предыдущей
   **фактом**, не ACK-ом.
-- `CANCEL_ORDER` / `CANCEL_ALGO_ORDER`: ACK не финализирует сущность,
+- `CANCEL_ORDER_COMMAND` / `CANCEL_ALGO_ORDER_COMMAND`: ACK не финализирует сущность,
   `CANCELED` по ACK не ставится; `closeReason` не перетирается, если уже
   установлен. Если refresh/history показывает другой факт (например, algo
   `effective`/`partially_effective`) — система верит exchange facts.
-- `CLOSE_POSITION`: см. выше — full close подтверждается
-  `REFRESH_POSITION`.
+- `CLOSE_POSITION_COMMAND`: см. выше — full close подтверждается
+  `REFRESH_POSITION_COMMAND`.
 
 ## Почему
 

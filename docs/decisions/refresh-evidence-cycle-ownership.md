@@ -19,14 +19,14 @@
   «`ExternalNotFoundException` — только после **полного** evidence-cycle» —
   атрибутирует терминал исполнителю.
 
-Если `REFRESH_ORDER` атомарен (один эндпоинт), один вызов не делает полный
+Если `REFRESH_ORDER_COMMAND` атомарен (один эндпоинт), один вызов не делает полный
 цикл и не может бросить not-found-terminal; если walks все эндпоинты — не
 «один запрос». Развилка: **(a)** обход в исполнителе vs **(b)**
 FSM-секвенс отдельных команд.
 
 ## Решение (вариант (a), валидировано в чате)
 
-- **Refresh-исполнители** (`REFRESH_ORDER`, `REFRESH_ALGO_ORDER`,
+- **Refresh-исполнители** (`REFRESH_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`,
   `REFRESH_FILLS`) проходят свой evidence-cycle **внутри одной команды**
   (эскалация live → pending → history → archive), **обрываются на первом
   успешном эндпоинте**, полный обход — только при не-найдено, и **сами
@@ -44,18 +44,18 @@ FSM-секвенс отдельных команд.
   > **Обновление (шаг 7, `docs/decisions/pnl-finalization-mechanics.md`
   > реш.1):** `REFRESH_FILLS` **снимается** на `CODE` шага 7 (в коде пока
   > жив — H15, `GAPS_CLOSE_6`) — order-fill-метрики идут из
-  > `OkxOrderResponse` через `REFRESH_ORDER`, fills для P&L не нужны;
+  > `OkxOrderResponse` через `REFRESH_ORDER_COMMAND`, fills для P&L не нужны;
   > его within-command 3d→3m-обход больше не актуален. Ту же within-command
-  > модель **наследует новая `REFRESH_BILLS`**: пагинация bills 7d
+  > модель **наследует новая `REFRESH_BILLS_COMMAND`**: пагинация bills 7d
   > (`/account/bills`) → 3m (`/account/bills-archive`) **внутри одной
   > команды**.
 
-  > **Обновление (шаг 7, H1/H3 `GAPS_CLOSE_7`): `REFRESH_POSITION` тоже
+  > **Обновление (шаг 7, H1/H3 `GAPS_CLOSE_7`): `REFRESH_POSITION_COMMAND` тоже
   > становится многоэндпоинтной.** Цикл — live `/account/positions` → при
   > not-found `/account/positions-history` по `posId`; вторая нога
   > наполняет поля положения закрытия на той же `Position`
   > (`docs/models/domain/core/Position.md` §«Положение закрытия»).
-  > Отличие от `REFRESH_ORDER`: **терминала цикл не выносит** — статус
+  > Отличие от `REFRESH_ORDER_COMMAND`: **терминала цикл не выносит** — статус
   > позиции определяет уже первая нога, а пустая вторая — легитимный
   > исход «число недоступно», не `MISSING_AFTER_REFRESH`. Прежняя
   > редакция шага 7 заводила под этот эндпоинт **отдельную команду**
@@ -91,7 +91,7 @@ FSM-секвенс отдельных команд.
 - `docs/integrations/okx/contracts/fills.md` — `REFRESH_FILLS` эскалирует
   3d→3m внутри команды. **Устарело:** `REFRESH_FILLS` снимается решением
   `GAPS_CLOSE_2` шага 7 (N12; исполнение — `CODE`);
-  within-command-эскалация 7d→3m живёт теперь в `REFRESH_BILLS`
+  within-command-эскалация 7d→3m живёт теперь в `REFRESH_BILLS_COMMAND`
   (`docs/decisions/pnl-finalization-mechanics.md` реш.1) — сам паттерн
   «обход внутри команды» решение пережил, сменился лишь его носитель.
 - `docs/models/mapping/Order.md`, `AlgoOrder.md` — обход цикла атрибутирован
@@ -104,10 +104,10 @@ FSM-секвенс отдельных команд.
   инструменту — Precheck-cleanliness / `AnomalyJob`; см.
   `.claude/work/questions/open-questions.md`).
   - **Живёт принцип** «одна команда на сущность», не конкретный состав набора:
-    состав меняется с сущностями. Слепок на 2026-06-10 был `REFRESH_ORDER` /
-    `REFRESH_ALGO_ORDER` / `REFRESH_POSITION` / `REFRESH_BALANCE` /
+    состав меняется с сущностями. Слепок на 2026-06-10 был `REFRESH_ORDER_COMMAND` /
+    `REFRESH_ALGO_ORDER_COMMAND` / `REFRESH_POSITION_COMMAND` / `REFRESH_BALANCE_COMMAND` /
     `REFRESH_FILLS`; на шаге 7 (N12/N6) `REFRESH_FILLS` снимается, добавляется
-    `REFRESH_BILLS` — **по тому же принципу**, по одной на новую сущность
+    `REFRESH_BILLS_COMMAND` — **по тому же принципу**, по одной на новую сущность
     (`DealCashFlow`; `docs/decisions/pnl-finalization-mechanics.md` реш.1).
     positions-history новой сущности **не даёт** — это та же `Position` после
     закрытия, поэтому эндпоинт лёг **ногой цикла**, а не командой (H1/H3

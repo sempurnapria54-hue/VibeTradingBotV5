@@ -2,11 +2,11 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `CREATE_ORDER` (компонент-executor): что делает.
+Кто исполняет `CREATE_ORDER_COMMAND` (компонент-executor): что делает.
 
 ## Назначение
 
-Получает `CREATE_ORDER`. Создаёт локальный `Order` со статусом `CREATED`,
+Получает `CREATE_ORDER_COMMAND`. Создаёт локальный `Order` со статусом `CREATED`,
 генерирует `internalId`, сохраняет рассчитанные параметры, создаёт
 attached protection внутри order (если есть), обновляет
 `DealActionState.target = RuntimeTarget(ORDER, orderId)` и
@@ -26,7 +26,7 @@ attached protection внутри order (если есть), обновляет
 **Write-once:** уже заполненный плановый риск не перетирается — ни
 REPLACE-ремоделом стопа, ни добором. `R` — риск **на входе**, бенчмарк
 измерения результата (`docs/models/domain/aggregate/Deal.md` §«Плановый
-риск»). Для не-входных `CREATE_ORDER` (защита, reduce-only) поле не
+риск»). Для не-входных `CREATE_ORDER_COMMAND` (защита, reduce-only) поле не
 пишется. Правило агрегации при многоногом входе
 (`GRID_ENTRY`/пирамидинг) — открытый вопрос `RISK-Q3`.
 

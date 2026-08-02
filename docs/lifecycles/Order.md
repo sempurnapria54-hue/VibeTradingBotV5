@@ -16,8 +16,8 @@
 используют `externalStatus` напрямую (см.
 `docs/rules/external-status-resolution.md`).
 
-> Resolver'ы, refresh-executors и команды (`REFRESH_ORDER`,
-> `SUBMIT_ORDER`, `CANCEL_ORDER`) —
+> Resolver'ы, refresh-executors и команды (`REFRESH_ORDER_COMMAND`,
+> `SUBMIT_ORDER_COMMAND`, `CANCEL_ORDER_COMMAND`) —
 > command-подсистема (шаг 4): `docs/components/` (executors, resolver'ы),
 > `docs/rules/command-lifecycle.md`. Амендной команды нет —
 > ремоделирование через REPLACE-оркестрацию
@@ -66,9 +66,9 @@ COMPLETED | CANCELED | ERROR -> (терминальные, переходов н
 ### PENDING vs ACTIVE
 
 ```text
-PENDING -> после SUBMIT_ORDER parent order (attached могла быть
+PENDING -> после SUBMIT_ORDER_COMMAND parent order (attached могла быть
            отправлена вместе с parent, active-факт не подтверждён)
-ACTIVE  -> только после REFRESH_ORDER, если
+ACTIVE  -> только после REFRESH_ORDER_COMMAND, если
            attached найдена в OrderExternalSnapshot.attachedAlgoOrders
            по internalId и нет failCode / failReason
 ```
@@ -93,8 +93,8 @@ parent CREATED / PENDING
   -> attached остаётся PENDING; ждём refresh / retry / recovery.
 
 parent ACTIVE / PARTIALLY_COMPLETED
-  -> дополнительный search-cycle (REFRESH_ORDER — внутр. pending/history,
-     REFRESH_POSITION);
+  -> дополнительный search-cycle (REFRESH_ORDER_COMMAND — внутр. pending/history,
+     REFRESH_POSITION_COMMAND);
      не делаем вывод по одному snapshot.
 
 parent COMPLETED
@@ -114,7 +114,7 @@ parent ERROR
 
 ## Exchange facts, обновляющие Order
 
-- **`REFRESH_ORDER`** — обновляет `Order` из `OrderExternalSnapshot`
+- **`REFRESH_ORDER_COMMAND`** — обновляет `Order` из `OrderExternalSnapshot`
   (externalId, externalStatus, status через resolver, side, price, size,
   accumulatedFillSize, averagePrice, fee, attachedAlgoOrders), проходя
   evidence-cycle **внутри команды**
@@ -126,7 +126,7 @@ parent ERROR
     ERROR при нераспознанном статусе), когда не найден среди pending.
 
   Order-fill-метрики (`accumulatedFillSize`, `averagePrice`, `fee`)
-  приходят в `Order` этим же `REFRESH_ORDER` — готовыми агрегатами из
+  приходят в `Order` этим же `REFRESH_ORDER_COMMAND` — готовыми агрегатами из
   `OkxOrderResponse` (`accFillSz`/`avgPx`); отдельной fill-команды нет.
 
 ## ERROR-переходы (safety cascade)

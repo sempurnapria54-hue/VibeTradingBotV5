@@ -2,26 +2,28 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `MARK_DEAL_EMERGENCY_CLOSED` (компонент-executor): аварийное
+Кто исполняет `MARK_DEAL_EMERGENCY_CLOSED_COMMAND` (компонент-executor): аварийное
 терминальное ребро, что читает/пишет, best-effort число и его провенанс,
 идемпотентность, retry-anchor.
 
 ## Назначение
 
-Получает `MARK_DEAL_EMERGENCY_CLOSED` — **аварийное терминальное ребро**
-`ERROR → EMERGENCY_CLOSED`, **симметрично `MARK_DEAL_CLOSED`** (штатному
+Получает `MARK_DEAL_EMERGENCY_CLOSED_COMMAND` — **аварийное терминальное ребро**
+`ERROR → EMERGENCY_CLOSED`, **симметрично `MARK_DEAL_CLOSED_COMMAND`** (штатному
 терминалу). **Читает** подтверждённое отсутствие live risk (снято/доказано
 `ErrorHandler` перед терминалом, `docs/components/ErrorHandler.md`) и
 **положение закрытия на `Position`** — persisted-поля, наполненные второй
-ногой `REFRESH_POSITION` (H1/H3, `GAPS_CLOSE_7`; симметрично
+ногой `REFRESH_POSITION_COMMAND` (H1/H3, `GAPS_CLOSE_7`; симметрично
 `docs/components/FinalizeDealExitExecutor.md` §«Положение закрытия —
 читается со строки»). Вложенной команды нет: факт durable, границу прохода
-FSM пересекает штатно, добыл его тот же `REFRESH_POSITION`, которым
+FSM пересекает штатно, добыл его тот же `REFRESH_POSITION_COMMAND`, которым
 `ErrorHandler` доказывал отсутствие позиции. **Пишет** терминал
 `Deal.status = EMERGENCY_CLOSED` +
 `closeReason = EMERGENCY_CLOSE` + **best-effort число** `resultProfit`/
-`resultProfitCurrency` + `DealFinalizationState(MARK_EMERGENCY_CLOSED).status =
-COMPLETED`. Торговых решений не принимает; `RiskValidator` не вызывается
+`resultProfitCurrency` — в одной транзакции с завершением своего
+исполнения `FINALIZE_DEAL_ERROR_ACTION` (второе исполнение действия —
+терминал; `docs/components/SystemActionExecutor.md`). Торговых решений не
+принимает; `RiskValidator` не вызывается
 (`docs/rules/risk-validator-scope.md`).
 
 ## Число — best-effort, провенанс (реш.3)
@@ -43,7 +45,7 @@ COMPLETED`. Торговых решений не принимает; `RiskValida
 - **Жёсткий отказ чтения приравнивается к «пусто»** на этой тропе — не к
   провалу действия (H15, `GAPS_CLOSE_7`;
   `docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия троп отказа
-  добычи»). Иначе `MARK_DEAL_EMERGENCY_CLOSED` уходит в `FAILED`, фабрика
+  добычи»). Иначе исполнение уходит в `FAILED`, `SystemActionExecutor`
   команду больше не эмитит, и сделка зависает в `ERROR` вопреки инварианту
   «сделка всегда доходит до терминала».
 
@@ -65,14 +67,14 @@ COMPLETED`. Торговых решений не принимает; `RiskValida
 
 ## Идемпотентность и retry
 
-- **Retry-anchor** — `DealFinalizationState(deal, MARK_EMERGENCY_CLOSED)` (база
-  `Retryable`, см.
-  `docs/decisions/deal-finalization-state-materialization.md`).
-- **Идемпотентность** — через `UNIQUE(deal_id, finalization_type)`: повтор на
-  уже `EMERGENCY_CLOSED`-сделке — no-op → `COMPLETED`.
+- **Retry-anchor** — строка исполнения `FINALIZE_DEAL_ERROR_ACTION`
+  (второе исполнение действия; вид SYSTEM, база `Retryable`;
+  `docs/models/domain/other/DealActionState.md`).
+- **Идемпотентность** — факт `Deal.status = EMERGENCY_CLOSED`: повтор на
+  уже терминализованной сделке — no-op.
 - Падение → `RETRY_PENDING`/`FAILED` (`docs/components/RetryPolicyService.md`,
   `docs/rules/runtime-error-classification.md`).
 
 Общая семантика финализационной группы —
-`docs/components/ServiceCommandExecutor.md`; модель retry-state —
-`docs/models/domain/other/DealFinalizationState.md`.
+`docs/components/ServiceCommandExecutor.md`; эмиссия звеньев —
+`docs/components/SystemActionExecutor.md`.

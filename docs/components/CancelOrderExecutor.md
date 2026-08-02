@@ -2,11 +2,11 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `CANCEL_ORDER` (компонент-executor): что делает.
+Кто исполняет `CANCEL_ORDER_COMMAND` (компонент-executor): что делает.
 
 ## Назначение
 
-Получает `CANCEL_ORDER`. Загружает локальный order по `payload.orderId`,
+Получает `CANCEL_ORDER_COMMAND`. Загружает локальный order по `payload.orderId`,
 берёт cancel reason из payload / current flow, отправляет cancel на
 биржу, сохраняет ACK / технический результат; факт отмены подтверждается
 refresh/search/history. Не переводит order в `CANCELED` по ACK;

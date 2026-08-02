@@ -48,7 +48,7 @@ STRAT-Q4).
 не-частичных algo (`STOP_LOSS`/`TAKE_PROFIT`/`OCO_FULL`/trailing)
 fraction = 1 (`externalSize` целиком); для частичных (`PARTIAL_*`) —
 `closeFractionPercents`. Полного закрытия позиции как **действия** нет —
-market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION`, вне
+market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION_COMMAND`, вне
 `SizeCalculator`.
 
 ## Сайзинг под лимит риска на сделку

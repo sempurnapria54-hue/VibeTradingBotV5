@@ -60,7 +60,7 @@ transaction.
   `docs/processes/risk-evaluation.md`.
 - **Не** создаёт команды (это `StrategyActionOrchestrator` через per-type
   `StrategyActionExecutor`) и не вызывает
-  `REFRESH_BALANCE`/`IntegrationService`.
+  `REFRESH_BALANCE_COMMAND`/`IntegrationService`.
 - Controlled calculation errors → `CalculationError` (суб-калькуляторы бросают
   `CalculationException`, `StrategyActionCalculator` перехватывает →
   `ERROR`-результат; `TEMPORARY`→RETRY_PENDING / `PERMANENT`→FAILED→Deal ERROR);

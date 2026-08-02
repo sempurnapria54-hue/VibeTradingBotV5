@@ -2,11 +2,11 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `CANCEL_ALGO_ORDER` (компонент-executor): что делает.
+Кто исполняет `CANCEL_ALGO_ORDER_COMMAND` (компонент-executor): что делает.
 
 ## Назначение
 
-Получает `CANCEL_ALGO_ORDER`. Загружает algo-order по
+Получает `CANCEL_ALGO_ORDER_COMMAND`. Загружает algo-order по
 `payload.algoOrderId`, отправляет cancel — endpoint ветвится по
 семье algo (ordinary → `cancel-algos`, advance/trailing →
 `cancel-advance-algos`; И-1 исход (а), семья из `conditionType` —

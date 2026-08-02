@@ -89,8 +89,8 @@ in-memory guard небезопасен; тогда D-M1 закрывается *
 
 - **активные `Deal`** (не в terminal status `CLOSED`/`EMERGENCY_CLOSED`,
   `docs/lifecycles/Deal.md`);
-- **подхват ожидающих повтора**: сделки с `DealActionState` /
-  `DealFinalizationState` в `RETRY_PENDING`, у которых `nextRetryAt`
+- **подхват ожидающих повтора**: сделки со строками исполнений
+  `DealActionState` (оба вида) в `RETRY_PENDING`, у которых `nextRetryAt`
   наступил (due-for-retry); до `nextRetryAt` повтор не берётся
   (`docs/components/RetryPolicyService.md`);
 - потенциально большая выборка — ограниченным окном/порядком, не

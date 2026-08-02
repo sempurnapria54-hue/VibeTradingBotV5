@@ -2,19 +2,19 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `REFRESH_BALANCE` (компонент-executor): что делает,
+Кто исполняет `REFRESH_BALANCE_COMMAND` (компонент-executor): что делает,
 особый контракт (не normal null, не RiskValidator).
 
 ## Назначение
 
-Получает `REFRESH_BALANCE` — read-only команда обновления account-level
+Получает `REFRESH_BALANCE_COMMAND` — read-only команда обновления account-level
 balance snapshot. Получает от `IntegrationService` уже validated
 `BalanceContainerExternalSnapshot`, создаёт `BalanceContainer` при
 отсутствии, обновляет account-level поля и полностью заменяет список
 `Balance` (см. `docs/models/domain/core/BalanceContainer.md`).
 
 Особенности: баланс не управляемая торговая сущность (нет active/closed
-lifecycle, нет status resolver), `REFRESH_BALANCE` не проходит через
+lifecycle, нет status resolver), `REFRESH_BALANCE_COMMAND` не проходит через
 `RiskValidator` (см. `docs/rules/risk-validator-scope.md`). Normal `null`
 contract не используется: успешный refresh обязан вернуть валидный
 snapshot с обязательной `settleCurrency`; пустой response / нет

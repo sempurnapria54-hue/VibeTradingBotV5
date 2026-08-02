@@ -23,7 +23,7 @@ Mapping (стаб, **OKX-Q1 закрыт**: `TradeFill` в фазе 1 не вв�
 **снимается** на `CODE` шага 7 (`docs/decisions/pnl-finalization-mechanics.md`
 реш.1; в коде пока жива — H15, `GAPS_CLOSE_6`) —
 эти fills-эндпоинты в целевом runtime фазы 1 **не используются** (order-fill-метрики
-идут из `OkxOrderResponse` через `REFRESH_ORDER`; число P&L — из
+идут из `OkxOrderResponse` через `REFRESH_ORDER_COMMAND`; число P&L — из
 positions-history/bills). Контракт оставлен справочно. Глубже 3 месяцев —
 `docs/integrations/okx/contracts/fills-archive.md`.
 

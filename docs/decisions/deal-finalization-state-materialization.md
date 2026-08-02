@@ -2,15 +2,26 @@
 
 ## На какой вопрос отвечает этот файл
 
-Почему persisted retry-state финализации сделки живёт в отдельной
+Почему persisted retry-state финализации сделки жил в отдельной
 сущности `DealFinalizationState`, а не в обобщённом `DealActionState`.
+
+> **Ревизовано (шаг 7, развилка «команда ↔ действие»):**
+> `DealFinalizationState` **упразднена** — финализация ведётся строками
+> исполнений **системных действий** в общей таблице `deal_action_states`
+> (`docs/decisions/command-action-boundary.md` §3). Несущий довод этого
+> решения — «не размывать инвариант `UNIQUE(deal_id,
+> strategy_action_id)`» — рухнул вместе с самим инвариантом: он
+> предполагал однократное исполнение действия стратегии в сделке, что
+> опровергнуто (грид — многократные, параллельные исполнения). Второй
+> довод (по-командный ретрай) сохранён формой «строка = исполнение».
+> Текст ниже — исторический контекст DEAL-Q1.
 
 ## Контекст
 
 Финализация сделки — теперь скоуп шага 6 (граница 6 ↔ 7, 2026-06-21:
 *механика* финализации — шаг 6, *расчёт прибыли* — шаг 7). Финализационные
-команды (`FINALIZE_DEAL_ENTRY`, `FINALIZE_DEAL_EXIT`, `MARK_DEAL_CLOSED`,
-`MARK_DEAL_ERROR` — `docs/components/models/ServiceCommand.md`) могут падать
+команды (`FINALIZE_DEAL_ENTRY_COMMAND`, `FINALIZE_DEAL_EXIT_COMMAND`, `MARK_DEAL_CLOSED_COMMAND`,
+`MARK_DEAL_ERROR_COMMAND` — `docs/components/models/ServiceCommand.md`) могут падать
 и обязаны ретраиться. Единственный носитель persisted-retry —
 база `Retryable`, наследуемая `DealActionState`. Но `DealActionState`
 жёстко привязан к `StrategyAction` (`strategyActionId` обязателен,
@@ -62,7 +73,7 @@
 ## Закрытие вопроса
 
 DEAL-Q1 закрыт на `GAPS_CLOSE_1` шага 6 фазы 1 (2026-06-22). Граничный
-контракт терминала при неисчислимой прибыли (поведение `MARK_DEAL_CLOSED`
+контракт терминала при неисчислимой прибыли (поведение `MARK_DEAL_CLOSED_COMMAND`
 после исчерпания retry) — **DEAL-Q2**: финализация всегда доводит сделку до
 терминала (чистый `CLOSED` с числом либо ошибочный терминал), число прибыли
 на ошибочном терминале — деталь шага 7 (`docs/lifecycles/Deal.md`

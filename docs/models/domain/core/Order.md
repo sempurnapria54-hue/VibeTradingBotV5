@@ -87,7 +87,7 @@ standalone `AlgoOrder` (раздел модели по
 `.claude/decisions/model-granularity.md`). Не материализуется
 автоматически в standalone `AlgoOrder`, даже если в snapshot есть
 attached/algo identifiers; standalone `AlgoOrder` создаётся только
-отдельным `StrategyAlgoOrderAction` через `CREATE_ALGO_ORDER`.
+отдельным `StrategyAlgoOrderAction` через `CREATE_ALGO_ORDER_COMMAND`.
 
 Java-класс `...core.order.AttachedAlgoOrder`, расширяет `Auditable`.
 

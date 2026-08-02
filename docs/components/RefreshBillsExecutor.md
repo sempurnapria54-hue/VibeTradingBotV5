@@ -2,12 +2,12 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `REFRESH_BILLS` (компонент-executor): что делает, пагинация
+Кто исполняет `REFRESH_BILLS_COMMAND` (компонент-executor): что делает, пагинация
 внутри команды, дедуп и линковка `deal_id`.
 
 ## Назначение
 
-Получает `REFRESH_BILLS` — runtime read-only команда (по отношению к бирже;
+Получает `REFRESH_BILLS_COMMAND` — runtime read-only команда (по отношению к бирже;
 локально **персистит** разбивку). Загружает bill-записи по окну сделки
 (`GET /api/v5/account/bills` (7d) → `GET /api/v5/account/bills-archive` (3m),
 пагинация назад по `billId` **внутри одной команды** — паритет evidence-cycle,
@@ -24,14 +24,20 @@
 ## Линковка `deal_id` по окну
 
 Bills **не несут `dealId`** (запись движения денег по аккаунту, не по сделке).
-Линковка `DealCashFlow.deal_id` делается по **окну + `instId`**: `begin` =
-`Position.externalCreatedAt` сделки (позиции нет — `externalCreatedAt` первого
-отправленного `Order`), `end` = `Position.externalModifiedAt` (`uTime` записи
-закрытия, приземлённой второй ногой `REFRESH_POSITION`; нет — `Deal.modifiedAt`);
-инструмент — `externalId` инструмента сделки (резолвится из `Deal.instrumentId`
-через `DealContext`, см. §Инструмент ниже). Границы включительные (H14,
-`GAPS_CLOSE_6`; операнд `end` — H1, `GAPS_CLOSE_7`;
+Линковка `DealCashFlow.deal_id` делается по **окну + `instId`**: границы
+окна — **собственные поля сделки** `Deal.billsWindowBegin` /
+`Deal.billsWindowEnd` (узел 1 `DOCS_CHECK_8`;
+`docs/models/domain/aggregate/Deal.md` §«Окно линковки bills»);
+инструмент — `externalId` инструмента сделки (резолвится из
+`Deal.instrumentId` через `DealContext`, см. §Инструмент ниже). Границы
+включительные (H14, `GAPS_CLOSE_6`;
 `docs/models/domain/other/DealCashFlow.md` §«Линковка к `Deal`»).
+
+**`billsWindowEnd` пуст → привязка ждёт.** Факт закрытия не добыт —
+executor персистит записи (дедуп по `externalBillId`), но линковку этим
+проходом не делает и окно суррогатом не закрывает; добычу факта ретраит
+`REFRESH_DEAL_CONTEXT_ACTION`, исчерпание бюджета уводит сделку ошибочной
+тропой + холд инструмента.
 
 **Однозначность держит инвариант «одна активная сделка на инструмент»**, не
 точность верхней границы: пока сделка удерживает слот, второй сделки по
@@ -59,7 +65,7 @@ guard не срабатывал никогда (`docs/models/mapping/DealCashFlo
 оживлён»).
 
 **Операнд — инструмент, не сделка.** Сравнивать с `Deal.resultProfitCurrency`
-нельзя: его пишет `FINALIZE_DEAL_EXIT`, то есть **после** этого прохода, и на
+нельзя: его пишет `FINALIZE_DEAL_EXIT_COMMAND`, то есть **после** этого прохода, и на
 момент записи оно `null` — предикат сравнивал бы с пустым
 (`docs/models/mapping/DealCashFlow.md` §«Операнд сравнения»). Носитель
 расчётной валюты инструмента — предложение на валидации (`GAPS_CLOSE_7`).

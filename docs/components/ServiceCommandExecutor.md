@@ -42,7 +42,7 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
   status resolver, обновляет сущность, заполняет `closeReason` только если
   текущий `== null`; торговых решений не принимает, cleanup не запускает,
   audit/history как runtime-source не использует. Для сущностей с
-  evidence-cycle (`REFRESH_ORDER` / `REFRESH_ALGO_ORDER`)
+  evidence-cycle (`REFRESH_ORDER_COMMAND` / `REFRESH_ALGO_ORDER_COMMAND`)
   исполнитель обходит эндпоинты **внутри одной команды** (эскалация
   live → pending → history → archive), обрывается на первом успешном,
   полный обход — только при не-найдено, и сам выносит терминал
@@ -60,18 +60,20 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
 > live-сущностей по инструменту (orphan / чужой риск; Precheck-cleanliness,
 > AnomalyJob) bulk-командой больше не покрыто — **CMD-Q4**.
 
-- **`FINALIZE_*` / `MARK_*`** — финализационные lifecycle/system actions
-  над самой `Deal` (`FINALIZE_DEAL_ENTRY` / `FINALIZE_DEAL_EXIT` /
-  `MARK_DEAL_CLOSED` / `MARK_DEAL_EMERGENCY_CLOSED` / `MARK_DEAL_ERROR`):
-  консолидируют подтверждённые
-  факты входа/выхода и делают терминальные/статусные рёбра сделки. На биржу
-  сами не ходят (опираются на уже добытые `REFRESH_*`-факты), торговых
-  решений не принимают, `RiskValidator` не вызывают
-  (`docs/rules/risk-validator-scope.md`). Идемпотентны через
-  `UNIQUE(deal_id, finalization_type)` (повтор на сделанной финализации —
-  no-op). Retry-anchor — `DealFinalizationState`, **не** `DealActionState`
-  (финализация не привязана к `StrategyAction`,
-  `docs/decisions/deal-finalization-state-materialization.md`). Семантика
+- **`FINALIZE_*` / `MARK_*`** — финализационные команды над самой `Deal`
+  (`FINALIZE_DEAL_ENTRY_COMMAND` / `FINALIZE_DEAL_EXIT_COMMAND` / `MARK_DEAL_CLOSED_COMMAND` /
+  `MARK_DEAL_EMERGENCY_CLOSED_COMMAND` / `MARK_DEAL_ERROR_COMMAND`) — **звенья системных
+  действий** `FINALIZE_DEAL_ENTRY_ACTION` / `FINALIZE_DEAL_EXIT_ACTION` /
+  `FINALIZE_DEAL_ERROR_ACTION` (`docs/components/SystemActionExecutor.md`):
+  консолидируют подтверждённые факты входа/выхода и делают
+  терминальные/статусные рёбра сделки — запись в `Deal` идёт **одной
+  транзакцией** с durable-продвижением исполнения
+  (`docs/decisions/command-action-boundary.md` §5). На биржу сами не ходят
+  (опираются на уже добытые `REFRESH_*`-факты), торговых решений не
+  принимают, `RiskValidator` не вызывают
+  (`docs/rules/risk-validator-scope.md`). Идемпотентны через факты `Deal`
+  + частичный ключ живого исполнения. Retry-anchor — строка исполнения
+  SYSTEM-вида (`docs/models/domain/other/DealActionState.md`). Семантика
   каждого — `docs/components/FinalizeDealEntryExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,
   `docs/components/MarkDealClosedExecutor.md`,
@@ -95,9 +97,11 @@ runtime-сущность и отдаёт факты FSM/handler'у (таксон
 
 При неуспехе executor'а — через `docs/components/RetryPolicyService.md`:
 `attemptCount`++, `nextRetryAt`, `lastError`, retry-anchor → `RETRY_PENDING`;
-при исчерпании попыток → `FAILED`. Retry-anchor — `DealActionState` для
-action-команд, `DealFinalizationState` для финализационных
-(`docs/decisions/deal-finalization-state-materialization.md`).
+при исчерпании бюджета исполнения → `FAILED`. **Retry-anchor один** —
+строка исполнения действия (`dealActionStateId`; оба вида — STRATEGY и
+SYSTEM; `docs/decisions/command-action-boundary.md`). Cleanup-команды
+анкера не несут — их отказ в учёт исполнений не пишется (серия — на
+инструмент-scope).
 
 Через этот retry/terminal-учёт проходит **и** брошенное executor'ом
 исключение, **и** возвращённый (не брошенный) неуспешный результат —

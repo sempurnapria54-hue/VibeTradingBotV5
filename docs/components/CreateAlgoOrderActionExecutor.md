@@ -13,14 +13,14 @@ algo-order (SL/TP/OCO/trailing; `StrategyAlgoOrderAction` + `actionType =
 CREATE`). По стадии `DealActionState` выдаёт следующую команду:
 
 ```text
-PLANNED   -> расчёт -> CREATE_ALGO_ORDER
-CREATED   -> SUBMIT_ALGO_ORDER
-SUBMITTED -> REFRESH_ALGO_ORDER
+PLANNED   -> расчёт -> CREATE_ALGO_ORDER_COMMAND
+CREATED   -> SUBMIT_ALGO_ORDER_COMMAND
+SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 ```
 
 ## Сборка дерева `Condition`
 
-На стадии `CREATE_ALGO_ORDER` собирает готовое дерево `Condition` с
+На стадии `CREATE_ALGO_ORDER_COMMAND` собирает готовое дерево `Condition` с
 рассчитанными trigger/trailing ценами (из `CalculatedPrice`): тип условия
 задаёт, какие ноги заполняются — `STOP_LOSS`/`PARTIAL_STOP_LOSS` →
 trigger stop-loss; `TAKE_PROFIT`/`PARTIAL_TAKE_PROFIT` → trigger

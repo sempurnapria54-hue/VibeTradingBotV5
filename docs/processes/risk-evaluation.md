@@ -35,7 +35,7 @@ FSM handler
 risk-increasing / risk-weakening actions; не для refresh/search/history,
 cleanup/safety, finalization и reduce-only partial exit. Перед
 risk-sensitive action handler обеспечивает fresh `BalanceContainer`; при
-absent/stale — `REFRESH_BALANCE` и новый проход FSM (на этой итерации
+absent/stale — `REFRESH_BALANCE_COMMAND` и новый проход FSM (на этой итерации
 `RiskValidator` не вызывается).
 
 ## Реакция на результат

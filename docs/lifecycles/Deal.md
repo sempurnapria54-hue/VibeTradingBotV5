@@ -44,7 +44,7 @@
 - **`EMERGENCY_CLOSED`** — аварийный terminal-финал после safety-flow
   (сделка была в `ERROR`, live risk снят/доказано отсутствие). Это и есть
   **ошибочный терминал** контракта финализации; ставит
-  `MARK_DEAL_EMERGENCY_CLOSED`; число `resultProfit` — **best-effort**
+  `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`; число `resultProfit` — **best-effort**
   (фактический realized net если доступен, иначе `null` с маркером
   «неисчислимо», **не ноль**; см. §«Терминальный контракт финализации»;
   DEAL-Q2 закрыт).
@@ -128,30 +128,32 @@ ReconciliationJob`.
 
 ## Терминальный контракт финализации (DEAL-Q2)
 
-Финализация использует **общий механизм повторов**
-(`DealFinalizationState`, `docs/models/domain/other/DealFinalizationState.md`).
-Граничный контракт между механикой финализации (шаг 6) и расчётом прибыли
-(шаг 7):
+Финализация использует **общий механизм повторов** — строки исполнений
+системных действий (`docs/models/domain/other/DealActionState.md`, вид
+SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный контракт
+между механикой финализации (шаг 6) и расчётом прибыли (шаг 7):
 
-- **Чистое закрытие.** Число считает и **пишет на `Deal`** `FINALIZE_DEAL_EXIT`
+- **Чистое закрытие.** Число считает и **пишет на `Deal`** `FINALIZE_DEAL_EXIT_COMMAND`
   (net из положения закрытия на `Position` + разбивка bills, в одной
-  транзакции с его `COMPLETED`; N7). `MARK_DEAL_CLOSED` **ассертит** непустоту
-  `Deal.resultProfit` и ставит **чистый терминал `CLOSED`** (число сам не
-  пишет — `docs/decisions/pnl-finalization-mechanics.md` реш.2).
-- Прибыль не посчиталась после исчерпания retry → это **ошибка** →
-  `DealFinalizationState(MARK_CLOSED) = FAILED`, сделка уходит ошибочной
-  тропой (`MarkDealErrorExecutor`/`ErrorHandler`) и доходит до **ошибочного
-  терминала** (`EMERGENCY_CLOSED`). Сделка **всегда доходит до терминала, не
-  зависает живым риском**.
-- **Аварийный терминал `EMERGENCY_CLOSED`** ставит **`MARK_DEAL_EMERGENCY_CLOSED`**
+  транзакции с продвижением своего исполнения; N7). `MARK_DEAL_CLOSED_COMMAND`
+  **ассертит** непустоту `Deal.resultProfit` и ставит **чистый терминал
+  `CLOSED`** (число сам не пишет —
+  `docs/decisions/pnl-finalization-mechanics.md` реш.2).
+- Прибыль не посчиталась после исчерпания бюджета добычи/финализации → это
+  **ошибка** → исполнение (`REFRESH_DEAL_CONTEXT_ACTION` /
+  `FINALIZE_DEAL_EXIT_ACTION`) в `FAILED`, сделка уходит ошибочной тропой
+  (`MarkDealErrorExecutor`/`ErrorHandler`) + **холд инструмента** и доходит
+  до **ошибочного терминала** (`EMERGENCY_CLOSED`). Сделка **всегда доходит
+  до терминала, не зависает живым риском**.
+- **Аварийный терминал `EMERGENCY_CLOSED`** ставит **`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`**
   (`docs/components/MarkDealEmergencyClosedExecutor.md`, симметрично
-  `MARK_DEAL_CLOSED`) с **best-effort числом** — **два провенанса разведены**
+  `MARK_DEAL_CLOSED_COMMAND`) с **best-effort числом** — **два провенанса разведены**
   (`docs/decisions/pnl-finalization-mechanics.md` реш.3):
   - **(a) ликвидация/ADL** (позицию закрыла биржа —
     `Position.externalCloseType ∈ 3..6`): net доступен полем
     `Position.externalRealizedProfit` → пишем **фактический realized net**;
   - **(b) отказ расчёта** (чистая тропа не смогла): перед терминалом
-    `ErrorHandler` гоняет `REFRESH_POSITION`, и её **вторая нога**
+    `ErrorHandler` гоняет `REFRESH_POSITION_COMMAND`, и её **вторая нога**
     (positions-history) ещё раз пробует добыть положение закрытия на
     `Position` (H1/H3 `GAPS_CLOSE_7`); net есть → пишем;
     **genuinely недоступен** → `resultProfit = null` c семантикой
@@ -171,7 +173,7 @@ ReconciliationJob`.
 DEAL-Q2 закрыт в три захода: механика/терминальный контракт — `GAPS_CLOSE_1`
 шага 6 (2026-06-22); *число* на ошибочном терминале (остаток DEAL-Q2, G5) —
 `GAPS_CLOSE_1` шага 7 (2026-07-03); *провенанс-контракт исполним + владелец
-терминала* (`MARK_DEAL_EMERGENCY_CLOSED`) — `GAPS_CLOSE_2` шага 7 (2026-07-04,
+терминала* (`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`) — `GAPS_CLOSE_2` шага 7 (2026-07-04,
 N8). *Расчёт* — шаг 7 (`docs/decisions/pnl-finalization-mechanics.md`).
 
 ## Restart / recovery

@@ -29,7 +29,7 @@ Mapping в `Position` — `docs/models/mapping/Position.md` (раздел
 
 ## Endpoints
 
-- **Получить позиции** (`REFRESH_POSITION`):
+- **Получить позиции** (`REFRESH_POSITION_COMMAND`):
   `GET /api/v5/account/positions?instType=SWAP&instId={...}`.
   Permission `Read`; rate limit 10 req / 2 s по User ID. Один
   логический запрос по инструменту; дополнительно по `posId` в **live**-ноге
@@ -40,7 +40,7 @@ Mapping в `Position` — `docs/models/mapping/Position.md` (раздел
   Query (все опц.): `instType`, `instId` (до 10 через запятую),
   `posId` (до 20). В net-режиме на инструмент ожидается одна запись
   с `posSide=net`; в long/short — отдельные `posSide=long`/`short`.
-- **Закрыть позицию** (`CLOSE_POSITION`):
+- **Закрыть позицию** (`CLOSE_POSITION_COMMAND`):
   `POST /api/v5/trade/close-position`. Permission `Trade`; rate
   limit 20 req / 2 s по User ID + Instrument ID. Body: `instId`
   (обяз.), `mgnMode` (обяз.; `isolated`/`cross`), `posSide` (условно
@@ -64,7 +64,7 @@ limit 10 req / 2 s по User ID. Глубина — 3 месяца, сортир
 нужны).
 
 **Добыча:** эндпоинт — **вторая нога evidence-cycle команды
-`REFRESH_POSITION`** (live `/account/positions` → при not-found
+`REFRESH_POSITION_COMMAND`** (live `/account/positions` → при not-found
 `/account/positions-history`, внутри одной команды; H1/H3 `GAPS_CLOSE_7`,
 `docs/decisions/pnl-finalization-mechanics.md` реш.1,
 `docs/components/RefreshPositionExecutor.md`). Наполняет
@@ -130,7 +130,7 @@ mapping native→snapshot→`Position`→`Deal` —
 **Инвариант:** одна сделка ↔ один `posId` ↔ **одна финализированная**
 запись positions-history, чей `realizedPnl` **кумулятивен по ВСЕМ**
 partial-закрытиям и доборам за жизнь позиции; читается **финализированной**
-(позиция полностью закрыта / flat по `REFRESH_POSITION`).
+(позиция полностью закрыта / flat по `REFRESH_POSITION_COMMAND`).
 
 **Помечено как предположение** до рантайм-верификации (контур source-api,
 demo, `.claude/tests/source-api/okx/plan.md` §AG1). Верифицировать:
@@ -145,6 +145,6 @@ demo, `.claude/tests/source-api/okx/plan.md` §AG1). Верифицироват�
 
 Response — ACK, не финальный статус (`docs/rules/ack-not-runtime-truth.md`).
 `data[0]` содержит `instId`, `posSide`. **Нет `ordId`** и нет
-финального статуса позиции — подтверждение через `REFRESH_POSITION`
+финального статуса позиции — подтверждение через `REFRESH_POSITION_COMMAND`
 (позиция исчезла или `pos=0`), опционально через fills и/или WS
 `positions`/`orders`.

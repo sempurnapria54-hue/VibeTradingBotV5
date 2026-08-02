@@ -138,4 +138,4 @@ order; standalone `AlgoOrder` — отдельная runtime-сущность. A
 protection **не** материализуется автоматически в standalone
 `AlgoOrder`, даже если биржа вернула algo identifiers внутри attached
 snapshot. Standalone `AlgoOrder` создаётся только отдельным
-`StrategyAlgoOrderAction` через `CREATE_ALGO_ORDER`.
+`StrategyAlgoOrderAction` через `CREATE_ALGO_ORDER_COMMAND`.

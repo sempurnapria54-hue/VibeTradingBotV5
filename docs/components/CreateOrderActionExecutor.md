@@ -13,9 +13,9 @@ order (`StrategyOrderAction` + `actionType = CREATE`). По стадии
 `DealActionState` выдаёт следующую команду:
 
 ```text
-PLANNED   -> расчёт -> risk (для risk-creating, т.е. не reduce-only) -> CREATE_ORDER
-CREATED   -> SUBMIT_ORDER
-SUBMITTED -> REFRESH_ORDER
+PLANNED   -> расчёт -> risk (для risk-creating, т.е. не reduce-only) -> CREATE_ORDER_COMMAND
+CREATED   -> SUBMIT_ORDER_COMMAND
+SUBMITTED -> REFRESH_ORDER_COMMAND
 ```
 
 На продвинутых стадиях расчёт и риск не повторяются — нога ведётся по

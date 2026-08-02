@@ -49,7 +49,7 @@ Java-класс `com.example.tradingbot.domain.model.core.balance.BalanceContain
 | `balances` | `List<Balance>` | Балансы по валютам. Для SWAP/USDT обязательна settle currency. |
 
 Метод `replaceBalances(List<Balance>)` — полная замена currency-level
-списка (clear + recreate). `REFRESH_BALANCE` использует replace
+списка (clear + recreate). `REFRESH_BALANCE_COMMAND` использует replace
 semantics: новый валидный exchange snapshot полностью заменяет
 старый список валют.
 
@@ -85,7 +85,7 @@ Java-класс `com.example.tradingbot.domain.model.core.balance.Balance`,
 - Если fresh balance snapshot не содержит обязательную settle
   currency — это не нормальная ситуация, а controlled
   external/account error.
-- Обновление — только через `REFRESH_BALANCE` (единственный
+- Обновление — только через `REFRESH_BALANCE_COMMAND` (единственный
   runtime-flow обновления контейнера; см. форвард-заметку про
   подсистему ServiceCommand в
   `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-balance.md`).
@@ -105,7 +105,7 @@ externalUpdatedAt / updatedAt + balanceExpirationDuration -> fresh / stale
   flow (входной владелец — Deal-lifecycle; форвард-заметка для
   миграции Deal — в `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-balance.md`).
 - Если balance absent/stale перед risk-check — handler создаёт
-  `REFRESH_BALANCE` и не вызывает `RiskValidator` на этой итерации;
+  `REFRESH_BALANCE_COMMAND` и не вызывает `RiskValidator` на этой итерации;
   после успешного refresh следующая итерация FSM пересобирает
   `DealContext` и продолжает flow.
 - Компонент-проверка (`BalanceFreshnessChecker`) и executor
@@ -161,7 +161,7 @@ API / parse / invariant   -> exception / controlled error
 - **CalculationContext** / `StrategyActionCalculator` могут
   использовать `BalanceContainer` как input для sizing, но не
   обновляют его, не вызывают `IntegrationService`, не создают
-  `REFRESH_BALANCE`, не принимают risk decision.
+  `REFRESH_BALANCE_COMMAND`, не принимают risk decision.
 - **RiskValidator** использует fresh `BalanceContainer` как входной
   snapshot (`externalTotalEquity` / `externalAdjustedEquity` /
   `externalAvailableEquity`; по settle currency — `externalEquity` /
@@ -188,5 +188,5 @@ normalized snapshot → domain.
 заголовочное число = net `realizedPnl` из positions-history, категорийная
 разбивка — из bills (правило принадлежит `Deal` — см.
 `.claude/decisions/rule-source-of-truth.md`,
-`docs/decisions/result-profit-source.md`). `REFRESH_BALANCE` после выхода из
+`docs/decisions/result-profit-source.md`). `REFRESH_BALANCE_COMMAND` после выхода из
 сделки нужен для актуального account snapshot, а не для расчёта PnL сделки.

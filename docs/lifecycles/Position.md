@@ -9,12 +9,12 @@
 
 ## Кто управляет
 
-Статусы `Position` меняет только `REFRESH_POSITION` flow:
+Статусы `Position` меняет только `REFRESH_POSITION_COMMAND` flow:
 `IntegrationService` отдаёт snapshot (или `null`), `PositionStatusResolver`
 возвращает `status + closeReason` candidate, `RefreshPositionExecutor`
 применяет результат. FSM напрямую `Position` не создаёт и не меняет.
 
-`REFRESH_POSITION` — **двуногая** refresh-команда (evidence-cycle внутри
+`REFRESH_POSITION_COMMAND` — **двуногая** refresh-команда (evidence-cycle внутри
 одной команды, H1/H3 `GAPS_CLOSE_7`): live `/account/positions` → при
 not-found `/account/positions-history` по `posId`. Вторая нога статус не
 меняет (его уже определил not-found первой ноги) — она **наполняет поля
@@ -39,7 +39,7 @@ not-found `/account/positions-history` по `posId`. Вторая нога ст�
 Промежуточные статусы (`CREATED`/`PENDING`/`OPENING`/`CLOSING`/
 `PARTIALLY_CLOSED`) не вводятся: `Position` не создаётся локально до
 биржи, появляется как результат исполнения `Order`, материализуется
-через `REFRESH_POSITION`; ACK от `CLOSE_POSITION` не runtime truth;
+через `REFRESH_POSITION_COMMAND`; ACK от `CLOSE_POSITION_COMMAND` не runtime truth;
 частичное уменьшение — это `ACTIVE` с обновлённым `externalSize`, не
 отдельный статус.
 
@@ -56,7 +56,7 @@ ERROR                        -> problem state, не normal closed
 
 Формула live risk — в `docs/models/domain/core/Position.md`.
 
-## Переходы (через `REFRESH_POSITION`)
+## Переходы (через `REFRESH_POSITION_COMMAND`)
 
 `PositionStatusResolver`:
 
@@ -82,10 +82,11 @@ snapshot.externalSize == 0 -> status = ACTIVE (не CLOSED, пока биржа
 - snapshot не найден, `Position` есть: `status = CLOSED`,
   `closeReason = EXTERNAL_CLOSE` (если был null); **дальше — вторая нога**:
   запись positions-history по `Position.externalId` наполняет поля
-  положения закрытия (§«Кто управляет»). Запись не нашлась — поля остаются
-  `null`, статус всё равно `CLOSED` (отсутствие числа — не отказ команды,
-  а вход в тропу «неисчислимо», `docs/lifecycles/Deal.md` §«Терминальный
-  контракт финализации»).
+  положения закрытия и `Deal.billsWindowEnd` (§«Кто управляет»). Запись не
+  нашлась — поля остаются `null`, статус всё равно `CLOSED`; отсутствие
+  факта — не отказ команды, добычу ретраит `REFRESH_DEAL_CONTEXT_ACTION`
+  (узел 4 `DOCS_CHECK_8`, вариант (а)); тропа «неисчислимо» — аварийный
+  контур (`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»).
 - snapshot не найден, `Position` нет: **новую `CLOSED` не создавать**;
   FSM/handler дальше анализирует `DealContext` и статус сделки. Вторая
   нога **не идёт**: адресовать запись нечем (`posId` не наблюдался).
@@ -120,7 +121,7 @@ Unknown / невозможно распарсить response — controlled exce
 
 ```text
 entry Order исполнен -> биржа создала позицию -> локальной Position
-ещё нет -> следующий REFRESH_POSITION находит -> executor создаёт
+ещё нет -> следующий REFRESH_POSITION_COMMAND находит -> executor создаёт
 Position, Position.dealId = Deal.id
 ```
 
@@ -133,8 +134,8 @@ Position, Position.dealId = Deal.id
 Если приложение упало, entry order исполнился, позиция открылась и
 закрылась по SL/TP/trailing, после рестарта локальной `Position`
 может ещё не быть. Это не anomaly при active `Deal` и известном entry
-order. Recovery-контур (`REFRESH_ORDER` → `REFRESH_POSITION` (null) →
-`REFRESH_ALGO_ORDER`) — Deal-lifecycle/orchestration;
+order. Recovery-контур (`REFRESH_ORDER_COMMAND` → `REFRESH_POSITION_COMMAND` (null) →
+`REFRESH_ALGO_ORDER_COMMAND`) — Deal-lifecycle/orchestration;
 полный flow — `docs/processes/deal-management.md` /
 `docs/lifecycles/Deal.md` (шаги 6-7). P&L сделки финализация собирает
 не через fills (число — net из positions-history, разбивка — из bills;
@@ -142,9 +143,11 @@ order. Recovery-контур (`REFRESH_ORDER` → `REFRESH_POSITION` (null) →
 `docs/decisions/pnl-finalization-mechanics.md`).
 Position-правило: локальную `CLOSED Position` можно не создавать, если
 её ещё не было; `Deal` финализируется по собранным фактам. **Цена этого
-правила названа** (`GAPS_CLOSE_7`): без строки `Position` положению
-закрытия негде приземлиться, то есть число и верхняя граница окна
-линковки bills на этой тропе недостижимы — см. развилку H6/H7 выше.
+правила названа** (`GAPS_CLOSE_7`; узел 1 `DOCS_CHECK_8`): без строки
+`Position` положению закрытия негде приземлиться, а наблюдатель
+`Deal.billsWindowEnd` (вторая нога) не срабатывает — число и привязка
+bills на этой тропе **ждут** до исчерпания бюджета добычи (дальше —
+ошибочная тропа + холд); см. развилку H6/H7 выше.
 
 ## Position not found vs Order/AlgoOrder
 
