@@ -176,6 +176,20 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 `docs/models/mapping/PositionCloseResult.md`; контракт эндпоинта —
 `docs/integrations/okx/contracts/position.md` §«История закрытых позиций».
 
+## Персистентность
+
+Хранится в БД (entity `PositionEntity`, таблица `positions`, создана
+`V6__create_deal_runtime_tables.sql`), наследует audit-поля
+(`AuditableEntity`). Enum-поля (`status`, `close_reason`, `direction`)
+хранятся строкой (имя enum; codestyle §Слои моделей и enum'ы).
+
+**Колонки положения закрытия — `ALTER`, в `V6` их нет** (симметрично
+`Deal.md`/`DealActionState.md`, H21 `DOCS_CHECK_8`):
+`external_realized_profit`, `external_result_currency`,
+`external_close_type` — nullable (пусты, пока позиция жива или запись
+закрытия не добыта), добавляются миграцией шага 7; полная schema-дельта
+шага — `docs/decisions/pnl-finalization-mechanics.md` §Следствия.
+
 ## Что Position не хранит
 
 `Position` не хранит fills, слагаемые net (`pnl`, `fee`, `fundingFee`,

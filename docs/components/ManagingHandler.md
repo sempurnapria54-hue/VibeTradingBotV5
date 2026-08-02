@@ -45,14 +45,14 @@ cancel-команды. `REFRESH_POSITION_COMMAND` без позиции → `EXI
 опасное расхождение, >1 позиция, borrow/debt, небезопасный recovery.
 Иначе остаётся в `MANAGING`.
 
-## Допустимые StrategyStep / возможные ServiceCommand
+## Допустимые StrategyStep
 
 Steps: `PROTECTION_ADJUSTMENT`, `PARTIAL_EXIT`, `GRID_MANAGEMENT`, `EXIT`,
-`FAIL_SAFE`. Команды: `REFRESH_BALANCE_COMMAND`, `CREATE_ALGO_ORDER_COMMAND`,
-`SUBMIT_ALGO_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`, `CREATE_ORDER_COMMAND`,
-`SUBMIT_ORDER_COMMAND`, `CANCEL_ORDER_COMMAND`, `CLOSE_POSITION_COMMAND`, `REFRESH_POSITION_COMMAND`,
-`REFRESH_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`,
-`MARK_DEAL_ERROR_COMMAND`. Ремодел защиты
-(`PROTECTION_ADJUSTMENT`) — REPLACE-оркестрацией из этого же набора
+`FAIL_SAFE`. Перечень команд handler-док не держит: состав команд —
+собственность действий (`docs/decisions/fsm-execution-layering.md`
+§«Handler исполняет действия»; реестры звеньев —
+`docs/decisions/command-action-boundary.md` §2,
+`docs/components/SystemActionExecutor.md`). Ремодел защиты
+(`PROTECTION_ADJUSTMENT`) — REPLACE-оркестрацией
 (place-new → факт → cancel-old; `docs/decisions/replace-not-amend.md`),
 амендных команд нет.

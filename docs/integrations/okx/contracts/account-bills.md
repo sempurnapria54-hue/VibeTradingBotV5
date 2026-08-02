@@ -85,11 +85,14 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    однозначным — второй сделки по инструменту в это время не существует
    (uk_deal_active_instrument). После терминала линковка не выполняется.
 
-1. Определить окно сделки (обе границы — из дат, уже лежащих на Deal/Position):
-   - begin = Position.externalCreatedAt (биржевое cTime открытия позиции);
-            позиции нет — externalCreatedAt первого отправленного Order;
-   - end   = Position.externalModifiedAt (uTime записи закрытия, приземлённой
-            второй ногой REFRESH_POSITION_COMMAND); нет — Deal.modifiedAt.
+1. Определить окно сделки — СОБСТВЕННЫЕ ПОЛЯ Deal (узел 1 DOCS_CHECK_8;
+   docs/decisions/command-action-boundary.md §7):
+   - begin = Deal.billsWindowBegin (пишет наблюдатель факта открытия);
+   - end   = Deal.billsWindowEnd (пишет вторая нога REFRESH_POSITION_COMMAND
+            транзакционно с полями положения закрытия).
+   Из чужих колонок (Position.externalCreatedAt/externalModifiedAt,
+   Deal.modifiedAt) окно НЕ реконструируется; end пуст (факт закрытия не
+   добыт) -> привязка ждёт, суррогатом окно не закрывается.
    Границы включительные. Верхняя граница нужна, чтобы не тянуть лишнего;
    разделяет сделки инвариант слота (п.0), а не она.
 
@@ -106,7 +109,9 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    Выход матчинга закрепляется как DealCashFlow.deal_id при сохранении.
 
 4. Сохранить как DealCashFlow (категорийная разбивка); резолв категории
-   (type/subType → CashFlowCategory) — при финализации, в вызывающем коде.
+   (type/subType → CashFlowCategory) — НА ЗАПИСИ, в вызывающем коде
+   executor'а, не в маппере и не при финализации: category на строке
+   NOT NULL (docs/models/domain/other/DealCashFlow.md §Структура).
    Ветка по валюте НА ЗАПИСИ (операнд — РАСЧЁТНАЯ ВАЛЮТА ИНСТРУМЕНТА,
    не Deal.resultProfitCurrency: последнее пишет FINALIZE_DEAL_EXIT_COMMAND, то есть
    ПОСЛЕ этого прохода, и здесь оно всегда null — H4):

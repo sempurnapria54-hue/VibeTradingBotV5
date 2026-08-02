@@ -390,6 +390,27 @@ H12 `DOCS_CHECK_7`. У гидрированной ставки **нет объя
 комиссии», `docs/components/InstrumentExternalRulesDataService.md`,
 `docs/models/domain/other/TradeFeeRate.md`.
 
+### CCY-Q2. Имя поля расчётной валюты и область модели `InstrumentExternalRules` (владелец — `solution-designer`)
+
+Хвост H12 `DOCS_CHECK_9`. Дом валют инструмента **решён** (расчётная,
+базовая и котировочная персистятся в `InstrumentExternalRules` —
+`docs/decisions/instrument-currencies-home.md`); открыты две связанные
+позиции:
+
+1. **Именование поля расчётной валюты:** `externalCurrency` против
+   `externalSettlementCurrency` — второе сохраняет дискриминатор при
+   трёх валютах на инструменте (крен). До закрытия имена полей в
+   носителях — предварительные (помечены).
+2. **Область модели:** модель заявляла «валют не держит» и названа
+   «правилами», тогда как валюты — атрибуты инструмента. Развилка:
+   расширение области модели с возможным переименованием против
+   отдельного носителя валют.
+
+Проработать владельцем до `CODE`-писателя валютных полей.
+Связано: `docs/models/domain/other/InstrumentExternalRules.md` §«Валюты
+инструмента», `docs/models/mapping/InstrumentExternalRules.md`,
+`docs/decisions/instrument-currencies-home.md`.
+
 ### HOLD-Q2. Статус онбординга после ручного снятия жёсткой блокировки (владелец — `solution-designer`)
 
 Смежный угол H13 `DOCS_CHECK_7`. `GAPS_CLOSE_7` зафиксировал множества входа:

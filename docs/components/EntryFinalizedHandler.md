@@ -51,9 +51,10 @@ order несёт активную приложенную защиту** (`Order.
 `→ MANAGING`. Живой риск без активной резолвимой защиты (ни main, ни
 active-attached) → `ERROR` + L3-холд инструмента.
 
-## Допустимые StrategyStep / возможные ServiceCommand
+## Допустимые StrategyStep
 
-Steps: `MAIN_PROTECTION`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE_COMMAND`,
-`CREATE_ALGO_ORDER_COMMAND`, `SUBMIT_ALGO_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`,
-`CANCEL_ALGO_ORDER_COMMAND`, `CANCEL_ORDER_COMMAND`, `REFRESH_POSITION_COMMAND`,
-`MARK_DEAL_ERROR_COMMAND`.
+Steps: `MAIN_PROTECTION`, `FAIL_SAFE`. Перечень команд handler-док не
+держит: состав команд — собственность действий
+(`docs/decisions/fsm-execution-layering.md` §«Handler исполняет действия»;
+реестры звеньев — `docs/decisions/command-action-boundary.md` §2,
+`docs/components/SystemActionExecutor.md`).

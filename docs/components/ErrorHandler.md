@@ -58,14 +58,14 @@ handler'а не имеет; терминал ставит `MARK_DEAL_EMERGENCY_C
 равно, факт помечается (`docs/lifecycles/Deal.md` §«Терминальный контракт
 финализации», DEAL-Q2 / G5).
 
-## Возможные ServiceCommand
+## Границы
 
-`MARK_DEAL_ERROR_COMMAND`, `REFRESH_POSITION_COMMAND`,
-`REFRESH_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`, `CANCEL_ORDER_COMMAND`,
-`CANCEL_ALGO_ORDER_COMMAND`, `CLOSE_POSITION_COMMAND`,
-`REFRESH_BILLS_COMMAND`, `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`. Kill-switch не эмитится ErrorHandler'ом
-как команда — реактивный side-executor вне реестра (`HoldSignal` →
-`SafetyHoldCoordinator`). Перечисление **неизвестных** live
-orders/algo по инструменту (хвосты orphan) — CMD-Q4. Зона
+Перечень команд handler-док не держит: состав команд — собственность
+действий (`docs/decisions/fsm-execution-layering.md` §«Handler исполняет
+действия»; реестры звеньев — `docs/decisions/command-action-boundary.md`
+§2, `docs/components/SystemActionExecutor.md`). Kill-switch не эмитится
+ErrorHandler'ом как команда — реактивный side-executor вне реестра
+(`HoldSignal` → `SafetyHoldCoordinator`). Перечисление **неизвестных**
+live orders/algo по инструменту (хвосты orphan) — CMD-Q4. Зона
 `AnomalyJob`/`ReconciliationJob` — live risk после terminal (см.
 `docs/components/AnomalyJob.md`).

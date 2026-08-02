@@ -40,7 +40,7 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 | `shutdownReason` | `ShutdownReason` | Причина graceful shutdown / controlled close (если запущен). Не заменяет `closeReason`. |
 | `closeReason` | `CloseReason` | Итоговая бизнес-причина завершения. |
 | `plannedRiskAmount` | `BigDecimal` | **Плановый риск сделки (`R`)** — убыток на стопе, посчитанный при постановке входа. Знаменатель R-мультипликатора (см. §«Плановый риск»). |
-| `plannedRiskCurrency` | `String` | Валюта планового риска (та же, что у `resultProfitCurrency` — иначе отношение не считается). |
+| `plannedRiskCurrency` | `String` | Валюта планового риска (та же, что у `resultProfitCurrency` — иначе отношение не считается). Источник значения у писателя — **расчётная валюта инструмента** (дом — `InstrumentExternalRules`, `docs/decisions/instrument-currencies-home.md`; имя поля валюты — открытый хвост CCY-Q2). |
 | `resultProfit` | `BigDecimal` | Итоговый PnL (см. ниже). |
 | `resultProfitCurrency` | `String` | Валюта результата (для `ETH-USDT-SWAP` обычно `USDT`). |
 | `billsWindowBegin` | `OffsetDateTime` | **Нижняя граница окна линковки bills** — собственное поле сделки, заполняет наблюдатель факта открытия (см. §«Окно линковки bills»). |
@@ -92,7 +92,13 @@ Java-класс `com.example.tradingbot.domain.model.core.deal.Deal`,
 
 - **Число** `resultProfit` = **net realized P&L**, берётся **готовым** из
   positions-history (`realizedPnl = pnl + fee + fundingFee + liqPenalty`,
-  посчитан биржей), **не** через fills/`TradeFill` и **не** через
+  посчитан биржей), **плюс cross-ccy-слагаемое** Σ(`amount` ×
+  `appliedRate`) по строкам `DealCashFlow` чужой `ccy` (биржевой net
+  считается в settle-ccy и издержку вне неё не содержит — без слагаемого
+  число завышалось бы молча; реш.5
+  `docs/decisions/pnl-finalization-mechanics.md`,
+  `docs/models/mapping/DealCashFlow.md` §«Число — в settle-ccy»). **Не**
+  через fills/`TradeFill` и **не** через
   `BalanceContainer` diff. `REFRESH_BALANCE_COMMAND` после выхода нужен для
   актуального account snapshot, не для PnL сделки.
 - **Категорийная разбивка** (торговая комиссия / funding / rebate /

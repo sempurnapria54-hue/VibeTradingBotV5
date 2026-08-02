@@ -46,10 +46,10 @@ handler гейтит эмиссию, не двигает статус. Если 
 бирже (SL/TP/trailing) и факты это объясняют — recovery в `EXIT_PENDING`
 (не anomaly при active Deal и known entry order).
 
-## Допустимые StrategyStep / возможные ServiceCommand
+## Допустимые StrategyStep
 
-Steps: `FAIL_SAFE` (новые торговые actions обычно не выбираются). Команды:
-`SUBMIT_ORDER_COMMAND`, `REFRESH_ORDER_COMMAND`, `REFRESH_POSITION_COMMAND`,
-`REFRESH_BALANCE_COMMAND`, `FINALIZE_DEAL_ENTRY_COMMAND`, `MARK_DEAL_ERROR_COMMAND`
-(добывающие — звеньями `REFRESH_DEAL_CONTEXT_ACTION`; финализация входа —
-звеном `FINALIZE_DEAL_ENTRY_ACTION`).
+Steps: `FAIL_SAFE` (новые торговые actions обычно не выбираются).
+Перечень команд handler-док не держит: состав команд — собственность
+действий (`docs/decisions/fsm-execution-layering.md` §«Handler исполняет
+действия»; реестры звеньев — `docs/decisions/command-action-boundary.md`
+§2, `docs/components/SystemActionExecutor.md`).

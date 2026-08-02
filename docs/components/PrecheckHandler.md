@@ -15,7 +15,8 @@
 ## Входные проверки
 
 `Deal.status = PRECHECK`; есть pinned `StrategyDetail` и `Instrument`;
-есть `BalanceContainer` или можно создать `REFRESH_BALANCE_COMMAND`; refresh/search
+есть `BalanceContainer` или его добудет звено `REFRESH_BALANCE_COMMAND`
+добывающего действия (`REFRESH_DEAL_CONTEXT_ACTION`); refresh/search
 не показывают >1 позиции; нет активной позиции/сделки (при максимуме
 одной); **чистота инструмента** — нет чужого/висящего на инструменте (см.
 ниже); нет borrow/debt; режим isolated. Не прошли безопасно → refresh /
@@ -39,9 +40,11 @@ Orphan-скан при уже открытой сделке и по неведо
 
 ## Рабочая логика
 
-Сначала обеспечить fresh `BalanceContainer` (absent/stale →
-`REFRESH_BALANCE_COMMAND`, остаться, не вызывать `RiskValidator`/`CREATE_ORDER_COMMAND` на
-этой итерации). Затем: найти `ENTRY`/`GRID_ENTRY` step → freshness
+Сначала обеспечить fresh `BalanceContainer` (absent/stale → добыча
+звеном `REFRESH_BALANCE_COMMAND` через `REFRESH_DEAL_CONTEXT_ACTION` —
+handler добывающие `REFRESH_*` напрямую не эмитит,
+`docs/components/SystemActionExecutor.md`; остаться, не вызывать
+`RiskValidator`/`CREATE_ORDER_COMMAND` на этой итерации). Затем: найти `ENTRY`/`GRID_ENTRY` step → freshness
 (`checkForStep`) → при устаревании `marketDataExpiredSetting` → проверить
 `StrategyCondition`. Если condition false и live risk нет → закрыть
 candidate Deal без ошибки (`CLOSED` + `ENTRY_CONDITION_EXPIRED`); если live
@@ -86,14 +89,19 @@ risk-creating входа подтверждена** (attached SL / иной ст
 не выпускается, `docs/rules/risk-creating-entry-protection.md`); рабочее
 плечо под расчёт пишет inline `SubmitOrderExecutor` перед постановкой
 открывающего ордера (не handler — см. §«Set-leverage перед постановкой»);
-`DealActionState` → `RuntimeTarget(ORDER, orderId)`; order создан/отправлен;
+`DealActionState` с целью в колонках (`targetEntityType = ORDER`,
+`targetEntityId = orderId` — объект `RuntimeTarget` расплющен в колонки,
+`docs/decisions/command-action-boundary.md` §3); order создан/отправлен;
 нет критичных
 конфликтов; нет риска под kill-switch. → `PRECHECK → ENTRY_SUBMITTED`.
 
-## Допустимые StrategyStep / возможные ServiceCommand
+## Допустимые StrategyStep
 
-Steps: `ENTRY`, `GRID_ENTRY`, `FAIL_SAFE`. Команды: `REFRESH_BALANCE_COMMAND`,
-`REFRESH_POSITION_COMMAND`, `CREATE_ORDER_COMMAND`, `SUBMIT_ORDER_COMMAND`, `MARK_DEAL_ERROR_COMMAND`.
+Steps: `ENTRY`, `GRID_ENTRY`, `FAIL_SAFE`. Перечень команд handler-док не
+держит: состав команд — собственность действий
+(`docs/decisions/fsm-execution-layering.md` §«Handler исполняет действия»;
+реестры звеньев — `docs/decisions/command-action-boundary.md` §2,
+`docs/components/SystemActionExecutor.md`).
 Перечисление **неизвестных** live orders/algo по
 инструменту для входной проверки чистоты берётся из стартового
 инструмент-скоупного exchange-read **вне command-layer**

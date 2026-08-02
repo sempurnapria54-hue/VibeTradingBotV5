@@ -48,8 +48,11 @@ ACTIVE && externalSize > 0` (см. `docs/models/domain/core/Position.md`).
 ## Свежесть баланса и отдельные данные
 
 Наличие `balanceContainer` не означает свежесть — её проверяет
-FSM/handler перед risk-sensitive flow; при absent/stale handler создаёт
-`REFRESH_BALANCE_COMMAND` и пересобирает `DealContext` (см.
+FSM/handler перед risk-sensitive flow; при absent/stale свежесть
+добывается звеном `REFRESH_BALANCE_COMMAND` через
+`REFRESH_DEAL_CONTEXT_ACTION` (handler добывающие `REFRESH_*` напрямую
+не эмитит, `docs/components/SystemActionExecutor.md`), и следующий
+проход пересобирает `DealContext` (см.
 `docs/models/domain/core/BalanceContainer.md`). Свежие `InstrumentExternalRules`,
 `MarketPriceData`, `IndicatorValue`, `MarketStructure`, `MarketPhase`,
 `CalculationContext` в `DealContext` не входят — собираются в

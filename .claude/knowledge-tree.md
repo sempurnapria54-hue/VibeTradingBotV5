@@ -160,7 +160,8 @@
 │       │   ├── phase-1-step-7-gaps-close-5.md — Как закрыты пробелы DOCS_CHECK_5 шага 7 (и что withhold)?
 │       │   ├── phase-1-step-7-gaps-close-6.md — Как закрыты пробелы DOCS_CHECK_6 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-7.md — Как закрыты пробелы DOCS_CHECK_7 шага 7?
-│       │   └── phase-1-step-7-gaps-close-8.md — Как закрыты пробелы DOCS_CHECK_8 шага 7 (в объёме решённого)?
+│       │   ├── phase-1-step-7-gaps-close-8.md — Как закрыты пробелы DOCS_CHECK_8 шага 7 (в объёме решённого)?
+│       │   └── phase-1-step-7-gaps-close-9.md — Каков исход закрытия находок DOCS_CHECK_9 по итогам сверки пользователя?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -261,6 +262,7 @@
 │   │   ├── derived-market-data-code-increments.md — Почему код-инкременты производных рыночных данных такие?
 │   │   ├── efficiency-ratio-as-catalog-indicator.md — Почему ER — каталожный операнд без выделенного ruleType?
 │   │   ├── fsm-execution-layering.md — Как разложены слои исполнения сделки и почему?
+│   │   ├── instrument-currencies-home.md — Почему валюты инструмента персистятся в InstrumentExternalRules?
 │   │   ├── instrument-external-rules-materialization.md — Как материализуется InstrumentExternalRules и почему?
 │   │   ├── market-data-result-identity-keying.md — Почему результаты расчёта ключуются настройкой-владельцем?
 │   │   ├── market-phase-conditional-classification.md — Почему MarketPhase.Type определяется авторскими условиями?

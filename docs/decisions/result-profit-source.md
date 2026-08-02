@@ -52,9 +52,10 @@ fills-путь торгово неполон.
   реш.5).
 - **Аварийный/ликвидационный терминал (`EMERGENCY_CLOSED`, G5):** число =
   **фактический realized net** (вкл. `liqPenalty`) если доступен из
-  positions-history (`realizedPnl`; провенанс ликвидации/ADL — по `type` и
-  опциональному `triggerPx`, применимость которого держит единственный
-  носитель `docs/integrations/okx/contracts/position.md` §История);
+  positions-history (`realizedPnl`; провенанс ликвидации/ADL — по `type` →
+  `Position.externalCloseType`; `triggerPx` из маппинга **выведен** — H22,
+  `GAPS_CLOSE_7` — и в провенансе не участвует, кандидат в носители
+  измеримости искажений — `PNL-Q1`);
   если недоступен (провенанс отказа расчёта) —
   best-effort **`null` с маркером «неисчислимо»**, **не ноль**
   (провенанс-контракт разведён на `GAPS_CLOSE_2`, N8 —

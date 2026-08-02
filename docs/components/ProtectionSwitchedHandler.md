@@ -35,8 +35,10 @@ protection; если attached ещё активна, а main подтвержд�
 дублирующей защиты, orphan algo-orders, конфликтующих pending orders;
 сделка готова к сопровождению. → `PROTECTION_SWITCHED → MANAGING`.
 
-## Допустимые StrategyStep / возможные ServiceCommand
+## Допустимые StrategyStep
 
-Steps: `FAIL_SAFE` (этап технический). Команды: `REFRESH_POSITION_COMMAND`,
-`REFRESH_ALGO_ORDER_COMMAND`, `REFRESH_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`,
-`CANCEL_ORDER_COMMAND`, `MARK_DEAL_ERROR_COMMAND`.
+Steps: `FAIL_SAFE` (этап технический). Перечень команд handler-док не
+держит: состав команд — собственность действий
+(`docs/decisions/fsm-execution-layering.md` §«Handler исполняет действия»;
+реестры звеньев — `docs/decisions/command-action-boundary.md` §2,
+`docs/components/SystemActionExecutor.md`).

@@ -27,9 +27,10 @@ limits / история закрытых позиций — `docs/integrations/o
 
 Отличие от live `/positions` (native `OkxPositionResponse`): positions-history
 несёт **realized**-факты закрытой позиции (`realizedPnl`, `closeAvgPx` и т. д.),
-которых нет у live-DTO. Средняя цена входа/выхода покрывается
-`openAvgPx`/`closeAvgPx` — fills для этого не нужны; в used-набор из них
-входит только `openAvgPx` (см. §«Не используется»).
+которых нет у live-DTO. Средние цены входа/выхода (`openAvgPx`/`closeAvgPx`)
+в used-набор **не входят** (H22/H23 — потребителя в фазе 1 нет;
+`Position.externalAverageEntryPrice` пишет только live-нога, см.
+§«Не используется»).
 
 ## Инвентарь полей
 
@@ -42,7 +43,6 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 |---|---|---|
 | `realizedPnl` | string-decimal | готовый net realized P&L = `pnl` + `fee` + `fundingFee` + `liqPenalty` (посчитан биржей) → `Position.externalRealizedProfit` → `Deal.resultProfit` |
 | `ccy` | string | валюта, в которой посчитан `realizedPnl` → `Position.externalResultCurrency` → `Deal.resultProfitCurrency` (для `ETH-USDT-SWAP` — `USDT`) |
-| `openAvgPx` | string-decimal | средняя цена входа → `Position.externalAverageEntryPrice` |
 | `type` | string | тип последнего закрытия (`1` частичное / `2` полное / `3` ликвидация / `4` частичная ликвидация / `5` ADL не полностью / `6` ADL полностью) → `Position.externalCloseType` (провенанс аварийного терминала) |
 | `posId` | string | биржевой id позиции (ключ адресации записи; истекает ~30 дней после полного закрытия) — сверяется с `Position.externalId` |
 | `uTime` | string-ms | время обновления записи → `Position.externalModifiedAt` (сортировка/пагинация positions-history — тоже по `uTime`) |
@@ -65,6 +65,13 @@ Used-минимум для числа `resultProfit`: готовый net бер�
   ликвидации/ADL). Оба — кандидаты в носители провенанса ликвидации/ADL,
   вопрос открыт (`PNL-Q1`). Побочно снят остаток H19: расхождение доков о
   применимости `triggerPx` больше ничего не нагружает — поле не маппится.
+- **Выведен из used на `DOCS_CHECK_8` (H23)**: `openAvgPx` (средняя цена
+  входа за жизнь позиции). Маппинг `openAvgPx →
+  Position.externalAverageEntryPrice` делал колонку двуписьменной (live
+  `avgPx` — текущая средняя, `openAvgPx` — средняя за жизнь; при доборах
+  расходятся, провенанс поля неоднозначен) —
+  `Position.externalAverageEntryPrice` пишет **только live-нога**
+  (`docs/models/mapping/PositionCloseResult.md`).
 - **Идентификация / атрибуты позиции** (не нужны числу; USDT-SWAP net /
   isolated фиксированы адаптером): `mgnMode`, `posSide`, `direction`,
   `lever`, `uly`, `cTime` (время создания).

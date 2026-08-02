@@ -93,4 +93,5 @@ reduce-only `Order`/`AlgoOrder`, не close-position); `bePx` не нужен
 ## Конвертация
 
 `empty string → null`; numeric string → `BigDecimal`; timestamp
-string → epoch millis / `Instant`.
+string → epoch millis → `OffsetDateTime` (конвенция типов времени
+проекта; H5 `GAPS_CLOSE_3`).

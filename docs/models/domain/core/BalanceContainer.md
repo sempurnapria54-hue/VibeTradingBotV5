@@ -104,10 +104,12 @@ externalUpdatedAt / updatedAt + balanceExpirationDuration -> fresh / stale
 - Проверку свежести выполняет FSM / handler перед risk-sensitive
   flow (входной владелец — Deal-lifecycle; форвард-заметка для
   миграции Deal — в `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-balance.md`).
-- Если balance absent/stale перед risk-check — handler создаёт
-  `REFRESH_BALANCE_COMMAND` и не вызывает `RiskValidator` на этой итерации;
-  после успешного refresh следующая итерация FSM пересобирает
-  `DealContext` и продолжает flow.
+- Если balance absent/stale перед risk-check — свежесть добывается
+  звеном `REFRESH_BALANCE_COMMAND` через `REFRESH_DEAL_CONTEXT_ACTION`
+  (handler добывающие `REFRESH_*` напрямую не эмитит,
+  `docs/components/SystemActionExecutor.md`), `RiskValidator` на этой
+  итерации не вызывается; после успешного refresh следующая итерация FSM
+  пересобирает `DealContext` и продолжает flow.
 - Компонент-проверка (`BalanceFreshnessChecker`) и executor
   (`RefreshBalanceExecutor`) — часть adapter/command-подсистемы,
   мигрируются отдельно (форвард-заметки в task-вопросах).

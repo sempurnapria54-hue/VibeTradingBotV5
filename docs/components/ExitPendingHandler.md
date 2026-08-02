@@ -32,7 +32,10 @@ live risk; локальные orders/algo доступны для очистки
 снятия live risk; `REFRESH_BILLS_COMMAND` (`DealCashFlow` — категорийная
 разбивка; её факт durable).
 
-**Cleanup — напрямую, без анкера:** live ordinary orders →
+**Cleanup — напрямую, без анкера:** живая позиция (штатный выход =
+«market-close всё + дочистка», владелец — этот handler,
+`docs/decisions/fsm-execution-layering.md` §Exit) →
+`CLOSE_POSITION_COMMAND`; live ordinary orders →
 `CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND` (серия неудач считается
 на инструмент-scope, `docs/components/models/ServiceCommand.md`).
 
@@ -67,11 +70,10 @@ balance обновлён; причина закрытия определена. 
 `docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия троп отказа
 добычи».
 
-## Допустимые StrategyStep / возможные ServiceCommand
+## Допустимые StrategyStep
 
-Steps: `FAIL_SAFE` (торговые steps обычно не применяются). Команды:
-`REFRESH_POSITION_COMMAND`, `REFRESH_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`,
-`CANCEL_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`, `REFRESH_BALANCE_COMMAND`,
-`REFRESH_BILLS_COMMAND`, `FINALIZE_DEAL_EXIT_COMMAND`, `MARK_DEAL_CLOSED_COMMAND`, `MARK_DEAL_ERROR_COMMAND`
-(добывающие — звеньями `REFRESH_DEAL_CONTEXT_ACTION`, финализационные —
-звеньями `FINALIZE_DEAL_EXIT_ACTION`/`FINALIZE_DEAL_ERROR_ACTION`).
+Steps: `FAIL_SAFE` (торговые steps обычно не применяются). Перечень
+команд handler-док не держит: состав команд — собственность действий
+(`docs/decisions/fsm-execution-layering.md` §«Handler исполняет действия»;
+реестры звеньев — `docs/decisions/command-action-boundary.md` §2,
+`docs/components/SystemActionExecutor.md`).

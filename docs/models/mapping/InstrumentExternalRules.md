@@ -83,7 +83,15 @@ contracts = baseQty / ctVal
 | `maxStopSz` | `externalMaxStopSize` |
 | `lever` | `externalMaxLeverage` |
 | `groupId` | `externalFeeGroupId` |
+| `settleCcy` | `externalSettlementCurrency`* |
+| `baseCcy` | `externalBaseCurrency` |
+| `quoteCcy` | `externalQuoteCurrency` |
 | `state` | `externalState` |
+
+\* Имя поля расчётной валюты — предварительное (открыт CCY-Q2:
+`externalCurrency` vs `externalSettlementCurrency`); дом валют
+ратифицирован — `docs/decisions/instrument-currencies-home.md` (H12
+`DOCS_CHECK_9`).
 
 ### Резолв enum'ов при материализации (`snapshotToDomain`)
 
@@ -115,10 +123,7 @@ contracts = baseQty / ctVal
 
 ### Не маппимые поля OKX
 
-`instFamily`, `uly`, `baseCcy`/`quoteCcy`/`settleCcy` (приходят в
-`InstrumentExternalSnapshot` — граничный снапшот инструмента, не в
-этой модели; разграничение —
-`docs/models/domain/core/Instrument.md`), `ctMult`,
+`instFamily`, `uly`, `ctMult`,
 `maxTwapSz`/`maxIcebergSz`/`maxLmtAmt`/`maxMktAmt` (per-order лимиты
 неиспользуемых типов ордеров — не используем),
 `listTime`/`expTime`/`openType`/`ruleType` (lifecycle биржи; для

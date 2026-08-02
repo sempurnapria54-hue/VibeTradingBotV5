@@ -153,8 +153,11 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   контракту** возвращает `BLOCKED` (коды `BALANCE_NOT_FRESH` /
   `BALANCE_INVALID`), а не чинит snapshot сам.
   - **В фазе 1 эти коды фактически не эмитятся** (H17, `GAPS_CLOSE_6`):
-    свежесть баланса обеспечивает handler **до** вызова — при absent/stale он
-    эмитит `REFRESH_BALANCE_COMMAND` и уходит на новый проход FSM, на котором
+    свежесть баланса обеспечивается **до** вызова — при absent/stale она
+    добывается звеном `REFRESH_BALANCE_COMMAND` через
+    `REFRESH_DEAL_CONTEXT_ACTION` (handler добывающие `REFRESH_*` напрямую
+    не эмитит, `docs/components/SystemActionExecutor.md`), и FSM уходит на
+    новый проход, на котором
     валидатор не вызывается (`docs/processes/risk-evaluation.md` §«Когда
     вызывается»; реестр кодов —
     `docs/components/models/RiskCheckResult.md` §«Определены, но в фазе 1 не

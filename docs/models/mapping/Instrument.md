@@ -48,7 +48,9 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 (JSONB-навес на `Instrument`), материализуемый **на шаге 5**
 (риск-преконтроль), вне оркестрации рыночных данных шага 1
 (`docs/decisions/instrument-external-rules-materialization.md`, закрыт
-INSTR-Q1). Роль `externalLeverage`/биржевой потолок плеча — там же
+INSTR-Q1). Валюты (settle/base/quote) навес **персистит** — с шага 7
+(H12 `DOCS_CHECK_9`, `docs/decisions/instrument-currencies-home.md`;
+имя поля расчётной валюты — открыт CCY-Q2); `ctMult` навес не хранит. Роль `externalLeverage`/биржевой потолок плеча — там же
 (INSTR-Q2 закрыт на шаге 6: рабочее плечо пишется inline в
 `SubmitOrderExecutor` перед постановкой открывающего ордера,
 `docs/components/SubmitOrderExecutor.md`).
@@ -75,7 +77,8 @@ INSTR-Q1). Роль `externalLeverage`/биржевой потолок плеч�
 
 `baseCcy`/`quoteCcy`/`settleCcy`, `lotSz`, `minSz`, `ctVal`,
 `ctMult`, `tickSz` — приходят в снапшоте, в домен шага 1 не мапятся
-(их дом — `InstrumentExternalRules`, материализуется на шаге 5).
+(их дом — `InstrumentExternalRules`; валюты навес персистит с шага 7 —
+`docs/decisions/instrument-currencies-home.md`).
 Биржевые `state`/`lever` из этого перечня исключены — они персистятся
 на `Instrument` (`externalStatus`/`externalLeverage`, см. таблицу выше).
 Полный OKX-инвентарь —

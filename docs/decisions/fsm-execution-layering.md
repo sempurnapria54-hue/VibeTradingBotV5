@@ -70,6 +70,26 @@ docs/decisions/command-action-boundary.md §2).
 Стратегия задаёт статусы-переходы и условия переходов; handler'ы ими
 пользуются. Handler не хардкодит переходы, а читает их из стратегии.
 
+### Handler исполняет действия; команды содержатся в действиях
+
+Уровень эмиссии handler'а — **действия**, не команды: handler выбирает
+и гейтит применимые действия (STRATEGY — через
+`StrategyActionOrchestrator`, SYSTEM — через `SystemActionExecutor`), а
+**состав команд-звеньев — собственность действия**, не handler'а
+(реестр звеньев системных действий —
+`docs/decisions/command-action-boundary.md` §2 и
+`docs/components/SystemActionExecutor.md`; strategy-команды — per-type
+`StrategyActionExecutor`'ы). Следствие: перечень «возможных
+`ServiceCommand`» **не является свойством handler'а** и в handler-доках
+не ведётся — такой перечень был бы дублем реестров действий и выражал
+бы отменённую топологию «команды у handler'а» (реконсиляционный класс
+находок H3 `DOCS_CHECK_9`).
+
+Единственный командный уровень, остающийся у handler'а напрямую, —
+**cleanup** (`CANCEL_*`/`CLOSE_POSITION_COMMAND` как дочистка): он
+сознательно вне действий, без анкера — его серия неудач считается на
+инструмент-scope (`docs/decisions/command-action-boundary.md` §2).
+
 ### `StrategyActionExecutor` — per-pass эмиттер (не синхронный)
 
 Исполнитель **одного типа действия** (`CREATE` ordinary/algo, …). За проход

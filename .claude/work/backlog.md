@@ -258,6 +258,15 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   шаге 6): transition-conditions в модели стратегии +
   exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) + снять
   вырожденный `CLOSE_FULL` — сверить остаток с as-built шага 6.
+- **Анкер идемпотентности `AnomalyReport` — перекрытие по scope** (хвост
+  H15 `DOCS_CHECK_9`; ключ назначен пользователем: (`exchangeId`,
+  `instrumentId`, `holdScope`, `severity`) + частичный индекс по
+  незакрытым — `docs/models/domain/other/AnomalyReport.md`
+  §Персистентность). Разобрать: два незакрытых факта **разных `code`**
+  на одном ключе (например, `FEE_RATE_STALE` и `FEE_GROUP_KEY_STALE` на
+  одной группе); семантика NULL `instrument_id` групповых радиусов в
+  частичном уникальном индексе; как scope влияет на перекрытие ключей
+  при эскалации радиуса.
 
 ### Перф-форвард (порог актуальности — фаза 3)
 

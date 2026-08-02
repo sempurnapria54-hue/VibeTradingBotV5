@@ -8,8 +8,10 @@
 
 Получает `CREATE_ORDER_COMMAND`. Создаёт локальный `Order` со статусом `CREATED`,
 генерирует `internalId`, сохраняет рассчитанные параметры, создаёт
-attached protection внутри order (если есть), обновляет
-`DealActionState.target = RuntimeTarget(ORDER, orderId)` и
+attached protection внутри order (если есть), обновляет target-колонки
+`DealActionState` (`targetEntityType = ORDER`, `targetEntityId = orderId`
+— объект `RuntimeTarget` расплющен в колонки,
+`docs/decisions/command-action-boundary.md` §3) и
 `DealActionState.status = CREATED` — всё одной транзакцией. На биржу не
 ходит, цену не пересчитывает, условия не проверяет.
 
@@ -31,7 +33,7 @@ REPLACE-ремоделом стопа, ни добором. `R` — риск **�
 (`GRID_ENTRY`/пирамидинг) — открытый вопрос `RISK-Q3`.
 
 Общая семантика `CREATE_*` — `docs/components/ServiceCommandExecutor.md`.
-`DealActionState` / `RuntimeTarget` — `docs/models/domain/other/DealActionState.md`.
+`DealActionState` / target-колонки — `docs/models/domain/other/DealActionState.md`.
 
 ## CreateOrderCommandPayload
 

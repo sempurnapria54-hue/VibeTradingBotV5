@@ -81,17 +81,20 @@ DEAL-Q1 закрыт на `GAPS_CLOSE_1` шага 6 фазы 1 (2026-06-22). Г�
 
 ## Связи
 
-- Модель — `docs/models/domain/other/DealFinalizationState.md`.
-- Lifecycle — `docs/lifecycles/DealFinalizationState.md`.
+- Ревизующее решение — `docs/decisions/command-action-boundary.md` §3
+  (сущность упразднена; действующий носитель —
+  `docs/models/domain/other/DealActionState.md`, per-pass исполнитель —
+  `docs/components/SystemActionExecutor.md`).
+- Модель `DealFinalizationState`, её lifecycle и
+  `DealFinalizationCommandFactory` — **упразднены** (файлы удалены на
+  `GAPS_CLOSE_8`); упоминания в тексте выше — исторический контекст
+  DEAL-Q1, не живые ссылки.
 - Финализационные executor'ы — `docs/components/FinalizeDealEntryExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,
   `docs/components/MarkDealClosedExecutor.md`,
   `docs/components/MarkDealErrorExecutor.md`,
   `docs/components/MarkDealEmergencyClosedExecutor.md` (введён на шаге 7, N8 —
   `docs/decisions/pnl-finalization-mechanics.md` реш.3).
-- Эмиссия команд — `docs/components/DealFinalizationCommandFactory.md`,
-  `docs/components/StrategyActionOrchestrator.md`,
-  `docs/components/models/ServiceCommand.md`.
 - Прецедент материализации операционной модели —
   `docs/decisions/deal-action-state-materialization.md`.
 - Retry-база — `docs/components/RetryPolicyService.md`.

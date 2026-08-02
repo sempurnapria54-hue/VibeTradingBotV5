@@ -68,7 +68,10 @@ guard не срабатывал никогда (`docs/models/mapping/DealCashFlo
 нельзя: его пишет `FINALIZE_DEAL_EXIT_COMMAND`, то есть **после** этого прохода, и на
 момент записи оно `null` — предикат сравнивал бы с пустым
 (`docs/models/mapping/DealCashFlow.md` §«Операнд сравнения»). Носитель
-расчётной валюты инструмента — предложение на валидации (`GAPS_CLOSE_7`).
+расчётной валюты инструмента — `InstrumentExternalRules` (H12
+`DOCS_CHECK_9`, `docs/decisions/instrument-currencies-home.md`; имя поля
+— открыт CCY-Q2); executor читает её через `DealContext`-резолв
+инструмента, как и `externalId` (§Инструмент).
 
 **Пересчёт — здесь и сразу, не при финализации.** Executor запрашивает курс
 **отдельным вызовом биржи на момент обработки** и кладёт его в
