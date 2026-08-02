@@ -153,6 +153,7 @@
 │       │   ├── phase-1-step-7-docs-check-7.md — Каков исход DOCS_CHECK_7 шага 7?
 │       │   ├── phase-1-step-7-docs-check-8.md — Каков исход DOCS_CHECK_8 шага 7?
 │       │   ├── phase-1-step-7-docs-check-9.md — Каков исход DOCS_CHECK_9 шага 7?
+│       │   ├── phase-1-step-7-docs-check-10.md — Каков исход DOCS_CHECK_10 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
