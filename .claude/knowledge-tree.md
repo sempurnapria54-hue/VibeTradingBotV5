@@ -162,7 +162,8 @@
 │       │   ├── phase-1-step-7-gaps-close-6.md — Как закрыты пробелы DOCS_CHECK_6 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-7.md — Как закрыты пробелы DOCS_CHECK_7 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-8.md — Как закрыты пробелы DOCS_CHECK_8 шага 7 (в объёме решённого)?
-│       │   └── phase-1-step-7-gaps-close-9.md — Каков исход закрытия находок DOCS_CHECK_9 по итогам сверки пользователя?
+│       │   ├── phase-1-step-7-gaps-close-9.md — Каков исход закрытия находок DOCS_CHECK_9 по итогам сверки пользователя?
+│       │   └── phase-1-step-7-gaps-close-10.md — Каков исход закрытия находок DOCS_CHECK_10?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)

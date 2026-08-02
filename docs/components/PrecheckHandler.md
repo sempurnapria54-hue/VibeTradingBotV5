@@ -56,6 +56,15 @@ handler плечо не пишет). Risk-check entry action — через
 risk-layer (`docs/processes/risk-evaluation.md`): BLOCKED в PRECHECK без
 live risk → `CLOSED` + `RISK_CONTROL`.
 
+**Ноль на тропах закрытия без входа пишется только после проверки биржи**
+(H7 `DOCS_CHECK_10`, `docs/rules/trading-constraints.md` §«Гейт открытия
+сделки»). Обе PRECHECK-тропы (`ENTRY_CONDITION_EXPIRED`, `RISK_CONTROL`)
+перед записью `resultProfit = 0` проверяют факт операций по сделке на
+бирже: операций не было ⇒ ноль как **исход проверки**; операции были ⇒
+сделка по этой тропе не закрывается, а идёт обычным путём финализации и
+получает реальное число. Рамка R-выборки ключуется тем же предикатом
+(`docs/models/domain/aggregate/Deal.md` §«Рамка R-выборки»).
+
 **Защита risk-creating входа обязательна.** Risk-creating вход
 (открытие/наращивание позиции) **без резолвимого стопа** до постановки не
 доходит: `RiskValidator` помечает `BLOCKED`

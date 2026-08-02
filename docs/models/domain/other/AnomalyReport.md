@@ -92,7 +92,7 @@ kill-switch не проходит вовсе, а мягкий холд став�
   группы — в `code` и слепке. N отчётов на N инструментов группы
   задваивали бы один факт.
 - **Анкер идемпотентности — незакрытый отчёт по ключу (`exchangeId`,
-  `instrumentId`, `holdScope`, `severity`)** (H15 `DOCS_CHECK_9`, решение
+  `instrumentId`, `scope`, `severity`)** (H15 `DOCS_CHECK_9`, решение
   пользователя; ревизует тройку H19 `GAPS_CLOSE_7` — прежний ключ включал
   `code` и «ключ группы», которого в колонках нет, и потому был
   **невыразим на схеме**). Производитель заводит отчёт, только если по
@@ -164,7 +164,7 @@ kill-switch не проходит вовсе, а мягкий холд став�
 | `FEE_GROUP_KEY_STALE` | `InstrumentExternalRulesSyncJob` | возраст ключа группы на инструменте > порога | `INSTRUMENT_GROUP` / `EXCHANGE` (по радиусу отказа) |
 
 В ключ анкера идемпотентности `code` **не входит** (H15 `DOCS_CHECK_9`
-— ключ собран из колонок: `exchangeId`, `instrumentId`, `holdScope`,
+— ключ собран из колонок: `exchangeId`, `instrumentId`, `scope`,
 `severity`; §Инварианты структуры): повторный тик по тому же факту
 нового отчёта не заводит; перекрытие разных `code` на одном ключе —
 хвост следующего шага.
@@ -178,7 +178,7 @@ kill-switch не проходит вовсе, а мягкий холд став�
 
 **Анкер идемпотентности — на уровне БД** (H15 `DOCS_CHECK_9`):
 частичный уникальный индекс по (`exchange_id`, `instrument_id`,
-`hold_scope`, `severity`) `where status in ('CREATED', 'IN_PROGRESS',
+`scope`, `severity`) `where status in ('CREATED', 'IN_PROGRESS',
 'KILL_SWITCH_EXECUTED')` — «не более одного незакрытого отчёта на факт»;
 отдельной колонки-якоря нет, операнды ключа — существующие колонки
 (`docs/rules/idempotency-via-unique.md`,

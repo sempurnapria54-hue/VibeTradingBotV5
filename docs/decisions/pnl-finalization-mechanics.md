@@ -553,6 +553,15 @@ staged-числа между двумя финализационными ком�
     частичные уникальные индексы живых исполнений; перенос строк
     `deal_finalization_states` (вид SYSTEM) + `DROP TABLE
     deal_finalization_states`;
+  - `anomaly_reports`: частичный уникальный индекс по (`exchange_id`,
+    `instrument_id`, `scope`, `severity`) `where status in ('CREATED',
+    'IN_PROGRESS', 'KILL_SWITCH_EXECUTED')` — анкер идемпотентности
+    (`docs/models/domain/other/AnomalyReport.md` §Персистентность; в
+    `V10` его нет). Строка добавлена по H20 `DOCS_CHECK_10`: перечень
+    заявлен полным, а док модели требовал индекс миграцией того же шага;
+  - `instruments`: бэкфилл `external_modified_at` — измеритель свежести
+    ключа комиссионной группы (H21 `DOCS_CHECK_10`, зависит от выбора
+    начального состояния);
   - новые таблицы: `deal_cash_flows` (вкл. `applied_rate`,
     `UNIQUE(external_bill_id)`), `trade_fee_rates`;
   - `strategy_actions`: миграция **значений** `action_type`
