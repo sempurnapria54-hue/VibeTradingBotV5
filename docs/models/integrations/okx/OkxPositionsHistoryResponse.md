@@ -27,10 +27,11 @@ limits / история закрытых позиций — `docs/integrations/o
 
 Отличие от live `/positions` (native `OkxPositionResponse`): positions-history
 несёт **realized**-факты закрытой позиции (`realizedPnl`, `closeAvgPx` и т. д.),
-которых нет у live-DTO. Средние цены входа/выхода (`openAvgPx`/`closeAvgPx`)
-в used-набор **не входят** (H22/H23 — потребителя в фазе 1 нет;
+которых нет у live-DTO. Средняя цена **входа** за жизнь позиции
+(`openAvgPx`) в used-набор **не входит** (H23 — потребителя нет,
 `Position.externalAverageEntryPrice` пишет только live-нога, см.
-§«Не используется»).
+§«Не используется»); средняя цена **выхода** (`closeAvgPx`) — **входит**
+(H26 `DOCS_CHECK_10`: потребитель — калибровка запаса на проскок).
 
 ## Инвентарь полей
 
@@ -42,7 +43,8 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 | OKX field | Тип | Семантика |
 |---|---|---|
 | `realizedPnl` | string-decimal | готовый net realized P&L = `pnl` + `fee` + `fundingFee` + `liqPenalty` (посчитан биржей) → `Position.externalRealizedProfit` → `Deal.resultProfit` |
-| `ccy` | string | валюта, в которой посчитан `realizedPnl` → `Position.externalResultCurrency` → `Deal.resultProfitCurrency` (для `ETH-USDT-SWAP` — `USDT`) |
+| `ccy` | string | валюта, в которой посчитан `realizedPnl` → `Position.externalResultCurrency`. В `Deal.resultProfitCurrency` **не переходит** — авторитет валюты результата — расчётная валюта инструмента, а это поле **проверяемый признак** (H10 `DOCS_CHECK_10`, `docs/models/domain/aggregate/Deal.md` §«Валюта результата: один авторитет») |
+| `closeAvgPx` | string-decimal | средняя цена фактического выхода → `Position.externalCloseAveragePrice`; потребитель — калибровка запаса на проскок (H26 `DOCS_CHECK_10`) |
 | `type` | string | тип последнего закрытия (`1` частичное / `2` полное / `3` ликвидация / `4` частичная ликвидация / `5` ADL не полностью / `6` ADL полностью) → `Position.externalCloseType` (провенанс аварийного терминала) |
 | `posId` | string | биржевой id позиции (ключ адресации записи; истекает ~30 дней после полного закрытия) — сверяется с `Position.externalId` |
 | `uTime` | string-ms | время обновления записи → `Position.externalModifiedAt` (сортировка/пагинация positions-history — тоже по `uTime`) |
@@ -59,12 +61,15 @@ Used-минимум для числа `resultProfit`: готовый net бер�
   (ликвидационный штраф), `settledPnl` (cross-FUTURES), `pnlRatio`.
 - **Объёмы / прочие цены:** `openMaxPos` (максимум позиции), `closeTotalPos`
   (накопленный закрытый объём), `nonSettleAvgPx` (cross-FUTURES).
-- **Выведены из used на `GAPS_CLOSE_7` (H22)** — потребителя в фазе 1 нет,
+- **Выведен из used на `GAPS_CLOSE_7` (H22)** — потребителя в фазе 1 нет,
   поля без потребителя не заводим (codestyle §«Неиспользуемый код»):
-  `closeAvgPx` (средняя цена выхода) и `triggerPx` (цена триггера
-  ликвидации/ADL). Оба — кандидаты в носители провенанса ликвидации/ADL,
-  вопрос открыт (`PNL-Q1`). Побочно снят остаток H19: расхождение доков о
-  применимости `triggerPx` больше ничего не нагружает — поле не маппится.
+  `triggerPx` (цена триггера ликвидации/ADL) — кандидат в носители
+  провенанса ликвидации/ADL, вопрос открыт (`PNL-Q1`). Побочно снят
+  остаток H19: расхождение доков о применимости `triggerPx` больше ничего
+  не нагружает — поле не маппится.
+  **`closeAvgPx` в used возвращён** (H26 `DOCS_CHECK_10`): у него назван
+  потребитель — калибровка запаса на проскок; правило «поле вместе с
+  потребителем» соблюдено, а не обойдено.
 - **Выведен из used на `DOCS_CHECK_8` (H23)**: `openAvgPx` (средняя цена
   входа за жизнь позиции). Маппинг `openAvgPx →
   Position.externalAverageEntryPrice` делал колонку двуписьменной (live

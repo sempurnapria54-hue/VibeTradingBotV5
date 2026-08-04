@@ -45,9 +45,12 @@ ServiceCommandExecutor → конкретный Executor`. Команды **си
   (`REFRESH_DEAL_CONTEXT_ACTION` / `FINALIZE_DEAL_*_ACTION`);
 - **cleanup-команды** (`CANCEL_*` / `CLOSE_POSITION_COMMAND`,
   эмитируемые handler'ом как дочистка/safety вне действия) анкера **не
-  несут**: их серия неудач считается на инструмент-scope
-  (`docs/rules/instrument-hold.md` §«Серия неудач»), второй deal-scoped
-  счётчик дал бы двойной учёт.
+  несут** — исполнения-действия у них нет. Следствие: бюджета отказов у
+  них тоже нет, и холд по их неудачам не поднимается (H17
+  `DOCS_CHECK_10`; прежняя формулировка «их серия считается на
+  инструмент-scope, второй счётчик дал бы двойной учёт» снята — счётчика
+  не существовало). Учёт — форвард на `TradeGuardJob`
+  (`docs/rules/instrument-hold.md` §«Носитель серии»).
 
 Kill-switch командой не является — он реактивен (`HoldSignal` →
 `SafetyHoldCoordinator`, см. `docs/components/KillSwitchExecutor.md`) и

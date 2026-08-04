@@ -23,7 +23,39 @@ attached protection внутри order (если есть), обновляет t
 (`|entry − stop| × contracts × ctVal + commissions`). Валидация и создание
 идут одним проходом (`docs/rules/risk-validator-scope.md`: валидатор
 вызывается после расчёта цены/размера и **до** создания команды), поэтому
-метрика доезжает без durable-слота между проходами.
+**durable-слота между проходами не нужно**.
+
+### Канал доставки — поля `CreateOrderCommandPayload` (H5 `DOCS_CHECK_10`)
+
+«Durable-слот не нужен» отвечает на вопрос «где число живёт **между
+проходами**», а не «**чем** оно доезжает **внутри** прохода» — это разные
+оси, и вторая до сих пор оставалась незакрытой: ни один существующий
+носитель метрику не несёт. `CalculatedStrategyAction` явно её не содержит
+(«не содержит `RiskValidationResult` и `CalculatedRiskMetrics`»),
+`RiskValidationResult` несёт decision/checks/comment, `CalculatedSize` —
+размер, а единственный числовой слот `RiskCheckResult.actualValue` на
+happy-path **не существует**: в фазе 1 `RiskValidator` строит **только**
+`BLOCKED`-результаты, то есть на пути `ALLOWED` список `checks` пуст.
+
+**Решение: метрика едет полями payload'а** — `plannedRiskAmount`,
+`plannedRiskCurrency`, `plannedEntryPrice`, `plannedSizeContracts`
+(§`CreateOrderCommandPayload`). Тем же путём, каким уже едут цена и
+размер: строит payload та же сторона, что вызывает `RiskValidator`, и в
+том же проходе.
+
+**Отвергнутые альтернативы:**
+
+- **поле на `RiskValidationResult`** (`riskAmount`/`riskCurrency`,
+  заполняемое и на `ALLOWED`) — работоспособно, но требует, чтобы
+  валидатор начал строить не-`BLOCKED` результаты ради переноса числа;
+  RVO решения превращается в транспорт метрики. Оставлено вторым
+  вариантом на случай, если метрика понадобится ещё одному потребителю;
+- **поле на `CalculatedSize`** — против ратифицированной границы
+  «risk-метрики не едут в calculated-RVO»;
+- **пересчёт в executor'е** — дублирует формулу сайзинга и заводит второй
+  экземпляр того же класса отказа, ради устранения которого знак ставки
+  снимается **одним местом** (`docs/decisions/pnl-finalization-mechanics.md`
+  реш.4).
 
 **Вместе с риском пишутся его операнды** (H6 `DOCS_CHECK_10`): той же
 транзакцией — `Deal.plannedEntryPrice` (reference-цена входа, по которой
@@ -55,6 +87,16 @@ REPLACE-ремоделом стопа, ни добором; то же для е�
 `positionReducingOnly` (доменное намерение → OKX `reduceOnly` в adapter),
 `attachedProtection` (`AttachedProtectionPayload`, если order создаётся со
 стартовым SL/TP).
+
+**Поля планового риска — только у входного действия** (H5/H6
+`DOCS_CHECK_10`): `plannedRiskAmount`, `plannedRiskCurrency`,
+`plannedEntryPrice`, `plannedSizeContracts`. У не-входных
+`CREATE_ORDER_COMMAND` (защита, reduce-only) они пусты — там нет
+преконтроля, который их производит. Это единственное исключение из «payload
+хранит минимум»: минимум означает «не тащить то, что executor возьмёт из
+сущности», а эти четыре числа **в сущности не остаются** —
+`plannedEntryPrice` при market-входе не садится даже на `Order.price`
+(§«Плановый риск сделки»).
 
 Хранит минимум для создания; client id (`internalId`), external id берутся
 из создаваемой сущности. `positionSide`/`marginMode` — generic command-level

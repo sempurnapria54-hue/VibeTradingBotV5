@@ -45,7 +45,7 @@
 `PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`,
 `MULTIPLE_POSITIONS_DETECTED`, `POSITION_STATE_UNKNOWN`,
 `INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`,
-`CALCULATED_ACTION_INVALID`.
+`SETTLE_CURRENCY_UNAVAILABLE`, `CALCULATED_ACTION_INVALID`.
 
 ### Эмитятся `RiskValidator`'ом в фазе 1
 
@@ -54,7 +54,8 @@
 `MARGIN_MODE_NOT_ISOLATED`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
 `SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`, `TAKE_PROFIT_INVALID_SIDE`,
 `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `INSTRUMENT_NOT_LIVE`,
-`INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`, `BALANCE_INVALID`,
+`INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`,
+`SETTLE_CURRENCY_UNAVAILABLE`, `BALANCE_INVALID`,
 `CALCULATED_ACTION_INVALID` (см. `docs/components/RiskValidator.md`).
 
 `RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход (открытие/наращивание
@@ -73,6 +74,20 @@ allocation-сайзинга в обход `RISK_PER_TRADE` (инвариант
 (`docs/models/mapping/TradeFeeRate.md` §«Знак ставки — снимается здесь»), и до
 валидатора ставка доезжает **издержкой**. Fallback-ставка из конфига вместо
 реджекта отвергнута — довод в `docs/components/RiskValidator.md`.
+
+`SETTLE_CURRENCY_UNAVAILABLE` — **расчётная валюта инструмента** не
+резолвится (навес не несёт её значения: поле новое, на существующих
+строках появляется только после ближайшего тика синка) → `BLOCKED` (H10
+`DOCS_CHECK_10`). Она — источник и `Deal.plannedRiskCurrency`, и
+`Deal.resultProfitCurrency`, а их совпадение — условие того, что
+R-мультипликатор вообще считается. Подставить `USDT` «по контуру»
+**отвергнуто** тем же доводом, что fallback ставки: подставленное число
+выглядит фактом, не будучи им. Ветка **зеркальна** `FEE_RATE_UNAVAILABLE`:
+реджект там, где риск ещё не взят; **после** взятия риска отказывать
+нельзя, и та же нехватка ведёт к `AnomalyReport`
+`SETTLE_CURRENCY_UNAVAILABLE` без блокировки
+(`docs/models/domain/aggregate/Deal.md` §«Валюта результата: один
+авторитет»).
 
 ### Определены, но в фазе 1 не эмитятся
 
@@ -103,6 +118,8 @@ Market data expired/missing — **не** risk-code первого уровня: 
 
 Отдельного кода контроля **экспозиции/позиционного лимита поверх биржевого
 максимума** в фазе 1 **нет**: такой guard относится к уровню риска на
-биржу/портфель (фаза 3), в фазе 1 единственная позиция ограничена лимитом
-риска на сделку. `EXCHANGE_MAX_LEVERAGE_EXCEEDED` остаётся как предел биржи
-(не наш кэп плеча).
+биржу/портфель (фаза 3), а в фазе 1 **торгуется один инструмент** (H8
+`DOCS_CHECK_10`, `docs/rules/trading-constraints.md` §Инструменты) —
+агрегата нет по ограничению контура, и единственная позиция ограничена
+лимитом риска на сделку. `EXCHANGE_MAX_LEVERAGE_EXCEEDED` остаётся как
+предел биржи (не наш кэп плеча).

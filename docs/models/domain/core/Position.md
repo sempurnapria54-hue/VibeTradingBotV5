@@ -42,7 +42,8 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
 | `externalMargin` | `BigDecimal` | Маржа позиции. |
 | `externalUnrealizedProfit` | `BigDecimal` | Нереализованный PnL. |
 | `externalRealizedProfit` | `BigDecimal` | **Положение закрытия:** готовый net realized P&L закрытой позиции, посчитанный биржей (`realizedPnl` positions-history). `null`, пока позиция жива или запись закрытия не добыта. |
-| `externalResultCurrency` | `String` | **Положение закрытия:** валюта, в которой посчитан `externalRealizedProfit` (`ccy` записи positions-history). |
+| `externalResultCurrency` | `String` | **Положение закрытия:** валюта, в которой посчитан `externalRealizedProfit` (`ccy` записи positions-history). **Проверяемый признак, не источник** `Deal.resultProfitCurrency` — авторитет валюты результата — расчётная валюта инструмента (H10 `DOCS_CHECK_10`, `docs/models/domain/aggregate/Deal.md` §«Валюта результата: один авторитет»). |
+| `externalCloseAveragePrice` | `BigDecimal` | **Положение закрытия:** средняя цена **фактического выхода** (`closeAvgPx` записи positions-history). Потребитель назван — **калибровка запаса на проскок** (§«Цена фактического выхода» ниже). `null`, пока позиция жива, запись закрытия не добыта либо источник цены не отдал. |
 | `externalCloseType` | `String` | **Положение закрытия:** сырой тип последнего закрытия источника (OKX `type`: `1`–`2` торговое, `3`–`6` ликвидация/ADL). Провенанс аварийного терминала (`docs/decisions/pnl-finalization-mechanics.md` реш.3). |
 
 Поля §«Положение закрытия» пишет **вторая нога `REFRESH_POSITION_COMMAND`**
@@ -183,6 +184,32 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 `docs/models/mapping/PositionCloseResult.md`; контракт эндпоинта —
 `docs/integrations/okx/contracts/position.md` §«История закрытых позиций».
 
+### Цена фактического выхода (H26 `DOCS_CHECK_10`)
+
+`externalCloseAveragePrice` персистится **с названным потребителем** —
+калибровкой запаса на проскок за стоп
+(`docs/decisions/per-trade-risk-policy.md` §«Без поправки на проскок»).
+
+- **Что было сломано.** Запас на проскок отложен «с числами из бэктеста»,
+  а живых чисел для калибровки не появилось бы ни на одной сделке: цена
+  фактического выхода в домене не сохранялась (`closeAvgPx` выведен из
+  снапшота, `triggerPx` тоже, у `AttachedAlgoOrder`/`AlgoOrder` полей
+  фактического исполнения нет). Разницу «цена стопа ↔ цена фактического
+  выхода» система не наблюдала.
+- **Почему это не нарушает «поле заводится вместе с потребителем».**
+  Потребитель существует — это отложенное решение о запасе; правило
+  работало против себя, потому что потребитель записан **в другом доке**.
+- **Симметрия с H6.** Обе половины сравнения оседают в базе: на входе
+  `plannedEntryPrice` против фактического `avgPx`, на выходе цена стопа
+  против `externalCloseAveragePrice`. Бэктест-проскок систематически
+  оптимистичен именно на тех барах, где стоп и срабатывает [Kaufman
+  гл.21 «Price Shocks», PDF с.1895-1899], поэтому калибровка обязана
+  опираться на живые исполнения, а не на бэктест.
+- **Расчётного потребителя в фазе 1 у поля нет** — оно накапливает
+  наблюдения; сам запас назначается на своём шаге. `triggerPx` остаётся
+  выведенным: он кандидат `PNL-Q1` (провенанс ликвидации/ADL), другой
+  вопрос.
+
 ## Персистентность
 
 Хранится в БД (entity `PositionEntity`, таблица `positions`, создана
@@ -193,6 +220,7 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 **Колонки положения закрытия — `ALTER`, в `V6` их нет** (симметрично
 `Deal.md`/`DealActionState.md`, H21 `DOCS_CHECK_8`):
 `external_realized_profit`, `external_result_currency`,
+`external_close_average_price` (H26 `DOCS_CHECK_10`),
 `external_close_type` — nullable (пусты, пока позиция жива или запись
 закрытия не добыта), добавляются миграцией шага 7; полная schema-дельта
 шага — `docs/decisions/pnl-finalization-mechanics.md` §Следствия.
@@ -203,14 +231,19 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 `liqPenalty` — категорийная разбивка живёт в `DealCashFlow`),
 strategy/action/audit history, raw exchange response.
 
-**Из положения закрытия не заводятся полями** (нет потребителя в фазе 1 —
-codestyle §«Неиспользуемый код»; H22, `GAPS_CLOSE_7`): средняя цена выхода
-(`closeAvgPx`) и цена триггера ликвидации/ADL (`triggerPx`). Оба —
-кандидаты в носители **измеримости искажений** (провенанс ликвидации/ADL);
-вопрос открыт (`PNL-Q1`, `.claude/work/questions/open-questions.md`) и
-заводит поле вместе с потребителем, а не раньше. В инвентаре источника они
-числятся неиспользуемыми
+**Из положения закрытия не заводится полем** (нет потребителя в фазе 1 —
+codestyle §«Неиспользуемый код»; H22, `GAPS_CLOSE_7`): цена триггера
+ликвидации/ADL (`triggerPx`) — кандидат в носители **измеримости
+искажений** (провенанс ликвидации/ADL); вопрос открыт (`PNL-Q1`,
+`.claude/work/questions/open-questions.md`) и заводит поле вместе с
+потребителем, а не раньше. В инвентаре источника поле числится
+неиспользуемым
 (`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`).
+
+**Средняя цена выхода (`closeAvgPx`) из этого перечня выведена** (H26
+`DOCS_CHECK_10`): у неё потребитель назван — калибровка запаса на проскок,
+— и она заведена полем `externalCloseAveragePrice` (§«Цена фактического
+выхода»).
 
 `Position` (live `/positions`) **сам по себе не считает** итоговый PnL:
 заголовочное `Deal.resultProfit` = net `realizedPnl` из **positions-history**

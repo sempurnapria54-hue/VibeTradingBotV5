@@ -48,16 +48,21 @@ first-class-носитель: **системное действие** — дей
 
 | Действие | Состав (звенья) |
 |---|---|
-| `REFRESH_DEAL_CONTEXT_ACTION` | добывающие `REFRESH_*`-команды (добыча фактов с биржи; без `CANCEL_*`/`CLOSE_POSITION_COMMAND` и без `FINALIZE_*`/`MARK_*`) |
+| `REFRESH_DEAL_CONTEXT_ACTION` | добывающие `REFRESH_*`-команды (добыча фактов с биржи; без `CANCEL_*`/`CLOSE_POSITION_COMMAND` и без `FINALIZE_*`/`MARK_*`). **Какие именно — выводится из `DealContext`** (статус сделки + runtime graph), не передаётся handler'ом: состав звеньев — собственность действия (H3 `DOCS_CHECK_10`, `docs/components/SystemActionExecutor.md` §«Состав конкретного цикла») |
 | `FINALIZE_DEAL_ENTRY_ACTION` | `FINALIZE_DEAL_ENTRY_COMMAND` |
 | `FINALIZE_DEAL_EXIT_ACTION` | `FINALIZE_DEAL_EXIT_COMMAND` → `MARK_DEAL_CLOSED_COMMAND` |
 | `FINALIZE_DEAL_ERROR_ACTION` | `MARK_DEAL_ERROR_COMMAND` / `MARK_DEAL_EMERGENCY_CLOSED_COMMAND` (два исполнения: вход в `ERROR`; терминал) |
 
 Границы — **по природе звена**, не по тропе (добыча повторяется на всех
 тропах). **Cleanup** (`CANCEL_*`/`CLOSE_POSITION_COMMAND` как дочистка)
-остаётся вне действий: его серия неудач уже считается на инструмент-scope
-(`docs/rules/instrument-hold.md` §«Серия неудач»), второй deal-scoped
-счётчик дал бы двойной учёт. **Kill-switch действием не материализуется**:
+остаётся вне действий — **потому что у него нет исполнения-действия**, а не
+потому что его отказы где-то считаются (H17 `DOCS_CHECK_10`; прежняя
+формулировка «его серия неудач уже считается на инструмент-scope, второй
+счётчик дал бы двойной учёт» **снята** — счётчика, на который она
+ссылалась, не существовало). Следствие названо честно: без анкера бюджета
+у cleanup нет, его отказы холд не поднимают; учёт — форвард на
+`TradeGuardJob` (`docs/rules/instrument-hold.md` §«Носитель серии»).
+**Kill-switch действием не материализуется**:
 звеньев-команд у него нет (teardown — прямые вызовы `IntegrationService`),
 наблюдаемость исполнения закрыта `AnomalyReport`
 (`docs/components/SafetyHoldCoordinator.md`); он остаётся аварийным

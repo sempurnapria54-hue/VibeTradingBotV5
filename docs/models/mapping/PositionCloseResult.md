@@ -67,7 +67,8 @@ executor работает только с validated normalized snapshot.
 | Snapshot field | Тип | Семантика |
 |---|---|---|
 | `externalRealizedPnl` | `BigDecimal` | готовый net realized P&L (net от всех издержек, посчитан биржей) |
-| `externalResultCurrency` | `String` | валюта, в которой посчитан `realizedPnl` |
+| `externalResultCurrency` | `String` | валюта, в которой посчитан `realizedPnl`; **проверяемый признак**, не источник `Deal.resultProfitCurrency` (H10) |
+| `externalCloseAveragePrice` | `BigDecimal` | средняя цена фактического выхода (`closeAvgPx`) — операнд калибровки запаса на проскок (H26 `DOCS_CHECK_10`) |
 | `externalCloseType` | `String` | тип последнего закрытия (`1`–`6`; ликвидация/ADL = `3`–`6`) |
 | `externalPosId` | `String` | биржевой id позиции (ключ адресации записи) |
 | `externalModifiedAt` | `OffsetDateTime` | время обновления записи positions-history |
@@ -80,9 +81,19 @@ parseable. Тип времени — `OffsetDateTime` по конвенции п
 не заводит (H25, `GAPS_CLOSE_7`;
 `docs/models/domain/other/Auditable.md` §«Единое имя времени источника»).
 
-**Состав сужен до полей с названным потребителем** (H22, `GAPS_CLOSE_7`;
-codestyle §«Неиспользуемый код»). Выведены из снапшота: `closeAvgPx`
-(средняя цена выхода), `triggerPx` (цена триггера ликвидации/ADL) — и
+**`closeAvgPx` возвращён — у него назван потребитель** (H26
+`DOCS_CHECK_10`, решение пользователя). Правило «поле заводится вместе с
+потребителем» держится: потребитель — **калибровка запаса на проскок**
+(`docs/decisions/per-trade-risk-policy.md` §«Без поправки на проскок»),
+отложенное решение, которое без этого поля неисполнимо — разницу «цена
+стопа ↔ цена фактического выхода» система не наблюдала бы **ни на одной**
+сделке. Решение симметрично H6: обе половины сравнения — заявленное
+против фактического — оседают в базе (у входа `plannedEntryPrice` против
+`avgPx`, у выхода цена стопа против `externalCloseAveragePrice`).
+
+**Прочий состав сужен до полей с названным потребителем** (H22,
+`GAPS_CLOSE_7`; codestyle §«Неиспользуемый код»). Остаются выведенными:
+`triggerPx` (цена триггера ликвидации/ADL) и
 **`openAvgPx`** (H23, `DOCS_CHECK_8`): потребителя в фазе 1 нет ни у
 одного, а маппинг `openAvgPx → Position.externalAverageEntryPrice` делал
 колонку двуписьменной (live `avgPx` — текущая средняя, `openAvgPx` —
@@ -103,6 +114,7 @@ H19**: расхождение доков о применимости `triggerPx`
 |---|---|---|
 | `externalRealizedPnl` | `Position.externalRealizedProfit` | биржевой net realized P&L закрытой позиции |
 | `externalResultCurrency` | `Position.externalResultCurrency` | валюта, в которой он посчитан |
+| `externalCloseAveragePrice` | `Position.externalCloseAveragePrice` | средняя цена фактического выхода; потребитель — калибровка запаса на проскок (H26) |
 | `externalCloseType` | `Position.externalCloseType` | провенанс закрытия (`3`–`6` = закрыла биржа) |
 | `externalModifiedAt` | `Position.externalModifiedAt` + **`Deal.billsWindowEnd`** | `uTime` записи закрытия (конвенция `Auditable`, H25). На `Deal` — верхняя граница окна линковки bills, пишется той же транзакцией (узел 1 `DOCS_CHECK_8`; окно из `Position.externalModifiedAt` больше не реконструируется) |
 | `externalPosId` | сверка с `Position.externalId` | не перезаписывает: адресация, а не данные |
@@ -112,7 +124,18 @@ H19**: расхождение доков о применимости `triggerPx`
 | `Position` | `Deal` | Кто пишет |
 |---|---|---|
 | `externalRealizedProfit` | `resultProfit` (слагаемое net) | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` |
-| `externalResultCurrency` | `resultProfitCurrency` | они же |
+| `externalResultCurrency` | **не пишется** — сверяется | они же (см. ниже) |
+
+**Валюта результата в `Deal` пишется не отсюда** (H10 `DOCS_CHECK_10`,
+решение пользователя). `Deal.resultProfitCurrency` берётся из **расчётной
+валюты инструмента** (`docs/models/domain/aggregate/Deal.md` §«Валюта
+результата: один авторитет»), а `Position.externalResultCurrency` —
+**проверяемый признак**: финализатор сверяет его с авторитетом и при
+расхождении ставит `AnomalyReport` `RESULT_CURRENCY_MISMATCH`, не
+блокируя расчёт. Прежняя строка таблицы («`externalResultCurrency` →
+`resultProfitCurrency`») делала носителей два, и число складывалось из
+net'а в валюте записи источника с cross-ccy-слагаемым в расчётной валюте
+инструмента — разные валюты молча.
 
 `externalCloseType` в `Deal` **не пишется** — он вход провенанса
 аварийного терминала (`docs/decisions/pnl-finalization-mechanics.md`
@@ -131,7 +154,13 @@ H19**: расхождение доков о применимости `triggerPx`
   молчаливое взятие слайса.
 - **Numeric:** числа приходят строками; обязательные (`realizedPnl`, `ccy`)
   заполнены и парсятся; для **чистого** закрытия `realizedPnl` присутствует
-  (пустое `realizedPnl` при чистом закрытии недопустимо). `triggerPx`
+  (пустое `realizedPnl` при чистом закрытии недопустимо). `closeAvgPx`
+  парсится, но обязательным **не** является: его отсутствие не влияет ни
+  на число, ни на терминал — пустое поле означает лишь, что сделка не
+  войдёт в выборку калибровки проскока. **`ccy` валидацией принимается на
+  веру намеренно** — соответствие расчётной валюте инструмента проверяет
+  не граница, а финализатор (H10; отказ на границе оставил бы сделку без
+  терминала). `triggerPx`
   валидацией не рассматривается вовсе — поле из снапшота выведено (H22,
   `GAPS_CLOSE_7`), поэтому расхождение доков о его применимости больше
   ничего не нагружает (закрывает остаток H19; единственный носитель
@@ -169,6 +198,7 @@ H19**: расхождение доков о применимости `triggerPx`
 |---|---|
 | `realizedPnl` | `externalRealizedPnl` |
 | `ccy` | `externalResultCurrency` |
+| `closeAvgPx` | `externalCloseAveragePrice` |
 | `type` | `externalCloseType` |
 | `posId` | `externalPosId` |
 | `uTime` | `externalModifiedAt` (epoch millis → `OffsetDateTime`) |
@@ -176,8 +206,9 @@ H19**: расхождение доков о применимости `triggerPx`
 Числовые поля парсятся в `BigDecimal`, `uTime` — в `OffsetDateTime`; `empty
 string → null`. Список не маппимых полей (`pnl`, `fee`, `fundingFee`,
 `liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide`, а также
-`closeAvgPx`/`triggerPx` — выведены H22; `openAvgPx` — выведен H23
-`DOCS_CHECK_8`) — в
+`triggerPx` — выведен H22; `openAvgPx` — выведен H23
+`DOCS_CHECK_8`; `closeAvgPx` из этого перечня **возвращён** — H26
+`DOCS_CHECK_10`) — в
 `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.
 
 ### OKX validation notes

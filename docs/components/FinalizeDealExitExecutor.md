@@ -75,8 +75,9 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
 ассертит непустоту и ставит терминал `CLOSED` (N7). Placeholder ZERO снят.
 - **Сверка bills ↔ net (N10):** число **всегда** = positions-history net (bills
   его не подменяют). Сверяется Σ`amount` **по строкам settle-ccy**.
-  Расхождение **сверх epsilon** (якорь — валовой оборот Σ`|amount|`, не
-  `|net|`) → **`AnomalyReport`** (аудит-аномалия,
+  Расхождение **сверх epsilon** (двухчастный тест: `min(композиционный по
+  обороту Σ`|amount|`, омиссионный по ожидаемой комиссии)` — H15
+  `DOCS_CHECK_10`) → **`AnomalyReport`** (аудит-аномалия,
   `scope = INSTRUMENT`, `severity = NON_CRITICAL` — тропа без kill-switch,
   `docs/lifecycles/AnomalyReport.md`) — **не блокирует** финализацию, сделка
   идёт в `CLOSED` (`docs/decisions/pnl-finalization-mechanics.md` реш.5).
@@ -84,6 +85,24 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
   записи движения (`RefreshBillsExecutor`, H4 `GAPS_CLOSE_7`) — там же, где
   доступен операнд сравнения (расчётная валюта инструмента) и где движение
   пересчитывается.
+- **Область сверки — за вычетом исключённых типов (H14 `DOCS_CHECK_10`):**
+  Σ`amount` идёт по строкам settle-ccy **вне списка исключений биржи**
+  (типы, не принадлежащие экономике сделки). Плюс отдельная проверка:
+  **непустая корзина `OTHER`** у сделки → `AnomalyReport`
+  `UNCLASSIFIED_CASH_FLOW` — так новый тип источника обнаруживается сам,
+  а не раздувает сумму молча
+  (`docs/models/mapping/DealCashFlow.md` §«Область сверки задаётся списком
+  исключений по бирже»).
+- **Валюта результата — пишется по авторитету, биржевая сверяется
+  (H10 `DOCS_CHECK_10`):** `Deal.resultProfitCurrency` берётся из
+  **расчётной валюты инструмента** (резолвится через `DealContext`, как и
+  у `RefreshBillsExecutor`), а `Position.externalResultCurrency`
+  **сверяется** с ней; не совпало → `AnomalyReport`
+  `RESULT_CURRENCY_MISMATCH` (`severity = NON_CRITICAL`), **расчёт не
+  блокируется и терминал проходит**. Операнд пуст → валюта берётся с
+  `Position` + `AnomalyReport` `SETTLE_CURRENCY_UNAVAILABLE` (явная
+  деградация с пометкой, `docs/models/domain/aggregate/Deal.md` §«Валюта
+  результата: один авторитет»).
 - **Число — в settle-ccy целиком (H5, `GAPS_CLOSE_6`):**
   `resultProfit` = net из положения закрытия **+ Σ(`amount` × `appliedRate`)**
   по строкам чужой `ccy`. Биржевой net считается в settle-ccy и издержку,

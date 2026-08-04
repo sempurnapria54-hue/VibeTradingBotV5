@@ -87,8 +87,13 @@ docs/decisions/command-action-boundary.md §2).
 
 Единственный командный уровень, остающийся у handler'а напрямую, —
 **cleanup** (`CANCEL_*`/`CLOSE_POSITION_COMMAND` как дочистка): он
-сознательно вне действий, без анкера — его серия неудач считается на
-инструмент-scope (`docs/decisions/command-action-boundary.md` §2).
+сознательно вне действий, без анкера — исполнения-действия у него нет
+(H17 `DOCS_CHECK_10`; прежняя редакция объясняла это тем, что «его серия
+неудач считается на инструмент-scope», — такого счётчика не существовало).
+Цена названа: отказы cleanup бюджетом не считаются и холд не поднимают —
+форвард на `TradeGuardJob`
+(`docs/decisions/command-action-boundary.md` §2,
+`docs/rules/instrument-hold.md` §«Носитель серии»).
 
 ### `StrategyActionExecutor` — per-pass эмиттер (не синхронный)
 

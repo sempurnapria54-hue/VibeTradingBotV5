@@ -150,14 +150,14 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 | Операция | Метод · путь | Статус | Покрытие | Провенанс | Примечание |
 |---|---|---|---|---|---|
 | Tickers | GET `/market/tickers` | есть-док | 🟢 в коде | офдок | `market-price-data.md`; клиент строит только одиночный `getTicker`, плюрал-эндпоинта нет |
-| Ticker | GET `/market/ticker` | есть-док | 🟢 в коде | офдок | `market-price-data.md`, `OkxTickerResponse`; `getTicker` |
+| Ticker | GET `/market/ticker` | есть-док | 🟢 в коде | офдок | `market-price-data.md`, `OkxTickerResponse`; `getTicker`. **Кандидат носителя курса cross-ccy** (H11 `DOCS_CHECK_10`): метод клиента **уже построен** — но пара `<CCY>-USDT` спотовая, вне SWAP-контура, доступность требует проверки |
 | Candles | GET `/market/candles` | есть-док | 🟢 в коде | офдок | `candle.md`, `CandleOkxResponse`; `getLatestCandles` |
 | History candles | GET `/market/history-candles` | есть-док | 🟢 в коде | офдок | `candle.md`; `getHistoryCandles` |
 | Order book | GET `/market/books` | **создан** | 🟢 в коде | офдок | `order-book.md`; ≤ 400 уровней; фазе 1 не нужен (стратегия на свечах); метода клиента нет |
 | Order book full | GET `/market/books-full` | **создан** | 🟢 в коде | офдок | `order-book.md`; ≤ 5000 уровней; метода клиента нет |
 | Public trades | GET `/market/trades` | **создан** | 🟢 в коде | офдок | `public-trades.md`; ≤ 500; метода клиента нет |
 | Trades history | GET `/market/history-trades` | **создан** | 🟢 в коде | офдок | `public-trades.md`; 3 месяца; метода клиента нет |
-| Index tickers | GET `/market/index-tickers` | **создан** | 🟢 в коде | офдок | `index-data.md`; метода клиента нет |
+| Index tickers | GET `/market/index-tickers` | **создан** | 🟢 в коде | офдок | `index-data.md`; метода клиента нет. **Кандидат носителя курса cross-ccy** (H11 `DOCS_CHECK_10`): индексная котировка не требует онбординга спота — но метод клиента пришлось бы строить. **Выбор между двумя кандидатами — за `integrator`** (ось запроса, доступность пары, `docs/components/RefreshBillsExecutor.md` §«Носитель курса»); после выбора строка операции заводится здесь |
 | Index candles | GET `/market/index-candles` | **создан** | 🟢 в коде | офдок | `index-data.md`; 1440 точек; метода клиента нет |
 | Index candles history | GET `/market/history-index-candles` | **создан** | 🟢 в коде | офдок | `index-data.md`; метода клиента нет |
 | Mark price candles | GET `/market/mark-price-candles` | **создан** | 🟢 в коде | офдок | `mark-price.md`; релевантно `tpTriggerPxType=mark`; метода клиента нет |
