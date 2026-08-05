@@ -36,8 +36,10 @@ live risk; локальные orders/algo доступны для очистки
 «market-close всё + дочистка», владелец — этот handler,
 `docs/decisions/fsm-execution-layering.md` §Exit) →
 `CLOSE_POSITION_COMMAND`; live ordinary orders →
-`CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND` (серия неудач считается
-на инструмент-scope, `docs/components/models/ServiceCommand.md`).
+`CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND` (учёта серии
+неудач **нет** — анкера у cleanup нет, потому что нет исполнения-действия;
+форвард на `TradeGuardJob`, H16 `DOCS_CHECK_11`,
+`docs/components/models/ServiceCommand.md`).
 
 **Завершение — через `FINALIZE_DEAL_EXIT_ACTION`:** определить/
 подтвердить `Deal.CloseReason`; `FINALIZE_DEAL_EXIT_COMMAND` эмитится по

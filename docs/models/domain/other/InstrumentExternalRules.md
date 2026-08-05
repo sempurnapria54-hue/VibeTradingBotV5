@@ -16,9 +16,12 @@
 > потребитель ограничений инструмента; решение
 > `docs/decisions/instrument-external-rules-materialization.md`, закрыт
 > INSTR-Q1, ренейм не требуется). Справочные валюты инструмента
-> (base/quote/settle) **персистятся здесь** (H12 `DOCS_CHECK_9`, решение
-> `docs/decisions/instrument-currencies-home.md`; см. §«Валюты
-> инструмента» — прежний клейм «валют не держит» снят). Авторитетный источник биржевого
+> (base/quote/settle) **здесь не живут** — их дом `Instrument`
+> (H6 `DOCS_CHECK_11`, решение
+> `docs/decisions/instrument-currencies-home.md`: валюты — атрибуты
+> контракта, а не его волатильной спецификации, под которую заведён
+> навес). Промежуточная редакция (`DOCS_CHECK_9`) помещала их сюда и тем
+> самым заводила третью тропу чтения навеса. Авторитетный источник биржевого
 > **потолка плеча** для преконтроля — `externalMaxLeverage` этой модели
 > (из OKX `lever`); одноимённое сырое значение на `Instrument`
 > (`externalLeverage`, заведено на шаге 1) для преконтроля не
@@ -85,9 +88,6 @@ Java-класс. Собственного `id` у класса нет — еди
 | `externalMaxStopSize` | `String` | Максимальный размер stop-ордера. |
 | `externalMaxLeverage` | `String` | Биржевой максимум плеча. |
 | `externalFeeGroupId` | `String` | **Ключ комиссионной группы** инструмента (OKX `groupId`, из `/public/instruments`). Не ставка, а ось её резолва: пара (`externalInstrumentType`, `externalFeeGroupId`) → строка `TradeFeeRate`. Обе половины — **сырые** поля (доменный `instrumentType` осью не является: `UNKNOWN` схлопнул бы разные группы в один ключ — `docs/models/domain/other/TradeFeeRate.md` §«Масштаб модели»). Стареет **самостоятельно** — измеритель отдельный от ставки, см. §«Свежесть ключа группы». Прочее — §«Ставка комиссии». |
-| `externalSettlementCurrency`* | `String` | **Расчётная валюта** инструмента (OKX `settleCcy`). Операнд ветки cross-ccy на записи `DealCashFlow` и источник `Deal.plannedRiskCurrency` / `resultProfitCurrency` (см. §«Валюты инструмента»). *Имя поля — предварительное: открыт CCY-Q2.* |
-| `externalBaseCurrency` | `String` | Базовая валюта инструмента (OKX `baseCcy`). |
-| `externalQuoteCurrency` | `String` | Котировочная валюта инструмента (OKX `quoteCcy`). |
 | `externalState` | `String` | Сырой статус инструмента биржи. |
 
 `external*`-поля хранят сырые строковые значения биржи; нормализованные
@@ -114,29 +114,28 @@ JSONB**, потому что живёт вне JSON; бэкфилл навеса
 > `DealCashFlow.externalFee` знак источника **сохраняет** — там он несущий
 > для арифметики композиции.
 
-## Валюты инструмента
+## Валюты инструмента здесь не живут
 
-**Расчётная, базовая и котировочная валюты персистятся на этом навесе**
-(H12 `DOCS_CHECK_9`, решение пользователя —
-`docs/decisions/instrument-currencies-home.md`; отвергнуты
-фаза-1-константа из конфига и запрос по требованию). Источник — тот же
-`/public/instruments` (`settleCcy`/`baseCcy`/`quoteCcy`), писатель — тот
-же `InstrumentExternalRulesSyncJob`, свежесть — тем же измерителем
-`externalModifiedAt` строки-владельца (§«Свежесть ключа группы»).
+**Дом расчётной, базовой и котировочной валют — `Instrument`** (H6
+`DOCS_CHECK_11`, решение пользователя —
+`docs/decisions/instrument-currencies-home.md`,
+`docs/models/domain/core/Instrument.md` §«Валюты инструмента»).
 
-Потребители расчётной валюты: ветка cross-ccy на записи `DealCashFlow`
-(`docs/components/RefreshBillsExecutor.md` — операнд сравнения `ccy`
-движения), писатель `Deal.plannedRiskCurrency`
-(`docs/components/CreateOrderExecutor.md`), финализация
-(`resultProfitCurrency`).
+Навес существует ради **часто обновляемой** спецификации (тики, лоты,
+лимиты, потолок плеча, ключ комиссионной группы); валюта расчёта меняется
+редко или не меняется вовсе и является атрибутом самого контракта.
+Помещение её сюда заводило **третью** тропу чтения навеса — при том что
+все три потребителя шага 7 уже держат `Instrument` через `DealContext`.
+Счёт **гидрированных** троп чтения навеса остаётся **две**
+(`CalculationContextFactory`, `RiskValidator`) — именно на них стоит
+довод о владельце гидрации ставки. Шаг 7 добавляет третьего читателя
+навеса (`FinalizeDealExitExecutor`, только `ctVal`), но **гидрации он не
+требует**: ставку финализатор не читает
+(`docs/components/InstrumentExternalRulesDataService.md` §Использование).
 
-**Открытый хвост — CCY-Q2** (владелец `solution-designer`,
-`.claude/work/questions/open-questions.md`): именование поля расчётной
-валюты (`externalCurrency` vs `externalSettlementCurrency` — второе
-сохраняет дискриминатор при трёх валютах) и область самой модели
-(расширение области с возможным переименованием против отдельного
-носителя валют — модель названа «правилами», а валюты — атрибуты). До
-закрытия имена полей — предварительные.
+**`CCY-Q2` закрыт** этим же решением — обе его позиции (именование и
+область модели); область навеса не расширяется и переименования не
+требует.
 
 ## Ставка комиссии — ключ здесь, значение в `TradeFeeRate`
 

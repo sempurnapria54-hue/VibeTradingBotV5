@@ -68,9 +68,12 @@ executor работает только с validated normalized snapshot.
 |---|---|---|
 | `externalRealizedPnl` | `BigDecimal` | готовый net realized P&L (net от всех издержек, посчитан биржей) |
 | `externalResultCurrency` | `String` | валюта, в которой посчитан `realizedPnl`; **проверяемый признак**, не источник `Deal.resultProfitCurrency` (H10) |
-| `externalCloseAveragePrice` | `BigDecimal` | средняя цена фактического выхода (`closeAvgPx`) — операнд калибровки запаса на проскок (H26 `DOCS_CHECK_10`) |
+| `externalCloseAveragePrice` | `BigDecimal` | средняя цена фактического выхода (`closeAvgPx`) — операнд калибровки запаса на проскок **на тропе attached-SL** (H26 `DOCS_CHECK_10`, операнд уточнён H21 `DOCS_CHECK_11`) |
 | `externalCloseType` | `String` | тип последнего закрытия (`1`–`6`; ликвидация/ADL = `3`–`6`) |
-| `externalPosId` | `String` | биржевой id позиции (ключ адресации записи) |
+| `externalFundingCost` | `BigDecimal` | накопленный funding закрытой позиции (`fundingFee`) — операнд де-микширования R-мультипликатора (H20 `DOCS_CHECK_11`) |
+| `externalPosId` | `String` | биржевой id позиции (ключ адресации записи; на create-тропе — **данные**, см. ниже) |
+| `externalDirection` | `String` | направление закрытой позиции (`direction`) — операнд **create-тропы** (H4 `DOCS_CHECK_11`) |
+| `externalCreatedAt` | `OffsetDateTime` | время создания записи positions-history (`cTime`) — операнд **create-тропы** и нижней границы окна линковки (H4 `DOCS_CHECK_11`) |
 | `externalModifiedAt` | `OffsetDateTime` | время обновления записи positions-history |
 
 Числовые/временные поля нормализуются при построении снапшота (string →
@@ -82,14 +85,21 @@ parseable. Тип времени — `OffsetDateTime` по конвенции п
 `docs/models/domain/other/Auditable.md` §«Единое имя времени источника»).
 
 **`closeAvgPx` возвращён — у него назван потребитель** (H26
-`DOCS_CHECK_10`, решение пользователя). Правило «поле заводится вместе с
-потребителем» держится: потребитель — **калибровка запаса на проскок**
-(`docs/decisions/per-trade-risk-policy.md` §«Без поправки на проскок»),
-отложенное решение, которое без этого поля неисполнимо — разницу «цена
-стопа ↔ цена фактического выхода» система не наблюдала бы **ни на одной**
-сделке. Решение симметрично H6: обе половины сравнения — заявленное
-против фактического — оседают в базе (у входа `plannedEntryPrice` против
-`avgPx`, у выхода цена стопа против `externalCloseAveragePrice`).
+`DOCS_CHECK_10`, решение пользователя), но **основным операндом
+калибровки быть перестал** (H21 `DOCS_CHECK_11`): он смешивает частичные
+TP с исполнением стопа и не отличает стоп-аут от прочих выходов. Основной
+операнд — `AlgoOrder.externalPrice` по стоповым типам условия; за
+`closeAvgPx` осталась подвыборка **attached-SL**, у которой собственной
+цены исполнения нет (`docs/models/domain/core/Position.md` §«Цена
+фактического выхода»). Правило «поле заводится вместе с потребителем»
+держится — потребитель сузился, но остался названным.
+
+**`fundingFee`, `cTime` и `direction` внесены в снапшот** (H20 и H4
+`DOCS_CHECK_11`, решения пользователя): у `fundingFee` потребитель —
+де-микширование R-мультипликатора, у `cTime`/`direction` — ратифицированная
+create-тропа (§ниже). До этого все три числились в отброшенных, и
+операнды ратифицированных потребителей за границу `IntegrationService`
+не выходили.
 
 **Прочий состав сужен до полей с названным потребителем** (H22,
 `GAPS_CLOSE_7`; codestyle §«Неиспользуемый код»). Остаются выведенными:
@@ -107,17 +117,39 @@ H19**: расхождение доков о применимости `triggerPx`
 
 ### snapshot → `Position`
 
-Применяет `RefreshPositionExecutor` (нога 2) на **той же** `Position`,
-статус которой нога 1 уже перевела в `CLOSED`:
+Применяет `RefreshPositionExecutor` (нога 2). **Троп две**, и состав
+маппинга у них разный:
 
-| Snapshot field | Domain | Семантика |
-|---|---|---|
-| `externalRealizedPnl` | `Position.externalRealizedProfit` | биржевой net realized P&L закрытой позиции |
-| `externalResultCurrency` | `Position.externalResultCurrency` | валюта, в которой он посчитан |
-| `externalCloseAveragePrice` | `Position.externalCloseAveragePrice` | средняя цена фактического выхода; потребитель — калибровка запаса на проскок (H26) |
-| `externalCloseType` | `Position.externalCloseType` | провенанс закрытия (`3`–`6` = закрыла биржа) |
-| `externalModifiedAt` | `Position.externalModifiedAt` + **`Deal.billsWindowEnd`** | `uTime` записи закрытия (конвенция `Auditable`, H25). На `Deal` — верхняя граница окна линковки bills, пишется той же транзакцией (узел 1 `DOCS_CHECK_8`; окно из `Position.externalModifiedAt` больше не реконструируется) |
-| `externalPosId` | сверка с `Position.externalId` | не перезаписывает: адресация, а не данные |
+- **update-тропа** (штатная) — `Position` уже существует, статус в
+  `CLOSED` перевела нога 1;
+- **create-тропа** — позиция **впервые увидена уже закрытой** (открылась и
+  закрылась между тиками, быстрый стоп, ликвидация), локальной `Position`
+  нет вовсе, и нога 2 её **материализует** из записи positions-history
+  (H9 `GAPS_CLOSE_10`; состав задан H4 `DOCS_CHECK_11`).
+
+| Snapshot field | Domain | Семантика | Тропа |
+|---|---|---|---|
+| `externalRealizedPnl` | `Position.externalRealizedProfit` | биржевой net realized P&L закрытой позиции | обе |
+| `externalResultCurrency` | `Position.externalResultCurrency` | валюта, в которой он посчитан | обе |
+| `externalCloseAveragePrice` | `Position.externalCloseAveragePrice` | средняя цена фактического выхода; потребитель — калибровка проскока на тропе attached-SL (H26, H21) | обе |
+| `externalCloseType` | `Position.externalCloseType` | провенанс закрытия (`3`–`6` = закрыла биржа) | обе |
+| `externalFundingCost` | `Position.externalFundingCost` | накопленный funding; потребитель — де-микширование R (H20) | обе |
+| `externalModifiedAt` | `Position.externalModifiedAt` + **`Deal.billsWindowEnd`** | `uTime` записи закрытия (конвенция `Auditable`, H25). На `Deal` — верхняя граница окна линковки bills, пишется той же транзакцией (узел 1 `DOCS_CHECK_8`; окно из `Position.externalModifiedAt` больше не реконструируется) | обе |
+| `externalPosId` | сверка с `Position.externalId` | не перезаписывает: адресация, а не данные | update |
+| `externalPosId` | `Position.externalId` (**запись**) | локальной `Position` нет ⇒ id записи и есть её идентичность | create |
+| `externalDirection` | `Position.direction` | направление материализуемой позиции; на update-тропе уже заполнено live-ногой | create |
+| `externalCreatedAt` | `Position.externalCreatedAt` + **`Deal.billsWindowBegin`** | `cTime` записи. На `Deal` — **нижняя** граница окна линковки bills, пишется той же транзакцией | create |
+
+**Статус и размер на create-тропе.** Материализуемая `Position` создаётся
+сразу в `CLOSED` (нога 1 её не видела и статуса не ставила);
+`externalSize` закрытой позиции равен нулю по определению — размер
+живой позиции этой тропой не наблюдался и не восстанавливается.
+
+**`billsWindowBegin` — write-once с тремя писателями.** Границу пишет
+live-нога (штатно), условно `SubmitOrderExecutor` и — на create-тропе —
+нога 2 (`docs/models/domain/aggregate/Deal.md` §«Окно линковки»). Порядок
+разрешения при конкуренции write-once задан там же; на create-тропе
+предыдущих писателей по построению не было.
 
 ### `Position` → `Deal` (финализатор)
 
@@ -146,12 +178,26 @@ net'а в валюте записи источника с cross-ccy-слагае
 
 В `IntegrationService` источника:
 
-- **Structural:** `response != null`; `code == 0`; на `posId` резолвится
-  **ровно одна финализированная** запись positions-history (инвариант
-  агрегации, `docs/integrations/okx/contracts/position.md` §«Инвариант
-  агрегации»; **N11, требует рантайм-верификации**). Множественная /
-  нефинализированная запись на `posId` — controlled external error, не
-  молчаливое взятие слайса.
+- **Structural:** `response != null`; `code == 0`; резолвится **ровно одна
+  финализированная** запись positions-history (инвариант агрегации,
+  `docs/integrations/okx/contracts/position.md` §«Инвариант агрегации»;
+  **N11, требует рантайм-верификации**). Множественная / нефинализированная
+  запись — controlled external error, не молчаливое взятие слайса.
+  - **Ось адресации — не всегда `posId`** (H5 `DOCS_CHECK_11`; модель
+    сняла ключевание — `docs/models/domain/core/Position.md` §Инварианты).
+    Когда `posId` наблюдался — адресация по нему, и «ровно одна» проверяется
+    на нём. Когда `posId` не наблюдался (create-тропа: позиция открылась и
+    закрылась между тиками) — адресация **инструментом и окном сделки**, а
+    однозначность держит инвариант «одна активная сделка на инструмент»
+    (`docs/rules/trading-constraints.md`).
+  - **Что считается «ровно одной» на второй оси — хвост `integrator`.**
+    Какие оси запроса принимает история позиций источника и как она себя
+    ведёт, если в окне по инструменту оказалось **несколько** записей
+    (несколько циклов открытия-закрытия внутри одного окна; частичные
+    закрытия отдельными записями), из доков не выводится — это факт
+    источника. До ответа поведение второй оси **не специфицировано**, и
+    create-тропа гейтится этим фактом
+    (`.claude/tests/source-api/okx/plan.md`).
 - **Numeric:** числа приходят строками; обязательные (`realizedPnl`, `ccy`)
   заполнены и парсятся; для **чистого** закрытия `realizedPnl` присутствует
   (пустое `realizedPnl` при чистом закрытии недопустимо). `closeAvgPx`
@@ -200,25 +246,40 @@ net'а в валюте записи источника с cross-ccy-слагае
 | `ccy` | `externalResultCurrency` |
 | `closeAvgPx` | `externalCloseAveragePrice` |
 | `type` | `externalCloseType` |
+| `fundingFee` | `externalFundingCost` |
 | `posId` | `externalPosId` |
+| `direction` | `externalDirection` |
+| `cTime` | `externalCreatedAt` (epoch millis → `OffsetDateTime`) |
 | `uTime` | `externalModifiedAt` (epoch millis → `OffsetDateTime`) |
 
-Числовые поля парсятся в `BigDecimal`, `uTime` — в `OffsetDateTime`; `empty
-string → null`. Список не маппимых полей (`pnl`, `fee`, `fundingFee`,
-`liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide`, а также
-`triggerPx` — выведен H22; `openAvgPx` — выведен H23
-`DOCS_CHECK_8`; `closeAvgPx` из этого перечня **возвращён** — H26
-`DOCS_CHECK_10`) — в
+Числовые поля парсятся в `BigDecimal`, `cTime`/`uTime` — в
+`OffsetDateTime`; `empty string → null`. Список не маппимых полей (`pnl`,
+`fee`, `liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide`,
+`lever`, `uly`, `openMaxPos`, `closeTotalPos`, `nonSettleAvgPx`, а также
+`triggerPx` — выведен H22; `openAvgPx` — выведен H23 `DOCS_CHECK_8`;
+`closeAvgPx` из этого перечня **возвращён** H26 `DOCS_CHECK_10`,
+`fundingFee` — H20, `cTime`/`direction` — H4 `DOCS_CHECK_11`) — в
 `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.
+
+**Счёт цепочки:** native used 9 = snapshot 9 = domain 9 (для create-тропы;
+на update-тропе `externalDirection`/`externalCreatedAt` не применяются, а
+`externalPosId` сверяется вместо записи).
 
 ### OKX validation notes
 
 - **Structural:** `code == 0`.
-- **Query:** запись добывается по `posId` (плюс `instType`/`instId`);
-  пагинация positions-history — по `uTime` (`limit` ≤ 100),
+- **Query:** когда `posId` наблюдался — запись добывается по нему (плюс
+  `instType`/`instId`); когда не наблюдался — по `instId` и окну сделки
+  (`after`/`before` по `uTime`). Пагинация positions-history — по `uTime`
+  (`limit` ≤ 100),
   `docs/integrations/okx/contracts/position.md` §«История закрытых позиций».
+  Точный набор принимаемых осей и их совместимость — хвост `integrator`
+  (H5 `DOCS_CHECK_11`).
 - **Инвариант агрегации (N11):** `realizedPnl` кумулятивен по всем
   partial-закрытиям и доборам за жизнь `posId`; читается финализированной
   записью (позиция flat по `REFRESH_POSITION_COMMAND`). До рантайм-верификации —
   **предположение** (контур source-api, `.claude/tests/source-api/okx/plan.md`
   §AG1); гейтит корректность числа до `CODE`.
+- **Семантика `fundingFee` записи — хвост `integrator`** (H20
+  `DOCS_CHECK_11`): накоплен за жизнь `posId` или только за последнее
+  закрытие. От ответа зависит, сверяется ли Σ`FUNDING` окна с ним напрямую.

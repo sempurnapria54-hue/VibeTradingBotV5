@@ -31,22 +31,28 @@ limits / история закрытых позиций — `docs/integrations/o
 (`openAvgPx`) в used-набор **не входит** (H23 — потребителя нет,
 `Position.externalAverageEntryPrice` пишет только live-нога, см.
 §«Не используется»); средняя цена **выхода** (`closeAvgPx`) — **входит**
-(H26 `DOCS_CHECK_10`: потребитель — калибровка запаса на проскок).
+(H26 `DOCS_CHECK_10`: потребитель — калибровка запаса на проскок на тропе
+attached-SL, H21 `DOCS_CHECK_11`).
 
 ## Инвентарь полей
 
 ### Используемые
 
 Used-минимум для числа `resultProfit`: готовый net берётся одним полем
-`realizedPnl`; своих слагаемых не складываем.
+`realizedPnl`; своих слагаемых не складываем. Сверх числа used-набор несёт
+операнды **create-тропы** (позиция впервые увидена уже закрытой) и
+готовый funding.
 
 | OKX field | Тип | Семантика |
 |---|---|---|
 | `realizedPnl` | string-decimal | готовый net realized P&L = `pnl` + `fee` + `fundingFee` + `liqPenalty` (посчитан биржей) → `Position.externalRealizedProfit` → `Deal.resultProfit` |
 | `ccy` | string | валюта, в которой посчитан `realizedPnl` → `Position.externalResultCurrency`. В `Deal.resultProfitCurrency` **не переходит** — авторитет валюты результата — расчётная валюта инструмента, а это поле **проверяемый признак** (H10 `DOCS_CHECK_10`, `docs/models/domain/aggregate/Deal.md` §«Валюта результата: один авторитет») |
-| `closeAvgPx` | string-decimal | средняя цена фактического выхода → `Position.externalCloseAveragePrice`; потребитель — калибровка запаса на проскок (H26 `DOCS_CHECK_10`) |
+| `closeAvgPx` | string-decimal | средняя цена фактического выхода → `Position.externalCloseAveragePrice`; потребитель — калибровка запаса на проскок на тропе attached-SL (H26 `DOCS_CHECK_10`, операнд уточнён H21 `DOCS_CHECK_11`) |
+| `fundingFee` | string-decimal | накопленный funding закрытой позиции → `Position.externalFundingCost`; потребитель — де-микширование R-мультипликатора (`docs/decisions/per-trade-risk-policy.md` §H25). `FUNDING`-строки `DealCashFlow` — **сверка** этого числа, не источник (H20 `DOCS_CHECK_11`) |
 | `type` | string | тип последнего закрытия (`1` частичное / `2` полное / `3` ликвидация / `4` частичная ликвидация / `5` ADL не полностью / `6` ADL полностью) → `Position.externalCloseType` (провенанс аварийного терминала) |
-| `posId` | string | биржевой id позиции (ключ адресации записи; истекает ~30 дней после полного закрытия) — сверяется с `Position.externalId` |
+| `posId` | string | биржевой id позиции (ключ адресации записи; истекает ~30 дней после полного закрытия). На **update**-тропе сверяется с `Position.externalId`; на **create**-тропе — **пишется** в него (H4 `DOCS_CHECK_11`) |
+| `direction` | string | направление закрытой позиции → `Position.direction` **только на create-тропе** (на update-тропе поле уже заполнено live-ногой). Без него create-тропа материализует `Position` без направления, а `positions.direction` nullable ⇒ отказ был бы тихим (H4 `DOCS_CHECK_11`) |
+| `cTime` | string-ms | время создания записи → `Position.externalCreatedAt` (наследуется от `Auditable`) и далее **нижняя граница окна линковки** `Deal.billsWindowBegin` на create-тропе (H4 `DOCS_CHECK_11`) |
 | `uTime` | string-ms | время обновления записи → `Position.externalModifiedAt` (сортировка/пагинация positions-history — тоже по `uTime`) |
 
 ### Не используется bot'ом (отбрасывается на маппинге)
@@ -57,8 +63,15 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 
 - **Слагаемые net и производные PnL** (net берётся готовым `realizedPnl`,
   разбивка — из bills): `pnl` (без комиссий), `fee` (минус — комиссия,
-  плюс — ребейт), `fundingFee` (накопленный funding), `liqPenalty`
-  (ликвидационный штраф), `settledPnl` (cross-FUTURES), `pnlRatio`.
+  плюс — ребейт), `liqPenalty` (ликвидационный штраф), `settledPnl`
+  (cross-FUTURES), `pnlRatio`.
+  **`fundingFee` в used возвращён** (H20 `DOCS_CHECK_11`, решение
+  пользователя): потребитель существует и записан **в другом доке** —
+  де-микширование R-мультипликатора (`per-trade-risk-policy.md` §H25).
+  Тот же довод, которым в used возвращён `closeAvgPx`; прежняя запись
+  «потребителя в фазе 1 нет» выбирала слабейший из двух источников
+  (best-effort bills против авторитетного числа биржи) и делала это
+  молча.
 - **Объёмы / прочие цены:** `openMaxPos` (максимум позиции), `closeTotalPos`
   (накопленный закрытый объём), `nonSettleAvgPx` (cross-FUTURES).
 - **Выведен из used на `GAPS_CLOSE_7` (H22)** — потребителя в фазе 1 нет,
@@ -78,8 +91,16 @@ Used-минимум для числа `resultProfit`: готовый net бер�
   `Position.externalAverageEntryPrice` пишет **только live-нога**
   (`docs/models/mapping/PositionCloseResult.md`).
 - **Идентификация / атрибуты позиции** (не нужны числу; USDT-SWAP net /
-  isolated фиксированы адаптером): `mgnMode`, `posSide`, `direction`,
-  `lever`, `uly`, `cTime` (время создания).
+  isolated фиксированы адаптером): `mgnMode`, `posSide`, `lever`, `uly`.
+  **`cTime` и `direction` в used возвращены** (H4 `DOCS_CHECK_11`):
+  create-тропа (позиция впервые увидена уже закрытой) материализует
+  `Position` из этой записи и заполняет ею нижнюю границу окна линковки —
+  оба поля её операнды, потребитель ратифицирован (H9 `GAPS_CLOSE_10`).
+  `cTime` попал в unused ещё и вопреки правилу `Auditable`: время
+  создания и обновления, отдаваемое биржей, в unused не выводится —
+  у него всегда есть наследуемый носитель
+  (`docs/models/domain/other/Auditable.md` §«Ревизия инвентаря
+  источника»).
 
 ## Конвертация
 

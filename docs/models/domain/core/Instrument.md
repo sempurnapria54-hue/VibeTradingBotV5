@@ -30,6 +30,9 @@
 | `externalType` | `String` | Тип инструмента на бирже: `SPOT`/`MARGIN`/`SWAP`/`FUTURES`/`OPTION`. |
 | `status` | `Status` | Нормализованный статус жизненного цикла инструмента (онбординг-статус системы). |
 | `externalStatus` | `String` | Биржевой статус инструмента (сырой). Источник — OKX `state` из снапшота. Не путать с онбординг-`status`. |
+| `externalSettlementCurrency` | `String` | **Расчётная валюта** инструмента (OKX `settleCcy`). Операнд ветки cross-ccy на записи `DealCashFlow`, источник `Deal.plannedRiskCurrency` и авторитет `Deal.resultProfitCurrency` (см. §«Валюты инструмента»). |
+| `externalBaseCurrency` | `String` | Базовая валюта инструмента (OKX `baseCcy`). |
+| `externalQuoteCurrency` | `String` | Котировочная валюта инструмента (OKX `quoteCcy`). |
 | `marginMode` | `MarginMode` | Режим маржи (нормализованный enum). |
 | `externalMarginMode` | `String` | Сырой режим маржи биржи (`cross`/`isolated`). |
 | `leverage` | `Integer` | Рабочее плечо инструмента; **задаётся при создании инструмента**, не из снапшота. |
@@ -119,21 +122,53 @@ safety-статуса не содержал вовсе); `ENTRY_BLOCKED` — **�
 приходят в граничном `InstrumentExternalSnapshot` (класс
 `domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot`)
 и **персистятся** на домен; рабочее `leverage` (`Integer`) задаётся
-при создании инструмента, не из снапшота. Справочные поля
-спецификации биржи (base/quote/settle currency, `lotSz`, `minSz`,
-`ctVal`, `ctMult`, `tickSz`) на доменном `Instrument` **не
-хранятся** — они приходят в `InstrumentExternalSnapshot`
-**транзиентно** и в шаге 1 персистентного дома не имеют. Mapping
+при создании инструмента, не из снапшота. Размерные поля спецификации
+биржи (`lotSz`, `minSz`, `ctVal`, `ctMult`, `tickSz`) на доменном
+`Instrument` **не хранятся** — их дом `InstrumentExternalRules` (шаг 5).
+**Валюты (base/quote/settle) — хранятся** (с шага 7, §ниже); в шаге 1
+они приходили транзиентно и персистентного дома не имели. Mapping
 snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
 идентичность + `externalStatus` + `externalLeverage`).
+
+## Валюты инструмента
+
+**Расчётная, базовая и котировочная валюты — поля `Instrument`**, с
+шага 7 (H6 `DOCS_CHECK_11`, решение пользователя —
+`docs/decisions/instrument-currencies-home.md`). Источник —
+`/public/instruments` (`settleCcy`/`baseCcy`/`quoteCcy`), канал —
+`InstrumentExternalSnapshot`, писатель — тот же синк спецификации.
+
+- **Почему на сущности, а не в навесе.** Валюта расчёта — свойство
+  самого контракта и меняется редко или не меняется вовсе; навес
+  `InstrumentExternalRules` заведён под **волатильную** часть
+  спецификации. Побочно снимается третья тропа чтения навеса: все три
+  потребителя шага 7 держат `Instrument` через `DealContext`
+  (`docs/components/models/DealContext.md`), и резолв у них уже есть.
+- **Потребители расчётной валюты** (шаг 7): ветка cross-ccy на записи
+  движения (`docs/components/RefreshBillsExecutor.md`), писатель
+  `Deal.plannedRiskCurrency` (`docs/components/CreateOrderExecutor.md`),
+  финализация — штатная и аварийная
+  (`docs/components/FinalizeDealExitExecutor.md`,
+  `docs/components/MarkDealEmergencyClosedExecutor.md`).
+- **Авторитет валюты результата — эта колонка**, а `ccy` записи
+  positions-history — проверяемый признак
+  (`docs/models/domain/aggregate/Deal.md` §«Валюта результата: один
+  авторитет»).
+- **Ветка «операнд пуст».** Колонки новые: на существующих строках
+  значение появляется после ближайшего тика синка. Реакции по точкам —
+  `docs/models/domain/aggregate/Deal.md` §«Ветка "операнд пуст"».
+- **`CCY-Q2` закрыт** этим решением (обе позиции — именование и область
+  модели); имена полей больше не предварительные.
 
 > **Разграничение `Instrument` ↔ `InstrumentExternalSnapshot` ↔
 > `InstrumentExternalRules` (шаг 1).** Биржевые `externalStatus`
 > (OKX `state`) и `externalLeverage` (OKX `lever`) приходят в
 > транзиентном `InstrumentExternalSnapshot` и **персистятся** на
-> `Instrument`. Справочные поля спецификации (base/quote/settle,
-> sizes) для шага 1 живут только в транзиентном
-> `InstrumentExternalSnapshot`; персистентного дома у них нет.
+> `Instrument`. Размерные поля спецификации (sizes, `ctVal`, тики) для
+> шага 1 живут только в транзиентном `InstrumentExternalSnapshot` —
+> персистентный дом появляется у них на шаге 5 (`InstrumentExternalRules`);
+> **валюты (base/quote/settle) персистятся на `Instrument` с шага 7**
+> (§«Валюты инструмента»).
 > Модель `InstrumentExternalRules` (sizing/rounding-правила:
 > tick/lot/min sizes, max-order sizes, `ctVal`, max leverage,
 > торгуемость) **материализуется на шаге 5** (риск-преконтроль) и на
@@ -162,10 +197,17 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
 - `internal_id`, `exchange_id`, `external_id`, `external_type`,
   `status`, `margin_mode`, `leverage` — `NOT NULL`;
   `external_margin_mode`, `planned_candle_start_date`,
-  `external_status`, `external_leverage` — nullable
+  `external_status`, `external_leverage`,
+  `external_settlement_currency`, `external_base_currency`,
+  `external_quote_currency` — nullable
   (`planned_candle_start_date` проставляется при онбординге из
-  конфига; `external_status`/`external_leverage` — при синхронизации
-  спецификации, переход `SYNC`).
+  конфига; `external_status`/`external_leverage`/валюты — при
+  синхронизации спецификации, переход `SYNC`).
+- **Колонки шага 7 — `ALTER`** (H6 `DOCS_CHECK_11`):
+  `external_settlement_currency`, `external_base_currency`,
+  `external_quote_currency` добавляются миграцией шага 7; бэкфилл не
+  нужен (`null` = «до ближайшего тика синка»). Полная schema-дельта
+  шага — `docs/decisions/pnl-finalization-mechanics.md` §Следствия.
 - `internal_id`, `exchange_id`, `margin_mode` — `updatable = false`
   (неизменны после создания).
 - `status` и `margin_mode` хранятся строкой (имя enum); enum — только

@@ -25,7 +25,12 @@
 - контракты операций — endpoints, permissions, rate limits,
   ACK-семантика, пагинация (`docs/integrations/{name}/contracts/`);
 - нативные модели источника — поля (used/unused) запросов/ответов
-  (`docs/models/integrations/{name}/`);
+  (`docs/models/integrations/{name}/`). При ревизии used/unused
+  обязательна сверка с правилом `Auditable`: поля **времени создания и
+  обновления**, отдаваемые источником, в unused не выводятся — у них
+  структурный носитель, а не прикладной потребитель
+  (`docs/models/domain/other/Auditable.md` §«Ревизия инвентаря
+  источника»);
 - правила источника — инварианты, adapter-константы, конвенции,
   специфичные для площадки (`docs/integrations/{name}/rules/`);
 - известные ограничения и квоты площадки.

@@ -68,6 +68,32 @@ Java-класс `...core.algo_order.AlgoOrder`, расширяет `Auditable`.
   `ORDER_FAILED`, `PARTIALLY_FAILED`, `UNKNOWN_EXTERNAL_STATUS`,
   `EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`.
 
+### Операнды планового риска — дом здесь, состав за развилкой (H3 `DOCS_CHECK_11`)
+
+Если вход исполнился **алго-ордером**, операнды планового риска
+(`plannedEntryPrice`, `plannedSizeContracts`) — атрибуты этой строки:
+дом назначен **сущности ноги входа, по тому, кто фактически исполнился**
+(`docs/models/domain/aggregate/Deal.md` §«Плановый риск»). Полями таблица
+пока не дополнена — развилка «`orders`, `algo_orders` или обе» открыта
+(`RISK-Q4`), **гейтит `CODE`**.
+
+### Поля фактического срабатывания — есть, и они операнд калибровки
+
+`externalPrice` (`actualPx`), `externalSize` (`actualSz`),
+`externalTriggerTime` — **фактические** факты срабатывания, не заявленные.
+`externalPrice` по стоповым типам условия (`STOP_LOSS` / `OCO_FULL` /
+`PARTIAL_STOP_LOSS` при `closeReason = TRIGGERED`) — **основной операнд
+калибровки запаса на проскок**, а второй операнд (уровень стопа) живёт на
+**той же** строке в `condition.trigger.stopLoss.value`, поэтому смешения
+partial-выходов и не-стоповых закрытий не возникает (H21 `DOCS_CHECK_11`;
+`docs/models/domain/core/Position.md` §«Цена фактического выхода»).
+У `AttachedAlgoOrder` аналога **нет** — там только заявленный
+`stopLossTriggerPrice`.
+
+**Хвост `integrator`:** означает ли `actualPx` цену исполнения
+сработавшего ордера или цену его выставления после триггера
+(`.claude/tests/source-api/okx/plan.md` §M15.7).
+
 ## Condition-модель (разделы `AlgoOrder`)
 
 Дерево условий — разделы внутри `AlgoOrder` по

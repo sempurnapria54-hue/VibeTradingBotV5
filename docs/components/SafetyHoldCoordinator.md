@@ -8,8 +8,10 @@
 
 ## Назначение
 
-`SafetyHoldCoordinator` — координатор реактивной реакции CRITICAL-холда
-над сделкой. Держатель **решения о последовательности**; сам ничего не
+`SafetyHoldCoordinator` — координатор реактивной реакции холда над
+сделкой: **двух классов** — полного (`FULL`, CRITICAL: `TRADE_BLOCKED` +
+kill-switch) и мягкого (`SOFT`, журнальный: `ENTRY_BLOCKED` без teardown;
+H14 `DOCS_CHECK_11`). Держатель **решения о последовательности**; сам ничего не
 исполняет напрямую, оркеструет исполнителей:
 
 - `InstrumentDataService` / `ExchangeDataService` — выставление
@@ -26,7 +28,32 @@
 `docs/components/DealOrchestratorJob.md`). Точка входа —
 `react(signal, dealContext)`, идемпотентная по статусу scope.
 
-## Последовательность реакции
+## Ветвление по классу реакции (H14 `DOCS_CHECK_11`)
+
+`react(signal, dealContext)` первым делом читает
+`signal.reactionClass` (`docs/components/models/HoldSignal.md` §Енум
+`ReactionClass`):
+
+- **`SOFT`** — мягкая ветка: `Instrument.Status.ENTRY_BLOCKED` через
+  `InstrumentDataService` + `AnomalyReport` (`NON_CRITICAL`,
+  `kind = STATE`). **`blockTrade` не вызывается, kill-switch не
+  гоняется, живые сделки доживают** (`docs/rules/instrument-hold.md`
+  §Enforcement). Последовательность ниже к этой ветке **не
+  применяется** — у мягкой реакции нет teardown, а значит нет ни
+  слепков, ни гейта терминала.
+  - **Идемпотентность мягкой ветки** — статус инструмента: повторный
+    `SOFT`-сигнал по инструменту, уже находящемуся в `ENTRY_BLOCKED` или
+    `TRADE_BLOCKED`, — no-op (обратной эскалации нет).
+  - **Мягкий сигнал биржевого радиуса не существует** — фабрики нет
+    (`docs/rules/exchange-hold.md`).
+- **`FULL`** — последовательность ниже, без изменений.
+
+Почему ветка живёт здесь, а не у отдельного производителя: реактивный
+канал уже принимает сигнал, знает scope и держит идемпотентность по
+статусу; второй путь к тому же статусу означал бы два места, где
+эскалация `ENTRY_BLOCKED → TRADE_BLOCKED` должна согласовываться.
+
+## Последовательность реакции (класс `FULL`)
 
 Инструмент-scope и биржа-scope — **одной формы**, различаются только
 scope-исполнителями (`InstrumentDataService`/`fireInstrument` vs

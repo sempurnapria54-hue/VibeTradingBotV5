@@ -79,6 +79,22 @@ invariant-проверка — в `docs/models/mapping/Order.md`.
   цикла), `UNKNOWN_EXTERNAL_STATUS`, `EXCHANGE_INVARIANT_VIOLATION`,
   `UNKNOWN`.
 
+### Операнды планового риска — дом здесь, состав за развилкой (H3 `DOCS_CHECK_11`)
+
+`plannedEntryPrice` (reference-цена входа, по которой считался риск) и
+`plannedSizeContracts` (заявленный размер) — **атрибуты ноги входа**, не
+сделки: при многоногом входе их несколько, и write-once-поле на `Deal`
+оставило бы число первой ноги, молча выдавая его за сделку
+(`docs/models/domain/aggregate/Deal.md` §«Плановый риск»). `R` как
+знаменатель остаётся на `Deal`; сюда переезжают только **операнды
+сравнения** «заявлено ↔ взято» (против `avgPx` / `accFillSz`).
+
+**Полями таблица пока не дополнена:** развилка «дом — `orders`,
+`algo_orders` или обе» не закрыта и прорабатывается владельцем
+(`RISK-Q4`, `.claude/work/questions/open-questions.md`) — она **гейтит
+`CODE`**, потому что задаёт состав schema-дельты шага 7
+(`docs/decisions/pnl-finalization-mechanics.md` §Следствия).
+
 ## Структура `AttachedAlgoOrder` (раздел `Order`)
 
 Embedded защитный algo-order, созданный вместе с parent `Order` (OKX

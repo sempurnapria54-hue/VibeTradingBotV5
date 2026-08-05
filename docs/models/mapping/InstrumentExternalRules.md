@@ -83,15 +83,13 @@ contracts = baseQty / ctVal
 | `maxStopSz` | `externalMaxStopSize` |
 | `lever` | `externalMaxLeverage` |
 | `groupId` | `externalFeeGroupId` |
-| `settleCcy` | `externalSettlementCurrency`* |
-| `baseCcy` | `externalBaseCurrency` |
-| `quoteCcy` | `externalQuoteCurrency` |
 | `state` | `externalState` |
 
-\* Имя поля расчётной валюты — предварительное (открыт CCY-Q2:
-`externalCurrency` vs `externalSettlementCurrency`); дом валют
-ратифицирован — `docs/decisions/instrument-currencies-home.md` (H12
-`DOCS_CHECK_9`).
+**Валюты (`settleCcy`/`baseCcy`/`quoteCcy`) навесом не маппятся** — их
+дом `Instrument` (H6 `DOCS_CHECK_11`,
+`docs/decisions/instrument-currencies-home.md`,
+`docs/models/mapping/Instrument.md`). Промежуточная редакция
+(`DOCS_CHECK_9`) маппила их сюда; строки сняты вместе с полями модели.
 
 ### Резолв enum'ов при материализации (`snapshotToDomain`)
 

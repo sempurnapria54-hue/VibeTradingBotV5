@@ -30,8 +30,10 @@ Refresh при неактуальном состоянии и **добыча P&L
 `Deal.billsWindowEnd`); опц. `REFRESH_BILLS_COMMAND` — разбивка. Активный риск
 снимается риск-минимизирующим порядком **cleanup-командами напрямую, без
 анкера** (открытая позиция → `CLOSE_POSITION_COMMAND`; live ordinary orders →
-`CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND`; их серия неудач
-считается на инструмент-scope), затем факт снятия подтверждается через
+`CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND`; учёта серии
+их неудач **нет** — анкера у cleanup нет, потому что нет
+исполнения-действия; учёт — форвард на `TradeGuardJob`, H16
+`DOCS_CHECK_11`), затем факт снятия подтверждается через
 `REFRESH_*` (ACK не truth); после safety-flow заново загрузить exchange
 facts; если live risk отсутствует и подтверждён — терминализировать через
 **`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`** (второе исполнение
@@ -53,7 +55,9 @@ ErrorHandler командой не эмитит: kill-switch — реактив�
 Иначе остаётся в `ERROR`. `EMERGENCY_CLOSED` — terminal (ошибочный),
 handler'а не имеет; терминал ставит `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`
 (`docs/components/MarkDealEmergencyClosedExecutor.md`) с **best-effort числом**:
-фактический realized net если доступен из positions-history, иначе `resultProfit
+net доступен из positions-history ⇒ число считается **по той же формуле, что
+на чистой тропе** (net + cross-ccy-слагаемое; best-effort — про
+**доступность**, не про **состав**, H18 `DOCS_CHECK_11`), иначе `resultProfit
 = null` с семантикой «неисчислимо» (**не ноль**) — сделка терминализуется всё
 равно, факт помечается (`docs/lifecycles/Deal.md` §«Терминальный контракт
 финализации», DEAL-Q2 / G5).

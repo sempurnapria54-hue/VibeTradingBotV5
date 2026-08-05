@@ -11,10 +11,11 @@
 ## Состояние
 
 Фаза 1 — `IN_PROGRESS`; шаги 1-6 `DONE`, **шаг 7 — `GAPS_CLOSE_11`**,
-шаги 8-11 `HOLD`. Ветка `claude-audit`, `HEAD = 3a815a9`.
+шаги 8-11 `HOLD`. Ветка `claude-audit`, `HEAD = 3189bef`.
 
-**В staging, не закоммичено:** отчёт `DOCS_CHECK_11`, хроника, статус шага,
-снапшот-ход, две курационные перестановки (§Курация).
+**Всё закоммичено** (отчёт `DOCS_CHECK_11`, хроника, статус шага,
+снапшот-ход, две курационные перестановки — §Курация); рабочее дерево чисто.
+PK обновлён.
 
 ## Как сюда пришли (после v77)
 
@@ -160,11 +161,9 @@ null` трёхзначен; область 4-й суммы), H11 (отложен
 
 ## Loose ends
 
-- Staged-пакет — ревью/коммит в IDEA.
 - **Custom Instructions**: правка `chat-project-instructions.md` (правило
-  ресурса) всё ещё не вставлена в Settings — до вставки не действует
-  (висит с позапрошлой сессии).
-- **Project Knowledge** — обновить по затронутым файлам.
+  ресурса) — вставлена ли в Settings, не подтверждено; висит с позапрошлой
+  сессии, до вставки не действует. Проверить в чате.
 - Целевые, в коде их нет: суффиксы enum'ов, `SystemActionExecutor`,
   V2-топология `deal_action_states`, `ENTRY_BLOCKED`,
   `HoldScope.INSTRUMENT_GROUP`, `REFRESH_BILLS_COMMAND`,
@@ -191,6 +190,6 @@ null` трёхзначен; область 4-й суммы), H11 (отложен
 
 ## После коммита
 
-1. **PK:** заменить снапшот (v78 сменяет v77) + обновить затронутые доки.
-2. **Custom Instructions:** перенести текст
-   `.claude/chat/chat-project-instructions.md` в Settings.
+Коммит и обновление PK — **выполнены** (`HEAD = 3189bef`). Остаётся
+подтвердить перенос `.claude/chat/chat-project-instructions.md` в Custom
+Instructions (§Loose ends).

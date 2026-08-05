@@ -41,16 +41,17 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 биржевого `state`: биржевой статус живёт сырым в `externalStatus`
 (`String`), а `Status` нормализует онбординг.
 
-Справочные поля спецификации (base/quote/settle currency, `lotSz`,
-`minSz`, `ctVal`, `ctMult`, `tickSz`) приходят в
-`InstrumentExternalSnapshot` **транзиентно** и в шаге 1 в домен
-**не персистятся**. Их персистентный дом — `InstrumentExternalRules`
-(JSONB-навес на `Instrument`), материализуемый **на шаге 5**
-(риск-преконтроль), вне оркестрации рыночных данных шага 1
+Размерные поля спецификации (`lotSz`, `minSz`, `ctVal`, `ctMult`,
+`tickSz`) приходят в `InstrumentExternalSnapshot` **транзиентно** и в
+шаге 1 в домен **не персистятся**. Их персистентный дом —
+`InstrumentExternalRules` (JSONB-навес на `Instrument`), материализуемый
+**на шаге 5** (риск-преконтроль), вне оркестрации рыночных данных шага 1
 (`docs/decisions/instrument-external-rules-materialization.md`, закрыт
-INSTR-Q1). Валюты (settle/base/quote) навес **персистит** — с шага 7
-(H12 `DOCS_CHECK_9`, `docs/decisions/instrument-currencies-home.md`;
-имя поля расчётной валюты — открыт CCY-Q2); `ctMult` навес не хранит. Роль `externalLeverage`/биржевой потолок плеча — там же
+INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/quote)
+персистятся на самом `Instrument`** — с шага 7 (H6 `DOCS_CHECK_11`,
+`docs/decisions/instrument-currencies-home.md`; `CCY-Q2` закрыт, имена
+полей окончательные), см. таблицу шага 7 ниже.
+Роль `externalLeverage`/биржевой потолок плеча — там же
 (INSTR-Q2 закрыт на шаге 6: рабочее плечо пишется inline в
 `SubmitOrderExecutor` перед постановкой открывающего ордера,
 `docs/components/SubmitOrderExecutor.md`).
@@ -73,14 +74,28 @@ INSTR-Q1). Валюты (settle/base/quote) навес **персистит** �
 приходит (не путать с биржевым `externalLeverage`). `internalId` /
 `exchangeId` присваиваются системой при онбординге.
 
+### `InstrumentOkxResponse` → snapshot → domain (валюты, шаг 7)
+
+| OKX field | Snapshot field | → domain `Instrument` |
+|---|---|---|
+| `settleCcy` | `externalSettlementCurrency` | `externalSettlementCurrency` |
+| `baseCcy` | `externalBaseCurrency` | `externalBaseCurrency` |
+| `quoteCcy` | `externalQuoteCurrency` | `externalQuoteCurrency` |
+
+Валюты приходят тем же снапшотом и тем же синком, что идентичность и
+биржевые поля; с шага 7 они **персистятся** на `Instrument` (H6
+`DOCS_CHECK_11`, `docs/decisions/instrument-currencies-home.md`).
+Расчётная валюта — операнд трёх потребителей шага 7 и авторитет
+`Deal.resultProfitCurrency`
+(`docs/models/domain/core/Instrument.md` §«Валюты инструмента»).
+
 ### Справочные поля OKX в шаге 1 (не персистятся)
 
-`baseCcy`/`quoteCcy`/`settleCcy`, `lotSz`, `minSz`, `ctVal`,
-`ctMult`, `tickSz` — приходят в снапшоте, в домен шага 1 не мапятся
-(их дом — `InstrumentExternalRules`; валюты навес персистит с шага 7 —
-`docs/decisions/instrument-currencies-home.md`).
+`lotSz`, `minSz`, `ctVal`, `ctMult`, `tickSz` — приходят в снапшоте, в
+домен шага 1 не мапятся (их дом — `InstrumentExternalRules`, шаг 5).
 Биржевые `state`/`lever` из этого перечня исключены — они персистятся
-на `Instrument` (`externalStatus`/`externalLeverage`, см. таблицу выше).
+на `Instrument` (`externalStatus`/`externalLeverage`, см. таблицу выше);
+валюты из него исключены с шага 7 (таблица выше).
 Полный OKX-инвентарь —
 `docs/models/integrations/okx/InstrumentOkxResponse.md`; персистентная
 проекция sizing/rounding-полей —

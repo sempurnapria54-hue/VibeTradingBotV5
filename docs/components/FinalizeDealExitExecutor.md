@@ -14,7 +14,10 @@
 P&L-факты: `DealCashFlow` (категорийная разбивка, добыта **до него**
 командой `REFRESH_BILLS_COMMAND`) и **положение закрытия на `Position`** (готовый
 net `realizedPnl` в поле `Position.externalRealizedProfit`) — см.
-§«Положение закрытия — читается со строки». **Вычисляет** net-число +
+§«Положение закрытия — читается со строки». Для **допуска сверки**
+дочитывает операнды планового риска (`Deal.plannedRiskAmount`;
+`plannedEntryPrice`/`plannedSizeContracts` ноги входа; уровень стопа её
+защиты) и `ctVal` навеса — §«Сверка bills ↔ net». **Вычисляет** net-число +
 сверяет сумму `DealCashFlow` с net
 (`docs/decisions/result-profit-source.md`); **пишет
 `resultProfit`/`resultProfitCurrency` прямо на `Deal`** (persisted) в
@@ -75,9 +78,7 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
 ассертит непустоту и ставит терминал `CLOSED` (N7). Placeholder ZERO снят.
 - **Сверка bills ↔ net (N10):** число **всегда** = positions-history net (bills
   его не подменяют). Сверяется Σ`amount` **по строкам settle-ccy**.
-  Расхождение **сверх epsilon** (двухчастный тест: `min(композиционный по
-  обороту Σ`|amount|`, омиссионный по ожидаемой комиссии)` — H15
-  `DOCS_CHECK_10`) → **`AnomalyReport`** (аудит-аномалия,
+  Расхождение **сверх epsilon** → **`AnomalyReport`** (аудит-аномалия,
   `scope = INSTRUMENT`, `severity = NON_CRITICAL` — тропа без kill-switch,
   `docs/lifecycles/AnomalyReport.md`) — **не блокирует** финализацию, сделка
   идёт в `CLOSED` (`docs/decisions/pnl-finalization-mechanics.md` реш.5).
@@ -85,6 +86,22 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
   записи движения (`RefreshBillsExecutor`, H4 `GAPS_CLOSE_7`) — там же, где
   доступен операнд сравнения (расчётная валюта инструмента) и где движение
   пересчитывается.
+- **Epsilon — форма и операнды.**
+  `epsilon = max( 0.01 settle-ccy, min( 0.5% × Σ|amount|, k × ожидаемая
+  комиссия сделки ) )` (H15 `DOCS_CHECK_10`; пол вынесен наружу — H8
+  `DOCS_CHECK_11`). **Ожидаемая комиссия считается из persisted-операндов
+  сделки, ставка не перечитывается** (H7 `DOCS_CHECK_11`):
+  `plannedRiskAmount − |plannedEntryPrice − stop| × plannedSizeContracts ×
+  ctVal`, где `plannedRiskAmount` — поле `Deal`, `plannedEntryPrice` /
+  `plannedSizeContracts` — поля **ноги входа** (`Order`/`AlgoOrder`, H3),
+  уровень стопа — на защите этой ноги, `ctVal` — единственное, что
+  финализатор дочитывает из `InstrumentExternalRules`
+  (`docs/components/InstrumentExternalRulesDataService.md` §Использование).
+  `TradeFeeRate` финализатор **не читает** — от её свежести и доступности
+  epsilon не зависит. Операнд планового риска пуст (популяция
+  «позиция создана вне приложения», H23) ⇒ омиссионный член не участвует,
+  `epsilon` вырождается в композиционный, факт помечается `AnomalyReport`.
+  Разбор — `docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon.
 - **Область сверки — за вычетом исключённых типов (H14 `DOCS_CHECK_10`):**
   Σ`amount` идёт по строкам settle-ccy **вне списка исключений биржи**
   (типы, не принадлежащие экономике сделки). Плюс отдельная проверка:
@@ -95,8 +112,12 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
   исключений по бирже»).
 - **Валюта результата — пишется по авторитету, биржевая сверяется
   (H10 `DOCS_CHECK_10`):** `Deal.resultProfitCurrency` берётся из
-  **расчётной валюты инструмента** (резолвится через `DealContext`, как и
-  у `RefreshBillsExecutor`), а `Position.externalResultCurrency`
+  **расчётной валюты инструмента** — поля
+  `Instrument.externalSettlementCurrency`, читаемого с
+  `DealContext.instrument` (H6 `DOCS_CHECK_11`,
+  `docs/decisions/instrument-currencies-home.md`; тот же резолв, что у
+  `RefreshBillsExecutor`, навес `InstrumentExternalRules` не
+  задействуется), а `Position.externalResultCurrency`
   **сверяется** с ней; не совпало → `AnomalyReport`
   `RESULT_CURRENCY_MISMATCH` (`severity = NON_CRITICAL`), **расчёт не
   блокируется и терминал проходит**. Операнд пуст → валюта берётся с

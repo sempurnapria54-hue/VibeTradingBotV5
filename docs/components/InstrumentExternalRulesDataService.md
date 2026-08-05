@@ -61,14 +61,30 @@ domain ↔ persistence): что возвращает, как хранит.
 
 ## Использование
 
-Читают правила `CalculationContextFactory` (кладёт в
-`CalculationContext`) и `RiskValidator` (напрямую) — для округления
-цены/размера, расчёта размера в контрактах (`ctVal`/`lotSz`/`minSz`),
-проверки min/max limits, биржевого max leverage, торгуемости
-инструмента (`status`) и **прогноза комиссии в риск-сайзинге**
-(`takerFeeRate()` — гидрируется этим сервисом, см. выше). Если актуальных
-правил нет — это блокирующее условие: фабрика/валидатор возвращают controlled
-ошибку (`INSTRUMENT_RULES_MISSING` у `RiskValidator`).
+Читателей **три**:
+
+1. **`CalculationContextFactory`** (кладёт в `CalculationContext`) — для
+   округления цены/размера, расчёта размера в контрактах
+   (`ctVal`/`lotSz`/`minSz`), проверки min/max limits, биржевого max
+   leverage, торгуемости инструмента (`status`).
+2. **`RiskValidator`** (напрямую) — то же плюс **прогноз комиссии в
+   риск-сайзинге** (`takerFeeRate()` — гидрируется этим сервисом, см. выше).
+3. **`FinalizeDealExitExecutor`** (шаг 7, H7 `DOCS_CHECK_11`) — **только
+   `ctVal`**, для омиссионного члена epsilon: ожидаемая комиссия сделки
+   извлекается из `plannedRiskAmount` вычитанием ценовой части
+   (`docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon).
+   **Ставку финализатор не читает** — гидрация ему не нужна, и от
+   свежести/доступности `TradeFeeRate` он не зависит.
+
+Если актуальных правил нет — это блокирующее условие: фабрика/валидатор
+возвращают controlled ошибку (`INSTRUMENT_RULES_MISSING` у
+`RiskValidator`); у финализатора пустой `ctVal` вырождает омиссионный член
+epsilon с пометкой, терминал не блокируется (там же, §«Ветка "операнд
+пуст"»).
+
+**Расчётной валюты инструмента здесь нет** — её дом `Instrument`
+(`docs/decisions/instrument-currencies-home.md`), поэтому три потребителя
+валюты шага 7 читателями навеса **не становятся**.
 
 ## Связи
 
