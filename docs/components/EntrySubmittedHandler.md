@@ -61,14 +61,20 @@ handler гейтит эмиссию, не двигает статус. Если 
   `DOCS_CHECK_11`, решение пользователя), а не статус: статус здесь как
   раз не различает исполнившуюся заявку от неисполнившейся. Durable-носители
   факта — прилинкованные строки `DealCashFlow` и `Order.accumulatedFillSize
-  > 0` (`docs/models/domain/aggregate/Deal.md` §«Рамка R-выборки»).
+  > 0`; составной признак целиком —
+  `docs/rules/deal-without-operations.md`.
 - **Рестарт дыры не образует:** сделка, застигнутая рестартом между
   отправкой и наблюдением, доводится до нужного статуса рефрешем на
   следующем запуске FSM — тем же механизмом, которым добывается любой
   недобытый факт; отдельной ветки восстановления предикат не требует.
-- **Пишет не handler.** Ноль и валюту пишет `MARK_DEAL_CLOSED_COMMAND`
-  второй веткой (H1 `DOCS_CHECK_11`;
-  `docs/components/MarkDealClosedExecutor.md` §«Вторая ветка»).
+- **Пишет не handler и переводит не handler.** Ноль и валюту пишет
+  `MARK_DEAL_CLOSED_COMMAND` второй веткой (H1 `DOCS_CHECK_11`;
+  `docs/components/MarkDealClosedExecutor.md` §«Вторая ветка»); **эмитит
+  звено `FINALIZE_DEAL_EXIT_ACTION`**, ветвлением по тому же признаку с
+  пропуском звена 1 (H7 `DOCS_CHECK_12`,
+  `docs/components/SystemActionExecutor.md` §`FINALIZE_DEAL_EXIT_ACTION`).
+  Заголовок «Отмена неисполненного входа → `CLOSED`» называет **исход
+  тропы**, не актора перехода.
 
 ## Допустимые StrategyStep
 

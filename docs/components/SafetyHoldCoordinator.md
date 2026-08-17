@@ -2,17 +2,15 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто координирует реактивную реакцию CRITICAL-холда над сделкой
-(компонент-координатор): последовательность шагов, исполнители, гейт
-терминала, эскалация, exception- и best-effort-политика, границы.
+Кто держит последовательность полной реакции холда (`FULL`): шаги,
+исполнители, гейт терминала, эскалация, exception- и best-effort-политика,
+границы.
 
 ## Назначение
 
-`SafetyHoldCoordinator` — координатор реактивной реакции холда над
-сделкой: **двух классов** — полного (`FULL`, CRITICAL: `TRADE_BLOCKED` +
-kill-switch) и мягкого (`SOFT`, журнальный: `ENTRY_BLOCKED` без teardown;
-H14 `DOCS_CHECK_11`). Держатель **решения о последовательности**; сам ничего не
-исполняет напрямую, оркеструет исполнителей:
+`SafetyHoldCoordinator` — держатель **последовательности полной реакции**
+(`FULL`: `TRADE_BLOCKED` + kill-switch). Сам ничего не исполняет напрямую,
+оркеструет исполнителей:
 
 - `InstrumentDataService` / `ExchangeDataService` — выставление
   `TRADE_BLOCKED` scope (`blockTrade`);
@@ -21,37 +19,21 @@ H14 `DOCS_CHECK_11`). Держатель **решения о последова�
 - `KillSwitchService` — аварийное снятие риска (см.
   `docs/components/KillSwitchExecutor.md`).
 
-Вызывается в проходе `DealOrchestratorJob` по `DealTransition.holdSignal`
-(handler увёл свою сделку в ERROR и приложил `HoldSignal` — см.
-`docs/components/models/HoldSignal.md`), под concurrency-гардом прохода
-**D-M1** (в фазе 1 — in-process `JobExecutionGuard`, см.
-`docs/components/DealOrchestratorJob.md`). Точка входа —
-`react(signal, dealContext)`, идемпотентная по статусу scope.
+**Вызывается только из `HoldService`** (H8 `DOCS_CHECK_12`, решение
+пользователя) — единственного исполнителя блокировки, которого зовут все
+детекторы (`docs/components/HoldService.md`). Прежняя редакция описывала
+вход иначе: «вызывается в проходе `DealOrchestratorJob` по
+`DealTransition.holdSignal`, приложенному handler'ом» — **эта топология
+снята**: сигнал не путешествует, канала-транспорта нет. Работа идёт под
+concurrency-гардом прохода **D-M1** (в фазе 1 — in-process
+`JobExecutionGuard`, см. `docs/components/DealOrchestratorJob.md`).
 
-## Ветвление по классу реакции (H14 `DOCS_CHECK_11`)
-
-`react(signal, dealContext)` первым делом читает
-`signal.reactionClass` (`docs/components/models/HoldSignal.md` §Енум
-`ReactionClass`):
-
-- **`SOFT`** — мягкая ветка: `Instrument.Status.ENTRY_BLOCKED` через
-  `InstrumentDataService` + `AnomalyReport` (`NON_CRITICAL`,
-  `kind = STATE`). **`blockTrade` не вызывается, kill-switch не
-  гоняется, живые сделки доживают** (`docs/rules/instrument-hold.md`
-  §Enforcement). Последовательность ниже к этой ветке **не
-  применяется** — у мягкой реакции нет teardown, а значит нет ни
-  слепков, ни гейта терминала.
-  - **Идемпотентность мягкой ветки** — статус инструмента: повторный
-    `SOFT`-сигнал по инструменту, уже находящемуся в `ENTRY_BLOCKED` или
-    `TRADE_BLOCKED`, — no-op (обратной эскалации нет).
-  - **Мягкий сигнал биржевого радиуса не существует** — фабрики нет
-    (`docs/rules/exchange-hold.md`).
-- **`FULL`** — последовательность ниже, без изменений.
-
-Почему ветка живёт здесь, а не у отдельного производителя: реактивный
-канал уже принимает сигнал, знает scope и держит идемпотентность по
-статусу; второй путь к тому же статусу означал бы два места, где
-эскалация `ENTRY_BLOCKED → TRADE_BLOCKED` должна согласовываться.
+Точка входа — `react(signal, dealContext)`, идемпотентная по статусу scope.
+Ветвление по классу реакции **сюда не входит**: `SOFT` исполняет
+`HoldService` сам (статус инструмента, без teardown), а до координатора
+доходит только `FULL`. Одно место согласования эскалации
+`ENTRY_BLOCKED → TRADE_BLOCKED` при этом сохраняется — им становится
+`HoldService`.
 
 ## Последовательность реакции (класс `FULL`)
 
@@ -115,8 +97,10 @@ after-слепок.
 
 ## Не делает
 
-Не закрывает свою триггерную сделку (её в ERROR уводит handler, приложив
-`HoldSignal`). Не решает «как технически» снять риск (это
+Не закрывает свою триггерную сделку (её в `ERROR` уводит FSM/handler). Не
+принимает вызовы от детекторов напрямую — единственный вход к нему
+`HoldService`. Не исполняет мягкую ветку. Не решает «как технически» снять
+риск (это
 `KillSwitchExecutor`) и не собирает слепки сам (это
 `AnomalyReportService`). Не ищет глобальные нарушения инвариантов и не
 досверяет орфанов (это `AnomalyJob`).
@@ -131,7 +115,10 @@ after-слепок.
 - `docs/components/KillSwitchExecutor.md`,
   `docs/components/DealOrchestratorJob.md` — исполнитель teardown и
   проход, из которого поднимается реакция.
-- `docs/components/models/HoldSignal.md` — сигнал холда (scope + code).
+- `docs/components/HoldService.md` — единственный исполнитель блокировки и
+  единственный вход сюда.
+- `docs/components/models/HoldSignal.md` — параметр вызова (радиус + класс
+  реакции + code).
 - `docs/models/domain/other/AnomalyReport.md`,
   `docs/lifecycles/AnomalyReport.md` — журнал инцидента и его lifecycle.
 - `docs/decisions/controlled-violation-exchange-wide-hold.md` —

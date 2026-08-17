@@ -13,6 +13,11 @@ entities. Фиксирует anomaly/safety report (`AnomalyReport`, см.
 `docs/models/domain/other/AnomalyReport.md`) и может инициировать safety-flow по
 правилам системы. Сделку по FSM **не** ведёт.
 
+**Блокировку ставит не сам — зовёт `HoldService`** (H8 `DOCS_CHECK_12`),
+передавая радиус и силу реакции по классификации аномалии
+(`docs/components/HoldService.md`). Это один из трёх детекторов холда;
+собственного пути к статусу scope у джобы нет.
+
 ## Типовые anomaly-кейсы
 
 - live `Order`/`AlgoOrder` есть на бирже, но нет соответствующей

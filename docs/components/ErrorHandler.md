@@ -42,8 +42,9 @@ facts; если live risk отсутствует и подтверждён — �
 Отдельной команды `REFRESH_POSITIONS_HISTORY` handler не эмитит — её нет
 в реестре.
 Обычные strategy steps не выполняются. Kill-switch
-ErrorHandler командой не эмитит: kill-switch — реактивный путь (`HoldSignal` →
-`SafetyHoldCoordinator` в проходе оркестратора), не команда. Safety-команды —
+ErrorHandler командой не эмитит: kill-switch — реактивный путь
+(`HoldService` зовёт `SafetyHoldCoordinator`; детектор на тропе сделки —
+оркестратор, `docs/components/HoldService.md`), не команда. Safety-команды —
 без `RiskValidator` (см. `docs/rules/risk-validator-scope.md`).
 
 ## Выходные проверки
@@ -69,7 +70,7 @@ net доступен из positions-history ⇒ число считается **
 действия»; реестры звеньев — `docs/decisions/command-action-boundary.md`
 §2, `docs/components/SystemActionExecutor.md`). Kill-switch не эмитится
 ErrorHandler'ом как команда — реактивный side-executor вне реестра
-(`HoldSignal` → `SafetyHoldCoordinator`). Перечисление **неизвестных**
+(`HoldService` → `SafetyHoldCoordinator`). Перечисление **неизвестных**
 live orders/algo по инструменту (хвосты orphan) — CMD-Q4. Зона
 `AnomalyJob`/`ReconciliationJob` — live risk после terminal (см.
 `docs/components/AnomalyJob.md`).

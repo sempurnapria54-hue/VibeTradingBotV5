@@ -82,9 +82,15 @@ INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/qu
 | `baseCcy` | `externalBaseCurrency` | `externalBaseCurrency` |
 | `quoteCcy` | `externalQuoteCurrency` | `externalQuoteCurrency` |
 
-Валюты приходят тем же снапшотом и тем же синком, что идентичность и
-биржевые поля; с шага 7 они **персистятся** на `Instrument` (H6
-`DOCS_CHECK_11`, `docs/decisions/instrument-currencies-home.md`).
+Валюты приходят **тем же снапшотом и той же тропой заведения инструмента**
+(переход `CREATED → SYNC`, `docs/lifecycles/Instrument.md`), что
+идентичность и биржевые поля; с шага 7 они **персистятся** на `Instrument`
+(H6 `DOCS_CHECK_11`; писатель назначен H10 `DOCS_CHECK_12` —
+`docs/decisions/instrument-currencies-home.md` §«Писатель — тропа
+заведения»). Формулировка «тем же синком» **снята**: в проекте она
+двузначна (онбординговый `SYNC` против ежечасного
+`InstrumentExternalRulesSyncJob`), а писателем является первый — валюты
+неизменны и периодического подтверждения не требуют.
 Расчётная валюта — операнд трёх потребителей шага 7 и авторитет
 `Deal.resultProfitCurrency`
 (`docs/models/domain/core/Instrument.md` §«Валюты инструмента»).

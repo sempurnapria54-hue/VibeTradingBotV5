@@ -31,19 +31,26 @@
 
 ## Решение
 
+> **Носителей этого решения больше нет.** Модель `DealFinalizationState`,
+> её lifecycle и `DealFinalizationCommandFactory` **упразднены**, доки
+> удалены на `GAPS_CLOSE_8`. Имена ниже — **исторический контекст
+> DEAL-Q1**, не ссылки: адресата у них не существует. Действующие
+> носители — `docs/models/domain/other/DealActionState.md` (строки
+> исполнений, вид SYSTEM), `docs/components/SystemActionExecutor.md`
+> (per-pass исполнитель), `docs/decisions/command-action-boundary.md` §3
+> (ревизующее решение).
+
 Дом persisted retry-state финализации — **отдельная сущность
-`DealFinalizationState`** с базой `Retryable`
-(`docs/models/domain/other/DealFinalizationState.md` + lifecycle
-`docs/lifecycles/DealFinalizationState.md`). По одной строке на
-финализационную команду сделки (ключ `UNIQUE(deal_id, finalization_type)`),
-ретрай — по-командно через `Retryable`.
+`DealFinalizationState`** с базой `Retryable` (модель + собственный
+lifecycle). По одной строке на финализационную команду сделки (ключ
+`UNIQUE(deal_id, finalization_type)`), ретрай — по-командно через
+`Retryable`.
 
 Финализационные `ServiceCommand` несут `dealFinalizationStateId` (не
 `dealActionStateId`); путь эмиссии — `DealFinalizationCommandFactory` по
 статусу `DealFinalizationState`, аналогично action-командам, которые
 эмитят per-type `StrategyActionExecutor`'ы под `StrategyActionOrchestrator`
-по статусу `DealActionState`
-(`docs/components/DealFinalizationCommandFactory.md`,
+по статусу `DealActionState` (слоение —
 `docs/decisions/fsm-execution-layering.md`).
 
 ## Обоснование
@@ -88,7 +95,11 @@ DEAL-Q1 закрыт на `GAPS_CLOSE_1` шага 6 фазы 1 (2026-06-22). Г�
 - Модель `DealFinalizationState`, её lifecycle и
   `DealFinalizationCommandFactory` — **упразднены** (файлы удалены на
   `GAPS_CLOSE_8`); упоминания в тексте выше — исторический контекст
-  DEAL-Q1, не живые ссылки.
+  DEAL-Q1, не живые ссылки. **Пометка продублирована в §Решение** — там,
+  где имена стоят: прежде она жила только здесь, а сами упоминания были
+  записаны **путём к удалённому файлу** и от живой ссылки не отличались.
+  Путь снят, имена оставлены — вопрос дока исторический, и переписывать
+  его под действующие носители значило бы стереть предмет решения.
 - Финализационные executor'ы — `docs/components/FinalizeDealEntryExecutor.md`,
   `docs/components/FinalizeDealExitExecutor.md`,
   `docs/components/MarkDealClosedExecutor.md`,

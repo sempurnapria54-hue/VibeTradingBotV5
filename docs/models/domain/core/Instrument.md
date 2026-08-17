@@ -136,7 +136,11 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
 шага 7 (H6 `DOCS_CHECK_11`, решение пользователя —
 `docs/decisions/instrument-currencies-home.md`). Источник —
 `/public/instruments` (`settleCcy`/`baseCcy`/`quoteCcy`), канал —
-`InstrumentExternalSnapshot`, писатель — тот же синк спецификации.
+`InstrumentExternalSnapshot`, **писатель — тропа заведения инструмента**
+(переход `CREATED → SYNC`, `docs/lifecycles/Instrument.md`): она ходит на
+биржу за спецификацией и заполняет валюты оттуда же (H10 `DOCS_CHECK_12`,
+решение пользователя). Формулировка «тот же синк спецификации» **снята** —
+она двузначна и писателя не определяет.
 
 - **Почему на сущности, а не в навесе.** Валюта расчёта — свойство
   самого контракта и меняется редко или не меняется вовсе; навес
@@ -154,8 +158,14 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
   positions-history — проверяемый признак
   (`docs/models/domain/aggregate/Deal.md` §«Валюта результата: один
   авторитет»).
-- **Ветка «операнд пуст».** Колонки новые: на существующих строках
-  значение появляется после ближайшего тика синка. Реакции по точкам —
+- **Значения неизменны, добываются один раз** — при заведении инструмента;
+  периодического подтверждения не требуют, `InstrumentExternalRulesSyncJob`
+  их не пишет (H10 `DOCS_CHECK_12`).
+- **Ветка «операнд пуст».** Достижима, когда валюта не резолвилась **при
+  заведении** (неполный ответ источника), и на популяции «позиция создана
+  вне приложения». Про существующие строки ветка ничего не утверждает —
+  до конца фазы 1 их нет
+  (`.claude/rules/pre-launch-schema-changes.md`). Реакции по точкам —
   `docs/models/domain/aggregate/Deal.md` §«Ветка "операнд пуст"».
 - **`CCY-Q2` закрыт** этим решением (обе позиции — именование и область
   модели); имена полей больше не предварительные.
@@ -205,8 +215,10 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
   синхронизации спецификации, переход `SYNC`).
 - **Колонки шага 7 — `ALTER`** (H6 `DOCS_CHECK_11`):
   `external_settlement_currency`, `external_base_currency`,
-  `external_quote_currency` добавляются миграцией шага 7; бэкфилл не
-  нужен (`null` = «до ближайшего тика синка»). Полная schema-дельта
+  `external_quote_currency` добавляются миграцией шага 7 **напрямую**;
+  бэкфилл не нужен — заведённых инструментов на момент ввода нет
+  (`.claude/rules/pre-launch-schema-changes.md`), а каждый заводимый после
+  получает валюты на тропе заведения. Полная schema-дельта
   шага — `docs/decisions/pnl-finalization-mechanics.md` §Следствия.
 - `internal_id`, `exchange_id`, `margin_mode` — `updatable = false`
   (неизменны после создания).

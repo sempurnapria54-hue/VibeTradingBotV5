@@ -84,6 +84,15 @@ Executor упал -> ServiceCommandExecutor ловит ошибку
 attemptCount >= maxAttempts -> DealActionState = FAILED -> FSM решает
 ```
 
+**`FAILED` — durable-факт, а не подъём холда** (H8 `DOCS_CHECK_12`). Эта
+служба и `ServiceCommandExecutor` только доводят строку исполнения до
+`FAILED`; блокировку по нему ставит **`HoldService`**, которого зовёт
+детектор — на тропе сделки это `DealOrchestratorJob`
+(`docs/components/HoldService.md`, `docs/rules/instrument-hold.md`
+§«Носитель серии»). Формулировка «`FAILED` → FSM решает» описывает
+разбор **сделки** и подъёмом холда не является: прежде тот же путь был
+описан здесь третьим способом, отличным от двух других доков.
+
 ## Опасные команды: refresh перед retry
 
 Для `SUBMIT_*`, `CANCEL_*`, `CLOSE_POSITION_COMMAND` перед повтором обязателен

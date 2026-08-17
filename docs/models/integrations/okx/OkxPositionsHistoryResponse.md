@@ -48,7 +48,9 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 | `realizedPnl` | string-decimal | готовый net realized P&L = `pnl` + `fee` + `fundingFee` + `liqPenalty` (посчитан биржей) → `Position.externalRealizedProfit` → `Deal.resultProfit` |
 | `ccy` | string | валюта, в которой посчитан `realizedPnl` → `Position.externalResultCurrency`. В `Deal.resultProfitCurrency` **не переходит** — авторитет валюты результата — расчётная валюта инструмента, а это поле **проверяемый признак** (H10 `DOCS_CHECK_10`, `docs/models/domain/aggregate/Deal.md` §«Валюта результата: один авторитет») |
 | `closeAvgPx` | string-decimal | средняя цена фактического выхода → `Position.externalCloseAveragePrice`; потребитель — калибровка запаса на проскок на тропе attached-SL (H26 `DOCS_CHECK_10`, операнд уточнён H21 `DOCS_CHECK_11`) |
-| `fundingFee` | string-decimal | накопленный funding закрытой позиции → `Position.externalFundingCost`; потребитель — де-микширование R-мультипликатора (`docs/decisions/per-trade-risk-policy.md` §H25). `FUNDING`-строки `DealCashFlow` — **сверка** этого числа, не источник (H20 `DOCS_CHECK_11`) |
+| `pnl` | string-decimal | реализованный P&L **до** издержек → `Position.externalRealizedProfitGross`; потребитель — **первая пара** раздельной сверки разбивки по категориям (H19 `DOCS_CHECK_12`) |
+| `fee` | string-decimal | знаковая комиссионная компонента (минус — комиссия, плюс — ребейт; **сырой знак**) → `Position.externalFee`; потребитель — **вторая пара** раздельной сверки (H19 `DOCS_CHECK_12`) |
+| `fundingFee` | string-decimal | накопленный funding закрытой позиции → `Position.externalFundingCost`, **со снятием знака при маппинге** (ниже — издержка, положительна когда фондирование уплачено; H20 `DOCS_CHECK_12`, единственное место приведения — `docs/models/mapping/PositionCloseResult.md` §«Знак `fundingFee`»). Потребители — де-микширование R-мультипликатора (`docs/decisions/per-trade-risk-policy.md` §H25) и **третья пара** сверки. `FUNDING`-строки `DealCashFlow` — **сверка** этого числа, не источник (H20 `DOCS_CHECK_11`) |
 | `type` | string | тип последнего закрытия (`1` частичное / `2` полное / `3` ликвидация / `4` частичная ликвидация / `5` ADL не полностью / `6` ADL полностью) → `Position.externalCloseType` (провенанс аварийного терминала) |
 | `posId` | string | биржевой id позиции (ключ адресации записи; истекает ~30 дней после полного закрытия). На **update**-тропе сверяется с `Position.externalId`; на **create**-тропе — **пишется** в него (H4 `DOCS_CHECK_11`) |
 | `direction` | string | направление закрытой позиции → `Position.direction` **только на create-тропе** (на update-тропе поле уже заполнено live-ногой). Без него create-тропа материализует `Position` без направления, а `positions.direction` nullable ⇒ отказ был бы тихим (H4 `DOCS_CHECK_11`) |
@@ -61,10 +63,16 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 разбивка (комиссия / funding / rebate / штраф) — из bills → `DealCashFlow`
 (`docs/models/mapping/DealCashFlow.md`), не из этих полей.
 
-- **Слагаемые net и производные PnL** (net берётся готовым `realizedPnl`,
-  разбивка — из bills): `pnl` (без комиссий), `fee` (минус — комиссия,
-  плюс — ребейт), `liqPenalty` (ликвидационный штраф), `settledPnl`
-  (cross-FUTURES), `pnlRatio`.
+- **Слагаемые net и производные PnL** (net берётся готовым `realizedPnl`):
+  `liqPenalty` (ликвидационный штраф), `settledPnl` (cross-FUTURES),
+  `pnlRatio`.
+  **`pnl` и `fee` в used возвращены** (H19 `DOCS_CHECK_12`, решение
+  пользователя): контроль целостности расширен до **раздельных пар по
+  категориям** (Σ по категории разбивки против соответствующего числа
+  биржи), и эти два поля — правые операнды двух из трёх пар. Это **прямая
+  цена** выбранной формы контроля, названная при закрытии. `liqPenalty`
+  остаётся выведенным: своя категория `LIQ_PENALTY` в разбивке есть, но
+  отдельной парой она не сверяется.
   **`fundingFee` в used возвращён** (H20 `DOCS_CHECK_11`, решение
   пользователя): потребитель существует и записан **в другом доке** —
   де-микширование R-мультипликатора (`per-trade-risk-policy.md` §H25).

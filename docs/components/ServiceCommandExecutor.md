@@ -106,11 +106,20 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Cleanup-команды
 счётчика, на который она ссылалась, не существовало,
 `docs/components/models/ServiceCommand.md`).
 
+**Холд этот executor не поднимает** (H8 `DOCS_CHECK_12`). Его выход —
+durable-факт: строка исполнения в `FAILED`. Блокировку по этому факту
+ставит **`HoldService`**, которого зовёт детектор; на тропе сделки детектор
+— `DealOrchestratorJob`, в той же точке, где он прерывает цикл команд по
+неуспешному результату (`docs/components/HoldService.md`,
+`docs/rules/instrument-hold.md` §«Носитель серии»). Так `FULL`-реакция
+(kill-switch teardown) не исполняется **из середины цикла команд**, поверх
+сделки, чей переход ещё не применён.
+
 **Ветка `Deal.status = ERROR`: жёсткий отказ не инкрементирует счётчик**
 (H4 `GAPS_CLOSE_10`; носитель открыт H17 `DOCS_CHECK_11`). Когда сделка
 уже в `ERROR` (аварийная тропа), жёсткий отказ чтения **приравнивается к
 «недоступно»**, а не к провалу действия: `attemptCount` не растёт, путь
-`RETRY_PENDING → FAILED` не запускается, `HoldSignal` не поднимается.
+`RETRY_PENDING → FAILED` не запускается, и холд по нему не ставится.
 Предикат — `Deal.status` из `DealContext`.
 
 - **Применитель — этот executor**, единственная ветка учёта отказов.

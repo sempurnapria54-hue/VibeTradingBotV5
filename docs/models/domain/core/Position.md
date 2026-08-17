@@ -45,7 +45,9 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
 | `externalResultCurrency` | `String` | **Положение закрытия:** валюта, в которой посчитан `externalRealizedProfit` (`ccy` записи positions-history). **Проверяемый признак, не источник** `Deal.resultProfitCurrency` — авторитет валюты результата — расчётная валюта инструмента (H10 `DOCS_CHECK_10`, `docs/models/domain/aggregate/Deal.md` §«Валюта результата: один авторитет»). |
 | `externalCloseAveragePrice` | `BigDecimal` | **Положение закрытия:** средняя цена **фактического выхода** (`closeAvgPx` записи positions-history). Потребитель назван — калибровка запаса на проскок **на тропе attached-SL** (основной операнд калибровки — `AlgoOrder.externalPrice`; §«Цена фактического выхода» ниже). `null`, пока позиция жива, запись закрытия не добыта либо источник цены не отдал. |
 | `externalCloseType` | `String` | **Положение закрытия:** сырой тип последнего закрытия источника (OKX `type`: `1`–`2` торговое, `3`–`6` ликвидация/ADL). Провенанс аварийного терминала (`docs/decisions/pnl-finalization-mechanics.md` реш.3). |
-| `externalFundingCost` | `BigDecimal` | **Положение закрытия:** накопленный funding закрытой позиции, посчитанный биржей (`fundingFee` записи positions-history). Потребитель назван — де-микширование R-мультипликатора (`docs/decisions/per-trade-risk-policy.md` §H25); `FUNDING`-строки `DealCashFlow` остаются **сверкой** этого числа, не источником (H20 `DOCS_CHECK_11`). `null`, пока позиция жива или запись закрытия не добыта. |
+| `externalRealizedProfitGross` | `BigDecimal` | **Положение закрытия:** реализованный P&L **до** издержек (`pnl` записи positions-history). Потребитель назван — первая пара раздельной сверки разбивки (H19 `DOCS_CHECK_12`, `docs/components/FinalizeDealExitExecutor.md`). `null`, пока позиция жива или запись закрытия не добыта. |
+| `externalFee` | `BigDecimal` | **Положение закрытия:** знаковая комиссионная компонента записи (`fee`; минус — комиссия, плюс — ребейт — **сырой знак**, как у `DealCashFlow.externalFee`). Потребитель назван — вторая пара раздельной сверки (H19 `DOCS_CHECK_12`). `null`, пока позиция жива или запись закрытия не добыта. |
+| `externalFundingCost` | `BigDecimal` | **Положение закрытия:** накопленный funding закрытой позиции (`fundingFee` записи positions-history), **знак нормализован при маппинге в снапшот**: это **издержка** — положительна, когда фондирование уплачено (H20 `DOCS_CHECK_12`; единственное место приведения — `docs/models/mapping/PositionCloseResult.md` §«Знак `fundingFee`»). Потребители названы — де-микширование R-мультипликатора (`docs/decisions/per-trade-risk-policy.md` §H25) и третья пара раздельной сверки (H19 `DOCS_CHECK_12`); `FUNDING`-строки `DealCashFlow` остаются **сверкой** этого числа, не источником (H20 `DOCS_CHECK_11`). `null`, пока позиция жива или запись закрытия не добыта. |
 
 Поля §«Положение закрытия» пишет **вторая нога `REFRESH_POSITION_COMMAND`**
 (positions-history), не финализатор; наследуемый `externalModifiedAt`
@@ -73,10 +75,16 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
   закрытия — поэтому не единственный источник идемпотентности.
   - **Адресация записи positions-history не ключуется `posId`.** Когда
     `posId` не наблюдался (позиция открылась и закрылась между тиками) либо
-    переиспользован биржей, запись адресуется инструментом и окном сделки;
-    однозначность держит инвариант «одна активная сделка на инструмент»
+    переиспользован биржей, запись адресуется инструментом и **временным
+    окном от `Order.externalCreatedAt` первой отправленной ноги входа**
+    (H12 `DOCS_CHECK_12`, решение пользователя); однозначность держит
+    инвариант «одна активная сделка на инструмент»
     (H9 `DOCS_CHECK_10` — прежняя ветка «ноги 2 нет без локального `posId`»
     снята, см. `docs/components/RefreshPositionExecutor.md`).
+    **«Окном сделки» операнд назывался ошибочно:** обе границы окна сделки
+    пишет ровно эта же нога, то есть на момент запроса они пусты.
+    Ограничение подтропы (вход не дошёл до биржи ⇒ операнда нет) —
+    `docs/components/RefreshPositionExecutor.md` §Evidence-cycle.
   - **Хвост `integrator`:** какие оси запроса принимает история позиций
     источника и как она ведёт себя, если в окне по инструменту оказалось
     несколько записей — сверка по контракту
@@ -249,12 +257,20 @@ OCO_FULL, PARTIAL_STOP_LOSS}` при `closeReason = TRIGGERED`.
 хранятся строкой (имя enum; codestyle §Слои моделей и enum'ы).
 
 **Колонки положения закрытия — `ALTER`, в `V6` их нет** (симметрично
-`Deal.md`/`DealActionState.md`, H21 `DOCS_CHECK_8`):
+`Deal.md`/`DealActionState.md`, H21 `DOCS_CHECK_8`). Их **семь**:
 `external_realized_profit`, `external_result_currency`,
 `external_close_average_price` (H26 `DOCS_CHECK_10`),
-`external_close_type` — nullable (пусты, пока позиция жива или запись
+`external_close_type`, **`external_funding_cost`** (H20 `DOCS_CHECK_11` —
+операнд де-микширования R-мультипликатора; пропуск в этом перечне закрыт
+H15 `DOCS_CHECK_12`), **`external_realized_profit_gross`** и
+**`external_fee`** (H19 `DOCS_CHECK_12` — правые операнды раздельной сверки
+по категориям) — все nullable (пусты, пока позиция жива или запись
 закрытия не добыта), добавляются миграцией шага 7; полная schema-дельта
 шага — `docs/decisions/pnl-finalization-mechanics.md` §Следствия.
+
+**Перечень здесь и schema-дельта шага обязаны совпадать по составу**
+(`docs/rules/persistence-representation.md` §«Место истины схемы»): этот
+раздел — место истины, дельта — сборка-указатель.
 
 ## Что Position не хранит
 

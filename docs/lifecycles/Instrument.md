@@ -59,7 +59,7 @@ handler'ы по образцу Deal, или иной механизм), — от
 | Статус | В торговле | Смысл |
 |---|---|---|
 | `CREATED` | нет | Запись инструмента заведена; спецификация не синхронизирована, групп свечей нет. |
-| `SYNC` | нет | Синхронизация спецификации инструмента с биржей (идентичность + биржевые `externalStatus`/`externalLeverage` из `InstrumentExternalSnapshot`). |
+| `SYNC` | нет | Синхронизация спецификации инструмента с биржей (идентичность + биржевые `externalStatus`/`externalLeverage` + **валюты base/quote/settle** из `InstrumentExternalSnapshot`). |
 | `CANDLES_LOADING` | нет | Группы свечей созданы и грузят историю/докачивают/проверяют целостность; хотя бы одна группа ещё не `ACTIVE`. |
 | `ACTIVE` | да | Спецификация синхронизирована и **все** группы свечей инструмента в `ACTIVE` (история покрыта и плотна). |
 
@@ -78,6 +78,14 @@ CANDLES_LOADING
   тянет спецификацию (идентичность + биржевые `externalStatus`/
   `externalLeverage` → domain, справочные sizing-поля транзиентно;
   `docs/models/mapping/Instrument.md`).
+  - **Валюты инструмента пишет эта тропа** (с шага 7):
+    `externalSettlementCurrency` / `externalBaseCurrency` /
+    `externalQuoteCurrency` заполняются здесь же, из того же ответа
+    `/public/instruments` (H10 `DOCS_CHECK_12`,
+    `docs/decisions/instrument-currencies-home.md` §«Писатель — тропа
+    заведения»). Значения считаются неизменными ⇒ второго писателя и
+    периодического обновления у них нет; ежечасный
+    `InstrumentExternalRulesSyncJob` валют не касается.
 - `SYNC → CANDLES_LOADING`: спецификация получена; для нужных
   таймфреймов созданы `CandleGroup`, `CandleJob` начал `BACKFILL`.
 - `CANDLES_LOADING → ACTIVE`: достигнута готовность свечных данных

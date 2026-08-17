@@ -98,6 +98,7 @@
 │   │   ├── curation.md — Какое правило регулярной курации базы знания?
 │   │   ├── external-source-sync.md — Какое правило синхронизации файлов с внешним источником правды?
 │   │   ├── naming.md — Какое правило именования файлов?
+│   │   ├── pre-launch-schema-changes.md — Какое правило схемных изменений, пока проект не запущен?
 │   │   ├── snapshot-format.md — Какое правило формата снапшота?
 │   │   ├── structure.md — Какое правило размещения знания?
 │   │   └── tech-radar.md — Что мы используем при написании кода (стэк со статусами)?
@@ -125,7 +126,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v80.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v81.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -165,7 +166,8 @@
 │       │   ├── phase-1-step-7-gaps-close-8.md — Как закрыты пробелы DOCS_CHECK_8 шага 7 (в объёме решённого)?
 │       │   ├── phase-1-step-7-gaps-close-9.md — Каков исход закрытия находок DOCS_CHECK_9 по итогам сверки пользователя?
 │       │   ├── phase-1-step-7-gaps-close-10.md — Каков исход закрытия находок DOCS_CHECK_10?
-│       │   └── phase-1-step-7-gaps-close-11.md — Как закрыты находки DOCS_CHECK_11?
+│       │   ├── phase-1-step-7-gaps-close-11.md — Как закрыты находки DOCS_CHECK_11?
+│       │   └── phase-1-step-7-gaps-close-12.md — Как закрыты находки DOCS_CHECK_12?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -173,7 +175,7 @@
 │       │   ├── roadmap.md — Какими фазами продукт движется к бизнес-ценности?
 │       │   └── phase-1.md — В каком статусе каждый шаг Фазы 1?
 │       └── history/ — Что мы уже сделали? (архив; содержимое не индексируется)
-│           └── snapshots/ — Где мы были раньше? (снапшоты v1–v79)
+│           └── snapshots/ — Где мы были раньше? (снапшоты v1–v80)
 ├── docs/ — Как устроен продукт (продуктовая документация)?
 │   ├── components/ — Кто выполняет?
 │   │   ├── models/ — Что это за runtime-объект?
@@ -183,7 +185,7 @@
 │   │   │   ├── CalculationContext.md — Что это за RVO CalculationContext?
 │   │   │   ├── CalculationError.md — Что это за RVO CalculationError?
 │   │   │   ├── DealContext.md — Что это за RVO DealContext?
-│   │   │   ├── HoldSignal.md — Что это за RVO HoldSignal?
+│   │   │   ├── HoldSignal.md — Что это за RVO HoldSignal (параметр вызова HoldService)?
 │   │   │   ├── MarketDataExpirationResult.md — Что это за RVO MarketDataExpirationResult?
 │   │   │   ├── MarketPriceData.md — Что это за RVO MarketPriceData?
 │   │   │   ├── PositionStatusResolveResult.md — Что это за RVO PositionStatusResolveResult?
@@ -216,6 +218,7 @@
 │   │   ├── ExitPendingHandler.md — Что делает FSM handler статуса EXIT_PENDING?
 │   │   ├── FinalizeDealEntryExecutor.md — Кто исполняет FINALIZE_DEAL_ENTRY?
 │   │   ├── FinalizeDealExitExecutor.md — Кто исполняет FINALIZE_DEAL_EXIT?
+│   │   ├── HoldService.md — Кто исполняет блокировку (холд) по требованию детекторов?
 │   │   ├── IndicatorJob.md — Кто считает технические индикаторы?
 │   │   ├── IndicatorService.md — Кто отдаёт готовые значения индикаторов?
 │   │   ├── InstrumentExternalRulesDataService.md — Кто отдаёт внешние правила инструмента (граница persistence)?
@@ -247,7 +250,7 @@
 │   │   ├── RetryPolicyService.md — Кто управляет retry-политикой исполнения команд?
 │   │   ├── RiskBlockResolver.md — Кто превращает результат risk-проверки в действие handler'а?
 │   │   ├── RiskValidator.md — Кто проверяет рассчитанное действие по risk-policy?
-│   │   ├── SafetyHoldCoordinator.md — Кто координирует реактивную реакцию CRITICAL-холда над сделкой?
+│   │   ├── SafetyHoldCoordinator.md — Кто держит последовательность полной реакции холда?
 │   │   ├── ServiceCommandExecutor.md — Кто исполняет атомарную команду и маршрутизирует её?
 │   │   ├── SizeCalculator.md — Кто рассчитывает размер действия?
 │   │   ├── StrategyActionCalculator.md — Кто рассчитывает runtime-параметры действия стратегии?
@@ -405,6 +408,7 @@
 │       ├── command-lifecycle.md — Каков жизненный цикл ServiceCommand?
 │       ├── condition-ruletype-granularity.md — Когда заводить выделенный StrategyConditionRuleType?
 │       ├── controlled-exchange-exceptions.md — Какие категории controlled exchange exceptions и реакции?
+│       ├── deal-without-operations.md — По какому признаку сделка считается не имевшей операций на бирже?
 │       ├── error-handling-policy.md — Как ошибки выходят наружу и градируются внутри?
 │       ├── exchange-hold.md — Какое правило определяет exchange-scope холд?
 │       ├── external-status-resolution.md — Как работать с сырым внешним статусом сущности?

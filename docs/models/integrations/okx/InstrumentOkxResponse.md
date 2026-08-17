@@ -21,42 +21,74 @@ Mapping в `InstrumentExternalSnapshot` и далее в `Instrument`
 
 ## Поля DTO
 
+**Перечень — целевой, не свершившийся** (H13 `DOCS_CHECK_12`). Он
+описывает состав DTO **после** дельты `CODE` шага 7; в коде сегодня часть
+позиций отсутствует, и они помечены явно. Прежняя редакция была написана
+свершившимся временем («coded DTO несёт…»), из-за чего единственная работа,
+у которой нет колонки-якоря, выглядела уже сделанной и ни в один перечень
+дельты не попадала. Правило формулировки — то же, по которому целевым
+временем записан `REFRESH_FILLS` (H15 `GAPS_CLOSE_6`).
+
 Coded DTO `InstrumentOkxResponse` несёт подмножество, релевантное
-идентичности инструмента (шаг 1) **и** sizing/rounding-правилам
-(шаг 5). Один DTO питает оба снапшота: identity-снапшот
-`InstrumentExternalSnapshot` (шаг 1) и rules-снапшот
+идентичности инструмента (шаг 1), sizing/rounding-правилам
+(шаг 5) **и валютам (шаг 7)**. Один DTO питает оба снапшота:
+identity-снапшот `InstrumentExternalSnapshot` (шаги 1 и 7) и rules-снапшот
 `InstrumentExternalRules` (шаг 5).
 
-Identity/spec-поля, маппящиеся в `InstrumentExternalSnapshot`
-(шаг 1):
+Identity/spec-поля, маппящиеся в `InstrumentExternalSnapshot`:
 
-| OKX field | Тип (raw) | Snapshot field |
-|---|---|---|
-| `instId` | string | `externalInstrumentId` |
-| `instType` | string | `externalInstrumentType` |
-| `baseCcy` | string | `baseCurrency` |
-| `quoteCcy` | string | `quoteCurrency` |
-| `settleCcy` | string | `settleCurrency` |
-| `lotSz` | string (decimal) | `lotSize` |
-| `minSz` | string (decimal) | `minimumOrderSize` |
-| `ctVal` | string (decimal) | `contractValue` |
-| `ctMult` | string (decimal) | `contractMultiplier` |
-| `tickSz` | string (decimal) | `priceTickSize` |
-| `state` | string | `externalStatus` |
-| `lever` | string | `externalLeverage` |
+| OKX field | Тип (raw) | Snapshot field | Состояние |
+|---|---|---|---|
+| `instId` | string | `externalInstrumentId` | есть |
+| `instType` | string | `externalInstrumentType` | есть |
+| `baseCcy` | string | `externalBaseCurrency` | есть; **имя целевое** — см. §ниже |
+| `quoteCcy` | string | `externalQuoteCurrency` | есть; **имя целевое** |
+| `settleCcy` | string | `externalSettlementCurrency` | есть; **имя целевое** |
+| `lotSz` | string (decimal) | `lotSize` | есть |
+| `minSz` | string (decimal) | `minimumOrderSize` | есть |
+| `ctVal` | string (decimal) | `contractValue` | есть |
+| `ctMult` | string (decimal) | `contractMultiplier` | есть |
+| `tickSz` | string (decimal) | `priceTickSize` | есть |
+| `state` | string | `externalStatus` | есть |
+| `lever` | string | `externalLeverage` | есть |
+
+**Имена валютных полей снапшота — целевые** (H14 `DOCS_CHECK_12`, решение
+пользователя, вариант 2). В коде снапшот сегодня несёт
+`externalSettleCurrency` / `externalBaseCurrency` / `externalQuoteCurrency`,
+а доменные поля названы `externalSettlementCurrency` / `externalBaseCurrency`
+/ `externalQuoteCurrency` (`docs/decisions/instrument-currencies-home.md` —
+имена доменных полей окончательны). Расходилось **трояко**: инвентарь нёс
+третий набор (`settleCurrency`/`baseCurrency`/`quoteCurrency`). Решение —
+**переименовать поле снапшота в коде** под доменное имя: снапшот
+транзиентный ⇒ ни миграции, ни бэкфилла, зато маппинг остаётся по имени
+(без явного `@Mapping`) и один факт зовётся одинаково во всех слоях.
+Переименование внесено в **не-схемную дельту `CODE`**
+(`docs/decisions/pnl-finalization-mechanics.md` §Следствия).
 
 Rules-поля (sizing/rounding/ограничители), питающие rules-снапшот
 шага 5 (см. `docs/models/mapping/InstrumentExternalRules.md` §OKX):
 
-| OKX field | Тип (raw) | Назначение |
-|---|---|---|
-| `ctType` | string | тип контракта (linear/inverse) |
-| `ctValCcy` | string | валюта стоимости контракта |
-| `maxLmtSz` | string (decimal) | макс. размер limit-ордера |
-| `maxMktSz` | string (decimal) | макс. размер market-ордера |
-| `maxTriggerSz` | string (decimal) | макс. размер trigger-ордера |
-| `maxStopSz` | string (decimal) | макс. размер stop-ордера |
-| `groupId` | string | id комиссионной группы инструмента; **ключ резолва ставки** — пара (`instType`, `groupId`) |
+| OKX field | Тип (raw) | Назначение | Состояние |
+|---|---|---|---|
+| `ctType` | string | тип контракта (linear/inverse) | есть |
+| `ctValCcy` | string | валюта стоимости контракта | есть |
+| `maxLmtSz` | string (decimal) | макс. размер limit-ордера | есть |
+| `maxMktSz` | string (decimal) | макс. размер market-ордера | есть |
+| `maxTriggerSz` | string (decimal) | макс. размер trigger-ордера | есть |
+| `maxStopSz` | string (decimal) | макс. размер stop-ордера | есть |
+| `groupId` | string | id комиссионной группы инструмента; **ключ резолва ставки** — пара (`instType`, `groupId`) | **целевое: в коде поля нет** — ни в DTO, ни в rules-снапшоте, ни в модели навеса |
+
+**`groupId` — целевая дельта `CODE`, и она внесена в перечень** (H13
+`DOCS_CHECK_12`). Поле живёт в JSONB-навесе, собственной колонки не имеет
+⇒ в schema-дельту шага не попадает **по построению**, и ни один
+самопроверяемый перечень пропуск не ловит. Поэтому добыча ключа записана
+отдельной строкой **не-схемной дельты `CODE`**
+(`docs/decisions/pnl-finalization-mechanics.md` §Следствия): поле DTO + поле
+`InstrumentExternalRulesExternalSnapshot` + строка маппера. Цена: миграций
+не требует, новых вызовов биржи не добавляет (`/public/instruments` уже
+читается). **Без этого** `externalFeeGroupId` остаётся `null`, ставка не
+резолвится и `FEE_RATE_UNAVAILABLE` блокирует **каждый** risk-creating вход
+(`docs/models/domain/other/InstrumentExternalRules.md`).
 
 **`groupId` — ключ, а не ставка.** Инструмент несёт только id своей
 комиссионной группы; сама ставка приходит отдельным эндпоинтом
@@ -84,9 +116,11 @@ OKX `public/instruments` отдаёт больше полей. Sizing/rounding-�
 `maxLmtSz`/`maxMktSz`/`maxTriggerSz`/`maxStopSz`) **входят** в этот
 DTO (см. таблицу rules-полей выше) и питают rules-снапшот
 `InstrumentExternalRules` (`docs/models/mapping/InstrumentExternalRules.md`
-§OKX). **`groupId` тоже входит** (шаг 7, `GAPS_CLOSE_3`): прежде он числился
-среди неиспользуемых — ошибочно, ключ fee-группы нужен для резолва ставки
-(см. таблицу rules-полей выше). Не входят прочие поля (`instFamily`, `uly`,
+§OKX). **`groupId` — входит целевым составом** (шаг 7, `GAPS_CLOSE_3`;
+формулировка уточнена H13 `DOCS_CHECK_12`): прежде он числился среди
+неиспользуемых — ошибочно, ключ fee-группы нужен для резолва ставки; в коде
+поля пока **нет**, его добыча — строка не-схемной дельты `CODE`. Не входят
+прочие поля (`instFamily`, `uly`,
 `listTime`/`expTime`, `category`/`alias` и т. п.) — доменно не
 используются. Coded `InstrumentOkxResponse` несёт только подмножество,
 релевантное идентичности (шаг 1) и правилам (шаг 5).

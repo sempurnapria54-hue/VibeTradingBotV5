@@ -16,12 +16,21 @@ concurrency-guard, границы.
    инструментов в `TRADE_BLOCKED` уводятся в `ERROR`;
 3. для каждой загружает `DealContext` (`DealContextService`);
 4. запускает `DealStateMachine` (см. `docs/components/DealStateMachine.md`);
-5. получает `DealTransition` (команды + опц. целевой статус / hold-сигнал);
+5. получает `DealTransition` (команды + опц. целевой статус);
 6. передаёт команды в `ServiceCommandExecutor`, прерывая цикл при первом
    неуспешном результате (остальные команды перехода в этом проходе не
-   гонятся — handler разберёт FAILED-якорь на следующем тике);
-7. применяет переход: сохраняет новый статус сделки (если задан) и реагирует
-   на поднятый handler'ом safety-hold-сигнал.
+   гонятся — handler разберёт FAILED-якорь на следующем тике). **Здесь же —
+   перехват ошибки/ошибочного кейса:** оркестратор зовёт `HoldService`,
+   передавая радиус и силу реакции (H8 `DOCS_CHECK_12`,
+   `docs/components/HoldService.md`);
+7. применяет переход: сохраняет новый статус сделки (если задан).
+
+**Оркестратор — один из трёх детекторов холда** (§6). Прежняя редакция шага 7
+(«реагирует на поднятый handler'ом safety-hold-сигнал» из
+`DealTransition.holdSignal`) **снята**: сигнал не путешествует, вызывается
+сервис. Поле-транспорт `DealTransition.holdSignal` уходит из модели —
+пункт CODE-дельты (`docs/decisions/pnl-finalization-mechanics.md`
+§Следствия).
 
 ## Enforcement холда
 
