@@ -139,9 +139,10 @@ fills») — это отложение, не отказ; решения «нуж
 `docs/integrations/okx/rules/okx-ws-channels.md` (один файл = один канал
 либо один файл = все каналы) — после сбора реальных push-примеров;
 (2) держать WS-альтернативу пометками внутри существующих
-`okx-*-mapping.md`, без отдельных файлов. До решения WS-каналы описаны
-только короткой пометкой в mapping-файлах; в `okx-service-urls.md`
-зафиксированы base URL public/private/business.
+контракт-доков `docs/integrations/okx/contracts/` и mapping-доков
+`docs/models/mapping/`, без отдельных файлов. До решения WS-каналы описаны
+только короткой пометкой в этих файлах; base URL public/private/business
+зафиксированы в `docs/integrations/okx/contracts/service-urls.md`.
 Связано: `docs/integrations/okx/contracts/service-urls.md`,
 `docs/integrations/okx/rules/ws-limits.md`,
 `docs/models/mapping/Order.md` (примеры WS-альтернатив).
