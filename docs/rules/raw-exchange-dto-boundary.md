@@ -34,10 +34,24 @@ exception. `null` означает «не найдено в этом источ�
 Маппер из client-модели возвращает validated `*ExternalSnapshot`
 (`InstrumentExternalSnapshot`, `InstrumentExternalRulesExternalSnapshot`,
 `MarketPriceDataExternalSnapshot`, `BalanceContainerExternalSnapshot`,
-`CandleExternalSnapshot`, order/algo/position external snapshots) —
+`CandleExternalSnapshot`, order/algo/position external snapshots;
+**сущности шага 7** — `PositionCloseResultExternalSnapshot`,
+`TradeFeeRateExternalSnapshot`, `DealCashFlowExternalSnapshot`) —
 external-поля модели, без доменных enum/нормализаций (они
 резолвятся при материализации). Это и есть единственное, что
-выходит за `IntegrationService`. Для свечей это означает: OKX-массив
+выходит за `IntegrationService`.
+
+**Реестр обязан пополняться вместе с сущностью** (H21 `GAPS_CLOSE_13`):
+клейм единственности превращает пропуск в инструкцию — писатель, не нашедший
+свою сущность в перечне, читает это как «у неё границы нет». Три снапшота
+шага 7 в перечень не попадали, и у одного из них (bills) звена снапшота
+не существовало вовсе: цепочка шла `raw → domain`, то есть за границу
+выходила persisted доменная модель с незаполненными `NOT NULL`-полями.
+Составы транзитных снапшотов живут в mapping-доках своих сущностей
+(`docs/models/mapping/DealCashFlow.md`,
+`docs/models/mapping/PositionCloseResult.md`,
+`docs/models/mapping/TradeFeeRate.md`) — отдельного `*ExternalSnapshot.md`
+они не требуют. Для свечей это означает: OKX-массив
 проходит границу как `CandleExternalSnapshot`, а не сырым массивом
 (`docs/models/mapping/Candle.md`). Граница онбординга инструмента
 (шаг 1) — `InstrumentExternalSnapshot`: идентичность + биржевые

@@ -19,6 +19,14 @@
 Файл оставлен как исторический стаб; при будущей потребности в пофилловой
 модели (вне фазы 1) mapping заполняется здесь.
 
+**В коде фазы 1 поверхности fills нет** (H26 `GAPS_CLOSE_13`): вместе с
+командой снимается весь read-путь — `FillExternalSnapshot`, `FillMapper`,
+`OkxFillResponse` и методы границы `IntegrationService.getFills(...)` /
+`getFillsHistory(...)`. Перечень каскада и довод —
+`docs/decisions/result-profit-source.md` §«Каскад снятия». Справочным
+остаётся контракт-док источника
+(`docs/integrations/okx/contracts/fills.md`).
+
 ## Контекст
 
 Сквозные правила — `docs/rules/raw-exchange-dto-boundary.md`,

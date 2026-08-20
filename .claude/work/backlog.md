@@ -300,17 +300,16 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   шаге 6): transition-conditions в модели стратегии +
   exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) + снять
   вырожденный `CLOSE_FULL` — сверить остаток с as-built шага 6.
-- **Анкер идемпотентности `AnomalyReport` — перекрытие по scope** (хвост
-  H15 `DOCS_CHECK_9`; ключ — (`exchangeId`, `instrumentId`, `scope`,
-  `severity`) + частичный индекс по незакрытым **и `kind = STATE`** —
-  `docs/models/domain/other/AnomalyReport.md` §Персистентность).
-  Разобрать: два незакрытых факта **разных `code`** на одном ключе
-  (`FEE_RATE_STALE` и `FEE_GROUP_KEY_STALE` на одной группе); семантика
-  NULL `instrument_id` групповых радиусов в частичном уникальном индексе;
-  как scope влияет на перекрытие ключей при эскалации радиуса. **Радиус
-  хвоста сузился** после разведения анкеров по `kind` (H16
-  `DOCS_CHECK_10`): под анкером остались только два `STATE`-кода синка,
-  журнальные события анкера не имеют.
+- **Идемпотентность `AnomalyReport` — популяция ограничения** (хвост H17
+  `GAPS_CLOSE_13`; анкер-ключ **снят**, идемпотентность держится
+  незавершённым статусом — `docs/models/domain/other/AnomalyReport.md`
+  §Персистентность). Разобрать на шаге 8: над какой популяцией действует
+  ограничение (все строки против неразобранных) — `ANOM-Q6`; как радиус
+  влияет на поиск незавершённого при эскалации scope. Вопросы «два
+  незакрытых факта разных `code` на одном ключе» и «семантика NULL
+  `instrument_id` в частичном уникальном индексе» **сняты вместе с
+  ключом** (`ANOM-Q3`, `ANOM-Q4`); гейтящий остаток шага 7 — `ANOM-Q5`
+  (сколько акторов ведут процессные отчёты).
 - **Переоценка инварианта «ликвидация за стопом» — проектирование**
   (H18 `DOCS_CHECK_10`, решение пользователя; требование записано —
   `docs/components/AnomalyJob.md` §«Переоценка инварианта»,
@@ -515,19 +514,22 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   (`NON_CRITICAL`); коды шага 7 — по реестру
   `docs/models/domain/other/AnomalyReport.md` §«Производящая поверхность и
   коды шага 7».
-  - **Новая колонка `kind`** (`STATE`/`EVENT`) + частичный уникальный
-    индекс `where kind = 'STATE' and status in (незакрытые)`: анкер
-    идемпотентности применяется **только к отчётам-состояниям**;
-    журнальные события (`PNL_RECONCILIATION_MISMATCH`,
+  - **Новая колонка `kind`** (`STATE`/`EVENT`) + **поисковый** (не
+    уникальный) индекс `where kind = 'STATE' and status in (незакрытые)`:
+    идемпотентность `STATE`-отчёта держится **незавершённым статусом** —
+    производитель ищет незакрытый отчёт своего `code` и радиуса и
+    продолжает его (H17 `GAPS_CLOSE_13`; анкер-ключ снят). Журнальные
+    события (`PNL_RECONCILIATION_MISMATCH`,
     `RESULT_CURRENCY_MISMATCH`, `UNCLASSIFIED_CASH_FLOW`,
     `SETTLE_CURRENCY_VIOLATION`, `SETTLE_CURRENCY_UNAVAILABLE`,
-    `CROSS_CCY_RATE_UNAVAILABLE`, `RESULT_PROFIT_UNAVAILABLE`) анкера
-    **не имеют** — они обязаны быть счётными (на этом стоит рамка
-    R-выборки).
+    `CROSS_CCY_RATE_UNAVAILABLE`, `RESULT_PROFIT_UNAVAILABLE`,
+    `CLOSE_OUTCOME_UNDETERMINED`, `BREAKDOWN_COMPLETENESS_NOT_ASSESSED`)
+    поиска незавершённого не делают — они обязаны быть счётными (на этом
+    стоит рамка R-выборки).
   - **`STATE`-отчёт не завершается сразу:** `CREATED → IN_PROGRESS` при
     постановке холда → `COMPLETED` при **ручном снятии**
-    (`docs/lifecycles/AnomalyReport.md`). Иначе охраняемое множество пусто
-    и анкер не срабатывает никогда.
+    (`docs/lifecycles/AnomalyReport.md`). Иначе искать незавершённый
+    нечего, и синк заводит копию каждый тик.
   - **`anomaly_reports.scope` → `varchar(32)`** тем же `ALTER` (H22:
     `INSTRUMENT_GROUP` — ровно 16 символов, запас нулевой).
   - **`HoldScope.INSTRUMENT_GROUP` — целевое значение**, вводится этим
@@ -694,8 +696,9 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     накапливает наблюдения для калибровки запаса на проскок;
   - **правило переноса `deal_finalization_states`** (H19): строки
     финализации **не переносятся** — `DELETE` + `DROP TABLE`; **`target`
-    (jsonb) STRATEGY-строк бэкфиллится** в target-колонки, затем `DROP
-    COLUMN target`;
+    (jsonb) расплющивается** в target-колонки + `DROP COLUMN target`,
+    **бэкфилла нет** — таблицы пусты по правилу фазы (H25
+    `GAPS_CLOSE_13`, `.claude/rules/pre-launch-schema-changes.md`);
   - **колонки ставок `trade_fee_rates` — `varchar(32)`** (H23), не
     `numeric`: доменный тип `String`, аксессор сознательно допускает
     непарсящееся значение; исключение записано

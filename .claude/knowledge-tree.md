@@ -156,6 +156,8 @@
 │       │   ├── phase-1-step-7-docs-check-10.md — Каков исход DOCS_CHECK_10 шага 7?
 │       │   ├── phase-1-step-7-docs-check-11.md — Каков исход DOCS_CHECK_11 шага 7?
 │       │   ├── phase-1-step-7-docs-check-12.md — Каков исход DOCS_CHECK_12 шага 7?
+│       │   ├── phase-1-step-7-docs-check-13.md — Каков исход DOCS_CHECK_13 шага 7?
+│       │   ├── phase-1-step-7-docs-check-14.md — Каков исход DOCS_CHECK_14 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
@@ -167,7 +169,8 @@
 │       │   ├── phase-1-step-7-gaps-close-9.md — Каков исход закрытия находок DOCS_CHECK_9 по итогам сверки пользователя?
 │       │   ├── phase-1-step-7-gaps-close-10.md — Каков исход закрытия находок DOCS_CHECK_10?
 │       │   ├── phase-1-step-7-gaps-close-11.md — Как закрыты находки DOCS_CHECK_11?
-│       │   └── phase-1-step-7-gaps-close-12.md — Как закрыты находки DOCS_CHECK_12?
+│       │   ├── phase-1-step-7-gaps-close-12.md — Как закрыты находки DOCS_CHECK_12?
+│       │   └── phase-1-step-7-gaps-close-13.md — Как закрыты находки DOCS_CHECK_13?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -402,6 +405,7 @@
 │   │   ├── risk-evaluation.md — Как устроена оценка риска?
 │   │   └── strategy-action-calculation.md — Как устроен расчёт параметров одного StrategyAction?
 │   └── rules/ — Какое правило действует в системе?
+│       ├── absent-value-semantics.md — Как выражается отсутствие значения у признака?
 │       ├── ack-not-runtime-truth.md — Почему ACK не подтверждает фактическое состояние сущности?
 │       ├── audit-not-runtime-source.md — Почему аудит не источник runtime-логики FSM?
 │       ├── business-logic-on-domain-model.md — Где выполняется бизнес-логика относительно слоёв?

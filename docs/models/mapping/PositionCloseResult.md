@@ -44,7 +44,7 @@ positions-history REST response -> raw OkxPositionsHistoryResponse
   -> RefreshPositionExecutor (нога 2 evidence-cycle)
   -> Position (поля положения закрытия, persisted)
   -> FinalizeDealExitExecutor | MarkDealEmergencyClosedExecutor
-  -> Deal.resultProfit
+  -> Deal.resultProfit + Deal.closeOutcome (признак отбора)
 ```
 
 Raw DTO не выходит за пределы `IntegrationService` / adapter-layer;
@@ -73,6 +73,7 @@ executor работает только с validated normalized snapshot.
 | `externalRealizedPnlGross` | `BigDecimal` | `pnl` записи — реализованный P&L **до** издержек; правый операнд первой пары раздельной сверки (H19 `DOCS_CHECK_12`) |
 | `externalFee` | `BigDecimal` | `fee` записи — знаковая комиссионная компонента (минус — комиссия, плюс — ребейт; **сырой знак**, как у `DealCashFlow.externalFee`); правый операнд второй пары сверки (H19 `DOCS_CHECK_12`) |
 | `externalFundingCost` | `BigDecimal` | накопленный funding закрытой позиции (`fundingFee`), **нормализованный по знаку**: издержка, положительна когда фондирование уплачено (H20 `DOCS_CHECK_12`). Операнд де-микширования R-мультипликатора и правый операнд третьей пары сверки |
+| `externalLiquidationPenalty` | `BigDecimal` | `liqPenalty` записи — ликвидационный штраф, **сырой знак** источника; правый операнд четвёртой пары сверки (H7 `DOCS_CHECK_13`) |
 | `externalPosId` | `String` | биржевой id позиции (ключ адресации записи; на create-тропе — **данные**, см. ниже) |
 | `externalDirection` | `String` | направление закрытой позиции (`direction`) — операнд **create-тропы** (H4 `DOCS_CHECK_11`) |
 | `externalCreatedAt` | `OffsetDateTime` | время создания записи positions-history (`cTime`) — операнд **create-тропы** и нижней границы окна линковки (H4 `DOCS_CHECK_11`) |
@@ -107,10 +108,22 @@ create-тропа (§ниже). До этого все три числились
 пользователя): это **прямая цена** выбранной формы контроля целостности —
 сверка расширена до **раздельных пар по категориям** (Σ по категории
 разбивки против соответствующего числа биржи), и без этих двух полей правых
-операндов двух из трёх пар не существует
+операндов двух из четырёх пар не существует
 (`docs/components/FinalizeDealExitExecutor.md` §«Расчёт прибыли и сверка»).
 Прежде оба числились выведенными как «слагаемые net, потребителя нет» —
 потребитель появился.
+
+**`liqPenalty` возвращён в снапшот** (H7 `DOCS_CHECK_13`, решение
+пользователя): та же прямая цена за **четвёртую** пару сверки. Прежний
+довод, выводивший категорию `LIQ_PENALTY` из-под контроля («отдельного
+числа биржи под неё в записи нет»), **ложен** — поле названо и контрактом
+источника, и нативным инвентарём
+(`docs/integrations/okx/contracts/position.md` §История). Четыре пары
+исчерпывают состав net'а (`realizedPnl = pnl + fee + fundingFee +
+liqPenalty`), поэтому отдельная суммарная сверка Σ`amount` ↔ net
+**снята**: она не покрывает ничего сверх четырёх пар, а её область
+(Σ`amount` по всей разбивке) шире состава net'а на строки, которых в
+net'е нет по построению.
 
 ### Знак `fundingFee` — нормализуется здесь, и только здесь
 
@@ -206,6 +219,8 @@ live-нога (штатно), условно `SubmitOrderExecutor` и — на c
 |---|---|---|
 | `externalRealizedProfit` | `resultProfit` (слагаемое net) | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` |
 | `externalResultCurrency` | **не пишется** — сверяется | они же (см. ниже) |
+| `externalCloseType` | `closeOutcome` (`1,2` → `NORMAL_EXIT`; `3,4` → `LIQUIDATION`; `5,6` → `FORCED_REDUCTION`; пусто либо вне `1..6` → `UNDETERMINED` + отчёт) | они же (`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта») |
+| `externalRealizedPnlGross`, `externalFee`, `externalFundingCost`, `externalLiquidationPenalty` | **не пишутся** — правые операнды четырёх пар сверки | `FinalizeDealExitExecutor` (сверка, не запись) |
 
 **Валюта результата в `Deal` пишется не отсюда** (H10 `DOCS_CHECK_10`,
 решение пользователя). `Deal.resultProfitCurrency` берётся из **расчётной
@@ -218,10 +233,18 @@ live-нога (штатно), условно `SubmitOrderExecutor` и — на c
 net'а в валюте записи источника с cross-ccy-слагаемым в расчётной валюте
 инструмента — разные валюты молча.
 
-`externalCloseType` в `Deal` **не пишется** — он вход провенанса
+**`externalCloseType` переходит в `Deal.closeOutcome`** (узел F
+`GAPS_CLOSE_12` + H2 `GAPS_CLOSE_13`). Он остаётся входом провенанса
 аварийного терминала (`docs/decisions/pnl-finalization-mechanics.md`
-реш.3), читается со строки `Position`. Запрашиваемость провенанса
-ликвидации/ADL на уровне `Deal` — открытый вопрос `PNL-Q1`.
+реш.3) и одновременно — операндом признака отбора: писатели те же два
+финализатора, значение резолвится по таблице выше, пустой или неизвестный
+операнд даёт `UNDETERMINED` (не благоприятный `NORMAL_EXIT`) плюс
+журнальный `AnomalyReport`. Прежняя клауза «в `Deal` не пишется» снята —
+она отстала от ратификации `Deal.closeOutcome`.
+
+**Что осталось открытым в `PNL-Q1`** — не представление провенанса
+(его доносит `closeOutcome`), а нужен ли **сверх** него `triggerPx`
+(цена триггера ликвидации/ADL).
 
 ### Validation (структурная, до маппинга)
 
@@ -308,24 +331,33 @@ net'а в валюте записи источника с cross-ccy-слагае
 | `ccy` | `externalResultCurrency` |
 | `closeAvgPx` | `externalCloseAveragePrice` |
 | `type` | `externalCloseType` |
+| `pnl` | `externalRealizedPnlGross` |
+| `fee` | `externalFee` |
 | `fundingFee` | `externalFundingCost` |
+| `liqPenalty` | `externalLiquidationPenalty` |
 | `posId` | `externalPosId` |
 | `direction` | `externalDirection` |
 | `cTime` | `externalCreatedAt` (epoch millis → `OffsetDateTime`) |
 | `uTime` | `externalModifiedAt` (epoch millis → `OffsetDateTime`) |
 
+**Таблица — место истины маппинга этого источника.** Маппер строится по
+ней; поле, которого в ней нет, в снапшот не попадает. Поэтому изменение
+состава снапшота обязано доезжать сюда же — перечень «не маппимых» и счёт
+цепочки ниже суть части того же носителя (H1 `DOCS_CHECK_13`).
+
 Числовые поля парсятся в `BigDecimal`, `cTime`/`uTime` — в
-`OffsetDateTime`; `empty string → null`. Список не маппимых полей (`pnl`,
-`fee`, `liqPenalty`, `settledPnl`, `pnlRatio`, `mgnMode`, `posSide`,
+`OffsetDateTime`; `empty string → null`. Список не маппимых полей
+(`settledPnl`, `pnlRatio`, `mgnMode`, `posSide`,
 `lever`, `uly`, `openMaxPos`, `closeTotalPos`, `nonSettleAvgPx`, а также
 `triggerPx` — выведен H22; `openAvgPx` — выведен H23 `DOCS_CHECK_8`;
 `closeAvgPx` из этого перечня **возвращён** H26 `DOCS_CHECK_10`,
-`fundingFee` — H20, `cTime`/`direction` — H4 `DOCS_CHECK_11`) — в
+`fundingFee` — H20, `cTime`/`direction` — H4 `DOCS_CHECK_11`,
+`pnl`/`fee` — H19 `DOCS_CHECK_12`, `liqPenalty` — H7 `DOCS_CHECK_13`) — в
 `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.
 
-**Счёт цепочки:** native used 9 = snapshot 9 = domain 9 (для create-тропы;
-на update-тропе `externalDirection`/`externalCreatedAt` не применяются, а
-`externalPosId` сверяется вместо записи).
+**Счёт цепочки:** native used 12 = snapshot 12 = domain 12 (для
+create-тропы; на update-тропе `externalDirection`/`externalCreatedAt` не
+применяются, а `externalPosId` сверяется вместо записи).
 
 ### OKX validation notes
 

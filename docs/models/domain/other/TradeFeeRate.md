@@ -258,7 +258,34 @@ scope и реакций».
 ## Персистентность
 
 Реляционная таблица `trade_fee_rates` (множественное число, codestyle §Схема
-БД):
+БД). **Полный состав колонок** — место истины схемы сущности (H18
+`GAPS_CLOSE_13`; `docs/rules/persistence-representation.md` §«Место истины
+схемы»):
+
+| Колонка | Тип | Nullability | Ключи / примечание |
+|---|---|---|---|
+| `id` | `bigserial` | `not null` | PK |
+| `exchange_id` | `bigint` | **`not null`** | FK → `exchanges`; первая ось резолва |
+| `external_instrument_type` | `varchar(32)` | **`not null`** | сырой `instType`, ось группы |
+| `external_fee_group_id` | `varchar(64)` | **`not null`** | сырой `groupId`, ось группы |
+| `instrument_type` | `varchar(32)` | **`not null`** | енум `InstrumentType` строкой; проекция, не ось |
+| `external_taker_fee_rate` | `varchar(32)` | **`not null`** | исключение из численной конвенции — довод §ниже |
+| `external_maker_fee_rate` | `varchar(32)` | **`not null`** | то же |
+| `external_fee_level` | `varchar(32)` | nullable | датчик оси тира |
+| `refresh_count` | `bigint` | **`not null`** | счётчик подтверждений строки |
+| `external_created_at` | `timestamptz` | nullable | audit-колонка |
+| `external_modified_at` | `timestamptz` | nullable | audit-колонка; метка последнего подтверждения |
+| `created_at` | `timestamptz` | **`not null`** | audit-колонка (JPA auditing) |
+| `updated_at` | `timestamptz` | **`not null`** | audit-колонка |
+| `created_by` | `varchar(64)` | nullable | audit-колонка |
+| `updated_by` | `varchar(64)` | nullable | audit-колонка |
+
+Состав audit-колонок — все шесть
+(`docs/models/domain/other/Auditable.md` §«Состав audit-колонок»).
+`exchange_id` — **FK и `NOT NULL`**, симметрично одноимённой колонке
+`deal_cash_flows`: прежде перечень его не называл вовсе.
+
+Прочие ограничения и доводы:
 
 - **`UNIQUE` по ключу группы НЕТ** — история означает несколько строк на ключ.
   Уникальность здесь была бы прямым запретом истории.

@@ -112,7 +112,39 @@ H11 `GAPS_CLOSE_6`); категорийная ось от ответа не за
 ## Персистентность
 
 Реляционная таблица `deal_cash_flows` (множественное число, по codestyle
-§Схема БД):
+§Схема БД). **Полный состав колонок** — место истины схемы сущности
+(H18 `GAPS_CLOSE_13`; `docs/rules/persistence-representation.md`
+§«Место истины схемы»):
+
+| Колонка | Тип | Nullability | Ключи / примечание |
+|---|---|---|---|
+| `id` | `bigserial` | `not null` | PK |
+| `deal_id` | `bigint` | nullable | FK → `deals`; `null` до матчинга |
+| `exchange_id` | `bigint` | **`not null`** | FK → `exchanges`; ось ключа уникальности |
+| `category` | `varchar(32)` | **`not null`** | енум `CashFlowCategory` строкой |
+| `amount` | `numeric(36,18)` | **`not null`** | денежная конвенция проекта |
+| `external_fee` | `numeric(36,18)` | nullable | комиссионная компонента записи |
+| `ccy` | `varchar(16)` | **`not null`** | валюта движения |
+| `applied_rate` | `numeric(36,18)` | nullable | заполнен только при `rate_status = APPLIED` |
+| `rate_status` | `varchar(32)` | **`not null`** | енум `RateStatus` строкой; самое длинное значение — `SETTLE_CURRENCY_UNAVAILABLE` (27 символов), поэтому 32, а не 16 |
+| `external_instrument_id` | `varchar(64)` | nullable | сырой `instId` |
+| `external_bill_id` | `varchar(64)` | **`not null`** | вместе с `exchange_id` — `UNIQUE` |
+| `external_type` | `varchar(32)` | **`not null`** | сырой `type` |
+| `external_sub_type` | `varchar(32)` | nullable | сырой `subType` |
+| `external_order_id` | `varchar(64)` | nullable | `ordId`, если движение связано с ордером |
+| `external_created_at` | `timestamptz` | nullable | audit-колонка `AuditableEntity`; обязательность — валидацией на границе разбора (§ниже) |
+| `external_modified_at` | `timestamptz` | nullable | audit-колонка |
+| `created_at` | `timestamptz` | **`not null`** | audit-колонка (JPA auditing) |
+| `updated_at` | `timestamptz` | **`not null`** | audit-колонка |
+| `created_by` | `varchar(64)` | nullable | audit-колонка |
+| `updated_by` | `varchar(64)` | nullable | audit-колонка |
+
+Состав audit-колонок — все шесть, по `docs/models/domain/other/Auditable.md`
+§«Состав audit-колонок». **Вывод «Обязательно: да ⇒ `NOT NULL`» общим не
+является** — `external_created_at` тому контрпример (§ниже), поэтому
+nullability названа здесь по каждой колонке, а не выводится из §Структуры.
+
+Прочие ограничения и доводы:
 
 - FK-колонка `deal_id` (`null` до матчинга; проставляется при сохранении).
 - FK-колонка `exchange_id` — `NOT NULL` (ось ключа уникальности, см. ниже).
@@ -159,7 +191,7 @@ H11 `GAPS_CLOSE_6`); категорийная ось от ответа не за
 завязаны: дедуп по адресуемому `external_bill_id` (`UNIQUE`), сверка суммы
 flows и запросы категорийной разбивки по `deal_id`. Каждое движение —
 адресуемая строка с собственным ключом уникальности и индексом выборки; у
-JSONB-навеса нет цели для `UNIQUE(external_bill_id)` и индекса `deal_id`.
+JSONB-навеса нет цели для `UNIQUE(exchange_id, external_bill_id)` и индекса `deal_id`.
 Поэтому `DealCashFlow` — собственная таблица, а не JSONB-коллекция на строке
 `Deal`.
 

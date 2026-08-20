@@ -52,8 +52,9 @@ ServiceCommandExecutor → конкретный Executor`. Команды **си
   не существовало). Учёт — форвард на `TradeGuardJob`
   (`docs/rules/instrument-hold.md` §«Носитель серии»).
 
-Kill-switch командой не является — он реактивен (`HoldSignal` →
-`SafetyHoldCoordinator`, см. `docs/components/KillSwitchExecutor.md`) и
+Kill-switch командой не является — он реактивен (детектор →
+`HoldService` → `SafetyHoldCoordinator`, см.
+`docs/components/KillSwitchExecutor.md`) и
 действием тоже не материализуется
 (`docs/decisions/command-action-boundary.md` §2).
 

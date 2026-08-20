@@ -24,7 +24,10 @@ Raw OKX `FillResponse` — элемент `data[]` ответов
 (`docs/rules/raw-exchange-dto-boundary.md`).
 
 Mapping — `docs/models/mapping/TradeFill.md` (стаб, **OKX-Q1 закрыт**:
-`TradeFill` в фазе 1 не вводится). Контракт endpoint'ов / rate limits /
+`TradeFill` в фазе 1 не вводится). **Этот native-DTO в коде фазы 1 не
+живёт** — снимается вместе со всем read-путём fills (H26 `GAPS_CLOSE_13`,
+`docs/decisions/result-profit-source.md` §«Каскад снятия»); файл остаётся
+справочным описанием полей источника. Контракт endpoint'ов / rate limits /
 пагинация — `docs/integrations/okx/contracts/fills.md`.
 
 ## Различие fills и orders

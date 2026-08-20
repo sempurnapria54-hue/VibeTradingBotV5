@@ -115,11 +115,36 @@ fills-путь торгово неполон.
   §История) → fills для avg-цены выхода **не нужны**; order-level fill-метрики
   (`accFillSz`/`avgPx`) доступны прямо из `OkxOrderResponse` (`REFRESH_ORDER_COMMAND`).
   ⇒ `REFRESH_FILLS` **снимается** — решение принято на `GAPS_CLOSE_2` (N12),
-  **исполнение — на `CODE` шага 7**: убрать из `ServiceCommandType`, удалить
-  `RefreshFillsExecutor`, провести каскад по handler'ам/evidence-cycle/`fills.md`.
-  В коде на момент записи команда и executor **ещё живы** (`ServiceCommandType.java`,
+  **исполнение — на `CODE` шага 7**. В коде на момент записи команда и
+  executor **ещё живы** (`ServiceCommandType.java`,
   `RefreshFillsExecutor.java`) — формулировка целевая, не свершившаяся
-  (H15, `GAPS_CLOSE_6`). P&L-факты добывают вторая нога `REFRESH_POSITION_COMMAND`
+  (H15, `GAPS_CLOSE_6`).
+
+### Каскад снятия — весь read-путь fills (H26 `GAPS_CLOSE_13`)
+
+Снимается **вся поверхность чтения исполнений**, не только команда:
+
+| Артефакт | Судьба |
+|---|---|
+| `ServiceCommandType.REFRESH_FILLS`, `RefreshFillsExecutor` | удаляются |
+| handler-ветки / evidence-cycle, ссылающиеся на команду | правятся |
+| `FillExternalSnapshot`, `FillMapper`, `OkxFillResponse` | удаляются |
+| `IntegrationService.getFills(...)` / `getFillsHistory(...)` и реализации | удаляются |
+| `docs/models/mapping/TradeFill.md`, `docs/models/integrations/okx/OkxFillResponse.md` | помечаются «в коде фазы 1 поверхности нет» |
+| `docs/integrations/okx/contracts/fills.md` | **остаётся справочно** — контракт-док источника не зависит от нашего кода |
+
+**Довод — исполнимость конвенции** «неиспользуемого кода нет»
+(`.claude/rules/codestyle.md` §«Неиспользуемый код», исключения — только
+Lombok-аксессоры и `@ConfigurationProperties`). После удаления команды у
+перечисленных артефактов не остаётся ни одного вызывающего; оставить их
+значило бы завести исключение «read-поверхность источника под будущий
+шаг», применимое затем к любому мёртвому коду. Той же конвенцией шаг 7 уже
+обосновал сужение состава полей снапшота — применять её к полям и не
+применять к целому read-пути было бы избирательно.
+
+**Цена возврата названа и мала:** пофилловый аудит, если понадобится,
+восстанавливается по сохранённым контракт-докам источника — они и есть
+дом знания о поверхности, а не код. P&L-факты добывают вторая нога `REFRESH_POSITION_COMMAND`
   (положение закрытия) и новая `REFRESH_BILLS_COMMAND`
   (`docs/decisions/pnl-finalization-mechanics.md` реш.1).
 

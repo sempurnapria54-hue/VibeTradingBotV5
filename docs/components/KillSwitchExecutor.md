@@ -64,7 +64,8 @@ runtime truth).
 
 Полный kill-switch flow построен: триггер — `KillSwitchService`
 (`fireInstrument` / `fireExchange` каскадом по сделкам биржи),
-оркестрация отчёта и слепков — `SafetyHoldCoordinator` (по сигналу холда
-в проходе `DealOrchestratorJob`; журнал —
+оркестрация отчёта и слепков — `SafetyHoldCoordinator`, которому
+`FULL`-ветку делегирует `HoldService` (H16 `GAPS_CLOSE_13`: сигнал в
+проходе не едет — детектор зовёт сервис; журнал —
 `docs/models/domain/other/AnomalyReport.md`). Здесь зафиксирована
 исполнительная семантика самого executor'а.

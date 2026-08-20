@@ -114,9 +114,10 @@ after-слепок.
   исключений и общая error-политика.
 - `docs/components/KillSwitchExecutor.md`,
   `docs/components/DealOrchestratorJob.md` — исполнитель teardown и
-  проход, из которого поднимается реакция.
-- `docs/components/HoldService.md` — единственный исполнитель блокировки и
-  единственный вход сюда.
+  проход, в котором детектор зовёт `HoldService`.
+- `docs/components/HoldService.md` — общий исполнитель блокировки и
+  единственный вход сюда (перечень зовущих сервис — открытый, H12
+  `GAPS_CLOSE_13`).
 - `docs/components/models/HoldSignal.md` — параметр вызова (радиус + класс
   реакции + code).
 - `docs/models/domain/other/AnomalyReport.md`,
