@@ -53,6 +53,7 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 | `fundingFee` | string-decimal | накопленный funding закрытой позиции → `Position.externalFundingCost`, **со снятием знака при маппинге** (ниже — издержка, положительна когда фондирование уплачено; H20 `DOCS_CHECK_12`, единственное место приведения — `docs/models/mapping/PositionCloseResult.md` §«Знак `fundingFee`»). Потребители — де-микширование R-мультипликатора (`docs/decisions/per-trade-risk-policy.md` §H25) и **третья пара** сверки. `FUNDING`-строки `DealCashFlow` — **сверка** этого числа, не источник (H20 `DOCS_CHECK_11`) |
 | `liqPenalty` | string-decimal | ликвидационный штраф (**сырой знак**) → `Position.externalLiquidationPenalty`; потребитель — **четвёртая пара** раздельной сверки против категории `LIQ_PENALTY` (H7 `DOCS_CHECK_13`) |
 | `type` | string | тип последнего закрытия (`1` частичное / `2` полное / `3` ликвидация / `4` частичная ликвидация / `5` ADL не полностью / `6` ADL полностью) → `Position.externalCloseType`; провенанс аварийного терминала **и** операнд `Deal.closeOutcome` (`1,2` → `NORMAL_EXIT`; `3,4` → `LIQUIDATION`; `5,6` → `FORCED_REDUCTION`; пусто либо вне `1..6` → `UNDETERMINED`; H2 `GAPS_CLOSE_13`) |
+| `instId` | string | биржевой идентификатор инструмента записи → `externalInstrumentId` снапшота; **операнд структурной валидации** «запись относится к запрошенному инструменту» (H18 `DOCS_CHECK_14`). Без него корректность чтения держалась бы только фильтром запроса — знанием вызывающего, а не фактом ответа, и при снятии ограничения «один инструмент в контуре» молча давала бы чужую запись |
 | `posId` | string | биржевой id позиции (ключ адресации записи; истекает ~30 дней после полного закрытия). На **update**-тропе сверяется с `Position.externalId`; на **create**-тропе — **пишется** в него (H4 `DOCS_CHECK_11`) |
 | `direction` | string | направление закрытой позиции → `Position.direction` **только на create-тропе** (на update-тропе поле уже заполнено live-ногой). Без него create-тропа материализует `Position` без направления, а `positions.direction` nullable ⇒ отказ был бы тихим (H4 `DOCS_CHECK_11`) |
 | `cTime` | string-ms | время создания записи → `Position.externalCreatedAt` (наследуется от `Auditable`) и далее **нижняя граница окна линковки** `Deal.billsWindowBegin` на create-тропе (H4 `DOCS_CHECK_11`) |
@@ -105,7 +106,18 @@ Used-минимум для числа `resultProfit`: готовый net бер�
   `Position.externalAverageEntryPrice` пишет **только live-нога**
   (`docs/models/mapping/PositionCloseResult.md`).
 - **Идентификация / атрибуты позиции** (не нужны числу; USDT-SWAP net /
-  isolated фиксированы адаптером): `mgnMode`, `posSide`, `lever`, `uly`.
+  isolated фиксированы адаптером): `mgnMode`, `posSide`, `lever`, `uly`,
+  **`instType`** (H18 `DOCS_CHECK_14`, внесён в unused **с доводом**:
+  тип инструмента дублирует ось запроса `instType=SWAP`, а идентичность
+  записи проверяется по `instId`, которому тип не нужен; прежде
+  `instId`/`instType` не значились **ни в одной** секции инвентаря —
+  не «отброшены», а пропущены). **`instId` — в used** (та же находка):
+  операнд структурной валидации, см. §Используемые.
+  **Посылка о наличии `instId`/`instType` в `data[]` взята из
+  контракт-дока проекта, не из офдока** — сверка с первоисточником за
+  `integrator`; если источник инструментной оси в ответе не даёт,
+  валидация вырождается в записанное ограничение «корректность держит
+  фильтр запроса».
   **`cTime` и `direction` в used возвращены** (H4 `DOCS_CHECK_11`):
   create-тропа (позиция впервые увидена уже закрытой) материализует
   `Position` из этой записи и заполняет ею нижнюю границу окна линковки —

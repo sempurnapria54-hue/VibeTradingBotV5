@@ -79,7 +79,7 @@ invariant-проверка — в `docs/models/mapping/Order.md`.
   цикла), `UNKNOWN_EXTERNAL_STATUS`, `EXCHANGE_INVARIANT_VIOLATION`,
   `UNKNOWN`.
 
-### Операнды планового риска — дом здесь, состав за развилкой (H3 `DOCS_CHECK_11`)
+### Операнды планового риска — дом здесь, и только здесь (`RISK-Q4` закрыт)
 
 `plannedEntryPrice` (reference-цена входа, по которой считался риск) и
 `plannedSizeContracts` (заявленный размер) — **атрибуты ноги входа**, не
@@ -89,11 +89,43 @@ invariant-проверка — в `docs/models/mapping/Order.md`.
 знаменатель остаётся на `Deal`; сюда переезжают только **операнды
 сравнения** «заявлено ↔ взято» (против `avgPx` / `accFillSz`).
 
-**Полями таблица пока не дополнена:** развилка «дом — `orders`,
-`algo_orders` или обе» не закрыта и прорабатывается владельцем
-(`RISK-Q4`, `.claude/work/questions/open-questions.md`) — она **гейтит
-`CODE`**, потому что задаёт состав schema-дельты шага 7
-(`docs/decisions/pnl-finalization-mechanics.md` §Следствия).
+**Дом — только `orders`** (`RISK-Q4` закрыт 2026-08-20): входной тропы
+алго-ордером не существует (вход — ordinary `Order`; у
+`AlgoOrder.ConditionType` входного значения нет — проверено по коду),
+поэтому вторая пара колонок в `algo_orders` была бы мёртвой схемой с
+живым именем. Оба поля **write-once** (`updatable = false`):
+REPLACE-нога не переписывает reference-цену — иначе разрыв «заявлено ↔
+взято», ради измерения которого операнды и заводятся, становится
+неизмеримым. Пишет их исполнитель `CREATE_ORDER_COMMAND` входного
+действия той же транзакцией; переиспользовать `orders.size`/`price`
+нельзя — это колонки биржевой стороны, перезаписываемые эхом ответа при
+каждом рефреше. Условие возврата вопроса —
+`docs/models/domain/core/AlgoOrder.md` §Назначение.
+
+## Персистентность
+
+Хранится в БД (entity `OrderEntity`, таблица `orders`, создана
+`V6__create_deal_runtime_tables.sql`), наследует audit-поля
+(`AuditableEntity`). Раздел заведён H16 `DOCS_CHECK_14` — **место истины
+схемы сущности** (`docs/rules/persistence-representation.md` §«Место
+истины схемы»); schema-дельта шага — сборка-указатель.
+
+- Состав `V6`: `id` (identity, PK), `deal_id` (`NOT NULL`, FK →
+  `deals`), `internal_id` (`varchar(64)` `NOT NULL`,
+  `uk_order_internal_id`), `external_id` (`varchar(64)`), `status`
+  (`varchar(32)` `NOT NULL`), `close_reason` (`varchar(32)`), `type`
+  (`varchar(32)` `NOT NULL`), `side` (`varchar(16)`), `external_status`
+  (`varchar(32)`), `price`, `size`, `accumulated_fill_size`,
+  `average_price`, `fee` (все `numeric(36,18)`, nullable),
+  `position_reducing_only` (`boolean`), `replaces_internal_id`
+  (`varchar(64)`), шесть audit-колонок (`AuditableEntity`, nullable).
+- **Колонки шага 7 — `ALTER`**: `planned_entry_price`,
+  `planned_size_contracts` — обе `numeric(36,18)`, nullable (пусты у
+  не-входных ног и у ордеров, заведённых вне нашего входа), write-once
+  на уровне entity (`updatable = false`). Бэкфилл не нужен
+  (`.claude/rules/pre-launch-schema-changes.md`).
+- Enum-поля хранятся строкой (имя enum; codestyle §Слои моделей и
+  enum'ы).
 
 ## Структура `AttachedAlgoOrder` (раздел `Order`)
 

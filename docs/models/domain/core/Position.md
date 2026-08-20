@@ -176,9 +176,13 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 а refresh-набор держит по одной команде на сущность.
 
 Добытое **приземляется на `Position`** (persisted), а не живёт транзитно:
-`externalRealizedProfit`, `externalResultCurrency`, `externalCloseType`,
-`externalModifiedAt` (`uTime` записи закрытия; на `Deal` та же транзакция
-пишет `billsWindowEnd`). Следствия:
+**все поля §Структура с пометкой «Положение закрытия»** (восемь) плюс
+наследуемый `externalModifiedAt` (`uTime` записи закрытия; на `Deal` та же
+транзакция пишет `billsWindowEnd`). Перечень здесь не дублируется —
+дубль-перечень из четырёх полей отстал от состава и утверждал второй
+состав в том же файле (H1 `DOCS_CHECK_14`); место истины состава —
+§Структура и таблица snapshot → `Position`
+(`docs/models/mapping/PositionCloseResult.md`). Следствия:
 
 - у факта закрытия есть **durable-дом** ⇒ он пересекает границу прохода
   FSM штатно, и потребители (финализатор штатной тропы, аварийный
@@ -267,7 +271,10 @@ H15 `DOCS_CHECK_12`), **`external_realized_profit_gross`** и
 **`external_fee`** (H19 `DOCS_CHECK_12` — правые операнды раздельной сверки
 по категориям), **`external_liquidation_penalty`** (H7 `DOCS_CHECK_13` —
 правый операнд четвёртой пары) — все `numeric(36,18)` кроме
-`external_result_currency`/`external_close_type` (`varchar`), все nullable
+`external_result_currency` (**`varchar(16)`** — строковая колонка валюты)
+и `external_close_type` (**`varchar(32)`** — сырой код источника; типы
+дописаны H13 `DOCS_CHECK_14` по общему правилу
+`docs/rules/persistence-representation.md` §«Строковые колонки»), все nullable
 (пусты, пока позиция жива или запись закрытия не добыта), добавляются
 миграцией шага 7; полная schema-дельта шага —
 `docs/decisions/pnl-finalization-mechanics.md` §Следствия.

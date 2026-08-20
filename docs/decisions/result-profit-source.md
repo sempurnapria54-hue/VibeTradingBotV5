@@ -42,8 +42,10 @@ fills-путь торгово неполон.
 - **Число — в settle-ccy целиком** (H5, `GAPS_CLOSE_6`; момент курса
   уточнён H4, `GAPS_CLOSE_7`, источник котировки — H25 `DOCS_CHECK_11`):
   `resultProfit` = net из positions-history **+ cross-ccy-слагаемое**
-  Σ(`amount` × `appliedRate`) **по строкам с `rateStatus = APPLIED`**
-  (предикат — H9 `DOCS_CHECK_11`; «по строкам чужой `ccy`» снято). Курс
+  Σ(`amount` × `appliedRate`) **по строкам cross-ccy-области** —
+  `rateStatus = APPLIED` **и** тип вне списка исключений биржи **и**
+  категория экономическая, не `OTHER` (конъюнкция — H11 `GAPS_CLOSE_13`,
+  выровнено H2 `DOCS_CHECK_14`; «по строкам чужой `ccy`» снято). Курс
   берётся **из свечи на момент операции** и фиксируется полем
   `DealCashFlow.appliedRate`; редакции «по курсу на момент закрытия» и «по
   курсу на момент обработки» — обе сняты. Биржевой net считается в

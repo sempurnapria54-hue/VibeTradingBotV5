@@ -27,7 +27,11 @@ Refresh при неактуальном состоянии и **добыча P&L
 напрямую не эмитит; `docs/components/SystemActionExecutor.md`): положение
 закрытия приезжает **второй ногой того же `REFRESH_POSITION_COMMAND`**, которым
 подтверждено отсутствие позиции, и ложится на `Position` (+
-`Deal.billsWindowEnd`); опц. `REFRESH_BILLS_COMMAND` — разбивка. Активный риск
+`Deal.billsWindowEnd`); `REFRESH_BILLS_COMMAND` (разбивка) входит в цикл **тогда
+и только тогда, когда окно движений закрыто** — `Deal.billsWindowEnd`
+непуст (составной предикат вместо «опц.», H9 `DOCS_CHECK_14`;
+`docs/components/SystemActionExecutor.md` §«Состав конкретного цикла»).
+Активный риск
 снимается риск-минимизирующим порядком **cleanup-командами напрямую, без
 анкера** (открытая позиция → `CLOSE_POSITION_COMMAND`; live ordinary orders →
 `CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND`; учёта серии

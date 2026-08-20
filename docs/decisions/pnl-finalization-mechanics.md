@@ -366,8 +366,9 @@ staged-числа между двумя финализационными ком�
     Биржевой `realizedPnl` посчитан **в settle-ccy** и издержку, уплаченную
     вне неё, не содержит. Поэтому заголовочное число = **net +
     cross-ccy-слагаемое** Σ(`amount` × `appliedRate`) по строкам
-    `rateStatus = APPLIED` (§«Cross-ccy» ниже; предикат — H9
-    `DOCS_CHECK_11`). Bills
+    cross-ccy-области — `rateStatus = APPLIED` **и** тип вне списка
+    исключений **и** категория экономическая (§«Cross-ccy» ниже;
+    конъюнкция — H11 `GAPS_CLOSE_13`, выровнено H2 `DOCS_CHECK_14`). Bills
     по-прежнему не подменяют net — они доносят слагаемое, которого в net
     физически нет.
 - **Не блокирует финализацию:** сделка идёт в `CLOSED` с net-числом. Расхождение
@@ -550,9 +551,12 @@ staged-числа между двумя финализационными ком�
     источник котировки пересмотрен H25 `DOCS_CHECK_11` — «момент обработки»
     снят, см. §«Механизм курса» ниже).
     `Deal.resultProfit` = net из positions-history +
-    Σ(`amount` × `appliedRate`) по строкам с **`rateStatus = APPLIED`**
-    (предикат пересмотрен H9 `DOCS_CHECK_11`; «по строкам чужой `ccy`»
-    снято — оно затягивает в произведение строки с пустым `appliedRate`).
+    Σ(`amount` × `appliedRate`) по строкам cross-ccy-области —
+    **`rateStatus = APPLIED` и тип вне списка исключений и категория
+    экономическая (не `OTHER`)**, конъюнкция целиком (H11
+    `GAPS_CLOSE_13`, выровнено H2 `DOCS_CHECK_14`; «по строкам чужой
+    `ccy`» снято — оно затягивает в произведение строки с пустым
+    `appliedRate`).
     Довод за само
     слагаемое: пометка аномалией фиксирует **факт** нарушения, но **смещения
     числа не устраняет** — без слагаемого число завышает результат ровно на
@@ -653,7 +657,7 @@ staged-числа между двумя финализационными ком�
 
 | Тропа | Отказ добычи | Реакция |
 |---|---|---|
-| Штатная (`EXIT_PENDING` → `CLOSED`) | `REFRESH_POSITION_COMMAND` / `REFRESH_BILLS_COMMAND` не смогли прочитать | **ретрай по бюджету исполнения `REFRESH_DEAL_CONTEXT_ACTION`**; исчерпание уводит сделку ошибочной тропой в `ERROR` + **холд инструмента** (управление-сайд серия, `docs/rules/instrument-hold.md` §«Серия неудач» — с доводом отладки и условием пересмотра) |
+| Штатная (`EXIT_PENDING` → `CLOSED`) | `REFRESH_POSITION_COMMAND` / `REFRESH_BILLS_COMMAND` не смогли прочитать | **ретрай по бюджету исполнения `REFRESH_DEAL_CONTEXT_ACTION`**; исчерпание уводит сделку ошибочной тропой в `ERROR` + **холд инструмента** (записанное отклонение от единой мягкой формы исчерпания — H6 `DOCS_CHECK_14`; `docs/rules/instrument-hold.md` §«Отказ добычи посттерминальных фактов» — с доводом отладки и условием пересмотра) |
 | Аварийный терминал (`ERROR` → `EMERGENCY_CLOSED`) | **жёсткий** отказ чтения (controlled/parse), не «пусто» | **приравнивается к «недоступно»** → пустой результат → `resultProfit = null` «неисчислимо» → **терминал всё равно ставится** |
 
 - **Почему асимметрия, а не единообразие.** На штатной тропе отказ означает
@@ -789,10 +793,11 @@ kill-switch-холд. Достроено:
     `docs/models/mapping/PositionCloseResult.md`); колонка-якорь у него
     есть (`positions.external_liquidation_penalty`), поэтому в
     schema-дельте он тоже назван;
-  - **четыре поля планового риска на payload'ах команд создания**
-    (`plannedRiskAmount`, `plannedRiskCurrency`, `plannedEntryPrice`,
-    `plannedSizeContracts` на `CreateOrderCommandPayload` **и**
-    `CreateAlgoOrderCommandPayload`) — payload runtime-объект, колонки у
+  - **четыре поля планового риска на `CreateOrderCommandPayload`** —
+    и **только** на нём (`plannedRiskAmount`, `plannedRiskCurrency`,
+    `plannedEntryPrice`, `plannedSizeContracts`; `RISK-Q4` закрыт:
+    входной алго-тропы не существует, `CreateAlgoOrderCommandPayload`
+    полей не несёт) — payload runtime-объект, колонки у
     него нет (H19 `GAPS_CLOSE_13`; `docs/components/CreateOrderExecutor.md`
     §«Канал доставки», `docs/components/CreateAlgoOrderExecutor.md`);
   - **новое значение `Instrument.Status.ENTRY_BLOCKED`** плюс его
@@ -814,11 +819,33 @@ kill-switch-холд. Достроено:
     `docs/decisions/result-profit-source.md` §«Каскад снятия»);
   - **идентичность объекта блокировки внутрь `HoldSignal`** и уход
     `DealContext` из подписи `HoldService.hold(...)` (H13
-    `GAPS_CLOSE_13`); фабрики сигнала получают параметр идентичности.
+    `GAPS_CLOSE_13`); фабрики сигнала получают параметр идентичности;
+  - **идентичность протянута вниз по цепочке** (H5 `DOCS_CHECK_14`):
+    подпись `SafetyHoldCoordinator.react(HoldSignal)` (вместо
+    `react(signal, dealContext)`), реактивная поверхность
+    `AnomalyReport` берёт `instrumentId`/`exchangeId` из сигнала;
+  - **резолв класса реакции по типу исключения** (H6 `DOCS_CHECK_14`):
+    отображение в `docs/components/HoldService.md` §«Момент вызова»;
+    код холда серии — один, `RETRY_BUDGET_EXHAUSTED`; пары кодов по
+    стороне ноги не существует;
+  - **инкремент бюджета на исчерпанном цикле** refresh-команды (H8
+    `DOCS_CHECK_14`; `docs/rules/command-lifecycle.md` следствие 3,
+    `docs/components/ServiceCommandExecutor.md` §Retry);
+  - **составной предикат bills-звена аварийного цикла** (H9
+    `DOCS_CHECK_14`: bills входит ⟺ `billsWindowEnd` непуст) и **сверка
+    на ветви (a) аварийного терминала** (H21 `DOCS_CHECK_14`);
+  - **реакция финализаторов на нарушение контракта в добытой записи**
+    (H7/H10 `DOCS_CHECK_14`): вызов `exchange(code, exchangeId)` при
+    пустом/неизвестном `type` и при пустом правом операнде пары
+    обязанной сверки (`docs/rules/exchange-hold.md` §«Что переводит в
+    HOLD»).
 - **Полная schema-дельта шага 7** (H21, `DOCS_CHECK_8`; всё — `ALTER` /
   новые объекты, в `V1-V10` их **нет**):
-  - `deals`: `ALTER` + `planned_risk_amount`, `planned_risk_currency`,
-    `bills_window_begin`, `bills_window_end` (nullable) **плюс признаки
+  - `deals`: `ALTER` + `planned_risk_amount` (`numeric(36,18)`),
+    `planned_risk_currency` (`varchar(16)`), `bills_window_begin`,
+    `bills_window_end` (обе `timestamptz`; все nullable; типы — H13
+    `DOCS_CHECK_14`, `docs/rules/persistence-representation.md`
+    §«Строковые колонки») **плюс признаки
     отбора для отчёта** (узел F `DOCS_CHECK_12`): `close_outcome`
     (`varchar(32)` — торговый исход закрытия, четыре значения включая
     `UNDETERMINED`, H2 `GAPS_CLOSE_13`), `reconciliation_status`
@@ -836,15 +863,17 @@ kill-switch-холд. Достроено:
     отчёта»). Операнды сравнения планового риска (`planned_entry_price`,
     `planned_size_contracts`) **сюда не входят** — их дом сущность ноги
     входа (H3 `DOCS_CHECK_11`, см. ниже);
-  - **нога входа — `orders` и/или `algo_orders`**: `ALTER` +
-    `planned_entry_price`, `planned_size_contracts` (nullable,
+  - **нога входа — только `orders`** (`RISK-Q4` закрыт 2026-08-20):
+    `ALTER` + `planned_entry_price`, `planned_size_contracts` (nullable,
     `numeric(36,18)`, write-once) — reference-цена и заявленный размер,
     против которых меряется разрыв «заявлено ↔ взято»
-    (`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).
-    **Развилка «обычный ордер против алго-ордера» не закрыта** и
-    прорабатывается владельцем (`RISK-Q4`): от неё зависит, какая из
-    двух таблиц (или обе) попадает в дельту, поэтому строка помечена
-    **гейтящей** `CODE`;
+    (`docs/models/domain/aggregate/Deal.md` §«Плановый риск»; место
+    истины — `docs/models/domain/core/Order.md` §Персистентность,
+    заведён H16 `DOCS_CHECK_14`). `algo_orders` колонок не получает —
+    входной алго-тропы не существует, пара колонок была бы мёртвой
+    схемой с живым именем; условие возврата —
+    `docs/models/domain/core/AlgoOrder.md` §Назначение. Пометка
+    «гейтит `RISK-Q4`» снята;
   - `positions`: `ALTER` + `external_realized_profit`,
     `external_result_currency`, `external_close_average_price` (H26
     `DOCS_CHECK_10` — операнд калибровки проскока на тропе attached-SL,
@@ -856,10 +885,14 @@ kill-switch-холд. Достроено:
     сверки разбивки по категориям), **`external_liquidation_penalty`**
     (H7 `GAPS_CLOSE_13` — правый операнд четвёртой пары, категория
     `LIQ_PENALTY`). Итого **восемь** колонок положения
-    закрытия; место истины перечня — `docs/models/domain/core/Position.md`
+    закрытия — шесть `numeric(36,18)`, `external_result_currency`
+    `varchar(16)`, `external_close_type` `varchar(32)` (типы — H13
+    `DOCS_CHECK_14`); место истины перечня —
+    `docs/models/domain/core/Position.md`
     §Персистентность;
   - `instruments`: `ALTER` + `external_settlement_currency`,
-    `external_base_currency`, `external_quote_currency` (nullable; H6
+    `external_base_currency`, `external_quote_currency` (все три
+    `varchar(16)`, nullable — H13 `DOCS_CHECK_14`; H6
     `DOCS_CHECK_11` — дом валют инструмента переехал с навеса на
     сущность, `docs/decisions/instrument-currencies-home.md`). **Писатель
     — тропа заведения инструмента** (H10 `DOCS_CHECK_12`); бэкфилл не
@@ -867,13 +900,20 @@ kill-switch-холд. Достроено:
     (`.claude/rules/pre-launch-schema-changes.md`), а не потому, что
     «значение появится после ближайшего тика синка» — эта формулировка
     снята;
-  - `deal_action_states`: `ALTER` — `strategy_action_id` → nullable,
-    `+action_kind`, `+system_action_type`, `+target_entity_type`,
-    `+target_entity_id`; снятие `uk_deal_action_state_deal_action`,
-    частичные уникальные индексы живых исполнений; **`DROP COLUMN
-    target`** — **бэкфилла нет** (H25 `GAPS_CLOSE_13`: строк нет,
-    переносить нечего, правило фазы применимо целиком —
-    `.claude/rules/pre-launch-schema-changes.md`); строки
+  - **исполнения — две таблицы** (H15 `DOCS_CHECK_14`, решение
+    пользователя; носитель топологии V2 «общая таблица» пересмотрен
+    явно): `deal_action_states` **переименовывается** в
+    `deal_strategy_action_states` (`strategy_action_id` остаётся
+    `NOT NULL`; `+target_entity_type`, `+target_entity_id`; снятие
+    `uk_deal_action_state_deal_action`, два частичных уникальных индекса
+    живых исполнений; **`DROP COLUMN target`** — **бэкфилла нет**, H25
+    `GAPS_CLOSE_13`); создаётся **`deal_system_action_states`**
+    (`deal_id`, `system_action_type` `NOT NULL`, `status`, retry-поля,
+    audit; частичный уникальный индекс живых по (`deal_id`,
+    `system_action_type`); target-колонок нет — цель всегда сделка);
+    колонок `action_kind` нет ни в одной. Место истины —
+    `docs/models/domain/other/DealActionState.md` §Инварианты /
+    §Персистентность. Строки
     `deal_finalization_states` **не переносятся** — `DELETE` + `DROP
     TABLE` (правило и довод — `docs/models/domain/other/DealActionState.md`
     §«Правило переноса», H19 `DOCS_CHECK_10`);
@@ -888,9 +928,16 @@ kill-switch-холд. Достроено:
     единственной 16-символьной enum-колонки проекта запас нулевой).
     **Частичных уникальных индексов-анкеров нет** (H17 `GAPS_CLOSE_13`,
     решение пользователя): анкер-ограничение уникальности **снято**
-    целиком — и групповой, и негрупповой. Идемпотентность `STATE`-отчёта
+    целиком — и групповой, и негрупповой. Взамен ставится **поисковый
+    (не уникальный) индекс незавершённых** по (`exchange_id`, `code`,
+    `scope`, `instrument_id`, `fee_group_key`) `where kind = 'STATE' and
+    status in ('CREATED','IN_PROGRESS','KILL_SWITCH_EXECUTED')` — H14
+    `DOCS_CHECK_14`: прежде дельта несла здесь только отрицание, а
+    индекс, требуемый моделью, в неё не попадал. Идемпотентность
+    `STATE`-отчёта
     держится **незавершённым статусом**: производитель перед созданием
-    ищет незавершённый отчёт своего кода и радиуса и **продолжает** его, в
+    ищет незавершённый отчёт своего кода и радиуса (составной ключ
+    поиска — `ANOM-Q5`) и **продолжает** его, в
     том числе после рестарта (`docs/models/domain/other/AnomalyReport.md`
     §«Отчёт как процесс с фазами»). Прежняя конструкция ключа была
     вдобавок мёртвой на `scope = EXCHANGE` (`instrument_id = null`,
@@ -904,10 +951,20 @@ kill-switch-холд. Достроено:
     индекс миграцией того же шага;
   - новые таблицы: `deal_cash_flows` (вкл. `applied_rate`, `rate_status`
     `not null`, `exchange_id` `not null`, `external_instrument_id`,
+    **три колонки ссылки на свечу курса**
+    `applied_rate_candle_instrument` / `_timeframe` / `_open_time` —
+    координатная запись, не FK (H11 `DOCS_CHECK_14`),
     **`UNIQUE(exchange_id, external_bill_id)`** — ось биржи в ключе, H13
-    `DOCS_CHECK_11`; индекс отбора несвязанных строк окна по
+    `DOCS_CHECK_11`; **индекс по `deal_id`** — выборка разбивки сделки и
+    сверка (H14 `DOCS_CHECK_14` — прежде дельта перечисляла индексы этой
+    таблицы выборочно); индекс отбора несвязанных строк окна по
     (`external_instrument_id`, `external_created_at`) `where deal_id is
-    null`, H11), `trade_fee_rates`;
+    null`, H11 `DOCS_CHECK_11`), `trade_fee_rates` (вкл. **индекс
+    резолва актуальной строки группы** по (`exchange_id`,
+    `external_instrument_type`, `external_fee_group_id`,
+    `created_at DESC`) — H14 `DOCS_CHECK_14`; audit-имена обеих новых
+    таблиц — `modified_at`/`modified_by` по фактическому
+    `AuditableEntity`, H12 `DOCS_CHECK_14`);
   - `strategy_actions`: миграция **значений** `action_type`
     (`CREATE→CREATE_ACTION` и т. д., суффиксное правило);
   - **Бэкфилл `instruments.external_modified_at`** (измеритель свежести
@@ -931,14 +988,18 @@ kill-switch-холд. Достроено:
      экономике сделки, наполнен тем же прогоном. Пустой список
      отгружает контроль целостности числа **погашенным**
      (`docs/models/mapping/DealCashFlow.md` §«Область сверки»).
-  3. **Развилка дома операндов планового риска** (`RISK-Q4`, H3
-     `DOCS_CHECK_11`): `orders`, `algo_orders` или обе — от неё зависит
-     состав дельты.
-  4. **Сколько акторов ведут процессные `STATE`-отчёты** (`ANOM-Q5`, H17
-     `GAPS_CLOSE_13`): поиск незавершённого отчёта и его создание не
-     атомарны, а перечень писателей открыт ⇒ два такта могут завести два
-     незавершённых отчёта на один факт. `ANOM-Q3` и `ANOM-Q4` сняты
-     вместе с анкер-ключом.
+  3. **Закрыт** (2026-08-20, `RISK-Q4`): дом операндов планового риска —
+     **только `orders`**, две колонки write-once; входной алго-тропы не
+     существует (inspection по коду), условие возврата записано в
+     `docs/models/domain/core/AlgoOrder.md` §Назначение. Гейта нет.
+  4. **Закрыт** (2026-08-20, `ANOM-Q5`): процессных писателей три,
+     межакторная гонка в фазе 1 недостижима (коды не пересекаются,
+     каждый актор сериализован guard'ом); внутритиковая тропа задвоения
+     закрыта проходом радиуса и составным ключом поиска; частичный
+     уникальный индекс — страховка мультиинстанса (фаза 3)
+     (`docs/models/domain/other/AnomalyReport.md` §Инварианты
+     структуры). `ANOM-Q3`/`ANOM-Q4` сняты вместе с анкер-ключом;
+     `ANOM-Q6` — зависимый. Гейта нет.
   5. **Носитель курса cross-ccy** (H25 `DOCS_CHECK_11`): эндпоинт свечей,
      разрешение и правило деградации — хэнд-офф `integrator`; до него
      пересчёт неисполним и **все** cross-ccy строки уходят в
@@ -978,6 +1039,23 @@ kill-switch-холд. Достроено:
      привязан срок выхода из разведочного режима — по образцу п. 2 того же
      реестра. Без этого `reconciliationStatus` может стать систематическим
      `MISMATCHED`, а на нём стоит доверие ко всей R-выборке.
+  9. **Посылка «биржевой net не содержит издержку вне settle-ccy»**
+     (`AG3.4`) — **гейтит** (статус назван H19 `DOCS_CHECK_14`; прежде
+     посылка статуса гейта не имела ни здесь, ни в носителе — реш.4
+     §выше). Довод: сестринская посылка того же класса (кумулятивность
+     `realizedPnl`, реш.6 — п. 1) помечена предположением **и гейтит**, а
+     довода, отличающего эту, нет; при её ложности cross-ccy-слагаемое
+     считается **дважды**, число занижается систематически, и ни одна из
+     четырёх пар этого не видит (строки не в settle-ccy). Прогон — та же
+     фикстура §AG1.
+
+  **Негейтящие решения записываются здесь же** (H19 `DOCS_CHECK_14`:
+  реестр, объявляющий себя сквозным местом сбора гейтов, обязан нести и
+  «рассмотрено — не гейтит», иначе отсутствие кейса читается как «не
+  рассматривали»): **`AG1.5`** (нижняя граница окна / entry-fee) и
+  **`AG3.5`** (гранулярность bills, fee-эхо) — рассмотрены и **не
+  гейтят**: их прогон и так запланирован **до** `CODE`
+  (`docs/models/mapping/DealCashFlow.md` §«Под-случай fee-эхо»).
 - **Дельта существующего executor'а:** `RefreshPositionExecutor` получает
   вторую ногу цикла (positions-history), запись полей положения закрытия
   на `Position` и запись `Deal.billsWindowBegin`/`billsWindowEnd`.

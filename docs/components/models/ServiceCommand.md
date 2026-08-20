@@ -33,8 +33,9 @@ ServiceCommandExecutor → конкретный Executor`. Команды **си
 | `dealActionStateId` | `Long` | Строка **исполнения действия** (`docs/models/domain/other/DealActionState.md`) — retry-anchor команды; один на оба вида действий (STRATEGY и SYSTEM). `null` только у cleanup-команд (см. ниже). |
 | `payload` | `ServiceCommandPayload` | Параметры выполнения (см. `docs/components/models/ServiceCommandPayload.md`). |
 
-**Retry-anchor один** — строка исполнения действия в
-`deal_action_states` (прежний второй анкер `dealFinalizationStateId`
+**Retry-anchor один** — строка исполнения действия
+(`deal_strategy_action_states` / `deal_system_action_states` — по виду,
+H15 `DOCS_CHECK_14`; прежний второй анкер `dealFinalizationStateId`
 упразднён вместе с `DealFinalizationState`;
 `docs/decisions/command-action-boundary.md` §3). Правила:
 

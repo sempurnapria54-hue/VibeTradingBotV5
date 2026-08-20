@@ -214,14 +214,16 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
 | Ребро | `closeOutcome` | `reconciliationStatus` | `breakdownIncomplete` |
 |---|---|---|---|
 | `EXIT_PENDING → CLOSED` (штатная) | по `Position.externalCloseType`, пусто/вне `1..6` ⇒ `UNDETERMINED` | исход сверки | `COMPLETE` / `INCOMPLETE_BY_WINDOW` / `NOT_ASSESSED` |
-| `ERROR → EMERGENCY_CLOSED` | то же | `NOT_RUN` | то же сравнение, при недобытых границах — `NOT_ASSESSED` |
+| `ERROR → EMERGENCY_CLOSED` | то же | ветвь (a) — запись закрытия добыта: **исход сверки** (`MATCHED`/`MISMATCHED`, H21 `DOCS_CHECK_14`); ветвь (b) — окно пусто: `NOT_RUN` | то же сравнение, при недобытых границах — `NOT_ASSESSED` |
 | три тропы **закрытия без входа** → `CLOSED` | **пусто** (неприменим) | **пусто** (неприменим) | **пусто** (неприменим) |
 
 Пустота на тропах без входа — **ратифицированное значение**, а не пропуск
 писателя: события, о котором признак, там не было
-(`docs/rules/absent-value-semantics.md`). Отличать такие сделки в отчёте
-позволяет статус (`status` + `closeReason`), по которому видно, как сделка
-закрылась.
+(`docs/rules/absent-value-semantics.md`). Назначенного операнда отбора
+таких сделок у отчёта нет: `closeReason` две тропы не различает, и
+определение популяции — за потребителем отчёта на шаге фронта (H20
+`DOCS_CHECK_14`, `docs/models/domain/aggregate/Deal.md` §«Рамка
+R-выборки»).
 
 DEAL-Q2 закрыт в три захода: механика/терминальный контракт — `GAPS_CLOSE_1`
 шага 6 (2026-06-22); *число* на ошибочном терминале (остаток DEAL-Q2, G5) —

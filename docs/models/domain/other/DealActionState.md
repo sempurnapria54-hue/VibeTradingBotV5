@@ -15,7 +15,8 @@
 это исполнение и какую runtime-сущность оно породило/затрагивает». Несёт
 идемпотентность/recovery/retry command-layer'а.
 
-Действия двух видов (`action_kind`):
+Действия двух видов (`actionKind` — доменный дискриминатор; в схеме вид
+кодируется таблицей, H15 `DOCS_CHECK_14`):
 
 - **`STRATEGY`** — исполнение узла авторского дерева стратегии
   (`StrategyAction` по `strategyActionId`): CREATE/REPLACE/CANCEL-ноги
@@ -52,7 +53,7 @@ Java-модель, наследует retry-состояние от базово
 |---|---|---|---|
 | `id` | `Long` | да | Идентичность **исполнения** (суррогатная). |
 | `dealId` | `Long` | да | Сделка, в рамках которой идёт исполнение. |
-| `actionKind` | `ActionKind` | да | Вид действия: `STRATEGY` / `SYSTEM` (дискриминатор). |
+| `actionKind` | `ActionKind` | да | Вид действия: `STRATEGY` / `SYSTEM` (доменный дискриминатор). **В схему не персистится** — вид кодируется таблицей (H15 `DOCS_CHECK_14`, §Персистентность). |
 | `strategyActionId` | `Long` | у STRATEGY | Узел стратегии, чьё исполнение отслеживается. `null` у SYSTEM-строк — узла стратегии за системным действием нет. |
 | `systemActionType` | `SystemActionType` | у SYSTEM | Тип системного действия. `null` у STRATEGY-строк. |
 | `targetEntityType` | `TargetEntityType` | нет | Тип runtime-сущности, на которую нацелено исполнение. Колонка (не jsonb): операнд ключа уникальности. |
@@ -141,40 +142,48 @@ runtime-сущность (target = новая, `replacesInternalId` = `internalI
 
 ## Инварианты
 
-Ключи — **частичные, по живым статусам, с целью в ключе** (модель — место
+**Стратегийные и системные исполнения хранятся в двух таблицах** (H15
+`DOCS_CHECK_14`, решение пользователя): `deal_strategy_action_states` и
+`deal_system_action_states`, у каждой **свои** ключи; частичных индексов
+по `action_kind` на общей таблице не заводится, псевдо-операнда
+`action_ref` не существует. Прежняя запись ключа через `action_ref` была
+неисполнима (колонки с таким именем нет), а форма ключа на общей таблице
+упиралась в `NULL`-семантику nullable-ссылки — здесь она **исчезает
+вместе с nullable-колонкой**: в стратегийной таблице `strategy_action_id`
+`NOT NULL`, в системной `system_action_type` `NOT NULL`.
+
+Ключи — **частичные, по живым статусам** (модель — место
 истины ключа, `docs/rules/idempotency-via-unique.md` §«Уникальность среди
 живых»):
 
 ```text
 живые статусы = PLANNED | CREATED | SUBMITTED | RETRY_PENDING
-action_ref    = strategy_action_id (STRATEGY) | system_action_type (SYSTEM)
 
-unique (deal_id, action_ref, target_entity_type, target_entity_id)
-       where status in (живые) and target_entity_id is not null
-unique (deal_id, action_ref)
-       where status in (живые) and target_entity_id is null
+deal_strategy_action_states:
+  unique (deal_id, strategy_action_id, target_entity_type, target_entity_id)
+         where status in (живые) and target_entity_id is not null
+  unique (deal_id, strategy_action_id)
+         where status in (живые) and target_entity_id is null
+
+deal_system_action_states:
+  unique (deal_id, system_action_type)
+         where status in (живые)
 ```
 
 - Ноги грида различаются **целью** и живут одновременно; «незапущенное»
   (`target == null`) исполнение узла — не более одного (вторая нога
   планируется следующим проходом — штатный режим loop-driven петли).
 - У системных действий цель — сама сделка ⇒ одно живое исполнение на
-  (сделку, тип действия). **Операнды заполняются оба**:
-  `target_entity_type = DEAL`, `target_entity_id = deal_id` — значит
-  SYSTEM-строку ловит **первый** (не-null) частичный индекс (H24
-  `DOCS_CHECK_10`; `docs/components/SystemActionExecutor.md` §Контракт
-  описывал ту же гарантию через вторую ветку — формулировки выровнены).
-  `NONE`/`null` у SYSTEM-строк не используется: цель у них есть всегда.
+  (сделку, тип действия); операнды цели в системный ключ **не входят** —
+  они производны (`DEAL`, `deal_id`), и target-колонок системная таблица
+  не несёт вовсе (§Персистентность). `NONE`/`null` у системных исполнений
+  не используется: цель у них есть всегда.
 - Завершённые строки ключ **не держит** — исполнение терминально,
   следующее заводится свободно.
 - Ключ защищает от дубля **планирования** (второй строки-намерения); от
   дубля ордера на бирже защищает stable client id
   (`internalId → clOrdId`, `docs/components/RetryPolicyService.md`
   §«Опасные команды»).
-- NULL-семантика: `strategy_action_id` nullable, поэтому жёсткий
-  `UNIQUE` по нему не работает — отсюда частичные индексы по
-  `action_kind` (`docs/rules/idempotency-via-unique.md`
-  §«NULL-семантика»).
 - `strategyActionId` хранится **только** здесь, не в
   `Order`/`AlgoOrder`/`Position`.
 - Target-колонки заполняет executor при создании/материализации сущности,
@@ -182,6 +191,28 @@ unique (deal_id, action_ref)
 - Строка переживает рестарт: command-layer пересобирает нужную команду по
   `status` + target + exchange facts; pending `ServiceCommand` как
   очередь не восстанавливаются (`docs/rules/command-lifecycle.md`).
+
+**Совместимость с ратифицированной топологией — проверена, цена
+названа.** Топология строк («строка = исполнение, не действие»:
+многократные исполнения, копление, `COMPLETED` жёстко терминален,
+сквозной бюджет отказов) **не пересматривается** — обе таблицы держат те
+же строки-исполнения с теми же статусами и retry-базой. Пересматривается
+**носитель** принятой топологии V2 («общая таблица, nullable ссылка,
+частичные ключи» → две таблицы, `NOT NULL`-ссылки, свои ключи) — явным
+решением, не молча. Запланированная следующая итерация топологии
+(политика очистки копящихся строк — фаза 3) совместима: чистка идёт
+per-таблица, и горизонты двух видов могут различаться. **Цена:** вторая
+entity и ветвление `DataService` по виду; `DealContext.actionStates`
+собирается из двух таблиц (два чтения вместо одного); переименование
+существующей таблицы (дёшево — таблицы пусты,
+`.claude/rules/pre-launch-schema-changes.md`); появление системного
+действия с целью ≠ `DEAL` потребует добавить системной таблице
+target-колонки (условие названо). **Выигрыш:** класс дефекта «`NULL`'ы в
+`UNIQUE` различны» устранён схемой, а не предикатом; каждый читатель уже
+читает свой вид (`StrategyActionOrchestrator` — STRATEGY,
+`SystemActionExecutor` — SYSTEM) — таблица совпадает с читателем;
+колонка-дискриминатор `action_kind` в схеме не нужна (вид кодируется
+таблицей; доменный енум `ActionKind` остаётся — вид различает домен).
 
 ## Транзакционная клауза записи в `Deal`
 
@@ -194,11 +225,32 @@ unique (deal_id, action_ref)
 
 ## Персистентность
 
-- Таблица `deal_action_states`. **Миграция шага 7 (ALTER):**
-  `strategy_action_id` → nullable; `+action_kind`, `+system_action_type`,
-  `+target_entity_type`, `+target_entity_id`; прежний
-  `uk_deal_action_state_deal_action` снимается, ставятся частичные
-  индексы §Инварианты.
+**Две таблицы, одна доменная модель** (H15 `DOCS_CHECK_14`). Домен —
+один класс `DealActionState` с дискриминатором `actionKind` (семантика
+исполнения общая: статусы, target, retry-база `Retryable`);
+разводится **хранение**: две entity
+(`DealStrategyActionStateEntity` / `DealSystemActionStateEntity`),
+маппинг по виду делает `DataService` — единственная граница
+domain ↔ persistence.
+
+- **`deal_strategy_action_states`** (существующая `deal_action_states`,
+  **переименовывается** — таблицы пусты, `ALTER RENAME` дёшев).
+  **Миграция шага 7:** rename; `strategy_action_id` остаётся `NOT NULL`;
+  `+target_entity_type`, `+target_entity_id` (расплющенный
+  `RuntimeTarget`); прежний жёсткий `uk_deal_action_state_deal_action`
+  снимается, ставятся два частичных ключа §Инварианты. Колонок
+  `action_kind` / `system_action_type` таблица **не получает** — вид
+  кодируется таблицей.
+- **`deal_system_action_states`** — **новая** (`CREATE TABLE`): `id`,
+  `deal_id` (`NOT NULL`, FK), `system_action_type` (`varchar(64)`
+  `NOT NULL` — енум строкой; самое длинное значение —
+  `REFRESH_DEAL_CONTEXT_ACTION`), `status` (`varchar(32)` `NOT NULL`),
+  retry-поля `Retryable` (`attempt_count`, `max_attempts`,
+  `next_retry_at`, `last_error` jsonb), audit-колонки. Target-колонок
+  нет: цель системного действия — всегда сама сделка (`deal_id`); ключ —
+  частичный §Инварианты.
+- `DROP TABLE deal_finalization_states` — по правилу переноса ниже (её
+  роль перенесена в системную таблицу).
 
 ### Правило переноса `deal_finalization_states` (H19 `DOCS_CHECK_10`)
 
@@ -245,8 +297,8 @@ unique (deal_id, action_ref)
 - побочно снят операнд, которого не существовало: ключи jsonb-сериализации
   `RuntimeTarget` в доках не зафиксированы, и `UPDATE` привязал бы миграцию
   к текущей форме сериализации, ничем не закреплённой;
-- у STRATEGY-строк, заводимых после ввода, `action_kind = STRATEGY`,
-  `system_action_type = null`.
+- расплющивание идёт в **стратегийной** таблице; системная таблица
+  target-колонок не несёт вовсе (H15 `DOCS_CHECK_14`, §Персистентность).
 
 **Почему асимметрия (а) и (б) — по оси существования строк.**
 Финализационные строки **и** STRATEGY-строки к моменту миграции одинаково
@@ -263,8 +315,9 @@ unique (deal_id, action_ref)
   (`docs/rules/persistence-representation.md`; прежний вложенный
   `RuntimeTarget` расплющен).
 - `lastError` (`RetryError`) — jsonb на строке.
-- Enum'ы (`action_kind`, `system_action_type`, `status`,
-  `target_entity_type`) — строкой (codestyle §Слои моделей и enum'ы).
+- Enum'ы (`system_action_type`, `status`,
+  `target_entity_type`) — строкой (codestyle §Слои моделей и enum'ы);
+  колонки `action_kind` нет ни в одной таблице (вид кодируется таблицей).
 
 ## Чего не хранит
 

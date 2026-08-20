@@ -75,6 +75,7 @@ executor работает только с validated normalized snapshot.
 | `externalFundingCost` | `BigDecimal` | накопленный funding закрытой позиции (`fundingFee`), **нормализованный по знаку**: издержка, положительна когда фондирование уплачено (H20 `DOCS_CHECK_12`). Операнд де-микширования R-мультипликатора и правый операнд третьей пары сверки |
 | `externalLiquidationPenalty` | `BigDecimal` | `liqPenalty` записи — ликвидационный штраф, **сырой знак** источника; правый операнд четвёртой пары сверки (H7 `DOCS_CHECK_13`) |
 | `externalPosId` | `String` | биржевой id позиции (ключ адресации записи; на create-тропе — **данные**, см. ниже) |
+| `externalInstrumentId` | `String` | сырой `instId` записи — операнд **структурной валидации** «запись относится к запрошенному инструменту» (H18 `DOCS_CHECK_14`); на `Position` не приземляется — сверка, не данные |
 | `externalDirection` | `String` | направление закрытой позиции (`direction`) — операнд **create-тропы** (H4 `DOCS_CHECK_11`) |
 | `externalCreatedAt` | `OffsetDateTime` | время создания записи positions-history (`cTime`) — операнд **create-тропы** и нижней границы окна линковки (H4 `DOCS_CHECK_11`) |
 | `externalModifiedAt` | `OffsetDateTime` | время обновления записи positions-history |
@@ -196,8 +197,10 @@ H19**: расхождение доков о применимости `triggerPx`
 | `externalRealizedPnlGross` | `Position.externalRealizedProfitGross` | `pnl` до издержек; потребитель — первая пара сверки (H19 `DOCS_CHECK_12`) | обе |
 | `externalFee` | `Position.externalFee` | знаковая комиссионная компонента записи; потребитель — вторая пара сверки (H19 `DOCS_CHECK_12`) | обе |
 | `externalFundingCost` | `Position.externalFundingCost` | накопленный funding, **знак нормализован при построении снапшота** (издержка > 0); потребители — де-микширование R (H20 `DOCS_CHECK_11`) и третья пара сверки (H19 `DOCS_CHECK_12`) | обе |
+| `externalLiquidationPenalty` | `Position.externalLiquidationPenalty` | ликвидационный штраф записи (**сырой знак** источника); потребитель — четвёртая пара сверки (H7 `DOCS_CHECK_13`; строка дозаведена H1 `DOCS_CHECK_14` — без неё правый операнд пары не приземлялся) | обе |
 | `externalModifiedAt` | `Position.externalModifiedAt` + **`Deal.billsWindowEnd`** | `uTime` записи закрытия (конвенция `Auditable`, H25). На `Deal` — верхняя граница окна линковки bills, пишется той же транзакцией (узел 1 `DOCS_CHECK_8`; окно из `Position.externalModifiedAt` больше не реконструируется) | обе |
 | `externalPosId` | сверка с `Position.externalId` | не перезаписывает: адресация, а не данные | update |
+| `externalInstrumentId` | сверка с `Instrument.externalId` запрошенного инструмента | не перезаписывает: структурная проверка принадлежности записи (H18 `DOCS_CHECK_14`) | обе |
 | `externalPosId` | `Position.externalId` (**запись**) | локальной `Position` нет ⇒ id записи и есть её идентичность | create |
 | `externalDirection` | `Position.direction` | направление материализуемой позиции; на update-тропе уже заполнено live-ногой | create |
 | `externalCreatedAt` | `Position.externalCreatedAt` + **`Deal.billsWindowBegin`** | `cTime` записи. На `Deal` — **нижняя** граница окна линковки bills, пишется той же транзакцией | create |
@@ -255,6 +258,15 @@ net'а в валюте записи источника с cross-ccy-слагае
   `docs/integrations/okx/contracts/position.md` §«Инвариант агрегации»;
   **N11, требует рантайм-верификации**). Множественная / нефинализированная
   запись — controlled external error, не молчаливое взятие слайса.
+  - **Принадлежность записи запрошенному инструменту** (H18
+    `DOCS_CHECK_14`): `instId` записи совпадает с `Instrument.externalId`
+    запрошенного инструмента — проверка **на границе**, по полю ответа, а
+    не доверием фильтру запроса (опора «в контуре один инструмент» молча
+    ломается при снятии ограничения — тот же довод, что у
+    `DealCashFlow.externalInstrumentId`). Несовпадение — controlled
+    external error. Наличие `instId` в `data[]` — посылка контракт-дока,
+    сверка с офдоком за `integrator`
+    (`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`).
   - **Ось адресации — не всегда `posId`** (H5 `DOCS_CHECK_11`; модель
     сняла ключевание — `docs/models/domain/core/Position.md` §Инварианты).
     Когда `posId` наблюдался — адресация по нему, и «ровно одна» проверяется
@@ -288,7 +300,23 @@ net'а в валюте записи источника с cross-ccy-слагае
   (пустое `realizedPnl` при чистом закрытии недопустимо). `closeAvgPx`
   парсится, но обязательным **не** является: его отсутствие не влияет ни
   на число, ни на терминал — пустое поле означает лишь, что сделка не
-  войдёт в выборку калибровки проскока. **`ccy` валидацией принимается на
+  войдёт в выборку калибровки проскока.
+  - **Правые операнды четырёх пар** (`pnl`, `fee`, `fundingFee`,
+    `liqPenalty`) — **обязательные поля добытой записи**, но реакция на
+    их недостачу живёт не на границе (H10 `DOCS_CHECK_14`): граница
+    приземляет добытое и не реджектит — отказ границы оставил бы сделку
+    без терминала; недостачу при обязанной сверке трактует **финализатор**
+    как нарушение контракта (ошибочный терминал + отчёт + полный биржевой
+    холд, `docs/models/domain/aggregate/Deal.md` §«Признаки отбора для
+    отчёта»). **Форма пустого значения несобытийных полей у источника не
+    подтверждена** (отдаёт ли он `"0"` или пустую строку на сделке без
+    funding/ликвидации) — рантайм-посылка того же прогона, что знак и
+    горизонт `fundingFee` (§AG1.7): если источник штатно отдаёт пустую
+    строку вместо нуля, это факт его модели и он поглощается
+    native-слоем (конвенция «пусто = 0 для несобытийного поля»
+    фиксируется в инвентаре,
+    `docs/decisions/source-model-change-absorption.md`), а не ошибочной
+    тропой на каждой сделке. **`ccy` валидацией принимается на
   веру намеренно** — соответствие расчётной валюте инструмента проверяет
   не граница, а финализатор (H10; отказ на границе оставил бы сделку без
   терминала). `triggerPx`
@@ -336,6 +364,7 @@ net'а в валюте записи источника с cross-ccy-слагае
 | `fundingFee` | `externalFundingCost` |
 | `liqPenalty` | `externalLiquidationPenalty` |
 | `posId` | `externalPosId` |
+| `instId` | `externalInstrumentId` |
 | `direction` | `externalDirection` |
 | `cTime` | `externalCreatedAt` (epoch millis → `OffsetDateTime`) |
 | `uTime` | `externalModifiedAt` (epoch millis → `OffsetDateTime`) |
@@ -355,9 +384,17 @@ net'а в валюте записи источника с cross-ccy-слагае
 `pnl`/`fee` — H19 `DOCS_CHECK_12`, `liqPenalty` — H7 `DOCS_CHECK_13`) — в
 `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`.
 
-**Счёт цепочки:** native used 12 = snapshot 12 = domain 12 (для
-create-тропы; на update-тропе `externalDirection`/`externalCreatedAt` не
-применяются, а `externalPosId` сверяется вместо записи).
+**Счёт цепочки:** native used 13 = snapshot 13 = domain 13. Домен
+считается по **различным snapshot-полям** таблицы snapshot → `Position`
+(`externalPosId` идёт двумя строками — сверка на update-тропе, запись на
+create-тропе — и считается один раз; строки-сверки — `externalPosId`
+update, `externalInstrumentId` — входят в счёт: они часть контракта
+маппера). Для create-тропы; на update-тропе
+`externalDirection`/`externalCreatedAt` не применяются, а `externalPosId`
+сверяется вместо записи. Пересчитан дважды `DOCS_CHECK_14`: H1 дозавёл
+строку `externalLiquidationPenalty` (до неё domain = 11, клейм «12 = 12 =
+12» был ложен по третьему члену), H18 добавил `externalInstrumentId`
+(12 → 13 по всем трём членам).
 
 ### OKX validation notes
 

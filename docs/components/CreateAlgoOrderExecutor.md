@@ -12,34 +12,31 @@ SL/TP/trailing-параметры, обновляет `DealActionState.target =
 RuntimeTarget(ALGO_ORDER, algoOrderId)` и `DealActionState.status =
 CREATED`. На биржу не ходит.
 
-## Плановый риск сделки — парная клауза к `CreateOrderExecutor`
+## Плановый риск сделки — алго-тропа операндов не несёт (`RISK-Q4` закрыт)
 
-**Писатель операндов планового риска — тот же per-leg executor** (H5
-`DOCS_CHECK_12`, решение пользователя). Дом операндов — **сущность ноги
-входа** (H3 `GAPS_CLOSE_11`), поэтому когда вход исполняется алго-ордером,
-`plannedEntryPrice` и `plannedSizeContracts` пишет **этот** executor, на
-создаваемый `AlgoOrder`, той же транзакцией, что создаёт сущность —
-симметрично `CreateOrderExecutor` (§«Плановый риск сделки» там). Знаменатель
-`Deal.plannedRiskAmount` остаётся на `Deal`; на `AlgoOrder` едут только
-операнды (`docs/models/domain/core/AlgoOrder.md` §«Операнды планового
-риска»).
+**Парная клауза к `CreateOrderExecutor` снята — не «пока развилка
+открыта», а навсегда для текущей модели:** входной тропы алго-ордером не
+существует (`AlgoOrder.ConditionType` — семь protective/closing значений,
+входного нет; `docs/models/domain/core/AlgoOrder.md` §Назначение —
+там же условие возврата). Операнды планового риска
+(`plannedEntryPrice` / `plannedSizeContracts`) пишет **только**
+`CreateOrderExecutor` на `Order` ноги входа
+(`docs/models/domain/core/Order.md` §«Операнды планового риска»);
+этот executor к плановому риску не причастен.
 
-- **Канал доставки — тот же**, что у обычной ноги: четыре числа едут полями
-  payload'а (§`CreateAlgoOrderCommandPayload`), потому что в сущности они не
-  остаются, а `RiskValidator` на этой тропе **уже вызывается**
-  (`docs/rules/risk-validator-scope.md` включает
-  `CREATE_ALGO_ORDER_COMMAND` в множество валидируемых risk-creating
-  действий) — метрика посчитана, нового расчёта и вызовов биржи правка не
-  добавляет.
-- **Write-once и «только у входного действия»** — как у обычной ноги: для
-  защитных `CREATE_ALGO_ORDER_COMMAND` (standalone SL/TP, OCO, trailing,
-  partial exit) поля пусты, там нет преконтроля, который их производит.
-- **Достижима ли входная тропа алго-ордером — открытый `RISK-Q4`**
-  (гейтит `CODE`): от него зависит, у какой из двух сущностей заводятся
-  колонки — `orders`, `algo_orders` или обеих; §Назначение `AlgoOrder`
-  входа среди применений не перечисляет, а `risk-validator-scope.md`
-  предполагает (H11 `DOCS_CHECK_12`). **Назначение писателя от этого исхода
-  не зависит** — оно per-leg при любом; открыт только состав таблиц.
+- **Обоснование прежнего канала потеряло предмет** (`RISK-Q4`): клауза
+  «`RiskValidator` на этой тропе уже вызывается — метрика посчитана»
+  описывала входную алго-тропу, которой нет. `RiskValidator` на
+  алго-тропе действительно вызывается, но по ветке **risk-weakening**
+  (защитный algo-order, не обеспечивающий требуемый контроль риска, —
+  `docs/rules/risk-validator-scope.md`), а не как вход: метрика
+  планового риска здесь не производится.
+- **Прежняя сцепка носителей снята без правки их по существу.** Оба
+  носителя, поставленные `RISK-Q4` в конфликт, оказались верны:
+  §Назначение `AlgoOrder` входа среди применений не перечисляет —
+  истинно; `risk-validator-scope.md` включает `CREATE_ALGO_ORDER_COMMAND`
+  в множество валидируемых — тоже истинно (ветка risk-weakening). Ложным
+  было прочтение «валидируется ⇒ вход алго-ордером достижим».
 
 Общая семантика `CREATE_*` — `docs/components/ServiceCommandExecutor.md`.
 `DealActionState` / `RuntimeTarget` — `docs/models/domain/other/DealActionState.md`.
@@ -54,9 +51,8 @@ CREATED`. На биржу не ходит.
 `closeFraction` не передаётся — остаётся sizing intent; command-layer
 получает готовый `sizeContracts`.
 
-**Поля планового риска — только у входного действия** (симметрично
-`CreateOrderCommandPayload`, H5 `DOCS_CHECK_12`): `plannedRiskAmount`,
-`plannedRiskCurrency`, `plannedEntryPrice`, `plannedSizeContracts`. У
-защитных `CREATE_ALGO_ORDER_COMMAND` они пусты. Это то же единственное
-исключение из «payload хранит минимум»: четыре числа в сущности не
-остаются, а преконтроль их уже посчитал.
+**Полей планового риска payload не несёт** (`RISK-Q4` закрыт): они
+остаются только у `CreateOrderCommandPayload` — входного действия
+алго-ордером не существует, и пустая четвёрка полей на защитном payload
+читалась бы как «тропа есть». Прежняя редакция («только у входного
+действия; у защитных пусты») снята вместе с посылкой входной алго-тропы.

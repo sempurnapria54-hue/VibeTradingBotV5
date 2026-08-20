@@ -158,6 +158,7 @@
 │       │   ├── phase-1-step-7-docs-check-12.md — Каков исход DOCS_CHECK_12 шага 7?
 │       │   ├── phase-1-step-7-docs-check-13.md — Каков исход DOCS_CHECK_13 шага 7?
 │       │   ├── phase-1-step-7-docs-check-14.md — Каков исход DOCS_CHECK_14 шага 7?
+│       │   ├── phase-1-step-7-risk-q4-anom-q5.md — Что предлагается по RISK-Q4 и ANOM-Q5?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-3.md — Как закрыты пробелы DOCS_CHECK_3 шага 7?
@@ -170,7 +171,8 @@
 │       │   ├── phase-1-step-7-gaps-close-10.md — Каков исход закрытия находок DOCS_CHECK_10?
 │       │   ├── phase-1-step-7-gaps-close-11.md — Как закрыты находки DOCS_CHECK_11?
 │       │   ├── phase-1-step-7-gaps-close-12.md — Как закрыты находки DOCS_CHECK_12?
-│       │   └── phase-1-step-7-gaps-close-13.md — Как закрыты находки DOCS_CHECK_13?
+│       │   ├── phase-1-step-7-gaps-close-13.md — Как закрыты находки DOCS_CHECK_13?
+│       │   └── phase-1-step-7-gaps-close-14.md — Как закрыты находки DOCS_CHECK_14 (и RISK-Q4/ANOM-Q5)?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)

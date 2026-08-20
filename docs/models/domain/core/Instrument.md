@@ -69,8 +69,8 @@ safety-статуса не содержал вовсе); `ENTRY_BLOCKED` — **�
 | Статус | Смысл | Что делает enforcement |
 |---|---|---|
 | `HOLD` | **онбординговый**: инструмент придержан, не вовлекается в онбординг | не участвует в синке/загрузке свечей |
-| `TRADE_BLOCKED` | **safety-холд с kill-switch** (риск-триггер уровня 3, управление-сайд серия неудач; `docs/rules/instrument-hold.md`) | выпадает из entry-скана **и** активные сделки уводятся в `ERROR` (`shutdownReason = RISK_POLICY`) → teardown live risk |
-| `ENTRY_BLOCKED` | **мягкий запрет новых входов** (несвежесть ставки/ключа группы, вход-сайд серия неудач) | выпадает из entry-скана; активные сделки **не трогаются**, ведутся штатным FSM |
+| `TRADE_BLOCKED` | **safety-холд с kill-switch** (риск-триггер уровня 3: нарушение риск-политики; временное отклонение — отказ добычи посттерминальных фактов; `docs/rules/instrument-hold.md`) | выпадает из entry-скана **и** активные сделки уводятся в `ERROR` (`shutdownReason = RISK_POLICY`) → teardown live risk |
+| `ENTRY_BLOCKED` | **мягкий запрет новых входов** (несвежесть ставки/ключа группы, исчерпание бюджета попыток исполнения — H6 `DOCS_CHECK_14`) | выпадает из entry-скана; активные сделки **не трогаются**, ведутся штатным FSM |
 
 **Множества входа — разные у двух классов** (H13, `GAPS_CLOSE_7`):
 
@@ -213,9 +213,12 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
   (`planned_candle_start_date` проставляется при онбординге из
   конфига; `external_status`/`external_leverage`/валюты — при
   синхронизации спецификации, переход `SYNC`).
-- **Колонки шага 7 — `ALTER`** (H6 `DOCS_CHECK_11`):
-  `external_settlement_currency`, `external_base_currency`,
-  `external_quote_currency` добавляются миграцией шага 7 **напрямую**;
+- **Колонки шага 7 — `ALTER`** (H6 `DOCS_CHECK_11`; типы дописаны H13
+  `DOCS_CHECK_14`): `external_settlement_currency`,
+  `external_base_currency`, `external_quote_currency` — все три
+  **`varchar(16)`** (строковые колонки валюты,
+  `docs/rules/persistence-representation.md` §«Строковые колонки») —
+  добавляются миграцией шага 7 **напрямую**;
   бэкфилл не нужен — заведённых инструментов на момент ввода нет
   (`.claude/rules/pre-launch-schema-changes.md`), а каждый заводимый после
   получает валюты на тропе заведения. Полная schema-дельта

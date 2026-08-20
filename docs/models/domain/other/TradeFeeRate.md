@@ -275,13 +275,22 @@ scope и реакций».
 | `refresh_count` | `bigint` | **`not null`** | счётчик подтверждений строки |
 | `external_created_at` | `timestamptz` | nullable | audit-колонка |
 | `external_modified_at` | `timestamptz` | nullable | audit-колонка; метка последнего подтверждения |
-| `created_at` | `timestamptz` | **`not null`** | audit-колонка (JPA auditing) |
-| `updated_at` | `timestamptz` | **`not null`** | audit-колонка |
+| `created_at` | `timestamptz` | nullable | audit-колонка (JPA auditing) |
+| `modified_at` | `timestamptz` | nullable | audit-колонка |
 | `created_by` | `varchar(64)` | nullable | audit-колонка |
-| `updated_by` | `varchar(64)` | nullable | audit-колонка |
+| `modified_by` | `varchar(64)` | nullable | audit-колонка |
 
 Состав audit-колонок — все шесть
-(`docs/models/domain/other/Auditable.md` §«Состав audit-колонок»).
+(`docs/models/domain/other/Auditable.md` §«Состав audit-колонок»);
+**имена — по фактическому `AuditableEntity`** (`modified_at`/`modified_by`,
+не `updated_at`/`updated_by` — H12 `DOCS_CHECK_14`: прежние имена
+расходились и с маппингом базового типа, и со всеми миграциями проекта, и
+с §«Свежесть» **этого же файла**, который меряет свежесть по
+`modified_at`; писатель миграции, идущий по месту истины схемы, создал бы
+таблицу, на которой синк падал бы каждым тиком, а дефект маскировался бы
+штатной реакцией на несвежесть). **Nullability audit-колонок выровнена с
+конвенцией существующих таблиц** (все nullable) — довода для отступления
+названо не было, отступление снято той же правкой.
 `exchange_id` — **FK и `NOT NULL`**, симметрично одноимённой колонке
 `deal_cash_flows`: прежде перечень его не называл вовсе.
 
