@@ -159,6 +159,7 @@
 │       │   ├── phase-1-step-7-docs-check-13.md — Каков исход DOCS_CHECK_13 шага 7?
 │       │   ├── phase-1-step-7-docs-check-14.md — Каков исход DOCS_CHECK_14 шага 7?
 │       │   ├── phase-1-step-7-docs-check-15.md — Каков исход DOCS_CHECK_15 шага 7?
+│       │   ├── phase-1-step-7-docs-check-16.md — Каков исход DOCS_CHECK_16 шага 7?
 │       │   ├── phase-1-step-7-risk-q4-anom-q5.md — Что предлагается по RISK-Q4 и ANOM-Q5?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
