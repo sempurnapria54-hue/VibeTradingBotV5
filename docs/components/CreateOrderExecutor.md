@@ -18,9 +18,11 @@ attached protection внутри order (если есть), обновляет t
 ## Плановый риск сделки (`R`)
 
 Для **входного** действия executor той же транзакцией пишет
-`Deal.plannedRiskAmount` / `plannedRiskCurrency` — величину `risk amount`,
-посчитанную `RiskValidator` при преконтроле **этого же** действия
-(`|entry − stop| × contracts × ctVal + commissions`). Валидация и создание
+`Order.plannedRiskAmount` / `plannedRiskCurrency` **создаваемой ноги** —
+величину `risk amount`, посчитанную `RiskValidator` при преконтроле
+**этого же** действия (`|entry − stop| × contracts × ctVal + commissions`)
+— и **пересчитывает `Deal.plannedRiskAmount` как сумму** по ногам входа
+сделки (H6/H11 `DOCS_CHECK_15`). Валидация и создание
 идут одним проходом (`docs/rules/risk-validator-scope.md`: валидатор
 вызывается после расчёта цены/размера и **до** создания команды), поэтому
 **durable-слота между проходами не нужно**.
@@ -83,16 +85,28 @@ executor заполняет его только когда `sendPriceToExchange`
 reference-цена в сущности ордера не остаётся. Без этих двух чисел разрыв
 «заявленный риск ↔ взятый» неизмерим постфактум
 (`docs/models/domain/aggregate/Deal.md` §«Плановый риск»;
-`docs/models/domain/core/Order.md` §«Операнды планового риска»). Знаменатель
-`plannedRiskAmount` при этом остаётся на `Deal` — переехали только операнды.
+`docs/models/domain/core/Order.md` §«Плановый риск и его операнды»).
 
-**Write-once:** уже заполненный плановый риск не перетирается — ни
-REPLACE-ремоделом стопа, ни добором; то же для его операндов. `R` — риск
-**на входе**, бенчмарк измерения результата
-(`docs/models/domain/aggregate/Deal.md` §«Плановый риск»). Для не-входных
-`CREATE_ORDER_COMMAND` (защита, reduce-only) поля не пишутся. Правило
-агрегации при многоногом входе (`GRID_ENTRY`/пирамидинг) — открытый вопрос
-`RISK-Q3`.
+**Куда пишутся четыре числа** (H6/H11 `DOCS_CHECK_15`, решение
+пользователя): все четыре — **на `Order`** создаваемой ноги
+(`planned_risk_amount`, `planned_risk_currency`, `planned_entry_price`,
+`planned_size_contracts`), и **той же транзакцией** executor
+пересчитывает `Deal.plannedRiskAmount` как **сумму** по ногам входа
+сделки. Прежняя редакция («знаменатель остаётся на `Deal`, переехали
+только операнды») **снята**: она держала риск и его операнды на разных
+уровнях и тем рвала тождество, которое их связывает
+(`docs/components/FinalizeDealExitExecutor.md` §epsilon).
+
+**Write-once — на ноге; сумма на сделке не write-once.** Уже заполненный
+плановый риск ноги не перетирается — ни REPLACE-ремоделом стопа, ни
+добором; то же для его операндов: `R` ноги — риск **на её входе**,
+бенчмарк измерения результата. Поле `Deal` при этом двигается при
+появлении **новой** ноги входа — растёт состав слагаемых, а не
+переписывается уже принятое. Для не-входных `CREATE_ORDER_COMMAND`
+(защита, reduce-only) поля не пишутся и сумма не меняется. Правило
+агрегации **лимита** при многоногом входе (`GRID_ENTRY`/пирамидинг)
+остаётся открытым вопросом `RISK-Q3` — знаменатель им не затронут
+(`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).
 
 Общая семантика `CREATE_*` — `docs/components/ServiceCommandExecutor.md`.
 `DealActionState` / target-колонки — `docs/models/domain/other/DealActionState.md`.

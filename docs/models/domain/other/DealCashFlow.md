@@ -43,7 +43,7 @@ Java-модель, наследует поля аудита от `Auditable`.
 | `appliedRate` | `BigDecimal` | нет | Курс пересчёта движения в расчётную валюту, взятый **из свечи на момент операции** (H25 `DOCS_CHECK_11`). Заполнен только при `rateStatus = APPLIED`. Делает cross-ccy-слагаемое `amount × appliedRate` **воспроизводимым**: число, полученное по внешней котировке, обязано быть проверяемым постфактум (H4, `GAPS_CLOSE_7`; тот же принцип, по которому отвергнут fallback-ставки). Момент курса — `externalCreatedAt` строки (момент **операции**, не обработки), отдельным полем не дублируется. |
 | `rateStatus` | `RateStatus` | да | **Состояние курса** на строке: `NOT_REQUIRED` / `APPLIED` / `RATE_UNAVAILABLE` / `SETTLE_CURRENCY_UNAVAILABLE` (см. §Енум `RateStatus`). Явный признак, а не вывод из пустоты `appliedRate`: пустым он бывает по трём разным причинам, и различение по `ccy` верно только для одной из них (H9 `DOCS_CHECK_11`). На нём ключуются область суммирования и множество должников догона курса. |
 | `appliedRateCandleInstrument` | `String` | нет | **Ссылка на свечу курса, координата 1:** сырой инструмент пары котировки (`instId`), по свече которого взят `appliedRate`. Заполнена только при `rateStatus = APPLIED` (H11 `DOCS_CHECK_14`). |
-| `appliedRateCandleTimeframe` | `TimeFrame` | нет | **Координата 2:** таймфрейм взятой свечи — фиксирует и **разрешение** (секундное или огрублённое деградацией): признак разрешения в `rateStatus` не кодируется, его несёт ссылка. Заполнена только при `APPLIED`. |
+| `appliedRateCandleTimeframe` | `TimeFrame` | нет | **Координата 2:** таймфрейм взятой свечи — фиксирует и **разрешение** (секундное или огрублённое деградацией): признак разрешения в `rateStatus` не кодируется, его несёт ссылка. Заполнена только при `APPLIED`. **Енум расширен `ONE_SECOND`** (H10 `DOCS_CHECK_15`): без секундного значения носитель не мог выразить именно то различение, ради которого заведён; легальность значения в группах свечей и в дереве стратегии ограничена явно (`docs/models/domain/other/CandleGroup.md` §«Енум `TimeFrame`»). |
 | `appliedRateCandleOpenTime` | `OffsetDateTime` | нет | **Координата 3:** время открытия интервала свечи. Вместе с двумя предыдущими однозначно идентифицирует свечу (та же схема идентичности, что у локальной `Candle`: группа-пара + таймфрейм + `openTimestamp`). Заполнена только при `APPLIED`. |
 | `exchangeId` | `Long` | да | Биржа-владелец движения. Входит в **ключ уникальности** вместе с `externalBillId`: `billId` — идентификатор в номенклатуре одной площадки, и при втором источнике столкновение значений дало бы не логическую ошибку, а отказ вставки на `UNIQUE`, то есть тихую потерю движения (H13 `DOCS_CHECK_11`). Разрешить биржу через `deal_id → instrument → exchange` нельзя: `deal_id` на момент вставки может быть `null`. |
 | `externalInstrumentId` | `String` | нет | **Сырой** биржевой идентификатор инструмента (`instId` bill-записи). Операнд предиката **отложенной линковки**: множество «уже сохранённых строк окна» адресуемо только колонками строки, и без инструмента предикат «окно + `instId`» над persisted-строками невыразим (H11 `DOCS_CHECK_11`). `null` — у движений без инструментной привязки. Сырой, а не FK: строка пишется до линковки, когда резолв в наш `Instrument.id` ещё не гарантирован; побочно даёт ось разбора форвард-слоту шага 8. |
@@ -128,19 +128,19 @@ H11 `GAPS_CLOSE_6`); категорийная ось от ответа не за
 | `id` | `bigserial` | `not null` | PK |
 | `deal_id` | `bigint` | nullable | FK → `deals`; `null` до матчинга |
 | `exchange_id` | `bigint` | **`not null`** | FK → `exchanges`; ось ключа уникальности |
-| `category` | `varchar(32)` | **`not null`** | енум `CashFlowCategory` строкой |
+| `category` | `varchar(64)` | **`not null`** | енум `CashFlowCategory` строкой |
 | `amount` | `numeric(36,18)` | **`not null`** | денежная конвенция проекта |
 | `external_fee` | `numeric(36,18)` | nullable | комиссионная компонента записи |
-| `ccy` | `varchar(16)` | **`not null`** | валюта движения |
+| `ccy` | `varchar(64)` | **`not null`** | валюта движения |
 | `applied_rate` | `numeric(36,18)` | nullable | заполнен только при `rate_status = APPLIED` |
-| `rate_status` | `varchar(32)` | **`not null`** | енум `RateStatus` строкой; самое длинное значение — `SETTLE_CURRENCY_UNAVAILABLE` (27 символов), поэтому 32, а не 16 |
+| `rate_status` | `varchar(64)` | **`not null`** | енум `RateStatus` строкой (единая норма длин, H18 `DOCS_CHECK_15`; прежний расчёт «27 символов ⇒ 32, а не 16» снят вместе с категоризацией) |
 | `applied_rate_candle_instrument` | `varchar(64)` | nullable | ссылка на свечу курса: сырой `instId` пары котировки; заполнена только при `APPLIED` (H11 `DOCS_CHECK_14`) |
-| `applied_rate_candle_timeframe` | `varchar(32)` | nullable | ссылка на свечу: таймфрейм (`TimeFrame` строкой) — несёт разрешение |
+| `applied_rate_candle_timeframe` | `varchar(64)` | nullable | ссылка на свечу: таймфрейм (`TimeFrame` строкой) — несёт разрешение (**секундное значение енума введено** H10 `DOCS_CHECK_15`) |
 | `applied_rate_candle_open_time` | `timestamptz` | nullable | ссылка на свечу: время открытия интервала |
 | `external_instrument_id` | `varchar(64)` | nullable | сырой `instId` |
 | `external_bill_id` | `varchar(64)` | **`not null`** | вместе с `exchange_id` — `UNIQUE` |
-| `external_type` | `varchar(32)` | **`not null`** | сырой `type` |
-| `external_sub_type` | `varchar(32)` | nullable | сырой `subType` |
+| `external_type` | `varchar(64)` | **`not null`** | сырой `type` |
+| `external_sub_type` | `varchar(64)` | nullable | сырой `subType` |
 | `external_order_id` | `varchar(64)` | nullable | `ordId`, если движение связано с ордером |
 | `external_created_at` | `timestamptz` | nullable | audit-колонка `AuditableEntity`; обязательность — валидацией на границе разбора (§ниже) |
 | `external_modified_at` | `timestamptz` | nullable | audit-колонка |
@@ -212,9 +212,30 @@ nullability названа здесь по каждой колонке, а не 
   строки задвоили бы движение в Σ`amount` (сломав сверку) и не имели бы
   второго `billId` под `UNIQUE`.
 - Индекс по `deal_id` — выборка разбивки сделки и сверка.
-- Индекс отбора несвязанных строк окна — по (`external_instrument_id`,
-  `external_created_at`) с предикатом `deal_id is null`: им адресуется
-  отложенная линковка (§«Линковка к `Deal`»).
+- Индекс отбора несвязанных строк окна — по (**`exchange_id`**,
+  `external_instrument_id`, `external_created_at`) с предикатом
+  `deal_id is null`: им адресуется отложенная линковка (§«Линковка к
+  `Deal`»).
+  - **Ось биржи внесена и в индекс, и в предикат** (H16 `DOCS_CHECK_15`,
+    решение пользователя). Прежний состав — «окно + `instId` +
+    `deal_id is null`» — молча опирался на «сейчас площадка одна»:
+    строковый `instId` между площадками **не уникален**
+    (`ETH-USDT-SWAP` существует у нескольких), поэтому строки второго
+    источника попадали бы под предикат чужой сделки, получали `deal_id`
+    и входили в суммы разбивки. Отказ **тихий**:
+    `UNIQUE(exchange_id, external_bill_id)` его не ловит (разные
+    `billId`), а сверка поймает только при превышении единого epsilon и
+    финализацию не блокирует.
+  - **Довод — тот же, которым отвергнут матч ставки по голому
+    `groupId`**: «сейчас сущность одна» основанием предиката не является
+    (`docs/models/domain/other/TradeFeeRate.md` §«Матч по паре, не по
+    голому `groupId`»). Здесь он симметрично применим, а прежде не был
+    выставлен. Достижимость в фазе 1 — ноль (одна биржа); цена правки —
+    одна колонка в `CREATE INDEX` и один конъюнкт в предикате, операнд
+    **уже есть на строке** (`exchange_id`, `NOT NULL`), связность не
+    растёт.
+  - Первым операндом индекса стоит `exchange_id` — самая селективная и
+    всегда известная координата отбора.
 - `category` хранится **строкой** (значение = `name()` доменного enum),
   persistence-поле — `String` без `@Enumerated` (codestyle §Слои моделей и
   enum'ы).
@@ -231,9 +252,14 @@ JSONB-навеса нет цели для `UNIQUE(exchange_id, external_bill_id)
 ## Линковка к `Deal`
 
 Bills **не несут** `dealId` — только `instId`, `ccy`, `ts`, `ordId`.
-`RefreshBillsExecutor` матчит движение к сделке по **окну сделки** +
-`instId` и **проставляет `deal_id`** при сохранении
+`RefreshBillsExecutor` матчит движение к сделке по **бирже + окну сделки +
+`instId`** и **проставляет `deal_id`** при сохранении
 (`docs/integrations/okx/contracts/account-bills.md` §Использование).
+**Ось биржи — обязательный конъюнкт предиката** (H16 `DOCS_CHECK_15`):
+`instId` между площадками не уникален, и без неё строки второго источника
+попадали бы под предикат чужой сделки (разбор и довод — §Персистентность,
+индекс отбора несвязанных строк). Операнд уже на строке — `exchange_id`
+`NOT NULL`.
 `instId` — это `Instrument.externalId`, и он резолвится **через
 `DealContext`**: пути `Deal.instrument.externalId` на модели нет — `Deal`
 хранит `instrumentId`, а сам `Instrument` в runtime graph не входит

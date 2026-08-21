@@ -211,8 +211,11 @@ fallback-ставки (`docs/components/RiskValidator.md` §«Null-полити�
 резолвится в эту строку.
 
 **Реакция — мягкая, kill-switch не применяется** (H2, `GAPS_CLOSE_5`):
-запрет новых входов + `AnomalyReport`; живые сделки доживают под своим
-стопом и сопровождаются штатно. Радиус ущерба несвежести — **сайзинг новых
+запрет новых входов + `AnomalyReport` — **по одному отчёту на каждый
+затронутый инструмент** (`scope = INSTRUMENT`; групповой радиус отчёта
+упразднён H14 `DOCS_CHECK_15`,
+`docs/models/domain/other/AnomalyReport.md` §Инварианты структуры). Живые
+сделки доживают под своим стопом и сопровождаются штатно. Радиус ущерба несвежести — **сайзинг новых
 входов**: в `R` живой сделки (задан стопом на бирже) и в её `resultProfit`
 (считается из фактов) ставка не участвует.
 
@@ -266,12 +269,12 @@ scope и реакций».
 |---|---|---|---|
 | `id` | `bigserial` | `not null` | PK |
 | `exchange_id` | `bigint` | **`not null`** | FK → `exchanges`; первая ось резолва |
-| `external_instrument_type` | `varchar(32)` | **`not null`** | сырой `instType`, ось группы |
+| `external_instrument_type` | `varchar(64)` | **`not null`** | сырой `instType`, ось группы |
 | `external_fee_group_id` | `varchar(64)` | **`not null`** | сырой `groupId`, ось группы |
-| `instrument_type` | `varchar(32)` | **`not null`** | енум `InstrumentType` строкой; проекция, не ось |
-| `external_taker_fee_rate` | `varchar(32)` | **`not null`** | исключение из численной конвенции — довод §ниже |
-| `external_maker_fee_rate` | `varchar(32)` | **`not null`** | то же |
-| `external_fee_level` | `varchar(32)` | nullable | датчик оси тира |
+| `instrument_type` | `varchar(64)` | **`not null`** | енум `InstrumentType` строкой; проекция, не ось |
+| `external_taker_fee_rate` | `varchar(64)` | **`not null`** | исключение из численной конвенции — довод §ниже |
+| `external_maker_fee_rate` | `varchar(64)` | **`not null`** | то же |
+| `external_fee_level` | `varchar(64)` | nullable | датчик оси тира |
 | `refresh_count` | `bigint` | **`not null`** | счётчик подтверждений строки |
 | `external_created_at` | `timestamptz` | nullable | audit-колонка |
 | `external_modified_at` | `timestamptz` | nullable | audit-колонка; метка последнего подтверждения |
@@ -308,7 +311,7 @@ scope и реакций».
   (§Запись).
 - **Колонки ставок — `varchar`, и это записанное исключение из конвенции**
   (H23 `DOCS_CHECK_10`): `external_taker_fee_rate`,
-  `external_maker_fee_rate`, `external_fee_level` — `varchar(32)`, а не
+  `external_maker_fee_rate`, `external_fee_level` — `varchar(64)`, а не
   `numeric(36,18)`, которого требует сквозная конвенция схемы для
   денежных/процентных величин (`docs/rules/persistence-representation.md`
   §«Численные колонки»).

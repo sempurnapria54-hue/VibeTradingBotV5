@@ -25,9 +25,9 @@ Mapping-слой для `TimeFrame`. Доменный enum `TimeFrame` стро�
 TimeFrame.ONE_HOUR <-> "1H"
 ```
 
-Полный набор доменных значений: `ONE_MINUTE`, `THREE_MINUTES`,
-`FIVE_MINUTES`, `FIFTEEN_MINUTES`, `ONE_HOUR`, `TWO_HOURS`,
-`FOUR_HOURS`, `ONE_DAY`.
+Полный набор доменных значений: **`ONE_SECOND`**, `ONE_MINUTE`,
+`THREE_MINUTES`, `FIVE_MINUTES`, `FIFTEEN_MINUTES`, `ONE_HOUR`,
+`TWO_HOURS`, `FOUR_HOURS`, `ONE_DAY`.
 
 ### Правила
 
@@ -37,3 +37,19 @@ TimeFrame.ONE_HOUR <-> "1H"
   Обратное направление в коде шага 1 не используется и не заведено
   (по потребности). Строки баров живут в `util.Constants.Okx`.
 - Отдельный `TimeFrameResolver` на первом этапе не нужен.
+
+### `ONE_SECOND` — ветка маппера и её условие (H10 `DOCS_CHECK_15`)
+
+Значение введено шагом 7 (канон — `docs/models/domain/other/CandleGroup.md`
+§«Енум `TimeFrame`»), поэтому **исчерпывающий `switch` `TimeFrameMapper`
+получает девятую ветку**: без неё маппер перестаёт компилироваться либо
+падает на новом значении.
+
+- **Строка источника — предмет сверки `integrator`**, не догадка: какой
+  бар секундного разрешения (и есть ли он вовсе на нужных парах
+  котировки) — открытое предусловие `CODE` п. 5
+  (`docs/decisions/pnl-finalization-mechanics.md`). До ответа строка в
+  `util.Constants.Okx` не заводится, а ветка маппера при вызове с
+  `ONE_SECOND` бросает — молчаливой подмены на минутную быть не должно:
+  именно её различает ссылка на свечу курса.
+- **Обратное направление по-прежнему не заводится** — потребителя нет.

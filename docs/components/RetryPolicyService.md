@@ -93,6 +93,17 @@ attemptCount >= maxAttempts -> DealActionState = FAILED -> FSM решает
 разбор **сделки** и подъёмом холда не является: прежде тот же путь был
 описан здесь третьим способом, отличным от двух других доков.
 
+**Чем `FAILED` доезжает до детектора** (H1 `DOCS_CHECK_15`). Перевод в
+`FAILED` — **предусловие** броска, а не сам сигнал: сразу после него
+`ServiceCommandExecutor` бросает `RetryBudgetExhaustedException` (либо
+пробрасывает `ControlledExchangeException`), и перехват этого исключения
+оркестратором и есть подъём холда. Порядок «сначала `FAILED`, потом
+бросок» обязателен — перехватчик обязан видеть durable-факт, а не узнавать
+о нём из исключения. Полный контракт —
+`docs/components/ServiceCommandExecutor.md` §«Контракт броска». Пока
+строка в `RETRY_PENDING`, ничего не бросается: повтор берёт следующий тик
+по `nextRetryAt`.
+
 ## Опасные команды: refresh перед retry
 
 Для `SUBMIT_*`, `CANCEL_*`, `CLOSE_POSITION_COMMAND` перед повтором обязателен

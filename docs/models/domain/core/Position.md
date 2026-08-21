@@ -149,12 +149,21 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 Создаётся только если позиция реально найдена на бирже; если не
 найдена — `IntegrationService` возвращает `null`, а не пустой snapshot.
 
-Поля: `externalId`, `externalSize`, `externalAverageEntryPrice`,
-`externalMarkPrice`, `externalLiquidationPrice`, `externalMargin`,
+Поля: `externalId`, `externalSize`, **`direction`** (доменный
+`Position.Direction` — нормализован в слое интеграции из знака `pos`,
+`docs/models/mapping/Position.md` §«Direction mapping»),
+`externalAverageEntryPrice`, `externalMarkPrice`,
+`externalLiquidationPrice`, `externalMargin`,
 `externalUnrealizedProfit` (+ `externalCreatedAt` /
 `externalModifiedAt` от `Auditable`). Если поле не обновляет
 `Position` — в snapshot не попадает. OKX mapping — в
 `docs/models/mapping/Position.md`.
+
+> `direction` в перечень **дозаведён** (H12 `DOCS_CHECK_15`, курационный
+> хвост): поле есть и в коде снапшота, и в mapping-таблице, а перечень
+> здесь его не называл. Симметричное поле второго снапшота —
+> `PositionCloseResultExternalSnapshot.direction` (H7 `DOCS_CHECK_15`:
+> тоже доменное значение, нормализуется на границе).
 
 Вторая нога `REFRESH_POSITION_COMMAND` (positions-history) нормализуется
 **своим** граничным объектом `PositionCloseResultExternalSnapshot` и
@@ -271,8 +280,10 @@ H15 `DOCS_CHECK_12`), **`external_realized_profit_gross`** и
 **`external_fee`** (H19 `DOCS_CHECK_12` — правые операнды раздельной сверки
 по категориям), **`external_liquidation_penalty`** (H7 `DOCS_CHECK_13` —
 правый операнд четвёртой пары) — все `numeric(36,18)` кроме
-`external_result_currency` (**`varchar(16)`** — строковая колонка валюты)
-и `external_close_type` (**`varchar(32)`** — сырой код источника; типы
+`external_result_currency` и `external_close_type` — обе
+**`varchar(64)`** (единая норма длин строковых колонок, H18
+`DOCS_CHECK_15`; прежние `varchar(16)`/`varchar(32)` по снятой
+категоризации «валюта / сырой код источника»; типы
 дописаны H13 `DOCS_CHECK_14` по общему правилу
 `docs/rules/persistence-representation.md` §«Строковые колонки»), все nullable
 (пусты, пока позиция жива или запись закрытия не добыта), добавляются

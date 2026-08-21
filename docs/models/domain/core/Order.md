@@ -46,6 +46,10 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `fee` | `BigDecimal` | Накопленная комиссия. |
 | `positionReducingOnly` | `Boolean` | Доменное намерение: ордер только уменьшает позицию. |
 | `replacesInternalId` | `String` | `internalId` предшественника в цепочке REPLACE (nullable; append-only след — обратная ссылка не хранится, выводится запросом). См. `docs/decisions/replace-not-amend.md`. |
+| `plannedEntryPrice` | `BigDecimal` | Reference-цена входа **этой ноги**, по которой считался её риск (для market-входа — `ORDER_MARKET_REFERENCE_PRICE` калькулятора, на биржу не отправляемая). Write-once. |
+| `plannedSizeContracts` | `BigDecimal` | Заявленный размер **этой ноги** (контракты). Write-once. |
+| `plannedRiskAmount` | `BigDecimal` | **Плановый риск этой ноги** — убыток на её стопе, посчитанный при постановке ноги. Слагаемое знаменателя `R` сделки (H6/H11 `DOCS_CHECK_15`). Write-once. |
+| `plannedRiskCurrency` | `String` | Валюта планового риска ноги (расчётная валюта инструмента). Write-once. |
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Embedded attached protection. |
 
 Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
@@ -79,28 +83,50 @@ invariant-проверка — в `docs/models/mapping/Order.md`.
   цикла), `UNKNOWN_EXTERNAL_STATUS`, `EXCHANGE_INVARIANT_VIOLATION`,
   `UNKNOWN`.
 
-### Операнды планового риска — дом здесь, и только здесь (`RISK-Q4` закрыт)
+### Плановый риск и его операнды — дом здесь (`RISK-Q4` закрыт; H6/H11 `DOCS_CHECK_15`)
 
-`plannedEntryPrice` (reference-цена входа, по которой считался риск) и
-`plannedSizeContracts` (заявленный размер) — **атрибуты ноги входа**, не
-сделки: при многоногом входе их несколько, и write-once-поле на `Deal`
-оставило бы число первой ноги, молча выдавая его за сделку
-(`docs/models/domain/aggregate/Deal.md` §«Плановый риск»). `R` как
-знаменатель остаётся на `Deal`; сюда переезжают только **операнды
-сравнения** «заявлено ↔ взято» (против `avgPx` / `accFillSz`).
+`plannedEntryPrice` (reference-цена входа, по которой считался риск),
+`plannedSizeContracts` (заявленный размер) и **`plannedRiskAmount` /
+`plannedRiskCurrency`** (сам плановый риск) — **атрибуты ноги входа**, не
+сделки: при многоногом входе их несколько.
+
+**Риск переехал на ногу вместе со своими операндами** (H6/H11
+`DOCS_CHECK_15`, решение пользователя). Прежде на `Deal` жило одно
+write-once-число, а операнды сравнения — на ногах; тождество, на котором
+стоит омиссионный член epsilon
+(`plannedRiskAmount − |plannedEntryPrice − stop| × plannedSizeContracts ×
+ctVal` = ожидаемая комиссия), верно **только в одной точке** — там, где
+все три операнда принадлежат одной ноге. При многоногом входе обе
+возможные ветки были односторонними: агрегат по сделке против ценовой
+части одной ноги даёт **отрицательное** вычитаемое (допуск схлопывается до
+шум-флора на самых крупных сделках), первая нога — вычитаемое ~1/N
+(допуск систематически уже режима отказа). Держа риск на ноге, тождество
+восстанавливается **поногово**, а сделке достаётся **сумма** — и та же
+сумма закрывает второй дефект: знаменатель `R` перестаёт быть числом
+первой ноги (`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).
+
+**Все четыре — write-once** (`updatable = false`). REPLACE-нога не
+переписывает ни reference-цену, ни риск: иначе разрыв «заявлено ↔ взято»
+становится неизмеримым, а слагаемое знаменателя перестаёт быть тем
+числом, под которое сайзились
+(`docs/decisions/per-trade-risk-policy.md` §«Асимметрия»).
 
 **Дом — только `orders`** (`RISK-Q4` закрыт 2026-08-20): входной тропы
 алго-ордером не существует (вход — ordinary `Order`; у
 `AlgoOrder.ConditionType` входного значения нет — проверено по коду),
-поэтому вторая пара колонок в `algo_orders` была бы мёртвой схемой с
-живым именем. Оба поля **write-once** (`updatable = false`):
-REPLACE-нога не переписывает reference-цену — иначе разрыв «заявлено ↔
-взято», ради измерения которого операнды и заводятся, становится
-неизмеримым. Пишет их исполнитель `CREATE_ORDER_COMMAND` входного
-действия той же транзакцией; переиспользовать `orders.size`/`price`
-нельзя — это колонки биржевой стороны, перезаписываемые эхом ответа при
-каждом рефреше. Условие возврата вопроса —
-`docs/models/domain/core/AlgoOrder.md` §Назначение.
+поэтому вторая четвёрка колонок в `algo_orders` была бы мёртвой схемой с
+живым именем. Пишет их исполнитель `CREATE_ORDER_COMMAND` входного
+действия той же транзакцией, что создание ноги; переиспользовать
+`orders.size`/`price` нельзя — это колонки биржевой стороны,
+перезаписываемые эхом ответа при каждом рефреше. Условие возврата вопроса
+— `docs/models/domain/core/AlgoOrder.md` §Назначение.
+
+**Пусты у не-входных ног.** Поля заполняются только у ног входа
+(`Type.ENTRY`); у reduce-only и защитных ordinary-ордеров планового риска
+нет по построению — они риска не создают
+(`docs/rules/risk-validator-scope.md`). Пустота здесь — «признак
+неприменим», а не «операнд не добыт»
+(`docs/rules/absent-value-semantics.md`).
 
 ## Персистентность
 
@@ -120,9 +146,14 @@ REPLACE-нога не переписывает reference-цену — иначе
   `position_reducing_only` (`boolean`), `replaces_internal_id`
   (`varchar(64)`), шесть audit-колонок (`AuditableEntity`, nullable).
 - **Колонки шага 7 — `ALTER`**: `planned_entry_price`,
-  `planned_size_contracts` — обе `numeric(36,18)`, nullable (пусты у
-  не-входных ног и у ордеров, заведённых вне нашего входа), write-once
-  на уровне entity (`updatable = false`). Бэкфилл не нужен
+  `planned_size_contracts`, **`planned_risk_amount`** (все три
+  `numeric(36,18)`) и **`planned_risk_currency`** (`varchar(64)` —
+  строковая колонка по правилу длин,
+  `docs/rules/persistence-representation.md` §«Строковые колонки: длины»);
+  все nullable (пусты у не-входных ног и у ордеров, заведённых вне нашего
+  входа), write-once на уровне entity (`updatable = false`). Пара
+  `planned_risk_*` добавлена H6/H11 `DOCS_CHECK_15` — дом планового риска
+  переехал с `Deal` на ногу, на сделке остаётся сумма. Бэкфилл не нужен
   (`.claude/rules/pre-launch-schema-changes.md`).
 - Enum-поля хранятся строкой (имя enum; codestyle §Слои моделей и
   enum'ы).

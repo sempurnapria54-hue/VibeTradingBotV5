@@ -139,7 +139,12 @@ Auditable заводится **в каждом слое отдельно, с п�
   `docs/models/domain/other/Candle.md`,
   `docs/models/domain/other/CandleGroup.md`,
   `docs/models/domain/other/TradeFeeRate.md`,
-  `docs/models/domain/other/DealCashFlow.md`.
+  `docs/models/domain/other/DealCashFlow.md`,
+  `docs/models/domain/other/DealActionState.md` (внесён H15
+  `DOCS_CHECK_15`: модель признана аудируемой, обе её таблицы-близнеца
+  несут полный набор из шести колонок; `external*At` у неё пусты навсегда
+  — у строки-исполнения события источника нет, и это названная цена, а не
+  отступление от правила состава).
   `InstrumentExternalRules` наследником **не является** (§Назначение:
   JSONB-навес без своей строки).
 - Опора на движение `modifiedAt` как на измеритель свежести:

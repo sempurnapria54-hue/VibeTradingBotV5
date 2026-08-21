@@ -18,10 +18,12 @@ CREATED`. На биржу не ходит.
 открыта», а навсегда для текущей модели:** входной тропы алго-ордером не
 существует (`AlgoOrder.ConditionType` — семь protective/closing значений,
 входного нет; `docs/models/domain/core/AlgoOrder.md` §Назначение —
-там же условие возврата). Операнды планового риска
-(`plannedEntryPrice` / `plannedSizeContracts`) пишет **только**
-`CreateOrderExecutor` на `Order` ноги входа
-(`docs/models/domain/core/Order.md` §«Операнды планового риска»);
+там же условие возврата). Плановый риск ноги и его операнды
+(`plannedRiskAmount` / `plannedRiskCurrency` / `plannedEntryPrice` /
+`plannedSizeContracts`) пишет **только** `CreateOrderExecutor` на `Order`
+ноги входа, он же пересчитывает сумму на `Deal`
+(H6/H11 `DOCS_CHECK_15`;
+`docs/models/domain/core/Order.md` §«Плановый риск и его операнды»);
 этот executor к плановому риску не причастен.
 
 - **Обоснование прежнего канала потеряло предмет** (`RISK-Q4`): клауза

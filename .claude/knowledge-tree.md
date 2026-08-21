@@ -173,7 +173,8 @@
 │       │   ├── phase-1-step-7-gaps-close-11.md — Как закрыты находки DOCS_CHECK_11?
 │       │   ├── phase-1-step-7-gaps-close-12.md — Как закрыты находки DOCS_CHECK_12?
 │       │   ├── phase-1-step-7-gaps-close-13.md — Как закрыты находки DOCS_CHECK_13?
-│       │   └── phase-1-step-7-gaps-close-14.md — Как закрыты находки DOCS_CHECK_14 (и RISK-Q4/ANOM-Q5)?
+│       │   ├── phase-1-step-7-gaps-close-14.md — Как закрыты находки DOCS_CHECK_14 (и RISK-Q4/ANOM-Q5)?
+│       │   └── phase-1-step-7-gaps-close-15.md — Как закрыты находки DOCS_CHECK_15?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)

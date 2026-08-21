@@ -158,11 +158,16 @@ INSTR-Q1 закрыт
 
 ### Отложенные продуктовые вопросы (future)
 
-- **Политика очистки накопленных строк исполнений `deal_action_states`**
-  — фаза 3. Строки копятся by design (`COMPLETED` жёстко терминален,
-  слот-переиспользования нет — В2.1 развилки «команда ↔ действие»);
-  ретеншен — цена, явно отложенная за границу фазы
-  (`docs/decisions/command-action-boundary.md` §Отложено).
+- **Политика очистки накопленных строк исполнений** (`deal_strategy_action_states`
+  **и** `deal_system_action_states` — чистка per-таблица, горизонты видов
+  могут различаться; имена приведены к принятой топологии H15
+  `DOCS_CHECK_14`) — фаза 3. Строки копятся by design (`COMPLETED` жёстко
+  терминален, слот-переиспользования нет — В2.1 развилки «команда ↔
+  действие»); ретеншен — цена, явно отложенная за границу фазы
+  (`docs/decisions/command-action-boundary.md` §Отложено). **Операнд
+  ретеншена есть** — `created_at` появляется вместе с audit-колонками
+  обеих таблиц (H15 `DOCS_CHECK_15`), бэкфилл на том горизонте не
+  потребуется.
 - `linkedOrderExternalIds` — использование для fills/recovery/audit
   (`2026-05-27-.../tasks-algo-order.md` ALGO-Q6).
 - Стандарт описания персистентности доменных моделей: формат и
@@ -324,8 +329,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **`TradeGuardJob` — новая джоба, счётчик серии неудач по инструменту**
   (H17 `DOCS_CHECK_10`). Компонент-дока и кода нет; шаг 7 работает с
   порогом серии = 1 (исчерпание бюджета попыток исполнения). Спроектировать:
-  носитель счётчиков (два класса — вход-сайд / управление-сайд,
-  раздельные), точка инкремента и сброса, окно/порог, `code` `HoldSignal`;
+  носитель счётчика (**один класс** — ось «вход-сайд / управление-сайд»
+  снята H6 `DOCS_CHECK_14`, форвард приведён к принятому H9
+  `DOCS_CHECK_15`), точка инкремента и сброса, окно/порог, `code`
+  `HoldSignal`;
   **учёт отказов cleanup-команд** (сегодня их не считает никто — анкера у
   них нет). Граница с `AnomalyJob`: тот сравнивает **текущее** состояние с
   инвариантом, `TradeGuardJob` считает **историю исходов** по инструменту.
@@ -479,13 +486,31 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **CODE границы «команда ↔ действие»
   (`docs/decisions/command-action-boundary.md`; замещает прежний пункт
   «retry-анкера добывающих команд»):**
-  - **носитель:** `deal_action_states` — `ALTER` (nullable
-    `strategy_action_id`, `+action_kind`, `+system_action_type`,
-    `+target_entity_type`, `+target_entity_id`; снятие
-    `uk_deal_action_state_deal_action`, частичные уникальные индексы живых
-    исполнений); перенос строк `deal_finalization_states` (вид SYSTEM) +
-    `DROP TABLE`; удаление `DealFinalizationState`-стека
-    (модель/entity/mapper/repository/dataservice);
+  - **носитель — две таблицы, не общая** (H15 `DOCS_CHECK_14`, решение
+    пользователя; инструкция приведена к принятому H8 `DOCS_CHECK_15` —
+    прежняя редакция предписывала **отменённую** топологию V2: общую
+    таблицу с nullable `strategy_action_id`, `+action_kind` и частичными
+    ключами по виду):
+    - `deal_action_states` **переименовывается** в
+      `deal_strategy_action_states`; `strategy_action_id` остаётся
+      `NOT NULL`; `+target_entity_type` (`varchar(64)`, nullable),
+      `+target_entity_id` (`bigint`, nullable), **+ шесть audit-колонок**
+      (H15 `DOCS_CHECK_15`); снятие `uk_deal_action_state_deal_action`,
+      два частичных уникальных индекса живых исполнений; `DROP COLUMN
+      target` без бэкфилла;
+    - создаётся **`deal_system_action_states`**: `id`, `deal_id`
+      (`NOT NULL`, FK), `system_action_type` (`varchar(64)` `NOT NULL`),
+      `status` (`varchar(64)` `NOT NULL`), retry-поля, шесть
+      audit-колонок; один частичный уникальный индекс живых по
+      (`deal_id`, `system_action_type`); **target-колонок нет** — цель
+      всегда сделка;
+    - **колонки `action_kind` нет ни в одной** — вид кодируется таблицей;
+    - вторая entity + ветвление `DataService` по виду;
+      `DealContext.actionStates` собирается **из двух чтений**;
+    - `deal_finalization_states`: строки **не переносятся** — `DELETE` +
+      `DROP TABLE`; удаление `DealFinalizationState`-стека
+      (модель/entity/mapper/repository/dataservice). Место истины —
+      `docs/models/domain/other/DealActionState.md` §Персистентность;
   - **`SystemActionExecutor`** вместо `DealFinalizationCommandFactory`;
     handler'ы перестают эмитить добывающие `REFRESH_*` напрямую через
     `DealFsmSupport.systemCommand(...)` — только звеньями
@@ -534,14 +559,22 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     постановке холда → `COMPLETED` при **ручном снятии**
     (`docs/lifecycles/AnomalyReport.md`). Иначе искать незавершённый
     нечего, и синк заводит копию каждый тик.
-  - **`anomaly_reports.scope` → `varchar(32)`** тем же `ALTER` (H22:
-    `INSTRUMENT_GROUP` — ровно 16 символов, запас нулевой).
-  - **`HoldScope.INSTRUMENT_GROUP` — целевое значение**, вводится этим
-    же CODE; **javadoc `HoldScope` в коде несёт снятые `GAPS_CLOSE_6`
+  - **`anomaly_reports.scope` → `varchar(64)`** тем же `ALTER` (H22
+    `DOCS_CHECK_10` — расширение; длина по единой норме строковых колонок,
+    H18 `DOCS_CHECK_15`).
+  - ~~`HoldScope.INSTRUMENT_GROUP` — целевое значение, вводится этим же
+    CODE~~ — **снято** (H14 `DOCS_CHECK_15`): групповой радиус отчёта
+    упразднён, единственного производителя у значения не осталось, енум
+    остаётся двузначным (`INSTRUMENT` / `EXCHANGE`) — как в коде и в
+    комментарии `V10`. **Колонка `anomaly_reports.fee_group_key` тоже не
+    заводится**; отчёт о несвежести ставок — **на инструмент**, по одному
+    на каждый затронутый, идентичность несёт `instrument_id`; поисковый
+    индекс незавершённых — по (`exchange_id`, `code`, `scope`,
+    `instrument_id`).
+  - **javadoc `HoldScope` в коде несёт снятые `GAPS_CLOSE_6`
     ярлыки уровня** («инструмент = уровень 3, биржа = уровень 4»,
     «Уровни error-градации») — переформулировать: scope есть **радиус**,
-    уровень живёт в error-политике; комментарий `V10` тоже знает только
-    два радиуса.
+    уровень живёт в error-политике.
 - **CODE cross-ccy (`GAPS_CLOSE_7`, H4; CCY-Q1 закрыт):** сравнение `ccy`
   движения с **расчётной валютой инструмента** (не с
   `Deal.resultProfitCurrency` — на записи оно `null`); при несовпадении —
@@ -651,8 +684,26 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     kill-switch-реакцию. Привести к решению: `TRADE_BLOCKED`/`CLOSED`/`ERROR`
     — из **любого** статуса; `ENTRY_BLOCKED` — только из `ACTIVE`
     (`docs/rules/instrument-hold.md` §«Множества входа»);
-  - **раздельные счётчики серии неудач** вход-сайд / управление-сайд (H7) —
-    класс определяет реакцию (мягкая vs полная);
+  - ~~раздельные счётчики серии неудач вход-сайд / управление-сайд (H7)~~
+    — **снято** (H9 `DOCS_CHECK_15`): ось стороны ноги отменена вовсе
+    (H6 `DOCS_CHECK_14`, решение пользователя). Резолв класса реакции идёт
+    **по типу перехваченного исключения**, форма исчерпания бюджета одна —
+    мягкая, код холда один — `RETRY_BUDGET_EXHAUSTED`
+    (`docs/rules/instrument-hold.md` §«Серия неудач: реакция на исчерпание
+    бюджета», `docs/components/HoldService.md` §«Момент вызова»);
+  - **канал подъёма реакции — строится, и строится первым** (H1
+    `DOCS_CHECK_15`): новый тип `RetryBudgetExhaustedException`; бросок в
+    `ServiceCommandExecutor` **после** перевода строки исполнения в
+    `FAILED` (вместо нынешнего `catch (RuntimeException) → return
+    failure(...)`); `classify()` перестаёт схлопывать
+    `ControlledExchangeException` в `VALIDATION_ERROR`; выделенный `catch`
+    в `DealOrchestratorJob` вокруг шага диспетчеризации команд, поимённо
+    по двум типам, **до** общего `catch (RuntimeException)`. Снятие
+    прежнего транспорта (`DealTransition.holdSignal`,
+    `DealOrchestratorJob.reactToHoldSignal`, `DealFsmSupport`) — **только
+    после** этого: прежний канал в коде жив и работает
+    (`docs/components/ServiceCommandExecutor.md` §«Контракт броска»,
+    `docs/components/DealOrchestratorJob.md` §«Перехват реакции»);
   - **измеритель свежести ключа группы** (H11, `GAPS_CLOSE_7` — ревизует H9
     `GAPS_CLOSE_6`; начальное состояние — H21 `DOCS_CHECK_10`):
     собственных `refreshCount`/`confirmedAt` у навеса **не заводить**;
@@ -667,8 +718,11 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     тиком). **Бэкфилла нет и `instruments` в schema-дельте нет** —
     бэкфилл проставил бы метке значение, которого измерение не
     производило;
-  - `AnomalyReport.scope` — значение **`INSTRUMENT_GROUP`** в `HoldScope`
-    (H4); `HoldSignal`-фабрики его не производят.
+  - ~~`AnomalyReport.scope` — значение `INSTRUMENT_GROUP` в `HoldScope`
+    (H4)~~ — **снято** (H14 `DOCS_CHECK_15`): групповой радиус отчёта
+    упразднён, отчёт о несвежести — **на инструмент** (`scope =
+    INSTRUMENT`, `instrument_id` заполнен, по одному на каждый
+    затронутый); значения `INSTRUMENT_GROUP` в енуме не появляется.
 - **CODE-дельта `GAPS_CLOSE_10`** (остальное, сверх пунктов выше):
   - **контурный гейт входа** (H8): `EntryScannerJob`/`DealOpeningService`
     к проверке «нет активной сделки по этому инструменту» добавляют «нет
@@ -703,18 +757,32 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     (jsonb) расплющивается** в target-колонки + `DROP COLUMN target`,
     **бэкфилла нет** — таблицы пусты по правилу фазы (H25
     `GAPS_CLOSE_13`, `.claude/rules/pre-launch-schema-changes.md`);
-  - **колонки ставок `trade_fee_rates` — `varchar(32)`** (H23), не
-    `numeric`: доменный тип `String`, аксессор сознательно допускает
-    непарсящееся значение; исключение записано
+  - **колонки ставок `trade_fee_rates` — `varchar(64)`** (H23; длина по
+    единой норме, H18 `DOCS_CHECK_15`), не `numeric`: доменный тип
+    `String`, аксессор сознательно допускает непарсящееся значение;
+    исключение записано
     (`docs/rules/persistence-representation.md` §«Численные колонки»);
-  - **SYSTEM-строки `deal_action_states` несут цель** (H24):
-    `target_entity_type = DEAL`, `target_entity_id = deal_id` — ловит
-    первый (не-null) частичный индекс;
+  - **все строковые колонки шага — `varchar(64)`** (H18 `DOCS_CHECK_15`,
+    решение пользователя): категоризация по типу значения (валюта 16 /
+    сырой код 32 / сырой идентификатор 64 / enum 32) схлопнута
+    (`docs/rules/persistence-representation.md` §«Строковые колонки:
+    длины»); места истины — §Персистентность моделей, сборка —
+    `docs/decisions/pnl-finalization-mechanics.md` §Следствия;
+  - ~~SYSTEM-строки `deal_action_states` несут цель (H24)~~ — **снято**
+    (H8 `DOCS_CHECK_15`): системные исполнения живут в собственной
+    таблице `deal_system_action_states`, **target-колонок у неё нет**
+    (цель системного действия всегда сама сделка, операнды цели в ключе
+    были бы производными; H15 `DOCS_CHECK_14`). Условие возврата —
+    появление системного действия с целью ≠ `DEAL`
+    (`docs/models/domain/other/DealActionState.md` §Инварианты);
   - **состав цикла добычи выводится из `DealContext`** (H3), а не
-    передаётся handler'ом; на `Deal.status = ERROR` жёсткий отказ чтения
-    приравнивается к «недоступно» в `ServiceCommandExecutor` (ноль
-    попыток), исчерпание бюджета **не поднимает `HoldSignal`**, а
-    разрешает эмиссию терминала (H4);
+    передаётся handler'ом; на `Deal.status = ERROR` **отказ канала
+    добычи** расходует бюджет штатно (H3 `DOCS_CHECK_15` — прежнее «ноль
+    попыток» отменено), `FAILED` строки `REFRESH_DEAL_CONTEXT_ACTION` —
+    durable-исход «недоступно», он же **разрешает эмиссию терминала**;
+    радиусная реакция не поднимается. **Контролируемое исключение под это
+    не подпадает** (H4 `DOCS_CHECK_15`): бросается и на аварийной тропе,
+    реакция — полный биржевой холд параллельно с ошибочным терминалом;
   - **условный писатель `billsWindowBegin`** (H27): ветка в
     `SubmitOrderExecutor` включается **только** при отрицательном ответе
     §AG1.5 — код пишется после рантайм-ответа, док-дом уже есть.

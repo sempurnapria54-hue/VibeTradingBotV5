@@ -216,8 +216,11 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
 - **Колонки шага 7 — `ALTER`** (H6 `DOCS_CHECK_11`; типы дописаны H13
   `DOCS_CHECK_14`): `external_settlement_currency`,
   `external_base_currency`, `external_quote_currency` — все три
-  **`varchar(16)`** (строковые колонки валюты,
-  `docs/rules/persistence-representation.md` §«Строковые колонки») —
+  **`varchar(64)`** (единая норма длин строковых колонок, H18
+  `DOCS_CHECK_15`; прежний `varchar(16)` по снятой категоризации
+  «строковая колонка валюты» —
+  `docs/rules/persistence-representation.md` §«Строковые колонки:
+  длины») —
   добавляются миграцией шага 7 **напрямую**;
   бэкфилл не нужен — заведённых инструментов на момент ввода нет
   (`.claude/rules/pre-launch-schema-changes.md`), а каждый заводимый после
