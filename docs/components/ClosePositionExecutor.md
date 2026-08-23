@@ -14,7 +14,12 @@ safety checks, отправляет full close request, сохраняет ACK /
 результат; подтверждение факта закрытия — отдельным `REFRESH_POSITION_COMMAND`.
 
 `CLOSE_POSITION_COMMAND` всегда full close — partial close запрещён (см.
-`docs/rules/no-partial-close.md`). Не блокируется `RiskValidator` (см.
+`docs/rules/no-partial-close.md`). **Эмитентов команды два** (решение
+держателя `GAPS_CLOSE_16`): `ExitPendingHandler` на тропе
+условия-перехода и исполнитель `CLOSE_ACTION` на тропе явного действия
+шага `EXIT`. Для самого исполнителя команды это различия не создаёт —
+контракт один; различается **дочистка вокруг** неё, и она открыта
+(`docs/models/domain/aggregate/Strategy.md` §Действия). Не блокируется `RiskValidator` (см.
 `docs/rules/risk-validator-scope.md`). Не смешивает закрытие с доменной
 автоотменой ордеров: OKX adapter может технически проставить
 `autoCxl=true`, но handler всё равно подтверждает закрытие через

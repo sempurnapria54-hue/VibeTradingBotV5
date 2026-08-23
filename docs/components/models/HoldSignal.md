@@ -110,7 +110,8 @@ call-site. Мягкой биржевой фабрики нет: биржевой
 **Перечень `code` — по производителям** (H6 `DOCS_CHECK_14`; `code`
 обязателен и попадает в `AnomalyReport.code` реактивного отчёта):
 `RETRY_BUDGET_EXHAUSTED` — исчерпание бюджета попыток исполнения
-(`instrumentSoft`, объявлен в `docs/rules/instrument-hold.md` §«Носитель
+(`instrument` — **полная** форма на всех тропах, H8 `DOCS_CHECK_16`,
+решение держателя; объявлен в `docs/rules/instrument-hold.md` §«Носитель
 серии»); `EXCHANGE_KILL_SWITCH_RESIDUAL` — эскалация неподтверждённого
 инструментного teardown (`docs/components/SafetyHoldCoordinator.md`);
 коды `ControlledExchangeException`-тропы — по `reasonCode`/классу

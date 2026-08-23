@@ -90,11 +90,14 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    - begin = Deal.billsWindowBegin (пишет ЕДИНСТВЕННЫЙ писатель
             SubmitOrderExecutor: Order.externalCreatedAt первой
             отправленной ноги, H9 DOCS_CHECK_16);
-   - end   = Deal.billsWindowEnd (пишет вторая нога REFRESH_POSITION_COMMAND
-            транзакционно с полями положения закрытия).
+   - end   = ТЕКУЩЕЕ ВРЕМЯ прохода (подвижная граница ЗАПРОСА, Р7
+            GAPS_CLOSE_16); неподвижная Deal.billsWindowEnd (uTime записи
+            закрытия, пишет вторая нога REFRESH_POSITION_COMMAND) —
+            граница ЛИНКОВКИ и контроля полноты, не запроса.
    Из чужих колонок (Position.externalCreatedAt/externalModifiedAt,
-   Deal.modifiedAt) окно НЕ реконструируется; end пуст (факт закрытия не
-   добыт) -> привязка ждёт, суррогатом окно не закрывается.
+   Deal.modifiedAt) окно НЕ реконструируется; Deal.billsWindowEnd пуст
+   (факт закрытия не добыт) -> ДОБЫЧА идёт, ПРИВЯЗКА ждёт; суррогатом
+   окно не закрывается.
    Границы включительные. Верхняя граница нужна, чтобы не тянуть лишнего;
    разделяет сделки инвариант слота (п.0), а не она.
 

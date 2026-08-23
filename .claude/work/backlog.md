@@ -498,14 +498,16 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     пользователя; инструкция приведена к принятому H20 `DOCS_CHECK_16` —
     прежняя редакция предписывала **отменённую** топологию: все четыре
     числа как поля `Deal`, write-once):
-    - **пять колонок `orders`** — `planned_risk_amount`,
+    - **шесть колонок `orders`** — `planned_risk_amount`,
       `planned_risk_currency`, `planned_entry_price`,
       `planned_size_contracts`, **`planned_contract_value`** (H5
-      `DOCS_CHECK_16` — `ctVal` момента постановки; все `numeric(36,18)`,
-      кроме валюты — `varchar(64)`; все nullable, write-once на уровне
-      entity `updatable = false`), + `ALTER` миграцией шага. **Инвариант —
-      «пять или ни одной»**: производит один преконтроль, пишет одна
-      транзакция;
+      `DOCS_CHECK_16` — `ctVal` момента постановки), **`planned_stop_price`**
+      (Р3 `GAPS_CLOSE_16` — уровень стопа, под который считался риск ноги;
+      нужен, потому что встроенная защита доборной ноги снимается после
+      пересчёта основной); все `numeric(36,18)`, кроме валюты —
+      `varchar(64)`; все nullable, write-once на уровне entity
+      `updatable = false`, + `ALTER` миграцией шага. **Инвариант — «шесть
+      или ни одной»**: производит один преконтроль, пишет одна транзакция;
     - **на `Deal` — три числа, не одно** (H3 `DOCS_CHECK_16` + решение
       держателя `GAPS_CLOSE_16`): `plannedRiskAmount` — **заявленный на
       входе** (Σ по **живым и исполнившимся** ногам входа — предикат H2
@@ -528,7 +530,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     - **`+risk_benchmark_availability`** на `deals` (`varchar(64)`, енум
       `RiskBenchmarkAvailability`: `AVAILABLE`/`NOT_APPLICABLE`/`MISSING`,
       H13 `DOCS_CHECK_16`) — пишут оба финализатора;
-    - `CreateOrderExecutor` пишет пять чисел **входного** действия в одной
+    - `CreateOrderExecutor` пишет шесть чисел **входного** действия в одной
       транзакции с созданием сущности. **Предикат «входное действие» у
       писателя — прохождение риск-преконтроля** (H1 `DOCS_CHECK_16`;
       носителей три и они эквивалентны, у писателя этот прямее —
@@ -567,6 +569,26 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
         `positionReducingOnly` предикатом отбора не делается и заводится
         отдельно (там же, §«Обнаружение рассогласования пары носителей»);
         реакция детектирующего контура — открытая развилка;
+    - **javadoc `RiskValidator.checkRiskCreatingEntryProtection`** повторяет
+      снятую формулировку «attached SL / **иной механизм**, давший цену
+      стопа» (`RiskValidator.java:142-148`). Формула снята решением
+      держателя Р8 `GAPS_CLOSE_16`: определимый стоп — **встроенная
+      attached-защита**, иной механизм формой защиты risk-creating входа
+      не является (`docs/rules/risk-creating-entry-protection.md`
+      §Правило). Привести javadoc к принятому;
+    - **шестое число ноги — `planned_stop_price`** (Р3 `GAPS_CLOSE_16`):
+      колонка `orders`, поле `Order.plannedStopPrice`, поле
+      `CreateOrderCommandPayload`, запись в `CreateOrderExecutor` той же
+      транзакцией; резолв уровня стопа у финализатора переезжает с
+      `attachedAlgoOrders` на persisted-число;
+    - **ремодел основной защиты под увеличенную позицию** (Р3): исполнитель
+      `StrategyActionType.REPLACE` под `PROTECTION_ADJUSTMENT` (сегодня
+      исполнителя нет) плюс снятие attached SL доборной ноги по
+      подтверждении новой основной (`closeReason = SWITCHED_BY_STRATEGY`);
+    - **детектирующий контур пары `Type` ↔ `positionReducingOnly`** (Р1):
+      сверка пары на ногах сделки в трёх исполнителях пересчёта сумм; при
+      расхождении — отказ операции (`VALIDATION_ERROR`), без нового кода
+      аномалии;
     - **`attachedProtection` не доезжает до payload** — гейт `CODE`,
       найден inspection. `CreateOrderExecutor` читает
       `payload.getAttachedProtection()`, а единственный строитель payload'а
@@ -600,40 +622,54 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     построена** (найдено inspection частичного выхода, `GAPS_CLOSE_16`).
     Факт шире, чем «в примере снятое значение»:
     - `trend-following-ema.json:290,477` несёт `actionType: "CLOSE_FULL"`,
-      которого в `StrategyActionType` **нет** (снят —
-      `docs/decisions/fsm-execution-layering.md`): поставляемый пример не
-      провалидируется;
-    - но и с валидным действием шаг не сработал бы: `ManagingHandler`
-      диспетчеризует действие шага в `StrategyActionOrchestrator`, а
-      executor'а под «закрытие позиции» нет **по построению** — полного
-      закрытия как действия в модели не существует
-      (`docs/rules/no-partial-close.md`). Действие не находит исполнителя ⇒
-      `ActionPlan.empty()` ⇒ ничего не происходит;
+      которого в `StrategyActionType` **нет**: поставляемый пример не
+      провалидируется. **Сам пример при этом признан верным** (решение
+      держателя `GAPS_CLOSE_16`): он пользуется законной возможностью —
+      объявить выход действием, — и снимать `CLOSE_FULL` из него **не
+      требуется**; требуется **привести имя значения** к решению по форме
+      действия (§ниже);
+    - `ManagingHandler` диспетчеризует действие шага в
+      `StrategyActionOrchestrator`, а executor'а под «закрытие позиции»
+      нет: до решения `GAPS_CLOSE_16` его не было **по построению**.
+      Действие не находит исполнителя ⇒ `ActionPlan.empty()` ⇒ ничего не
+      происходит;
+    - **комментарий в коде** (`StrategyActionType`, «полного закрытия
+      позиции как действия нет») — **устаревший**: решение держателя его
+      отменило. Правится этой же дельтой;
     - `ManagingHandler.startApplicable(...)` при этом требует **непустой**
       список действий, чтобы шаг вообще запустился, а
       `checkTransition`/`isExitSubmitted` ждёт `DealActionState` в
       `SUBMITTED` — состояния, которое без исполнителя не наступает.
 
-    **Целевая форма пересмотрена решением держателя `GAPS_CLOSE_16`:
-    способов объявить выход — два, и оба законны** (условие-переход **и**
-    явное действие шага `EXIT`, `docs/rules/no-partial-close.md`).
-    Механизм закрытия при этом один: market-close исполняет
-    `ExitPendingHandler` командой `CLOSE_POSITION_COMMAND`.
+    **Целевая форма — решение держателя `GAPS_CLOSE_16`: способов объявить
+    выход два, и оба законны** (условие-переход **и** явное действие шага
+    `EXIT`, `docs/rules/no-partial-close.md`). Команда закрытия одна —
+    `CLOSE_POSITION_COMMAND`, — но **эмитентов у неё два** (вариант B):
+    `ExitPendingHandler` и исполнитель `CLOSE_ACTION`.
 
-    Дельта, не зависящая от открытой развилки:
+    Дельта:
     - шаг `EXIT` может быть **условие-только** — пустой список действий
       допустим, `ManagingHandler` по истинному условию делает переход,
       валидация перестаёт требовать действия у этого типа шага;
+    - **третье значение `actionKind`** — `POSITION`; **третий подтип
+      `StrategyAction`** — `StrategyPositionAction` (`key`, `actionType`,
+      `level`); **четвёртое значение `StrategyActionType`** —
+      **`CLOSE_ACTION`** (суффиксный маркер уровня,
+      `.claude/rules/naming.md`); валидация состава действий расширяется на
+      новый подтип;
+    - **исполнитель `CLOSE_ACTION`** эмитит `CLOSE_POSITION_COMMAND` сам;
+      `DealActionState` заводится обычным порядком — runtime-сущность есть
+      (`Position`);
+    - **в поставляемом примере** `actionType: "CLOSE_FULL"` →
+      `"CLOSE_ACTION"` (обе позиции: `:290`, `:477`); `actionKind:
+      "POSITION"` остаётся как есть — он верен;
+    - **javadoc/комментарий `StrategyActionType`** приводится к принятому:
+      клауза «полного закрытия позиции как действия нет» снимается;
+    - **дочистка на тропе явного действия** (кто отменяет живые ноги и
+      защиту и в каком порядке) — **открыта**, см. §«Развилки,
+      возвращаемые на валидацию» отчёта `GAPS_CLOSE_16`. До её прохождения
+      исполнитель эмитит только команду закрытия;
 
-    Дельта, **зависящая** от развилки «форма действия полного закрытия»
-    (`.claude/work/progress/phase-1-step-7-gaps-close-16.md` §«Развилки,
-    возвращаемые на валидацию»): третье значение `actionKind`, третий
-    подтип `StrategyAction`, четвёртое значение `StrategyActionType`,
-    исполнитель и вопрос о `DealActionState` без runtime-сущности. **До
-    прохождения развилки эта часть не пишется**, и `CLOSE_FULL` из
-    поставляемого примера **не снимается**: пример останется невалидным
-    ровно до тех пор, пока форма не выбрана, — снимать его сейчас значило
-    бы закрепить отменённое решение;
   - **`StrategyActionType.REPLACE` и `CANCEL` — исполнителей нет**
     (inspection 2026-08-23). `StrategyActionExecutor`-ов два, оба на
     `CREATE`; оркестратор не находит исполнителя ⇒ `ActionPlan.empty()` ⇒
