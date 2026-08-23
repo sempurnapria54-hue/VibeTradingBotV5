@@ -30,10 +30,11 @@ live risk; локальные orders/algo доступны для очистки
 `REFRESH_ORDER_COMMAND` / `REFRESH_ALGO_ORDER_COMMAND` по известным сущностям сделки
 (каждый внутри себя проходит pending/history); `REFRESH_BALANCE_COMMAND` после
 снятия live risk; `REFRESH_BILLS_COMMAND` (`DealCashFlow` — категорийная
-разбивка; её факт durable) — **по предикату непустоты `Deal.billsWindowEnd`,
-как и на аварийной тропе** (H7 `DOCS_CHECK_16`): до приземления записи
-закрытия окно пусто, звено недобываемо по построению и в цикл не входит
-(`docs/components/SystemActionExecutor.md` §«Состав конкретного цикла»).
+разбивка; её факт durable) — **звено выходной тропы**: гейт эмиссии стоит
+на тропе, а не на окне (H7 `DOCS_CHECK_16`, редакция — решение держателя),
+поэтому здесь оно в цикле есть всегда, а на аварийной тропе — не эмитится
+вовсе (`docs/components/SystemActionExecutor.md` §«Состав конкретного
+цикла»).
 
 **Cleanup — напрямую, без анкера:** живая позиция (штатный выход =
 «market-close всё + дочистка», владелец — этот handler,

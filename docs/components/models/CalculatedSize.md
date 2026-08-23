@@ -32,7 +32,8 @@
 
 `sz` в OKX API для SWAP/FUTURES — это контракты, не USDT. Формула расчёта
 контрактов через `ctVal`/`lotSz`/`minSz` — у `docs/components/SizeCalculator.md`.
-Direct partial close позиции не рассчитывается; полного закрытия позиции
-как действия нет (market-close ведёт `ExitPendingHandler`), частичное
-уменьшение — через reduce-only `Order`/`AlgoOrder` (см.
+Direct partial close позиции не рассчитывается; полное закрытие идёт
+market-close'ом (ведёт `ExitPendingHandler`) — и при выходе по
+условию-переходу, и при явном действии шага `EXIT`; частичное уменьшение —
+через reduce-only `Order`/`AlgoOrder` (см.
 `docs/rules/no-partial-close.md`).

@@ -169,17 +169,16 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
     но **с** полным биржевым холдом — радиус там неизвестен
     (`docs/models/mapping/PositionCloseResult.md` §«Контракт записи
     проверяется здесь»).
-  - **Различение несут два носителя** — терминальный статус **и** значение
-    `reconciliationStatus` (новой колонки нет — енум хранится строкой):
-    «должны были посчитать и не посчитали» ⇒ **ошибочный** терминал
-    **+ `OPERAND_MISSING`**; «должны были и посчитали» ⇒ успешный
-    (`MATCHED`/`MISMATCHED`); «не должны были» ⇒ успешный независимо от
-    посчитанного (`NOT_RUN`). Прежняя редакция («различение несёт
-    терминальный статус, **не** значение признака; значения "оценено не
-    всё" нет намеренно») описывала только штатную тропу и **снята** H6
-    `DOCS_CHECK_16`: внутри `EMERGENCY_CLOSED` терминал константен, а
-    сверка на ветви (a) обязана — там различает только признак
-    (`docs/models/domain/aggregate/Deal.md` §Енумы).
+  - **Различение несёт терминальный статус**, не значение
+    `reconciliationStatus` и не новая колонка: «должны были посчитать и не
+    посчитали» ⇒ **ошибочный** терминал; «должны были и посчитали» ⇒
+    успешный (`MATCHED`/`MISMATCHED`); «не должны были» ⇒ успешный
+    независимо от посчитанного (`NOT_RUN`). Поэтому значения «оценено не
+    всё» у `ReconciliationStatus` нет намеренно (H6 `DOCS_CHECK_16`
+    предлагал завести его и **отклонён** решением держателя; цена — внутри
+    `EMERGENCY_CLOSED` терминал константен, и два случая там различает
+    журнальный `AnomalyReport` `RECONCILIATION_OPERAND_MISSING`, а не
+    признак: `docs/models/domain/aggregate/Deal.md` §Енумы).
   - Операнды предиката и его провенанс —
     `docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта»;
     поведение исполнителя — `docs/components/FinalizeDealExitExecutor.md`
@@ -261,7 +260,7 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
 | Ребро | `closeOutcome` | `reconciliationStatus` | `breakdownIncomplete` | `riskBenchmarkAvailability` |
 |---|---|---|---|---|
 | `EXIT_PENDING → CLOSED` (штатная) | по `Position.externalCloseType`, пусто (записи нет) ⇒ `UNDETERMINED` | исход сверки | `COMPLETE` / `INCOMPLETE_BY_WINDOW` / `NOT_ASSESSED` | `AVAILABLE`, либо `MISSING` при пустом знаменателе (H13 `DOCS_CHECK_16`) |
-| `ERROR → EMERGENCY_CLOSED` | то же | ветвь (a) — запись закрытия добыта: **исход сверки** (`MATCHED`/`MISMATCHED`, H21 `DOCS_CHECK_14`; операнд допуска не резолвился — **`OPERAND_MISSING`**, H6 `DOCS_CHECK_16`: внутри этого терминала различает только признак); ветвь (b) — окно пусто: `NOT_RUN` | то же сравнение, при недобытом операнде — `NOT_ASSESSED` | то же (`NOT_APPLICABLE` недостижим — операции были) |
+| `ERROR → EMERGENCY_CLOSED` | то же | ветвь (a) — запись закрытия добыта: **исход сверки** (`MATCHED`/`MISMATCHED`, H21 `DOCS_CHECK_14`; операнд допуска не резолвился — `NOT_RUN` + журнальный `AnomalyReport` `RECONCILIATION_OPERAND_MISSING`, отдельного значения признака нет); ветвь (b) — окно пусто: `NOT_RUN` | то же сравнение, при недобытом операнде — `NOT_ASSESSED` | то же (`NOT_APPLICABLE` недостижим — операции были) |
 | три тропы **закрытия без входа** → `CLOSED` | **пусто** (неприменим) | **пусто** (неприменим) | **пусто** (неприменим) | **`NOT_APPLICABLE`** — единственный признак, который на этих тропах **не пуст**: он и назван, чтобы отличить эту популяцию от аномальной (H13 `DOCS_CHECK_16`) |
 
 **Штатное ребро при обязанной и невыполненной сверке недостижимо** (H10

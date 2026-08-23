@@ -105,8 +105,9 @@ SHORT и давала бы шортам систематически больш�
 ## Инвариант partial exit
 
 `SizeCalculator` **не** рассчитывает direct partial close позиции
-(полного закрытия позиции как действия нет — market-close ведёт
-`ExitPendingHandler`). Частичное уменьшение —
+(полное закрытие идёт market-close'ом, ведёт его `ExitPendingHandler` —
+независимо от того, объявлен выход условием-переходом или явным действием
+шага `EXIT`, `docs/rules/no-partial-close.md`). Частичное уменьшение —
 только через `StrategyOrderAction` reduce-only или `StrategyAlgoOrderAction`
 partial TP / reduce-only; размер закрывающего `Order`/`AlgoOrder`
 считается так, чтобы action не увеличивал позицию (`closeFraction` 0..1,

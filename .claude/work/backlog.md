@@ -305,8 +305,11 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **Остаток Stage 3 FSM/action слоистости** (решение —
   `docs/decisions/fsm-execution-layering.md`; Stage 1-2 построены на
   шаге 6): transition-conditions в модели стратегии +
-  exit-as-transition (`MANAGING→EXIT_PENDING` без `DEAL_EXIT`) + снять
-  вырожденный `CLOSE_FULL` — сверить остаток с as-built шага 6.
+  exit-as-transition (`MANAGING→EXIT_PENDING`) — сверить остаток с
+  as-built шага 6. **Пункт «снять вырожденный `CLOSE_FULL`» снят**
+  (решение держателя `GAPS_CLOSE_16`: полное закрытие выражается и
+  условием-переходом, и явным действием шага `EXIT`); форма действия —
+  открытая развилка, см. §Шаг 7.
 - **Идемпотентность `AnomalyReport`** (хвост H17
   `GAPS_CLOSE_13`; анкер-ключ **снят**, идемпотентность держится
   незавершённым статусом — `docs/models/domain/other/AnomalyReport.md`
@@ -505,8 +508,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       транзакция;
     - **на `Deal` — три числа, не одно** (H3 `DOCS_CHECK_16` + решение
       держателя `GAPS_CLOSE_16`): `plannedRiskAmount` — **заявленный на
-      входе** (Σ по ногам входа за вычетом замещённых, предикат — H2
-      `DOCS_CHECK_16`; знаменатель R-мультипликатора);
+      входе** (Σ по **живым и исполнившимся** ногам входа — предикат H2
+      `DOCS_CHECK_16` в редакции держателя `GAPS_CLOSE_16`: бизнес-тип +
+      состояние + страховочная непустота числа; знаменатель
+      R-мультипликатора);
       **`incurred_risk_amount`** — **фактический на входе**
       (Σ `plannedRiskAmount_i × accFillSz_i / plannedSizeContracts_i`;
       частичным выходом **не уменьшается**);
@@ -538,16 +543,30 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       `StrategyCreateRequestValidator` (сейчас не проверяется вовсе);
       носителей у оси два, и согласованность держится **проверкой**
       (`docs/models/domain/core/Order.md` §Енумы, названная цена решения);
-    - **предикаты «это входная нога» в `src/` — ошибочны, не тавтологичны**
-      (переформулировано по итогам inspection частичного выхода; прежняя
-      формулировка «тавтологичны» снята). `CalculationContextFactory.isEntryType(...)`
-      и фильтр в `DealFsmSupport.entryOrder(...)` (~стр. 190) проверяют
-      `type == ENTRY || type == ENTRY_ATTACHED_STOP_LOSS`. До третьего
-      значения это было истинно для **всякого** ordinary order, включая
-      reduce-only ⇒ `entryOrder()` мог вернуть **ногу частичного выхода**, а
-      на её результате стоит гейт защиты `EntryFinalizedHandler`. С вводом
-      `REDUCE_ONLY` предикаты становятся верными **без правки** — но
-      проверить и оставить осознанно, а не по совпадению;
+    - **предикаты «это входная нога» в `src/` переписываются на
+      признак, выбранный решением держателя** (`GAPS_CLOSE_16`; прежняя
+      редакция «становятся верными без правки — проверить и оставить»
+      снята: держатель запретил оставлять их верными **по совпадению**).
+      `CalculationContextFactory.isEntryType(...)` и фильтр в
+      `DealFsmSupport.entryOrder(...)` (~стр. 190) держат инлайновую
+      дизъюнкцию `type == ENTRY || type == ENTRY_ATTACHED_STOP_LOSS`. До
+      ввода `REDUCE_ONLY` она была истинна для **всякого** ordinary order,
+      включая reduce-only ⇒ `entryOrder()` мог вернуть **ногу частичного
+      выхода**, а на её результате стоит гейт защиты
+      `EntryFinalizedHandler`. Дельта:
+      - предикат «нога входа» переезжает **на доменную модель** —
+        `Order.isEntryLeg()` (бизнес-тип, `Type ∈ {ENTRY,
+        ENTRY_ATTACHED_STOP_LOSS}`), по `.claude/rules/codestyle.md`
+        §«Вложенность и rich-модели»; оба места вызывают его, инлайновых
+        дизъюнкций по `Type` в `src/` не остаётся;
+      - там, где отбираются **слагаемые сумм риска**, к нему добавляется
+        страховочный конъюнкт непустоты `plannedRiskAmount`
+        (`docs/models/domain/aggregate/Deal.md` §«Предикат отбора
+        слагаемых»);
+      - **обнаружение рассогласования пары** `Type` ↔
+        `positionReducingOnly` предикатом отбора не делается и заводится
+        отдельно (там же, §«Обнаружение рассогласования пары носителей»);
+        реакция детектирующего контура — открытая развилка;
     - **`attachedProtection` не доезжает до payload** — гейт `CODE`,
       найден inspection. `CreateOrderExecutor` читает
       `payload.getAttachedProtection()`, а единственный строитель payload'а
@@ -555,7 +574,8 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       заполняет** ⇒ `Order.attachedAlgoOrders` пуст всегда. Следствия: (а)
       сделка без шага `MAIN_PROTECTION` уходит в `ERROR` (`markErrorStopless`)
       на **каждом** входе; (б) `stop_i` не резолвится **ни у одной** ноги ⇒
-      `reconciliationStatus = OPERAND_MISSING` на каждой сделке
+      обязанная сверка не выполняется и сделка уходит **ошибочной тропой**
+      на каждой сделке
       (`docs/components/FinalizeDealExitExecutor.md` §epsilon). Заполнить
       payload из `StrategyOrderAction.attachedProtection`.
       - ⚠️ **Торговое следствие, а не только дефект доставки поля:** между
@@ -594,13 +614,26 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       `checkTransition`/`isExitSubmitted` ждёт `DealActionState` в
       `SUBMITTED` — состояния, которое без исполнителя не наступает.
 
-    Целевая форма задана доками и правки концепции не требует: выход —
-    **условие-переход** `MANAGING → EXIT_PENDING`, market-close исполняет
-    `ExitPendingHandler` командой `CLOSE_POSITION_COMMAND`. Дельта: шаг
-    `EXIT` становится **условие-только** (пустой список действий
-    допустим), `ManagingHandler` по истинному условию `EXIT`-шага делает
-    переход, валидация перестаёт требовать действия у этого типа шага,
-    из примеров снимается `CLOSE_FULL`;
+    **Целевая форма пересмотрена решением держателя `GAPS_CLOSE_16`:
+    способов объявить выход — два, и оба законны** (условие-переход **и**
+    явное действие шага `EXIT`, `docs/rules/no-partial-close.md`).
+    Механизм закрытия при этом один: market-close исполняет
+    `ExitPendingHandler` командой `CLOSE_POSITION_COMMAND`.
+
+    Дельта, не зависящая от открытой развилки:
+    - шаг `EXIT` может быть **условие-только** — пустой список действий
+      допустим, `ManagingHandler` по истинному условию делает переход,
+      валидация перестаёт требовать действия у этого типа шага;
+
+    Дельта, **зависящая** от развилки «форма действия полного закрытия»
+    (`.claude/work/progress/phase-1-step-7-gaps-close-16.md` §«Развилки,
+    возвращаемые на валидацию»): третье значение `actionKind`, третий
+    подтип `StrategyAction`, четвёртое значение `StrategyActionType`,
+    исполнитель и вопрос о `DealActionState` без runtime-сущности. **До
+    прохождения развилки эта часть не пишется**, и `CLOSE_FULL` из
+    поставляемого примера **не снимается**: пример останется невалидным
+    ровно до тех пор, пока форма не выбрана, — снимать его сейчас значило
+    бы закрепить отменённое решение;
   - **`StrategyActionType.REPLACE` и `CANCEL` — исполнителей нет**
     (inspection 2026-08-23). `StrategyActionExecutor`-ов два, оба на
     `CREATE`; оркестратор не находит исполнителя ⇒ `ActionPlan.empty()` ⇒
@@ -801,12 +834,16 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   6. **Инвариант агрегации positions-history** (N11, §AG1) — прежний
      гейт `CODE`, не новый.
   7. **Знаки трёх операндов записи и bill'а штрафа** (H15
-     `DOCS_CHECK_16`) — **гейт `CODE`**, кейс `AG1.7`: фактический знак
+     `DOCS_CHECK_16`) — **гейта нет** (статус снят решением держателя
+     `GAPS_CLOSE_16`: знак выясняется прогоном и правится по факту —
+     меняется наличие отрицания в паре сверки, то есть реализация, а не
+     конструкция). Кейс `AG1.7`: фактический знак
      `fee` и `liqPenalty` в positions-history и знак `balChg` у bill'а
      ликвидационного штрафа. Четвёртая пара сверки сравнивает
      `externalLiquidationPenalty` **без отрицания**; при положительной
      величине штрафа Δ₄ = 2·|штраф| на **каждой** ликвидации, то есть
-     контроль погашен на левом хвосте. Предусловие `CODE` п. 7.
+     контроль погашен на левом хвосте — **цена ошибки названа, но
+     `CODE` ответа не ждёт**. Предусловие `CODE` п. 7 (без статуса гейта).
   8. ~~**Дом конфига списка исключений** (H16 `DOCS_CHECK_16`)~~ —
      **структурная половина закрыта** (решение пользователя:
      `@ConfigurationProperties` per-exchange, предусловие `CODE` п. 12).
