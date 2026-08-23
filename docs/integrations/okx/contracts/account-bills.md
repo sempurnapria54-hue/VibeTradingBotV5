@@ -87,7 +87,9 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
 
 1. Определить окно сделки — СОБСТВЕННЫЕ ПОЛЯ Deal (узел 1 DOCS_CHECK_8;
    docs/decisions/command-action-boundary.md §7):
-   - begin = Deal.billsWindowBegin (пишет наблюдатель факта открытия);
+   - begin = Deal.billsWindowBegin (пишет ЕДИНСТВЕННЫЙ писатель
+            SubmitOrderExecutor: Order.externalCreatedAt первой
+            отправленной ноги, H9 DOCS_CHECK_16);
    - end   = Deal.billsWindowEnd (пишет вторая нога REFRESH_POSITION_COMMAND
             транзакционно с полями положения закрытия).
    Из чужих колонок (Position.externalCreatedAt/externalModifiedAt,

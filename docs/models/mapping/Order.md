@@ -44,6 +44,17 @@ Snapshot — нормализованный граничный объект; е�
 | `stopLossTriggerPrice` | `Order.stopLossTriggerPrice` | top-level SL trigger |
 | `attachedAlgoOrders[]` | `Order.attachedAlgoOrders[]` | список `AttachedAlgoOrder` (см. ниже) |
 
+**Поля планового риска в снапшот не входят и им не перезаписываются.**
+`plannedRiskAmount`, `plannedRiskCurrency`, `plannedEntryPrice`,
+`plannedSizeContracts`, `plannedContractValue` — **наши** величины,
+произведённые риск-преконтролем и доставленные
+`CreateOrderCommandPayload`'ом (`docs/components/CreateOrderExecutor.md`
+§«Куда пишутся пять чисел»); источник таких фактов не отдаёт, и эхо
+рефреша их не трогает — все пять write-once (`updatable = false`).
+Строка заведена H5 `DOCS_CHECK_16` структурным свипом: пятая колонка
+`orders` вводилась, и mapping-таблица обязана была сказать, что её здесь
+нет **намеренно**, — иначе отсутствие читается как пропуск.
+
 ### `Domain Order → request`
 
 - **Create**: `Instrument.externalId → instId`; `isolated → tdMode`

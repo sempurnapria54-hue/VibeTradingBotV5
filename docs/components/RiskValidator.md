@@ -59,10 +59,14 @@ distance. Метрики могут попасть в `RiskCheckResult.details`,
 аудит, но **не** входят в `CalculatedStrategyAction`.
 
 **Исключение — risk amount входного действия** (H9, `GAPS_CLOSE_7`): он
-**персистится** как `Order.plannedRiskAmount` **создаваемой ноги**, а
-`Deal.plannedRiskAmount` (знаменатель `R`) той же транзакцией
-пересчитывается как **сумма** по ногам входа (H6/H11 `DOCS_CHECK_15`);
-писатель — `docs/components/CreateOrderExecutor.md`, тот же проход. Это не отменяет
+**персистится** как `Order.plannedRiskAmount` **создаваемой ноги**, а суммы
+на `Deal` (`plannedRiskAmount` — знаменатель `R`; `incurredRiskAmount` —
+взятый риск, H3 `DOCS_CHECK_16`) той же транзакцией пересчитываются по
+ногам входа (H6/H11 `DOCS_CHECK_15`); писатель —
+`docs/components/CreateOrderExecutor.md`, тот же проход. **Вместе с риском
+валидатор отдаёт и `ctVal` момента постановки** — он и так читает навес,
+чтобы посчитать риск, а значение садится на ногу пятым числом
+(`Order.plannedContractValue`, H5 `DOCS_CHECK_16`). Это не отменяет
 правила выше: метрика по-прежнему не едет в `CalculatedStrategyAction` —
 она уходит в **поле сделки**, у которого свой торговый смысл
 (`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).

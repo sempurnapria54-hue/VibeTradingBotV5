@@ -50,6 +50,7 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `plannedSizeContracts` | `BigDecimal` | Заявленный размер **этой ноги** (контракты). Write-once. |
 | `plannedRiskAmount` | `BigDecimal` | **Плановый риск этой ноги** — убыток на её стопе, посчитанный при постановке ноги. Слагаемое знаменателя `R` сделки (H6/H11 `DOCS_CHECK_15`). Write-once. |
 | `plannedRiskCurrency` | `String` | Валюта планового риска ноги (расчётная валюта инструмента). Write-once. |
+| `plannedContractValue` | `BigDecimal` | Размер контракта инструмента (`ctVal`) **на момент постановки этой ноги** — четвёртый операнд тождества планового риска. Write-once (H5 `DOCS_CHECK_16`). |
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Embedded attached protection. |
 
 Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
@@ -72,6 +73,15 @@ invariant-проверка — в `docs/models/mapping/Order.md`.
 
 - **`Type`**: `ENTRY`, `ENTRY_ATTACHED_STOP_LOSS`. Бизнес-тип, не
   описывает strategy role (grid-entry / partial-exit / full-exit).
+  **Различает наличие встроенной защиты, а не входность** (H1
+  `DOCS_CHECK_16`): значения читаются как «без attached-защиты» / «со
+  встроенным attached SL». Обе константы формально названы входными, но
+  reduce-only и защитные ordinary-ордера несут значение из этой же пары
+  (`type NOT NULL`, и третьего значения нет) — поэтому **предикатом
+  отбора ног входа `Type` быть не может**; предикаты названы в
+  §«Предикат "нога входа"». Дельта `CODE`: javadoc обеих констант в
+  `Order.java` называет их «входной ордер» — формулировка приводится к
+  этой редакции (`.claude/work/backlog.md` §Шаг 7).
 - **`Status`**: `CREATED`, `PENDING`, `ACTIVE`, `PARTIALLY_COMPLETED`,
   `COMPLETED`, `CANCELED`, `ERROR` (значения/переходы — в lifecycle).
 - **`CloseReason`**: `FILLED`, `CANCELED_BY_STRATEGY`,
@@ -105,11 +115,60 @@ ctVal` = ожидаемая комиссия), верно **только в од
 сумма закрывает второй дефект: знаменатель `R` перестаёт быть числом
 первой ноги (`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).
 
-**Все четыре — write-once** (`updatable = false`). REPLACE-нога не
+**Все пять — write-once** (`updatable = false`). REPLACE-нога не
 переписывает ни reference-цену, ни риск: иначе разрыв «заявлено ↔ взято»
 становится неизмеримым, а слагаемое знаменателя перестаёт быть тем
 числом, под которое сайзились
 (`docs/decisions/per-trade-risk-policy.md` §«Асимметрия»).
+
+### `plannedContractValue` — пятое число, и почему оно persisted (H5 `DOCS_CHECK_16`)
+
+Тождество планового риска ноги стоит на **четырёх** операндах:
+
+```text
+plannedRiskAmount_i = |plannedEntryPrice_i − stop_i|
+                      × plannedSizeContracts_i × ctVal_i
+                      + ожидаемая комиссия_i
+```
+
+Три из них были persisted write-once, а `ctVal` **дочитывался финализатором
+из JSONB-навеса `InstrumentExternalRules`**, который синк переписывает
+каждым тиком. Довод, которым проект отверг пере-чтение **ставки комиссии**
+(«persisted write-once воспроизводимо, перечитанное значение — нет»,
+`docs/decisions/pnl-finalization-mechanics.md` реш.4), дословно применим и
+здесь — и применён не был: в одной секции стояли «ставку не перечитываем,
+потому что persisted» и «`ctVal` читай из навеса».
+
+**Что чинится.** Два следствия, оба измеримые:
+
+- **тихое** — смена `ctVal` между входом и финализацией даёт неверный
+  допуск на **уже закрытой** сделке: либо ложный `MISMATCHED`, либо
+  погашенный контроль. Величина искажения кратна отношению старого и нового
+  размера контракта, то есть не мала;
+- **громкое** — нерезолвимый `ctVal` (навес не синхронизирован) уводил
+  завершившуюся **штатно** сделку с корректным `resultProfit` в
+  `EMERGENCY_CLOSED`: терминальная ось получала событие, к торговле
+  отношения не имеющее.
+
+**Канал и писатель — те же, что у четырёх соседей**: значение приходит
+`CreateOrderCommandPayload`'ом входного действия (риск-преконтроль читает
+навес **в момент постановки** — он и так его читает, чтобы посчитать риск),
+пишется `CreateOrderExecutor`'ом той же транзакцией, что создание ноги.
+Отдельного чтения навеса ход не добавляет.
+
+**Инвариант «пять или ни одного».** Все пять чисел производит один
+преконтроль и пишет одна транзакция: непустой `plannedRiskAmount_i` при
+пустом `plannedContractValue_i` недостижим. Это и есть основание, по
+которому финализатор перестаёт быть читателем навеса
+(`docs/components/InstrumentExternalRulesDataService.md` §Использование).
+
+**Чего ход не делает.** Он не персистит **готовое** число ожидаемой
+комиссии (`plannedCommission_i`) — этот вариант рассмотрен и отвергнут
+(решение пользователя): он снимал бы вместе с `ctVal` и `stop_i`, но заводил
+число, выводимое из уже персистенных. `stop_i` резолвится через
+`Order.attachedAlgoOrders` — форма защиты доборной ноги сужена под это
+(`docs/rules/risk-creating-entry-protection.md` §«Форма защиты у доборной
+ноги»).
 
 **Дом — только `orders`** (`RISK-Q4` закрыт 2026-08-20): входной тропы
 алго-ордером не существует (вход — ordinary `Order`; у
@@ -121,12 +180,39 @@ ctVal` = ожидаемая комиссия), верно **только в од
 перезаписываемые эхом ответа при каждом рефреше. Условие возврата вопроса
 — `docs/models/domain/core/AlgoOrder.md` §Назначение.
 
-**Пусты у не-входных ног.** Поля заполняются только у ног входа
-(`Type.ENTRY`); у reduce-only и защитных ordinary-ордеров планового риска
-нет по построению — они риска не создают
+**Пусты у не-входных ног.** У reduce-only и защитных ordinary-ордеров
+планового риска нет по построению — они риска не создают
 (`docs/rules/risk-validator-scope.md`). Пустота здесь — «признак
 неприменим», а не «операнд не добыт»
 (`docs/rules/absent-value-semantics.md`).
+
+### Предикат «нога входа» — два, и `Type` не из них
+
+H1 `DOCS_CHECK_16`. Прежняя редакция называла предикатом отбора
+`Type.ENTRY`. **`Order.Type` дискриминатором входа не является** и не
+может им быть: енум двузначен, и **обе** константы —
+`ENTRY` / `ENTRY_ATTACHED_STOP_LOSS`, — а `type NOT NULL`, значит и
+reduce-only, и защитные ordinary-ордера обязаны нести значение из этой же
+пары (`StrategyOrderAction.orderType: Order.Type` —
+`docs/models/domain/aggregate/Strategy.md`). Буквальное чтение прежней
+скобки одновременно **исключало** штатный защищённый вход
+(`ENTRY_ATTACHED_STOP_LOSS`) и **не исключало** не-входные ордера. Что
+енум на самом деле различает — наличие встроенной защиты, — записано в
+§Енумы.
+
+Предикатов **два**, у писателя и у читателя, и они разные по природе:
+
+| Сторона | Предикат | Носитель |
+|---|---|---|
+| **Писатель** | действие прошло риск-преконтроль, то есть **risk-creating / risk-increasing**, а не reduce-only: пять чисел приходят `CreateOrderCommandPayload`'ом **входного** действия | `docs/rules/risk-validator-scope.md` §Вызывается; `docs/components/CreateOrderActionExecutor.md`; `docs/components/CreateOrderExecutor.md` §«Куда пишутся пять чисел» |
+| **Читатель** | нога с **непустым `plannedRiskAmount`** — производный durable-признак, читаемый без внешнего контекста | `docs/components/FinalizeDealExitExecutor.md` §epsilon |
+
+**Третьего носителя не заводится.** Отдельное поле-признак «нога входа»
+на `orders` не вводится: различитель на сущности уже есть —
+`positionReducingOnly` на стороне намерения и непустой
+`plannedRiskAmount` на стороне факта, — и новая колонка была бы третьим
+местом, знающим одно и то же (`.claude/rules/codestyle.md`; связность
+растёт).
 
 ## Персистентность
 
@@ -146,15 +232,22 @@ ctVal` = ожидаемая комиссия), верно **только в од
   `position_reducing_only` (`boolean`), `replaces_internal_id`
   (`varchar(64)`), шесть audit-колонок (`AuditableEntity`, nullable).
 - **Колонки шага 7 — `ALTER`**: `planned_entry_price`,
-  `planned_size_contracts`, **`planned_risk_amount`** (все три
-  `numeric(36,18)`) и **`planned_risk_currency`** (`varchar(64)` —
-  строковая колонка по правилу длин,
-  `docs/rules/persistence-representation.md` §«Строковые колонки: длины»);
-  все nullable (пусты у не-входных ног и у ордеров, заведённых вне нашего
-  входа), write-once на уровне entity (`updatable = false`). Пара
+  `planned_size_contracts`, **`planned_risk_amount`**,
+  **`planned_contract_value`** (все четыре `numeric(36,18)`) и
+  **`planned_risk_currency`** (`varchar(64)` — строковая колонка по правилу
+  длин, `docs/rules/persistence-representation.md` §«Строковые колонки:
+  длины»); все nullable (пусты у не-входных ног и у ордеров, заведённых вне
+  нашего входа), write-once на уровне entity (`updatable = false`). Пара
   `planned_risk_*` добавлена H6/H11 `DOCS_CHECK_15` — дом планового риска
-  переехал с `Deal` на ногу, на сделке остаётся сумма. Бэкфилл не нужен
+  переехал с `Deal` на ногу, на сделке остаётся сумма;
+  `planned_contract_value` — H5 `DOCS_CHECK_16` (четвёртый операнд
+  тождества перестаёт дочитываться из изменчивого навеса, §«`plannedContractValue`
+  — пятое число»). Бэкфилл не нужен
   (`.claude/rules/pre-launch-schema-changes.md`).
+- **Инвариант заполнения — «пять или ни одного»**: все пять колонок
+  производит один риск-преконтроль и пишет одна транзакция, поэтому
+  смешанного состояния (часть заполнена, часть нет) не бывает. На нём стоит
+  вывод финализатора из читателей навеса.
 - Enum-поля хранятся строкой (имя enum; codestyle §Слои моделей и
   enum'ы).
 

@@ -126,7 +126,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v83.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v84.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -175,7 +175,9 @@
 │       │   ├── phase-1-step-7-gaps-close-12.md — Как закрыты находки DOCS_CHECK_12?
 │       │   ├── phase-1-step-7-gaps-close-13.md — Как закрыты находки DOCS_CHECK_13?
 │       │   ├── phase-1-step-7-gaps-close-14.md — Как закрыты находки DOCS_CHECK_14 (и RISK-Q4/ANOM-Q5)?
-│       │   └── phase-1-step-7-gaps-close-15.md — Как закрыты находки DOCS_CHECK_15?
+│       │   ├── phase-1-step-7-gaps-close-15.md — Как закрыты находки DOCS_CHECK_15?
+│       │   └── phase-1-step-7-gaps-close-16.md — Как закрыты находки DOCS_CHECK_16?
+│       ├── blind/ — Какой выбор CC сделал по развилкам под-шага до опроса держателя? (запечатанный ключ слепого прохода; сейчас пусто — первый ключ на GAPS_CLOSE_17)
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)

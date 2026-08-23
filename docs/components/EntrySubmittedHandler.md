@@ -25,8 +25,10 @@ STRATEGY-исполнение). **Добыча — через `REFRESH_DEAL_CONT
 (handler добывающие `REFRESH_*` напрямую не эмитит;
 `docs/components/SystemActionExecutor.md`): отправлен, не подтверждён →
 `REFRESH_ORDER_COMMAND` (внутр. цикл order → pending → history); мог исполниться →
-`REFRESH_POSITION_COMMAND` (первое наблюдение позиции пишет
-`Deal.billsWindowBegin`). Факты исполнения ордера (`accFillSz`/`avgPx`) —
+`REFRESH_POSITION_COMMAND`. **`Deal.billsWindowBegin` эта тропа не пишет** —
+границу поставил `SubmitOrderExecutor` при постановке первой ноги (H9
+`DOCS_CHECK_16`; прежняя редакция «первое наблюдение позиции пишет
+`billsWindowBegin`» снята). Факты исполнения ордера (`accFillSz`/`avgPx`) —
 из `REFRESH_ORDER_COMMAND`, отдельной fill-команды нет. Перед повторным submit —
 поиск по client id. Если `REFRESH_POSITION_COMMAND` нашёл позицию, а локальной
 нет — `RefreshPositionExecutor` создаёт `Position` и привязывает к `Deal`.
