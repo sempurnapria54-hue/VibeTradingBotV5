@@ -281,9 +281,9 @@ H8 `GAPS_CLOSE_13`; область Σ`amount` по `FUNDING` — левый оп
 | Сумма | Область | Зачем |
 |---|---|---|
 | комиссия сделки = Σ`externalFee` | строки **торговых** категорий (`REALIZED_PNL` / `TRADE_FEE` / `REBATE`) **в settle-ccy**, за вычетом **исключённых типов** (§ниже) | левый операнд **второй** пары сверки (против `fee`) |
-| realized-pnl-слагаемое = Σ(`amount` − `externalFee`) | **только** строки `REALIZED_PNL` **в settle-ccy** | левый операнд **первой** пары (против `pnl`) |
-| funding-слагаемое = Σ`amount` | **только** строки `FUNDING` **в settle-ccy** | левый операнд **третьей** пары (против `−externalFundingCost`) |
-| штраф-слагаемое = Σ`amount` | **только** строки `LIQ_PENALTY` **в settle-ccy** | левый операнд **четвёртой** пары (против `externalLiquidationPenalty`, H7 `GAPS_CLOSE_13`) |
+| realized-pnl-слагаемое = Σ(`amount` − `externalFee`) | **только** строки `REALIZED_PNL` **в settle-ccy**, за вычетом **исключённых типов** (§ниже) | левый операнд **первой** пары (против `pnl`) |
+| funding-слагаемое = Σ`amount` | **только** строки `FUNDING` **в settle-ccy**, за вычетом **исключённых типов** (§ниже) | левый операнд **третьей** пары (против `−externalFundingCost`) |
+| штраф-слагаемое = Σ`amount` | **только** строки `LIQ_PENALTY` **в settle-ccy**, за вычетом **исключённых типов** (§ниже) | левый операнд **четвёртой** пары (против `externalLiquidationPenalty`, H7 `GAPS_CLOSE_13`) |
 | cross-ccy-слагаемое = Σ(`amount` × `appliedRate`) | строки, у которых **`rateStatus = APPLIED`** **и** тип **вне списка исключений** **и** категория **экономическая** (не `OTHER`) | довнести в число издержку, уплаченную вне settle-ccy (H5 `GAPS_CLOSE_6`; операнд и курс — H4 `GAPS_CLOSE_7`; предикат — H9 `DOCS_CHECK_11`, выровнен H11 `GAPS_CLOSE_13`) |
 
 **Общей Σ`amount` по всей разбивке в реестре больше нет** (H7

@@ -450,15 +450,24 @@ staged-числа между двумя финализационными ком�
       стороны — отрицательное вычитаемое при агрегате (допуск падает до
       шум-флора на самых крупных сделках) либо комиссию ~1/N при первой
       ноге. Сумма разностей и есть ожидаемая комиссия сделки.
-    - **Где живут операнды.** `plannedRiskAmount`, `plannedEntryPrice`,
-      `plannedSizeContracts` — все три поля **ноги входа** (`orders`;
-      риск переехал туда H6/H11 `DOCS_CHECK_15`, операнды — H3
+    - **Где живут операнды — все пять на ноге входа** (Р3 / H5
+      `GAPS_CLOSE_16`, решения держателя). `plannedRiskAmount`,
+      `plannedEntryPrice`, `plannedSizeContracts` — поля **ноги входа**
+      (`orders`; риск переехал туда H6/H11 `DOCS_CHECK_15`, операнды — H3
       `DOCS_CHECK_11`); на `Deal` живёт их **сумма**. Уровень стопа —
-      `AlgoOrder.condition.trigger.stopLoss.value` либо элемент
-      `Order.attachedAlgoOrders`, выбранный **записанным предикатом
-      селекции** (статус + причина закрытия; H12 `DOCS_CHECK_15`) —
-      защиты **этой же входной ноги**; `ctVal` —
-      `InstrumentExternalRules`.
+      `Order.plannedStopPrice` **той же ноги** (шестое число, Р3); `ctVal`
+      — `Order.plannedContractValue` **той же ноги** (пятое число, H5
+      `DOCS_CHECK_16`).
+      - **Прежняя редакция снята.** Уровень стопа резолвился через элемент
+        `Order.attachedAlgoOrders`, выбранный предикатом селекции (статус +
+        причина закрытия, H12 `DOCS_CHECK_15`), а `ctVal` дочитывался из
+        навеса `InstrumentExternalRules`. Оба хода отменены: встроенная
+        защита доборной ноги снимается после пересчёта основной, то есть
+        durable-операндом быть перестала, а финализатор **выведен из
+        читателей навеса вовсе** (`docs/components/InstrumentExternalRulesDataService.md`
+        §Использование — читателей два). Предикат селекции операндом
+        епсилона **не является**
+        (`docs/components/FinalizeDealExitExecutor.md` §epsilon).
     - **Темпоральная привязка стопа — вход, и она держится структурой**
       (H10 `GAPS_CLOSE_13`). Тождество вычитания верно только с тем
       уровнем, под который считался `plannedRiskAmount`, поэтому операнд —
@@ -893,13 +902,17 @@ kill-switch-холд. Достроено:
     `docs/models/mapping/PositionCloseResult.md`); колонка-якорь у него
     есть (`positions.external_liquidation_penalty`), поэтому в
     schema-дельте он тоже назван;
-  - **четыре поля планового риска на `CreateOrderCommandPayload`** —
+  - **шесть полей планового риска на `CreateOrderCommandPayload`** —
     и **только** на нём (`plannedRiskAmount`, `plannedRiskCurrency`,
-    `plannedEntryPrice`, `plannedSizeContracts`; `RISK-Q4` закрыт:
-    входной алго-тропы не существует, `CreateAlgoOrderCommandPayload`
-    полей не несёт) — payload runtime-объект, колонки у
-    него нет (H19 `GAPS_CLOSE_13`; `docs/components/CreateOrderExecutor.md`
-    §«Канал доставки», `docs/components/CreateAlgoOrderExecutor.md`);
+    `plannedEntryPrice`, `plannedSizeContracts`, `plannedContractValue`
+    (H5 `DOCS_CHECK_16`), `plannedStopPrice` (Р3 `GAPS_CLOSE_16`);
+    `RISK-Q4` закрыт: входной алго-тропы не существует,
+    `CreateAlgoOrderCommandPayload` полей не несёт) — payload
+    runtime-объект, колонки у него нет (H19 `GAPS_CLOSE_13`;
+    `docs/components/CreateOrderExecutor.md` §«Канал доставки»,
+    `docs/components/CreateAlgoOrderExecutor.md`). Счёт здесь и в
+    §«Куда пишутся шесть чисел» обязан совпадать — прежняя редакция
+    называла четыре;
   - **новое значение `Instrument.Status.ENTRY_BLOCKED`** плюс его
     enforcement в выборках скана и оркестратора — колонка
     `instruments.status` существует с `V1`, якоря нет
@@ -910,10 +923,18 @@ kill-switch-холд. Достроено:
     дельте есть, а **метода** — нет
     (`docs/models/domain/other/AnomalyReport.md` §«Производящая
     поверхность и коды шага 7»);
-  - **ветка `ServiceCommandExecutor`, приравнивающая жёсткий отказ к
-    «пусто» при `Deal.status = ERROR`** (нулевые попытки, `HoldService` не
-    зовётся) — §«Кто применяет приравнивание»,
-    `docs/components/MarkDealEmergencyClosedExecutor.md`;
+  - **ветка `ServiceCommandExecutor` при `Deal.status = ERROR` —
+    дискриминатор броска, не учёта** (H3/H4 `DOCS_CHECK_15`, решения
+    пользователя): бюджет расходуется **штатно** на обеих тропах
+    (`attemptCount`++ → `RETRY_PENDING` → `FAILED`), durable-исход
+    «недоступно» несёт строка `FAILED`; на `ERROR` **отказ канала добычи**
+    радиусную реакцию не поднимает (броска нет), а **дефект содержимого
+    ответа** (`ControlledExchangeException`) обрабатывается **как на
+    штатной тропе** — бросок и полный биржевой холд. Прежняя редакция
+    («жёсткий отказ ≡ пусто», **нулевые попытки**, `HoldService` не
+    зовётся) **снята целиком** — §5a, `docs/components/ServiceCommandExecutor.md`
+    §«Ветка `Deal.status = ERROR`», `docs/rules/command-lifecycle.md`
+    следствие 3, `docs/components/MarkDealEmergencyClosedExecutor.md`;
   - **снятие read-пути fills целиком** — команда, executor, снапшот,
     маппер, native-DTO и методы границы (H26 `GAPS_CLOSE_13`,
     `docs/decisions/result-profit-source.md` §«Каскад снятия»);
@@ -950,15 +971,39 @@ kill-switch-холд. Достроено:
     (H7 `DOCS_CHECK_15`): поле снапшота меняет тип и имя
     (`externalDirection: String` → `direction: Position.Direction`),
     незнакомое значение — то же controlled-исключение;
-  - **предикат селекции attached-защиты ноги входа** (H12
-    `DOCS_CHECK_15`): операнд уровня стопа выбирается из
-    `Order.attachedAlgoOrders` по статусу и причине закрытия — «первый
-    элемент» операндом не является
+  - **операнды епсилона — persisted-числа ноги, предиката селекции нет**
+    (Р3 / H5 `GAPS_CLOSE_16`, решения держателя; ревизует H12
+    `DOCS_CHECK_15`): уровень стопа — `Order.plannedStopPrice`, `ctVal` —
+    `Order.plannedContractValue`, оба write-once на той же ноге. Предикат
+    селекции attached-защиты **исполнителем не строится**, коллекция
+    `Order.attachedAlgoOrders` финализатору не требуется, читателем навеса
+    `InstrumentExternalRules` он не является
     (`docs/components/FinalizeDealExitExecutor.md` §epsilon);
   - **`TimeFrame` расширяется значением `ONE_SECOND`** (H10
     `DOCS_CHECK_15`) + ветка `TimeFrameMapper`; легальность значения в
     `CandleGroup` и в дереве стратегии ограничена валидацией
     (`docs/models/domain/other/CandleGroup.md` §«Енум `TimeFrame`»);
+  - **третье значение `Order.Type` — `REDUCE_ONLY`** (решение держателя
+    `GAPS_CLOSE_16`): енум, javadoc всех трёх констант, Strategy API
+    (`@Schema`), примеры стратегий; плюс **валидация инварианта пары**
+    `Type = REDUCE_ONLY ⇔ positionReducingOnly = true` в
+    `StrategyCreateRequestValidator` (сейчас не проверяется вовсе).
+    Значения хранятся строкой, таблицы пусты — миграция значений не нужна
+    (`docs/models/domain/core/Order.md` §Енумы,
+    `docs/models/domain/aggregate/Strategy.md`);
+  - **форма явного выхода: `actionKind = POSITION`, подтип
+    `StrategyPositionAction`, четвёртое значение `StrategyActionType` —
+    `CLOSE_ACTION`** (решение держателя `GAPS_CLOSE_16`, вариант B), плюс
+    **исполнитель `CLOSE_ACTION`**, эмитящий `CLOSE_POSITION_COMMAND` сам,
+    и расширение валидации состава действий на новый подтип. Таблица
+    `strategy_position_actions` **существует с шага 2** (`V2`), схемной
+    дельты нет (`docs/decisions/fsm-execution-layering.md` §Exit,
+    `docs/models/domain/aggregate/Strategy.md`, `docs/rules/no-partial-close.md`).
+    - **Входит ли эта позиция в `CODE` шага 7 — вопрос скоупа, открыт**
+      (H21 `DOCS_CHECK_17`): форма ратифицирована на под-шаге **этого**
+      шага, компонент-дока исполнителя нет, и дочистка на тропе явного
+      действия остаётся открытой. Реестр несёт позицию, потому что
+      объявляет себя полным; решение о скоупе — держательское;
   - **плановый риск переезжает на ногу входа** (H6/H11 `DOCS_CHECK_15`;
     состав расширен H5 `DOCS_CHECK_16` и Р3 `GAPS_CLOSE_16`):
     `CreateOrderCommandPayload` везёт **шесть** чисел (пятое —
@@ -1331,8 +1376,8 @@ kill-switch-холд. Достроено:
       реестр объявляет себя сквозным: между «список наполнен» и «список
       читается кодом» лежала невыбранная структура, при которой `CODE`
       формально удовлетворял п. 2, не имея откуда список прочитать. Список
-      — конъюнкт **четырёх из пяти** областей суммирования и
-      cross-ccy-области, формирующей само число.
+      — конъюнкт **всех пяти** областей суммирования, включая
+      cross-ccy-область, формирующую само число (счёт выровнен H16 `DOCS_CHECK_17`: реестр объявляет пять областей, cross-ccy — одна из них).
       - **Дом — `@ConfigurationProperties` per-exchange.** Механизм в
         проекте уже используется; перечень меняется **без релиза**, что и
         было решающим соображением: состав посторонних `type`/`subType`

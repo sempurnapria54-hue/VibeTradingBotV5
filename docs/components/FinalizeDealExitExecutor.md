@@ -17,7 +17,8 @@ net `realizedPnl` в поле `Position.externalRealizedProfit`) — см.
 §«Положение закрытия — читается со строки». Для **допуска сверки**
 дочитывает операнды планового риска **по каждой ноге входа**
 (`Order.plannedRiskAmount` / `plannedEntryPrice` / `plannedSizeContracts` /
-`plannedContractValue` + уровень стопа её attached-защиты) — §«Сверка
+`plannedContractValue` / `plannedStopPrice` — все пять write-once на самой
+ноге; attached-защита операндом быть перестала, Р3 `GAPS_CLOSE_16`) — §«Сверка
 bills ↔ net». **Навес `InstrumentExternalRules` не читает** (H5
 `DOCS_CHECK_16`): все операнды тождества — persisted-факты ноги.
 **Вычисляет** net-число +
@@ -234,9 +235,10 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
                               × plannedContractValue_i
     ```
 
-    **Все операнды слагаемого — persisted-поля одной и той же ноги** плюс
-    уровень её attached SL (`docs/models/domain/core/Order.md` §«Плановый
-    риск и его операнды»). **Финализатор навес `InstrumentExternalRules`
+    **Все операнды слагаемого — persisted-поля одной и той же ноги**,
+    включая уровень стопа `plannedStopPrice` (`docs/models/domain/core/Order.md`
+    §«Плановый риск и его операнды»; attached-защита операндом быть
+    перестала — Р3 `GAPS_CLOSE_16`). **Финализатор навес `InstrumentExternalRules`
     не читает вовсе** (H5 `DOCS_CHECK_16`, решение пользователя): прежняя
     редакция дочитывала оттуда `ctVal` — единственную величину тождества,
     не привязанную темпорально ко входу, — и тем ставила допуск в

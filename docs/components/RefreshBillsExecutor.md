@@ -11,8 +11,11 @@
 локально **персистит** разбивку). Загружает bill-записи по окну сделки
 (`GET /api/v5/account/bills` (7d) → `GET /api/v5/account/bills-archive` (3m),
 пагинация назад по `billId` **внутри одной команды** — паритет evidence-cycle,
-`docs/decisions/refresh-evidence-cycle-ownership.md`), фильтруя по окну сделки
-`begin`/`end` + `instId`. **По валюте не фильтрует** — ни в запросе, ни в
+`docs/decisions/refresh-evidence-cycle-ownership.md`), фильтруя по диапазону
+`[Deal.billsWindowBegin, now]` + `instId` — **верхняя граница запроса
+подвижна** (Р7 `GAPS_CLOSE_16`, §«Верхних границ две»; неподвижная
+`Deal.billsWindowEnd` отвечает за линковку и контроль полноты, а не за
+запрос). **По валюте не фильтрует** — ни в запросе, ни в
 матчинге (H5, `GAPS_CLOSE_6`).
 
 **Глубина конвейера — `bills-archive` (3 месяца), и это операнд признака

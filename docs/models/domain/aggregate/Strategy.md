@@ -643,8 +643,10 @@ CHECK-констрейнты, отвергнутые альтернативы) �
   `JOIN FETCH` (без N+1).
 - Таблицы: `strategies`, `strategy_market_phase_settings`,
   `strategy_details`, `strategy_steps`, `strategy_actions` + видовые
-  `strategy_order_actions` / `strategy_algo_order_actions`, плюс
-  `strategy_indicator_settings` / `strategy_market_structure_settings`.
+  `strategy_order_actions` / `strategy_algo_order_actions` /
+  **`strategy_position_actions`** (существует с `V2`; носитель подтипа
+  `StrategyPositionAction` — `docs/decisions/strategy-tree-persistence.md`),
+  плюс `strategy_indicator_settings` / `strategy_market_structure_settings`.
 - На `strategies` — частичный UNIQUE-индекс «одна `ACTIVE` на
   инструмент» (БД-страховка инварианта lifecycle).
 - Настройки рыночных данных — собственные реляционные строки

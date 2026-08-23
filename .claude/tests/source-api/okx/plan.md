@@ -1328,7 +1328,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 |---|---|---|---|
 | `POST /raw {method:GET, path:/api/v5/account/positions-history, query:{instType:SWAP, after:1, limit:10}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` — массив (ожидается пустой) | Пагинация по `uTime`: `after=1` (эпоха) отрезает всё новее 1мс → `data=[]`. Пустой результат вне окна валиден, не реджект. Если OKX реджектит формат `after` — код в наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=0 |
 
-### AG1.5 Содержательный (шаг 7, N11) — семантика агрегации partial-close ⏳ PENDING
+### AG1.5 Содержательный (шаг 7, N11) — семантика агрегации partial-close ⏳ PENDING — **ГЕЙТИТ `CODE`** (предусловие п. 1)
 
 **Гейтит корректность числа `Deal.resultProfit`** (`docs/decisions/pnl-finalization-mechanics.md` реш.6). Форм-кейсы AG1.1-1.4 проверяют структуру пустого/битого ответа; здесь — **содержательный инвариант агрегации**, который выбранный путь берёт на веру.
 
@@ -1393,7 +1393,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
   одной записью, а остальные уходят в `AnomalyReport`).
 - **Статус:** ⏳ **PENDING**. Провенанс — H5 `DOCS_CHECK_11`.
 
-### AG1.7 Содержательный (шаг 7, H20) — семантика и знаки числовых полей записи ⏳ PENDING
+### AG1.7 Содержательный (шаг 7, H20) — семантика и знаки числовых полей записи ⏳ PENDING — **ГЕЙТИТ `CODE`** (предусловие п. 7 — горизонт `fundingFee`; знаки (2) гейта не образуют)
 
 `fundingFee` возвращён в used-набор (H20 `DOCS_CHECK_11`) как
 авторитетный операнд де-микширования R-мультипликатора
@@ -1479,7 +1479,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 |---|---|---|---|
 | `POST /raw {method:GET, path:/api/v5/account/bills, query:{instType:SWAP, type:99999}, signed:true}` | HTTP 200; `b.code≠"0"` ЛИБО `b.code="0"` с `b.data=[]` | `type` вне справочника: реджект OKX либо пустой результат. Точный исход/код — наблюдение | RUN 2026-06-20 ✓ — http 200, b.code=0, data.size=12 |
 
-### AG3.4 Содержательный (шаг 7, H8 / RQ-4) — комиссии приходят в settle-ccy ⏳ PENDING
+### AG3.4 Содержательный (шаг 7, H8 / RQ-4) — комиссии приходят в settle-ccy ⏳ PENDING — **ГЕЙТИТ `CODE`** (предусловие п. 9 — вторая проверка)
 
 **Единственный наблюдатель инварианта settle-ccy**
 (`docs/rules/trading-constraints.md` §«Валюта комиссии»: комиссии платятся
@@ -1517,8 +1517,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
   - **Провенанс посылки — `предположение`** до этого ответа
     (`docs/decisions/pnl-finalization-mechanics.md` реш.5), по образцу
     инварианта агрегации N11.
-- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5 после
-  чистого `DOCS_CHECK_4`). Провенанс — H8 отчёта
+- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/processes/roadmap-step-execution.md` §4). Провенанс — H8 отчёта
   `phase-1-step-7-gaps-close-3.md`; вторая проверка — H13
   `phase-1-step-7-docs-check-10.md`.
 
@@ -1554,8 +1553,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
   раздельные (fee-запись с `balChg` = `fee`, отдельная pnl-запись). Зафиксировать
   факт в `docs/models/integrations/okx/OkxAccountBillResponse.md` (провенанс
   `рантайм`, `.claude/rules/external-source-sync.md`).
-- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5 после
-  чистого `DOCS_CHECK_4`). Провенанс — H2 отчёта
+- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/processes/roadmap-step-execution.md` §4). Провенанс — H2 отчёта
   `phase-1-step-7-docs-check-3.md`.
 
 ## AG4. Bills archive 3m — GET /api/v5/account/bills-archive (Account)
@@ -1865,8 +1863,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
   zero-fee trading»: при промо нулевой комиссии `trade-fee` отдаёт ненулевую
   ставку, а факт в bills будет нулевым. Расхождение в эту сторону — ожидаемое
   (прогноз консервативнее факта), не дефект цепочки.
-- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5 после
-  чистого `DOCS_CHECK_4`; расхождение сверх округления → эскалация на
+- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/processes/roadmap-step-execution.md` §4); расхождение сверх округления → эскалация на
   `solution-designer`). Провенанс — H1 (N9 fee-wiring),
   `phase-1-step-7-gaps-close-3.md`.
 

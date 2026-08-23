@@ -39,10 +39,17 @@ DealOrchestratorJob
   -> загружает DealContext (DealContextService) -> DealStateMachine
 
 DealStateMachine / handler
-  -> этап сделки, freshness step, StrategyCondition, выбор StrategyAction
-  -> strategy-action-calculation: CalculationContext -> Price -> Size
-  -> risk-evaluation: RiskValidator -> RiskBlockResolver (для risk-creating)
-  -> StrategyActionOrchestrator (per-type StrategyActionExecutor) -> ServiceCommand
+  -> ветвь стратегии:
+       этап сделки, freshness step, StrategyCondition, выбор StrategyAction
+       -> strategy-action-calculation: CalculationContext -> Price -> Size
+       -> risk-evaluation: RiskValidator -> RiskBlockResolver (для risk-creating)
+       -> StrategyActionOrchestrator (per-type StrategyActionExecutor) -> ServiceCommand
+  -> системная ветвь:
+       SystemActionExecutor (REFRESH_DEAL_CONTEXT_ACTION / FINALIZE_DEAL_EXIT_ACTION /
+       FINALIZE_DEAL_ERROR_ACTION) -> звенья-команды; состав звена выводится из
+       Deal.status (docs/components/SystemActionExecutor.md). Статусные рёбра,
+       являющиеся исходом системного действия, пишет звено, а не handler
+       (docs/decisions/fsm-execution-layering.md)
 
 ServiceCommandExecutor -> конкретный Executor
   -> исполняет атомарную операцию, обновляет DealActionState
@@ -63,9 +70,14 @@ ServiceCommandExecutor -> конкретный Executor
 `docs/lifecycles/Deal.md` (здесь не дублируются). Ключевое: `ERROR` —
 non-terminal; `ERROR → CLOSED` запрещён; `ERROR → EMERGENCY_CLOSED` —
 после подтверждения отсутствия live risk; для **чистого** terminal
-`CLOSED` обязательны `resultProfit`/`resultProfitCurrency`, для ошибочного
-`EMERGENCY_CLOSED` — по терминальному контракту (`docs/lifecycles/Deal.md`
-§«Терминальный контракт финализации», DEAL-Q2).
+`CLOSED` обязательны `resultProfit`/`resultProfitCurrency` — **со
+смягчением по валюте на тропах закрытия без входа** (там ассерт ребра
+проверяет только `resultProfit`, а валюта пишется, только если
+резолвится), для ошибочного `EMERGENCY_CLOSED` — по терминальному
+контракту (`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»
+и §«Смягчение по валюте на тропах без входа», DEAL-Q2). Безусловное
+прочтение «обязательны оба поля» даёт недостижимый терминал на самом
+частом сценарии сканера.
 
 После рестарта pending `ServiceCommand` как очередь не восстанавливаются
 (см. `docs/rules/command-lifecycle.md`): FSM пересобирает состояние по

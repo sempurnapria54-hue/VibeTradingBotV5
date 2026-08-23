@@ -150,7 +150,10 @@ reference-цена в сущности ордера не остаётся. Бе�
 **Поля планового риска — только у входного действия** (H5/H6
 `DOCS_CHECK_10`): `plannedRiskAmount`, `plannedRiskCurrency`,
 `plannedEntryPrice`, `plannedSizeContracts`, **`plannedContractValue`**
-(H5 `DOCS_CHECK_16`). У не-входных `CREATE_ORDER_COMMAND` (защита,
+(H5 `DOCS_CHECK_16`), **`plannedStopPrice`** (Р3 `GAPS_CLOSE_16`) —
+**шесть, и перечень обязан совпадать со счётом** (§«Куда пишутся шесть
+чисел»; прежняя редакция перечисляла пять, называя шестью).
+У не-входных `CREATE_ORDER_COMMAND` (защита,
 reduce-only) они пусты — там нет преконтроля, который их производит. Это единственное исключение из «payload
 хранит минимум»: минимум означает «не тащить то, что executor возьмёт из
 сущности», а эти шесть чисел **в сущности не остаются** —

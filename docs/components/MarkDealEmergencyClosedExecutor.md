@@ -187,8 +187,10 @@ realized net» без слагаемого — и
     только сделками, у которых операции были, поэтому `NOT_APPLICABLE`
     здесь недостижим) + журнальный `AnomalyReport` `PLANNED_RISK_MISSING`.
   - **Полноту разбивки аварийный терминал считает тем же сравнением**
-    (H4 `GAPS_CLOSE_13`): `Deal.breakdownIncomplete` — окно линковки
-    против глубины архивной выдачи, значения
+    (H4 `GAPS_CLOSE_13`): `Deal.breakdownIncomplete` — **возраст нижней
+    границы окна на момент добычи** (`t_добычи − billsWindowBegin`)
+    против глубины архивной выдачи (операнд — H20 `DOCS_CHECK_15`,
+    формулировка выровнена H10 `DOCS_CHECK_17`), значения
     `COMPLETE`/`INCOMPLETE_BY_WINDOW`; **границы окна не добыты**
     (на ветке (b) `billsWindowEnd` пуст по построению) ⇒ `NOT_ASSESSED` +
     журнальный отчёт. Безусловного «заведомо неполна» executor **не
@@ -221,8 +223,12 @@ realized net» без слагаемого — и
 `ERROR → EMERGENCY_CLOSED` (`docs/lifecycles/Deal.md`). `EMERGENCY_CLOSED` —
 **ошибочный terminal**: FSM handler'а не имеет. Executor ставит терминал только
 после подтверждённого `ErrorHandler`'ом снятия live risk (иначе — не
-терминализирует, сделка остаётся под safety-flow в `ERROR`). Команду эмитит
-`ErrorHandler`.
+терминализирует, сделка остаётся под safety-flow в `ERROR`). **Действие
+инициирует `ErrorHandler`; команду эмитит звено
+`FINALIZE_DEAL_ERROR_ACTION`** (второе исполнение) — handler `MARK_*`
+напрямую не эмитит, канон `docs/decisions/fsm-execution-layering.md`
+§«Handler исполняет действия»; симметрично `MARK_DEAL_CLOSED_COMMAND`
+(`docs/components/MarkDealClosedExecutor.md` §«Терминальное ребро»).
 
 ## Идемпотентность и retry
 

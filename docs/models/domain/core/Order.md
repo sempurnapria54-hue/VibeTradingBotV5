@@ -51,6 +51,7 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `plannedRiskAmount` | `BigDecimal` | **Плановый риск этой ноги** — убыток на её стопе, посчитанный при постановке ноги. Слагаемое знаменателя `R` сделки (H6/H11 `DOCS_CHECK_15`). Write-once. |
 | `plannedRiskCurrency` | `String` | Валюта планового риска ноги (расчётная валюта инструмента). Write-once. |
 | `plannedContractValue` | `BigDecimal` | Размер контракта инструмента (`ctVal`) **на момент постановки этой ноги** — четвёртый операнд тождества планового риска. Write-once (H5 `DOCS_CHECK_16`). |
+| `plannedStopPrice` | `BigDecimal` | Уровень стопа, под который считался риск **этой ноги**, — пятый операнд тождества (§«`plannedStopPrice` — шестое число»). Write-once (Р3 `GAPS_CLOSE_16`). |
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Embedded attached protection. |
 
 Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
@@ -330,7 +331,8 @@ inspection частичного выхода.
   (`varchar(64)`), шесть audit-колонок (`AuditableEntity`, nullable).
 - **Колонки шага 7 — `ALTER`**: `planned_entry_price`,
   `planned_size_contracts`, **`planned_risk_amount`**,
-  **`planned_contract_value`** (все четыре `numeric(36,18)`) и
+  **`planned_contract_value`**, **`planned_stop_price`** (все пять
+  `numeric(36,18)`) и
   **`planned_risk_currency`** (`varchar(64)` — строковая колонка по правилу
   длин, `docs/rules/persistence-representation.md` §«Строковые колонки:
   длины»); все nullable (пусты у не-входных ног и у ордеров, заведённых вне
@@ -339,7 +341,9 @@ inspection частичного выхода.
   переехал с `Deal` на ногу, на сделке остаётся сумма;
   `planned_contract_value` — H5 `DOCS_CHECK_16` (четвёртый операнд
   тождества перестаёт дочитываться из изменчивого навеса, §«`plannedContractValue`
-  — пятое число»). Бэкфилл не нужен
+  — пятое число»); `planned_stop_price` — Р3 `GAPS_CLOSE_16` (пятый операнд
+  тождества перестаёт резолвиться через снимаемую встроенную защиту,
+  §«`plannedStopPrice` — шестое число»). Бэкфилл не нужен
   (`.claude/rules/pre-launch-schema-changes.md`).
 - **Инвариант заполнения — «шесть или ни одного»**: все шесть колонок
   производит один риск-преконтроль и пишет одна транзакция, поэтому

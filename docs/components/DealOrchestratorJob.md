@@ -142,9 +142,14 @@ in-memory guard небезопасен; тогда D-M1 закрывается *
 
 - **активные `Deal`** (не в terminal status `CLOSED`/`EMERGENCY_CLOSED`,
   `docs/lifecycles/Deal.md`);
-- **подхват ожидающих повтора**: сделки со строками исполнений
-  `DealActionState` (оба вида) в `RETRY_PENDING`, у которых `nextRetryAt`
-  наступил (due-for-retry); до `nextRetryAt` повтор не берётся
+- **подхват ожидающих повтора — не вторая ось выборки, а предикат
+  продвижения.** Проход **сделко-ориентирован**: отдельной выборки по
+  таблицам исполнений не существует, и индекса под due-for-retry не
+  вводится (H10 `DOCS_CHECK_16`, `docs/models/domain/other/DealActionState.md`
+  §«Поисковые индексы»). Сделка со строкой `DealActionState` (любого вида)
+  в `RETRY_PENDING` **уже попадает** в выборку по `Deal.status` — она не
+  терминальна; «наступил ли `nextRetryAt`» проверяется **над уже
+  загруженными** строками, до срока повтор не берётся
   (`docs/components/RetryPolicyService.md`);
 - потенциально большая выборка — ограниченным окном/порядком, не
   безлимитным чтением (`.claude/rules/codestyle.md` §Выборка данных).
