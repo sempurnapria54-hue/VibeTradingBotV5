@@ -61,7 +61,8 @@ distance. Метрики могут попасть в `RiskCheckResult.details`,
 **Исключение — risk amount входного действия** (H9, `GAPS_CLOSE_7`): он
 **персистится** как `Order.plannedRiskAmount` **создаваемой ноги**, а суммы
 на `Deal` (`plannedRiskAmount` — знаменатель `R`; `incurredRiskAmount` —
-взятый риск, H3 `DOCS_CHECK_16`) той же транзакцией пересчитываются по
+взятый на входе; `currentRiskAmount` — текущий, решение держателя
+`GAPS_CLOSE_16`) той же транзакцией пересчитываются по
 ногам входа (H6/H11 `DOCS_CHECK_15`); писатель —
 `docs/components/CreateOrderExecutor.md`, тот же проход. **Вместе с риском
 валидатор отдаёт и `ctVal` момента постановки** — он и так читает навес,

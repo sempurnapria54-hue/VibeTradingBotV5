@@ -48,7 +48,18 @@ cancel-команды. `REFRESH_POSITION_COMMAND` без позиции → `EXI
 ## Допустимые StrategyStep
 
 Steps: `PROTECTION_ADJUSTMENT`, `PARTIAL_EXIT`, `GRID_MANAGEMENT`, `EXIT`,
-`FAIL_SAFE`. Перечень команд handler-док не держит: состав команд —
+`FAIL_SAFE`.
+
+> **Клейм полноты не обеспечен кодом** (inspection 2026-08-23; в пакете
+> валидации, флаг `предложил`). Фактический перечень в
+> `ManagingHandler.managingSteps(...)` — **четыре** типа: `FAIL_SAFE`
+> отсутствует и ни одним handler'ом не читается. Из четырёх работает
+> **один**: `PARTIAL_EXIT` (CREATE-действие). `PROTECTION_ADJUSTMENT` и
+> `GRID_MANAGEMENT` несут действия `REPLACE`/`CANCEL`, у которых
+> **исполнителей нет**; `EXIT` не исполним по построению (полного закрытия
+> как действия в модели нет). Разбор — `.claude/notes/2026-08-23-разрывы-спека-кода-на-тропе-живой-сделки.md`;
+> дельта `CODE` — `.claude/work/backlog.md` §Шаг 7. Решить, подключается
+> `FAIL_SAFE` или снимается из енума, — отдельная позиция. Перечень команд handler-док не держит: состав команд —
 собственность действий (`docs/decisions/fsm-execution-layering.md`
 §«Handler исполняет действия»; реестры звеньев —
 `docs/decisions/command-action-boundary.md` §2,

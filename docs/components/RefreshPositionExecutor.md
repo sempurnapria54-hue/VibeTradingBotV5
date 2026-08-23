@@ -99,6 +99,15 @@
       `Position`»). Прежде ветка была ратифицирована, но её операнды за
       adapter не выходили: `cTime` и `direction` числились в отброшенных,
       а `positions.direction` nullable — отказ был бы **тихим**.
+- **Пишет `Deal.currentRiskAmount`** (решение держателя `GAPS_CLOSE_16`).
+  Текущий риск = `incurredRiskAmount × (Position.externalSize / Σ
+  accumulatedFillSize_i по ногам входа)`, и его единственный изменчивый
+  операнд — **размер позиции**, наблюдаемый ногой 1 этого цикла. После
+  частичного выхода (`Type.REDUCE_ONLY`, шаг `PARTIAL_EXIT`) размер падает,
+  и число пересчитывается **здесь** — той же транзакцией, что обновление
+  external-полей позиции. Два входных числа (`plannedRiskAmount`,
+  `incurredRiskAmount`) от размера позиции не зависят и этим executor'ом
+  **не трогаются** (`docs/models/domain/aggregate/Deal.md` §«Взятый риск»).
 - **Из двух границ окна линковки этот executor пишет одну** (узел 1
   `DOCS_CHECK_8`; сужено H9 `DOCS_CHECK_16`): нога 2 при приземлении записи
   закрытия — `Deal.billsWindowEnd` (`uTime` записи, той же транзакцией, что

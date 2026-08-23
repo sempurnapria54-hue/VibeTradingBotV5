@@ -468,6 +468,27 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     `RefreshPositionExecutor`, нога 2 (`uTime` записи закрытия, одной
     транзакцией с полями положения закрытия). Обе — условным `UPDATE`
     (`where ... is null`), не `updatable = false`.
+- ⚠️ **Цена доведения шага 7 до `CODE` при незакрытых разрывах — принята и
+  записана** (решение держателя 2026-08-23; разведка —
+  `.claude/notes/2026-08-23-разрывы-спека-кода-на-тропе-живой-сделки.md`;
+  реестр предусловий — `docs/decisions/pnl-finalization-mechanics.md`
+  §«Предусловия `CODE`» п. 13):
+
+  > **Клеймы полноты шага 7 непроверяемы до реализации системного слоя.**
+  > Доки описывают `SystemActionType`, `REPLACE`-ремодел и наблюдение
+  > состояния в `MANAGING`, которых в коде нет. «Чисто» на `DOCS_CHECK`
+  > означает «**доки не противоречат друг другу**», а не «спецификация
+  > реализуема».
+
+  Пять разрывов (Р1-Р5 разведки) уходят дельтой `CODE` **ниже**, контур
+  сейчас не достраивается. Гейт `CODE` при этом **не может открыться по
+  клейму, который никто не проверял**: прогон `DOCS_CHECK` проверяет
+  согласованность доков между собой и реализуемость спецификации не
+  проверяет — у линз нет такой поверхности. Отчёт `DOCS_CHECK_17` обязан
+  различать эти два утверждения явно.
+  **Сегодня фаза 1 до штатного терминала не доводит сделку** — минимум для
+  прохода: `attachedProtection` в payload + наблюдение состояния в
+  `MANAGING`.
 - **CODE R-слота и формулы риска (`GAPS_CLOSE_7`, H9/H10; расширено
   H5/H6 `DOCS_CHECK_10`):**
   - **дом — нога, не сделка** (H6/H11 `GAPS_CLOSE_15`, решение
@@ -482,13 +503,18 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       entity `updatable = false`), + `ALTER` миграцией шага. **Инвариант —
       «пять или ни одной»**: производит один преконтроль, пишет одна
       транзакция;
-    - **на `Deal` — два числа, не одно** (H3 `DOCS_CHECK_16`, решение
-      пользователя): `plannedRiskAmount` — **заявленный** (Σ по ногам входа
-      за вычетом замещённых, предикат — H2 `DOCS_CHECK_16`; знаменатель
-      R-мультипликатора) и **`incurred_risk_amount`** — **взятый**
-      (Σ `plannedRiskAmount_i × accFillSz_i / plannedSizeContracts_i`);
-      плюс общая `plannedRiskCurrency`. Обе — **не write-once**,
-      производные проекции ног, пересчитываются **целиком**;
+    - **на `Deal` — три числа, не одно** (H3 `DOCS_CHECK_16` + решение
+      держателя `GAPS_CLOSE_16`): `plannedRiskAmount` — **заявленный на
+      входе** (Σ по ногам входа за вычетом замещённых, предикат — H2
+      `DOCS_CHECK_16`; знаменатель R-мультипликатора);
+      **`incurred_risk_amount`** — **фактический на входе**
+      (Σ `plannedRiskAmount_i × accFillSz_i / plannedSizeContracts_i`;
+      частичным выходом **не уменьшается**);
+      **`current_risk_amount`** — **фактический текущий**
+      (`incurred × Position.externalSize / Σ accFillSz_i`; уменьшается
+      частичным выходом, при полном — ноль; потребитель — сопровождение);
+      плюс общая `plannedRiskCurrency`. Все три — **не write-once**,
+      производные проекции, пересчитываются **целиком**;
     - **пересчитывают три исполнителя** (каждый своей транзакцией, по
       своему триггеру): `CreateOrderExecutor` (создана нога входа),
       `RefreshOrderExecutor` (наблюдены исполнение/терминальный статус),
@@ -498,30 +524,111 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       `RiskBenchmarkAvailability`: `AVAILABLE`/`NOT_APPLICABLE`/`MISSING`,
       H13 `DOCS_CHECK_16`) — пишут оба финализатора;
     - `CreateOrderExecutor` пишет пять чисел **входного** действия в одной
-      транзакции с созданием сущности. **Предикат «входное действие» —
-      прохождение риск-преконтроля, не `Order.Type`** (H1 `DOCS_CHECK_16`:
-      енум двузначен, обе константы носят и не-входные ордера;
+      транзакции с созданием сущности. **Предикат «входное действие» у
+      писателя — прохождение риск-преконтроля** (H1 `DOCS_CHECK_16`;
+      носителей три и они эквивалентны, у писателя этот прямее —
       `docs/models/domain/core/Order.md` §«Предикат "нога входа"»);
-    - **javadoc `Order.Type`** в `src/` называет обе константы «входной
-      ордер» — привести к редакции §Енумы того же дока (H1
-      `DOCS_CHECK_16`);
-    - **тавтологичные предикаты «это входная нога» в `src/`** — найдены
-      свипом H1 `DOCS_CHECK_16`:
-      `CalculationContextFactory.isEntryType(...)` и фильтр в
-      `DealFsmSupport` (~стр. 190) проверяют `type == ENTRY || type ==
-      ENTRY_ATTACHED_STOP_LOSS`, то есть **истинны для всякого** ordinary
-      order — енум двузначен и третьего значения нет. Предикат подменить
-      на действующий (риск-преконтроль на стороне писателя, непустой
-      `plannedRiskAmount` на стороне читателя;
-      `docs/models/domain/core/Order.md` §«Предикат "нога входа"»). Это не
-      правка стиля: сейчас код молча считает входной **любую** ногу,
-      включая reduce-only.
+    - **`Order.Type` получает третье значение `REDUCE_ONLY`** (решение
+      держателя, `GAPS_CLOSE_16`): енум, javadoc всех трёх констант,
+      Strategy API (`@Schema`), примеры стратегий. Значения хранятся
+      строкой, таблицы пусты — миграция значений не нужна
+      (`.claude/rules/pre-launch-schema-changes.md`);
+    - **валидация инварианта пары** — `Type = REDUCE_ONLY ⇔
+      positionReducingOnly = true`. Рассогласование отвергается
+      `StrategyCreateRequestValidator` (сейчас не проверяется вовсе);
+      носителей у оси два, и согласованность держится **проверкой**
+      (`docs/models/domain/core/Order.md` §Енумы, названная цена решения);
+    - **предикаты «это входная нога» в `src/` — ошибочны, не тавтологичны**
+      (переформулировано по итогам inspection частичного выхода; прежняя
+      формулировка «тавтологичны» снята). `CalculationContextFactory.isEntryType(...)`
+      и фильтр в `DealFsmSupport.entryOrder(...)` (~стр. 190) проверяют
+      `type == ENTRY || type == ENTRY_ATTACHED_STOP_LOSS`. До третьего
+      значения это было истинно для **всякого** ordinary order, включая
+      reduce-only ⇒ `entryOrder()` мог вернуть **ногу частичного выхода**, а
+      на её результате стоит гейт защиты `EntryFinalizedHandler`. С вводом
+      `REDUCE_ONLY` предикаты становятся верными **без правки** — но
+      проверить и оставить осознанно, а не по совпадению;
+    - **`attachedProtection` не доезжает до payload** — гейт `CODE`,
+      найден inspection. `CreateOrderExecutor` читает
+      `payload.getAttachedProtection()`, а единственный строитель payload'а
+      `CreateOrderActionExecutor.createOrderCommand(...)` его **не
+      заполняет** ⇒ `Order.attachedAlgoOrders` пуст всегда. Следствия: (а)
+      сделка без шага `MAIN_PROTECTION` уходит в `ERROR` (`markErrorStopless`)
+      на **каждом** входе; (б) `stop_i` не резолвится **ни у одной** ноги ⇒
+      `reconciliationStatus = OPERAND_MISSING` на каждой сделке
+      (`docs/components/FinalizeDealExitExecutor.md` §epsilon). Заполнить
+      payload из `StrategyOrderAction.attachedProtection`.
+      - ⚠️ **Торговое следствие, а не только дефект доставки поля:** между
+        филлом входа и постановкой основной защиты позиция стоит на бирже
+        **без стопа** — при том что риск-преконтроль стоп **потребовал** и
+        по нему сайзил (`PriceCalculator` резолвит `stopLossPrice`
+        исключительно из `attachedProtection.stopLossSettings`; без него
+        вход блокируется `RISK_CREATING_ENTRY_WITHOUT_STOP`). То есть
+        система считает риск ограниченным, а он не ограничен ничем.
+        **Это риск денег.** Инвариант
+        `docs/rules/risk-creating-entry-protection.md` при этом формально
+        соблюдается — он **локальный** (FSM не уводит в `MANAGING` без
+        подтверждённой защиты), а не биржевой; текст правила этого не
+        различает — позиция в пакете валидации;
   - **Канал доставки — поля `CreateOrderCommandPayload`** (H5): ни один
     существующий RVO метрику не несёт, а `RiskCheckResult.actualValue` на
     happy-path не существует (в фазе 1 валидатор строит только
     `BLOCKED`-результаты). `plannedEntryPrice` **нельзя брать с
     `Order.price`** — при market-входе executor его не заполняет
     (верифицировано `CreateOrderExecutor.java:65-67`);
+  - **шаг `EXIT` не срабатывает — тропа выхода по условию стратегии не
+    построена** (найдено inspection частичного выхода, `GAPS_CLOSE_16`).
+    Факт шире, чем «в примере снятое значение»:
+    - `trend-following-ema.json:290,477` несёт `actionType: "CLOSE_FULL"`,
+      которого в `StrategyActionType` **нет** (снят —
+      `docs/decisions/fsm-execution-layering.md`): поставляемый пример не
+      провалидируется;
+    - но и с валидным действием шаг не сработал бы: `ManagingHandler`
+      диспетчеризует действие шага в `StrategyActionOrchestrator`, а
+      executor'а под «закрытие позиции» нет **по построению** — полного
+      закрытия как действия в модели не существует
+      (`docs/rules/no-partial-close.md`). Действие не находит исполнителя ⇒
+      `ActionPlan.empty()` ⇒ ничего не происходит;
+    - `ManagingHandler.startApplicable(...)` при этом требует **непустой**
+      список действий, чтобы шаг вообще запустился, а
+      `checkTransition`/`isExitSubmitted` ждёт `DealActionState` в
+      `SUBMITTED` — состояния, которое без исполнителя не наступает.
+
+    Целевая форма задана доками и правки концепции не требует: выход —
+    **условие-переход** `MANAGING → EXIT_PENDING`, market-close исполняет
+    `ExitPendingHandler` командой `CLOSE_POSITION_COMMAND`. Дельта: шаг
+    `EXIT` становится **условие-только** (пустой список действий
+    допустим), `ManagingHandler` по истинному условию `EXIT`-шага делает
+    переход, валидация перестаёт требовать действия у этого типа шага,
+    из примеров снимается `CLOSE_FULL`;
+  - **`StrategyActionType.REPLACE` и `CANCEL` — исполнителей нет**
+    (inspection 2026-08-23). `StrategyActionExecutor`-ов два, оба на
+    `CREATE`; оркестратор не находит исполнителя ⇒ `ActionPlan.empty()` ⇒
+    действие молча не исполняется. Задето: **весь ремодел защиты**
+    (`PROTECTION_ADJUSTMENT` — перенос стопа, трейлинг) и снятие grid-ног
+    (`GRID_MANAGEMENT`). `docs/decisions/replace-not-amend.md` объявляет
+    REPLACE единственной операцией ремоделирования. Терминал не гейтит —
+    гейтит **управление** сделкой;
+  - **`ManagingHandler` не наблюдает состояние — сделка не выходит из
+    `MANAGING`** (inspection 2026-08-23, **несущий разрыв**). Handler не
+    эмитит ни одной `REFRESH_*`-команды, а `DealContextService` собирает
+    контекст только из persistence. Срабатывание SL/TP на бирже локально не
+    наблюдается ⇒ `positionLiveRisk` не меняется ⇒ перехода в
+    `EXIT_PENDING` нет ⇒ сделка удерживает слот инструмента бессрочно.
+    Целевая форма — `REFRESH_DEAL_CONTEXT_ACTION` (тропа «сопровождение»,
+    `docs/components/SystemActionExecutor.md`); минимальная —
+    `ManagingHandler` эмитит `REFRESH_POSITION` / `REFRESH_ALGO_ORDER`,
+    когда продвигать нечего;
+  - **`FAIL_SAFE` — значение `StrategyStepType` без потребителя**
+    (inspection 2026-08-23). `managingSteps()` перечисляет четыре типа,
+    javadoc и `docs/components/ManagingHandler.md` §«Допустимые
+    StrategyStep» — пять. Решить: подключить или снять значение; **клейм
+    полноты в доке ложен в любом случае** и идёт в пакет валидации;
+  - **мёртвые поля `CreateOrderCommandPayload`** — `positionSide`,
+    `marginMode`, `executionType` не заполняются и не читаются (adapter
+    ставит константами); `strategyDirection`, `instrumentExternalId`
+    заполняются и не читаются (исполнитель берёт из `DealContext`). Снять
+    или обосновать (`.claude/rules/codestyle.md` §«Неиспользуемый код»);
   - **координатные колонки ссылки на свечу курса** —
     `applied_rate_candle_instrument` / `_timeframe` / `_open_time` в
     `deal_cash_flows` (H11 `DOCS_CHECK_14`); прежняя редакция перечисляла

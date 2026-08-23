@@ -472,14 +472,21 @@ indicator-vs-indicator допускается — базовый кейс кро
 ### StrategyOrderAction
 `key`, `targetActionKey` (для REPLACE/CANCEL; для CREATE null),
 `actionType` (CREATE/REPLACE/CANCEL), `orderType: Order.Type`
-(ENTRY / ENTRY_ATTACHED_STOP_LOSS), `direction: StrategyTradeDirection`,
-`allocationPercents` (доля расчётного объёма), `positionReducingOnly:
+(ENTRY / ENTRY_ATTACHED_STOP_LOSS / **REDUCE_ONLY** — третье значение
+введено решением держателя `GAPS_CLOSE_16` под частичный выход;
+`docs/models/domain/core/Order.md` §Енумы), `direction: StrategyTradeDirection`,
+`allocationPercents` (доля расчётного объёма; у `REDUCE_ONLY` — доля
+**снимаемой** позиции), `positionReducingOnly:
 Boolean` (strategy-intent → `Order.positionReducingOnly` → OKX
-`reduceOnly` только в adapter), `level: Integer` (живёт в стратегии, не
-переносится в Order как runtime-role), `placement: StrategyPricePlacement`
+`reduceOnly` только в adapter; **связан инвариантом** с `orderType`:
+`REDUCE_ONLY` ⇔ `true`, рассогласование отвергается валидацией —
+`docs/models/domain/core/Order.md` §Енумы), `level: Integer` (живёт в
+стратегии, не переносится в Order как runtime-role),
+`placement: StrategyPricePlacement`
 (для market-like входа null), `attachedProtection:
 StrategyAttachedProtectionSettings` (для ENTRY null; для
-ENTRY_ATTACHED_STOP_LOSS обязательна).
+ENTRY_ATTACHED_STOP_LOSS обязательна; у `REDUCE_ONLY` — null, защита
+выходу не нужна).
 
 ### StrategyTradeDirection
 `LONG`, `SHORT` — нормализованное торговое направление (runtime mapper
