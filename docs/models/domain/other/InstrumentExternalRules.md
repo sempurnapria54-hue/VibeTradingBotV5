@@ -72,7 +72,7 @@ Java-класс. Собственного `id` у класса нет — еди
 |---|---|---|
 | `instrumentId` | `Long` | Внутренний ID инструмента-владельца (ключ навеса). |
 | `instrumentType` | `InstrumentType` | Нормализованный тип инструмента. |
-| `contractType` | `ContractType` | Нормализованный тип контракта. |
+| `contractType` | `ContractType` | Нормализованный тип контракта. **Читатель — тропа заведения инструмента:** `contractType ≠ LINEAR` реджектится, контур торгует только линейные контракты (H19 `DOCS_CHECK_17`, решение держателя П15; `docs/rules/trading-constraints.md` §Правило). |
 | `status` | `Status` | Нормализованный статус инструмента. |
 | `externalInstrumentType` | `String` | Сырой тип инструмента биржи. |
 | `externalInstrumentId` | `String` | ID инструмента на бирже. |

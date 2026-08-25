@@ -517,19 +517,28 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       **`incurred_risk_amount`** — **фактический на входе**
       (Σ `plannedRiskAmount_i × accFillSz_i / plannedSizeContracts_i`;
       частичным выходом **не уменьшается**);
-      **`current_risk_amount`** — **фактический текущий**
-      (`incurred × Position.externalSize / Σ accFillSz_i`; уменьшается
+      **`current_risk_amount`** — **неотработанная доля** взятого на входе
+      риска (`incurred × Position.externalSize / Σ accFillSz_i`; уменьшается
       частичным выходом, при полном — ноль; потребитель — сопровождение);
-      плюс общая `plannedRiskCurrency`. Все три — **не write-once**,
+      **`protection_relieved_risk_amount`** — **риск, снятый защитой**
+      (`incurred −` риск при актуальном уровне стопа; решение держателя П10
+      валидации `GAPS_CLOSE_17`);
+      плюс общая `plannedRiskCurrency`. Все четыре — **не write-once**,
       производные проекции, пересчитываются **целиком**;
-    - **пересчитывают три исполнителя** (каждый своей транзакцией, по
+    - **пересчитывают пять исполнителей** (каждый своей транзакцией, по
       своему триггеру): `CreateOrderExecutor` (создана нога входа),
       `RefreshOrderExecutor` (наблюдены исполнение/терминальный статус),
-      `CancelOrderExecutor` (нога отменена/замещена). Разбор —
-      `docs/models/domain/aggregate/Deal.md` §«Взятый риск»;
+      `CancelOrderExecutor` (нога отменена/замещена),
+      `RefreshPositionExecutor` (наблюдена позиция — живая **либо из
+      истории**, решение держателя П1), писатель защиты
+      (`CreateAlgoOrderExecutor` / place-нога `REPLACE`) — только четвёртое
+      число. Разбор — `docs/models/domain/aggregate/Deal.md` §«Взятый риск»;
     - **`+risk_benchmark_availability`** на `deals` (`varchar(64)`, енум
       `RiskBenchmarkAvailability`: `AVAILABLE`/`NOT_APPLICABLE`/`MISSING`,
-      H13 `DOCS_CHECK_16`) — пишут оба финализатора;
+      H13 `DOCS_CHECK_16`) — `AVAILABLE`/`MISSING` пишут оба финализатора,
+      **`NOT_APPLICABLE` — `MarkDealClosedExecutor`** той же транзакцией,
+      что ставит терминал (решение держателя П9 валидации `GAPS_CLOSE_17`;
+      ветка `NOT_APPLICABLE` у финализатора выхода снята как недостижимая);
     - `CreateOrderExecutor` пишет шесть чисел **входного** действия в одной
       транзакции с созданием сущности. **Предикат «входное действие» у
       писателя — прохождение риск-преконтроля** (H1 `DOCS_CHECK_16`;
@@ -584,7 +593,39 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     - **ремодел основной защиты под увеличенную позицию** (Р3): исполнитель
       `StrategyActionType.REPLACE` под `PROTECTION_ADJUSTMENT` (сегодня
       исполнителя нет) плюс снятие attached SL доборной ноги по
-      подтверждении новой основной (`closeReason = SWITCHED_BY_STRATEGY`);
+      подтверждении новой основной (`closeReason = SWITCHED_BY_STRATEGY`).
+      **Триггер — шаг стратегии** `PROTECTION_ADJUSTMENT` с условием
+      «позиция увеличилась» (решение держателя С2 валидации `GAPS_CLOSE_16`;
+      системный слой и совмещение с пакетом добора отвергнуты);
+    - **дельта двух валидаций `GAPS_CLOSE_16`/`_17`** (решения держателя
+      С1-С4, П1-П18 — разбор в отчётах закрытия):
+      - `+protection_relieved_risk_amount` на `deals` (`numeric(36,18)`,
+        nullable) — риск, снятый защитой; пишет писатель защиты
+        (`CreateAlgoOrderExecutor` / place-нога `REPLACE`) (П10);
+      - `+liquidation_distance_ratio` на `orders` (`numeric(36,18)`,
+        nullable, write-once) — запас до ликвидации на момент постановки
+        ноги; измеритель, не контроль (П14);
+      - `POST_MORTEM_HARVEST_EXHAUSTED` — второй код холда по исчерпанию
+        бюджета (реакция та же полная, различение журнальное) (П6);
+      - `RECONCILIATION_OPERAND_MISSING` — код и ветка **удаляются** (С3);
+      - **предикат неполноты числа уводит терминал**: `INCOMPLETE_BY_WINDOW`
+        либо cross-ccy-строка без `rateStatus = APPLIED` ⇒ ошибочная тропа
+        вместо чистого `CLOSED`; нового поля нет (П11);
+      - **конвенция «пусто = 0» для несобытийных полей** записи
+        positions-history — в native-слое, **до** проверки обязательности
+        контракта границы (П12);
+      - **реджект `contractType ≠ LINEAR`** на тропе заведения инструмента;
+        горячий путь не трогается (П15);
+      - **состав цикла добычи един для всех троп** — тропного разведения
+        состава нет, гейт остаётся у отдельного звена (bills — по тропе)
+        (П5); **пустой `billsWindowBegin`** ⇒ суррогат `Deal.createdAt`
+        внутри исполнителя (П7);
+      - **операнд `breakdownIncomplete` составной** —
+        `max(t_добычи, billsWindowEnd) − billsWindowBegin` (П4);
+      - `ExitActionExecutor` + `StrategyActionType.EXIT_ACTION` (вместо
+        `CLOSE_ACTION`) + порядок дочистки по
+        `docs/rules/exit-teardown-order.md`; `ExitPendingHandler`
+        приводится к тому же порядку (С1, П16);
     - **детектирующий контур пары `Type` ↔ `positionReducingOnly`** (Р1):
       сверка пары на ногах сделки в трёх исполнителях пересчёта сумм; при
       расхождении — отказ операции (`VALIDATION_ERROR`), без нового кода
@@ -593,13 +634,16 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       найден inspection. `CreateOrderExecutor` читает
       `payload.getAttachedProtection()`, а единственный строитель payload'а
       `CreateOrderActionExecutor.createOrderCommand(...)` его **не
-      заполняет** ⇒ `Order.attachedAlgoOrders` пуст всегда. Следствия: (а)
+      заполняет** ⇒ `Order.attachedAlgoOrders` пуст всегда. Следствие:
       сделка без шага `MAIN_PROTECTION` уходит в `ERROR` (`markErrorStopless`)
-      на **каждом** входе; (б) `stop_i` не резолвится **ни у одной** ноги ⇒
-      обязанная сверка не выполняется и сделка уходит **ошибочной тропой**
-      на каждой сделке
-      (`docs/components/FinalizeDealExitExecutor.md` §epsilon). Заполнить
-      payload из `StrategyOrderAction.attachedProtection`.
+      на **каждом** входе. Заполнить payload из
+      `StrategyOrderAction.attachedProtection`.
+      - **Второе следствие («`stop_i` не резолвится ⇒ обязанная сверка не
+        выполняется») снято** двумя решениями держателя: уровень стопа
+        персистится **шестым числом** ноги (Р3 `GAPS_CLOSE_16`), а ветка
+        «операнд допуска не резолвится» удалена вместе с журнальным кодом
+        (позиция С3). Резолв епсилона от `attachedAlgoOrders` больше не
+        зависит (`docs/components/FinalizeDealExitExecutor.md` §epsilon).
       - ⚠️ **Торговое следствие, а не только дефект доставки поля:** между
         филлом входа и постановкой основной защиты позиция стоит на бирже
         **без стопа** — при том что риск-преконтроль стоп **потребовал** и
@@ -645,7 +689,8 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     выход два, и оба законны** (условие-переход **и** явное действие шага
     `EXIT`, `docs/rules/no-partial-close.md`). Команда закрытия одна —
     `CLOSE_POSITION_COMMAND`, — но **эмитентов у неё два** (вариант B):
-    `ExitPendingHandler` и исполнитель `CLOSE_ACTION`.
+    `ExitPendingHandler` и `ExitActionExecutor`. **Скоуп подтверждён**
+    (П16 валидации `GAPS_CLOSE_17`): позиция входит в `CODE` шага 7.
 
     Дельта:
     - шаг `EXIT` может быть **условие-только** — пустой список действий
@@ -654,21 +699,23 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     - **третье значение `actionKind`** — `POSITION`; **третий подтип
       `StrategyAction`** — `StrategyPositionAction` (`key`, `actionType`,
       `level`); **четвёртое значение `StrategyActionType`** —
-      **`CLOSE_ACTION`** (суффиксный маркер уровня,
-      `.claude/rules/naming.md`); валидация состава действий расширяется на
-      новый подтип;
-    - **исполнитель `CLOSE_ACTION`** эмитит `CLOSE_POSITION_COMMAND` сам;
-      `DealActionState` заводится обычным порядком — runtime-сущность есть
-      (`Position`);
+      **`EXIT_ACTION`** (суффиксный маркер уровня,
+      `.claude/rules/naming.md`; имя уточнено позицией С1 — действие
+      выхода из сделки, а не команда закрытия позиции); валидация состава
+      действий расширяется на новый подтип;
+    - **`ExitActionExecutor`** (компонент-док заведён,
+      `docs/components/ExitActionExecutor.md`) эмитит **последовательность**
+      команд сам: отмена живых входных (не reduce-only) ног →
+      `CLOSE_POSITION_COMMAND`; порядок — инвариант
+      `docs/rules/exit-teardown-order.md`. `DealActionState` заводится
+      обычным порядком — runtime-сущность есть (`Position`);
+    - **порядок дочистки `ExitPendingHandler`** приводится к тому же
+      инварианту: прежняя редакция закрывала позицию первой;
     - **в поставляемом примере** `actionType: "CLOSE_FULL"` →
-      `"CLOSE_ACTION"` (обе позиции: `:290`, `:477`); `actionKind:
+      `"EXIT_ACTION"` (обе позиции: `:290`, `:477`); `actionKind:
       "POSITION"` остаётся как есть — он верен;
     - **javadoc/комментарий `StrategyActionType`** приводится к принятому:
       клауза «полного закрытия позиции как действия нет» снимается;
-    - **дочистка на тропе явного действия** (кто отменяет живые ноги и
-      защиту и в каком порядке) — **открыта**, см. §«Развилки,
-      возвращаемые на валидацию» отчёта `GAPS_CLOSE_16`. До её прохождения
-      исполнитель эмитит только команду закрытия;
 
   - **`StrategyActionType.REPLACE` и `CANCEL` — исполнителей нет**
     (inspection 2026-08-23). `StrategyActionExecutor`-ов два, оба на

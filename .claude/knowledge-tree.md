@@ -127,7 +127,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v86.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v87.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -230,6 +230,7 @@
 │   │   ├── EntryScannerJob.md — Кто ищет возможность создать новую сделку?
 │   │   ├── EntrySubmittedHandler.md — Что делает FSM handler статуса ENTRY_SUBMITTED?
 │   │   ├── ErrorHandler.md — Что делает FSM handler статуса ERROR?
+│   │   ├── ExitActionExecutor.md — Кто исполняет действие выхода из сделки?
 │   │   ├── ExitPendingHandler.md — Что делает FSM handler статуса EXIT_PENDING?
 │   │   ├── FinalizeDealEntryExecutor.md — Кто исполняет FINALIZE_DEAL_ENTRY?
 │   │   ├── FinalizeDealExitExecutor.md — Кто исполняет FINALIZE_DEAL_EXIT?
@@ -427,6 +428,7 @@
 │       ├── deal-without-operations.md — По какому признаку сделка считается не имевшей операций на бирже?
 │       ├── error-handling-policy.md — Как ошибки выходят наружу и градируются внутри?
 │       ├── exchange-hold.md — Какое правило определяет exchange-scope холд?
+│       ├── exit-teardown-order.md — В каком порядке снимаются живые сущности при закрытии позиции?
 │       ├── external-status-resolution.md — Как работать с сырым внешним статусом сущности?
 │       ├── idempotency-via-unique.md — Как обеспечивается уникальность и идемпотентность сущностей?
 │       ├── instrument-hold.md — Какое правило определяет инструмент-scope холд?

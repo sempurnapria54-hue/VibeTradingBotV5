@@ -20,16 +20,20 @@ close-position и где выполняется частичный выход.
 
   **Команда закрытия одна, эмитентов у неё два** (решение держателя
   `GAPS_CLOSE_16`, вариант B): `CLOSE_POSITION_COMMAND` эмитит
-  `ExitPendingHandler` на тропе условия-перехода и исполнитель
-  `CLOSE_ACTION` — на тропе явного действия. Правило «полное закрытие
-  идёт только `CLOSE_POSITION_COMMAND`» держится; **teardown при этом
-  перестаёт быть в одних руках**, и чем закрывается расхождение дочистки
-  между двумя путями — **открыто**
-  (`.claude/work/progress/phase-1-step-7-gaps-close-16.md` §«Развилки,
-  возвращаемые на валидацию», позиция С1). Форма самого действия при этом
-  назначена: `actionKind = POSITION`, `StrategyPositionAction`,
-  `StrategyActionType.CLOSE_ACTION`
+  `ExitPendingHandler` на тропе условия-перехода и `ExitActionExecutor` —
+  на тропе явного действия. Правило «полное закрытие идёт только
+  `CLOSE_POSITION_COMMAND`» держится. Форма действия:
+  `actionKind = POSITION`, `StrategyPositionAction`,
+  `StrategyActionType.EXIT_ACTION`
   (`docs/models/domain/aggregate/Strategy.md` §Действия).
+
+  **Дочистка на тропе явного действия — не внешняя, а состав действия**
+  (решение держателя, позиция С1): `CLOSE_POSITION_COMMAND` закрывает
+  позицию и только её, а осмысленное действие стратегии — **выход из
+  сделки**, включающий отмену живых входных ног. Порядок команд — инвариант
+  `docs/rules/exit-teardown-order.md` (единственное место записи, общее для
+  штатной и аварийной троп). Общий компонент teardown **не заводится**:
+  носителей последовательности два, и они разной природы.
 - Частичное уменьшение (partial exit) выполняется только через
   reduce-only `Order` / `AlgoOrder` actions.
 - Частичное уменьшение — это `Position.status == ACTIVE` с
@@ -56,7 +60,8 @@ risk-policy check `RiskValidator`): `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 Коды — `docs/components/models/RiskCheckResult.md` (`RiskCheckCode`).
 Выход выражается условием-перехода `MANAGING → EXIT_PENDING` **либо**
 явным действием шага `EXIT` (§Правило); `CLOSE_POSITION_COMMAND` в обоих
-случаях исполняет `ExitPendingHandler` (full close, reduce-only; см.
+случаях исполняет `ClosePositionExecutor` (full close, reduce-only), а
+эмитит её `ExitPendingHandler` либо `ExitActionExecutor` — по тропе (см.
 `docs/models/domain/aggregate/Strategy.md`).
 
 ## Почему
@@ -67,9 +72,12 @@ risk-policy check `RiskValidator`): `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 модель закрытия простой: один механизм полного закрытия + reduce-only
 действия для частичного выхода, без промежуточного
 `PARTIALLY_CLOSED`-статуса. **Второй эмитент команды простоту трогает, и
-это названо:** сама команда остаётся одна, но владение teardown
-раздваивается — довод простоты здесь перевешен ценностью явного
+это названо:** сама команда остаётся одна, но последовательность выхода
+несут две тропы — довод простоты здесь перевешен ценностью явного
 объявления выхода в стратегии (решение держателя `GAPS_CLOSE_16`).
+Дублем это не является: тропы **разной природы** (системный kill-switch
+против стратегии), а порядок у них общий и записан один раз —
+`docs/rules/exit-teardown-order.md`.
 
 ## Связанное
 

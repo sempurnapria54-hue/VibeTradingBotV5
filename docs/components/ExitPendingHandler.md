@@ -36,14 +36,19 @@ live risk; локальные orders/algo доступны для очистки
 вовсе (`docs/components/SystemActionExecutor.md` §«Состав конкретного
 цикла»).
 
-**Cleanup — напрямую, без анкера:** живая позиция (штатный выход =
-«market-close всё + дочистка», владелец — этот handler,
-`docs/decisions/fsm-execution-layering.md` §Exit) →
-`CLOSE_POSITION_COMMAND`; live ordinary orders →
-`CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND` (учёта серии
-неудач **нет** — анкера у cleanup нет, потому что нет исполнения-действия;
-форвард на `TradeGuardJob`, H16 `DOCS_CHECK_11`,
-`docs/components/models/ServiceCommand.md`).
+**Cleanup — напрямую, без анкера**, в порядке инварианта
+`docs/rules/exit-teardown-order.md` (единственное место записи; собственной
+копии последовательности handler-док не держит): живые **входные**
+(не reduce-only) ноги → `CANCEL_ORDER_COMMAND` / `CANCEL_ALGO_ORDER_COMMAND`
+→ живая позиция → `CLOSE_POSITION_COMMAND` → остальные live-сущности
+(reduce-only ноги, защита) → `CANCEL_*`. Учёта серии неудач **нет** — анкера
+у cleanup нет, потому что нет исполнения-действия; форвард на
+`TradeGuardJob`, H16 `DOCS_CHECK_11`,
+`docs/components/models/ServiceCommand.md`.
+
+**Прежняя редакция («market-close всё + дочистка», закрытие первым) снята**
+решением держателя (позиция С1 `GAPS_CLOSE_16`): не-reduce-only входная нога,
+исполнившаяся после закрытия, открывает позицию заново.
 
 **Завершение — через `FINALIZE_DEAL_EXIT_ACTION`:** определить/
 подтвердить `Deal.CloseReason`; `FINALIZE_DEAL_EXIT_COMMAND` эмитится по
