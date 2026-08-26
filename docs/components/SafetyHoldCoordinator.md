@@ -9,8 +9,11 @@
 ## Назначение
 
 `SafetyHoldCoordinator` — держатель **последовательности полной реакции**
-(`FULL`: `TRADE_BLOCKED` + kill-switch). Сам ничего не исполняет напрямую,
-оркеструет исполнителей:
+(`FULL`: `TRADE_BLOCKED` + kill-switch). Биржевая заморозка (`FREEZE`,
+ступень 1 лестницы: `Exchange.HOLD` + `AnomalyReport`, без kill-switch и
+каскада) через координатор **не идёт** — её ставит `HoldService`
+напрямую (`docs/rules/exchange-hold.md`). Сам ничего не исполняет
+напрямую, оркеструет исполнителей:
 
 - `InstrumentDataService` / `ExchangeDataService` — выставление
   `TRADE_BLOCKED` scope (`blockTrade`);
@@ -45,10 +48,13 @@ concurrency-гардом прохода **D-M1** (в фазе 1 — in-process
 
 ## Последовательность реакции (класс `FULL`)
 
-Инструмент-scope и биржа-scope — **одной формы**, различаются только
-scope-исполнителями (`InstrumentDataService`/`fireInstrument` vs
+Инструмент-scope и биржа-scope — **одной формы у `FULL`**, различаются
+только scope-исполнителями (`InstrumentDataService`/`fireInstrument` vs
 `ExchangeDataService`/`fireExchange`); ярлыки уровня со scope сняты (H6,
-`GAPS_CLOSE_5`; уровень — ось error-политики). Дизайн холдов шага 6:
+`GAPS_CLOSE_5`; уровень — ось error-политики). Биржевая **ступень 1**
+(`FREEZE`, заморозка) — **другая форма**: без kill-switch и каскада,
+координатором не исполняется (`docs/rules/exchange-hold.md`). Дизайн
+холдов шага 6:
 
 1. **`TRADE_BLOCKED` scope первым** (`blockTrade`) — gate и анкер
    идемпотентности. Повторный сигнал того же scope, когда scope **уже в
@@ -63,6 +69,12 @@ scope-исполнителями (`InstrumentDataService`/`fireInstrument` vs
      пропущен. Переход `ENTRY_BLOCKED → TRADE_BLOCKED` **разрешён** и
      реакцию не пропускает (эскалация мягкого класса в полный); обратной
      эскалации нет.
+   - **Биржевая пара анкеров симметрична** (`docs/rules/exchange-hold.md`
+     §«Границы и эскалация»): `Exchange.HOLD` (заморозка, ступень 1) —
+     **не** анкер идемпотентности — биржа под заморозкой обязана принять
+     последующий триггер ступени 2, `HOLD → TRADE_BLOCKED` разрешён и
+     реакцию не пропускает; анкером `FULL`-реакции служит только
+     `Exchange.TRADE_BLOCKED`.
 2. `AnomalyReport` `CREATED` + **before-слепок** (локальный БД-граф +
    внешний биржевой).
 3. `IN_PROGRESS`.
@@ -80,13 +92,19 @@ after-слепок.
 
 Не подтверждено:
 
-- **Инструмент-scope не подтверждён → ЭСКАЛАЦИЯ** на биржевой холд +
-  общебиржевой kill-switch: тем же контуром `reactExchange` с сигналом
-  `HoldSignal.exchange(EXCHANGE_KILL_SWITCH_RESIDUAL)` (code
-  `EXCHANGE_KILL_SWITCH_RESIDUAL`). Обоснование (HOLD-Q1): неустранимый
+- **Инструмент-scope не подтверждён → ЭСКАЛАЦИЯ на ступень 2**
+  (`Exchange.TRADE_BLOCKED` + общебиржевой kill-switch): тем же контуром
+  `reactExchange` с сигналом
+  `HoldSignal.exchangeTradeBlock(EXCHANGE_KILL_SWITCH_RESIDUAL)`.
+  Ступень — по триггеру: неустранимый остаток teardown — **живой риск,
+  снятие которого не подтверждается**, то есть триггер ступени 2
+  (`docs/rules/exchange-hold.md`); controlled-тропа, напротив, с самого
+  начала идёт ступенью 1 (`FREEZE`, без kill-switch) через `HoldService`
+  и в эту эскалацию не попадает. Обоснование (HOLD-Q1): неустранимый
   остаток означает, что интеграции нельзя доверять и радиус неизвестен →
   консервативно тормозим биржу (см.
-  `docs/decisions/controlled-violation-exchange-wide-hold.md`,
+  `docs/decisions/controlled-violation-exchange-wide-hold.md` — частично
+  superseded лестницей, `docs/decisions/exchange-safety-ladder.md`;
   `docs/rules/controlled-exchange-exceptions.md`).
 - **Биржа-scope не подтверждён → эскалировать некуда**: отчёт **остаётся
   открытым** (`KILL_SWITCH_EXECUTED`, не `COMPLETED`). Досверка орфанов
@@ -131,4 +149,6 @@ after-слепок.
 - `docs/models/domain/other/AnomalyReport.md`,
   `docs/lifecycles/AnomalyReport.md` — журнал инцидента и его lifecycle.
 - `docs/decisions/controlled-violation-exchange-wide-hold.md` —
-  обоснование эскалации L3→биржа (HOLD-Q1).
+  обоснование эскалации L3→биржа (HOLD-Q1); частично superseded
+  лестницей (`docs/decisions/exchange-safety-ladder.md`): controlled
+  exception теперь даёт ступень 1 (`Exchange.HOLD`), не flatten.

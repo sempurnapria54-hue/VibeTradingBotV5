@@ -72,7 +72,7 @@
   `.claude/chat/chat-project-instructions.md`.
 - Механика, на которой едет обкатка ревью, — петля
   `DOCS_CHECK_N` / `GAPS_CLOSE_N` (`roadmap-step-execution.md`).
-- Гейт/леджер-паттерн — `question-delegation.md`,
-  `delegation-ledger.md`.
+- Гейт/леджер-паттерн (выключен режимом автономии до конца фазы 1) —
+  `.claude/work/history/2026-08-26-autonomy-transition.md`.
 - Аналогия устройства «процесс + агенты-исполнители» —
   `knowledge-classification.md` + `knowledge-curator.md`.

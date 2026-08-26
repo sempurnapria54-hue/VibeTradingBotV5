@@ -88,6 +88,10 @@ concurrency-guard, границы.
   уводится в `ERROR` с `shutdownReason = RISK_POLICY` (для биржевого
   каскада — `EXCHANGE_HOLD`), дальше её разбирает `ErrorHandler` (teardown
   live risk);
+- `Exchange.HOLD` (биржевая заморозка, ступень 1 — статус вводится на
+  `CODE`) оркестратором **не перехватывается**: активные сделки не
+  трогаются и доживают под текущим стопом; каскадный перехват — только у
+  `Exchange.TRADE_BLOCKED` (ступень 2, `docs/rules/exchange-hold.md`);
 - `Instrument.Status.ENTRY_BLOCKED` **не перехватывается** — мягкий класс
   запрещает только **новые входы**, а живые сделки доживают под своим стопом
   и ведутся штатным FSM. Запрет входов даёт выборка `EntryScannerJob`

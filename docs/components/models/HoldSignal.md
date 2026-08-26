@@ -30,7 +30,7 @@ call-site и **тут же передаваемый** исполнителю б�
 | Поле | Тип | Назначение |
 |---|---|---|
 | `scope` | `HoldScope` | Scope (радиус) холда: `INSTRUMENT` / `EXCHANGE`. |
-| `reactionClass` | `ReactionClass` | **Класс реакции**: `SOFT` / `FULL` (см. §Енум `ReactionClass`). |
+| `reactionClass` | `ReactionClass` | **Класс реакции**: `SOFT` / `FREEZE` / `FULL` (см. §Енум `ReactionClass`). |
 | `code` | `String` | Машинно-читаемый код причины; попадает в `AnomalyReport.code`. |
 | `instrumentId` | `Long` | **Идентичность объекта блокировки** при `scope = INSTRUMENT`; пусто при `scope = EXCHANGE`. |
 | `exchangeId` | `Long` | **Идентичность объекта блокировки** при `scope = EXCHANGE`; при `INSTRUMENT` — биржа инструмента, если детектор её знает, иначе пусто (резолвится сервисом). |
@@ -58,6 +58,13 @@ call-site и **тут же передаваемый** исполнителю б�
 
 - `FULL` — прежнее (и до шага 7 единственное) поведение реактивного
   контура: `TRADE_BLOCKED` + teardown через `KillSwitchExecutor`.
+- `FREEZE` — **биржевая заморозка** (ступень 1 биржевой лестницы,
+  `docs/rules/exchange-hold.md`): `Exchange.HOLD` + `AnomalyReport`
+  (`NON_CRITICAL`, `kind = STATE`); kill-switch **не гоняется**, каскада
+  активных сделок в `ERROR` нет — живые сделки доживают под текущим
+  стопом. `HoldService` ставит напрямую, координатор не зовётся. В коде
+  `FREEZE` и `Exchange.HOLD` **вводятся на `CODE`**
+  (`docs/rules/exchange-hold.md` §«Состояние носителей»).
 - `SOFT` — **мягкий холд**: `Instrument.Status.ENTRY_BLOCKED`;
   kill-switch **не гоняется**, живые сделки доживают
   (`docs/rules/instrument-hold.md` §Enforcement).
@@ -99,13 +106,21 @@ call-site и **тут же передаваемый** исполнителю б�
   `HoldScope.INSTRUMENT` + `ReactionClass.FULL` + code + идентичность.
 - `instrumentSoft(code, instrumentId)` — мягкий холд инструмента:
   `HoldScope.INSTRUMENT` + `ReactionClass.SOFT` + code + идентичность.
-- `exchange(code, exchangeId)` — холд биржи: `HoldScope.EXCHANGE` +
-  `ReactionClass.FULL` + code + идентичность.
+- `exchange(code, exchangeId)` — **заморозка биржи (ступень 1)**:
+  `HoldScope.EXCHANGE` + `ReactionClass.FREEZE` + code + идентичность →
+  `Exchange.HOLD`. Все зарегистрированные зовущие этой фабрики —
+  controlled-тропы, то есть триггеры ступени 1
+  (`docs/rules/exchange-hold.md`).
+- `exchangeTradeBlock(code, exchangeId)` — **полная реакция биржи
+  (ступень 2)**: `HoldScope.EXCHANGE` + `ReactionClass.FULL` + code +
+  идентичность → `Exchange.TRADE_BLOCKED`. Триггер — живой риск без
+  защиты (`docs/rules/risk-creating-entry-protection.md`).
 
 Публичного конструктора для прямой сборки не используем — сигнал строится
 фабрикой по scope и классу реакции, чтобы радиус и намерение читались на
-call-site. Мягкой биржевой фабрики нет: биржевой радиус мягкой ветки не
-имеет (`docs/rules/exchange-hold.md`).
+call-site. Мягкой биржевой фабрики по-прежнему нет: биржевой радиус
+`SOFT`-ветки не имеет (`docs/rules/exchange-hold.md`); биржевая
+**заморозка** — не `SOFT`, а `FREEZE` (фабрика `exchange(...)`, ступень 1).
 
 **Перечень `code` — по производителям** (H6 `DOCS_CHECK_14`; `code`
 обязателен и попадает в `AnomalyReport.code` реактивного отчёта):
@@ -116,18 +131,22 @@ call-site. Мягкой биржевой фабрики нет: биржевой
 **посмертной** добычи (`Deal.status = ERROR`; форма реакции та же полная,
 различение журнальное — решение держателя П6 валидации `GAPS_CLOSE_17`);
 `EXCHANGE_KILL_SWITCH_RESIDUAL` — эскалация неподтверждённого
-инструментного teardown (`docs/components/SafetyHoldCoordinator.md`);
+инструментного teardown (живой риск не подтверждён снятым — ступень 2,
+фабрика `exchangeTradeBlock`;
+`docs/components/SafetyHoldCoordinator.md`);
 коды `ControlledExchangeException`-тропы — по `reasonCode`/классу
-исключения (`docs/rules/controlled-exchange-exceptions.md`). Пары имён
+исключения (`docs/rules/controlled-exchange-exceptions.md`) — это коды
+**`FREEZE`-реакции** (ступень 1: `Exchange.HOLD` фабрикой
+`exchange(...)`). Пары имён
 «кодов серии по стороне» не существует — снята вместе с осью стороны.
 
 **Код `CLOSE_OUTCOME_UNDETERMINED` кодом холда быть перестал** (H5
 `DOCS_CHECK_15`): он остаётся кодом **аномалии**
 (`docs/models/domain/other/AnomalyReport.md`), но сигнала не производит.
 Нарушение контракта в добытой записи закрытия теперь обнаруживается **в
-слое интеграции** и поднимает биржевой холд общим контуром — по классу
-перехваченного `ControlledExchangeException`, то есть кодом
-`reasonCode`-тропы. **`RECONCILIATION_OPERAND_MISSING` снят целиком**
+слое интеграции** и поднимает биржевую заморозку (ступень 1) общим
+контуром — по классу перехваченного `ControlledExchangeException`, то
+есть кодом `reasonCode`-тропы. **`RECONCILIATION_OPERAND_MISSING` снят целиком**
 (решение держателя, позиция С3 валидации `GAPS_CLOSE_16`): недостача
 **нашего** операнда допуска не производит ни сигнала, ни аномалии —
 нарушенный инвариант ловит детектирующий контур отказом операции.
@@ -156,7 +175,9 @@ error-политики «группа инструментов × запрет �
 ярлыки уровня («инструмент = уровень 3, биржа = уровень 4», «Уровни
 error-градации»), которые `GAPS_CLOSE_6` (H4) с енума снял — то есть код
 воспроизводит отменённое тождество scope ≡ уровень
-(`.claude/work/backlog.md` §Шаг 7).
+(`.claude/work/backlog.md` §Шаг 7). Ярлык устарел вдвойне: уровень 4
+внутри двухступенчатый (`Exchange.HOLD` / `TRADE_BLOCKED`,
+`docs/rules/exchange-hold.md`) и одним значением scope не выражается.
 
 **Значения `INSTRUMENT_GROUP` в енуме нет** (H14 `DOCS_CHECK_15`, решение
 пользователя). Оно было **целевым** — вводилось на `CODE` шага 7 ради

@@ -35,9 +35,12 @@ main protection (`CANCEL_*`). Если switch не нужен (нет `MAIN_PROT
 step или его условие не сработало) — переход в `MANAGING` **только если entry
 order несёт активную приложенную защиту** (`Order.hasActiveAttachedProtection()`
 — active-like состояние защиты, не просто наличие attached algo). Иначе
-позиция с live risk без резолвимой защиты = бесстоповая постфактум → `ERROR`
-+ L3-холд инструмента (`markErrorStopless`;
-`docs/rules/instrument-hold.md`, `docs/rules/risk-creating-entry-protection.md`).
+позиция с live risk без резолвимой защиты = бесстоповая постфактум →
+`ERROR` + **ступень 2 биржевой лестницы: `Exchange.TRADE_BLOCKED`**
+(живой риск без защиты — нарушение инварианта,
+`docs/rules/risk-creating-entry-protection.md`,
+`docs/rules/exchange-hold.md`; в коде `markErrorStopless` пока ставит
+L3-холд инструмента — перевешивание на `CODE`).
 
 ## Выходные проверки
 
@@ -49,7 +52,8 @@ order несёт активную приложенную защиту** (`Order.
 конфликтующей защиты и orphan algo-orders; нет риска под kill-switch.
 → `ENTRY_FINALIZED → PROTECTION_SWITCHED` (если switch реально нужен) или
 `→ MANAGING`. Живой риск без активной резолвимой защиты (ни main, ни
-active-attached) → `ERROR` + L3-холд инструмента.
+active-attached) → `ERROR` + ступень 2 (`Exchange.TRADE_BLOCKED`; в коде
+пока L3-холд инструмента — перевешивание на `CODE`).
 
 ## Допустимые StrategyStep
 

@@ -1,11 +1,23 @@
-# Обязательная защита risk-creating входа
+# Обязательная защита живого риска
 
 ## На какой вопрос отвечает этот файл
 
-Какой инвариант системы требует, чтобы risk-creating вход без определимого
-стопа не доходил до постановки на бирже.
+Какой инвариант системы запрещает живой риск без защиты.
 
 ## Правило (инвариант системы)
+
+**Живого риска без защиты быть не должно** (концептуальное правило
+держателя, 2026-08-26). Любая открытая или наращиваемая позиция в любой
+момент несёт подтверждаемую защиту; живой риск без защиты — нарушение
+инварианта системы, аномалия, реакция — **блок торговли по всей бирже**
+(`Exchange.TRADE_BLOCKED`, ступень 2 лестницы —
+`docs/rules/exchange-hold.md`).
+
+Инвариант enforced с двух сторон: на входе (риск без защиты не
+создаётся — §ниже) и постфактум (обнаруженный незащищённый риск
+снимается полной реакцией — §Двусторонний enforcement, п.2).
+
+### На входе
 
 **Risk-creating вход** (действие, открывающее или наращивающее позицию)
 **без определимого стопа не доходит до постановки** ордера на бирже. `PRECHECK`
@@ -39,8 +51,9 @@ Attached-защита уходит на биржу **вместе с родит�
   (`PROTECTION_SWITCHED`); момента «позиция есть, защиты нет» между филлом и
   этим шагом больше не существует;
 - **остаётся только наша неосведомлённость** до рефреша: attached-заявка
-  могла не встать (`failCode`). Эта ветка уже покрыта — L3-холд
-  `EntryFinalizedHandler` (§Двусторонний enforcement).
+  могла не встать (`failCode`). Эта ветка покрыта гейтом
+  `EntryFinalizedHandler` (§Двусторонний enforcement): неподтверждённая
+  защита при живом риске — нарушение инварианта, ступень 2.
 
 Альтернатива (пропустить вход и пометить аномалией постфактум) **отвергнута**
 — оставляет живую бесстоповую позицию на бирже; защита обязана быть **до**
@@ -121,8 +134,9 @@ order»); отсутствие attached SL в payload'е доборного вх
    (`docs/components/PrecheckHandler.md`, `docs/processes/risk-evaluation.md`).
    Выходная проверка `PRECHECK` не выпускает entry без резолвимой защиты;
    `ENTRY_FINALIZED` не уводит в `MANAGING` позицию с live risk без
-   подтверждённой защиты; иначе — L3-холд
-   (`docs/components/EntryFinalizedHandler.md`).
+   подтверждённой защиты; иначе — нарушение инварианта, ступень 2
+   (`Exchange.TRADE_BLOCKED`, `docs/rules/exchange-hold.md`;
+   `docs/components/EntryFinalizedHandler.md`).
    - **Гейтов два, по тропам, и они проверяют разное** (уточнено
      inspection, `GAPS_CLOSE_16`): тропа **без** сработавшего
      `MAIN_PROTECTION` требует active-like **attached SL входа**
@@ -137,14 +151,18 @@ order»); отсутствие attached SL в payload'е доборного вх
      защиту, иначе преконтроль его не выпускает. Гейт второй тропы
      проверяет standalone-защиту не потому, что attached могло не быть, а
      потому, что владение управлением к этому моменту уже переключено.
-2. **Реакция на нарушение постфактум.** Если бесстоповая risk-creating позиция
-   обнаружится **иным путём** (восстановление после перезапуска, фоновый скан)
-   — это нарушение инварианта → **реакция уровня 3** error-градации (холд
-   инструмента + kill-switch + `AnomalyReport`,
-   `docs/rules/error-handling-policy.md`, `docs/rules/instrument-hold.md`).
-   Сопутствующий controlled-violation доминирует и поднимает L4
-   (`docs/decisions/controlled-violation-exchange-wide-hold.md`). На входе
-   нарушение не должно случаться (п.1); п.2 — страховка инварианта.
+2. **Реакция на нарушение постфактум.** Если живой риск без защиты
+   обнаружится **любым путём** (рефреш показал, что attached-заявка не
+   встала; восстановление после перезапуска; фоновый скан) — это
+   нарушение инварианта системы → **ступень 2 лестницы**:
+   `Exchange.TRADE_BLOCKED` — блок торговли по всей бирже + kill-switch
+   flatten + `AnomalyReport` (`docs/rules/exchange-hold.md`,
+   `docs/rules/error-handling-policy.md` §«Внутренняя градация»,
+   уровень 4). Прежняя реакция L3 (инструмент) с доминированием
+   сопутствующего controlled-violation **снята** п.4 держателя: нарушен
+   наш собственный учёт покрытия риска, доверять его радиусу нельзя
+   (`docs/decisions/exchange-safety-ladder.md`). На входе нарушение не
+   должно случаться (п.1); п.2 — страховка инварианта.
 
 ## Что правило не трогает
 
@@ -175,9 +193,9 @@ order»); отсутствие attached SL в payload'е доборного вх
   код — `docs/components/models/RiskCheckResult.md`
   (`RISK_CREATING_ENTRY_WITHOUT_STOP`).
 - Защита в `MANAGING`/switch — `docs/components/EntryFinalizedHandler.md`.
-- Реакция уровня 3 — `docs/rules/error-handling-policy.md`,
-  `docs/rules/instrument-hold.md` (сопутствующий controlled-violation
-  доминирует L4 — `docs/rules/exchange-hold.md`,
-  `docs/decisions/controlled-violation-exchange-wide-hold.md`).
+- Реакция на нарушение постфактум — ступень 2 лестницы:
+  `docs/rules/exchange-hold.md`,
+  `docs/decisions/exchange-safety-ladder.md`,
+  `docs/rules/error-handling-policy.md` (уровень 4).
 - Торговый грунт — `docs/decisions/per-trade-risk-policy.md`,
   `docs/rules/trading-constraints.md`.

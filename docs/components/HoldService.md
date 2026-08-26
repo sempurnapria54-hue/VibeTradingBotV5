@@ -59,9 +59,10 @@
 **Что при этом не изменилось:** сервис остаётся **общим местом** реакции,
 и детектор, которому нечего добавить к штатной последовательности, зовёт
 его, а не переписывает её у себя. Идемпотентность по статусу scope и
-эскалация `ENTRY_BLOCKED → TRADE_BLOCKED` живут здесь; детектор, ставящий
-статус сам, берёт на себя и то и другое — и это его цена, названная
-явно.
+эскалации — `ENTRY_BLOCKED → TRADE_BLOCKED` у инструмента и биржевая
+лестница `Exchange.HOLD → TRADE_BLOCKED` (`docs/rules/exchange-hold.md`)
+— согласуются здесь; детектор, ставящий статус сам, берёт на себя и то и
+другое — и это его цена, названная явно.
 
 **Наблюдатель серии отчёта не производит** (H9 `DOCS_CHECK_12`): серия
 неудачных исполнений — **не аномалия**, а параметр, который наблюдатель
@@ -81,7 +82,9 @@
   (`docs/rules/instrument-hold.md` §Enforcement). Ни слепков, ни гейта
   терминала у мягкой ветки нет. **Отчёт об аномалии мягкая ветка не
   производит** — его заводит детектор, если факт того стоит (H14
-  `GAPS_CLOSE_13`).
+  `GAPS_CLOSE_13`). Ветка **инструментная**: биржевого радиуса у `SOFT`
+  нет; биржевая заморозка — не `SOFT`, а отдельная биржевая форма
+  `FREEZE` (§ниже).
 - **Групповой и аккаунтный радиус мягкой реакции — набором вызовов.**
   Детектор, у которого обесценен факт целой группы или всего аккаунта,
   разворачивает радиус в **набор инструментов** и зовёт сервис по
@@ -90,6 +93,13 @@
   (`docs/rules/instrument-hold.md`): развёртка набора существует в любом
   варианте, и отдельного значения `HoldScope`, мягкой биржевой фабрики
   или читателя навеса внутри сервиса не заводится.
+- **`FREEZE`** — биржевая заморозка (ступень 1 лестницы,
+  `docs/rules/exchange-hold.md`): `Exchange.HOLD` + `AnomalyReport`
+  (`NON_CRITICAL`, `kind = STATE`) **напрямую**, координатор не зовётся —
+  каскада активных сделок в `ERROR` и kill-switch-шагов у заморозки нет,
+  живые сделки доживают под текущим стопом. Снятие — вручную в `ACTIVE`.
+  Статус `Exchange.HOLD` и эта ветка **вводятся на `CODE`**
+  (`docs/rules/exchange-hold.md` §«Состояние носителей»).
 - **`FULL`** — полная реакция: `TRADE_BLOCKED` + teardown. Последовательность
   (анкер идемпотентности, слепки, kill-switch, гейт терминала, эскалация
   инструмент→биржа) держит `SafetyHoldCoordinator`
@@ -99,7 +109,11 @@
 **Идемпотентность — по статусу scope.** Повторный `SOFT` по инструменту,
 уже находящемуся в `ENTRY_BLOCKED` или `TRADE_BLOCKED`, — no-op; обратной
 эскалации нет. Переход `ENTRY_BLOCKED → TRADE_BLOCKED` разрешён и реакцию
-не пропускает.
+не пропускает. Симметрично на бирже: **`Exchange.HOLD` — не анкер
+идемпотентности** — биржа под заморозкой обязана принять последующий
+триггер ступени 2, эскалация `HOLD → TRADE_BLOCKED` разрешена и реакцию
+не пропускает (`docs/rules/exchange-hold.md` §«Границы и эскалация»);
+анкер `FULL`-реакции биржи — `Exchange.TRADE_BLOCKED`.
 
 **Exception-total.** Наружу исключение не пробрасывается: сбой реакции →
 `AnomalyReport` `ERROR`, проход зовущего живёт. Блокировка не должна
@@ -143,7 +157,7 @@
 
 | Что перехвачено | Реакция |
 |---|---|
-| `ControlledExchangeException` (все подклассы: `ExternalStatusException`, `ExternalInvariantViolationException`, `ExternalNotFoundException`) | безусловный L4 — `exchange(code, exchangeId)`, `FULL` биржевой (`docs/rules/controlled-exchange-exceptions.md` §Эскалация) |
+| `ControlledExchangeException` (все подклассы: `ExternalStatusException`, `ExternalInvariantViolationException`, `ExternalNotFoundException`) | безусловная **биржевая заморозка (ступень 1)** — `exchange(code, exchangeId)`, `FREEZE` биржевой: `Exchange.HOLD` + `AnomalyReport`, без kill-switch и каскада (`docs/rules/controlled-exchange-exceptions.md` §Эскалация; лестница — `docs/rules/exchange-hold.md`) |
 | `RetryBudgetExhaustedException` — **исчерпание бюджета попыток** (строка исполнения уже `FAILED`; первопричина — в `cause`: ретраябельный `ExchangeIntegrationException`, non-retryable `INTERNAL_ERROR`/`VALIDATION_ERROR`, ACK-реджект либо легитимно-пустой исход исчерпанного цикла) | `instrument(RETRY_BUDGET_EXHAUSTED, instrumentId)` — **полная реакция инструмента** (`FULL` + kill-switch), **одна на все тропы** (H8 `DOCS_CHECK_16`, решение держателя `GAPS_CLOSE_16`: различителя не заводить). Прежняя мягкая форма и «записанное отклонение» для этого типа сняты; цена названа в §«Различителя нет» и в `docs/rules/instrument-hold.md` |
 
 **Контракт броска — на стороне исполнителя** (H1 `DOCS_CHECK_15`):

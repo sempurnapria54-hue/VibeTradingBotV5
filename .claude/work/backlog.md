@@ -17,14 +17,15 @@
 связи — `.claude/decisions/product-roadmap-type.md`.
 
 Файл держит только живое (правило —
-`.claude/rules/closed-work-transfer.md`); итоги закрытого — в
-`history/` (последние чистки:
-`2026-07-13-backlog-phase-1-closed-cleanup.md`,
-`2026-07-14-claude-docs-curation.md`). Нумерация секций — с
-пропусками (номера закрытых не переиспользуются). Полные
-форвард-заметки миграций — в подпапках `history/`
-(`tasks-<сущность>.md` / `tasks-<док>.md`); архивные доки в
-`.claude-archive/` не удалены — источник для оставшихся миграций.
+`.claude/rules/closed-work-transfer.md`, вкл. §«Диета рабочих
+файлов»); итоги закрытого — в `history/` (последние чистки:
+`2026-07-14-claude-docs-curation.md`,
+`2026-08-26-workfiles-diet.md`). Пункт — задача + указатель на дом
+политики (`.claude/rules/policy-home.md`), не пересказ политики.
+Нумерация секций — с пропусками (номера закрытых не
+переиспользуются). Полные форвард-заметки миграций — в подпапках
+`history/` (`tasks-<сущность>.md` / `tasks-<док>.md`); архивные доки
+в `.claude-archive/` не удалены — источник для оставшихся миграций.
 
 ## Cross-cutting миграции
 
@@ -84,98 +85,48 @@ FW10), `tasks-deal.md` (DEAL-FW8).
 
 ### 9. Exchange модель/lifecycle
 
-**Суть:** полная модель/lifecycle `Exchange` (`HOLD`/`DISABLED` среди
-прочих; правило — `docs/rules/exchange-hold.md`), `Instrument`,
-`Account`. Сюда же — координация статусов инструмента (онбординговый
-`HOLD` × safety-статусы `TRADE_BLOCKED`/`ENTRY_BLOCKED`) и standalone
-модель `Instrument` для market-data.
-
-> **`AnomalyReport.Severity` из этого пункта выведен** (H6,
-> `GAPS_CLOSE_6`). Прежняя формулировка («CRITICAL → торговля запрещена;
-> NON_CRITICAL → после kill-switch может быть разрешена») несла снятую
-> политику: severity отвечает **только** на «гоняется ли kill-switch», а
-> блокировку торговли задаёт **состав реакции** error-политики и несёт
-> статус scope (`docs/models/domain/other/AnomalyReport.md` §Енумы,
-> `docs/rules/error-handling-policy.md` §«Перечень scope и реакций»).
-
-> **Множество входа `Exchange.TRADE_BLOCKED` — не пересмотрено** (свип
-> `GAPS_CLOSE_7`, H13). Для `Instrument` ратифицировано: `TRADE_BLOCKED` /
-> `CLOSED` / `ERROR` достижимы **из любого статуса** (авария застаёт
-> сущность в любом состоянии; ограничение входа делает реакцию
-> пропускаемой — тот же отказ маскировки, ради которого менялся анкер
-> координатора). `docs/models/domain/core/Exchange.md` по-прежнему говорит
-> «вход — только из `ACTIVE`»: тот же вопрос для биржи **не обсуждался**,
-> решение за владельцем. Взвесить вместе с полным lifecycle `Exchange` и
-> разнобоем имён `HOLD`/`TRADE_BLOCKED`.
+**Суть:** полная модель/lifecycle `Exchange` (safety-лестница
+`HOLD`/`TRADE_BLOCKED` — `docs/rules/exchange-hold.md`; `DISABLED`
+среди прочих), `Instrument`, `Account`. Сюда же — координация статусов
+инструмента (онбординговый `HOLD` × safety-статусы
+`TRADE_BLOCKED`/`ENTRY_BLOCKED`) и standalone модель `Instrument` для
+market-data.
 
 **Осталось:** полный lifecycle `Exchange`, периферийные статусы
 `Instrument` (`HOLD`, `ERROR`-recovery, повторный онбординг,
 `CLOSED`), `Account`. Минимальные модели `Instrument`/`Exchange` и
 онбординг-путь lifecycle уже материализованы
-(`docs/models/domain/core/`, `docs/lifecycles/Instrument.md`);
-INSTR-Q1 закрыт
-(`docs/decisions/instrument-external-rules-materialization.md`).
-Связанный открытый вопрос: ORCH-Q1 (владелец оркестрации онбординга
-инструмента и загрузки свечей; ось владения `Instrument.Status`) —
+(`docs/models/domain/core/`, `docs/lifecycles/Instrument.md`).
+Разнобой имён биржевого safety-статуса и множества входа закрыты
+лестницей 2026-08-26 (`docs/decisions/exchange-safety-ladder.md`,
+`docs/rules/exchange-hold.md`); CODE-дельта лестницы — §Шаг 7.
+Блокировку торговли задаёт состав реакции error-политики, не
+`severity` отчёта (`docs/models/domain/other/AnomalyReport.md`
+§Енумы). Связанный открытый вопрос: ORCH-Q1 (владелец оркестрации
+онбординга инструмента; ось владения `Instrument.Status`) —
 `open-questions.md`.
-
-**Разнобой имён safety-статуса биржи — сводится здесь** (зафиксирован
-`GAPS_CLOSE_4` шага 7; не находка шага 7, а унаследованный долг). Три
-расходящихся источника:
-
-- **`Exchange.HOLD`** — `docs/rules/exchange-hold.md` (сам носитель
-  правила), `docs/rules/external-status-resolution.md`,
-  `docs/rules/runtime-error-classification.md`,
-  `docs/rules/risk-creating-entry-protection.md`,
-  `docs/lifecycles/Order.md`, `docs/lifecycles/AlgoOrder.md`,
-  `docs/models/mapping/AlgoOrder.md`, `docs/models/mapping/Balance.md`,
-  `docs/components/EntryScannerJob.md`,
-  `docs/integrations/okx/rules/reduce-only-invariant.md`.
-- **`Exchange.TRADE_BLOCKED`** (аппарат шага 6) —
-  `docs/decisions/controlled-violation-exchange-wide-hold.md`,
-  `docs/rules/controlled-exchange-exceptions.md`,
-  `docs/components/SafetyHoldCoordinator.md`,
-  `docs/components/models/HoldSignal.md` (перебакечен `GAPS_CLOSE_5`, H20:
-  имени `Exchange.HOLD` файл не содержит — несёт `TRADE_BLOCKED` и
-  `HoldScope.EXCHANGE`).
-- **Доковый инвентарь был стейл** — `docs/models/domain/core/Exchange.md`
-  перечислял `CREATED`, `PENDING`, `ACTIVE`, `CLOSED`, `ERROR` и утверждал,
-  что в енуме нет ни `HOLD`, ни `TRADE_BLOCKED`. **В коде `TRADE_BLOCKED`
-  есть** (`Exchange.java`, плюс `isTradeBlocked()`); инвентарь
-  синхронизирован на `GAPS_CLOSE_6` (H3). То же было по `Instrument`
-  (`Instrument.java` несёт `TRADE_BLOCKED` наряду с онбординговым `HOLD`).
-
-Имя в обороте — **`TRADE_BLOCKED`**; **статус материализован в коде**, долг
-свёлся к **переименованию `Exchange.HOLD` → `TRADE_BLOCKED` в доках первой
-группы**. Делается **одним ходом** с полным lifecycle (весь набор состояний
-разом), не точечным переименованием.
-**Шаг 7 писателя `Exchange.HOLD` НЕ вводит** — холд по несвежести
-ставки комиссии уехал на инструмент (`GAPS_CLOSE_4`;
-`docs/rules/instrument-hold.md` §«Несвежесть ставки комиссии»).
 
 **Форвард-заметки:** `2026-05-27-.../tasks-order.md` (ORD-Q5),
 `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md` (ANOM-Q4).
 
 ### Отложенные продуктовые вопросы (future)
 
-- **Политика очистки накопленных строк исполнений** (`deal_strategy_action_states`
-  **и** `deal_system_action_states` — чистка per-таблица, горизонты видов
-  могут различаться; имена приведены к принятой топологии H15
-  `DOCS_CHECK_14`) — фаза 3. Строки копятся by design (`COMPLETED` жёстко
-  терминален, слот-переиспользования нет — В2.1 развилки «команда ↔
-  действие»); ретеншен — цена, явно отложенная за границу фазы
-  (`docs/decisions/command-action-boundary.md` §Отложено). **Операнд
-  ретеншена есть** — `created_at` появляется вместе с audit-колонками
-  обеих таблиц (H15 `DOCS_CHECK_15`), бэкфилл на том горизонте не
-  потребуется.
+- **Политика очистки накопленных строк исполнений**
+  (`deal_strategy_action_states` **и** `deal_system_action_states` —
+  чистка per-таблица, горизонты видов могут различаться) — фаза 3.
+  Строки копятся by design (`COMPLETED` жёстко терминален,
+  слот-переиспользования нет); ретеншен — цена, явно отложенная за
+  границу фазы (`docs/decisions/command-action-boundary.md`
+  §Отложено). Операнд ретеншена есть — `created_at` появляется вместе
+  с audit-колонками обеих таблиц.
 - `linkedOrderExternalIds` — использование для fills/recovery/audit
   (`2026-05-27-.../tasks-algo-order.md` ALGO-Q6).
 - Стандарт описания персистентности доменных моделей: формат и
-  версионирование jsonb-снимков (`AnomalyReport.internalBefore/After` и
-  др.). Шире одной модели.
-  (Провенанс — `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`,
+  версионирование jsonb-снимков (`AnomalyReport.internalBefore/After`
+  и др.). Шире одной модели. (Провенанс —
+  `2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`,
   **архивный** вопрос `ANOM-Q5` той миграции; не путать с одноимённым
-  закрытым вопросом шага 7 — H25 `DOCS_CHECK_14`.)
+  закрытым вопросом шага 7.)
 
 ## Закрытие фазы 1 — обязательный пересмотр допущения «таблицы пусты»
 
@@ -200,16 +151,19 @@ INSTR-Q1 закрыт
    к моменту применения; (б) если контур запускался раньше срока —
    миграция **падает**, и это надо обнаружить до фазы 2, а не в проде.
    Известные носители на момент записи (`GAPS_CLOSE_12`):
-   `anomaly_reports.kind` (H17), валютные колонки `instruments` (H10),
-   признаки отбора для отчёта на `deals` (узел F).
+   `anomaly_reports.kind`, валютные колонки `instruments`, признаки
+   отбора для отчёта на `deals`.
 3. **Проверить не-схемные допущения того же класса.** Правило снимает не
    только вопрос о колонках: «заведённых инструментов на момент ввода нет»
-   (писатель валют, H10) и «сделок, живых на момент ввода, не существует»
+   (писатель валют) и «сделок, живых на момент ввода, не существует»
    (`Deal.md` §«Ветка "операнд пуст"») — те же рассуждения о популяции,
    которой нет. После запуска они перестают быть верными, а ветки, которые
    на них сослались, — достижимыми.
 4. **Записать исход** в history-файл закрытия фазы: что снято, что
    пересмотрено, что осталось верным.
+5. **Пересмотреть режим автономии и выключенную механику делегирования**
+   (гейт/леджер/слепые проходы) — решение держателя 2026-08-26; история —
+   `.claude/work/history/2026-08-26-autonomy-transition.md`.
 
 **Почему якорь заведён отдельным пунктом, а не примечанием в правиле.**
 Класс дефекта, который прогон шага 7 ловил пять итераций подряд, — «решение
@@ -271,9 +225,8 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **Простой жёсткий предел плеча на сделку — отложен (ратифицировано
   2026-06-20,** `docs/decisions/per-trade-risk-policy.md`**).**
   Остаточный зазор: **узкий стоп → высокое плечо** при малом денежном
-  убытке по стопу (риск на сделку умещается в лимит, но нотинал/плечо
-  большие). **Вернуться после наблюдений** (бэктест / живые прогоны),
-  когда станет видно, материализуется ли зазор на практике.
+  убытке по стопу. **Вернуться после наблюдений** (бэктест / живые
+  прогоны), когда станет видно, материализуется ли зазор на практике.
 
 ### Шаг 8 (safety / AnomalyJob)
 
@@ -296,121 +249,100 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   (1) **AnomalyJob-путь** (проактивная детекция → зов executor'а) +
   общебиржевая **orphan-сверка** (сущности вне модели сделки) +
   перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 —
-  **шаг 8**; (2) **PnL-финализация `EMERGENCY_CLOSED`** (остаток
-  DEAL-Q2 закрыт G5: число считается по **той же формуле, что на чистой
-  тропе** — net вкл. `liqPenalty` **плюс cross-ccy-слагаемое**;
-  best-effort — про доступность числа, не про состав, H18
-  `DOCS_CHECK_11`; расчёт — шаг 7). Связано с **ANOM-Q2**
+  **шаг 8**; (2) **PnL-финализация `EMERGENCY_CLOSED`** — число
+  считается по той же формуле, что на чистой тропе (расчёт — шаг 7;
+  `docs/decisions/pnl-finalization-mechanics.md`). Связано с ANOM-Q2
   (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`).
 - **Остаток Stage 3 FSM/action слоистости** (решение —
   `docs/decisions/fsm-execution-layering.md`; Stage 1-2 построены на
   шаге 6): transition-conditions в модели стратегии +
   exit-as-transition (`MANAGING→EXIT_PENDING`) — сверить остаток с
-  as-built шага 6. **Пункт «снять вырожденный `CLOSE_FULL`» снят**
-  (решение держателя `GAPS_CLOSE_16`: полное закрытие выражается и
-  условием-переходом, и явным действием шага `EXIT`); форма действия —
-  открытая развилка, см. §Шаг 7.
-- **Идемпотентность `AnomalyReport`** (хвост H17
-  `GAPS_CLOSE_13`; анкер-ключ **снят**, идемпотентность держится
-  незавершённым статусом — `docs/models/domain/other/AnomalyReport.md`
-  §Персистентность). **`ANOM-Q5` закрыт** (2026-08-20): акторов три,
-  межакторная гонка в фазе 1 недостижима; составной ключ поиска по
-  радиусу + проход радиуса у синка. На шаге 8 остаётся: как радиус
-  влияет на поиск незавершённого при эскалации scope. **`ANOM-Q6` —
-  зависимый, горизонт фаза 3** (оживает с частичным уникальным индексом
-  мультиинстанса). `ANOM-Q3`, `ANOM-Q4` сняты вместе с ключом.
+  as-built шага 6. Полное закрытие выражается и условием-переходом, и
+  явным действием шага `EXIT` (`docs/rules/no-partial-close.md`);
+  форма действия — §Шаг 7.
+- **Идемпотентность `AnomalyReport`:** держится незавершённым статусом
+  (`docs/models/domain/other/AnomalyReport.md` §Персистентность). На
+  шаге 8 остаётся: как радиус влияет на поиск незавершённого при
+  эскалации scope. `ANOM-Q6` — зависимый, горизонт фаза 3
+  (`open-questions.md`).
 - **Переоценка инварианта «ликвидация за стопом» — проектирование**
-  (H18 `DOCS_CHECK_10`, решение пользователя; требование записано —
-  `docs/components/AnomalyJob.md` §«Переоценка инварианта»,
-  `docs/decisions/per-trade-risk-policy.md` §«Роль плеча»). Спроектировать
-  на шаге: **такт** проверки; **гистерезис** против ложных срабатываний у
-  широких стопов; выбор реакции — **перестановка защиты** vs
-  **контролируемый выход**; код аномалии в реестре. Довод, почему не
-  `RiskValidator`: переоценка ведомой позиции риска не создаёт
+  (требование записано — `docs/components/AnomalyJob.md` §«Переоценка
+  инварианта», `docs/decisions/per-trade-risk-policy.md` §«Роль
+  плеча»). Спроектировать на шаге: **такт** проверки; **гистерезис**
+  против ложных срабатываний у широких стопов; выбор реакции —
+  **перестановка защиты** vs **контролируемый выход**; код аномалии в
+  реестре. Вне `RiskValidator`
   (`docs/rules/risk-validator-scope.md` §«Переоценка вне создания
   риска»).
-- **`TradeGuardJob` — новая джоба, счётчик серии неудач по инструменту**
-  (H17 `DOCS_CHECK_10`). Компонент-дока и кода нет; шаг 7 работает с
-  порогом серии = 1 (исчерпание бюджета попыток исполнения). Спроектировать:
-  носитель счётчика (**один класс** — ось «вход-сайд / управление-сайд»
-  снята H6 `DOCS_CHECK_14`, форвард приведён к принятому H9
-  `DOCS_CHECK_15`), точка инкремента и сброса, окно/порог, `code`
-  `HoldSignal`;
-  **учёт отказов cleanup-команд** (сегодня их не считает никто — анкера у
-  них нет). Граница с `AnomalyJob`: тот сравнивает **текущее** состояние с
-  инвариантом, `TradeGuardJob` считает **историю исходов** по инструменту.
-- **Инвентарь периодических джоб — держать сверенным** (`GAPS_CLOSE_10`).
-  Состояние на 2026-08-03: **в коде и докax** — `CandleJob`,
-  `IndicatorJob`, `MarketStructureJob`, `InstrumentExternalRulesSyncJob`,
+- **`TradeGuardJob` — новая джоба, счётчик серии неудач по
+  инструменту.** Компонент-доки и кода нет; шаг 7 работает с порогом
+  серии = 1 (исчерпание бюджета попыток исполнения). Спроектировать:
+  носитель счётчика (**один класс**), точка инкремента и сброса,
+  окно/порог, `code` `HoldSignal`; **учёт отказов cleanup-команд**
+  (сегодня их не считает никто — анкера у них нет). Граница с
+  `AnomalyJob`: тот сравнивает **текущее** состояние с инвариантом,
+  `TradeGuardJob` считает **историю исходов** по инструменту.
+- **Инвентарь периодических джоб — держать сверенным.** Состояние на
+  2026-08-03: **в коде и доках** — `CandleJob`, `IndicatorJob`,
+  `MarketStructureJob`, `InstrumentExternalRulesSyncJob`,
   `EntryScannerJob`, `DealOrchestratorJob`; **док есть, кода нет** —
   `AnomalyJob` (материализация — этот шаг); **только название** —
-  `ReconciliationJob` (п.7), `TradeGuardJob` (введена H17); **снят** —
+  `ReconciliationJob` (п.7), `TradeGuardJob`; **снят** —
   `MarketPhaseJob` (`docs/decisions/market-phase-stateless.md`);
   **отвергнута** — `TradeFeeSyncJob`
-  (`docs/decisions/pnl-finalization-mechanics.md` реш.4, вариант B).
-  Класс дефекта, ради которого инвентарь собран: механизм **существует,
-  но не записан** (или записан, но не существует), и проверяющая линза
-  находит «механизма нет» там, где он есть, — или принимает на веру то,
-  чего нет. Пометки состояния носителей ставятся **в самих
-  компонент-доках** (образец — `docs/components/AnomalyJob.md`
-  §«Состояние носителей»), отдельного инвентарь-дока не заводим: типа под
-  кросс-компонентный инвентарь в `.claude/rules/structure.md` нет, а
-  заводить его ради одной таблицы преждевременно.
+  (`docs/decisions/pnl-finalization-mechanics.md` реш.4). Пометки
+  состояния носителей — **в самих компонент-доках** (образец —
+  `docs/components/AnomalyJob.md` §«Состояние носителей»), отдельного
+  инвентарь-дока не заводим.
 
 ### Ось упущенных возможностей и разрешимость выборки — фаза 3
 
-**Отправлено форвардом решением пользователя** (`GAPS_CLOSE_12`, узел G):
-ось упущенных возможностей относится к **фазе 3**, не к фазе 2; в шаге 7 и
-фазе 2 не разбирается.
+Отправлено форвардом решением пользователя: ось упущенных
+возможностей относится к **фазе 3**, не к фазе 2; в шаге 7 и фазе 2
+не разбирается.
 
-- **Счёт упущенных возможностей на уровне скана** (H22 `DOCS_CHECK_12`).
-  Пропуски входа **до** создания `Deal` не счётны ни одним механизмом:
-  инструмент под `ENTRY_BLOCKED`/`TRADE_BLOCKED` выпадает из выборки скана,
-  инструмент с неподтверждённым ключом группы статуса не меняет и отчёта не
-  заводит, контурный гейт «нет активной сделки ни по одному инструменту»
-  отсекает кандидатов молча. Реакции проекта на отказы — преимущественно
-  «запрет новых входов + ручное снятие», то есть цена отказа конвертируется
-  ровно в эту ось. Развилка фазы 3: считать **сделку** или **время торговой
-  недоступности** (uptime). Носитель признанной цены —
-  `docs/decisions/pnl-finalization-mechanics.md` §«Форвард-фокус: ось
-  упущенных возможностей» (раздел заведён `GAPS_CLOSE_12`; прежде ссылка на
-  него была битой). Смежное — `PNL-Q1` п.2.
-- **Разрешимость R-выборки при пропускной способности контура** (H24
-  `DOCS_CHECK_12`). Контур фазы 1 — один инструмент, одна активная сделка;
-  сколько сделок нужно, чтобы отличить систему от шума, не оценено
-  [SR ∝ √(независимых ставок/год), Carver ST гл.2 с.59-60]. До оценки числа
-  ожидаемости фазы 1 — **операционные, не статистические**, и ни одно
-  решение не должно опираться на них как на оценку.
+- **Счёт упущенных возможностей на уровне скана.** Пропуски входа
+  **до** создания `Deal` не счётны ни одним механизмом (инструмент
+  под холдом выпадает из выборки скана, контурный гейт отсекает
+  кандидатов молча), при том что реакции проекта — преимущественно
+  «запрет новых входов + ручное снятие», то есть цена отказа
+  конвертируется ровно в эту ось. Развилка фазы 3: считать **сделку**
+  или **время торговой недоступности** (uptime). Носитель признанной
+  цены — `docs/decisions/pnl-finalization-mechanics.md`
+  §«Форвард-фокус: ось упущенных возможностей». Смежное — `PNL-Q1`
+  п.2.
+- **Разрешимость R-выборки при пропускной способности контура.**
+  Контур фазы 1 — один инструмент, одна активная сделка; сколько
+  сделок нужно, чтобы отличить систему от шума, не оценено
+  [SR ∝ √(независимых ставок/год), Carver ST гл.2 с.59-60]. До оценки
+  числа ожидаемости фазы 1 — **операционные, не статистические**, и ни
+  одно решение не должно опираться на них как на оценку.
 
 ### Перф-форвард (порог актуальности — фаза 3)
 
 - **[MAJOR, perf] L4 `fireExchange` — небанженный O(сделок) burst под
-  guard прохода (ревью холд-дельты, 2026-06-24).**
-  `KillSwitchService.fireExchange` итерирует небанженный
-  `DealDataService.findActiveByExchangeId` и на **каждую** сделку строит
-  `DealContext` (~9 запросов) + kill-switch REST — внутри guard-прохода.
-  Распухает по **памяти / стоимости запроса** линейно по числу
-  одновременных сделок биржи, без потолка. В фазе 1 объём мал — не
-  нагружено. **Починка (когда возьмём): перебор пачками (bounded) —
-  полный свип сохранён**, режется не скорость, а ограниченный аппетит
-  (память/стоимость). **`LIMIT` небезопасен** (отрезал бы несвёрнутый
-  live risk); альтернатива — off-lock dispatch L4-teardown. Источник —
+  guard прохода (ревью холд-дельты, 2026-06-24).** Теперь только
+  ступень 2 лестницы (`Exchange.TRADE_BLOCKED`,
+  `docs/rules/exchange-hold.md`). `KillSwitchService.fireExchange`
+  итерирует небанженный `DealDataService.findActiveByExchangeId` и на
+  **каждую** сделку строит `DealContext` (~9 запросов) + kill-switch
+  REST — внутри guard-прохода; линейно по числу одновременных сделок
+  биржи, без потолка. В фазе 1 объём мал. **Починка (когда возьмём):
+  перебор пачками (bounded) — полный свип сохранён**; `LIMIT`
+  небезопасен (отрезал бы несвёрнутый live risk); альтернатива —
+  off-lock dispatch L4-teardown. Источник —
   `history/2026-07-03-phase-1-step-6-fsm-orchestration/phase-1-step-6-code.md`
   §Доработка холд-дельты.
 - **[MINOR, perf] Дублирующий тикер-REST в entry-скане (повторное ревью
   фикс-дельты M4, 2026-07-02).** `MarketPhaseService.buildContext` тянет
-  тикер (`MarketPriceDataService.getMarketPriceData`) для классификации
-  фазы по каждому ACTIVE-инструменту без активной сделки за проход;
-  квалифицированный инструмент затем тянет тот же тикер повторно в
-  `MarketConditionContextFactory.build`. Итог: +1 тикер-REST на каждый
-  скан-инструмент, 2 идентичных вызова на квалифицированный — линейно к
-  числу инструментов, давление на rate-limit OKX. Функционально
-  корректно, согласуется с stage-1 no-cache. **Починка:** тянуть
-  `MarketPriceData` один раз в `EntryScannerJob.scanInstrument` и
-  прокинуть в оба контекста (фазовый + condition), либо короткоживущий
-  per-tick кэш в `MarketPriceDataService`. Кросс-коллаборатор:
-  `MarketConditionContextFactory.build` шарится с FSM
-  (`DealFsmSupport.conditionContext`).
+  тикер для классификации фазы по каждому ACTIVE-инструменту без
+  активной сделки за проход; квалифицированный инструмент затем тянет
+  тот же тикер повторно в `MarketConditionContextFactory.build` —
+  линейно к числу инструментов, давление на rate-limit OKX.
+  **Починка:** тянуть `MarketPriceData` один раз в
+  `EntryScannerJob.scanInstrument` и прокинуть в оба контекста, либо
+  короткоживущий per-tick кэш. Кросс-коллаборатор:
+  `MarketConditionContextFactory.build` шарится с FSM.
 - **Унификация инфраструктуры джоб — горизонт фаза 3 (код-ревью заход 2,
   2026-07-01).** Доработка механизма замыкания под
   мультиинстанс/микросервисы. Состав: абстрактный `ScheduledJob`-родитель
@@ -426,790 +358,560 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 ## Шаг 7 (сделки и P&L) — исполнительный хвост
 
 **Концепция закрыта:** источник числа —
-`docs/decisions/result-profit-source.md`; механика/носители стадий 1-2 —
-`docs/decisions/pnl-finalization-mechanics.md`. Ниже — **исполнительный хвост
+`docs/decisions/result-profit-source.md`; механика/носители стадий 1-2
+и реестр предусловий `CODE` —
+`docs/decisions/pnl-finalization-mechanics.md`; сверка bills↔net —
+`docs/rules/pnl-reconciliation.md`. Ниже — **исполнительный хвост
 (CODE) + рантайм-верификация + форвард**, не выбор пути. **Гейт `CODE`
-упирается в** (состояние на `GAPS_CLOSE_14`, 2026-08-20): калибратор
-допуска (предусловие `CODE` п. 8), грунт `integrator` (5 позиций —
-`AG1.6`, `AG1.7`, `AG6.2`, `M15.7`, `MG7.5`; статус `AG3.4` внесён в
-реестр гейтящим H19 `DOCS_CHECK_14` — прогон той же фикстуры `AG1`) и
-чистый `DOCS_CHECK_15`. **`RISK-Q4` и `ANOM-Q5` как гейты сняты**
-(закрыты 2026-08-20; итоги — реестр предусловий `CODE` пп. 3-4).
+упирается в** (состояние на 2026-08-20): калибратор допуска
+(предусловие `CODE` п. 8), грунт `integrator` (позиции `AG1.6`,
+`AG1.7`, `AG6.2`, `M15.7`, `MG7.5`, `AG3.4`) и чистый `DOCS_CHECK`.
+
+⚠️ **Цена доведения шага 7 до `CODE` при незакрытых разрывах — принята
+и записана** (решение держателя 2026-08-23; реестр предусловий `CODE`
+п. 13, `docs/decisions/pnl-finalization-mechanics.md`; разведка —
+`.claude/notes/2026-08-23-разрывы-спека-кода-на-тропе-живой-сделки.md`):
+клеймы полноты шага 7 непроверяемы до реализации системного слоя —
+«чисто» на `DOCS_CHECK` означает «доки не противоречат друг другу», а
+не «спецификация реализуема»; отчёт прогона обязан различать эти два
+утверждения явно. Пять разрывов (Р1-Р5 разведки) уходят дельтой `CODE`
+ниже. Минимум для прохода сделки до штатного терминала:
+`attachedProtection` в payload + наблюдение состояния в `MANAGING`.
+
+### Лестница биржевых safety-состояний — CODE-дельта (2026-08-26)
+
+Дом правила — `docs/rules/exchange-hold.md`; решение —
+`docs/decisions/exchange-safety-ladder.md`; сигнал —
+`docs/components/models/HoldSignal.md`.
+
+- ввести статус **`Exchange.HOLD`** (ступень 1, заморозка) + его
+  enforcement: блок `SUBMIT_*` **без** каскада сделок в `ERROR`;
+  оркестратор `HOLD` не перехватывает; `EntryScannerJob` режет входы
+  по **обеим** ступеням;
+- ввести **`ReactionClass.FREEZE`**; фабрику `HoldSignal.exchange()`
+  перенацелить на `FREEZE`, добавить `exchangeTradeBlock()`;
+- перевесить реакцию controlled-исключений с
+  `KillSwitchService.fireExchange` на постановку `HOLD`;
+- перевесить `markErrorStopless` / гейт `EntryFinalizedHandler` с
+  L3-инструмента на ступень 2 (`Exchange.TRADE_BLOCKED` — живой риск
+  без защиты);
+- снятие: `TRADE_BLOCKED` → только в `HOLD`; `HOLD` → в `ACTIVE`
+  (ручные сервисные операции).
+
+### CODE-дельта шага
 
 - **CODE стадий 1-2 (доспецифицировано, писать код):** носители
   `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
-  (`mapping/PositionCloseResult.md`) + `DealCashFlow` (модель+mapping+таблица
-  `deal_cash_flows`, включая компоненту `externalFee` и `applied_rate`);
-  команды/executor'ы `REFRESH_BILLS` / `MARK_DEAL_EMERGENCY_CLOSED`;
-  расчёт+запись `resultProfit` на `Deal` в `FinalizeDealExitExecutor` (N7);
-  сверка bills↔net → `AnomalyReport` (N10); снятие `REFRESH_FILLS` (N12, доки
-  закрыты — код-удаление на CODE).
-- **CODE узла добычи положения закрытия (`GAPS_CLOSE_7`, H1/H3):**
-  - `RefreshPositionExecutor` — **вторая нога evidence-cycle**: при not-found
-    live-позиции запрос `/account/positions-history` по `posId`, маппинг в
-    `PositionCloseResultExternalSnapshot`, запись полей на `Position`.
-    Терминала цикл не выносит; запись не найдена — поля `null`, статус
-    `CLOSED` (`docs/components/RefreshPositionExecutor.md`);
+  (`mapping/PositionCloseResult.md`) + `DealCashFlow`
+  (модель+mapping+таблица `deal_cash_flows`, включая компоненту
+  `externalFee` и `applied_rate`); команды/executor'ы `REFRESH_BILLS` /
+  `MARK_DEAL_EMERGENCY_CLOSED`; расчёт+запись `resultProfit` на `Deal`
+  в `FinalizeDealExitExecutor` (N7); сверка bills↔net →
+  `AnomalyReport` (N10; правило — `docs/rules/pnl-reconciliation.md`);
+  снятие `REFRESH_FILLS` (N12, доки закрыты — код-удаление на CODE).
+- **CODE узла добычи положения закрытия:**
+  - `RefreshPositionExecutor` — **вторая нога evidence-cycle**: при
+    not-found live-позиции запрос `/account/positions-history` по
+    `posId`, маппинг в `PositionCloseResultExternalSnapshot`, запись
+    полей на `Position`. Терминала цикл не выносит; запись не найдена —
+    поля `null`, статус `CLOSED`
+    (`docs/components/RefreshPositionExecutor.md`);
   - `Position`/`PositionEntity` + миграция: колонки
     `external_realized_profit`, `external_result_currency`,
     `external_close_type`;
-  - **`REFRESH_POSITIONS_HISTORY` в `ServiceCommandType` не заводить** (её нет
-    в целевом составе — 17, `docs/components/models/ServiceCommand.md`);
+  - `REFRESH_POSITIONS_HISTORY` в `ServiceCommandType` **не заводить**
+    (целевой состав — 17, `docs/components/models/ServiceCommand.md`);
     handler'ы её не эмитят;
   - финализаторы (`FinalizeDealExitExecutor`,
-    `MarkDealEmergencyClosedExecutor`) читают число **со строки `Position`**,
-    вложенных команд не исполняют;
+    `MarkDealEmergencyClosedExecutor`) читают число **со строки
+    `Position`**, вложенных команд не исполняют;
   - `RefreshBillsExecutor` — окно `[Deal.billsWindowBegin,
-    Deal.billsWindowEnd]` (собственные поля сделки, узел 1 `DOCS_CHECK_8`;
-    `billsWindowEnd` пуст → привязка ждёт), инструмент из `DealContext`,
-    **guard «сделка удерживает слот»** (статус вне
-    `CLOSED`/`EMERGENCY_CLOSED`) перед линковкой;
+    Deal.billsWindowEnd]` (`billsWindowEnd` пуст → привязка ждёт),
+    инструмент из `DealContext`, **guard «сделка удерживает слот»**
+    (статус вне `CLOSED`/`EMERGENCY_CLOSED`) перед линковкой
+    (`docs/components/RefreshBillsExecutor.md`);
   - `Deal`/`DealEntity` + миграция: колонки `bills_window_begin`,
-    `bills_window_end`; **писатели окна — разные** (H9 `DOCS_CHECK_16`):
-    `begin` — `SubmitOrderExecutor` (`Order.externalCreatedAt` первой
+    `bills_window_end`; **писатели окна — разные**: `begin` —
+    `SubmitOrderExecutor` (`Order.externalCreatedAt` первой
     отправленной ноги, всегда при постановке); `end` —
     `RefreshPositionExecutor`, нога 2 (`uTime` записи закрытия, одной
     транзакцией с полями положения закрытия). Обе — условным `UPDATE`
     (`where ... is null`), не `updatable = false`.
-- ⚠️ **Цена доведения шага 7 до `CODE` при незакрытых разрывах — принята и
-  записана** (решение держателя 2026-08-23; разведка —
-  `.claude/notes/2026-08-23-разрывы-спека-кода-на-тропе-живой-сделки.md`;
-  реестр предусловий — `docs/decisions/pnl-finalization-mechanics.md`
-  §«Предусловия `CODE`» п. 13):
-
-  > **Клеймы полноты шага 7 непроверяемы до реализации системного слоя.**
-  > Доки описывают `SystemActionType`, `REPLACE`-ремодел и наблюдение
-  > состояния в `MANAGING`, которых в коде нет. «Чисто» на `DOCS_CHECK`
-  > означает «**доки не противоречат друг другу**», а не «спецификация
-  > реализуема».
-
-  Пять разрывов (Р1-Р5 разведки) уходят дельтой `CODE` **ниже**, контур
-  сейчас не достраивается. Гейт `CODE` при этом **не может открыться по
-  клейму, который никто не проверял**: прогон `DOCS_CHECK` проверяет
-  согласованность доков между собой и реализуемость спецификации не
-  проверяет — у линз нет такой поверхности. Отчёт `DOCS_CHECK_17` обязан
-  различать эти два утверждения явно.
-  **Сегодня фаза 1 до штатного терминала не доводит сделку** — минимум для
-  прохода: `attachedProtection` в payload + наблюдение состояния в
-  `MANAGING`.
-- **CODE R-слота и формулы риска (`GAPS_CLOSE_7`, H9/H10; расширено
-  H5/H6 `DOCS_CHECK_10`):**
-  - **дом — нога, не сделка** (H6/H11 `GAPS_CLOSE_15`, решение
-    пользователя; инструкция приведена к принятому H20 `DOCS_CHECK_16` —
-    прежняя редакция предписывала **отменённую** топологию: все четыре
-    числа как поля `Deal`, write-once):
-    - **шесть колонок `orders`** — `planned_risk_amount`,
-      `planned_risk_currency`, `planned_entry_price`,
-      `planned_size_contracts`, **`planned_contract_value`** (H5
-      `DOCS_CHECK_16` — `ctVal` момента постановки), **`planned_stop_price`**
-      (Р3 `GAPS_CLOSE_16` — уровень стопа, под который считался риск ноги;
-      нужен, потому что встроенная защита доборной ноги снимается после
-      пересчёта основной); все `numeric(36,18)`, кроме валюты —
-      `varchar(64)`; все nullable, write-once на уровне entity
-      `updatable = false`, + `ALTER` миграцией шага. **Инвариант — «шесть
-      или ни одной»**: производит один преконтроль, пишет одна транзакция;
-    - **на `Deal` — три числа, не одно** (H3 `DOCS_CHECK_16` + решение
-      держателя `GAPS_CLOSE_16`): `plannedRiskAmount` — **заявленный на
-      входе** (Σ по **живым и исполнившимся** ногам входа — предикат H2
-      `DOCS_CHECK_16` в редакции держателя `GAPS_CLOSE_16`: бизнес-тип +
-      состояние + страховочная непустота числа; знаменатель
-      R-мультипликатора);
-      **`incurred_risk_amount`** — **фактический на входе**
-      (Σ `plannedRiskAmount_i × accFillSz_i / plannedSizeContracts_i`;
-      частичным выходом **не уменьшается**);
-      **`current_risk_amount`** — **неотработанная доля** взятого на входе
-      риска (`incurred × Position.externalSize / Σ accFillSz_i`; уменьшается
-      частичным выходом, при полном — ноль; потребитель — сопровождение);
-      **`protection_relieved_risk_amount`** — **риск, снятый защитой**
-      (`incurred −` риск при актуальном уровне стопа; решение держателя П10
-      валидации `GAPS_CLOSE_17`);
-      плюс общая `plannedRiskCurrency`. Все четыре — **не write-once**,
-      производные проекции, пересчитываются **целиком**;
-    - **пересчитывают пять исполнителей** (каждый своей транзакцией, по
-      своему триггеру): `CreateOrderExecutor` (создана нога входа),
-      `RefreshOrderExecutor` (наблюдены исполнение/терминальный статус),
-      `CancelOrderExecutor` (нога отменена/замещена),
-      `RefreshPositionExecutor` (наблюдена позиция — живая **либо из
-      истории**, решение держателя П1), писатель защиты
-      (`CreateAlgoOrderExecutor` / place-нога `REPLACE`) — только четвёртое
-      число. Разбор — `docs/models/domain/aggregate/Deal.md` §«Взятый риск»;
-    - **`+risk_benchmark_availability`** на `deals` (`varchar(64)`, енум
-      `RiskBenchmarkAvailability`: `AVAILABLE`/`NOT_APPLICABLE`/`MISSING`,
-      H13 `DOCS_CHECK_16`) — `AVAILABLE`/`MISSING` пишут оба финализатора,
-      **`NOT_APPLICABLE` — `MarkDealClosedExecutor`** той же транзакцией,
-      что ставит терминал (решение держателя П9 валидации `GAPS_CLOSE_17`;
-      ветка `NOT_APPLICABLE` у финализатора выхода снята как недостижимая);
-    - `CreateOrderExecutor` пишет шесть чисел **входного** действия в одной
-      транзакции с созданием сущности. **Предикат «входное действие» у
-      писателя — прохождение риск-преконтроля** (H1 `DOCS_CHECK_16`;
-      носителей три и они эквивалентны, у писателя этот прямее —
-      `docs/models/domain/core/Order.md` §«Предикат "нога входа"»);
-    - **`Order.Type` получает третье значение `REDUCE_ONLY`** (решение
-      держателя, `GAPS_CLOSE_16`): енум, javadoc всех трёх констант,
-      Strategy API (`@Schema`), примеры стратегий. Значения хранятся
-      строкой, таблицы пусты — миграция значений не нужна
-      (`.claude/rules/pre-launch-schema-changes.md`);
-    - **валидация инварианта пары** — `Type = REDUCE_ONLY ⇔
-      positionReducingOnly = true`. Рассогласование отвергается
-      `StrategyCreateRequestValidator` (сейчас не проверяется вовсе);
-      носителей у оси два, и согласованность держится **проверкой**
-      (`docs/models/domain/core/Order.md` §Енумы, названная цена решения);
-    - **предикаты «это входная нога» в `src/` переписываются на
-      признак, выбранный решением держателя** (`GAPS_CLOSE_16`; прежняя
-      редакция «становятся верными без правки — проверить и оставить»
-      снята: держатель запретил оставлять их верными **по совпадению**).
-      `CalculationContextFactory.isEntryType(...)` и фильтр в
-      `DealFsmSupport.entryOrder(...)` (~стр. 190) держат инлайновую
-      дизъюнкцию `type == ENTRY || type == ENTRY_ATTACHED_STOP_LOSS`. До
-      ввода `REDUCE_ONLY` она была истинна для **всякого** ordinary order,
-      включая reduce-only ⇒ `entryOrder()` мог вернуть **ногу частичного
-      выхода**, а на её результате стоит гейт защиты
-      `EntryFinalizedHandler`. Дельта:
-      - предикат «нога входа» переезжает **на доменную модель** —
-        `Order.isEntryLeg()` (бизнес-тип, `Type ∈ {ENTRY,
-        ENTRY_ATTACHED_STOP_LOSS}`), по `.claude/rules/codestyle.md`
-        §«Вложенность и rich-модели»; оба места вызывают его, инлайновых
-        дизъюнкций по `Type` в `src/` не остаётся;
-      - там, где отбираются **слагаемые сумм риска**, к нему добавляется
-        страховочный конъюнкт непустоты `plannedRiskAmount`
-        (`docs/models/domain/aggregate/Deal.md` §«Предикат отбора
-        слагаемых»);
-      - **обнаружение рассогласования пары** `Type` ↔
-        `positionReducingOnly` предикатом отбора не делается и заводится
-        отдельно (там же, §«Обнаружение рассогласования пары носителей»);
-        реакция детектирующего контура — открытая развилка;
-    - **javadoc `RiskValidator.checkRiskCreatingEntryProtection`** повторяет
-      снятую формулировку «attached SL / **иной механизм**, давший цену
-      стопа» (`RiskValidator.java:142-148`). Формула снята решением
-      держателя Р8 `GAPS_CLOSE_16`: определимый стоп — **встроенная
-      attached-защита**, иной механизм формой защиты risk-creating входа
-      не является (`docs/rules/risk-creating-entry-protection.md`
-      §Правило). Привести javadoc к принятому;
-    - **шестое число ноги — `planned_stop_price`** (Р3 `GAPS_CLOSE_16`):
-      колонка `orders`, поле `Order.plannedStopPrice`, поле
-      `CreateOrderCommandPayload`, запись в `CreateOrderExecutor` той же
-      транзакцией; резолв уровня стопа у финализатора переезжает с
-      `attachedAlgoOrders` на persisted-число;
-    - **ремодел основной защиты под увеличенную позицию** (Р3): исполнитель
-      `StrategyActionType.REPLACE` под `PROTECTION_ADJUSTMENT` (сегодня
-      исполнителя нет) плюс снятие attached SL доборной ноги по
-      подтверждении новой основной (`closeReason = SWITCHED_BY_STRATEGY`).
-      **Триггер — шаг стратегии** `PROTECTION_ADJUSTMENT` с условием
-      «позиция увеличилась» (решение держателя С2 валидации `GAPS_CLOSE_16`;
-      системный слой и совмещение с пакетом добора отвергнуты);
-    - **дельта двух валидаций `GAPS_CLOSE_16`/`_17`** (решения держателя
-      С1-С4, П1-П18 — разбор в отчётах закрытия):
-      - `+protection_relieved_risk_amount` на `deals` (`numeric(36,18)`,
-        nullable) — риск, снятый защитой; пишет писатель защиты
-        (`CreateAlgoOrderExecutor` / place-нога `REPLACE`) (П10);
-      - `+liquidation_distance_ratio` на `orders` (`numeric(36,18)`,
-        nullable, write-once) — запас до ликвидации на момент постановки
-        ноги; измеритель, не контроль (П14);
-      - `POST_MORTEM_HARVEST_EXHAUSTED` — второй код холда по исчерпанию
-        бюджета (реакция та же полная, различение журнальное) (П6);
-      - `RECONCILIATION_OPERAND_MISSING` — код и ветка **удаляются** (С3);
-      - **предикат неполноты числа уводит терминал**: `INCOMPLETE_BY_WINDOW`
-        либо cross-ccy-строка без `rateStatus = APPLIED` ⇒ ошибочная тропа
-        вместо чистого `CLOSED`; нового поля нет (П11);
-      - **конвенция «пусто = 0» для несобытийных полей** записи
-        positions-history — в native-слое, **до** проверки обязательности
-        контракта границы (П12);
-      - **реджект `contractType ≠ LINEAR`** на тропе заведения инструмента;
-        горячий путь не трогается (П15);
-      - **состав цикла добычи един для всех троп** — тропного разведения
-        состава нет, гейт остаётся у отдельного звена (bills — по тропе)
-        (П5); **пустой `billsWindowBegin`** ⇒ суррогат `Deal.createdAt`
-        внутри исполнителя (П7);
-      - **операнд `breakdownIncomplete` составной** —
-        `max(t_добычи, billsWindowEnd) − billsWindowBegin` (П4);
-      - `ExitActionExecutor` + `StrategyActionType.EXIT_ACTION` (вместо
-        `CLOSE_ACTION`) + порядок дочистки по
-        `docs/rules/exit-teardown-order.md`; `ExitPendingHandler`
-        приводится к тому же порядку (С1, П16);
-    - **детектирующий контур пары `Type` ↔ `positionReducingOnly`** (Р1):
-      сверка пары на ногах сделки в трёх исполнителях пересчёта сумм; при
-      расхождении — отказ операции (`VALIDATION_ERROR`), без нового кода
-      аномалии;
-    - **`attachedProtection` не доезжает до payload** — гейт `CODE`,
-      найден inspection. `CreateOrderExecutor` читает
-      `payload.getAttachedProtection()`, а единственный строитель payload'а
-      `CreateOrderActionExecutor.createOrderCommand(...)` его **не
-      заполняет** ⇒ `Order.attachedAlgoOrders` пуст всегда. Следствие:
-      сделка без шага `MAIN_PROTECTION` уходит в `ERROR` (`markErrorStopless`)
-      на **каждом** входе. Заполнить payload из
-      `StrategyOrderAction.attachedProtection`.
-      - **Второе следствие («`stop_i` не резолвится ⇒ обязанная сверка не
-        выполняется») снято** двумя решениями держателя: уровень стопа
-        персистится **шестым числом** ноги (Р3 `GAPS_CLOSE_16`), а ветка
-        «операнд допуска не резолвится» удалена вместе с журнальным кодом
-        (позиция С3). Резолв епсилона от `attachedAlgoOrders` больше не
-        зависит (`docs/components/FinalizeDealExitExecutor.md` §epsilon).
-      - ⚠️ **Торговое следствие, а не только дефект доставки поля:** между
-        филлом входа и постановкой основной защиты позиция стоит на бирже
-        **без стопа** — при том что риск-преконтроль стоп **потребовал** и
-        по нему сайзил (`PriceCalculator` резолвит `stopLossPrice`
-        исключительно из `attachedProtection.stopLossSettings`; без него
-        вход блокируется `RISK_CREATING_ENTRY_WITHOUT_STOP`). То есть
-        система считает риск ограниченным, а он не ограничен ничем.
-        **Это риск денег.** Инвариант
-        `docs/rules/risk-creating-entry-protection.md` при этом формально
-        соблюдается — он **локальный** (FSM не уводит в `MANAGING` без
-        подтверждённой защиты), а не биржевой; текст правила этого не
-        различает — позиция в пакете валидации;
-  - **Канал доставки — поля `CreateOrderCommandPayload`** (H5): ни один
-    существующий RVO метрику не несёт, а `RiskCheckResult.actualValue` на
-    happy-path не существует (в фазе 1 валидатор строит только
-    `BLOCKED`-результаты). `plannedEntryPrice` **нельзя брать с
-    `Order.price`** — при market-входе executor его не заполняет
-    (верифицировано `CreateOrderExecutor.java:65-67`);
-  - **шаг `EXIT` не срабатывает — тропа выхода по условию стратегии не
-    построена** (найдено inspection частичного выхода, `GAPS_CLOSE_16`).
-    Факт шире, чем «в примере снятое значение»:
-    - `trend-following-ema.json:290,477` несёт `actionType: "CLOSE_FULL"`,
-      которого в `StrategyActionType` **нет**: поставляемый пример не
-      провалидируется. **Сам пример при этом признан верным** (решение
-      держателя `GAPS_CLOSE_16`): он пользуется законной возможностью —
-      объявить выход действием, — и снимать `CLOSE_FULL` из него **не
-      требуется**; требуется **привести имя значения** к решению по форме
-      действия (§ниже);
-    - `ManagingHandler` диспетчеризует действие шага в
-      `StrategyActionOrchestrator`, а executor'а под «закрытие позиции»
-      нет: до решения `GAPS_CLOSE_16` его не было **по построению**.
-      Действие не находит исполнителя ⇒ `ActionPlan.empty()` ⇒ ничего не
-      происходит;
-    - **комментарий в коде** (`StrategyActionType`, «полного закрытия
-      позиции как действия нет») — **устаревший**: решение держателя его
-      отменило. Правится этой же дельтой;
-    - `ManagingHandler.startApplicable(...)` при этом требует **непустой**
-      список действий, чтобы шаг вообще запустился, а
-      `checkTransition`/`isExitSubmitted` ждёт `DealActionState` в
-      `SUBMITTED` — состояния, которое без исполнителя не наступает.
-
-    **Целевая форма — решение держателя `GAPS_CLOSE_16`: способов объявить
-    выход два, и оба законны** (условие-переход **и** явное действие шага
-    `EXIT`, `docs/rules/no-partial-close.md`). Команда закрытия одна —
-    `CLOSE_POSITION_COMMAND`, — но **эмитентов у неё два** (вариант B):
-    `ExitPendingHandler` и `ExitActionExecutor`. **Скоуп подтверждён**
-    (П16 валидации `GAPS_CLOSE_17`): позиция входит в `CODE` шага 7.
-
-    Дельта:
-    - шаг `EXIT` может быть **условие-только** — пустой список действий
-      допустим, `ManagingHandler` по истинному условию делает переход,
-      валидация перестаёт требовать действия у этого типа шага;
-    - **третье значение `actionKind`** — `POSITION`; **третий подтип
-      `StrategyAction`** — `StrategyPositionAction` (`key`, `actionType`,
-      `level`); **четвёртое значение `StrategyActionType`** —
-      **`EXIT_ACTION`** (суффиксный маркер уровня,
-      `.claude/rules/naming.md`; имя уточнено позицией С1 — действие
-      выхода из сделки, а не команда закрытия позиции); валидация состава
-      действий расширяется на новый подтип;
-    - **`ExitActionExecutor`** (компонент-док заведён,
-      `docs/components/ExitActionExecutor.md`) эмитит **последовательность**
-      команд сам: отмена живых входных (не reduce-only) ног →
-      `CLOSE_POSITION_COMMAND`; порядок — инвариант
-      `docs/rules/exit-teardown-order.md`. `DealActionState` заводится
-      обычным порядком — runtime-сущность есть (`Position`);
-    - **порядок дочистки `ExitPendingHandler`** приводится к тому же
-      инварианту: прежняя редакция закрывала позицию первой;
-    - **в поставляемом примере** `actionType: "CLOSE_FULL"` →
-      `"EXIT_ACTION"` (обе позиции: `:290`, `:477`); `actionKind:
-      "POSITION"` остаётся как есть — он верен;
-    - **javadoc/комментарий `StrategyActionType`** приводится к принятому:
-      клауза «полного закрытия позиции как действия нет» снимается;
-
+- **CODE R-слота и формулы риска** (дом политики —
+  `docs/models/domain/aggregate/Deal.md` §«Плановый риск» / §«Взятый
+  риск», `docs/decisions/per-trade-risk-policy.md`):
+  - **шесть колонок `orders`** (дом планового риска — нога, не
+    сделка): `planned_risk_amount`, `planned_risk_currency`,
+    `planned_entry_price`, `planned_size_contracts`,
+    `planned_contract_value`, `planned_stop_price`; все
+    `numeric(36,18)`, валюта — `varchar(64)`; nullable, write-once
+    (`updatable = false`), `ALTER` миграцией шага. Инвариант — «шесть
+    или ни одной»: производит один преконтроль, пишет одна транзакция.
+    Пишет `CreateOrderExecutor` для **входного** действия (предикат —
+    прохождение риск-преконтроля, `docs/models/domain/core/Order.md`
+    §«Предикат "нога входа"») одной транзакцией с созданием сущности;
+    поле `plannedStopPrice` — также в `CreateOrderCommandPayload`,
+    резолв уровня стопа у финализатора переезжает с
+    `attachedAlgoOrders` на persisted-число;
+  - **на `Deal` — четыре производных числа** + общая
+    `plannedRiskCurrency`: `plannedRiskAmount` (заявленный на входе,
+    знаменатель R-мультипликатора), `incurredRiskAmount` (фактический
+    на входе), `currentRiskAmount` (неотработанная доля),
+    `protectionRelievedRiskAmount` (снятый защитой). Не write-once,
+    пересчитываются **целиком**; формулы и предикат отбора слагаемых —
+    `Deal.md` §«Взятый риск» / §«Предикат отбора слагаемых»;
+  - **пересчитывают пять исполнителей**, каждый своей транзакцией:
+    `CreateOrderExecutor`, `RefreshOrderExecutor`,
+    `CancelOrderExecutor`, `RefreshPositionExecutor` (позиция живая
+    либо из истории), писатель защиты (`CreateAlgoOrderExecutor` /
+    place-нога `REPLACE`) — только четвёртое число;
+  - **`+risk_benchmark_availability`** на `deals` (`varchar(64)`, енум
+    `AVAILABLE`/`NOT_APPLICABLE`/`MISSING`): `AVAILABLE`/`MISSING`
+    пишут оба финализатора, `NOT_APPLICABLE` —
+    `MarkDealClosedExecutor` той же транзакцией, что ставит терминал;
+  - **`+liquidation_distance_ratio`** на `orders` (`numeric(36,18)`,
+    nullable, write-once) — запас до ликвидации на момент постановки
+    ноги; измеритель, не контроль;
+  - **`Order.Type` получает третье значение `REDUCE_ONLY`** (енум,
+    javadoc всех констант, Strategy API `@Schema`, примеры стратегий;
+    хранение строкой — миграция значений не нужна,
+    `.claude/rules/pre-launch-schema-changes.md`) и **валидацию
+    инварианта пары** `Type = REDUCE_ONLY ⇔ positionReducingOnly =
+    true` в `StrategyCreateRequestValidator` (сейчас не проверяется
+    вовсе; `docs/models/domain/core/Order.md` §Енумы);
+  - **предикат «нога входа» переезжает на доменную модель** —
+    `Order.isEntryLeg()` (бизнес-тип, `Type ∈ {ENTRY,
+    ENTRY_ATTACHED_STOP_LOSS}`); оба call-site
+    (`CalculationContextFactory.isEntryType`,
+    `DealFsmSupport.entryOrder`) зовут его, инлайновых дизъюнкций по
+    `Type` в `src/` не остаётся; в суммах риска — страховочный
+    конъюнкт непустоты `plannedRiskAmount`;
+  - **детектирующий контур пары `Type` ↔ `positionReducingOnly`** (Р1):
+    сверка пары на ногах сделки в трёх исполнителях пересчёта сумм;
+    при расхождении — отказ операции (`VALIDATION_ERROR`), без нового
+    кода аномалии (`Deal.md` §«Обнаружение рассогласования пары
+    носителей»);
+  - **javadoc `RiskValidator.checkRiskCreatingEntryProtection`**
+    (`RiskValidator.java:142-148`) привести к принятому: определимый
+    стоп — **встроенная attached-защита**, иной механизм формой защиты
+    не является (`docs/rules/risk-creating-entry-protection.md`
+    §Правило);
+  - **ремодел основной защиты под увеличенную позицию** (Р3):
+    исполнитель `StrategyActionType.REPLACE` под
+    `PROTECTION_ADJUSTMENT` (сегодня исполнителя нет) + снятие
+    attached SL доборной ноги по подтверждении новой основной
+    (`closeReason = SWITCHED_BY_STRATEGY`); триггер — шаг стратегии
+    `PROTECTION_ADJUSTMENT` с условием «позиция увеличилась»;
+  - **прочая дельта валидаций `GAPS_CLOSE_16`/`_17`:**
+    `POST_MORTEM_HARVEST_EXHAUSTED` — второй код холда по исчерпанию
+    бюджета (реакция та же, различение журнальное);
+    `RECONCILIATION_OPERAND_MISSING` — код и ветка удаляются; предикат
+    неполноты числа уводит терминал на ошибочную тропу
+    (`INCOMPLETE_BY_WINDOW` либо cross-ccy-строка без `rateStatus =
+    APPLIED`), нового поля нет; конвенция «пусто = 0» несобытийных
+    полей записи positions-history — в native-слое, **до** проверки
+    обязательности контракта границы; реджект `contractType ≠ LINEAR`
+    на тропе заведения инструмента; состав цикла добычи един для всех
+    троп (гейт bills — у звена); пустой `billsWindowBegin` ⇒ суррогат
+    `Deal.createdAt` внутри исполнителя; операнд `breakdownIncomplete`
+    составной — `max(t_добычи, billsWindowEnd) − billsWindowBegin`;
+  - **`attachedProtection` не доезжает до payload — гейт `CODE`.**
+    `CreateOrderExecutor` читает `payload.getAttachedProtection()`, а
+    единственный строитель payload'а
+    `CreateOrderActionExecutor.createOrderCommand(...)` его **не
+    заполняет** ⇒ `Order.attachedAlgoOrders` пуст всегда ⇒ сделка без
+    шага `MAIN_PROTECTION` уходит в `ERROR` на **каждом** входе.
+    Заполнить payload из `StrategyOrderAction.attachedProtection`.
+    ⚠️ **Торговое следствие:** между филлом входа и постановкой
+    основной защиты позиция стоит на бирже **без стопа** — при том что
+    риск-преконтроль стоп потребовал и по нему сайзил. **Это риск
+    денег.** Инвариант `risk-creating-entry-protection.md` формально
+    соблюдается — он локальный (FSM), а не биржевой; текст правила
+    этого не различает — позиция в пакете валидации;
+  - **канал доставки плановых чисел — поля
+    `CreateOrderCommandPayload`**: ни один существующий RVO метрику не
+    несёт; `plannedEntryPrice` **нельзя брать с `Order.price`** — при
+    market-входе executor его не заполняет
+    (`CreateOrderExecutor.java:65-67`);
+  - **тропа выхода по условию/действию стратегии — не построена.**
+    Целевая форма — решение держателя: способов объявить выход два, и
+    оба законны (условие-переход **и** явное действие шага `EXIT`,
+    `docs/rules/no-partial-close.md`); команда закрытия одна —
+    `CLOSE_POSITION_COMMAND`, эмитентов два. Дельта:
+    - шаг `EXIT` может быть **условие-только** — пустой список
+      действий допустим, `ManagingHandler` по истинному условию делает
+      переход, валидация перестаёт требовать действия у этого типа
+      шага;
+    - третье значение `actionKind` — `POSITION`; третий подтип
+      `StrategyAction` — `StrategyPositionAction` (`key`, `actionType`,
+      `level`); четвёртое значение `StrategyActionType` —
+      **`EXIT_ACTION`**; валидация состава действий расширяется на
+      новый подтип;
+    - **`ExitActionExecutor`** (компонент-док заведён —
+      `docs/components/ExitActionExecutor.md`) эмитит
+      последовательность команд сам: отмена живых входных
+      (не reduce-only) ног → `CLOSE_POSITION_COMMAND`; порядок —
+      инвариант `docs/rules/exit-teardown-order.md`; **порядок
+      дочистки `ExitPendingHandler`** приводится к тому же инварианту
+      (прежняя редакция закрывала позицию первой);
+    - в поставляемом примере `trend-following-ema.json` `actionType:
+      "CLOSE_FULL"` → `"EXIT_ACTION"` (`:290`, `:477`); `actionKind:
+      "POSITION"` верен, остаётся; javadoc/комментарий
+      `StrategyActionType` («полного закрытия позиции как действия
+      нет») снимается;
   - **`StrategyActionType.REPLACE` и `CANCEL` — исполнителей нет**
     (inspection 2026-08-23). `StrategyActionExecutor`-ов два, оба на
-    `CREATE`; оркестратор не находит исполнителя ⇒ `ActionPlan.empty()` ⇒
-    действие молча не исполняется. Задето: **весь ремодел защиты**
-    (`PROTECTION_ADJUSTMENT` — перенос стопа, трейлинг) и снятие grid-ног
-    (`GRID_MANAGEMENT`). `docs/decisions/replace-not-amend.md` объявляет
-    REPLACE единственной операцией ремоделирования. Терминал не гейтит —
+    `CREATE`; оркестратор не находит исполнителя ⇒ `ActionPlan.empty()`
+    ⇒ действие молча не исполняется. Задет **весь ремодел защиты**
+    (`PROTECTION_ADJUSTMENT`) и снятие grid-ног (`GRID_MANAGEMENT`);
+    REPLACE — единственная операция ремоделирования
+    (`docs/decisions/replace-not-amend.md`). Терминал не гейтит —
     гейтит **управление** сделкой;
   - **`ManagingHandler` не наблюдает состояние — сделка не выходит из
-    `MANAGING`** (inspection 2026-08-23, **несущий разрыв**). Handler не
-    эмитит ни одной `REFRESH_*`-команды, а `DealContextService` собирает
-    контекст только из persistence. Срабатывание SL/TP на бирже локально не
-    наблюдается ⇒ `positionLiveRisk` не меняется ⇒ перехода в
-    `EXIT_PENDING` нет ⇒ сделка удерживает слот инструмента бессрочно.
-    Целевая форма — `REFRESH_DEAL_CONTEXT_ACTION` (тропа «сопровождение»,
-    `docs/components/SystemActionExecutor.md`); минимальная —
+    `MANAGING`** (inspection 2026-08-23, **несущий разрыв**). Handler
+    не эмитит ни одной `REFRESH_*`-команды, контекст собирается только
+    из persistence ⇒ срабатывание SL/TP на бирже локально не
+    наблюдается ⇒ перехода в `EXIT_PENDING` нет ⇒ сделка удерживает
+    слот бессрочно. Целевая форма — `REFRESH_DEAL_CONTEXT_ACTION`
+    (`docs/components/SystemActionExecutor.md`); минимальная —
     `ManagingHandler` эмитит `REFRESH_POSITION` / `REFRESH_ALGO_ORDER`,
     когда продвигать нечего;
   - **`FAIL_SAFE` — значение `StrategyStepType` без потребителя**
-    (inspection 2026-08-23). `managingSteps()` перечисляет четыре типа,
-    javadoc и `docs/components/ManagingHandler.md` §«Допустимые
-    StrategyStep» — пять. Решить: подключить или снять значение; **клейм
-    полноты в доке ложен в любом случае** и идёт в пакет валидации;
+    (inspection 2026-08-23): `managingSteps()` перечисляет четыре
+    типа, javadoc и `docs/components/ManagingHandler.md` — пять.
+    Подключить или снять; клейм полноты в доке ложен в любом случае —
+    в пакет валидации;
   - **мёртвые поля `CreateOrderCommandPayload`** — `positionSide`,
-    `marginMode`, `executionType` не заполняются и не читаются (adapter
-    ставит константами); `strategyDirection`, `instrumentExternalId`
-    заполняются и не читаются (исполнитель берёт из `DealContext`). Снять
-    или обосновать (`.claude/rules/codestyle.md` §«Неиспользуемый код»);
+    `marginMode`, `executionType` не заполняются и не читаются;
+    `strategyDirection`, `instrumentExternalId` заполняются и не
+    читаются. Снять или обосновать (`.claude/rules/codestyle.md`
+    §«Неиспользуемый код»);
   - **координатные колонки ссылки на свечу курса** —
     `applied_rate_candle_instrument` / `_timeframe` / `_open_time` в
-    `deal_cash_flows` (H11 `DOCS_CHECK_14`); прежняя редакция перечисляла
-    только `appliedRate` и `rateStatus` — неполнота инструкции, снята H20
-    `DOCS_CHECK_16`;
+    `deal_cash_flows`;
   - `SizeCalculator` — **закрытая форма**
     `contracts ≤ budget / (ctVal × (|entry−stop| + rate × (entryPx + stopPx)))`;
-    итеративного подбора и «вычитания комиссии из бюджета» отдельным шагом
-    нет;
-  - `RiskValidator` — та же база нотинала каждой ноги (вход по цене входа,
-    выход по цене стопа), чтобы шорты не сайзились крупнее.
-- **CODE границы «команда ↔ действие»
-  (`docs/decisions/command-action-boundary.md`; замещает прежний пункт
-  «retry-анкера добывающих команд»):**
-  - **носитель — две таблицы, не общая** (H15 `DOCS_CHECK_14`, решение
-    пользователя; инструкция приведена к принятому H8 `DOCS_CHECK_15` —
-    прежняя редакция предписывала **отменённую** топологию V2: общую
-    таблицу с nullable `strategy_action_id`, `+action_kind` и частичными
-    ключами по виду):
-    - `deal_action_states` **переименовывается** в
-      `deal_strategy_action_states`; `strategy_action_id` остаётся
-      `NOT NULL`; `+target_entity_type` (`varchar(64)`, nullable),
-      `+target_entity_id` (`bigint`, nullable), **+ шесть audit-колонок**
-      (H15 `DOCS_CHECK_15`); снятие `uk_deal_action_state_deal_action`,
-      два частичных уникальных индекса живых исполнений; `DROP COLUMN
-      target` без бэкфилла;
-    - создаётся **`deal_system_action_states`**: `id`, `deal_id`
-      (`NOT NULL`, FK), `system_action_type` (`varchar(64)` `NOT NULL`),
-      `status` (`varchar(64)` `NOT NULL`), retry-поля, шесть
-      audit-колонок; один частичный уникальный индекс живых по
-      (`deal_id`, `system_action_type`); **target-колонок нет** — цель
-      всегда сделка;
-    - **колонки `action_kind` нет ни в одной** — вид кодируется таблицей;
-    - вторая entity + ветвление `DataService` по виду;
-      `DealContext.actionStates` собирается **из двух чтений**;
-    - `deal_finalization_states`: строки **не переносятся** — `DELETE` +
-      `DROP TABLE`; удаление `DealFinalizationState`-стека
-      (модель/entity/mapper/repository/dataservice). Место истины —
-      `docs/models/domain/other/DealActionState.md` §Персистентность;
+    итеративного подбора и «вычитания комиссии из бюджета» отдельным
+    шагом нет; `RiskValidator` — та же база нотинала каждой ноги (вход
+    по цене входа, выход по цене стопа), чтобы шорты не сайзились
+    крупнее.
+- **CODE границы «команда ↔ действие»**
+  (`docs/decisions/command-action-boundary.md`; место истины
+  персистентности — `docs/models/domain/other/DealActionState.md`
+  §Персистентность):
+  - **носитель — две таблицы, не общая:** `deal_action_states`
+    переименовывается в `deal_strategy_action_states`
+    (`strategy_action_id` остаётся `NOT NULL`; `+target_entity_type`
+    (`varchar(64)`, nullable), `+target_entity_id` (`bigint`,
+    nullable), + шесть audit-колонок; снятие
+    `uk_deal_action_state_deal_action`, два частичных уникальных
+    индекса живых исполнений; `DROP COLUMN target` без бэкфилла);
+    создаётся **`deal_system_action_states`** (`id`, `deal_id`
+    `NOT NULL` FK, `system_action_type`, `status`, retry-поля, шесть
+    audit-колонок; один частичный уникальный индекс живых по
+    (`deal_id`, `system_action_type`); **target-колонок нет**);
+    колонки `action_kind` нет ни в одной — вид кодируется таблицей;
+    вторая entity + ветвление `DataService` по виду;
+    `DealContext.actionStates` собирается из двух чтений;
+    `deal_finalization_states`: строки **не переносятся** — `DELETE` +
+    `DROP TABLE`; удаление `DealFinalizationState`-стека;
   - **`SystemActionExecutor`** вместо `DealFinalizationCommandFactory`;
-    handler'ы перестают эмитить добывающие `REFRESH_*` напрямую через
-    `DealFsmSupport.systemCommand(...)` — только звеньями
-    `REFRESH_DEAL_CONTEXT_ACTION` (иначе `applyFailureAccounting` —
-    no-op); cleanup (`CANCEL_*`/`CLOSE_POSITION`) — напрямую, без анкера;
+    handler'ы перестают эмитить добывающие `REFRESH_*` напрямую —
+    только звеньями `REFRESH_DEAL_CONTEXT_ACTION`; cleanup
+    (`CANCEL_*`/`CLOSE_POSITION`) — напрямую, без анкера;
   - **`ServiceCommandExecutor`** — одна ветка учёта (анкер один);
-    `DealActionStateDataService` — резолв живого исполнения по частичному
-    ключу вместо `findByDealIdAndStrategyActionId` (ключ дефектен для
-    грида: второму исполнению узла некуда лечь);
+    `DealActionStateDataService` — резолв живого исполнения по
+    частичному ключу вместо `findByDealIdAndStrategyActionId` (ключ
+    дефектен для грида);
   - **транзакционные связки:** `ENTRY_FINALIZED` — одной транзакцией с
-    завершением `FINALIZE_DEAL_ENTRY_ACTION` (В4.1); терминалы — с
+    завершением `FINALIZE_DEAL_ENTRY_ACTION`; терминалы — с
     продвижением своих звеньев (обобщение N7);
   - **переименование enum'ов** — `ServiceCommandType` → `*_COMMAND`
-    (в БД не хранится), `StrategyActionType` → `*_ACTION` + **миграция
-    значений `strategy_actions.action_type`** + правка примера
+    (в БД не хранится), `StrategyActionType` → `*_ACTION` + миграция
+    значений `strategy_actions.action_type` + правка примера
     `strategy-examples/trend-following-ema.json`; свип по
     switch/equals/конфиг-ключам;
   - **retry-конфиг:** завести секцию `service-command-retry`
-    (`default-policy` + per-command `policies`) — сегодня её **нет ни в
-    одном конфиге**, `getPolicy` возвращает `null` и `canRetry` падает
+    (`default-policy` + per-command `policies`) — сегодня её нет ни в
+    одном конфиге, `getPolicy` возвращает `null` и `canRetry` падает
     NPE в catch-ветке учёта отказа, подменяя исходную ошибку; защитить
     `getPolicy` от пустого default'а;
-  - нового finalization-типа `FETCH_*` **не заводить** (сущность
-    финализации упразднена). На аварийном терминале — жёсткий отказ
-    чтения приравнять к «недоступно» (пустой результат + терминал), чтобы
-    `MARK_DEAL_EMERGENCY_CLOSED` не уходил в `FAILED`.
-- **CODE журнальных аномалий (`GAPS_CLOSE_7`, H19/H23; уточнено H16/H22
-  `DOCS_CHECK_10`):** вторая точка входа `AnomalyReportService` — **без
-  `DealContext`**, с явными `scope`/`severity`/`kind`/`code`
-  (`NON_CRITICAL`); коды шага 7 — по реестру
-  `docs/models/domain/other/AnomalyReport.md` §«Производящая поверхность и
-  коды шага 7».
-  - **Новая колонка `kind`** (`STATE`/`EVENT`) + **поисковый** (не
-    уникальный) индекс `where kind = 'STATE' and status in (незакрытые)`:
-    идемпотентность `STATE`-отчёта держится **незавершённым статусом** —
-    производитель ищет незакрытый отчёт своего `code` и радиуса и
-    продолжает его (H17 `GAPS_CLOSE_13`; анкер-ключ снят). Журнальные
-    события (`PNL_RECONCILIATION_MISMATCH`,
-    `RESULT_CURRENCY_MISMATCH`, `UNCLASSIFIED_CASH_FLOW`,
-    `SETTLE_CURRENCY_VIOLATION`, `SETTLE_CURRENCY_UNAVAILABLE`,
-    `CROSS_CCY_RATE_UNAVAILABLE`, `RESULT_PROFIT_UNAVAILABLE`,
-    `CLOSE_OUTCOME_UNDETERMINED`, `BREAKDOWN_COMPLETENESS_NOT_ASSESSED`)
-    поиска незавершённого не делают — они обязаны быть счётными (на этом
-    стоит рамка R-выборки).
-  - **`STATE`-отчёт не завершается сразу:** `CREATED → IN_PROGRESS` при
-    постановке холда → `COMPLETED` при **ручном снятии**
-    (`docs/lifecycles/AnomalyReport.md`). Иначе искать незавершённый
-    нечего, и синк заводит копию каждый тик.
-  - **`anomaly_reports.scope` → `varchar(64)`** тем же `ALTER` (H22
-    `DOCS_CHECK_10` — расширение; длина по единой норме строковых колонок,
-    H18 `DOCS_CHECK_15`).
-  - ~~`HoldScope.INSTRUMENT_GROUP` — целевое значение, вводится этим же
-    CODE~~ — **снято** (H14 `DOCS_CHECK_15`): групповой радиус отчёта
-    упразднён, единственного производителя у значения не осталось, енум
-    остаётся двузначным (`INSTRUMENT` / `EXCHANGE`) — как в коде и в
-    комментарии `V10`. **Колонка `anomaly_reports.fee_group_key` тоже не
-    заводится**; отчёт о несвежести ставок — **на инструмент**, по одному
-    на каждый затронутый, идентичность несёт `instrument_id`; поисковый
-    индекс незавершённых — по (`exchange_id`, `code`, `scope`,
-    `instrument_id`).
-  - **javadoc `HoldScope` в коде несёт снятые `GAPS_CLOSE_6`
-    ярлыки уровня** («инструмент = уровень 3, биржа = уровень 4»,
-    «Уровни error-градации») — переформулировать: scope есть **радиус**,
-    уровень живёт в error-политике.
-- **CODE cross-ccy (`GAPS_CLOSE_7`, H4; CCY-Q1 закрыт):** сравнение `ccy`
-  движения с **расчётной валютой инструмента** (не с
-  `Deal.resultProfitCurrency` — на записи оно `null`); при несовпадении —
-  персист + линковка + курс **из свечи на момент операции** (H25
-  `DOCS_CHECK_11`; редакция «отдельным вызовом биржи на момент обработки»
-  снята) + запись `DealCashFlow.appliedRate` и `rateStatus` +
-  `AnomalyReport`; слагаемое числа Σ(`amount` × `appliedRate`) **по строкам
-  `rateStatus = APPLIED`** (H9 `DOCS_CHECK_11`; предикат «по строкам чужой
-  `ccy`» снят) считает финализатор. Носитель расчётной
-  валюты **определён** — поле `Instrument.externalSettlementCurrency`
-  (`docs/decisions/instrument-currencies-home.md`); `CCY-Q2` **закрыт**
-  (H6 `DOCS_CHECK_11`).
-  ⚠ **Хэнд-офф `integrator` — носитель курса** (H11 `DOCS_CHECK_10`;
-  источник котировки задан H25 `DOCS_CHECK_11` — **свеча на момент
-  операции**, а не тикер). Собрать: доступно ли **секундное разрешение**
-  на нужных парах `<CCY>-USDT` и на какую **глубину хранения**; отсюда —
-  **правило деградации** (какой следующий интервал берётся); **какая
-  цена берётся из свечи** (close интервала, содержащего момент; иное) —
-  от этого зависит воспроизводимость; **стоимость по квоте и группировка
-  запросов** (движений в окне может быть много, по-строчный запрос курса
+  - нового finalization-типа `FETCH_*` **не заводить**; на аварийном
+    терминале жёсткий отказ чтения приравнять к «недоступно» (пустой
+    результат + терминал), чтобы `MARK_DEAL_EMERGENCY_CLOSED` не
+    уходил в `FAILED`.
+- **CODE журнальных аномалий** (реестр кодов и персистентность —
+  `docs/models/domain/other/AnomalyReport.md` §«Производящая
+  поверхность и коды шага 7» / §Персистентность):
+  - вторая точка входа `AnomalyReportService` — **без `DealContext`**,
+    с явными `scope`/`severity`/`kind`/`code` (`NON_CRITICAL`);
+  - новая колонка `kind` (`STATE`/`EVENT`) + **поисковый** (не
+    уникальный) индекс незавершённых `STATE`; идемпотентность
+    `STATE`-отчёта держится незавершённым статусом; `EVENT`-коды
+    поиска незавершённого не делают — обязаны быть счётными (на этом
+    стоит рамка R-выборки);
+  - `STATE`-отчёт не завершается сразу: `CREATED → IN_PROGRESS` при
+    постановке холда → `COMPLETED` при ручном снятии
+    (`docs/lifecycles/AnomalyReport.md`);
+  - `anomaly_reports.scope` → `varchar(64)` тем же `ALTER`; отчёт о
+    несвежести ставок — **на инструмент** (`scope = INSTRUMENT`,
+    идентичность несёт `instrument_id`); значения `INSTRUMENT_GROUP` в
+    `HoldScope` не появляется, `fee_group_key` не заводится;
+  - javadoc `HoldScope` в коде несёт снятые ярлыки уровня —
+    переформулировать: scope есть **радиус**, уровень живёт в
+    error-политике.
+- **CODE cross-ccy** (политика —
+  `docs/components/RefreshBillsExecutor.md` §«Носитель курса» /
+  §«Политика отказа котировки и догон»,
+  `docs/decisions/pnl-finalization-mechanics.md` реш.5): сравнение
+  `ccy` движения с **расчётной валютой инструмента**
+  (`Instrument.externalSettlementCurrency`,
+  `docs/decisions/instrument-currencies-home.md`); при несовпадении —
+  персист + линковка + курс **из свечи на момент операции** + запись
+  `DealCashFlow.appliedRate` и `rateStatus` + `AnomalyReport`;
+  слагаемое Σ(`amount` × `appliedRate`) по строкам `rateStatus =
+  APPLIED` считает финализатор; недоступный курс — `appliedRate =
+  null`, `rateStatus = RATE_UNAVAILABLE`, слагаемое не вносится, долг
+  догона, курс не подставляется.
+  ⚠ **Хэнд-офф `integrator` — носитель курса.** Собрать: доступно ли
+  секундное разрешение на парах `<CCY>-USDT` и глубина хранения;
+  правило деградации (следующий интервал); какая цена берётся из
+  свечи; стоимость по квоте и группировка запросов (по-строчный запрос
   упирается в 5 req/s); доступность пар при SWAP-only контуре. Завести
-  строку операции в манифесте покрытия. Политика при недоступном курсе
-  **уже задана** (`docs/components/RefreshBillsExecutor.md` §«Носитель
-  курса», §«Политика отказа котировки и догон»): `appliedRate = null`,
-  `rateStatus = RATE_UNAVAILABLE`, слагаемое не вносится, `AnomalyReport`
-  `CROSS_CCY_RATE_UNAVAILABLE`, строка образует **долг догона**; курс не
-  подставляется.
-- **Список исключений сверки по бирже — дом решён, содержание открыто**
-  (H14 `DOCS_CHECK_10`; дом — H16 `DOCS_CHECK_16`, решение пользователя).
-  Область Σ-сверки задаётся перечнем `type`/`subType`, **исключаемых** из
-  экономики сделки. **Носитель — `@ConfigurationProperties` per-exchange**
-  (меняется без релиза; непустой стартовый набор — в конфиге по умолчанию;
-  ключ по бирже). Открытым остаётся **содержание** перечня —
-  хэнд-офф `integrator`.
-  ⚠ **Непустой список — предусловие `CODE`** (H10 `DOCS_CHECK_11`,
-  решение пользователя). Прежняя редакция отгружала контроль с заведомо
-  пустым списком («проявятся через `OTHER` и расхождение сверки») — это
-  процедура разведки, а не режим работы: при пустом списке контроль
-  целостности числа мёртв с первого дня, а на нём стоит вся R-выборка.
-  Перечень наполняется тем же рантайм-прогоном
-  (`.claude/tests/source-api/okx/plan.md`), и до его непустоты шаг на
-  `CODE` не переводится
-  (`docs/models/mapping/DealCashFlow.md` §«Область сверки задаётся списком
-  исключений по бирже»).
-
-- **Грунт `integrator` для шага 7 — собирается, не дожидаясь чистого
-  прогона** (правило §4 `.claude/processes/roadmap-step-execution.md`;
-  заведено `GAPS_CLOSE_11`). Сводный перечень того, что упирается в факт
-  источника, а не в проектирование:
-  1. **Оси адресации истории позиций без `posId`** (H5 `DOCS_CHECK_11`):
-     какие оси запроса принимает `positions-history` и как ведёт себя,
-     если в окне по инструменту **несколько** записей (несколько циклов
-     открытия-закрытия; частичные закрытия отдельными записями). Без
-     ответа create-тропа не специфицирована — **гейт `CODE`**.
-  2. **Носитель курса cross-ccy** (H25) — см. хэнд-офф выше.
-  3. **Семантика `actualPx` алго-ордера** (H21, новый хвост): означает
-     ли поле цену **исполнения** сработавшего ордера или цену его
-     **выставления** после триггера. От ответа зависит, измеряет ли
-     разность «уровень стопа ↔ `externalPrice`» проскок или ноль, то есть
-     исполним ли выбранный операнд калибровки
-     (`docs/models/domain/core/Position.md` §«Цена фактического выхода»).
-  4. **Семантика `fundingFee` записи positions-history** (H20): накоплен
-     за жизнь `posId` или только за последнее закрытие — от этого зависит,
-     сверяется ли Σ`FUNDING` окна с ним напрямую.
-  5. **Инвентарь bill-типов, не принадлежащих экономике сделки** (H10) —
-     см. хэнд-офф выше, **гейт `CODE`**.
-  6. **Инвариант агрегации positions-history** (N11, §AG1) — прежний
-     гейт `CODE`, не новый.
-  7. **Знаки трёх операндов записи и bill'а штрафа** (H15
-     `DOCS_CHECK_16`) — **гейта нет** (статус снят решением держателя
-     `GAPS_CLOSE_16`: знак выясняется прогоном и правится по факту —
-     меняется наличие отрицания в паре сверки, то есть реализация, а не
-     конструкция). Кейс `AG1.7`: фактический знак
-     `fee` и `liqPenalty` в positions-history и знак `balChg` у bill'а
-     ликвидационного штрафа. Четвёртая пара сверки сравнивает
-     `externalLiquidationPenalty` **без отрицания**; при положительной
-     величине штрафа Δ₄ = 2·|штраф| на **каждой** ликвидации, то есть
-     контроль погашен на левом хвосте — **цена ошибки названа, но
-     `CODE` ответа не ждёт**. Предусловие `CODE` п. 7 (без статуса гейта).
-  8. ~~**Дом конфига списка исключений** (H16 `DOCS_CHECK_16`)~~ —
-     **структурная половина закрыта** (решение пользователя:
-     `@ConfigurationProperties` per-exchange, предусловие `CODE` п. 12).
-     Хэнд-офф выше существовал врезкой в mapping-доке и в сквозной реестр
-     гейтов не вносился — внесён и закрыт. Остаётся **содержание**
-     перечня — это п. 5 выше, не отдельная позиция.
-  9. ~~**Ветка `AG1.5`** (штампуется ли entry-fee раньше `cTime`
-     позиции)~~ — **снята** (H9 `DOCS_CHECK_16`, решение пользователя):
-     писатель нижней границы один, `Order.externalCreatedAt` не позже
-     комиссии исполнения той же ноги ⇒ окно накрывает entry-fee по
-     построению. Позиция закрыта, не отложена.
-  10. **Наличие `instId`/`instType` в `data[]` positions-history** (H17
-     `DOCS_CHECK_16` — посылка H18 `DOCS_CHECK_14`) — **гейта нет**:
-     посылка взята из контракт-дока проекта, не из офдока. При
-     отрицательном ответе структурная валидация вырождается в записанное
-     ограничение «корректность держит фильтр запроса».
-
-  **Позиции 7-10 добываются одним заходом** (H15/H16/H9/H17
-  `DOCS_CHECK_16`): все четыре — недобытый факт источника, у 7 фикстура
-  названа (`AG1.7`), у 9 прогон уже запланирован, 8 и 10 сверяются с
-  офдоком без отдельного прогона. Разносить их на четыре задачи нечем —
-  владелец, контур и фикстура общие.
-- **CODE fee-wiring (N9, доспецифицирован на `GAPS_CLOSE_3`, доведён на
-  `GAPS_CLOSE_4`):** новая модель **`TradeFeeRate`** + таблица
-  `trade_fee_rates` (одна строка на группу; ключ группы — **сырая** пара
-  (`external_instrument_type`, `external_fee_group_id`), H7; история: значение
-  группы — taker/maker/`level` — изменилось → новая строка, совпало →
-  **инкремент `refresh_count`** + обновление `external_ts`, H5/H11) + native
-  `OkxTradeFeeResponse` + `mapping/TradeFeeRate` (**знак ставки снимается здесь,
-  `× −1`** — ниже маппинга ставка есть издержка, `abs` в формулах нет, H2);
-  `externalFeeGroupId` на навесе `InstrumentExternalRules` (**не сама ставка**);
-  **гидрация ставки — в `InstrumentExternalRulesDataService`** (хранилищный
-  слой; обе тропы чтения навеса гидрированы, H1); `InstrumentExternalRulesSyncJob`
-  — второй источник `trade-fee`, **один вызов на тик** до цикла (A′), матч
-  per-instrument **по паре**, не по голому `groupId` (H8); реджект
-  `FEE_RATE_UNAVAILABLE` в `RiskValidator` (только на `null`); **мягкий холд
-  инструментов группы по несвежести** — запрет новых входов +
-  `AnomalyReport`, **без kill-switch**, живые сделки доживают под своим
-  стопом (H2 `GAPS_CLOSE_5`; реконсилировано H1 `GAPS_CLOSE_6`), **снятие —
-  вручную** (H2 `GAPS_CLOSE_6`); порог в конфиг, стартово 24 ч; H3/H4.
-- **CODE узла холда (`GAPS_CLOSE_6`):**
-  - новый статус **`Instrument.Status.ENTRY_BLOCKED`** (мягкий класс) +
-    ручное снятие `ENTRY_BLOCKED → ACTIVE` (сервис/контроллер по образцу
-    `InstrumentService.unblockTrade`); `TRADE_BLOCKED` остаётся за
-    kill-switch-классом (H3);
-  - **гейт пропуска реакции `SafetyHoldCoordinator`** ключуется на «scope
-    уже в `TRADE_BLOCKED`», а не «scope не в `ACTIVE`» — иначе мягкий холд
-    маскирует последующий kill-switch-триггер (H3, эскалация
-    `ENTRY_BLOCKED → TRADE_BLOCKED`);
-  - javadoc `Instrument.Status.TRADE_BLOCKED` / `Instrument.isTradeBlocked()`
-    сужает класс до «уровень 3» — **переформулировать без расширения на
-    мягкий класс** (H14, `GAPS_CLOSE_7`). Прежняя формулировка пункта
-    («расширить — тропа несвежести приезжает с уровня 4 по радиусу»)
-    противоречила первому буллету этой же секции: несвежесть уводит в
-    `ENTRY_BLOCKED`, а не в `TRADE_BLOCKED`. Исполнение как было написано
-    расширило бы `isTradeBlocked()` на мягкий класс — и оркестратор снова
-    начал бы уводить живые сделки в `ERROR` по несвежести, воскресив снятую
-    политику. Задача: javadoc описывает **kill-switch-класс** (перехват
-    активных сделок), мягкий класс — отдельный предикат под `ENTRY_BLOCKED`;
-  - **множества входа safety-статусов** (H13, `GAPS_CLOSE_7`): охраняемое
-    обновление `InstrumentDataService.blockTrade` требует `status = 'ACTIVE'`
-    — из `ENTRY_BLOCKED` вернёт «не применено» и **замаскирует**
-    kill-switch-реакцию. Привести к решению: `TRADE_BLOCKED`/`CLOSED`/`ERROR`
-    — из **любого** статуса; `ENTRY_BLOCKED` — только из `ACTIVE`
-    (`docs/rules/instrument-hold.md` §«Множества входа»);
-  - ~~раздельные счётчики серии неудач вход-сайд / управление-сайд (H7)~~
-    — **снято** (H9 `DOCS_CHECK_15`): ось стороны ноги отменена вовсе
-    (H6 `DOCS_CHECK_14`, решение пользователя). Резолв класса реакции идёт
-    **по типу перехваченного исключения**, форма исчерпания бюджета одна —
-    мягкая, код холда один — `RETRY_BUDGET_EXHAUSTED`
-    (`docs/rules/instrument-hold.md` §«Серия неудач: реакция на исчерпание
-    бюджета», `docs/components/HoldService.md` §«Момент вызова»);
-  - **канал подъёма реакции — строится, и строится первым** (H1
-    `DOCS_CHECK_15`): новый тип `RetryBudgetExhaustedException`; бросок в
+  строку операции в манифесте покрытия.
+- **Список исключений сверки по бирже — дом решён, содержание
+  открыто.** Носитель — `@ConfigurationProperties` per-exchange
+  (непустой стартовый набор в конфиге по умолчанию); содержание
+  перечня — хэнд-офф `integrator`, наполняется рантайм-прогоном
+  (`.claude/tests/source-api/okx/plan.md`). ⚠ **Непустой список —
+  предусловие `CODE`**: при пустом списке контроль целостности числа
+  мёртв с первого дня, а на нём стоит вся R-выборка
+  (`docs/models/mapping/DealCashFlow.md` §«Область сверки задаётся
+  списком исключений по бирже»).
+- **CODE fee-wiring (N9):** новая модель **`TradeFeeRate`** + таблица
+  `trade_fee_rates` (одна строка на группу; ключ группы — **сырая**
+  пара (`external_instrument_type`, `external_fee_group_id`); история:
+  значение группы изменилось → новая строка, совпало — инкремент
+  `refresh_count` + обновление `external_ts`) + native
+  `OkxTradeFeeResponse` + `mapping/TradeFeeRate` (**знак ставки
+  снимается здесь, `× −1`** — ниже маппинга ставка есть издержка);
+  `externalFeeGroupId` на навесе `InstrumentExternalRules` (**не сама
+  ставка**); гидрация ставки — в `InstrumentExternalRulesDataService`
+  (обе тропы чтения навеса); `InstrumentExternalRulesSyncJob` — второй
+  источник `trade-fee`, **один вызов на тик** до цикла, матч
+  per-instrument **по паре**, не по голому `groupId`; реджект
+  `FEE_RATE_UNAVAILABLE` в `RiskValidator` (только на `null`); холд
+  инструментов группы по несвежести — по
+  `docs/rules/instrument-hold.md` §«Несвежесть ставки комиссии»
+  (`ENTRY_BLOCKED`, без kill-switch, снятие вручную); порог в конфиг,
+  стартово 24 ч.
+- **CODE узла холда** (дом — `docs/rules/instrument-hold.md`,
+  `docs/components/HoldService.md`):
+  - новый статус **`Instrument.Status.ENTRY_BLOCKED`** (мягкий класс)
+    + ручное снятие `ENTRY_BLOCKED → ACTIVE` (сервис/контроллер по
+    образцу `InstrumentService.unblockTrade`); `TRADE_BLOCKED`
+    остаётся за kill-switch-классом;
+  - **гейт пропуска реакции `SafetyHoldCoordinator`** ключуется на
+    «scope уже в `TRADE_BLOCKED`», а не «scope не в `ACTIVE`» — иначе
+    мягкий холд маскирует последующий kill-switch-триггер;
+  - javadoc `Instrument.Status.TRADE_BLOCKED` / `isTradeBlocked()` —
+    описывает **kill-switch-класс**; мягкий класс — отдельный предикат
+    под `ENTRY_BLOCKED`, `isTradeBlocked()` на него **не расширять**
+    (иначе оркестратор уводил бы живые сделки в `ERROR` по
+    несвежести);
+  - **множества входа safety-статусов:**
+    `TRADE_BLOCKED`/`CLOSED`/`ERROR` — из **любого** статуса;
+    `ENTRY_BLOCKED` — только из `ACTIVE`
+    (`docs/rules/instrument-hold.md` §«Множества входа»); привести
+    охраняемое обновление `InstrumentDataService.blockTrade` (сейчас
+    требует `status = 'ACTIVE'` и маскирует реакцию из
+    `ENTRY_BLOCKED`);
+  - **канал подъёма реакции — строится, и строится первым:** новый
+    тип `RetryBudgetExhaustedException`; бросок в
     `ServiceCommandExecutor` **после** перевода строки исполнения в
-    `FAILED` (вместо нынешнего `catch (RuntimeException) → return
-    failure(...)`); `classify()` перестаёт схлопывать
-    `ControlledExchangeException` в `VALIDATION_ERROR`; выделенный `catch`
-    в `DealOrchestratorJob` вокруг шага диспетчеризации команд, поимённо
-    по двум типам, **до** общего `catch (RuntimeException)`. Снятие
-    прежнего транспорта (`DealTransition.holdSignal`,
-    `DealOrchestratorJob.reactToHoldSignal`, `DealFsmSupport`) — **только
-    после** этого: прежний канал в коде жив и работает
+    `FAILED`; `classify()` перестаёт схлопывать
+    `ControlledExchangeException` в `VALIDATION_ERROR`; выделенный
+    `catch` в `DealOrchestratorJob` вокруг шага диспетчеризации,
+    поимённо по двум типам, **до** общего `catch (RuntimeException)`.
+    Снятие прежнего транспорта (`DealTransition.holdSignal`,
+    `DealOrchestratorJob.reactToHoldSignal`, `DealFsmSupport`) —
+    **только после**: прежний канал в коде жив и работает
     (`docs/components/ServiceCommandExecutor.md` §«Контракт броска»,
     `docs/components/DealOrchestratorJob.md` §«Перехват реакции»);
-  - **измеритель свежести ключа группы** (H11, `GAPS_CLOSE_7` — ревизует H9
-    `GAPS_CLOSE_6`; начальное состояние — H21 `DOCS_CHECK_10`):
-    собственных `refreshCount`/`confirmedAt` у навеса **не заводить**;
-    синк на каждом успешном чтении `/public/instruments` **явно
-    проставляет `Instrument.externalModifiedAt`** (колонка
-    `instruments.external_modified_at` уже есть — `V1`, сегодня никем не
-    заполняется). Возраст этой метки и есть возраст ключа группы.
-    **Писатель ровно один — синк**: онбординговый `SYNC` метку не пишет и
-    не может (граничный снапшот шага 1 поля времени не несёт).
-    **`NULL` = «ключ не подтверждён»** ⇒ инструмент **не попадает в
-    entry-скан** (предусловие, не холд; снимается само первым успешным
-    тиком). **Бэкфилла нет и `instruments` в schema-дельте нет** —
-    бэкфилл проставил бы метке значение, которого измерение не
-    производило;
-  - ~~`AnomalyReport.scope` — значение `INSTRUMENT_GROUP` в `HoldScope`
-    (H4)~~ — **снято** (H14 `DOCS_CHECK_15`): групповой радиус отчёта
-    упразднён, отчёт о несвежести — **на инструмент** (`scope =
-    INSTRUMENT`, `instrument_id` заполнен, по одному на каждый
-    затронутый); значения `INSTRUMENT_GROUP` в енуме не появляется.
+  - **измеритель свежести ключа группы:** собственных
+    `refreshCount`/`confirmedAt` у навеса не заводить; синк на каждом
+    успешном чтении `/public/instruments` явно проставляет
+    `Instrument.externalModifiedAt` (колонка есть с `V1`, сегодня
+    никем не заполняется); возраст метки = возраст ключа группы.
+    **Писатель ровно один — синк** (онбординговый `SYNC` метку не
+    пишет). `NULL` = «ключ не подтверждён» ⇒ инструмент не попадает в
+    entry-скан (предусловие, не холд; снимается первым успешным
+    тиком). Бэкфилла нет и `instruments` в schema-дельте нет.
 - **CODE-дельта `GAPS_CLOSE_10`** (остальное, сверх пунктов выше):
-  - **контурный гейт входа** (H8): `EntryScannerJob`/`DealOpeningService`
-    к проверке «нет активной сделки по этому инструменту» добавляют «нет
+  - **контурный гейт входа:** `EntryScannerJob`/`DealOpeningService` к
+    проверке «нет активной сделки по этому инструменту» добавляют «нет
     активной сделки **ни по одному**» — энфорсмент «в фазе 1 торгуется
-    один инструмент». DB-инварианта нет (у `deals` нет колонки биржи),
-    гонку закрывает `JobExecutionGuard`; снимается в фазе 3;
-  - **предусловие entry-скана «ключ группы подтверждён»** (H21):
-    инструмент с пустым `external_modified_at` в скан не попадает;
-  - **валюта результата** (H10): `Deal.resultProfitCurrency` пишется из
-    **расчётной валюты инструмента**, `Position.externalResultCurrency`
-    **сверяется** → `RESULT_CURRENCY_MISMATCH` при расхождении (расчёт не
-    блокируется); ветка пустого операнда — реджект
+    один инструмент». DB-инварианта нет, гонку закрывает
+    `JobExecutionGuard`; снимается в фазе 3;
+  - **предусловие entry-скана «ключ группы подтверждён»:** инструмент
+    с пустым `external_modified_at` в скан не попадает;
+  - **валюта результата:** `Deal.resultProfitCurrency` пишется из
+    расчётной валюты инструмента; `Position.externalResultCurrency`
+    **сверяется** → `RESULT_CURRENCY_MISMATCH` при расхождении (расчёт
+    не блокируется); ветка пустого операнда — реджект
     `SETTLE_CURRENCY_UNAVAILABLE` в `RiskValidator` (новый
     `RiskCheckCode`) на входе, `AnomalyReport` того же кода на записи
     движения и на финализации;
-  - **аварийный терминал считает то же слагаемое** (H12):
-    `MarkDealEmergencyClosedExecutor` применяет cross-ccy-слагаемое
-    Σ(`amount` × `appliedRate`), на биржу не ходит (курс уже на строке);
-  - **корзина `OTHER` наблюдаема** (H14): непустой `OTHER` у сделки →
+  - **аварийный терминал считает то же слагаемое:**
+    `MarkDealEmergencyClosedExecutor` применяет cross-ccy-слагаемое,
+    на биржу не ходит (курс уже на строке);
+  - **корзина `OTHER` наблюдаема:** непустой `OTHER` у сделки →
     `AnomalyReport` `UNCLASSIFIED_CASH_FLOW`; Σ-сверка идёт за вычетом
-    типов из конфига исключений биржи (дом конфига — хэнд-офф
-    `integrator`, выше);
-  - **epsilon двухчастный** (H15): `min( max(0.01, 0.5%·Σ|amount|),
-    k × ожидаемая комиссия сделки )` — срабатывает меньший; величины
-    провизорны, структура нет;
-  - **`Position.externalCloseAveragePrice`** (H26) + колонка
+    типов из конфига исключений биржи;
+  - **epsilon двухчастный** — форма закрыта, величины провизорны
+    (`docs/rules/pnl-reconciliation.md`,
+    `docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon);
+  - **`Position.externalCloseAveragePrice`** + колонка
     `external_close_average_price`; маппится из `closeAvgPx`
-    positions-history; расчётного потребителя в фазе 1 нет — поле
-    накапливает наблюдения для калибровки запаса на проскок;
-  - **правило переноса `deal_finalization_states`** (H19): строки
-    финализации **не переносятся** — `DELETE` + `DROP TABLE`; **`target`
-    (jsonb) расплющивается** в target-колонки + `DROP COLUMN target`,
-    **бэкфилла нет** — таблицы пусты по правилу фазы (H25
-    `GAPS_CLOSE_13`, `.claude/rules/pre-launch-schema-changes.md`);
-  - **колонки ставок `trade_fee_rates` — `varchar(64)`** (H23; длина по
-    единой норме, H18 `DOCS_CHECK_15`), не `numeric`: доменный тип
-    `String`, аксессор сознательно допускает непарсящееся значение;
-    исключение записано
+    positions-history; потребитель — калибровка запаса на проскок
+    (расчётного потребителя в фазе 1 нет);
+  - **колонки ставок `trade_fee_rates` — `varchar(64)`**, не
+    `numeric`: доменный тип `String`, аксессор сознательно допускает
+    непарсящееся значение; исключение записано
     (`docs/rules/persistence-representation.md` §«Численные колонки»);
-  - **все строковые колонки шага — `varchar(64)`** (H18 `DOCS_CHECK_15`,
-    решение пользователя): категоризация по типу значения (валюта 16 /
-    сырой код 32 / сырой идентификатор 64 / enum 32) схлопнута
-    (`docs/rules/persistence-representation.md` §«Строковые колонки:
-    длины»); места истины — §Персистентность моделей, сборка —
-    `docs/decisions/pnl-finalization-mechanics.md` §Следствия;
-  - ~~SYSTEM-строки `deal_action_states` несут цель (H24)~~ — **снято**
-    (H8 `DOCS_CHECK_15`): системные исполнения живут в собственной
-    таблице `deal_system_action_states`, **target-колонок у неё нет**
-    (цель системного действия всегда сама сделка, операнды цели в ключе
-    были бы производными; H15 `DOCS_CHECK_14`). Условие возврата —
-    появление системного действия с целью ≠ `DEAL`
-    (`docs/models/domain/other/DealActionState.md` §Инварианты);
-  - **состав цикла добычи выводится из `DealContext`** (H3), а не
-    передаётся handler'ом; на `Deal.status = ERROR` **отказ канала
-    добычи** расходует бюджет штатно (H3 `DOCS_CHECK_15` — прежнее «ноль
-    попыток» отменено), `FAILED` строки `REFRESH_DEAL_CONTEXT_ACTION` —
-    durable-исход «недоступно», он же **разрешает эмиссию терминала**;
-    радиусная реакция не поднимается. **Контролируемое исключение под это
-    не подпадает** (H4 `DOCS_CHECK_15`): бросается и на аварийной тропе,
-    реакция — полный биржевой холд параллельно с ошибочным терминалом;
-  - **`billsWindowBegin` — единственный писатель, безусловно** (H9
-    `DOCS_CHECK_16`, решение пользователя; условная ветка H27 снята):
+    **все строковые колонки шага — `varchar(64)`** (там же,
+    §«Строковые колонки: длины»);
+  - **состав цикла добычи выводится из `DealContext`**, а не
+    передаётся handler'ом; на `Deal.status = ERROR` отказ канала
+    добычи расходует бюджет штатно, `FAILED` строки
+    `REFRESH_DEAL_CONTEXT_ACTION` — durable-исход «недоступно», он же
+    разрешает эмиссию терминала; радиусная реакция не поднимается.
+    Контролируемое исключение под это не подпадает: бросается и на
+    аварийной тропе, реакция — `Exchange.HOLD` (заморозка, ступень 1)
+    параллельно с ошибочным терминалом
+    (`docs/rules/exchange-hold.md`);
+  - **`billsWindowBegin` — единственный писатель, безусловно:**
     `SubmitOrderExecutor` пишет `Order.externalCreatedAt` первой
-    отправленной ноги **всегда** при постановке, условным `UPDATE` (`where
-    bills_window_begin is null`). Ни live-нога, ни нога 2
-    `REFRESH_POSITION_COMMAND` поля не касаются. Ждать рантайм-ответа
-    §AG1.5 не нужно — он снят конструкцией.
-- **Форвард (не сейчас): авто-снятие мягкого холда по предикату свежести.**
-  Отложено, не отвергнуто (H2 `GAPS_CLOSE_6`): в фазе 1 снятие ручное —
-  пайплайн в отладке, человек идёт разбирать причину сбоя. Горизонт
-  пересмотра — **установившийся режим** (сбои интеграции стали редкими и
-  понятными); тогда же взвесить гистерезис / K подряд успешных чтений как
-  порог восстановления доверия. Носитель довода —
-  `docs/rules/instrument-hold.md` §Снятие.
-- **N11 — рантайм-верификация инварианта агрегации positions-history** (гейтит
-  корректность числа, **до CODE**): партиал-выходы одного `posId` → одна
-  финализированная запись, `realizedPnl` кумулятивен. Test-план —
-  `.claude/tests/source-api/okx/plan.md` §AG1.5 (⏳ PENDING; интегратор/тестер:
-  фикстура-цепочка на demo). Если OKX не агрегирует — путь корректируется.
-- **Рантайм-хвост на той же фикстуре §AG1.5** (один прогон, **после чистого
-  `DOCS_CHECK_4`** — порядок последовательный): **H2** гранулярность bills
-  (§AG3.5), **RQ-3** ставка группы ↔ фактическая комиссия (§AG12.5), **RQ-4**
-  `ccy` fee-bills = USDT (§AG3.4). Без фикстуры: **RQ-1** покрытие `feeGroup[]`
-  (§AG12.4), **RQ-2** `groupId` непуст (§M1.7).
-- **N13 — funding как holding-cost (форвард, фаза 2 / шаг ожидаемости):** в
-  число funding учтён; на форварде издержка удержания без дома — разделяющий
-  довод «комиссию в R, funding в post-cost expectancy» зафиксирован
-  (`per-trade-risk-policy.md` §«Учёт комиссий»); завести форвард-дом на шаге
-  ожидаемости/бэктеста. Scope (фаза 2 vs step-7-adjacent) — хвост пользователя.
-- **Epsilon сверки bills↔net (N10)** — провизорная **величина**
-  (max(0.01 settle-ccy, 0.5%·Σ`|amount|`)); подтверждение/калибровка —
-  пользователь/бэктест. **Якорь** (Σ`|amount|`, не `|net|`) провизорным больше
-  не является — закрыт на `GAPS_CLOSE_3` (H7).
-- **H6 — добор недостающего числа на `EMERGENCY_CLOSED` (форвард, фаза 2 / шаг
-  ожидаемости):** null = «неисчислимо» — не финальный вердикт, а **отложенный
-  долг**; направление принято (добор до истечения окна positions-history, ~3 мес),
-  **материализация** (кто дочитывает, на каком такте, что с просроченным окном) —
-  за шагом ожидаемости (`pnl-finalization-mechanics.md` реш.3). Пометки
-  недостаточно: пропуск outcome-коррелирован, drop завышает ожидаемость.
+    отправленной ноги всегда при постановке, условным `UPDATE`; ни
+    live-нога, ни нога 2 поля не касаются.
+
+### Грунт `integrator` для шага 7
+
+Собирается, **не дожидаясь чистого прогона** (правило §4
+`.claude/processes/roadmap-step-execution.md`). Что упирается в факт
+источника, а не в проектирование:
+
+1. **Оси адресации истории позиций без `posId`**: какие оси запроса
+   принимает `positions-history` и как ведёт себя при **нескольких**
+   записях в окне по инструменту. Без ответа create-тропа не
+   специфицирована — **гейт `CODE`**.
+2. **Носитель курса cross-ccy** — хэнд-офф выше (§CODE cross-ccy).
+3. **Семантика `actualPx` алго-ордера**: цена **исполнения** или цена
+   **выставления** после триггера — от ответа зависит исполнимость
+   операнда калибровки (`docs/models/domain/core/Position.md` §«Цена
+   фактического выхода»).
+4. **Семантика `fundingFee` записи positions-history**: накоплен за
+   жизнь `posId` или только за последнее закрытие.
+5. **Инвентарь bill-типов, не принадлежащих экономике сделки** —
+   наполняет список исключений сверки, **гейт `CODE`**.
+6. **Инвариант агрегации positions-history** (N11, §AG1) — прежний
+   гейт `CODE`, не новый.
+7. **Знаки трёх операндов записи и bill'а штрафа** (кейс `AG1.7`) —
+   **гейта нет**: знак выясняется прогоном и правится по факту
+   (меняется наличие отрицания в паре сверки — реализация, не
+   конструкция). Цена ошибки названа —
+   `docs/rules/pnl-reconciliation.md`. Предусловие `CODE` п. 7.
+10. **Наличие `instId`/`instType` в `data[]` positions-history** —
+   **гейта нет**: посылка из контракт-дока проекта, не из офдока; при
+   отрицательном ответе структурная валидация вырождается в записанное
+   ограничение «корректность держит фильтр запроса».
+
+Позиции 7-10 добываются одним заходом: владелец, контур и фикстура
+общие (у 7 фикстура названа — `AG1.7`). Позиции 8-9 закрыты — итог в
+`history/2026-08-26-workfiles-diet.md`.
+
+### Рантайм-верификация и форвард
+
+- **N11 — рантайм-верификация инварианта агрегации positions-history**
+  (гейтит корректность числа, **до CODE**): партиал-выходы одного
+  `posId` → одна финализированная запись, `realizedPnl` кумулятивен.
+  Test-план — `.claude/tests/source-api/okx/plan.md` §AG1.5
+  (⏳ PENDING; интегратор/тестер: фикстура-цепочка на demo). Если OKX
+  не агрегирует — путь корректируется.
+- **Рантайм-хвост на той же фикстуре §AG1.5** (один прогон, после
+  чистого `DOCS_CHECK` — порядок последовательный): **H2**
+  гранулярность bills (§AG3.5), **RQ-3** ставка группы ↔ фактическая
+  комиссия (§AG12.5), **RQ-4** `ccy` fee-bills = USDT (§AG3.4). Без
+  фикстуры: **RQ-1** покрытие `feeGroup[]` (§AG12.4), **RQ-2**
+  `groupId` непуст (§M1.7).
+- **N13 — funding как holding-cost (форвард, фаза 2 / шаг
+  ожидаемости):** в число funding учтён; разделяющий довод «комиссию в
+  R, funding в post-cost expectancy» зафиксирован
+  (`per-trade-risk-policy.md` §«Учёт комиссий»); завести форвард-дом
+  на шаге ожидаемости/бэктеста. Scope (фаза 2 vs step-7-adjacent) —
+  хвост пользователя.
+- **Калибровка epsilon сверки bills↔net (N10):** величины (`0.01`,
+  `0.5%`, `k`) провизорны — подтверждение/калибровка:
+  пользователь/бэктест; `k` вдобавок стоит предусловием `CODE` п. 8 и
+  вторым основанием `PNL-Q1` п. 3. Форма закрыта
+  (`docs/rules/pnl-reconciliation.md`,
+  `docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon).
+- **H6 — добор недостающего числа на `EMERGENCY_CLOSED` (форвард,
+  фаза 2 / шаг ожидаемости):** null = «неисчислимо» — отложенный долг,
+  не финальный вердикт; направление принято (добор до истечения окна
+  positions-history, ~3 мес), материализация (кто дочитывает, на каком
+  такте, что с просроченным окном) — за шагом ожидаемости
+  (`pnl-finalization-mechanics.md` реш.3). Пропуск
+  outcome-коррелирован, drop завышает ожидаемость. Смежное **H17**:
+  направление стоит на непроверенном допущении «недоступность обычно
+  временна» — если записи не существует в принципе (краевые
+  ADL/ликвидационные исходы), добор — no-op; при материализации
+  записать: H6 направлением **уменьшается, а не закрывается**
+  [Kaufman гл.1, PDF с.110-112].
 - **Искажение измеряемой ожидаемости: две оси × две стороны (торговый
-  форвард-фокус):** форма уточнена на `GAPS_CLOSE_5` (H22) — **знак есть
-  свойство механизма, а не оси**; правильная форма — матрица «две оси × две
-  стороны», механизмы по клеткам. Сама двухосевая декомпозиция
-  (`GAPS_CLOSE_4`) держится, третьей оси не нашлось.
-  - **Исходы × оптимистично** (число лучше правды): H6 null-drop
-    (`pnl-finalization-mechanics.md` реш.3) + N11 недосчёт агрегации +
-    опущенный гэп-проскок (TR2, `per-trade-risk-policy.md` §«Без поправки на
-    проскок»). **H16 из клетки выведен** (`GAPS_CLOSE_6`, H5): cross-ccy
-    движение больше не помечается-и-забывается — оно персистится, линкуется
-    и **входит в число эквивалентом по курсу из свечи на момент операции**
-    (курс записан полем `appliedRate`; `pnl-finalization-mechanics.md`
-    реш.5, H4 `GAPS_CLOSE_7`, источник котировки — H25 `DOCS_CHECK_11`;
-    редакция «по курсу на момент обработки» снята). Урок H6 («пометка
-    фиксирует факт, но не
-    устраняет смещение») к нему **применён**; остаток «точность курса»
-    закрыт записью применённого курса — величина воспроизводима.
-  - **Исходы × пессимистично:** клетка **непуста** (H8, `DOCS_CHECK_6` →
-    `GAPS_CLOSE_6`). Механизм — **L4-flatten чужих здоровых сделок**:
-    controlled-violation на **одной** сделке безусловно поднимает биржевой
-    холд и каскадный `KillSwitchService.fireExchange` по **всем** активным
-    сделкам биржи (`controlled-violation-exchange-wide-hold.md`,
-    `KillSwitchService.md` §«Биржа-scope»). Здоровые сделки закрываются по
-    рынку в момент, некоррелированный с рынком: правый хвост R усекается,
-    а закрытые с реальным числом входят в R-выборку — измеряемая
-    ожидаемость **занижается**. Прежний механизм-кандидат клетки
-    (kill-switch по несвежести) снят `GAPS_CLOSE_5` (H2), но клетка от
-    этого пустой не стала — просто занята другим механизмом.
-    Соразмерность L4 сознательно принята риск-политикой
-    (`controlled-violation-exchange-wide-hold.md` §Принцип: незрелая
-    интеграция ⇒ консервативный широкий тормоз) — здесь фиксируется её
-    **цена по оси измерения**, не пересмотр решения.
-  - **Возможности × пессимистично** (сделок меньше/мельче правды): **H13**
-    taker-консерватизм при maker-входах = систематический недосайзинг
-    (`pnl-finalization-mechanics.md` реш.4, оговорка); **H15** цена пропуска
-    входа под реджектом/холдом оценена в ~0 — корпус против: «весь годовой
-    профит часто делает одна сделка — её нельзя пропустить» [Tharp гл.6
-    с.158-159; гл.11 с.279], «издержки: равный вред от занижения и завышения»
-    [Kaufman гл.1, PDF с.114-119]; **H21** промо нулевой комиссии не видно в
-    `trade-fee` ⇒ прогноз завышает издержку ⇒ недосайзинг
-    (`docs/integrations/okx/contracts/trade-fee.md` §«Прочие ремарки»).
-  - **Возможности × оптимистично** (сделок больше/крупнее правды): клетка
-    **непуста** (H8, `DOCS_CHECK_6` → `GAPS_CLOSE_6`). Механизм — **окно
-    несвежести двусторонне**: до срабатывания порога (0-24 ч) сайзинг идёт
-    по последней известной ставке, и если внутри окна тир **понизился**
-    (ставка выросла), прогноз комиссии занижен ⇒ бюджет риска «свободнее»
-    ⇒ позиция **больше положенной** [Vince гл.1 с.9,18 — перебор хуже
-    недобора]. Прежде окно рассматривалось только со стороны «мы можем
-    недосайзить»; сторона перебора зафиксирована здесь. Радиус ограничен
-    величиной шага тира и длиной окна; лечится сокращением порога
-    свежести — калибровка вместе с величиной порога.
-  - **Почему это один фокус, а не два пункта.** Крены на разных осях в
-    разные стороны не компенсируются, а делают сравнение **бэктест ↔ live
-    двусторонне несопоставимым**: искажение исходов сдвигает распределение
-    R, искажение возможностей — его объём и состав. Мерить одно, не зная
-    другого, нельзя. Владелец — фаза ожидаемости
-    (`progress/phase-1-step-7-docs-check-4.md` §Сводка, Lens C; форма —
-    `phase-1-step-7-docs-check-5.md` H22).
-- **H17 — «недоступность обычно временна» на непроверенном допущении**
-  (форвард, фаза 2 / шаг ожидаемости): направление H6 (добор числа до истечения
-  окна positions-history) стоит на допущении о **той самой популяции**, которая
-  по доводу H6 **outcome-коррелирована**. Если null возникает оттого, что записи
-  не существует в принципе (краевые ADL/ликвидационные исходы), добор — no-op.
-  Следствие, которое надо записать при материализации добора: H6 направлением
-  **уменьшается, а не закрывается**, коэффициент неизвестен [Kaufman гл.1, PDF
-  с.110-112: «подозревать хорошие результаты»].
-- **Форма epsilon — закрыта, живёт только калибровка.** Итог закрытия —
-  `.claude/work/history/2026-08-20-curation-sweep-snapshot-v82.md` §2;
-  содержание — `docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon.
-  Живой форвард: **калибровка величин** (`0.01`, `0.5%`, `k`) провизорна —
-  числится отдельным пунктом выше; `k` вдобавок стоит предусловием `CODE`
-  п. 8 и вторым основанием `PNL-Q1` п. 3.
-- **Вход в market-maker-программу → пересмотр оси запроса `trade-fee`**
-  (инвариант organic-base-rates, `pnl-finalization-mechanics.md` реш.4): запрос
-  без `instId`/`instFamily` даёт organic base rates — валидный ответ, но не тот,
-  если аккаунт станет участником программы.
-- **`elpMaker` → `rpiMaker`** (прод OKX **2026-07-28**, параллельные имена до
-  2026-10-31): поле **unused**, механики нет по
-  `docs/decisions/source-model-change-absorption.md`; переоценка — только если
-  поле станет used до конца окна.
+  форвард-фокус; владелец — фаза ожидаемости).** Матрица «оси
+  (исходы/возможности) × стороны (оптимистично/пессимистично)»,
+  механизмы по клеткам; крены на разных осях не компенсируются —
+  сравнение бэктест ↔ live двусторонне несопоставимо, мерить одно, не
+  зная другого, нельзя:
+  - **исходы × оптимистично:** H6 null-drop
+    (`pnl-finalization-mechanics.md` реш.3), N11 недосчёт агрегации,
+    опущенный гэп-проскок (`per-trade-risk-policy.md` §«Без поправки
+    на проскок»);
+  - **исходы × пессимистично:** flatten чужих здоровых сделок при
+    `Exchange.TRADE_BLOCKED` (ступень 2) — рыночное закрытие в момент,
+    некоррелированный с рынком: правый хвост R усекается, измеряемая
+    ожидаемость занижается. Радиус механизма сужен лестницей
+    2026-08-26: controlled-исключения flatten больше не гоняют —
+    ступень 1 живые сделки не трогает
+    (`docs/rules/exchange-hold.md`);
+  - **возможности × пессимистично:** taker-консерватизм при
+    maker-входах = систематический недосайзинг
+    (`pnl-finalization-mechanics.md` реш.4); цена пропуска входа под
+    реджектом/холдом оценена в ~0 — корпус против [Tharp гл.6, гл.11;
+    Kaufman гл.1]; промо нулевой комиссии не видно в `trade-fee` ⇒
+    прогноз завышает издержку ⇒ недосайзинг
+    (`docs/integrations/okx/contracts/trade-fee.md` §«Прочие
+    ремарки»);
+  - **возможности × оптимистично:** окно несвежести ставки
+    двусторонне — при понижении тира внутри окна (0-24 ч) прогноз
+    комиссии занижен ⇒ позиция больше положенной [Vince гл.1]; лечится
+    сокращением порога свежести — калибровка вместе с величиной
+    порога.
+- **Форвард: авто-снятие мягкого холда по предикату свежести** —
+  отложено, не отвергнуто: в фазе 1 снятие ручное (пайплайн в отладке,
+  человек разбирает причину). Горизонт пересмотра — установившийся
+  режим; тогда же взвесить гистерезис / K подряд успешных чтений.
+  Носитель довода — `docs/rules/instrument-hold.md` §Снятие.
+- **Вход в market-maker-программу → пересмотр оси запроса
+  `trade-fee`** (инвариант organic-base-rates,
+  `pnl-finalization-mechanics.md` реш.4): запрос без
+  `instId`/`instFamily` даёт organic base rates — не тот ответ, если
+  аккаунт станет участником программы.
+- **`elpMaker` → `rpiMaker`** (прод OKX **2026-07-28**, параллельные
+  имена до 2026-10-31): поле **unused**, механики нет по
+  `docs/decisions/source-model-change-absorption.md`; переоценка —
+  только если поле станет used до конца окна.
 
 ## Хвост шага 4 (CODE-отложения, 2026-06-11)
 
@@ -1245,7 +947,7 @@ Refinements, сознательно отложенные при `CODE` шага 
   докам) — добрать. Актуально и для звеньев шага 7: **вторая нога
   `REFRESH_POSITION`** (positions-history, пагинация по `uTime`) и
   `REFRESH_BILLS` (7d→3m); `REFRESH_FILLS` снят, отдельной команды
-  `REFRESH_POSITIONS_HISTORY` нет (H1/H3 `GAPS_CLOSE_7`).
+  `REFRESH_POSITIONS_HISTORY` нет.
 - **Рантайм-прогон через `OkxProxyController`** — отдельно, при
   поднятом PostgreSQL + demo-кредах (вкл. И-2: подтверждение
   `cancel-advance-algos` для trailing в demo trading).
@@ -1284,12 +986,6 @@ Java-файлов, 20 подсистем, адверсариальная вер�
 2 blocker / 4 major / 26 minor). **Правки по ревью не вносились** — это было
 чистое ревью.
 
-**Регистрация задним числом (свип курации при снапшоте v79):** ревью
-существовало только заметкой, входящих ссылок из живых файлов не имело, и
-**оба блокера в `backlog.md` не значились** — то есть исполнителю `CODE`
-они были невидимы. Ровно тот класс, из-за которого рабочие файлы считаются
-опаснее доков: они адресованы исполнителю.
-
 - **🔴 B1. `CreateAlgoOrderActionExecutor.java:68` — стоп-лосс уходит на
   биржу без триггерной цены.** `createAlgoCommand` строит `Condition` с
   одним `type` и **никогда** не заполняет `trigger`/`trailing`; результат
@@ -1304,9 +1000,10 @@ Java-файлов, 20 подсистем, адверсариальная вер�
   только `positionLiveRisk`, защиту — никогда.
 - **Связка B1 → B2:** B1 создаёт стоп без триггера ⇒ биржа его отвергает
   ⇒ B2 не ловит отсутствие активной защиты и пускает live-risk позицию в
-  `MANAGING` бесстоповой. Это прямо противоречит
-  `docs/rules/risk-creating-entry-protection.md` (требует увода в `ERROR`
-  через `markErrorStopless`).
+  `MANAGING` бесстоповой. Это живой риск без защиты — по лестнице
+  2026-08-26 требуемая реакция — `Exchange.TRADE_BLOCKED` (ступень 2,
+  `docs/rules/exchange-hold.md`); перевешивание
+  `markErrorStopless`/гейта — §Шаг 7, CODE-дельта лестницы.
 
 **Статус:** оба — в **ядре шага 6**, на котором шаг 7 стоит. Гейтом `CODE`
 шага 7 формально не объявлены (шаг 7 их не вводил), но чинить их следует
@@ -1374,22 +1071,26 @@ Java-файлов, 20 подсистем, адверсариальная вер�
 
 ### M2. `BalanceContainer.externalUpdatedAt` → конвенционное имя
 
-**Суть.** `GAPS_CLOSE_7` (H25) свёл имя «время события источника» к
-конвенции `Auditable` (`externalCreatedAt`/`externalModifiedAt`) и запретил
-заводить собственные имена под этот факт: `DealCashFlow.externalTs` →
-`externalCreatedAt`, `TradeFeeRate.externalTs` → `externalModifiedAt`,
-снапшот положения закрытия → `externalModifiedAt`. **`BalanceContainer`
-намеренно не тронут**: его `externalUpdatedAt` введён на шаге 4, живёт в
-домене, персистенции и api-ответе, на нём стоит freshness-check баланса —
-переименование к шагу 7 отношения не имеет и тянет свою миграцию.
+**Суть.** Имя «время события источника» сведено к конвенции `Auditable`
+(`externalCreatedAt`/`externalModifiedAt`); собственные имена под этот
+факт запрещены. **`BalanceContainer` намеренно не тронут**: его
+`externalUpdatedAt` введён на шаге 4, живёт в домене, персистенции и
+api-ответе, на нём стоит freshness-check баланса — переименование
+тянет свою миграцию.
 
 **Задача:** привести `BalanceContainer.externalUpdatedAt` (account-level и
 currency-level) и его снапшоты к `externalModifiedAt`, либо зафиксировать
 исключение решением. Носители: `docs/models/domain/core/BalanceContainer.md`,
 `docs/models/mapping/Balance.md`, entity/api/миграция.
 
-**Тип:** чистка именования, неблокирующая. Провенанс — H25
-`DOCS_CHECK_7`.
+**Тип:** чистка именования, неблокирующая.
+
+### M3. Сведение кластеров дублирования политики к домам (policy-home)
+
+Оставшиеся кластеры дублирования политики свести к домам: свежесть,
+cross-ccy, аномалии/идемпотентность отчётов, частичный выход, риск/R,
+epsilon, окно bills-линковки — **по мере касания, не тотально**.
+Правило — `.claude/rules/policy-home.md`.
 
 ## Инфра-долг (Boot 4 миграция / рантайм-робастность)
 

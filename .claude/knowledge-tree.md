@@ -88,7 +88,7 @@
 │   │   ├── api-docs-completion.md — Как интеграционные доки источника доводятся до полного покрытия периметра?
 │   │   ├── knowledge-classification.md — Как устроен процесс классификации знания?
 │   │   ├── pipeline-shakedown.md — Как устроена обкатка агентского пайплайна?
-│   │   ├── question-delegation.md — Как устроена поэтапная передача вопросов от пользователя агентам?
+│   │   ├── question-delegation.md — Как устроен режим автономии (кто решает развилки, что доходит до пользователя)?
 │   │   ├── roadmap-step-execution.md — Как устроено исполнение одного шага роадмапа (docs-first)?
 │   │   ├── source-api-testing.md — Как устроено тестирование API внешнего источника?
 │   │   └── trading-library-distillation.md — Как знание из сырых книг выносится в дистиллят?
@@ -97,8 +97,10 @@
 │   │   ├── closed-work-transfer.md — Какое правило переноса закрытого из рабочих файлов в history/?
 │   │   ├── codestyle.md — Как мы пишем код?
 │   │   ├── curation.md — Какое правило регулярной курации базы знания?
+│   │   ├── design-simplicity.md — Какое правило-дефолт проектирования (простота и переиспользование)?
 │   │   ├── external-source-sync.md — Какое правило синхронизации файлов с внешним источником правды?
 │   │   ├── naming.md — Какое правило именования файлов?
+│   │   ├── policy-home.md — Какое правило о единственном носителе-доме каждой политики?
 │   │   ├── pre-launch-schema-changes.md — Какое правило схемных изменений, пока проект не запущен?
 │   │   ├── snapshot-format.md — Какое правило формата снапшота?
 │   │   ├── structure.md — Какое правило размещения знания?
@@ -127,7 +129,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v87.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v88.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -141,7 +143,8 @@
 │   │       └── environment.postman_environment.json — (артефакт: Postman-окружение)
 │   └── work/ — В каком состоянии исполнительная работа?
 │       ├── backlog.md — Что мы планируем сделать?
-│       ├── delegation-ledger.md — Какой счёт прогонов гейта делегирования у категорий владельцев?
+│       ├── decision-digest.md — Какие проектные решения CC принял автономно в текущей итерации?
+│       ├── 2026-08-26-step-7-question-flow-analysis.md — Какие источники дали поток ~400 вопросов на шаге 7?
 │       ├── progress/ — На каком шаге мы в этой активной операции?
 │       │   ├── phase-1-step-7-chronicle.md — Какова хроника под-шагов шага 7 Фазы 1?
 │       │   ├── phase-1-step-7-command-action-boundary.md — Что предлагается по развилке границы «команда ↔ действие»?
@@ -180,9 +183,6 @@
 │       │   ├── phase-1-step-7-gaps-close-15.md — Как закрыты находки DOCS_CHECK_15?
 │       │   ├── phase-1-step-7-gaps-close-16.md — Как закрыты находки DOCS_CHECK_16?
 │       │   └── phase-1-step-7-gaps-close-17.md — Как закрыты находки DOCS_CHECK_17?
-│       ├── blind/ — Какой выбор CC сделал по развилкам под-шага до опроса держателя? (запечатанный ключ слепого прохода)
-│       │   ├── phase-1-step-7-partial-exit-consequences.md — Какой выбор CC сделал по развилкам следствий частичного выхода?
-│       │   └── phase-1-step-7-gaps-close-17.md — Какой выбор CC сделал по развилкам GAPS_CLOSE_17?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -284,6 +284,7 @@
 │   │   ├── deal-finalization-state-materialization.md — Почему retry-state финализации — отдельная сущность?
 │   │   ├── derived-market-data-code-increments.md — Почему код-инкременты производных рыночных данных такие?
 │   │   ├── efficiency-ratio-as-catalog-indicator.md — Почему ER — каталожный операнд без выделенного ruleType?
+│   │   ├── exchange-safety-ladder.md — Почему exchange-scope safety разведён на две ступени (HOLD/TRADE_BLOCKED)?
 │   │   ├── fsm-execution-layering.md — Как разложены слои исполнения сделки и почему?
 │   │   ├── instrument-currencies-home.md — Почему валюты инструмента персистятся в InstrumentExternalRules?
 │   │   ├── instrument-external-rules-materialization.md — Как материализуется InstrumentExternalRules и почему?
@@ -427,7 +428,8 @@
 │       ├── controlled-exchange-exceptions.md — Какие категории controlled exchange exceptions и реакции?
 │       ├── deal-without-operations.md — По какому признаку сделка считается не имевшей операций на бирже?
 │       ├── error-handling-policy.md — Как ошибки выходят наружу и градируются внутри?
-│       ├── exchange-hold.md — Какое правило определяет exchange-scope холд?
+│       ├── exchange-hold.md — Какова лестница exchange-scope safety-состояний (HOLD/TRADE_BLOCKED)?
+│       ├── execution-hierarchy.md — Какова иерархия уровней исполнения торговли?
 │       ├── exit-teardown-order.md — В каком порядке снимаются живые сущности при закрытии позиции?
 │       ├── external-status-resolution.md — Как работать с сырым внешним статусом сущности?
 │       ├── idempotency-via-unique.md — Как обеспечивается уникальность и идемпотентность сущностей?
@@ -436,8 +438,9 @@
 │       ├── market-data-retention.md — Какое правило хранения/чистки результатов расчёта?
 │       ├── no-partial-close.md — Почему запрещено частичное закрытие через close-position?
 │       ├── persistence-representation.md — Как сущность представляется в БД?
+│       ├── pnl-reconciliation.md — Какое правило сверки итогового P&L (bills ↔ net)?
 │       ├── raw-exchange-dto-boundary.md — Как ограничено распространение raw exchange DTO по слоям?
-│       ├── risk-creating-entry-protection.md — Почему вход без определимого стопа не доходит до биржи?
+│       ├── risk-creating-entry-protection.md — Какой инвариант системы запрещает живой риск без защиты?
 │       ├── risk-validator-scope.md — Когда RiskValidator вызывается, а когда нет?
 │       ├── runtime-error-classification.md — Как классифицируются unexpected runtime-ошибки?
 │       ├── time-utc.md — Какое правило по работе со временем?

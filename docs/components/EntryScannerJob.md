@@ -67,7 +67,9 @@ context для аудита.
 статусе `ACTIVE`, поэтому оба safety-статуса (`TRADE_BLOCKED` — холд с
 kill-switch; `ENTRY_BLOCKED` — мягкий запрет новых входов, H3
 `GAPS_CLOSE_6`) выпадают из скана **самой выборкой**, отдельной проверки не
-требуют. Биржевой холд (`Exchange.TRADE_BLOCKED`) режется каскадом:
-инструменты такой биржи пропускаются. Это и есть точка enforcement запрета
-новых входов для мягкого класса (`docs/rules/instrument-hold.md`
-§Enforcement).
+требуют. Биржевые ступени режутся каскадом: инструменты биржи под
+`Exchange.HOLD` (заморозка, ступень 1 — статус вводится на `CODE`) или
+`Exchange.TRADE_BLOCKED` (ступень 2) пропускаются — новые входы блокируют
+**обе** ступени лестницы (`docs/rules/exchange-hold.md`). Это и есть
+точка enforcement запрета новых входов для мягкого класса
+(`docs/rules/instrument-hold.md` §Enforcement).

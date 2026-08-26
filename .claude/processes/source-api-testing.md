@@ -152,5 +152,5 @@ in-perimeter строк без метки быть не должно.
   `.claude/tests/{testType}/{source}/`;
   обоснование — `.claude/decisions/test-knowledge-type.md`.
 - Решение о ре-базе на сырьё — `.claude/decisions/source-api-target-rebase.md`.
-- Делегирование и ступень автономии —
+- Режим автономии и карта владельцев —
   `.claude/processes/question-delegation.md`.

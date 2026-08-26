@@ -41,12 +41,18 @@ ServiceCommandExecutionResult execute(P payload, DealContext dealContext);
 - **`REFRESH_*`** — читает exchange facts через `IntegrationService`, применяет
   status resolver, обновляет сущность, заполняет `closeReason` только если
   текущий `== null`; торговых решений не принимает, cleanup не запускает,
-  audit/history как runtime-source не использует. Для сущностей с
-  evidence-cycle (`REFRESH_ORDER_COMMAND` / `REFRESH_ALGO_ORDER_COMMAND`)
-  исполнитель обходит эндпоинты **внутри одной команды** (эскалация
-  live → pending → history → archive), обрывается на первом успешном,
-  полный обход — только при не-найдено, и сам выносит терминал
-  (`MISSING_AFTER_REFRESH`); владение циклом —
+  audit/history как runtime-source не использует. Право обхода
+  нескольких эндпоинтов **внутри одной команды** — общий принцип
+  класса `REFRESH_*` (`docs/rules/command-lifecycle.md` §«Атомарность
+  не означает „один HTTP-запрос“»,
+  `docs/rules/execution-hierarchy.md`), не привилегия отдельных
+  команд: у `REFRESH_ORDER_COMMAND` / `REFRESH_ALGO_ORDER_COMMAND` это
+  эскалация live → pending → history → archive (обрывается на первом
+  успешном, полный обход — только при не-найдено, терминал
+  `MISSING_AFTER_REFRESH` выносит сама команда), у
+  `REFRESH_POSITION_COMMAND` — две ноги, у `REFRESH_BILLS_COMMAND` —
+  пагинация; лестница эндпоинтов — деталь конкретной команды в её
+  компонент-доке. Владение циклом —
   `docs/decisions/refresh-evidence-cycle-ownership.md`.
 
 > **Pending/history эндпоинты** (`orders-pending` / `orders-history` /

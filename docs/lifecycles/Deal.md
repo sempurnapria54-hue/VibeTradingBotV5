@@ -83,7 +83,8 @@ Strategy.DELETED                    -> shutdownReason = STRATEGY_DELETED
 Instrument.TRADE_BLOCKED (холд      -> shutdownReason = RISK_POLICY
   инструмента, риск-триггер)
 Exchange.TRADE_BLOCKED / DISABLED   -> shutdownReason = EXCHANGE_HOLD
-  (биржевой холд, каскад)
+  (ступень 2 лестницы / отключение,
+  каскад)
 Market data expired (по policy)     -> shutdownReason = MARKET_DATA_EXPIRED
 ```
 
@@ -96,6 +97,13 @@ Market data expired (по policy)     -> shutdownReason = MARKET_DATA_EXPIRED
 `RISK_POLICY`, а `EXCHANGE_HOLD` приходит только каскадом от биржевой
 строки. Эта таблица — носитель, в который полезет писатель шага 7, поэтому
 расхождение снято здесь, а не «где-нибудь ещё».
+
+**Сделки гасит только ступень 2 биржевой лестницы**
+(`Exchange.TRADE_BLOCKED`) и `DISABLED`. `Exchange.HOLD` — биржевая
+заморозка, ступень 1 — сделки **не гасит**: активные сделки не
+перехватываются и доживают под текущим стопом, `shutdownReason =
+EXCHANGE_HOLD` производится **только** каскадом ступени 2
+(`docs/rules/exchange-hold.md`).
 
 **Не** заполняется (`shutdownReason = null`) при обычном выходе:
 strategy exit → `closeReason = STRATEGY_EXIT`; TP/SL → `TAKE_PROFIT`/
@@ -175,7 +183,8 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
   - **Правые операнды четырёх пар сюда больше не попадают** (H5
     `DOCS_CHECK_15`): их обязательность проверяется **на границе
     интеграции**, и нарушение уводит сделку тем же ошибочным терминалом,
-    но **с** полным биржевым холдом — радиус там неизвестен
+    но **с** биржевой заморозкой (`Exchange.HOLD`, ступень 1,
+    `docs/rules/exchange-hold.md`) — радиус там неизвестен
     (`docs/models/mapping/PositionCloseResult.md` §«Контракт записи
     проверяется здесь»).
   - **Различение несёт терминальный статус**, не значение
@@ -218,8 +227,9 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
     не имел носителя вовсе, и сделка зависала в `ERROR` ровно вопреки
     инварианту, ради которого асимметрия вводилась).
     **Контролируемое исключение под приравнивание не подпадает** (H4
-    `DOCS_CHECK_15`): дефект содержимого ответа даёт **полный биржевой
-    холд** и здесь тоже, параллельно с ошибочным терминалом — ветки не
+    `DOCS_CHECK_15`): дефект содержимого ответа даёт **биржевую
+    заморозку** (`Exchange.HOLD`, ступень 1) и здесь тоже, параллельно с
+    ошибочным терминалом — ветки не
     конкурируют (`docs/components/ServiceCommandExecutor.md` §«Контракт
     броска»; `docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия
     троп отказа добычи»).

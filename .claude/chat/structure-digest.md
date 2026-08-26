@@ -27,7 +27,9 @@ PK, но чат открывает их точечно. При изменени�
 - Наблюдения/разведка → `notes/`. Шаблоны кода и доков →
   `templates/`. Торговые первоисточники и дистиллят →
   `library/trading/`. Тест-планы API источников → `tests/`.
-- Работа: план → `work/backlog.md`; продуктовый роадмап →
+- Работа: план → `work/backlog.md`; дайджест автономных решений
+  CC (на чтение пользователю, вето постфактум) →
+  `work/decision-digest.md`; продуктовый роадмап →
   `work/roadmap/` (`roadmap.md` + `phase-N.md`); активная
   задача → `work/progress/`; нерешённое →
   `work/questions/open-questions.md` (+ `questions/tasks/` по
