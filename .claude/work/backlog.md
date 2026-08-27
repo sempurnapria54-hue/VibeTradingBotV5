@@ -384,19 +384,29 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 `docs/decisions/exchange-safety-ladder.md`; сигнал —
 `docs/components/models/HoldSignal.md`.
 
-- ввести статус **`Exchange.HOLD`** (ступень 1, заморозка) + его
-  enforcement: блок `SUBMIT_*` **без** каскада сделок в `ERROR`;
-  оркестратор `HOLD` не перехватывает; `EntryScannerJob` режет входы
-  по **обеим** ступеням;
-- ввести **`ReactionClass.FREEZE`**; фабрику `HoldSignal.exchange()`
-  перенацелить на `FREEZE`, добавить `exchangeTradeBlock()`;
-- перевесить реакцию controlled-исключений с
-  `KillSwitchService.fireExchange` на постановку `HOLD`;
+Состав пересмотрен ревизией держателя (`GAPS_CLOSE_18`).
+
+- ввести статус **`Exchange.HOLD`** (ступень 1, мягкий холд) + его
+  enforcement: биржа выпадает из выборки `EntryScannerJob` — **и всё**;
+  командного блок-сета у ступени нет, оркестратор `HOLD` не
+  перехватывает, живые сделки ведутся штатным FSM в полном объёме
+  (ремодел защиты, управление, закрытие);
+- добавить фабрику `HoldSignal.exchangeTradeBlock()`;
+  **`ReactionClass.FREEZE` и фабрика `HoldSignal.exchange()` не
+  вводятся** — производителей у биржевой ступени 1 не осталось;
+- **реакцию controlled-исключений и safety-каскада внешнего статуса
+  оставить на `KillSwitchService.fireExchange`** (ступень 2), заменив
+  сборку сигнала на `exchangeTradeBlock(...)`;
+- ввести **блок-сет ступени 2**: после teardown ни одна команда
+  permission `Trade` на биржу не уходит (`SUBMIT_*`, `CANCEL_*`,
+  `CLOSE_POSITION_COMMAND`), открыт только read; единственное
+  исключение — teardown самого kill-switch'а;
 - перевесить `markErrorStopless` / гейт `EntryFinalizedHandler` с
   L3-инструмента на ступень 2 (`Exchange.TRADE_BLOCKED` — живой риск
   без защиты);
 - снятие: `TRADE_BLOCKED` → только в `HOLD`; `HOLD` → в `ACTIVE`
-  (ручные сервисные операции).
+  (ручные сервисные операции); ручная **постановка** `HOLD` — тоже
+  сервисная операция, реактивного пути к ней нет.
 
 ### CODE-дельта шага
 
@@ -787,8 +797,8 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     `REFRESH_DEAL_CONTEXT_ACTION` — durable-исход «недоступно», он же
     разрешает эмиссию терминала; радиусная реакция не поднимается.
     Контролируемое исключение под это не подпадает: бросается и на
-    аварийной тропе, реакция — `Exchange.HOLD` (заморозка, ступень 1)
-    параллельно с ошибочным терминалом
+    аварийной тропе, реакция — `Exchange.TRADE_BLOCKED` (ступень 2 +
+    flatten) параллельно с ошибочным терминалом
     (`docs/rules/exchange-hold.md`);
   - **`billsWindowBegin` — единственный писатель, безусловно:**
     `SubmitOrderExecutor` пишет `Order.externalCreatedAt` первой
@@ -881,10 +891,11 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   - **исходы × пессимистично:** flatten чужих здоровых сделок при
     `Exchange.TRADE_BLOCKED` (ступень 2) — рыночное закрытие в момент,
     некоррелированный с рынком: правый хвост R усекается, измеряемая
-    ожидаемость занижается. Радиус механизма сужен лестницей
-    2026-08-26: controlled-исключения flatten больше не гоняют —
-    ступень 1 живые сделки не трогает
-    (`docs/rules/exchange-hold.md`);
+    ожидаемость занижается. Радиус механизма **не сужен**: ревизия
+    держателя (`GAPS_CLOSE_18`) вернула controlled-исключения и
+    safety-каскад на ступень 2 с flatten — цена названа и принята
+    (`docs/decisions/exchange-safety-ladder.md` §«Названная цена
+    ревизии»);
   - **возможности × пессимистично:** taker-консерватизм при
     maker-входах = систематический недосайзинг
     (`pnl-finalization-mechanics.md` реш.4); цена пропуска входа под

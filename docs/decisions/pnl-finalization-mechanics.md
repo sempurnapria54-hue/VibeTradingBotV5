@@ -141,7 +141,7 @@ cross-ccy-слагаемое). Сверка — четыре пары по ка�
 даёт durable-исход «недоступно» (`FAILED` строки) → `resultProfit =
 null`, терминал ставится, радиусной реакции нет; **дефект содержимого
 ответа** (`ControlledExchangeException`) — как на штатной тропе: бросок
-⇒ биржевая заморозка (`Exchange.HOLD`, ступень 1 лестницы), параллельно
+⇒ биржевая ступень 2 (`Exchange.TRADE_BLOCKED` + flatten), параллельно
 с ошибочным терминалом. Исполнитель приравнивания —
 `ServiceCommandExecutor` (предикат `Deal.status = ERROR`).
 
@@ -157,11 +157,20 @@ null`, терминал ставится, радиусной реакции не
 
 ### 6. Инвариант агрегации positions-history — рантайм-верификация (N11)
 
-Инвариант: одна сделка ↔ один `posId` ↔ одна финализированная запись
+Инвариант: **один эпизод** ↔ один `posId` ↔ одна финализированная запись
 positions-history с `realizedPnl`, кумулятивным по всем
-partial-закрытиям; читается финализированной. До рантайм-верификации —
-**предположение**, гейтит корректность числа ⇒ верификация до `CODE`
-(предусловие п. 1).
+partial-закрытиям **этого эпизода**; читается финализированной. До
+рантайм-верификации — **предположение**, гейтит корректность числа ⇒
+верификация до `CODE` (предусловие п. 1).
+
+**Формулировка «одна сделка ↔ один `posId`» снята** (T3 `DOCS_CHECK_18`,
+решение держателя): сделка многоэпизодна
+(`docs/decisions/multi-episode-deal.md`), эпизодов у неё может быть
+несколько, и число сделки — Σ по ним. Верифицируемое утверждение
+сместилось на **эпизод**: инвариант про кумулятивность внутри одного
+`posId` остаётся ровно тем же и проверяется тем же кейсом; добавляется
+вторая половина — **окно сделки может содержать несколько записей, и
+каждая адресуется своим `posId`**.
 
 - **Дома:** `docs/models/mapping/PositionCloseResult.md`,
   `docs/integrations/okx/contracts/position.md` §«Инвариант агрегации»,
@@ -176,12 +185,41 @@ partial-закрытиям; читается финализированной. �
 
 ## Следствия
 
-Целевая дельта `CODE` шага 7 (новые команды/executor'ы, не-схемная
-дельта, полная schema-дельта) зафиксирована в архивной редакции этого
-решения (§Следствия архива — см. §История ниже); рабочий носитель
-дельты — `.claude/work/backlog.md` §Шаг 7. Биржевые реакции дельты
-читаются по лестнице `docs/rules/exchange-hold.md` (`Exchange.HOLD` —
-ступень 1, без kill-switch).
+Не-схемная дельта `CODE` шага 7 (новые команды/executor'ы, правки
+компонентов) — рабочий носитель `.claude/work/backlog.md` §Шаг 7;
+развёрнутая историческая редакция — архив (§История). Биржевые реакции
+дельты читаются по лестнице `docs/rules/exchange-hold.md`
+(`Exchange.TRADE_BLOCKED` — ступень 2 с kill-switch; `Exchange.HOLD` —
+ручной гейт входов).
+
+### Schema-дельта шага 7 — сборка-указатель
+
+**Это сборка, а не место истины.** Место истины схемы каждой сущности —
+её §Персистентность (`docs/rules/persistence-representation.md` §«Место
+истины схемы — §Персистентность модели»); сборка обязана **совпадать по
+составу** с перечнями моделей, и детектор расхождения исполняется по ней
+(там же, «симметричное требование к обоим носителям»). Пустой сборки
+быть не может:
+без неё детектор исполнять не на чем — ровно так колонка
+`orders.liquidation_distance_ratio` и не доехала до миграции (B1
+`DOCS_CHECK_18`).
+
+| Сущность / таблица | Что меняется | Место истины |
+|---|---|---|
+| `deals` | `ALTER`: `planned_risk_amount`, `incurred_risk_amount`, `current_risk_amount`, `protection_relieved_risk_amount`, `planned_risk_currency`, `bills_window_begin`, `bills_window_end`, `close_outcome`, `reconciliation_status`, `breakdown_incomplete`, `risk_benchmark_availability`; `+ix_deal_status_close_outcome`, `−ix_deal_status` | `docs/models/domain/aggregate/Deal.md` §Персистентность |
+| `orders` | `ALTER`: `planned_entry_price`, `planned_size_contracts`, `planned_risk_amount`, `planned_risk_currency`, `planned_contract_value`, `planned_stop_price` (инвариант «шесть или ни одного») **+ `liquidation_distance_ratio`** (седьмое число, в инвариант не входит) | `docs/models/domain/core/Order.md` §Персистентность |
+| `positions` | `ALTER`: восемь колонок положения закрытия; **`−uk_position_deal`**, `+uk_position_deal_live` (частичный `unique (deal_id) where status = 'ACTIVE'`), `+uk_position_deal_external` (`unique (deal_id, external_id)`), `+ix_position_deal` — многоэпизодная сделка | `docs/models/domain/core/Position.md` §Персистентность |
+| `deal_cash_flows` | **`CREATE TABLE`** (24 колонки) + `UNIQUE(exchange_id, external_bill_id)` + частичный индекс отбора несвязанных строк по (`exchange_id`, `external_instrument_id`, `external_created_at`) `where deal_id is null` | `docs/models/domain/other/DealCashFlow.md` §Персистентность |
+| `deal_action_states` → `deal_strategy_action_states` | `RENAME`; `+target_entity_type`, `+target_entity_id`, `+`шесть audit-колонок; `−uk_deal_action_state_deal_action`, `+`два частичных ключа; **`+fk_deal_strategy_action_state_deal`** (симметрия с таблицей-близнецом); `+ix_deal_strategy_action_state_deal` | `docs/models/domain/other/DealActionState.md` §Персистентность |
+| `deal_system_action_states` | **`CREATE TABLE`** + частичный ключ + `ix_deal_system_action_state_deal` | там же |
+| `deal_finalization_states` | **`DROP TABLE`** (роль перенесена) | там же, §«Правило переноса» |
+| `anomaly_reports` | `ALTER`: `+kind` (`not null` сразу), `scope` `varchar(16)` → `varchar(64)`; `fee_group_key` **не заводится** | `docs/models/domain/other/AnomalyReport.md` §Персистентность |
+| `instruments` | `ALTER`: колонки валют инструмента | `docs/models/domain/core/Instrument.md` §Персистентность |
+| `strategy_details` | `ALTER`: `+position_reopen_allowed` (многоэпизодная сделка — параметр стратегии) | `docs/models/domain/aggregate/Strategy.md` §Персистентность |
+
+Бэкфилла не требует ни одна строка сборки: до конца фазы 1 таблицы пусты
+(`.claude/rules/pre-launch-schema-changes.md`). Обязательные колонки
+вводятся `ALTER`'ом напрямую, без `default` «на время миграции».
 
 ## Предусловия `CODE` шага 7
 
@@ -190,7 +228,9 @@ partial-закрытиям; читается финализированной. �
 носителях.
 
 1. **Инвариант агрегации positions-history** (реш.6) — **гейтит**;
-   рантайм-прогон `.claude/tests/source-api/okx/plan.md` §AG1.
+   рантайм-прогон `.claude/tests/source-api/okx/plan.md` §AG1. Состав
+   расширен многоэпизодностью: сверх кумулятивности внутри `posId`
+   проверяется поведение окна с **несколькими** записями (`AG1.9`).
 2. **Непустой список исключений сверки для OKX** — **гейтит** (хвост
    `integrator`, содержание перечня;
    `docs/models/mapping/DealCashFlow.md` §«Область сверки»).
@@ -236,9 +276,9 @@ partial-закрытиям; читается финализированной. �
     для несобытийного поля» применяется **до** проверки обязательности
     (`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`
     §Конвертация), иначе контракт границы
-    (`ExternalInvariantViolationException` ⇒ биржевая заморозка
-    `Exchange.HOLD`, ступень 1, ручное снятие) реджектил бы каждую
-    нормально закрывшуюся сделку.
+    (`ExternalInvariantViolationException` ⇒ биржевая ступень 2
+    `Exchange.TRADE_BLOCKED` + flatten, ручное снятие) реджектил бы
+    каждую нормально закрывшуюся сделку.
 
 Негейтящие: `AG1.5` (нижняя граница окна: единственный писатель —
 `SubmitOrderExecutor`, окно накрывает entry-fee по построению) и

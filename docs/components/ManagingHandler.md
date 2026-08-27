@@ -17,7 +17,7 @@
 `Deal.status = MANAGING`; pinned `StrategyDetail`; позиция активна с live
 risk **или** есть факты, что позиция закрыта и нужен переход в
 `EXIT_PENDING`; `ACTIVE && externalSize == 0` — не normal `CLOSED`, а
-cleanup/retry/anomaly; main protection актуальна; ≤1 позиция; нет чужих
+cleanup/retry/anomaly; main protection актуальна; ≤1 живая позиция; нет чужих
 live orders/algo; нет критичного расхождения и borrow/debt.
 
 ## Рабочая логика

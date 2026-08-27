@@ -68,8 +68,11 @@ context для аудита.
 kill-switch; `ENTRY_BLOCKED` — мягкий запрет новых входов, H3
 `GAPS_CLOSE_6`) выпадают из скана **самой выборкой**, отдельной проверки не
 требуют. Биржевые ступени режутся каскадом: инструменты биржи под
-`Exchange.HOLD` (заморозка, ступень 1 — статус вводится на `CODE`) или
-`Exchange.TRADE_BLOCKED` (ступень 2) пропускаются — новые входы блокируют
-**обе** ступени лестницы (`docs/rules/exchange-hold.md`). Это и есть
-точка enforcement запрета новых входов для мягкого класса
-(`docs/rules/instrument-hold.md` §Enforcement).
+`Exchange.HOLD` (мягкий холд, ступень 1 — статус вводится на `CODE`) или
+`Exchange.TRADE_BLOCKED` (ступень 2) пропускаются — новые сделки
+блокируют **обе** ступени лестницы (`docs/rules/exchange-hold.md`). Это и
+есть точка enforcement запрета новых входов для мягкого класса
+(`docs/rules/instrument-hold.md` §Enforcement) — и **единственная** точка
+enforcement биржевой ступени 1: командного блок-сета у неё нет, живые
+сделки биржи под `Exchange.HOLD` сопровождаются полностью
+(`docs/rules/exchange-hold.md` §«Что блокирует»).

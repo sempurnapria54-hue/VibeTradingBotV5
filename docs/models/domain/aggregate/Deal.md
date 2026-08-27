@@ -43,8 +43,8 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
 | `closeReason` | `CloseReason` | Итоговая бизнес-причина завершения. |
 | `plannedRiskAmount` | `BigDecimal` | **Заявленный плановый риск сделки (`R`)** — **сумма** плановых рисков её **живых и исполнившихся** ног входа (`Order.plannedRiskAmount`); снятые ноги не входят. **Знаменатель R-мультипликатора** (§«Плановый риск», §«Предикат отбора слагаемых»). Не write-once: производная проекция ног, пересчитывается целиком. |
 | `incurredRiskAmount` | `BigDecimal` | **Взятый риск сделки (на входе)** — сколько из заявленного встало под удар: Σ по ногам входа `plannedRiskAmount_i × (accumulatedFillSize_i / plannedSizeContracts_i)`. Не знаменатель — измеритель разрыва «заявлено ↔ взято». **Частичным выходом не уменьшается** (§«Взятый риск»). Не write-once, производная проекция. |
-| `currentRiskAmount` | `BigDecimal` | **Неотработанная доля взятого на входе риска**: `incurredRiskAmount × (Position.externalSize / Σ accumulatedFillSize_i)`. Уменьшается частичным выходом, при полном — ноль. **Риском «под ударом сейчас» не является** — уровня стопа формула не содержит. Потребитель — **сопровождение**, не отчёт. Не write-once, производная проекция. |
-| `protectionRelievedRiskAmount` | `BigDecimal` | **Риск, снятый защитой** — насколько актуальный стоп уменьшил взятый риск: `incurredRiskAmount −` риск при **актуальном** уровне стопа. Пересчитывает писатель защиты (`CreateAlgoOrderExecutor` / place-нога `REPLACE`). Величину «риск под ударом» несёт эта пара чисел, а не `currentRiskAmount` в одиночку. Не write-once, производная проекция. |
+| `currentRiskAmount` | `BigDecimal` | **Неотработанная доля взятого на входе риска**: `incurredRiskAmount × (livePosition().externalSize / Σ accumulatedFillSize_i)`. Уменьшается частичным выходом, при полном — ноль. **Риском «под ударом сейчас» не является** — уровня стопа формула не содержит. Потребитель — **сопровождение**, не отчёт. Не write-once, производная проекция. |
+| `protectionRelievedRiskAmount` | `BigDecimal` | **Риск, снятый защитой** — насколько актуальный стоп уменьшил взятый риск: `incurredRiskAmount − riskAtCurrentStop` (закрытая форма вычитаемого — §«Форма вычитаемого»). Пересчитывают писатели защиты (`CreateOrderExecutor` — встроенная защита ноги входа; `CreateAlgoOrderExecutor` / place-нога `REPLACE` — standalone). Величину «риск под ударом» несёт эта пара чисел, а не `currentRiskAmount` в одиночку. Знак не клэмпится. Не write-once, производная проекция. |
 | `plannedRiskCurrency` | `String` | Валюта планового риска — **одна на все четыре числа** (та же, что у `resultProfitCurrency` — иначе отношение не считается). Источник у писателя — **расчётная валюта инструмента** (`Instrument.externalSettlementCurrency`, `docs/decisions/instrument-currencies-home.md`); у всех ног сделки она одна. |
 | `resultProfit` | `BigDecimal` | Итоговый PnL (см. ниже). |
 | `resultProfitCurrency` | `String` | Валюта результата (для `ETH-USDT-SWAP` обычно `USDT`). Источник — **расчётная валюта инструмента**; валюта от биржи — проверяемый признак, не источник (§«Валюта результата: один авторитет»). |
@@ -56,7 +56,7 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
 | `riskBenchmarkAvailability` | `RiskBenchmarkAvailability` | **Почему знаменатель `R` пуст или непуст** — признак отбора, разводит две природы пустоты `plannedRiskAmount`. Пишут финализация (штатная и аварийная) и — для `NOT_APPLICABLE` на тропах закрытия без входа — `MarkDealClosedExecutor`; пусто до терминала. |
 | `orders` | `List<Order>` | Ordinary orders сделки (attached protection — внутри `Order`). |
 | `algoOrders` | `List<AlgoOrder>` | Standalone algo-orders сделки. |
-| `position` | `Position` | Текущая позиция (≤1 на `Deal`). |
+| `positions` | `List<Position>` | **Эпизоды позиции сделки** (одна биржевая позиция = один `posId` = одна строка). Живой эпизод — ≤1; закрытые остаются (`docs/decisions/multi-episode-deal.md`). Доменный предикат `livePosition()` отдаёт живой либо пусто. |
 
 `Deal.direction` имеет тип `StrategyTradeDirection` (енум `Strategy`,
 `docs/models/domain/aggregate/Strategy.md`).
@@ -78,8 +78,9 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
   (только если policy решила завершать сделку controlled-exit, не
   при любом stale), `MANUAL_STOP`, `RISK_POLICY`, `EXCHANGE_HOLD`
   (производится **каскадом ступени 2** биржевой лестницы —
-  `Exchange.TRADE_BLOCKED`/`DISABLED`; ступень 1 `Exchange.HOLD`
-  сделки не гасит — `docs/rules/exchange-hold.md`), `UNKNOWN`.
+  `Exchange.TRADE_BLOCKED`/`DISABLED`; ступень 1 `Exchange.HOLD` —
+  мягкий холд, сделки не гасит и их сопровождение не ограничивает —
+  `docs/rules/exchange-hold.md`), `UNKNOWN`.
   Заполняется только при реальном запуске graceful shutdown (см.
   lifecycle).
 - **`CloseReason`**: `ENTRY_CONDITION_EXPIRED` (candidate закрыт в
@@ -170,13 +171,29 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
 `.claude/decisions/rule-source-of-truth.md`); источник данных числа и
 разбивки — `docs/decisions/result-profit-source.md`:
 
-- **Число** `resultProfit` = **net realized P&L**, берётся **готовым** из
-  positions-history (`realizedPnl = pnl + fee + fundingFee + liqPenalty`,
-  посчитан биржей), **плюс cross-ccy-слагаемое** Σ(`amount` ×
+- **Число** `resultProfit` = **Σ net realized P&L по эпизодам сделки**,
+  каждый берётся **готовым** из positions-history
+  (`realizedPnl = pnl + fee + fundingFee + liqPenalty`, посчитан биржей;
+  слагаемое живёт полем `Position.externalRealizedProfit` своей строки),
+  **плюс cross-ccy-слагаемое** Σ(`amount` ×
   `appliedRate`) по строкам `DealCashFlow`, у которых **`rateStatus =
   APPLIED` и тип вне списка исключений биржи и категория — экономическая
   (не `OTHER`)** — предикат области **конъюнктивный**, полный, не
-  сокращение. Биржевой net считается в settle-ccy и издержку вне неё не
+  сокращение.
+  - **Почему сумма, а не число последнего эпизода** (решение держателя,
+    `docs/decisions/multi-episode-deal.md`): сделка многоэпизодна —
+    внутри неё позиция может схлопнуться и открыться заново. Числитель
+    обязан покрывать те же ноги, что и знаменатель `R`, иначе
+    R-мультипликаторы систематически сжаты [Tharp гл.6 с.144-146; Vince
+    гл.1 с.17].
+  - **Сумма — производная проекция, пересчитываемая целиком** по
+    строкам эпизодов; инкрементального накопления нет, поэтому
+    повторное наблюдение не задваивает число (командная идемпотентность
+    `REFRESH_*` сохраняется).
+  - **Пустое слагаемое не подставляется нулём.** Эпизод, чьё положение
+    закрытия не добыто, делает сумму **недоступной**, а не заниженной:
+    поведение — по терминальному контракту (чистая тропа ждёт и ретраит,
+    аварийная даёт `null` «неисчислимо»). Биржевой net считается в settle-ccy и издержку вне неё не
   содержит — без слагаемого число завышалось бы молча
   (`docs/decisions/pnl-finalization-mechanics.md` реш.5,
   `docs/models/mapping/DealCashFlow.md` §«Число — в settle-ccy»). **Не**
@@ -209,8 +226,8 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
   уходит ошибочной тропой к терминалу — всегда доходит до терминала, не
   зависает живым риском.
 - **Расчёт и запись.** Число вычисляет и **пишет прямо на `Deal`**
-  `FinalizeDealExitExecutor` (net из **`Position.externalRealizedProfit`**
-  — положения закрытия, приземлённого второй ногой
+  `FinalizeDealExitExecutor` (Σ **`Position.externalRealizedProfit`** по
+  эпизодам — положений закрытия, приземлённых второй ногой
   `REFRESH_POSITION_COMMAND`, — плюс разбивка из `DealCashFlow` +
   сверка; в одной транзакции с продвижением своего исполнения —
   durable-носитель числа = само поле `Deal`, рестарт-safe).
@@ -254,7 +271,7 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
 | Точка | Операнд пуст ⇒ |
 |---|---|
 | Вход (`RiskValidator`, писатель `plannedRiskCurrency`) | **реджект** `SETTLE_CURRENCY_UNAVAILABLE` — сделка не открывается. Подставить `USDT` «по контуру» нельзя: подставленное число, выглядящее фактом |
-| Запись движения (`RefreshBillsExecutor`, cross-ccy guard) | строка **персистится и линкуется**, guard не выполняется, `appliedRate` не считается; `AnomalyReport` `SETTLE_CURRENCY_UNAVAILABLE` |
+| Запись движения (`RefreshBillsExecutor`, cross-ccy guard) | строка **персистится и линкуется**, guard не выполняется, `appliedRate` не считается; `AnomalyReport` `SETTLE_CURRENCY_UNAVAILABLE`. Строка становится **должником догона** — валюта резолвится ближайшим тиком синка, после чего guard исполним (B3 `DOCS_CHECK_18`) |
 | Финализация (`resultProfitCurrency`) | берётся `Position.externalResultCurrency` как единственный доступный факт + `AnomalyReport` `SETTLE_CURRENCY_UNAVAILABLE`. **Явная деградация с пометкой**, не второй молчаливый источник |
 
 Реджект на входе делает две нижние ветки практически недостижимыми для
@@ -293,10 +310,15 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
   durable-слота между проходами не нужно. Сумма — **производная, но
   персистируемая**: фильтр и отчёт обязаны быть выразимы запросом без
   join'а по `orders` (§«Признаки отбора для отчёта»).
-- **Чем доезжает — полями `CreateOrderCommandPayload`.** Четыре числа
-  (`plannedRiskAmount`, `plannedRiskCurrency`, `plannedEntryPrice`,
-  `plannedSizeContracts`) едут payload'ом — тем же путём, что цена и
-  размер (`docs/components/CreateOrderExecutor.md` §«Канал доставки»).
+- **Чем доезжает — полями `CreateOrderCommandPayload`.** Числа входного
+  действия едут payload'ом — тем же путём, что цена и размер: **шесть**
+  операндов тождества риска (`plannedRiskAmount`, `plannedRiskCurrency`,
+  `plannedEntryPrice`, `plannedSizeContracts`, `plannedContractValue`,
+  `plannedStopPrice`) **плюс седьмое** — измеритель
+  `liquidationDistanceRatio`. Счёт держит место истины payload'а
+  (`docs/components/CreateOrderExecutor.md` §`CreateOrderCommandPayload`);
+  здесь — указатель, а не второй перечень (устаревший счёт «четыре» снят
+  B4 `DOCS_CHECK_18`).
 - **Write-once живёт на ноге; сумма на сделке — не write-once.**
   Слагаемое `Order.plannedRiskAmount` пишется при постановке своей
   ноги и **не переписывается**: трейлинг двигает стоп, но риск ноги —
@@ -342,8 +364,10 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
   кратно числу перевыставлений.
 - **Частично исполнившаяся и затем снятая нога** из **заявленного**
   выходит тоже; взятый ею риск учитывает второе число (§«Взятый риск»)
-  исполненной долей — разведение по двум полям и делает предикат
-  простым.
+  исполненной долей — **и для этого у второго числа свой предикат**, без
+  конъюнкта по статусу (§«Предикат взятого риска»). Прежняя редакция
+  обещала это поведение, отбирая слагаемые «тем же предикатом», который
+  снятую ногу как раз исключал (T1 `DOCS_CHECK_18`).
 - **Нога в `ERROR` в сумму не входит** — не живая и не исполнившаяся;
   её исполненная доля остаётся во взятом риске. Сделка с такой ногой
   идёт safety-каскадом и в отчёт попадает помеченной.
@@ -407,10 +431,85 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
 
 | Поле | Что измеряет | Момент | Предикат / формула |
 |---|---|---|---|
-| `plannedRiskAmount` | **заявленный** риск — бенчмарк, «риск, под который сайзились» | вход | Σ `Order.plannedRiskAmount` по **живым и исполнившимся** ногам входа (§выше) |
-| **`incurredRiskAmount`** | **взятый** риск — сколько из заявленного встало под удар | вход | Σ по ногам входа, отобранным **тем же предикатом**, что и первое число, включая страховочный конъюнкт (§«Предикат отбора слагаемых»): `plannedRiskAmount_i × (accumulatedFillSize_i / plannedSizeContracts_i)`; слагаемое ноги с `plannedSizeContracts_i = 0` — **ноль**, не деление |
-| **`currentRiskAmount`** | **неотработанная доля** взятого на входе риска | сейчас | `incurredRiskAmount × (Position.externalSize / Σ accumulatedFillSize_i по ногам входа)`; слагаемых нет ⇒ поле **пусто**; слагаемые есть, а `Σ accumulatedFillSize_i = 0` ⇒ поле **ноль** (риск заведомо ещё не взят — значение по проверенному факту, `docs/rules/absent-value-semantics.md`) |
-| **`protectionRelievedRiskAmount`** | **риск, снятый защитой** — насколько актуальный стоп уменьшил взятый риск | сейчас | `incurredRiskAmount −` риск при актуальном уровне стопа (`AlgoOrder.condition.trigger.stopLoss.value` действующей защиты; операнд уже persisted); защиты нет ⇒ поле **пусто** |
+| `plannedRiskAmount` | **заявленный** риск — бенчмарк, «риск, под который сайзились» | вход | Σ `Order.plannedRiskAmount` по **живым и исполнившимся** ногам входа (§«Предикат отбора слагаемых», предикат **заявленного**) |
+| **`incurredRiskAmount`** | **взятый** риск — сколько из заявленного встало под удар | вход | Σ по ногам входа, отобранным предикатом **взятого** (§ниже): `plannedRiskAmount_i × (accumulatedFillSize_i / plannedSizeContracts_i)`; слагаемое ноги с `plannedSizeContracts_i = 0` — **ноль**, не деление |
+| **`currentRiskAmount`** | **неотработанная доля** взятого на входе риска | сейчас | `incurredRiskAmount × (livePosition().externalSize / Σ accumulatedFillSize_i по тому же предикату взятого)`; живого эпизода нет ⇒ числитель **ноль**; слагаемых нет ⇒ поле **пусто**; слагаемые есть, а `Σ accumulatedFillSize_i = 0` ⇒ поле **ноль** (риск заведомо ещё не взят — значение по проверенному факту, `docs/rules/absent-value-semantics.md`) |
+| **`protectionRelievedRiskAmount`** | **риск, снятый защитой** — насколько актуальный стоп уменьшил взятый риск | сейчас | `incurredRiskAmount − riskAtCurrentStop` (закрытая форма вычитаемого — §«Форма вычитаемого»); действующей защиты нет ⇒ поле **пусто** |
+
+#### Предикат взятого риска — свой, без конъюнкта по статусу
+
+**Второе и третье числа отбирают ноги своим предикатом** (T1
+`DOCS_CHECK_18`):
+
+```text
+слагаемые incurredRiskAmount / знаменателя currentRiskAmount =
+  строки orders сделки, у которых
+    type ∈ {ENTRY, ENTRY_ATTACHED_STOP_LOSS}   — бизнес-тип
+    И accumulated_fill_size > 0                — риск фактически взят
+    И planned_risk_amount НЕПУСТ               — страховка (та же, что у заявленного)
+```
+
+**Почему не «тот же предикат, что у заявленного».** Конъюнкт
+`status ∈ isLive() ∪ {COMPLETED}` исключает **`CANCELED`**, то есть ровно
+ту ногу, ради которой второе число и заведено: частично исполнившуюся и
+затем снятую. Её порождает самая частая тропа — перевыставление входа
+(`docs/decisions/replace-not-amend.md` §Решение п.3: cancel-old →
+place-new) и teardown частично налитой ноги. Счётные последствия
+прежнего предиката, обе — направленные:
+
+- **разрыв «заявлено ↔ взято» не измеряется** там, где он и возникает:
+  филлы снятой ноги выпадают из обоих чисел;
+- **третье число ломается арифметически:** `livePosition().externalSize`
+  содержит филлы снятой ноги, а знаменатель `Σ accumulatedFillSize_i` —
+  нет ⇒ отношение > 1, и «неотработанная доля» превышает взятый риск.
+
+**Что это не меняет.** Знаменатель `R` (`plannedRiskAmount`) свой
+предикат сохраняет: снятая заявка не стояла — за неё сделка не
+рисковала, и раздувать бенчмарк перевыставлениями нельзя (§«Предикат
+отбора слагаемых»). Два предиката вместо одного — названная цена;
+довод «разведение по двум полям делает предикат простым» ослаблен, но
+альтернатива (один предикат) сохраняет неверный торговый исход.
+Конъюнкт `accumulated_fill_size > 0` делает предикат взятого
+самонесущим: нога без филлов слагаемого не даёт независимо от статуса.
+
+#### Форма вычитаемого `protectionRelievedRiskAmount`
+
+**`riskAtCurrentStop` — та же закрытая форма, что у планового риска, с
+подстановкой действующего стопа** (T2 `DOCS_CHECK_18`):
+
+```text
+riskAtCurrentStop = Σ по ногам предиката взятого:
+    ( |plannedEntryPrice_i − stopCurrent| × accumulatedFillSize_i × plannedContractValue_i
+      + комиссионный член_i )
+```
+
+— тождественно `plannedRiskAmount_i` (`docs/decisions/
+per-trade-risk-policy.md` §«Закрытая форма сайзинга») с двумя заменами:
+`stop_i → stopCurrent` и `plannedSizeContracts_i → accumulatedFillSize_i`.
+Три операнда, которых форма прежде не называла, названы:
+
+- **комиссионный член входит** — как и в уменьшаемом. Иначе при
+  **недвинутом** стопе поле выдавало бы ≈ двойную комиссию > 0, то есть
+  «защита сняла риск», которого она не снимала. При недвинутом стопе
+  поле равно **нулю точно**;
+- **размер — поногово `accumulatedFillSize_i`**, не
+  `livePosition().externalSize`: во втором случае эффект скейл-аута
+  считался бы дважды (он уже учтён третьим числом);
+- **знак не клэмпится.** Стоп за безубытком даёт `riskAtCurrentStop < 0`
+  и `protectionRelievedRiskAmount > incurredRiskAmount`; ослабление
+  защиты (risk-weakening `REPLACE`) даёт **уменьшение** поля вплоть до
+  отрицательного. Клэмп в нуле убил бы ровно ту информацию, ради которой
+  пара чисел заведена (§ниже, «Чего сумма не покрывает»).
+
+**Действующая защита — новейшая живая защитная нога сделки:**
+standalone `AlgoOrder` (`condition.trigger.stopLoss.value`), а пока
+standalone-защиты нет — attached-защита ноги входа, чей уровень persisted
+write-once шестым числом (`Order.plannedStopPrice`). В переходном окне
+двойной защиты (REPLACE основной; attached добора до пересчёта основной)
+операндом служит **последняя поставленная** — та, которую назначила
+стратегия. Названная цена: внутри окна поле отражает назначенный стоп, а
+не тот, что стоит на бирже; окно закрывается той же цепочкой действия,
+то есть держится один проход.
 
 - **Величину «риск под ударом» несёт пара чисел, а не третье поле в
   одиночку** (решение держателя): стоп двигается (безубыток, трейлинг,
@@ -454,14 +553,14 @@ Java-класс `com.example.tradingbot.domain.model.aggregate.deal.Deal`,
 
   | Триггер | Исполнитель | Какие поля |
   |---|---|---|
-  | создана новая нога входа | `CreateOrderExecutor` | **две суммы** — `plannedRiskAmount` и `incurredRiskAmount` |
+  | создана новая нога входа (со своей встроенной защитой) | `CreateOrderExecutor` | **две суммы** — `plannedRiskAmount` и `incurredRiskAmount` — **плюс `protectionRelievedRiskAmount`**: встроенная защита ноги и есть новая действующая, её уровень persisted тем же ходом (`Order.plannedStopPrice`) |
   | наблюдены исполнение / терминальный статус ноги **входа** | `RefreshOrderExecutor` | обе входные суммы |
   | нога входа отменена / замещена | `CancelOrderExecutor` | обе входные суммы |
   | **наблюдена позиция** — живая либо из истории | `RefreshPositionExecutor` | **только `currentRiskAmount`** — входные поля от размера позиции не зависят |
-  | **поставлена / замещена защита** | `CreateAlgoOrderExecutor`, place-нога `REPLACE` | **только `protectionRelievedRiskAmount`** |
+  | **поставлена / замещена standalone-защита** | `CreateAlgoOrderExecutor`, place-нога `REPLACE` | **только `protectionRelievedRiskAmount`** |
 
   **Reduce-only-нога входные поля не двигает** — она не входит в
-  множество слагаемых; её исполнение меняет `Position.externalSize` и
+  множество слагаемых; её исполнение меняет размер живого эпизода и
   через него — только `currentRiskAmount`.
 
   **Третье число пишет только тот, кто наблюдает позицию** (решение
@@ -581,11 +680,21 @@ fills, average prices, partial exits) в `Deal` не хранится: числ�
   терминал** (решение держателя). Источник неполноты у разбивки и у
   `resultProfit` общий (cross-ccy-слагаемое суммируется по тем же
   строкам), усечение направленное — число завышается, — поэтому такая
-  сделка чистого `CLOSED` не получает: предикат
-  «`breakdownIncomplete = INCOMPLETE_BY_WINDOW` **либо** есть
-  cross-ccy-строка без `rateStatus = APPLIED`» уводит её **ошибочной
-  тропой** к `EMERGENCY_CLOSED`. Пятого признака (полноты числителя)
-  не заводится — предикат собран из существующих фактов.
+  сделка чистого `CLOSED` не получает. Предикат — **перечнем значений,
+  без неявного «иначе»** (Г1 + B3 `DOCS_CHECK_18`):
+
+  ```text
+  breakdownIncomplete ∈ {INCOMPLETE_BY_WINDOW, NOT_ASSESSED}
+  ИЛИ ∃ прилинкованная строка DealCashFlow с
+        rateStatus ∈ {RATE_UNAVAILABLE, SETTLE_CURRENCY_UNAVAILABLE}
+  ```
+
+  Истина ⇒ **ошибочная тропа** к `EMERGENCY_CLOSED`; исполняет предикат
+  выходная проверка `ExitPendingHandler`
+  (`docs/components/FinalizeDealExitExecutor.md` §«Неполное число — не
+  чистый терминал», `docs/components/ExitPendingHandler.md` §«Выходные
+  проверки»). Пятого признака (полноты числителя) не заводится —
+  предикат собран из существующих фактов.
 - **`breakdownIncomplete` — структурная, а не дефектная неполнота.**
   Окно добычи конечно со стороны источника, горизонт удержания сделки
   не ограничен; у сделки длиннее окна часть строк недобываема
@@ -612,13 +721,14 @@ fills, average prices, partial exits) в `Deal` не хранится: числ�
   `realizedPnl`, `ccy`, резолвимый `direction`) проверяются **в слое
   интеграции**; нарушение — `ExternalInvariantViolationException`
   (`docs/models/mapping/PositionCloseResult.md` §«Контракт записи
-  проверяется здесь»). Реакция — **биржевая заморозка `Exchange.HOLD`**
-  (ступень 1 лестницы, без kill-switch), поднимается общим контуром
+  проверяется здесь»). Реакция — **биржевая ступень 2
+  `Exchange.TRADE_BLOCKED`** (kill-switch flatten), поднимается общим контуром
   перехвата **параллельно** ошибочному терминалу сделки — ветки не
-  конкурируют (`docs/rules/exchange-hold.md` §«Что переводит в HOLD»).
+  конкурируют (`docs/rules/exchange-hold.md` §«Что переводит в
+  TRADE_BLOCKED», п.1).
   **Следствие для признака:** до финализатора запись с `type` вне
   перечня не доезжает, поэтому `UNDETERMINED` несёт один смысл —
-  **записи нет вовсе**; заморозки этот случай не вызывает.
+  **записи нет вовсе**; биржевой реакции этот случай не вызывает.
 - **Обязанная и невыполненная сверка ⇒ ошибочный терминал.** Принцип
   формулируется через **обязанность**: наступила и не исполнена ⇒
   ошибочный терминал; «должны были и посчитали» ⇒ успешный терминал
@@ -656,17 +766,26 @@ fills, average prices, partial exits) в `Deal` не хранится: числ�
 клейма выведен: `NOT_APPLICABLE` пишет `MarkDealClosedExecutor` той же
 транзакцией (§Енумы).
 
-**Принудительный эпизод внутри сделки отдельным полем не выражается.**
-`closeOutcome` — проекция **последнего** закрытия источника; сделка,
-где принудительное сокращение произошло в середине, а последним
-закрытием было наше, числится `NORMAL_EXIT`. Факт **полной**
+**Принудительный эпизод внутри сделки отдельным полем `Deal` не
+выражается.** `closeOutcome` — проекция **последнего** закрытия
+источника; сделка, где принудительное сокращение произошло в середине, а
+последним закрытием было наше, числится `NORMAL_EXIT`. Факт **полной**
 ликвидации / принудительного закрытия несёт **`closeOutcome`
-(`LIQUIDATION` / `FORCED_REDUCTION`) — единственный носитель, на любой
-тропе**: маршрутизирующего правила «закрытие позиции биржей доводит
-сделку до `EMERGENCY_CLOSED`» не существует — ликвидация штатно
-проходит и чистой тропой, и `closeOutcome` пишется на обеих. Названная
-цена: **частичный** принудительный эпизод, за которым последовал наш
-выход, отдельно не счётен.
+(`LIQUIDATION` / `FORCED_REDUCTION`) — единственный носитель уровня
+сделки, на любой тропе**: маршрутизирующего правила «закрытие позиции
+биржей доводит сделку до `EMERGENCY_CLOSED`» не существует — ликвидация
+штатно проходит и чистой тропой, и `closeOutcome` пишется на обеих.
+
+**Прежняя названная цена — «частичный принудительный эпизод, за которым
+последовал наш выход, отдельно не счётен» — снята многоэпизодностью**
+(`docs/decisions/multi-episode-deal.md`): у эпизода **есть своя строка**
+`positions` со своим `external_close_type`, и такой эпизод счётен
+запросом по строкам. Ограничение осталось только на уровне **поля
+сделки**: одно поле — один исход, и это последний. Кейс, где эпизод не
+получает строки (принудительное **сокращение** без схлопывания в ноль:
+`posId` тот же, позиция уменьшилась), остаётся неотличимым по строкам —
+его след ловят категория `LIQ_PENALTY` в разбивке и предусловие `CODE`
+п. 10.
 
 **След эпизода — посылка, а не факт.** «След частичного эпизода
 остаётся строками `LIQ_PENALTY` и покрыт четвёртой парой сверки» —
@@ -856,9 +975,16 @@ write-once:
 
 `Deal` содержит runtime graph: `orders` (см.
 `docs/models/domain/core/Order.md`), `algoOrders` (см.
-`docs/models/domain/core/AlgoOrder.md`), `position` (см.
-`docs/models/domain/core/Position.md`, ≤1 на `Deal`). Live risk сделки —
-вычисляемо (см. lifecycle), отдельным boolean-полем не хранится.
+`docs/models/domain/core/AlgoOrder.md`), `positions` (см.
+`docs/models/domain/core/Position.md` — **строки эпизодов**, живая ≤1).
+Live risk сделки — вычисляемо (см. lifecycle), отдельным boolean-полем не
+хранится.
+
+**Закрытые эпизоды из графа не выводятся** (`docs/decisions/
+multi-episode-deal.md`): по ним считается `resultProfit` и правые
+операнды четырёх пар сверки, поэтому «граф сделки» без них был бы
+клеймом полноты, опровергаемым собственным финализатором. «Текущая
+позиция» — предикат модели `livePosition()`, не отдельное поле.
 
 В runtime graph **не** входят и в `Deal` не хранятся:
 `DealActionState`, `Exchange`, `Instrument`, `StrategyDetail`,
@@ -878,7 +1004,7 @@ bills»; `docs/models/domain/other/DealCashFlow.md` §«Линковка к
 
 Хранится в БД (entity `DealEntity`, таблица `deals`), наследует
 audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
-`position`) — отдельные таблицы по `deal_id`, не cascade-коллекции этой
+`positions`) — отдельные таблицы по `deal_id`, не cascade-коллекции этой
 строки. Категорийная разбивка P&L (`DealCashFlow`) — тоже **отдельная
 таблица `deal_cash_flows` по `deal_id`** (не поле `Deal`; число
 `resultProfit`/`resultProfitCurrency` — поля `Deal`, разбивка — строки
@@ -907,7 +1033,13 @@ audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
   (`numeric(36,18)` — **неотработанная доля** взятого на входе риска;
   не write-once), **`protection_relieved_risk_amount`**
   (`numeric(36,18)` — **риск, снятый защитой**; не write-once),
-  `planned_risk_currency` (`varchar(64)` — одна на все четыре числа),
+  `planned_risk_currency` (`varchar(64)` — одна на все четыре числа;
+  **несимметрия с существующей `result_profit_currency` (`varchar(16)`,
+  `V6`) названа и ретрофита не требует** — B8 `DOCS_CHECK_18`: единая
+  норма длин действует на **вводимые** колонки
+  (`docs/rules/persistence-representation.md` §«Строковые колонки:
+  длины»), а `varchar(16)` вмещает любой тикер валюты, поэтому
+  расширение существующей колонки было бы правкой без потребителя),
   `bills_window_begin`, `bills_window_end` (обе `timestamptz`) **плюс
   признаки отбора для отчёта** — `close_outcome` (`varchar(64)`),
   `reconciliation_status` (`varchar(64)`), `breakdown_incomplete`
@@ -918,17 +1050,21 @@ audit-поля (`AuditableEntity`). Runtime graph (`orders`/`algoOrders`/
   **Длины строковых колонок — единая норма `varchar(64)`**
   (`docs/rules/persistence-representation.md` §«Строковые колонки:
   длины»). Полная schema-дельта шага —
-  `docs/decisions/pnl-finalization-mechanics.md` §Следствия. Перечень
+  `docs/decisions/pnl-finalization-mechanics.md` §«Schema-дельта шага 7». Перечень
   здесь — **место истины** схемы сущности
   (`docs/rules/persistence-representation.md` §«Место истины схемы»).
-- **Индекс отбора для отчёта** — по (`status`, `close_outcome`):
-  выборка отчёта фильтрует по терминалу и торговому исходу, без
-  индекса растёт линейно по истории закрытых сделок. Остальные
-  признаки низкоселективны и в индекс не идут. **Прежний
-  `ix_deal_status` дропается той же миграцией**: (`status`) — префикс
-  нового индекса, выборку активных сделок он обслуживает; вторая
+- **Индекс отбора для отчёта — `ix_deal_status_close_outcome`** по
+  (`status`, `close_outcome`): выборка отчёта фильтрует по терминалу и
+  торговому исходу, без индекса растёт линейно по истории закрытых
+  сделок. Остальные признаки низкоселективны и в индекс не идут.
+  **Прежний `ix_deal_status` дропается той же миграцией**: (`status`) —
+  префикс нового индекса, выборку активных сделок он обслуживает; вторая
   структура на непрунимой таблице платится стоимостью записи без
-  выигрыша чтения.
+  выигрыша чтения. **Имя названо здесь** (B5 `DOCS_CHECK_18`): место
+  истины схемы `deals` — этот раздел, а три соседних индекса названы
+  поимённо; на имя ссылается
+  `docs/models/domain/other/DealActionState.md` §«Поисковые индексы»
+  (довод «отбор идёт префиксом этого индекса»).
 - `internal_id` — `updatable = false` (неизменен после создания).
 - **`bills_window_begin` / `bills_window_end` — write-once условным
   `UPDATE`, не `updatable = false`**: строка `deals` создаётся раньше,

@@ -15,7 +15,7 @@
 
 `Deal.status = ENTRY_SUBMITTED`; есть pinned `StrategyDetail`,
 `DealActionState` и локальный entry `Order`, относящийся к сделке и не в
-невозможном статусе; ≤1 позиция/инструмент; нет чужого риска; если
+невозможном статусе; ≤1 живая позиция на инструмент; нет чужого риска; если
 attached protection ожидалась — она в entry `Order` или есть recovery-путь.
 
 ## Рабочая логика

@@ -86,7 +86,7 @@ AlgoOrder.size → sz`).
 
 Сверка expected vs actual (mismatch → `ExternalInvariantViolationException`
 → `AlgoOrder.ERROR` + `closeReason = EXCHANGE_INVARIANT_VIOLATION` →
-`Deal.ERROR` → `Exchange.HOLD`):
+`Deal.ERROR` → `Exchange.TRADE_BLOCKED`):
 
 ```text
 tdMode    == isolated

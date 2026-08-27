@@ -79,6 +79,23 @@ Java-модель, наследует поля аудита от `Auditable`.
   резолвится, guard сравнения не выполнялся вовсе. Сопровождается
   одноимённым `AnomalyReport`
   (`docs/models/domain/aggregate/Deal.md` §«Ветка "операнд пуст"»).
+  **Тоже должник догона** (B3 `DOCS_CHECK_18`): валюта инструмента
+  резолвится ближайшим тиком синка, после чего guard исполним —
+  строка уходит в `NOT_REQUIRED` / `APPLIED` / `RATE_UNAVAILABLE`
+  (`docs/components/RefreshBillsExecutor.md` §«Политика отказа котировки
+  и догон»).
+
+**Оба «пусто по отказу» входят в предикат неполноты числа.** Область
+суммирования ключуется `APPLIED`, а предикат неполноты — **перечнем
+значений** `{RATE_UNAVAILABLE, SETTLE_CURRENCY_UNAVAILABLE}`, а не
+формулировкой «cross-ccy-строка без `APPLIED`»: у строки со
+`SETTLE_CURRENCY_UNAVAILABLE` cross-ccy-ность **неопределима по
+построению** (расчётной валюты, с которой сравнивать `ccy`, нет), а вывод
+из `ccy` в этом кластере запрещён явно
+(`docs/models/mapping/DealCashFlow.md` §«Cross-ccy-область ключуется
+признаком состояния курса, а не `ccy`»). Дом предиката —
+`docs/components/FinalizeDealExitExecutor.md` §«Неполное число — не
+чистый терминал».
 
 Тот же довод, по которому `AnomalyReport` получил `kind`: «пусто по
 природе» и «пусто по отказу» не делят одно значение. Побочно признак
@@ -262,7 +279,7 @@ JSONB-навеса нет цели для `UNIQUE(exchange_id, external_bill_id)
 | Класс колонок | Колонки | На конфликте |
 |---|---|---|
 | **Снапшот источника** | `amount`, `external_fee`, `ccy`, `external_type`, `external_sub_type`, `external_order_id`, `external_instrument_id`, `external_created_at`, `external_modified_at` | **обновляются** — это и есть «привести к состоянию биржи» |
-| **Производные вызывающего** | `deal_id`, `category`, `applied_rate`, `rate_status`, `applied_rate_candle_instrument` / `_timeframe` / `_open_time` | **монотонно**: пустое заполняется, заполненное не обнуляется; `RATE_UNAVAILABLE → APPLIED` разрешён, **обратный переход запрещён** |
+| **Производные вызывающего** | `deal_id`, `category`, `applied_rate`, `rate_status`, `applied_rate_candle_instrument` / `_timeframe` / `_open_time` | **монотонно**: пустое заполняется, заполненное не обнуляется; порядок состояний курса `SETTLE_CURRENCY_UNAVAILABLE → RATE_UNAVAILABLE → {NOT_REQUIRED, APPLIED}`, переходы **только вперёд** (B3 `DOCS_CHECK_18`; прежняя редакция знала один переход `RATE_UNAVAILABLE → APPLIED`) |
 | **Ключ и audit** | `exchange_id`, `external_bill_id`; `created_at` / `created_by` | не трогаются (`modified_*` ведёт JPA auditing) |
 
 **Почему монотонность, а не «последний писатель выигрывает».** Отказ добычи

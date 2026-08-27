@@ -275,6 +275,7 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 | `phaseEntryPolicy` | `PhaseEntryPolicy` | Как торгуем в этой фазе. |
 | `riskPerTradePercent` | `BigDecimal` | Риск на сделку, % от **свободного депозита** (`externalAvailableEquity`); см. `docs/decisions/per-trade-risk-policy.md`. |
 | `targetRiskRewardRatio` | `BigDecimal` | High-level ориентир R/R. |
+| `positionReopenAllowed` | `Boolean` | **Допустимо ли переоткрытие позиции внутри сделки** (многоэпизодная сделка, `docs/decisions/multi-episode-deal.md`). `true` — позиция, схлопнувшаяся в ноль в `MANAGING`, может быть открыта заново живой входной ногой; сделка становится многоэпизодной, `resultProfit` аккумулирует по эпизодам. `false` — наблюдение `externalSize → 0` в `MANAGING` снимает живые входные ноги (`docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»), сделка остаётся одноэпизодной. |
 | `stepsByStatus` | `Map<Deal.Status, List<StrategyStep>>` | Шаги, сгруппированные по статусу сделки. |
 
 Индикаторы/структуры, нужные детали (ATR для SL, RSI для ENTRY и т. д.),
@@ -290,6 +291,17 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 `UNKNOWN` → `NO_TRADE`. Матрица — инвариант доменной модели (метод
 `PhaseEntryPolicy.isAllowedFor`); проверяется на create (400). У
 `NO_TRADE`-детали риск-поля и настройки опциональны (nullable).
+
+**`positionReopenAllowed` обязателен у торгуемой детали** (nullable
+только у `NO_TRADE`, как и риск-поля): умолчания у него нет намеренно —
+из двух исходов один снимает живые ноги, другой оставляет, и
+подразумевать выбор автора нельзя
+(`docs/rules/absent-value-semantics.md`). Из `phaseEntryPolicy` он **не
+выводится**: `GRID` делает переоткрытие вероятным, но не объявляет его —
+и обратно, деталь `FOLLOW_PHASE` с отложенным добором может его
+допускать. Выводимый признак нельзя ни провалидировать на create, ни
+предъявить как решение автора, поэтому заведён отдельным полем
+(`docs/decisions/multi-episode-deal.md`).
 
 ## StrategyStep (раздел)
 
@@ -665,6 +677,13 @@ CHECK-констрейнты, отвергнутые альтернативы) �
   плюс `strategy_indicator_settings` / `strategy_market_structure_settings`.
 - На `strategies` — частичный UNIQUE-индекс «одна `ACTIVE` на
   инструмент» (БД-страховка инварианта lifecycle).
+- **Колонка шага 7 — `ALTER`:** `strategy_details.position_reopen_allowed`
+  (`boolean`, nullable — обязателен по существу у торгуемой детали,
+  пуст у `NO_TRADE`; как и остальные риск-поля детали). Бэкфилл не
+  нужен — таблицы пусты
+  (`.claude/rules/pre-launch-schema-changes.md`). Полная schema-дельта
+  шага — `docs/decisions/pnl-finalization-mechanics.md`
+  §«Schema-дельта шага 7».
 - Настройки рыночных данных — собственные реляционные строки
   strategy-scope; `UNIQUE(strategy_id, key)` — DB-страховка инварианта
   каталога (см. §Архитектурные инварианты); `id` настройки — цель

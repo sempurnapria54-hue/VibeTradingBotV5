@@ -49,7 +49,7 @@ handler `MARK_*` не эмитит — канон
 ## resultProfit на терминальном ребре и контракт неисчислимой прибыли (DEAL-Q2)
 
 - **Расчёт и запись числа** `resultProfit` — **шаг 7**, владелец
-  `FinalizeDealExitExecutor` (net из `Position.externalRealizedProfit` +
+  `FinalizeDealExitExecutor` (Σ `Position.externalRealizedProfit` по эпизодам +
   разбивка `DealCashFlow` + сверка; пишет число **на `Deal`**,
   `docs/decisions/result-profit-source.md`,
   `docs/decisions/pnl-finalization-mechanics.md` реш.2). `MARK_DEAL_CLOSED_COMMAND`
@@ -156,7 +156,9 @@ handler `MARK_*` не эмитит — канон
     `breakdownIncomplete` — на этих тропах пусты, и пустота есть значение);
     `riskBenchmarkAvailability` из-под него **выведен явно**.
   - **Ветка `NOT_APPLICABLE` у финализатора выхода снята** как недостижимая
-    (`docs/components/FinalizeDealExitExecutor.md` §«Что пишет финализация»).
+    (`docs/components/FinalizeDealExitExecutor.md` §«Признаки отбора»;
+    прежняя ссылка на §«Что пишет финализация» была битой — такой секции
+    нет, П2 `DOCS_CHECK_18`).
   - Ни нового значения енума, ни колонки, ни вызова биржи: одно
     присваивание в уже существующей транзакции терминала.
 - **Смягчение ассерта записано правилом, а не выведено:**

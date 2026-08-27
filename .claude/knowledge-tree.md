@@ -291,6 +291,7 @@
 │   │   ├── market-data-result-identity-keying.md — Почему результаты расчёта ключуются настройкой-владельцем?
 │   │   ├── market-phase-conditional-classification.md — Почему MarketPhase.Type определяется авторскими условиями?
 │   │   ├── market-phase-stateless.md — Почему MarketPhase вычисляется на лету, а не хранится?
+│   │   ├── multi-episode-deal.md — Почему сделка допускает несколько эпизодов позиции?
 │   │   ├── per-trade-risk-policy.md — Какова риск-политика на сделку в фазе 1 и почему?
 │   │   ├── pnl-finalization-mechanics.md — Как механически добываются P&L-факты и пишется resultProfit?
 │   │   ├── refresh-evidence-cycle-ownership.md — Кто проходит evidence-cycle refresh-команд?

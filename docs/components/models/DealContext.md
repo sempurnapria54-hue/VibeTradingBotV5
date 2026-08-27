@@ -22,7 +22,7 @@ persisted (см. `.claude/decisions/runtime-value-object.md`); собирает�
 
 | Поле | Тип | Назначение |
 |---|---|---|
-| `deal` | `Deal` | Сделка с runtime graph (`orders` + `algoOrders` + `position`). |
+| `deal` | `Deal` | Сделка с runtime graph (`orders` + `algoOrders` + `positions` — строки эпизодов, живая ≤1). |
 | `exchange` | `Exchange` | Биржа / exchange account (для HOLD / safety / adapter context). |
 | `instrument` | `Instrument` | Торговый инструмент сделки. |
 | `strategyDetail` | `StrategyDetail` | Pinned-конфигурация сделки. |
@@ -32,8 +32,9 @@ persisted (см. `.claude/decisions/runtime-value-object.md`); собирает�
 ## Runtime graph и сборка по фактам
 
 `Order`/`AlgoOrder`/`Position` не дублируются отдельными полями — входят
-в `Deal` runtime graph (`deal.orders`/`deal.algoOrders`/`deal.position`;
-≤1 `Position` на `Deal`). Exchange facts сначала применяются
+в `Deal` runtime graph (`deal.orders`/`deal.algoOrders`/`deal.positions` —
+**строки эпизодов**, живая ≤1;
+`docs/decisions/multi-episode-deal.md`). Exchange facts сначала применяются
 refresh-командами к БД, затем `DealContext` собирает уже обновлённый
 graph:
 
@@ -42,8 +43,10 @@ exchange facts -> REFRESH_* -> обновлённые сущности в БД
   -> Deal runtime graph -> DealContext -> FSM decision
 ```
 
-Live risk позиции вычисляется: `deal.position != null && status ==
-ACTIVE && externalSize > 0` (см. `docs/models/domain/core/Position.md`).
+Live risk позиции вычисляется по **живому эпизоду**:
+`deal.livePosition() != null && status == ACTIVE && externalSize > 0`
+(см. `docs/models/domain/core/Position.md`). Закрытые эпизоды в предикат
+не входят по построению — они не `ACTIVE`.
 
 ## Свежесть баланса и отдельные данные
 

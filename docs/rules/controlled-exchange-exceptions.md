@@ -20,7 +20,7 @@ problem-state. `reasonCode`: `UNKNOWN_EXTERNAL_STATUS`, `ORDER_FAILED`,
 
 ```text
 entity -> ERROR; closeReason = reasonCode
-Deal -> ERROR; Exchange -> HOLD
+Deal -> ERROR; Exchange -> TRADE_BLOCKED (ступень 2 + flatten)
 ```
 
 ### ExternalInvariantViolationException
@@ -31,7 +31,7 @@ net`, `side`/`ordType`/`reduceOnly` != expected).
 
 ```text
 entity -> ERROR; closeReason = EXCHANGE_INVARIANT_VIOLATION
-Deal -> ERROR; Exchange -> HOLD
+Deal -> ERROR; Exchange -> TRADE_BLOCKED (ступень 2 + flatten)
 ```
 
 ### ExternalNotFoundException
@@ -45,27 +45,31 @@ Deal -> ERROR; Exchange -> HOLD
 
 ```text
 entity -> ERROR; closeReason = MISSING_AFTER_REFRESH
-Deal -> ERROR; Exchange -> HOLD
+Deal -> ERROR; Exchange -> TRADE_BLOCKED (ступень 2 + flatten)
 ```
 
-## Эскалация — безусловный биржевой HOLD (все три категории)
+## Эскалация — безусловная биржевая ступень 2 (все три категории)
 
-`Exchange -> HOLD` во всех трёх блоках — **безусловная заморозка биржи**
-(уровень 4, ступень 1 лестницы — `docs/rules/exchange-hold.md`),
-единообразная для всех трёх категорий: один controlled-эксепшн на одной
-сделке → `Exchange.HOLD` + `AnomalyReport` + ручной разбор. Квалификатор
-«по severity / safetyImpact» для `ExternalStatusException` **снят** —
-эскалация безусловна и **доминирует над инструмент-L3**. Обоснование:
-контролируемая биржевая ошибка — сигнал недоверенной интеграции,
-истинный радиус поражения неизвестен, потому тормозим консервативно
-(вся биржа) (`docs/decisions/controlled-violation-exchange-wide-hold.md`).
+`Exchange -> TRADE_BLOCKED` во всех трёх блоках — **безусловная
+критическая реакция биржи** (уровень 4, ступень 2 лестницы —
+`docs/rules/exchange-hold.md`), единообразная для всех трёх категорий:
+один controlled-эксепшн на одной сделке → kill-switch flatten всей биржи
++ каскад активных сделок в `ERROR` + `AnomalyReport` + ручной разбор.
+Квалификатор «по severity / safetyImpact» для `ExternalStatusException`
+**снят** — эскалация безусловна и **доминирует над инструмент-L3**.
+Обоснование: контролируемая биржевая ошибка — сигнал недоверенной
+интеграции, истинный радиус поражения неизвестен, потому тормозим
+консервативно (вся биржа)
+(`docs/decisions/controlled-violation-exchange-wide-hold.md`).
 
-**Flatten на этой тропе снят** (лестница,
-`docs/decisions/exchange-safety-ladder.md`): kill-switch — реакция
-ступени 2 (живой риск без защиты), а не controlled-исключения; живые
-сделки под `HOLD` доживают под текущим стопом. Если controlled-эксепшн
-означает, что **защита живой сделки отсутствует или не подтверждается**,
-— это триггер ступени 2 (`Exchange.TRADE_BLOCKED`), не этой.
+**Flatten на этой тропе — состав реакции** (ревизия держателя,
+`GAPS_CLOSE_18`; `docs/decisions/exchange-safety-ladder.md`). Интерим-
+редакция, снимавшая его и оставлявшая ступень 1 («живые сделки доживают
+под текущим стопом»), **снята**: она держалась на посылке, что защита
+живой сделки исполняется биржей независимо от нашей интеграции, — а
+именно эту посылку controlled-эксепшн и ставит под вопрос. Площадке,
+повёдшей себя неожиданно, ничего не шлём: сворачиваемся kill-switch'ем и
+замолкаем.
 
 ## Разделение ответственности
 
@@ -78,5 +82,6 @@ Resolver FSM-решение не принимает и сущность не с�
 
 Правило сквозное по командам/статусам (`.claude/decisions/rule-source-of-truth.md`);
 пересекается с `docs/rules/external-status-resolution.md` (resolver-
-result, unknown→exception) и `docs/rules/exchange-hold.md` (что HOLD
-блокирует/разрешает). Эффект на `Deal` — `docs/lifecycles/Deal.md`.
+result, unknown→exception) и `docs/rules/exchange-hold.md` (что каждая
+ступень блокирует/разрешает). Эффект на `Deal` —
+`docs/lifecycles/Deal.md`.

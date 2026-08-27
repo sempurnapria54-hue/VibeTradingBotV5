@@ -16,7 +16,7 @@ expected = Order.positionReducingOnly
 actual   = OrderResponse.reduceOnly
 mismatch -> EXCHANGE_INVARIANT_VIOLATION
          -> Order.ERROR, closeReason = EXCHANGE_INVARIANT_VIOLATION,
-            Deal.ERROR, Exchange.HOLD
+            Deal.ERROR, Exchange.TRADE_BLOCKED (ступень 2 + flatten)
 ```
 
 Если биржа не поддерживает reduce-only/close-only — adapter может

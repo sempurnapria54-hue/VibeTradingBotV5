@@ -17,7 +17,7 @@ standalone main protection подтверждена active → attached снят
 ## Входные проверки
 
 `Deal.status = PROTECTION_SWITCHED`; позиция активна; main protection
-существует локально и связана через `DealActionState`; ≤1 позиция; нет
+существует локально и связана через `DealActionState`; ≤1 живая позиция; нет
 критичного расхождения БД/биржи; статус действительно применим. Если после
 рестарта switch не нужен, а позиция безопасна — safe forward recovery в
 `MANAGING`.

@@ -148,8 +148,8 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 Иначе валидация границы реджектила бы **каждую** сделку без фондирования
 или без ликвидационного штрафа: контракт требует, чтобы эти четыре поля
 были заполнены и парсились, а нарушение выражается
-`ExternalInvariantViolationException` ⇒ биржевая заморозка
-(`Exchange.HOLD`) с ручным
+`ExternalInvariantViolationException` ⇒ биржевая ступень 2
+(`Exchange.TRADE_BLOCKED` + flatten) с ручным
 снятием (`docs/models/mapping/PositionCloseResult.md` §«Контракт записи
 проверяется здесь»).
 

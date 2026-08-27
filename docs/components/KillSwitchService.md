@@ -11,9 +11,9 @@
 `KillSwitchService` — тонкий триггер `KillSwitchExecutor` для реактивной
 реакции холда. Kill-switch — состав **полных** реакций: L3-полной
 инструмента (`fireInstrument`) и ступени 2 биржевой лестницы
-(`fireExchange` → `Exchange.TRADE_BLOCKED`). У биржевой заморозки
-(`Exchange.HOLD`, ступень 1) kill-switch-шага нет — на ней сервис не
-зовётся (`docs/rules/exchange-hold.md`). Зовётся
+(`fireExchange` → `Exchange.TRADE_BLOCKED`). У биржевой ступени 1
+(`Exchange.HOLD` — ручной гейт входов) kill-switch-шага нет — на ней
+сервис не зовётся (`docs/rules/exchange-hold.md`). Зовётся
 `SafetyHoldCoordinator`'ом на шаге kill-switch
 (см. `docs/components/SafetyHoldCoordinator.md`); сам teardown и сверку
 реального состояния делает `KillSwitchExecutor`

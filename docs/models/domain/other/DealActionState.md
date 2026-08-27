@@ -259,6 +259,12 @@ domain ↔ persistence.
 - **`deal_strategy_action_states`** (существующая `deal_action_states`,
   **переименовывается** — таблицы пусты, `ALTER RENAME` дёшев).
   **Миграция шага 7:** rename; `strategy_action_id` остаётся `NOT NULL`;
+  **`+fk_deal_strategy_action_state_deal`** — FK `deal_id → deals(id)`
+  (B6 `DOCS_CHECK_18`): колонка `NOT NULL` с `V6`, а FK у неё не было,
+  тогда как таблица-близнец `deal_system_action_states` его получает.
+  Асимметрия снята выравниванием **вверх** — тем же доводом симметрии,
+  которым выровнен audit-состав; цена нулевая (таблицы пусты,
+  `.claude/rules/pre-launch-schema-changes.md`);
   `+target_entity_type` (**`varchar(64)`, nullable** — енум
   `TargetEntityType` строкой), `+target_entity_id` (**`bigint`,
   nullable**) — расплющенный `RuntimeTarget`; **+ шесть audit-колонок**

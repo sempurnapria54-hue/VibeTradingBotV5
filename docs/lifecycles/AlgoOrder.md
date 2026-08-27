@@ -77,7 +77,7 @@ safety-каскад (`docs/rules/external-status-resolution.md`).
 
 ## ERROR-переходы (safety cascade)
 
-`AlgoOrder -> ERROR`, `Deal -> ERROR`, `Exchange -> HOLD`
+`AlgoOrder -> ERROR`, `Deal -> ERROR`, `Exchange -> TRADE_BLOCKED`
 (`docs/rules/external-status-resolution.md`, `docs/rules/exchange-hold.md`):
 
 - **Problem/unknown external status** (`order_failed` →

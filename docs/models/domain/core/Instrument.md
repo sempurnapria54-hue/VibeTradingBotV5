@@ -225,7 +225,7 @@ snapshot↔domain — `docs/models/mapping/Instrument.md` (для шага 1 =
   бэкфилл не нужен — заведённых инструментов на момент ввода нет
   (`.claude/rules/pre-launch-schema-changes.md`), а каждый заводимый после
   получает валюты на тропе заведения. Полная schema-дельта
-  шага — `docs/decisions/pnl-finalization-mechanics.md` §Следствия.
+  шага — `docs/decisions/pnl-finalization-mechanics.md` §«Schema-дельта шага 7».
 - `internal_id`, `exchange_id`, `margin_mode` — `updatable = false`
   (неизменны после создания).
 - `status` и `margin_mode` хранятся строкой (имя enum); enum — только

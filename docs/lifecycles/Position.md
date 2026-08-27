@@ -18,8 +18,9 @@
 одной команды, H1/H3 `GAPS_CLOSE_7`): live `/account/positions` → при
 not-found `/account/positions-history` по `posId`. Вторая нога статус не
 меняет (его уже определил not-found первой ноги) — она **наполняет поля
-положения закрытия** на той же `Position`
-(`docs/models/domain/core/Position.md` §«Положение закрытия»).
+положения закрытия** на строках эпизодов сделки, у которых их ещё нет
+(`docs/models/domain/core/Position.md` §«Положение закрытия»,
+§«Смена эпизода» ниже).
 
 > Компоненты `PositionStatusResolver`, `RefreshPositionExecutor`,
 > `ClosePositionExecutor` — command-подсистема (шаг 4),
@@ -73,13 +74,17 @@ snapshot.externalSize == 0 -> status = ACTIVE (не CLOSED, пока биржа
 - **closeReason** заполняется только если текущий
   `Position.closeReason == null` (write-once: уже заполненный не
   перетирается).
-- snapshot найден, локальной `Position` нет (active Deal flow):
+- snapshot найден, живой `Position` у сделки нет (active Deal flow):
   создать `Position`, `dealId = Deal.id`, `status = ACTIVE`,
-  `direction = resolved`, заполнить `external*` поля. Штатный сценарий
-  после исполнения entry order.
-- snapshot найден, `Position` есть: `status = ACTIVE`, обновить
-  `external*`, проверить, что `direction` не изменилась.
-- snapshot не найден, `Position` есть: `status = CLOSED`,
+  `externalId = posId`, `direction = resolved`, заполнить `external*`
+  поля. Штатный сценарий после исполнения entry order — и он же
+  сценарий **второго эпизода** (§«Смена эпизода»).
+- snapshot найден, живой `Position` есть **и `posId` совпадает**:
+  `status = ACTIVE`, обновить `external*`, проверить, что `direction` не
+  изменилась.
+- snapshot найден, живой `Position` есть, **но `posId` другой** — смена
+  эпизода, §ниже.
+- snapshot не найден, живой `Position` есть: `status = CLOSED`,
   `closeReason = EXTERNAL_CLOSE` (если был null); **дальше — вторая нога**:
   запись positions-history по `Position.externalId` наполняет поля
   положения закрытия и `Deal.billsWindowEnd` (§«Кто управляет»). Запись не
@@ -98,6 +103,43 @@ snapshot.externalSize == 0 -> status = ACTIVE (не CLOSED, пока биржа
 направления live position — нарушение инварианта → error/safety-flow.
 При создании `direction` сверяется с expected из `DealContext` / entry
 action / entry order.
+
+## Смена эпизода (многоэпизодная сделка)
+
+Сделка многоэпизодна (`docs/decisions/multi-episode-deal.md`): позиция
+может схлопнуться в ноль и открыться заново — новой ногой входа,
+оставшейся живой в `MANAGING`. Биржа даёт новой позиции **новый
+`posId`**, и это единственный наблюдаемый признак смены.
+
+**Дискриминатор — `posId`, не размер.** `externalSize = 0` эпизод не
+закрывает (§«Status vs live risk»), а «позиция снова ненулевая» без
+смены `posId` — это тот же эпизод.
+
+```text
+live-нога вернула snapshot с posId ≠ Position.externalId живой строки:
+  1) живая строка -> CLOSED, closeReason = EXTERNAL_CLOSE (если был null)
+  2) создаётся новая строка эпизода: posId из snapshot, status = ACTIVE
+  3) вторая нога добывает положение закрытия для КАЖДОЙ строки сделки,
+     которая CLOSED и своего положения закрытия ещё не несёт
+```
+
+- **Шаг 3 — не «для закрывшейся сейчас», а для всех должников.**
+  Предикат добычи (`status = CLOSED` **и** `externalRealizedProfit`
+  пуст) делает ногу идемпотентной и покрывает эпизод, схлопнувшийся и
+  переоткрывшийся **между тиками**: его строка создаётся из записи
+  positions-history окна, а не из live-ответа.
+- **Эпизод, не наблюдавшийся живым**, материализуется тем же
+  механизмом, которым материализуется позиция, не наблюдённая вовсе:
+  запись адресуется инструментом и окном сделки
+  (`docs/models/domain/core/Position.md` §Инварианты), и **несколько
+  записей окна — несколько эпизодов**, каждая своей строкой по своему
+  `posId`.
+- **Стратегия переоткрытие не объявила** (`StrategyDetail
+  .positionReopenAllowed = false`) — второго эпизода не возникает по
+  построению: наблюдение `externalSize -> 0` в `MANAGING` снимает живые
+  входные ноги тем же порядком, что действует на выходе
+  (`docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»). Смена
+  `posId` у такой сделки — аномалия, а не режим.
 
 ## ERROR-переход (exchange invariant violation)
 

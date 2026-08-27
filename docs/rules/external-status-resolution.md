@@ -42,8 +42,14 @@
 <entity>.status = ERROR
 <entity>.closeReason = UNKNOWN_EXTERNAL_STATUS | MISSING_AFTER_REFRESH
 Deal.status = ERROR
-Exchange.status = HOLD   (см. docs/rules/exchange-hold.md)
+Exchange.status = TRADE_BLOCKED   (ступень 2 + kill-switch flatten;
+                                   см. docs/rules/exchange-hold.md)
 ```
+
+Ступень каскада — **вторая** (ревизия держателя, `GAPS_CLOSE_18`):
+нераспознанный статус и ненайденная после полного цикла сущность суть
+«биржа повела себя неожиданно», а такой площадке мы сворачиваем позиции
+и больше ничего не шлём.
 
 `ERROR` — это локальное safety-состояние сущности после
 невозможности безопасно интерпретировать внешний факт, а не

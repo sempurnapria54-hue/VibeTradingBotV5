@@ -132,7 +132,7 @@ parent ERROR
 ## ERROR-переходы (safety cascade)
 
 Оба сценария — cross-cutting safety-каскад `Order -> ERROR`,
-`Deal -> ERROR`, `Exchange -> HOLD` (см.
+`Deal -> ERROR`, `Exchange -> TRADE_BLOCKED` (см.
 `docs/rules/external-status-resolution.md` и `docs/rules/exchange-hold.md`):
 
 - **Unknown external status**: resolver бросает

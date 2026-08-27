@@ -99,11 +99,11 @@ Market data expired (по policy)     -> shutdownReason = MARKET_DATA_EXPIRED
 расхождение снято здесь, а не «где-нибудь ещё».
 
 **Сделки гасит только ступень 2 биржевой лестницы**
-(`Exchange.TRADE_BLOCKED`) и `DISABLED`. `Exchange.HOLD` — биржевая
-заморозка, ступень 1 — сделки **не гасит**: активные сделки не
-перехватываются и доживают под текущим стопом, `shutdownReason =
-EXCHANGE_HOLD` производится **только** каскадом ступени 2
-(`docs/rules/exchange-hold.md`).
+(`Exchange.TRADE_BLOCKED`) и `DISABLED`. `Exchange.HOLD` — мягкий холд,
+ступень 1 — сделки **не гасит**: активные сделки не перехватываются и
+ведутся штатным FSM в полном объёме (ремодел защиты, управление,
+закрытие); `shutdownReason = EXCHANGE_HOLD` производится **только**
+каскадом ступени 2 (`docs/rules/exchange-hold.md`).
 
 **Не** заполняется (`shutdownReason = null`) при обычном выходе:
 strategy exit → `closeReason = STRATEGY_EXIT`; TP/SL → `TAKE_PROFIT`/
@@ -157,16 +157,23 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
   держателя П11, вариант 3). `resultProfit` считается по строкам
   `DealCashFlow`, а они усекаемы глубиной конвейера добычи и нерезолвившимся
   курсом; оба усечения **завышают** число. Предикат неполноты собран из уже
-  существующих фактов — `Deal.breakdownIncomplete = INCOMPLETE_BY_WINDOW`
-  **либо** прилинкованная cross-ccy-строка без `rateStatus = APPLIED`;
-  отдельного признака полноты числа **не заводится**. Число пишется и
-  остаётся наблюдаемым, но чистого `CLOSED` такая сделка не получает
+  существующих фактов и записан **перечнем значений** (Г1 + B3
+  `DOCS_CHECK_18`): `breakdownIncomplete ∈ {INCOMPLETE_BY_WINDOW,
+  NOT_ASSESSED}` **либо** прилинкованная строка `DealCashFlow` с
+  `rateStatus ∈ {RATE_UNAVAILABLE, SETTLE_CURRENCY_UNAVAILABLE}`;
+  отдельного признака полноты числа **не заводится**. **Актор — выходная
+  проверка `ExitPendingHandler`** (`docs/components/ExitPendingHandler.md`
+  §«Выходные проверки»): она уводит сделку `EXIT_PENDING → ERROR`, живая
+  строка `FINALIZE_DEAL_EXIT_ACTION` закрывается `SKIPPED`, холд не
+  поднимается. Число пишется и остаётся наблюдаемым, но чистого `CLOSED`
+  такая сделка не получает
   (`docs/components/FinalizeDealExitExecutor.md` §«Признаки отбора»).
 - **Сверка была обязана выполниться и не выполнилась → тоже ошибочный
   терминал** (H10 `DOCS_CHECK_14`; принцип переформулирован через
   **обязанность** — H2 `DOCS_CHECK_15`, решение пользователя). Обязанность
-  выражена составным durable-предикатом из существующих полей: запись
-  закрытия добыта (`Position.externalRealizedProfit` непуст) **и** окно
+  выражена составным durable-предикатом из существующих полей: записи
+  закрытия добыты у **всех** эпизодов сделки
+  (`Position.externalRealizedProfit` непуст на каждой строке) **и** окно
   движений закрыто (`Deal.billsWindowEnd` непуст). Наступила и не
   исполнена — сделка уходит **ошибочной тропой** к `EMERGENCY_CLOSED`.
   Успешного `CLOSED` с невыполненной обязанной сверкой не существует —
@@ -183,7 +190,7 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
   - **Правые операнды четырёх пар сюда больше не попадают** (H5
     `DOCS_CHECK_15`): их обязательность проверяется **на границе
     интеграции**, и нарушение уводит сделку тем же ошибочным терминалом,
-    но **с** биржевой заморозкой (`Exchange.HOLD`, ступень 1,
+    но **с** биржевой ступенью 2 (`Exchange.TRADE_BLOCKED` + flatten,
     `docs/rules/exchange-hold.md`) — радиус там неизвестен
     (`docs/models/mapping/PositionCloseResult.md` §«Контракт записи
     проверяется здесь»).
@@ -206,9 +213,11 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
   `MARK_DEAL_CLOSED_COMMAND`) с **best-effort числом** — **два провенанса разведены**
   (`docs/decisions/pnl-finalization-mechanics.md` реш.3):
   - **(a) ликвидация/ADL** (позицию закрыла биржа —
-    `Position.externalCloseType ∈ 3..6`): net доступен полем
-    `Position.externalRealizedProfit` → число считается **по той же
-    формуле, что на чистой тропе** (net + cross-ccy-слагаемое): best-effort
+    `Position.externalCloseType ∈ 3..6`): net доступен полями
+    `Position.externalRealizedProfit` строк эпизодов → число считается
+    **по той же
+    формуле, что на чистой тропе** (Σ net по эпизодам +
+    cross-ccy-слагаемое): best-effort
     относится к **доступности** числа, не к его **составу** (H12
     `DOCS_CHECK_10`; формулировка «фактический realized net» снята H18
     `DOCS_CHECK_11` — она читалась как «на аварийной тропе слагаемого
@@ -228,8 +237,8 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
     инварианту, ради которого асимметрия вводилась).
     **Контролируемое исключение под приравнивание не подпадает** (H4
     `DOCS_CHECK_15`): дефект содержимого ответа даёт **биржевую
-    заморозку** (`Exchange.HOLD`, ступень 1) и здесь тоже, параллельно с
-    ошибочным терминалом — ветки не
+    ступень 2** (`Exchange.TRADE_BLOCKED` + flatten) и здесь тоже,
+    параллельно с ошибочным терминалом — ветки не
     конкурируют (`docs/components/ServiceCommandExecutor.md` §«Контракт
     броска»; `docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия
     троп отказа добычи»).

@@ -9,12 +9,20 @@
 
 Получает `FINALIZE_DEAL_EXIT_COMMAND` — консолидацию фактов штатного выхода после
 того, как live risk снят, **и расчёт итогового `resultProfit`** (шаг 7).
-**Читает** подтверждённые факты выхода (`Position` закрыта/отсутствует по
+**Читает** подтверждённые факты выхода (живого эпизода `Position` нет по
 `REFRESH_POSITION_COMMAND`; нет live orders/algo; `Deal.CloseReason` определён) плюс
 P&L-факты: `DealCashFlow` (категорийная разбивка, добыта **до него**
-командой `REFRESH_BILLS_COMMAND`) и **положение закрытия на `Position`** (готовый
-net `realizedPnl` в поле `Position.externalRealizedProfit`) — см.
-§«Положение закрытия — читается со строки». Для **допуска сверки**
+командой `REFRESH_BILLS_COMMAND`) и **положения закрытия на строках
+эпизодов** (готовый net `realizedPnl` в поле
+`Position.externalRealizedProfit` каждой строки) — см.
+§«Положение закрытия — читается со строки».
+
+**Число сделки — Σ по эпизодам** (`docs/decisions/multi-episode-deal.md`):
+сделка многоэпизодна, и финализатор складывает готовые net'ы её строк, а
+правые операнды четырёх пар сверки берёт суммами по тем же строкам.
+Эпизод без добытого положения закрытия делает число **недоступным**
+(звено не завершается), а не заниженным: подстановка нуля запрещена
+(`docs/rules/absent-value-semantics.md`). Для **допуска сверки**
 дочитывает операнды планового риска **по каждой ноге входа**
 (`Order.plannedRiskAmount` / `plannedEntryPrice` / `plannedSizeContracts` /
 `plannedContractValue` / `plannedStopPrice` — все пять write-once на самой
@@ -54,8 +62,8 @@ bills ↔ net». **Навес `InstrumentExternalRules` не читает** (H5
   `docs/models/domain/other/DealActionState.md`). Рестарт до завершения
   перезапускает звено: число пересчитывается из тех же persisted-полей и
   пишется в той же транзакции. Рестарт после завершения — no-op.
-- **поля пусты (запись закрытия не добыта) → звено не эмитится и не
-  завершается** (узел 4 `DOCS_CHECK_8`, вариант (а)):
+- **поля пусты хотя бы у одного эпизода (запись закрытия не добыта) →
+  звено не эмитится и не завершается** (узел 4 `DOCS_CHECK_8`, вариант (а)):
   `FINALIZE_DEAL_EXIT_COMMAND` эмитится `SystemActionExecutor` только по
   **терминальному исходу добычи** (`REFRESH_DEAL_CONTEXT_ACTION` довёл
   цикл), а без числа не завершается. Исчерпание бюджета добычи →
@@ -76,7 +84,7 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
 **Расчёт `Deal.resultProfit` — здесь.** Шаг 6 поставил *механику* финализации
 (retry-state, терминальное ребро, триггер, идемпотентность) и
 интерим-placeholder ZERO; шаг 7 наделяет `FINALIZE_DEAL_EXIT_COMMAND` **расчётом и
-записью числа** на `Deal`: net из `Position.externalRealizedProfit` +
+записью числа** на `Deal`: Σ `Position.externalRealizedProfit` по эпизодам +
 разбивка из `DealCashFlow` + сверка. `MARK_DEAL_CLOSED_COMMAND`
 (`MarkDealClosedExecutor`) число **не пишет** — читает готовое `Deal.resultProfit`,
 ассертит непустоту и ставит терминал `CLOSED` (N7). Placeholder ZERO снят.
@@ -354,7 +362,7 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
     | не наступила | — | `NOT_RUN`, успешный терминал |
 
     Обязанность выражена тем же составным предикатом, что у правых операндов
-    пар: запись закрытия добыта (`Position.externalRealizedProfit` непуст)
+    пар: записи закрытия добыты у **всех** эпизодов (`Position.externalRealizedProfit` непуст на каждой строке)
     **и** окно движений закрыто (`Deal.billsWindowEnd` непуст)
     (`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта»).
 
@@ -478,12 +486,47 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
     курсом**, — и оба усечения уменьшают вычитаемую издержку, то есть
     **завышают** число направленно. Отсюда:
     - **предикат неполноты — из уже существующих фактов**, новой колонки
-      нет: `Deal.breakdownIncomplete = INCOMPLETE_BY_WINDOW` **либо** среди
-      прилинкованных строк есть cross-ccy-строка без `rateStatus = APPLIED`
-      (та же, чей `AnomalyReport` — `CROSS_CCY_RATE_UNAVAILABLE`);
+      нет; **оба дизъюнкта записаны перечнем значений, без неявного
+      «иначе»** (Г1 + B3 `DOCS_CHECK_18`):
+
+      ```text
+      неполное число ⇔
+        Deal.breakdownIncomplete ∈ {INCOMPLETE_BY_WINDOW, NOT_ASSESSED}
+        ИЛИ ∃ прилинкованная строка DealCashFlow с
+              rateStatus ∈ {RATE_UNAVAILABLE, SETTLE_CURRENCY_UNAVAILABLE}
+      ```
+
+      - **`NOT_ASSESSED` в перечне** — «не проверяли» не то же, что
+        «проверили, всё в порядке» (`docs/rules/absent-value-semantics.md`
+        §«Благоприятное значение по умолчанию запрещено»: признак
+        нарушения — предикат вида «перечень ⇒ значения, **иначе** —
+        благоприятное»). Прежняя редакция называла только
+        `INCOMPLETE_BY_WINDOW`, и третье значение уходило в неявное
+        `иначе` ⇒ чистый `CLOSED`. Ветка достижима штатно
+        (`docs/lifecycles/Deal.md` §«Признаки отбора на рёбрах в
+        терминал» прямо допускает `NOT_ASSESSED` на ребре
+        `EXIT_PENDING → CLOSED`), и на популяции без отправленной ноги
+        входа она **постоянна**;
+      - **cross-ccy-дизъюнкт — по значениям `rateStatus`, а не по
+        «cross-ccy-строке без `APPLIED`»**. У строки со
+        `SETTLE_CURRENCY_UNAVAILABLE` cross-ccy-ность **неопределима по
+        построению** (расчётная валюта не резолвилась), а вывод из `ccy`
+        в этом кластере запрещён явно
+        (`docs/models/mapping/DealCashFlow.md` §«Cross-ccy-область
+        ключуется признаком состояния курса, а не `ccy`»). Перечень
+        значений выразим колонкой и решает обе неопределённости разом;
+        `NOT_REQUIRED` и `APPLIED` в него не входят — это и есть полнота;
     - **исход — ошибочная тропа** к `EMERGENCY_CLOSED`, а не успешный
       `CLOSED`. Число пишется и остаётся наблюдаемым; терминал говорит, что
       доверять ему как чистому нельзя;
+    - **актор маршрутизации — `ExitPendingHandler`, выходной проверкой**
+      (Г2 `DOCS_CHECK_18`). Финализатор предикат **не исполняет**: он
+      пишет число и признаки своей транзакцией, а развилкой
+      «`CLOSED` vs `ERROR`» на этой тропе уже владеет handler
+      (`docs/components/ExitPendingHandler.md` §«Выходные проверки»).
+      Так решение получает и точку вычисления, и актора, не заводя ни
+      пятого ребра у `MarkDealClosedExecutor`, ни конструкции «звено с
+      двумя статусными исходами», которой канон не знает;
     - **отдельного признака полноты числа не заводится** — ни третьего
       значения `breakdownIncomplete`, ни `resultProfitCompleteness`
       (вариант 2 предложения владельца отвергнут держателем).

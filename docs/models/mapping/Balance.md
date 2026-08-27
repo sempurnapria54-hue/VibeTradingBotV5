@@ -103,7 +103,7 @@ snapshot полностью заменяет старый список currency 
   risk-creating action не выполняется; `RiskValidator` при
   absent/stale/invalid возвращает `BLOCKED`; для active Deal возможен
   переход `Deal → ERROR` по FSM policy; для account-level safety
-  problem возможен `Exchange.HOLD`.
+  problem возможен `Exchange.TRADE_BLOCKED` (ступень 2).
 - **Normal null contract не используется:** успешный refresh обязан
   вернуть валидный snapshot с settleCurrency; empty/missing/invalid
   → exception / controlled error.

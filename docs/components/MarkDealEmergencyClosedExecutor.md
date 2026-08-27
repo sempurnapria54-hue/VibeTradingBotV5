@@ -36,9 +36,9 @@ FSM пересекает штатно, добыл его тот же `REFRESH_PO
   ликвидация/ADL, `Position.externalCloseType ∈ 3..6`; но ветвь
   определяется **добытостью записи**, а не тем, кто закрыл: маршрута
   «закрыла биржа ⇒ аварийная тропа» не существует, H22 `DOCS_CHECK_14`):
-  `realizedPnl` доступен полем
-  `Position.externalRealizedProfit` → число считается **по той же формуле,
-  что на чистой тропе**: net **плюс cross-ccy-слагаемое**
+  `realizedPnl` доступен полями `Position.externalRealizedProfit` строк
+  эпизодов → число считается **по той же формуле,
+  что на чистой тропе**: Σ net по эпизодам **плюс cross-ccy-слагаемое**
   Σ(`amount` × `appliedRate`) по строкам cross-ccy-области
   (конъюнктивный предикат — §«Состав числа — тот же, что у штатной
   тропы»).
@@ -63,8 +63,8 @@ FSM пересекает штатно, добыл его тот же `REFRESH_PO
   асимметрия вводилась.
   - **Контролируемое исключение под приравнивание не подпадает** (H4
     `DOCS_CHECK_15`, решение пользователя). Дефект **содержимого** ответа
-    (`ControlledExchangeException`) даёт **биржевую заморозку**
-    (`Exchange.HOLD`, ступень 1, без kill-switch —
+    (`ControlledExchangeException`) даёт **биржевую ступень 2**
+    (`Exchange.TRADE_BLOCKED`, kill-switch flatten —
     `docs/rules/exchange-hold.md`) и на
     аварийной тропе тоже; сделка при этом **закрывается терминальным
     ошибочным статусом** — ветки не конкурируют, терминал разрешён тем же
@@ -84,8 +84,8 @@ FSM пересекает штатно, добыл его тот же `REFRESH_PO
 
 **Best-effort относится к доступности числа, а не к его составу.** Когда
 net доступен, аварийный терминал пишет `resultProfit` по **той же
-формуле**, что и `FinalizeDealExitExecutor`: net из
-`Position.externalRealizedProfit` **+ Σ(`amount` × `appliedRate`)** по
+формуле**, что и `FinalizeDealExitExecutor`: Σ
+`Position.externalRealizedProfit` по эпизодам **+ Σ(`amount` × `appliedRate`)** по
 строкам cross-ccy-области — **`rateStatus = APPLIED` и тип вне списка
 исключений биржи и категория экономическая (не `OTHER`)**
 (`docs/models/domain/aggregate/Deal.md`

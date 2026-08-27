@@ -83,8 +83,8 @@
   терминала у мягкой ветки нет. **Отчёт об аномалии мягкая ветка не
   производит** — его заводит детектор, если факт того стоит (H14
   `GAPS_CLOSE_13`). Ветка **инструментная**: биржевого радиуса у `SOFT`
-  нет; биржевая заморозка — не `SOFT`, а отдельная биржевая форма
-  `FREEZE` (§ниже).
+  нет; биржевая ступень 1 реактивным сигналом не ставится вовсе
+  (§ниже).
 - **Групповой и аккаунтный радиус мягкой реакции — набором вызовов.**
   Детектор, у которого обесценен факт целой группы или всего аккаунта,
   разворачивает радиус в **набор инструментов** и зовёт сервис по
@@ -93,13 +93,14 @@
   (`docs/rules/instrument-hold.md`): развёртка набора существует в любом
   варианте, и отдельного значения `HoldScope`, мягкой биржевой фабрики
   или читателя навеса внутри сервиса не заводится.
-- **`FREEZE`** — биржевая заморозка (ступень 1 лестницы,
-  `docs/rules/exchange-hold.md`): `Exchange.HOLD` + `AnomalyReport`
-  (`NON_CRITICAL`, `kind = STATE`) **напрямую**, координатор не зовётся —
-  каскада активных сделок в `ERROR` и kill-switch-шагов у заморозки нет,
-  живые сделки доживают под текущим стопом. Снятие — вручную в `ACTIVE`.
-  Статус `Exchange.HOLD` и эта ветка **вводятся на `CODE`**
-  (`docs/rules/exchange-hold.md` §«Состояние носителей»).
+- **Биржевой ступени 1 у сервиса ветки нет** (ревизия держателя,
+  `GAPS_CLOSE_18`). `Exchange.HOLD` — **ручной** мягкий холд и посадочная
+  ступень при снятии `TRADE_BLOCKED`; автоматических триггеров у неё не
+  осталось, поэтому класс реакции `FREEZE` и фабрика
+  `exchange(code, exchangeId)` **в код не вводятся**
+  (`docs/rules/exchange-hold.md` §«Что переводит в HOLD»). Ручную
+  постановку делает сервисная операция, реактивный контур в ней не
+  участвует.
 - **`FULL`** — полная реакция: `TRADE_BLOCKED` + teardown. Последовательность
   (анкер идемпотентности, слепки, kill-switch, гейт терминала, эскалация
   инструмент→биржа) держит `SafetyHoldCoordinator`
@@ -110,7 +111,7 @@
 уже находящемуся в `ENTRY_BLOCKED` или `TRADE_BLOCKED`, — no-op; обратной
 эскалации нет. Переход `ENTRY_BLOCKED → TRADE_BLOCKED` разрешён и реакцию
 не пропускает. Симметрично на бирже: **`Exchange.HOLD` — не анкер
-идемпотентности** — биржа под заморозкой обязана принять последующий
+идемпотентности** — биржа под мягким холдом обязана принять последующий
 триггер ступени 2, эскалация `HOLD → TRADE_BLOCKED` разрешена и реакцию
 не пропускает (`docs/rules/exchange-hold.md` §«Границы и эскалация»);
 анкер `FULL`-реакции биржи — `Exchange.TRADE_BLOCKED`.
@@ -157,7 +158,7 @@
 
 | Что перехвачено | Реакция |
 |---|---|
-| `ControlledExchangeException` (все подклассы: `ExternalStatusException`, `ExternalInvariantViolationException`, `ExternalNotFoundException`) | безусловная **биржевая заморозка (ступень 1)** — `exchange(code, exchangeId)`, `FREEZE` биржевой: `Exchange.HOLD` + `AnomalyReport`, без kill-switch и каскада (`docs/rules/controlled-exchange-exceptions.md` §Эскалация; лестница — `docs/rules/exchange-hold.md`) |
+| `ControlledExchangeException` (все подклассы: `ExternalStatusException`, `ExternalInvariantViolationException`, `ExternalNotFoundException`) | безусловная **биржевая ступень 2** — `exchangeTradeBlock(code, exchangeId)`, `FULL` биржевой: `Exchange.TRADE_BLOCKED` + kill-switch flatten + каскад активных сделок в `ERROR` + `AnomalyReport` (`docs/rules/controlled-exchange-exceptions.md` §Эскалация; лестница — `docs/rules/exchange-hold.md` §«Что переводит в TRADE_BLOCKED», п.1) |
 | `RetryBudgetExhaustedException` — **исчерпание бюджета попыток** (строка исполнения уже `FAILED`; первопричина — в `cause`: ретраябельный `ExchangeIntegrationException`, non-retryable `INTERNAL_ERROR`/`VALIDATION_ERROR`, ACK-реджект либо легитимно-пустой исход исчерпанного цикла) | `instrument(RETRY_BUDGET_EXHAUSTED, instrumentId)` — **полная реакция инструмента** (`FULL` + kill-switch), **одна на все тропы** (H8 `DOCS_CHECK_16`, решение держателя `GAPS_CLOSE_16`: различителя не заводить). Прежняя мягкая форма и «записанное отклонение» для этого типа сняты; цена названа в §«Различителя нет» и в `docs/rules/instrument-hold.md` |
 
 **Контракт броска — на стороне исполнителя** (H1 `DOCS_CHECK_15`):
