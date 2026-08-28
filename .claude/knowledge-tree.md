@@ -129,7 +129,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v88.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v89.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -169,6 +169,7 @@
 │       │   ├── phase-1-step-7-docs-check-19.md — Каков исход DOCS_CHECK_19 шага 7?
 │       │   ├── phase-1-step-7-docs-check-20.md — Каков исход DOCS_CHECK_20 шага 7?
 │       │   ├── phase-1-step-7-docs-check-21.md — Каков исход DOCS_CHECK_21 шага 7?
+│       │   ├── phase-1-step-7-docs-check-22.md — Каков исход DOCS_CHECK_22 шага 7?
 │       │   ├── phase-1-step-7-risk-q4-anom-q5.md — Что предлагается по RISK-Q4 и ANOM-Q5?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
@@ -190,7 +191,8 @@
 │       │   ├── phase-1-step-7-gaps-close-18.md — Каков исход закрытия находок DOCS_CHECK_18?
 │       │   ├── phase-1-step-7-gaps-close-19.md — Каков исход закрытия находок DOCS_CHECK_19?
 │       │   ├── phase-1-step-7-gaps-close-20.md — Каков исход закрытия находок DOCS_CHECK_20?
-│       │   └── phase-1-step-7-gaps-close-21.md — Каков исход закрытия находок DOCS_CHECK_21?
+│       │   ├── phase-1-step-7-gaps-close-21.md — Каков исход закрытия находок DOCS_CHECK_21?
+│       │   └── phase-1-step-7-gaps-close-22.md — Каков исход закрытия находок DOCS_CHECK_22?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)

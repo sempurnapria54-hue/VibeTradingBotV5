@@ -604,6 +604,14 @@ closing, не открывают позицию). Для `OCO_FULL`: SL из
 (ключ настройки структуры, для `MARKET_STRUCTURE_BUFFER_PERCENT`:
 swing/range/support/resistance).
 
+**До измерения базиса `last` ↔ `mark` create принимает только
+`triggerPriceType = MARK`** (реджект `STRATEGY_TRIGGER_PRICE_TYPE_NOT_MARK`,
+400). Ограничение временное, дом формулировки и условие снятия —
+`docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
+защиты объявляется стратегией и доезжает до биржи»; енум `TriggerPriceType`
+при этом **не сужается** — сужена популяция принимаемых конфигураций, а не
+модель.
+
 ### TrailingSettings
 `activationProfitPercents` (null — сразу), `callbackPercents`
 (callback ratio/percent на биржу), `activationBufferPercents`.
@@ -705,8 +713,19 @@ CHECK-констрейнты, отвергнутые альтернативы) �
   (`numeric(36,18)`, nullable — та же nullability, что у прочих
   риск-полей детали) — сделочный лимит риска (C6 `DOCS_CHECK_20` +
   `RISK-Q3-A`, дом — `docs/decisions/per-trade-risk-policy.md` §«Три
-  лимита внутри уровня „риск на сделку“»). **Одновременный лимит
-  колонки не получает** — он глобальный конфиг, не поле детали. Бэкфилл не
+  лимита внутри уровня „риск на сделку“»); и
+  **`+strategy_simultaneous_risk_per_deal_percent`** (`numeric(36,18)`,
+  nullable — **максимум стратегии** на одновременный риск, C9
+  `DOCS_CHECK_21`). **Глобальный** максимум одновременного риска колонки
+  не получает — он конфиг (`@ConfigurationProperties`), не поле детали.
+  *(B4 `DOCS_CHECK_22`: перечень нёс три позиции из четырёх, а отрицание
+  стояло безусловным — «одновременный лимит колонки не получает», — при
+  том что колонка максимума стратегии названа ниже в этом же разделе
+  (буллет о типах числовых полей). Место истины схемы объявлено ведущим при
+  расхождении с составом сборки (`docs/rules/persistence-representation.md`
+  §«Место истины схемы — §Персистентность модели»), поэтому ложное
+  отрицание здесь читалось бы как указание снести колонку из сборки.)*
+  Бэкфилл не
   нужен — таблицы пусты
   (`.claude/rules/pre-launch-schema-changes.md`). Полная schema-дельта
   шага — `docs/decisions/pnl-finalization-mechanics.md`

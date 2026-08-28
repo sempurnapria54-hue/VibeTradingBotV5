@@ -212,7 +212,13 @@ realized net» без слагаемого — и
   - **Полноту разбивки аварийный терминал считает тем же сравнением**
     (H4 `GAPS_CLOSE_13`): `Deal.breakdownIncomplete` — **возраст нижней
     границы окна на позднейший из двух моментов**
-    (`max(billsFetchedThrough, billsWindowEnd) − billsWindowBegin`)
+    (`max(billsFetchedThrough, billsWindowEnd) − нижняя граница окна`,
+    где нижняя граница — `Deal.billsWindowBegin`, при его пустоте
+    суррогат `Deal.externalCreatedAt`; операнд **один на все три роли** —
+    `docs/components/RefreshBillsExecutor.md` §«Нижняя граница: поле или
+    суррогат». Прежде здесь стоял голый `billsWindowBegin` — третий
+    носитель формулы, до которого правка A6 `DOCS_CHECK_21` не дошла;
+    найден свипом `GAPS_CLOSE_22`, ни одной линзой не назван)
     против глубины архивной выдачи (операнд — H20 `DOCS_CHECK_15`,
     составная форма — решение держателя П4 валидации `GAPS_CLOSE_17`,
     вариант C: операнд монотонен и не зависит от тропы), значения
@@ -283,6 +289,16 @@ PNL_RECONCILIATION_MISMATCH, exchangeId))` **после коммита** тра�
 напрямую не эмитит, канон `docs/decisions/fsm-execution-layering.md`
 §«Handler исполняет действия»; симметрично `MARK_DEAL_CLOSED_COMMAND`
 (`docs/components/MarkDealClosedExecutor.md` §«Терминальное ребро»).
+
+**Терминал закрывает живые SYSTEM-исполнения сделки — своей
+транзакцией.** Применив терминал, executor зовёт
+`SystemActionExecutor.reviseLiveExecutions(dealContext)`: терминализованная
+сделка в выборку следующего прохода **не попадает**, поэтому её живые
+SYSTEM-строки не закроет никто, кроме ребра, применившего терминал.
+Предикат неактуальности и довод —
+`docs/components/SystemActionExecutor.md` §«Ревизия живых
+SYSTEM-исполнений» (клауза внесена A1 `DOCS_CHECK_22`, симметрично
+штатной тропе).
 
 ## Идемпотентность и retry
 
