@@ -38,7 +38,6 @@
   устарело, или сервис рыночных данных не может вернуть актуальную цену —
   сигнализирует контролируемую ошибку расчёта **броском** `CalculationException`
   (несёт `CalculationError`; `StrategyActionCalculator` перехватывает →
-  `ERROR`-результат, см. `docs/components/models/CalculationError.md`
-  §«Механизм сигнализации»), а не считает по старым данным
+  `ERROR`-результат, см. `docs/components/models/CalculationError.md`), а не считает по старым данным
   (`docs/rules/market-data-freshness.md`). Конкретно: при отсутствии рыночной
   цены — **temporary** `CalculationException` с кодом `NO_MARKET_PRICE`.

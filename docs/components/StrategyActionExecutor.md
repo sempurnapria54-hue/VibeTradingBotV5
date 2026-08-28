@@ -12,7 +12,7 @@
 `DealActionState` и выдаёт **следующую** команду действия (`place →
 refresh-подтверждение по фактам → следующая`) либо пустой `ActionPlan`
 («готово / нечего делать»). Секвенс ведёт петля по подтверждённым фактам,
-не по ACK (см. `docs/decisions/fsm-execution-layering.md`). Обобщает
+не по ACK (см. `docs/processes/fsm-execution-layering.md`). Обобщает
 прежние `DealActionPlanner` (стадии/повтор) + `ServiceCommandFactory`
 (эмиссия команды по типу действия), разложенные по типам действий.
 
@@ -38,13 +38,12 @@ ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state,
   `docs/components/CreateAlgoOrderActionExecutor.md`);
 - `ExitActionExecutor` (`EXIT_ACTION` над `StrategyPositionAction`,
   `docs/components/ExitActionExecutor.md`) — компонент-док заведён
-  решением держателя (валидация `GAPS_CLOSE_17`, позиция П16) и входит в
-  объём `CODE` шага 7; в перечне его **не было** (P7 `DOCS_CHECK_24`).
+  решением держателя и входит в
+  объём `CODE` шага 7; в перечне его **не было**.
 
 **Перечень пересобирается по составу компонент-доков, а не пополняется по
 памяти правки.** Исполнители действий `REPLACE` и `CANCEL` в нём
 отсутствуют потому, что их **нет**, а не потому, что перечень отстал:
 диспетчер на такое действие возвращает пустой `ActionPlan`
 (`docs/components/StrategyActionOrchestrator.md`), и это
-зарегистрированная дельта `CODE` (`.claude/work/backlog.md` §«Шаг 7 —
-исполнительный хвост»), а не доковый пробел.
+зарегистрированная дельта `CODE` (`.claude/work/backlog.md`), а не доковый пробел.

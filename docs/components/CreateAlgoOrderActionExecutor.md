@@ -29,29 +29,18 @@ take-profit; `OCO_FULL` → обе; `TRAILING_*` → trailing. Иначе защ
 
 ## Отношение к risk и направление
 
-**Прогоняет `RiskValidator` по ветке risk-weakening** (A1 `DOCS_CHECK_24`).
+**Прогоняет `RiskValidator` по ветке risk-weakening**.
 Действие reduce-only и позицию не открывает, поэтому входной набор
 неравенств к нему не применяется, — но `CREATE_ALGO_ORDER_COMMAND` **входит**
 в множество валидируемых как «создание защитного algo-order, не
 обеспечивающего требуемый контроль риска»
-(`docs/rules/risk-validator-scope.md` §Вызывается). Здесь считается
-**предикат покрытия** (`docs/rules/risk-creating-entry-protection.md`
-§«Предикат покрытия и точки его проверки», строка «преконтроль»);
+(`docs/rules/risk-validator-scope.md`). Здесь считается
+**предикат покрытия** (`docs/rules/live-risk-protection.md`, строка «преконтроль»);
 `BLOCKED` `PROTECTION_COVERAGE_REDUCED` в `ERROR` не уводит
-(`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
-сделки»).
-
-**Прежняя редакция («Risk-валидацию не проходит: algo-защита reduce-only,
-позицию не открывает») утверждала о названном правиле факт, которого в нём
-нет**, и оставляла преконтрольную точку предиката покрытия **без
-вызывающего**: этот executor — единственный планировщик действия над
-standalone algo-order, а соседний `docs/components/CreateAlgoOrderExecutor.md`
-в то же время писал, что валидатор на алго-тропе вызывается по ветке
-weakening. Смешаны были две разные вещи: «не валидируется **как вход**»
-(истинно) и «не валидируется вовсе» (ложно).
+(`docs/processes/risk-evaluation.md`).
 
 Направление — закрывающее к направлению сделки
 (`positionReducingOnly = true`). Ошибка расчёта
 возвращается как `calcError`-`ActionPlan`. Сам команды не исполняет и
 статус сделки не двигает. Секвенс ведёт петля по подтверждённым фактам
-(см. `docs/decisions/fsm-execution-layering.md`).
+(см. `docs/processes/fsm-execution-layering.md`).

@@ -34,8 +34,7 @@ embedded защитного algo-order'а внутри `Order` (см.
 по статусу parent: `CREATED/PENDING` → ждать; `ACTIVE/PARTIALLY_COMPLETED`
 → доп. search-cycle; `COMPLETED` → анализ позиции/fills; `CANCELED` →
 `PARENT_ORDER_CANCELED`; `ERROR` → `UNKNOWN`) — владелец
-`docs/lifecycles/Order.md` (§«Attached protection resolving», §«Missing
-attached protection policy»). Здесь не дублируется: resolver применяет эту
+`docs/lifecycles/Order.md` (,). Здесь не дублируется: resolver применяет эту
 матрицу, не переопределяет её.
 
 ## Границы

@@ -23,7 +23,7 @@ live-вызова, а `RiskValidator` фазы 1 в биржу не ходит �
 отклонит (или скорректирует при `pxAmendType=1` — см. `order.md`).
 Предварительная сверка цены с лимитами — **форвард** (в валидатор фазы 1 не
 входит без явной live-точки преконтроля). Решено на шаге 5
-(`docs/decisions/instrument-external-rules-materialization.md`).
+(`docs/models/domain/other/InstrumentExternalRules.md`).
 
 ## GET /api/v5/public/price-limit
 

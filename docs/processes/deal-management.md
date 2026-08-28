@@ -49,7 +49,7 @@ DealStateMachine / handler
        FINALIZE_DEAL_ERROR_ACTION) -> звенья-команды; состав звена выводится из
        Deal.status (docs/components/SystemActionExecutor.md). Статусные рёбра,
        являющиеся исходом системного действия, пишет звено, а не handler
-       (docs/decisions/fsm-execution-layering.md)
+       (docs/processes/fsm-execution-layering.md)
 
 ServiceCommandExecutor -> конкретный Executor
   -> исполняет атомарную операцию, обновляет DealActionState
@@ -74,8 +74,7 @@ non-terminal; `ERROR → CLOSED` запрещён; `ERROR → EMERGENCY_CLOSED` 
 смягчением по валюте на тропах закрытия без входа** (там ассерт ребра
 проверяет только `resultProfit`, а валюта пишется, только если
 резолвится), для ошибочного `EMERGENCY_CLOSED` — по терминальному
-контракту (`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»
-и §«Смягчение по валюте на тропах без входа», DEAL-Q2). Безусловное
+контракту. Безусловное
 прочтение «обязательны оба поля» даёт недостижимый терминал на самом
 частом сценарии сканера.
 

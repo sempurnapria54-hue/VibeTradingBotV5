@@ -1,87 +1,49 @@
-# Запрет partial close позиции
+# Полный выход и частичное уменьшение
 
 ## На какой вопрос отвечает этот файл
 
-Какое правило системы запрещает частичное закрытие позиции через
-close-position и где выполняется частичный выход.
+Чем выражается полное закрытие позиции и чем — частичное уменьшение.
 
 ## Правило
 
-- `CLOSE_POSITION_COMMAND` используется только для **полного** закрытия
-  позиции. Direct partial close через `Position` / `CLOSE_POSITION_COMMAND`
-  запрещён.
-- Полное закрытие выражается **двумя способами, и оба законны** (решение
-  держателя `GAPS_CLOSE_16`; прежняя клауза «полное закрытие — **не**
-  действие стратегии» снята):
-  - **условие-переход** `MANAGING → EXIT_PENDING` — шаг `EXIT` несёт
-    только условие, действий у него нет;
-  - **явное действие шага `EXIT`** — стратегия называет выход действием, а
-    не только условием.
+- **`CLOSE_POSITION_COMMAND` — только полное закрытие.** Прямое частичное
+  закрытие через позицию запрещено (`DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`).
+- **Частичное уменьшение выполняется reduce-only заявками.** Это позиция в
+  активном статусе с обновлённым размером, а не отдельный статус и не
+  частичное закрытие.
 
-  **Команда закрытия одна, эмитентов у неё два** (решение держателя
-  `GAPS_CLOSE_16`, вариант B): `CLOSE_POSITION_COMMAND` эмитит
-  `ExitPendingHandler` на тропе условия-перехода и `ExitActionExecutor` —
-  на тропе явного действия. Правило «полное закрытие идёт только
-  `CLOSE_POSITION_COMMAND`» держится. Форма действия:
-  `actionKind = POSITION`, `StrategyPositionAction`,
-  `StrategyActionType.EXIT_ACTION`
-  (`docs/models/domain/aggregate/Strategy.md` §Действия).
+## Две законные формы полного выхода
 
-  **Дочистка на тропе явного действия — не внешняя, а состав действия**
-  (решение держателя, позиция С1): `CLOSE_POSITION_COMMAND` закрывает
-  позицию и только её, а осмысленное действие стратегии — **выход из
-  сделки**, включающий отмену живых входных ног. Порядок команд — инвариант
-  `docs/rules/exit-teardown-order.md` (единственное место записи, общее для
-  штатной и аварийной троп). Общий компонент teardown **не заводится**:
-  носителей последовательности три, и они разной природы (реестр — там
-  же, §«Носителей последовательности три»).
-- Частичное уменьшение (partial exit) выполняется только через
-  reduce-only `Order` / `AlgoOrder` actions.
-- Частичное уменьшение — это `Position.status == ACTIVE` с
-  обновлённым `externalSize`, а не отдельный статус и не partial
-  close.
+| Форма | Кто эмитит команду |
+|---|---|
+| условие-переход в статус выхода: шаг `EXIT` несёт только условие | `ExitPendingHandler` |
+| явное действие шага `EXIT` (`actionKind = POSITION`) | `ExitActionExecutor` |
 
-### Механизм partial exit
+Команда закрытия одна, эмитентов у неё два. Правило «полное закрытие идёт
+только командой закрытия позиции» держится.
 
-Partial exit идёт через трассируемые runtime-сущности:
-`StrategyOrderAction` / `StrategyAlgoOrderAction` → `CREATE_* → SUBMIT_*
-→ REFRESH_*`/fills/history → `DealActionState.COMPLETED`. Обязательные
-свойства action: reduce-only semantics, stable client id, связь через
-`DealActionState`, восстановление через fills/history/refresh, запрет на
-увеличение позиции. Для reduce-only partial exit `RiskValidator` не
-вызывается — handler выполняет minimal safety/invariant checks (см.
-`docs/rules/risk-validator-scope.md`).
+**Дочистка на тропе явного действия — состав действия, а не внешняя
+операция:** команда закрывает позицию и только её, а осмысленное действие
+стратегии — выход из сделки, включающий отмену живых входных ног. Порядок
+— `docs/rules/exit-teardown-order.md`.
 
-### Коды нарушения инварианта
+## Механизм частичного выхода
 
-Нарушения partial-exit инварианта — safety/invariant violation (не
-risk-policy check `RiskValidator`): `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
-`PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`
-(direct partial close через `CLOSE_POSITION_COMMAND`).
-Коды — `docs/components/models/RiskCheckResult.md` (`RiskCheckCode`).
-Выход выражается условием-перехода `MANAGING → EXIT_PENDING` **либо**
-явным действием шага `EXIT` (§Правило); `CLOSE_POSITION_COMMAND` в обоих
-случаях исполняет `ClosePositionExecutor` (full close, reduce-only), а
-эмитит её `ExitPendingHandler` либо `ExitActionExecutor` — по тропе (см.
-`docs/models/domain/aggregate/Strategy.md`).
+Частичный выход идёт через трассируемые сущности: действие стратегии →
+создание, отправка, подтверждение фактом → завершённая строка исполнения.
+Обязательные свойства действия: reduce-only, стабильный клиентский
+идентификатор, связь через строку исполнения, восстановление по фактам,
+запрет на увеличение позиции.
 
-## Почему
+Преконтроль риска для reduce-only выхода не вызывается; обработчик делает
+минимальные проверки инвариантов.
 
-Сквозное правило по нескольким сущностям (`Position`, `Order`,
-`AlgoOrder`, `Deal`) без единственного владельца — первоисточник в
-сквозном слое (`.claude/decisions/rule-source-of-truth.md`). Держит
-модель закрытия простой: один механизм полного закрытия + reduce-only
-действия для частичного выхода, без промежуточного
-`PARTIALLY_CLOSED`-статуса. **Второй эмитент команды простоту трогает, и
-это названо:** сама команда остаётся одна, но последовательность выхода
-несут две тропы — довод простоты здесь перевешен ценностью явного
-объявления выхода в стратегии (решение держателя `GAPS_CLOSE_16`).
-Дублем это не является: тропы **разной природы** (системный kill-switch
-против стратегии), а порядок у них общий и записан один раз —
-`docs/rules/exit-teardown-order.md`.
+**Коды нарушения инварианта:** `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
+`PARTIAL_EXIT_INCREASES_POSITION`,
+`DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`.
 
-## Связанное
+## Связи
 
-- `docs/models/domain/core/Position.md`, `docs/lifecycles/Position.md`.
-- `docs/rules/ack-not-runtime-truth.md` (факт закрытия подтверждается
-  refresh-ом, не ACK).
+- Порядок выхода — `docs/rules/exit-teardown-order.md`.
+- Scope преконтроля — `docs/rules/risk-validator-scope.md`.
+- Формы действия — `docs/models/domain/aggregate/Strategy.md`.

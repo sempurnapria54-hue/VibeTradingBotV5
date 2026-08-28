@@ -17,7 +17,7 @@
 **Safety-статусы вне этого охвата.** `TRADE_BLOCKED` (холд с kill-switch) и
 `ENTRY_BLOCKED` (мягкий запрет новых входов) — не онбординговые: их пишет
 реактивный/safety-контур, а не онбординг, и снимаются они **вручную** в
-`ACTIVE`. **Множества входа у них разные** (H13, `GAPS_CLOSE_7`):
+`ACTIVE`. **Множества входа у них разные**:
 
 ```text
 ACTIVE            -> ENTRY_BLOCKED   (мягкая блокировка — только из ACTIVE)
@@ -31,8 +31,8 @@ ENTRY_BLOCKED     -> TRADE_BLOCKED   (эскалация мягкого в по�
 их затереть может: авария приоритетнее онбординга. Отсюда открытый вопрос
 `HOLD-Q2` — в какой статус возвращает ручное снятие, если инструмент был
 заблокирован из онбординга (сегодня снятие ведёт в `ACTIVE`).
-Рёбра и семантика — `docs/rules/instrument-hold.md` §Enforcement и
-`docs/models/domain/core/Instrument.md` §Енумы; координация всех троп в
+Рёбра и семантика — `docs/rules/instrument-hold.md` и
+`docs/models/domain/core/Instrument.md`; координация всех троп в
 одном lifecycle — backlog п.9.
 
 ## Кто управляет
@@ -81,9 +81,7 @@ CANDLES_LOADING
   - **Валюты инструмента пишет эта тропа** (с шага 7):
     `externalSettlementCurrency` / `externalBaseCurrency` /
     `externalQuoteCurrency` заполняются здесь же, из того же ответа
-    `/public/instruments` (H10 `DOCS_CHECK_12`,
-    `docs/decisions/instrument-currencies-home.md` §«Писатель — тропа
-    заведения»). Значения считаются неизменными ⇒ второго писателя и
+    `/public/instruments`. Значения считаются неизменными ⇒ второго писателя и
     периодического обновления у них нет; ежечасный
     `InstrumentExternalRulesSyncJob` валют не касается.
 - `SYNC → CANDLES_LOADING`: спецификация получена; для нужных
@@ -108,8 +106,7 @@ CANDLES_LOADING
   `CandleGroup`).
 
 Готовность данных для активации **стратегии** — отдельный, более
-поздний слой (`docs/processes/market-data-calculation.md`
-§«Активация стратегии и готовность данных»); здесь — готовность
+поздний слой (`docs/processes/market-data-calculation.md`); здесь — готовность
 самого **инструмента**.
 
 ## Связи

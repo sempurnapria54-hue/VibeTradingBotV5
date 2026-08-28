@@ -28,7 +28,7 @@ GET /trade/order-algo        (по algoId; нет externalId → по algoClOrdI
 refresh (`REFRESH_ORDER_COMMAND` / `REFRESH_POSITION_COMMAND`) — отдельные
 команды, выбирает FSM. Pending/history-эндпоинты — звенья цикла; их судьба
 как самостоятельных `ServiceCommandType` — CMD-Q3. Владение циклом —
-`docs/decisions/refresh-evidence-cycle-ownership.md`. Общая семантика
+`docs/rules/command-lifecycle.md`. Общая семантика
 `REFRESH_*` — `docs/components/ServiceCommandExecutor.md`.
 
 ## Исключение из «обновляет только `AlgoOrder`» — числа риска на сделке
@@ -36,26 +36,23 @@ refresh (`REFRESH_ORDER_COMMAND` / `REFRESH_POSITION_COMMAND`) — отдель�
 **Наблюдение алго-ордера меняет операнд четвёртого числа сделки**, поэтому
 executor той же транзакцией пересчитывает **все четыре** числа риска на
 `Deal` — по общему правилу «кто меняет любой операнд, пересчитывает всю
-четвёрку» (`docs/models/domain/aggregate/Deal.md` §«Взятый риск», таблица
+четвёрку» (`docs/models/domain/aggregate/Deal.md`, таблица
 триггеров — место истины; формулы здесь не пересказываются).
 
-Меняемых операндов два, и оба наблюдаемы только здесь (C3 + A7
-`DOCS_CHECK_19`):
+Меняемых операндов два, и оба наблюдаемы только здесь:
 
 - **уровень трейлинговой защиты.** Трейлинг двигает **биржа**;
   наблюдаемое значение приходит полем
   `AlgoOrder.condition.trailing.externalPrice` (`moveTriggerPx`) —
   **не** плоским `AlgoOrder.externalPrice`, которое несёт `actualPx`,
-  фактическую цену срабатывания (B2 `DOCS_CHECK_20`;
-  `docs/models/domain/core/AlgoOrder.md` §«Поля фактического
-  срабатывания»). Без пересчёта на наблюдении «риск, снятый защитой»
+  фактическую цену срабатывания. Без пересчёта на наблюдении «риск, снятый защитой»
   не обновлялся бы вовсе на том классе конфигураций, где стоп
   **непрерывно** снижает риск;
-  - **Приземление операнда утверждено** (B2 `DOCS_CHECK_20`): рефреш
+  - **Приземление операнда утверждено**: рефреш
     обновляет вложенный `condition` **пополевым мерджем** из снапшота
     — маппером `updateFromSnapshot(snapshot, @MappingTarget algoOrder)`
     с `nullValuePropertyMappingStrategy = IGNORE`
-    (`.claude/rules/codestyle.md` §Маппинг). Целиком `condition` не
+    (`.claude/rules/codestyle.md`). Целиком `condition` не
     заменяется: снапшот рефреша несёт не все её поля (заявленные
     параметры трейлинга приходят при постановке, `moveTriggerPx` —
     при наблюдении), и замена целиком затирала бы разницу null'ами.

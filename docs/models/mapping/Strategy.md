@@ -6,24 +6,13 @@
 полиморфные ветви, JSONB-навес, плоские строки шагов и резолв
 self-ссылок действий.
 
-## Контекст
-
-Mapping-слой для `Strategy`. Доменная модель —
-`docs/models/domain/aggregate/Strategy.md`; персистентная схема —
-там же §Персистентность (+
-`docs/decisions/strategy-tree-persistence.md`). Биржевого источника у
-стратегии нет (внутренняя сущность) — снапшот-слоя нет; слои:
-api (форма ввода/вывода) ↔ domain ↔ persistence. Исполнители —
-`StrategyMapper` (MapStruct) + `StrategyJsonConverter` (JSONB-навес);
-граница domain ↔ persistence — `StrategyDataService`.
-
 ## api ↔ domain
 
 - Полное дерево принимается/отдаётся как один документ
   (`CreateStrategyApiRequest` / `StrategyApiResponse`); вложенные
   api-модели shared между запросом и ответом; аудит-поля — только на
   корне ответа.
-- Enum'ы и `Duration` в api — строки (`name()` доменного enum;
+- Enum'ы и `Duration` в api — строки (`name` доменного enum;
   ISO-8601, например `PT30M`).
 - **Полиморфизм действий** — JSON-дискриминатор `actionKind`
   (`ORDER`/`ALGO_ORDER`/`POSITION`) на api-базе действия (только
@@ -66,5 +55,5 @@ api (форма ввода/вывода) ↔ domain ↔ persistence. Испол�
 ## Резолв статуса
 
 Статус — административный (`docs/lifecycles/Strategy.md`), биржевой
-проекции не имеет; хранится строкой (= `name()`), конвертация
+проекции не имеет; хранится строкой (= `name`), конвертация
 enum ↔ строка — на границе persistence.

@@ -1,0 +1,202 @@
+{
+  "subject": "deal-risk-numbers",
+  "question": "Чему равны четыре числа риска сделки и по какому предикату отбираются их слагаемые",
+  "home": "docs/models/domain/aggregate/Deal.md",
+
+  "operands": {
+    "legs[].type": "Order.type — бизнес-тип ноги",
+    "legs[].status": "Order.status",
+    "legs[].plannedRiskAmount": "Order.plannedRiskAmount — write-once на ноге",
+    "legs[].plannedSizeContracts": "Order.plannedSizeContracts",
+    "legs[].accumulatedFillSize": "Order.accumulatedFillSize",
+    "legs[].plannedEntryPrice": "Order.plannedEntryPrice",
+    "legs[].plannedStopPrice": "Order.plannedStopPrice",
+    "legs[].plannedContractValue": "Order.plannedContractValue",
+    "legs[].positionId": "Order.positionId — ось эпизода",
+    "legs[].stopCurrent": "действующий уровень защиты этой ноги; резолв — docs/spec/protection-coverage.json",
+    "livePosition.id": "Deal.livePosition().id",
+    "livePosition.externalSize": "Position.externalSize живого эпизода",
+    "direction": "Deal.direction"
+  },
+
+  "values": [
+    {
+      "name": "isEntryLeg",
+      "note": "Бизнес-тип ноги входа. Предикатом отбора служит тип, а не намерение reduce-only.",
+      "expr": "in(type, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')"
+    },
+    {
+      "name": "isLiveOrCompleted",
+      "note": "Живая либо исполнившаяся. Всякая снятая выпадает независимо от причины снятия.",
+      "expr": "in(status, 'CREATED', 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED', 'COMPLETED')"
+    },
+    {
+      "name": "filledShare",
+      "note": "Вырожденный знаменатель даёт ноль, а не деление.",
+      "expr": "if(plannedSizeContracts == 0, 0, accumulatedFillSize / plannedSizeContracts)"
+    },
+    {
+      "name": "onLiveEpisode",
+      "note": "Нога принадлежит живому эпизоду. Пустой positionId в множество не входит.",
+      "expr": "notNull(positionId) && positionId == livePosition.id"
+    },
+    {
+      "name": "feeRate",
+      "note": "Ставка, под которую нога сайзилась, восстановленная обращением закрытой формы сайзинга. Нового поля не требует.",
+      "expr": "(plannedRiskAmount / (plannedContractValue * plannedSizeContracts) - abs(plannedEntryPrice - plannedStopPrice)) / (plannedEntryPrice + plannedStopPrice)"
+    },
+    {
+      "name": "signedStopDistance",
+      "note": "Знаковая дистанция до действующего стопа: за безубытком отрицательна.",
+      "expr": "if(direction == 'LONG', plannedEntryPrice - stopCurrent, stopCurrent - plannedEntryPrice)"
+    },
+    {
+      "name": "legRiskAtCurrentStop",
+      "note": "Риск ноги при действующем стопе: та же закрытая форма с подстановкой действующего стопа и фактического филла.",
+      "expr": "signedStopDistance * accumulatedFillSize * plannedContractValue + feeRate * (plannedEntryPrice + stopCurrent) * accumulatedFillSize * plannedContractValue"
+    },
+
+    {
+      "name": "dealPlannedRisk",
+      "note": "Заявленный плановый риск сделки — знаменатель R.",
+      "op": "sum",
+      "over": "legs",
+      "where": "isEntryLeg && isLiveOrCompleted && notNull(plannedRiskAmount)",
+      "of": "plannedRiskAmount"
+    },
+    {
+      "name": "dealIncurredRisk",
+      "note": "Взятый на входе риск. Предикат свой, без конъюнкта по статусу: снятая с филлом нога сюда входит.",
+      "op": "sum",
+      "over": "legs",
+      "where": "isEntryLeg && accumulatedFillSize > 0 && notNull(plannedRiskAmount)",
+      "of": "plannedRiskAmount * filledShare"
+    },
+    {
+      "name": "episodeIncurredRisk",
+      "note": "Уменьшаемое пары «снятое защитой» — взятый риск, ограниченный живым эпизодом.",
+      "op": "sum",
+      "over": "legs",
+      "where": "isEntryLeg && accumulatedFillSize > 0 && notNull(plannedRiskAmount) && onLiveEpisode",
+      "of": "plannedRiskAmount * filledShare"
+    },
+    {
+      "name": "episodeRiskAtCurrentStop",
+      "note": "Вычитаемое пары — риск ног живого эпизода при действующей защите.",
+      "op": "sum",
+      "over": "legs",
+      "where": "isEntryLeg && accumulatedFillSize > 0 && notNull(plannedRiskAmount) && onLiveEpisode",
+      "of": "legRiskAtCurrentStop"
+    },
+    {
+      "name": "protectionRelievedRisk",
+      "note": "Риск, снятый защитой. Знак не клэмпится.",
+      "expr": "episodeIncurredRisk - episodeRiskAtCurrentStop"
+    },
+    {
+      "name": "episodeFilledSize",
+      "op": "sum",
+      "over": "legs",
+      "where": "isEntryLeg && onLiveEpisode",
+      "of": "accumulatedFillSize"
+    },
+    {
+      "name": "dealCurrentRisk",
+      "note": "Неотработанная доля взятого на входе риска.",
+      "expr": "if(episodeFilledSize == 0, 0, dealIncurredRisk * livePosition.externalSize / episodeFilledSize)"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "перевыставление входа: снятая нога из знаменателя выходит, из взятого — нет",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 30 },
+        "legs": [
+          { "type": "ENTRY", "status": "CANCELED", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 },
+          { "type": "ENTRY", "status": "ACTIVE", "plannedRiskAmount": 70, "plannedSizeContracts": 70, "accumulatedFillSize": 0, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": null, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "dealPlannedRisk": 70, "dealIncurredRisk": 30 }
+    },
+    {
+      "case": "нога в ERROR в знаменатель не входит, а её филл во взятом риске остаётся",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 20 },
+        "legs": [
+          { "type": "ENTRY", "status": "ERROR", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 20, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "dealPlannedRisk": 0, "dealIncurredRisk": 20 }
+    },
+    {
+      "case": "недвинутый стоп: снятое защитой равно нулю алгебраически",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 100 },
+        "legs": [
+          { "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "episodeIncurredRisk": 929.55, "episodeRiskAtCurrentStop": 929.55, "protectionRelievedRisk": 0 }
+    },
+    {
+      "case": "стоп за безубытком: снятое защитой больше взятого, знак не клэмпится",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 100 },
+        "legs": [
+          { "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 3010 }
+        ]
+      },
+      "expect": { "episodeRiskAtCurrentStop": -69.95, "protectionRelievedRisk": 999.5 }
+    },
+    {
+      "case": "многоэпизодная сделка: пара считается по ногам живого эпизода, ноги закрытого не участвуют",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 2, "externalSize": 50 },
+        "legs": [
+          { "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 },
+          { "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 464.775, "plannedSizeContracts": 50, "accumulatedFillSize": 50, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 2, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "dealIncurredRisk": 1394.325, "episodeIncurredRisk": 464.775, "protectionRelievedRisk": 0 }
+    },
+    {
+      "case": "нога с пустым идентификатором эпизода в пару не входит",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 100 },
+        "legs": [
+          { "type": "ENTRY", "status": "ACTIVE", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": null, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "episodeIncurredRisk": 0, "protectionRelievedRisk": 0 }
+    },
+    {
+      "case": "частичный выход уменьшает неотработанную долю, взятый риск не трогает",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 40 },
+        "legs": [
+          { "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "dealIncurredRisk": 100, "dealCurrentRisk": 40 }
+    },
+    {
+      "case": "вырожденный размер ноги даёт ноль, а не деление",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 0 },
+        "legs": [
+          { "type": "ENTRY", "status": "ACTIVE", "plannedRiskAmount": 0, "plannedSizeContracts": 0, "accumulatedFillSize": 0, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "dealIncurredRisk": 0, "dealCurrentRisk": 0 }
+    }
+  ]
+}

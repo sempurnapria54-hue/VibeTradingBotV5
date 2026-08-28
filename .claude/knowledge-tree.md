@@ -121,6 +121,7 @@
 │   │   ├── recognize-knowledge.md — Как опознать фрагмент, который стоит зафиксировать?
 │   │   ├── reconcile-knowledge.md — Как привести доку к изменившемуся/удалённому коду?
 │   │   ├── security-review.md — Как сделать ревью безопасности кода?
+│   │   ├── stagnation-detection.md — Как проверить итерации прогонов шага на топтание на месте?
 │   │   ├── test-code.md — Как написать код-тесты контура API источника по плану?
 │   │   ├── test-collection.md — Как построить исполняемую тест-коллекцию (Postman)?
 │   │   ├── test-design.md — Как построить тест-план и кейсы по сырью API источника?
@@ -129,7 +130,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v89.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v90.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -147,6 +148,8 @@
 │       ├── 2026-08-26-step-7-question-flow-analysis.md — Какие источники дали поток ~400 вопросов на шаге 7?
 │       ├── progress/ — На каком шаге мы в этой активной операции?
 │       │   ├── phase-1-step-7-chronicle.md — Какова хроника под-шагов шага 7 Фазы 1?
+│       │   ├── corpus-rewrite-mapping.md — Что из каждого дока корпуса остаётся, что переезжает и что удаляется?
+│       │   ├── risk-contour-design.md — Как устроен узел покрытия и риск-контур, если проектировать их целиком из концепции?
 │       │   ├── phase-1-step-7-command-action-boundary.md — Что предлагается по развилке границы «команда ↔ действие»?
 │       │   ├── phase-1-step-7-docs-check-1.md — Каков исход DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-docs-check-2.md — Каков исход DOCS_CHECK_2 шага 7?
@@ -208,260 +211,242 @@
 ├── docs/ — Как устроен продукт (продуктовая документация)?
 │   ├── components/ — Кто выполняет?
 │   │   ├── models/ — Что это за runtime-объект?
-│   │   │   ├── CalculatedPrice.md — Что это за RVO CalculatedPrice?
-│   │   │   ├── CalculatedSize.md — Что это за RVO CalculatedSize?
-│   │   │   ├── CalculatedStrategyAction.md — Что это за RVO CalculatedStrategyAction?
-│   │   │   ├── CalculationContext.md — Что это за RVO CalculationContext?
-│   │   │   ├── CalculationError.md — Что это за RVO CalculationError?
-│   │   │   ├── DealContext.md — Что это за RVO DealContext?
-│   │   │   ├── HoldSignal.md — Что это за RVO HoldSignal (параметр вызова HoldService)?
-│   │   │   ├── MarketDataExpirationResult.md — Что это за RVO MarketDataExpirationResult?
-│   │   │   ├── MarketPriceData.md — Что это за RVO MarketPriceData?
-│   │   │   ├── PositionStatusResolveResult.md — Что это за RVO PositionStatusResolveResult?
-│   │   │   ├── RiskBlockAction.md — Что это за RVO RiskBlockAction?
-│   │   │   ├── RiskCheckResult.md — Что это за RVO RiskCheckResult?
-│   │   │   ├── RiskValidationResult.md — Что это за RVO RiskValidationResult?
-│   │   │   ├── ServiceCommand.md — Что это за RVO ServiceCommand?
-│   │   │   ├── ServiceCommandPayload.md — Что такое ServiceCommandPayload и где живут payload-подтипы?
-│   │   │   └── StrategyActionCalculationResult.md — Что это за RVO StrategyActionCalculationResult?
-│   │   ├── AlgoOrderExternalStatusResolver.md — Кто переводит внешний статус algo-order в доменный?
-│   │   ├── AnomalyJob.md — Кто ищет нарушения базовых инвариантов системы?
-│   │   ├── AttachedAlgoOrderStateResolver.md — Кто определяет доменный статус attached protection?
-│   │   ├── CalculationContextFactory.md — Кто собирает CalculationContext?
-│   │   ├── CancelAlgoOrderExecutor.md — Кто исполняет CANCEL_ALGO_ORDER?
-│   │   ├── CancelOrderExecutor.md — Кто исполняет CANCEL_ORDER?
-│   │   ├── CandleJob.md — Кто готовит базовые свечные данные?
-│   │   ├── ClosePositionExecutor.md — Кто исполняет CLOSE_POSITION?
-│   │   ├── CreateAlgoOrderActionExecutor.md — Кто планирует CREATE-действие над standalone algo-order?
-│   │   ├── CreateAlgoOrderExecutor.md — Кто исполняет CREATE_ALGO_ORDER?
-│   │   ├── CreateOrderActionExecutor.md — Кто планирует CREATE-действие над ordinary order?
-│   │   ├── CreateOrderExecutor.md — Кто исполняет CREATE_ORDER?
-│   │   ├── DealContextService.md — Кто собирает DealContext для прохода FSM?
-│   │   ├── DealOpeningService.md — Кто атомарно создаёт Deal?
-│   │   ├── DealOrchestratorJob.md — Кто сопровождает уже созданные сделки?
-│   │   ├── DealStateMachine.md — Кто управляет статусами сделки (FSM)?
-│   │   ├── EntryFinalizedHandler.md — Что делает FSM handler статуса ENTRY_FINALIZED?
-│   │   ├── EntryScannerJob.md — Кто ищет возможность создать новую сделку?
-│   │   ├── EntrySubmittedHandler.md — Что делает FSM handler статуса ENTRY_SUBMITTED?
-│   │   ├── ErrorHandler.md — Что делает FSM handler статуса ERROR?
-│   │   ├── ExitActionExecutor.md — Кто исполняет действие выхода из сделки?
-│   │   ├── ExitPendingHandler.md — Что делает FSM handler статуса EXIT_PENDING?
-│   │   ├── FinalizeDealEntryExecutor.md — Кто исполняет FINALIZE_DEAL_ENTRY?
-│   │   ├── FinalizeDealExitExecutor.md — Кто исполняет FINALIZE_DEAL_EXIT?
-│   │   ├── HoldService.md — Кто исполняет блокировку (холд) по требованию детекторов?
-│   │   ├── IndicatorJob.md — Кто считает технические индикаторы?
-│   │   ├── IndicatorService.md — Кто отдаёт готовые значения индикаторов?
-│   │   ├── InstrumentExternalRulesDataService.md — Кто отдаёт внешние правила инструмента (граница persistence)?
-│   │   ├── InstrumentExternalRulesSyncJob.md — Кто обновляет внешние правила инструмента?
-│   │   ├── IntegrationService.md — Кто является границей биржевого клиента / adapter-layer?
-│   │   ├── KillSwitchExecutor.md — Кто исполняет kill-switch teardown?
-│   │   ├── KillSwitchService.md — Кто триггерит аварийный kill-switch для реакции холда?
-│   │   ├── ManagingHandler.md — Что делает FSM handler статуса MANAGING?
-│   │   ├── MarkDealClosedExecutor.md — Кто исполняет MARK_DEAL_CLOSED?
-│   │   ├── MarkDealEmergencyClosedExecutor.md — Кто исполняет MARK_DEAL_EMERGENCY_CLOSED?
-│   │   ├── MarkDealErrorExecutor.md — Кто исполняет MARK_DEAL_ERROR?
-│   │   ├── MarketDataExpirationChecker.md — Кто проверяет свежесть рыночных данных?
-│   │   ├── MarketPhaseResolver.md — Кто резолвит авторские правила фазы в MarketPhase.Type?
-│   │   ├── MarketPhaseService.md — Кто отдаёт актуальную фазу рынка?
-│   │   ├── MarketPriceDataService.md — Кто отдаёт runtime-цены инструмента?
-│   │   ├── MarketStructureJob.md — Кто считает структуру рынка (job)?
-│   │   ├── MarketStructureResolver.md — Кто вычисляет структуру рынка из свечей?
-│   │   ├── MarketStructureService.md — Кто отдаёт готовую структуру рынка?
-│   │   ├── OrderExternalStatusResolver.md — Кто переводит внешний статус ordinary order в доменный?
-│   │   ├── PositionStatusResolver.md — Кто определяет доменный статус позиции по факту наличия?
-│   │   ├── PrecheckHandler.md — Что делает FSM handler статуса PRECHECK?
-│   │   ├── PriceCalculator.md — Кто рассчитывает цены действия?
-│   │   ├── ProtectionSwitchedHandler.md — Что делает FSM handler статуса PROTECTION_SWITCHED?
-│   │   ├── RefreshAlgoOrderExecutor.md — Кто исполняет REFRESH_ALGO_ORDER?
-│   │   ├── RefreshBalanceExecutor.md — Кто исполняет REFRESH_BALANCE?
-│   │   ├── RefreshBillsExecutor.md — Кто исполняет REFRESH_BILLS?
-│   │   ├── RefreshOrderExecutor.md — Кто исполняет REFRESH_ORDER?
-│   │   ├── RefreshPositionExecutor.md — Кто исполняет REFRESH_POSITION?
-│   │   ├── RetryPolicyService.md — Кто управляет retry-политикой исполнения команд?
-│   │   ├── RiskBlockResolver.md — Кто превращает результат risk-проверки в действие handler'а?
-│   │   ├── RiskValidator.md — Кто проверяет рассчитанное действие по risk-policy?
-│   │   ├── SafetyHoldCoordinator.md — Кто держит последовательность полной реакции холда?
-│   │   ├── ServiceCommandExecutor.md — Кто исполняет атомарную команду и маршрутизирует её?
-│   │   ├── SizeCalculator.md — Кто рассчитывает размер действия?
-│   │   ├── StrategyActionCalculator.md — Кто рассчитывает runtime-параметры действия стратегии?
-│   │   ├── StrategyActionExecutor.md — Кто выдаёт следующую команду одного типа действия за проход?
-│   │   ├── StrategyActionOrchestrator.md — Кто диспетчеризует планирование действия стратегии за проход?
-│   │   ├── StrategyConditionEvaluator.md — Кто проверяет применимость StrategyCondition?
-│   │   ├── SubmitAlgoOrderExecutor.md — Кто исполняет SUBMIT_ALGO_ORDER_COMMAND?
-│   │   ├── SubmitOrderExecutor.md — Кто исполняет SUBMIT_ORDER_COMMAND?
+│   │   │   ├── CalculatedPrice.md — Что это за runtime value object `CalculatedPrice`: структура, енумы `PriceMode` / `StrategyPricePurpose`, под-объекты resolved-цен?
+│   │   │   ├── CalculatedSize.md — Что это за runtime value object `CalculatedSize`: структура, енум `SizeMode`?
+│   │   │   ├── CalculatedStrategyAction.md — Что это за runtime value object `CalculatedStrategyAction`: структура, что в него входит и что сознательно не входит?
+│   │   │   ├── CalculationContext.md — Что это за runtime value object `CalculationContext`: структура, scope сборки, отношение к `DealContext`?
+│   │   │   ├── CalculationError.md — Что это за runtime value object `CalculationError`: структура, енум `CalculationErrorType`, политика реакции?
+│   │   │   ├── DealContext.md — Что это за runtime value object `DealContext`: структура, scope одного прохода FSM, отношение к `CalculationContext`?
+│   │   │   ├── HoldSignal.md — Что это за runtime value object `HoldSignal` — параметр вызова `HoldService`: структура, фабрики, енумы `ReactionClass` / `HoldScope`?
+│   │   │   ├── MarketDataExpirationResult.md — Что это за runtime value object `MarketDataExpirationResult`: структура, енум `Status`?
+│   │   │   ├── MarketPriceData.md — Что это за runtime value object `MarketPriceData`: структура, boundary-snapshot, правила использования?
+│   │   │   ├── PositionStatusResolveResult.md — Что это за runtime value object `PositionStatusResolveResult` и общий паттерн resolve-result?
+│   │   │   ├── RiskBlockAction.md — Что это за runtime value object `RiskBlockAction`: структура, енум `Type`?
+│   │   │   ├── RiskCheckResult.md — Что это за runtime value object `RiskCheckResult`: структура, енумы `RiskCheckStatus` и `RiskCheckCode`?
+│   │   │   ├── RiskValidationResult.md — Что это за runtime value object `RiskValidationResult`: структура, енум `RiskDecision`?
+│   │   │   ├── ServiceCommand.md — Что это за runtime value object `ServiceCommand`: структура, енум `ServiceCommandType`, ключевой инвариант «не persisted queue»?
+│   │   │   ├── ServiceCommandPayload.md — Что такое `ServiceCommandPayload` (параметры команды) и где живут конкретные payload-подтипы?
+│   │   │   └── StrategyActionCalculationResult.md — Что это за runtime value object `StrategyActionCalculationResult`: структура, енум `Status`?
+│   │   ├── AlgoOrderExternalStatusResolver.md — Кто переводит внешний статус standalone algo-order в доменный (компонент- resolver): ответственность, границы, реализация под биржу?
+│   │   ├── AnomalyJob.md — Кто ищет нарушения базовых инвариантов системы (компонент-job): что ищет, чем не является?
+│   │   ├── AttachedAlgoOrderStateResolver.md — Кто определяет доменный статус attached protection «по фактам» (компонент-resolver): контракт, границы, реализация под биржу?
+│   │   ├── CalculationContextFactory.md — Кто собирает `CalculationContext` (компонент-фабрика): что собирает, из каких сервисов, какие границы соблюдает?
+│   │   ├── CancelAlgoOrderExecutor.md — Кто исполняет `CANCEL_ALGO_ORDER_COMMAND` (компонент-executor): что делает?
+│   │   ├── CancelOrderExecutor.md — Кто исполняет `CANCEL_ORDER_COMMAND` (компонент-executor): что делает?
+│   │   ├── CandleJob.md — Кто готовит базовые свечные данные (компонент-job): что делает, что не делает?
+│   │   ├── ClosePositionExecutor.md — Кто исполняет `CLOSE_POSITION_COMMAND` (компонент-executor): что делает, инвариант full close?
+│   │   ├── CreateAlgoOrderActionExecutor.md — Кто планирует CREATE-действие над standalone algo-order за проход (компонент-executor): стадии, сборка дерева `Condition`, отношение к risk?
+│   │   ├── CreateAlgoOrderExecutor.md — Кто исполняет `CREATE_ALGO_ORDER_COMMAND` (компонент-executor): что делает?
+│   │   ├── CreateOrderActionExecutor.md — Кто планирует CREATE-действие над ordinary order за проход (компонент- executor): стадии, связь с risk-layer?
+│   │   ├── CreateOrderExecutor.md — Кто исполняет `CREATE_ORDER_COMMAND` (компонент-executor): что делает?
+│   │   ├── DealContextService.md — Кто собирает `DealContext` для прохода FSM (компонент-сервис): что собирает, границы?
+│   │   ├── DealOpeningService.md — Кто атомарно создаёт `Deal` (компонент-сервис): что делает, чего не делает?
+│   │   ├── DealOrchestratorJob.md — Кто сопровождает уже созданные сделки (компонент-job): цикл работы, операционная оболочка (CRON / выключатель / фасад / выборка), concurrency-guard, границы?
+│   │   ├── DealStateMachine.md — Кто управляет статусами сделки (компонент-оркестратор FSM): что делает, конструкция handler'а (3 типа проверок), границы?
+│   │   ├── EntryFinalizedHandler.md — Что делает FSM handler статуса `ENTRY_FINALIZED` (компонент): проверки, логика, шаги, команды?
+│   │   ├── EntryScannerJob.md — Кто ищет возможность создать новую сделку (компонент-job): шаги, что передаёт в `DealOpeningService`, чего не делает?
+│   │   ├── EntrySubmittedHandler.md — Что делает FSM handler статуса `ENTRY_SUBMITTED` (компонент): проверки, логика, шаги, команды?
+│   │   ├── ErrorHandler.md — Что делает FSM handler статуса `ERROR` (компонент): проверки, логика, команды, переход в `EMERGENCY_CLOSED`?
+│   │   ├── ExitActionExecutor.md — Кто исполняет действие выхода из сделки за проход (компонент-executor): состав команд, порядок, границы?
+│   │   ├── ExitPendingHandler.md — Что делает FSM handler статуса `EXIT_PENDING` (компонент): проверки, логика, шаги, команды?
+│   │   ├── FinalizeDealEntryExecutor.md — Кто исполняет `FINALIZE_DEAL_ENTRY_COMMAND` (компонент-executor): что читает/пишет, статусное ребро `ENTRY_FINALIZED`, идемпотентность, retry-anchor?
+│   │   ├── FinalizeDealExitExecutor.md — Кто исполняет команду финализации штатного выхода?
+│   │   ├── HoldService.md — Кто исполняет блокировку по требованию детекторов?
+│   │   ├── IndicatorJob.md — Кто считает технические индикаторы (компонент-job): что делает, что не делает, как обращается с warmup и идемпотентностью?
+│   │   ├── IndicatorService.md — Кто отдаёт готовые значения индикаторов (компонент-сервис): контракт, поведение при отсутствии/устаревании?
+│   │   ├── InstrumentExternalRulesDataService.md — Кто отдаёт внешние правила инструмента (компонент — граница domain ↔ persistence): что возвращает, как хранит?
+│   │   ├── InstrumentExternalRulesSyncJob.md — Кто обновляет внешние справочные данные инструмента (компонент-job): что делает, источники, частота?
+│   │   ├── IntegrationService.md — Кто является границей биржевого клиента / adapter-layer (компонент): nullable contract, что не выходит наружу?
+│   │   ├── KillSwitchExecutor.md — Кто исполняет kill-switch teardown (компонент вне реестра команд): с чем работает, границы?
+│   │   ├── KillSwitchService.md — Кто триггерит аварийный kill-switch для реактивной реакции холда (компонент-триггер): scope-исполнители, каскад биржи, агрегация подтверждения, границы?
+│   │   ├── ManagingHandler.md — Что делает FSM handler статуса `MANAGING` (компонент): проверки, логика, шаги, команды?
+│   │   ├── MarkDealClosedExecutor.md — Кто исполняет `MARK_DEAL_CLOSED_COMMAND` (компонент-executor): терминальное ребро, что читает/пишет, идемпотентность, retry-anchor, контракт обязательного `resultProfit`?
+│   │   ├── MarkDealEmergencyClosedExecutor.md — Кто исполняет `MARK_DEAL_EMERGENCY_CLOSED_COMMAND` (компонент-executor): аварийное терминальное ребро, что читает/пишет, best-effort число и его провенанс, идемпотентность, retry-anchor?
+│   │   ├── MarkDealErrorExecutor.md — Кто исполняет `MARK_DEAL_ERROR_COMMAND` (компонент-executor): что читает/пишет, ребро в `ERROR`, идемпотентность, retry-anchor?
+│   │   ├── MarketDataExpirationChecker.md — Кто проверяет свежесть рыночных данных (компонент-сервис): контракт, что проверяет, чем не управляет?
+│   │   ├── MarketPhaseResolver.md — Кто резолвит авторские правила фазы в `MarketPhase.Type` (компонент): что делает, на каких данных, границы?
+│   │   ├── MarketPhaseService.md — Кто отдаёт актуальную фазу рынка (компонент-сервис): контракт, как вычисляет, поведение при отсутствии/устаревании входов?
+│   │   ├── MarketPriceDataService.md — Кто отдаёт runtime-цены инструмента (компонент-сервис): что возвращает, откуда?
+│   │   ├── MarketStructureJob.md — Кто считает структуру рынка (компонент-job): что делает, что не делает?
+│   │   ├── MarketStructureResolver.md — Кто вычисляет структуру рынка из свечей (доменный компонент): контракт (вход/выход), потребление готового ER, fallback, границы?
+│   │   ├── MarketStructureService.md — Кто отдаёт готовую структуру рынка (компонент-сервис): контракт, поведение при отсутствии/устаревании?
+│   │   ├── OrderExternalStatusResolver.md — Кто переводит внешний статус ordinary order в доменный (компонент- resolver): ответственность, границы, реализация под биржу?
+│   │   ├── PositionStatusResolver.md — Кто определяет доменный статус позиции по факту её наличия (компонент- resolver): контракт, политика null/externalSize, реализация под биржу?
+│   │   ├── PrecheckHandler.md — Что делает FSM handler статуса `PRECHECK` (компонент): проверки, логика, шаги, команды?
+│   │   ├── PriceCalculator.md — Кто рассчитывает цены действия (компонент-калькулятор цены): контракт, формулы SL/TP/trailing/limit/structure, округление, вокабуляр источников цены?
+│   │   ├── ProtectionSwitchedHandler.md — Что делает FSM handler статуса `PROTECTION_SWITCHED` (компонент): проверки, логика, шаги, команды?
+│   │   ├── RefreshAlgoOrderExecutor.md — Кто исполняет `REFRESH_ALGO_ORDER_COMMAND` (компонент-executor): что делает, границы?
+│   │   ├── RefreshBalanceExecutor.md — Кто исполняет `REFRESH_BALANCE_COMMAND` (компонент-executor): что делает, особый контракт (не normal null, не RiskValidator)?
+│   │   ├── RefreshBillsExecutor.md — Кто исполняет команду добычи движений средств?
+│   │   ├── RefreshOrderExecutor.md — Кто исполняет `REFRESH_ORDER_COMMAND` (компонент-executor): что делает, границы?
+│   │   ├── RefreshPositionExecutor.md — Кто исполняет `REFRESH_POSITION_COMMAND` (компонент-executor): что делает, политика null/externalSize, evidence-cycle live → positions-history?
+│   │   ├── RetryPolicyService.md — Кто управляет retry-политикой исполнения команд (компонент): контракт, модель политики, retry-состояние, правило для опасных команд?
+│   │   ├── RiskBlockResolver.md — Кто превращает результат risk-проверки в действие handler'а (компонент): контракт, зачем каждый параметр?
+│   │   ├── RiskValidator.md — Кто проверяет рассчитанное действие по risk-policy (компонент): что проверяет, что считает сам, чего не делает?
+│   │   ├── SafetyHoldCoordinator.md — Кто держит последовательность полной реакции холда (`FULL`): шаги, исполнители, гейт терминала, эскалация, exception- и best-effort-политика, границы?
+│   │   ├── ServiceCommandExecutor.md — Кто исполняет атомарную команду и маршрутизирует её в конкретный executor (компонент): контракт, общая семантика групп, обработка controlled exceptions?
+│   │   ├── SizeCalculator.md — Кто рассчитывает размер действия (компонент-калькулятор размера): контракт, формула расчёта контрактов, инвариант partial exit?
+│   │   ├── StrategyActionCalculator.md — Кто рассчитывает runtime-параметры действия стратегии (компонент- оркестратор расчёта): контракт, что объединяет, границы?
+│   │   ├── StrategyActionExecutor.md — Кто выдаёт следующую команду одного типа действия стратегии за проход (компонент-интерфейс): контракт, per-pass семантика, реализации?
+│   │   ├── StrategyActionOrchestrator.md — Кто диспетчеризует планирование одного действия стратегии за проход (компонент): контракт, гейт повтора, маршрутизация по типу действия?
+│   │   ├── StrategyConditionEvaluator.md — Кто проверяет применимость `StrategyCondition` (компонент): что делает, на каких данных, границы?
+│   │   ├── SubmitAlgoOrderExecutor.md — Кто исполняет `SUBMIT_ALGO_ORDER_COMMAND` (компонент-executor): что делает?
+│   │   ├── SubmitOrderExecutor.md — Кто исполняет `SUBMIT_ORDER_COMMAND` (компонент-executor): что делает, recoverability?
 │   │   └── SystemActionExecutor.md — Кто выдаёт следующую команду системного действия за проход?
-│   ├── decisions/ — Почему мы решили так, а не иначе? (продукт)
-│   │   ├── action-orchestration-vs-command.md — Чем действие-оркестрация отличается от аварийного teardown?
-│   │   ├── command-action-boundary.md — Почему командный слой — атомарные команды + системные действия?
-│   │   ├── controlled-violation-exchange-wide-hold.md — Почему контролируемая биржевая ошибка поднимает L4-холд биржи?
-│   │   ├── deal-action-state-materialization.md — Почему DealActionState материализован именно так?
-│   │   ├── deal-finalization-state-materialization.md — Почему retry-state финализации — отдельная сущность?
-│   │   ├── derived-market-data-code-increments.md — Почему код-инкременты производных рыночных данных такие?
-│   │   ├── efficiency-ratio-as-catalog-indicator.md — Почему ER — каталожный операнд без выделенного ruleType?
-│   │   ├── exchange-safety-ladder.md — Почему exchange-scope safety разведён на две ступени (HOLD/TRADE_BLOCKED)?
-│   │   ├── fsm-execution-layering.md — Как разложены слои исполнения сделки и почему?
-│   │   ├── instrument-currencies-home.md — Почему валюты инструмента персистятся в InstrumentExternalRules?
-│   │   ├── instrument-external-rules-materialization.md — Как материализуется InstrumentExternalRules и почему?
-│   │   ├── market-data-result-identity-keying.md — Почему результаты расчёта ключуются настройкой-владельцем?
-│   │   ├── market-phase-conditional-classification.md — Почему MarketPhase.Type определяется авторскими условиями?
-│   │   ├── market-phase-stateless.md — Почему MarketPhase вычисляется на лету, а не хранится?
-│   │   ├── multi-episode-deal.md — Почему сделка допускает несколько эпизодов позиции?
-│   │   ├── per-trade-risk-policy.md — Какова риск-политика на сделку в фазе 1 и почему?
-│   │   ├── pnl-finalization-mechanics.md — Как механически добываются P&L-факты и пишется resultProfit?
-│   │   ├── refresh-evidence-cycle-ownership.md — Кто проходит evidence-cycle refresh-команд?
-│   │   ├── replace-not-amend.md — Почему домен ремоделирует через REPLACE, а не амендит?
-│   │   ├── result-profit-source.md — Откуда берётся Deal.resultProfit и почему?
-│   │   ├── service-command-payload-base-type.md — Почему у payload'ов общий маркер-базовый тип?
-│   │   ├── source-model-change-absorption.md — Как мы обходимся с известным заранее изменением модели источника?
-│   │   ├── strategy-condition-authoring-contract.md — Почему контракт авторинга условия — объектная settings-модель?
-│   │   ├── strategy-materialization-and-validation.md — Как материализуется «одна реализация» и scope валидатора?
-│   │   ├── strategy-signal-is-entry-condition.md — Почему «сигнал» — это условие входного шага стратегии?
-│   │   ├── strategy-tree-persistence.md — Почему дерево Strategy персистится реляционным каркасом?
-│   │   └── volume-condition-semantics.md — Почему объёмное условие — подтверждающий фильтр?
-│   ├── dictionary/ — Что означает этот термин? (пока пусто)
-│   ├── integrations/ — Каков контракт и правила источника {name}?
-│   │   └── okx/
-│   │       ├── coverage-manifest.md — Какова полнота покрытия поверхности OKX REST API доками?
-│   │       ├── contracts/ — Каков контракт и лимиты операции OKX?
-│   │       │   ├── account-bills.md — Каков контракт операций по bill-записям аккаунта?
-│   │       │   ├── account-config.md — Каков контракт операций конфигурации счёта?
-│   │       │   ├── account-position-risk.md — Каков контракт операции account-position-risk?
-│   │       │   ├── account-rate-limit.md — Каков контракт чтения аккаунт-уровневого rate limit?
-│   │       │   ├── algo-order.md — Каков контракт операций по algo-ордеру?
-│   │       │   ├── balance.md — Каков контракт получения баланса?
-│   │       │   ├── batch-operations.md — Каков контракт batch-операций по ordinary order?
-│   │       │   ├── cancel-all-after.md — Каков контракт Cancel All After?
-│   │       │   ├── candle.md — Каков контракт операций по свечам?
-│   │       │   ├── fills-archive.md — Каков контракт выгрузки fills старше 3 месяцев?
-│   │       │   ├── fills.md — Каков контракт операций по fills?
-│   │       │   ├── funding-rate.md — Каков контракт чтения funding rate SWAP?
-│   │       │   ├── index-data.md — Каков контракт чтения данных индекса?
-│   │       │   ├── instrument.md — Каков контракт получения спецификации инструмента?
-│   │       │   ├── insurance-fund.md — Каков контракт чтения баланса страхового фонда?
-│   │       │   ├── mark-price.md — Каков контракт чтения mark price?
-│   │       │   ├── market-price-data.md — Каков контракт получения тикера?
-│   │       │   ├── max-size.md — Каков контракт оценки max-size / max-avail-size?
-│   │       │   ├── open-interest.md — Каков контракт чтения открытого интереса?
-│   │       │   ├── order-book.md — Каков контракт чтения стакана?
-│   │       │   ├── order-precheck.md — Каков контракт order precheck?
-│   │       │   ├── order.md — Каков контракт операций по ordinary order?
-│   │       │   ├── position-tiers.md — Каков контракт чтения позиционных тиров?
-│   │       │   ├── position.md — Каков контракт операций по позиции?
-│   │       │   ├── price-limit.md — Каков контракт чтения ценовых лимитов?
-│   │       │   ├── public-trades.md — Каков контракт чтения публичных сделок?
-│   │       │   ├── server-time.md — Каков контракт чтения серверного времени?
-│   │       │   ├── service-urls.md — Какие URL у OKX по окружениям и регионам?
-│   │       │   └── trade-fee.md — Каков контракт чтения ставок комиссий аккаунта?
-│   │       └── rules/ — Какое правило источника OKX?
-│   │           ├── adapter-constants.md — Какие константы OKX adapter выставляет сам?
-│   │           ├── reduce-only-invariant.md — Какой invariant adapter проверяет по reduceOnly?
-│   │           ├── timeframe-constants.md — Какое правило обращения со строками таймфреймов OKX?
-│   │           └── ws-limits.md — Какие лимиты у WebSocket-соединений OKX?
+│   ├── dictionary/ — —
+│   ├── integrations/ — Что известно про источник?
+│   │   └── okx/ — Что известно про источник OKX?
+│   │       ├── contracts/ — Каков контракт и какие лимиты у этой операции источника?
+│   │       │   ├── account-bills.md — Каков контракт OKX-операций по bill-записям аккаунта (7d, 3m, deep-архив с 2021): endpoint'ы, query, лимиты, пагинация?
+│   │       │   ├── account-config.md — Каков контракт OKX-операций конфигурации счёта: чтение конфигурации (`account/config`), режим позиций (`set-position-mode`), плечо (`set-leverage`, `leverage-info`)?
+│   │       │   ├── account-position-risk.md — Каков контракт OKX-операции `account-position-risk` — одновременный снапшот балансов и позиций аккаунта?
+│   │       │   ├── account-rate-limit.md — Каков контракт OKX-операции чтения аккаунт-уровневого rate limit (fill-ratio-based лимит суб-аккаунта): endpoint, поля?
+│   │       │   ├── algo-order.md — Каков контракт OKX-операций по algo-ордеру: endpoint'ы, лимиты, ACK-семантика, ordType-specific body, evidence-cycle, ветвление cancel-пути по семье algo?
+│   │       │   ├── balance.md — Каков контракт OKX-операции получения баланса: endpoint, лимиты, validation?
+│   │       │   ├── batch-operations.md — Каков контракт batch-операций OKX по ordinary order (place / cancel / amend пакетом): endpoint'ы, лимиты, поэлементный ACK, атомарность?
+│   │       │   ├── cancel-all-after.md — Каков контракт OKX-операции Cancel All After (серверная отмена всех pending-ордеров по таймауту): endpoint, поля, лимиты, семантика?
+│   │       │   ├── candle.md — Каков контракт OKX-операций по свечам: endpoint'ы, query, лимиты?
+│   │       │   ├── fills-archive.md — Каков контракт OKX-операций для выгрузки fills > 3 месяцев: endpoint'ы, async-флоу (генерация → polling → скачивание), лимиты?
+│   │       │   ├── fills.md — Каков контракт OKX-операций по fills (3d, 3m): endpoint'ы, query, лимиты, пагинация?
+│   │       │   ├── funding-rate.md — Каков контракт OKX-операций чтения funding rate SWAP: текущий/ прогнозный (`funding-rate`) и история ставок (`funding-rate-history`)?
+│   │       │   ├── index-data.md — Каков контракт OKX-операций чтения данных индекса: `index-tickers`, `index-candles`, `history-index-candles`?
+│   │       │   ├── instrument.md — Каков контракт OKX-операции получения спецификации инструмента?
+│   │       │   ├── insurance-fund.md — Каков контракт OKX-операции чтения баланса страхового фонда (`insurance-fund`; в офдоке — «security fund»)?
+│   │       │   ├── mark-price.md — Каков контракт OKX-операций чтения mark price: текущее значение (`public/mark-price`) и свечи (`mark-price-candles`, `history-mark-price-candles`)?
+│   │       │   ├── market-price-data.md — Каков контракт OKX-операции получения тикера?
+│   │       │   ├── max-size.md — Каков контракт OKX-операций оценки максимального размера ордера (`max-size`) и доступного баланса/эквити под сделку (`max-avail-size`)?
+│   │       │   ├── open-interest.md — Каков контракт OKX-операции чтения открытого интереса контрактов (`open-interest`)?
+│   │       │   ├── order-book.md — Каков контракт OKX-операций чтения стакана: `books` (до 400 уровней) и `books-full` (до 5000 уровней)?
+│   │       │   ├── order-precheck.md — Каков контракт OKX-операции order precheck (серверная пре-оценка влияния ордера на счёт до постановки): endpoint, поля, применимость?
+│   │       │   ├── order.md — Каков контракт OKX-операций по ordinary order: endpoint'ы, лимиты, ACK-семантика, пагинация?
+│   │       │   ├── position-tiers.md — Каков контракт OKX-операции чтения позиционных тиров (лимиты размера позиции, ставки маржи и максимальное плечо по тирам)?
+│   │       │   ├── position.md — Каков контракт OKX-операций по позиции: endpoint'ы, лимиты, close-position ACK, подтверждение факта закрытия, история закрытых позиций?
+│   │       │   ├── price-limit.md — Каков контракт OKX-операции чтения ценовых лимитов (`price-limit`): верхняя граница buy и нижняя граница sell?
+│   │       │   ├── public-trades.md — Каков контракт OKX-операций чтения публичных сделок инструмента: последние (`trades`) и история 3 месяца (`history-trades`)?
+│   │       │   ├── server-time.md — Каков контракт OKX-операции чтения серверного времени API (`public/time`)?
+│   │       │   ├── service-urls.md — Какие URL у OKX по окружениям (production, demo) и регионам?
+│   │       │   └── trade-fee.md — Каков контракт OKX-операции чтения ставок комиссий аккаунта (`trade-fee`): endpoint, поля, знаковая конвенция?
+│   │       ├── rules/ — Какое правило источника OKX?
+│   │       │   ├── adapter-constants.md — Какие константы OKX adapter выставляет сам, не из доменных моделей?
+│   │       │   ├── reduce-only-invariant.md — Какой invariant OKX adapter проверяет по `reduceOnly` факту?
+│   │       │   ├── timeframe-constants.md — Какое у нас правило обращения со строками таймфреймов OKX?
+│   │       │   └── ws-limits.md — Какие лимиты у WebSocket соединений OKX и какие требования по keep-alive / количеству подписок?
+│   │       └── coverage-manifest.md — Какова полнота покрытия поверхности OKX REST API нашими интеграционными доками — что задокументировано, что пробел, что вне продуктового периметра?
 │   ├── lifecycles/ — Через какие состояния проходит этот объект?
-│   │   ├── AlgoOrder.md — Через какие статусы проходит AlgoOrder?
-│   │   ├── AnomalyReport.md — Через какие статусы проходит AnomalyReport?
-│   │   ├── CandleGroup.md — Через какие статусы проходит загрузка свечей группы?
-│   │   ├── Deal.md — Через какие FSM-статусы проходит Deal?
-│   │   ├── DealActionState.md — Через какие статусы проходит исполнение действия (DealActionState)?
-│   │   ├── Instrument.md — Через какие статусы проходит онбординг инструмента?
-│   │   ├── Order.md — Через какие статусы проходят Order и AttachedAlgoOrder?
-│   │   ├── Position.md — Через какие статусы проходит Position?
-│   │   └── Strategy.md — Через какие административные статусы проходит Strategy?
-│   ├── models/
+│   │   ├── AlgoOrder.md — Через какие статусы проходит `AlgoOrder`, кто и при каких фактах их меняет?
+│   │   ├── AnomalyReport.md — Через какие статусы проходит `AnomalyReport`, кто и при каких событиях их меняет?
+│   │   ├── CandleGroup.md — Через какие статусы проходит загрузка свечей группы (`CandleGroup`) и кто ими управляет?
+│   │   ├── Deal.md — Через какие FSM-статусы проходит `Deal`, какие из них terminal, какие инварианты переходов и как считается live risk сделки?
+│   │   ├── DealActionState.md — Через какие статусы проходит исполнение действия (`DealActionState`, оба вида — STRATEGY и SYSTEM), кто и при каких фактах их меняет?
+│   │   ├── Instrument.md — Через какие статусы проходит онбординг инструмента (`Instrument`) в шаге 1 и кто ими управляет?
+│   │   ├── Order.md — Через какие статусы проходят `Order` и embedded `AttachedAlgoOrder`, кто и при каких фактах их меняет?
+│   │   ├── Position.md — Через какие статусы проходит `Position`, кто и при каких событиях их меняет?
+│   │   └── Strategy.md — Через какие административные статусы проходит `Strategy`, что каждый из них разрешает/блокирует и кто управляет переходами?
+│   ├── models/ — Какие у нас модели и как они переходят между слоями?
 │   │   ├── api/ — Что это за модель API нашего сервиса?
-│   │   │   ├── README.md — Что это за слой и когда здесь появляются файлы?
-│   │   │   └── OkxRawApiRequest.md — Какие поля у конверта запроса POST /api/proxy/okx/raw?
-│   │   ├── domain/
+│   │   │   ├── OkxRawApiRequest.md — Какие поля у `OkxRawApiRequest` — конверта запроса generic-эндпоинта `POST /api/proxy/okx/raw`, и как эндпоинт их читает?
+│   │   │   └── README.md — Что это за слой `docs/models/api/` и когда здесь появляются файлы?
+│   │   ├── domain/ — Какие у нас доменные модели?
 │   │   │   ├── aggregate/ — Что это за сущность без биржевой привязки, нужная для торговли?
-│   │   │   │   ├── Deal.md — Что это за торговая модель Deal?
-│   │   │   │   └── Strategy.md — Что это за торговая модель Strategy?
+│   │   │   │   ├── Deal.md — Что это за сущность `Deal`?
+│   │   │   │   └── Strategy.md — Что это за сущность `Strategy` и из чего состоит её дерево?
 │   │   │   ├── core/ — Что это за торговая модель с биржевым воплощением?
-│   │   │   │   ├── AlgoOrder.md — Что это за торговая модель AlgoOrder?
-│   │   │   │   ├── BalanceContainer.md — Что это за торговая модель BalanceContainer (и Balance)?
-│   │   │   │   ├── Exchange.md — Что это за доменная модель Exchange?
-│   │   │   │   ├── Instrument.md — Что это за доменная модель Instrument?
-│   │   │   │   ├── Order.md — Что это за торговая модель Order (и AttachedAlgoOrder)?
-│   │   │   │   └── Position.md — Что это за торговая модель Position?
+│   │   │   │   ├── AlgoOrder.md — Что это за сущность `AlgoOrder` — отдельная условная заявка сделки?
+│   │   │   │   ├── BalanceContainer.md — Что это за сущность `BalanceContainer` и вложенный в неё `Balance`?
+│   │   │   │   ├── Exchange.md — Что это за сущность `Exchange`?
+│   │   │   │   ├── Instrument.md — Что это за сущность `Instrument`?
+│   │   │   │   ├── Order.md — Что это за сущность `Order` и вложенная в неё встроенная защита?
+│   │   │   │   └── Position.md — Что это за сущность `Position`?
 │   │   │   └── other/ — Что это за прочая хранимая модель?
-│   │   │       ├── AnomalyReport.md — Что это за модель AnomalyReport?
-│   │   │       ├── Auditable.md — Какие общие audit-поля несут доменные сущности?
-│   │   │       ├── Candle.md — Что это за доменная модель Candle?
-│   │   │       ├── CandleGroup.md — Что это за доменная модель CandleGroup?
-│   │   │       ├── DealActionState.md — Что это за модель DealActionState (строка-исполнение действия)?
-│   │   │       ├── DealCashFlow.md — Что это за модель DealCashFlow?
-│   │   │       ├── IndicatorValue.md — Что это за модель IndicatorValue?
-│   │   │       ├── InstrumentExternalRules.md — Что это за модель InstrumentExternalRules?
-│   │   │       ├── MarketPhase.md — Что это за MarketPhase и почему вычисляется на лету?
-│   │   │       ├── MarketStructure.md — Что это за модель MarketStructure?
-│   │   │       └── TradeFeeRate.md — Что это за модель TradeFeeRate?
-│   │   ├── externalSnapshot/ — Какая структура нормализованного граничного объекта *ExternalSnapshot?
-│   │   │   └── README.md — Что это за слой и когда здесь появляются файлы?
-│   │   ├── integrations/ — Какие поля у нативной модели источника {name}?
-│   │   │   └── okx/
-│   │   │       ├── CandleOkxResponse.md — Какие поля у OKX candle response?
-│   │   │       ├── InstrumentOkxResponse.md — Какие поля у OKX instrument response?
-│   │   │       ├── OkxAccountBillResponse.md — Какие поля у OKX bill response?
-│   │   │       ├── OkxAlgoOrderResponse.md — Какие поля у OKX algo-order response?
-│   │   │       ├── OkxBalanceResponse.md — Какие поля у OKX account balance response?
-│   │   │       ├── OkxFillResponse.md — Какие поля у OKX fill response?
-│   │   │       ├── OkxFillsArchiveResponse.md — Какие поля у OKX fills-archive responses?
-│   │   │       ├── OkxOrderResponse.md — Какие поля у OKX ordinary order response?
-│   │   │       ├── OkxPositionResponse.md — Какие поля у OKX positions response?
-│   │   │       ├── OkxPositionsHistoryResponse.md — Какие поля у OKX positions-history response?
-│   │   │       ├── OkxTickerResponse.md — Какие поля у OKX ticker response?
-│   │   │       └── OkxTradeFeeResponse.md — Какие поля у OKX trade-fee response?
+│   │   │       ├── AnomalyReport.md — Что это за модель `AnomalyReport`?
+│   │   │       ├── Auditable.md — Какие общие поля аудита несут доменные сущности?
+│   │   │       ├── Candle.md — Что это за доменная модель `Candle`: структура, персистентность, правило закрытых свечей?
+│   │   │       ├── CandleGroup.md — Что это за доменная модель `CandleGroup`: структура, енум `TimeFrame`, целостность по count, персистентность; где описан её lifecycle?
+│   │   │       ├── DealActionState.md — Что это за модель `DealActionState` — строка исполнения действия?
+│   │   │       ├── DealCashFlow.md — Что это за модель `DealCashFlow` — журнал денежного движения, отнесённого к сделке?
+│   │   │       ├── IndicatorValue.md — Что это за модель `IndicatorValue`: структура abstract-базы, наследники по типам индикаторов, енум `Type`, правила хранения?
+│   │   │       ├── InstrumentExternalRules.md — Что это за модель `InstrumentExternalRules` — справочные правила инструмента?
+│   │   │       ├── MarketPhase.md — Что это за `MarketPhase`: структура, енум `Type`, и почему она **вычисляется на лету** из текущих индикаторов/структур, а не хранится?
+│   │   │       ├── MarketStructure.md — Что это за модель `MarketStructure`: структура, енум `Type`, вложенные ценовые уровни `MarketPriceLevel`, правила хранения и актуальности?
+│   │   │       └── TradeFeeRate.md — Что это за модель `TradeFeeRate` — ставка торговой комиссии?
+│   │   ├── externalSnapshot/ — Какая структура нормализованного граничного объекта?
+│   │   │   └── README.md — Что это за слой `docs/models/externalSnapshot/` и когда здесь появляются файлы?
+│   │   ├── integrations/ — Какие поля у нативной модели источника?
+│   │   │   └── okx/ — Какие поля у нативной модели источника OKX?
+│   │   │       ├── CandleOkxResponse.md — Какие поля у OKX candle response — что приходит от биржи и что из этого используется?
+│   │   │       ├── InstrumentOkxResponse.md — Какие поля у OKX instrument response — что приходит от биржи и что из этого используется?
+│   │   │       ├── OkxAccountBillResponse.md — Какие поля у OKX bill response — одной записи денежного движения по торговому аккаунту?
+│   │   │       ├── OkxAlgoOrderResponse.md — Какие поля у нативной модели OKX algo-order response и какие из них использует bot?
+│   │   │       ├── OkxBalanceResponse.md — Какие поля у OKX account balance response — что приходит от биржи и что из этого используется?
+│   │   │       ├── OkxFillResponse.md — Какие поля у OKX fill response (одна сделка / одно исполнение)?
+│   │   │       ├── OkxFillsArchiveResponse.md — Какие поля у OKX fills-archive responses (генерация и получение ссылки) — двух операций async-флоу выгрузки fills > 3 месяцев?
+│   │   │       ├── OkxOrderResponse.md — Какие поля у нативной модели OKX ordinary order response (включая вложенный массив `attachAlgoOrds`) и какие из них использует bot?
+│   │   │       ├── OkxPositionResponse.md — Какие поля у нативной модели OKX positions response и какие из них использует bot?
+│   │   │       ├── OkxPositionsHistoryResponse.md — Какие поля у нативной модели OKX positions-history response и какие из них использует bot?
+│   │   │       ├── OkxTickerResponse.md — Какие поля у OKX ticker response — что приходит от биржи и что из этого используется?
+│   │   │       └── OkxTradeFeeResponse.md — Какие поля у OKX trade-fee response — ответа со ставками комиссий комиссионных групп аккаунта?
 │   │   ├── mapping/ — Как сущность переходит между слоями?
-│   │   │   ├── AlgoOrder.md — Как AlgoOrder ложится на нативные модели и нормализуется?
-│   │   │   ├── Balance.md — Как BalanceContainer/Balance ложатся на нативные модели?
-│   │   │   ├── Candle.md — Как нативные свечи ложатся на доменные свечные данные?
-│   │   │   ├── DealCashFlow.md — Как OKX bill-записи ложатся на DealCashFlow?
-│   │   │   ├── Instrument.md — Как Instrument переходит между слоями?
-│   │   │   ├── InstrumentExternalRules.md — Как InstrumentExternalRules ложится на нативные модели?
-│   │   │   ├── MarketPriceData.md — Как MarketPriceData ложится на нативные модели?
-│   │   │   ├── Order.md — Как Order (+AttachedAlgoOrder) ложится на нативные модели?
-│   │   │   ├── Position.md — Как Position ложится на нативные модели?
-│   │   │   ├── PositionCloseResult.md — Как positions-history нормализуется в PositionCloseResult-снапшот?
-│   │   │   ├── Strategy.md — Как Strategy переходит между слоями (api ↔ domain ↔ persistence)?
-│   │   │   ├── TimeFrame.md — Как enum TimeFrame маппится в строки таймфреймов источников?
-│   │   │   ├── TradeFeeRate.md — Как ставка комиссии источника ложится на TradeFeeRate?
-│   │   │   └── TradeFill.md — Как fills легли бы на TradeFill, если бы он вводился?
+│   │   │   ├── AlgoOrder.md — Как доменный `AlgoOrder` ложится на нативные модели источников, нормализуется через `AlgoOrderExternalSnapshot` и как резолвится его статус?
+│   │   │   ├── Balance.md — Как доменные `BalanceContainer` / `Balance` ложатся на нативные модели источников, нормализуются через `BalanceContainerExternalSnapshot` / `BalanceExternalSnapshot`, какие поля валидируются?
+│   │   │   ├── Candle.md — Как нативные представления свечей источников ложатся на доменные свечные данные и какие особенности их формата?
+│   │   │   ├── DealCashFlow.md — Как OKX bill-записи ложатся на доменную `DealCashFlow`, как из `type`/`subType` резолвится `CashFlowCategory`, какие поля валидируются?
+│   │   │   ├── Instrument.md — Как `Instrument` переходит между слоями (источник ↔ `InstrumentExternalSnapshot` ↔ domain) и что из снапшота персистится в шаге 1?
+│   │   │   ├── InstrumentExternalRules.md — Как доменный `InstrumentExternalRules` ложится на нативные модели источников, нормализуется через `InstrumentExternalRulesExternalSnapshot` и как резолвятся типы и статус инструмента?
+│   │   │   ├── MarketPriceData.md — Как доменный `MarketPriceData` ложится на нативные модели источников и нормализуется через `MarketPriceDataExternalSnapshot`?
+│   │   │   ├── Order.md — Как доменный `Order` (+ `AttachedAlgoOrder`) ложится на нативные модели источников, нормализуется через `OrderExternalSnapshot` и как резолвится его статус?
+│   │   │   ├── Position.md — Как доменная `Position` ложится на нативные модели источников, нормализуется через `PositionExternalSnapshot` и какие invariants проверяются?
+│   │   │   ├── PositionCloseResult.md — Как положение закрытой позиции источника ложится на `Position`?
+│   │   │   ├── Strategy.md — Как `Strategy` переходит между слоями (api ↔ domain ↔ persistence): полиморфные ветви, JSONB-навес, плоские строки шагов и резолв self-ссылок действий?
+│   │   │   ├── TimeFrame.md — Как доменный enum `TimeFrame` маппится в строки таймфреймов источников?
+│   │   │   ├── TradeFeeRate.md — Как ставка комиссии источника ложится на доменную `TradeFeeRate`?
+│   │   │   └── TradeFill.md — Как нативные fills источников легли бы на доменный `TradeFill`, если бы он вводился (в фазе 1 — не вводится)?
 │   │   └── persistence/ — Что это за модель хранимого слоя?
-│   │       └── README.md — Что это за слой и когда здесь появляются файлы?
+│   │       └── README.md — Что это за слой `docs/models/persistence/` и когда здесь появляются файлы?
 │   ├── processes/ — Как устроен этот процесс?
-│   │   ├── candle-loading.md — Как устроена добыча и поддержание целостности свечной истории?
-│   │   ├── deal-management.md — Как устроено сопровождение сделки во времени?
-│   │   ├── market-data-calculation.md — Как устроено вычисление производных рыночных данных?
-│   │   ├── risk-evaluation.md — Как устроена оценка риска?
-│   │   └── strategy-action-calculation.md — Как устроен расчёт параметров одного StrategyAction?
-│   └── rules/ — Какое правило действует в системе?
-│       ├── absent-value-semantics.md — Как выражается отсутствие значения у признака?
-│       ├── ack-not-runtime-truth.md — Почему ACK не подтверждает фактическое состояние сущности?
-│       ├── audit-not-runtime-source.md — Почему аудит не источник runtime-логики FSM?
-│       ├── business-logic-on-domain-model.md — Где выполняется бизнес-логика относительно слоёв?
-│       ├── command-lifecycle.md — Каков жизненный цикл ServiceCommand?
-│       ├── condition-ruletype-granularity.md — Когда заводить выделенный StrategyConditionRuleType?
-│       ├── controlled-exchange-exceptions.md — Какие категории controlled exchange exceptions и реакции?
-│       ├── deal-without-operations.md — По какому признаку сделка считается не имевшей операций на бирже?
-│       ├── error-handling-policy.md — Как ошибки выходят наружу и градируются внутри?
-│       ├── exchange-hold.md — Какова лестница exchange-scope safety-состояний (HOLD/TRADE_BLOCKED)?
-│       ├── execution-hierarchy.md — Какова иерархия уровней исполнения торговли?
-│       ├── exit-teardown-order.md — В каком порядке снимаются живые сущности при закрытии позиции?
-│       ├── external-status-resolution.md — Как работать с сырым внешним статусом сущности?
-│       ├── idempotency-via-unique.md — Как обеспечивается уникальность и идемпотентность сущностей?
-│       ├── instrument-hold.md — Какое правило определяет инструмент-scope холд?
-│       ├── market-data-freshness.md — Какое правило свежести рыночных данных?
-│       ├── market-data-retention.md — Какое правило хранения/чистки результатов расчёта?
-│       ├── no-partial-close.md — Почему запрещено частичное закрытие через close-position?
-│       ├── persistence-representation.md — Как сущность представляется в БД?
-│       ├── pnl-reconciliation.md — Какое правило сверки итогового P&L (bills ↔ net)?
-│       ├── raw-exchange-dto-boundary.md — Как ограничено распространение raw exchange DTO по слоям?
-│       ├── risk-creating-entry-protection.md — Какой инвариант системы запрещает живой риск без защиты?
-│       ├── risk-validator-scope.md — Когда RiskValidator вызывается, а когда нет?
-│       ├── runtime-error-classification.md — Как классифицируются unexpected runtime-ошибки?
-│       ├── time-utc.md — Какое правило по работе со временем?
-│       ├── trading-configuration-ownership.md — Что настраивает стратегия, а чем владеет система?
-│       ├── trading-constraints.md — В каком торговом контуре и с какими ограничениями работает бот?
-│       └── writer-named-for-every-value.md — Какое правило требует называть писателя для каждого значения и перехода?
+│   │   ├── candle-loading.md — Как устроен процесс добычи и поддержания целостности свечной истории: оркестрация `CandleJob`, цикл статусов `CandleGroup`, политика глубины/целостности, координация онбординга инструмента?
+│   │   ├── deal-management.md — Как устроен процесс сопровождения сделки во времени: поток от поиска входа до закрытия, какие компоненты и подпроцессы участвуют?
+│   │   ├── fsm-execution-layering.md — Как разложены слои исполнения сделки от петли до биржевого вызова?
+│   │   ├── market-data-calculation.md — Как устроен процесс вычисления производных рыночных данных (индикаторы / структура / фаза) поверх загруженных свечей: какие jobs, в какой последовательности, по какой цепочке зависимостей, и где результаты используются?
+│   │   ├── risk-evaluation.md — Как устроен процесс оценки риска: когда вызывается, как обрабатывается результат, какова реакция на BLOCKED?
+│   │   └── strategy-action-calculation.md — Как устроен процесс расчёта параметров одного `StrategyAction`: поток build `CalculationContext` → price → size, где его границы с FSM, risk и command-слоем?
+│   ├── rules/ — Какое правило действует в системе?
+│   │   ├── absent-value-semantics.md — Как выражается отсутствие значения у признака?
+│   │   ├── ack-not-runtime-truth.md — Какое правило системы запрещает считать ACK биржи фактом о состоянии сущности?
+│   │   ├── audit-not-runtime-source.md — Какое правило запрещает управляющей логике читать историю, чтобы решить, что делать дальше?
+│   │   ├── command-lifecycle.md — Каков жизненный цикл `ServiceCommand`?
+│   │   ├── condition-ruletype-granularity.md — Когда заводится именованный тип правила условия, а когда используется генерик-сравнение?
+│   │   ├── controlled-exchange-exceptions.md — Какие категории контролируемых исключений существуют на границе с биржей и какова реакция на них?
+│   │   ├── deal-without-operations.md — Как определяется, что по сделке не было операций на бирже?
+│   │   ├── error-handling-policy.md — Как ошибки выходят наружу и как градируются внутри торгового контура?
+│   │   ├── exchange-hold.md — Какое правило определяет биржевые safety-состояния и переходы между ними?
+│   │   ├── execution-hierarchy.md — Какова иерархия уровней исполнения торговли?
+│   │   ├── exit-teardown-order.md — В каком порядке снимаются живые ноги и закрывается позиция при выходе?
+│   │   ├── external-status-resolution.md — Какое правило определяет работу с сырым статусом источника и реакцию на нераспознанный статус?
+│   │   ├── idempotency-via-unique.md — Чем обеспечиваются уникальность и идемпотентность хранимых сущностей?
+│   │   ├── instrument-hold.md — Какое правило определяет холд по одному инструменту?
+│   │   ├── live-risk-protection.md — Какой инвариант системы запрещает живой риск без защиты?
+│   │   ├── market-data-freshness.md — Как определяется свежесть рыночных данных и что она ограничивает?
+│   │   ├── market-data-retention.md — Какое у нас правило хранения результатов расчёта рыночных данных?
+│   │   ├── no-partial-close.md — Чем выражается полное закрытие позиции и чем — частичное уменьшение?
+│   │   ├── persistence-representation.md — Какое у нас правило представления доменных структур в базе?
+│   │   ├── pnl-reconciliation.md — Как сверяется заголовочный результат сделки с разбивкой движений и что делается при расхождении?
+│   │   ├── raw-exchange-dto-boundary.md — Какое правило ограничивает распространение сырых DTO источника по слоям?
+│   │   ├── replace-not-amend.md — Как система ремоделирует уже стоящие на бирже сущности?
+│   │   ├── risk-policy.md — Какой риск система допускает на сделку и чем удерживает его в этих границах?
+│   │   ├── risk-validator-scope.md — Для каких действий вызывается `RiskValidator`?
+│   │   ├── runtime-error-classification.md — Как классифицируются неожиданные runtime-ошибки?
+│   │   ├── strategy-condition-contract.md — Как автор стратегии записывает условие?
+│   │   ├── strategy-validation.md — Что проверяется при создании стратегии и что откладывается до активации?
+│   │   ├── time-utc.md — Какое у нас правило работы со временем?
+│   │   ├── trading-configuration-ownership.md — Что в торговле настраивает стратегия, а чем владеет система?
+│   │   ├── trading-constraints.md — В каком торговом контуре и с какими ограничениями работает бот?
+│   │   └── writer-named-for-every-value.md — Какое правило требует называть писателя для каждого значения и перехода?
+│   ├── spec/ — Чему равна эта величина или предикат и на каких примерах это проверено?
+│   │   ├── deal-risk-numbers.json — Чему равны четыре числа риска сделки и по какому предикату отбираются их слагаемые?
+│   │   ├── pnl-reconciliation.json — Чему равен допуск сверки, какие строки в него входят и сошлась ли сверка?
+│   │   ├── protection-coverage.json — Какое покрытие несут защиты живого эпизода, достаточно ли оно и законно ли снятие защиты?
+│   │   └── risk-limits.json — Чему равны операнды четырёх потолков риска и выполняются ли неравенства?
+│   └── concept.md — Из каких принципов выведена система и почему они такие?
 ├── src/ — (Код, не документация.)
 └── .claude-archive/ — (Архив старой инфраструктуры; не место для новых файлов.)
 ```

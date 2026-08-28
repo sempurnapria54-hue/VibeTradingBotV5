@@ -22,11 +22,10 @@ ERROR` (non-terminal runtime status для `ErrorHandler`/safety-flow) — в
 
 `* → ERROR` **на тропах решения** (любой active runtime status).
 
-**Не всякое ребро в `ERROR` едет через это звено** (A4 `DOCS_CHECK_20`):
+**Не всякое ребро в `ERROR` едет через это звено**:
 тропы **перехвата** — enforcement холда и оба `catch` оркестратора —
 пишут статус прямой записью, звена не эмитируя
-(`docs/decisions/fsm-execution-layering.md` §«Ребро `* → ERROR`:
-карв-аут по природе тропы», `docs/components/DealOrchestratorJob.md`).
+(`docs/processes/fsm-execution-layering.md`, `docs/components/DealOrchestratorJob.md`).
 Звено обслуживает рёбра, являющиеся **исходом решения** handler'а:
 `EXIT_PENDING → ERROR` по неполноте числа
 (`docs/components/ExitPendingHandler.md`), BLOCKED-вердикт риск-валидации
@@ -40,11 +39,9 @@ handler**, второго (`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`) —
 дальнейший разбор ведёт `docs/components/ErrorHandler.md`; аварийный терминал
 `ERROR → EMERGENCY_CLOSED` после подтверждённого снятия live risk ставит
 **`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`** (`docs/components/MarkDealEmergencyClosedExecutor.md`,
-best-effort число, шаг 7 — `docs/decisions/pnl-finalization-mechanics.md` реш.3).
+best-effort число, шаг 7 — `docs/rules/pnl-reconciliation.md` реш.3).
 `MARK_DEAL_ERROR_COMMAND` сам терминал не ставит — он переводит сделку под safety-flow.
-Сюда же сходится ошибочная тропа неисчислимой финализации
-(`MarkDealClosedExecutor` после исчерпания retry — DEAL-Q2,
-`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»).
+Сюда же сходится ошибочная тропа неисчислимой финализации.
 
 ## Идемпотентность и retry
 

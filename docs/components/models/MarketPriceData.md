@@ -35,11 +35,11 @@ Client model OKX ticker
 | `externalLastPrice` | `BigDecimal` | Последняя цена сделки. |
 | `externalAskPrice` | `BigDecimal` | Лучшая цена продажи. |
 | `externalBidPrice` | `BigDecimal` | Лучшая цена покупки. |
-| `externalAskSize` | `BigDecimal` | Объём на лучшей цене продажи (глубина топа стакана). Вводится P10 `DOCS_CHECK_24` — операнд измерителя `Order.bookDepthAtPlacement`. |
+| `externalAskSize` | `BigDecimal` | Объём на лучшей цене продажи (глубина топа стакана). Вводится — операнд измерителя `Order.bookDepthAtPlacement`. |
 | `externalBidSize` | `BigDecimal` | Объём на лучшей цене покупки. Там же. |
 | `externalTimestamp` | `OffsetDateTime` | Время тикера на бирже. |
 
-`MID_PRICE` не хранится — вычисляется методом `midPrice()`:
+`MID_PRICE` не хранится — вычисляется методом `midPrice`:
 `(externalBidPrice + externalAskPrice) / 2`; возвращает `null`, если
 одной из сторон нет.
 

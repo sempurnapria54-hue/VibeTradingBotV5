@@ -28,7 +28,7 @@ PROFIT/LOSS_PERCENTS_REACHED -> Position.avgPrice + MarketPriceData
 контексте классификации фазы `TREND_CHANGED` не используется: whitelist
 `StrategyMarketPhaseRule` запрещает и `MARKET_PHASE` (само-референция), и
 сам `TREND_CHANGED` (темпоральное несовместимо со stateless-классификатором
-— см. `docs/models/domain/aggregate/Strategy.md` §StrategyMarketPhaseRule).
+— см. `docs/models/domain/aggregate/Strategy.md`).
 
 ## Границы
 

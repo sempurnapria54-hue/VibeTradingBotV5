@@ -30,7 +30,7 @@ payload-классов («Сервисные команды» §13, §10). Ра�
   **Обновление (CMD-Q3, 2026-06-10):** эти четыре команды сняты из
   `ServiceCommandType` вовсе — их эндпоинты стали звеньями внутреннего
   evidence-cycle entity-refresh-команд
-  (`docs/decisions/refresh-evidence-cycle-ownership.md`).
+  (`docs/rules/command-lifecycle.md`).
 
 ## Обоснование
 
@@ -59,7 +59,7 @@ payload-классов («Сервисные команды» §13, §10). Ра�
 
 CMD-Q2 (общий базовый тип/дискриминатор payload'ов + судьба
 `ServiceCommandPayload.md`) закрыт на `GAPS_CLOSE_1` шага 4 (2026-06-10)
-решением `docs/decisions/service-command-payload-base-type.md`: маркер-база
+решением `docs/components/models/ServiceCommandPayload.md`: маркер-база
 `ServiceCommandPayload` (без поведения), дискриминатор — `ServiceCommandType`
 на команде, `ServiceCommandPayload.md` — дом базового типа. Payload-разделы
 перенесены к своим executor'ам.

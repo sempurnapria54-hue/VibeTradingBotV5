@@ -23,14 +23,6 @@ mismatch -> EXCHANGE_INVARIANT_VIOLATION
 проигнорировать `positionReducingOnly`; unsupported exchange на
 первом этапе не блокируем.
 
-## Почему
-
-Reduce-only — критическая защита от случайного увеличения позиции в
-обратную сторону (бот строит exits на reduce-only-ордерах).
-Расхождение между намерением domain и фактическим биржевым значением
-нельзя «починить» молча — это сигнал, что adapter/биржа выставила не
-то, что запросил domain.
-
 ## Где применяется
 
 - `OkxIntegrationService` validation после create order;
@@ -39,6 +31,6 @@ Reduce-only — критическая защита от случайного у
 
 ## Связанные
 
-- `docs/models/mapping/Order.md` §OKX → request mapping.
+- `docs/models/mapping/Order.md` → request mapping.
 - `docs/rules/external-status-resolution.md` (safety-каскад).
 - `docs/rules/raw-exchange-dto-boundary.md`.

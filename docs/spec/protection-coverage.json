@@ -1,0 +1,294 @@
+{
+  "subject": "protection-coverage",
+  "question": "Какое покрытие несут защиты живого эпизода, достаточно ли оно и законно ли снятие защиты",
+  "home": "docs/rules/live-risk-protection.md",
+
+  "operands": {
+    "protections[].carrier": "ATTACHED — Order.attachedAlgoOrders[*]; STANDALONE — AlgoOrder сделки",
+    "protections[].status": "AttachedAlgoOrder.status / AlgoOrder.status",
+    "protections[].kind": "STOP — фиксированный уровень; TRAILING — трейлинг; TAKE_PROFIT — тейк",
+    "protections[].size": "AttachedAlgoOrder.size / AlgoOrder.size",
+    "protections[].parentFillSize": "Order.accumulatedFillSize родительской ноги (только ATTACHED)",
+    "protections[].triggeredSize": "AlgoOrder.externalSize — фактически сработавший размер (только STANDALONE)",
+    "protections[].activationPrice": "AlgoOrder.condition.trailing.activationPrice",
+    "protections[].observedTrailingPrice": "AlgoOrder.condition.trailing.externalPrice (moveTriggerPx)",
+    "position.externalSize": "Position.externalSize живого эпизода",
+    "position.live": "Position.hasLiveRisk()",
+    "commitments[].terminal": "DealActionState строки защитного действия — терминальна ли",
+    "commitments[].budgetExhausted": "бюджет попыток строки исчерпан",
+    "cancelTargetId": "id снимаемой защиты — операнд преконтроля снятия"
+  },
+
+  "values": [
+    {
+      "name": "isLive",
+      "note": "Живая заявка. У встроенной защиты множество уже; CREATED не входит нигде: заявка на бирже не подтверждена.",
+      "expr": "if(carrier == 'ATTACHED', in(status, 'PENDING', 'ACTIVE'), in(status, 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED'))"
+    },
+    {
+      "name": "carriesActiveStopLevel",
+      "note": "Несёт действующий уровень остановки убытка. Тейк не несёт никогда; трейлинг — только пока цена активации пуста либо уровень уже наблюдён.",
+      "expr": "if(kind == 'TAKE_PROFIT', false, if(kind == 'TRAILING', isNull(activationPrice) || notNull(observedTrailingPrice), true))"
+    },
+    {
+      "name": "isProtection",
+      "note": "Заявка считается защитой.",
+      "expr": "isLive && carriesActiveStopLevel"
+    },
+    {
+      "name": "coveredSize",
+      "note": "Сколько реально закрывает эта защита. У встроенной — не больше филла своей ноги; у standalone — остаток после срабатывания.",
+      "expr": "if(carrier == 'ATTACHED', min(size, parentFillSize), size - triggeredSize)"
+    },
+    {
+      "name": "coverage",
+      "note": "Совокупное покрытие живого эпизода.",
+      "op": "sum",
+      "over": "protections",
+      "where": "isProtection",
+      "of": "coveredSize"
+    },
+    {
+      "name": "coverageSufficient",
+      "note": "Покрытие полное: 100 % живой экспозиции.",
+      "expr": "coverage >= position.externalSize"
+    },
+    {
+      "name": "hasLiveCommitment",
+      "note": "Есть действующее обязательство покрытия: нетерминальная строка исполнения защитного действия с неисчерпанным бюджетом.",
+      "op": "any",
+      "over": "commitments",
+      "of": "!terminal && !budgetExhausted"
+    },
+    {
+      "name": "invariantViolated",
+      "note": "Нарушение инварианта: живой риск без покрытия и без обязательства. Реакция — биржевая ступень 2.",
+      "expr": "position.live && !coverageSufficient && !hasLiveCommitment"
+    },
+    {
+      "name": "coverageAfterRemoval",
+      "note": "Покрытие после того, как снимаемая защита исчезнет.",
+      "op": "sum",
+      "over": "protections",
+      "where": "isProtection && id != cancelTargetId",
+      "of": "coveredSize"
+    },
+    {
+      "name": "removalAllowed",
+      "note": "Снятие защиты законно: её покрытие уже несёт другая подтверждённая защита.",
+      "expr": "coverageAfterRemoval >= position.externalSize"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "встроенная защита на полностью налитой ноге покрывает позицию",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "a1", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 100, "triggeredSize": null, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 100, "coverageSufficient": true, "invariantViolated": false }
+    },
+    {
+      "case": "встроенная защита капится филлом своей ноги, а не своим размером",
+      "state": {
+        "position": { "live": true, "externalSize": 30 },
+        "commitments": [],
+        "protections": [
+          { "id": "a1", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 30, "triggeredSize": null, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 30, "coverageSufficient": true }
+    },
+    {
+      "case": "трейлинг до достижения цены активации защитой не считается",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "t1", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": 3063, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 0, "coverageSufficient": false, "invariantViolated": true }
+    },
+    {
+      "case": "трейлинг без цены активации защищает сразу",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "t1", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 100, "invariantViolated": false }
+    },
+    {
+      "case": "активированный трейлинг покрывает: уровень наблюдён",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "t1", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": 3063, "observedTrailingPrice": 3120 }
+        ]
+      },
+      "expect": { "coverage": 100, "coverageSufficient": true }
+    },
+    {
+      "case": "тейк покрытием не является ни при каком статусе",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "p1", "carrier": "STANDALONE", "kind": "TAKE_PROFIT", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 0, "invariantViolated": true }
+    },
+    {
+      "case": "частично сработавшая standalone-защита покрывает остаток",
+      "state": {
+        "position": { "live": true, "externalSize": 60 },
+        "commitments": [],
+        "protections": [
+          { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "PARTIALLY_COMPLETED", "size": 100, "parentFillSize": null, "triggeredSize": 40, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 60, "coverageSufficient": true }
+    },
+    {
+      "case": "CREATED не покрывает: подтверждения с биржи нет",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [ { "terminal": false, "budgetExhausted": false } ],
+        "protections": [
+          { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "CREATED", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 0, "coverageSufficient": false, "invariantViolated": false }
+    },
+    {
+      "case": "пакет шага: снятие OCO при неактивированном трейлинге не допускается",
+      "state": {
+        "cancelTargetId": "oco",
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "oco", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "trl", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": 3063, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 100, "coverageAfterRemoval": 0, "removalAllowed": false, "invariantViolated": false }
+    },
+    {
+      "case": "тот же пакет после активации трейлинга: снятие допускается",
+      "state": {
+        "cancelTargetId": "oco",
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "oco", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "trl", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "parentFillSize": null, "triggeredSize": 0, "activationPrice": 3063, "observedTrailingPrice": 3120 }
+        ]
+      },
+      "expect": { "coverageAfterRemoval": 100, "removalAllowed": true }
+    },
+    {
+      "case": "перевыставление входа: новая нога с нулевым филлом покрытия не даёт, старая ещё несёт",
+      "state": {
+        "position": { "live": true, "externalSize": 30 },
+        "commitments": [],
+        "protections": [
+          { "id": "old", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 30, "triggeredSize": null, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "new", "carrier": "ATTACHED", "kind": "STOP", "status": "PENDING", "size": 70, "parentFillSize": 0, "triggeredSize": null, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 30, "coverageSufficient": true }
+    },
+    {
+      "case": "перевыставление входа: снятие старой ноги до пересчёта основной защиты не допускается",
+      "state": {
+        "cancelTargetId": "old",
+        "position": { "live": true, "externalSize": 30 },
+        "commitments": [],
+        "protections": [
+          { "id": "old", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 30, "triggeredSize": null, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "new", "carrier": "ATTACHED", "kind": "STOP", "status": "PENDING", "size": 70, "parentFillSize": 0, "triggeredSize": null, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverageAfterRemoval": 0, "removalAllowed": false }
+    },
+    {
+      "case": "перевыставление входа: основная защита пересчитана на новый размер — снятие допускается",
+      "state": {
+        "cancelTargetId": "old",
+        "position": { "live": true, "externalSize": 30 },
+        "commitments": [],
+        "protections": [
+          { "id": "old", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 30, "triggeredSize": null, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "main", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 30, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverageAfterRemoval": 30, "removalAllowed": true }
+    },
+    {
+      "case": "недопокрытие под живым обязательством нарушением не является",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [ { "terminal": false, "budgetExhausted": false } ],
+        "protections": []
+      },
+      "expect": { "coverage": 0, "coverageSufficient": false, "hasLiveCommitment": true, "invariantViolated": false }
+    },
+    {
+      "case": "недопокрытие при исчерпанном бюджете обязательства — нарушение",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [ { "terminal": false, "budgetExhausted": true } ],
+        "protections": []
+      },
+      "expect": { "hasLiveCommitment": false, "invariantViolated": true }
+    },
+    {
+      "case": "лестница частичных стопов на 25+25+25+15 позицию не покрывает",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "l1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 25, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "l2", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 25, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "l3", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 25, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "l4", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 15, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 90, "coverageSufficient": false, "invariantViolated": true }
+    },
+    {
+      "case": "лестница, где последняя ступень получила остаток, покрывает ровно 100 %",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "l1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 25, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "l2", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 25, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "l3", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 25, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null },
+          { "id": "l4", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 25, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expect": { "coverage": 100, "coverageSufficient": true }
+    },
+    {
+      "case": "недобытый размер защиты отказывает, а не подставляет ноль",
+      "state": {
+        "position": { "live": true, "externalSize": 100 },
+        "commitments": [],
+        "protections": [
+          { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": null, "parentFillSize": null, "triggeredSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+        ]
+      },
+      "expectRefusal": { "coverage": "пустой размер в арифметике" }
+    }
+  ]
+}

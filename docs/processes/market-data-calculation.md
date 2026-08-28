@@ -37,20 +37,12 @@ EntryScannerJob / DealOrchestratorJob (FSM)
      фазу получают через MarketPhaseService (вычисляется на лету)
 ```
 
-Компоненты: `docs/components/IndicatorJob.md`,
-`MarketStructureJob.md`. Фаза **не предрассчитывается job'ом** — она
-вычисляется на чтение через `docs/components/MarketPhaseService.md` /
-`MarketPhaseResolver.md` (ревизия трек D,
-`docs/decisions/market-phase-stateless.md`; прежний `MarketPhaseJob`
-удалён). Загрузку свечей ведёт `docs/components/CandleJob.md` в процессе
-`docs/processes/candle-loading.md`.
-
 `InstrumentExternalRulesSyncJob` (подготовка спеков инструмента) в
 активную оркестрацию рыночных данных **не входит**: он готовит
 `InstrumentExternalRules` — модель, материализуемую на шаге 5
 (риск-преконтроль), отдельным от расчёта рыночных данных контуром
 (`docs/components/InstrumentExternalRulesSyncJob.md`,
-`docs/decisions/instrument-external-rules-materialization.md`).
+`docs/models/domain/other/InstrumentExternalRules.md`).
 
 ## Свечи как вход
 
@@ -79,7 +71,7 @@ IndicatorValue + MarketStructure
 - Jobs идемпотентны (уникальность по `instrument` +
   **настройка-владелец** (`strategy_indicator_setting_id` /
   `strategy_market_structure_setting_id`) + candle/window timestamp —
-  owner-ключевание, `docs/decisions/market-data-result-identity-keying.md`;
+  owner-ключевание, `docs/rules/market-data-freshness.md`;
   checkpoint **производный** — `max(timestamp)` по таблице результатов на
   (инструмент + настройка-владелец), отдельного состояния не храним). Фаза
   job'ом не считается (вычисляется на чтение), идемпотентность к ней
@@ -113,7 +105,7 @@ StrategyActionCalculator -> расчёт цены / размера
 - **Владелец проверки на шаге 3 не материализуется.** Активационная
   проверка — потребитель сервисов этого шага, но сам её исполнитель
   появляется по линии activate-валидации (см.
-  `docs/decisions/strategy-materialization-and-validation.md`: линия реза
+  `docs/rules/strategy-validation.md`: линия реза
   create = структура / activate = готовность-к-запуску). Семантика
   activate (422) отложена до зрелости поздних шагов (4/7); назначать
   владельца проверки на шаге 3 — спекуляция (нет текущего потребителя).

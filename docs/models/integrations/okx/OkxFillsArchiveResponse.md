@@ -5,21 +5,6 @@
 Какие поля у OKX fills-archive responses (генерация и получение
 ссылки) — двух операций async-флоу выгрузки fills > 3 месяцев.
 
-## Контекст
-
-Нативная модель источника OKX. Возвращается `POST /api/v5/trade/fills-archive`
-(запросить генерацию) и `GET /api/v5/trade/fills-archive` (получить
-ссылку на файл). Используется только когда нужны fills **старше 3
-месяцев и до ~2 лет** (для последних 3 месяцев — `trade/fills-history`,
-см. `OkxFillResponse.md`).
-
-Persisted-сущность `TradeFillsArchive` на первом этапе **не вводим**
-(см. OKX-Q2 в `.claude/work/questions/open-questions.md`). Контракт
-endpoint'ов и async-флоу — `docs/integrations/okx/contracts/fills-archive.md`.
-
-Raw OKX DTO не выходит за adapter-layer
-(`docs/rules/raw-exchange-dto-boundary.md`).
-
 ## Generate response (POST /api/v5/trade/fills-archive)
 
 `data[0]`:
@@ -50,4 +35,4 @@ Raw OKX DTO не выходит за adapter-layer
 `clOrdId`, `billId`, `fillPx`, `fillSz`, `side`, `posSide`, `execType`,
 `feeCcy`, `fee`, `ts`, `instType`, `instId`, `tag`). Точная схема
 выгрузки в архиве не зафиксирована; при материализации
-`TradeFillsArchive` (OKX-Q2) — сверять по реальному ответу OKX.
+`TradeFillsArchive` — сверять по реальному ответу OKX.

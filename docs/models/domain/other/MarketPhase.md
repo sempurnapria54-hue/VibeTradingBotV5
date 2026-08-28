@@ -14,28 +14,13 @@
 `docs/components/MarketPhaseResolver.md` — упорядоченный first-match
 поверх `StrategyConditionEvaluator` (первая клауза с истинным `condition`
 задаёт `Type`, ни одна → `UNKNOWN`; см.
-`docs/decisions/market-phase-conditional-classification.md`).
+`docs/models/domain/other/MarketPhase.md`).
 
-`MarketPhase` **не персистируется** (ревизия трек D —
-`docs/decisions/market-phase-stateless.md`): своего персист-слоя, своих
+`MarketPhase` **не персистируется**: своего персист-слоя, своих
 часов и своего срока свежести у фазы нет — она производная от своих
 входов. `EntryScannerJob` по `MarketPhase.Type` выбирает `StrategyDetail`
 (`MarketPhase.Type → StrategyDetail.marketPhaseType`); раздачей актуальной
 фазы занимается `MarketPhaseService` (вычисляет, не читает из БД).
-
-> **Классификация — форвард-заметка.** Раньше `MarketPhase` была
-> persisted-моделью рыночных данных (`domain/other`). После перехода в
-> stateless-вычисление это не хранимая модель, а runtime-значение, и по
-> природе ближе к **Runtime value object** (`docs/components/models/`,
-> `.claude/decisions/runtime-value-object.md`). Формальная реклассификация
-> (перенос файла) **отложена**: `MarketPhase.Type` — доменный enum,
-> используемый strategy-layer (`StrategyDetail.marketPhaseType`,
-> `phaseRules`), и размещение пары «значение vs его доменный enum» —
-> отдельная классификационная развилка (критерии RVO конфликтуют:
-> структурно подходит, но «не доменная сущность» нарушается доменным
-> enum'ом). Оформлено открытым вопросом **PHASE-Q2**
-> (`.claude/work/questions/open-questions.md`), non-gating. Пока файл
-> остаётся здесь; содержание описывает вычисляемое, не хранимое.
 
 ## Структура
 
@@ -71,9 +56,9 @@
   истории и retention у фазы нет (в отличие от `IndicatorValue` /
   `MarketStructure`, которые хранят ряд и ключуются настройкой-владельцем).
   Если когда-нибудь понадобится хранить ряд фаз — отдельным решением
-  (`docs/rules/market-data-retention.md` §Якорь пересмотра).
+  (`docs/rules/market-data-retention.md` пересмотра).
 - **Анти-whipsaw — операнд-уровневый.** Сглаживающие периоды индикаторов и
   структурный `breakoutConfirmationBars`; отдельной подтверждаемости/
   гистерезиса фазы нет — открытый торговый вопрос PHASE-Q1
   (`.claude/work/questions/open-questions.md`,
-  `docs/decisions/market-phase-stateless.md` §Открытый торговый вопрос).
+  `docs/models/domain/other/MarketPhase.md` торговый вопрос).

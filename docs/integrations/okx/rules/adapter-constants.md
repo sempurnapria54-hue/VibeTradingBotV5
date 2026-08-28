@@ -17,18 +17,6 @@
 аргументы** — это adapter-policy. Domain-уровень не знает про режимы
 OKX.
 
-## Почему
-
-Текущая конфигурация бота:
-- Один инструмент `ETH-USDT-SWAP` в режиме `isolated`/`net`.
-- Расширения (cross / long-short hedge mode) не планируются на этом
-  этапе.
-
-Жёсткая константа избавляет от размазывания adapter-policy по domain
-и от ситуаций, когда adapter и domain не согласованы. Сверка в
-response (`tdMode == isolated`, `posSide == net`) — invariant check,
-нарушение → safety-каскад.
-
 ## Где применяется
 
 - `OkxIntegrationService` (создание/отмена ордеров, close-position);
@@ -37,10 +25,10 @@ response (`tdMode == isolated`, `posSide == net`) — invariant check,
 
 ## Связанные mapping-доки
 
-- `docs/models/mapping/Order.md` §OKX (adapter constants — `isolated`
+- `docs/models/mapping/Order.md` (adapter constants — `isolated`
   → `tdMode`, `net` → `posSide`).
-- `docs/models/mapping/AlgoOrder.md` §OKX (то же).
-- `docs/models/mapping/Position.md` §OKX (close-position body).
+- `docs/models/mapping/AlgoOrder.md` (то же).
+- `docs/models/mapping/Position.md` (close-position body).
 
 ## Связано с
 

@@ -5,24 +5,6 @@
 Какие поля у нативной модели OKX positions response и какие из них
 использует bot.
 
-## Контекст
-
-Нативная модель источника OKX. Возвращается `GET
-/api/v5/account/positions`. Не выходит за `IntegrationService`/adapter —
-`docs/rules/raw-exchange-dto-boundary.md`.
-
-Mapping в `PositionExternalSnapshot` и далее в `Position` —
-`docs/models/mapping/Position.md` (раздел `## OKX`). Доменная модель и
-статусы — `docs/models/domain/core/Position.md` и
-`docs/lifecycles/Position.md`. Контракт endpoint'а / rate limits /
-close-position ACK — `docs/integrations/okx/contracts/position.md`.
-Правила OKX (`isolated`/`net` константы, leverage validation) —
-`docs/integrations/okx/rules/`.
-
-В net mode по инструменту ожидается одна запись `posSide=net`; `pos`
-может быть положительным или отрицательным; `posId` может жить
-ограниченное время после полного закрытия (биржа держит ~30 дней).
-
 ## Инвентарь полей
 
 ### Используемые
@@ -76,7 +58,7 @@ close-position ACK — `docs/integrations/okx/contracts/position.md`.
 reduce-only `Order`/`AlgoOrder`, не close-position); `bePx` не нужен
 для live-risk; `realizedPnl`/`fee`/`fundingFee`/`pnl` — realized-факты
 закрытой позиции, живут в **positions-history** (число `Deal.resultProfit`
-= net `realizedPnl` оттуда, `docs/decisions/result-profit-source.md`), а не
+= net `realizedPnl` оттуда, `docs/models/domain/aggregate/Deal.md`), а не
 в live `/positions`.
 
 ## Close-position response
@@ -93,5 +75,4 @@ reduce-only `Order`/`AlgoOrder`, не close-position); `bePx` не нужен
 ## Конвертация
 
 `empty string → null`; numeric string → `BigDecimal`; timestamp
-string → epoch millis → `OffsetDateTime` (конвенция типов времени
-проекта; H5 `GAPS_CLOSE_3`).
+string → epoch millis → `OffsetDateTime`.

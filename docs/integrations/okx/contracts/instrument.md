@@ -12,19 +12,8 @@
 → Get instruments», вне периметра: используем публичный). При
 расхождении с офдоком побеждает офдок; синхронизация — перевыкачка +
 дифф при каждом заходе интегратора
-(`.claude/processes/api-docs-completion.md` §4a, канал —
-`.claude/skills/integration-okx.md`). Последняя сверка: **2026-07-14**
-(прогон интегратора, `GAPS_CLOSE_3` шага 7 — сверка fee-полей
-`groupId`; прежняя сверка 2026-06-11 — существование/путь + пример
-офдока по манифесту).
-
-## Контекст
-
-Mapping в `InstrumentExternalRules` —
-`docs/models/mapping/InstrumentExternalRules.md` (раздел `## OKX`).
-Доменная модель — `docs/models/domain/other/InstrumentExternalRules.md`.
-Обновляет правила — `docs/components/InstrumentExternalRulesSyncJob.md`.
-Native-поля ответа — `docs/models/integrations/okx/InstrumentOkxResponse.md`.
+(`.claude/processes/api-docs-completion.md`, канал —
+`.claude/skills/integration-okx.md`). Последняя сверка: **2026-07-14**.
 
 ## `groupId` — ключ комиссионной группы инструмента
 
@@ -43,7 +32,7 @@ endpoint to get the trading fee of a specific symbol». Отсюда **ось р
 На инструменте оседает только ключ (`InstrumentExternalRules.externalFeeGroupId`);
 дом ставки — `TradeFeeRate`, одна строка на группу
 (`docs/models/domain/other/TradeFeeRate.md`,
-`docs/decisions/pnl-finalization-mechanics.md` реш.4).
+`docs/rules/pnl-reconciliation.md` реш.4).
 
 ## Endpoint
 

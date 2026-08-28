@@ -1,0 +1,334 @@
+{
+  "subject": "risk-limits",
+  "question": "Чему равны операнды четырёх потолков риска и выполняются ли неравенства",
+  "home": "docs/rules/risk-policy.md",
+
+  "operands": {
+    "base": "база риска — Balance.externalAvailableBalance расчётной валюты",
+    "deal.plannedRiskAmount": "Deal.plannedRiskAmount — заявленный риск живых и исполнившихся ног",
+    "deal.plannedRiskEquityBase": "снимок базы, замороженный первым сайзингом",
+    "deal.direction": "Deal.direction — LONG или SHORT",
+    "position.externalSize": "Position.externalSize живого эпизода",
+    "position.externalAverageEntryPrice": "Position.externalAverageEntryPrice — фактическая средняя цена входа",
+    "stopCurrentLive": "наименее благоприятный уровень среди действующих защит; резолв — docs/spec/protection-coverage.json",
+    "instrument.contractValue": "InstrumentExternalRules.externalContractValue",
+    "instrument.takerFeeRate": "InstrumentExternalRules.takerFeeRate() — текущая ставка",
+    "entryLegs[]": "строки orders сделки с бизнес-типом входа",
+    "limits.riskPerActionPercent": "StrategyDetail.riskPerActionPercent, проценты",
+    "limits.cumulativeMultiplier": "StrategyDetail.cumulativeRiskPerDealMultiplier (K)",
+    "limits.strategySimultaneousPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",
+    "limits.globalSimultaneousPercent": "globalSimultaneousRiskPerDealPercent, проценты",
+    "limits.dealNotionalMultiplier": "M — сделочный кэп нотинала в долях базы риска; умолчания нет",
+    "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening"
+  },
+
+  "values": [
+    {
+      "name": "legIsLive",
+      "note": "Живая входная нога.",
+      "expr": "in(status, 'CREATED', 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED')"
+    },
+    {
+      "name": "legFilledShare",
+      "note": "Доля ноги, которая налилась. Вырожденный знаменатель даёт ноль, а не деление.",
+      "expr": "if(plannedSizeContracts == 0, 0, accumulatedFillSize / plannedSizeContracts)"
+    },
+    {
+      "name": "legUnfilledRisk",
+      "note": "Заявленный риск ноги в её неисполненной доле.",
+      "expr": "if(plannedSizeContracts == 0, 0, plannedRiskAmount * (plannedSizeContracts - accumulatedFillSize) / plannedSizeContracts)"
+    },
+    {
+      "name": "legIncurredRisk",
+      "note": "Риск, который нога уже взяла своим филлом.",
+      "expr": "plannedRiskAmount * legFilledShare"
+    },
+    {
+      "name": "legNotional",
+      "note": "Нотинал заявленного размера ноги.",
+      "expr": "plannedSizeContracts * instrument.contractValue * plannedEntryPrice"
+    },
+    {
+      "name": "unfilledPlannedRisk",
+      "note": "Что ещё может встать под удар: неисполненная доля живых входных ног.",
+      "op": "sum",
+      "over": "entryLegs",
+      "where": "legIsLive",
+      "of": "legUnfilledRisk"
+    },
+    {
+      "name": "signedStopDistance",
+      "note": "Дистанция до действующей защиты со знаком направления; за безубытком отрицательна.",
+      "expr": "if(deal.direction == 'LONG', position.externalAverageEntryPrice - stopCurrentLive, stopCurrentLive - position.externalAverageEntryPrice)"
+    },
+    {
+      "name": "livePositionRiskAtStop",
+      "note": "Что стои́т под ударом: живой эпизод до действующей защиты, с round-trip комиссией. Клэмп нулём — здесь, а не на сумме.",
+      "expr": "max(0, signedStopDistance * position.externalSize * instrument.contractValue + instrument.takerFeeRate * (position.externalAverageEntryPrice + stopCurrentLive) * position.externalSize * instrument.contractValue)"
+    },
+    {
+      "name": "liveRiskNow",
+      "note": "Операнд одновременного потолка.",
+      "expr": "unfilledPlannedRisk + livePositionRiskAtStop"
+    },
+    {
+      "name": "incurredCanceled",
+      "note": "Риск, взятый снятыми ногами в их исполненной доле: перевыставление входа бюджет не обнуляет.",
+      "op": "sum",
+      "over": "entryLegs",
+      "where": "status == 'CANCELED' && accumulatedFillSize > 0",
+      "of": "legIncurredRisk"
+    },
+    {
+      "name": "dealRiskTaken",
+      "note": "Операнд кумулятивного потолка: заявленное живыми и исполнившимися плюс взятое снятыми.",
+      "expr": "deal.plannedRiskAmount + incurredCanceled"
+    },
+    {
+      "name": "liveLegsNotional",
+      "note": "Нотинал живых входных ног.",
+      "op": "sum",
+      "over": "entryLegs",
+      "where": "legIsLive",
+      "of": "legNotional"
+    },
+    {
+      "name": "livePositionNotional",
+      "note": "Нотинал живого эпизода.",
+      "expr": "position.externalSize * instrument.contractValue * position.externalAverageEntryPrice"
+    },
+    {
+      "name": "dealNotional",
+      "note": "Операнд сделочного кэпа экспозиции.",
+      "expr": "liveLegsNotional + livePositionNotional"
+    },
+    {
+      "name": "cumulativeBase",
+      "note": "База кумулятивного потолка невозрастающая: просадка режет, рост не поднимает.",
+      "expr": "min(deal.plannedRiskEquityBase, base)"
+    },
+    {
+      "name": "actWithinPerAction",
+      "expr": "actRisk <= limits.riskPerActionPercent / 100 * base"
+    },
+    {
+      "name": "withinCumulative",
+      "expr": "dealRiskTaken + actRisk <= limits.cumulativeMultiplier * limits.riskPerActionPercent / 100 * cumulativeBase"
+    },
+    {
+      "name": "withinStrategySimultaneous",
+      "expr": "liveRiskNow + actRisk <= limits.strategySimultaneousPercent / 100 * base"
+    },
+    {
+      "name": "withinGlobalSimultaneous",
+      "expr": "liveRiskNow + actRisk <= limits.globalSimultaneousPercent / 100 * base"
+    },
+    {
+      "name": "withinDealNotional",
+      "note": "Незаданный M отказывает вычислением, а не пропускает действие.",
+      "expr": "dealNotional <= limits.dealNotionalMultiplier * base"
+    },
+    {
+      "name": "perContractRisk",
+      "note": "Закрытая форма сайзинга: риск одного контракта с round-trip комиссией.",
+      "expr": "(abs(sizing.entryPrice - sizing.stopPrice) + instrument.takerFeeRate * (sizing.entryPrice + sizing.stopPrice)) * instrument.contractValue"
+    },
+    {
+      "name": "riskOfSizedLeg",
+      "note": "Риск ноги выбранного размера — та же форма, умноженная на контракты.",
+      "expr": "perContractRisk * sizing.contracts"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "живой риск: неисполненная доля ноги плюс живой эпизод до стопа",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": [
+          { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000 }
+        ]
+      },
+      "expect": { "unfilledPlannedRisk": 70, "livePositionRiskAtStop": 92.955, "liveRiskNow": 162.955 }
+    },
+    {
+      "case": "стоп за безубытком: живое слагаемое гаснет, плановый риск живой ноги — нет",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 3010,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": [
+          { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000 }
+        ]
+      },
+      "expect": { "livePositionRiskAtStop": 0, "liveRiskNow": 70 }
+    },
+    {
+      "case": "снятая нога отдаёт в кумулятивный бюджет свою исполненную долю",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 10, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": [
+          { "status": "CANCELED", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000 }
+        ]
+      },
+      "expect": { "incurredCanceled": 30, "dealRiskTaken": 40 }
+    },
+    {
+      "case": "вырожденный знаменатель даёт ноль, а не деление",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 0, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": [
+          { "status": "ACTIVE", "plannedRiskAmount": 0, "plannedSizeContracts": 0, "accumulatedFillSize": 0, "plannedEntryPrice": 3000 }
+        ]
+      },
+      "expect": { "unfilledPlannedRisk": 0, "incurredCanceled": 0 }
+    },
+    {
+      "case": "кумулятивная база сжимается просадкой и не растёт вместе с депозитом",
+      "state": {
+        "base": 8000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": []
+      },
+      "expect": { "cumulativeBase": 8000 }
+    },
+    {
+      "case": "рост депозита кумулятивный потолок не поднимает",
+      "state": {
+        "base": 12000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": []
+      },
+      "expect": { "cumulativeBase": 10000 }
+    },
+    {
+      "case": "веер живых ног при полной аллокации выходит за сделочный кэп нотинала",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 2 },
+        "entryLegs": [
+          { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 70, "accumulatedFillSize": 0, "plannedEntryPrice": 3000 }
+        ]
+      },
+      "expect": { "liveLegsNotional": 21000, "livePositionNotional": 9000, "dealNotional": 30000, "withinDealNotional": false }
+    },
+    {
+      "case": "тот же веер при большем кэпе проходит",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": [
+          { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 70, "accumulatedFillSize": 0, "plannedEntryPrice": 3000 }
+        ]
+      },
+      "expect": { "dealNotional": 30000, "withinDealNotional": true }
+    },
+    {
+      "case": "незаданный кэп нотинала отказывает, а не пропускает действие",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": null },
+        "entryLegs": []
+      },
+      "expectRefusal": { "withinDealNotional": "M не задан" }
+    },
+    {
+      "case": "закрытая форма сайзинга: комиссия входит обеими ногами",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "sizing": { "entryPrice": 3000, "stopPrice": 2910, "contracts": 10 }
+      },
+      "expect": { "perContractRisk": 9.2955, "riskOfSizedLeg": 92.955 }
+    },
+    {
+      "case": "поактное неравенство: нога под бюджет проходит, вдвое большая — нет",
+      "state": {
+        "base": 10000,
+        "actRisk": 92.955,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 0, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": []
+      },
+      "expect": { "actWithinPerAction": true, "withinCumulative": true, "withinStrategySimultaneous": true }
+    },
+    {
+      "case": "риск акта вдвое выше поактного бюджета отвергается",
+      "state": {
+        "base": 10000,
+        "actRisk": 185.91,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 0, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": []
+      },
+      "expect": { "actWithinPerAction": false }
+    },
+    {
+      "case": "ослабление защиты: риск акта нулевой, но одновременный потолок считается по новой защите",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2700,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "entryLegs": []
+      },
+      "expect": { "livePositionRiskAtStop": 302.85, "withinStrategySimultaneous": false }
+    }
+  ]
+}

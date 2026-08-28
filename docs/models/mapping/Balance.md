@@ -6,21 +6,6 @@
 источников, нормализуются через `BalanceContainerExternalSnapshot` /
 `BalanceExternalSnapshot`, какие поля валидируются.
 
-## Контекст
-
-Mapping-слой для `BalanceContainer`/`Balance`. Доменная модель —
-`docs/models/domain/core/BalanceContainer.md`. Сквозные правила —
-`docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/business-logic-on-domain-model.md`,
-`docs/rules/market-data-freshness.md`. Контракт endpoint'а —
-`docs/integrations/<name>/contracts/balance.md`.
-
-Текущие источники: **OKX**.
-
-Приоритет источников при противоречии: подтверждённые решения по
-Balance → endpoint-доки источника → доменная модель → общие доки →
-код → legacy.
-
 ## Source-agnostic ядро
 
 ### Mapping-flow

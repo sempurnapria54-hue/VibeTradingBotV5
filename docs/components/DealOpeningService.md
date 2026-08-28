@@ -21,10 +21,9 @@ entry context).
 2. создаёт `Deal`, ставит `Deal.Status = PRECHECK`, пишет
    **`Deal.externalCreatedAt`** — биржевой момент создания сделки,
    полученный от scanner'а (`GET /public/time`, П7-B; на биржу за ним
-   **этот** сервис не ходит — §«Не делает»). Поле служит нижней границей
+   **этот** сервис не ходит —). Поле служит нижней границей
    окна линковки bills, когда `billsWindowBegin` пуст
-   (`docs/models/domain/aggregate/Deal.md` §«Почему у нижней границы
-   один писатель»);
+   (`docs/models/domain/aggregate/Deal.md`);
 3. сохраняет pinned-связи с инструментом и `StrategyDetail`;
 4. передаёт `marketPhase` и подробный entry context в аудит/timeline
    (в `Deal` подробный entry context не хранится);

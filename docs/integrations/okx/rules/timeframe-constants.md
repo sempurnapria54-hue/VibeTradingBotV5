@@ -17,13 +17,6 @@
   `lowerCase` / `upperCase` — точное соответствие строк (см.
   `docs/models/mapping/TimeFrame.md`).
 
-## Почему
-
-OKX принимает `bar` буквально и регистрозависимо (см.
-`docs/integrations/okx/contracts/candle.md` — «Регистр важен»).
-Любая нормализация регистра приведёт к отклонённому запросу или
-к молчаливо неверному таймфрейму.
-
 ## Связано
 
 - `docs/integrations/okx/contracts/candle.md` (поддерживаемые

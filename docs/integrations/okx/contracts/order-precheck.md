@@ -22,7 +22,7 @@ precheck»). При расхождении с офдоком побеждает 
 биржу за ограничениями не ходит). Серверный `order-precheck` неприменим в
 нашем режиме маржи (isolated/Futures, `acctLv=2` — ограничение ниже) и в
 фазе 1 не используется; door-open при смене режима. Решение —
-`docs/decisions/instrument-external-rules-materialization.md`.
+`docs/models/domain/other/InstrumentExternalRules.md`.
 
 ## Ограничение применимости (офдок)
 

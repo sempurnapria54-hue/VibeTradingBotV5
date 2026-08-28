@@ -18,28 +18,6 @@ deep-архив с 2021): endpoint'ы, query, лимиты, пагинация.
 сверка: 2026-06-11 (прогон 3 — bills-archive поле-уровнево,
 deep-архив дистиллирован).
 
-## Контекст
-
-Native responses —
-`docs/models/integrations/okx/OkxAccountBillResponse.md`. Доменный носитель
-разбивки — `DealCashFlow` (**OKX-Q3 закрыт**: bills — **категорийная разбивка
-+ сверка**, не первоисточник числа; заголовочное `Deal.resultProfit` = net из
-positions-history, `docs/decisions/result-profit-source.md`). Структура
-`DealCashFlow` и маппинг bills → домен —
-`docs/models/domain/other/DealCashFlow.md`,
-`docs/models/mapping/DealCashFlow.md`.
-
-Различие fills и bills:
-- **Fill** — факт исполнения ордера (что произошло на рынке).
-- **Bill** — запись движения денег по аккаунту (что изменило баланс).
-
-Bills покрывают и funding, и rebate, и другие cashflow, не привязанные
-напрямую к executions — поэтому дают **категорийную разбивку** результата
-(торговая комиссия / funding / rebate / ликвидационный штраф). Само
-**число** `resultProfit` берётся готовым net'ом из positions-history
-(`realizedPnl`), а сумма bills-flows **сверяется** с ним (контроль
-целостности), не подменяет его.
-
 ## Endpoints
 
 - **Bills 7 дней:** `GET /api/v5/account/bills`. Permission: Read.
@@ -86,7 +64,7 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    (uk_deal_active_instrument). После терминала линковка не выполняется.
 
 1. Определить окно сделки — СОБСТВЕННЫЕ ПОЛЯ Deal (узел 1 DOCS_CHECK_8;
-   docs/decisions/command-action-boundary.md §7):
+   docs/rules/command-lifecycle.md):
    - begin = Deal.billsWindowBegin (пишет ЕДИНСТВЕННЫЙ писатель
             SubmitOrderExecutor: Order.externalCreatedAt первой
             отправленной ноги, H9 DOCS_CHECK_16); при его пустоте —
@@ -115,8 +93,7 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    нарушающая запись не приходила бы в ответ вовсе.
 
 3. Линковка к сделке (bills НЕ несут dealId) — предикат и его разбор
-   живут в доме: docs/models/domain/other/DealCashFlow.md §«Линковка
-   к `Deal`». Здесь пересказа нет намеренно — он уже дважды разошёлся
+   живут в доме: docs/models/domain/other/DealCashFlow.md. Здесь пересказа нет намеренно — он уже дважды разошёлся
    с домом (B6 DOCS_CHECK_19: выпадала обязательная ось биржи, а
    символ `end` связывался и с подвижной границей запроса, и с
    границей линковки). Выход матчинга закрепляется как
@@ -126,7 +103,7 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
 4. Сохранить как DealCashFlow (категорийная разбивка); резолв категории
    (type/subType → CashFlowCategory) — НА ЗАПИСИ, в вызывающем коде
    executor'а, не в маппере и не при финализации: category на строке
-   NOT NULL (docs/models/domain/other/DealCashFlow.md §Структура).
+   NOT NULL (docs/models/domain/other/DealCashFlow.md).
    Ветка по валюте НА ЗАПИСИ (операнд — РАСЧЁТНАЯ ВАЛЮТА ИНСТРУМЕНТА,
    не Deal.resultProfitCurrency: последнее пишет FINALIZE_DEAL_EXIT_COMMAND, то есть
    ПОСЛЕ этого прохода, и здесь оно всегда null — H4):
@@ -162,9 +139,8 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    Непустой OTHER → AnomalyReport (UNCLASSIFIED_CASH_FLOW).
    НЕПУСТОЙ СПИСОК — ПРЕДУСЛОВИЕ CODE (H10 DOCS_CHECK_11): с пустым списком
    контроль целостности отгружается погашенным. Наполняется рантайм-прогоном
-   источника (.claude/tests/source-api/okx/plan.md §AG6.2); дом конфига и
-   его правка при добавлении биржи — docs/models/mapping/DealCashFlow.md
-   §«Область сверки задаётся списком исключений по бирже».
+   источника (.claude/tests/source-api/okx/plan.md.2); дом конфига и
+   его правка при добавлении биржи — docs/models/mapping/DealCashFlow.md.
    Расхождение — ОБЩЕЕ ПО СДЕЛКЕ (Σ|Δᵢ| по четырём парам против одного
    допуска, H9 GAPS_CLOSE_13; epsilon двухчастный:
    min(композиционный по обороту, омиссионный по ожидаемой комиссии) —
@@ -186,30 +162,16 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    зафиксирован на записи (п.4) — финализация его не запрашивает.
 ```
 
-**Область суммирования — не одна** (H9, `GAPS_CLOSE_4`; счёт областей —
-H8 `GAPS_CLOSE_13`). Сверка идёт **четырьмя парами** по категориям
+**Область суммирования — не одна**. Сверка идёт **четырьмя парами** по категориям
 (`REALIZED_PNL` / торговые / `FUNDING` / `LIQ_PENALTY`), каждая по строкам
-**в расчётной валюте** и **вне списка исключений биржи** (H14
-`DOCS_CHECK_10`); **общей суммы-сверки Σ`amount` по всей разбивке больше
-нет** — четыре пары исчерпывают состав net'а (H7 `GAPS_CLOSE_13`).
+**в расчётной валюте** и **вне списка исключений биржи**; **общей суммы-сверки Σ`amount` по всей разбивке больше
+нет** — четыре пары исчерпывают состав net'а.
 Realized-слагаемое считается **только** по строкам `REALIZED_PNL`,
 `FUNDING` из него исключён (holding-cost, не realized pnl) — у него своя
-funding-область. Пересчитанные строки — отдельная **cross-ccy-область**
-(H5, `GAPS_CLOSE_6`; области адресуются именами, не номерами — H3
-`DOCS_CHECK_14`): в валютные суммы они не складываются, а входят слагаемым
+funding-область. Пересчитанные строки — отдельная **cross-ccy-область**: в валютные суммы они не складываются, а входят слагаемым
 в число по зафиксированному `appliedRate` — предикат области
-**`rateStatus = APPLIED` и тип вне исключений и экономическая категория**
-(H9 `DOCS_CHECK_11`, выровнен H11 `GAPS_CLOSE_13`), не `ccy`. Области —
-`docs/models/mapping/DealCashFlow.md` §«Область суммирования — задаётся явно».
-
-> **Граница 6 ↔ 7 и источник числа.** Само **число** `Deal.resultProfit` =
-> net из positions-history (`realizedPnl`), **не** `sum(DealCashFlow.amount)`
-> (`docs/decisions/result-profit-source.md`). *Расчёт* (число + разбивка +
-> сверка) — **шаг 7**, владелец `FinalizeDealExitExecutor`; запись на
-> терминале — `MarkDealClosedExecutor`. Механика финализации шага 6 поставила
-> ребро/retry/placeholder ZERO; шаг 7 наделяет её расчётом. Терминальный
-> контракт (число на аварийном терминале — фактический net) —
-> `docs/lifecycles/Deal.md` §«Терминальный контракт финализации» (DEAL-Q2).
+**`rateStatus = APPLIED` и тип вне исключений и экономическая категория**, не `ccy`. Области —
+`docs/models/mapping/DealCashFlow.md`.
 
 Применимо к окнам ≤ 3 месяцев (`bills-archive`).
 

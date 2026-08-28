@@ -11,27 +11,10 @@
 changelog `log_en/`, напр. вывод AWS-доменов 2025-04-28). При
 расхождении с офдоком побеждает офдок; синхронизация — перевыкачка +
 дифф при каждом заходе интегратора
-(`.claude/processes/api-docs-completion.md` §4a, канал —
+(`.claude/processes/api-docs-completion.md`, канал —
 `.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
 (существование/пути; поле-уровневая перевычитка — при заходе по
 теме).
-
-## Контекст
-
-Exchange-specific контракт инфраструктуры OKX: фактические endpoint-URL
-для REST и WS. Используется client-layer при сборке HTTP-клиента и
-WS-соединений.
-Конкретные REST endpoints (`/api/v5/...`) — в контракт-файлах
-`docs/integrations/okx/contracts/` (`order.md`, `balance.md` и др.);
-здесь — base URL. Прежний указатель вёл в «mapping-файлы
-`okx-order-mapping.md` / `okx-balance-mapping.md`» — таких файлов нет, и
-носитель endpoint'ов другого типа: правлено N4 `DOCS_CHECK_23`.
-
-> Альтернатива при размещении: объединить с
-> `docs/integrations/okx/rules/ws-limits.md` в `connectivity.md`. Не
-> выбрана, чтобы сохранить «один файл — одна забота» (география
-> endpoint'ов — контракт инфраструктуры vs лимиты протокола —
-> правило источника).
 
 ## Production
 
@@ -71,7 +54,7 @@ WS-каналы OKX (имена: `account`, `positions`, `orders`,
 `balance_and_position`, `tickers`, `candle<bar>`, `instruments`,
 `algo-orders`, `algo-advance` и др.) — полноценно не задокументированы
 в текущем заходе (REST-only миграция). Список и контракты WS-каналов —
-отдельный заход (см. OKX-Q4 в `.claude/work/questions/open-questions.md`).
+отдельный заход.
 
 REST `okx-*-mapping.md` указывают WS-альтернативу там, где она есть, но
 не описывают её детально.

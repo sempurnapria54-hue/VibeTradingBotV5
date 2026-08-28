@@ -38,7 +38,7 @@
 - **`CLOSED`** — штатный terminal-финал. Live risk отсутствует
   (подтверждено facts); обязательны `resultProfit` /
   `resultProfitCurrency` — **со смягчением по валюте на тропах без
-  входа** (§«Смягчение по валюте на тропах без входа»: валюта не
+  входа** (: валюта не
   резолвилась ⇒ ассерт проверяет только `resultProfit`); FSM handler не
   запускается.
 - **`ERROR`** — ошибочное runtime-состояние (не terminal, не закрытая
@@ -50,7 +50,7 @@
   `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`; число `resultProfit` — **best-effort
   по доступности, но не по составу**: доступен net — считается по той же
   формуле, что на чистой тропе; иначе `null` с маркером «неисчислимо»,
-  **не ноль** (см. §«Терминальный контракт финализации»; DEAL-Q2 закрыт).
+  **не ноль**.
 
 ## Группы статусов
 
@@ -91,11 +91,11 @@ Exchange.TRADE_BLOCKED / DISABLED   -> shutdownReason = EXCHANGE_HOLD
 Market data expired (по policy)     -> shutdownReason = MARKET_DATA_EXPIRED
 ```
 
-**Инструмент-холд и биржевой холд разведены** (H21, `GAPS_CLOSE_7`).
+**Инструмент-холд и биржевой холд разведены**.
 Прежняя строка склеивала «Exchange/Instrument/Account HOLD» в один
 `EXCHANGE_HOLD` — это расходилось и с правилом
-(`docs/rules/instrument-hold.md` §Enforcement,
-`docs/models/domain/core/Instrument.md` §Енумы), и с кодом
+(`docs/rules/instrument-hold.md`,
+`docs/models/domain/core/Instrument.md`), и с кодом
 (`DealOrchestratorJob.enforceHold`), где холд **инструмента** проставляет
 `RISK_POLICY`, а `EXCHANGE_HOLD` приходит только каскадом от биржевой
 строки. Эта таблица — носитель, в который полезет писатель шага 7, поэтому
@@ -119,18 +119,9 @@ risk → `CLOSED` + `RISK_CONTROL`.
 `Deal` active, если не в terminal status (`ERROR` — active, не
 terminal). Terminal — `CLOSED`/`EMERGENCY_CLOSED`: нет FSM handler. Для
 **чистого** `CLOSED` `resultProfit`/`resultProfitCurrency` обязательны —
-**со смягчением по валюте на тропах без входа** (§«Смягчение по валюте
-на тропах без входа»); для
-ошибочного `EMERGENCY_CLOSED` — по §«Терминальный контракт финализации»
+**со смягчением по валюте на тропах без входа** ; для
+ошибочного `EMERGENCY_CLOSED` — по
 (не блокируется инвариантом чистого закрытия).
-
-> **Инвариант двух полей нигде не записывается безусловно** (B7 + A8
-> `DOCS_CHECK_21`). Смягчение живёт в этом же файле, но три носителя —
-> §Статусы, §«Terminal semantics» и
-> `docs/models/domain/aggregate/Deal.md` §«Итоговый PnL» — повторяли
-> абсолют без указателя, а `CODE`-писатель читает **дом поля** или
-> **дом терминального контракта**, не обязательно оба. Указатель
-> проставлен во всех трёх.
 
 Live risk сделки (не хранится boolean-полем; вычисляется через
 runtime graph, `DealActionState`, refresh/search/history facts,
@@ -151,7 +142,7 @@ ReconciliationJob`.
 
 Финализация использует **общий механизм повторов** — строки исполнений
 системных действий (`docs/models/domain/other/DealActionState.md`, вид
-SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный контракт
+SYSTEM; `docs/rules/command-lifecycle.md`). Граничный контракт
 между механикой финализации (шаг 6) и расчётом прибыли (шаг 7):
 
 - **Чистое закрытие.** Число считает и **пишет на `Deal`** `FINALIZE_DEAL_EXIT_COMMAND`
@@ -159,101 +150,50 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
   транзакции с продвижением своего исполнения; N7). `MARK_DEAL_CLOSED_COMMAND`
   **ассертит** непустоту `Deal.resultProfit` и ставит **чистый терминал
   `CLOSED`** (число сам не пишет —
-  `docs/decisions/pnl-finalization-mechanics.md` реш.2).
+  `docs/rules/pnl-reconciliation.md` реш.2).
 - Прибыль не посчиталась после исчерпания бюджета добычи/финализации → это
   **ошибка** → исполнение (`REFRESH_DEAL_CONTEXT_ACTION` /
   `FINALIZE_DEAL_EXIT_ACTION`) в `FAILED`, сделка уходит ошибочной тропой
   (`MarkDealErrorExecutor`/`ErrorHandler`) + **холд инструмента** и доходит
   до **ошибочного терминала** (`EMERGENCY_CLOSED`). Сделка **всегда доходит
   до терминала, не зависает живым риском**.
-- **Число неполно → тоже ошибочный терминал** (H11 `DOCS_CHECK_17`, решение
-  держателя П11, вариант 3). `resultProfit` считается по строкам
+- **Число неполно → тоже ошибочный терминал**. `resultProfit` считается по строкам
   `DealCashFlow`, а они усекаемы глубиной конвейера добычи и нерезолвившимся
   курсом; оба усечения **завышают** число. Предикат неполноты собран из уже
-  существующих фактов и записан **перечнем значений** (Г1 + B3
-  `DOCS_CHECK_18`): `breakdownIncomplete ∈ {INCOMPLETE_BY_WINDOW,
+  существующих фактов и записан **перечнем значений**: `breakdownIncomplete ∈ {INCOMPLETE_BY_WINDOW,
   NOT_ASSESSED}` **либо** прилинкованная строка `DealCashFlow` с
   `rateStatus ∈ {RATE_UNAVAILABLE, SETTLE_CURRENCY_UNAVAILABLE}`;
   отдельного признака полноты числа **не заводится**. **Актор — выходная
-  проверка `ExitPendingHandler`** (`docs/components/ExitPendingHandler.md`
-  §«Выходные проверки»): она уводит сделку `EXIT_PENDING → ERROR`, живая
+  проверка `ExitPendingHandler`** (`docs/components/ExitPendingHandler.md`): она уводит сделку `EXIT_PENDING → ERROR`, живая
   строка `FINALIZE_DEAL_EXIT_ACTION` закрывается `SKIPPED`, холд не
   поднимается. Число пишется и остаётся наблюдаемым, но чистого `CLOSED`
   такая сделка не получает
-  (`docs/components/FinalizeDealExitExecutor.md` §«Признаки отбора»).
-- **Сверка была обязана выполниться и не выполнилась → тоже ошибочный
-  терминал** (H10 `DOCS_CHECK_14`; принцип переформулирован через
-  **обязанность** — H2 `DOCS_CHECK_15`, решение пользователя). Обязанность
-  выражена составным durable-предикатом **из трёх конъюнктов** — дом
-  формулировки `docs/rules/pnl-reconciliation.md` §«Когда и кем», здесь
-  не пересказывается. Наступила и не
-  исполнена — сделка уходит **ошибочной тропой** к `EMERGENCY_CLOSED`.
-  Успешного `CLOSED` с невыполненной обязанной сверкой не существует —
-  **независимо от того, чей операнд недостаёт**.
-  - **Ветка «операнд допуска не резолвится» снята вместе с журнальным
-    кодом** (решение держателя, позиция С3 `GAPS_CLOSE_16`, вариант a):
-    оба операнда допуска — `ctVal` (H5 `DOCS_CHECK_16`) и уровень стопа
-    (Р3) — персистятся write-once на ноге и резолвятся всегда
-    (`docs/components/FinalizeDealExitExecutor.md` §epsilon), а нарушенный
-    инвариант «шесть или ни одного» ловит **детектирующий контур отказом
-    операции** (`docs/models/domain/aggregate/Deal.md` §«Обнаружение
-    рассогласования пары носителей»). Биржевой холд по этому классу не
-    поднимается: недостача наша, радиус ущерба локализован сделкой.
-  - **Правые операнды четырёх пар сюда больше не попадают** (H5
-    `DOCS_CHECK_15`): их обязательность проверяется **на границе
-    интеграции**, и нарушение уводит сделку тем же ошибочным терминалом,
-    но **с** биржевой ступенью 2 (`Exchange.TRADE_BLOCKED` + flatten,
-    `docs/rules/exchange-hold.md`) — радиус там неизвестен
-    (`docs/models/mapping/PositionCloseResult.md` §«Контракт записи
-    проверяется здесь»).
-  - **Различение несёт терминальный статус**, не значение
-    `reconciliationStatus` и не новая колонка: «должны были посчитать и не
-    посчитали» ⇒ **ошибочный** терминал; «должны были и посчитали» ⇒
-    успешный (`MATCHED`/`MISMATCHED`); «не должны были» ⇒ успешный
-    независимо от посчитанного (`NOT_RUN`). Поэтому значения «оценено не
-    всё» у `ReconciliationStatus` нет намеренно (H6 `DOCS_CHECK_16`
-    предлагал завести его и **отклонён** решением держателя) — и различать
-    внутри `EMERGENCY_CLOSED` больше нечего: ветки «были обязаны, операнда
-    не нашлось» не существует (позиция С3 `GAPS_CLOSE_16`;
-    `docs/models/domain/aggregate/Deal.md` §Енумы).
-  - Операнды предиката и его провенанс —
-    `docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта»;
-    поведение исполнителя — `docs/components/FinalizeDealExitExecutor.md`
-    §«Расчёт прибыли (шаг 7) и сверка».
+  (`docs/components/FinalizeDealExitExecutor.md`).
 - **Аварийный терминал `EMERGENCY_CLOSED`** ставит **`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`**
   (`docs/components/MarkDealEmergencyClosedExecutor.md`, симметрично
   `MARK_DEAL_CLOSED_COMMAND`) с **best-effort числом** — **два провенанса разведены**
-  (`docs/decisions/pnl-finalization-mechanics.md` реш.3):
+  (`docs/rules/pnl-reconciliation.md` реш.3):
   - **(a) ликвидация/ADL** (позицию закрыла биржа —
     `Position.externalCloseType ∈ 3..6`): net доступен полями
     `Position.externalRealizedProfit` строк эпизодов → число считается
     **по той же
     формуле, что на чистой тропе** (Σ net по эпизодам +
     cross-ccy-слагаемое): best-effort
-    относится к **доступности** числа, не к его **составу** (H12
-    `DOCS_CHECK_10`; формулировка «фактический realized net» снята H18
-    `DOCS_CHECK_11` — она читалась как «на аварийной тропе слагаемого
-    нет» и молча завышала число в корзине, которая и так смещена);
+    относится к **доступности** числа, не к его **составу**;
   - **(b) отказ расчёта** (чистая тропа не смогла): перед терминалом
     `ErrorHandler` гоняет `REFRESH_POSITION_COMMAND`, и её **вторая нога**
     (positions-history) ещё раз пробует добыть положение закрытия на
-    `Position` (H1/H3 `GAPS_CLOSE_7`); net есть → пишем;
+    `Position`; net есть → пишем;
     **genuinely недоступен** → `resultProfit = null` c семантикой
     **«неисчислимо»** (**не ноль**), сделка терминализуется всё равно, факт
     помечается (лог/`AnomalyReport`). **Отказ канала добычи на этой тропе
     приравнивается к «недоступно»** — но **расходует бюджет**, и durable-
     носителем исхода служит `FAILED` строки `REFRESH_DEAL_CONTEXT_ACTION`,
-    он же разрешает эмиссию терминала (H3 `DOCS_CHECK_15`; редакция
-    «попыток ноль, счётчик не растёт» снята — без расхода бюджета исход
-    не имел носителя вовсе, и сделка зависала в `ERROR` ровно вопреки
-    инварианту, ради которого асимметрия вводилась).
-    **Контролируемое исключение под приравнивание не подпадает** (H4
-    `DOCS_CHECK_15`): дефект содержимого ответа даёт **биржевую
+    он же разрешает эмиссию терминала.
+    **Контролируемое исключение под приравнивание не подпадает**: дефект содержимого ответа даёт **биржевую
     ступень 2** (`Exchange.TRADE_BLOCKED` + flatten) и здесь тоже,
     параллельно с ошибочным терминалом — ветки не
-    конкурируют (`docs/components/ServiceCommandExecutor.md` §«Контракт
-    броска»; `docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия
-    троп отказа добычи»).
+    конкурируют (`docs/components/ServiceCommandExecutor.md`; `docs/rules/pnl-reconciliation.md`).
   - **Маркер:** на `EMERGENCY_CLOSED` `resultProfit != null` = посчитанное
     число; `null` = «неисчислимо» — **отличимо от нуля** (ноль = посчитанный
     нулевой P&L). Инвариант «`resultProfit` обязателен» — только про
@@ -261,16 +201,16 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
   - **Причина (торговая):** число **не зануляется** — недоступность помечается,
     null-случай в расчёт ожидаемости не входит как unknown (не считается
     нулём), левый хвост R-распределения не усекается молча. Сама сделка при
-    этом записана и из популяции не выводится — узел F `DOCS_CHECK_12`,
-    `docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта».
+    этом записана и из популяции не выводится — узел F,
+    `docs/models/domain/aggregate/Deal.md`.
 
 ### Смягчение по валюте на тропах без входа (H1 `DOCS_CHECK_11`)
 
 Инвариант чистого `CLOSED` — про **два** поля: `resultProfit` и
 `resultProfitCurrency`. На **тропах закрытия без входа** (три тропы,
-`docs/rules/trading-constraints.md` §«Гейт открытия сделки») число и валюту
+`docs/rules/trading-constraints.md`) число и валюту
 пишет `MARK_DEAL_CLOSED_COMMAND` сам, второй веткой
-(`docs/components/MarkDealClosedExecutor.md` §«Вторая ветка»), и валюта
+(`docs/components/MarkDealClosedExecutor.md`), и валюта
 пишется **только если резолвится**.
 
 **Правило.** Если расчётная валюта инструмента не резолвится, терминал
@@ -295,13 +235,13 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
 ### Признаки отбора на рёбрах в терминал (H3 `GAPS_CLOSE_13`)
 
 Перечень записываемого на каждом ребре дополняется признаками отбора
-(`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта»):
+(`docs/models/domain/aggregate/Deal.md`):
 
 | Ребро | `closeOutcome` | `reconciliationStatus` | `breakdownIncomplete` | `riskBenchmarkAvailability` |
 |---|---|---|---|---|
-| `EXIT_PENDING → CLOSED` (штатная) | по `Position.externalCloseType` **последнего эпизода** (`max(externalModifiedAt)`), пусто (записи нет) ⇒ `UNDETERMINED` | исход сверки | **только `COMPLETE`** (A1 `DOCS_CHECK_21`) | `AVAILABLE`, либо `MISSING` при пустом знаменателе (H13 `DOCS_CHECK_16`) |
-| `ERROR → EMERGENCY_CLOSED` | то же | **исход сверки** (`MATCHED`/`MISMATCHED`) — только если движения **добывались** (`Deal.billsFetchedThrough` непуст), то есть сделка успела побывать на выходной тропе; иначе `NOT_RUN` (A2 `DOCS_CHECK_19`; прежнее «ветвь (a) — запись закрытия добыта» опиралось на чужой операнд) | то же сравнение; `billsFetchedThrough` пуст ⇒ `NOT_ASSESSED`, а не `COMPLETE` | то же (`NOT_APPLICABLE` недостижим — операции были) |
-| три тропы **закрытия без входа** → `CLOSED` | **пусто** (неприменим) | **пусто** (неприменим) | **пусто** (неприменим) | **`NOT_APPLICABLE`** — единственный признак, который на этих тропах **не пуст**: он и назван, чтобы отличить эту популяцию от аномальной (H13 `DOCS_CHECK_16`). **Пишет `MarkDealClosedExecutor` той же транзакцией** (решение держателя П9 валидации `GAPS_CLOSE_17`) — финализатор выхода на этих тропах не работает |
+| `EXIT_PENDING → CLOSED` (штатная) | по `Position.externalCloseType` **последнего эпизода** (`max(externalModifiedAt)`), пусто (записи нет) ⇒ `UNDETERMINED` | исход сверки | **только `COMPLETE`** | `AVAILABLE`, либо `MISSING` при пустом знаменателе |
+| `ERROR → EMERGENCY_CLOSED` | то же | **исход сверки** (`MATCHED`/`MISMATCHED`) — только если движения **добывались** (`Deal.billsFetchedThrough` непуст), то есть сделка успела побывать на выходной тропе; иначе `NOT_RUN` | то же сравнение; `billsFetchedThrough` пуст ⇒ `NOT_ASSESSED`, а не `COMPLETE` | то же (`NOT_APPLICABLE` недостижим — операции были) |
+| три тропы **закрытия без входа** → `CLOSED` | **пусто** (неприменим) | **пусто** (неприменим) | **пусто** (неприменим) | **`NOT_APPLICABLE`** — единственный признак, который на этих тропах **не пуст**: он и назван, чтобы отличить эту популяцию от аномальной. **Пишет `MarkDealClosedExecutor` той же транзакцией** — финализатор выхода на этих тропах не работает |
 
 **Таблица — ассерт ребра: она перечисляет значения, наблюдаемые у
 сделки, которая ребро прошла.** Заголовок «перечень записываемого»
@@ -312,50 +252,17 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
 `docs/rules/deal-without-operations.md`), и в этой роли она
 обязана согласоваться с маршрутизацией.
 
-**Строка 1 сужена до `COMPLETE`** (A1 `DOCS_CHECK_21`). Решение П11 (см.
-§«Терминальный контракт финализации» выше) делает
-`breakdownIncomplete ∈ {INCOMPLETE_BY_WINDOW, NOT_ASSESSED}`
-**маршрутизирующим предикатом ухода** со штатного ребра: выходная
-проверка `ExitPendingHandler` уводит такую сделку `EXIT_PENDING → ERROR`
-и далее в `EMERGENCY_CLOSED`. Прежняя редакция разрешала оба значения на
-штатном ребре — то есть таблица разрешала писателю ровно то, что П11
-запрещает, и на неё же ссылались как на доказательство достижимости
-(`docs/components/FinalizeDealExitExecutor.md`; циркулярная ссылка
-снята). Оба значения остаются наблюдаемыми — в строке
-`ERROR → EMERGENCY_CLOSED`.
-
-**Штатное ребро при обязанной и невыполненной сверке недостижимо** (H10
-`DOCS_CHECK_14`; операнд обобщён H2 `DOCS_CHECK_15`): нерезолвимый операнд
+**Штатное ребро при обязанной и невыполненной сверке недостижимо**: нерезолвимый операнд
 обязанной сверки уводит сделку ошибочной тропой
-(§«Терминальный контракт финализации» выше), поэтому
+( выше), поэтому
 `reconciliationStatus` в строке `EXIT_PENDING → CLOSED` — всегда исход
 **выполненной** сверки либо `NOT_RUN` сверки, которая не была обязана.
 Значение «вне `1..6`» в первой колонке снято: такая запись не проходит
-границу интеграции (H5 `DOCS_CHECK_15`).
+границу интеграции.
 
-**Селектор эпизода у `closeOutcome` назван** (A13 `DOCS_CHECK_21`).
-У многоэпизодной сделки строк `Position` несколько, и `externalCloseType`
-есть у каждой закрытой; `closeOutcome` сделки резолвится по **последнему
-эпизоду** — строке с `max(externalModifiedAt)` (тот же операнд, которым
-выбирается запись для `billsWindowEnd`); место истины селектора —
-`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта». Прежняя
-формулировка называла операнд в единственном числе и на многоэпизодной
-сделке была неоднозначна; квантор «по всем строкам эпизодов» проект уже
-применял в соседнем месте (`docs/components/SystemActionExecutor.md`).
-
-Пустота на тропах без входа — **ратифицированное значение**, а не пропуск
-писателя: события, о котором признак, там не было
-(`docs/rules/absent-value-semantics.md`). Назначенного операнда отбора
-таких сделок у отчёта нет: `closeReason` две тропы не различает, и
-определение популяции — за потребителем отчёта на шаге фронта (H20
-`DOCS_CHECK_14`, `docs/models/domain/aggregate/Deal.md` §«Рамка
-R-выборки»).
-
-DEAL-Q2 закрыт в три захода: механика/терминальный контракт — `GAPS_CLOSE_1`
-шага 6 (2026-06-22); *число* на ошибочном терминале (остаток DEAL-Q2, G5) —
-`GAPS_CLOSE_1` шага 7 (2026-07-03); *провенанс-контракт исполним + владелец
-терминала* (`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`) — `GAPS_CLOSE_2` шага 7 (2026-07-04,
-N8). *Расчёт* — шаг 7 (`docs/decisions/pnl-finalization-mechanics.md`).
+DEAL-Q2 закрыт в три захода: механика/терминальный контракт шага 6 (2026-06-22); *число* на ошибочном терминале шага 7 (2026-07-03); *провенанс-контракт исполним + владелец
+терминала* (`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`) шага 7 (2026-07-04,
+N8). *Расчёт* — шаг 7 (`docs/rules/pnl-reconciliation.md`).
 
 ## Restart / recovery
 

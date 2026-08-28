@@ -35,7 +35,7 @@ Payload документируется **разделом в доке своег
 
 Амендных payload'ов (`AmendOrderCommandPayload` /
 `AmendAlgoOrderCommandPayload`) нет — сняты вместе с
-`AMEND_*`-командами (`docs/decisions/replace-not-amend.md`).
+`AMEND_*`-командами (`docs/rules/replace-not-amend.md`).
 
 ## Базовый тип
 
@@ -52,4 +52,4 @@ Payload документируется **разделом в доке своег
 тип поля `ServiceCommand.payload` и границу generic-диспетча
 (`ServiceCommandExecutor.execute(P payload, …)`), масштабируется на новые
 команды/биржевые модели. Обоснование —
-`docs/decisions/service-command-payload-base-type.md` (закрытие CMD-Q2).
+`docs/components/models/ServiceCommandPayload.md`.

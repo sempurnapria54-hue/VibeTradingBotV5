@@ -20,21 +20,12 @@ persisted (см. `.claude/decisions/runtime-value-object.md`); собирает�
 
 ## Структура
 
-| Поле | Тип | Назначение |
-|---|---|---|
-| `deal` | `Deal` | Сделка с runtime graph (`orders` + `algoOrders` + `positions` — строки эпизодов, живая ≤1). |
-| `exchange` | `Exchange` | Биржа / exchange account (для HOLD / safety / adapter context). |
-| `instrument` | `Instrument` | Торговый инструмент сделки. |
-| `strategyDetail` | `StrategyDetail` | Pinned-конфигурация сделки. |
-| `balanceContainer` | `BalanceContainer` | Последний persisted snapshot баланса (свежесть **не** гарантирована). |
-| `actionStates` | `List<DealActionState>` | Строки **исполнений действий** сделки — обоих видов (STRATEGY и SYSTEM; recovery/retry/idempotency/target-resolution; модель — `docs/models/domain/other/DealActionState.md`). Одна коллекция: прежний отдельный список финализационных состояний упразднён вместе с `DealFinalizationState` (`docs/decisions/command-action-boundary.md`). По SYSTEM-строкам `SystemActionExecutor` выбирает команду системного действия за проход. |
-
 ## Runtime graph и сборка по фактам
 
 `Order`/`AlgoOrder`/`Position` не дублируются отдельными полями — входят
 в `Deal` runtime graph (`deal.orders`/`deal.algoOrders`/`deal.positions` —
 **строки эпизодов**, живая ≤1;
-`docs/decisions/multi-episode-deal.md`). Exchange facts сначала применяются
+`docs/models/domain/aggregate/Deal.md`). Exchange facts сначала применяются
 refresh-командами к БД, затем `DealContext` собирает уже обновлённый
 graph:
 
@@ -44,7 +35,7 @@ exchange facts -> REFRESH_* -> обновлённые сущности в БД
 ```
 
 Live risk позиции вычисляется по **живому эпизоду**:
-`deal.livePosition() != null && status == ACTIVE && externalSize > 0`
+`deal.livePosition != null && status == ACTIVE && externalSize > 0`
 (см. `docs/models/domain/core/Position.md`). Закрытые эпизоды в предикат
 не входят по построению — они не `ACTIVE`.
 
@@ -62,4 +53,4 @@ FSM/handler перед risk-sensitive flow; при absent/stale свежесть
 `CalculationContext` в рантайме перед расчётом. Отдельный `PositionContext`
 не используется: эпизоды живут строками `deal.positions`, живой резолвится
 предикатом модели `livePosition()`
-(`docs/decisions/multi-episode-deal.md`).
+(`docs/models/domain/aggregate/Deal.md`).

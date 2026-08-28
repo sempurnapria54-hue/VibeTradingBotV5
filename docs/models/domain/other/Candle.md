@@ -40,7 +40,7 @@
 Признак закрытия (`confirm`) на доменной `Candle` **не хранится**:
 правило производящей стороны — в БД попадают только закрытые
 (`confirm=1`) свечи. Незакрытую свечу `CandleJob` не сохраняет (см.
-`docs/components/CandleJob.md` §Правило, `docs/models/mapping/Candle.md`
+`docs/components/CandleJob.md`, `docs/models/mapping/Candle.md`
 §`confirm` policy). Так все расчёты идут без look-ahead.
 
 ## Персистентность

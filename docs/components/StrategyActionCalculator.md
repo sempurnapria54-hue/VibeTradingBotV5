@@ -28,7 +28,7 @@ size  = sizeCalculator.calculate(context, price)
 Суб-калькуляторы при контролируемой ошибке расчёта бросают
 `CalculationException`; `StrategyActionCalculator` перехватывает его и
 возвращает `ERROR` с `CalculationError` (см.
-`docs/components/models/CalculationError.md` §«Механизм сигнализации»).
+`docs/components/models/CalculationError.md`).
 
 ## Границы
 

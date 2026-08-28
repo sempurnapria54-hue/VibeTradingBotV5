@@ -11,7 +11,7 @@
 из закрытых свечей окна выводит `MarketStructure` (тип, ценовые уровни,
 событие пробоя). Семантика классификации (свинг-пивоты, кластеризация
 уровней, тесты диапазона/тренда, пробой, `UNKNOWN`) —
-`docs/models/domain/other/MarketStructure.md` §Семантика классификации.
+`docs/models/domain/other/MarketStructure.md` классификации.
 Зовётся тонким `docs/components/MarketStructureJob.md`; сам не персистит.
 
 Имя `Resolver` (не `Analyzer`) — чтобы развести с будущей ролью «аналитик»
@@ -35,8 +35,8 @@ resolve(
 ```
 
 - **Потребляет готовые ER/ATR-скаляры, не пересчитывает.** ER — **единый
-  каталожный источник** (fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`,
-  `docs/decisions/derived-market-data-code-increments.md`): резолвер ER по
+  каталожный источник** (fork A — `docs/rules/condition-ruletype-granularity.md`,
+  `docs/models/domain/other/MarketStructure.md`): резолвер ER по
   свечам, когда он объявлен, **не считает**, берёт готовый скаляр
   (дискриминатор тренд/шум). ATR (толеранс кластеризации уровней, D3) — так
   же. Скаляры извлекает из готового `IndicatorValue` и подаёт
@@ -57,7 +57,7 @@ resolve(
 - **Stateless по входу.** Результат — функция от окна свечей, `params` и
   переданных ER/ATR-скаляров; история прошлых результатов не читается.
   «Докуда посчитано» — производный checkpoint job'а
-  (`MarketStructureJob` §Идемпотентность).
+  (`MarketStructureJob`).
 - **Событие пробоя.** Подтверждённый пробой (буфер `breakoutBufferPercents`
   + удержание `breakoutConfirmationBars` — оба из `MarketStructureParams`)
   экспонируется явным `breakoutEvent`, который условие
@@ -91,10 +91,10 @@ resolve(
 - Тонкий job-владелец — `docs/components/MarketStructureJob.md`.
 - Раздача готовой структуры потребителям — `docs/components/MarketStructureService.md`.
 - ER как каталожный вход (единый источник) —
-  `docs/decisions/efficiency-ratio-as-catalog-indicator.md`,
+  `docs/rules/condition-ruletype-granularity.md`,
   `docs/models/domain/other/IndicatorValue.md`.
 - Пороги структуры (D2/D3), проводка ER/ATR-входов (fork-A), краевой случай
-  идентичности — `docs/decisions/derived-market-data-code-increments.md`.
+  идентичности — `docs/models/domain/other/MarketStructure.md`.
 - `MarketStructure` как операнд правил фазы / `RANGE_BREAKOUT_CONFIRMED` —
-  `docs/decisions/market-phase-conditional-classification.md`,
-  `docs/decisions/strategy-condition-authoring-contract.md`.
+  `docs/models/domain/other/MarketPhase.md`,
+  `docs/rules/strategy-condition-contract.md`.

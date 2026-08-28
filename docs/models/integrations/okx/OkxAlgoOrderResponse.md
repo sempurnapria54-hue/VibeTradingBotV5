@@ -5,20 +5,6 @@
 Какие поля у нативной модели OKX algo-order response и какие из них
 использует bot.
 
-## Контекст
-
-Нативная модель источника OKX. Возвращается `GET /trade/order-algo`,
-`/trade/orders-algo-pending`, `/trade/orders-algo-history` и
-create/cancel ACK (с сокращённым набором). Не выходит за
-`IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
-
-Mapping в `AlgoOrderExternalSnapshot` и далее в `AlgoOrder` —
-`docs/models/mapping/AlgoOrder.md` (раздел `## OKX`). Доменная модель
-и статусы — `docs/models/domain/core/AlgoOrder.md` и
-`docs/lifecycles/AlgoOrder.md`. Контракт endpoint'ов / rate limits /
-ACK — `docs/integrations/okx/contracts/algo-order.md`. Правила OKX —
-`docs/integrations/okx/rules/`.
-
 ## Инвентарь полей
 
 ### Используемые

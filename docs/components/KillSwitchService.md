@@ -11,22 +11,22 @@
 `KillSwitchService` — тонкий триггер `KillSwitchExecutor` для реактивной
 реакции холда. Kill-switch — состав **полных** реакций: L3-полной
 инструмента (`fireInstrument`) и ступени 2 биржевой лестницы
-(`fireExchange` → `Exchange.TRADE_BLOCKED`). У биржевой ступени 1
+(`fireExchange()` → `Exchange.TRADE_BLOCKED`). У биржевой ступени 1
 (`Exchange.HOLD` — ручной гейт входов) kill-switch-шага нет — на ней
 сервис не зовётся (`docs/rules/exchange-hold.md`). Зовётся
 `SafetyHoldCoordinator`'ом на шаге kill-switch
 (см. `docs/components/SafetyHoldCoordinator.md`); сам teardown и сверку
 реального состояния делает `KillSwitchExecutor`
-(`killSwitchExecutor.execute(dealContext).getSuccess()`, см.
+(`killSwitchExecutor.execute(dealContext).getSuccess`, см.
 `docs/components/KillSwitchExecutor.md`). Это тот «тонкий триггер»,
 который подключает hold-подсистема (раньше — орфан
-`DealFsmSupport.killSwitchCommand()`, удалён на сверке `CODE`).
+`DealFsmSupport.killSwitchCommand`, удалён на сверке `CODE`).
 
 ## Scope-исполнители
 
-Ярлыки уровня со scope-API сняты (H6, `GAPS_CLOSE_5`): scope описывает
+Ярлыки уровня со scope-API сняты: scope описывает
 радиус, уровень серьёзности — отдельная ось
-(`docs/rules/error-handling-policy.md` §«Радиус ущерба задаёт scope»).
+(`docs/rules/error-handling-policy.md`).
 
 - **Инструмент-scope `fireInstrument(dealContext)`** — kill-switch по графу
   **триггерной сделки** (её runtime graph + instId). Возвращает

@@ -33,10 +33,10 @@
 (`MARK_DEAL_ERROR_COMMAND`, `markError`). Форвард: нет открытой сделки → биржа по
 инструменту должна быть пуста; не пуста (чужой/висящий live order/algo) →
 `AnomalyReport` + холд инструмента (`docs/rules/instrument-hold.md`). «Оптовую
-команду» в command-layer не возвращаем (CMD-Q4: read **вне** command-layer).
+команду» в command-layer не возвращаем.
 Orphan-скан при уже открытой сделке и по неведомым ботом инструментам — зона
 `AnomalyJob` (шаг 8); легитимное окно двойной reduce-only защиты REPLACE не
-флагается (`docs/decisions/replace-not-amend.md`).
+флагается (`docs/rules/replace-not-amend.md`).
 
 ## Рабочая логика
 
@@ -56,28 +56,23 @@ handler плечо не пишет). Risk-check entry action — через
 risk-layer (`docs/processes/risk-evaluation.md`): BLOCKED в PRECHECK без
 live risk → `CLOSED` + `RISK_CONTROL`.
 
-**Ноль на тропах закрытия без входа пишется только после проверки биржи**
-(H7 `DOCS_CHECK_10`, `docs/rules/trading-constraints.md` §«Гейт открытия
-сделки»). Обе PRECHECK-тропы (`ENTRY_CONDITION_EXPIRED`, `RISK_CONTROL`)
+**Ноль на тропах закрытия без входа пишется только после проверки биржи**. Обе PRECHECK-тропы (`ENTRY_CONDITION_EXPIRED`, `RISK_CONTROL`)
 перед записью `resultProfit = 0` проверяют факт операций по сделке на
 бирже: операций не было ⇒ ноль как **исход проверки**; операции были ⇒
 сделка по этой тропе не закрывается, а идёт обычным путём финализации и
 получает реальное число. Отбор сделок для отчёта ключуется тем же
 признаком (`docs/rules/deal-without-operations.md`).
 
-- **Операнд на этих двух тропах — статус сделки** (H2 `DOCS_CHECK_11`,
-  решение пользователя): из `PRECHECK` заявка на биржу не уходила по
+- **Операнд на этих двух тропах — статус сделки**: из `PRECHECK` заявка на биржу не уходила по
   построению, поэтому «проверка факта операций» здесь выражается уже
   имеющимся достоверным фактом, а не exchange-read'ом. Составной предикат
   целиком (третья тропа — из `ENTRY_SUBMITTED`, там операнд другой) — в
   `docs/rules/deal-without-operations.md`.
 - **Пишет не handler и переводит не handler.** Ноль и валюту пишет
   `MARK_DEAL_CLOSED_COMMAND` второй веткой, той же транзакцией, что и
-  терминал (H1 `DOCS_CHECK_11`;
-  `docs/components/MarkDealClosedExecutor.md` §«Вторая ветка»); **эмитит
+  терминал; **эмитит
   это звено `FINALIZE_DEAL_EXIT_ACTION`** — ветвлением по тому же признаку,
-  пропуская звено 1 (H7 `DOCS_CHECK_12`,
-  `docs/components/SystemActionExecutor.md` §`FINALIZE_DEAL_EXIT_ACTION`).
+  пропуская звено 1.
   Handler доводит сделку до состояния, в котором действие заводится, и
   `MARK_*` напрямую не эмитит. Формулировки выше («закрыть candidate Deal»,
   «`CLOSED` + `RISK_CONTROL`») называют **исход тропы**, а не актора
@@ -89,7 +84,7 @@ live risk → `CLOSED` + `RISK_CONTROL`.
 доходит: `RiskValidator` помечает `BLOCKED`
 (`RISK_CREATING_ENTRY_WITHOUT_STOP`) — без fail-open allocation-сайзинга в
 обход `RISK_PER_TRADE`; в `PRECHECK` без live risk это `CLOSED` +
-`RISK_CONTROL` (инвариант `docs/rules/risk-creating-entry-protection.md`).
+`RISK_CONTROL` (инвариант `docs/rules/live-risk-protection.md`).
 Reduce-only/закрывающие действия правило не трогает.
 
 **Set-leverage перед постановкой (INSTR-Q2 — закрыт).** Рабочее плечо пишется
@@ -107,19 +102,19 @@ Reduce-only/закрывающие действия правило не трог
 `Instrument.leverage` (null → пропуск); неуспех → `ExchangeIntegrationException`.
 **Сам `PrecheckHandler` плечо не пишет.** Спецификация —
 `docs/components/SubmitOrderExecutor.md`. INSTR-Q2 закрыт
-(`docs/decisions/instrument-external-rules-materialization.md`,
-`docs/decisions/per-trade-risk-policy.md`).
+(`docs/models/domain/other/InstrumentExternalRules.md`,
+`docs/rules/risk-policy.md`).
 
 ## Выходные проверки
 
 Entry action материализован в локальный `Order`; **резолвимая защита
 risk-creating входа подтверждена** (attached SL / иной стоп — без неё entry
-не выпускается, `docs/rules/risk-creating-entry-protection.md`); рабочее
+не выпускается, `docs/rules/live-risk-protection.md`); рабочее
 плечо под расчёт пишет inline `SubmitOrderExecutor` перед постановкой
-открывающего ордера (не handler — см. §«Set-leverage перед постановкой»);
+открывающего ордера (не handler — см.);
 `DealActionState` с целью в колонках (`targetEntityType = ORDER`,
 `targetEntityId = orderId` — объект `RuntimeTarget` расплющен в колонки,
-`docs/decisions/command-action-boundary.md` §3); order создан/отправлен;
+`docs/rules/command-lifecycle.md`); order создан/отправлен;
 нет критичных
 конфликтов; нет риска под kill-switch. → `PRECHECK → ENTRY_SUBMITTED`.
 
@@ -127,8 +122,8 @@ risk-creating входа подтверждена** (attached SL / иной ст
 
 Steps: `ENTRY`, `GRID_ENTRY`, `FAIL_SAFE`. Перечень команд handler-док не
 держит: состав команд — собственность действий
-(`docs/decisions/fsm-execution-layering.md` §«Handler исполняет действия»;
-реестры звеньев — `docs/decisions/command-action-boundary.md` §2,
+(`docs/processes/fsm-execution-layering.md`;
+реестры звеньев — `docs/rules/command-lifecycle.md`,
 `docs/components/SystemActionExecutor.md`).
 Перечисление **неизвестных** live orders/algo по
 инструменту для входной проверки чистоты берётся из стартового

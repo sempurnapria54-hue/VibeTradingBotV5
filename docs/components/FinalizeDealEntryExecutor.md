@@ -19,8 +19,7 @@ retry-anchor.
 graph сделки **и статусное ребро `Deal.status = ENTRY_FINALIZED`** — в
 **одной транзакции** с durable-продвижением своего исполнения
 (валидация 4 развилки «команда ↔ действие»; второй экземпляр паттерна
-N7 — транзакционная клауза `docs/decisions/command-action-boundary.md`
-§5). На биржу сам не ходит; новых торговых решений не принимает
+N7 — транзакционная клауза `docs/rules/command-lifecycle.md`). На биржу сам не ходит; новых торговых решений не принимает
 (`RiskValidator` не вызывается, `docs/rules/risk-validator-scope.md`).
 
 ## Статусное ребро
@@ -32,7 +31,7 @@ N7 — транзакционная клауза `docs/decisions/command-action-
 переводом статуса могло завестись второе исполнение консолидации,
 закрыто. Это действующий паттерн статусных рёбер (терминалы пишут
 `MARK_*`-команды), не исключение
-(`docs/decisions/fsm-execution-layering.md`).
+(`docs/processes/fsm-execution-layering.md`).
 
 ## Идемпотентность и retry
 

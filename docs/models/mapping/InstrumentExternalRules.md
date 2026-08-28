@@ -7,31 +7,6 @@
 `InstrumentExternalRulesExternalSnapshot` и как резолвятся типы и
 статус инструмента.
 
-## Контекст
-
-Mapping-слой для `InstrumentExternalRules`. Доменная модель —
-`docs/models/domain/other/InstrumentExternalRules.md`. Обновляет
-правила — `docs/components/InstrumentExternalRulesSyncJob.md`. Сквозные
-правила — `docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'а —
-`docs/integrations/<name>/contracts/instrument.md`.
-
-**Ставка комиссии здесь не маппится — только ключ её группы.** Значение ставки
-приходит **другим эндпоинтом** (`trade-fee`) и едет своим снапшотом в
-`TradeFeeRate` (`docs/models/mapping/TradeFeeRate.md`,
-`docs/models/domain/other/TradeFeeRate.md`); в этой модели живёт
-`externalFeeGroupId` — половина ключа резолва. Один mapping-док — один
-источник; синк у них общий (`InstrumentExternalRulesSyncJob`), но модели и
-такт разные.
-
-**Ось резолва — пара, и обе её половины сырые** (H7, `GAPS_CLOSE_4`):
-(`externalInstrumentType`, `externalFeeGroupId`), а **не** доменная проекция
-`instrumentType`, которая резолвится ниже по этому же файлу
-(§«Резолв enum'ов при материализации»). Довод — коллизия `UNKNOWN`:
-`docs/models/domain/other/TradeFeeRate.md` §«Масштаб модели».
-
-Текущие источники: **OKX**.
-
 ## Source-agnostic ядро
 
 ### Mapping-flow
@@ -86,10 +61,7 @@ contracts = baseQty / ctVal
 | `state` | `externalState` |
 
 **Валюты (`settleCcy`/`baseCcy`/`quoteCcy`) навесом не маппятся** — их
-дом `Instrument` (H6 `DOCS_CHECK_11`,
-`docs/decisions/instrument-currencies-home.md`,
-`docs/models/mapping/Instrument.md`). Промежуточная редакция
-(`DOCS_CHECK_9`) маппила их сюда; строки сняты вместе с полями модели.
+дом `Instrument`. Промежуточная редакция маппила их сюда; строки сняты вместе с полями модели.
 
 ### Резолв enum'ов при материализации (`snapshotToDomain`)
 
@@ -105,7 +77,7 @@ contracts = baseQty / ctVal
 Неизвестное сырое значение нормализуется в `UNKNOWN`. Per-order max sizes
 и `lever`/`state` потребляет риск-преконтроль шага 5 (`SIZE_ABOVE_LIMIT`,
 `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `INSTRUMENT_NOT_LIVE`). Решение —
-`docs/decisions/instrument-external-rules-materialization.md`.
+`docs/models/domain/other/InstrumentExternalRules.md`.
 
 ### Разграничение со снапшотом инструмента (шаг 1)
 
@@ -116,7 +88,7 @@ contracts = baseQty / ctVal
 плеча — rules (`Status`/`externalState`, `externalMaxLeverage`); одноимённые
 сырые поля на `Instrument` несут то же значение, но для преконтроля не
 авторитетны (дубль; устранение — мелкая чистка). Решение —
-`docs/decisions/instrument-external-rules-materialization.md` (закрыт INSTR-Q1,
+`docs/models/domain/other/InstrumentExternalRules.md` (закрыт INSTR-Q1,
 снят leverage/HOLD-под-вопрос INSTR-Q2).
 
 ### Не маппимые поля OKX
@@ -128,9 +100,9 @@ contracts = baseQty / ctVal
 SWAP `expTime` обычно пусто), `category`/`alias`/`stk`/
 `optType`, `posLmtAmt`/`posLmtPct`/`maxPlatOILmt` (позиционные лимиты —
 форвард к риску на биржу/портфель, фаза 3,
-`docs/decisions/per-trade-risk-policy.md`).
+`docs/rules/risk-policy.md`).
 
-**`groupId` из этого списка снят** (шаг 7, `GAPS_CLOSE_3`, H1). Он не «прочее
+**`groupId` из этого списка снят**. Он не «прочее
 поле биржи», а **ключ резолва ставки комиссии**: офдок OKX прямо предписывает
 брать его отсюда — «instType and groupId should be used together to determine a
 trading fee group. Users should use this endpoint together with fee rates

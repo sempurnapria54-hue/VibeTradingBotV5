@@ -6,18 +6,6 @@
 источников, нормализуется через `OrderExternalSnapshot` и как
 резолвится его статус.
 
-## Контекст
-
-Mapping-слой для `Order`. Доменная модель — `docs/models/domain/core/Order.md`;
-lifecycle — `docs/lifecycles/Order.md`. Сквозные правила,
-управляющие этим маппингом, — `docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/ack-not-runtime-truth.md`,
-`docs/rules/external-status-resolution.md`,
-`docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'ов
-конкретного источника — в `docs/integrations/<name>/contracts/`.
-
-Текущие источники: **OKX** (раздел ниже).
-
 ## Source-agnostic ядро
 
 ### `OrderExternalSnapshot` → `Order`
@@ -39,9 +27,9 @@ Snapshot — нормализованный граничный объект; е�
 | `fee` | `Order.fee` | комиссия |
 | `externalCreatedAt` | `Order.externalCreatedAt` | |
 | `externalModifiedAt` | `Order.externalModifiedAt` | |
-| `attachedAlgoInternalId` | — | top-level attached client id; **у `Order` такого поля нет** (B6 `DOCS_CHECK_20`) — идентичность attached-защиты живёт на элементе `attachedAlgoOrders[]` (`internalId`), и top-level эхо в домен не приземляется |
+| `attachedAlgoInternalId` | — | top-level attached client id; **у `Order` такого поля нет** — идентичность attached-защиты живёт на элементе `attachedAlgoOrders[]` (`internalId`), и top-level эхо в домен не приземляется |
 | `takeProfitTriggerPrice` (future) | — | top-level TP trigger (для entry-with-attached-SL) |
-| `stopLossTriggerPrice` | — | top-level SL trigger; **у `Order` такого поля нет** (B6 `DOCS_CHECK_20`) — уровень живёт на элементе `attachedAlgoOrders[].stopLossTriggerPrice` (`docs/models/domain/core/Order.md` §«Структура `AttachedAlgoOrder`»), верифицировано по `Order.java` |
+| `stopLossTriggerPrice` | — | top-level SL trigger; **у `Order` такого поля нет** — уровень живёт на элементе `attachedAlgoOrders[].stopLossTriggerPrice` (`docs/models/domain/core/Order.md`), верифицировано по `Order.java` |
 | `attachedAlgoOrders[]` | `Order.attachedAlgoOrders[]` | список `AttachedAlgoOrder` (см. ниже) |
 
 **Поля планового риска в снапшот не входят и им не перезаписываются.**
@@ -49,16 +37,15 @@ Snapshot — нормализованный граничный объект; е�
 `plannedSizeContracts`, `plannedContractValue`, **`plannedStopPrice`** —
 **наши** величины,
 произведённые риск-преконтролем и доставленные
-`CreateOrderCommandPayload`'ом (`docs/components/CreateOrderExecutor.md`
-§«Куда пишутся шесть чисел»); источник таких фактов не отдаёт, и эхо
+`CreateOrderCommandPayload`'ом (`docs/components/CreateOrderExecutor.md`); источник таких фактов не отдаёт, и эхо
 рефреша их не трогает — все шесть write-once (`updatable = false`).
 **Тем же порядком не приземляются `liquidationDistanceRatio` (седьмое
 число) и `positionId`** — первое производит преконтроль, второе пишет
 `RefreshOrderExecutor` при первом филле; из снапшота не берётся ни то,
 ни другое.
-Строка заведена H5 `DOCS_CHECK_16` структурным свипом (пятая колонка
-`orders`), расширена Р3 `GAPS_CLOSE_16` (шестая, `planned_stop_price`) и
-доведена до объявленного счёта B6 `DOCS_CHECK_20` (перечислялись пять,
+Строка заведена структурным свипом (пятая колонка
+`orders`), расширена (шестая, `planned_stop_price`) и
+доведена до объявленного счёта (перечислялись пять,
 объявлялось шесть):
 mapping-таблица обязана сказать, что этих колонок здесь нет
 **намеренно**, — иначе отсутствие читается как пропуск.
@@ -78,11 +65,11 @@ mapping-таблица обязана сказать, что этих колон
   `clOrdId`.
 
 Амендного request-mapping **нет**: домен не амендит
-(`docs/decisions/replace-not-amend.md`) — ремоделирование ордера =
+(`docs/rules/replace-not-amend.md`) — ремоделирование ордера =
 REPLACE-оркестрация (cancel-нога → подтверждение терминала с
 разбором fill-race → place новой сущности с `replacesInternalId`).
 Биржевой amend-контракт OKX задокументирован как поверхность
-(`docs/integrations/okx/contracts/order.md` §Amend), доменом не
+(`docs/integrations/okx/contracts/order.md`), доменом не
 используется.
 
 Per-item error классифицируется: retryable → `RETRY_PENDING`;
@@ -179,18 +166,17 @@ cost-price SL для split). `tpTriggerPx` vs `tpTriggerRatio` —
 взаимоисключимо; аналогично SL.
 
 **`slTriggerPxType` заполняется всегда, биржевой default не
-используется** (C1 `DOCS_CHECK_20`): источник значения —
+используется**: источник значения —
 `AttachedAlgoOrder.triggerPriceType`, доезжающее из
 `StopLossSettings.triggerPriceType` стратегии через
 `AttachedProtectionPayload`. Дом принципа —
-`docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
-защиты объявляется стратегией и доезжает до биржи».
+`docs/rules/live-risk-protection.md`.
 
 **Amend OKX-specific — доменом не используется** (REPLACE-only,
-`docs/decisions/replace-not-amend.md`): амендные поля биржи
+`docs/rules/replace-not-amend.md`): амендные поля биржи
 (`reqId`/`cxlOnFail`/`pxAmendType`/`attachAlgoOrds[*]` с
 `new*`-полями) остаются описанными в контракте поверхности
-(`docs/integrations/okx/contracts/order.md` §Amend,
+(`docs/integrations/okx/contracts/order.md`,
 `OkxOrderResponse.md`), в request-mapping домена не входят.
 Ремодел attached protection: до fill родителя — REPLACE
 родительского ордера вместе с attach-настройками; после fill
@@ -216,7 +202,7 @@ attached материализуется в standalone algo —
 `clOrdId = internalId`. Цикл обходит `RefreshOrderExecutor` **внутри одной
 команды** `REFRESH_ORDER_COMMAND` (обрыв на первом успешном эндпоинте; терминал
 `MISSING_AFTER_REFRESH` выносит он же — см.
-`docs/decisions/refresh-evidence-cycle-ownership.md`). Order-fill-метрики
+`docs/rules/command-lifecycle.md`). Order-fill-метрики
 (`accFillSz` → `accumulatedFillSize`, `avgPx` → `averagePrice`, `fee`)
 приходят готовыми из того же `OkxOrderResponse` — отдельной fill-команды нет.
 Доп. факты сделки (`REFRESH_POSITION_COMMAND`) запрашиваются отдельной командой;

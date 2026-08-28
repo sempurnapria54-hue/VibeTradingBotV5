@@ -5,20 +5,6 @@
 Какие поля у OKX account balance response — что приходит от биржи и
 что из этого используется.
 
-## Контекст
-
-Нативная модель источника OKX. Возвращается `GET
-/api/v5/account/balance`. Не выходит за `IntegrationService`/adapter —
-`docs/rules/raw-exchange-dto-boundary.md`.
-
-Mapping в `BalanceContainerExternalSnapshot` /
-`BalanceExternalSnapshot` и далее в `BalanceContainer`/`Balance` —
-`docs/models/mapping/Balance.md` (раздел `## OKX`). Доменная модель и
-freshness/risk-семантика — `docs/models/domain/core/BalanceContainer.md`.
-Контракт endpoint'а / rate limits / validation —
-`docs/integrations/okx/contracts/balance.md`. Правила OKX —
-`docs/integrations/okx/rules/`.
-
 ## Структура response (упрощённо)
 
 ```json

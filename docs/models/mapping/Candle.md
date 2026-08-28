@@ -5,23 +5,6 @@
 Как нативные представления свечей источников ложатся на доменные
 свечные данные и какие особенности их формата.
 
-## Контекст
-
-Mapping-слой для свечей. Доменно свечи добывает
-`docs/components/CandleJob.md` (процесс
-`docs/processes/candle-loading.md`); потребители — `IndicatorJob`
-и др. (`docs/processes/market-data-calculation.md`).
-Mapping таймфреймов — `docs/models/mapping/TimeFrame.md`. Сквозные
-правила — `docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'ов
-— `docs/integrations/<name>/contracts/candle.md`.
-
-Текущие источники: **OKX**.
-
-> Альтернатива размещению: расширить `mapping/MarketPriceData.md`
-> до tickers + candles. Не выбрана, чтобы сохранить «один файл —
-> одна доменная роль» (`MarketPriceData` ≠ исторические OHLC).
-
 ## OKX
 
 ### Формат свечи
@@ -86,5 +69,5 @@ OKX-массив [9] → CandleExternalSnapshot → domain Candle
 
 В `/market/candles` первая свеча часто неполная (`confirm=0`); для
 индикаторов используются только `confirm=1` свечи
-(`docs/components/CandleJob.md` §Правило). В `/market/history-candles`
+(`docs/components/CandleJob.md`). В `/market/history-candles`
 обычно приходят уже закрытые (`confirm=1`).

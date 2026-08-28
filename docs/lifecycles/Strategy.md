@@ -67,7 +67,7 @@ DELETED  -> (терминальный)
 дополнительно держит инвариант «одна `ACTIVE` на инструмент»
 (проверка приложения + частичный UNIQUE-индекс в БД). Поверхность —
 `PUT /api/strategies/{internalId}/status`
-(`docs/decisions/strategy-materialization-and-validation.md`).
+(`docs/rules/strategy-validation.md`).
 
 ## Кто управляет
 
@@ -75,6 +75,6 @@ DELETED  -> (терминальный)
 деактивация/логическое удаление стратегии). Расчётные jobs
 (`IndicatorJob`/`MarketStructureJob`) `Strategy.Status` **не** меняют
 (фаза job'ом не считается — вычисляется на лету,
-`docs/decisions/market-phase-stateless.md`). Immutability стратегии (см.
+`docs/models/domain/other/MarketPhase.md`). Immutability стратегии (см.
 `docs/models/domain/aggregate/Strategy.md`) означает, что правила не
 редактируются — меняется только статус контейнера.

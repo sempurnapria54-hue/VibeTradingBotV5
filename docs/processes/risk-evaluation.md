@@ -58,10 +58,7 @@ ALLOWED  -> StrategyActionOrchestrator создаёт команду
 
 **`BLOCKED` по `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
 `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED` и
-`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` в `ERROR` не уводит** (C6
-`DOCS_CHECK_20` + `RISK-Q3-A`; третий код внесён C2 `DOCS_CHECK_23` —
-перечень расходился с клеймом «все три сделочных кода — не авария» в
-`docs/components/models/RiskCheckResult.md`).
+`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` в `ERROR` не уводит**.
 
 **Почему глобальный код тоже в карв-ауте.** Он достижим, когда потолок
 изменила **система** после приёма стратегии, — то есть по поводу
@@ -80,22 +77,13 @@ ALLOWED  -> StrategyActionOrchestrator создаёт команду
 стратегии флагается как авария — и стоило бы teardown живого риска там,
 где риск под контролем.
 
-**`PROTECTION_COVERAGE_REDUCED` — в том же карв-ауте** (C1
-`DOCS_CHECK_23`). Реджект защитного действия, оставляющего покрытие ниже
+**`PROTECTION_COVERAGE_REDUCED` — в том же карв-ауте**. Реджект защитного действия, оставляющего покрытие ниже
 живой экспозиции, — не признак рассогласования, а **сработавший
 контроль**: реджект приходится на **place-ногу** защитного `REPLACE`
 (place-new → подтверждение → cancel-old), поэтому старая защита остаётся
 живой и покрытие сохраняется; уводить сделку в `ERROR` значило бы рвать
 живой риск там, где он под контролем. Дом предиката —
-`docs/rules/risk-creating-entry-protection.md` §«Предикат покрытия и
-точки его проверки».
-
-- **Довод верен для тропы, на которой код достижим, и только для неё**
-  (A1 `DOCS_CHECK_24`). Прежняя редакция давала его безусловно, включая
-  тропу «снятие ступени без замены», — а та до валидатора не доходит
-  вовсе (`CANCEL_ALGO_ORDER_COMMAND` вне scope) и ловится выходной
-  проверкой `MANAGING`, где исход другой: нарушение инварианта, ступень 2,
-  а не тихий карв-аут.
+`docs/rules/live-risk-protection.md`.
 
 Карв-аут не новый по конструкции: тот же ряд, что `PRECHECK + BLOCKED +
 live risk ещё нет ⇒ терминал `CLOSED`, не авария` (схема выше). Ось
@@ -108,8 +96,7 @@ live risk ещё нет ⇒ терминал `CLOSED`, не авария` (сх�
 (`docs/components/MarkDealClosedExecutor.md`), ребро в `ERROR` — по
 карв-ауту природы тропы: решение handler'а ⇒ звено
 `MARK_DEAL_ERROR_COMMAND`, перехват ⇒ прямая запись петлёй
-(`docs/decisions/fsm-execution-layering.md` §«Ребро `* → ERROR`:
-карв-аут по природе тропы»). Прежняя запись «`Deal.status = ERROR`»
+(`docs/processes/fsm-execution-layering.md`). Прежняя запись «`Deal.status = ERROR`»
 присваиванием выражала писателя, которого на этой тропе нет.
 
 `RISK_CONTROL` отличается от `ENTRY_CONDITION_EXPIRED`: первое — вход

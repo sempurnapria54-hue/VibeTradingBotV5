@@ -16,15 +16,6 @@
 используют `externalStatus` напрямую (см.
 `docs/rules/external-status-resolution.md`).
 
-> Resolver'ы, refresh-executors и команды (`REFRESH_ORDER_COMMAND`,
-> `SUBMIT_ORDER_COMMAND`, `CANCEL_ORDER_COMMAND`) —
-> command-подсистема (шаг 4): `docs/components/` (executors, resolver'ы),
-> `docs/rules/command-lifecycle.md`. Амендной команды нет —
-> ремоделирование через REPLACE-оркестрацию
-> (`docs/decisions/replace-not-amend.md`; для entry-ордера —
-> cancel-нога первой, разбор fill-race по фактам). Здесь — статусная
-> механика, которой владеет сам `Order`.
-
 ## `Order.Status`
 
 | Статус | Runtime-active | Final | Live risk | Смысл |
@@ -51,7 +42,7 @@
 | `CANCELED` | нет | да | Отменена/снята. |
 | `ERROR` | — | problem-final | Ошибочное состояние. |
 
-`isActiveLike()` = PENDING/ACTIVE. Допустимые переходы (`canTransitionTo`):
+`isActiveLike()` = PENDING/ACTIVE. Допустимые переходы (`canTransitionTo()`):
 
 ```text
 null     -> CREATED
@@ -111,9 +102,8 @@ parent CANCELED
       не возникает: entry-REPLACE при непустом филле идёт
       place-new -> подтверждение -> cancel-old, поэтому налитый объём
       к моменту отмены уже покрыт новой ногой —
-      docs/decisions/replace-not-amend.md §Решение п.3,
-      docs/rules/risk-creating-entry-protection.md
-      §«Перевыставление входа при непустом филле».)
+      docs/rules/replace-not-amend.md п.3,
+      docs/rules/live-risk-protection.md.)
 
 parent ERROR
   -> attached -> ERROR, closeReason = UNKNOWN.
@@ -125,7 +115,7 @@ parent ERROR
   (externalId, externalStatus, status через resolver, side, price, size,
   accumulatedFillSize, averagePrice, fee, attachedAlgoOrders), проходя
   evidence-cycle **внутри команды**
-  (`docs/decisions/refresh-evidence-cycle-ownership.md`):
+  (`docs/rules/command-lifecycle.md`):
   - `GET /trade/order` — конкретный parent `Order`;
   - `orders-pending` — список live/pending по инструменту; не найден среди
     pending — **не** финальный факт отмены/исполнения;

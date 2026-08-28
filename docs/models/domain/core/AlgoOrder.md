@@ -2,206 +2,112 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за торговая модель `AlgoOrder` (standalone algo-order):
-структура, condition-модель, external snapshot, что хранит и что нет.
-
-Статусы и переходы — в `docs/lifecycles/AlgoOrder.md`.
+Что это за сущность `AlgoOrder` — отдельная условная заявка сделки.
 
 ## Назначение
 
-`AlgoOrder` — standalone algo-order, связанный с `Deal`. Применяется
-для standalone stop-loss / take-profit, OCO, trailing stop, partial
-exit (reduce-only). Хранит локальный intent, идентификаторы
-(`internalId`/`externalId`), доменный статус, сырой внешний статус
-(диагностика), параметры условия срабатывания, рассчитанный размер,
-факты срабатывания с биржи, diagnostic facts (связанные ordinary
-order ids).
+`AlgoOrder` — условная заявка, связанная со сделкой: отдельный стоп,
+тейк, их комбинация, трейлинг, частичный выход.
 
-**Входа среди применений нет** — все типы условия protective/closing
-(`ConditionType`: семь значений, входного не существует; подтверждено по
-коду, `RISK-Q4`). **Условие возврата `RISK-Q4`:** появление входного
-condition-type (условный вход алго-ордером, входной
-`StrategyAlgoOrderAction`) переоткрывает состав таблиц планового риска и
-его операндов — сегодня они живут только в `orders`
-(`docs/models/domain/core/Order.md` §«Плановый риск и его операнды»).
+**Входа среди применений нет:** все типы условия — защитные либо
+закрывающие. Появление входного типа условия переоткрыло бы состав
+таблиц планового риска: сегодня они живут только у обычных заявок.
 
-`AlgoOrder` **не** является действием стратегии. Связь
-`StrategyAction` ↔ `AlgoOrder` — через `DealActionState` →
-`RuntimeTarget(entityType = ALGO_ORDER, entityId)`, поэтому
-`AlgoOrder` не хранит `strategyActionId`, `strategyActionKey`,
-`role`, `level` (механизм связи —
-`docs/models/domain/other/DealActionState.md`).
+`AlgoOrder` **не является действием стратегии**: связь «действие —
+runtime-сущность» живёт в строке исполнения, поэтому ссылок на действие
+модель не хранит.
 
-## Структура `AlgoOrder`
+**Ссылки на ногу входа у неё нет — связь только со сделкой.** Отсюда
+отдельная условная заявка **не может** быть носителем уровня стопа
+конкретной ноги: «защита той же ноги» ею не адресуема. Поэтому форма
+защиты доборной ноги сужена до её собственной встроенной защиты.
 
-Java-класс `...core.algo_order.AlgoOrder`, расширяет `Auditable`.
+## Структура
 
 | Поле | Тип | Назначение |
 |---|---|---|
-| `id` | `Long` | Внутренний идентификатор в БД. |
+| `id` | `Long` | Внутренний идентификатор. |
 | `dealId` | `Long` | Сделка. |
-| `internalId` | `String` | stable client id (OKX `algoClOrdId`). |
-| `externalId` | `String` | биржевой id (OKX `algoId`). |
-| `status` | `Status` | Доменный статус (см. lifecycle). |
-| `closeReason` | `CloseReason` | Причина финализации / ERROR. |
-| `conditionType` | `ConditionType` | Денормализованная проекция `condition.type` (обязательна, должна совпадать). |
-| `condition` | `Condition` | Условие срабатывания (jsonb; только trigger/trailing). |
-| `size` | `BigDecimal` | Рассчитанный materialized размер (результат `SizeCalculator`; для SWAP/FUTURES — контракты). |
-| `direction` | `Direction` | `BUY` / `SELL` (closing long → SELL, short → BUY). |
-| `positionReducingOnly` | `Boolean` | Доменное намерение: только уменьшать позицию. |
-| `replacesInternalId` | `String` | `internalId` предшественника в цепочке REPLACE (nullable; append-only след — обратная ссылка не хранится, выводится запросом). См. `docs/decisions/replace-not-amend.md`. |
-| `externalStatus` | `String` | Сырой статус биржи (OKX `state`) — диагностика, FSM напрямую не использует. |
-| `failCode` | `String` | Код ошибки биржи (OKX `failCode`). |
-| `externalSize` | `BigDecimal` | Фактический размер срабатывания (OKX `actualSz`) — не исходный `size`. |
-| `externalPrice` | `BigDecimal` | Фактическая цена срабатывания (OKX `actualPx`). |
-| `externalTriggerTime` | `Instant` | Время срабатывания (OKX `triggerTime`). |
-| `linkedOrderExternalIds` | `List<String>` | Связанные ordinary order ids (OKX `ordId`/`ordIdList`) — храним как внешний факт, runtime на них не опирается. |
+| `internalId` | `String` | Стабильный клиентский идентификатор. |
+| `externalId` | `String` | Биржевой идентификатор. |
+| `status` | `Status` | Доменный статус. |
+| `closeReason` | `CloseReason` | Причина финализации. |
+| `conditionType` | `ConditionType` | Денормализованная проекция типа условия; обязана совпадать с условием. |
+| `condition` | `Condition` | Условие срабатывания (JSONB): триггер либо трейлинг. |
+| `size` | `BigDecimal` | Рассчитанный размер в контрактах. |
+| `direction` | `Direction` | Сторона заявки. |
+| `positionReducingOnly` | `Boolean` | Доменное намерение «только уменьшать позицию». |
+| `replacesInternalId` | `String` | Предшественник в цепочке замещений. |
+| `externalStatus` | `String` | Сырой статус биржи — диагностика. |
+| `failCode` | `String` | Код отказа биржи. |
+| `externalSize` | `BigDecimal` | **Фактический размер срабатывания**, не исходный размер. |
+| `externalPrice` | `BigDecimal` | **Фактическая цена срабатывания.** У живой трейлинговой защиты пусто; после срабатывания несёт цену исполнения, а не уровень стопа. |
+| `externalTriggerTime` | `Instant` | Время срабатывания. |
+| `linkedOrderExternalIds` | `List<String>` | Связанные идентификаторы обычных заявок — внешний факт, runtime на него не опирается. |
 
-Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
-**`isActiveLike()`** (PENDING/ACTIVE/PARTIALLY_COMPLETED — вводится A4
-`DOCS_CHECK_24`; предикат «защита стои́т на бирже» для предиката покрытия,
-`docs/rules/risk-creating-entry-protection.md` §Правило: `CREATED` исключён,
-потому что заявка ещё не отправлена и подтверждения нет
-(`docs/rules/ack-not-runtime-truth.md`), а `PARTIALLY_COMPLETED` включён —
-она жива и покрывает остаток `size − externalSize`. Имя и семантика
-симметричны `AttachedAlgoOrder.isActiveLike()`, но **набор статусов другой**:
-у attached их два, у standalone три — у attached состояния «частично
-сработала» нет),
-`toPending/toActive/toComplete/toCancel(reason)/toError(reason)` (через
-строгий `transitTo` с матрицей переходов — см. lifecycle),
-`validateConditionProjection()` (сверяет `conditionType == condition.type`,
-оба не null). Статус `PARTIALLY_COMPLETED` достижим только по матрице
-переходов (exchange-driven recovery), отдельного transition-хелпера нет.
+**Доменные методы:** `isLive()`; **`isActiveLike()`** — `PENDING`,
+`ACTIVE`, `PARTIALLY_COMPLETED`: предикат «заявка стоит на бирже».
+`CREATED` исключён — подтверждения нет; частично сработавшая включена —
+она жива и покрывает остаток. Имя симметрично встроенной защите, но
+**набор статусов другой**: у встроенной их два, состояния «частично
+сработала» у неё нет.
 
-### Енумы `AlgoOrder`
+Плюс переходы состояний через строгую матрицу и проверка совпадения
+проекции типа условия с самим условием.
 
-- **`Direction`**: `BUY`, `SELL`.
-- **`Status`**: `CREATED`, `PENDING`, `ACTIVE`, `PARTIALLY_COMPLETED`
-  (exchange-driven recovery-status, не целевой сценарий),
-  `COMPLETED`, `CANCELED`, `ERROR` (переходы — lifecycle).
-- **`CloseReason`**: `TRIGGERED`, `CANCELED_BY_STRATEGY`,
-  `REPLACED_BY_STRATEGY` (стратегия заменила другим algo-order),
-  `KILL_SWITCH`, `MANUAL_CANCEL`, `MISSING_AFTER_REFRESH`,
-  `ORDER_FAILED`, `PARTIALLY_FAILED`, `UNKNOWN_EXTERNAL_STATUS`,
-  `EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`.
+## Енумы
 
-### Плановый риск и его операнды — дом не здесь (`RISK-Q4` закрыт)
+**`Direction`** — `BUY`, `SELL`.
 
-Плановый риск ноги (`plannedRiskAmount`, `plannedRiskCurrency` — переехали
-на ногу H6/H11 `DOCS_CHECK_15`) и его операнды (`plannedEntryPrice`,
-`plannedSizeContracts`) — атрибуты **ноги входа**, а входной тропы
-алго-ордером не существует (§Назначение): дом — **только `Order`**
-(`docs/models/domain/core/Order.md` §«Плановый риск и его операнды»);
-`algo_orders` этих колонок не получает — это была бы мёртвая
-четвёрка с живым именем, читающаяся как «тропа есть». Прежняя
-формулировка «если вход исполнился алго-ордером» снята вместе с
-посылкой; условие возврата — §Назначение.
+**`Status`** — `CREATED`, `PENDING`, `ACTIVE`, `PARTIALLY_COMPLETED`,
+`COMPLETED`, `CANCELED`, `ERROR`.
 
-**Ссылки на ногу у `AlgoOrder` нет, и это несущий факт** (H4
-`DOCS_CHECK_16`, верифицировано по `AlgoOrder.java`): связь — только
-`dealId`. Отсюда standalone-алго-сущность **не может** быть носителем
-операнда `stop_i` конкретной ноги входа: «защита **той же** ноги»
-standalone-сущностью не адресуема ничем. Поэтому форма защиты **доборной**
-ноги сужена до собственного attached SL
-(`docs/rules/risk-creating-entry-protection.md` §«Защита доборной ноги
-снимается после пересчёта основной»).
+**`CloseReason`** — `TRIGGERED`, `CANCELED_BY_STRATEGY`,
+`REPLACED_BY_STRATEGY`, `KILL_SWITCH`, `MANUAL_CANCEL`,
+`MISSING_AFTER_REFRESH`, `ORDER_FAILED`, `PARTIALLY_FAILED`,
+`UNKNOWN_EXTERNAL_STATUS`, `EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`.
 
-**Резолв `stop_i` у финализатора идёт не через `attachedAlgoOrders`, а с
-persisted-числа** `Order.plannedStopPrice` (Р3 `GAPS_CLOSE_16`;
-стейл-редакция «только через `Order.attachedAlgoOrders`» снята B7
-`DOCS_CHECK_20`). Шестое число write-once на ноге, поэтому уровень не
-зависит ни от того, жива ли встроенная защита, ни от того, снята ли она
-подтверждённой standalone
-(`docs/components/FinalizeDealExitExecutor.md` §epsilon,
-`docs/models/domain/core/Order.md` §«`plannedStopPrice` — шестое
-число»). Обратную ссылку `AlgoOrder → Order` это тем более **не
-требует**.
+**`ConditionType`** — `STOP_LOSS`, `PARTIAL_STOP_LOSS`, `TAKE_PROFIT`,
+`PARTIAL_TAKE_PROFIT`, `OCO_FULL`, `TRAILING_PERCENTS`,
+`TRAILING_VALUE`.
 
-### Поля фактического срабатывания — есть, и они операнд калибровки
+Какие из них считаются защитой — не свойство типа, а свойство заявки:
+`docs/rules/live-risk-protection.md`.
 
-`externalPrice` (`actualPx`), `externalSize` (`actualSz`),
-`externalTriggerTime` — **фактические** факты срабатывания, не заявленные.
-`externalPrice` по стоповым типам условия (`STOP_LOSS` / `OCO_FULL` /
-`PARTIAL_STOP_LOSS` при `closeReason = TRIGGERED`) — **основной операнд
-калибровки запаса на проскок**, а второй операнд (уровень стопа) живёт на
-**той же** строке в `condition.trigger.stopLoss.value`, поэтому смешения
-partial-выходов и не-стоповых закрытий не возникает (H21 `DOCS_CHECK_11`;
-`docs/models/domain/core/Position.md` §«Цена фактического выхода»).
-У `AttachedAlgoOrder` аналога **нет** — там только заявленный
-`stopLossTriggerPrice`.
+**`TriggerPriceType`** — `LAST`, `INDEX`, `MARK`. Ценовая база триггера
+объявляется стратегией и доезжает до биржи.
 
-**Хвост `integrator`:** означает ли `actualPx` цену исполнения
-сработавшего ордера или цену его выставления после триггера
-(`.claude/tests/source-api/okx/plan.md` §M15.7).
+## Условие срабатывания
 
-## Condition-модель (разделы `AlgoOrder`)
+`Condition` — JSONB на строке: тип плюс параметры триггера либо
+трейлинга.
 
-Дерево условий — разделы внутри `AlgoOrder` по
-`.claude/decisions/model-granularity.md` (не самостоятельные
-сущности). `Condition` отвечает только за **условие срабатывания**;
-размер — в `AlgoOrder.size`; `closeFraction` **не** в `Condition`
-(живёт в strategy/action sizing intent, например
-`StrategyAlgoOrderAction.closeFractionPercents`, используется
-`SizeCalculator`).
+- **триггерная ветка** несёт уровни стопа и тейка;
+- **трейлинговая ветка** несёт цену активации, отступ и **наблюдаемый
+  уровень** — он появляется **при наблюдении**, после активации.
 
-- **`Condition`**: `type: ConditionType`, `trigger: Trigger`,
-  `trailing: Trailing`. Инвариант: ровно один механизм —
-  `trigger XOR trailing`; `type` соответствует заполненным полям
-  (SL/TP/OCO/PARTIAL_* → trigger; TRAILING_* → trailing);
-  `AlgoOrder.conditionType == condition.type`.
-- **`Trigger`**: `stopLoss: TriggerPrice`, `takeProfit: TriggerPrice`
-  (null — соответствующая нога не используется).
-- **`TriggerPrice`**: `type: TriggerPriceType` (внутренний),
-  `value: BigDecimal` (внутреннее значение), `externalType: String`
-  (биржевой тип цены), `externalValue: BigDecimal` (биржевое
-  значение, может отличаться округлением). На первом этапе SL/TP/OCO
-  legs исполняются market-like после trigger (OKX `slOrdPx=-1`/
-  `tpOrdPx=-1`); limit-execution после trigger не моделируем.
-- **`TriggerPriceType`**: `LAST`, `INDEX`, `MARK`.
-- **`Trailing`**: `trailingPercents` (OKX `callbackRatio`),
-  `trailingStepValue` (OKX `callbackSpread`), `activationPrice:
-  TriggerPrice` (null — активен сразу), `externalPrice` (текущее
-  биржевое значение trailing, OKX `moveTriggerPx`).
-- **`ConditionType`**: `STOP_LOSS`, `TAKE_PROFIT`, `OCO_FULL`,
-  `TRAILING_PERCENTS`, `TRAILING_VALUE`, `PARTIAL_TAKE_PROFIT`,
-  `PARTIAL_STOP_LOSS`. OKX `ordType` вычисляет client-layer resolver
-  из `conditionType` (`externalType`/`ordType` в `AlgoOrder` не
-  хранится) — см. `docs/models/mapping/AlgoOrder.md`.
+Отсюда трейлинг с непройденной ценой активации уровня остановки убытка
+не несёт и защитой не считается.
 
-## External snapshots (разделы `AlgoOrder`)
+## Плановый риск здесь не живёт
 
-Нормализованные snapshots для refresh/service layer (не persisted;
-разделы по `model-granularity.md`). Raw DTO не выходит за adapter-layer
-(`docs/rules/raw-exchange-dto-boundary.md`); OKX mapping — в
-`docs/models/mapping/AlgoOrder.md` §OKX.
+Плановый риск и его операнды — атрибуты **ноги входа**, а входной тропы
+условной заявкой не существует. Соответствующих колонок у таблицы нет:
+это была бы мёртвая четвёрка с живым именем, читающаяся как «тропа
+есть».
 
-- **`AlgoOrderExternalSnapshot`**: `internalId`, `externalId`,
-  `externalStatus`, `failCode`, `externalSize`, `externalPrice`,
-  `externalTriggerTime`, `condition: ConditionExternalSnapshot`,
-  `linkedOrderExternalIds`.
-- **`ConditionExternalSnapshot`** → `TriggerExternalSnapshot`
-  (`stopLoss`, `takeProfit`: `TriggerPriceExternalSnapshot` с
-  `externalType`/`externalValue`) + `TrailingExternalSnapshot`
-  (`activationPrice: TriggerPriceExternalSnapshot`, `externalPrice`).
-- В snapshot **не** хранятся: `externalType`/`ordType`,
-  `externalDirection`/`side`, `externalPositionSide`/`posSide`,
-  `actualSide`, `reduceOnly`, `tdMode` — это client/adapter
-  validation или raw audit, не domain snapshot.
+Уровень стопа ноги финализация резолвит с persisted-числа самой ноги, а
+не через её встроенную защиту: число write-once, поэтому уровень
+остаётся резолвимым и после снятия защиты.
 
-## Что AlgoOrder не хранит
+## Что `AlgoOrder` не хранит
 
-`strategyActionId`/`strategyActionKey`/`role`/`level` (в
-`DealActionState`), `externalType`/`ordType`, `externalDirection`/
-`side`, `externalPositionSide`/`posSide`, `tdMode`, `reduceOnly`
-(как факт), `actualSide`, `closeFraction`. OKX `tdMode=isolated`/
-`posSide=net` — константы `OkxIntegrationService`. `reduceOnly` —
-проверяется adapter-layer как invariant, не хранится.
+Долю закрытия, объявленную стратегией: она живёт на действии. Ссылок на
+действие стратегии, роль и уровень — они в строке исполнения.
 
-## Отличие от attached protection
+## Связи
 
-`AttachedAlgoOrder` (внутри `Order`) — embedded protection parent
-order; standalone `AlgoOrder` — отдельная runtime-сущность. Attached
-protection **не** материализуется автоматически в standalone
-`AlgoOrder`, даже если биржа вернула algo identifiers внутри attached
-snapshot. Standalone `AlgoOrder` создаётся только отдельным
-`StrategyAlgoOrderAction` через `CREATE_ALGO_ORDER_COMMAND`.
+- Статусы и переходы — `docs/lifecycles/AlgoOrder.md`.
+- Покрытие защитой — `docs/rules/live-risk-protection.md`.
+- Ремодел — `docs/rules/replace-not-amend.md`.
+- Маппинг источника — `docs/models/mapping/AlgoOrder.md`.

@@ -37,15 +37,6 @@ RVO: `CalculationContext`, `CalculatedPrice`, `CalculatedSize`,
 `CalculatedStrategyAction`, `StrategyActionCalculationResult`,
 `CalculationError` (см. `docs/components/models/`).
 
-## Почему расчёт в runtime
-
-Данные `DealContext` собраны заранее; между сборкой и созданием команды
-цена могла измениться. Поэтому свежий `CalculationContext` собирается
-максимально близко ко времени создания команды (актуальные
-`MarketPriceData`, `InstrumentExternalRules`, `AtrValue`, структура, фаза,
-баланс). Особенно важно для market-like entry, SL/TP, trailing, расчёта
-размера в контрактах.
-
 ## Scope
 
 Один рассчитываемый action = один свежий `CalculationContext` (не один на

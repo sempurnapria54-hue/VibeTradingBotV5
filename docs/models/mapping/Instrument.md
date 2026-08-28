@@ -6,21 +6,6 @@
 `InstrumentExternalSnapshot` ↔ domain) и что из снапшота
 персистится в шаге 1.
 
-## Контекст
-
-Mapping-слой для `Instrument`. Доменная модель —
-`docs/models/domain/core/Instrument.md`. Граничный снапшот —
-`InstrumentExternalSnapshot` (транзиентный, единственное, что
-выходит за `IntegrationService`/adapter; см.
-`docs/rules/raw-exchange-dto-boundary.md`). Сквозные правила —
-`docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/business-logic-on-domain-model.md`. Контракт
-endpoint'а — `docs/integrations/okx/contracts/instrument.md`.
-Инвентарь полей источника —
-`docs/models/integrations/okx/InstrumentOkxResponse.md`.
-
-Текущие источники: **OKX**.
-
 ## Source-agnostic ядро
 
 ### Mapping-flow
@@ -46,11 +31,9 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 шаге 1 в домен **не персистятся**. Их персистентный дом —
 `InstrumentExternalRules` (JSONB-навес на `Instrument`), материализуемый
 **на шаге 5** (риск-преконтроль), вне оркестрации рыночных данных шага 1
-(`docs/decisions/instrument-external-rules-materialization.md`, закрыт
+(`docs/models/domain/other/InstrumentExternalRules.md`, закрыт
 INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/quote)
-персистятся на самом `Instrument`** — с шага 7 (H6 `DOCS_CHECK_11`,
-`docs/decisions/instrument-currencies-home.md`; `CCY-Q2` закрыт, имена
-полей окончательные), см. таблицу шага 7 ниже.
+персистятся на самом `Instrument`** — с шага 7, см. таблицу шага 7 ниже.
 Роль `externalLeverage`/биржевой потолок плеча — там же
 (INSTR-Q2 закрыт на шаге 6: рабочее плечо пишется inline в
 `SubmitOrderExecutor` перед постановкой открывающего ордера,
@@ -84,16 +67,13 @@ INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/qu
 
 Валюты приходят **тем же снапшотом и той же тропой заведения инструмента**
 (переход `CREATED → SYNC`, `docs/lifecycles/Instrument.md`), что
-идентичность и биржевые поля; с шага 7 они **персистятся** на `Instrument`
-(H6 `DOCS_CHECK_11`; писатель назначен H10 `DOCS_CHECK_12` —
-`docs/decisions/instrument-currencies-home.md` §«Писатель — тропа
-заведения»). Формулировка «тем же синком» **снята**: в проекте она
+идентичность и биржевые поля; с шага 7 они **персистятся** на `Instrument`. Формулировка «тем же синком» **снята**: в проекте она
 двузначна (онбординговый `SYNC` против ежечасного
 `InstrumentExternalRulesSyncJob`), а писателем является первый — валюты
 неизменны и периодического подтверждения не требуют.
 Расчётная валюта — операнд трёх потребителей шага 7 и авторитет
 `Deal.resultProfitCurrency`
-(`docs/models/domain/core/Instrument.md` §«Валюты инструмента»).
+(`docs/models/domain/core/Instrument.md`).
 
 ### Справочные поля OKX в шаге 1 (не персистятся)
 
@@ -114,4 +94,4 @@ INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/qu
 - Торговые правила инструмента (материализуются на шаге 5) —
   `docs/models/domain/other/InstrumentExternalRules.md`,
   `docs/models/mapping/InstrumentExternalRules.md`,
-  `docs/decisions/instrument-external-rules-materialization.md`.
+  `docs/models/domain/other/InstrumentExternalRules.md`.

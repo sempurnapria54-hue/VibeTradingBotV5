@@ -16,13 +16,6 @@ executor применяет результат через строгие transit
 handlers **не** используют `externalStatus` напрямую (см.
 `docs/rules/external-status-resolution.md`).
 
-> Resolver'ы, executors и команды (`CREATE_ALGO_ORDER_COMMAND`,
-> `SUBMIT_ALGO_ORDER_COMMAND`, `CANCEL_ALGO_ORDER_COMMAND`, `REFRESH_ALGO_ORDER_COMMAND`) —
-> command-подсистема (шаг 4): `docs/components/` (executors,
-> resolver'ы), `docs/rules/command-lifecycle.md`. Амендной команды
-> нет — ремоделирование через REPLACE-оркестрацию
-> (`docs/decisions/replace-not-amend.md`).
-
 ## Статусы и live semantics
 
 | Статус | Runtime-live | Live on exchange | Смысл |
@@ -40,7 +33,7 @@ handlers **не** используют `externalStatus` напрямую (см.
 
 ## Матрица переходов
 
-Строгий `transitTo` (недопустимый переход → `IllegalStateException`):
+Строгий `transitTo()` (недопустимый переход → `IllegalStateException`):
 
 ```text
 null                 -> CREATED
@@ -114,7 +107,7 @@ refresh/history, верить фактам; если всё ещё live и cance
 новая сущность ставится первой (protective-порядок), старая
 отменяется с `closeReason = REPLACED_BY_STRATEGY` после
 подтверждения новой фактом; цепочка — `replacesInternalId`
-(`docs/decisions/replace-not-amend.md`).
+(`docs/rules/replace-not-amend.md`).
 
 ## Граница refresh-executor
 

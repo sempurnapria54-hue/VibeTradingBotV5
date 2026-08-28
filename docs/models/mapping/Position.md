@@ -6,19 +6,6 @@
 нормализуется через `PositionExternalSnapshot` и какие invariants
 проверяются.
 
-## Контекст
-
-Mapping-слой для `Position`. Доменная модель —
-`docs/models/domain/core/Position.md`; lifecycle —
-`docs/lifecycles/Position.md`. Сквозные правила —
-`docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/ack-not-runtime-truth.md`,
-`docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'ов
-— `docs/integrations/<name>/contracts/position.md`. Правила
-источника — `docs/integrations/<name>/rules/`.
-
-Текущие источники: **OKX**.
-
 ## Source-agnostic ядро
 
 ### `PositionExternalSnapshot` → `Position`

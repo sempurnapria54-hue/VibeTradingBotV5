@@ -47,14 +47,12 @@ count, докачка дыр бинарным поиском. Идемпотен
 рассинхрона после рестарта в середине пачки). Оркестрация —
 процесс `docs/processes/candle-loading.md`. Политика загрузки и
 целостности (глубина, расписание, докачка дыр) —
-`docs/lifecycles/CandleGroup.md` §«Политика загрузки и
-целостности».
+`docs/lifecycles/CandleGroup.md`.
 
 Пакет — `domain.jobs`. Кроме CRON, тик запускается вне расписания
 через `JobController` (`POST /api/jobs/candle-loading/trigger`):
 запуск **асинхронный** (не блокирует HTTP-ответ) через фасад
-`CandleJobFacade` (`@Async`) — см. `.claude/rules/codestyle.md`
-§«Джобы». Триггер появления нового закрытого бара — предикат модели
+`CandleJobFacade` (`@Async`) — см. `.claude/rules/codestyle.md`. Триггер появления нового закрытого бара — предикат модели
 `CandleGroup.hasNewClosedBar(now)`.
 
 ## Связи

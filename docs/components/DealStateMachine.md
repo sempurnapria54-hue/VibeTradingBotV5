@@ -32,8 +32,7 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
    - **Ребро в `ERROR` handler сам не пишет** — оно исход решения, значит
      едет звеном `MARK_DEAL_ERROR_COMMAND` в первом исполнении
      `FINALIZE_DEAL_ERROR_ACTION`; handler **гейтит эмиссию**
-     (`docs/decisions/fsm-execution-layering.md` §«Ребро `* → ERROR`:
-     карв-аут по природе тропы»). Прямой записью статуса ребро едет
+     (`docs/processes/fsm-execution-layering.md`). Прямой записью статуса ребро едет
      только на тропах **перехвата**, и владеет ими петля, не FSM.
 2. **Рабочая логика этапа** — что сделать, чтобы приблизить завершение
    этапа (refresh / `CREATE_*`/`SUBMIT_*`/`CANCEL_*` /
@@ -42,7 +41,7 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
    `StrategyActionOrchestrator`; добывающие и финализационные — звеньями
    системных действий через `SystemActionExecutor`); REPLACE-действия
    секвенсятся этими же командами по фактам —
-   `docs/decisions/replace-not-amend.md`).
+   `docs/rules/replace-not-amend.md`).
    Сама по себе завершение этапа не означает.
 3. **Выходные проверки** — можно ли считать этап завершённым; именно они
    отвечают за обычный переход между этапами.
@@ -51,21 +50,20 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
 
 `DealStateMachine` / петля — **владелец оркестрации порядка ног REPLACE**:
 вычисляет следующую ногу по **подтверждённым фактам** (не ACK), по
-риск-классу действия (`docs/decisions/replace-not-amend.md`). Эмиссия команд
+риск-классу действия (`docs/rules/replace-not-amend.md`). Эмиссия команд
 остаётся «одна атомарная команда за проход»: strategy-команды даёт
 `StrategyActionOrchestrator` (`docs/components/StrategyActionOrchestrator.md`),
 команды системных действий — `SystemActionExecutor`
 (`docs/components/SystemActionExecutor.md`); секвенс ног в себя ни
 тот, ни другой не берут. Без петли, реагирующей на факты, правило ног было бы
-мёртвым кодом (CMD-Q5).
+мёртвым кодом.
 
-Принцип границы (CMD-Q6, `docs/decisions/action-orchestration-vs-command.md`):
+Принцип границы:
 *действие-оркестрация* (REPLACE) — многошаговая последовательность, ведомая
 петлёй по фактам; *kill-switch* — не команда петли и не действие-оркестрация,
 а аварийный side-executor вне реестра (`KillSwitchExecutor`), исполняемый
 реактивно через `SafetyHoldCoordinator`: синхронный self-contained teardown,
-не завися от исправности петли (природа CMD-Q6-исключения —
-`docs/components/KillSwitchExecutor.md`).
+не завися от исправности петли.
 
 ## Влияние стратегии
 

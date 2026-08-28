@@ -41,8 +41,7 @@ warmup-зону и сохраняет только значения, приго�
 сохраняется; со свечи 51+ — сохраняется). Для консервативных индикаторов
 warmup можно увеличить внутри алгоритма — это ответственность
 `IndicatorJob`. Объявленная глубина прогрева (эффективный `warmup` в
-`IndicatorParams`, `docs/models/domain/aggregate/Strategy.md`
-§IndicatorParams) — вход для глубины загрузки свечей
+`IndicatorParams`, `docs/models/domain/aggregate/Strategy.md`) — вход для глубины загрузки свечей
 (`docs/processes/candle-loading.md`); здесь — runtime-пропуск
 разгонной зоны при расчёте.
 
@@ -51,7 +50,7 @@ warmup можно увеличить внутри алгоритма — это 
 Считает по закрытым свечам, не использует future data, сохраняет результат
 с уникальностью `UNIQUE(instrument_id, strategy_indicator_setting_id,
 candle_timestamp)` (ключ по настройке-владельцу — owner-ключевание, см.
-`docs/decisions/market-data-result-identity-keying.md`), при повторном
+`docs/rules/market-data-freshness.md`), при повторном
 запуске дублей не создаёт. Реестра конфигураций и дедупа по `config_id`
 больше нет — каждая настройка-владелец считается под себя. Для
 `DELETED`-стратегий новые значения не считает.

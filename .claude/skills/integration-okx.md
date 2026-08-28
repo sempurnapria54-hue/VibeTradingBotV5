@@ -76,7 +76,7 @@ WebFetch-суммаризатора** — суммаризатор на гига
 `SUBMIT_*`. `FINALIZE_DEAL_*` / `MARK_DEAL_*` / `EXECUTE_KILL_SWITCH`
 биржевого endpoint напрямую не имеют (собираются из вышеперечисленных).
 Амендных команд нет — ремоделирование идёт REPLACE-оркестрацией
-существующих команд (`docs/decisions/replace-not-amend.md`); биржевые
+существующих команд (`docs/rules/replace-not-amend.md`); биржевые
 amend-эндпоинты задокументированы как поверхность, доменом не
 используются.
 
@@ -134,6 +134,6 @@ amend-эндпоинты задокументированы как поверх�
 - Роль — `.claude/agents/integrator.md`.
 - Процесс — `.claude/processes/api-docs-completion.md`.
 - Манифест покрытия поверхности OKX —
-  `docs/integrations/okx/coverage-manifest.md`.
+  `.claude/processes/api-docs-completion.md`.
 - Интеграционные доки OKX — `docs/integrations/okx/`,
   `docs/models/integrations/okx/`.

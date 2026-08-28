@@ -43,14 +43,13 @@ look-ahead.
 
 Джоба живёт в пакете `domain.jobs`; кроме CRON, тик запускается вне
 расписания через `JobController` (`POST /api/jobs/candle-loading/trigger`)
-асинхронно (фасад `CandleJobFacade`, `@Async`) — codestyle §«Джобы».
+асинхронно (фасад `CandleJobFacade`, `@Async`) — codestyle.
 
 Контракт пагинации назад и лимиты OKX REST —
 `docs/integrations/okx/contracts/candle.md`. Полная политика
 загрузки и целостности (глубина, расписание `SYNC`/`CHECK`, докачка
-дыр, поведение при постоянной дыре) — `docs/lifecycles/CandleGroup.md`
-§«Политика загрузки и целостности»; density-инвариант —
-`docs/models/domain/other/CandleGroup.md` §«Целостность по count».
+дыр, поведение при постоянной дыре) — `docs/lifecycles/CandleGroup.md`; density-инвариант —
+`docs/models/domain/other/CandleGroup.md`.
 Граница свечи (OKX-массив → `CandleExternalSnapshot` → domain
 `Candle`) — `docs/models/mapping/Candle.md`.
 
@@ -71,7 +70,7 @@ look-ahead.
 (плановый горизонт на инструмент). Стратегия объявляет, сколько истории
 нужно для прогрева её индикаторов: эффективный `warmup` + `timeframe`
 каждой `StrategyIndicatorSetting`
-(`docs/models/domain/aggregate/Strategy.md` §IndicatorParams) — это
+(`docs/models/domain/aggregate/Strategy.md`) — это
 **вход** для расчёта глубины загрузки на стороне рыночных данных. Как
 именно warmup-горизонт стратегии конкретно перекладывается в
 `plannedCandleStartDate` — cross-cutting strategy ↔ market-data,

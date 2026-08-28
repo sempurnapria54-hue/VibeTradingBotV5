@@ -13,7 +13,7 @@
 настройкой-владельцем (одна типизированная FK `strategyIndicatorSettingId`),
 **не шарится** между настройками и не ключуется по идентичности
 конфигурации — реестр `indicator_configs` убран ревизией трек D (см.
-`docs/decisions/market-data-result-identity-keying.md`). Persisted-модель
+`docs/rules/market-data-freshness.md`). Persisted-модель
 рыночных данных, не про бизнес-цикл сделки → `other` (см.
 `.claude/decisions/models-core-vs-other.md`).
 
@@ -32,7 +32,7 @@ Java abstract-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID значения. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `strategyIndicatorSettingId` | `Long` | FK на настройку-владельца `StrategyIndicatorSetting` (`strategy_indicator_settings.id`) — owner-ключевание (см. `docs/decisions/market-data-result-identity-keying.md`). |
+| `strategyIndicatorSettingId` | `Long` | FK на настройку-владельца `StrategyIndicatorSetting` (`strategy_indicator_settings.id`) — owner-ключевание (см. `docs/rules/market-data-freshness.md`). |
 | `candleTimestamp` | `OffsetDateTime` | Время свечи, на которой рассчитан индикатор. |
 
 Конкретное значение лежит в наследнике (по типу индикатора).
@@ -45,7 +45,7 @@ Java abstract-класс, наследует `Auditable`.
 `EFFICIENCY_RATIO` — мера эффективности/шума (Kaufman efficiency ratio):
 скаляр ∈ [0,1] по окну (`= |чистый ход| / Σ|побарных ходов|`), ER→1 —
 тренд, ER→0 — шум/боковик. Авторски-адресуемый операнд каталога (введён
-fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`): на
+fork A — `docs/rules/condition-ruletype-granularity.md`): на
 него ссылаются условия (классификации фазы и входа) через
 `INDICATOR_COMPARE`, и его же потребляет опциональный
 шумовой-фильтр-вход `MarketStructureResolver` — единый шаримый ER, без
@@ -57,7 +57,7 @@ fork A — `docs/decisions/efficiency-ratio-as-catalog-indicator.md`): на
 поэтому **OBV-операнд условия ограничен относительными формами**
 (`CROSSED_ABOVE`/`CROSSED_BELOW` против серии/своей скользящей,
 направление/динамика); **абсолютный compare OBV с `CONSTANT` не
-допускается** (`docs/decisions/volume-condition-semantics.md`).
+допускается** (`docs/models/domain/aggregate/Strategy.md`).
 Стабильный абсолютный порог по объёму, если понадобится, — отдельный
 **нормированный** операнд (volume oscillator / нормированный объём), не
 OBV; сейчас не заведён (каталог расширяем по потребности).
@@ -84,8 +84,8 @@ OBV; сейчас не заведён (каталог расширяем по п
 часть (например, `MACD_LINE`/`HISTOGRAM`, `STOCH_K`, `PERCENT_B`); снимает
 масштаб-зависимость абсолютного compare. Одно-компонентные (`EMA`/`RSI`/
 `ATR`/`OBV`/`EFFICIENCY_RATIO`) компонент не несут. Контракт и справочник
-«тип → компоненты» — `docs/decisions/strategy-condition-authoring-contract.md`,
-грунт — `docs/decisions/derived-market-data-code-increments.md`.
+«тип → компоненты» — `docs/rules/strategy-condition-contract.md`,
+грунт — `docs/models/domain/other/MarketStructure.md`.
 
 ## Правила хранения
 
@@ -95,7 +95,7 @@ OBV; сейчас не заведён (каталог расширяем по п
 - Индикаторы считаются только по закрытым свечам (без look-ahead).
 - Уникальность: `UNIQUE(instrument_id, strategy_indicator_setting_id,
   candle_timestamp)` (ключ по настройке-владельцу — owner-ключевание, см.
-  `docs/decisions/market-data-result-identity-keying.md`).
+  `docs/rules/market-data-freshness.md`).
 - Свежесть значения проверяет `MarketDataExpirationChecker` по
   `expirationDuration` **настройки-владельца** `StrategyIndicatorSetting`:
   у строки результата ровно один владелец, под него и оценивается

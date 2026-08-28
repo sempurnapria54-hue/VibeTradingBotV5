@@ -19,13 +19,13 @@ funding rate history»). При расхождении с офдоком поб�
 
 ## Статус использования
 
-**В-6 / OKX-Q3 разрешены (шаг 7, `GAPS_CLOSE_1`).** Funding в число
+**В-6 / OKX-Q3 разрешены.** Funding в число
 `resultProfit` идёт через positions-history (внутри готового net
 `realizedPnl`) + bills (`subType` 173/174 — категорийная разбивка,
 `account-bills.md`) — путь (1). `funding-rate-history` (`realizedRate`,
 путь (2)) для числа **не ведётся**: ставки расчётных периодов без привязки к
 позиции — годятся лишь для прогноза/сверки
-(`docs/decisions/result-profit-source.md`).
+(`docs/models/domain/aggregate/Deal.md`).
 
 ## GET /api/v5/public/funding-rate
 

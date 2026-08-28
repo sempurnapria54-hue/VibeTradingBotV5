@@ -11,20 +11,8 @@ endpoint'ы, async-флоу (генерация → polling → скачиван
 раздел «Order Book Trading → Trade», секции apply/get transaction
 details архива). При расхождении с офдоком побеждает офдок;
 синхронизация — перевыкачка + дифф при каждом заходе интегратора
-(`.claude/processes/api-docs-completion.md` §4a, канал —
-`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
-(существование/путь по манифесту; поле-уровневая перевычитка — при
-заходе по теме, якорь OKX-Q2).
-
-## Контекст
-
-Native responses —
-`docs/models/integrations/okx/OkxFillsArchiveResponse.md`. Persisted
-сущность `TradeFillsArchive` не введена — см. **OKX-Q2** в
-`.claude/work/questions/open-questions.md`. Здесь зафиксирован
-контракт операций для будущего использования.
-
-Для последних 3 месяцев — `docs/integrations/okx/contracts/fills.md`.
+(`.claude/processes/api-docs-completion.md`, канал —
+`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11.
 
 ## Endpoints
 

@@ -1,73 +1,47 @@
-# Резолвинг внешнего статуса и safety-каскад
+# Резолв внешнего статуса
 
 ## На какой вопрос отвечает этот файл
 
-Какое правило системы определяет работу с сырым внешним статусом
-сущности и реакцию на нераспознанный статус / ненайденную сущность.
+Какое правило определяет работу с сырым статусом источника и реакцию на
+нераспознанный статус.
 
 ## Правило
 
-- FSM и handlers **не** используют сырой внешний статус биржи
-  (`externalStatus`) напрямую. Сначала он проходит через resolver
-  (`OrderExternalStatusResolver` и аналоги), который нормализует
-  его в доменный статус либо бросает controlled exception. Resolver
-  не сохраняет сущность, не меняет `Deal`, не создаёт команды, не
-  принимает FSM-решения.
-- **Unknown external status** не маппится в обычный доменный статус
-  и не в `Status.ERROR` как mapping-результат. Resolver бросает
-  `ExternalStatusException(reasonCode = UNKNOWN_EXTERNAL_STATUS)`;
-  refresh/executor boundary ловит её и выполняет safety-каскад.
-- **Not found после полного evidence-cycle**: если ожидаемая
-  сущность не найдена после **полного** цикла источников (details +
-  pending + history + archive при необходимости), boundary бросает
-  `ExternalNotFoundException` и выполняет safety-каскад с
-  `MISSING_AFTER_REFRESH`. Пустой ответ одного endpoint — **не**
-  основание для финального вывода.
-- **Result-object и write-once closeReason.** Resolver возвращает
-  result-object `status + optional closeReason candidate` (обобщённо
-  `EntityStatusResolveResult` / `StatusResolveResult<S,C>`); refresh/
-  executor применяет `status` всегда, а `closeReason candidate` —
-  только если текущий `closeReason == null` (ранее установленный не
-  перетирается). Для `Order`/`AlgoOrder` resolver работает с внешним
-  статусом биржи; для `Position` — с фактом наличия позиции
-  (`PositionExternalSnapshot` / `null`), где успешный `null` =
-  нормальный closed-on-exchange факт (`CLOSED` + `EXTERNAL_CLOSE`), а
-  не `ExternalNotFoundException`. Компоненты-resolver'ы —
-  `docs/components/OrderExternalStatusResolver.md`,
-  `AlgoOrderExternalStatusResolver.md`, `PositionStatusResolver.md`.
+**Сырой статус источника FSM не видит.** Он проходит через resolver
+сущности, который нормализует его в доменный статус либо бросает
+контролируемое исключение. Resolver сущность не сохраняет, `Deal` не
+меняет, команд не создаёт и решений FSM не принимает.
 
-## Safety-каскад
+- **Неизвестный статус не маппится молча** — ни в обычный доменный
+  статус, ни в `ERROR` как результат маппинга. Resolver бросает
+  `ExternalStatusException(UNKNOWN_EXTERNAL_STATUS)`.
+- **Ненайденная сущность — только после полного цикла добычи.** Пустой
+  ответ одного эндпоинта основанием для вывода не является; после
+  исчерпания цикла граница бросает `ExternalNotFoundException`
+  (`MISSING_AFTER_REFRESH`).
+- **Resolver отдаёт результат-объект** `статус + кандидат closeReason`.
+  Статус применяется всегда, кандидат — только если `closeReason` ещё
+  пуст: ранее установленный не перетирается.
+- **Для позиции успешный `null` — нормальный факт закрытия на бирже**
+  (`CLOSED` + `EXTERNAL_CLOSE`), а не ненайденность.
+
+## Реакция
+
+Оба исхода — «биржа повела себя неожиданно», реакция одна:
 
 ```text
-<entity>.status = ERROR
-<entity>.closeReason = UNKNOWN_EXTERNAL_STATUS | MISSING_AFTER_REFRESH
-Deal.status = ERROR
-Exchange.status = TRADE_BLOCKED   (ступень 2 + kill-switch flatten;
-                                   см. docs/rules/exchange-hold.md)
+сущность → ERROR, closeReason = UNKNOWN_EXTERNAL_STATUS | MISSING_AFTER_REFRESH
+Deal     → ERROR
+Exchange → TRADE_BLOCKED (ступень 2, kill-switch flatten)
 ```
 
-Ступень каскада — **вторая** (ревизия держателя, `GAPS_CLOSE_18`):
-нераспознанный статус и ненайденная после полного цикла сущность суть
-«биржа повела себя неожиданно», а такой площадке мы сворачиваем позиции
-и больше ничего не шлём.
+`ERROR` сущности — локальное safety-состояние после невозможности
+безопасно интерпретировать внешний факт, а не распознанный биржевой
+статус.
 
-`ERROR` — это локальное safety-состояние сущности после
-невозможности безопасно интерпретировать внешний факт, а не
-распознанный биржевой статус. `MISSING_AFTER_REFRESH` означает, что
-система не смогла найти expected entity и безопасно объяснить её
-финал — признак ошибки интеграции / id mapping / query / pagination /
-history-window; требует остановки normal trading-flow до разбора.
+## Связи
 
-## Почему
-
-Сквозное правило по нескольким сущностям (`Order`, `AlgoOrder`,
-attached protection) без единственного владельца — первоисточник в
-сквозном слое (`.claude/decisions/rule-source-of-truth.md`).
-Exchange-specific перечень статусов и evidence-cycle endpoints — в
-`docs/integrations/{name}/rules/` (для OKX —
-`docs/models/mapping/Order.md`).
-
-## Связанное
-
-- `docs/rules/exchange-hold.md`, `docs/rules/ack-not-runtime-truth.md`.
-- `docs/lifecycles/Order.md`.
+- Реакция ступени 2 — `docs/rules/exchange-hold.md`.
+- Категории контролируемых исключений —
+  `docs/rules/controlled-exchange-exceptions.md`.
+- Перечни статусов источника — `docs/models/mapping/`.

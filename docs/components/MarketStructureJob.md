@@ -29,7 +29,7 @@ breakout-условий и сопровождения позиции.
   подаёт их резолверу (fork-A);
 - зовёт `MarketStructureResolver.resolve(window, efficiencyRatio, atr,
   params)` — тот выводит `type`, `levels`, `breakoutEvent`, `confirmedAt`,
-  окно (семантика — `MarketStructure.md` §Семантика классификации;
+  окно (семантика — `MarketStructure.md` классификации;
   уровни/пробой по свечам сам не ищет);
 - сохраняет `MarketStructure` и `MarketPriceLevel`.
 
@@ -39,7 +39,7 @@ ER/ATR объявлен, но готового/свежего значения �
 потребитель не торговал по недосчитанной структуре. Необъявленный ключ
 (`null`) → резолвер сам идёт в прокси / fallback. Различие держит job;
 резолвер видит только скаляр или `null` (fork-A —
-`docs/decisions/derived-market-data-code-increments.md`).
+`docs/models/domain/other/MarketStructure.md`).
 
 Job — тонкий: классификацию структуры держит `MarketStructureResolver`,
 готовые индикаторы считает `IndicatorJob`.
@@ -56,7 +56,7 @@ Job — тонкий: классификацию структуры держит
 Считает по закрытым свечам, уникальность `UNIQUE(instrument_id,
 strategy_market_structure_setting_id, window_end_at)` (ключ по
 настройке-владельцу — owner-ключевание, см.
-`docs/decisions/market-data-result-identity-keying.md`). Если структура
+`docs/rules/market-data-freshness.md`). Если структура
 сломалась — сохраняет новый результат (например, `type = UNKNOWN`), а не
 правит старый. Реестра конфигураций и дедупа по `config_id` больше нет:
 каждая настройка структуры считается под себя (один владелец → один ряд
@@ -68,7 +68,7 @@ params`, но разными `efficiencyRatioKey` / `atrKey` делили `confi
 С owner-ключеванием разделяемого ряда нет — каждая настройка (со своими
 ER/ATR-ключами) пишет в свою строку под своим
 `strategy_market_structure_setting_id`. STRUCT-Q2 закрыт
-(`docs/decisions/derived-market-data-code-increments.md` §Краевой случай
+(`docs/models/domain/other/MarketStructure.md` случай
 идентичности).
 
 **Checkpoint — производный, отдельного состояния нет.** «Докуда

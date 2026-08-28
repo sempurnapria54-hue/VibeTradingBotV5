@@ -20,7 +20,7 @@ SUBMITTED -> REFRESH_ORDER_COMMAND
 
 На продвинутых стадиях расчёт и риск не повторяются — нога ведётся по
 фактам из `DealActionState.target`. Секвенс ведёт петля по подтверждённым
-фактам (см. `docs/decisions/fsm-execution-layering.md`).
+фактам (см. `docs/processes/fsm-execution-layering.md`).
 
 ## Связь с risk-layer
 

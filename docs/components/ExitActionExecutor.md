@@ -10,15 +10,13 @@
 `ExitActionExecutor` — per-pass `StrategyActionExecutor` (см.
 `docs/components/StrategyActionExecutor.md`) действия выхода
 (`StrategyPositionAction` + `actionType = EXIT_ACTION`,
-`docs/models/domain/aggregate/Strategy.md` §Действия). Заводится решением
-держателя (валидация `GAPS_CLOSE_17`, позиция П16 — действие выхода входит в
-объём `CODE` шага 7).
+`docs/models/domain/aggregate/Strategy.md`). Заводится решением
+держателя.
 
 **Действие выхода — не одна команда.** `CLOSE_POSITION_COMMAND` закрывает
 позицию, и всё; в стратегии закрытие одной позиции самостоятельного смысла
 не имеет. Осмысленное действие — **выход из сделки**, и отмена живых входных
-ног входит **в его состав**, а не является внешней дочисткой (решение
-держателя, позиция С1 `GAPS_CLOSE_16`).
+ног входит **в его состав**, а не является внешней дочисткой.
 
 ## Состав и порядок
 
@@ -33,20 +31,20 @@
 ```
 
 Стадия выводится из **подтверждённых фактов**, не из счётчика проходов
-(`docs/decisions/command-action-boundary.md` §5); секвенс ведёт петля
-(`docs/decisions/fsm-execution-layering.md`). Reduce-only ноги (защита,
+(`docs/rules/command-lifecycle.md`); секвенс ведёт петля
+(`docs/processes/fsm-execution-layering.md`). Reduce-only ноги (защита,
 частичный выход) под отмену этим действием **не идут**: они риск снимают, а
 не создают, — их дочищает `ExitPendingHandler` уже после подтверждённого
 закрытия.
 
 ## Границы
 
-- **Закрытие позиции означает закрытие сделки** (решение держателя):
+- **Закрытие позиции означает закрытие сделки**:
   закрывать одну позицию и открывать другую внутри сделки смысла нет.
   Поэтому исполнитель не запрашивает переход и не ставит терминал —
   подтверждение закрытия, финализацию числа и терминал ведёт тропа
   `EXIT_PENDING` (`docs/components/ExitPendingHandler.md`,
-  `docs/decisions/pnl-finalization-mechanics.md`).
+  `docs/rules/pnl-reconciliation.md`).
 - **`RiskValidator` не вызывается** — действие risk-reducing
   (`docs/rules/risk-validator-scope.md`).
 - **`DealActionState` заводится обычным порядком** — у действия есть
@@ -58,8 +56,7 @@
 
 ## Связи
 
-- Тип действия и его форма — `docs/models/domain/aggregate/Strategy.md`
-  §Действия.
+- Тип действия и его форма — `docs/models/domain/aggregate/Strategy.md`.
 - Инвариант порядка — `docs/rules/exit-teardown-order.md`.
 - Команда закрытия и её исполнитель —
   `docs/components/ClosePositionExecutor.md`,

@@ -7,14 +7,6 @@
 
 ## Назначение
 
-`StrategyActionOrchestrator` — диспетчер действия. Для выбранного
-handler'ом `StrategyAction` гейтит повтор и делегирует прогресс
-подходящему `StrategyActionExecutor` (по типу действия), возвращая
-`ActionPlan`. Сам команды не исполняет и статус сделки не двигает — это
-делает handler / оркестратор петли. Обобщает прежний `DealActionPlanner`
-(стадии/повтор) поверх per-type executor'ов (обобщение
-`ServiceCommandFactory`). См. `docs/decisions/fsm-execution-layering.md`.
-
 ## Контракт
 
 ```java

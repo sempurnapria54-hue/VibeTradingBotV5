@@ -21,9 +21,7 @@ Recoverability: если приложение упало после отправ
 
 ## Нижняя граница окна линковки bills — единственный писатель
 
-**Этот executor — единственный писатель `Deal.billsWindowBegin`** (H9
-`DOCS_CHECK_16`, решение пользователя). Условная развилка H27
-`DOCS_CHECK_10` («штатная ветка — live-нога `REFRESH_POSITION_COMMAND`,
+**Этот executor — единственный писатель `Deal.billsWindowBegin`**. Условная развилка («штатная ветка — live-нога `REFRESH_POSITION_COMMAND`,
 ветка дефолта — этот executor») **снята**: писатель один на всех тропах,
 безусловно.
 
@@ -32,29 +30,19 @@ Recoverability: если приложение упало после отправ
   `Order`/`DealActionState`.
 - **Write-once — условным `UPDATE`** (`where bills_window_begin is null`):
   уже заполненная нижняя граница не перетирается последующими
-  постановками. Механизм — `docs/models/domain/aggregate/Deal.md`
-  §Персистентность (строка `deals` существует раньше значения, поэтому
+  постановками. Механизм — `docs/models/domain/aggregate/Deal.md` (строка `deals` существует раньше значения, поэтому
   `updatable = false` неприменим).
 - **Почему окно шире, но безопасно:** лишних движений оно не захватывает —
   активная сделка на инструмент одна, тот же инвариант слота, что держит
-  верхнюю границу (`docs/models/domain/other/DealCashFlow.md` §«Линковка к
-  `Deal`»).
-- **Зависимость от рантайм-ответа §AG1.5 снята вместе с развилкой.**
-  Вопрос «штампуется ли entry-fee раньше `cTime` позиции» для этой границы
-  больше не имеет силы: `externalCreatedAt` ордера **не позже** любой его
-  же комиссии исполнения (комиссия входа штампуется при филле, филл — не
-  раньше постановки), значит окно накрывает entry-fee **по построению**,
-  каким бы ни оказался ответ. Это и было ценой варианта: одна условная
-  ветка снята, один рантайм-гейт закрыт конструкцией.
+  верхнюю границу (`docs/models/domain/other/DealCashFlow.md`).
 - **Известное ограничение сохраняется, но новым не становится.** У
   позиции, возникшей вокруг **чужого** риска (создана вне приложения),
   отправленной ноги входа нет — значит нет и операнда границы. Та же
   подтропа уже не адресуема и по временной оси запроса
-  positions-history (`docs/components/RefreshPositionExecutor.md`
-  §«Известное ограничение»), то есть выбор писателя её достижимость не
+  positions-history (`docs/components/RefreshPositionExecutor.md`), то есть выбор писателя её достижимость не
   меняет.
 - **Дом поля не меняется** — оно остаётся собственным полем `Deal`
-  (`docs/models/domain/aggregate/Deal.md` §«Окно линковки bills»).
+  (`docs/models/domain/aggregate/Deal.md`).
 
 ## Рабочее плечо перед постановкой (set-leverage, INSTR-Q2)
 
@@ -73,8 +61,8 @@ Recoverability: если приложение упало после отправ
 place-вызовом — атомарно, непропускаемо, покрывает и наращивание позиции в
 `MANAGING`. Тайминг/владелец и роль `Instrument.leverage`
 (потолок/умолчание) — `docs/components/PrecheckHandler.md`,
-`docs/decisions/per-trade-risk-policy.md`,
-`docs/decisions/instrument-external-rules-materialization.md` (INSTR-Q2 закрыт).
+`docs/rules/risk-policy.md`,
+`docs/models/domain/other/InstrumentExternalRules.md` (INSTR-Q2 закрыт).
 
 ## SubmitOrderCommandPayload
 

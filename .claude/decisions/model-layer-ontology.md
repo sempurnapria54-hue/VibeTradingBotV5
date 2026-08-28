@@ -32,7 +32,7 @@
 Модели документируются по слою. `docs/models/` организован по слоям.
 Бизнес-логика всегда выполняется на доменной модели: мапим в домен
 → выполняем логику → при необходимости мапим обратно. Сквозное
-правило — `docs/rules/business-logic-on-domain-model.md`.
+правило — `.claude/rules/codestyle.md`.
 
 ### Цепочка слоёв
 
@@ -174,7 +174,7 @@ Per-source детали — подразделами внутри одного �
 - `.claude/rules/structure.md` — переписаны model-строки таблицы.
 - `.claude/decisions/client-layer-docs.md` и `models-core-vs-other.md`
   помечены `SUPERSEDED` ссылкой на этот файл.
-- `docs/rules/business-logic-on-domain-model.md` — новое сквозное
+- `.claude/rules/codestyle.md` — новое сквозное
   правило, к которому привязан принцип.
 - Обновлены ссылки в `rule-source-of-truth.md`,
   `raw-exchange-dto-boundary.md`, `ack-not-runtime-truth.md`,

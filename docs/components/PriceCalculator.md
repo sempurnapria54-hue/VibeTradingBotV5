@@ -114,7 +114,6 @@ placement (`LAST_PRICE` … `MID_PRICE`) — раздел `StrategyPriceSource` 
 
 Сигнализирует контролируемую ошибку расчёта (бросает `CalculationException`,
 которое `StrategyActionCalculator` превращает в `CalculationError` в
-`ERROR`-результате — см. `docs/components/models/CalculationError.md`
-§«Механизм сигнализации»), если нет актуальной цены / entry
+`ERROR`-результате — см. `docs/components/models/CalculationError.md`), если нет актуальной цены / entry
 price / ATR / market structure / `tickSize`, либо цена стала невалидной
 после округления (см. `docs/components/models/CalculationError.md`).

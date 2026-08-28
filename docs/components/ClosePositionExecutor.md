@@ -14,8 +14,7 @@ safety checks, отправляет full close request, сохраняет ACK /
 результат; подтверждение факта закрытия — отдельным `REFRESH_POSITION_COMMAND`.
 
 `CLOSE_POSITION_COMMAND` всегда full close — partial close запрещён (см.
-`docs/rules/no-partial-close.md`). **Эмитентов команды два** (решение
-держателя `GAPS_CLOSE_16`): `ExitPendingHandler` на тропе
+`docs/rules/no-partial-close.md`). **Эмитентов команды два**: `ExitPendingHandler` на тропе
 условия-перехода и `ExitActionExecutor` на тропе явного действия
 шага `EXIT`. Для самого исполнителя команды это различия не создаёт —
 контракт один; различается **дочистка вокруг** неё, и её порядок задан

@@ -12,7 +12,7 @@
 (не `CommandExecutor`, по типу команды не диспатчится). Тип команды
 `EXECUTE_KILL_SWITCH` **убран** — kill-switch не команда. Зовётся
 программно из `KillSwitchService`
-(`killSwitchExecutor.execute(dealContext).getSuccess()`). Работает только с
+(`killSwitchExecutor.execute(dealContext).getSuccess`). Работает только с
 live-сущностями: active positions, live orders, live algo-orders. Всю
 историю по инструменту не чистит; `relatedInactive` может добавляться
 только в report/snapshot, action-state работает только с live risk.
@@ -43,14 +43,6 @@ live positions/orders/algo-orders известны, какие read/safety ко�
 
 Порядок вызовов значим — риск снижается максимально быстро:
 
-> **Расхождение с инвариантом порядка названо, не снято.** Держатель
-> объявил инвариант «сначала отменить входные ноги, потом закрывать
-> позицию» общим для обеих троп (`docs/rules/exit-teardown-order.md`),
-> а порядок ниже ставит close первым. Конечное состояние совпадает,
-> порядок — нет; какой из двух исходов верен, решает держатель, и до его
-> прохождения порядок ниже **не переписывается**.
-
-
 1. **Close позиции первым** — доминирующий live market risk; market
    reduce-only close (с `autoCxl` — снимает resting-ордера на бирже
    атомарно) флэтит экспозицию за один вызов.
@@ -71,9 +63,7 @@ runtime truth).
 ## Статус миграции
 
 Полный kill-switch flow построен: триггер — `KillSwitchService`
-(`fireInstrument` / `fireExchange` каскадом по сделкам биржи),
+(`fireInstrument` / `fireExchange()` каскадом по сделкам биржи),
 оркестрация отчёта и слепков — `SafetyHoldCoordinator`, которому
-`FULL`-ветку делегирует `HoldService` (H16 `GAPS_CLOSE_13`: сигнал в
-проходе не едет — детектор зовёт сервис; журнал —
-`docs/models/domain/other/AnomalyReport.md`). Здесь зафиксирована
+`FULL`-ветку делегирует `HoldService`. Здесь зафиксирована
 исполнительная семантика самого executor'а.

@@ -16,7 +16,7 @@ price candlesticks», «Get mark price candlesticks history»). При
 «актуализируй» (`.claude/processes/api-docs-completion.md`, канал
 чтения — `.claude/skills/integration-okx.md`). Последняя сверка:
 2026-06-11 (прогон 3, поле-уровневая дистилляция). Рантайм-сверка:
-2026-06-19 (контур source-api, demo — рантайм-заметка в §GET
+2026-06-19 (контур source-api, demo — рантайм-заметка в
 /api/v5/public/mark-price; провенанс `рантайм`).
 
 ## Статус использования

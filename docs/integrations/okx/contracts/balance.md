@@ -11,16 +11,9 @@ validation.
 раздел «Trading Account → REST API», секция «Get balance»). При
 расхождении с офдоком побеждает офдок; синхронизация — перевыкачка +
 дифф при каждом заходе интегратора
-(`.claude/processes/api-docs-completion.md` §4a, канал —
+(`.claude/processes/api-docs-completion.md`, канал —
 `.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
 (прогон 1 — соответствие спеке подтверждено).
-
-## Контекст
-
-Mapping в `BalanceContainer`/`Balance` —
-`docs/models/mapping/Balance.md` (раздел `## OKX`). Native response —
-`docs/models/integrations/okx/OkxBalanceResponse.md`. Доменная
-модель — `docs/models/domain/core/BalanceContainer.md`.
 
 ## Endpoint
 
@@ -37,11 +30,6 @@ Mapping в `BalanceContainer`/`Balance` —
   `OK-ACCESS-TIMESTAMP`, `OK-ACCESS-PASSPHRASE`,
   `Content-Type: application/json`. Demo trading:
   `x-simulated-trading: 1`.
-
-> Верный путь — `GET /api/v5/account/balance`. В архивных доках
-> встречалась опечатка `balanceExternalSnapshot` — это **не**
-> реальный endpoint OKX. При миграции использовать
-> `/api/v5/account/balance`.
 
 ## Структура response (упрощённо)
 
@@ -72,4 +60,4 @@ Mapping в `BalanceContainer`/`Balance` —
 
 `data` содержит ровно один account snapshot. Поля и список не
 маппимых — в `docs/models/integrations/okx/OkxBalanceResponse.md`.
-Validation — в `docs/models/mapping/Balance.md` §Validation.
+Validation — в `docs/models/mapping/Balance.md`.

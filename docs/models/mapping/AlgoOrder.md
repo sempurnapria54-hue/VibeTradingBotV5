@@ -6,19 +6,6 @@
 нормализуется через `AlgoOrderExternalSnapshot` и как резолвится его
 статус.
 
-## Контекст
-
-Mapping-слой для `AlgoOrder`. Доменная модель —
-`docs/models/domain/core/AlgoOrder.md`; lifecycle —
-`docs/lifecycles/AlgoOrder.md`. Сквозные правила —
-`docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/ack-not-runtime-truth.md`,
-`docs/rules/external-status-resolution.md`,
-`docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'ов
-— `docs/integrations/<name>/contracts/`.
-
-Текущие источники: **OKX**.
-
 ## Source-agnostic ядро
 
 ### `AlgoOrderExternalSnapshot` → `AlgoOrder`
@@ -38,7 +25,7 @@ Mapping-слой для `AlgoOrder`. Доменная модель —
 | `condition.trigger.takeProfit.externalValue` | — | внешнее значение TP trigger |
 | `condition.trigger.takeProfit.externalType` | — | тип цены TP |
 | `condition.trailing.activationPrice.externalValue` | — | цена активации trailing |
-| `condition.trailing.externalPrice` | **`AlgoOrder.condition.trailing.externalPrice`** | текущее значение trailing (`moveTriggerPx`) — **операнд `stopCurrent`** трейлинговой защиты (B2 `DOCS_CHECK_20`; `docs/models/domain/aggregate/Deal.md` §«Форма вычитаемого `protectionRelievedRiskAmount`») |
+| `condition.trailing.externalPrice` | **`AlgoOrder.condition.trailing.externalPrice`** | текущее значение trailing (`moveTriggerPx`) — **операнд `stopCurrent`** трейлинговой защиты |
 | `externalCreatedAt` | `AlgoOrder.externalCreatedAt` | |
 | `externalModifiedAt` | `AlgoOrder.externalModifiedAt` | (есть в history) |
 
@@ -46,11 +33,10 @@ Mapping-слой для `AlgoOrder`. Доменная модель —
 `condition.trailing.activationPrice.externalType` остаётся `null` —
 не нарушение invariant.
 
-**Приземление `condition.*` — пополевым мерджем, не заменой целиком**
-(B2 `DOCS_CHECK_20`). Обновление идёт маппером
+**Приземление `condition.*` — пополевым мерджем, не заменой целиком**. Обновление идёт маппером
 `updateFromSnapshot(snapshot, @MappingTarget algoOrder)` с
 `nullValuePropertyMappingStrategy = IGNORE`
-(`.claude/rules/codestyle.md` §Маппинг): снапшот рефреша несёт не все
+(`.claude/rules/codestyle.md`): снапшот рефреша несёт не все
 поля условия — заявленные параметры трейлинга приходят при постановке,
 `moveTriggerPx` появляется при наблюдении, — поэтому замена объекта
 целиком затирала бы разницу null'ами. В jsonb `condition`
@@ -166,10 +152,10 @@ move_order_stop (TRAILING_*)  -> advance  -> POST /trade/cancel-advance-algos
 
 Advance-ветка несёт пометку «endpoint вне текущего офдока, требует
 runtime-подтверждения» — находка И-2
-(`docs/integrations/okx/contracts/algo-order.md` §Ветвление
+(`docs/integrations/okx/contracts/algo-order.md`
 cancel-пути). Amend advance-семьи биржей не поддерживается (И-3);
 следствие снято решением REPLACE-only — домен не амендит ничего
-(`docs/decisions/replace-not-amend.md`).
+(`docs/rules/replace-not-amend.md`).
 
 ### OKX status resolver
 
@@ -181,7 +167,7 @@ cancel-пути). Amend advance-семьи биржей не поддержив�
 - `order_failed`/`partially_failed`/unknown →
   `ExternalStatusException` → safety-каскад.
 
-Подробности — `docs/lifecycles/AlgoOrder.md` §Резолвинг.
+Подробности — `docs/lifecycles/AlgoOrder.md`.
 
 ### OKX request mapping — дополнения
 
@@ -194,13 +180,13 @@ OKX-специфичные поля create body (через adapter): `algoClOrd
 market), `tpTriggerPx`/`tpTriggerPxType`/`tpOrdPx` (`-1` = market).
 
 **Amend — доменом не используется** (REPLACE-only,
-`docs/decisions/replace-not-amend.md`): амендного request-mapping
+`docs/rules/replace-not-amend.md`): амендного request-mapping
 нет; ремоделирование любого algo — REPLACE-оркестрация
 (place новой с `replacesInternalId` → подтверждение фактом →
 cancel старой, `REPLACED_BY_STRATEGY`). Биржевой amend-контракт
 (только Stop/Trigger; advance не амендится — И-3, исторический
 контекст выбора REPLACE-only) — поверхность,
-`docs/integrations/okx/contracts/algo-order.md` §Amend.
+`docs/integrations/okx/contracts/algo-order.md`.
 
 **Cancel**: `instId`, `algoId` (предпочтительно) / `algoClOrdId`.
 Если `externalId` неизвестен — сначала refresh/search по
@@ -213,7 +199,7 @@ cancel старой, `REPLACED_BY_STRATEGY`). Биржевой amend-контр�
 по `algoClOrdId`. Пустой `data=[]` одного endpoint — не финал. Цикл
 обходит `RefreshAlgoOrderExecutor` **внутри одной команды**
 `REFRESH_ALGO_ORDER_COMMAND`; терминал `MISSING_AFTER_REFRESH` выносит он же (см.
-`docs/decisions/refresh-evidence-cycle-ownership.md`).
+`docs/rules/command-lifecycle.md`).
 
 ## Целевые изменения кода (checklist, не runtime-логика)
 

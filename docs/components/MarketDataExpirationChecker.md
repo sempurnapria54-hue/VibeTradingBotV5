@@ -27,7 +27,7 @@
 `StrategyMarketStructureSetting`. У `StrategyMarketPhaseSetting`
 `expirationDuration` **нет** — `MarketPhase` не персистируется, свежесть
 фазы наследуется от свежести её входов (индикаторов/структур; см.
-`docs/decisions/market-phase-stateless.md`).
+`docs/models/domain/other/MarketPhase.md`).
 
 ## Вычисление свежести (на чтение)
 
@@ -36,7 +36,7 @@
 свежо ⟺ `now < expiredAt`. `referencePoint` — `windowEndAt` (структура) /
 `candleTimestamp` (индикатор); `confirmedAt` — гейт без look-ahead, не
 точка отсчёта. Результат ключуется настройкой-владельцем (owner-ключевание,
-`docs/decisions/market-data-result-identity-keying.md`): у строки один
+`docs/rules/market-data-freshness.md`): у строки один
 владелец, под его `expirationDuration` и оценивается свежесть — общей
 строки с несколькими запрашивающими больше нет. Правило —
 `docs/rules/market-data-freshness.md`.

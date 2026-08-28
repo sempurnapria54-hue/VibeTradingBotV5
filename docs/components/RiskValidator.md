@@ -14,16 +14,9 @@
 
 ## Входы
 
-Сигнатура — `validate(CalculatedStrategyAction, DealContext)`. Из
-`CalculatedStrategyAction` валидатор извлекает цену/размер
-(`CalculatedPrice` / `CalculatedSize`). Из `DealContext` он читает
-**runtime graph сделки целиком** — не закрытый список отдельных полей
-(N4 `DOCS_CHECK_21`: прежняя редакция перечисляла операнды списком, и
-три операнда сделочных лимитов в него не попали):
-
 | Что читает | Откуда | Зачем |
 |---|---|---|
-| `balanceContainer` | `DealContext` | база риска — `Balance.externalAvailableBalance` расчётной валюты (`docs/decisions/per-trade-risk-policy.md` §«Определение и база») |
+| `balanceContainer` | `DealContext` | база риска — `Balance.externalAvailableBalance` расчётной валюты (`docs/rules/risk-policy.md`) |
 | `deal` с графом (`orders`, `algoOrders`, `positions`) | `DealContext.deal` | операнды обоих сделочных лимитов: неисполненная доля живых ног, взятое снятыми ногами, размер и средняя цена живого эпизода, уровни действующих защит |
 | `deal.plannedRiskAmount`, `deal.plannedRiskEquityBase` | `DealContext.deal` | операнд и база кумулятивного потолка |
 | `strategyDetail` | `DealContext` | `riskPerActionPercent`, `cumulativeRiskPerDealMultiplier`, `strategySimultaneousRiskPerDealPercent` |
@@ -33,71 +26,48 @@
 `InstrumentExternalRules` **не** входной аргумент — валидатор сам читает
 его через `InstrumentExternalRulesDataService.findByInstrumentId`.
 Отдельного RVO `RiskSettings` нет (см.
-`docs/decisions/per-trade-risk-policy.md`).
+`docs/rules/risk-policy.md`).
 
 **Граф уже собран проходом FSM** (`docs/components/models/DealContext.md`),
 поэтому чтение по ногам и эпизодам не добавляет запросов; отдельного
 persisted-носителя под операнды лимитов не заводится
-(`docs/decisions/per-trade-risk-policy.md` §«Что считается живым риском в
-моменте»).
+(`docs/rules/risk-policy.md`).
 
-**Отсюда — владелец гидрации ставки** (H1, `GAPS_CLOSE_4`). `CalculationContext`
+**Отсюда — владелец гидрации ставки**. `CalculationContext`
 у валидатора нет: тропа чтения навеса у него **своя**, прямая. Поэтому ставку
 наливает `InstrumentExternalRulesDataService` (граница domain ↔ persistence,
 через которую проходят обе тропы), а не `CalculationContextFactory`: гидрация в
 фабрике накрыла бы только тропу калькуляторов, валидатор получал бы
 негидрированный навес → `takerFeeRate()` = `null` → `FEE_RATE_UNAVAILABLE`
 блокировал бы **каждый** risk-creating вход. Разбор —
-`docs/components/InstrumentExternalRulesDataService.md` §«Гидрация ставки
-комиссии».
+`docs/components/InstrumentExternalRulesDataService.md`.
 
 ## Метрики (считает сам)
 
 risk amount (убыток на стопе: `|entry − stop| × sizeContracts × ctVal +
 commissions`, где `commissions` = `rate × sizeContracts × ctVal ×
 (entryPrice + stopPrice)` — **каждая нога по своей цене**, вход по цене
-входа, выход по цене стопа (H10, `GAPS_CLOSE_7`: единая оценка по цене входа
-занижала комиссию выхода для SHORT). Валидатор проверяет **уже посчитанный**
+входа, выход по цене стопа. Валидатор проверяет **уже посчитанный**
 размер, поэтому решает то же неравенство в проверочной форме; сайзинг
 `SizeCalculator` решает его относительно `contracts` — закрытой формой
-(`docs/decisions/per-trade-risk-policy.md` §«Закрытая форма сайзинга»).
+(`docs/rules/risk-policy.md`).
 Ставка — прогноз вход+выход по taker-ставке из
-`instrumentExternalRules.takerFeeRate()` (N9 — не отдельный fetch; **дом
-ставки** — `docs/models/domain/other/TradeFeeRate.md`, на инструменте только
-ключ группы `externalFeeGroupId`; аксессор гидрирует хранилищный слой —
-`docs/components/InstrumentExternalRulesDataService.md` §«Гидрация ставки
-комиссии», H1, `GAPS_CLOSE_4`); **включён с шага 7** (G6), согласовано с
-`SizeCalculator`, см. `docs/decisions/per-trade-risk-policy.md` §«Учёт
-комиссий (включён на шаге 7)»);
+`instrumentExternalRules.takerFeeRate`; **включён с шага 7** (G6), согласовано с
+`SizeCalculator`, см. `docs/rules/risk-policy.md`);
 **risk percent от базы риска** (свободный остаток расчётной валюты, не
 account-level агрегат и не total/adjusted — см.
-`docs/decisions/per-trade-risk-policy.md` §«Определение и база»);
+`docs/rules/risk-policy.md`);
 SL distance; liquidation guard distance. Метрики могут попасть в `RiskCheckResult.details`, логи или
 аудит, но **не** входят в `CalculatedStrategyAction`.
 
-**Исключение — risk amount входного действия** (H9, `GAPS_CLOSE_7`): он
-**персистится** как `Order.plannedRiskAmount` **создаваемой ноги**, а
-производные числа на `Deal` той же транзакцией пересчитываются
-писателем — `docs/components/CreateOrderExecutor.md`, тот же проход.
-Состав, счёт и формулы — место истины
-`docs/models/domain/aggregate/Deal.md` §«Взятый риск»; здесь не
-пересказываются (прежняя редакция перечисляла три числа и приписывала их
-все `CreateOrderExecutor`'у, расходясь с домом — B3 `DOCS_CHECK_19`). **Вместе с риском
-валидатор отдаёт и `ctVal` момента постановки** — он и так читает навес,
-чтобы посчитать риск, а значение садится на ногу пятым числом
-(`Order.plannedContractValue`, H5 `DOCS_CHECK_16`). Это не отменяет
-правила выше: метрика по-прежнему не едет в `CalculatedStrategyAction` —
-она уходит в **поле сделки**, у которого свой торговый смысл
-(`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).
-
 Аксессор отдаёт ставку **издержкой** — знак биржевой конвенции снят при
-маппинге (`docs/models/domain/other/TradeFeeRate.md` §«Знак ставки»). Поэтому
+маппинге (`docs/models/domain/other/TradeFeeRate.md`). Поэтому
 `+ commissions` верно как написано, `abs` вызывающему не нужен: положительная
 издержка увеличивает убыток на стопе, отрицательная (ребейт) уменьшает.
 
 `position exposure после действия` — метрика **уровня риска на биржу/портфель**
 (форвард к фазе 3); в фазе 1 (только риск на сделку) кода-блокера по экспозиции
-нет (`docs/decisions/per-trade-risk-policy.md`).
+нет (`docs/rules/risk-policy.md`).
 
 ## Конкретные проверки (фаза 1)
 
@@ -112,7 +82,7 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 
 Далее накапливаются (любой `BLOCKED` ⇒ итог `BLOCKED`):
 
-- `INSTRUMENT_NOT_LIVE` — `rules.isLive()` ложно;
+- `INSTRUMENT_NOT_LIVE` — `rules.isLive` ложно;
 - `MARGIN_MODE_NOT_ISOLATED` — `Instrument.marginMode != ISOLATED`;
 - `SIZE_BELOW_MIN` — размер ниже `minSize`;
 - `SIZE_LOT_STEP_INVALID` — размер не кратен `lotSize`;
@@ -124,21 +94,12 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   входа;
 - `TAKE_PROFIT_INVALID_SIDE` — тейк на неверной стороне относительно
   входа;
-- `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION` — стоп за/у цены ликвидации
-  позиции. **Проверка знает ценовую базу стопа** (C1 `DOCS_CHECK_20`):
-  ликвидация у источника вычисляется по `mark`, поэтому сравнение верно
-  только когда стоп триггерится в той же базе. Дом ограничения —
-  `docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
-  защиты объявляется стратегией и доезжает до биржи».
-  **Исходы ветки перечислены явно** (C5 `DOCS_CHECK_22`; прежняя
-  редакция называла запас обязательным, его величину — недобытым
-  грунтом, а поведение до добычи не определяла ни здесь, ни в доме):
 
   | Ценовая база стопа | Что делает проверка |
   |---|---|
   | `MARK` | сравнение **прямое**, запаса нет: обе величины в одной базе |
-  | `LAST` / `INDEX` | **недостижимо**: стратегия с такой базой не создаётся (create-реджект `STRATEGY_TRIGGER_PRICE_TYPE_NOT_MARK`, `docs/decisions/strategy-materialization-and-validation.md`). Провизорного запаса **не вводится** |
-  | база не резолвится | `triggerPriceType` — **обязательное** поле стратегии (`docs/models/domain/aggregate/Strategy.md` §StopLossSettings), пустым до валидатора не доезжает |
+  | `LAST` / `INDEX` | **недостижимо**: стратегия с такой базой не создаётся (create-реджект `STRATEGY_TRIGGER_PRICE_TYPE_NOT_MARK`, `docs/rules/strategy-validation.md`). Провизорного запаса **не вводится** |
+  | база не резолвится | `triggerPriceType` — **обязательное** поле стратегии (`docs/models/domain/aggregate/Strategy.md`), пустым до валидатора не доезжает |
 
   После измерения базиса (`MG9.5`) ограничение снимается сервисной
   операцией, и здесь появляется строка с назначенным запасом — правка
@@ -146,12 +107,12 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 - `RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход
   (открытие/наращивание позиции) без **резолвимого стопа**: `BLOCKED`,
   **без** fail-open allocation-сайзинга в обход `RISK_PER_TRADE`
-  (инвариант `docs/rules/risk-creating-entry-protection.md`). Проверяется
+  (инвариант `docs/rules/live-risk-protection.md`). Проверяется
   до риск-на-сделку: нет стопа → risk-amount нечем посчитать → блок, не
   сайзинг по allocation. Reduce-only/закрывающие действия не затрагивает
   (риск снимают);
 - `FEE_RATE_UNAVAILABLE` — прогнозная ставка комиссии не резолвится
-  (`instrumentExternalRules.takerFeeRate()` → `null`): `BLOCKED`. Проверяется
+  (`instrumentExternalRules.takerFeeRate` → `null`): `BLOCKED`. Проверяется
   до риск-на-сделку — комиссия входит в убыток на стопе, без ставки
   risk-amount неполон. Только для risk-creating / risk-increasing действий (там,
   где прогноз комиссии входит в сайзинг, `docs/rules/risk-validator-scope.md`);
@@ -174,45 +135,9 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   чтобы «стратегия выбрала свой бюджет» и «система изменила потолок» не
   читались одинаково.
 
-- `PROTECTION_COVERAGE_REDUCED` — **покрытие после завершения ремодела ниже
-  живой экспозиции**: `Σ` покрытия живых защит минус покрытие замещаемой
-  (при `REPLACE`, резолв по `replacesInternalId`) плюс покрытие новой
-  `< Position.externalSize`. Проверка идёт **только на ветке
-  risk-weakening**; call-site — `docs/components/CreateAlgoOrderActionExecutor.md`
-  §«Отношение к risk и направление». Формула покрытия и остальные три точки
-  проверки — `docs/rules/risk-creating-entry-protection.md` §Правило и
-  §«Предикат покрытия и точки его проверки», здесь не пересказываются.
-  Исход `BLOCKED` **аварией не является** (карв-аут, §ниже).
-  - **Предикат сравнивает с экспозицией, а не с прошлым покрытием** (A1
-    `DOCS_CHECK_24`). Прежняя редакция дома называла монотонность
-    («пост-действенное ≥ пред-действенного»); на place-ноге защитного
-    `REPLACE` она тождественно истинна (старая защита ещё жива), а при
-    прочтении «после завершения ремодела» блокировала бы штатный класс
-    «скейл-аут + пересчёт защиты на меньший, но полный размер». Проверки
-    **этого кода в перечне не было вовсе**, хотя реестр
-    `docs/components/models/RiskCheckResult.md` объявлял его эмитируемым.
-
-**Набор неравенств сужен по классу действия** (C3 `DOCS_CHECK_23`): на
-**risk-creating / risk-increasing** обязаны выполниться **все четыре**;
-на **risk-weakening** (ремодел защиты) — **три**, поактное не
-применяется, «риск акта» = 0, а `liveRiskNow` берётся
-**пост-действенным**. Формулы операндов (`dealRiskTaken`, `liveRiskNow`),
-определение «риска акта» по классам и дом политики —
-`docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня
-„риск на сделку“» и §«„Риск акта“ определён по классу действия, и на
-ослаблении защиты форма другая», здесь не пересказываются. Прежняя
-редакция («все четыре» без сужения) требовала на ветке weakening
-вычислить операнд, определения которого не существовало, а метрика
-`risk amount` там невычислима — у защитного действия нет `entry`. **Исход `BLOCKED` по
-сделочным кодам аварией не является**
-(`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
-сделки»).
-
 **Пола дистанции стопа среди проверок нет** — названное ограничение, не
 пропуск: worst-case **за** стоп-ценой системой в фазе 1 не
-ограничивается (`docs/decisions/per-trade-risk-policy.md`
-§«Worst-case открывающего входа», решение держателя C5
-`DOCS_CHECK_21`).
+ограничивается.
 
 Агрегация: любой `BLOCKED` ⇒ `BLOCKED`; путь `WARNING` в коде есть
 (аггрегатор его учитывает), но **ни одна проверка фазы 1 `WARNING` не
@@ -225,9 +150,8 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 - **Ставка была, но чтение упало** → последняя известная **не затирается**:
   на отказе синк **не пишет ничего** — история `TradeFeeRate` append-only,
   актуальная = последняя строка по `createdAt`, она просто остаётся последней и
-  стареет (H10, `GAPS_CLOSE_4`; дом — `docs/models/mapping/TradeFeeRate.md`
-  §«Error policy»). Устаревание известной ставки ведёт к **холду инструментов
-  группы** (`docs/rules/instrument-hold.md` §«Несвежесть ставки комиссии»), не к
+  стареет. Устаревание известной ставки ведёт к **холду инструментов
+  группы** (`docs/rules/instrument-hold.md`), не к
   реджекту.
 - **Ставки не было никогда** (ни одной строки `TradeFeeRate` по группе
   инструмента либо у инструмента нет `externalFeeGroupId`) → **реджект**
@@ -250,16 +174,14 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   или OKX adapter. При absent/stale/invalid `BalanceContainer` он **по
   контракту** возвращает `BLOCKED` (коды `BALANCE_NOT_FRESH` /
   `BALANCE_INVALID`), а не чинит snapshot сам.
-  - **В фазе 1 эти коды фактически не эмитятся** (H17, `GAPS_CLOSE_6`):
+  - **В фазе 1 эти коды фактически не эмитятся**:
     свежесть баланса обеспечивается **до** вызова — при absent/stale она
     добывается звеном `REFRESH_BALANCE_COMMAND` через
     `REFRESH_DEAL_CONTEXT_ACTION` (handler добывающие `REFRESH_*` напрямую
     не эмитит, `docs/components/SystemActionExecutor.md`), и FSM уходит на
     новый проход, на котором
-    валидатор не вызывается (`docs/processes/risk-evaluation.md` §«Когда
-    вызывается»; реестр кодов —
-    `docs/components/models/RiskCheckResult.md` §«Определены, но в фазе 1 не
-    эмитятся»). Противоречия между «возвращает» и «не эмитится» нет:
+    валидатор не вызывается (`docs/processes/risk-evaluation.md`; реестр кодов —
+    `docs/components/models/RiskCheckResult.md`). Противоречия между «возвращает» и «не эмитится» нет:
     здесь — **граница ответственности** (валидатор снапшот не чинит), там —
     фактическая достижимость ветки при текущем порядке вызова.
 - Вызывается только для risk-creating / risk-increasing / risk-weakening

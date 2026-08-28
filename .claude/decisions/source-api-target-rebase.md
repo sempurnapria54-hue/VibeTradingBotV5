@@ -291,7 +291,7 @@ Prod убран из контура целиком: **нет prod-кейсов, 
 - Скиллы — `.claude/skills/{test-design,test-collection,test-code,test-run,test-review}.md`.
 - Роль — `.claude/agents/tester.md`; шаблон — `.claude/templates/docs/test-plan.md`.
 - Манифест (источник набора, рантайм-провенанс) —
-  `docs/integrations/okx/coverage-manifest.md`.
+  `.claude/processes/api-docs-completion.md`.
 - Контур доукомплектации (C3) — `.claude/processes/api-docs-completion.md`,
   `.claude/rules/external-source-sync.md`.
 - Тип знания планов — `.claude/decisions/test-knowledge-type.md`.

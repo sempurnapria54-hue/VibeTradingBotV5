@@ -16,7 +16,7 @@
 `strategyMarketStructureSettingId`), **не шарится** и не ключуется по
 идентичности конфигурации — реестр `market_structure_configs` убран
 ревизией трек D (см.
-`docs/decisions/market-data-result-identity-keying.md`). Persisted-модель
+`docs/rules/market-data-freshness.md`). Persisted-модель
 рыночных данных, не про бизнес-цикл сделки → `other` (см.
 `.claude/decisions/models-core-vs-other.md`).
 
@@ -28,7 +28,7 @@ breakout-условий и сопровождения позиции. Потре
 ищут. Для классификации фазы `MarketStructure` фигурирует **операндом**
 авторских правил (`MARKET_STRUCTURE`-операнд, в т.ч. тест `Type` через
 `MARKET_STRUCTURE_IS`), не входом скоринга — см.
-`docs/decisions/market-phase-conditional-classification.md`.
+`docs/models/domain/other/MarketPhase.md`.
 
 ## Структура
 
@@ -38,7 +38,7 @@ Java-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID результата расчёта. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `strategyMarketStructureSettingId` | `Long` | FK на настройку-владельца `StrategyMarketStructureSetting` (`strategy_market_structure_settings.id`) — owner-ключевание (см. `docs/decisions/market-data-result-identity-keying.md`). |
+| `strategyMarketStructureSettingId` | `Long` | FK на настройку-владельца `StrategyMarketStructureSetting` (`strategy_market_structure_settings.id`) — owner-ключевание (см. `docs/rules/market-data-freshness.md`). |
 | `type` | `Type` | Тип структуры рынка. |
 | `windowStartAt` | `OffsetDateTime` | Начало окна свечей расчёта. |
 | `windowEndAt` | `OffsetDateTime` | Конец окна свечей расчёта. |
@@ -107,7 +107,7 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 `StrategyMarketStructureSetting.efficiencyRatioKey` / `atrKey`, и
 `MarketStructureParams`. Скаляры резолверу подаёт `MarketStructureJob`,
 извлекая их из готового `IndicatorValue` (fork-A —
-`docs/decisions/derived-market-data-code-increments.md`):
+`docs/models/domain/other/MarketStructure.md`):
 
 - **ER-вход не объявлен** (`efficiencyRatioKey` null) → резолвер считает
   внутренний прокси (нетто-ход окна / суммарный побарный ход — мини-ER по
@@ -163,7 +163,7 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
    подтверждающее свидетельство завершилось (`breakoutConfirmationBars`
    пройдены / `minTouches` достигнуты): гейт «использовать без look-ahead».
    `windowStartAt` / `windowEndAt` — границы окна `lookbackBars`; точка
-   отсчёта свежести — `windowEndAt`, не `confirmedAt` (см. §Правила
+   отсчёта свежести — `windowEndAt`, не `confirmedAt` (см.
    хранения).
 
 **Валидный уровень:** с `≥ minTouches` касаниями, не сломанный
@@ -176,7 +176,7 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 - Считается только по закрытым свечам (без look-ahead).
 - Уникальность: `UNIQUE(instrument_id, strategy_market_structure_setting_id,
   window_end_at)` (ключ по настройке-владельцу — owner-ключевание, см.
-  `docs/decisions/market-data-result-identity-keying.md`).
+  `docs/rules/market-data-freshness.md`).
 - **Per-настроечный `structureType` отсутствует** (`StrategyMarketStructureSetting`
   его не несёт): `MarketStructure.Type` — **выход** расчёта
   (`MarketStructureResolver` его выводит), не вход настройки. Реестра
@@ -188,7 +188,7 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
     ключами) пишет в **свою** строку под своим
     `strategy_market_structure_setting_id` — разделяемого ряда, на котором
     возникала коллизия, нет (см.
-    `docs/decisions/derived-market-data-code-increments.md` §Краевой случай
+    `docs/models/domain/other/MarketStructure.md` случай
     идентичности).
 - **Свежесть на чтение:** `expiredAt = windowEndAt +
   ownerSetting.expirationDuration` считается в runtime, колонкой не

@@ -4,32 +4,6 @@
 
 Какие поля у OKX fill response (одна сделка / одно исполнение).
 
-## Контекст
-
-Raw OKX `FillResponse` — элемент `data[]` ответов
-`GET /api/v5/trade/fills` (последние 3 дня) и
-`GET /api/v5/trade/fills-history` (последние 3 месяца). Эти fills-эндпоинты
-в runtime фазы 1 **не используются**: команда `REFRESH_FILLS` снята на шаге 7
-(`docs/decisions/pnl-finalization-mechanics.md` реш.1) — order-fill-метрики
-(`accFillSz`/`avgPx`) идут прямо из `OkxOrderResponse` (`REFRESH_ORDER_COMMAND`), а
-число P&L — из positions-history/bills. Поля ниже оставлены как справка
-(deep-архив — `OKX-Q2`).
-
-`Fill` как persisted entity в фазе 1 **не вводим** — **OKX-Q1 закрыт**
-(persisted `TradeFill` не материализуется,
-`docs/decisions/result-profit-source.md`). Поэтому ниже описаны поля DTO
-биржи, а не маппинг в доменную сущность.
-
-Раw OKX DTO не выходит за adapter-layer
-(`docs/rules/raw-exchange-dto-boundary.md`).
-
-Mapping — `docs/models/mapping/TradeFill.md` (стаб, **OKX-Q1 закрыт**:
-`TradeFill` в фазе 1 не вводится). **Этот native-DTO в коде фазы 1 не
-живёт** — снимается вместе со всем read-путём fills (H26 `GAPS_CLOSE_13`,
-`docs/decisions/result-profit-source.md` §«Каскад снятия»); файл остаётся
-справочным описанием полей источника. Контракт endpoint'ов / rate limits /
-пагинация — `docs/integrations/okx/contracts/fills.md`.
-
 ## Различие fills и orders
 
 - **Order** = заявка (может исполниться частично или несколько раз).

@@ -11,17 +11,10 @@
 Candlesticks», «GET / Candlesticks history»). При расхождении с
 офдоком побеждает офдок; синхронизация — перевыкачка + дифф при
 каждом заходе интегратора
-(`.claude/processes/api-docs-completion.md` §4a, канал —
+(`.claude/processes/api-docs-completion.md`, канал —
 `.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
 (существование/путь по манифесту; поле-уровневая перевычитка — при
 заходе по теме).
-
-## Контекст
-
-Mapping в свечи — `docs/models/mapping/Candle.md` (формат
-9-элементного массива). Доменно свечи готовит
-`docs/components/CandleJob.md`. Mapping таймфреймов —
-`docs/models/mapping/TimeFrame.md`.
 
 ## Endpoints
 
@@ -66,5 +59,4 @@ Mapping в свечи — `docs/models/mapping/Candle.md` (формат
 ## WS-альтернатива
 
 Public канал `candle<bar>` (например `candle1m`, `candle1H`,
-`candle1Dutc`). Полноценная WS-документация — отдельный заход
-(OKX-Q4).
+`candle1Dutc`). Полноценная WS-документация — отдельный заход.

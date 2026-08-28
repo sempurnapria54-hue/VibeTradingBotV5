@@ -17,39 +17,31 @@
 `Deal.status = MANAGING`; pinned `StrategyDetail`; позиция активна с live
 risk **или** есть факты, что позиция закрыта и нужен переход в
 `EXIT_PENDING`; main protection **покрывает позицию** (предикат покрытия —
-`docs/rules/risk-creating-entry-protection.md` §Правило; проверяется на
-выходе, см. §«Выходные проверки»); ≤1 живая позиция; нет чужих
+`docs/rules/live-risk-protection.md`; проверяется на
+выходе, см.); ≤1 живая позиция; нет чужих
 live orders/algo; нет критичного расхождения и borrow/debt.
-
-**`ACTIVE && externalSize == 0` — не normal `CLOSED`, и дальше ветка
-зависит от `StrategyDetail.positionReopenAllowed`** (A9
-`DOCS_CHECK_20`). Прежняя редакция относила этот факт к
-cleanup/retry/anomaly безусловно — то есть трактовала схлопывание в ноль
-как дефект и при `true`, где оно легитимно:
 
 | `positionReopenAllowed` | Классификация `ACTIVE && externalSize == 0` |
 |---|---|
-| `true` | **штатное состояние**, не аномалия: живые входные ноги остаются, их филл открывает новый эпизод (`docs/lifecycles/Position.md` §«Смена эпизода»). Handler ничего не снимает и остаётся в `MANAGING` |
-| `false` | **гейт срабатывает**: живые **входные** (не reduce-only) ноги снимаются cleanup-командами напрямую — тем же порядком и тем же инвариантом, что на выходе (`docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»). Остаток — cleanup/retry/anomaly по прежним признакам |
+| `true` | **штатное состояние**, не аномалия: живые входные ноги остаются, их филл открывает новый эпизод (`docs/lifecycles/Position.md`). Handler ничего не снимает и остаётся в `MANAGING` |
+| `false` | **гейт срабатывает**: живые **входные** (не reduce-only) ноги снимаются cleanup-командами напрямую — тем же порядком и тем же инвариантом, что на выходе (`docs/rules/exit-teardown-order.md`). Остаток — cleanup/retry/anomaly по прежним признакам |
 
 - **Наблюдатель — этот handler.** Смену `externalSize` добывает нога 1
   `REFRESH_POSITION_COMMAND`, но исполнитель команды параметров
   стратегии не читает по построению
-  (`docs/components/ServiceCommandExecutor.md` §Назначение), поэтому
+  (`docs/components/ServiceCommandExecutor.md`), поэтому
   реакция живёт там же, где остальные решения `MANAGING`: факт durable
   (`Position.externalSize` на строке), читается из `DealContext`
   следующим проходом.
 - **Названная цена.** Снятие идёт cleanup-командами, у которых нет
   исполнения-действия, значит нет и бюджета отказов
-  (`docs/decisions/command-action-boundary.md` §2): неснятая нога не
+  (`docs/rules/command-lifecycle.md`): неснятая нога не
   даёт ни ретрая, ни холда — её подберёт следующий проход. Цена уже
-  принята проектом для всего cleanup; учёт — форвард на `TradeGuardJob`
-  (H16 `DOCS_CHECK_11`).
+  принята проектом для всего cleanup; учёт — форвард на `TradeGuardJob`.
 - **Гейт — не новый тип шага стратегии.** Отдельный шаг потребовал бы
   объявления в `stepsByStatus`, а необъявленный шаг молча не работает —
   ровно то, чего избегает обязательность параметра
-  (`docs/models/domain/aggregate/Strategy.md`
-  §«`positionReopenAllowed` обязателен у торгуемой детали»).
+  (`docs/models/domain/aggregate/Strategy.md`).
 
 ## Рабочая логика
 
@@ -65,10 +57,8 @@ Risk-creating actions — через risk-layer; reduce-only partial exit — б
 `RiskValidator`, через safety/invariant checks (см.
 `docs/rules/risk-validator-scope.md`). Полный выход → `CLOSE_POSITION_COMMAND` /
 cancel-команды. «Живой позиции нет» — по ветке `positionReopenAllowed`
-независимо от того, каким наблюдением это выяснилось (§«Выходные
-проверки»): и `REFRESH_POSITION_COMMAND` без позиции, и
-`ACTIVE && externalSize == 0` — один и тот же факт «эпизода нет»
-(A4 `DOCS_CHECK_21`); fail-safe → emergency.
+независимо от того, каким наблюдением это выяснилось : и `REFRESH_POSITION_COMMAND` без позиции, и
+`ACTIVE && externalSize == 0` — один и тот же факт «эпизода нет»; fail-safe → emergency.
 
 ## Выходные проверки
 
@@ -80,10 +70,9 @@ cancel-команды. «Живой позиции нет» — по ветке 
 опасное расхождение, >1 позиция, borrow/debt, небезопасный recovery.
 Иначе остаётся в `MANAGING`.
 
-**Четвёртая точка предиката покрытия — здесь** (A7 `DOCS_CHECK_24`, решение
-держателя `GAPS_CLOSE_24`). При живом эпизоде выходная проверка считает
+**Четвёртая точка предиката покрытия — здесь**. При живом эпизоде выходная проверка считает
 покрытие живых защит (формула — дом,
-`docs/rules/risk-creating-entry-protection.md` §Правило) и сверяет его с
+`docs/rules/live-risk-protection.md`) и сверяет его с
 `Position.externalSize`. Покрытие ниже — **нарушение инварианта системы**:
 `Exchange.TRADE_BLOCKED`, ступень 2 (`docs/rules/exchange-hold.md`), не
 локальный `ERROR` сделки.
@@ -101,23 +90,6 @@ cancel-команды. «Живой позиции нет» — по ветке 
   роли отвергнута держателем.
 - **Операнды уже в графе прохода** — новых чтений и полей не вводится.
 
-**Конъюнкт `positionReopenAllowed` в выходной проверке обязателен** (A4
-`DOCS_CHECK_21`). Прежняя редакция уводила в `EXIT_PENDING`
-**безусловно** по факту «позиция закрывается или закрыта / факт через
-`REFRESH_POSITION_COMMAND`», то есть по тому самому состоянию, в которое
-сделка попадает при штатном полном закрытии эпизода. На одном факте
-получались две взаимоисключающие инструкции: §«Входные проверки»
-говорила «остаётся в `MANAGING`», выходная — «уходит в `EXIT_PENDING`».
-
-- **Почему это гейтило.** Наблюдаемость закрытия у источника не
-  зафиксирована: `Position` может остаться `ACTIVE` с `externalSize = 0`
-  либо исчезнуть из выдачи (`docs/lifecycles/Position.md` §Статусы). При
-  безусловной выходной проверке ветка `positionReopenAllowed = true`
-  оказывалась **условно мёртвой** — работающей только в первом случае, —
-  и ратифицированное решение о многоэпизодной сделке отгружалось бы
-  погашенным вместе с колонкой `orders.position_id`, заведённой ради оси
-  эпизодов. Правка делает решение исполнимым **независимо от поведения
-  источника**: оба наблюдения ведут в одну ветку.
 - **Выход для `true` назван, и он обязателен.** Сделка с
   `positionReopenAllowed = true`, у которой нет ни живого эпизода, ни
   живых входных ног, переоткрыть позицию уже не может — ждать нечего.
@@ -126,7 +98,7 @@ cancel-команды. «Живой позиции нет» — по ветке 
   контур (инструмент один, активная сделка одна). Поэтому «живых
   входных ног нет» — самостоятельное условие ухода в `EXIT_PENDING`.
 - **Дискриминатор не меняется.** Смену эпизода по-прежнему различает
-  `posId`, а не размер (`docs/lifecycles/Position.md` §«Смена эпизода»);
+  `posId`, а не размер (`docs/lifecycles/Position.md`);
   правка касается только того, при каком условии отсутствие живого
   эпизода означает **выход сделки**, а не паузу между эпизодами.
 
@@ -134,32 +106,23 @@ cancel-команды. «Живой позиции нет» — по ветке 
 
 Steps: `PROTECTION_ADJUSTMENT`, `PARTIAL_EXIT`, `GRID_MANAGEMENT`, `EXIT`,
 `FAIL_SAFE`. Перечень команд handler-док не держит: состав команд —
-собственность действий (`docs/decisions/fsm-execution-layering.md`
-§«Handler исполняет действия»; реестры звеньев —
-`docs/decisions/command-action-boundary.md` §2,
+собственность действий (`docs/processes/fsm-execution-layering.md`; реестры звеньев —
+`docs/rules/command-lifecycle.md`,
 `docs/components/SystemActionExecutor.md`). Ремодел защиты
 (`PROTECTION_ADJUSTMENT`) — REPLACE-оркестрацией
-(place-new → факт → cancel-old; `docs/decisions/replace-not-amend.md`),
+(place-new → факт → cancel-old; `docs/rules/replace-not-amend.md`),
 амендных команд нет.
 
-**Доборная нога приходит со своим attached SL, и он временный** (H4
-`DOCS_CHECK_16`; редакция — решение держателя `GAPS_CLOSE_16`, Р3). Шаги,
+**Доборная нога приходит со своим attached SL, и он временный**. Шаги,
 создающие новую ногу входа в `MANAGING` (`GRID_MANAGEMENT` и пирамидинг), —
 risk-creating, значит нога ставится со встроенной защитой по общему правилу
-(`docs/rules/risk-creating-entry-protection.md` §Правило). После её
+(`docs/rules/live-risk-protection.md`). После её
 исполнения **основная standalone-защита пересчитывается под увеличенную
 позицию** (`PROTECTION_ADJUSTMENT`, `REPLACE`), и подтверждение новой
 основной защиты **снимает attached SL доборной ноги**
 (`closeReason = SWITCHED_BY_STRATEGY`).
 
-Окно двойной защиты в `MANAGING` — **переходное**, а не штатное: оно живёт
-от филла доборной ноги до подтверждения пересчитанной основной, аномалией
-не флагается и заканчивается снятием встроенной. Прежняя редакция
-(«сосуществуют штатно, ремодела доборной защиты нет») **снята**.
-
-**Триггер пересчёта — шаг стратегии** (решение держателя, позиция С2
-валидации `GAPS_CLOSE_16`): `PROTECTION_ADJUSTMENT` с условием «позиция
+**Триггер пересчёта — шаг стратегии**: `PROTECTION_ADJUSTMENT` с условием «позиция
 увеличилась». Системный слой и совмещение пересчёта с тем же пакетом
 действий, что создал добор, **отвергнуты**. Разбор —
-`docs/rules/risk-creating-entry-protection.md` §«Защита доборной ноги
-снимается после пересчёта основной».
+`docs/rules/live-risk-protection.md`.

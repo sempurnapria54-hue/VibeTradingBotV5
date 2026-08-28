@@ -13,14 +13,12 @@
 дифф при каждом заходе интегратора по источнику и по задаче
 «актуализируй» (`.claude/processes/api-docs-completion.md`, канал
 чтения — `.claude/skills/integration-okx.md`). Последняя сверка:
-**2026-07-14** (прогон интегратора, поле-уровневая сверка против офдока —
-`GAPS_CLOSE_3` шага 7, пробел H1).
+**2026-07-14**.
 
 ## Статус использования
 
 Используется с шага 7 (**В-7 активирован**): ставки `trade-fee` — источник
-**прогнозной комиссии в риск-сайзинге** (G6, `GAPS_CLOSE_1` шага 7,
-`docs/decisions/per-trade-risk-policy.md` §«Учёт комиссий»). **Дом ставки —
+**прогнозной комиссии в риск-сайзинге**. **Дом ставки —
 `TradeFeeRate`** (отдельная модель/таблица, **одна строка на группу**;
 `docs/models/domain/other/TradeFeeRate.md`). На навесе инструмента
 `InstrumentExternalRules` остаётся только **ключ группы**
@@ -28,26 +26,24 @@
 аккаунта, а не справочника инструмента. `InstrumentExternalRulesSyncJob`
 дочитывает `trade-fee` **раз на тик по `instType`** (не по инструменту) и
 пишет строку на группу; резолв ставки — по паре (`instType`, `groupId`), обе
-половины ключа — **сырые значения источника**, не доменные проекции (H7,
-`GAPS_CLOSE_4`; довод — `docs/models/domain/other/TradeFeeRate.md` §«Масштаб
-модели»). **Поверхность чтения не двинулась** — калькуляторы берут ставку
-прежним аксессором `InstrumentExternalRules.takerFeeRate()`, без отдельного
+половины ключа — **сырые значения источника**, не доменные проекции. **Поверхность чтения не двинулась** — калькуляторы берут ставку
+прежним аксессором `InstrumentExternalRules.takerFeeRate`, без отдельного
 поля контекста и exchange-вызова из калькулятора (N9,
-`docs/decisions/pnl-finalization-mechanics.md` реш.4). Троп чтения навеса
+`docs/rules/pnl-reconciliation.md` реш.4). Троп чтения навеса
 **две** (`CalculationContext` у калькуляторов; прямая, через
 `findByInstrumentId`, — у `RiskValidator`), поэтому аксессор гидрирует
 **хранилищный слой** — `docs/components/InstrumentExternalRulesDataService.md`,
 единственная граница domain ↔ persistence навеса, через которую проходят обе
-тропы (H1, `GAPS_CLOSE_4`).
+тропы.
 
 Фактические комиссии исполнения (для `resultProfit`) живут в
 bills/positions-history (`account-bills.md`,
-`docs/decisions/result-profit-source.md`); `trade-fee` — ставки для
+`docs/models/domain/aggregate/Deal.md`); `trade-fee` — ставки для
 **прогноза** (сайзинг до входа) и сверки. Wiring — шаг 7 CODE.
 
 Native-инвентарь полей (used/unused) —
 `docs/models/integrations/okx/OkxTradeFeeResponse.md`; маппинг →
-`docs/models/mapping/TradeFeeRate.md` §OKX.
+`docs/models/mapping/TradeFeeRate.md`.
 
 ## GET /api/v5/account/trade-fee
 
@@ -65,8 +61,7 @@ Query: `instType` (обяз.: SPOT/MARGIN/SWAP/FUTURES/OPTION/**EVENTS**),
 
 Перечень `instType` выше — офдок; **наш контур фазы 1 — SWAP-only**, поэтому
 вызов ровно один (`instType=SWAP`). FUTURES вынесен из контура до шага с
-отдельными биржами (H8, `GAPS_CLOSE_4`; `docs/rules/trading-constraints.md`
-§Правило) — на ось запроса это влияет так: второго вызова
+отдельными биржами — на ось запроса это влияет так: второго вызова
 (`instType=FUTURES`) в фазе 1 нет.
 
 ### Response (`data[0]`)
@@ -91,7 +86,7 @@ Query: `instType` (обяз.: SPOT/MARGIN/SWAP/FUTURES/OPTION/**EVENTS**),
 том что Spot-перечень в списке начинается с `3`). Офдок сам снимает вопрос
 ремаркой «actual return values shall prevail» → **перечень групп не
 хардкодится**, матч динамический по значению `groupId` из ответа
-(`docs/models/mapping/TradeFeeRate.md` §OKX).
+(`docs/models/mapping/TradeFeeRate.md`).
 
 ### Инвариант organic-base-rates
 
@@ -111,12 +106,12 @@ base rates. **Мы не участники программы → base rates к�
 
 - **«The Open API will not reflect zero-fee trading»** — промо нулевой
   комиссии в ответе `trade-fee` не отражается ⇒ прогноз в этом случае
-  **завышает** издержку. Это не «безопасная сторона» (H21, `GAPS_CLOSE_5`):
+  **завышает** издержку. Это не «безопасная сторона»:
   завышенный прогноз сжимает риск-бюджет и даёт позицию меньше положенной —
   систематический недосайзинг; у издержек равный вред от занижения и
   завышения. Механизм учтён в форвард-фокусе искажений ожидаемости
   (`.claude/work/backlog.md`, клетка «возможности × пессимистично»);
-  наблюдаемость промо — RQ-3 (§AG12.5). Сверка прогноз↔`bills` может
+  наблюдаемость промо — RQ-3 (.5). Сверка прогноз↔`bills` может
   расходиться именно по этой причине.
 - **Upcoming: `elpMaker` → `rpiMaker`** (ELP→RPI rebranding). Demo
   **2026-07-21**, прод **2026-07-28**, параллельные имена до **2026-10-31**.
@@ -133,15 +128,14 @@ base rates. **Мы не участники программы → base rates к�
 как ставка комиссии. Совпадает со знаком `fee` в fills/bills
 (отрицательный `fee` — списание).
 
-**Дальше границы конвенция не течёт** (H2, `GAPS_CLOSE_4`). Знак снимается
+**Дальше границы конвенция не течёт**. Знак снимается
 при маппинге — `× −1` в per-source-секции
-`docs/models/mapping/TradeFeeRate.md` §«Знак ставки — снимается здесь»; ниже
+`docs/models/mapping/TradeFeeRate.md`; ниже
 маппинга ставка есть **издержка** (комиссия положительна, ребейт отрицателен),
 и `abs` в формулах не появляется. Довод —
-`docs/models/domain/other/TradeFeeRate.md` §«Знак ставки».
+`docs/models/domain/other/TradeFeeRate.md`.
 
 Оговорка про `fee` в bills: там знак — **факт движения** и **не
 нормализуется** (он участвует в арифметике `amount − externalFee = pnl`,
-`docs/models/mapping/DealCashFlow.md` §«Знак `externalFee` — сырой,
-нормализации нет»). Асимметрия сознательная: нормализуется прогнозная
+`docs/models/mapping/DealCashFlow.md`). Асимметрия сознательная: нормализуется прогнозная
 **ставка**, не фактическое движение.

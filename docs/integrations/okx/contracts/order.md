@@ -10,32 +10,22 @@ ACK-семантика, пагинация.
 Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
 раздел «Order Book Trading → Trade»). При расхождении с офдоком
 побеждает офдок; синхронизация — перевыкачка + дифф при каждом
-заходе интегратора (`.claude/processes/api-docs-completion.md` §4a,
+заходе интегратора (`.claude/processes/api-docs-completion.md`,
 канал — `.claude/skills/integration-okx.md`). Последняя сверка:
 2026-06-11 (прогон 1 — соответствие спеке подтверждено).
 
-## Контекст
-
-Mapping в `Order` — `docs/models/mapping/Order.md` (раздел `## OKX`).
-Native response/request поля — `docs/models/integrations/okx/OkxOrderResponse.md`.
-Правила OKX (reduce-only invariant, adapter-константы) —
-`docs/integrations/okx/rules/`. Доменные модель/lifecycle —
-`docs/models/domain/core/Order.md` / `docs/lifecycles/Order.md`.
-
 ## Единица размера (`sz`, `accFillSz`) — контракты у SWAP/FUTURES
 
-**Открытая сверка `integrator`** (B12 `DOCS_CHECK_20`). Дистиллят офдока
+**Открытая сверка `integrator`**. Дистиллят офдока
 единицу `sz` / `accFillSz` не называет, а поле несущее: у нас
 `accumulatedFillSize` входит операндом в три из четырёх чисел риска
 через отношение к `plannedSizeContracts`
-(`docs/models/domain/aggregate/Deal.md` §«Взятый риск»). Действующая
+(`docs/models/domain/aggregate/Deal.md`). Действующая
 запись — «для SWAP/FUTURES контракты»
-(`docs/models/domain/core/Order.md` §Структура), и она **предположение**
+(`docs/models/domain/core/Order.md`), и она **предположение**
 до наблюдения.
 
-- **Проверка — на уже существующих кейсах** (`.claude/tests/source-api/
-  okx/plan.md`: цепочки `M16.limit` / `M16.market` ordinary-order +
-  §AG1.5; адрес приведён к именам кейсов плана — N1 `DOCS_CHECK_21`): сопоставить
+- **Проверка — на уже существующих кейсах**: сопоставить
   отправленный `sz` с `accFillSz` исполненного ордера и с `pos` записи
   positions-history — совпадение по величине подтверждает единицу
   «контракты» на всех трёх поверхностях.
@@ -49,7 +39,7 @@ Native response/request поля — `docs/models/integrations/okx/OkxOrderRespo
 - **Create** (`SUBMIT_ORDER_COMMAND`): `POST /api/v5/trade/order`. Permission
   `Trade`; rate limit 60 req / 2 s по User ID + Instrument ID.
 - **Amend** (доменом **не используется** — REPLACE-only,
-  `docs/decisions/replace-not-amend.md`; контракт — поверхность
+  `docs/rules/replace-not-amend.md`; контракт — поверхность
   биржи): `POST /api/v5/trade/amend-order`. Permission `Trade`; rate
   limit 60 req / 2 s по User ID + Instrument ID.
   `newPx`/`newSz`/`attachAlgoOrds` — изменения должны включать
@@ -120,5 +110,5 @@ refresh/search/history.
 
 Полный цикл для evidence-not-found: `GET /trade/order` →
 `orders-pending` → `orders-history` → `orders-history-archive` (если
-history не покрывает период). Подробно — в `mapping/Order.md` §OKX
+history не покрывает период). Подробно — в `mapping/Order.md`
 evidence-cycle.

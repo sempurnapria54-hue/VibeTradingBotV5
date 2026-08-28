@@ -27,8 +27,7 @@ endpoint живёт в **Public Data**: `GET /api/v5/public/position-tiers`
 Не используется (в фазе 1). Решено на шаге 5: потолок плеча для преконтроля
 берётся инструмент-уровневым (`InstrumentExternalRules.externalMaxLeverage`
 из `lever`); per-tier `maxLever`/`maxSz` (потолок плеча от размера позиции,
-позиционный лимит) — **форвард к риску на биржу/портфель** (фаза 3, бывший
-вход RISK-Q2; `docs/decisions/per-trade-risk-policy.md`). В валидатор фазы 1
+позиционный лимит) — **форвард к риску на биржу/портфель**. В валидатор фазы 1
 не входит (validator не делает live-вызовов).
 
 ## GET /api/v5/public/position-tiers

@@ -26,14 +26,6 @@ order history»; changelog — `https://www.okx.com/docs-v5/log_en/`).
 (см. находку И-2 ниже). Офдок не подменяется: расхождение офдок↔биржа
 фиксируется этим провенансом.
 
-## Контекст
-
-Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
-`## OKX`). Native response/request поля —
-`docs/models/integrations/okx/OkxAlgoOrderResponse.md`. Правила OKX —
-`docs/integrations/okx/rules/`. Доменные модель/lifecycle —
-`docs/models/domain/core/AlgoOrder.md` / `docs/lifecycles/AlgoOrder.md`.
-
 ## Endpoints
 
 - **Create** (`SUBMIT_ALGO_ORDER_COMMAND`): `POST /api/v5/trade/order-algo`.
@@ -41,7 +33,7 @@ Mapping в `AlgoOrder` — `docs/models/mapping/AlgoOrder.md` (раздел
   ID. Body — общие поля (`instId`, `tdMode`, `side`, `ordType`, `sz`,
   `posSide`, `reduceOnly`, `algoClOrdId`) + ordType-specific.
 - **Amend** (доменом **не используется** — REPLACE-only,
-  `docs/decisions/replace-not-amend.md`; контракт — поверхность
+  `docs/rules/replace-not-amend.md`; контракт — поверхность
   биржи): `POST /api/v5/trade/amend-algos`. Permission `Trade`; rate
   limit 20 req / 2 s по User ID + Instrument ID.
   **Только Stop/Trigger-ордера** — офдок («POST / Amend algo
@@ -138,12 +130,6 @@ conditional) → `cancel-algos`; **advance** (trailing
 (`conditionType → ordType → семья`, маппинг —
 `docs/models/mapping/AlgoOrder.md`).
 
-**Основание** — продуктовый факт: стратегия предусматривает
-trailing-защиту (`TrailingSettings`, `ConditionType.TRAILING_*` —
-`docs/models/domain/aggregate/Strategy.md`,
-`docs/models/domain/core/AlgoOrder.md`); сужение скоупа до ordinary
-(прежний крен (б)) с этим несовместимо.
-
 ### Находка И-2 (прогон 3): cancel-advance-algos выведен из офдока
 
 Свежая сверка живого офдока (2026-06-11) меняет фактуру прогона 2:
@@ -192,15 +178,14 @@ already stopped». **Вывод:** advance-ветвь решения (а) (`canc
 
 Биржевой факт: `amend-algos` нормативно поддерживает только
 Stop/Trigger; standalone `move_order_stop` / iceberg / twap **не
-амендятся** (см. Endpoints → Amend). Следствие закрыто
-(`GAPS_CLOSE_3`, 2026-06-11): домен не амендит **ничего** —
+амендятся** (см. Endpoints → Amend). Следствие закрыто: домен не амендит **ничего** —
 ремоделирование любой сущности идёт REPLACE-оркестрацией
-(`docs/decisions/replace-not-amend.md`); амендная асимметрия биржи
+(`docs/rules/replace-not-amend.md`); амендная асимметрия биржи
 перестала касаться доменного слоя (исторически И-3 — один из
 триггеров выбора REPLACE-only).
 
 ## Evidence-cycle
 
 Полный цикл: `GET /trade/order-algo` → `orders-algo-pending` →
-`orders-algo-history`. Подробно — в `mapping/AlgoOrder.md` §OKX
+`orders-algo-history`. Подробно — в `mapping/AlgoOrder.md`
 evidence-cycle.

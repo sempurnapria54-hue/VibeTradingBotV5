@@ -1,0 +1,242 @@
+{
+  "subject": "pnl-reconciliation",
+  "question": "Чему равен допуск сверки, какие строки в него входят и сошлась ли сверка",
+  "home": "docs/rules/pnl-reconciliation.md",
+
+  "operands": {
+    "cashFlows[].amount": "DealCashFlow.amount — знаковая сумма движения",
+    "cashFlows[].ccy": "DealCashFlow.ccy",
+    "cashFlows[].category": "DealCashFlow.category — экономическая либо принимающая корзина OTHER",
+    "cashFlows[].excludedByExchange": "тип движения входит в список исключений сверки этой биржи",
+    "settleCurrency": "расчётная валюта инструмента",
+    "legs[]": "ноги входа сделки с write-once числами планового риска",
+    "pairs[].discrepancy": "расхождение одной из четырёх пар по категориям",
+    "tolerance.relativeShare": "относительный член: доля валового оборота",
+    "tolerance.omissionMultiplier": "омиссионный член: множитель ожидаемой комиссии сделки",
+    "tolerance.floor": "пол допуска в расчётной валюте",
+    "duty.closeRecordsFetchedForAllEpisodes": "записи закрытия добыты у всех эпизодов",
+    "duty.windowClosed": "верхняя граница окна линковки непуста",
+    "duty.flowsFetched": "добыча движений выполнялась"
+  },
+
+  "values": [
+    {
+      "name": "inReconciliationScope",
+      "note": "Область сверки: расчётная валюта, вне списка исключений биржи, экономическая категория. Конъюнкция целиком.",
+      "expr": "ccy == settleCurrency && !excludedByExchange && category != 'OTHER'"
+    },
+    {
+      "name": "grossTurnover",
+      "note": "Валовой оборот — якорь относительного члена. Обе стороны теста однородны по покрытию.",
+      "op": "sum",
+      "over": "cashFlows",
+      "where": "inReconciliationScope",
+      "of": "abs(amount)"
+    },
+    {
+      "name": "legFeeRate",
+      "note": "Ставка, под которую нога сайзилась, восстановленная обращением закрытой формы сайзинга.",
+      "expr": "(plannedRiskAmount / (plannedContractValue * plannedSizeContracts) - abs(plannedEntryPrice - plannedStopPrice)) / (plannedEntryPrice + plannedStopPrice)"
+    },
+    {
+      "name": "legExpectedFee",
+      "note": "Ожидаемая round-trip комиссия ноги, взвешенная филлом: комиссионный поток порождают филлы.",
+      "expr": "legFeeRate * (plannedEntryPrice + plannedStopPrice) * plannedSizeContracts * plannedContractValue * (if(plannedSizeContracts == 0, 0, accumulatedFillSize / plannedSizeContracts))"
+    },
+    {
+      "name": "expectedDealFee",
+      "note": "Ожидаемая комиссия сделки. Множество ног — предикат взятого риска, а не заявленного.",
+      "op": "sum",
+      "over": "legs",
+      "where": "in(type, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS') && accumulatedFillSize > 0 && notNull(plannedRiskAmount)",
+      "of": "legExpectedFee"
+    },
+    {
+      "name": "epsilon",
+      "note": "Допуск один на сделку. Тест двухчастный, срабатывает меньший член; пол общий и вынесен наружу.",
+      "expr": "max(tolerance.floor, min(tolerance.relativeShare * grossTurnover, tolerance.omissionMultiplier * expectedDealFee))"
+    },
+    {
+      "name": "totalDiscrepancy",
+      "note": "Общее расхождение по четырём парам: расхождения разных знаков друг друга не гасят.",
+      "op": "sum",
+      "over": "pairs",
+      "of": "abs(discrepancy)"
+    },
+    {
+      "name": "dutyArisen",
+      "note": "Обязанность сверки — конъюнкция трёх условий.",
+      "expr": "duty.closeRecordsFetchedForAllEpisodes && duty.windowClosed && duty.flowsFetched"
+    },
+    {
+      "name": "matched",
+      "note": "Сверка сошлась. Считается только при наступившей обязанности.",
+      "expr": "dutyArisen && totalDiscrepancy <= epsilon"
+    },
+    {
+      "name": "mismatched",
+      "expr": "dutyArisen && totalDiscrepancy > epsilon"
+    },
+    {
+      "name": "notRun",
+      "note": "Сверка не была обязана: хотя бы один конъюнкт не выполнен.",
+      "expr": "!dutyArisen"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "расхождение в пределах допуска: относительный член связывает",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -100, "ccy": "USDT", "category": "REALIZED_PNL", "excludedByExchange": false },
+          { "amount": -0.5, "ccy": "USDT", "category": "TRADE_FEE", "excludedByExchange": false },
+          { "amount": 2, "ccy": "USDT", "category": "FUNDING", "excludedByExchange": false }
+        ],
+        "legs": [
+          { "type": "ENTRY", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1 }
+        ],
+        "pairs": [ { "discrepancy": 0.2 }, { "discrepancy": -0.1 }, { "discrepancy": 0 }, { "discrepancy": 0 } ]
+      },
+      "expect": { "grossTurnover": 102.5, "expectedDealFee": 29.55, "epsilon": 0.5125, "totalDiscrepancy": 0.3, "matched": true, "mismatched": false }
+    },
+    {
+      "case": "расхождения разных знаков друг друга не гасят",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -100, "ccy": "USDT", "category": "REALIZED_PNL", "excludedByExchange": false }
+        ],
+        "legs": [
+          { "type": "ENTRY", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1 }
+        ],
+        "pairs": [ { "discrepancy": 0.4 }, { "discrepancy": -0.4 }, { "discrepancy": 0 }, { "discrepancy": 0 } ]
+      },
+      "expect": { "totalDiscrepancy": 0.8, "epsilon": 0.5, "mismatched": true }
+    },
+    {
+      "case": "движения в чужой валюте и в списке исключений в оборот не входят",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -100, "ccy": "USDT", "category": "REALIZED_PNL", "excludedByExchange": false },
+          { "amount": -50, "ccy": "OKB", "category": "TRADE_FEE", "excludedByExchange": false },
+          { "amount": -30, "ccy": "USDT", "category": "TRADE_FEE", "excludedByExchange": true },
+          { "amount": -20, "ccy": "USDT", "category": "OTHER", "excludedByExchange": false }
+        ],
+        "legs": [],
+        "pairs": [ { "discrepancy": 0 } ]
+      },
+      "expect": { "grossTurnover": 100 }
+    },
+    {
+      "case": "на малом обороте связывает пол допуска",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -0.4, "ccy": "USDT", "category": "TRADE_FEE", "excludedByExchange": false }
+        ],
+        "legs": [],
+        "pairs": [ { "discrepancy": 0.005 } ]
+      },
+      "expect": { "grossTurnover": 0.4, "expectedDealFee": 0, "epsilon": 0.01, "matched": true }
+    },
+    {
+      "case": "омиссионный член меньше композиционного и связывает",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.01, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -1000, "ccy": "USDT", "category": "REALIZED_PNL", "excludedByExchange": false }
+        ],
+        "legs": [
+          { "type": "ENTRY", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1 }
+        ],
+        "pairs": [ { "discrepancy": 0.1 } ]
+      },
+      "expect": { "grossTurnover": 1000, "expectedDealFee": 29.55, "epsilon": 0.2955, "matched": true }
+    },
+    {
+      "case": "неисполненная нога комиссии не создаёт и в омиссионный член не входит",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -100, "ccy": "USDT", "category": "REALIZED_PNL", "excludedByExchange": false }
+        ],
+        "legs": [
+          { "type": "ENTRY", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 0, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1 }
+        ],
+        "pairs": [ { "discrepancy": 0 } ]
+      },
+      "expect": { "expectedDealFee": 0 }
+    },
+    {
+      "case": "снятая с частичным филлом нога комиссию создаёт и в член входит",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -100, "ccy": "USDT", "category": "REALIZED_PNL", "excludedByExchange": false }
+        ],
+        "legs": [
+          { "type": "ENTRY", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1 }
+        ],
+        "pairs": [ { "discrepancy": 0 } ]
+      },
+      "expect": { "expectedDealFee": 8.865 }
+    },
+    {
+      "case": "движения не добывались: сверка не была обязана",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": false },
+        "cashFlows": [],
+        "legs": [],
+        "pairs": []
+      },
+      "expect": { "notRun": true, "matched": false, "mismatched": false }
+    },
+    {
+      "case": "запись закрытия не добыта у одного из эпизодов: сверка не была обязана",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": false, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": -100, "ccy": "USDT", "category": "REALIZED_PNL", "excludedByExchange": false }
+        ],
+        "legs": [],
+        "pairs": [ { "discrepancy": 99 } ]
+      },
+      "expect": { "notRun": true, "mismatched": false }
+    },
+    {
+      "case": "пустая сумма движения отказывает, а не читается нулём",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [
+          { "amount": null, "ccy": "USDT", "category": "TRADE_FEE", "excludedByExchange": false }
+        ],
+        "legs": [],
+        "pairs": []
+      },
+      "expectRefusal": { "grossTurnover": "пустая сумма в арифметике" }
+    }
+  ]
+}

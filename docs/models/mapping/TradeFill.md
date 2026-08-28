@@ -8,32 +8,24 @@
 ## Статус
 
 **Закрыт (не вводится).** `TradeFill` как persisted entity в фазе 1 **не
-материализуется** — **OKX-Q1 закрыт** на `GAPS_CLOSE_1` шага 7 (2026-07-03,
-`docs/decisions/result-profit-source.md`): пофилловый аудит вне фазы 1;
+материализуется** — **OKX-Q1 закрыт** на шага 7 (2026-07-03,
+`docs/models/domain/aggregate/Deal.md`): пофилловый аудит вне фазы 1;
 число `resultProfit` берётся net'ом из positions-history, разбивка — из bills
 (`DealCashFlow`), fills для этого не нужны. Order-fill-метрики
 (`accFillSz`/`avgPx`) агрегируются в `Order` прямо из `OkxOrderResponse` при
 `REFRESH_ORDER_COMMAND`; отдельная команда `REFRESH_FILLS` и её executor **сняты** на
-шаге 7 (`docs/decisions/pnl-finalization-mechanics.md` реш.1).
+шаге 7 (`docs/rules/pnl-reconciliation.md` реш.1).
 
 Файл оставлен как исторический стаб; при будущей потребности в пофилловой
 модели (вне фазы 1) mapping заполняется здесь.
 
-**В коде фазы 1 поверхности fills нет** (H26 `GAPS_CLOSE_13`): вместе с
+**В коде фазы 1 поверхности fills нет**: вместе с
 командой снимается весь read-путь — `FillExternalSnapshot`, `FillMapper`,
 `OkxFillResponse` и методы границы `IntegrationService.getFills(...)` /
 `getFillsHistory(...)`. Перечень каскада и довод —
-`docs/decisions/result-profit-source.md` §«Каскад снятия». Справочным
+`docs/models/domain/aggregate/Deal.md`. Справочным
 остаётся контракт-док источника
 (`docs/integrations/okx/contracts/fills.md`).
-
-## Контекст
-
-Сквозные правила — `docs/rules/raw-exchange-dto-boundary.md`,
-`docs/rules/business-logic-on-domain-model.md`. Контракт endpoint'ов
-— `docs/integrations/<name>/contracts/fills.md`. Поля native —
-`docs/models/integrations/<name>/...FillResponse.md` (для OKX:
-`OkxFillResponse.md`).
 
 ## Существующие связи
 

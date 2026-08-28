@@ -7,16 +7,6 @@
 
 ## Назначение
 
-`MarketPhaseService` отдаёт актуальную `MarketPhase` (см.
-`docs/models/domain/other/MarketPhase.md`). Фаза **не персистируется** —
-сервис **вычисляет её на лету** на момент запроса (ревизия трек D,
-`docs/decisions/market-phase-stateless.md`): собирает текущие (последние
-доступные) `IndicatorValue` / `MarketStructure` по `key`-ссылкам операндов
-`StrategyMarketPhaseSetting.phaseRules`, а также **текущую цену** по
-тикеру инструмента (`MarketPriceDataService`, для PRICE-операндов правил
-фазы) и зовёт `docs/components/MarketPhaseResolver.md` (stateless
-first-match). Прежний `MarketPhaseJob`, писавший `MarketPhase`, удалён.
-
 ## Контракт (пример метода)
 
 - `Optional<MarketPhase> getCurrentPhase(Instrument instrument,

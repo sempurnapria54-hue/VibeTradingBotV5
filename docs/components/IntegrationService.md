@@ -34,8 +34,7 @@ evidence-cycle может быть error/recovery (см.
 Перечисление **всего живого на инструменте** (позиции, live orders, live
 algo — включая **незнакомые** боту сущности) — отдельный
 инструмент-скоупный exchange-read **в `IntegrationService`**, **не**
-`ServiceCommand` (CMD-Q4: bulk-команды сняты, в command-layer не
-возвращаются — `docs/components/models/ServiceCommand.md`). Дёргается:
+`ServiceCommand`. Дёргается:
 
 - **`PrecheckHandler`** (шаг 6) — чистота инструмента перед входом: нет
   открытой сделки → биржа по инструменту должна быть пуста

@@ -14,34 +14,24 @@
 возвращает `status + closeReason` candidate, `RefreshPositionExecutor`
 применяет результат. FSM напрямую `Position` не создаёт и не меняет.
 
-`REFRESH_POSITION_COMMAND` — **двуногая** refresh-команда (evidence-cycle внутри
-одной команды, H1/H3 `GAPS_CLOSE_7`): live `/account/positions` → при
+`REFRESH_POSITION_COMMAND` — **двуногая** refresh-команда: live `/account/positions` → при
 not-found `/account/positions-history`. Вторая нога статус не
 меняет (его уже определил not-found первой ноги) — она **наполняет поля
 положения закрытия** на строках эпизодов сделки, у которых их ещё нет
-(`docs/models/domain/core/Position.md` §«Положение закрытия»,
-§«Смена эпизода» ниже).
+(`docs/models/domain/core/Position.md`, ниже).
 
 **Ось адресации второй ноги — `posId`, а при его отсутствии инструмент
 и окно сделки.** Нога 2 идёт при not-found ноги 1 **всегда**, в том
 числе когда локальной строки `Position` нет вовсе: ограничение «только
 при наблюдавшемся `posId`» снято (`docs/components/
-RefreshPositionExecutor.md` §«Нога 2 идёт при not-found ноги 1 —
-всегда»). Оно делало недостижимым число для сделки, чью позицию не
+RefreshPositionExecutor.md`). Оно делало недостижимым число для сделки, чью позицию не
 застали живой между тиками, — то есть на тропе быстрого стопа и
 ликвидации.
 
 **Верхняя граница окна двигается монотонно вперёд.** Нога 2 ставит
 `Deal.billsWindowEnd = uTime` **последней** записи закрытия: окно
 обязано накрывать движения всех эпизодов
-(`docs/models/domain/aggregate/Deal.md` §«Верхняя граница монотонна, а
-не write-once»).
-
-> Компоненты `PositionStatusResolver`, `RefreshPositionExecutor`,
-> `ClosePositionExecutor` — command-подсистема (шаг 4),
-> `docs/components/`; `AnomalyJob` / `DealOrchestratorJob` —
-> orchestration/anomaly (шаги 6-8). Здесь — только статусная механика,
-> которой владеет сама `Position`.
+(`docs/models/domain/aggregate/Deal.md`).
 
 ## Статусы
 
@@ -93,39 +83,36 @@ snapshot.externalSize == 0 -> status = ACTIVE (не CLOSED, пока биржа
   создать `Position`, `dealId = Deal.id`, `status = ACTIVE`,
   `externalId = posId`, `direction = resolved`, заполнить `external*`
   поля. Штатный сценарий после исполнения entry order — и он же
-  сценарий **второго эпизода** (§«Смена эпизода»).
+  сценарий **второго эпизода** .
 - snapshot найден, живой `Position` есть **и `posId` совпадает**:
   `status = ACTIVE`, обновить `external*`, проверить, что `direction` не
   изменилась.
 - snapshot найден, живой `Position` есть, **но `posId` другой** — смена
-  эпизода, §ниже.
+  эпизода,.
 - snapshot не найден, живой `Position` есть: `status = CLOSED`,
   `closeReason = EXTERNAL_CLOSE` (если был null); **дальше — вторая нога**:
   запись positions-history по `Position.externalId` наполняет поля
-  положения закрытия и двигает `Deal.billsWindowEnd` (§«Кто управляет»).
+  положения закрытия и двигает `Deal.billsWindowEnd` .
   Запись не
   нашлась — поля остаются `null`, статус всё равно `CLOSED`; отсутствие
-  факта — не отказ команды, добычу ретраит `REFRESH_DEAL_CONTEXT_ACTION`
-  (узел 4 `DOCS_CHECK_8`, вариант (а)); тропа «неисчислимо» — аварийный
-  контур (`docs/lifecycles/Deal.md` §«Терминальный контракт финализации»).
+  факта — не отказ команды, добычу ретраит `REFRESH_DEAL_CONTEXT_ACTION`; тропа «неисчислимо» — аварийный
+  контур (`docs/lifecycles/Deal.md`).
 - snapshot не найден, `Position` нет: **вторая нога идёт всё равно** —
   запись адресуется инструментом и окном сделки, и найденная запись
   **материализует** строку (`status = CLOSED`, поля положения закрытия,
   `posId` → `externalId` и `direction` из самой записи;
-  `docs/components/RefreshPositionExecutor.md` §«Позиция, впервые
-  увиденная уже закрытой»). Записей в окне несколько — эпизодов
+  `docs/components/RefreshPositionExecutor.md`). Записей в окне несколько — эпизодов
   несколько, каждая своей строкой. Запись не нашлась — строка не
   создаётся, FSM/handler дальше анализирует `DealContext` и статус
   сделки.
-  - **Развилка H6/H7 `DOCS_CHECK_7` закрыта** (`docs/decisions/
-    multi-episode-deal.md` §«Что это закрывает попутно»): ось
+  - **Развилка закрыта** (`docs/decisions/
+    multi-episode-deal.md`): ось
     адресации названа, поиск по инструменту и окну разрешён, инвариант
     слота («одна активная сделка на инструмент») держит однозначность.
   - **Известное ограничение.** Тропа адресуема только когда вход дошёл
     до биржи: у позиции вокруг чужого риска отправленной ноги входа
     нет, значит нет и операнда нижней границы
-    (`docs/components/RefreshPositionExecutor.md` §«Известное
-    ограничение»).
+    (`docs/components/RefreshPositionExecutor.md`).
 
 `direction` при обновлении active `Position` меняться не должен. Смена
 направления live position — нарушение инварианта → error/safety-flow.
@@ -134,25 +121,13 @@ action / entry order.
 
 ## Смена эпизода (многоэпизодная сделка)
 
-Сделка многоэпизодна (`docs/decisions/multi-episode-deal.md`): позиция
+Сделка многоэпизодна (`docs/models/domain/aggregate/Deal.md`): позиция
 может схлопнуться в ноль и открыться заново — новой ногой входа,
 оставшейся живой в `MANAGING`. Биржа даёт новой позиции **новый
 `posId`**, и это единственный наблюдаемый признак смены.
 
-**«Новый `posId`» — предположение до рантайм-верификации** (B11
-`DOCS_CHECK_20`). Офдок говорит только, что `posId` истекает через ~30
-дней после полного закрытия; переиспользуется ли он **внутри** окна, он
-не утверждает (`docs/integrations/okx/contracts/position.md`
-§«Идентификация записи»). Проверка — `.claude/tests/source-api/okx/plan.md`
-§AG1.9. Если источник `posId` переиспользует, меняются **оба**: этот
-дискриминатор и ключ `uk_position_deal_external`. Посылка
-**зарегистрирована предусловием `CODE`** (п. 15,
-`docs/decisions/pnl-finalization-mechanics.md` §«Предусловия `CODE`
-шага 7») — до B6 `DOCS_CHECK_21` кейс её покрывал, а реестр не
-регистрировал, и клейм «реестр сквозной» был ложен.
-
 **Дискриминатор — `posId`, не размер.** `externalSize = 0` эпизод не
-закрывает (§«Status vs live risk»), а «позиция снова ненулевая» без
+закрывает , а «позиция снова ненулевая» без
 смены `posId` — это тот же эпизод.
 
 ```text
@@ -171,15 +146,15 @@ live-нога вернула snapshot с posId ≠ Position.externalId живо�
 - **Эпизод, не наблюдавшийся живым**, материализуется тем же
   механизмом, которым материализуется позиция, не наблюдённая вовсе:
   запись адресуется инструментом и окном сделки
-  (`docs/models/domain/core/Position.md` §Инварианты), и **несколько
+  (`docs/models/domain/core/Position.md`), и **несколько
   записей окна — несколько эпизодов**, каждая своей строкой по своему
   `posId`.
 - **Стратегия переоткрытие не объявила** (`StrategyDetail
-  .positionReopenAllowed = false`) — второго эпизода не возникает по
+.positionReopenAllowed = false`) — второго эпизода не возникает по
   построению: `ManagingHandler` по наблюдению `externalSize -> 0`
   снимает живые входные ноги тем же порядком, что действует на выходе
-  (`docs/components/ManagingHandler.md` §«Входные проверки»,
-  `docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»). Смена
+  (`docs/components/ManagingHandler.md`,
+  `docs/rules/exit-teardown-order.md`). Смена
   `posId` у такой сделки — аномалия, а не режим.
 
 ## ERROR-переход (exchange invariant violation)
@@ -213,26 +188,6 @@ Position, Position.dealId = Deal.id
 `Deal`, объясняющего её, — зона `AnomalyJob` / safety-flow.
 
 ## Recovery после рестарта
-
-Если приложение упало, entry order исполнился, позиция открылась и
-закрылась по SL/TP/trailing, после рестарта локальной `Position`
-может ещё не быть. Это не anomaly при active `Deal` и известном entry
-order. Recovery-контур (`REFRESH_ORDER_COMMAND` → `REFRESH_POSITION_COMMAND` (null) →
-`REFRESH_ALGO_ORDER_COMMAND`) — Deal-lifecycle/orchestration;
-полный flow — `docs/processes/deal-management.md` /
-`docs/lifecycles/Deal.md` (шаги 6-7). P&L сделки финализация собирает
-не через fills (число — net из positions-history, разбивка — из bills;
-`docs/decisions/result-profit-source.md`,
-`docs/decisions/pnl-finalization-mechanics.md`).
-Position-правило: локальная `CLOSED Position` **материализуется ногой 2
-из записи positions-history**, если её ещё не было; `Deal`
-финализируется по собранным фактам тем же проходом
-(`docs/components/RefreshPositionExecutor.md` §«Позиция, впервые
-увиденная уже закрытой»). Прежняя редакция («новую `CLOSED` не
-создавать, вторая нога не идёт, число и привязка bills ждут») **снята**
-вместе с ограничением ноги 2 по наблюдавшемуся `posId`: она делала
-число недостижимым ровно на левом хвосте распределения — тропе быстрого
-стопа и ликвидации.
 
 ## Position not found vs Order/AlgoOrder
 

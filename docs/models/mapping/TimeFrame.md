@@ -5,18 +5,6 @@
 Как доменный enum `TimeFrame` маппится в строки таймфреймов
 источников.
 
-## Контекст
-
-Mapping-слой для `TimeFrame`. Доменный enum `TimeFrame` строк
-источника не хранит; каноническое описание enum (первоисточник —
-свечная подсистема) — `docs/models/domain/other/CandleGroup.md`
-§«Енум `TimeFrame`». Маппинг строк живёт только здесь и в
-`TimeFrameMapper` (компонент adapter-слоя). Раздел `TimeFrame` в
-`docs/models/domain/aggregate/Strategy.md` сведён к ссылке на канон
-(TIME-Q1 закрыт на `GAPS_CLOSE_1` шага 2).
-
-Текущие источники: **OKX**.
-
 ## OKX
 
 Доменный `TimeFrame` ↔ строка таймфрейма OKX, например:
@@ -40,15 +28,14 @@ TimeFrame.ONE_HOUR <-> "1H"
 
 ### `ONE_SECOND` — ветка маппера и её условие (H10 `DOCS_CHECK_15`)
 
-Значение введено шагом 7 (канон — `docs/models/domain/other/CandleGroup.md`
-§«Енум `TimeFrame`»), поэтому **исчерпывающий `switch` `TimeFrameMapper`
+Значение введено шагом 7 (канон — `docs/models/domain/other/CandleGroup.md`), поэтому **исчерпывающий `switch` `TimeFrameMapper`
 получает девятую ветку**: без неё маппер перестаёт компилироваться либо
 падает на новом значении.
 
 - **Строка источника — предмет сверки `integrator`**, не догадка: какой
   бар секундного разрешения (и есть ли он вовсе на нужных парах
   котировки) — открытое предусловие `CODE` п. 5
-  (`docs/decisions/pnl-finalization-mechanics.md`). До ответа строка в
+  (`docs/rules/pnl-reconciliation.md`). До ответа строка в
   `util.Constants.Okx` не заводится, а ветка маппера при вызове с
   `ONE_SECOND` бросает — молчаливой подмены на минутную быть не должно:
   именно её различает ссылка на свечу курса.

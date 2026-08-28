@@ -5,18 +5,6 @@
 Какие поля у OKX candle response — что приходит от биржи и что из
 этого используется.
 
-## Контекст
-
-Нативная модель источника OKX (Java `CandleOkxResponse`).
-Возвращается `GET /api/v5/market/candles` и
-`GET /api/v5/market/history-candles`. Не выходит за
-`IntegrationService`/adapter — `docs/rules/raw-exchange-dto-boundary.md`.
-
-Формат провода, конвертация и `confirm` policy —
-`docs/models/mapping/Candle.md`. Доменная модель —
-`docs/models/domain/other/Candle.md`. Контракт endpoint'ов /
-лимиты / пагинация — `docs/integrations/okx/contracts/candle.md`.
-
 ## Формат провода
 
 На проводе свеча OKX — **позиционный массив из 9 элементов** (не
@@ -45,7 +33,7 @@ millis.
 
 `confirm` в доменную `Candle` не пишется: только закрытые
 (`confirm=1`) свечи сохраняются (правило производящей стороны, см.
-`docs/models/domain/other/Candle.md` §Правило закрытых свечей,
+`docs/models/domain/other/Candle.md` закрытых свечей,
 `docs/models/mapping/Candle.md`). В `market/candles` первая свеча
 часто неполная (`confirm=0`); `market/history-candles` обычно
 отдаёт уже закрытые.
