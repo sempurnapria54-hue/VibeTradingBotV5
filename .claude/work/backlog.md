@@ -517,15 +517,32 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   `CreateOrderExecutor` из восьмого поля `CreateOrderCommandPayload`);
 - **`+orders.position_id`** (FK, write-once, пишет
   `RefreshOrderExecutor` при первом филле ноги);
-- **двухуровневый лимит риска:** `strategy_details.risk_per_trade_percent`
-  → `risk_per_action_percent` (`ALTER RENAME`), `+risk_per_deal_percent`;
-  `RiskCheckCode.RISK_PER_TRADE_EXCEEDED` →
-  `RISK_PER_ACTION_EXCEEDED`, `+RISK_PER_DEAL_EXCEEDED`; правка
-  `StrategyDetail` / api-модели / entity и двух
-  `strategy-examples/*.json`; вторая проверка в `RiskValidator`;
-  `BLOCKED` по `RISK_PER_DEAL_EXCEEDED` **в `ERROR` не уводит**
-  (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
-  сделки»);
+- **три лимита риска внутри уровня «риск на сделку»** (C6
+  `DOCS_CHECK_20` + `RISK-Q3-A`; дом —
+  `docs/decisions/per-trade-risk-policy.md`):
+  - `strategy_details.risk_per_trade_percent` → `risk_per_action_percent`
+    (`ALTER RENAME`), `+cumulative_risk_per_deal_multiplier`; правка
+    `StrategyDetail` / api-модели / entity и двух
+    `strategy-examples/*.json`;
+  - **глобальный конфиг** `simultaneousRiskPerDealPercent = 1%`
+    (`@ConfigurationProperties`, колонки нет);
+  - `RiskCheckCode.RISK_PER_TRADE_EXCEEDED` → `RISK_PER_ACTION_EXCEEDED`,
+    `+RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
+    `+RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`; **две** новые проверки в
+    `RiskValidator` (`liveRiskNow = max(0, plannedRiskAmount −
+    protectionRelievedRiskAmount)`, носителя остатка не заводить);
+  - **статическая проверка на create стратегии**
+    (`StrategyCreateRequestValidator`, 400):
+    `n_risk_creating(step) × riskPerActionPercent ≤
+    simultaneousRiskPerDealPercent` для каждого шага
+    (`docs/decisions/strategy-materialization-and-validation.md`);
+  - `BLOCKED` по обоим сделочным кодам **в `ERROR` не уводит**
+    (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
+    сделки»);
+- **биржевой якорь нижней границы окна bills** (П7-B, вариант (г)):
+  `EntryScannerJob` читает `GET /public/time` перед вызовом
+  `DealOpeningService`, тот пишет `Deal.externalCreatedAt`; отказ
+  эндпоинта ⇒ сделка не создаётся. Суррогат `Deal.createdAt` снят;
 - **`+trade_fee_rates.external_fee_level`**, **`+ix_anomaly_report_unfinished_state`**
   (сборка — `docs/decisions/pnl-finalization-mechanics.md`
   §«Schema-дельта шага 7»);
@@ -665,7 +682,8 @@ top-level эхо attached-защиты (`attachedAlgoInternalId`,
     обязательности контракта границы; реджект `contractType ≠ LINEAR`
     на тропе заведения инструмента; состав цикла добычи един для всех
     троп (гейт bills — у звена); пустой `billsWindowBegin` ⇒ суррогат
-    `Deal.createdAt` внутри исполнителя; операнд `breakdownIncomplete`
+    **`Deal.externalCreatedAt`** внутри исполнителя (П7-B, биржевой
+    якорь); операнд `breakdownIncomplete`
     составной — `max(billsFetchedThrough, billsWindowEnd) −
     billsWindowBegin`, оба операнда биржевые (A8 `DOCS_CHECK_20`);
   - **`attachedProtection` не доезжает до payload — гейт `CODE`.**

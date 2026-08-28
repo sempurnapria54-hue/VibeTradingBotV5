@@ -132,13 +132,24 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 - `RISK_PER_ACTION_EXCEEDED` — риск **одного действия** (%) выше
   `StrategyDetail.riskPerActionPercent` (база — текущий
   `externalAvailableEquity`);
-- `RISK_PER_DEAL_EXCEEDED` — **потолок сделки**: `Deal.plannedRiskAmount`
-  плюс риск проверяемого действия выше `StrategyDetail.riskPerDealPercent
-  × Deal.plannedRiskEquityBase`. Оба неравенства обязаны выполниться;
-  дом политики — `docs/decisions/per-trade-risk-policy.md` §«Лимит риска
-  двухуровневый». **Исход `BLOCKED` по этому коду аварией не является**
-  (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
-  сделки»).
+- `RISK_PER_DEAL_CUMULATIVE_EXCEEDED` — **кумулятивный потолок сделки**:
+  `Deal.plannedRiskAmount` плюс риск проверяемого действия выше
+  `cumulativeRiskPerDealMultiplier × riskPerActionPercent ×
+  Deal.plannedRiskEquityBase`;
+- `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED` — **одновременный риск на
+  сделку**: `liveRiskNow` плюс риск проверяемого действия выше
+  `simultaneousRiskPerDealPercent × externalAvailableEquity`, где
+  `liveRiskNow = max(0, Deal.plannedRiskAmount −
+  Deal.protectionRelievedRiskAmount)`. Лимит — **глобальный конфиг**
+  (`1%`), не поле стратегии; носителя остатка не заводится — величина
+  вычисляется здесь.
+
+**Все три неравенства обязаны выполниться**; дом политики —
+`docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня
+„риск на сделку“», здесь не пересказывается. **Исход `BLOCKED` по обоим
+сделочным кодам аварией не является**
+(`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
+сделки»).
 
 Агрегация: любой `BLOCKED` ⇒ `BLOCKED`; путь `WARNING` в коде есть
 (аггрегатор его учитывает), но **ни одна проверка фазы 1 `WARNING` не

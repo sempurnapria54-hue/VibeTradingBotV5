@@ -350,7 +350,10 @@ Bills **не несут** `dealId` — только `instId`, `ccy`, `ts`, `ordI
 невыразим — прочитанное значение могло быть до-закрытийным, закрывающие
 движения выпадали из окна необратимо.
 
-- `begin` = `Deal.billsWindowBegin` — `Order.externalCreatedAt` первой
+- `begin` = `Deal.billsWindowBegin`, а при его пустоте —
+  `Deal.externalCreatedAt` (биржевой момент создания сделки, П7-B;
+  разбор — `docs/models/domain/aggregate/Deal.md` §«Почему у нижней
+  границы один писатель»). `Deal.billsWindowBegin` — `Order.externalCreatedAt` первой
   отправленной ноги; писатель **один**, `SubmitOrderExecutor` (H9
   `DOCS_CHECK_16`; прежняя AG1.5-развилка снята вместе с двумя другими
   писателями — разбор у модели `Deal`).

@@ -89,7 +89,10 @@ Bills добываются командой **`REFRESH_BILLS_COMMAND`** (`Refres
    docs/decisions/command-action-boundary.md §7):
    - begin = Deal.billsWindowBegin (пишет ЕДИНСТВЕННЫЙ писатель
             SubmitOrderExecutor: Order.externalCreatedAt первой
-            отправленной ноги, H9 DOCS_CHECK_16);
+            отправленной ноги, H9 DOCS_CHECK_16); при его пустоте —
+            СУРРОГАТ Deal.externalCreatedAt (биржевой момент создания
+            сделки, GET /public/time; П7-B DOCS_CHECK_20 — системные
+            часы суррогатом быть не могут);
    - end   = СЕРВЕРНОЕ ВРЕМЯ ИСТОЧНИКА прохода (GET /public/time,
             server-time.md; A8 DOCS_CHECK_20 — системные часы в биржевом
             окне не участвуют, docs/rules/time-utc.md). Подвижная

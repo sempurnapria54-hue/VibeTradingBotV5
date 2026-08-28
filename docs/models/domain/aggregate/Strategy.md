@@ -273,8 +273,8 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 | `id` | `Long` | Технический ID. |
 | `marketPhaseType` | `MarketPhase.Type` | Для какой фазы работает detail. |
 | `phaseEntryPolicy` | `PhaseEntryPolicy` | Как торгуем в этой фазе. |
-| `riskPerActionPercent` | `BigDecimal` | **Поактный** лимит риска: % от **свободного депозита** (`externalAvailableEquity`) на одно risk-creating действие; см. `docs/decisions/per-trade-risk-policy.md` §«Лимит риска двухуровневый». |
-| `riskPerDealPercent` | `BigDecimal` | **Потолок риска на сделку**: % от `Deal.plannedRiskEquityBase` (база первого сайзинга сделки), которым ограничена Σ плановых рисков живых и исполнившихся ног входа. Инвариант — `riskPerDealPercent ≥ riskPerActionPercent`; см. там же. |
+| `riskPerActionPercent` | `BigDecimal` | **Поактный** лимит риска: % от **свободного депозита** (`externalAvailableEquity`) на одно risk-creating действие. Он же — единица измерения кумулятивного потолка (`K × riskPerActionPercent`) и операнд статической проверки против одновременного лимита; см. `docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня „риск на сделку“». |
+| `cumulativeRiskPerDealMultiplier` | `BigDecimal` | **Кумулятивный потолок риска на сделку — множитель поактного лимита** (`K`): Σ плановых рисков живых и исполнившихся ног входа не превышает `K × riskPerActionPercent × Deal.plannedRiskEquityBase`. **Не валидируется** — ни снизу, ни сверху (решение держателя `RISK-Q3-A`); при `K < 1` первая же нога не проходит, и это выбор автора, а не ошибка конфигурации. См. там же. |
 | `targetRiskRewardRatio` | `BigDecimal` | High-level ориентир R/R. |
 | `positionReopenAllowed` | `Boolean` | **Допустимо ли переоткрытие позиции внутри сделки** (многоэпизодная сделка, `docs/decisions/multi-episode-deal.md`). `true` — позиция, схлопнувшаяся в ноль в `MANAGING`, может быть открыта заново живой входной ногой; сделка становится многоэпизодной, `resultProfit` аккумулирует по эпизодам. `false` — `ManagingHandler` по наблюдению `externalSize → 0` в `MANAGING` снимает живые входные ноги (`docs/components/ManagingHandler.md` §«Входные проверки»; порядок — `docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»), сделка остаётся одноэпизодной. |
 | `stepsByStatus` | `Map<Deal.Status, List<StrategyStep>>` | Шаги, сгруппированные по статусу сделки. |
@@ -293,13 +293,18 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 `PhaseEntryPolicy.isAllowedFor`); проверяется на create (400). У
 `NO_TRADE`-детали риск-поля и настройки опциональны (nullable).
 
-**`riskPerDealPercent` обязателен у торгуемой детали** и умолчания не
-имеет (C6 `DOCS_CHECK_20`). Вывести его из `riskPerActionPercent`
-нельзя: множитель «сколько актов подряд стратегия вправе сложить» —
-суждение о допустимой просадке, а не следствие модели; численное
-значение — риск-аппетит держателя
-(`.claude/work/questions/open-questions.md` §RISK-Q3-A), до его ответа
-провизорно.
+**`cumulativeRiskPerDealMultiplier` обязателен у торгуемой детали** и
+умолчания не имеет (C6 `DOCS_CHECK_20`). Вывести его из
+`riskPerActionPercent` нельзя: множитель «сколько актов подряд стратегия
+вправе сложить» — суждение о допустимой просадке, а не следствие модели.
+
+**Третий лимит — одновременный риск на сделку — полем детали не
+является** (решение держателя `RISK-Q3-A`): это **глобальный конфиг**
+(`simultaneousRiskPerDealPercent`, `1%`), потому что стратегия обязана в
+него умещаться, а не переопределять его. Деталь проверяется против него
+**статически на create**: пакет действий любого шага не может создать
+больше ног, чем помещается в лимит (§Персистентность,
+`docs/decisions/per-trade-risk-policy.md` §«Валидация — в двух точках»).
 
 **`positionReopenAllowed` обязателен у торгуемой детали** (nullable
 только у `NO_TRADE`, как и риск-поля): умолчания у него нет намеренно —
@@ -690,11 +695,12 @@ CHECK-констрейнты, отвергнутые альтернативы) �
   (`boolean`, nullable — обязателен по существу у торгуемой детали,
   пуст у `NO_TRADE`; как и остальные риск-поля детали);
   **`risk_per_trade_percent` → `risk_per_action_percent`**
-  (`ALTER RENAME`) и **`+risk_per_deal_percent`** (`numeric(36,18)`,
-  nullable — та же nullability, что у прочих риск-полей детали) —
-  двухуровневый лимит риска (C6 `DOCS_CHECK_20`, дом —
-  `docs/decisions/per-trade-risk-policy.md` §«Лимит риска
-  двухуровневый»). Бэкфилл не
+  (`ALTER RENAME`) и **`+cumulative_risk_per_deal_multiplier`**
+  (`numeric(36,18)`, nullable — та же nullability, что у прочих
+  риск-полей детали) — сделочный лимит риска (C6 `DOCS_CHECK_20` +
+  `RISK-Q3-A`, дом — `docs/decisions/per-trade-risk-policy.md` §«Три
+  лимита внутри уровня „риск на сделку“»). **Одновременный лимит
+  колонки не получает** — он глобальный конфиг, не поле детали. Бэкфилл не
   нужен — таблицы пусты
   (`.claude/rules/pre-launch-schema-changes.md`). Полная schema-дельта
   шага — `docs/decisions/pnl-finalization-mechanics.md`
@@ -733,15 +739,23 @@ CHECK-констрейнты, отвергнутые альтернативы) �
   `*Multiplier` — `BigDecimal` (numeric(36,18), Constants.Price);
   `*Bars` / `*Period` / `level` / `warmup` — `Integer`. Риск-поля детали
   (`riskPerActionPercent`, `targetRiskRewardRatio`) — nullable (у
-  `NO_TRADE`-детали риска нет); `riskPerDealPercent` — там же и с тем же
-  правилом nullability.
+  `NO_TRADE`-детали риска нет); `cumulativeRiskPerDealMultiplier` — там
+  же и с тем же правилом nullability.
 - Валидацию полей и контекстный whitelist операндов/`ruleType` делает
   приложение.
-- **`riskPerDealPercent ≥ riskPerActionPercent`** — инвариант детали,
-  проверяется на create (400). Нарушение делает первую же ногу входа
-  непроходимой по построению
-  (`docs/decisions/per-trade-risk-policy.md` §«Лимит риска
-  двухуровневый»).
+- **`cumulativeRiskPerDealMultiplier` не валидируется** (решение
+  держателя `RISK-Q3-A`): любое значение легально, включая `K < 1`,
+  при котором первая же нога не проходит. Прежде предложенный CC
+  инвариант `K ≥ 1` **снят** — отказ на `PRECHECK` громкий и
+  немедленный, а второй уровень контроля над явно объявленным числом
+  дублировал бы первый.
+- **Одновременный лимит проверяется статически** (400): для каждого
+  `StrategyStep` — `n_risk_creating(step) × riskPerActionPercent ≤
+  simultaneousRiskPerDealPercent`. Пакет действий шага выполняется
+  целиком, поэтому веер ног, не помещающийся в лимит **никогда**, есть
+  ошибка конфигурации, и её место — create
+  (`docs/decisions/per-trade-risk-policy.md` §«Валидация — в двух
+  точках»).
 
 ## TimeFrame
 
