@@ -39,20 +39,27 @@ Snapshot — нормализованный граничный объект; е�
 | `fee` | `Order.fee` | комиссия |
 | `externalCreatedAt` | `Order.externalCreatedAt` | |
 | `externalModifiedAt` | `Order.externalModifiedAt` | |
-| `attachedAlgoInternalId` | `Order.attachedAlgoInternalId` | top-level attached client id |
+| `attachedAlgoInternalId` | — | top-level attached client id; **у `Order` такого поля нет** (B6 `DOCS_CHECK_20`) — идентичность attached-защиты живёт на элементе `attachedAlgoOrders[]` (`internalId`), и top-level эхо в домен не приземляется |
 | `takeProfitTriggerPrice` (future) | — | top-level TP trigger (для entry-with-attached-SL) |
-| `stopLossTriggerPrice` | `Order.stopLossTriggerPrice` | top-level SL trigger |
+| `stopLossTriggerPrice` | — | top-level SL trigger; **у `Order` такого поля нет** (B6 `DOCS_CHECK_20`) — уровень живёт на элементе `attachedAlgoOrders[].stopLossTriggerPrice` (`docs/models/domain/core/Order.md` §«Структура `AttachedAlgoOrder`»), верифицировано по `Order.java` |
 | `attachedAlgoOrders[]` | `Order.attachedAlgoOrders[]` | список `AttachedAlgoOrder` (см. ниже) |
 
 **Поля планового риска в снапшот не входят и им не перезаписываются.**
 `plannedRiskAmount`, `plannedRiskCurrency`, `plannedEntryPrice`,
-`plannedSizeContracts`, `plannedContractValue` — **наши** величины,
+`plannedSizeContracts`, `plannedContractValue`, **`plannedStopPrice`** —
+**наши** величины,
 произведённые риск-преконтролем и доставленные
 `CreateOrderCommandPayload`'ом (`docs/components/CreateOrderExecutor.md`
 §«Куда пишутся шесть чисел»); источник таких фактов не отдаёт, и эхо
 рефреша их не трогает — все шесть write-once (`updatable = false`).
+**Тем же порядком не приземляются `liquidationDistanceRatio` (седьмое
+число) и `positionId`** — первое производит преконтроль, второе пишет
+`RefreshOrderExecutor` при первом филле; из снапшота не берётся ни то,
+ни другое.
 Строка заведена H5 `DOCS_CHECK_16` структурным свипом (пятая колонка
-`orders`) и расширена Р3 `GAPS_CLOSE_16` (шестая, `planned_stop_price`):
+`orders`), расширена Р3 `GAPS_CLOSE_16` (шестая, `planned_stop_price`) и
+доведена до объявленного счёта B6 `DOCS_CHECK_20` (перечислялись пять,
+объявлялось шесть):
 mapping-таблица обязана сказать, что этих колонок здесь нет
 **намеренно**, — иначе отсутствие читается как пропуск.
 
@@ -170,6 +177,14 @@ market), `tpTriggerPxType`/`slTriggerPxType` (`last`/`index`/`mark`,
 default `last`), `sz` (для split-TP), `amendPxOnTriggerType` (`0`/`1`
 cost-price SL для split). `tpTriggerPx` vs `tpTriggerRatio` —
 взаимоисключимо; аналогично SL.
+
+**`slTriggerPxType` заполняется всегда, биржевой default не
+используется** (C1 `DOCS_CHECK_20`): источник значения —
+`AttachedAlgoOrder.triggerPriceType`, доезжающее из
+`StopLossSettings.triggerPriceType` стратегии через
+`AttachedProtectionPayload`. Дом принципа —
+`docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
+защиты объявляется стратегией и доезжает до биржи».
 
 **Amend OKX-specific — доменом не используется** (REPLACE-only,
 `docs/decisions/replace-not-amend.md`): амендные поля биржи

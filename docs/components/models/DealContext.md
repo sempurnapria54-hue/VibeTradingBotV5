@@ -60,4 +60,6 @@ FSM/handler перед risk-sensitive flow; при absent/stale свежесть
 `MarketPriceData`, `IndicatorValue`, `MarketStructure`, `MarketPhase`,
 `CalculationContext` в `DealContext` не входят — собираются в
 `CalculationContext` в рантайме перед расчётом. Отдельный `PositionContext`
-не используется (≤1 `Position` на `Deal`).
+не используется: эпизоды живут строками `deal.positions`, живой резолвится
+предикатом модели `livePosition()`
+(`docs/decisions/multi-episode-deal.md`).

@@ -75,10 +75,10 @@ Java-модель, наследует поля аудита от `Auditable`.
 входов (`Instrument.ENTRY_BLOCKED`) — тоже холд с ручным снятием, но его
 отчёт идёт `NON_CRITICAL`, потому что kill-switch в составе реакции нет;
 блокировку задаёт состав реакции, не `severity` (§ниже). На биржевом
-радиусе `NON_CRITICAL`-производителя холда нет вовсе: обе ступени
-лестницы либо ставятся вручную (`Exchange.HOLD`), либо гоняют kill-switch
-(`Exchange.TRADE_BLOCKED` ⇒ `CRITICAL`) —
-`docs/rules/exchange-hold.md`.
+радиусе то же самое: ступень 1 (`Exchange.HOLD`) — холд с ручным снятием
+при `NON_CRITICAL`-отчёте (`kind = STATE`), потому что kill-switch в
+составе реакции нет; ступень 2 гоняет kill-switch ⇒ `CRITICAL`
+(`docs/rules/exchange-hold.md`).
 
 ### `Kind`
 
@@ -135,8 +135,8 @@ error-политики (`docs/rules/error-handling-policy.md` §«Перечен
 описывала обе ветки в kill-switch-терминах — снята: `NON_CRITICAL`-тропа
 kill-switch не проходит вовсе, а мягкий холд ставится при
 `NON_CRITICAL`-аномалии и снимается вручную. На биржевом радиусе
-разведение то же, но по другой оси: ступень 1 (`Exchange.HOLD`) — ручной
-гейт входов и реактивным отчётом вообще не сопровождается, ступень 2 —
+разведение то же: ступень 1 (`Exchange.HOLD`) — гейт входов при
+`NON_CRITICAL`-отчёте (`kind = STATE`), ступень 2 —
 kill-switch и `CRITICAL` (`docs/rules/exchange-hold.md`).
 
 ## Инварианты структуры
@@ -317,11 +317,12 @@ H5 `DOCS_CHECK_14`). Существующая точка входа рассчи
 | Поверхность | Кто зовёт | Что задаёт |
 |---|---|---|
 | Реактивная (существующая) | `SafetyHoldCoordinator`, `AnomalyJob` | `HoldSignal` — идентичность объекта (`instrumentId`/`exchangeId`) **из сигнала** (H5 `DOCS_CHECK_14`: `DealContext` из цепочки ушёл вместе с уходом из подписи `HoldService.hold(...)`); `severity = CRITICAL`, `kind = STATE`; слепки собирает `AnomalyReportService`, радиус приходит ему через координатора из того же сигнала |
-| Журнальная (вводится шагом 7) | `FinalizeDealExitExecutor`, `RefreshBillsExecutor`, `MarkDealEmergencyClosedExecutor`, `InstrumentExternalRulesSyncJob` | `exchangeId`, `scope`, опц. `instrumentId`, `code`, `severity = NON_CRITICAL`, **`kind`** (`EVENT` у producer'ов сделки, `STATE` у синка), слепки |
+| Журнальная (вводится шагом 7) | `FinalizeDealExitExecutor`, `RefreshBillsExecutor`, `MarkDealEmergencyClosedExecutor`, `InstrumentExternalRulesSyncJob`, `HoldService` (ветка `FREEZE` — биржевая ступень 1) | `exchangeId`, `scope`, опц. `instrumentId`, `code`, `severity = NON_CRITICAL`, **`kind`** (`EVENT` у producer'ов сделки, `STATE` у синка и `FREEZE`-холда), слепки |
 
-**Процессные (`STATE`) отчёты ведут три актора** (`ANOM-Q5` закрыт на
-трёх; четвёртого, вводившегося под биржевую ступень 1, нет — ревизия
-держателя `GAPS_CLOSE_18`): синк (журнальная тропа),
+**Процессные (`STATE`) отчёты ведут четыре актора** (`ANOM-Q5` закрыт на
+трёх; четвёртый — `HoldService` в ветке `FREEZE`, введён вместе с первым
+автоматическим триггером биржевой ступени 1, `GAPS_CLOSE_19`): синк
+(журнальная тропа), `HoldService` (биржевая ступень 1),
 `SafetyHoldCoordinator` (реактивная с kill-switch),
 `AnomalyJob` (проактивная, полноценно — шаг 8). Поиск незавершённого
 применяется ко **всем** `STATE`-отчётам, включая критические
@@ -352,8 +353,9 @@ H5 `DOCS_CHECK_14`). Существующая точка входа рассчи
   работаем дальше. Класс реакции холда (`SOFT`/`FULL`) — **другая ось**, она
   живёт на стороне холда (`docs/components/models/HoldSignal.md`) и в отчёт
   не переносится;
-- **`STATE`-ветку lifecycle внутри `NON_CRITICAL` ведёт синк**; других
-  ведущих у неё нет и не требуется
+- **`STATE`-ветку lifecycle внутри `NON_CRITICAL` ведут двое** — синк
+  (несвежесть ставки) и `HoldService` в ветке `FREEZE` (биржевая
+  ступень 1, `GAPS_CLOSE_19`); других ведущих у неё нет и не требуется
   (`docs/lifecycles/AnomalyReport.md` §«Кто управляет»).
 
 **Реестр кодов шага 7 — журнальной поверхности** (`code` обязателен — до
@@ -363,17 +365,19 @@ H5 `DOCS_CHECK_14`). Существующая точка входа рассчи
 
 | `code` | Производитель | Факт | `scope` | `kind` |
 |---|---|---|---|---|
-| `PNL_RECONCILIATION_MISMATCH` | `FinalizeDealExitExecutor` | общее расхождение по сделке (`Σ|Δᵢ|` по **четырём** парам раздельной сверки) вышло за epsilon (H19 `DOCS_CHECK_12`, четвёртая пара и единый допуск — H7/H9 `GAPS_CLOSE_13`); сопровождается `Deal.reconciliationStatus = MISMATCHED`. **Уровень внутренней градации и лестница эскалации не назначены** — `PNL-Q1` п.3 (H21 `DOCS_CHECK_12`) | `INSTRUMENT` | `EVENT` |
+| `PNL_RECONCILIATION_MISMATCH` | `FinalizeDealExitExecutor` (журнальный) + `HoldService` (отчёт состояния холда) | общее расхождение по сделке (`Σ|Δᵢ|` по **четырём** парам раздельной сверки) вышло за epsilon (H19 `DOCS_CHECK_12`, четвёртая пара и единый допуск — H7/H9 `GAPS_CLOSE_13`); сопровождается `Deal.reconciliationStatus = MISMATCHED`. **Уровень градации назначен** (решение держателя, `GAPS_CLOSE_19`): уровень 4, **ступень 1** биржевой лестницы — при **калиброванном** допуске; в разведочном режиме только журнальный отчёт, лестница не триггерится (`docs/rules/pnl-reconciliation.md` §«Реакция на расхождение»). Тот же код несёт `HoldSignal` `FREEZE`-тропы | `INSTRUMENT` (журнальный) / `EXCHANGE` (холд) | `EVENT` (журнальный) / `STATE` (холд) |
 | `RESULT_CURRENCY_MISMATCH` | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` (H9 `DOCS_CHECK_17`) | валюта записи закрытия (`Position.externalResultCurrency`) не совпала с расчётной валютой инструмента (H10 `DOCS_CHECK_10`); расчёт не блокируется | `INSTRUMENT` | `EVENT` |
 | `UNCLASSIFIED_CASH_FLOW` | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` (H9 `DOCS_CHECK_17`) | у сделки есть залинкованные строки категории `OTHER` — тип движения не распознан и не исключён (H14 `DOCS_CHECK_10`) | `INSTRUMENT` | `EVENT` |
 | `SETTLE_CURRENCY_VIOLATION` | `RefreshBillsExecutor` | движение в валюте, отличной от расчётной валюты инструмента | `INSTRUMENT` | `EVENT` |
 | `SETTLE_CURRENCY_UNAVAILABLE` | `RefreshBillsExecutor` / `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` / `MarkDealClosedExecutor` (H9 `DOCS_CHECK_17` — писателей валюты три) | расчётная валюта инструмента не резолвится — операнд сравнения/источник валюты результата пуст (H10 `DOCS_CHECK_10`) | `INSTRUMENT` | `EVENT` |
 | `CROSS_CCY_RATE_UNAVAILABLE` | `RefreshBillsExecutor` | котировка для пересчёта cross-ccy движения не получена: `appliedRate` = `null`, слагаемое не вносится (H11 `DOCS_CHECK_10`) | `INSTRUMENT` | `EVENT` |
 | `RESULT_PROFIT_UNAVAILABLE` | `MarkDealEmergencyClosedExecutor` | число на аварийном терминале «неисчислимо» (`null`) | `INSTRUMENT` | `EVENT` |
-| `EMERGENCY_TERMINAL_UNVERIFIED` | `MarkDealEmergencyClosedExecutor` | сделка завершена аварийным терминалом: сверка bills ↔ net **не гонялась**. **Одна запись на эпизод**, обе ветви (H22 `DOCS_CHECK_11`). Клауза «сделка выведена из R-выборки» **снята** (узел F `DOCS_CHECK_12`): из популяции ничего не выводится, факт несёт поле `Deal.reconciliationStatus = NOT_RUN`, а отчёт остаётся журнальной записью о факте | `INSTRUMENT` | `EVENT` |
+| `EMERGENCY_TERMINAL_UNVERIFIED` | `MarkDealEmergencyClosedExecutor` | сделка завершена аварийным терминалом: сверка bills ↔ net **не гонялась** (`reconciliationStatus = NOT_RUN` — обязанность не наступила, чаще всего потому, что движения не добывались: bills-звено на аварийной тропе не эмитится). **Одна запись на эпизод.** Клейм «обе ветви» **снят** (A2 `DOCS_CHECK_19`): ветвь с посчитанной сверкой отчёта не производит — там исход `MATCHED`/`MISMATCHED`. Клауза «сделка выведена из R-выборки» **снята** (узел F `DOCS_CHECK_12`): из популяции ничего не выводится, факт несёт поле `Deal.reconciliationStatus = NOT_RUN`, а отчёт остаётся журнальной записью о факте | `INSTRUMENT` | `EVENT` |
 | `PLANNED_RISK_MISSING` | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` | у сделки состоялись операции, но `Deal.plannedRiskAmount` пуст — сопровождается **`Deal.riskBenchmarkAvailability = MISSING`** (H13 `DOCS_CHECK_16`: две природы пустоты знаменателя разведены признаком, нормальная популяция несёт `NOT_APPLICABLE`) — **сумма по ногам входа пуста, потому что ног с плановым риском нет** (позиция создана вне приложения; H6/H11 `DOCS_CHECK_15` смысла кода не меняет): знаменатель R не определён, сделка помечается как `R-unknown` и **считается** поштучно; омиссионный член epsilon не участвует (H23/H7 `DOCS_CHECK_11`) | `INSTRUMENT` | `EVENT` |
 | `CLOSE_OUTCOME_UNDETERMINED` | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` | операнд торгового исхода (`Position.externalCloseType`) **пуст, потому что записи закрытия нет** ⇒ `Deal.closeOutcome = UNDETERMINED` (H2 `GAPS_CLOSE_13`). Холда не вызывает. Ветка «запись добыта, а поле пусто/вне перечня» сюда больше не приходит: контракт записи проверяется **на границе интеграции**, и её нарушение уводит сделку общим контуром в биржевую ступень 2 (`Exchange.TRADE_BLOCKED` + flatten) (H5 `DOCS_CHECK_15`, `docs/models/mapping/PositionCloseResult.md` §«Контракт записи проверяется здесь») | `INSTRUMENT` | `EVENT` |
 | `BREAKDOWN_COMPLETENESS_NOT_ASSESSED` | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` | границы окна линковки не добыты ⇒ сравнение с глубиной архивной выдачи не выполнялось ⇒ `Deal.breakdownIncomplete = NOT_ASSESSED` (H4 `GAPS_CLOSE_13`); «не проверяли» отделено от «проверили, всё в порядке» | `INSTRUMENT` | `EVENT` |
+| `PARTIAL_EXIT_ROUNDED_TO_FULL` | `SizeCalculator` (через исполнителя действия) | объявленная доля частичного выхода после округления вниз по `lotSz` оказалась меньше `minSz`, и остаток позиции тоже меньше `minSz` ⇒ выход исполнен **целиком**: «частично» на этом размере невыразимо. Исход объявляется, а не подставляется (C5 `DOCS_CHECK_20`, `docs/components/SizeCalculator.md` §«Reduce-only / algo») | `INSTRUMENT` | `EVENT` |
+| `PARTIAL_EXIT_BELOW_MIN_SIZE` | `SizeCalculator` (через исполнителя действия) | объявленная доля меньше `minSz` при остатке ≥ `minSz` ⇒ действие **не исполнено**, шаг стратегии пропущен, сделка остаётся в текущем статусе (C5 `DOCS_CHECK_20`) | `INSTRUMENT` | `EVENT` |
 | `FEE_RATE_STALE` | `InstrumentExternalRulesSyncJob` | возраст строки ставки группы > порога — **по одному отчёту на каждый инструмент группы** (H14 `DOCS_CHECK_15`) | `INSTRUMENT` | `STATE` |
 | `FEE_GROUP_KEY_STALE` | `InstrumentExternalRulesSyncJob` | возраст ключа группы на инструменте > порога — **по одному отчёту на каждый затронутый инструмент**, включая режим «вызов не прошёл» (H14 `DOCS_CHECK_15`) | `INSTRUMENT` | `STATE` |
 
@@ -400,11 +404,11 @@ attached-защиты) в резолве епсилона больше не уч
 (`docs/components/FinalizeDealExitExecutor.md` §epsilon).
 
 **Кодов серии отказов в реестре нет** (H9 `DOCS_CHECK_12`). Серия отчёта
-не производит, а `severity` класс реакции не выражает. Коды причины холда
-по исчерпанию бюджета — **два** (`RETRY_BUDGET_EXHAUSTED` на живой тропе и
-`POST_MORTEM_HARVEST_EXHAUSTED` у посмертной добычи; решение держателя П6
-валидации `GAPS_CLOSE_17`), и живут они как коды холда (`HoldSignal.code`),
-не как коды аномалии;
+не производит, а `severity` класс реакции не выражает. Код причины холда
+по исчерпанию бюджета — **один** (`RETRY_BUDGET_EXHAUSTED` на живой
+тропе; `POST_MORTEM_HARVEST_EXHAUSTED` снят A3 `DOCS_CHECK_20` — у
+посмертной добычи производителя холда нет), и живёт он как код холда
+(`HoldSignal.code`), не как код аномалии;
 
 **Реестр выше — реестр кодов ЖУРНАЛЬНОЙ поверхности** (H8
 `DOCS_CHECK_16`). Клауза «кодов серии в реестре нет … живёт как код холда,
@@ -425,13 +429,11 @@ attached-защиты) в резолве епсилона больше не уч
 - **двузначности код не даёт:** мягкой ветки у этого кода не осталось
   вовсе, поэтому `AnomalyReport` с `RETRY_BUDGET_EXHAUSTED` означает ровно
   одно — `FULL` по инструменту. Прежде однозначность держалась тем, что
-  мягкая ветка отчёта не производила; теперь — тем, что ветка одна. То же
-  верно для `POST_MORTEM_HARVEST_EXHAUSTED`: реакция та же полная,
-  различается только тропа-производитель;
+  мягкая ветка отчёта не производила; теперь — тем, что ветка одна;
 - **в реестр журнальных кодов ничего не вводится.** Ветка не «серия»
   (серия отчёта по-прежнему не производит) и не журнальная — она
   реактивная, а у реактивной поверхности собственный источник кода
-  (`HoldSignal.code`, теперь двузначный по исчерпанию). Реестр выше
+  (`HoldSignal.code`, по исчерпанию бюджета однозначный). Реестр выше
   перечисляет производителей журнальной тропы и `SafetyHoldCoordinator` не содержит
   **законно**; клейм полноты у него ограничен этой поверхностью, и
   ограничение теперь записано. объявлен в
@@ -467,7 +469,9 @@ attached-защиты) в резолве епсилона больше не уч
 продолжает его с нужной фазы (§Инварианты структуры, «Отчёт — процесс с
 фазами»).
 
-- **Поисковый индекс вместо уникального:** по (`exchange_id`, `code`,
+- **Поисковый индекс вместо уникального:**
+  **`ix_anomaly_report_unfinished_state`** (имя названо здесь — место
+  истины схемы сущности, B8 `DOCS_CHECK_20`) по (`exchange_id`, `code`,
   `scope`, `instrument_id`) `where kind = 'STATE' and
   status in ('CREATED', 'IN_PROGRESS', 'KILL_SWITCH_EXECUTED')` —
   **не уникальный**, его задача обслужить поиск незавершённого, а не

@@ -20,7 +20,23 @@ ERROR` (non-terminal runtime status для `ErrorHandler`/safety-flow) — в
 
 ## Ребро статуса
 
-`* → ERROR` (любой active runtime status). `ERROR` — **не** terminal:
+`* → ERROR` **на тропах решения** (любой active runtime status).
+
+**Не всякое ребро в `ERROR` едет через это звено** (A4 `DOCS_CHECK_20`):
+тропы **перехвата** — enforcement холда и оба `catch` оркестратора —
+пишут статус прямой записью, звена не эмитируя
+(`docs/decisions/fsm-execution-layering.md` §«Ребро `* → ERROR`:
+карв-аут по природе тропы», `docs/components/DealOrchestratorJob.md`).
+Звено обслуживает рёбра, являющиеся **исходом решения** handler'а:
+`EXIT_PENDING → ERROR` по неполноте числа
+(`docs/components/ExitPendingHandler.md`), BLOCKED-вердикт риск-валидации
+на risk-creating/risk-weakening действии
+(`docs/processes/risk-evaluation.md`) и прочие рёбра, где `ERROR` —
+исход условий перехода. **Затребователь первого исполнения — этот
+handler**, второго (`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`) —
+`ErrorHandler`.
+
+`ERROR` — **не** terminal:
 дальнейший разбор ведёт `docs/components/ErrorHandler.md`; аварийный терминал
 `ERROR → EMERGENCY_CLOSED` после подтверждённого снятия live risk ставит
 **`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`** (`docs/components/MarkDealEmergencyClosedExecutor.md`,

@@ -53,8 +53,10 @@ concurrency-гардом прохода **D-M1** (в фазе 1 — in-process
 `ExchangeDataService`/`fireExchange`); ярлыки уровня со scope сняты (H6,
 `GAPS_CLOSE_5`; уровень — ось error-политики). Биржевая **ступень 1**
 (`Exchange.HOLD`) — **другая форма**: гейт entry-скана без kill-switch и
-каскада, ставится вручную и координатором не исполняется
-(`docs/rules/exchange-hold.md`). Дизайн холдов шага 6:
+каскада, координатором **не** исполняется. Ставится либо вручную, либо
+автоматическим триггером `MISMATCHED` через `HoldService` в ветке
+`FREEZE` (`docs/rules/exchange-hold.md`,
+`docs/components/HoldService.md`); мимо координатора идут обе тропы. Дизайн холдов шага 6:
 
 1. **`TRADE_BLOCKED` scope первым** (`blockTrade`) — gate и анкер
    идемпотентности. Повторный сигнал того же scope, когда scope **уже в

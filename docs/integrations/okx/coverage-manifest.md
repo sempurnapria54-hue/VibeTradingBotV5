@@ -177,7 +177,7 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 | Funding rate history | GET `/public/funding-rate-history` | **создан** | 🟢 в коде | офдок | `funding-rate.md`; **не источник числа** `resultProfit` (funding — через bills/positions-history, `result-profit-source.md`); лишь прогноз/сверка; метода клиента нет |
 | Open interest | GET `/public/open-interest` | **создан** | 🟢 в коде | офдок | `open-interest.md`; метода клиента нет |
 | Position tiers | GET `/public/position-tiers` | **создан** | 🟢 в коде | офдок | `position-tiers.md`; **находка прогона 3:** путь public, не `account/` (сторонний скелет ошибался); метода клиента нет |
-| Server time | GET `/public/time` | **создан** | 🟢 в коде | офдок | `server-time.md`; синхронизация подписи; метода клиента нет |
+| Server time | GET `/public/time` | **создан** | 🟢 в коде | офдок | `server-time.md`; синхронизация подписи; **якорь верхней границы окна bills** (A8 `DOCS_CHECK_20`) — метод клиента заводится шагом 7 |
 | Insurance fund | GET `/public/insurance-fund` | **создан** | 🟢 в коде | офдок | `insurance-fund.md` (офдок: «security fund»); метода клиента нет |
 | Delivery/exercise, settlement, estimated price, underlying, discount-rate, premium history, exchange-rate, index-components, tick bands, series/events/markets (EVENTS), economic calendar, historical market data | various | вне-периметра | — | офдок | FUTURES delivery / OPTIONS / EVENTS / индекс-сервисы — вне скоупа SWAP |
 

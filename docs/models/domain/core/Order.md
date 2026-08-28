@@ -32,6 +32,7 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 |---|---|---|
 | `id` | `Long` | Внутренний идентификатор в БД. |
 | `dealId` | `Long` | Сделка, к которой относится ордер. |
+| `positionId` | `Long` | **Эпизод сделки, к которому относится нога** (строка `Position`; многоэпизодная сделка — `docs/decisions/multi-episode-deal.md`). Пусто, пока эпизода нет: нога поставлена до открытия позиции, либо нога никакого эпизода не открыла (снята неисполненной). Write-once. Потребитель фазы 1 — бюджет риска по эпизодам (§«`positionId` — ось эпизода»); поэпизодный `R` — фаза 2. |
 | `internalId` | `String` | Межсервисный id; stable client id (OKX `clOrdId`). |
 | `externalId` | `String` | Биржевой id ordinary order (OKX `ordId`). |
 | `status` | `Status` | Доменный статус (см. lifecycle). |
@@ -40,8 +41,8 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `side` | `String` | Сторона (OKX `buy` / `sell`). |
 | `externalStatus` | `String` | Сырой статус биржи (OKX `state`) — **диагностический факт**, FSM напрямую не использует. |
 | `price` | `BigDecimal` | Цена (для market-like может быть null). |
-| `size` | `BigDecimal` | Размер (для SWAP/FUTURES — контракты). |
-| `accumulatedFillSize` | `BigDecimal` | Накопленный исполненный объём. |
+| `size` | `BigDecimal` | Размер (для SWAP/FUTURES — контракты). Единица источника — рантайм-подтверждение `.claude/tests/source-api/okx/plan.md` §AG1.5/§C-фикстура (B12 `DOCS_CHECK_20`); офдок `order.md` единицу `sz`/`accFillSz` не называет. |
+| `accumulatedFillSize` | `BigDecimal` | Накопленный исполненный объём — **в тех же единицах, что `size`** (для SWAP/FUTURES — контракты; B12 `DOCS_CHECK_20`). Единица несущая: поле — операнд трёх из четырёх чисел риска через отношение `accumulatedFillSize_i / plannedSizeContracts_i` (`docs/models/domain/aggregate/Deal.md` §«Взятый риск»), и разные единицы у числителя и знаменателя дали бы молча неверную долю. |
 | `averagePrice` | `BigDecimal` | Средняя цена исполнения. |
 | `fee` | `BigDecimal` | Накопленная комиссия. |
 | `positionReducingOnly` | `Boolean` | Доменное намерение: ордер только уменьшает позицию. |
@@ -184,7 +185,7 @@ liquidationDistanceRatio_i = |plannedEntryPrice_i − liqPx| / |plannedEntryPric
   Прежде носителя не называл ни один док — колонка была объявлена, но не
   доведена ни до §Структура, ни до §Персистентность, ни до payload'а, и
   до миграции не доехала бы.
-- **Источник операнда — `DealContext.position`** живого эпизода
+- **Источник операнда — живой эпизод `DealContext`** (`deal.livePosition()`)
   (`externalLiquidationPrice`): при доборе позиция существует и `liqPx`
   наблюдён; на **открывающем** входе позиции ещё нет, операнда нет,
   колонка остаётся пустой. Это и есть популяция, на которой измеритель
@@ -296,6 +297,36 @@ attached-защиты (`docs/components/FinalizeDealExitExecutor.md` §«Пре�
 операции (`docs/models/domain/aggregate/Deal.md` §«Обнаружение
 рассогласования пары носителей»).
 
+### `positionId` — ось эпизода
+
+**Колонка заводится на шаге 7, семантика поэпизодного `R` — фаза 2**
+(N5 `DOCS_CHECK_20`, решение держателя). Разведение сознательное: связь
+«нога → эпизод» наблюдаема **только в момент, когда она возникает**, и
+ретроспективно невосстановима, тогда как правило отнесения `R` к
+эпизодам требует ответов, которые фаза 1 не даёт (ноги, филлующиеся в
+двух эпизодах; отнесение частичного выхода при неттинге).
+
+**Писатель — `RefreshOrderExecutor`**, при наблюдении первого филла
+ноги: он единственный, кто видит переход ноги в исполнение, и в том же
+проходе `DealContext` несёт живую строку `Position`
+(`livePosition()`). Значение — `id` живого эпизода на момент филла;
+**write-once** (guard `where position_id is null`): нога принадлежит
+тому эпизоду, который открыла или в котором исполнилась, и
+переприсвоение исказило бы обе стороны.
+
+- **Почему не `CreateOrderExecutor`.** На постановке эпизода может не
+  быть вовсе (открывающий вход), и колонка садилась бы пустой навсегда
+  у ровно той ноги, ради которой заводится.
+- **Пустое значение законно и означает «эпизода у ноги нет»**: нога
+  снята неисполненной либо ещё не филловалась. Благоприятного
+  умолчания не подставляется
+  (`docs/rules/absent-value-semantics.md`).
+- **Потребитель в фазе 1 уже есть** — потолок риска на сделку
+  (`docs/decisions/per-trade-risk-policy.md` §«Лимит риска
+  двухуровневый»): он ограничивает Σ **поперёк эпизодов**, и разбор
+  «сколько бюджета удерживает закрывшийся эпизод» адресуем только этой
+  колонкой. Правило «поле заводится вместе с потребителем» выполнено.
+
 ### Предикат «нога входа» — три носителя, и они согласованы инвариантом
 
 H1 `DOCS_CHECK_16`; редакция пересмотрена решением держателя по итогам
@@ -390,6 +421,13 @@ inspection частичного выхода.
   тождества перестаёт резолвиться через снимаемую встроенную защиту,
   §«`plannedStopPrice` — шестое число»). Бэкфилл не нужен
   (`.claude/rules/pre-launch-schema-changes.md`).
+- **Колонка `position_id`** (`bigint`, nullable, FK → `positions`,
+  write-once; `+fk_order_position`, `+ix_order_position`) — ось эпизода
+  (N5 `DOCS_CHECK_20`, решение держателя). Заводится **сейчас**, потому
+  что таблицы пусты (`.claude/rules/pre-launch-schema-changes.md`), а
+  ретроспективно связь `Order → эпизод` **невосстановима**: её не
+  существует ни в одном другом носителе
+  (`docs/decisions/multi-episode-deal.md` §«Названная цена»).
 - **Седьмая колонка того же `ALTER` — `liquidation_distance_ratio`**
   (`numeric(36,18)`, nullable, write-once; П14 держателя, приземлена B1
   `DOCS_CHECK_18`). Она **не входит** в инвариант «шесть или ни одного»:
@@ -416,7 +454,9 @@ standalone `AlgoOrder` (раздел модели по
 attached/algo identifiers; standalone `AlgoOrder` создаётся только
 отдельным `StrategyAlgoOrderAction` через `CREATE_ALGO_ORDER_COMMAND`.
 
-Java-класс `...core.order.AttachedAlgoOrder`, расширяет `Auditable`.
+Java-класс `...core.order.AttachedAlgoOrder`, расширяет `Auditable`;
+хранится **своей таблицей** `attached_algo_orders` по `order_id`
+(не JSONB-навес и не embedded-коллекция строки `orders`).
 
 | Поле | Тип | Назначение |
 |---|---|---|
@@ -432,6 +472,7 @@ Java-класс `...core.order.AttachedAlgoOrder`, расширяет `Auditable
 | `externalType` | `String` | Биржевой тип attached protection. |
 | `size` | `BigDecimal` | Размер. |
 | `stopLossTriggerPrice` | `BigDecimal` | Триггерная цена SL (текущий проект — attached SL). |
+| `triggerPriceType` | `AlgoOrder.TriggerPriceType` | **Ценовая база триггера** (`LAST`/`INDEX`/`MARK`) — объявленное стратегией `StopLossSettings.triggerPriceType`, доезжает до биржи в `attachAlgoOrds[*].slTriggerPxType` (C1 `DOCS_CHECK_20`; дом принципа — `docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера защиты»). Обязательно: без него применялся бы биржевой default `last`, а guard запаса до ликвидации считается от `mark`. |
 
 Доменные методы: `isActiveLike()` (PENDING/ACTIVE),
 `canTransitionTo(target)` (явная матрица — см. lifecycle),

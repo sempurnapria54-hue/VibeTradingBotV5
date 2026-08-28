@@ -44,15 +44,40 @@ absent/stale — добыча звеном `REFRESH_BALANCE_COMMAND` через
 
 ```text
 PRECHECK + BLOCKED + live risk ещё нет
-  -> Deal.status = CLOSED, closeReason = RISK_CONTROL   # не авария
+  -> терминал CLOSED, closeReason = RISK_CONTROL       # не авария
 
 ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING + BLOCKED
   (для risk-creating / risk-weakening action)
-  -> Deal.status = ERROR -> ErrorHandler / safety-flow
+  -> ребро в ERROR -> ErrorHandler / safety-flow
 
 WARNING  -> action не блокируется; фиксируется в логах / истории
 ALLOWED  -> StrategyActionOrchestrator создаёт команду
 ```
+
+### Карв-аут исчерпанного бюджета сделки
+
+**`BLOCKED` по `RISK_PER_DEAL_EXCEEDED` в `ERROR` не уводит** (C6
+`DOCS_CHECK_20`). Исчерпанный бюджет сделки — ожидаемый исход
+легитимной стратегии, а не рассогласование состояния: действие **не
+исполняется**, сделка остаётся в текущем статусе и ведётся до выхода
+имеющимися ногами. Ребро в `ERROR` означало бы, что нормальная работа
+стратегии флагается как авария — и стоило бы teardown живого риска там,
+где риск под контролем.
+
+Карв-аут не новый по конструкции: тот же ряд, что `PRECHECK + BLOCKED +
+live risk ещё нет ⇒ терминал `CLOSED`, не авария` (схема выше). Ось
+разведения одна — **является ли реджект признаком рассогласования**.
+Все прочие коды `BLOCKED` на risk-creating / risk-weakening действии
+ведут в `ERROR` по-прежнему.
+
+**Статус здесь никто не присваивает.** Схема называет **исход**, а не
+писателя: терминал `CLOSED` пишет звено `MARK_DEAL_CLOSED_COMMAND`
+(`docs/components/MarkDealClosedExecutor.md`), ребро в `ERROR` — по
+карв-ауту природы тропы: решение handler'а ⇒ звено
+`MARK_DEAL_ERROR_COMMAND`, перехват ⇒ прямая запись петлёй
+(`docs/decisions/fsm-execution-layering.md` §«Ребро `* → ERROR`:
+карв-аут по природе тропы»). Прежняя запись «`Deal.status = ERROR`»
+присваиванием выражала писателя, которого на этой тропе нет.
 
 `RISK_CONTROL` отличается от `ENTRY_CONDITION_EXPIRED`: первое — вход
 запрещён risk-policy до live risk; второе — входное условие стало false.

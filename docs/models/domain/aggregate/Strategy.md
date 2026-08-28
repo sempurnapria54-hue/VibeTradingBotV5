@@ -273,9 +273,10 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 | `id` | `Long` | Технический ID. |
 | `marketPhaseType` | `MarketPhase.Type` | Для какой фазы работает detail. |
 | `phaseEntryPolicy` | `PhaseEntryPolicy` | Как торгуем в этой фазе. |
-| `riskPerTradePercent` | `BigDecimal` | Риск на сделку, % от **свободного депозита** (`externalAvailableEquity`); см. `docs/decisions/per-trade-risk-policy.md`. |
+| `riskPerActionPercent` | `BigDecimal` | **Поактный** лимит риска: % от **свободного депозита** (`externalAvailableEquity`) на одно risk-creating действие; см. `docs/decisions/per-trade-risk-policy.md` §«Лимит риска двухуровневый». |
+| `riskPerDealPercent` | `BigDecimal` | **Потолок риска на сделку**: % от `Deal.plannedRiskEquityBase` (база первого сайзинга сделки), которым ограничена Σ плановых рисков живых и исполнившихся ног входа. Инвариант — `riskPerDealPercent ≥ riskPerActionPercent`; см. там же. |
 | `targetRiskRewardRatio` | `BigDecimal` | High-level ориентир R/R. |
-| `positionReopenAllowed` | `Boolean` | **Допустимо ли переоткрытие позиции внутри сделки** (многоэпизодная сделка, `docs/decisions/multi-episode-deal.md`). `true` — позиция, схлопнувшаяся в ноль в `MANAGING`, может быть открыта заново живой входной ногой; сделка становится многоэпизодной, `resultProfit` аккумулирует по эпизодам. `false` — наблюдение `externalSize → 0` в `MANAGING` снимает живые входные ноги (`docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»), сделка остаётся одноэпизодной. |
+| `positionReopenAllowed` | `Boolean` | **Допустимо ли переоткрытие позиции внутри сделки** (многоэпизодная сделка, `docs/decisions/multi-episode-deal.md`). `true` — позиция, схлопнувшаяся в ноль в `MANAGING`, может быть открыта заново живой входной ногой; сделка становится многоэпизодной, `resultProfit` аккумулирует по эпизодам. `false` — `ManagingHandler` по наблюдению `externalSize → 0` в `MANAGING` снимает живые входные ноги (`docs/components/ManagingHandler.md` §«Входные проверки»; порядок — `docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»), сделка остаётся одноэпизодной. |
 | `stepsByStatus` | `Map<Deal.Status, List<StrategyStep>>` | Шаги, сгруппированные по статусу сделки. |
 
 Индикаторы/структуры, нужные детали (ATR для SL, RSI для ENTRY и т. д.),
@@ -291,6 +292,14 @@ STRUCT-Q1), числом в канон не зашиваются; при `null` 
 `UNKNOWN` → `NO_TRADE`. Матрица — инвариант доменной модели (метод
 `PhaseEntryPolicy.isAllowedFor`); проверяется на create (400). У
 `NO_TRADE`-детали риск-поля и настройки опциональны (nullable).
+
+**`riskPerDealPercent` обязателен у торгуемой детали** и умолчания не
+имеет (C6 `DOCS_CHECK_20`). Вывести его из `riskPerActionPercent`
+нельзя: множитель «сколько актов подряд стратегия вправе сложить» —
+суждение о допустимой просадке, а не следствие модели; численное
+значение — риск-аппетит держателя
+(`.claude/work/questions/open-questions.md` §RISK-Q3-A), до его ответа
+провизорно.
 
 **`positionReopenAllowed` обязателен у торгуемой детали** (nullable
 только у `NO_TRADE`, как и риск-поля): умолчания у него нет намеренно —
@@ -629,7 +638,7 @@ ORDER↔ORDER / ALGO↔ALGO, форма действия полного закр
 partial-exit) опираются на зреющую модель команд/сделок/FSM и отложены
 — на **activate (422)** как «готова к запуску» и/или более поздние
 инкременты реализации. Числовые торговые
-поля (`riskPerTradePercent`, `allocationPercents`, …) на create
+поля (`riskPerActionPercent`, `allocationPercents`, …) на create
 ограничиваются только структурно — невозможные значения (отрицательный
 риск; доля вне [0; 100] там, где поле — доля) → 400; торгово-суждённые
 диапазоны (консервативные ориентиры риска и т. п.) — семантика
@@ -677,9 +686,15 @@ CHECK-констрейнты, отвергнутые альтернативы) �
   плюс `strategy_indicator_settings` / `strategy_market_structure_settings`.
 - На `strategies` — частичный UNIQUE-индекс «одна `ACTIVE` на
   инструмент» (БД-страховка инварианта lifecycle).
-- **Колонка шага 7 — `ALTER`:** `strategy_details.position_reopen_allowed`
+- **Колонки шага 7 — `ALTER`:** `strategy_details.position_reopen_allowed`
   (`boolean`, nullable — обязателен по существу у торгуемой детали,
-  пуст у `NO_TRADE`; как и остальные риск-поля детали). Бэкфилл не
+  пуст у `NO_TRADE`; как и остальные риск-поля детали);
+  **`risk_per_trade_percent` → `risk_per_action_percent`**
+  (`ALTER RENAME`) и **`+risk_per_deal_percent`** (`numeric(36,18)`,
+  nullable — та же nullability, что у прочих риск-полей детали) —
+  двухуровневый лимит риска (C6 `DOCS_CHECK_20`, дом —
+  `docs/decisions/per-trade-risk-policy.md` §«Лимит риска
+  двухуровневый»). Бэкфилл не
   нужен — таблицы пусты
   (`.claude/rules/pre-launch-schema-changes.md`). Полная schema-дельта
   шага — `docs/decisions/pnl-finalization-mechanics.md`
@@ -717,10 +732,16 @@ CHECK-констрейнты, отвергнутые альтернативы) �
 - Типы числовых полей: `*Percents` / `*Score` / `*Ratio` /
   `*Multiplier` — `BigDecimal` (numeric(36,18), Constants.Price);
   `*Bars` / `*Period` / `level` / `warmup` — `Integer`. Риск-поля детали
-  (`riskPerTradePercent`, `targetRiskRewardRatio`) — nullable (у
-  `NO_TRADE`-детали риска нет).
+  (`riskPerActionPercent`, `targetRiskRewardRatio`) — nullable (у
+  `NO_TRADE`-детали риска нет); `riskPerDealPercent` — там же и с тем же
+  правилом nullability.
 - Валидацию полей и контекстный whitelist операндов/`ruleType` делает
   приложение.
+- **`riskPerDealPercent ≥ riskPerActionPercent`** — инвариант детали,
+  проверяется на create (400). Нарушение делает первую же ногу входа
+  непроходимой по построению
+  (`docs/decisions/per-trade-risk-policy.md` §«Лимит риска
+  двухуровневый»).
 
 ## TimeFrame
 

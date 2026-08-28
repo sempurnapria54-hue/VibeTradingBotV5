@@ -296,7 +296,7 @@ bills_window_begin is null`), не `updatable = false`: строка `deals`
 | `externalRealizedProfit` | `resultProfit` (слагаемое net) | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` |
 | `externalResultCurrency` | **не пишется** — сверяется | они же (см. ниже) |
 | `externalCloseType` | `closeOutcome` (`1,2` → `NORMAL_EXIT`; `3,4` → `LIQUIDATION`; `5,6` → `FORCED_REDUCTION`; **пусто** → `UNDETERMINED` + отчёт; значение вне `1..6` сюда не доезжает — контракт записи проверяется на границе, §«Контракт записи проверяется здесь») | они же (`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта») |
-| `externalRealizedPnlGross`, `externalFee`, `externalFundingCost`, `externalLiquidationPenalty` | **не пишутся** — правые операнды четырёх пар сверки | `FinalizeDealExitExecutor` (сверка, не запись) |
+| `externalRealizedProfitGross`, `externalFee`, `externalFundingCost`, `externalLiquidationPenalty` | **не пишутся** — правые операнды четырёх пар сверки (суммируются **по эпизодам**) | `FinalizeDealExitExecutor` (сверка, не запись) |
 
 **Валюта результата в `Deal` пишется не отсюда** (H10 `DOCS_CHECK_10`,
 решение пользователя). `Deal.resultProfitCurrency` берётся из **расчётной

@@ -171,6 +171,38 @@ market-data.
 Условие снятия внутри правила — ровно этот класс: его читает тот, кто уже
 открыл правило, то есть тот, кому оно и так не нужно.
 
+## Закрытие фазы 1 — снятие разведочного режима допуска сверки
+
+**Второй встречный якорь того же класса** (заведён `GAPS_CLOSE_19`, решение
+держателя). Допуск сверки bills↔net отгружается в `CODE`
+**некалиброванным**; разведочный режим действует «до боевой торговли», а
+конец фазы 1 — момент, когда проект перестаёт считаться незапущенным
+(`.claude/rules/pre-launch-schema-changes.md`). Значит носитель события —
+здесь, а механический триггер — тот же
+`.claude/skills/update-roadmap-progress.md` §«Гейт закрытия фазы».
+
+**Что сделать до перевода фазы в `DONE`:**
+
+1. **Прогнать калибровку** — интеграторский прогон по реальному API:
+   прокси `POST /api/proxy/okx/raw` + исполнение калибровочных сделок +
+   добыча bills за окном + наш расчёт → замер |Δ| по четырём парам →
+   величины `0.01` / `0.5%` / `k`
+   (`docs/rules/pnl-reconciliation.md` §«Разведочный режим допуска»).
+2. **Проверить переносимость структуры на прод** — ад-хок структурная
+   сверка: гранулярность trade-bill, состав типов, знаковые конвенции,
+   наличие отдельных записей комиссии. Тем же каналом, что ад-хок
+   проверка success-контракта архива
+   (`docs/integrations/okx/contracts/account-bills.md`).
+3. **Снять флаг разведочного режима** сервисной операцией — не раньше,
+   чем закрыто `N` сделок с обязанной сверкой (стартовое `N = 20`,
+   величина провизорна).
+4. **Записать исход** в history-файл закрытия фазы: какие величины
+   получены, на каких наблюдениях, что показала структурная сверка.
+
+**Цена невыполнения названа:** пока режим не снят, `MISMATCHED` **ничего
+не блокирует** — единственный детектор недосчёта числа работает
+журналом. Забытый разведочный режим неотличим от работающего контроля.
+
 ## Шаг «Безопасность» (Фаза 1, шаг 9) — форвард-материал
 
 Материал, отложенный до шага «Безопасность» роадмапа
@@ -362,10 +394,25 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 и реестр предусловий `CODE` —
 `docs/decisions/pnl-finalization-mechanics.md`; сверка bills↔net —
 `docs/rules/pnl-reconciliation.md`. Ниже — **исполнительный хвост
-(CODE) + рантайм-верификация + форвард**, не выбор пути. **Гейт `CODE`
-упирается в** (состояние на 2026-08-20): калибратор допуска
-(предусловие `CODE` п. 8), грунт `integrator` (позиции `AG1.6`,
-`AG1.7`, `AG6.2`, `M15.7`, `MG7.5`, `AG3.4`) и чистый `DOCS_CHECK`.
+(CODE) + рантайм-верификация + форвард**, не выбор пути.
+
+**Гейт `CODE` упирается в** (пересобрано `GAPS_CLOSE_19` по реестру
+предусловий и разметке плана — прежний список датировался 2026-08-20 и
+устарел в обе стороны: включал негейтящий `M15.7`, не включал `AG1.8` и
+`AG1.9`):
+
+- **чистый `DOCS_CHECK`**;
+- **грунт `integrator` / `tester`** — восемь гейтящих предусловий
+  (`docs/decisions/pnl-finalization-mechanics.md` §«Предусловия `CODE`
+  шага 7», пп. 1, 2, 5, 6, 7, 9, 10, 14) и их кейсы: `AG1.5` + `AG1.9`
+  (п. 1), `AG6.2` (п. 2), `MG7.5` (п. 5), `AG1.6` (п. 6), `AG1.7`
+  (пп. 7 и 14), `AG3.4` (п. 9), `AG1.8` (п. 10).
+
+**Калибратор допуска гейтом быть перестал** (решение держателя,
+`GAPS_CLOSE_19`): в `CODE` выходим с некалиброванным допуском, он
+калибруется до боевой торговли — §«Закрытие фазы 1 — снятие
+разведочного режима допуска сверки». `M15.7` (семантика `actualPx`)
+гейтом не размечен ни планом, ни реестром — из списка убран.
 
 ⚠️ **Цена доведения шага 7 до `CODE` при незакрытых разрывах — принята
 и записана** (решение держателя 2026-08-23; реестр предусловий `CODE`
@@ -391,9 +438,11 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   командного блок-сета у ступени нет, оркестратор `HOLD` не
   перехватывает, живые сделки ведутся штатным FSM в полном объёме
   (ремодел защиты, управление, закрытие);
-- добавить фабрику `HoldSignal.exchangeTradeBlock()`;
-  **`ReactionClass.FREEZE` и фабрика `HoldSignal.exchange()` не
-  вводятся** — производителей у биржевой ступени 1 не осталось;
+- добавить фабрики `HoldSignal.exchangeTradeBlock()` **и
+  `HoldSignal.exchange()`** вместе с `ReactionClass.FREEZE` —
+  производитель у биржевой ступени 1 есть (реакция на `MISMATCHED`,
+  `GAPS_CLOSE_19`); интерим-клауза `GAPS_CLOSE_18` «не вводятся»
+  **снята**. Дом — `docs/rules/exchange-hold.md`;
 - **реакцию controlled-исключений и safety-каскада внешнего статуса
   оставить на `KillSwitchService.fireExchange`** (ступень 2), заменив
   сборку сигнала на `exchangeTradeBlock(...)`;
@@ -409,6 +458,99 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   сервисная операция, реактивного пути к ней нет.
 
 ### CODE-дельта шага
+
+**Многоэпизодная сделка и следствия `GAPS_CLOSE_18` / `_19`** (N4
+`DOCS_CHECK_19` — прежде эта половина дельты не имела рабочего носителя,
+хотя решение указывало сюда):
+
+- **`Deal.position` → `Deal.positions`** (`List<Position>`) + доменный
+  предикат `Deal.livePosition()`; читатели переписываются на него;
+- **строка `Position` = эпизод**: смена `posId` на живой ноге закрывает
+  строку и заводит новую; нога 2 добывает положение закрытия **для
+  каждой** `CLOSED`-строки без него
+  (`docs/lifecycles/Position.md` §«Смена эпизода»);
+- **`StrategyDetail.positionReopenAllowed`** + гейт в `MANAGING` при
+  `false` — наблюдатель и применитель `ManagingHandler`, входная
+  классификация `ACTIVE && externalSize == 0` ветвится по параметру
+  (`docs/components/ManagingHandler.md` §«Входные проверки»);
+- **`Deal.billsFetchedThrough`** — писатель `RefreshBillsExecutor`,
+  монотонный `UPDATE`; предикаты завершения bills-звена и обязанности
+  сверки переписываются на него;
+- **линковка bills при сохранении** (по подвижной границе при
+  нетерминальном `Deal`), а не по `billsWindowEnd`;
+- **пересчёт четырёх чисел риска — единым методом**, зовомым из семи
+  точек (`CreateOrderExecutor`, `RefreshOrderExecutor`,
+  `CancelOrderExecutor`, `RefreshPositionExecutor`,
+  `CreateAlgoOrderExecutor`, **`RefreshAlgoOrderExecutor`**,
+  **`CancelAlgoOrderExecutor`**); знаковая дистанция стопа по
+  `Deal.direction`; операнд трейлинга —
+  `AlgoOrder.condition.trailing.externalPrice` (B2 `DOCS_CHECK_20`; не
+  плоское `externalPrice`, оно несёт `actualPx`);
+- **актор предиката неполноты числа** — выходная проверка
+  `ExitPendingHandler`; **`SystemActionExecutor` пишет `SKIPPED`** при
+  выводе стадии;
+- **реакция на `MISMATCHED`** — `HoldSignal.exchange(...)` из
+  исполнителей терминального ребра при боевом режиме допуска; **флаг
+  разведочного режима** per-exchange и сервисная операция его снятия.
+
+**Дельта `GAPS_CLOSE_20`** (закрытие `DOCS_CHECK_20`; дома политик —
+в ссылках, здесь только «что сделать»):
+
+- **`Deal.billsWindowEnd` — монотонное вперёд**, не write-once: guard
+  `where bills_window_end is null or bills_window_end < :uTime`
+  (`docs/models/domain/aggregate/Deal.md` §«Верхняя граница монотонна,
+  а не write-once»); предикат завершения `REFRESH_POSITION_COMMAND` —
+  **по всем строкам эпизодов**;
+- **`GET /public/time` — метод клиента + якорь верхней границы окна
+  bills**: `billsFetchedThrough` и `end` запроса берутся из него, не из
+  системных часов (`docs/rules/time-utc.md` §«Два временных домена»);
+- **дискриминатор броска радиусной реакции — дизъюнкция** «`Deal.status
+  = ERROR` или живого риска нет» с явной непустотой коллекции
+  `positions` (`docs/components/ServiceCommandExecutor.md` §«Ветка
+  „радиус локализован“»); **`POST_MORTEM_HARVEST_EXHAUSTED` не
+  вводится**;
+- **ребро `* → ERROR` — карв-аут по природе тропы**: решение ⇒ звено
+  `MARK_DEAL_ERROR_COMMAND`, перехват (enforcement холда, оба `catch`
+  оркестратора) ⇒ прямая запись петлёй
+  (`docs/decisions/fsm-execution-layering.md`);
+- **`+deals.planned_risk_equity_base`** (write-once, пишет
+  `CreateOrderExecutor` из восьмого поля `CreateOrderCommandPayload`);
+- **`+orders.position_id`** (FK, write-once, пишет
+  `RefreshOrderExecutor` при первом филле ноги);
+- **двухуровневый лимит риска:** `strategy_details.risk_per_trade_percent`
+  → `risk_per_action_percent` (`ALTER RENAME`), `+risk_per_deal_percent`;
+  `RiskCheckCode.RISK_PER_TRADE_EXCEEDED` →
+  `RISK_PER_ACTION_EXCEEDED`, `+RISK_PER_DEAL_EXCEEDED`; правка
+  `StrategyDetail` / api-модели / entity и двух
+  `strategy-examples/*.json`; вторая проверка в `RiskValidator`;
+  `BLOCKED` по `RISK_PER_DEAL_EXCEEDED` **в `ERROR` не уводит**
+  (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
+  сделки»);
+- **`+trade_fee_rates.external_fee_level`**, **`+ix_anomaly_report_unfinished_state`**
+  (сборка — `docs/decisions/pnl-finalization-mechanics.md`
+  §«Schema-дельта шага 7»);
+- **приземление `condition.trailing.externalPrice`** при рефреше —
+  `updateFromSnapshot` с `IGNORE`-стратегией null'ов
+  (`docs/models/mapping/AlgoOrder.md`);
+- **`+attached_algo_orders.trigger_price_type`** и поле
+  `AttachedAlgoOrder.triggerPriceType` + `AttachedProtectionPayload` →
+  `attachAlgoOrds[*].slTriggerPxType` (C1 `DOCS_CHECK_20`); `RiskValidator`
+  учитывает базу стопа в проверке запаса до ликвидации;
+- **`stopCurrent` резолвится поногово** (C2 `DOCS_CHECK_20`), комиссионный
+  член — по `stopCurrent_i` со ставкой, обращённой из шестёрки (B9);
+- **пола `minSz` у reduce-only размера нет** — три исхода округления и два
+  журнальных кода (`PARTIAL_EXIT_ROUNDED_TO_FULL`,
+  `PARTIAL_EXIT_BELOW_MIN_SIZE`; C5 `DOCS_CHECK_20`,
+  `docs/components/SizeCalculator.md`).
+
+**Форвард вне шага 7** (`принято-в-работу`, B6 `DOCS_CHECK_20`):
+top-level эхо attached-защиты (`attachedAlgoInternalId`,
+`stopLossTriggerPrice` снапшота `Order`) в домен не приземляется —
+решить, нужен ли ему носитель, или строки снапшота выводятся из состава
+(`docs/models/mapping/Order.md` §«`OrderExternalSnapshot` → `Order`»).
+Смежно: эхо `slTriggerPxType` не читается вовсе
+(`docs/rules/risk-creating-entry-protection.md` §«Названное
+ограничение»).
 
 - **CODE стадий 1-2 (доспецифицировано, писать код):** носители
   `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
@@ -435,18 +577,18 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   - финализаторы (`FinalizeDealExitExecutor`,
     `MarkDealEmergencyClosedExecutor`) читают число **со строки
     `Position`**, вложенных команд не исполняют;
-  - `RefreshBillsExecutor` — окно `[Deal.billsWindowBegin,
-    Deal.billsWindowEnd]` (`billsWindowEnd` пуст → привязка ждёт),
-    инструмент из `DealContext`, **guard «сделка удерживает слот»**
-    (статус вне `CLOSED`/`EMERGENCY_CLOSED`) перед линковкой
+  - `RefreshBillsExecutor` — окно `[Deal.billsWindowBegin, t_source]`,
+    где `t_source` — `GET /public/time` прохода; линковка **при
+    сохранении**, ограничена нетерминальностью `Deal`, а не отметкой
+    (**guard «сделка удерживает слот»** — статус вне
+    `CLOSED`/`EMERGENCY_CLOSED`); инструмент из `DealContext`
     (`docs/components/RefreshBillsExecutor.md`);
   - `Deal`/`DealEntity` + миграция: колонки `bills_window_begin`,
-    `bills_window_end`; **писатели окна — разные**: `begin` —
-    `SubmitOrderExecutor` (`Order.externalCreatedAt` первой
-    отправленной ноги, всегда при постановке); `end` —
-    `RefreshPositionExecutor`, нога 2 (`uTime` записи закрытия, одной
-    транзакцией с полями положения закрытия). Обе — условным `UPDATE`
-    (`where ... is null`), не `updatable = false`.
+    `bills_window_end`, `bills_fetched_through`, `planned_risk_equity_base`
+    — состав и guard'ы держит `docs/models/domain/aggregate/Deal.md`
+    §Персистентность, здесь не дублируются; **писатели окна — разные**:
+    `begin` — `SubmitOrderExecutor`; `end` — `RefreshPositionExecutor`,
+    нога 2.
 - **CODE R-слота и формулы риска** (дом политики —
   `docs/models/domain/aggregate/Deal.md` §«Плановый риск» / §«Взятый
   риск», `docs/decisions/per-trade-risk-policy.md`):
@@ -470,11 +612,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     `protectionRelievedRiskAmount` (снятый защитой). Не write-once,
     пересчитываются **целиком**; формулы и предикат отбора слагаемых —
     `Deal.md` §«Взятый риск» / §«Предикат отбора слагаемых»;
-  - **пересчитывают пять исполнителей**, каждый своей транзакцией:
-    `CreateOrderExecutor`, `RefreshOrderExecutor`,
-    `CancelOrderExecutor`, `RefreshPositionExecutor` (позиция живая
-    либо из истории), писатель защиты (`CreateAlgoOrderExecutor` /
-    place-нога `REPLACE`) — только четвёртое число;
+  - **пересчитывают семь исполнителей**, каждый своей транзакцией и
+    **все четыре числа целиком** (правило и перечень — место истины
+    `docs/models/domain/aggregate/Deal.md` §«Взятый риск», таблица
+    триггеров; здесь не дублируется);
   - **`+risk_benchmark_availability`** на `deals` (`varchar(64)`, енум
     `AVAILABLE`/`NOT_APPLICABLE`/`MISSING`): `AVAILABLE`/`MISSING`
     пишут оба финализатора, `NOT_APPLICABLE` —
@@ -513,8 +654,9 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     (`closeReason = SWITCHED_BY_STRATEGY`); триггер — шаг стратегии
     `PROTECTION_ADJUSTMENT` с условием «позиция увеличилась»;
   - **прочая дельта валидаций `GAPS_CLOSE_16`/`_17`:**
-    `POST_MORTEM_HARVEST_EXHAUSTED` — второй код холда по исчерпанию
-    бюджета (реакция та же, различение журнальное);
+    `POST_MORTEM_HARVEST_EXHAUSTED` **не вводится** (снят A3
+    `DOCS_CHECK_20` — производителя нет; дом —
+    `docs/rules/instrument-hold.md`);
     `RECONCILIATION_OPERAND_MISSING` — код и ветка удаляются; предикат
     неполноты числа уводит терминал на ошибочную тропу
     (`INCOMPLETE_BY_WINDOW` либо cross-ccy-строка без `rateStatus =
@@ -524,7 +666,8 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     на тропе заведения инструмента; состав цикла добычи един для всех
     троп (гейт bills — у звена); пустой `billsWindowBegin` ⇒ суррогат
     `Deal.createdAt` внутри исполнителя; операнд `breakdownIncomplete`
-    составной — `max(t_добычи, billsWindowEnd) − billsWindowBegin`;
+    составной — `max(billsFetchedThrough, billsWindowEnd) −
+    billsWindowBegin`, оба операнда биржевые (A8 `DOCS_CHECK_20`);
   - **`attachedProtection` не доезжает до payload — гейт `CODE`.**
     `CreateOrderExecutor` читает `payload.getAttachedProtection()`, а
     единственный строитель payload'а

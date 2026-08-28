@@ -30,7 +30,7 @@ call-site и **тут же передаваемый** исполнителю б�
 | Поле | Тип | Назначение |
 |---|---|---|
 | `scope` | `HoldScope` | Scope (радиус) холда: `INSTRUMENT` / `EXCHANGE`. |
-| `reactionClass` | `ReactionClass` | **Класс реакции**: `SOFT` / `FULL` (см. §Енум `ReactionClass`). |
+| `reactionClass` | `ReactionClass` | **Класс реакции**: `SOFT` / `FREEZE` / `FULL` (см. §Енум `ReactionClass`). |
 | `code` | `String` | Машинно-читаемый код причины; попадает в `AnomalyReport.code`. |
 | `instrumentId` | `Long` | **Идентичность объекта блокировки** при `scope = INSTRUMENT`; пусто при `scope = EXCHANGE`. |
 | `exchangeId` | `Long` | **Идентичность объекта блокировки** при `scope = EXCHANGE`; при `INSTRUMENT` — биржа инструмента, если детектор её знает, иначе пусто (резолвится сервисом). |
@@ -64,14 +64,21 @@ call-site и **тут же передаваемый** исполнителю б�
 - `SOFT` — **мягкий холд**: `Instrument.Status.ENTRY_BLOCKED`;
   kill-switch **не гоняется**, живые сделки доживают
   (`docs/rules/instrument-hold.md` §Enforcement).
+- `FREEZE` — **биржевая ступень 1**: `Exchange.HOLD` + `AnomalyReport`
+  (`NON_CRITICAL`, `kind = STATE`); kill-switch **не гоняется**, каскада
+  активных сделок в `ERROR` нет, командного блок-сета у ступени нет —
+  биржа выпадает из entry-скана, живые сделки сопровождаются полностью
+  (`docs/rules/exchange-hold.md` §«Ступень 1»). `HoldService` ставит
+  напрямую, координатор не зовётся.
 
-**Третьего класса нет — `FREEZE` не вводится** (ревизия держателя,
-`GAPS_CLOSE_18`). Он заводился под биржевую ступень 1, а её
-автоматические триггеры целиком переехали на ступень 2: неожиданное
-поведение биржи — теперь `FULL`. `Exchange.HOLD` остаётся **ручным**
-мягким холдом и посадочной ступенью при снятии `TRADE_BLOCKED`, то есть
-реактивным сигналом не ставится вовсе; вводить класс без производителя
-запрещено (codestyle §«Неиспользуемый код»).
+**Производитель `FREEZE` — ровно один** (`GAPS_CLOSE_19`): исполнитель
+терминального ребра сделки при `reconciliationStatus = MISMATCHED` и
+**калиброванном** допуске (`MarkDealClosedExecutor` /
+`MarkDealEmergencyClosedExecutor`; дом реакции —
+`docs/rules/pnl-reconciliation.md` §«Реакция на расхождение»). В
+разведочном режиме допуска сигнал не поднимается вовсе. Интерим-клауза
+`GAPS_CLOSE_18` «`FREEZE` не вводится — производителей нет» снята вместе
+с появлением производителя.
 
 **Журнальный `AnomalyReport` в состав класса реакции не входит** (H14
 `GAPS_CLOSE_13`). Отчёт производит **детектор** — там, где решается, стоит
@@ -110,6 +117,11 @@ call-site и **тут же передаваемый** исполнителю б�
   `HoldScope.INSTRUMENT` + `ReactionClass.FULL` + code + идентичность.
 - `instrumentSoft(code, instrumentId)` — мягкий холд инструмента:
   `HoldScope.INSTRUMENT` + `ReactionClass.SOFT` + code + идентичность.
+- `exchange(code, exchangeId)` — **мягкий холд биржи (ступень 1)**:
+  `HoldScope.EXCHANGE` + `ReactionClass.FREEZE` + code + идентичность →
+  `Exchange.HOLD`. Единственный зовущий — исполнитель терминального ребра
+  при расхождении сверки за калиброванным допуском (§Енум
+  `ReactionClass`).
 - `exchangeTradeBlock(code, exchangeId)` — **критическая реакция биржи
   (ступень 2)**: `HoldScope.EXCHANGE` + `ReactionClass.FULL` + code +
   идентичность → `Exchange.TRADE_BLOCKED`. Триггеров два и оба сюда:
@@ -121,30 +133,30 @@ call-site и **тут же передаваемый** исполнителю б�
 
 Публичного конструктора для прямой сборки не используем — сигнал строится
 фабрикой по scope и классу реакции, чтобы радиус и намерение читались на
-call-site. **Биржевая фабрика одна** (ревизия держателя, `GAPS_CLOSE_18`):
-ни мягкой, ни «заморозочной» биржевой фабрики нет — `SOFT` биржевого
-радиуса не имеет, а `Exchange.HOLD` ставится вручную, вне реактивного
-контура (`docs/rules/exchange-hold.md` §«Что переводит в HOLD»). Прежняя
-фабрика `exchange(code, exchangeId)` (`FREEZE` → `Exchange.HOLD`) **не
-вводится**: её зовущие переехали на `exchangeTradeBlock(...)`.
+call-site. **Биржевых фабрик две — по ступеням лестницы**; мягкой
+(`SOFT`) биржевой фабрики нет и не будет: `SOFT` — инструментный класс,
+а биржевой мягкий холд есть `FREEZE`, у него своя ступень и свой состав.
 
 **Перечень `code` — по производителям** (H6 `DOCS_CHECK_14`; `code`
 обязателен и попадает в `AnomalyReport.code` реактивного отчёта):
 `RETRY_BUDGET_EXHAUSTED` — исчерпание бюджета попыток исполнения **на
 живой тропе** (`instrument` — **полная** форма, H8 `DOCS_CHECK_16`,
 решение держателя; объявлен в `docs/rules/instrument-hold.md` §«Носитель
-серии»); `POST_MORTEM_HARVEST_EXHAUSTED` — исчерпание бюджета у цикла
-**посмертной** добычи (`Deal.status = ERROR`; форма реакции та же полная,
-различение журнальное — решение держателя П6 валидации `GAPS_CLOSE_17`);
-`EXCHANGE_KILL_SWITCH_RESIDUAL` — эскалация неподтверждённого
+серии»; **`POST_MORTEM_HARVEST_EXHAUSTED` снят** A3 `DOCS_CHECK_20` —
+посмертная добыча холда не производит, производителя у кода не
+осталось); `EXCHANGE_KILL_SWITCH_RESIDUAL` — эскалация неподтверждённого
 инструментного teardown (живой риск не подтверждён снятым — ступень 2,
 фабрика `exchangeTradeBlock`;
 `docs/components/SafetyHoldCoordinator.md`);
 коды `ControlledExchangeException`-тропы — по `reasonCode`/классу
 исключения (`docs/rules/controlled-exchange-exceptions.md`) — это тоже
 коды **ступени 2** (`Exchange.TRADE_BLOCKED` фабрикой
-`exchangeTradeBlock(...)`; ревизия держателя `GAPS_CLOSE_18`). Пары имён
-«кодов серии по стороне» не существует — снята вместе с осью стороны.
+`exchangeTradeBlock(...)`; ревизия держателя `GAPS_CLOSE_18`);
+**`PNL_RECONCILIATION_MISMATCH`** — единственный код `FREEZE`-тропы
+(ступень 1, фабрика `exchange(...)`; тот же код несёт журнальный отчёт
+детектора — `docs/models/domain/other/AnomalyReport.md` §«Реестр кодов»).
+Пары имён «кодов серии по стороне» не существует — снята вместе с осью
+стороны.
 
 **Код `CLOSE_OUTCOME_UNDETERMINED` кодом холда быть перестал** (H5
 `DOCS_CHECK_15`): он остаётся кодом **аномалии**
@@ -165,9 +177,9 @@ call-site. **Биржевая фабрика одна** (ревизия держ
 error-политики «группа инструментов × запрет новых входов» и
 «биржа/аккаунт × запрет новых входов» **выразимы** без фабрики
 `instrumentGroup(code)` (которая не заводится) и без мягкой биржевой
-фабрики. Реактивного пути к `Exchange.HOLD` не существует и он не
-требуется: гейт входов биржевого радиуса ставится вручную
-(`docs/rules/exchange-hold.md` §«Что переводит в HOLD»).
+фабрики. Реактивный путь к `Exchange.HOLD` существует, но он **не
+мягкий**: это `FREEZE` с собственным составом и единственным
+производителем (§Фабрики), а не развёртка `SOFT` на биржевой радиус.
 
 ## Енум `HoldScope`
 

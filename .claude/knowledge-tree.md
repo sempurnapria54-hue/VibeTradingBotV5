@@ -165,6 +165,9 @@
 │       │   ├── phase-1-step-7-docs-check-15.md — Каков исход DOCS_CHECK_15 шага 7?
 │       │   ├── phase-1-step-7-docs-check-16.md — Каков исход DOCS_CHECK_16 шага 7?
 │       │   ├── phase-1-step-7-docs-check-17.md — Каков исход DOCS_CHECK_17 шага 7?
+│       │   ├── phase-1-step-7-docs-check-18.md — Каков исход DOCS_CHECK_18 шага 7?
+│       │   ├── phase-1-step-7-docs-check-19.md — Каков исход DOCS_CHECK_19 шага 7?
+│       │   ├── phase-1-step-7-docs-check-20.md — Каков исход DOCS_CHECK_20 шага 7?
 │       │   ├── phase-1-step-7-risk-q4-anom-q5.md — Что предлагается по RISK-Q4 и ANOM-Q5?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
@@ -182,7 +185,10 @@
 │       │   ├── phase-1-step-7-gaps-close-14.md — Как закрыты находки DOCS_CHECK_14 (и RISK-Q4/ANOM-Q5)?
 │       │   ├── phase-1-step-7-gaps-close-15.md — Как закрыты находки DOCS_CHECK_15?
 │       │   ├── phase-1-step-7-gaps-close-16.md — Как закрыты находки DOCS_CHECK_16?
-│       │   └── phase-1-step-7-gaps-close-17.md — Как закрыты находки DOCS_CHECK_17?
+│       │   ├── phase-1-step-7-gaps-close-17.md — Как закрыты находки DOCS_CHECK_17?
+│       │   ├── phase-1-step-7-gaps-close-18.md — Каков исход закрытия находок DOCS_CHECK_18?
+│       │   ├── phase-1-step-7-gaps-close-19.md — Каков исход закрытия находок DOCS_CHECK_19?
+│       │   └── phase-1-step-7-gaps-close-20.md — Каков исход закрытия находок DOCS_CHECK_20?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)
@@ -446,7 +452,8 @@
 │       ├── runtime-error-classification.md — Как классифицируются unexpected runtime-ошибки?
 │       ├── time-utc.md — Какое правило по работе со временем?
 │       ├── trading-configuration-ownership.md — Что настраивает стратегия, а чем владеет система?
-│       └── trading-constraints.md — В каком торговом контуре и с какими ограничениями работает бот?
+│       ├── trading-constraints.md — В каком торговом контуре и с какими ограничениями работает бот?
+│       └── writer-named-for-every-value.md — Какое правило требует называть писателя для каждого значения и перехода?
 ├── src/ — (Код, не документация.)
 └── .claude-archive/ — (Архив старой инфраструктуры; не место для новых файлов.)
 ```

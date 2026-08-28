@@ -36,10 +36,16 @@ Refresh при неактуальном состоянии и **добыча P&L
 Активный риск
 снимается риск-минимизирующим порядком **cleanup-командами напрямую, без
 анкера** (открытая позиция → `CLOSE_POSITION_COMMAND`; live ordinary orders →
-`CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND`; учёта серии
+`CANCEL_ORDER_COMMAND`; live algo → `CANCEL_ALGO_ORDER_COMMAND`) —
+это **третий носитель последовательности teardown**, и его порядок
+(close-first) расходится с инвариантом штатной тропы так же, как у
+`KillSwitchExecutor`; реестр расхождений и открытая развилка —
+`docs/rules/exit-teardown-order.md` §«Носителей последовательности три»
+и §«Расхождение с ратифицированным порядком kill-switch» (`ORCH-Q2`).
+Здесь порядок не пере-решается. Учёта серии
 их неудач **нет** — анкера у cleanup нет, потому что нет
 исполнения-действия; учёт — форвард на `TradeGuardJob`, H16
-`DOCS_CHECK_11`), затем факт снятия подтверждается через
+`DOCS_CHECK_11`. Затем факт снятия подтверждается через
 `REFRESH_*` (ACK не truth); после safety-flow заново загрузить exchange
 facts; если live risk отсутствует и подтверждён — терминализировать через
 **`MARK_DEAL_EMERGENCY_CLOSED_COMMAND`** (второе исполнение

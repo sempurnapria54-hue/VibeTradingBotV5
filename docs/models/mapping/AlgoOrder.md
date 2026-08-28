@@ -38,13 +38,30 @@ Mapping-слой для `AlgoOrder`. Доменная модель —
 | `condition.trigger.takeProfit.externalValue` | — | внешнее значение TP trigger |
 | `condition.trigger.takeProfit.externalType` | — | тип цены TP |
 | `condition.trailing.activationPrice.externalValue` | — | цена активации trailing |
-| `condition.trailing.externalPrice` | — | текущее значение trailing |
+| `condition.trailing.externalPrice` | **`AlgoOrder.condition.trailing.externalPrice`** | текущее значение trailing (`moveTriggerPx`) — **операнд `stopCurrent`** трейлинговой защиты (B2 `DOCS_CHECK_20`; `docs/models/domain/aggregate/Deal.md` §«Форма вычитаемого») |
 | `externalCreatedAt` | `AlgoOrder.externalCreatedAt` | |
 | `externalModifiedAt` | `AlgoOrder.externalModifiedAt` | (есть в history) |
 
 Если источник не возвращает тип цены активации trailing,
 `condition.trailing.activationPrice.externalType` остаётся `null` —
 не нарушение invariant.
+
+**Приземление `condition.*` — пополевым мерджем, не заменой целиком**
+(B2 `DOCS_CHECK_20`). Обновление идёт маппером
+`updateFromSnapshot(snapshot, @MappingTarget algoOrder)` с
+`nullValuePropertyMappingStrategy = IGNORE`
+(`.claude/rules/codestyle.md` §Маппинг): снапшот рефреша несёт не все
+поля условия — заявленные параметры трейлинга приходят при постановке,
+`moveTriggerPx` появляется при наблюдении, — поэтому замена объекта
+целиком затирала бы разницу null'ами. В jsonb `condition`
+сериализуется целиком **после** мерджа; частичного апдейта колонки не
+вводится.
+
+**Плоское `externalPrice` и `condition.trailing.externalPrice` — разные
+факты, и их нельзя путать:** первое — `actualPx` (фактическая цена
+срабатывания, пусто у живой защиты), второе — `moveTriggerPx` (текущий
+уровень трейлинга). Совпадение имён — следствие конвенции «`external*` —
+значение источника», а не одного значения в двух местах.
 
 ### `Domain AlgoOrder → request`
 

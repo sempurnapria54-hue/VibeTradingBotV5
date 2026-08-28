@@ -71,9 +71,8 @@
 
 **Второй носитель — строки `DealCashFlow`, прилинкованные к сделке —
 снят** (H17 `DOCS_CHECK_15`, решение пользователя), потому что **на этой
-тропе он недостижим по построению**: линковка движения к сделке требует
-непустого `Deal.billsWindowEnd`, который пишет только вторая нога
-`REFRESH_POSITION_COMMAND`, а `REFRESH_BILLS_COMMAND` в состав цикла
+тропе он недостижим по построению**: строку `DealCashFlow` производит
+только `REFRESH_BILLS_COMMAND`, а он в состав цикла
 добычи тропы `ENTRY_SUBMITTED` не входит вовсе
 (`docs/components/SystemActionExecutor.md` §«Состав конкретного цикла»,
 `docs/models/domain/other/DealCashFlow.md` §«Линковка к `Deal`»). То есть

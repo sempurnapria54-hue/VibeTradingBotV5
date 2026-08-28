@@ -208,7 +208,7 @@ exchange response; раздел модели по `.claude/decisions/model-granu
 `/account/positions-history` по `posId`. Это тот же within-command-обход,
 которым `REFRESH_ORDER_COMMAND` эскалирует live → pending → history
 (`docs/decisions/refresh-evidence-cycle-ownership.md`,
-`docs/rules/command-lifecycle.md` §«Команды атомарны»); отдельной команды
+`docs/rules/command-lifecycle.md` §Правило); отдельной команды
 `REFRESH_POSITIONS_HISTORY` **не вводится** — сущность одна (`Position`),
 а refresh-набор держит по одной команде на сущность.
 

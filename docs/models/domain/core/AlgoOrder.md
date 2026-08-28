@@ -95,11 +95,18 @@ Java-класс `...core.algo_order.AlgoOrder`, расширяет `Auditable`.
 standalone-сущностью не адресуема ничем. Поэтому форма защиты **доборной**
 ноги сужена до собственного attached SL
 (`docs/rules/risk-creating-entry-protection.md` §«Форма защиты у доборной
-ноги»), а финализатор резолвит `stop_i` только через
-`Order.attachedAlgoOrders`
-(`docs/components/FinalizeDealExitExecutor.md` §epsilon). Заводить обратную
-ссылку `AlgoOrder → Order` под это **не требуется**: привязка к ноге уже
-есть у attached-коллекции, а вторая связь дублировала бы её.
+ноги»).
+
+**Резолв `stop_i` у финализатора идёт не через `attachedAlgoOrders`, а с
+persisted-числа** `Order.plannedStopPrice` (Р3 `GAPS_CLOSE_16`;
+стейл-редакция «только через `Order.attachedAlgoOrders`» снята B7
+`DOCS_CHECK_20`). Шестое число write-once на ноге, поэтому уровень не
+зависит ни от того, жива ли встроенная защита, ни от того, снята ли она
+подтверждённой standalone
+(`docs/components/FinalizeDealExitExecutor.md` §epsilon,
+`docs/models/domain/core/Order.md` §«`plannedStopPrice` — шестое
+число»). Обратную ссылку `AlgoOrder → Order` это тем более **не
+требует**.
 
 ### Поля фактического срабатывания — есть, и они операнд калибровки
 
@@ -157,7 +164,7 @@ partial-выходов и не-стоповых закрытий не возни
 Нормализованные snapshots для refresh/service layer (не persisted;
 разделы по `model-granularity.md`). Raw DTO не выходит за adapter-layer
 (`docs/rules/raw-exchange-dto-boundary.md`); OKX mapping — в
-`okx-algo-order-mapping.md`.
+`docs/models/mapping/AlgoOrder.md` §OKX.
 
 - **`AlgoOrderExternalSnapshot`**: `internalId`, `externalId`,
   `externalStatus`, `failCode`, `externalSize`, `externalPrice`,

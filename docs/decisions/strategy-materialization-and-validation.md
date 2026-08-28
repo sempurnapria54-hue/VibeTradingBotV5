@@ -50,12 +50,12 @@ create = структура / activate = готовность-к-запуску)
   ссылки `indicatorKey`/`structureKey`/`targetActionKey` — в рамках
   своей детали. Исполнитель — `StrategyCreateRequestValidator`
   (api-слой) + Bean Validation per-field границ.
-- **Числовые торговые поля** (`riskPerTradePercent`,
+- **Числовые торговые поля** (`riskPerActionPercent`,
   `targetRiskRewardRatio`, `allocationPercents`, `distancePercents`,
   …) на create ограничиваются только **структурно**: невозможные
   значения (отрицательный риск; доля вне [0; 100] там, где поле —
   доля) → 400. **Торгово-суждённые диапазоны** («ганслингерский»
-  `riskPerTradePercent > 3%` и прочие разумно-но-легальные пороги) на
+  `riskPerActionPercent > 3%` и прочие разумно-но-легальные пороги) на
   create **не проверяются** — это семантика готовности к запуску,
   относится к **activate (422)**, отложенной до шагов 4/7
   (ТР2 `DOCS_CHECK_8`, 2026-06-05). Оговорка «там, где поле — доля»

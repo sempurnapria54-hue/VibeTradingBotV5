@@ -22,6 +22,27 @@ Native response/request поля — `docs/models/integrations/okx/OkxOrderRespo
 `docs/integrations/okx/rules/`. Доменные модель/lifecycle —
 `docs/models/domain/core/Order.md` / `docs/lifecycles/Order.md`.
 
+## Единица размера (`sz`, `accFillSz`) — контракты у SWAP/FUTURES
+
+**Открытая сверка `integrator`** (B12 `DOCS_CHECK_20`). Дистиллят офдока
+единицу `sz` / `accFillSz` не называет, а поле несущее: у нас
+`accumulatedFillSize` входит операндом в три из четырёх чисел риска
+через отношение к `plannedSizeContracts`
+(`docs/models/domain/aggregate/Deal.md` §«Взятый риск»). Действующая
+запись — «для SWAP/FUTURES контракты»
+(`docs/models/domain/core/Order.md` §Структура), и она **предположение**
+до наблюдения.
+
+- **Проверка — на уже существующей фикстуре** (`.claude/tests/source-api/
+  okx/plan.md`, C-фикстура ordinary-order + §AG1.5): сопоставить
+  отправленный `sz` с `accFillSz` исполненного ордера и с `pos` записи
+  positions-history — совпадение по величине подтверждает единицу
+  «контракты» на всех трёх поверхностях.
+- **Цена ошибки — направленная и тихая:** если `accFillSz` придёт в
+  базовой валюте, отношение к `plannedSizeContracts` (контракты)
+  завысит или занизит `incurredRiskAmount` в `ctVal` раз, и ни одна
+  проверка этого не увидит — обе величины положительны и правдоподобны.
+
 ## Endpoints
 
 - **Create** (`SUBMIT_ORDER_COMMAND`): `POST /api/v5/trade/order`. Permission

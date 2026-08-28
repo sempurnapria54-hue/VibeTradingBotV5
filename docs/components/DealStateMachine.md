@@ -29,6 +29,12 @@ Terminal-статусы `CLOSED` / `EMERGENCY_CLOSED` handler'ов **не** им
    статусах). Не проходят безопасно → refresh / recovery / `ERROR` /
    kill-switch. В happy-path на следующий этап не переводят (исключение —
    safe forward recovery после рестарта).
+   - **Ребро в `ERROR` handler сам не пишет** — оно исход решения, значит
+     едет звеном `MARK_DEAL_ERROR_COMMAND` в первом исполнении
+     `FINALIZE_DEAL_ERROR_ACTION`; handler **гейтит эмиссию**
+     (`docs/decisions/fsm-execution-layering.md` §«Ребро `* → ERROR`:
+     карв-аут по природе тропы»). Прямой записью статуса ребро едет
+     только на тропах **перехвата**, и владеет ими петля, не FSM.
 2. **Рабочая логика этапа** — что сделать, чтобы приблизить завершение
    этапа (refresh / `CREATE_*`/`SUBMIT_*`/`CANCEL_*` /
    risk-reducing/cleanup команды; проверка condition; выбор action; вызов

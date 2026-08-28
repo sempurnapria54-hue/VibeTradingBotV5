@@ -21,7 +21,7 @@
 `DealContext`). `InstrumentExternalRules` **не** входной аргумент —
 валидатор сам читает его через
 `InstrumentExternalRulesDataService.findByInstrumentId`. Риск-настройки
-(`riskPerTradePercent`) — из `StrategyDetail`; отдельного RVO
+(`riskPerActionPercent`) — из `StrategyDetail`; отдельного RVO
 `RiskSettings` нет (см. `docs/decisions/per-trade-risk-policy.md`).
 
 **Отсюда — владелец гидрации ставки** (H1, `GAPS_CLOSE_4`). `CalculationContext`
@@ -59,12 +59,13 @@ distance. Метрики могут попасть в `RiskCheckResult.details`,
 аудит, но **не** входят в `CalculatedStrategyAction`.
 
 **Исключение — risk amount входного действия** (H9, `GAPS_CLOSE_7`): он
-**персистится** как `Order.plannedRiskAmount` **создаваемой ноги**, а суммы
-на `Deal` (`plannedRiskAmount` — знаменатель `R`; `incurredRiskAmount` —
-взятый на входе; `currentRiskAmount` — текущий, решение держателя
-`GAPS_CLOSE_16`) той же транзакцией пересчитываются по
-ногам входа (H6/H11 `DOCS_CHECK_15`); писатель —
-`docs/components/CreateOrderExecutor.md`, тот же проход. **Вместе с риском
+**персистится** как `Order.plannedRiskAmount` **создаваемой ноги**, а
+производные числа на `Deal` той же транзакцией пересчитываются
+писателем — `docs/components/CreateOrderExecutor.md`, тот же проход.
+Состав, счёт и формулы — место истины
+`docs/models/domain/aggregate/Deal.md` §«Взятый риск»; здесь не
+пересказываются (прежняя редакция перечисляла три числа и приписывала их
+все `CreateOrderExecutor`'у, расходясь с домом — B3 `DOCS_CHECK_19`). **Вместе с риском
 валидатор отдаёт и `ctVal` момента постановки** — он и так читает навес,
 чтобы посчитать риск, а значение садится на ногу пятым числом
 (`Order.plannedContractValue`, H5 `DOCS_CHECK_16`). Это не отменяет
@@ -106,7 +107,15 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 - `TAKE_PROFIT_INVALID_SIDE` — тейк на неверной стороне относительно
   входа;
 - `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION` — стоп за/у цены ликвидации
-  позиции;
+  позиции. **Проверка знает ценовую базу стопа** (C1 `DOCS_CHECK_20`):
+  ликвидация у источника вычисляется по `mark`, поэтому при
+  `triggerPriceType = MARK` сравнение прямое, а при `LAST`/`INDEX`
+  порог обязан нести запас на базис между базами — иначе ликвидация
+  достижима раньше стопа при формально выполненном инварианте
+  (`docs/rules/risk-creating-entry-protection.md` §«Ценовая база
+  триггера защиты объявляется стратегией и доезжает до биржи»).
+  Величина запаса — `грунт` (базис `last` ↔ `mark` на инструменте), до
+  его получения безопасный выбор автора стратегии — `MARK`;
 - `RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход
   (открытие/наращивание позиции) без **резолвимого стопа**: `BLOCKED`,
   **без** fail-open allocation-сайзинга в обход `RISK_PER_TRADE`
@@ -120,8 +129,16 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   risk-amount неполон. Только для risk-creating / risk-increasing действий (там,
   где прогноз комиссии входит в сайзинг, `docs/rules/risk-validator-scope.md`);
   reduce-only/закрывающие не затрагивает;
-- `RISK_PER_TRADE_EXCEEDED` — риск на сделку (%) выше
-  `StrategyDetail.riskPerTradePercent`.
+- `RISK_PER_ACTION_EXCEEDED` — риск **одного действия** (%) выше
+  `StrategyDetail.riskPerActionPercent` (база — текущий
+  `externalAvailableEquity`);
+- `RISK_PER_DEAL_EXCEEDED` — **потолок сделки**: `Deal.plannedRiskAmount`
+  плюс риск проверяемого действия выше `StrategyDetail.riskPerDealPercent
+  × Deal.plannedRiskEquityBase`. Оба неравенства обязаны выполниться;
+  дом политики — `docs/decisions/per-trade-risk-policy.md` §«Лимит риска
+  двухуровневый». **Исход `BLOCKED` по этому коду аварией не является**
+  (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
+  сделки»).
 
 Агрегация: любой `BLOCKED` ⇒ `BLOCKED`; путь `WARNING` в коде есть
 (аггрегатор его учитывает), но **ни одна проверка фазы 1 `WARNING` не

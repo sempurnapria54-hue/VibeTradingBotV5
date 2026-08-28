@@ -16,9 +16,38 @@
 
 `Deal.status = MANAGING`; pinned `StrategyDetail`; позиция активна с live
 risk **или** есть факты, что позиция закрыта и нужен переход в
-`EXIT_PENDING`; `ACTIVE && externalSize == 0` — не normal `CLOSED`, а
-cleanup/retry/anomaly; main protection актуальна; ≤1 живая позиция; нет чужих
+`EXIT_PENDING`; main protection актуальна; ≤1 живая позиция; нет чужих
 live orders/algo; нет критичного расхождения и borrow/debt.
+
+**`ACTIVE && externalSize == 0` — не normal `CLOSED`, и дальше ветка
+зависит от `StrategyDetail.positionReopenAllowed`** (A9
+`DOCS_CHECK_20`). Прежняя редакция относила этот факт к
+cleanup/retry/anomaly безусловно — то есть трактовала схлопывание в ноль
+как дефект и при `true`, где оно легитимно:
+
+| `positionReopenAllowed` | Классификация `ACTIVE && externalSize == 0` |
+|---|---|
+| `true` | **штатное состояние**, не аномалия: живые входные ноги остаются, их филл открывает новый эпизод (`docs/lifecycles/Position.md` §«Смена эпизода»). Handler ничего не снимает и остаётся в `MANAGING` |
+| `false` | **гейт срабатывает**: живые **входные** (не reduce-only) ноги снимаются cleanup-командами напрямую — тем же порядком и тем же инвариантом, что на выходе (`docs/rules/exit-teardown-order.md` §«Гейт в `MANAGING`»). Остаток — cleanup/retry/anomaly по прежним признакам |
+
+- **Наблюдатель — этот handler.** Смену `externalSize` добывает нога 1
+  `REFRESH_POSITION_COMMAND`, но исполнитель команды параметров
+  стратегии не читает по построению
+  (`docs/components/ServiceCommandExecutor.md` §Назначение), поэтому
+  реакция живёт там же, где остальные решения `MANAGING`: факт durable
+  (`Position.externalSize` на строке), читается из `DealContext`
+  следующим проходом.
+- **Названная цена.** Снятие идёт cleanup-командами, у которых нет
+  исполнения-действия, значит нет и бюджета отказов
+  (`docs/decisions/command-action-boundary.md` §2): неснятая нога не
+  даёт ни ретрая, ни холда — её подберёт следующий проход. Цена уже
+  принята проектом для всего cleanup; учёт — форвард на `TradeGuardJob`
+  (H16 `DOCS_CHECK_11`).
+- **Гейт — не новый тип шага стратегии.** Отдельный шаг потребовал бы
+  объявления в `stepsByStatus`, а необъявленный шаг молча не работает —
+  ровно то, чего избегает обязательность параметра
+  (`docs/models/domain/aggregate/Strategy.md`
+  §«`positionReopenAllowed` обязателен у торгуемой детали»).
 
 ## Рабочая логика
 
@@ -34,7 +63,8 @@ Risk-creating actions — через risk-layer; reduce-only partial exit — б
 `RiskValidator`, через safety/invariant checks (см.
 `docs/rules/risk-validator-scope.md`). Полный выход → `CLOSE_POSITION_COMMAND` /
 cancel-команды. `REFRESH_POSITION_COMMAND` без позиции → `EXIT_PENDING`;
-`ACTIVE && externalSize==0` → cleanup/retry/anomaly; fail-safe → emergency.
+`ACTIVE && externalSize==0` → по ветке `positionReopenAllowed`
+(§«Входные проверки»); fail-safe → emergency.
 
 ## Выходные проверки
 

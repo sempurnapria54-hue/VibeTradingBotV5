@@ -38,7 +38,7 @@ StrategyAction + свежие runtime-data` и должен быть собра�
 | `indicatorSettings` | `List<StrategyIndicatorSetting>` | Каталог настроек индикаторов стратегии — для резолва готового значения по «мягкому» ключу. |
 | `marketStructureSettings` | `List<StrategyMarketStructureSetting>` | Каталог настроек структуры рынка стратегии — для резолва структуры по «мягкому» ключу. |
 
-Риск-настройки сделки (`riskPerTradePercent`) читаются из присутствующего
+Риск-настройки сделки (`riskPerActionPercent`) читаются из присутствующего
 `strategyDetail` (pinned деталь). Отдельного поля/RVO `RiskSettings` нет
 (закрыт RISK-Q1, см. `docs/decisions/per-trade-risk-policy.md`).
 

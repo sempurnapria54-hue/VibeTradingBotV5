@@ -18,6 +18,8 @@ attached protection внутри order (если есть), обновляет t
 ## Плановый риск сделки (`R`)
 
 Для **входного** действия executor той же транзакцией пишет
+`Deal.plannedRiskEquityBase` (write-once, база первого сайзинга —
+`docs/models/domain/aggregate/Deal.md` §«База процента риска») и
 `Order.plannedRiskAmount` / `plannedRiskCurrency` **создаваемой ноги** —
 величину `risk amount`, посчитанную `RiskValidator` при преконтроле
 **этого же** действия (`|entry − stop| × contracts × ctVal + commissions`)
@@ -109,16 +111,19 @@ reference-цена в сущности ордера не остаётся. Бе�
 уровнях и тем рвала тождество, которое их связывает
 (`docs/components/FinalizeDealExitExecutor.md` §epsilon).
 
-**Четвёртое число сделки пишет он же, когда нога несёт встроенную
-защиту** (T2 `DOCS_CHECK_18`). Risk-creating вход ставится с attached SL
+**Числа риска на `Deal` пересчитываются здесь целиком — все четыре**
+(T2 `DOCS_CHECK_18`, правило выровнено B3 `DOCS_CHECK_19`). Создание
+ноги входа меняет сразу два операнда: состав слагаемых и **действующую
+защиту** — risk-creating вход ставится с attached SL
 (`docs/rules/risk-creating-entry-protection.md` §Правило), и до первой
-standalone-защиты **действующей** защитой сделки является именно она;
-её уровень садится write-once шестым числом (`Order.plannedStopPrice`)
-той же транзакцией. Поэтому executor той же транзакцией пересчитывает и
-`Deal.protectionRelievedRiskAmount` — по закрытой форме
-(`docs/models/domain/aggregate/Deal.md` §«Форма вычитаемого»; формула
-здесь не пересказывается). На **открывающем** входе результат равен нулю
-точно — защита ещё ничего не сняла, и это верное значение, а не пустота.
+standalone-защиты действующей является именно она; её уровень садится
+write-once шестым числом (`Order.plannedStopPrice`) той же транзакцией.
+По общему правилу «кто меняет любой операнд, пересчитывает всю четвёрку»
+executor делает это одной транзакцией с созданием ноги. Состав, счёт и
+формулы — место истины `docs/models/domain/aggregate/Deal.md` §«Взятый
+риск»; здесь не пересказываются. На **открывающем** входе
+`protectionRelievedRiskAmount` равен нулю точно — защита ещё ничего не
+сняла, и это верное значение, а не пустота.
 
 **Write-once — на ноге; сумма на сделке не write-once.** Уже заполненный
 плановый риск ноги не перетирается — ни REPLACE-ремоделом стопа, ни
@@ -144,7 +149,9 @@ standalone-защиты **действующей** защитой сделки �
 действия, потому что производит их преконтроль. Пустой набор чисел ⇒ нога
 не входная ⇒ ни поля, ни суммы не трогаются. Правило
 агрегации **лимита** при многоногом входе (`GRID_ENTRY`/пирамидинг)
-остаётся открытым вопросом `RISK-Q3` — знаменатель им не затронут
+**закрыто** двухуровневым лимитом (`RISK-Q3`, `GAPS_CLOSE_20`;
+`docs/decisions/per-trade-risk-policy.md` §«Лимит риска двухуровневый»)
+— знаменатель им не затронут
 (`docs/models/domain/aggregate/Deal.md` §«Плановый риск»).
 
 Общая семантика `CREATE_*` — `docs/components/ServiceCommandExecutor.md`.
@@ -166,15 +173,27 @@ standalone-защиты **действующей** защитой сделки �
 **шесть, и перечень обязан совпадать со счётом** (§«Куда пишутся шесть
 чисел»; прежняя редакция перечисляла пять, называя шестью).
 
+**Восьмое поле — `plannedRiskEquityBase`** (C4 `DOCS_CHECK_20`, решение
+держателя). Едет тем же payload'ом, в шестёрку **не входит**: это
+**база процента**, по которой `SizeCalculator` считал бюджет, а не
+операнд тождества риска ноги. Приземляется **на `Deal`**, а не на ногу,
+и **write-once** — базу задаёт первый сайзинг сделки
+(`docs/models/domain/aggregate/Deal.md` §«База процента риска»);
+вторая и последующие ноги везут его тем же полем, executor записи не
+делает (guard `where planned_risk_equity_base is null`).
+
 **Седьмое поле — `liquidationDistanceRatio`** (П14 держателя, доведено
 B1 `DOCS_CHECK_18`). Едет тем же payload'ом, но **в шестёрку не входит**:
 это измеритель запаса до ликвидации, а не операнд тождества риска, и его
 пустота законна при заполненной шестёрке. Операнд `liqPx` берётся из
-`DealContext.position` живого эпизода при **доборе**; на открывающем
+`DealContext` — живого эпизода (`deal.livePosition()`) при **доборе**; на открывающем
 входе позиции ещё нет ⇒ поле пусто
 (`docs/models/domain/core/Order.md` §«`liquidationDistanceRatio` —
-седьмое число»). Итого payload несёт **семь** чисел: шесть тождества +
-измеритель.
+седьмое число»). Итого payload несёт **восемь** чисел: шесть тождества +
+измеритель + база процента (`plannedRiskEquityBase`, C4
+`DOCS_CHECK_20`); плюс `triggerPriceType` в
+`attachedProtection`-подобъекте (C1 `DOCS_CHECK_20`) — он не число и в
+счёт не входит.
 У не-входных `CREATE_ORDER_COMMAND` (защита,
 reduce-only) они пусты — там нет преконтроля, который их производит. Это единственное исключение из «payload
 хранит минимум»: минимум означает «не тащить то, что executor возьмёт из
@@ -193,3 +212,12 @@ intent; OKX adapter всё равно ставит `tdMode=isolated`, `posSide=n
 (вложен в `CreateOrderCommandPayload.attachedProtection`). Структура
 attached protection — `docs/models/domain/core/Order.md`
 (`AttachedAlgoOrder`).
+
+**Payload несёт и `triggerPriceType`** (C1 `DOCS_CHECK_20`) —
+объявленную стратегией ценовую базу триггера
+(`StopLossSettings.triggerPriceType`). Без неё
+`attachAlgoOrds[*].slTriggerPxType` уходил бы пустым и биржа применяла
+бы свой default `last`, тогда как запас до ликвидации считается от
+`mark` (дом принципа —
+`docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
+защиты объявляется стратегией и доезжает до биржи»).
