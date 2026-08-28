@@ -34,12 +34,16 @@ contractsRounded = roundByLotSize(contracts)
 ### Вход (open/increase)
 
 Желаемый notional берётся от свободного депозита:
-`desiredNotional = externalAvailableEquity × (allocationPercents / 100)`,
+`desiredNotional = база риска × (allocationPercents / 100)`,
 затем `contracts = desiredNotional / (entryPrice × ctVal)`. Если у входа
 есть стоп — `contracts` кэпится **поактным** лимитом риска (см. ниже).
 Итог округляется вниз по `lotSz` и снизу ограничен `minSz`. База
-аллокации — `externalAvailableEquity` (якорь процента — открытый вопрос
-STRAT-Q4).
+аллокации — та же **база риска**, что у лимитов (свободный остаток
+расчётной валюты, `docs/decisions/per-trade-risk-policy.md`
+§«Определение и база»; C6 `DOCS_CHECK_21` — прежде читался account-level
+`externalAvailableEquity`, чья номинация и валютный состав не объявлены).
+Якорь процента — открытый вопрос STRAT-Q4, им эта правка не
+затрагивается: сменился носитель величины, не смысл процента.
 
 ### Reduce-only / algo
 
@@ -86,7 +90,7 @@ market-close ведёт `ExitPendingHandler` командой `CLOSE_POSITION_CO
 
 Для risk-creating входа со стопом размер **ограничен поактным лимитом
 риска**: убыток на стопе не должен превышать
-`StrategyDetail.riskPerActionPercent × BalanceContainer.externalAvailableEquity`
+`StrategyDetail.riskPerActionPercent × база риска`
 (`docs/decisions/per-trade-risk-policy.md`). Убыток на стопе для линейного
 контракта — `|entryPrice − stopPrice| × contracts × ctVal + commissions`
 (прогнозная комиссия вход+выход по **taker**-ставке — worst-case; **включена с
@@ -130,12 +134,19 @@ SHORT и давала бы шортам систематически больш�
 - **сделочные лимиты калькулятор не считает** — оба проверяются
   `RiskValidator`'ом над готовым размером
   (`RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
-  `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`;
+  `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`,
+  `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`;
   `docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня
   „риск на сделку“»): подбирать размер под остаток бюджета значило бы
   выпускать ногу заведомо меньше объявленного стратегией, не сообщая об
   этом;
-- запас на проскок за стоп в фазе 1 не закладывается (убыток по цене стопа).
+- запас на проскок за стоп в фазе 1 не закладывается (убыток по цене
+  стопа), и **пола дистанции стопа тоже нет** — при узком стопе размер
+  и нотинал растут обратно пропорционально дистанции, а worst-case за
+  стоп-ценой ничем не ограничен. Названное ограничение с условием
+  пересмотра — `docs/decisions/per-trade-risk-policy.md`
+  §«Worst-case открывающего входа» (решение держателя, C5
+  `DOCS_CHECK_21`).
 
 Верхний биржевой предел плеча/размера остаётся за `RiskValidator`
 (`EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `SIZE_ABOVE_LIMIT`); отдельного нашего кэпа

@@ -94,8 +94,8 @@ Java-класс `...core.algo_order.AlgoOrder`, расширяет `Auditable`.
 операнда `stop_i` конкретной ноги входа: «защита **той же** ноги»
 standalone-сущностью не адресуема ничем. Поэтому форма защиты **доборной**
 ноги сужена до собственного attached SL
-(`docs/rules/risk-creating-entry-protection.md` §«Форма защиты у доборной
-ноги»).
+(`docs/rules/risk-creating-entry-protection.md` §«Защита доборной ноги
+снимается после пересчёта основной»).
 
 **Резолв `stop_i` у финализатора идёт не через `attachedAlgoOrders`, а с
 persisted-числа** `Order.plannedStopPrice` (Р3 `GAPS_CLOSE_16`;

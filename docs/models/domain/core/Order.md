@@ -41,7 +41,7 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `side` | `String` | Сторона (OKX `buy` / `sell`). |
 | `externalStatus` | `String` | Сырой статус биржи (OKX `state`) — **диагностический факт**, FSM напрямую не использует. |
 | `price` | `BigDecimal` | Цена (для market-like может быть null). |
-| `size` | `BigDecimal` | Размер (для SWAP/FUTURES — контракты). Единица источника — рантайм-подтверждение `.claude/tests/source-api/okx/plan.md` §AG1.5/§C-фикстура (B12 `DOCS_CHECK_20`); офдок `order.md` единицу `sz`/`accFillSz` не называет. |
+| `size` | `BigDecimal` | Размер (для SWAP/FUTURES — контракты). Единица источника — рантайм-подтверждение `.claude/tests/source-api/okx/plan.md` §AG1.5 и цепочки `M16.limit` (`Climit`) / `M16.market` (`Cmarket`) (B12 `DOCS_CHECK_20`; адрес приведён к именам кейсов плана — N1 `DOCS_CHECK_21`); офдок `order.md` единицу `sz`/`accFillSz` не называет. |
 | `accumulatedFillSize` | `BigDecimal` | Накопленный исполненный объём — **в тех же единицах, что `size`** (для SWAP/FUTURES — контракты; B12 `DOCS_CHECK_20`). Единица несущая: поле — операнд трёх из четырёх чисел риска через отношение `accumulatedFillSize_i / plannedSizeContracts_i` (`docs/models/domain/aggregate/Deal.md` §«Взятый риск»), и разные единицы у числителя и знаменателя дали бы молча неверную долю. |
 | `averagePrice` | `BigDecimal` | Средняя цена исполнения. |
 | `fee` | `BigDecimal` | Накопленная комиссия. |
@@ -478,6 +478,55 @@ Java-класс `...core.order.AttachedAlgoOrder`, расширяет `Auditable
 Доменные методы: `isActiveLike()` (PENDING/ACTIVE),
 `canTransitionTo(target)` (явная матрица — см. lifecycle),
 `toPending/toActive/toComplete/toCancel/toError`.
+
+### Персистентность `AttachedAlgoOrder`
+
+**Место истины схемы таблицы `attached_algo_orders`** (B3
+`DOCS_CHECK_21`; прежде §Персистентность объявляла себя местом истины
+**только для `orders`**, и единственным носителем типа и nullability
+вводимой колонки оказывалась сборка schema-дельты — что правило
+`docs/rules/persistence-representation.md` §«Место истины схемы» прямо
+запрещает).
+
+Таблица создана `V6__create_deal_runtime_tables.sql`; наследует
+audit-поля (`AuditableEntity`).
+
+| Колонка | Тип | Nullability | Комментарий |
+|---|---|---|---|
+| `id` | `bigint identity` | `NOT NULL` | PK |
+| `order_id` | `bigint` | `NOT NULL` | FK → `orders` (`fk_attached_algo_order_order`) |
+| `internal_id` | `varchar(64)` | `NOT NULL` | ключ матчинга; `uk_attached_algo_order_internal_id` |
+| `external_attached_id` | `varchar(64)` | `null` | появляется после ACK биржи |
+| `external_id` | `varchar(64)` | `null` | биржа возвращает не всегда |
+| `status` | `varchar(32)` | `NOT NULL` | енум строкой |
+| `close_reason` | `varchar(32)` | `null` | пусто, пока защита жива |
+| `type` | `varchar(32)` | `NOT NULL` | енум строкой |
+| `external_status` | `varchar(32)` | `null` | у attached полноценного state нет |
+| `external_type` | `varchar(32)` | `null` | биржевой тип |
+| `size` | `numeric(36,18)` | `null` |  |
+| `stop_loss_trigger_price` | `numeric(36,18)` | `null` |  |
+| **`trigger_price_type`** | `varchar(64)` | `null` | **вводится шагом 7**: енум `AlgoOrder.TriggerPriceType` строкой |
+| шесть audit-колонок | `timestamptz` / `varchar(64)` | `null` | тот же состав, что у соседних таблиц |
+
+**Почему вводимая колонка nullable, хотя поле объявлено обязательным.**
+Обязательность держится **на стороне постановки**: risk-creating вход не
+выпускается без объявленной ценовой базы триггера
+(`docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
+защиты объявляется стратегией и доезжает до биржи»,
+`docs/models/domain/aggregate/Strategy.md` §StopLossSettings — поле
+обязательно). Строка же материализуется **и из биржевого эха**:
+`AttachedAlgoOrderExternalSnapshot` типа триггера не несёт
+(§«External snapshots»), поэтому `NOT NULL` на колонке отказывал бы во
+вставке ровно на подтверждающей тропе, где значение не наблюдается, а не
+на тропе создания, где оно объявлено. Довод прежде не был записан — он
+и есть содержание этой правки.
+
+**Тот же пробел есть у `algo_orders`** (standalone): её схема тоже живёт
+только в `V6`, §Персистентность у `docs/models/domain/core/AlgoOrder.md`
+нет. Шаг 7 состава этой таблицы **не меняет** — строки в schema-дельте у
+неё нет и диф по ней не исполняется, — поэтому пробел закрывается не
+здесь: задача в `.claude/work/backlog.md` §«Места истины схемы для
+таблиц без §Персистентность».
 
 ### Енумы `AttachedAlgoOrder`
 

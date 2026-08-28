@@ -113,7 +113,8 @@ severity / safetyImpact**» (условно); для
 
 **Выравнивание выполнено** (H18, `GAPS_CLOSE_6`):
 `docs/rules/controlled-exchange-exceptions.md` несёт §«Эскалация —
-безусловный L4 (все три категории)» с ровно этой формулировкой. Клауза
+безусловная биржевая ступень 2 (все три категории)» с ровно этой
+формулировкой (имя приведено к действующему заголовку — A9 `DOCS_CHECK_21`). Клауза
 «выравнивание делается на `SYNC_DOCS_FROM_CODE`» устарела и снята — работа
 уже сделана, задачи на `SYNC` по этому пункту нет.
 
@@ -122,7 +123,9 @@ severity / safetyImpact**» (условно); для
 - `.claude/work/questions/open-questions.md` — HOLD-Q1 (закрыт этим
   решением).
 - `docs/rules/controlled-exchange-exceptions.md` — три категории
-  controlled exceptions (§«Эскалация — безусловный L4»; выравнивание
+  controlled exceptions (`docs/rules/controlled-exchange-exceptions.md`
+  §«Эскалация — безусловная биржевая ступень 2 (все три категории)»;
+  выравнивание
   **выполнено**, см. §выше — стейл-хвост «выравнивается на `SYNC`» снят,
   H27 `GAPS_CLOSE_7`).
 - `docs/rules/exchange-hold.md` (что блокирует L4-холд),

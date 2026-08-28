@@ -145,7 +145,11 @@ action / entry order.
 не утверждает (`docs/integrations/okx/contracts/position.md`
 §«Идентификация записи»). Проверка — `.claude/tests/source-api/okx/plan.md`
 §AG1.9. Если источник `posId` переиспользует, меняются **оба**: этот
-дискриминатор и ключ `uk_position_deal_external`.
+дискриминатор и ключ `uk_position_deal_external`. Посылка
+**зарегистрирована предусловием `CODE`** (п. 15,
+`docs/decisions/pnl-finalization-mechanics.md` §«Предусловия `CODE`
+шага 7») — до B6 `DOCS_CHECK_21` кейс её покрывал, а реестр не
+регистрировал, и клейм «реестр сквозной» был ложен.
 
 **Дискриминатор — `posId`, не размер.** `externalSize = 0` эпизод не
 закрывает (§«Status vs live risk»), а «позиция снова ненулевая» без

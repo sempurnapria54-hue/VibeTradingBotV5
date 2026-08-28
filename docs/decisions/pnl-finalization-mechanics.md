@@ -159,8 +159,11 @@ ERROR` или живого риска нет» (A3 `DOCS_CHECK_20`, дом —
   штатным (довод радиуса).
 - **Дом:** `docs/rules/pnl-reconciliation.md` §«Асимметрия троп отказа
   добычи»; ветка исполнителя —
-  `docs/components/ServiceCommandExecutor.md` §«Ветка
-  `Deal.status = ERROR`».
+  `docs/components/ServiceCommandExecutor.md` §«Ветка „радиус
+  локализован“» (B9 `DOCS_CHECK_21`: прежний адрес §«Ветка
+  `Deal.status = ERROR`» — стейл-имя, не существующее ни в одном
+  файле; свип C4 `GAPS_CLOSE_20` его не нашёл, потому что имя разбито
+  переносом строки, а фильтр свипа шёл по словам-дискриминаторам).
 
 ### 6. Инвариант агрегации positions-history — рантайм-верификация (N11)
 
@@ -230,6 +233,21 @@ partial-закрытиям **этого эпизода**; читается фи�
 (`docs/rules/persistence-representation.md`). Безымянных объектов в
 сборке не остаётся.
 
+**Клейм проверяется по объектам, а не по строкам** (B2 `DOCS_CHECK_21`).
+Прежний проход прочитал требование как «у каждой **строки** сборки нет
+безымянных объектов» и пропустил три частичных ключа, объявленных внутри
+строки счётом («+два частичных ключа») и предикатом («частичный ключ
+§Инварианты»). Счёт — не перечень, и правило «перечень, а не счёт»
+действует **внутри** строки тоже: раскрывается каждый вводимый объект,
+а не их количество.
+
+**Строка несёт и снимаемое, а не только вводимое** (B1 `DOCS_CHECK_21`).
+Детектор расхождения ищет **разницу** составов, поэтому объект, который
+шаг сносит (`−колонка`, `−ключ`, `−индекс`, `DROP TABLE`), обязан быть в
+строке так же, как вводимый: иначе снос виден только месту истины, а
+сборка молча его теряет — зеркальный случай той же тропы, ради которой
+сборка и заведена.
+
 Пустой сборки быть не может:
 без неё детектор исполнять не на чем — ровно так колонка
 `orders.liquidation_distance_ratio` и не доехала до миграции (B1
@@ -239,16 +257,16 @@ partial-закрытиям **этого эпизода**; читается фи�
 |---|---|---|
 | `deals` | `ALTER`: `planned_risk_amount`, `incurred_risk_amount`, `current_risk_amount`, `protection_relieved_risk_amount`, `planned_risk_currency`, **`planned_risk_equity_base`**, `bills_window_begin`, `bills_window_end`, **`bills_fetched_through`**, `close_outcome`, `reconciliation_status`, `breakdown_incomplete`, `risk_benchmark_availability`; `+ix_deal_status_close_outcome`, `−ix_deal_status` | `docs/models/domain/aggregate/Deal.md` §Персистентность |
 | `orders` | `ALTER`: `planned_entry_price`, `planned_size_contracts`, `planned_risk_amount`, `planned_risk_currency`, `planned_contract_value`, `planned_stop_price` (инвариант «шесть или ни одного») **+ `liquidation_distance_ratio`** (седьмое число, в инвариант не входит) **+ `position_id`** (FK → `positions`, nullable — эпизод, к которому относится нога; N5 `DOCS_CHECK_20`, решение держателя); `+fk_order_position`, `+ix_order_position` | `docs/models/domain/core/Order.md` §Персистентность |
-| `attached_algo_orders` | `ALTER`: **`+trigger_price_type`** (`varchar(64)`, nullable — енум `TriggerPriceType` строкой; ценовая база триггера attached-защиты, C1 `DOCS_CHECK_20`) | `docs/models/domain/core/Order.md` §«Структура `AttachedAlgoOrder`» |
-| `positions` | `ALTER`: восемь колонок положения закрытия — `external_realized_profit`, `external_result_currency`, `external_close_average_price`, `external_close_type`, `external_funding_cost`, `external_realized_profit_gross`, `external_fee`, `external_liquidation_penalty`; **`−uk_position_deal`**, `+uk_position_deal_live` (частичный `unique (deal_id) where status = 'ACTIVE'`), `+uk_position_deal_external` (`unique (deal_id, external_id)`), `+ix_position_deal` — многоэпизодная сделка | `docs/models/domain/core/Position.md` §Персистентность |
+| `attached_algo_orders` | `ALTER`: **`+trigger_price_type`** (`varchar(64)`, nullable — енум `TriggerPriceType` строкой; ценовая база триггера attached-защиты, C1 `DOCS_CHECK_20`) | `docs/models/domain/core/Order.md` §«Персистентность `AttachedAlgoOrder`» |
+| `positions` | `ALTER`: восемь колонок положения закрытия — `external_realized_profit`, `external_result_currency`, `external_close_average_price`, `external_close_type`, `external_funding_cost`, `external_realized_profit_gross`, `external_fee`, `external_liquidation_penalty`; **`−uk_position_deal`**, `+uk_position_deal_live` (частичный `unique (deal_id) where status = 'ACTIVE'`), `+uk_position_deal_external` (частичный `unique (deal_id, external_id) where external_id is not null` — B5 `DOCS_CHECK_21`), `+ix_position_deal` — многоэпизодная сделка | `docs/models/domain/core/Position.md` §Персистентность |
 | `deal_cash_flows` | **`CREATE TABLE`**: `id`, `deal_id`, `exchange_id`, `category`, `amount`, `external_fee`, `ccy`, `applied_rate`, `rate_status`, `applied_rate_candle_instrument`, `applied_rate_candle_timeframe`, `applied_rate_candle_open_time`, `external_instrument_id`, `external_bill_id`, `external_type`, `external_sub_type`, `external_order_id` + шесть audit-колонок; `+uk_deal_cash_flow_exchange_bill`, `+fk_deal_cash_flow_deal`, `+fk_deal_cash_flow_exchange`, `+ix_deal_cash_flow_deal`, `+ix_deal_cash_flow_unlinked` (частичный, `where deal_id is null`) | `docs/models/domain/other/DealCashFlow.md` §Персистентность |
 | `trade_fee_rates` | **`CREATE TABLE`**: `id`, `exchange_id`, `external_instrument_type`, `external_fee_group_id`, `instrument_type`, `external_taker_fee_rate`, `external_maker_fee_rate`, **`external_fee_level`**, `refresh_count` + шесть audit-колонок; `+fk_trade_fee_rate_exchange`, `+ix_trade_fee_rate_group`. `UNIQUE` по ключу группы **не заводится** — история означает несколько строк на ключ | `docs/models/domain/other/TradeFeeRate.md` §Персистентность |
-| `deal_action_states` → `deal_strategy_action_states` | `RENAME`; `+target_entity_type`, `+target_entity_id`, `+`шесть audit-колонок; `−uk_deal_action_state_deal_action`, `+`два частичных ключа; **`+fk_deal_strategy_action_state_deal`** (симметрия с таблицей-близнецом); `+ix_deal_strategy_action_state_deal` | `docs/models/domain/other/DealActionState.md` §Персистентность |
-| `deal_system_action_states` | **`CREATE TABLE`**: `id`, `deal_id`, `system_action_type`, `status`, `attempt_count`, `max_attempts`, `next_retry_at`, `last_error` + шесть audit-колонок; `+fk_deal_system_action_state_deal`, частичный ключ §Инварианты, `+ix_deal_system_action_state_deal`. Target-колонок нет — цель системного действия всегда сама сделка | там же |
+| `deal_action_states` → `deal_strategy_action_states` | `RENAME`; `+target_entity_type`, `+target_entity_id`, `+`шесть audit-колонок; **`−target`** (jsonb — расплющена в две колонки, двух представлений одного факта не оставляем); `status` `varchar(32)` → **`varchar(64)`**; `−uk_deal_action_state_deal_action`, `+uk_deal_strategy_action_state_target` (частичный, `where … and target_entity_id is not null`), `+uk_deal_strategy_action_state_action` (частичный, `where … and target_entity_id is null`); **`+fk_deal_strategy_action_state_deal`** (симметрия с таблицей-близнецом), `fk_deal_action_state_strategy_action` → **`fk_deal_strategy_action_state_strategy_action`** (`RENAME CONSTRAINT`); `+ix_deal_strategy_action_state_deal` | `docs/models/domain/other/DealActionState.md` §Персистентность |
+| `deal_system_action_states` | **`CREATE TABLE`**: `id`, `deal_id`, `system_action_type`, `status`, `attempt_count`, `max_attempts`, `next_retry_at`, `last_error` + шесть audit-колонок (типы и nullability — место истины); `+fk_deal_system_action_state_deal`, `+uk_deal_system_action_state_action` (частичный, `where status in (живые)`), `+ix_deal_system_action_state_deal`. Target-колонок нет — цель системного действия всегда сама сделка | там же |
 | `deal_finalization_states` | **`DROP TABLE`** (роль перенесена) | там же, §«Правило переноса» |
 | `anomaly_reports` | `ALTER`: `+kind` (`not null` сразу), `scope` `varchar(16)` → `varchar(64)`; **`+ix_anomaly_report_unfinished_state`** — поисковый индекс незавершённых `STATE`-отчётов по (`exchange_id`, `code`, `scope`, `instrument_id`) `where kind = 'STATE' and status in ('CREATED', 'IN_PROGRESS', 'KILL_SWITCH_EXECUTED')`; `fee_group_key` **не заводится** | `docs/models/domain/other/AnomalyReport.md` §Персистентность |
 | `instruments` | `ALTER`: `external_settlement_currency`, `external_base_currency`, `external_quote_currency` — все `varchar(64)`, nullable | `docs/models/domain/core/Instrument.md` §Персистентность |
-| `strategy_details` | `ALTER`: `+position_reopen_allowed` (многоэпизодная сделка — параметр стратегии); **`risk_per_trade_percent` → `risk_per_action_percent`** (`RENAME`) и **`+cumulative_risk_per_deal_multiplier`** (`numeric(36,18)`, nullable) — сделочный лимит риска (C6 `DOCS_CHECK_20` + `RISK-Q3-A`, решение держателя; `docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня „риск на сделку“»). Одновременный лимит колонки не получает — глобальный конфиг | `docs/models/domain/aggregate/Strategy.md` §Персистентность |
+| `strategy_details` | `ALTER`: `+position_reopen_allowed` (многоэпизодная сделка — параметр стратегии); **`risk_per_trade_percent` → `risk_per_action_percent`** (`RENAME`), **`+cumulative_risk_per_deal_multiplier`** (`numeric(36,18)`, nullable) и **`+strategy_simultaneous_risk_per_deal_percent`** (`numeric(36,18)`, nullable — максимум одновременного риска стратегии, C9 `DOCS_CHECK_21`, расширение держателя) — сделочные лимиты риска (`docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня „риск на сделку“»). **Глобальный** максимум одновременного риска колонки не получает — он остаётся конфигом | `docs/models/domain/aggregate/Strategy.md` §Персистентность |
 
 Бэкфилла не требует ни одна строка сборки: до конца фазы 1 таблицы пусты
 (`.claude/rules/pre-launch-schema-changes.md`). Обязательные колонки
@@ -321,6 +339,20 @@ partial-закрытиям **этого эпизода**; читается фи�
     (`ExternalInvariantViolationException` ⇒ биржевая ступень 2
     `Exchange.TRADE_BLOCKED` + flatten, ручное снятие) реджектил бы
     каждую нормально закрывшуюся сделку.
+
+15. **Посылка «переоткрытая позиция получает новый `posId` внутри окна
+    линковки»** — **гейтит** (кейс `AG1.9`, вторая половина). Она несёт
+    **дискриминатор смены эпизода** и ключ идемпотентности
+    `uk_position_deal_external`; при ложности ключ ловит **легитимный**
+    второй эпизод как дубль, то есть даёт отказ вставки на **штатной**
+    тропе (`docs/integrations/okx/contracts/position.md` §«Что офдок
+    этим НЕ утверждает», `docs/lifecycles/Position.md` §«Смена эпизода
+    (многоэпизодная сделка)»). Отдельным пунктом, а не расширением п. 1 (B6
+    `DOCS_CHECK_21`): п. 1 назван инвариантом **агрегации**, предмет
+    ключа в него не помещается, а слияние двух посылок в один гейт —
+    ровно тот дефект, который реестр уже ловил на `AG1.5`. Кейс
+    посылку покрывает; недоставало **регистрации** — клейм «реестр
+    сквозной» без неё был ложен.
 
 Негейтящие: `AG3.5` (гранулярность bills, fee-эхо) и **`AG3.6`**
 (фактический состав полей bill-записи, B10 `DOCS_CHECK_20`) —

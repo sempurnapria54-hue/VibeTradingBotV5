@@ -189,7 +189,8 @@
 │       │   ├── phase-1-step-7-gaps-close-17.md — Как закрыты находки DOCS_CHECK_17?
 │       │   ├── phase-1-step-7-gaps-close-18.md — Каков исход закрытия находок DOCS_CHECK_18?
 │       │   ├── phase-1-step-7-gaps-close-19.md — Каков исход закрытия находок DOCS_CHECK_19?
-│       │   └── phase-1-step-7-gaps-close-20.md — Каков исход закрытия находок DOCS_CHECK_20?
+│       │   ├── phase-1-step-7-gaps-close-20.md — Каков исход закрытия находок DOCS_CHECK_20?
+│       │   └── phase-1-step-7-gaps-close-21.md — Каков исход закрытия находок DOCS_CHECK_21?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили (общие вопросы)?
 │       │   └── tasks/ — Что неясно по конкретной активной задаче? (сейчас пусто)

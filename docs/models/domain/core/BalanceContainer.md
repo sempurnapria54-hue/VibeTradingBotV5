@@ -45,8 +45,25 @@ Java-класс `com.example.tradingbot.domain.model.core.balance.BalanceContain
 | `externalUpdatedAt` | `OffsetDateTime` | Время обновления account-level snapshot на стороне биржи. База freshness-check. |
 | `externalTotalEquity` | `BigDecimal` | Total equity аккаунта по данным биржи. |
 | `externalAdjustedEquity` | `BigDecimal` | Adjusted / effective equity. |
-| `externalAvailableEquity` | `BigDecimal` | Account-level available (свободный) equity — **база риск-политики на сделку** (`docs/decisions/per-trade-risk-policy.md`) и проверки достаточности средств перед risk-creating / risk-increasing action. |
+| `externalAvailableEquity` | `BigDecimal` | Account-level available (свободный) equity. **Базой риск-политики не является** (C6 `DOCS_CHECK_21`) — диагностическая величина уровня аккаунта. |
 | `balances` | `List<Balance>` | Балансы по валютам. Для SWAP/USDT обязательна settle currency. |
+
+**Единица и валютный состав account-level полей не объявлены** (C6
+`DOCS_CHECK_21`). Все три — величины **уровня аккаунта**: они агрегируют
+все валюты аккаунта, а их номинацию офдок источника не называет и
+модель не записывает (`docs/integrations/okx/contracts/balance.md`,
+`docs/models/mapping/Balance.md` — описания без единицы). Поэтому:
+
+- **риск-контур их не читает** — база риска берётся из строки `Balance`
+  расчётной валюты (§`Balance` ниже,
+  `docs/decisions/per-trade-risk-policy.md` §«Определение и база»); тем
+  самым посылка о номинации перестала быть несущей, и добывать её
+  отдельно не требуется;
+- **сравнивать их с величинами в расчётной валюте нельзя** — ни в
+  неравенствах лимитов, ни в допуске сверки; если такая нужда возникнет
+  (второй инструмент с другой settle-ccy, вторая биржа), номинация
+  становится несущей и добывается прогоном контура тестов API источника
+  **до** ввода потребителя.
 
 Метод `replaceBalances(List<Balance>)` — полная замена currency-level
 списка (clear + recreate). `REFRESH_BALANCE_COMMAND` использует replace
@@ -66,7 +83,7 @@ Java-класс `com.example.tradingbot.domain.model.core.balance.Balance`,
 | `externalUpdatedAt` | `OffsetDateTime` | Время обновления currency-level snapshot на бирже. |
 | `externalEquity` | `BigDecimal` | Equity по валюте. |
 | `externalCashBalance` | `BigDecimal` | Cash balance по валюте. |
-| `externalAvailableBalance` | `BigDecimal` | Доступный баланс по валюте. |
+| `externalAvailableBalance` | `BigDecimal` | Доступный баланс по валюте. У строки **расчётной валюты инструмента** это и есть **база риска** — операнд сайзинга и всех трёх лимитов риска на сделку (`docs/decisions/per-trade-risk-policy.md` §«Определение и база»). Единица определена по построению: `externalCurrency` строки. |
 | `externalFrozenBalance` | `BigDecimal` | Замороженный баланс — диагностика, почему часть средств недоступна. |
 
 ## Инварианты
@@ -165,13 +182,15 @@ API / parse / invariant   -> exception / controlled error
   обновляют его, не вызывают `IntegrationService`, не создают
   `REFRESH_BALANCE_COMMAND`, не принимают risk decision.
 - **RiskValidator** использует fresh `BalanceContainer` как входной
-  snapshot (`externalTotalEquity` / `externalAdjustedEquity` /
-  `externalAvailableEquity`; по settle currency — `externalEquity` /
-  `externalCashBalance` / `externalAvailableBalance` /
-  `externalFrozenBalance`), но не обновляет его и не создаёт
-  `ServiceCommand`. Defensive policy: absent/stale/invalid →
+  snapshot; **базу риска** он читает из строки `Balance` расчётной
+  валюты (`externalAvailableBalance`), прочие поля строки
+  (`externalEquity` / `externalCashBalance` / `externalFrozenBalance`) и
+  account-level величины — диагностика. Валидатор не обновляет снапшот и
+  не создаёт `ServiceCommand`. Defensive policy: absent/stale/invalid →
   `RiskValidationResult.BLOCKED`, code `BALANCE_NOT_FRESH` /
-  `BALANCE_INVALID`.
+  `BALANCE_INVALID`; отсутствие строки расчётной валюты либо
+  непозитивный `externalAvailableBalance` — это `BALANCE_INVALID`
+  (`docs/components/RiskValidator.md` §«Конкретные проверки»).
 
 ## Чего не хранит домен
 

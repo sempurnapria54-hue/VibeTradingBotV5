@@ -203,6 +203,72 @@ market-data.
 не блокирует** — единственный детектор недосчёта числа работает
 журналом. Забытый разведочный режим неотличим от работающего контроля.
 
+## Пересмотр worst-case открывающего входа — по данным первого периода живой торговли
+
+**Третий встречный якорь того же класса** (заведён `GAPS_CLOSE_21`,
+решение держателя на C5 `DOCS_CHECK_21`, вариант (а)). Worst-case **за**
+стоп-ценой системой не ограничен: кэпа плеча нет, кэпа нотинала нет,
+пола дистанции стопа нет, guard ликвидации на открывающем входе не
+гоняется, а измеритель `Order.liquidationDistanceRatio` на этой
+популяции пуст. Держатель принял ограничение осознанно — «без учёта
+проскальзываний, потом посмотрим реальное положение дел», — и назначил
+**условием пересмотра данные**, а не срок.
+
+Сведение четырёх дыр воедино, счётная иллюстрация и перечень наблюдений —
+`docs/decisions/per-trade-risk-policy.md` §«Worst-case открывающего
+входа»; здесь — носитель со стороны **события**, чтобы условие не
+осталось внутри правила, которое читает только тот, кому оно и так
+нужно.
+
+**Когда срабатывает:** по накоплении первого периода живой торговли —
+не по календарю, а по наличию выборки закрытых сделок, достаточной,
+чтобы распределения читались (ориентир — та же величина `N`, что у
+снятия разведочного режима допуска, и по той же причине провизорная).
+
+**Что сделать:**
+
+1. **Снять три распределения** — все из уже персистируемых колонок,
+   нового поля не требуется:
+   - фактические дистанции стопов —
+     `Order.plannedEntryPrice` против `plannedStopPrice`;
+   - фактические нотиналы и плечи —
+     `plannedSizeContracts × plannedContractValue × plannedEntryPrice`
+     против `Deal.plannedRiskEquityBase`;
+   - наблюдённый запас до ликвидации — `Order.liquidationDistanceRatio`
+     по ногам, где он непуст (доборные входы при живой позиции).
+2. **Вернуться к развилке** «кэп нотинала на сделку **или** пол
+   дистанции стопа в единицах волатильности» — на числах, а не на
+   предположении; обе формы отложены, не отвергнуты
+   (`docs/decisions/per-trade-risk-policy.md` §Альтернативы).
+3. **Смежное — C8:** тем же заходом пересматривается «филл отдыхающей
+   ноги риск-контроля не проходит» (`per-trade-risk-policy.md`
+   §«Филл отдыхающей входной ноги риск-контроля не проходит»): нужны
+   частота события и величина расхождения, операнды те же.
+4. **Записать исход** в history-файл: какие распределения получены и
+   какое решение принято по обеим формам ограничения.
+
+**Цена невыполнения названа:** при дистанции стопа 0.1 % поактный лимит
+риска формально выполнен, а гэп в 10 % сквозь стоп даёт **100R**. Пока
+пересмотр не проведён, единственная защита от этого — дисциплина автора
+стратегии.
+
+## Места истины схемы для таблиц без §Персистентность
+
+**Заведено `GAPS_CLOSE_21`** (B3 `DOCS_CHECK_21`, смежное). У
+`attached_algo_orders` место истины схемы заведено этим закрытием
+(`docs/models/domain/core/Order.md` §«Персистентность
+`AttachedAlgoOrder`»); у **`algo_orders`** его по-прежнему нет —
+состав живёт только в `V6__create_deal_runtime_tables.sql`, а
+`docs/models/domain/core/AlgoOrder.md` §Персистентность не существует.
+
+Шаг 7 состава `algo_orders` **не меняет**, поэтому строки в
+schema-дельте у неё нет и диф по ней не исполняется — пробел не гейтит
+`CODE` шага 7. Закрывается ближайшим шагом, который эту таблицу
+трогает, либо курационным заходом: правило требует место истины у
+**каждой** таблицы (`docs/rules/persistence-representation.md`
+§«Место истины схемы»), и «шаг её не менял» — объяснение отсрочки, а не
+исключение из правила.
+
 ## Шаг «Безопасность» (Фаза 1, шаг 9) — форвард-материал
 
 Материал, отложенный до шага «Безопасность» роадмапа
@@ -524,17 +590,20 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     (`ALTER RENAME`), `+cumulative_risk_per_deal_multiplier`; правка
     `StrategyDetail` / api-модели / entity и двух
     `strategy-examples/*.json`;
-  - **глобальный конфиг** `simultaneousRiskPerDealPercent = 1%`
-    (`@ConfigurationProperties`, колонки нет);
+  - **глобальный конфиг** `globalSimultaneousRiskPerDealPercent = 1%`
+    (`@ConfigurationProperties`, колонки нет) **+ параметр стратегии**
+    `strategySimultaneousRiskPerDealPercent` (колонка есть — см.
+    CODE-дельту `GAPS_CLOSE_21` ниже; C9 `DOCS_CHECK_21`);
   - `RiskCheckCode.RISK_PER_TRADE_EXCEEDED` → `RISK_PER_ACTION_EXCEEDED`,
     `+RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
-    `+RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`; **две** новые проверки в
-    `RiskValidator` (`liveRiskNow = max(0, plannedRiskAmount −
-    protectionRelievedRiskAmount)`, носителя остатка не заводить);
+    `+RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`,
+    `+RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`; **три** новые
+    проверки в `RiskValidator` — операнды считаются по runtime graph,
+    носителя остатка не заводить (формулы — дом политики,
+    `docs/decisions/per-trade-risk-policy.md`);
   - **статическая проверка на create стратегии**
-    (`StrategyCreateRequestValidator`, 400):
-    `n_risk_creating(step) × riskPerActionPercent ≤
-    simultaneousRiskPerDealPercent` для каждого шага
+    (`StrategyCreateRequestValidator`, 400): два правила — вложенность
+    потолков и `N_overlap × riskPerActionPercent ≤` максимума стратегии
     (`docs/decisions/strategy-materialization-and-validation.md`);
   - `BLOCKED` по обоим сделочным кодам **в `ERROR` не уводит**
     (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
@@ -558,17 +627,55 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **пола `minSz` у reduce-only размера нет** — три исхода округления и два
   журнальных кода (`PARTIAL_EXIT_ROUNDED_TO_FULL`,
   `PARTIAL_EXIT_BELOW_MIN_SIZE`; C5 `DOCS_CHECK_20`,
-  `docs/components/SizeCalculator.md`).
-
-**Форвард вне шага 7** (`принято-в-работу`, B6 `DOCS_CHECK_20`):
-top-level эхо attached-защиты (`attachedAlgoInternalId`,
-`stopLossTriggerPrice` снапшота `Order`) в домен не приземляется —
-решить, нужен ли ему носитель, или строки снапшота выводятся из состава
-(`docs/models/mapping/Order.md` §«`OrderExternalSnapshot` → `Order`»).
-Смежно: эхо `slTriggerPxType` не читается вовсе
-(`docs/rules/risk-creating-entry-protection.md` §«Названное
-ограничение»).
-
+  `docs/components/SizeCalculator.md`);
+- **CODE-дельта `GAPS_CLOSE_21`** (дом каждой позиции назван, здесь —
+  что писать):
+  - **база риска — строка `Balance` расчётной валюты**
+    (`externalAvailableBalance` записи `ccy = settleCurrency`), а не
+    account-level `externalAvailableEquity`: `SizeCalculator`
+    (аллокация + бюджет), `RiskValidator` (все неравенства +
+    `BALANCE_INVALID` при отсутствии строки), `CreateOrderExecutor`
+    (значение в `Deal.plannedRiskEquityBase`) — C6 `DOCS_CHECK_21`;
+  - **операнды сделочных лимитов считаются в `RiskValidator` по
+    runtime graph**, а не читаются из четвёрки:
+    `liveRiskNow = unfilledPlannedRisk + livePositionRiskAtStop`
+    (второе слагаемое — от `Position.externalAverageEntryPrice` /
+    `externalSize` / наименее благоприятного живого стопа, клэмп на
+    слагаемом) и `dealRiskTaken = plannedRiskAmount + incurredCanceled`
+    — C1-C3 `DOCS_CHECK_21`, дом —
+    `docs/decisions/per-trade-risk-policy.md`;
+  - **четыре неравенства вместо трёх** + новый код
+    `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` в `RiskCheckCode`;
+    база кумулятивного — `min(plannedRiskEquityBase, база риска)` (C7);
+  - **`+strategy_details.strategy_simultaneous_risk_per_deal_percent`**
+    (`numeric(36,18)`, nullable) + поле `StrategyDetail` +
+    api-модель; **глобальный** максимум — `@ConfigurationProperties`
+    (`globalSimultaneousRiskPerDealPercent`, `1%`), прежнее безмаркерное
+    имя снято (C9);
+  - **create-валидация стратегии** — два новых правила
+    `StrategyCreateRequestValidator`:
+    `STRATEGY_SIMULTANEOUS_RISK_ABOVE_GLOBAL` и
+    `STRATEGY_SIMULTANEOUS_RISK_UNSATISFIABLE` (`N_overlap` — по
+    структуре пересечений, не по одному шагу; C9);
+  - **вторая точка входа `SystemActionExecutor.reviseLiveExecutions(
+    DealContext)`** — ревизия живых SYSTEM-исполнений на проходе
+    оркестратора и на терминальном ребре; переход
+    `RETRY_PENDING → SKIPPED` в матрице SYSTEM (A3, A14);
+  - **выходная проверка `ManagingHandler`** получает конъюнкт
+    `positionReopenAllowed` + дизъюнкт «живых входных ног нет» (A4);
+  - **`HoldService.hold(...)` на терминальном ребре — после коммита**
+    транзакции терминала, обе тропы (A7);
+  - **суррогат нижней границы окна** подставляется и в предикат
+    линковки, и в операнд признака полноты, не только в запрос (A6);
+  - **схема:** `−deal_action_states.target` (jsonb),
+    `status varchar(32) → varchar(64)`,
+    `RENAME CONSTRAINT fk_deal_action_state_strategy_action →
+    fk_deal_strategy_action_state_strategy_action`, три частичных ключа
+    с именами, `uk_position_deal_external` — частичный
+    (`where external_id is not null`) — B1-B5, B11, B13;
+  - **омиссионный член epsilon** взвешивается филлами по предикату
+    взятого (C11), область `Σ|amount|` — строки расчётной валюты вне
+    списка исключений (A5).
 - **CODE стадий 1-2 (доспецифицировано, писать код):** носители
   `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
   (`mapping/PositionCloseResult.md`) + `DealCashFlow`
@@ -965,6 +1072,15 @@ top-level эхо attached-защиты (`attachedAlgoInternalId`,
     `SubmitOrderExecutor` пишет `Order.externalCreatedAt` первой
     отправленной ноги всегда при постановке, условным `UPDATE`; ни
     live-нога, ни нога 2 поля не касаются.
+
+**Форвард вне шага 7** (`принято-в-работу`, B6 `DOCS_CHECK_20`):
+top-level эхо attached-защиты (`attachedAlgoInternalId`,
+`stopLossTriggerPrice` снапшота `Order`) в домен не приземляется —
+решить, нужен ли ему носитель, или строки снапшота выводятся из состава
+(`docs/models/mapping/Order.md` §«`OrderExternalSnapshot` → `Order`»).
+Смежно: эхо `slTriggerPxType` не читается вовсе
+(`docs/rules/risk-creating-entry-protection.md` §«Названное
+ограничение»).
 
 ### Грунт `integrator` для шага 7
 

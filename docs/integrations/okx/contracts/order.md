@@ -33,8 +33,9 @@ Native response/request поля — `docs/models/integrations/okx/OkxOrderRespo
 (`docs/models/domain/core/Order.md` §Структура), и она **предположение**
 до наблюдения.
 
-- **Проверка — на уже существующей фикстуре** (`.claude/tests/source-api/
-  okx/plan.md`, C-фикстура ordinary-order + §AG1.5): сопоставить
+- **Проверка — на уже существующих кейсах** (`.claude/tests/source-api/
+  okx/plan.md`: цепочки `M16.limit` / `M16.market` ordinary-order +
+  §AG1.5; адрес приведён к именам кейсов плана — N1 `DOCS_CHECK_21`): сопоставить
   отправленный `sz` с `accFillSz` исполненного ордера и с `pos` записи
   positions-history — совпадение по величине подтверждает единицу
   «контракты» на всех трёх поверхностях.

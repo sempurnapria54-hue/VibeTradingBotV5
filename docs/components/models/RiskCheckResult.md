@@ -37,6 +37,7 @@
 Стартовый набор кодов:
 `RISK_PER_ACTION_EXCEEDED`, `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
 `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`,
+`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`,
 `RISK_CREATING_ENTRY_WITHOUT_STOP`,
 `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `MARGIN_MODE_NOT_ISOLATED`,
 `BORROW_OR_DEBT_DETECTED`, `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`,
@@ -51,7 +52,9 @@
 ### Эмитятся `RiskValidator`'ом в фазе 1
 
 `RISK_PER_ACTION_EXCEEDED`, `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
-`RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`, `RISK_CREATING_ENTRY_WITHOUT_STOP`,
+`RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`,
+`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`,
+`RISK_CREATING_ENTRY_WITHOUT_STOP`,
 `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
 `MARGIN_MODE_NOT_ISOLATED`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
 `SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`, `TAKE_PROFIT_INVALID_SIDE`,
@@ -111,28 +114,35 @@ Market data expired/missing — **не** risk-code первого уровня: 
 
 ### Риск и экспозиция (фаза 1)
 
-**Кодов лимита риска два — по числу уровней** (C6 `DOCS_CHECK_20`; дом
-политики — `docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня
+**Кодов лимита риска четыре — по числу неравенств** (C6 `DOCS_CHECK_20`,
+C9 `DOCS_CHECK_21`; дом политики —
+`docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня
 „риск на сделку“», здесь не пересказывается):
 
 `RISK_PER_ACTION_EXCEEDED` — **поактный** лимит: убыток
-на стопе одного risk-creating действия как % от свободного депозита
+на стопе одного risk-creating действия как % от базы риска
 превышает `StrategyDetail.riskPerActionPercent`. Срабатывает в том числе
 когда действие не укладывается в лимит **даже на минимальном размере
 инструмента** (`minSz`) — строгое блокирование без открытия.
 
 `RISK_PER_DEAL_CUMULATIVE_EXCEEDED` — **кумулятивный потолок сделки**:
-`Deal.plannedRiskAmount` плюс риск нового действия превышает
+`dealRiskTaken` плюс риск нового действия превышает
 `cumulativeRiskPerDealMultiplier × riskPerActionPercent ×
-Deal.plannedRiskEquityBase`.
+min(Deal.plannedRiskEquityBase, база риска текущая)`.
 
-`RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED` — **одновременный риск на сделку**:
-`liveRiskNow` (= `max(0, plannedRiskAmount − protectionRelievedRiskAmount)`)
-плюс риск нового действия превышает `simultaneousRiskPerDealPercent ×
-externalAvailableEquity`. Величина лимита — **глобальный конфиг**, не
-поле стратегии.
+`RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED` — **одновременный риск на сделку
+против максимума стратегии**: `liveRiskNow` плюс риск нового действия
+превышает `StrategyDetail.strategySimultaneousRiskPerDealPercent × база
+риска`.
 
-**Оба сделочных кода — не авария ни в одном статусе:** действие
+`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` — тот же операнд против
+**глобального** максимума (`globalSimultaneousRiskPerDealPercent × база
+риска`, конфиг). Отдельный код, а не тот же: инвариант «максимум
+стратегии ≤ глобального» проверяется на create, поэтому срабатывание
+этого кода означает, что потолок изменила **система** после приёма
+стратегии, — иной разбор, чем «стратегия выбрала свой бюджет».
+
+**Все три сделочных кода — не авария ни в одном статусе:** действие
 не исполняется, сделка остаётся в текущем статусе и ведётся до выхода
 имеющимися ногами (`docs/processes/risk-evaluation.md` §«Карв-аут
 исчерпанного бюджета сделки»).

@@ -14,15 +14,32 @@
 
 ## Входы
 
-Сигнатура — `validate(CalculatedStrategyAction, DealContext)`. Из этих
-двух входов `RiskValidator` сам извлекает цену/размер
-(`CalculatedPrice`/`CalculatedSize` из `CalculatedStrategyAction`),
-баланс/позицию/направление/`StrategyDetail`/`Instrument` (из
-`DealContext`). `InstrumentExternalRules` **не** входной аргумент —
-валидатор сам читает его через
-`InstrumentExternalRulesDataService.findByInstrumentId`. Риск-настройки
-(`riskPerActionPercent`) — из `StrategyDetail`; отдельного RVO
-`RiskSettings` нет (см. `docs/decisions/per-trade-risk-policy.md`).
+Сигнатура — `validate(CalculatedStrategyAction, DealContext)`. Из
+`CalculatedStrategyAction` валидатор извлекает цену/размер
+(`CalculatedPrice` / `CalculatedSize`). Из `DealContext` он читает
+**runtime graph сделки целиком** — не закрытый список отдельных полей
+(N4 `DOCS_CHECK_21`: прежняя редакция перечисляла операнды списком, и
+три операнда сделочных лимитов в него не попали):
+
+| Что читает | Откуда | Зачем |
+|---|---|---|
+| `balanceContainer` | `DealContext` | база риска — `Balance.externalAvailableBalance` расчётной валюты (`docs/decisions/per-trade-risk-policy.md` §«Определение и база») |
+| `deal` с графом (`orders`, `algoOrders`, `positions`) | `DealContext.deal` | операнды обоих сделочных лимитов: неисполненная доля живых ног, взятое снятыми ногами, размер и средняя цена живого эпизода, уровни действующих защит |
+| `deal.plannedRiskAmount`, `deal.plannedRiskEquityBase` | `DealContext.deal` | операнд и база кумулятивного потолка |
+| `strategyDetail` | `DealContext` | `riskPerActionPercent`, `cumulativeRiskPerDealMultiplier`, `strategySimultaneousRiskPerDealPercent` |
+| `instrument`, направление сделки | `DealContext` | `marginMode`, плечо, знак дистанции стопа |
+| `globalSimultaneousRiskPerDealPercent` | глобальный конфиг (`@ConfigurationProperties`) | жёсткий системный потолок одновременного риска |
+
+`InstrumentExternalRules` **не** входной аргумент — валидатор сам читает
+его через `InstrumentExternalRulesDataService.findByInstrumentId`.
+Отдельного RVO `RiskSettings` нет (см.
+`docs/decisions/per-trade-risk-policy.md`).
+
+**Граф уже собран проходом FSM** (`docs/components/models/DealContext.md`),
+поэтому чтение по ногам и эпизодам не добавляет запросов; отдельного
+persisted-носителя под операнды лимитов не заводится
+(`docs/decisions/per-trade-risk-policy.md` §«Что считается живым риском в
+моменте»).
 
 **Отсюда — владелец гидрации ставки** (H1, `GAPS_CLOSE_4`). `CalculationContext`
 у валидатора нет: тропа чтения навеса у него **своя**, прямая. Поэтому ставку
@@ -52,10 +69,10 @@ commissions`, где `commissions` = `rate × sizeContracts × ctVal ×
 комиссии», H1, `GAPS_CLOSE_4`); **включён с шага 7** (G6), согласовано с
 `SizeCalculator`, см. `docs/decisions/per-trade-risk-policy.md` §«Учёт
 комиссий (включён на шаге 7)»);
-**risk percent от свободного депозита** (база —
-`BalanceContainer.externalAvailableEquity`, не total/adjusted, см.
-`docs/decisions/per-trade-risk-policy.md`); SL distance; liquidation guard
-distance. Метрики могут попасть в `RiskCheckResult.details`, логи или
+**risk percent от базы риска** (свободный остаток расчётной валюты, не
+account-level агрегат и не total/adjusted — см.
+`docs/decisions/per-trade-risk-policy.md` §«Определение и база»);
+SL distance; liquidation guard distance. Метрики могут попасть в `RiskCheckResult.details`, логи или
 аудит, но **не** входят в `CalculatedStrategyAction`.
 
 **Исключение — risk amount входного действия** (H9, `GAPS_CLOSE_7`): он
@@ -89,8 +106,9 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
 - `CALCULATED_ACTION_INVALID` — размер отсутствует / непозитивен;
 - `INSTRUMENT_RULES_MISSING` — `InstrumentExternalRules` не
   материализованы;
-- `BALANCE_INVALID` — `externalAvailableEquity` отсутствует /
-  непозитивен.
+- `BALANCE_INVALID` — база риска не резолвится: свежий
+  `BalanceContainer` не содержит строки расчётной валюты либо её
+  `externalAvailableBalance` отсутствует / непозитивен.
 
 Далее накапливаются (любой `BLOCKED` ⇒ итог `BLOCKED`):
 
@@ -130,26 +148,36 @@ Fail-fast (возвращают `BLOCKED` сразу, без остальных 
   где прогноз комиссии входит в сайзинг, `docs/rules/risk-validator-scope.md`);
   reduce-only/закрывающие не затрагивает;
 - `RISK_PER_ACTION_EXCEEDED` — риск **одного действия** (%) выше
-  `StrategyDetail.riskPerActionPercent` (база — текущий
-  `externalAvailableEquity`);
+  `StrategyDetail.riskPerActionPercent` от **текущей** базы риска;
 - `RISK_PER_DEAL_CUMULATIVE_EXCEEDED` — **кумулятивный потолок сделки**:
-  `Deal.plannedRiskAmount` плюс риск проверяемого действия выше
+  `dealRiskTaken` плюс риск проверяемого действия выше
   `cumulativeRiskPerDealMultiplier × riskPerActionPercent ×
-  Deal.plannedRiskEquityBase`;
+  min(Deal.plannedRiskEquityBase, база риска текущая)`;
 - `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED` — **одновременный риск на
-  сделку**: `liveRiskNow` плюс риск проверяемого действия выше
-  `simultaneousRiskPerDealPercent × externalAvailableEquity`, где
-  `liveRiskNow = max(0, Deal.plannedRiskAmount −
-  Deal.protectionRelievedRiskAmount)`. Лимит — **глобальный конфиг**
-  (`1%`), не поле стратегии; носителя остатка не заводится — величина
-  вычисляется здесь.
+  сделку против максимума стратегии**: `liveRiskNow` плюс риск
+  проверяемого действия выше
+  `StrategyDetail.strategySimultaneousRiskPerDealPercent × база риска`;
+- `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` — тот же операнд против
+  **глобального** максимума (`globalSimultaneousRiskPerDealPercent ×
+  база риска`). Достижим, только если инвариант «максимум стратегии ≤
+  глобального» нарушен задним числом (конфиг изменён после create) —
+  это **страховка сверху**, и её реджект разведён отдельным кодом,
+  чтобы «стратегия выбрала свой бюджет» и «система изменила потолок» не
+  читались одинаково.
 
-**Все три неравенства обязаны выполниться**; дом политики —
+**Все четыре неравенства обязаны выполниться**; формулы операндов
+(`dealRiskTaken`, `liveRiskNow`) и дом политики —
 `docs/decisions/per-trade-risk-policy.md` §«Три лимита внутри уровня
-„риск на сделку“», здесь не пересказывается. **Исход `BLOCKED` по обоим
+„риск на сделку“», здесь не пересказываются. **Исход `BLOCKED` по
 сделочным кодам аварией не является**
 (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
 сделки»).
+
+**Пола дистанции стопа среди проверок нет** — названное ограничение, не
+пропуск: worst-case **за** стоп-ценой системой в фазе 1 не
+ограничивается (`docs/decisions/per-trade-risk-policy.md`
+§«Worst-case открывающего входа», решение держателя C5
+`DOCS_CHECK_21`).
 
 Агрегация: любой `BLOCKED` ⇒ `BLOCKED`; путь `WARNING` в коде есть
 (аггрегатор его учитывает), но **ни одна проверка фазы 1 `WARNING` не

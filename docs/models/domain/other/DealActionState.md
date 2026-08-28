@@ -179,19 +179,34 @@ runtime-сущность (target = новая, `replacesInternalId` = `internalI
 истины ключа, `docs/rules/idempotency-via-unique.md` §«Уникальность среди
 живых»):
 
+**У каждого ключа есть имя** (B2 `DOCS_CHECK_21`): безымянный объект
+заставляет писателя миграции имя придумать, а сборка schema-дельты
+объявляет, что безымянных объектов в ней не остаётся
+(`docs/decisions/pnl-finalization-mechanics.md` §«Schema-дельта шага 7»).
+
 ```text
 живые статусы = PLANNED | CREATED | SUBMITTED | RETRY_PENDING
 
 deal_strategy_action_states:
-  unique (deal_id, strategy_action_id, target_entity_type, target_entity_id)
-         where status in (живые) and target_entity_id is not null
-  unique (deal_id, strategy_action_id)
-         where status in (живые) and target_entity_id is null
+  uk_deal_strategy_action_state_target
+    unique (deal_id, strategy_action_id, target_entity_type, target_entity_id)
+           where status in (живые) and target_entity_id is not null
+  uk_deal_strategy_action_state_action
+    unique (deal_id, strategy_action_id)
+           where status in (живые) and target_entity_id is null
 
 deal_system_action_states:
-  unique (deal_id, system_action_type)
-         where status in (живые)
+  uk_deal_system_action_state_action
+    unique (deal_id, system_action_type)
+           where status in (живые)
 ```
+
+Имена разводятся **операндом различения**: `…_target` — ключ ног,
+различаемых целью; `…_action` — ключ «одно живое исполнение на узел»
+(в стратегийной таблице узел — `strategy_action_id`, в системной —
+`system_action_type`). Все три укладываются в лимит идентификатора
+PostgreSQL (63 байта): самое длинное —
+`uk_deal_strategy_action_state_target`, 36 символов.
 
 - Ноги грида различаются **целью** и живут одновременно; «незапущенное»
   (`target == null`) исполнение узла — не более одного (вторая нога
@@ -272,7 +287,22 @@ domain ↔ persistence.
   `modified_at` — `timestamptz`; `created_by`, `modified_by` —
   `varchar(64)`; все nullable, H15 `DOCS_CHECK_15`); прежний жёсткий
   `uk_deal_action_state_deal_action` снимается, ставятся два частичных
-  ключа §Инварианты. Колонок `action_kind` / `system_action_type` таблица
+  ключа §Инварианты (`uk_deal_strategy_action_state_target`,
+  `uk_deal_strategy_action_state_action`).
+  - **Существующий FK переименовывается вместе с таблицей** (B13
+    `DOCS_CHECK_21`): `fk_deal_action_state_strategy_action` →
+    `fk_deal_strategy_action_state_strategy_action`. Довод тот же, что у
+    вводимого рядом `fk_deal_strategy_action_state_deal`, — симметрия
+    имён с таблицей-близнецом; к соседу довод прежде не применялся, и
+    таблица уезжала бы с именем FK от прежнего имени таблицы. Цена
+    нулевая: `ALTER … RENAME CONSTRAINT`, таблицы пусты.
+  - **`status` выравнивается вверх до `varchar(64)`** (B11
+    `DOCS_CHECK_21`): существующая колонка — `varchar(32)` (`V6`), норма
+    шага и колонка близнеца — `varchar(64)`. Функционального разрыва
+    нет (самое длинное значение енума — 13 символов), но норма была
+    объявлена без `ALTER`, то есть сборка и место истины расходились бы
+    молча. Асимметрия снимается тем же выравниванием вверх и тем же
+    доводом симметрии, которым выровнен audit-состав; цена нулевая. Колонок `action_kind` / `system_action_type` таблица
   **не получает** — вид кодируется таблицей.
   - **Типы и nullability двух новых колонок названы здесь** (H19
     `DOCS_CHECK_15`), а не оставлены выводимыми: место истины схемы —
@@ -290,14 +320,28 @@ domain ↔ persistence.
     «`NULL`'ы в `UNIQUE` различны, значит ключ мёртв» проект уже ловил
     дважды (`docs/rules/idempotency-via-unique.md` §«Уникальность среди
     живых»).
-- **`deal_system_action_states`** — **новая** (`CREATE TABLE`): `id`,
-  `deal_id` (`NOT NULL`, FK), `system_action_type` (`varchar(64)`
-  `NOT NULL` — енум строкой), `status` (`varchar(64)` `NOT NULL`),
-  retry-поля `Retryable` (`attempt_count`, `max_attempts`,
-  `next_retry_at`, `last_error` jsonb), **шесть audit-колонок** того же
-  состава и той же nullability, что у таблицы-близнеца. Target-колонок
-  нет: цель системного действия — всегда сама сделка (`deal_id`); ключ —
-  частичный §Инварианты.
+- **`deal_system_action_states`** — **новая** (`CREATE TABLE`).
+  Поколоночно (B4 `DOCS_CHECK_21`: оборот «как у близнеца» покрывал
+  только audit-состав, а типы и nullability retry-колонок оставались
+  выводимыми — тот самый механизм «писатель миграции выбирает по
+  аналогии и расходится с соседями добросовестно», которым обоснована
+  предыдущая правка этого же раздела):
+
+  | Колонка | Тип | Nullability | Комментарий |
+  |---|---|---|---|
+  | `id` | `bigserial` | `NOT NULL` | `primary key` — `pk_deal_system_action_state`; форма та же, что у близнеца |
+  | `deal_id` | `bigint` | `NOT NULL` | FK → `deals` (`fk_deal_system_action_state_deal`) |
+  | `system_action_type` | `varchar(64)` | `NOT NULL` | енум `SystemActionType` строкой |
+  | `status` | `varchar(64)` | `NOT NULL` | енум `DealActionStateStatus` строкой |
+  | `attempt_count` | `integer` | `null` | `Retryable`; nullable — как у близнеца (`V6`) |
+  | `max_attempts` | `integer` | `null` | `Retryable`; nullable — как у близнеца |
+  | `next_retry_at` | `timestamptz` | `null` | `Retryable`; пусто, пока ретрай не запланирован |
+  | `last_error` | `jsonb` | `null` | `Retryable`; пусто, пока ошибок не было |
+  | шесть audit-колонок | `timestamptz` / `varchar(64)` | `null` | тот же состав и та же nullability, что у близнеца |
+
+  Target-колонок нет: цель системного действия — всегда сама сделка
+  (`deal_id`); ключ — частичный, `uk_deal_system_action_state_action`
+  (§Инварианты).
 - **Обе таблицы несут полный набор audit-колонок** (H15 `DOCS_CHECK_15`,
   решение пользователя). Прежде дельта объявляла audit только у новой
   таблицы, а старая их не несла: одна доменная модель, две entity, у одной

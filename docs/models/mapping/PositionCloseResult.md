@@ -76,7 +76,7 @@ executor работает только с validated normalized snapshot.
 | `externalLiquidationPenalty` | `BigDecimal` | `liqPenalty` записи — ликвидационный штраф, **сырой знак** источника; правый операнд четвёртой пары сверки (H7 `DOCS_CHECK_13`) |
 | `externalPosId` | `String` | биржевой id позиции (ключ адресации записи; на create-тропе — **данные**, см. ниже) |
 | `externalInstrumentId` | `String` | сырой `instId` записи — операнд **структурной валидации** «запись относится к запрошенному инструменту» (H18 `DOCS_CHECK_14`); на `Position` не приземляется — сверка, не данные |
-| `direction` | `Position.Direction` | направление закрытой позиции — операнд **create-тропы** (H4 `DOCS_CHECK_11`); **доменное значение, нормализованное в слое интеграции** (H7 `DOCS_CHECK_15`), симметрично `PositionExternalSnapshot.direction` живой ноги. Имя без префикса `external` — по признаку конвенции «ниже маппинга величина обязана быть проектной нормалью» (`docs/models/domain/other/InstrumentExternalRules.md` §«Конвенция `external*`») |
+| `direction` | `Position.Direction` | направление закрытой позиции — операнд **create-тропы** (H4 `DOCS_CHECK_11`); **доменное значение, нормализованное в слое интеграции** (H7 `DOCS_CHECK_15`), симметрично `PositionExternalSnapshot.direction` живой ноги. Имя без префикса `external` — по признаку конвенции «ниже маппинга величина обязана быть проектной нормалью» (`docs/models/domain/other/InstrumentExternalRules.md` §«Оговорка к конвенции `external*`») |
 | `externalCreatedAt` | `OffsetDateTime` | время создания записи positions-history (`cTime`) — операнд **create-тропы**; audit-поле `Position` (конвенция `Auditable`). Роль «операнд нижней границы окна линковки» (H4 `DOCS_CHECK_11`) **снята** H9 `DOCS_CHECK_16` — границу ставит единственный писатель `SubmitOrderExecutor` |
 | `externalModifiedAt` | `OffsetDateTime` | время обновления записи positions-history |
 
@@ -110,7 +110,8 @@ create-тропа (§ниже). До этого все три числились
 сверка расширена до **раздельных пар по категориям** (Σ по категории
 разбивки против соответствующего числа биржи), и без этих двух полей правых
 операндов двух из четырёх пар не существует
-(`docs/components/FinalizeDealExitExecutor.md` §«Расчёт прибыли и сверка»).
+(`docs/components/FinalizeDealExitExecutor.md` §«Расчёт прибыли (шаг 7) и
+сверка»).
 Прежде оба числились выведенными как «слагаемые net, потребителя нет» —
 потребитель появился.
 
@@ -294,7 +295,7 @@ bills_window_begin is null`), не `updatable = false`: строка `deals`
 | `Position` | `Deal` | Кто пишет |
 |---|---|---|
 | `externalRealizedProfit` | `resultProfit` (слагаемое net) | `FinalizeDealExitExecutor` / `MarkDealEmergencyClosedExecutor` |
-| `externalResultCurrency` | **не пишется** — сверяется | они же (см. ниже) |
+| `externalResultCurrency` | **не пишется** — сверяется; **исключение**: `Deal.resultProfitCurrency` не резолвится из авторитета ⇒ берётся отсюда как деградация с пометкой (см. ниже) | они же (см. ниже) |
 | `externalCloseType` | `closeOutcome` (`1,2` → `NORMAL_EXIT`; `3,4` → `LIQUIDATION`; `5,6` → `FORCED_REDUCTION`; **пусто** → `UNDETERMINED` + отчёт; значение вне `1..6` сюда не доезжает — контракт записи проверяется на границе, §«Контракт записи проверяется здесь») | они же (`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта») |
 | `externalRealizedProfitGross`, `externalFee`, `externalFundingCost`, `externalLiquidationPenalty` | **не пишутся** — правые операнды четырёх пар сверки (суммируются **по эпизодам**) | `FinalizeDealExitExecutor` (сверка, не запись) |
 
@@ -308,6 +309,19 @@ bills_window_begin is null`), не `updatable = false`: строка `deals`
 `resultProfitCurrency`») делала носителей два, и число складывалось из
 net'а в валюте записи источника с cross-ccy-слагаемым в расчётной валюте
 инструмента — разные валюты молча.
+
+**Деградационная ветка — условная, и она не воскрешает второй носитель**
+(B8 `DOCS_CHECK_21`). Когда авторитет **пуст** (расчётная валюта
+инструмента не резолвилась при заведении), финализация берёт
+`Position.externalResultCurrency` как единственный доступный факт и
+помечает это `AnomalyReport` `SETTLE_CURRENCY_UNAVAILABLE`
+(`docs/models/domain/aggregate/Deal.md` §«Ветка „операнд пуст“»).
+Противоречия с «не пишется — сверяется» нет: **носитель по-прежнему
+один**, а ветка описывает поведение при его пустоте, помечена аномалией
+и наблюдаема. Отвергнутый дефект был другим — безусловный перенос
+значения, при котором два источника расходились **молча**; здесь
+молчания нет. Прежняя редакция называла правило безусловно («не
+пишется»), и два дока противоречили друг другу дословно.
 
 **`externalCloseType` переходит в `Deal.closeOutcome`** (узел F
 `GAPS_CLOSE_12` + H2 `GAPS_CLOSE_13`). Он остаётся входом провенанса

@@ -37,7 +37,10 @@
   к `CLOSED`.
 - **`CLOSED`** — штатный terminal-финал. Live risk отсутствует
   (подтверждено facts); обязательны `resultProfit` /
-  `resultProfitCurrency`; FSM handler не запускается.
+  `resultProfitCurrency` — **со смягчением по валюте на тропах без
+  входа** (§«Смягчение по валюте на тропах без входа»: валюта не
+  резолвилась ⇒ ассерт проверяет только `resultProfit`); FSM handler не
+  запускается.
 - **`ERROR`** — ошибочное runtime-состояние (не terminal, не закрытая
   сделка). Обычные strategy steps не выполняются; разрешены только
   safety / recovery / refresh / kill-switch действия.
@@ -115,9 +118,19 @@ risk → `CLOSED` + `RISK_CONTROL`.
 
 `Deal` active, если не в terminal status (`ERROR` — active, не
 terminal). Terminal — `CLOSED`/`EMERGENCY_CLOSED`: нет FSM handler. Для
-**чистого** `CLOSED` `resultProfit`/`resultProfitCurrency` обязательны; для
+**чистого** `CLOSED` `resultProfit`/`resultProfitCurrency` обязательны —
+**со смягчением по валюте на тропах без входа** (§«Смягчение по валюте
+на тропах без входа»); для
 ошибочного `EMERGENCY_CLOSED` — по §«Терминальный контракт финализации»
 (не блокируется инвариантом чистого закрытия).
+
+> **Инвариант двух полей нигде не записывается безусловно** (B7 + A8
+> `DOCS_CHECK_21`). Смягчение живёт в этом же файле, но три носителя —
+> §Статусы, §«Terminal semantics» и
+> `docs/models/domain/aggregate/Deal.md` §«Итоговый PnL» — повторяли
+> абсолют без указателя, а `CODE`-писатель читает **дом поля** или
+> **дом терминального контракта**, не обязательно оба. Указатель
+> проставлен во всех трёх.
 
 Live risk сделки (не хранится boolean-полем; вычисляется через
 runtime graph, `DealActionState`, refresh/search/history facts,
@@ -286,9 +299,30 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
 
 | Ребро | `closeOutcome` | `reconciliationStatus` | `breakdownIncomplete` | `riskBenchmarkAvailability` |
 |---|---|---|---|---|
-| `EXIT_PENDING → CLOSED` (штатная) | по `Position.externalCloseType`, пусто (записи нет) ⇒ `UNDETERMINED` | исход сверки | `COMPLETE` / `INCOMPLETE_BY_WINDOW` / `NOT_ASSESSED` | `AVAILABLE`, либо `MISSING` при пустом знаменателе (H13 `DOCS_CHECK_16`) |
+| `EXIT_PENDING → CLOSED` (штатная) | по `Position.externalCloseType` **последнего эпизода** (`max(externalModifiedAt)`), пусто (записи нет) ⇒ `UNDETERMINED` | исход сверки | **только `COMPLETE`** (A1 `DOCS_CHECK_21`) | `AVAILABLE`, либо `MISSING` при пустом знаменателе (H13 `DOCS_CHECK_16`) |
 | `ERROR → EMERGENCY_CLOSED` | то же | **исход сверки** (`MATCHED`/`MISMATCHED`) — только если движения **добывались** (`Deal.billsFetchedThrough` непуст), то есть сделка успела побывать на выходной тропе; иначе `NOT_RUN` (A2 `DOCS_CHECK_19`; прежнее «ветвь (a) — запись закрытия добыта» опиралось на чужой операнд) | то же сравнение; `billsFetchedThrough` пуст ⇒ `NOT_ASSESSED`, а не `COMPLETE` | то же (`NOT_APPLICABLE` недостижим — операции были) |
 | три тропы **закрытия без входа** → `CLOSED` | **пусто** (неприменим) | **пусто** (неприменим) | **пусто** (неприменим) | **`NOT_APPLICABLE`** — единственный признак, который на этих тропах **не пуст**: он и назван, чтобы отличить эту популяцию от аномальной (H13 `DOCS_CHECK_16`). **Пишет `MarkDealClosedExecutor` той же транзакцией** (решение держателя П9 валидации `GAPS_CLOSE_17`) — финализатор выхода на этих тропах не работает |
+
+**Таблица — ассерт ребра: она перечисляет значения, наблюдаемые у
+сделки, которая ребро прошла.** Заголовок «перечень записываемого»
+допускал и второе прочтение — «что финализатор пишет **до** ребра», — и
+в нём строка 1 была бы верна с тремя значениями `breakdownIncomplete`.
+Прочтение выбрано первое: на таблицу ссылаются как на ассерт
+(`docs/components/MarkDealClosedExecutor.md`,
+`docs/decisions/deal-without-operations.md`), и в этой роли она
+обязана согласоваться с маршрутизацией.
+
+**Строка 1 сужена до `COMPLETE`** (A1 `DOCS_CHECK_21`). Решение П11 (см.
+§«Терминальный контракт финализации» выше) делает
+`breakdownIncomplete ∈ {INCOMPLETE_BY_WINDOW, NOT_ASSESSED}`
+**маршрутизирующим предикатом ухода** со штатного ребра: выходная
+проверка `ExitPendingHandler` уводит такую сделку `EXIT_PENDING → ERROR`
+и далее в `EMERGENCY_CLOSED`. Прежняя редакция разрешала оба значения на
+штатном ребре — то есть таблица разрешала писателю ровно то, что П11
+запрещает, и на неё же ссылались как на доказательство достижимости
+(`docs/components/FinalizeDealExitExecutor.md`; циркулярная ссылка
+снята). Оба значения остаются наблюдаемыми — в строке
+`ERROR → EMERGENCY_CLOSED`.
 
 **Штатное ребро при обязанной и невыполненной сверке недостижимо** (H10
 `DOCS_CHECK_14`; операнд обобщён H2 `DOCS_CHECK_15`): нерезолвимый операнд
@@ -298,6 +332,16 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
 **выполненной** сверки либо `NOT_RUN` сверки, которая не была обязана.
 Значение «вне `1..6`» в первой колонке снято: такая запись не проходит
 границу интеграции (H5 `DOCS_CHECK_15`).
+
+**Селектор эпизода у `closeOutcome` назван** (A13 `DOCS_CHECK_21`).
+У многоэпизодной сделки строк `Position` несколько, и `externalCloseType`
+есть у каждой закрытой; `closeOutcome` сделки резолвится по **последнему
+эпизоду** — строке с `max(externalModifiedAt)` (тот же операнд, которым
+выбирается запись для `billsWindowEnd`); место истины селектора —
+`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для отчёта». Прежняя
+формулировка называла операнд в единственном числе и на многоэпизодной
+сделке была неоднозначна; квантор «по всем строкам эпизодов» проект уже
+применял в соседнем месте (`docs/components/SystemActionExecutor.md`).
 
 Пустота на тропах без входа — **ратифицированное значение**, а не пропуск
 писателя: события, о котором признак, там не было
