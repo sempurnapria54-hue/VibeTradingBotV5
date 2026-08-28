@@ -168,6 +168,7 @@
 │       │   ├── phase-1-step-7-docs-check-18.md — Каков исход DOCS_CHECK_18 шага 7?
 │       │   ├── phase-1-step-7-docs-check-19.md — Каков исход DOCS_CHECK_19 шага 7?
 │       │   ├── phase-1-step-7-docs-check-20.md — Каков исход DOCS_CHECK_20 шага 7?
+│       │   ├── phase-1-step-7-docs-check-21.md — Каков исход DOCS_CHECK_21 шага 7?
 │       │   ├── phase-1-step-7-risk-q4-anom-q5.md — Что предлагается по RISK-Q4 и ANOM-Q5?
 │       │   ├── phase-1-step-7-gaps-close-1.md — Как закрыты пробелы DOCS_CHECK_1 шага 7?
 │       │   ├── phase-1-step-7-gaps-close-2.md — Как закрыты пробелы DOCS_CHECK_2 шага 7?
