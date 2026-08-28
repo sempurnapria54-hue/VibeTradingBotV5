@@ -398,8 +398,16 @@ N7). Идемпотентность: сделка уже в `ENTRY_FINALIZED` �
 `EXIT_PENDING → ERROR` (решение держателя П11, актор — Г2
 `DOCS_CHECK_18`; `docs/components/ExitPendingHandler.md` §«Выходные
 проверки»). Тогда исполнение этого действия становится неактуальным, и
-**этот executor закрывает его `SKIPPED`** при выводе стадии на
-следующем проходе (A4 `DOCS_CHECK_19`) — не `FAILED`: провала не было,
+**этот executor закрывает его `SKIPPED` второй точкой входа** —
+`reviseLiveExecutions(dealContext)` на следующем проходе (A4
+`DOCS_CHECK_19`; механизм уточнён A8 `DOCS_CHECK_23`). Прежняя редакция
+называла здесь **вывод стадии**, то есть `next(type, …)`, — а он на этом
+сценарии не вызывается вовсе: сделка идёт ошибочной тропой, и
+`ErrorHandler` называет только `REFRESH_DEAL_CONTEXT_ACTION` и
+`FINALIZE_DEAL_ERROR_ACTION` (§Контракт выше;
+`docs/lifecycles/DealActionState.md` §«Писатель `SKIPPED`», таблица
+«Почему `next(type, …)` не вызывается»). Ровно ради этого сценария
+вторая точка входа и заведена. Не `FAILED`: провала не было,
 сделка сменила тропу, а `FAILED` притянул бы холд инструмента, который
 решение исключает. Дальше терминал ставит `FINALIZE_DEAL_ERROR_ACTION`.
 

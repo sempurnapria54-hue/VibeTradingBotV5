@@ -47,7 +47,8 @@
 `PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`,
 `MULTIPLE_POSITIONS_DETECTED`, `POSITION_STATE_UNKNOWN`,
 `INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`,
-`SETTLE_CURRENCY_UNAVAILABLE`, `CALCULATED_ACTION_INVALID`.
+`SETTLE_CURRENCY_UNAVAILABLE`, `CALCULATED_ACTION_INVALID`,
+`PROTECTION_COVERAGE_REDUCED`.
 
 ### Эмитятся `RiskValidator`'ом в фазе 1
 
@@ -61,7 +62,22 @@
 `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `INSTRUMENT_NOT_LIVE`,
 `INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`,
 `SETTLE_CURRENCY_UNAVAILABLE`, `BALANCE_INVALID`,
-`CALCULATED_ACTION_INVALID` (см. `docs/components/RiskValidator.md`).
+`CALCULATED_ACTION_INVALID`, `PROTECTION_COVERAGE_REDUCED`
+(см. `docs/components/RiskValidator.md`).
+
+`PROTECTION_COVERAGE_REDUCED` — защитное действие **уменьшает**
+совокупное покрытие живых защит (пост-действенное покрытие меньше
+пред-действенного) — C1 `DOCS_CHECK_23`, решение держателя. Ветка
+scope — risk-weakening («создание защитного algo-order, не
+обеспечивающего требуемый контроль риска»,
+`docs/rules/risk-validator-scope.md`); предикат и его три точки
+проверки — `docs/rules/risk-creating-entry-protection.md` §«Предикат
+покрытия и точки его проверки». **Предикат — монотонность, а не
+полнота:** лестница частичных стопов ставится ступень за ступенью, и
+промежуточное покрытие законно неполно; полнота требуется на гейтах
+троп, после исполнения пакета шага. **Не авария** —
+`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
+сделки», куда код внесён вместе с сделочными.
 
 `RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход (открытие/наращивание
 позиции) без резолвимого стопа: `BLOCKED` вместо fail-open
@@ -142,7 +158,10 @@ min(Deal.plannedRiskEquityBase, база риска текущая)`.
 этого кода означает, что потолок изменила **система** после приёма
 стратегии, — иной разбор, чем «стратегия выбрала свой бюджет».
 
-**Все три сделочных кода — не авария ни в одном статусе:** действие
+**Все три сделочных кода — не авария ни в одном статусе** (карв-аут
+несёт **четыре** кода: три сделочных плюс
+`PROTECTION_COVERAGE_REDUCED` — C1/C2 `DOCS_CHECK_23`; перечень держит
+дом): действие
 не исполняется, сделка остаётся в текущем статусе и ведётся до выхода
 имеющимися ногами (`docs/processes/risk-evaluation.md` §«Карв-аут
 исчерпанного бюджета сделки»).

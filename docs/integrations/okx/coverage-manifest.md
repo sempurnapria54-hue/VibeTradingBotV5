@@ -64,8 +64,13 @@ generic-эндпоинт `POST /api/proxy/okx/raw`, **полный in-perimeter*
 `.claude/processes/source-api-testing.md` §Колонка покрытия. Текущая
 отметка отражает код-тесты
 `src/test/java/com/example/tradingbot/integration/sourceapi/okx/`
-(**полное in-perimeter покрытие через `/raw`**, этап CODE-тесты,
-2026-06-20): все 60 in-perimeter строк — `🟢 в коде`. План —
+(этап CODE-тесты, 2026-06-20): in-perimeter строк **60**, из них
+`🟢 в коде` — **58**; оставшиеся две (`Fills 3d`, `Fills 3m`) несут
+`⚪ не-runtime` — покрытия не требуют, контракт держим справочно. Счёт
+пересобран из разметки таблиц B5 `DOCS_CHECK_23`; прежняя формулировка
+«полное in-perimeter покрытие… все 60 строк — `🟢`» приписывала статус
+и этим двум, а меняет их статус как раз шаг 7 (`REFRESH_FILLS`
+снимается на `CODE`). План —
 `.claude/tests/source-api/okx/plan.md` (DESIGN аппрувнут 2026-06-19).
 
 ### Канал чтения офдока

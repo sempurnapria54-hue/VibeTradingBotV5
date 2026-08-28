@@ -309,7 +309,7 @@ SYSTEM; `docs/decisions/command-action-boundary.md`). Граничный кон�
 в нём строка 1 была бы верна с тремя значениями `breakdownIncomplete`.
 Прочтение выбрано первое: на таблицу ссылаются как на ассерт
 (`docs/components/MarkDealClosedExecutor.md`,
-`docs/decisions/deal-without-operations.md`), и в этой роли она
+`docs/rules/deal-without-operations.md`), и в этой роли она
 обязана согласоваться с маршрутизацией.
 
 **Строка 1 сужена до `COMPLETE`** (A1 `DOCS_CHECK_21`). Решение П11 (см.

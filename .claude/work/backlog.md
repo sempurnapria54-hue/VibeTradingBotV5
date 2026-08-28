@@ -527,9 +527,11 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   (`docs/decisions/pnl-finalization-mechanics.md` §«Предусловия `CODE`
   шага 7», пп. 1, 2, 5, 6, 7, 9, 10, 14, 15, 16) и их кейсы: `AG1.5`
   (п. 1), `AG1.9` (пп. 1 и 15 — вторая половина кейса несёт
-  самостоятельное предусловие), `AG6.2` (п. 2), `AG6` (п. 16 — то же
-  наблюдение справочника, что наполняет п. 2), `MG7.5` (п. 5), `AG1.6`
-  (п. 6), `AG1.7` (пп. 7 и 14), `AG3.4` (п. 9), `AG1.8` (п. 10).
+  самостоятельное предусловие), **`AG6.1` (пп. 2 и 16 — справочник
+  типов; его перечень — операнд обоих)**, `AG6.2` (п. 2), `MG7.5`
+  (п. 5), `AG1.6` (п. 6), `AG1.7` (пп. 7 и 14), `AG3.4` (п. 9), `AG1.8`
+  (п. 10). Имена кейсов пп. 2 и 16 уточнены N2 `DOCS_CHECK_23` —
+  прежнее «`AG6`» было заголовком группы, не кейсом.
 
 **Калибратор допуска гейтом быть перестал** (решение держателя,
 `GAPS_CLOSE_19`): в `CODE` выходим с некалиброванным допуском, он
@@ -874,8 +876,14 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     троп (гейт bills — у звена); пустой `billsWindowBegin` ⇒ суррогат
     **`Deal.externalCreatedAt`** внутри исполнителя (П7-B, биржевой
     якорь); операнд `breakdownIncomplete`
-    составной — `max(billsFetchedThrough, billsWindowEnd) −
-    billsWindowBegin`, оба операнда биржевые (A8 `DOCS_CHECK_20`);
+    составной — `max(billsFetchedThrough, billsWindowEnd) −` **нижняя
+    граница окна** (`billsWindowBegin`, при пустоте — суррогат
+    `Deal.externalCreatedAt`), оба операнда биржевые (A8
+    `DOCS_CHECK_20`; голая нижняя граница — снятая редакция, правлено N1
+    `DOCS_CHECK_23`). Триггер `NOT_ASSESSED` **один** — пустой
+    `billsFetchedThrough` (A1 `DOCS_CHECK_23`); состав и довод —
+    `docs/models/domain/aggregate/Deal.md` §«Почему у `NOT_ASSESSED`
+    один триггер, а не два»;
   - **`attachedProtection` не доезжает до payload — гейт `CODE`.**
     `CreateOrderExecutor` читает `payload.getAttachedProtection()`, а
     единственный строитель payload'а
@@ -1137,9 +1145,16 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     positions-history; потребитель — калибровка запаса на проскок
     (расчётного потребителя в фазе 1 нет);
   - **колонки ставок `trade_fee_rates` — `varchar(64)`**, не
-    `numeric`: доменный тип `String`, аксессор сознательно допускает
-    непарсящееся значение; исключение записано
-    (`docs/rules/persistence-representation.md` §«Численные колонки»);
+    `numeric`: доменный тип `String` по решению о **сыром хранении**
+    ставки; исключение записано
+    (`docs/rules/persistence-representation.md` §«Численные колонки»;
+    прежний довод «аксессор сознательно допускает непарсящееся
+    значение» снят B3 `DOCS_CHECK_23` — у этой ветки нет производителя,
+    граница реджектит непарсящуюся ставку и строку не пишет).
+    **Сравнение при записи — численное** для ставок, строковое для
+    `level` (B1 `DOCS_CHECK_23`,
+    `docs/models/domain/other/TradeFeeRate.md` §«Запись: история
+    значением, свежесть счётчиком»);
     **все строковые колонки шага — `varchar(64)`** (там же,
     §«Строковые колонки: длины»);
   - **состав цикла добычи выводится из `DealContext`**, а не

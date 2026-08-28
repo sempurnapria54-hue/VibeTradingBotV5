@@ -198,7 +198,7 @@ H11 `GAPS_CLOSE_6`); категорийная ось от ответа не за
 | `modified_by` | `varchar(64)` | nullable | audit-колонка |
 
 Состав audit-колонок — все шесть, по `docs/models/domain/other/Auditable.md`
-§«Состав audit-колонок»; **имена — по фактическому `AuditableEntity`**
+§«Единое имя времени источника и состав audit-колонок»; **имена — по фактическому `AuditableEntity`**
 (`modified_at`/`modified_by`, не `updated_at`/`updated_by`, — H12
 `DOCS_CHECK_14`: прежние имена расходились с маппингом базового типа и со
 всеми существующими миграциями, Hibernate генерировал бы SQL по

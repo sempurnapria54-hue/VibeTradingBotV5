@@ -21,9 +21,11 @@ changelog `log_en/`, напр. вывод AWS-доменов 2025-04-28). При
 Exchange-specific контракт инфраструктуры OKX: фактические endpoint-URL
 для REST и WS. Используется client-layer при сборке HTTP-клиента и
 WS-соединений.
-Конкретные REST endpoints (`/api/v5/...`) — в mapping-файлах
-(`okx-order-mapping.md`, `okx-balance-mapping.md` и т.п.); здесь —
-base URL.
+Конкретные REST endpoints (`/api/v5/...`) — в контракт-файлах
+`docs/integrations/okx/contracts/` (`order.md`, `balance.md` и др.);
+здесь — base URL. Прежний указатель вёл в «mapping-файлы
+`okx-order-mapping.md` / `okx-balance-mapping.md`» — таких файлов нет, и
+носитель endpoint'ов другого типа: правлено N4 `DOCS_CHECK_23`.
 
 > Альтернатива при размещении: объединить с
 > `docs/integrations/okx/rules/ws-limits.md` в `connectivity.md`. Не

@@ -186,8 +186,15 @@ consolidate её читает. `REFRESH_BILLS_COMMAND` — тоже **отдел
   |---|---|
   | `max(billsFetchedThrough, billsWindowEnd) − нижняя граница окна` ≤ глубины | `COMPLETE` |
   | `max(billsFetchedThrough, billsWindowEnd) − нижняя граница окна` > глубины | `INCOMPLETE_BY_WINDOW` |
-  | **операнд не добыт**: добыча движений не выполнялась (`billsFetchedThrough` пуст) **либо** нижняя граница не резолвится (пусты и `billsWindowBegin`, и `Deal.externalCreatedAt`) | `NOT_ASSESSED` + журнальный `AnomalyReport` |
+  | **операнд не добыт**: добыча движений не выполнялась (`billsFetchedThrough` пуст) — единственный триггер, A1 `DOCS_CHECK_23` | `NOT_ASSESSED` + журнальный `AnomalyReport` |
 
+  - **Триггер `NOT_ASSESSED` один** (A1 `DOCS_CHECK_23`): дизъюнкт
+    «нижняя граница не резолвится» снят как недостижимый — суррогат
+    непуст у каждой строки `deals`; пустой `externalCreatedAt` —
+    нарушенный инвариант, его ловит детектирующий контур отказом
+    операции. Довод и запись — дом,
+    `docs/models/domain/aggregate/Deal.md` §«Почему у `NOT_ASSESSED`
+    один триггер, а не два».
   - **Нижняя граница здесь — та же, что у запроса и линковки** (A6
     `DOCS_CHECK_21`): `Deal.billsWindowBegin`, при его пустоте —
     суррогат `Deal.externalCreatedAt`

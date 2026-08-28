@@ -32,9 +32,14 @@ actions → `DealActionState` → `StrategyActionCalculator` →
 `CREATE_ALGO_ORDER_COMMAND` → `SUBMIT_ALGO_ORDER_COMMAND` → refresh для подтверждения
 active protection. Снять attached protection — только после подтверждения
 main protection (`CANCEL_*`). Если switch не нужен (нет `MAIN_PROTECTION`
-step или его условие не сработало) — переход в `MANAGING` **только если entry
-order несёт активную приложенную защиту** (`Order.hasActiveAttachedProtection()`
-— active-like состояние защиты, не просто наличие attached algo). Иначе
+step или его условие не сработало) — переход в `MANAGING` **только если
+приложенные защиты ног покрывают позицию целиком**: `Σ accumulated_fill_size`
+ног с active-like attached-защитой ≥ `Position.externalSize` (C1
+`DOCS_CHECK_23`, решение держателя). Прежний предикат —
+`Order.hasActiveAttachedProtection()`, то есть active-like **наличие**, —
+пропускал недопокрытую позицию как защищённую; предикат и его три точки
+проверки — `docs/rules/risk-creating-entry-protection.md` §«Предикат
+покрытия и точки его проверки». Иначе
 позиция с live risk без резолвимой защиты = бесстоповая постфактум →
 `ERROR` + **ступень 2 биржевой лестницы: `Exchange.TRADE_BLOCKED`**
 (живой риск без защиты — нарушение инварианта,

@@ -51,8 +51,8 @@ Java-класс `com.example.tradingbot.domain.model.core.order.Order`,
 | `plannedSizeContracts` | `BigDecimal` | Заявленный размер **этой ноги** (контракты). Write-once. |
 | `plannedRiskAmount` | `BigDecimal` | **Плановый риск этой ноги** — убыток на её стопе, посчитанный при постановке ноги. Слагаемое знаменателя `R` сделки (H6/H11 `DOCS_CHECK_15`). Write-once. |
 | `plannedRiskCurrency` | `String` | Валюта планового риска ноги (расчётная валюта инструмента). Write-once. |
-| `plannedContractValue` | `BigDecimal` | Размер контракта инструмента (`ctVal`) **на момент постановки этой ноги** — четвёртый операнд тождества планового риска. Write-once (H5 `DOCS_CHECK_16`). |
-| `plannedStopPrice` | `BigDecimal` | Уровень стопа, под который считался риск **этой ноги**, — пятый операнд тождества (§«`plannedStopPrice` — шестое число»). Write-once (Р3 `GAPS_CLOSE_16`). |
+| `plannedContractValue` | `BigDecimal` | Размер контракта инструмента (`ctVal`) **на момент постановки этой ноги** — четвёртый **арифметический** операнд тождества планового риска (пятое **число** шестёрки: счёт чисел включает `plannedRiskCurrency`, счёт операндов — нет; базы счёта названы B7 `DOCS_CHECK_23`). Write-once (H5 `DOCS_CHECK_16`). |
+| `plannedStopPrice` | `BigDecimal` | Уровень стопа, под который считался риск **этой ноги**, — пятый **арифметический** операнд тождества, шестое число шестёрки (§«`plannedStopPrice` — шестое число»). Write-once (Р3 `GAPS_CLOSE_16`). |
 | `liquidationDistanceRatio` | `BigDecimal` | **Наблюдаемый запас до ликвидации на момент постановки ноги** — измеритель, не операнд тождества риска (§«`liquidationDistanceRatio` — седьмое число»). Write-once; **пуст, когда `liqPx` на момент постановки не наблюдался** (открывающий вход). В инвариант «шесть или ни одного» **не входит** (B1 `DOCS_CHECK_18`). |
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Embedded attached protection. |
 
@@ -438,7 +438,10 @@ inspection частичного выхода.
   ретроспективно связь `Order → эпизод` **невосстановима**: её не
   существует ни в одном другом носителе
   (`docs/decisions/multi-episode-deal.md` §«Названная цена»).
-- **Седьмая колонка того же `ALTER` — `liquidation_distance_ratio`**
+- **`liquidation_distance_ratio` — седьмое ЧИСЛО риска** (не седьмая
+  колонка `ALTER`: тот вводит **восемь** колонок — шесть тождества,
+  `position_id` и это; база счёта названа B7 `DOCS_CHECK_23`, прежняя
+  подпись «седьмая колонка» читалась как «колонок семь»)
   (`numeric(36,18)`, nullable, write-once; П14 держателя, приземлена B1
   `DOCS_CHECK_18`). Она **не входит** в инвариант «шесть или ни одного»:
   её операнд `liqPx` наблюдается не всегда, и её пустота — самостоятельное
