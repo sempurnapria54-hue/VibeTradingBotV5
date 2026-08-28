@@ -34,10 +34,13 @@ forward-дизайн шага 5 (`docs/models/mapping/MarketPriceData.md`,
 | `last` | string (decimal) | да | Last traded price. |
 | `askPx` | string (decimal) | да | Best ask. |
 | `bidPx` | string (decimal) | да | Best bid. |
+| `askSz` | string (decimal) | да | Объём на лучшем ask — **вводится шагом 7** (P10 `DOCS_CHECK_24`): операнд измерителя ёмкости `Order.bookDepthAtPlacement`. |
+| `bidSz` | string (decimal) | да | Объём на лучшем bid. Там же. |
 | `ts` | string (epoch millis) | да | Время тикера. |
 
 Таблица выровнена под **худой coded DTO** (`OkxTickerResponse.java`:
-`instType`/`instId`/`last`/`askPx`/`bidPx`/`ts`) — decision о ре-базе
+`instType`/`instId`/`last`/`askPx`/`bidPx`/`ts`; шаг 7 добавляет
+`askSz`/`bidSz`) — decision о ре-базе
 контура на сырьё (`.claude/decisions/source-api-target-rebase.md`,
 §«doc-sync»): держим только заведённые поля, карваута на полное зеркало
 биржи нет.
@@ -50,9 +53,11 @@ forward-дизайн шага 5 (`docs/models/mapping/MarketPriceData.md`,
 ## Поля, которые НЕ входят в DTO
 
 OKX `market/ticker` отдаёт больше полей, чем содержит coded DTO:
-`lastSz`, `askSz`/`bidSz` (глубина стакана), `open24h`,
-`high24h`/`low24h`, `vol24h`/`volCcy24h`, `sodUtc0`/`sodUtc8` (24h-
-агрегаты и SOD-метрики). Доменно не используются и в DTO не заведены.
+`lastSz`, `open24h`, `high24h`/`low24h`, `vol24h`/`volCcy24h`,
+`sodUtc0`/`sodUtc8` (24h-агрегаты и SOD-метрики). Доменно не
+используются и в DTO не заведены. **`askSz`/`bidSz` из этого перечня
+выведены шагом 7** — они переехали в таблицу используемых (P10
+`DOCS_CHECK_24`).
 
 `markPx`/`idxPx` ранее значились в таблице полей DTO — в coded DTO их
 **нет** (перенесены сюда при doc-sync). Возвращает ли `market/ticker`

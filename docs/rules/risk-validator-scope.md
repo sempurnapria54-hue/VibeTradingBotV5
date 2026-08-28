@@ -57,6 +57,15 @@ Cancel-нога REPLACE отдельной валидации не получа�
   `CLOSE_POSITION_COMMAND` — снимают/локализуют уже существующий риск (kill-switch
   снимает риск отдельно — реактивный side-executor вне реестра команд, тоже
   не проходит RiskValidator);
+  - **Исключение подтверждено и его следствие названо** (A1
+    `DOCS_CHECK_24`). Отсюда следует, что **снятие ступени защитной лестницы
+    без замены** преконтролем не ловится: это `CANCEL_ALGO_ORDER_COMMAND`.
+    Дом предиката покрытия прежде называл эту тропу среди ловимых
+    преконтролем — ложно; ловит её **выходная проверка `MANAGING`**
+    (`docs/components/ManagingHandler.md`, четвёртая точка). Вводить
+    `CANCEL` в scope отвергнуто: той же командой идут teardown выхода и
+    kill-switch, и валидируемость означала бы, что их можно отклонить
+    блок-сетом холда;
 - **finalization**: `FINALIZE_DEAL_ENTRY_COMMAND`, `FINALIZE_DEAL_EXIT_COMMAND`,
   `MARK_DEAL_CLOSED_COMMAND`, `MARK_DEAL_ERROR_COMMAND`, `MARK_DEAL_EMERGENCY_CLOSED_COMMAND`
   (звенья системных действий без `StrategyAction`; retry-anchor — строка

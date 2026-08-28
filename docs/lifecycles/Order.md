@@ -107,6 +107,13 @@ parent COMPLETED
 
 parent CANCELED
   -> attached -> CANCELED, closeReason = PARENT_ORDER_CANCELED.
+     (Отмена родителя с НЕПУСТЫМ accumulatedFillSize штатной тропой
+      не возникает: entry-REPLACE при непустом филле идёт
+      place-new -> подтверждение -> cancel-old, поэтому налитый объём
+      к моменту отмены уже покрыт новой ногой —
+      docs/decisions/replace-not-amend.md §Решение п.3,
+      docs/rules/risk-creating-entry-protection.md
+      §«Перевыставление входа при непустом филле».)
 
 parent ERROR
   -> attached -> ERROR, closeReason = UNKNOWN.

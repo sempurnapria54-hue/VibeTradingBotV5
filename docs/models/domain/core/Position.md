@@ -42,7 +42,7 @@ Java-класс `com.example.tradingbot.domain.model.core.position.Position`,
 | `status` | `Status` | Доменный статус (см. lifecycle). |
 | `closeReason` | `CloseReason` | Причина закрытия / problem reason. Не дублирует `Deal.CloseReason`. |
 | `direction` | `Direction` | Доменное направление (`LONG` / `SHORT`). |
-| `externalSize` | `BigDecimal` | Размер по данным биржи, нормализованный абсолют (`abs(pos)`). |
+| `externalSize` | `BigDecimal` | Размер по данным биржи, нормализованный абсолют (`abs(pos)`), **в контрактах** — та же единица, что у `Order.size`/`accumulatedFillSize` и `AlgoOrder.size` (N2 `DOCS_CHECK_24`: предикат покрытия сравнивает их напрямую, поэтому единица названа явно; подтверждение — рантайм-прогон, офдок единицу `pos` не называет). |
 | `externalAverageEntryPrice` | `BigDecimal` | Средняя цена входа. |
 | `externalMarkPrice` | `BigDecimal` | Mark price. |
 | `externalLiquidationPrice` | `BigDecimal` | Расчётная цена ликвидации. |

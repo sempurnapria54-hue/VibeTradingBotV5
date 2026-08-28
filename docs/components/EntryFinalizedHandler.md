@@ -33,13 +33,14 @@ actions → `DealActionState` → `StrategyActionCalculator` →
 active protection. Снять attached protection — только после подтверждения
 main protection (`CANCEL_*`). Если switch не нужен (нет `MAIN_PROTECTION`
 step или его условие не сработало) — переход в `MANAGING` **только если
-приложенные защиты ног покрывают позицию целиком**: `Σ accumulated_fill_size`
-ног с active-like attached-защитой ≥ `Position.externalSize` (C1
-`DOCS_CHECK_23`, решение держателя). Прежний предикат —
+приложенные защиты ног покрывают позицию целиком**:
+`Σ min(AttachedAlgoOrder.size, Order.accumulated_fill_size_i)` по ногам с
+active-like attached-защитой ≥ `Position.externalSize` (C1 `DOCS_CHECK_23`,
+решение держателя; операнд уточнён A2 `DOCS_CHECK_24`). Прежний предикат —
 `Order.hasActiveAttachedProtection()`, то есть active-like **наличие**, —
-пропускал недопокрытую позицию как защищённую; предикат и его три точки
-проверки — `docs/rules/risk-creating-entry-protection.md` §«Предикат
-покрытия и точки его проверки». Иначе
+пропускал недопокрытую позицию как защищённую; форма операнда и точки
+проверки — `docs/rules/risk-creating-entry-protection.md` §Правило и
+§«Предикат покрытия и точки его проверки», здесь не пересказываются. Иначе
 позиция с live risk без резолвимой защиты = бесстоповая постфактум →
 `ERROR` + **ступень 2 биржевой лестницы: `Exchange.TRADE_BLOCKED`**
 (живой риск без защиты — нарушение инварианта,
@@ -50,15 +51,22 @@ L3-холд инструмента — перевешивание на `CODE`).
 ## Выходные проверки
 
 Позиция активна; entry финализирован; **защита позиции с live risk
-подтверждена активной** — attached SL держится в active-like состоянии
-(`Order.hasActiveAttachedProtection()`), пока main protection не подтверждена
-(голого окна без защиты для risk-creating позиции нет, инвариант
-`docs/rules/risk-creating-entry-protection.md`); нет дублирующей/
-конфликтующей защиты и orphan algo-orders; нет риска под kill-switch.
+покрывает её целиком** — покрытие attached-защит ног ≥
+`Position.externalSize` (формула операнда — дом,
+`docs/rules/risk-creating-entry-protection.md` §Правило), пока main
+protection не подтверждена (голого окна без защиты для risk-creating
+позиции нет, инвариант — тот же дом); нет дублирующей/конфликтующей защиты
+и orphan algo-orders; нет риска под kill-switch.
 → `ENTRY_FINALIZED → PROTECTION_SWITCHED` (если switch реально нужен) или
-`→ MANAGING`. Живой риск без активной резолвимой защиты (ни main, ни
-active-attached) → `ERROR` + ступень 2 (`Exchange.TRADE_BLOCKED`; в коде
-пока L3-холд инструмента — перевешивание на `CODE`).
+`→ MANAGING`. Живой риск с покрытием ниже `externalSize` (ни main, ни
+attached не добирают) → `ERROR` + ступень 2 (`Exchange.TRADE_BLOCKED`; в
+коде пока L3-холд инструмента — перевешивание на `CODE`).
+
+**Предикат здесь — покрытие, а не наличие** (A6 `DOCS_CHECK_24`). Прежняя
+редакция этой секции держала снятый предикат
+`Order.hasActiveAttachedProtection()` — то есть правка C1 `DOCS_CHECK_23`
+доехала до §«Рабочая логика» и не доехала до выходной проверки того же
+файла, а именно её читает писатель гейта.
 
 ## Допустимые StrategyStep
 

@@ -58,6 +58,15 @@ Java-класс `...core.algo_order.AlgoOrder`, расширяет `Auditable`.
 | `linkedOrderExternalIds` | `List<String>` | Связанные ordinary order ids (OKX `ordId`/`ordIdList`) — храним как внешний факт, runtime на них не опирается. |
 
 Доменные методы: `isLive()` (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED),
+**`isActiveLike()`** (PENDING/ACTIVE/PARTIALLY_COMPLETED — вводится A4
+`DOCS_CHECK_24`; предикат «защита стои́т на бирже» для предиката покрытия,
+`docs/rules/risk-creating-entry-protection.md` §Правило: `CREATED` исключён,
+потому что заявка ещё не отправлена и подтверждения нет
+(`docs/rules/ack-not-runtime-truth.md`), а `PARTIALLY_COMPLETED` включён —
+она жива и покрывает остаток `size − externalSize`. Имя и семантика
+симметричны `AttachedAlgoOrder.isActiveLike()`, но **набор статусов другой**:
+у attached их два, у standalone три — у attached состояния «частично
+сработала» нет),
 `toPending/toActive/toComplete/toCancel(reason)/toError(reason)` (через
 строгий `transitTo` с матрицей переходов — см. lifecycle),
 `validateConditionProjection()` (сверяет `conditionType == condition.type`,

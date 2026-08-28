@@ -38,7 +38,7 @@ Mapping-слой для `AlgoOrder`. Доменная модель —
 | `condition.trigger.takeProfit.externalValue` | — | внешнее значение TP trigger |
 | `condition.trigger.takeProfit.externalType` | — | тип цены TP |
 | `condition.trailing.activationPrice.externalValue` | — | цена активации trailing |
-| `condition.trailing.externalPrice` | **`AlgoOrder.condition.trailing.externalPrice`** | текущее значение trailing (`moveTriggerPx`) — **операнд `stopCurrent`** трейлинговой защиты (B2 `DOCS_CHECK_20`; `docs/models/domain/aggregate/Deal.md` §«Форма вычитаемого») |
+| `condition.trailing.externalPrice` | **`AlgoOrder.condition.trailing.externalPrice`** | текущее значение trailing (`moveTriggerPx`) — **операнд `stopCurrent`** трейлинговой защиты (B2 `DOCS_CHECK_20`; `docs/models/domain/aggregate/Deal.md` §«Форма вычитаемого `protectionRelievedRiskAmount`») |
 | `externalCreatedAt` | `AlgoOrder.externalCreatedAt` | |
 | `externalModifiedAt` | `AlgoOrder.externalModifiedAt` | (есть в history) |
 

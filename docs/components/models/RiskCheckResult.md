@@ -65,17 +65,19 @@
 `CALCULATED_ACTION_INVALID`, `PROTECTION_COVERAGE_REDUCED`
 (см. `docs/components/RiskValidator.md`).
 
-`PROTECTION_COVERAGE_REDUCED` — защитное действие **уменьшает**
-совокупное покрытие живых защит (пост-действенное покрытие меньше
-пред-действенного) — C1 `DOCS_CHECK_23`, решение держателя. Ветка
-scope — risk-weakening («создание защитного algo-order, не
-обеспечивающего требуемый контроль риска»,
-`docs/rules/risk-validator-scope.md`); предикат и его три точки
-проверки — `docs/rules/risk-creating-entry-protection.md` §«Предикат
-покрытия и точки его проверки». **Предикат — монотонность, а не
-полнота:** лестница частичных стопов ставится ступень за ступенью, и
-промежуточное покрытие законно неполно; полнота требуется на гейтах
-троп, после исполнения пакета шага. **Не авария** —
+`PROTECTION_COVERAGE_REDUCED` — защитное действие оставляет **покрытие
+после завершения ремодела ниже живой экспозиции** — C1 `DOCS_CHECK_23`,
+решение держателя; операнд уточнён A1 `DOCS_CHECK_24`. Ветка scope —
+risk-weakening («создание защитного algo-order, не обеспечивающего
+требуемый контроль риска», `docs/rules/risk-validator-scope.md`);
+call-site — `docs/components/CreateAlgoOrderActionExecutor.md`; предикат и
+его **четыре** точки проверки —
+`docs/rules/risk-creating-entry-protection.md` §«Предикат покрытия и точки
+его проверки». **Предикат сравнивает с `Position.externalSize`, а не с
+прошлым покрытием:** монотонность прежней редакции на place-ноге была
+тождественно истинна, а «снятие ступени без замены» она не ловила вовсе —
+`CANCEL_ALGO_ORDER_COMMAND` выведен из scope, и эту тропу ловит выходная
+проверка `MANAGING`. **Не авария** —
 `docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
 сделки», куда код внесён вместе с сделочными.
 

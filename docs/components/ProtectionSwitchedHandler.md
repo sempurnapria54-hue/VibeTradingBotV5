@@ -32,11 +32,15 @@ protection; если attached ещё активна, а main подтвержд�
 ## Выходные проверки
 
 Позиция активна; **main protection покрывает позицию целиком** —
-`Σ AlgoOrder.size` живых standalone-защит ≥ `Position.externalSize` (C1
-`DOCS_CHECK_23`: предикат — покрытие, не активность; лестница частичных
-стопов легальна, недопокрытие — нет; дом —
-`docs/rules/risk-creating-entry-protection.md` §«Предикат покрытия и
-точки его проверки»); attached снята/не влияет; нет
+`Σ (AlgoOrder.size − coalesce(AlgoOrder.externalSize, 0))` по живым
+standalone-защитам ≥ `Position.externalSize` (C1 `DOCS_CHECK_23`: предикат —
+покрытие, не активность; лестница частичных стопов легальна, недопокрытие —
+нет. Операнд и множество защит уточнены A2/A3/A4 `DOCS_CHECK_24`: «живая» —
+`AlgoOrder.isActiveLike()` = `{PENDING, ACTIVE, PARTIALLY_COMPLETED}`,
+`conditionType` — из закрытого перечня защит, сработавшая доля вычитается.
+Дом формулы — `docs/rules/risk-creating-entry-protection.md` §Правило, точки
+проверки — §«Предикат покрытия и точки его проверки»); attached снята/не
+влияет; нет
 дублирующей защиты, orphan algo-orders, конфликтующих pending orders;
 сделка готова к сопровождению. → `PROTECTION_SWITCHED → MANAGING`.
 

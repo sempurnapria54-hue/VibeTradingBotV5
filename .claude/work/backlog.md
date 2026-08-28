@@ -523,15 +523,17 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 вместе):
 
 - **чистый `DOCS_CHECK`**;
-- **грунт `integrator` / `tester`** — **десять** гейтящих предусловий
-  (`docs/decisions/pnl-finalization-mechanics.md` §«Предусловия `CODE`
-  шага 7», пп. 1, 2, 5, 6, 7, 9, 10, 14, 15, 16) и их кейсы: `AG1.5`
-  (п. 1), `AG1.9` (пп. 1 и 15 — вторая половина кейса несёт
-  самостоятельное предусловие), **`AG6.1` (пп. 2 и 16 — справочник
-  типов; его перечень — операнд обоих)**, `AG6.2` (п. 2), `MG7.5`
-  (п. 5), `AG1.6` (п. 6), `AG1.7` (пп. 7 и 14), `AG3.4` (п. 9), `AG1.8`
-  (п. 10). Имена кейсов пп. 2 и 16 уточнены N2 `DOCS_CHECK_23` —
-  прежнее «`AG6`» было заголовком группы, не кейсом.
+- **грунт `integrator` / `tester`** — **одиннадцать** гейтящих
+  предусловий (`docs/decisions/pnl-finalization-mechanics.md`
+  §«Предусловия `CODE` шага 7», пп. 1, 2, 5, 6, 7, 9, 10, 14, 15, 16,
+  **17**) и их кейсы: `AG1.5` (п. 1), `AG1.9` (пп. 1 и 15 — вторая
+  половина кейса несёт самостоятельное предусловие), **`AG6.1` (пп. 2 и
+  16 — справочник типов; его перечень — операнд обоих)**, `AG6.2`
+  (п. 2), `MG7.5` (п. 5), `AG1.6` (п. 6), `AG1.7` (пп. 7 и 14), `AG3.4`
+  (п. 9), `AG1.8` (п. 10), **новый кейс attached-при-отмене (п. 17,
+  A8 `DOCS_CHECK_24` — заводится в план `integrator`)**. Имена кейсов
+  пп. 2 и 16 уточнены N2 `DOCS_CHECK_23` — прежнее «`AG6`» было
+  заголовком группы, не кейсом.
 
 **Калибратор допуска гейтом быть перестал** (решение держателя,
 `GAPS_CLOSE_19`): в `CODE` выходим с некалиброванным допуском, он
@@ -761,6 +763,64 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     `ICredEmptyCredentialsLiveTest` адресуют `backlog` §I3 — секции нет,
     пункт закрыт и вынесен в `history/` (N6, свип `GAPS_CLOSE_22`).
     Правится на `CODE`; доки этим не затронуты.
+- **CODE-дельта `GAPS_CLOSE_23` + `GAPS_CLOSE_24`** (записана одним блоком
+  — N1 `DOCS_CHECK_24`: дельта `_23` рабочего носителя не имела вовсе, и
+  пакет C1/C3 не был назван ни в одной секции; дома политик — в ссылках,
+  здесь только «что сделать»):
+  - **инвариант защиты — покрытие, а не наличие** (дом —
+    `docs/rules/risk-creating-entry-protection.md` §Правило):
+    `Σ` покрытия живых защит `≥ Position.externalSize`, где покрытие
+    attached = `min(AttachedAlgoOrder.size, Order.accumulatedFillSize)`
+    родительской ноги, standalone =
+    `AlgoOrder.size − coalesce(AlgoOrder.externalSize, 0)`; «живая» —
+    `isActiveLike()` **и** `conditionType` из закрытого перечня защит
+    (`STOP_LOSS`, `PARTIAL_STOP_LOSS`, `OCO_FULL`, `TRAILING_PERCENTS`,
+    `TRAILING_VALUE`);
+  - **`+AlgoOrder.isActiveLike()`** = `{PENDING, ACTIVE,
+    PARTIALLY_COMPLETED}` (у `AttachedAlgoOrder` метод уже есть и набор
+    у него **другой** — два статуса);
+  - **четыре точки проверки покрытия**: `StrategyCreateRequestValidator`
+    (статическая сумма долей = 100 при `actionType = CREATE`),
+    `RiskValidator` ветка weakening (покрытие **после завершения
+    ремодела** `≥ externalSize`, замещаемая — по `replacesInternalId`),
+    выходная проверка `ManagingHandler` (**новая**, четвёртая),
+    `EntryFinalizedHandler` / `ProtectionSwitchedHandler`;
+  - **два кода реджекта:** `STRATEGY_PROTECTION_COVERAGE_INCOMPLETE`
+    (create, 400) и `PROTECTION_COVERAGE_REDUCED` (`RiskCheckCode`,
+    рантайм; в `ERROR` не уводит — карв-аут
+    `docs/processes/risk-evaluation.md`);
+  - **call-site преконтроля — `CreateAlgoOrderActionExecutor`**: он
+    прогоняет `RiskValidator` по ветке weakening (прежний док утверждал
+    обратное);
+  - **`+CalculationError` `PROTECTION_LADDER_STEP_BELOW_MIN_SIZE`**
+    (`PERMANENT`, не retryable) + **остаток последней ступени лестницы**:
+    `size_last = externalSize − Σ предыдущих`
+    (`docs/components/SizeCalculator.md` §«Защитная ступень — другой
+    класс»);
+  - **порядок ног entry-`REPLACE` ветвится по филлу**: при
+    `accumulatedFillSize > 0` — place-new → подтверждение → cancel-old
+    (`docs/decisions/replace-not-amend.md` §Решение п. 3);
+  - **сужение набора неравенств по классу действия** (C3
+    `DOCS_CHECK_23`): risk-weakening — три неравенства, «риск акта» = 0,
+    `liveRiskNow` **пост-действенный**; поактное не применяется. Знают об
+    этом `RiskValidator` и его call-site'ы;
+  - **писатель `orders.position_id` — `RefreshPositionExecutor`**, не
+    `RefreshOrderExecutor` (A9 `DOCS_CHECK_24`): проставляет ногам с
+    непустым `accumulated_fill_size` и пустым `position_id` в момент
+    материализации/наблюдения эпизода, write-once;
+  - **схема:** `+orders.book_depth_at_placement` (`numeric(36,18)`,
+    nullable, write-once — измеритель ёмкости, пишет `CreateOrderExecutor`);
+    `ALTER` по `orders` становится **девятиколоночным**;
+  - **`+MarketPriceData.externalAskSize` / `externalBidSize`** (маппинг
+    `askSz`/`bidSz` тикера) — операнды измерителя выше;
+  - **`1 %` — провизорная величина** с семантикой «верхняя граница
+    вложенности потолков» (C4 `DOCS_CHECK_23`); поведение кода не
+    меняется;
+  - **гигиена комментариев `src/`:**
+    `CreateAlgoOrderActionExecutor.java:40` несёт снятую клаузу
+    «Risk-валидацию не проходит» — привести к действующей редакции
+    (валидируется по ветке risk-weakening). Найдено свипом
+    `GAPS_CLOSE_24`; линзам `src/`-комментарии в предмет не входили.
 - **CODE стадий 1-2 (доспецифицировано, писать код):** носители
   `OkxPositionsHistoryResponse` / `PositionCloseResultExternalSnapshot`
   (`mapping/PositionCloseResult.md`) + `DealCashFlow`

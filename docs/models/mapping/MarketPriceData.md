@@ -60,7 +60,18 @@ ID → доменный `MarketPriceData`).
 | `askPx` | `externalAskPrice` |
 | `bidPx` | `externalBidPrice` |
 | `ts` | `externalTimestamp` |
+| `askSz` | `externalAskSize` |
+| `bidSz` | `externalBidSize` |
 
-Не маппится: `lastSz`, `askSz`/`bidSz` (глубина стакана), `open24h`,
-`high24h`/`low24h`, `vol24h`/`volCcy24h`, `sodUtc0`/`sodUtc8` (24h-
-агрегаты и SOD-метрики — доменно не используются).
+**`askSz`/`bidSz` вводятся шагом 7** (P10 `DOCS_CHECK_24`, крен (4)):
+глубина топа стакана — **измеритель ёмкости инструмента**, фиксируемый в
+момент постановки ноги. Он ничего не блокирует: по его распределению после
+первого периода живой торговли назначается (или отклоняется) ёмкостный
+потолок — тем же приёмом, что уже применён к
+`Order.liquidationDistanceRatio`. Довод и условие пересмотра —
+`docs/decisions/per-trade-risk-policy.md` §«Трёхуровневая модель риска; в
+фазе 1 — только риск на сделку».
+
+Не маппится: `lastSz`, `open24h`, `high24h`/`low24h`,
+`vol24h`/`volCcy24h`, `sodUtc0`/`sodUtc8` (24h-агрегаты и SOD-метрики —
+доменно не используются).

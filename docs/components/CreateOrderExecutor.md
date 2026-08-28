@@ -191,8 +191,18 @@ B1 `DOCS_CHECK_18`). Едет тем же payload'ом, но **в шестёрк
 `DealContext` — живого эпизода (`deal.livePosition()`) при **доборе**; на открывающем
 входе позиции ещё нет ⇒ поле пусто
 (`docs/models/domain/core/Order.md` §«`liquidationDistanceRatio` —
-седьмое число»). Итого payload несёт **восемь** чисел: шесть тождества +
-измеритель + база процента (`plannedRiskEquityBase`, C4
+седьмое число»).
+
+**Второй измеритель — `bookDepthAtPlacement`** (P10 `DOCS_CHECK_24`,
+решение держателя). Едет тем же payload'ом, в шестёрку **не входит** по
+той же причине. Операнд — `CalculationContext.marketPriceData`
+(`externalAskSize` для `BUY`, `externalBidSize` для `SELL`); свежих цен в
+контексте нет ⇒ поле пусто
+(`docs/models/domain/core/Order.md` §«`bookDepthAtPlacement` —
+наблюдаемая ёмкость стакана на момент постановки»).
+
+Итого payload несёт **девять** чисел: шесть тождества + **два**
+измерителя + база процента (`plannedRiskEquityBase`, C4
 `DOCS_CHECK_20`); плюс `triggerPriceType` в
 `attachedProtection`-подобъекте (C1 `DOCS_CHECK_20`) — он не число и в
 счёт не входит.

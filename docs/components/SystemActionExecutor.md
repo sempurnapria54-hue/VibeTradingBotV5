@@ -473,7 +473,7 @@ N7). Идемпотентность: сделка уже в `ENTRY_FINALIZED` �
 **контролируемое исключение** под приравнивание не подпадает — оно
 поднимает биржевую ступень 2 (`Exchange.TRADE_BLOCKED`) и здесь тоже
 (H4 `DOCS_CHECK_15`;
-`docs/decisions/pnl-finalization-mechanics.md` §«Асимметрия троп»).
+`docs/decisions/pnl-finalization-mechanics.md` §«5a. Асимметрия троп отказа добычи»).
 
 ## Что не входит
 

@@ -35,6 +35,8 @@ Client model OKX ticker
 | `externalLastPrice` | `BigDecimal` | Последняя цена сделки. |
 | `externalAskPrice` | `BigDecimal` | Лучшая цена продажи. |
 | `externalBidPrice` | `BigDecimal` | Лучшая цена покупки. |
+| `externalAskSize` | `BigDecimal` | Объём на лучшей цене продажи (глубина топа стакана). Вводится P10 `DOCS_CHECK_24` — операнд измерителя `Order.bookDepthAtPlacement`. |
+| `externalBidSize` | `BigDecimal` | Объём на лучшей цене покупки. Там же. |
 | `externalTimestamp` | `OffsetDateTime` | Время тикера на бирже. |
 
 `MID_PRICE` не хранится — вычисляется методом `midPrice()`:
@@ -46,7 +48,8 @@ Client model OKX ticker
 Выход маппера из client-модели биржи до сборки `MarketPriceData`
 (`raw-exchange-dto-boundary.md`). Поля: `externalInstrumentType`,
 `externalInstrumentId`, `externalLastPrice`, `externalAskPrice`,
-`externalBidPrice`, `externalTimestamp` (без `instrumentId` — внутренний
+`externalBidPrice`, **`externalAskSize`**, **`externalBidSize`**,
+`externalTimestamp` (без `instrumentId` — внутренний
 ID добавляется уже при сборке `MarketPriceData`). Сырой OKX DTO за
 `IntegrationService` не выходит; OKX ticker → snapshot маппинг —
 `docs/models/mapping/MarketPriceData.md`.

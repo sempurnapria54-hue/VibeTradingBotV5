@@ -256,7 +256,7 @@ partial-закрытиям **этого эпизода**; читается фи�
 | Сущность / таблица | Что меняется | Место истины |
 |---|---|---|
 | `deals` | `ALTER`: `planned_risk_amount`, `incurred_risk_amount`, `current_risk_amount`, `protection_relieved_risk_amount`, `planned_risk_currency`, **`planned_risk_equity_base`**, `bills_window_begin`, `bills_window_end`, **`bills_fetched_through`**, `close_outcome`, `reconciliation_status`, `breakdown_incomplete`, `risk_benchmark_availability`; `+ix_deal_status_close_outcome`, `−ix_deal_status` | `docs/models/domain/aggregate/Deal.md` §Персистентность |
-| `orders` | `ALTER`: `planned_entry_price`, `planned_size_contracts`, `planned_risk_amount`, `planned_risk_currency`, `planned_contract_value`, `planned_stop_price` (инвариант «шесть или ни одного») **+ `liquidation_distance_ratio`** (седьмое число, в инвариант не входит) **+ `position_id`** (FK → `positions`, nullable — эпизод, к которому относится нога; N5 `DOCS_CHECK_20`, решение держателя); `+fk_order_position`, `+ix_order_position` | `docs/models/domain/core/Order.md` §Персистентность |
+| `orders` | `ALTER`: `planned_entry_price`, `planned_size_contracts`, `planned_risk_amount`, `planned_risk_currency`, `planned_contract_value`, `planned_stop_price` (инвариант «шесть или ни одного») **+ `liquidation_distance_ratio`** (седьмое число, в инвариант не входит) **+ `book_depth_at_placement`** (измеритель ёмкости стакана, в инвариант не входит; P10 `DOCS_CHECK_24`, решение держателя) **+ `position_id`** (FK → `positions`, nullable — эпизод, к которому относится нога; N5 `DOCS_CHECK_20`, решение держателя; писатель — `RefreshPositionExecutor`, A9 `DOCS_CHECK_24`); `+fk_order_position`, `+ix_order_position` — **девять колонок** | `docs/models/domain/core/Order.md` §Персистентность |
 | `attached_algo_orders` | `ALTER`: **`+trigger_price_type`** (`varchar(64)`, nullable — енум `TriggerPriceType` строкой; ценовая база триггера attached-защиты, C1 `DOCS_CHECK_20`) | `docs/models/domain/core/Order.md` §«Персистентность `AttachedAlgoOrder`» |
 | `positions` | `ALTER`: восемь колонок положения закрытия — `external_realized_profit`, `external_result_currency`, `external_close_average_price`, `external_close_type`, `external_funding_cost`, `external_realized_profit_gross`, `external_fee`, `external_liquidation_penalty`; **`−uk_position_deal`**, `+uk_position_deal_live` (частичный `unique (deal_id) where status = 'ACTIVE'`), `+uk_position_deal_external` (частичный `unique (deal_id, external_id) where external_id is not null` — B5 `DOCS_CHECK_21`), `+ix_position_deal` — многоэпизодная сделка | `docs/models/domain/core/Position.md` §Персистентность |
 | `deal_cash_flows` | **`CREATE TABLE`**: `id`, `deal_id`, `exchange_id`, `category`, `amount`, `external_fee`, `ccy`, `applied_rate`, `rate_status`, `applied_rate_candle_instrument`, `applied_rate_candle_timeframe`, `applied_rate_candle_open_time`, `external_instrument_id`, `external_bill_id`, `external_type`, `external_sub_type`, `external_order_id` + шесть audit-колонок; `+uk_deal_cash_flow_exchange_bill`, `+fk_deal_cash_flow_deal`, `+fk_deal_cash_flow_exchange`, `+ix_deal_cash_flow_deal`, `+ix_deal_cash_flow_unlinked` (частичный, `where deal_id is null`) | `docs/models/domain/other/DealCashFlow.md` §Персистентность |
@@ -287,7 +287,7 @@ partial-закрытиям **этого эпизода**; читается фи�
    **`AG6.1` и `AG6.2`**: первый даёт перечень `type`/`subType`
    справочника — недостающий операнд, второй отбирает из него
    непринадлежащее экономике сделки; хвост `integrator`, содержание
-   перечня; `docs/models/mapping/DealCashFlow.md` §«Область сверки»).
+   перечня; `docs/models/mapping/DealCashFlow.md` §«Область сверки задаётся списком исключений по бирже»).
    Прежняя редакция называла только `AG6.2` — N2 `DOCS_CHECK_23`: при
    `AG6.1` в статусе ⚠️ ПЕРЕПРОГОН это читалось как «справочник не
    нужен», тогда как план объявляет его перечень операндом **обоих**
@@ -376,6 +376,19 @@ partial-закрытиям **этого эпизода**; читается фи�
     задаёт **границу экономики** (что исключить), этот — **расшифровку
     значений** (что чем является); пункты закрываются одним прогоном, но
     ложность одного не влечёт ложности другого.
+
+17. **Поведение attached-заявки при отмене частично налитого родителя** —
+    **гейтит** (A8 `DOCS_CHECK_24`; кейс к плану `integrator`). Переживает
+    ли `attachAlgoOrds`-защита отмену родительской заявки, у которой
+    `accumulatedFillSize > 0`. От ответа зависит **выбор развязки**, а не
+    её наличие: при «переживает» достаточно конъюнкта по филлу в политике
+    снятия (`docs/lifecycles/Order.md`), при «не переживает» действует
+    ветвление порядка ног entry-`REPLACE`
+    (`docs/decisions/replace-not-amend.md` §Решение п. 3). Дом тропы —
+    `docs/rules/risk-creating-entry-protection.md` §«Перевыставление входа
+    при непустом филле». Гейтит **выбор**, потому что более дешёвая
+    развязка не должна быть пропущена молча; спецификация до ответа
+    непротиворечива — записанный порядок безопасен при любом исходе.
 
 Негейтящие: `AG3.5` (гранулярность bills, fee-эхо) и **`AG3.6`**
 (фактический состав полей bill-записи, B10 `DOCS_CHECK_20`) —
