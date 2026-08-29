@@ -51,6 +51,7 @@
 │   │   ├── executor-payload-file-granularity.md — Почему документация command-layer гранулируется file-per-executor?
 │   │   ├── forward-notes-after-task-closure.md — Где живут форвард-заметки после закрытия задачи-источника?
 │   │   ├── fsm-handler-as-component.md — Где живёт handler-per-status FSM-сущности?
+│   │   ├── gating-node-closure-depth.md — Почему закрытие гейтящего узла углублено критерием глубины и мини-петлёй критики?
 │   │   ├── integrator-agent.md — Почему интеграционное знание внешних источников введено именно так?
 │   │   ├── knowledge-classification.md — Почему фиксация знания устроена через пятишаговую классификацию?
 │   │   ├── master-index-not-fixated.md — Почему не сохраняем master-index/навигационные доки как знание?
