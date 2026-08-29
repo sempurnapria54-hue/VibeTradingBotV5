@@ -36,7 +36,7 @@ DESIGN (`.claude/skills/test-design.md`). Готовый план кладётс
   `{name}` на уровне сырья (такой-то скоуп)?».
 - **Скоуп** — что покрывает план. Для новой биржи — **весь периметр
   манифеста ∩ сырой клиент**: каждый запрос в периметре
-  (`docs/integrations/{name}/coverage-manifest.md`, строки `есть-док`/
+  (`.claude/tests/{testType}/{source}/coverage-manifest.md`, строки `есть-док`/
   `создан`/`обновлён`), прямой кейс (если достижим) + **негатив на
   каждый запрос (вкл. write/мутацию)** + **каждый вариант типа-
   дискриминатора**. Плюс триггер (новая биржа / новый эндпоинт /
@@ -100,6 +100,6 @@ DESIGN (`.claude/skills/test-design.md`). Готовый план кладётс
   код-тестов — `.claude/skills/test-code.md`; прогона — `.claude/skills/test-run.md`.
 - Роль-автор — `.claude/agents/tester.md`.
 - Процесс контура — `.claude/processes/source-api-testing.md`.
-- Источник набора — манифест `docs/integrations/{name}/coverage-manifest.md`.
+- Источник набора — манифест `.claude/tests/{testType}/{source}/coverage-manifest.md`.
 - Тип знания (где живут планы) — `.claude/decisions/test-knowledge-type.md`.
 - Решение о ре-базе на сырьё — `.claude/decisions/source-api-target-rebase.md`.

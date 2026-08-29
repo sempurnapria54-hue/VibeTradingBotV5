@@ -1,0 +1,159 @@
+{
+  "subject": "stop-distance",
+  "question": "Допустим ли объявленный уровень остановки убытка",
+  "home": "docs/rules/risk-policy.md",
+
+  "operands": {
+    "direction": "направление ноги — LONG или SHORT",
+    "plannedEntryPrice": "плановая цена входа своей ноги — якорь уровня, пока живого эпизода нет",
+    "positionSize": "Position.externalSize живого эпизода — нормализованный абсолют в контрактах; пусто либо 0 — живого эпизода нет (docs/models/domain/core/Position.md: живой риск есть тогда и только тогда, когда status = ACTIVE и externalSize > 0)",
+    "positionAverageEntryPrice": "Position.externalAverageEntryPrice живого эпизода — фактическая себестоимость; пишет её только live-нога рефреша, поэтому у живого эпизода она может быть ещё не наблюдена — тогда якорь пуст целиком, а не откатывается к плановой цене, и всякая величина, на нём стоящая, отказывает вычислением",
+    "stopPrice": "рассчитанный уровень остановки убытка проверяемого действия",
+    "feeRate": "прогнозная ставка комиссии как издержка — InstrumentExternalRules.takerFeeRate(); пусто — уровень не проверяется, действие отвергается FEE_RATE_UNAVAILABLE",
+    "calculationType": "объявленный стратегией способ расчёта уровня (StopLossSettings.calculationType)",
+    "distancePercents": "объявленная доля дистанции; у BREAKEVEN не объявляется — уровень выводится из ставки",
+    "placementRole": "роль объявления: PRIMARY — первичная постановка уровня (встроенная защита входа, первичная защитная заявка); TRANSFER — перенос уже стоящего уровня защитным REPLACE с указанной целью"
+  },
+
+  "values": [
+    {
+      "name": "calculationTypeKnown",
+      "note": "Закрытый перечень способов расчёта уровня остановки убытка. BREAKEVEN — декларатор формулы безубытка: без него безубыток объявить нечем, и стратегии выражают его долей на убыточной стороне.",
+      "expr": "in(calculationType, 'ENTRY_PRICE_PERCENT', 'ATR_PERCENT', 'MARKET_STRUCTURE_BUFFER_PERCENT', 'BREAKEVEN')"
+    },
+    {
+      "name": "distanceDeclaredWhenNeeded",
+      "note": "Доля дистанции объявляется всеми способами, кроме BREAKEVEN: у него доля есть функция ставки комиссии, и объявленная автором была бы вторым носителем той же величины.",
+      "expr": "if(calculationType == 'BREAKEVEN', isNull(?distancePercents), notNull(?distancePercents))"
+    },
+    {
+      "name": "breakevenRoleAllowed",
+      "note": "BREAKEVEN допустим только как ПЕРЕНОС уже стоящего уровня. Первичной защитой он быть не может: уровень нулевого P&L лежит на прибыльной стороне, поэтому worst-case выхода он не задаёт (R перестаёт существовать), дистанция риска схлопывается до round-trip комиссии и сайзинг раздувается во столько же раз, а sell-stop выше марк-цены у LONG исполняется немедленно. Реджект создания — STRATEGY_BREAKEVEN_NOT_A_TRANSFER.",
+      "expr": "calculationType != 'BREAKEVEN' || placementRole == 'TRANSFER'"
+    },
+    {
+      "name": "hasLiveEpisode",
+      "note": "Живой эпизод существует — по определению живого риска позиции (docs/models/domain/core/Position.md). Пустой либо нулевой размер есть ФАКТ «эпизода нет», а не недобытая величина.",
+      "expr": "coalesce(?positionSize, 0) > 0"
+    },
+    {
+      "name": "entryAnchor",
+      "note": "Якорь уровня. Пока живого эпизода нет, факта себестоимости не существует, и якорь — плановая цена своей ноги. Как только эпизод есть, якорь — ФАКТИЧЕСКАЯ средняя цена входа: заявленная смещала бы контроль в разрешающую сторону тем сильнее, чем больше проскок (docs/rules/risk-policy.md §«Живое меряется от живой экспозиции»). Ветвь, а не coalesce: у живого эпизода с ещё не наблюдённой средней ценой откат к плановой был бы благоприятным умолчанием (П1 §4) — вместо него отказ вычисления.",
+      "expr": "if(hasLiveEpisode, positionAverageEntryPrice, plannedEntryPrice)"
+    },
+    {
+      "name": "breakevenLevel",
+      "note": "Цена нулевого P&L с учётом round-trip комиссии, ТОЧНО: из q*[(S - P) - f*(P + S)] = 0 следует S = P*(1 + f)/(1 - f) для LONG и S = P*(1 - f)/(1 + f) для SHORT. Линейное приближение P*(1 +- 2f) оставляет остаток +-2f^2*P, знако-асимметричный по стороне, поэтому не берётся. Для LONG уровень лежит ВЫШЕ якоря, для SHORT — ниже: сторона противоположна той, куда ставится обычный стоп.",
+      "expr": "if(direction == 'LONG', entryAnchor * (1 + feeRate) / (1 - feeRate), entryAnchor * (1 - feeRate) / (1 + feeRate))"
+    },
+    {
+      "name": "signedStopDistance",
+      "note": "Дистанция до уровня со знаком направления, от якоря: положительна на убыточной стороне, отрицательна за безубытком.",
+      "expr": "if(direction == 'LONG', entryAnchor - stopPrice, stopPrice - entryAnchor)"
+    },
+    {
+      "name": "stopOnLossSide",
+      "note": "Уровень стои́т на убыточной стороне от якоря — только там пол дистанции применим.",
+      "expr": "signedStopDistance > 0"
+    },
+    {
+      "name": "stopDistanceFloor",
+      "note": "Пол дистанции равен round-trip комиссии в ценовых единицах — комиссия входа по якорю плюс комиссия выхода по цене стопа. Численного буфера сверх комиссии в поле нет: буфер есть величина риск-аппетита, и назначает её держатель (docs/rules/risk-policy.md §«Пол дистанции стопа»).",
+      "expr": "feeRate * (entryAnchor + stopPrice)"
+    },
+    {
+      "name": "stopDistanceAboveFloor",
+      "note": "Предикат преконтроля: на убыточной стороне дистанция обязана покрывать round-trip комиссию, иначе STOP_DISTANCE_BELOW_FLOOR. За безубытком пол не применяется — там срабатывание убытка не фиксирует.",
+      "expr": "!stopOnLossSide || signedStopDistance >= stopDistanceFloor"
+    },
+    {
+      "name": "lossAtStopPerUnit",
+      "note": "Убыток на стопе в ценовых единицах на единицу экспозиции: ценовая дистанция от якоря плюс комиссии обеих ног. На точном безубытке равен нулю — этим клейм «ноль» и проверяется.",
+      "expr": "signedStopDistance + stopDistanceFloor"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "LONG: точный безубыток лежит выше себестоимости, и убыток на нём равен нулю",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": 40, "positionAverageEntryPrice": 3000, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
+      "expect": { "entryAnchor": 3000, "breakevenLevel": 3003.001500750375, "lossAtStopPerUnit": 0, "stopOnLossSide": false, "stopDistanceAboveFloor": true, "distanceDeclaredWhenNeeded": true, "calculationTypeKnown": true, "breakevenRoleAllowed": true }
+    },
+    {
+      "case": "SHORT: точный безубыток лежит ниже себестоимости, и убыток на нём равен нулю",
+      "state": { "direction": "SHORT", "plannedEntryPrice": 3000, "positionSize": 40, "positionAverageEntryPrice": 3000, "stopPrice": 2997.001499250375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
+      "expect": { "breakevenLevel": 2997.001499250375, "lossAtStopPerUnit": 0, "stopOnLossSide": false }
+    },
+    {
+      "case": "линейное приближение безубытком не является: на уровне вход умножить на (1 + 2 ставки) остаётся убыток",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 3003, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.1, "placementRole": "TRANSFER" },
+      "expect": { "lossAtStopPerUnit": 0.0015, "stopOnLossSide": false }
+    },
+    {
+      "case": "BREAKEVEN первичной защитой не объявляется: уровень на прибыльной стороне worst-case выхода не задаёт",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "PRIMARY" },
+      "expect": { "calculationTypeKnown": true, "distanceDeclaredWhenNeeded": true, "breakevenRoleAllowed": false }
+    },
+    {
+      "case": "перенос на живой позиции считается от ФАКТИЧЕСКОЙ средней: плановая цена дала бы уровень на убыточной стороне",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": 40, "positionAverageEntryPrice": 3020, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
+      "expect": { "entryAnchor": 3020, "breakevenLevel": 3023.021510755378, "stopOnLossSide": true }
+    },
+    {
+      "case": "тот же перенос по фактической средней даёт нулевой убыток",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": 40, "positionAverageEntryPrice": 3020, "stopPrice": 3023.021510755378, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
+      "expect": { "lossAtStopPerUnit": 0, "stopOnLossSide": false }
+    },
+    {
+      "case": "SHORT с проскоком: перенос по фактической средней даёт нулевой убыток и на короткой стороне",
+      "state": { "direction": "SHORT", "plannedEntryPrice": 3000, "positionSize": 40, "positionAverageEntryPrice": 2980, "stopPrice": 2977.021489255372, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
+      "expect": { "entryAnchor": 2980, "breakevenLevel": 2977.021489255372, "lossAtStopPerUnit": 0, "stopOnLossSide": false }
+    },
+    {
+      "case": "прежняя редакция эталона: 0.1 % от входа на убыточной стороне сидит ровно на полу — комиссия составляет половину убытка на стопе",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 2997, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.1, "placementRole": "TRANSFER" },
+      "expect": { "signedStopDistance": 3, "stopOnLossSide": true, "stopDistanceFloor": 2.9985, "lossAtStopPerUnit": 5.9985, "stopDistanceAboveFloor": true }
+    },
+    {
+      "case": "стоп вдвое ближе пола отвергается: срабатывание фиксировало бы убыток, которого рынок не сделал",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 2998.5, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.05, "placementRole": "PRIMARY" },
+      "expect": { "signedStopDistance": 1.5, "stopDistanceFloor": 2.99925, "stopDistanceAboveFloor": false }
+    },
+    {
+      "case": "SHORT: стоп ближе пола отвергается зеркально",
+      "state": { "direction": "SHORT", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 3001.5, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.05, "placementRole": "PRIMARY" },
+      "expect": { "signedStopDistance": 1.5, "stopDistanceAboveFloor": false }
+    },
+    {
+      "case": "волатильностный стоп эталона от пола далеко",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 2985, "feeRate": 0.0005, "calculationType": "ATR_PERCENT", "distancePercents": 150, "placementRole": "PRIMARY" },
+      "expect": { "signedStopDistance": 15, "stopDistanceFloor": 2.9925, "stopDistanceAboveFloor": true, "breakevenRoleAllowed": true }
+    },
+    {
+      "case": "стоп по плановой цене на живой позиции с проскоком: якорь фактический, и от него дистанция ниже пола",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": 40, "positionAverageEntryPrice": 3020, "stopPrice": 3019, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.03, "placementRole": "TRANSFER" },
+      "expect": { "entryAnchor": 3020, "signedStopDistance": 1, "stopOnLossSide": true, "stopDistanceAboveFloor": false }
+    },
+    {
+      "case": "BREAKEVEN с объявленной долей отвергается на создании: доля есть функция ставки, а не выбор автора",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "distancePercents": 0.1, "placementRole": "TRANSFER" },
+      "expect": { "distanceDeclaredWhenNeeded": false }
+    },
+    {
+      "case": "способ расчёта вне закрытого перечня отвергается",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 2985, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_ABSOLUTE", "distancePercents": 15, "placementRole": "PRIMARY" },
+      "expect": { "calculationTypeKnown": false }
+    },
+    {
+      "case": "живой эпизод есть, а средняя цена входа ещё не наблюдена — якорь отказывает вычислением, а не откатывается к плановой цене",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": 40, "positionAverageEntryPrice": null, "stopPrice": 2985, "feeRate": 0.0005, "calculationType": "ATR_PERCENT", "distancePercents": 150, "placementRole": "TRANSFER" },
+      "expect": { "hasLiveEpisode": true, "entryAnchor": null },
+      "expectRefusal": { "breakevenLevel": "якорь пуст", "stopDistanceFloor": "якорь пуст", "stopDistanceAboveFloor": "якорь пуст" }
+    },
+    {
+      "case": "пустая ставка отказывает вычислением пола, а не подставляет ноль",
+      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "positionSize": null, "positionAverageEntryPrice": null, "stopPrice": 2997, "feeRate": null, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.1, "placementRole": "PRIMARY" },
+      "expectRefusal": { "stopDistanceFloor": "ставка комиссии не резолвится", "breakevenLevel": "ставка комиссии не резолвится" }
+    }
+  ]
+}

@@ -2,62 +2,138 @@
   "subject": "deal-context-load",
   "question": "Какой объём графа сделки обязан быть загружен",
   "home": "docs/components/DealContextService.md",
-  "includes": ["protection-coverage"],
+  "includes": ["protection-coverage", "algo-order-lifecycle", "deal-risk-numbers"],
 
   "operands": {
+    "deal.billsWindowBegin": "Deal.billsWindowBegin — время создания первой ОТПРАВЛЕННОЙ входной заявки сделки; write-once, единственный писатель SubmitOrderExecutor (docs/models/domain/aggregate/Deal.md §Структура). Durable-колонка сделки: её значение не выводится из загружаемых коллекций и потому годится в удостоверители их пустоты",
+    "deal.entryReason": "Deal.entryReason; RECOVERY — сделка заведена восстановлением существующего живого риска, то есть позиция наблюдалась ДО её создания. Write-once при создании",
     "episodes[].loaded": "эпизод позиции попал в загруженный контекст",
     "episodes[].exitAt": "положение закрытия эпизода добыто",
-    "tranches[].loaded": "транш сделки попал в загруженный контекст",
-    "legs[].loaded": "нога (заявка) сделки попала в загруженный контекст; ноги собираются по всем траншам",
+    "tranches[].loaded": "транш сделки попал в загруженный контекст; транши грузятся все, включая терминальные",
+    "legs[].loaded": "нога (заявка) сделки попала в загруженный контекст; ноги собираются обходом всех траншей",
+    "legs[].type": "Order.type — бизнес-тип ноги; предикат ноги входа берётся из дома protection-coverage §isEntryOrder (подключён своим includes), здесь множество не переписывается",
+    "legs[].accumulatedFillSize": "Order.accumulatedFillSize — исполненный объём ноги",
     "legs[].protections[].loaded": "встроенная защита ноги попала в загруженный контекст",
     "legs[].protections[]": "остальные поля — как в protection-coverage",
     "algoOrders[].loaded": "отдельная условная заявка попала в загруженный контекст",
-    "algoOrders[].required": "заявка входит в обязательный объём: живая либо защитная терминальная",
+    "algoOrders[].status": "AlgoOrder.status",
+    "algoOrders[].kind": "STOP — фиксированный уровень; TRAILING — трейлинг; TAKE_PROFIT — тейк (та же классификация, что в protection-coverage)",
+    "cashFlows[].loaded": "строка разбивки движений сделки попала в загруженный контекст",
+    "cashFlowsTruncated": "выборка строк разбивки уперлась в потолок окна выборки: строки за его пределами не читались",
     "position.externalSize": "живая экспозиция эпизода"
   },
 
   "values": [
     {
-      "name": "episodesComplete",
-      "note": "Эпизоды грузятся все, включая закрытые: по ним считается результат сделки.",
-      "op": "all",
-      "over": "episodes",
-      "of": "loaded"
+      "name": "entrySubmitted",
+      "note": "Входная заявка сделки отправлялась. Резолвится durable-колонкой сделки, а не наличием ноги в загруженной коллекции: резолв «в legs есть входная заявка» был бы круговым — он удостоверял бы пустоту ровно той коллекцией, чью пустоту удостоверяет, и вернул бы вакуумную истину.",
+      "expr": "notNull(deal.billsWindowBegin)"
     },
     {
-      "name": "tranchesComplete",
-      "note": "Нетерминальные транши грузятся все: невидимый транш делает свою экспозицию неатрибутируемой, и сверка суммы с нетто-размером ложно сработала бы.",
+      "name": "entryFilled",
+      "note": "Вход сделки исполнялся хотя бы частично. Читает ноги — но не эпизоды, чью пустоту удостоверяет; цепочка не циклична и обрывается на durable-колонке: пустота самих ног удостоверена entrySubmitted, поэтому дефектно пустые ноги дают отказ раньше, чем этот предикат успевает соврать.",
+      "op": "any",
+      "over": "legs",
+      "where": "isEntryOrder",
+      "of": "accumulatedFillSize > 0"
+    },
+    {
+      "name": "positionObserved",
+      "note": "Позиция по сделке наблюдалась: вход исполнялся либо сделка заведена восстановлением уже существующего живого риска. Два дизъюнкта несущие по отдельности — восстановленная сделка своих исполненных ног не имеет, а исполнившаяся стратегийная не имеет RECOVERY.",
+      "expr": "entryFilled || deal.entryReason == 'RECOVERY'"
+    },
+    {
+      "name": "tranchesAllLoaded",
       "op": "all",
       "over": "tranches",
       "of": "loaded"
     },
     {
-      "name": "legsComplete",
+      "name": "tranchesPresent",
+      "note": "Транши материализуются при создании сделки (docs/models/domain/aggregate/Deal.md §Структура); у восстановленной сделки транш тоже есть — пусто лишь его объявление. Пустой список траншей — дефект загрузки, а не факт домена, поэтому непустота требуется безусловно.",
+      "op": "exists",
+      "over": "tranches"
+    },
+    {
+      "name": "tranchesComplete",
+      "note": "Транши грузятся ВСЕ, включая терминальные: ноги собираются их обходом, а числа риска и омиссионный член допуска считаются по ногам всей сделки. Требование непустоты несущее: фильтр, опустошающий список к точке расчёта, иначе прошёл бы как полнота.",
+      "expr": "tranchesAllLoaded && tranchesPresent"
+    },
+    {
+      "name": "episodesAllLoaded",
+      "op": "all",
+      "over": "episodes",
+      "of": "loaded"
+    },
+    {
+      "name": "episodesPresent",
+      "op": "exists",
+      "over": "episodes"
+    },
+    {
+      "name": "episodesComplete",
+      "note": "Эпизоды грузятся все, включая закрытые: по ним считается результат сделки и правые операнды пар сверки. Пустота законна ровно тогда, когда позиции не было ВООБЩЕ — не тогда, когда не отправлялось входной заявки: у восстановленной сделки заявки не было, а эпизод есть, и удостоверитель уровня «вход отправлялся» пропустил бы её пустой.",
+      "expr": "episodesAllLoaded && (episodesPresent || !positionObserved)"
+    },
+    {
+      "name": "legsAllLoaded",
       "op": "all",
       "over": "legs",
       "of": "loaded"
     },
     {
+      "name": "legsPresent",
+      "op": "exists",
+      "over": "legs"
+    },
+    {
+      "name": "legsComplete",
+      "note": "Пустота ног законна ровно когда входная заявка не отправлялась: у восстановленной сделки её не было никогда, у сделки до отправки — ещё не было. При отправленном входе пустой список ног обнулял бы четыре числа риска, экспозицию транша и омиссионный член — в разрешающую сторону.",
+      "expr": "legsAllLoaded && (legsPresent || !entrySubmitted)"
+    },
+    {
       "name": "attachedComplete",
-      "note": "Встроенные защиты грузятся вместе со своей ногой целиком, включая терминальные.",
+      "note": "Встроенные защиты грузятся вместе со своей ногой целиком, включая терминальные. Требования непустоты нет: нога без встроенной защиты законна, а невакуумность наследуется от ног — защита не может отсутствовать у загруженной ноги, не отсутствуя в базе.",
       "op": "all",
       "over": "legs[].protections[]",
       "of": "loaded"
     },
     {
+      "name": "algoProtectiveKind",
+      "note": "Вид-носитель защиты. Тейк защитой не бывает никогда (protection-coverage §carriesActiveStopLevel).",
+      "expr": "kind != 'TAKE_PROFIT'"
+    },
+    {
+      "name": "algoRequired",
+      "note": "Вывод клаузы дома «все живые плюс защитные терминальные». Живая — по дому статусной модели (algo-order-lifecycle §algoIsLive: созданная тоже живая), множество здесь не переписывается. Живая защитная уже покрыта первым дизъюнктом, поэтому объединение живых и защитных даёт ровно то же множество, что «живые плюс защитные терминальные». Защитная терминальная нужна звеном цепочки замещений — по ней резолвится указатель предшественника.",
+      "expr": "algoIsLive || algoProtectiveKind"
+    },
+    {
       "name": "algoComplete",
+      "note": "Пустота законна всегда: защита сделки бывает только встроенной. Вакуумная истина здесь безвредна — отсутствие условной заявки занижает покрытие и оставляет уровень действующей защиты пустым, то есть ошибка направлена запрещающе.",
       "op": "all",
       "over": "algoOrders",
-      "where": "required",
+      "where": "algoRequired",
       "of": "loaded"
     },
     {
+      "name": "cashFlowsAllLoaded",
+      "op": "all",
+      "over": "cashFlows",
+      "of": "loaded"
+    },
+    {
+      "name": "cashFlowsComplete",
+      "note": "Строки разбивки грузятся окном с потолком (docs/components/DealContextService.md §«Объёмы загрузки»): это единственная коллекция контекста, чья мощность не задана конструкцией сделки. Упёршаяся в потолок выборка — НЕ усечение, а неполнота: предикат ложен и расчёт запрещён. Пустота законна всегда — движений может не быть (вход снят до филла); разрешающую половину ловит третий конъюнкт обязанности сверки «движения добывались» (docs/rules/pnl-reconciliation.md).",
+      "expr": "cashFlowsAllLoaded && !cashFlowsTruncated"
+    },
+    {
       "name": "contextComplete",
-      "expr": "tranchesComplete && episodesComplete && legsComplete && attachedComplete && algoComplete"
+      "expr": "tranchesComplete && episodesComplete && legsComplete && attachedComplete && algoComplete && cashFlowsComplete"
     },
     {
       "name": "computationAllowed",
-      "note": "Неполный контекст не даёт заниженного числа: он даёт отказ. Направление ошибки — консервативное.",
+      "note": "Неполный контекст не даёт заниженного числа: он даёт отказ. Отказ срабатывает и на пустой коллекции, чья пустота не удостоверена фактом: op: all над пустотой истинен, и без требования непустоты предикат разрешал бы расчёт на пустом множестве — числа риска, экспозиция транша и омиссионный член вышли бы нулями, то есть в разрешающую сторону.",
       "expr": "contextComplete"
     },
 
@@ -115,15 +191,21 @@
     {
       "case": "полный контекст: посчитанное совпадает с фактическим",
       "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
         "position": { "externalSize": 3 },
         "episodes": [ { "loaded": true, "exitAt": 100 }, { "loaded": true, "exitAt": 200 } ],
+        "tranches": [ { "loaded": true } ],
         "legs": [
-          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] },
-          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] },
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
         ],
-        "algoOrders": [ { "loaded": true, "required": true } ]
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ],
+        "cashFlows": [ { "loaded": true }, { "loaded": true } ]
       },
       "expect": {
+        "entrySubmitted": true, "entryFilled": true, "positionObserved": true,
+        "tranchesComplete": true, "cashFlowsComplete": true,
         "contextComplete": true, "computationAllowed": true,
         "coverageLoaded": 3, "coverageFull": 3,
         "coverageAnswerLoaded": true, "coverageAnswerDistorted": false
@@ -132,13 +214,16 @@
     {
       "case": "нога не загружена — покрытие занижено, штатная сделка выглядит нарушителем",
       "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
         "position": { "externalSize": 3 },
         "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
         "legs": [
-          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] },
-          { "loaded": false, "protections": [ { "loaded": false, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] },
+          { "loaded": false, "type": "ENTRY", "accumulatedFillSize": 1, "protections": [ { "loaded": false, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
         ],
-        "algoOrders": [ { "loaded": true, "required": true } ]
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": {
         "legsComplete": false, "attachedComplete": false, "contextComplete": false, "computationAllowed": false,
@@ -149,30 +234,165 @@
     {
       "case": "транш не загружен — его экспозиция невидима, и сверка суммы с нетто-размером ложно сработала бы",
       "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
         "position": { "externalSize": 3 },
         "episodes": [ { "loaded": true, "exitAt": 100 } ],
         "tranches": [ { "loaded": true }, { "loaded": false } ],
         "legs": [
-          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 3, "parentFillSize": 3 } ] }
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 3, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 3, "parentFillSize": 3 } ] }
         ],
-        "algoOrders": [ { "loaded": true, "required": true } ]
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": {
+        "tranchesAllLoaded": false, "tranchesPresent": true,
         "tranchesComplete": false, "legsComplete": true, "contextComplete": false, "computationAllowed": false
+      }
+    },
+    {
+      "case": "фильтр «нетерминальные» опустошил транши и ноги в точке расчёта — полнота ложна, а не вакуумно истинна",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 0 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [],
+        "legs": [],
+        "algoOrders": []
+      },
+      "expect": {
+        "tranchesAllLoaded": true, "tranchesPresent": false, "tranchesComplete": false,
+        "legsAllLoaded": true, "legsPresent": false, "legsComplete": false,
+        "episodesComplete": true,
+        "contextComplete": false, "computationAllowed": false
+      }
+    },
+    {
+      "case": "тропа закрытия без входа — входная заявка не отправлялась, пустые эпизоды и ноги законны",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": null },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 0 },
+        "episodes": [],
+        "tranches": [ { "loaded": true } ],
+        "legs": [],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "entrySubmitted": false, "entryFilled": false, "positionObserved": false,
+        "episodesPresent": false, "episodesComplete": true,
+        "legsPresent": false, "legsComplete": true,
+        "tranchesComplete": true, "cashFlowsComplete": true,
+        "contextComplete": true, "computationAllowed": true
+      }
+    },
+    {
+      "case": "вход отправлен и снят до исполнения — эпизодов не было, их пустота законна, но пустота ног уже нет",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 0 },
+        "episodes": [],
+        "tranches": [ { "loaded": true } ],
+        "legs": [ { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 0, "protections": [] } ],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "entrySubmitted": true, "entryFilled": false, "positionObserved": false,
+        "episodesPresent": false, "episodesComplete": true,
+        "legsPresent": true, "legsComplete": true,
+        "contextComplete": true, "computationAllowed": true
+      }
+    },
+    {
+      "case": "вход исполнялся, а эпизоды пусты — позиция наблюдалась, значит это дефект загрузки, а не факт",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 2 },
+        "episodes": [],
+        "tranches": [ { "loaded": true } ],
+        "legs": [ { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [] } ],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "entryFilled": true, "positionObserved": true,
+        "episodesAllLoaded": true, "episodesPresent": false, "episodesComplete": false,
+        "contextComplete": false, "computationAllowed": false
+      }
+    },
+    {
+      "case": "восстановленная сделка: входной заявки не было никогда, но позиция наблюдалась — пустые эпизоды не проходят",
+      "state": {
+        "deal": { "entryReason": "RECOVERY", "billsWindowBegin": null },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 2 },
+        "episodes": [],
+        "tranches": [ { "loaded": true } ],
+        "legs": [],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "entrySubmitted": false, "entryFilled": false, "positionObserved": true,
+        "legsPresent": false, "legsComplete": true,
+        "episodesPresent": false, "episodesComplete": false,
+        "contextComplete": false, "computationAllowed": false
+      }
+    },
+    {
+      "case": "восстановленная сделка с загруженным эпизодом полна: своих ног у неё нет по построению",
+      "state": {
+        "deal": { "entryReason": "RECOVERY", "billsWindowBegin": null },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": null } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [],
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ],
+        "cashFlows": [ { "loaded": true } ]
+      },
+      "expect": {
+        "positionObserved": true,
+        "episodesComplete": true, "legsComplete": true, "tranchesComplete": true,
+        "contextComplete": true, "computationAllowed": true
+      }
+    },
+    {
+      "case": "пустой список траншей — дефект загрузки даже на тропе без входа: удостоверителя у этой пустоты нет",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": null },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 0 },
+        "episodes": [],
+        "tranches": [],
+        "legs": [],
+        "algoOrders": []
+      },
+      "expect": {
+        "tranchesPresent": false, "tranchesComplete": false,
+        "episodesComplete": true, "legsComplete": true,
+        "contextComplete": false, "computationAllowed": false
       }
     },
     {
       "case": "терминальные встроенные защиты не загружены — на покрытие не влияют, но объём всё равно неполон",
       "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
         "position": { "externalSize": 2 },
         "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
         "legs": [
-          { "loaded": true, "protections": [
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [
             { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 },
             { "loaded": false, "carrier": "ATTACHED", "status": "CANCELED", "kind": "STOP", "size": 2, "parentFillSize": 2 }
           ] }
         ],
-        "algoOrders": [ { "loaded": true, "required": true } ]
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": {
         "attachedComplete": false, "contextComplete": false,
@@ -182,12 +402,15 @@
     {
       "case": "закрытый эпизод не загружен — предикат добытости отвечает истиной молча",
       "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
         "position": { "externalSize": 2 },
         "episodes": [ { "loaded": true, "exitAt": 100 }, { "loaded": false, "exitAt": null } ],
+        "tranches": [ { "loaded": true } ],
         "legs": [
-          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
         ],
-        "algoOrders": [ { "loaded": true, "required": true } ]
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": {
         "episodesComplete": false, "contextComplete": false, "computationAllowed": false,
@@ -195,28 +418,101 @@
       }
     },
     {
-      "case": "незагруженная незащитная терминальная условная заявка объёма не нарушает",
+      "case": "строка разбивки движений не загружена — левая сторона пар сверки неполна, объём неполон",
       "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
         "position": { "externalSize": 2 },
         "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
         "legs": [
-          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
         ],
-        "algoOrders": [ { "loaded": true, "required": true }, { "loaded": false, "required": false } ]
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ],
+        "cashFlows": [ { "loaded": true }, { "loaded": false } ]
+      },
+      "expect": {
+        "cashFlowsAllLoaded": false, "cashFlowsComplete": false, "contextComplete": false, "computationAllowed": false
+      }
+    },
+    {
+      "case": "выборка разбивки уперлась в потолок окна — усечения не бывает молча, это неполнота",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": true,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ],
+        "cashFlows": [ { "loaded": true }, { "loaded": true } ]
+      },
+      "expect": {
+        "cashFlowsAllLoaded": true, "cashFlowsComplete": false,
+        "contextComplete": false, "computationAllowed": false
+      }
+    },
+    {
+      "case": "незагруженный терминальный тейк объёма не нарушает: он не живой и не защитный",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" }, { "loaded": false, "status": "COMPLETED", "kind": "TAKE_PROFIT" } ]
       },
       "expect": { "algoComplete": true, "contextComplete": true, "computationAllowed": true }
     },
     {
       "case": "живая условная заявка не загружена — объём неполон",
       "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
         "position": { "externalSize": 2 },
         "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
         "legs": [
-          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
         ],
-        "algoOrders": [ { "loaded": false, "required": true } ]
+        "algoOrders": [ { "loaded": false, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": { "algoComplete": false, "contextComplete": false, "computationAllowed": false }
+    },
+    {
+      "case": "снятая защитная условная заявка не загружена — цепочка замещений не резолвится, объём неполон",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "TRAILING" }, { "loaded": false, "status": "CANCELED", "kind": "STOP" } ]
+      },
+      "expect": { "algoComplete": false, "contextComplete": false, "computationAllowed": false }
+    },
+    {
+      "case": "пустой список отдельных условных заявок законен: защита сделки бывает только встроенной",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": []
+      },
+      "expect": { "algoComplete": true, "contextComplete": true, "computationAllowed": true }
     }
   ]
 }

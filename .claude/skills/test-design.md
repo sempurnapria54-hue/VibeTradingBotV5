@@ -28,7 +28,7 @@
 ## Известный скелет
 
 - **Полнота покрытия — по манифесту.** Источник набора запросов —
-  манифест покрытия источника (`docs/integrations/{name}/coverage-manifest.md`,
+  манифест покрытия источника (`.claude/tests/{testType}/{source}/coverage-manifest.md`,
   провенанс офдок). План перечисляет **каждый запрос в периметре**
   (строки `есть-док`/`создан`/`обновлён`); `вне-периметра` /
   `сознательно-вне` исключены. Новый манифест не заводится.
@@ -170,7 +170,7 @@ demo-рантайме.
 
 ## Вход / Выход
 
-- **Вход:** манифест покрытия (`docs/integrations/{name}/coverage-manifest.md`,
+- **Вход:** манифест покрытия (`.claude/tests/{testType}/{source}/coverage-manifest.md`,
   источник набора), контракты (`docs/integrations/{name}/contracts/`),
   правила (`docs/integrations/{name}/rules/`), поверхность сырого
   клиента (`OkxRestClient`), скоуп прогона (триггер), консультации
@@ -184,7 +184,7 @@ demo-рантайме.
 - Роль — `.claude/agents/tester.md`.
 - Шаблон плана/кейса — `.claude/templates/docs/test-plan.md`.
 - Процесс контура — `.claude/processes/source-api-testing.md`.
-- Источник набора — манифест `docs/integrations/{name}/coverage-manifest.md`.
+- Источник набора — манифест `.claude/tests/{testType}/{source}/coverage-manifest.md`.
 - Построение коллекции — `.claude/skills/test-collection.md`;
   написание код-тестов — `.claude/skills/test-code.md`;
   прогон — `.claude/skills/test-run.md`; ревью — `.claude/skills/test-review.md`.

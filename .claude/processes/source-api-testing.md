@@ -43,7 +43,7 @@ prod-read-only блока нет; прод пользователь провер
 
 1. **DESIGN.** `tester` составляет план и кейсы (`test-design`) —
    **источник набора запросов — манифест покрытия**
-   (`docs/integrations/{name}/coverage-manifest.md`), весь in-perimeter
+   (`.claude/tests/{testType}/{source}/coverage-manifest.md`), весь in-perimeter
    периметр через `/raw` — и строит по плану исполняемую
    **Postman-коллекцию** (`test-collection`) через A2-passthrough, до
    запуска. Структура — **метод → кейсы → таблица** (класс на метод,
@@ -104,9 +104,16 @@ DESIGN-only заход (обкатка формы) останавливаетс�
 
 ## Колонка покрытия в манифесте
 
-Манифест покрытия (`docs/integrations/{name}/coverage-manifest.md`)
+Манифест покрытия (`.claude/tests/{testType}/{source}/coverage-manifest.md`)
 несёт **колонку статуса покрытия контуром** — чек-лист инварианта
 полноты. Метки по стадии (цветные — эмодзи-кружок + слово):
+
+*Адрес манифеста исправлен `GAPS_CLOSE_27` (F10 `DOCS_CHECK_27`): шесть
+живых носителей адресовали его как `docs/integrations/{name}/coverage-manifest.md`
+— такого файла не существовало. Манифест лежит рядом с планом, который
+его потребляет, по тому же доводу, по которому туда переехал реестр
+предусловий (`code-preconditions.md` §«Почему реестр здесь, а не в
+`docs/`»).*
 
 - 🔴 **не в плане** — in-perimeter запрос, ещё не покрыт планом;
 - 🟡 **в плане** — кейсы в утверждённом/строящемся плане (этап DESIGN);
@@ -147,7 +154,7 @@ in-perimeter строк без метки быть не должно.
 - Консультант по контрактам / правка апидоков — `.claude/agents/integrator.md`,
   `.claude/processes/api-docs-completion.md`.
 - Источник набора запросов — манифест покрытия
-  `docs/integrations/{name}/coverage-manifest.md`.
+  `.claude/tests/{testType}/{source}/coverage-manifest.md`.
 - Per-source тест-планы (тип знания) —
   `.claude/tests/{testType}/{source}/`;
   обоснование — `.claude/decisions/test-knowledge-type.md`.

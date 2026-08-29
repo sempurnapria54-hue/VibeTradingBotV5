@@ -2,9 +2,10 @@
   "subject": "deal-risk-numbers",
   "question": "Чему равны четыре числа риска сделки",
   "home": "docs/models/domain/aggregate/Deal.md",
+  "includes": ["protection-coverage"],
 
   "operands": {
-    "legs[].type": "Order.type — бизнес-тип ноги; ноги собираются по всем траншам сделки: числа риска агрегатные",
+    "legs[].type": "Order.type — бизнес-тип ноги; ноги собираются по всем траншам сделки: числа риска агрегатные. Предикат ноги входа — дом docs/spec/protection-coverage.json, величина isEntryOrder, подключена через includes; множество здесь не переписывается",
     "legs[].status": "Order.status",
     "legs[].plannedRiskAmount": "Order.plannedRiskAmount — write-once на ноге",
     "legs[].plannedSizeContracts": "Order.plannedSizeContracts",
@@ -13,18 +14,13 @@
     "legs[].plannedStopPrice": "Order.plannedStopPrice",
     "legs[].plannedContractValue": "Order.plannedContractValue",
     "legs[].positionId": "Order.positionId — ось эпизода",
-    "legs[].stopCurrent": "действующий уровень защиты ЭТОЙ НОГИ — по приоритету носителя внутри её транша; резолв — docs/spec/protection-coverage.json, значение trancheStopCurrent",
+    "legs[].stopCurrent": "действующий уровень защиты, покрывающей ЭТУ НОГУ, — наименее благоприятный среди всех действующих защит её транша; резолв — docs/spec/protection-coverage.json, значение trancheStopCurrent",
     "livePosition.id": "Deal.livePosition().id",
     "livePosition.externalSize": "Position.externalSize живого эпизода",
     "direction": "Deal.direction"
   },
 
   "values": [
-    {
-      "name": "isEntryLeg",
-      "note": "Бизнес-тип ноги входа. Предикатом отбора служит тип, а не намерение reduce-only.",
-      "expr": "in(type, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')"
-    },
     {
       "name": "isLiveOrCompleted",
       "note": "Живая либо исполнившаяся. Всякая снятая выпадает независимо от причины снятия.",
@@ -58,18 +54,18 @@
 
     {
       "name": "dealPlannedRisk",
-      "note": "Заявленный плановый риск сделки — знаменатель R.",
+      "note": "Риск, принятый сделкой на входах, — знаменатель R и операнд кумулятивного потолка. Живая либо исполнившаяся нога входит заявленным риском целиком; выбывшая (снятая, ERROR) — только налитой долей: за неисполненную долю сделка не рисковала, а за налитую рисковала и продолжает. Перевыставление входа знаменатель не раздувает и не обнуляет.",
       "op": "sum",
       "over": "legs",
-      "where": "isEntryLeg && isLiveOrCompleted && notNull(plannedRiskAmount)",
-      "of": "plannedRiskAmount"
+      "where": "isEntryOrder && notNull(plannedRiskAmount)",
+      "of": "if(isLiveOrCompleted, plannedRiskAmount, plannedRiskAmount * filledShare)"
     },
     {
       "name": "dealIncurredRisk",
-      "note": "Взятый на входе риск. Предикат свой, без конъюнкта по статусу: снятая с филлом нога сюда входит.",
+      "note": "Взятый на входе риск. Предикат свой, без конъюнкта по статусу: у живой и исполнившейся ноги берётся НАЛИТАЯ доля, а не полный заявленный риск. Прежняя контрастная рамка «снятая с филлом нога СЮДА входит» снята: после новой формы dealPlannedRisk она входит и туда — своей налитой долей; различие двух чисел проходит по доле, а не по множеству (дом — docs/models/domain/aggregate/Deal.md §«Четыре числа риска»).",
       "op": "sum",
       "over": "legs",
-      "where": "isEntryLeg && accumulatedFillSize > 0 && notNull(plannedRiskAmount)",
+      "where": "isEntryOrder && accumulatedFillSize > 0 && notNull(plannedRiskAmount)",
       "of": "plannedRiskAmount * filledShare"
     },
     {
@@ -77,7 +73,7 @@
       "note": "Уменьшаемое пары «снятое защитой» — взятый риск, ограниченный живым эпизодом.",
       "op": "sum",
       "over": "legs",
-      "where": "isEntryLeg && accumulatedFillSize > 0 && notNull(plannedRiskAmount) && onLiveEpisode",
+      "where": "isEntryOrder && accumulatedFillSize > 0 && notNull(plannedRiskAmount) && onLiveEpisode",
       "of": "plannedRiskAmount * filledShare"
     },
     {
@@ -85,7 +81,7 @@
       "note": "Вычитаемое пары — риск ног живого эпизода при действующей защите.",
       "op": "sum",
       "over": "legs",
-      "where": "isEntryLeg && accumulatedFillSize > 0 && notNull(plannedRiskAmount) && onLiveEpisode",
+      "where": "isEntryOrder && accumulatedFillSize > 0 && notNull(plannedRiskAmount) && onLiveEpisode",
       "of": "legRiskAtCurrentStop"
     },
     {
@@ -97,7 +93,7 @@
       "name": "episodeFilledSize",
       "op": "sum",
       "over": "legs",
-      "where": "isEntryLeg && onLiveEpisode",
+      "where": "isEntryOrder && onLiveEpisode",
       "of": "accumulatedFillSize"
     },
     {
@@ -109,7 +105,7 @@
 
   "examples": [
     {
-      "case": "перевыставление входа: снятая нога из знаменателя выходит, из взятого — нет",
+      "case": "перевыставление входа: снятая нога отдаёт в знаменатель налитую долю, а не всю заявку и не ноль",
       "state": {
         "direction": "LONG",
         "livePosition": { "id": 1, "externalSize": 30 },
@@ -118,10 +114,10 @@
           { "type": "ENTRY", "status": "ACTIVE", "plannedRiskAmount": 70, "plannedSizeContracts": 70, "accumulatedFillSize": 0, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": null, "stopCurrent": 2910 }
         ]
       },
-      "expect": { "dealPlannedRisk": 70, "dealIncurredRisk": 30 }
+      "expect": { "dealPlannedRisk": 100, "dealIncurredRisk": 30 }
     },
     {
-      "case": "нога в ERROR в знаменатель не входит, а её филл во взятом риске остаётся",
+      "case": "нога в ERROR: заявленное сверх филла из знаменателя выходит, налитое остаётся и там, и во взятом риске",
       "state": {
         "direction": "LONG",
         "livePosition": { "id": 1, "externalSize": 20 },
@@ -129,7 +125,7 @@
           { "type": "ENTRY", "status": "ERROR", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 20, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 }
         ]
       },
-      "expect": { "dealPlannedRisk": 0, "dealIncurredRisk": 20 }
+      "expect": { "dealPlannedRisk": 20, "dealIncurredRisk": 20 }
     },
     {
       "case": "недвинутый стоп: снятое защитой равно нулю алгебраически",

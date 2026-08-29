@@ -2,7 +2,7 @@
   "subject": "deal-tranche-lifecycle",
   "question": "Какие переходы статуса транша допустимы",
   "home": "docs/lifecycles/DealTranche.md",
-  "includes": ["protection-coverage"],
+  "includes": ["protection-coverage", "order-lifecycle"],
 
   "operands": {
     "from": "текущий статус транша",

@@ -35,7 +35,8 @@
     },
     {
       "name": "refusalReason",
-      "expr": "if(!refusesInsteadOfMapping, null, if(rawStatus == 'order_failed', 'ORDER_FAILED', if(rawStatus == 'partially_failed', 'PARTIALLY_FAILED', 'UNKNOWN_EXTERNAL_STATUS')))"
+      "note": "Причина отказа обязана принадлежать перечню CloseReason СВОЕЙ сущности (docs/rules/external-status-resolution.md). ORDER_FAILED и PARTIALLY_FAILED — значения state условной заявки источника и живут только в перечне AlgoOrder; обычной заявке из причин отказа остаётся UNKNOWN_EXTERNAL_STATUS.",
+      "expr": "if(!refusesInsteadOfMapping, null, if(entity == 'ALGO_ORDER' && rawStatus == 'order_failed', 'ORDER_FAILED', if(entity == 'ALGO_ORDER' && rawStatus == 'partially_failed', 'PARTIALLY_FAILED', 'UNKNOWN_EXTERNAL_STATUS')))"
     },
     {
       "name": "positionAbsenceIsNormal",
@@ -54,8 +55,8 @@
     },
     {
       "name": "closeReasonCandidate",
-      "note": "Кандидат причины: у отмены он приходит из нашего намерения, а не из статуса источника.",
-      "expr": "if(refusesInsteadOfMapping, refusalReason, if(notFoundIsTerminal, 'MISSING_AFTER_REFRESH', if(resolvedStatus == 'COMPLETED' && entity != 'POSITION', if(entity == 'ORDER', 'FILLED', 'TRIGGERED'), if(resolvedStatus == 'CANCELED', cancelIntentReason, if(positionAbsenceIsNormal, 'EXTERNAL_CLOSE', null)))))"
+      "note": "Кандидат причины: у отмены он приходит из нашего намерения, а не из статуса источника. Намерения нет — причина всё равно непуста: UNKNOWN означает «отмена наблюдена, наше намерение не резолвится», и без неё отмена, инициированная не нами, упиралась бы в требование непустой причины на ребре в CANCELED (docs/spec/algo-order-lifecycle.json, reasonRequired). Ручная отмена от биржевой отличается прежним значением MANUAL_CANCEL нашего намерения и сырым статусом источника, сохранённым на сущности.",
+      "expr": "if(refusesInsteadOfMapping, refusalReason, if(notFoundIsTerminal, 'MISSING_AFTER_REFRESH', if(resolvedStatus == 'COMPLETED' && entity != 'POSITION', if(entity == 'ORDER', 'FILLED', 'TRIGGERED'), if(resolvedStatus == 'CANCELED', coalesce(cancelIntentReason, 'UNKNOWN'), if(positionAbsenceIsNormal, 'EXTERNAL_CLOSE', null)))))"
     },
     {
       "name": "closeReasonApplied",
@@ -119,6 +120,21 @@
       "case": "частичный отказ — своё проблемное состояние: часть могла исполниться",
       "state": { "entity": "ALGO_ORDER", "rawStatus": "partially_failed", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
       "expect": { "refusalReason": "PARTIALLY_FAILED", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "отказ постановки у ОБЫЧНОЙ заявки берёт причину из своего перечня, а не из перечня условной",
+      "state": { "entity": "ORDER", "rawStatus": "order_failed", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "refusesInsteadOfMapping": true, "refusalReason": "UNKNOWN_EXTERNAL_STATUS", "closeReasonApplied": "UNKNOWN_EXTERNAL_STATUS", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "отмена, не объявленная нашим намерением, причину всё равно получает",
+      "state": { "entity": "ALGO_ORDER", "rawStatus": "canceled", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "resolvedStatus": "CANCELED", "closeReasonApplied": "UNKNOWN", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "отмена защитным механизмом биржи у обычной заявки — та же тропа непустой причины",
+      "state": { "entity": "ORDER", "rawStatus": "mmp_canceled", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "resolvedStatus": "CANCELED", "closeReasonApplied": "UNKNOWN", "raisesExchangeStepTwo": false }
     },
     {
       "case": "позиции нет на бирже — это нормальный факт закрытия, не ненайденность",

@@ -23,7 +23,7 @@
   "values": [
     {
       "name": "perContractRisk",
-      "note": "Закрытая форма: убыток на стопе одного контракта с round-trip комиссией.",
+      "note": "Закрытая форма сайзинга: убыток на стопе одного контракта с round-trip комиссией. ДОМ ФОРМЫ — эта спека: величина объявляется здесь и только здесь; спека, которой нужно ЗНАЧЕНИЕ, объявляет его операндом с указателем сюда, спека, которой нужна САМА ФОРМА на своих строках, подключает её через includes.",
       "expr": "(abs(entry.entryPrice - entry.stopPrice) + instrument.takerFeeRate * (entry.entryPrice + entry.stopPrice)) * instrument.contractValue"
     },
     {
@@ -73,8 +73,8 @@
     },
     {
       "name": "exitOutcome",
-      "note": "Пола минимума у reduce-only выхода нет: подъём размера менял бы объявленное действие. Вместо пола — три исхода округления.",
-      "expr": "if(exitSize >= instrument.minSize, 'PARTIAL', if(exitRemainder < instrument.minSize, 'FULL', 'SKIPPED'))"
+      "note": "Пола минимума у reduce-only выхода нет: подъём размера менял бы объявленное действие. Вместо пола — исходы округления. Полных выходов два, и они разведены значением: FULL_BY_FRACTION — объявленная доля забрала экспозицию целиком, ничего не округлялось, журнальный отчёт не заводится; FULL — «частично» на этом размере невыразимо, выход целиком объявляется отчётом PARTIAL_EXIT_ROUNDED_TO_FULL. Одно значение на оба исхода заставляло бы потребителя перевыводить exitSize >= minSize, чтобы решить, какой отчёт заводить.",
+      "expr": "if(exitSize >= instrument.minSize, if(exitRemainder == 0, 'FULL_BY_FRACTION', 'PARTIAL'), if(exitRemainder < instrument.minSize, 'FULL', 'SKIPPED'))"
     },
 
     {
@@ -100,7 +100,7 @@
         "exit": { "fraction": 0 },
         "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
-      "expect": { "perContractRisk": 9.2955, "riskBudget": 100, "contractsFromAllocation": 33.33333333333333, "entryContracts": 10, "entryWithinRiskBudget": true }
+      "expect": { "perContractRisk": 9.2955, "riskBudget": 100, "contractsFromAllocation": 33.33333333333333, "entryContracts": 10, "entryRiskAtStop": 92.955, "entryWithinRiskBudget": true }
     },
     {
       "case": "узкий стоп: связывает аллокация, а не потолок риска",
@@ -137,6 +137,18 @@
         "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "exitSize": 5, "exitOutcome": "PARTIAL" }
+    },
+    {
+      "case": "объявленная доля забрала экспозицию целиком — полный выход по доле, а не округление",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 10 },
+        "exit": { "fraction": 1 },
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "exitSize": 10, "exitRemainder": 0, "exitOutcome": "FULL_BY_FRACTION" }
     },
     {
       "case": "доля меньше минимума, а остаток тоже меньше — выходим целиком и объявляем это",

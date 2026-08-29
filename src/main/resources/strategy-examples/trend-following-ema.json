@@ -160,6 +160,7 @@
       "tranches": [
         {
           "key": "bull_main",
+          "levelCount": 1,
           "positionReopenAllowed": false,
           "stepsByStatus": {
             "PRECHECK": [
@@ -301,8 +302,7 @@
                     "actionType": "REPLACE_ACTION",
                     "conditionType": "OCO_FULL",
                     "stopLossSettings": {
-                      "calculationType": "ENTRY_PRICE_PERCENT",
-                      "distancePercents": 0.1,
+                      "calculationType": "BREAKEVEN",
                       "triggerPriceType": "MARK"
                     },
                     "closeFractionPercents": 100,
@@ -403,6 +403,7 @@
       "tranches": [
         {
           "key": "bear_main",
+          "levelCount": 1,
           "positionReopenAllowed": false,
           "stepsByStatus": {
             "PRECHECK": [
@@ -544,8 +545,7 @@
                     "actionType": "REPLACE_ACTION",
                     "conditionType": "OCO_FULL",
                     "stopLossSettings": {
-                      "calculationType": "ENTRY_PRICE_PERCENT",
-                      "distancePercents": 0.1,
+                      "calculationType": "BREAKEVEN",
                       "triggerPriceType": "MARK"
                     },
                     "closeFractionPercents": 100,

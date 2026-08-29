@@ -186,7 +186,9 @@ write-once для причины закрытия —
 `docs/spec/external-status-resolution.json` (`orderStatus`,
 `refusalReason`, `closeReasonApplied`). Причина отмены берётся из
 нашего намерения, не из статуса источника: отмена по
-защитному механизму биржи резолвится так же, как обычная.
+защитному механизму биржи резолвится так же, как обычная — и, как всякая
+отмена без нашего намерения, причину всё равно получает
+(`docs/rules/external-status-resolution.md`).
 
 ### OKX evidence-cycle / not found
 

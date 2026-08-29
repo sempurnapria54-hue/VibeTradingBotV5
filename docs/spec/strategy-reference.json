@@ -2,11 +2,13 @@
   "subject": "strategy-reference",
   "question": "Проходит ли эталонная стратегия репозитория действующие требования к дереву стратегии",
   "home": "docs/rules/strategy-validation.md",
+  "includes": ["stop-distance"],
   "operands": {
     "strategy": "src/main/resources/strategy-examples/trend-following-ema.json — исполнимый эталон",
     "details[].phaseEntryPolicy": "политика входа в фазе; NO_TRADE — неторгуемая деталь",
     "details[].stepsByStatus{}": "шаги, сгруппированные по статусу сделки",
     "steps[].actions[]": "пакет действий шага",
+    "details[].tranches[].levelCount": "сколько одновременно живых траншей объявляет эта запись; умолчания нет — пустое место мажорировалось бы единицей, то есть в разрешающую сторону",
     "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — максимальный риск на сделку (конфигурация)",
     "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)"
   },
@@ -105,7 +107,7 @@
     },
     {
       "name": "riskChainHolds",
-      "note": "Инвариант вложенности потолков: поактный ≤ максимум стратегии ≤ глобальный, а множитель катастрофического потолка не выше конфигурационного. Вырожденный случай одного одновременно живого действия.",
+      "note": "Инвариант вложенности потолков: поактный ≤ максимум стратегии ≤ глобальный, а множитель катастрофического потолка не выше конфигурационного. Число одновременно живых траншей сюда не входит — это отдельное неравенство с собственным реджектом (overlapRiskSatisfiable).",
       "expr": "riskPerActionPercent <= strategySimultaneousRiskPerDealPercent && strategySimultaneousRiskPerDealPercent <= globalSimultaneousRiskPerDealPercent && strategyCatastrophicRiskPerDealMultiplier <= globalCatastrophicRiskPerDealMultiplier"
     },
     {
@@ -113,6 +115,24 @@
       "op": "count",
       "over": "strategy.details[]",
       "where": "isTradableDetail && !riskChainHolds"
+    },
+    {
+      "name": "detailOverlapCount",
+      "note": "N_overlap — число одновременно живых траншей детали: сумма levelCount по её объявлениям. Транши объявлены, поэтому число считается, а не мажорируется обходом дерева шагов.",
+      "op": "sum",
+      "over": "tranches",
+      "of": "levelCount"
+    },
+    {
+      "name": "overlapRiskSatisfiable",
+      "note": "Веер детали умещается в её же потолок одновременного риска: N_overlap × поактный ≤ максимум стратегии. Проверка консервативна и это названо — она мажорирует сумму произведением. Реджект собственный: STRATEGY_SIMULTANEOUS_RISK_UNSATISFIABLE.",
+      "expr": "detailOverlapCount * riskPerActionPercent <= strategySimultaneousRiskPerDealPercent"
+    },
+    {
+      "name": "detailsBreakingOverlap",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "isTradableDetail && !overlapRiskSatisfiable"
     },
     {
       "name": "actionTypeKnown",
@@ -194,6 +214,37 @@
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
       "where": "notNull(?allocationPercents) && (allocationPercents < 0 || allocationPercents > 100)"
+    },
+    {
+      "name": "actionStopCalculationType",
+      "note": "Способ расчёта уровня, объявленный этим действием: своими настройками стопа либо настройками встроенной защиты входа.",
+      "expr": "coalesce(?stopLossSettings.calculationType, ?attachedProtection.stopLossSettings.calculationType)"
+    },
+    {
+      "name": "actionIsLevelTransfer",
+      "note": "Действие ПЕРЕНОСИТ уже стоящий уровень: защитный REPLACE с названной целью. Всё прочее — первичная постановка (встроенная защита входа, первичная защитная заявка), то есть placementRole = PRIMARY.",
+      "expr": "actionKind == 'ALGO_ORDER' && actionType == 'REPLACE_ACTION' && notNull(?targetActionKey)"
+    },
+    {
+      "name": "breakevenAsPrimaryStop",
+      "note": "Объявления BREAKEVEN не в роли переноса. Правило и довод — дом docs/spec/stop-distance.json, величина breakevenRoleAllowed; здесь роль выводится из формы действия дерева стратегии. Реджект создания — STRATEGY_BREAKEVEN_NOT_A_TRANSFER.",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
+      "where": "actionStopCalculationType == 'BREAKEVEN' && !actionIsLevelTransfer"
+    },
+    {
+      "name": "stopSettingsMisdeclared",
+      "note": "Объявления уровня стопа в защитных действиях транша: способ расчёта — из закрытого перечня, доля дистанции согласована со способом (у BREAKEVEN не объявляется). Предикаты — дом docs/spec/stop-distance.json.",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[].stopLossSettings",
+      "where": "!calculationTypeKnown || !distanceDeclaredWhenNeeded"
+    },
+    {
+      "name": "attachedStopSettingsMisdeclared",
+      "note": "То же для встроенной защиты входной заявки.",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[].attachedProtection.stopLossSettings",
+      "where": "!calculationTypeKnown || !distanceDeclaredWhenNeeded"
     },
     {
       "name": "detailsCount",
@@ -316,6 +367,151 @@
       },
       "expect": {
         "detailsBreakingRiskChain": 0
+      }
+    },
+    {
+      "case": "объявления уровня стопа в эталоне — из закрытого перечня, и доля согласована со способом: шаг безубытка объявлен BREAKEVEN без доли",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "stopSettingsMisdeclared": 0,
+        "attachedStopSettingsMisdeclared": 0,
+        "breakevenAsPrimaryStop": 0
+      }
+    },
+    {
+      "case": "BREAKEVEN встроенной защитой входа отвергается: структурно объявление законно, но роль первичная — worst-case выхода такой уровень не задаёт",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "PRECHECK": [
+                      {
+                        "actions": [
+                          {
+                            "actionKind": "ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                            "attachedProtection": {
+                              "stopLossSettings": { "calculationType": "BREAKEVEN", "triggerPriceType": "MARK" }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "stopSettingsMisdeclared": 0,
+        "attachedStopSettingsMisdeclared": 0,
+        "breakevenAsPrimaryStop": 1
+      }
+    },
+    {
+      "case": "BREAKEVEN первичной защитной заявкой отвергается тоже: CREATE_ACTION переносом не является",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "ENTRY_FINALIZED": [
+                      {
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "OCO_FULL",
+                            "stopLossSettings": { "calculationType": "BREAKEVEN", "triggerPriceType": "MARK" }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "stopSettingsMisdeclared": 0,
+        "breakevenAsPrimaryStop": 1
+      }
+    },
+    {
+      "case": "веер эталона умещается в потолок одновременного риска: каждая торгуемая деталь объявляет один одновременно живой транш",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "detailsBreakingOverlap": 0
+      }
+    },
+    {
+      "case": "три одновременно живых транша по поактному потолку в максимум стратегии не умещаются никогда",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 1.0,
+              "strategySimultaneousRiskPerDealPercent": 1.0,
+              "tranches": [ { "levelCount": 3 } ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsBreakingOverlap": 1
+      }
+    },
+    {
+      "case": "тот же веер при вдвое меньшем поактном потолке проходит границей",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 0.5,
+              "strategySimultaneousRiskPerDealPercent": 1.0,
+              "tranches": [ { "levelCount": 1 }, { "levelCount": 1 } ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsBreakingOverlap": 0
+      }
+    },
+    {
+      "case": "транш без объявленного levelCount отказывает вычислением, а не мажорируется единицей",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 1.0,
+              "strategySimultaneousRiskPerDealPercent": 1.0,
+              "tranches": [ { "key": "t1" } ]
+            }
+          ]
+        }
+      },
+      "expectRefusal": {
+        "detailsBreakingOverlap": "levelCount транша не объявлен"
       }
     }
   ]

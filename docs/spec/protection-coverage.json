@@ -2,6 +2,7 @@
   "subject": "protection-coverage",
   "question": "Каково покрытие защиты транша",
   "home": "docs/rules/live-risk-protection.md",
+  "includes": ["order-lifecycle"],
 
   "operands": {
     "tranches[]": "транши сделки; у каждого свои заявки, защиты и обязательства",
@@ -29,10 +30,6 @@
     {
       "name": "isEntryOrder",
       "expr": "in(type, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')"
-    },
-    {
-      "name": "isLiveOrder",
-      "expr": "in(status, 'CREATED', 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED')"
     },
     {
       "name": "trancheEntryFilled",
@@ -66,7 +63,7 @@
       "name": "trancheHasLiveEntryOrder",
       "op": "any",
       "over": "orders",
-      "of": "isEntryOrder && isLiveOrder"
+      "of": "isEntryOrder && orderIsLive"
     },
     {
       "name": "trancheRiskBearing",
@@ -164,49 +161,27 @@
 
     {
       "name": "protectionStopLevel",
-      "note": "Уровень остановки убытка одной защиты. У трейлинга он наблюдаемый: до наблюдения уровня нет, и такая защита в isProtection не попадает.",
+      "note": "Уровень остановки убытка одной защиты. У трейлинга он НАБЛЮДАЕМЫЙ: до первого наблюдения уровня нет, и величина пуста. Из isProtection такая защита выпадает только тогда, когда объявлена цена активации и та ещё не достигнута (carriesActiveStopLevel); трейлинг БЕЗ цены активации защищает сразу, в isProtection входит и уровня при этом не несёт — тогда trancheStopCurrent отказывает вычислением, а не берёт уровень у соседней защиты.",
       "expr": "if(kind == 'TRAILING', ?observedTrailingPrice, ?stopLevel)"
     },
     {
-      "name": "attachedLowest",
+      "name": "trancheStopLowest",
+      "note": "Нижний уровень среди ВСЕХ действующих защит транша, безотносительно носителя.",
       "op": "min", "over": "protections",
-      "where": "isProtection && carrier == 'ATTACHED'",
+      "where": "isProtection",
       "of": "protectionStopLevel"
     },
     {
-      "name": "attachedHighest",
+      "name": "trancheStopHighest",
+      "note": "Верхний уровень среди ВСЕХ действующих защит транша, безотносительно носителя.",
       "op": "max", "over": "protections",
-      "where": "isProtection && carrier == 'ATTACHED'",
-      "of": "protectionStopLevel"
-    },
-    {
-      "name": "standaloneStopLowest",
-      "op": "min", "over": "protections",
-      "where": "isProtection && carrier != 'ATTACHED' && kind != 'TRAILING'",
-      "of": "protectionStopLevel"
-    },
-    {
-      "name": "standaloneStopHighest",
-      "op": "max", "over": "protections",
-      "where": "isProtection && carrier != 'ATTACHED' && kind != 'TRAILING'",
-      "of": "protectionStopLevel"
-    },
-    {
-      "name": "trailingLowest",
-      "op": "min", "over": "protections",
-      "where": "isProtection && kind == 'TRAILING'",
-      "of": "protectionStopLevel"
-    },
-    {
-      "name": "trailingHighest",
-      "op": "max", "over": "protections",
-      "where": "isProtection && kind == 'TRAILING'",
+      "where": "isProtection",
       "of": "protectionStopLevel"
     },
     {
       "name": "trancheStopCurrent",
-      "note": "Действующий уровень защиты транша — по приоритету носителя: своя встроенная, затем отдельный стоп своего транша, затем его активированный трейлинг. Внутри класса берётся менее благоприятный: у LONG это нижний уровень, у SHORT — верхний. Защиты нет вовсе — пусто целиком, а не ноль.",
-      "expr": "if(deal.direction == 'LONG', coalesce(attachedLowest, standaloneStopLowest, trailingLowest), coalesce(attachedHighest, standaloneStopHighest, trailingHighest))"
+      "note": "Действующий уровень защиты транша — наименее благоприятный среди ВСЕХ его действующих защит: у LONG нижний, у SHORT верхний. Класс носителя (встроенная / отдельная / трейлинг) отбор не сужает: под лестницей разноуровневых защит и в окне двойной защиты часть экспозиции останавливается только на худшем уровне, и приоритет носителя занижал бы риск — ошибка в разрешающую сторону (docs/concept.md П1 §3). Защиты нет вовсе — пусто целиком, а не ноль. Защита, которая покрывает, но уровня ещё не наблюдала (трейлинг без цены активации до первого наблюдения), отказывает вычислением: подстановка чужого уровня вместо неизвестного была бы разрешающей ошибкой.",
+      "expr": "if(deal.direction == 'LONG', trancheStopLowest, trancheStopHighest)"
     },
     {
       "name": "dealStopLowest",
@@ -550,7 +525,7 @@
     },
 
     {
-      "case": "LONG: приоритет носителя — встроенная защита побеждает отдельный стоп, даже если тот ниже",
+      "case": "LONG: наименее благоприятный берётся среди всех защит транша — отдельный стоп ниже встроенной, и уровнем становится он",
       "state": {
         "deal": { "direction": "LONG" },
         "position": { "live": true, "externalSize": 100 },
@@ -565,7 +540,7 @@
           }
         ]
       },
-      "expect": { "stopCurrentLive": 2910 }
+      "expect": { "stopCurrentLive": 2800 }
     },
     {
       "case": "LONG: внутри одного класса берётся менее благоприятный — нижний уровень",
@@ -621,7 +596,7 @@
       "expect": { "stopCurrentLive": null, "anyTrancheViolated": true }
     },
     {
-      "case": "активированный трейлинг несёт наблюдённый уровень и берётся третьим по приоритету",
+      "case": "активированный трейлинг несёт наблюдённый уровень и, будучи единственной действующей защитой, задаёт уровень транша",
       "state": {
         "deal": { "direction": "LONG" },
         "position": { "live": true, "externalSize": 100 },
@@ -636,6 +611,60 @@
         ]
       },
       "expect": { "stopCurrentLive": 3150 }
+    },
+    {
+      "case": "SHORT: класс носителя отбор не сужает — верхний уровень несёт отдельный стоп, а не встроенная защита",
+      "state": {
+        "deal": { "direction": "SHORT" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "a1", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 100, "stopLevel": 3050 },
+              { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 100, "closedSize": 0, "stopLevel": 3200 }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "stopCurrentLive": 3200 }
+    },
+    {
+      "case": "окно двойной защиты: замена стои́т, старая ещё жива — уровнем остаётся худшая из двух, а не та, чей носитель приоритетнее",
+      "state": {
+        "deal": { "direction": "LONG" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "a1", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 40, "parentFillSize": 40, "stopLevel": 2950 },
+              { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 60, "closedSize": 0, "stopLevel": 2800 }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "allTranchesCovered": true, "anyTrancheViolated": false, "stopCurrentLive": 2800 }
+    },
+    {
+      "case": "трейлинг без цены активации покрывает, но уровня ещё не наблюдал — уровень транша отказывает вычислением, а не берётся у соседней защиты",
+      "state": {
+        "deal": { "direction": "LONG" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "a1", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 100, "stopLevel": 2910 },
+              { "id": "t1", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "closedSize": 0, "activationPrice": null, "observedTrailingPrice": null }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expectRefusal": { "stopCurrentLive": "защита без наблюдённого уровня" }
     },
     {
       "case": "два транша с разными уровнями: на позицию берётся менее благоприятный из них",

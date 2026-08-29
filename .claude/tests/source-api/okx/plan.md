@@ -18,7 +18,9 @@ A2-passthrough. Структура **эндпоинт → кейсы → таб�
 **DESIGN аппрувнут** (2026-06-19): план + коллекция прошли два
 независимых адверсариальных ревью (оба APPROVE), §Принятые решения
 §Нерешённое 1-4 закрыты. CODE-тесты написаны
-(`src/test/java/com/example/tradingbot/integration/sourceapi/okx/`).
+(`src/test/java/com/example/tradingbot/integration/sourceapi/okx/`) — **на
+состав плана той даты**; на кейсы, заведённые после, ни код-тестов, ни
+запросов коллекции нет (§Структурный изоморфизм).
 
 **RUN прогнан** (2026-06-20, demo/non-prod, `mvn -o test -Dgroups=source-api-live`;
 сырые логи не сохранены, итоговый отчёт —
@@ -63,6 +65,34 @@ BUILD SUCCESS (`-Dmaven.test.failure.ignore=true`). Колонка «Факт +
 Разбор находок (маршрутизация по владельцам, C3 в апидоки) — этап 7
 процесса `.claude/processes/source-api-testing.md`.
 
+**Счёт прогона 2026-06-20 относится к составу плана на ту дату.** Числа
+выше (200 тестов, 312 строк) — величины **того** прогона; кейсы,
+заведённые после него, в них не входят и колонку «Факт» не имеют.
+Добавлено после:
+
+- **`M17.5`** (2026-08-29) — судьба встроенной защиты при отмене родителя,
+  три цепочки, **31 строка**, ⏳ `PENDING`, **гейтит `CODE`** (предусловие
+  п. 17 реестра `.claude/tests/source-api/okx/code-preconditions.md`).
+  Код-теста нет; в прогон 2026-06-20 не входил. Кейс — **первое** покрытие
+  `attachAlgoOrds` в плане.
+
+**Кейсов шага 7, ожидающих прогона, — семнадцать; прогнан ноль.**
+Категории не склеиваются: **шестнадцать содержательных** (заголовок
+«Содержательный (шаг 7, …)», все ⏳ `PENDING`) — `M1.7`, `M15.7`, `M17.5`,
+`AG1.5`, `AG1.6`, `AG1.7`, `AG1.8`, `AG1.9`, `AG3.4`, `AG3.5`, `AG3.6`,
+`AG6.2`, `AG12.4`, `AG12.5`, `MG7.5`, `MG9.5` — плюс **один прямой**,
+`AG6.1`, помеченный ⚠️ ПЕРЕПРОГОН (прогон 2026-06-20 состоялся, но
+сохранил мощность справочника вместо перечня).
+
+**Гейтящих среди них десять** — `AG1.5`, `AG1.6`, `AG1.7`, `AG1.8`,
+`AG1.9`, `AG3.4`, `AG6.1`, `AG6.2`, `MG7.5`, `M17.5`; они несут
+**одиннадцать** предусловий реестра. Отображение не однозначно в обе
+стороны, поэтому называется целиком: три кейса закрывают по два пункта
+(`AG1.7` — пп. 7 и 14; `AG1.9` — пп. 1 и 15; `AG6.1` — пп. 2 и 16), и два
+пункта закрываются парами кейсов (п. 1 — `AG1.5` **и** `AG1.9`; п. 2 —
+`AG6.1` **и** `AG6.2`). Тринадцать слотов «кейс × пункт» сворачиваются в
+одиннадцать различных пунктов ровно этими двумя перекрытиями.
+
 ## Принцип: контур проверяет контракт биржи, не наш код
 
 API-тесты контура проверяют **контракт API биржи OKX** — что сам
@@ -92,8 +122,9 @@ POST {{base_url}}/api/proxy/okx/raw
 ## Скоуп
 
 **Весь in-perimeter манифеста, не субсет.** Источник набора —
-`.claude/processes/api-docs-completion.md` (строки `есть-док`/`создан`/
-`обновлён`); `вне-периметра`/`сознательно-вне` исключены. **60
+`.claude/tests/source-api/okx/coverage-manifest.md` (строки
+`есть-док`/`создан`/`обновлён`); `вне-периметра`/`сознательно-вне`
+исключены. **60
 эндпоинтов** покрыты (см. §Инвариант полноты), каждый через `/raw` —
 включая прежние client-coverage-gap'ы (метода клиента нет — тело конверта
 строится руками по контракту) и прежде заблокированные негативы (сырой
@@ -116,15 +147,36 @@ POST {{base_url}}/api/proxy/okx/raw
 
 ## Структурный изоморфизм (план ↔ коллекция ↔ код-тесты)
 
-- **эндпоинт** → раздел плана (`## <ID>n …`) / папка коллекции /
-  (будущий) класс код-тестов;
+- **эндпоинт** → раздел плана (`## <ID>n …`) / папка коллекции / класс
+  код-тестов;
 - **кейс** → подраздел плана (`### <ID>n.k`) + таблица / запрос (или
-  под-папка для цепочки) коллекции / (будущий) тест-метод;
-- **запрос** → строка таблицы / request коллекции / (будущий) шаг-ассерт.
+  под-папка для цепочки) коллекции / тест-метод;
+- **запрос** → строка таблицы / request коллекции / шаг-ассерт.
 
-Коллекция (`collection.postman_collection.json`) — 1:1 с этим планом.
 Исполнитель прогона — код-тесты (`test-code`), бьющие в тот же `/raw`
 (механика 1:1 с коллекцией); коллекция — ревью/аппрув-артефакт.
+
+**Изоморфизм держится на составе 2026-06-19; на дельте — нет.**
+Коллекция и код-тесты 1:1 с планом **на дату аппрува**; кейсы, заведённые
+после, ни в коллекции, ни в коде не представлены — проверено грепом
+идентификаторов по `collection.postman_collection.json` и по
+`src/test/java/com/example/tradingbot/integration/sourceapi/okx/`:
+
+- **шестнадцать содержательных кейсов шага 7** (`M1.7`, `M15.7`, `M17.5`,
+  `AG1.5`, `AG1.6`, `AG1.7`, `AG1.8`, `AG1.9`, `AG3.4`, `AG3.5`, `AG3.6`,
+  `AG6.2`, `AG12.4`, `AG12.5`, `MG7.5`, `MG9.5`) — **ноль** попаданий в
+  коллекции и **ноль** в код-тестах;
+- `AG6.1` — единственный из кейсов шага 7, представленный в обоих
+  (аппрув 2026-06-19 его покрывает); его перепрогон меняет **фиксацию
+  исхода**, не запрос.
+
+Следствие процедурное, и оно тяжелее записи: аппрув контура даётся **на
+пару** план + коллекция, а код-тесты и прогон до аппрува не запускаются
+(`.claude/processes/source-api-testing.md` §APPROVE). Значит сбор грунта
+по десяти гейтящим кейсам блокирован не только средой: сперва коллекция
+достраивается до 1:1 на дельте и проходит этапы 2-3, затем пишутся
+код-тесты (F4 `DOCS_CHECK_27`). Прежняя формулировка «коллекция — 1:1 с
+этим планом» безусловным клеймом полноты запрещала искать дальше и снята.
 
 ## Сквозные проверки (красная нить)
 
@@ -194,9 +246,16 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 **Правило.** Исход `OBSERVED_ABSENT` **закрывает** гейтящее предусловие
 `CODE`, и одновременно **обязывает** записать допущение явно: в реестре
-предусловий (`docs/rules/pnl-reconciliation.md`) у соответствующего пункта появляется строка «посылка
-проверкой **не подтверждена**: событие за прогон не наблюдалось;
-допущение — <формулировка>». Молча закрыть гейт этим исходом нельзя.
+предусловий (`.claude/tests/source-api/okx/code-preconditions.md`
+§«Закрытие исходом `OBSERVED_ABSENT`» — там же место под строку) у
+соответствующего слота появляется строка «посылка проверкой **не
+подтверждена**: событие за прогон не наблюдалось; допущение —
+<формулировка>». Молча закрыть гейт этим исходом нельзя: без строки в
+реестре слот считается открытым.
+
+*Прежний адрес правила — `docs/rules/pnl-reconciliation.md` — мёртв:
+реестр переехал `GAPS_CLOSE_26`, а свип переезда до этой клаузы не доехал
+(F5 `DOCS_CHECK_27`).*
 
 **Названная цена принята держателем:** посылка уезжает в код помеченной, но
 **непроверенной**. Альтернатива — ждать фактического наблюдения — означает,
@@ -221,7 +280,8 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 | Public-gaps | `PG1`–`PG8` | 8 | Public (mark-price, price-limit, funding×2, open-interest, position-tiers, server-time, insurance-fund) |
 | **Итого** | | **60** | весь in-perimeter ∖ {вне-периметра, сознательно-вне} |
 
-**Колонка покрытия манифеста** (`.claude/processes/api-docs-completion.md`)
+**Колонка покрытия манифеста**
+(`.claude/tests/source-api/okx/coverage-manifest.md`)
 подлежит **переразметке**: прежние `⚪ gap` (in-perimeter без метода
 клиента) ныне покрыты через `/raw` → `🟡 в плане`; легенда колонки —
 под `/raw`-семантику. Переразметка — отдельным проходом владельца колонки
@@ -839,6 +899,150 @@ teardown (идемпотентный cancel) → Verify.end. **WRITE.** **Сре
 | **Teardown M17.4.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, clOrdId:m17_clId}, signed:true}` (идемпотентная страховка) | HTTP 200; (sCode 0 или already-canceled/not-exist) | Биржа чистая | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 | **M17.4.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.code="0"`; `b.data` не содержит `m17_ordId` — вернулось к чистому == старт | **Verify.end:** живых ордеров по инструменту нет (== Snapshot.start) | RUN 2026-06-20 ✓ — прошёл (ожидание подтверждено) |
 
+### M17.5 Содержательный (шаг 7, A8 `DOCS_CHECK_24`) — судьба встроенной защиты при отмене родителя ⏳ PENDING — **ГЕЙТИТ `CODE`** (предусловие п. 17)
+
+**Единственный носитель факта, на котором стоит исход `CANCEL_BY_PARENT`**
+(`docs/lifecycles/Order.md` §«Отсутствие встроенной защиты в снапшоте»):
+домен помечает встроенную защиту снятой, как только родитель отменён.
+Верно ли это **на бирже**, когда у родителя непустой налив, не фиксирует
+ни один контракт-док (`docs/integrations/okx/contracts/order.md`
+§Операции — `attachAlgoOrds` назван параметром постановки и amend'а, его
+судьба при отмене не описана).
+
+- **Что верифицировать:**
+  1. **представление встроенной защиты у живого родителя** — присутствует
+     ли `attachAlgoOrds[*]` в `GET /trade/order` до филла, несёт ли
+     `attachAlgoId`/`algoId`, виден ли attached как самостоятельная запись
+     в `orders-algo-pending` (операнд матчинга по клиентскому
+     идентификатору — `docs/components/AttachedAlgoOrderStateResolver.md`);
+  2. **несущее — судьба защиты при отмене родителя с непустым наливом:**
+     после `cancel-order` по частично налитому родителю остаётся ли на
+     бирже **живая** защита на налитый объём, или она снимается вместе с
+     родителем;
+  3. **чем это наблюдаемо** — через `attachAlgoOrds[*]` отменённого
+     родителя, через `orders-algo-pending` либо через
+     `orders-algo-history`; какая пометка сопровождает снятие.
+- **Ожидание не выдумывается — обе развязки названы, и цена у них разная**
+  (A8 `DOCS_CHECK_24`):
+  - **защита снята вместе с родителем** ⇒ доменный `CANCEL_BY_PARENT`
+    фактически верен, но налитый объём остаётся **без покрытия** до
+    постановки новой защиты — тропа опасна по существу, а не по учёту;
+  - **защита пережила отмену** ⇒ домен помечает **живую** защиту
+    `CANCELED`, покрытие недосчитывается, и гейт покрытия уводит штатную
+    сделку в ступень 2 с flatten по **ложному** факту
+    (`docs/rules/exchange-hold.md`).
+- **Почему кейс не снят решением о порядке ног.** Штатная тропа замещения
+  входа при непустом филле ныне идёт «поставить новое → подтвердить →
+  снять старое» (`docs/rules/replace-not-amend.md`), и отмена налитого
+  родителя из неё ушла. Но исход `CANCEL_BY_PARENT` в lifecycle остался и
+  достижим вне замещения (ручное вмешательство, отмена со стороны биржи,
+  `cxlOnFail` при неудавшемся amend), а резолвер встроенной защиты
+  трактует отсутствие защиты в снапшоте **по статусу родителя** — то есть
+  посылка о поведении источника несущая и после смены порядка ног.
+- **Фикстура — три цепочки, своя роль у каждой.** Общее: инструмент
+  `ETH-USDT-SWAP`, `tdMode=isolated`, встроенная защита ставится **одним**
+  SL (`attachAlgoOrds[0].slTriggerPx`) с триггером заведомо далеко от рынка
+  (`floor(last·0.5)`, кратно `tickSz`) — чтобы защита не сработала за время
+  цепочки; матч по `attachAlgoClOrdId`.
+- **Потолок риска цепочки:** `sz` подбирается так, чтобы notional по
+  `last` не превышал **200 USDT**; если на уровне лучшего аска стои́т
+  больше половины этого потолка, попытка **пропускается** и книга
+  перечитывается (см. C17b).
+- **Первое покрытие `attachAlgoOrds` в плане.** До этого кейса ни один
+  раздел плана тела с встроенной защитой не строил — постановка `M16`
+  покрывала `ordType`-варианты без attached. Кейс не заявляет покрытия
+  варианта постановки: `attachAlgoOrds` здесь — **предмет наблюдения**, а
+  инвариант полноты считается по эндпоинтам, не по полям тела.
+- **Статус:** ⏳ **PENDING — до `CODE` шага 7**. Провенанс — A8
+  `DOCS_CHECK_24` (вариант (1): «требует биржевого факта — жива ли attached
+  после отмены родителя»); реестр —
+  `.claude/tests/source-api/okx/code-preconditions.md` п. 17.
+
+#### C17a — родитель без налива (детерминированная база)
+
+Граф: Snapshot.start → price → place(неисполнимый limit + attached SL) →
+get(live, attached в details) → algo-pending(до отмены) → cancel →
+get(canceled) → algo-pending(после отмены) → teardown → Verify.end.
+**Достижимость:** достижим (налив не требуется). **WRITE.** **Среда:** demo.
+
+| Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| **C17a.snapshot.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; `b.data` не содержит живых ордеров по инструменту | **Snapshot.start:** чистый старт | |
+| **C17a.price.** `POST /raw {method:GET, path:/api/v5/market/ticker, query:{instId:ETH-USDT-SWAP}, signed:false}` | HTTP 200; `b.data[0].last>0` | live `last` → `a_px=floor(last·0.5)` (неисполнимая limit buy), `a_sl=floor(last·0.4)` — оба кратны `tickSz`; SL заведомо вне досягаемости | |
+| **C17a.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:0.01, px:a_px, clOrdId:a_clId, reduceOnly:false, attachAlgoOrds:[{attachAlgoClOrdId:a_attId, slTriggerPx:a_sl, slOrdPx:"-1", slTriggerPxType:"last"}]}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `b.data[0].ordId` непустой | Родитель принят со встроенной защитой; `ordId` → `a_ordId`. `slOrdPx="-1"` — market-исполнение защиты (контракт `algo-order.md`) | |
+| **C17a.get.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:a_ordId}, signed:true}` | HTTP 200; `b.data[0].state="live"`; `b.data[0].accFillSz="0"`; **наблюдение:** присутствует ли `b.data[0].attachAlgoOrds[0]`, каковы `attachAlgoClOrdId`, `attachAlgoId`, `algoId`, `failCode`/`failReason` | Форма представления встроенной защиты у живого родителя — **факт, не ожидание**: офдок состав полей в details не фиксирует | |
+| **C17a.algoPending.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instType:SWAP, instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.code="0"`; **наблюдение:** содержит ли `b.data` запись с `algoClOrdId`/`attachAlgoClOrdId` = `a_attId` | Виден ли attached до филла как самостоятельная algo-запись. Ожидание не выдумывается | |
+| **C17a.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:a_ordId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | ACK отмены родителя без налива | |
+| **C17a.canceled.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:a_ordId}, signed:true}` (поллинг до `state=canceled`) | HTTP 200; `b.data[0].state="canceled"`; **наблюдение:** сохраняется ли `attachAlgoOrds[0]` в отменённом родителе и с какими значениями | База сравнения для C17b: как выглядит отменённый родитель **без** налива | |
+| **C17a.algoPendingAfter.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instType:SWAP, instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; `b.data` не содержит записи по `a_attId` | Защита ненали́того родителя живой не остаётся (проверяется). Обратный факт — находка | |
+| **Teardown C17a.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:a_ordId}, signed:true}` (идемпотентная страховка) | HTTP 200; (`sCode=0` или already-canceled/not-exist) | Биржа чистая | |
+| **C17a.verify.** `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` (поллинг до условия) | HTTP 200; `b.data` не содержит `a_ordId` | **Verify.end:** == Snapshot.start | |
+
+#### C17b — родитель с непустым наливом (несущая цепочка)
+
+Граф: Snapshot.start(pending + positions) → books(глубина лучшего аска) →
+place(marketable limit + attached SL) → get(partially_filled) →
+positions(налитое открыто) → cancel(родитель) → get(canceled, налив
+сохранён) → algo-pending → algo-history → teardown(algo) →
+teardown(позиция) → Verify.end. **Достижимость:** достижим с оговоркой о
+гонке (см. «Вырождение попытки»). **WRITE.** **Среда:** demo.
+
+**Конструкция частичного налива.** Лимит-buy ставится **по цене лучшего
+аска** (маркетабелен ровно на один уровень книги) размером
+`b_sz = 2 × Σ sz(asks[0])`, округлённым вверх до `lotSz` и ограниченным
+потолком риска (notional ≤ 200 USDT по `last`). Тогда налив ≈ объём
+лучшего уровня, остаток встаёт живым лимитом по той же цене.
+
+**Вырождение попытки и что при нём делается.** Между чтением книги и
+постановкой уровень меняется, поэтому возможны два вырождения: **полный
+налив** (родитель `filled` — отменять нечего) и **нулевой налив**
+(родитель `live` — это уже C17a). Оба — не исход кейса: попытка
+**сворачивается teardown'ом** (снять/закрыть) и повторяется с
+перечитыванием книги, **до трёх попыток**. Если ни одна не дала
+`partially_filled`, кейс остаётся **`PENDING`** и предусловие п. 17
+**не закрывается**: «фикстуру собрать не удалось» — не то же, что
+`OBSERVED_ABSENT` (§«Исходы содержательного кейса»: третий исход — для
+события, инициируемого биржей; частичный налив заказуем нами). Подмена
+одного другим закрыла бы гейт ложно.
+
+| Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| **C17b.snapshot.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` + `POST /raw {method:GET, path:/api/v5/trade/orders-pending, query:{instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.code="0"`; позиции нет (`b.data` пуст либо `b.data[0].pos=0`); живых ордеров по инструменту нет | **Snapshot.start:** ни позиции, ни живых ордеров | |
+| **C17b.books.** `POST /raw {method:GET, path:/api/v5/market/books, query:{instId:ETH-USDT-SWAP, sz:5}, signed:false}` | HTTP 200; `b.data[0].asks[0][0]>0`; `b.data[0].asks[0][1]>0` | `b_px = asks[0][0]`; `b_sz = ceilToLot(2 × asks[0][1])`, ограничен потолком риска. `asks[0][1]` больше половины потолка ⇒ попытка пропускается, книга перечитывается | |
+| **C17b.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:limit, sz:b_sz, px:b_px, clOrdId:b_clId, reduceOnly:false, attachAlgoOrds:[{attachAlgoClOrdId:b_attId, slTriggerPx:b_sl, slOrdPx:"-1", slTriggerPxType:"last"}]}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"`; `ordId` непустой | Маркетабельный лимит со встроенной защитой; `ordId` → `b_ordId`. `b_sl=floor(last·0.5)` — вне досягаемости за время цепочки | |
+| **C17b.get.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:b_ordId}, signed:true}` (поллинг до стабилизации) | HTTP 200; `b.data[0].state="partially_filled"`; `0 < b.data[0].accFillSz < b_sz` | **Условие продолжения цепочки.** `state=filled` либо `accFillSz=0` ⇒ вырождение попытки (см. выше): teardown + повтор | |
+| **C17b.position.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.data[0].pos` ≠ 0; `b.data[0].posId` непустой | Налитый объём — живая позиция: именно её покрывает спорная защита | |
+| **C17b.cancel.** `POST /raw {method:POST, path:/api/v5/trade/cancel-order, body:{instId:ETH-USDT-SWAP, ordId:b_ordId}, signed:true}` | HTTP 200; `b.code="0"`; `b.data[0].sCode="0"` | ACK отмены **частично налитого** родителя — событие, ради которого кейс существует | |
+| **C17b.getAfter.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:b_ordId}, signed:true}` (поллинг до `state=canceled`) | HTTP 200; `b.data[0].state="canceled"`; `b.data[0].accFillSz` — прежний (налив сохранён); **наблюдение:** содержимое `attachAlgoOrds[0]` (`attachAlgoId`, `algoId`, `failCode`, `sz`) | Родитель терминален при непустом наливе; представление встроенной защиты в нём — факт | |
+| **C17b.algoPending.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instType:SWAP, instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; **наблюдение (несущее):** есть ли живая запись с `algoClOrdId`/`attachAlgoClOrdId` = `b_attId`, и если есть — её `sz` против `accFillSz` родителя | **Ответ предусловия п. 17.** Есть живая защита ⇒ доменный `CANCEL_BY_PARENT` даёт ложный `CANCELED`; нет ⇒ налитый объём фактически без покрытия | |
+| **C17b.algoHistory.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-history, query:{instType:SWAP, instId:ETH-USDT-SWAP, ordType:conditional, state:canceled}, signed:true}` | HTTP 200; **наблюдение:** присутствует ли запись по `b_attId`, каковы её `state`/`algoId`/сопутствующая пометка | Чем источник маркирует снятие встроенной защиты — операнд резолвера статуса | |
+| **Teardown C17b (algo).** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:b_algoId}], signed:true}` (только если C17b.algoPending нашёл живую) | HTTP 200; (`sCode=0` либо not-exist) | Снять пережившую защиту, чтобы она не сработала после кейса | |
+| **Teardown C17b (позиция).** `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` | HTTP 200; (`b.code="0"` либо «нет позиции») | Закрыть налитое; `autoCxl` снимает остаточные заявки | |
+| **C17b.verify.** `POST /raw {method:GET, path:/api/v5/account/positions, …}` + `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, …}` (поллинг до условия) | HTTP 200; позиции нет; живых algo по инструменту нет | **Verify.end:** == Snapshot.start. Расхождение → фейл (инвариант восстановления) | |
+
+#### C17c — терминал при непустом наливе без нашей отмены (детерминированный дублёр)
+
+`ordType=ioc` при `sz` больше объёма лучшего уровня даёт **гарантированно**
+частично налитый ордер, чей остаток снимает сама биржа: терминал
+`canceled` при `accFillSz>0` достигается **без гонки**. Цепочка отвечает на
+тот же вопрос о судьбе встроенной защиты, но при **другом инициаторе**
+терминала, поэтому C17b она не заменяет: расхождение исходов C17b и C17c —
+самостоятельный факт (инициатор отмены значим). **`ioc` — фикстурное
+средство, не заявка на покрытие варианта** `ordType`: адаптер его не
+строит, в инвариант полноты он не входит.
+
+| Запрос | Проверки (сырой JSON OKX) | Ожидаемый результат | Факт + наблюдения (RUN) |
+|---|---|---|---|
+| **C17c.snapshot.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; позиции нет | **Snapshot.start** | |
+| **C17c.books.** `POST /raw {method:GET, path:/api/v5/market/books, query:{instId:ETH-USDT-SWAP, sz:5}, signed:false}` | HTTP 200; `b.data[0].asks[0][1]>0` | `c_px = asks[0][0]`; `c_sz = ceilToLot(2 × asks[0][1])` под тем же потолком риска | |
+| **C17c.place.** `POST /raw {method:POST, path:/api/v5/trade/order, body:{instId:ETH-USDT-SWAP, tdMode:isolated, side:buy, ordType:ioc, sz:c_sz, px:c_px, clOrdId:c_clId, attachAlgoOrds:[{attachAlgoClOrdId:c_attId, slTriggerPx:c_sl, slOrdPx:"-1", slTriggerPxType:"last"}]}, signed:true}` | HTTP 200; **наблюдение:** `b.data[0].sCode` — принят ли `attachAlgoOrds` вместе с `ioc` | Реджект сочетания — тоже факт контракта, фиксируется и снимает цепочку (не фейл) | |
+| **C17c.get.** `POST /raw {method:GET, path:/api/v5/trade/order, query:{instId:ETH-USDT-SWAP, ordId:c_ordId}, signed:true}` (поллинг до терминала) | HTTP 200; `b.data[0].state="canceled"`; `b.data[0].accFillSz>0`; **наблюдение:** `attachAlgoOrds[0]` | Терминал при непустом наливе получен без гонки | |
+| **C17c.algoPending.** `POST /raw {method:GET, path:/api/v5/trade/orders-algo-pending, query:{instType:SWAP, instId:ETH-USDT-SWAP, ordType:conditional}, signed:true}` | HTTP 200; **наблюдение:** жива ли запись по `c_attId` | Сравнивается с исходом C17b: совпало ⇒ судьба защиты от инициатора не зависит; разошлось ⇒ зависит, и это находка | |
+| **C17c.position.** `POST /raw {method:GET, path:/api/v5/account/positions, query:{instType:SWAP, instId:ETH-USDT-SWAP}, signed:true}` | HTTP 200; `b.data[0].pos` ≠ 0 | Налитый объём открыт (предмет покрытия) | |
+| **Teardown C17c (algo).** `POST /raw {method:POST, path:/api/v5/trade/cancel-algos, body:[{instId:ETH-USDT-SWAP, algoId:c_algoId}], signed:true}` (если жива) | HTTP 200; (`sCode=0` либо not-exist) | Защита снята | |
+| **Teardown C17c (позиция).** `POST /raw {method:POST, path:/api/v5/trade/close-position, body:{instId:ETH-USDT-SWAP, mgnMode:isolated, posSide:net, autoCxl:true, ccy:USDT}, signed:true}` | HTTP 200; (`b.code="0"` либо «нет позиции») | Позиция закрыта | |
+| **C17c.verify.** `POST /raw {method:GET, path:/api/v5/account/positions, …}` + `orders-algo-pending` (поллинг до условия) | HTTP 200; позиции нет; живых algo нет | **Verify.end:** == Snapshot.start | |
+
 ## M18. closePosition — POST /api/v5/trade/close-position (Close position)
 
 - **Объект:** OKX `POST /api/v5/trade/close-position` (`signed:true`)
@@ -1358,7 +1562,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 ### AG1.5 Содержательный (шаг 7, N11) — семантика агрегации partial-close ⏳ PENDING — **ГЕЙТИТ `CODE`** (предусловие п. 1)
 
-**Гейтит корректность числа `Deal.resultProfit`** (`docs/rules/pnl-reconciliation.md` реш.6). Форм-кейсы AG1.1-1.4 проверяют структуру пустого/битого ответа; здесь — **содержательный инвариант агрегации**, который выбранный путь берёт на веру.
+**Гейтит корректность числа `Deal.resultProfit`** (`docs/rules/pnl-reconciliation.md` §«Реакция на расхождение»). Форм-кейсы AG1.1-1.4 проверяют структуру пустого/битого ответа; здесь — **содержательный инвариант агрегации**, который выбранный путь берёт на веру.
 
 - **Что верифицировать:** после позиции с **частичным выходом** (partial TP `type` 1) и последующим **полным закрытием** (SL/close `type` 2) — отдаёт ли OKX **ОДНУ финализированную запись на `posId`**, чей `realizedPnl` **кумулятивен по обоим слайсам** (не только по последнему), и **в какой момент** запись финализирована (риск чтения послайсовой/нефинализированной записи → систематический недосчёт realized, усечение левого хвоста R).
 - **Требует фикстуры-цепочки** (не form-only): open position → partial reduce-only close → full close (или SL-триггер) → `REFRESH_POSITION` подтверждает flat → read `positions-history` по `posId`. На свежем demo нужна реальная закрытая позиция в окне — содержательный прогон, не пустой массив AG1.1.
@@ -1639,7 +1843,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
     cross-ccy-движения в окне; отсутствие такого движения — не провал
     кейса, а «не наблюдалось».
   - **Провенанс посылки — `предположение`** до этого ответа
-    (`docs/rules/pnl-reconciliation.md` реш.5), по образцу
+    (`docs/rules/pnl-reconciliation.md` §«Ожидание курса чужой валюты»), по образцу
     инварианта агрегации N11.
 - **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/processes/roadmap-step-execution.md` §4). Провенанс — H8 отчёта
   `phase-1-step-7-gaps-close-3.md`; вторая проверка — H13
@@ -1657,17 +1861,26 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
   комбинированную** (`balChg` = pnl + fee).
 - **Почему не гейтит доки:** маппинг взят суперсетом — native `fee` в used,
   категории резолвятся по `type`/`subType`, `balChg` остаётся под
-  сумму-сверку (`docs/models/mapping/DealCashFlow.md`). **Claim суперсета ограничен** (H15 `GAPS_CLOSE_5`,
-  дотянуто до плана H11 `GAPS_CLOSE_6`): гранулярность-независимы
-  **Σ`amount`** и **realized-слагаемое**; для **Σ`externalFee`** —
-  **не держится**. Поэтому ответ меняет не маппинг, а то, какая ветка
-  разбивки фактически работает и сходится ли число комиссии.
+  сумму-сверку (`docs/models/mapping/DealCashFlow.md`). Прежнее ограничение
+  claim'а суперсета (H15 `GAPS_CLOSE_5`, H11 `GAPS_CLOSE_6`:
+  «для **Σ`externalFee`** гранулярность-независимость не держится»)
+  **снято `GAPS_CLOSE_27`, узел Н4**: композиция вычитает комиссионную
+  компоненту из своей строки, а различитель гранулярности отделяет
+  комбинированную запись от эха, и все три формы дают один результат
+  (`docs/spec/pnl-reconciliation.json` §`separateFeeGranularity`).
+  **Кейс перестал быть посылкой формулы** и остаётся ради инвентаря: он
+  отвечает, какая ветка разбивки фактически работает, но композицию не
+  гейтит.
 - **Расширение вопросника (H10, `GAPS_CLOSE_6`) — инспекция `fee` на
   pnl-записи.** Помимо «сколько записей на событие» проверить, **не несёт ли
   pnl-запись информационное эхо** комиссии в поле `fee` при раздельной
   гранулярности (`balChg` = pnl без комиссии, но `fee = −f` присутствует).
-  Эхо задваивает `f` в Σ`externalFee` и даёт `realized = pnl + f` вместо
-  `pnl`, при том что Σ`amount` сходится — **сверка этого не видит**.
+  Эхо задваивало бы `f` в сумме комиссии и давало `realized = pnl + f`
+  вместо `pnl` при сходящейся Σ`amount` — **сверка этого не видела бы**.
+  Форма против этого уже защищена различителем гранулярности
+  (`GAPS_CLOSE_27`, узел Н4; пример «информационное эхо комиссии…» в
+  `docs/spec/pnl-reconciliation.json`), поэтому проверка нужна как
+  **подтверждение факта источника**, а не как развилка формулы.
   Записать факт по обоим полям обеих записей, а не только по их количеству.
 - **Фикстура — та же §AG1.5** (закрытая позиция + bills за окно), лишнего
   прогона не создаёт.
@@ -1796,6 +2009,19 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
   `CashFlowCategory`, `docs/models/mapping/DealCashFlow.md` §«Резолв
   категории») и п. 2 (список исключений, §AG6.2 ниже). Без содержания оба
   «грунт добыт» ложны.
+- **Чем перечень сохраняется — названо, потому что носителя у требования
+  не было** (F3 `DOCS_CHECK_27`). Единственный код-тест кейса
+  (`Ag6BillSubtypesLiveTest.ag6_1_directDictionary`) пишет через
+  `OkxSourceApiLiveTestBase.observe(...)`, а тот логирует `data.size` и
+  три кода — **содержимого `data` не читает вовсе**. Перепрогон в нынешнем
+  виде вернёт `data.size=32` второй раз. Требуемый носитель — **отдельный
+  инструмент наблюдения состава** в базовом классе контура
+  (`observeContent(caseId, response)`: печатает элементы `data`), а не
+  расширение `observe(...)`: последний зовут ~200 кейсов, часть из них
+  тянет ордера и позиции. Кейс-специфичный дамп внутри одного тест-метода
+  отвергнут счётно — состава требуют **четыре** кейса контура (`AG6.1`,
+  `AG6.2`, `AG1.7`, `AG3.6`), то есть это четыре копии одного кода.
+  Написание инструмента — работа `tester` в `src/test`, этап 4 контура.
 - **Что делать при перепрогоне:** сохранить **все** пары `type`/`subType`
   с описанием источника — в исход кейса (датированное наблюдение).
   Действующее рабочее значение при этом живёт **не здесь**, а в

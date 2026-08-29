@@ -33,6 +33,14 @@ handler:
 `MARK_*`-команды), не исключение
 (`docs/processes/fsm-execution-layering.md`).
 
+## Энфорсеров счёта не пишет
+
+Ни `Exchange.consecutiveLossCount`, ни ход `Exchange.riskBase` вниз этому
+звену не принадлежат: оно консолидирует **вход**, терминалом сделки не
+является и её результата не знает. Писатели обеих величин — оба
+терминальных исполнителя (`docs/rules/loss-streak-halt.md`,
+`docs/rules/risk-policy.md`).
+
 ## Идемпотентность и retry
 
 - **Retry-anchor** — строка исполнения `FINALIZE_DEAL_ENTRY_ACTION`

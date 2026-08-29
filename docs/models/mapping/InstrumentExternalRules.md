@@ -24,13 +24,10 @@ source ответ → `InstrumentExternalRulesExternalSnapshot` (сырые
 
 ### Sizing-формула (линейный контракт, `ctValCcy = baseCcy`)
 
-```text
-baseQty   = usdtNotional / price
-contracts = baseQty / ctVal
-→ округлить по lotSz; проверить minSz
-```
-
-См. `docs/components/SizeCalculator.md`.
+Форма здесь не переписывается: дом формы — `docs/spec/order-sizing.json`
+(`contractsFromAllocation`, `desiredContracts`, `entryContracts`), смысл —
+`docs/components/SizeCalculator.md`. Из этого дока в форму заходят
+`ctVal`, `lotSz` и `minSz`.
 
 ## OKX
 

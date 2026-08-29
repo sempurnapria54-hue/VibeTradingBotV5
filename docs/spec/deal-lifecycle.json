@@ -2,17 +2,20 @@
   "subject": "deal-lifecycle",
   "question": "Какие переходы статуса сделки допустимы",
   "home": "docs/lifecycles/Deal.md",
-  "includes": ["protection-coverage"],
+  "includes": ["protection-coverage", "order-lifecycle"],
 
   "operands": {
     "from": "текущий статус сделки",
     "to": "предполагаемый статус",
     "tranches[].status": "статус транша; резолв переходов — docs/spec/deal-tranche-lifecycle.json",
     "tranches[].orders[]": "заявки транша — операнд его живого риска",
+    "tranches[].protections[]": "защиты транша — операнд его живого риска наравне с заявками",
     "position.live": "живой эпизод существует",
+    "position.externalSize": "нетто-размер позиции по данным биржи; правая сторона сверки экспозиции",
+    "riskBenchmarkResolved": "знаменатель R определён — операнд признака отбора «доступность знаменателя» (docs/models/domain/aggregate/Deal.md §Енумы, RiskBenchmarkAvailability)",
     "resultProfit": "число результата сделки; пусто — неисчислимо",
     "resultProfitCurrency": "валюта результата; пусто — не резолвилась",
-    "hadEntry": "по сделке были операции на бирже"
+    "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака и его операнды по тропам — docs/rules/deal-without-operations.md (признак «операций по сделке не было» есть его отрицание); форма здесь не переписывается. Отправка заявки, не давшая движения средств, входом не считается"
   },
 
   "values": [
@@ -37,19 +40,50 @@
       "of": "status == 'CLOSED'"
     },
     {
+      "name": "trancheHasLiveOrder",
+      "note": "Любая живая заявка транша, не только входная: живая reduce-only тоже несёт риск исполнения.",
+      "op": "any",
+      "over": "orders",
+      "of": "orderIsLive"
+    },
+    {
+      "name": "anyLiveOrder",
+      "op": "any",
+      "over": "tranches",
+      "of": "trancheHasLiveOrder"
+    },
+    {
+      "name": "trancheHasLiveProtection",
+      "note": "Живая условная заявка транша: встроенная либо отдельная. Живой считается по своему носителю — docs/spec/protection-coverage.json (isLive).",
+      "op": "any",
+      "over": "protections",
+      "of": "isLive"
+    },
+    {
+      "name": "anyLiveProtection",
+      "op": "any",
+      "over": "tranches",
+      "of": "trancheHasLiveProtection"
+    },
+    {
       "name": "riskProvenAbsent",
-      "note": "Живой риск снят и это подтверждено фактами: эпизода нет, ни один транш риска не несёт.",
-      "expr": "!position.live && !dealRiskBearing"
+      "note": "Живой риск снят и это подтверждено фактами прохода. Признаков живого риска пять (docs/lifecycles/Deal.md §«Живой риск»), резолвятся здесь ЧЕТЫРЕ: позиция, заявка, условная заявка, расхождение (строки 1, 2, 3, 5 перечня). Конъюнктов при этом ПЯТЬ, а не четыре: dealRiskBearing покрывает сразу два признака — экспозицию транша и его живую входную заявку, — а anyLiveOrder расширяет второй признак до заявок вне входного множества; перекрытие намеренное. Признак 4, «неизвестная живая сущность на бирже», операндами прохода не резолвится по построению (добыча ходит по известным сущностям сделки) и держится другим носителем: инструмент-скоупным сбором чистоты инструмента, см. ту же секцию дома.",
+      "expr": "!position.live && !dealRiskBearing && !anyLiveOrder && !anyLiveProtection && exposureReconciled"
     },
     {
       "name": "cleanTerminalContract",
-      "note": "Штатный терминал: число обязательно всегда; валюта — кроме троп закрытия без входа, где она пишется, только если резолвится.",
+      "note": "Штатный терминал: число обязательно всегда; валюта — кроме троп закрытия без входа, где она пишется, только если резолвится. У состоявшейся сделки нерезолвенная валюта штатный терминал закрывает, и это не тупик: продолжение — ошибочная тропа плюс аварийный терминал (docs/lifecycles/Deal.md §«Нерезолвенная расчётная валюта»).",
       "expr": "notNull(resultProfit) && (notNull(resultProfitCurrency) || !hadEntry)"
     },
     {
       "name": "emergencyTerminalContract",
       "note": "Аварийный терминал: число best-effort по доступности. Пусто допустимо и означает «неисчислимо», ноль — нет. Терминальность траншей на этой тропе не гейт: строка транша стала бы второй точкой отказа аварийного контура.",
       "expr": "true"
+    },
+    {
+      "name": "benchmarkAvailabilityOnTerminal",
+      "note": "Какое значение доступности знаменателя пишет терминал на своём ребре. Разделяет не тропа и не терминал, а ФАКТ ВХОДА: входа не было — NOT_APPLICABLE, нормальная популяция; вход был — AVAILABLE либо MISSING по факту знаменателя, и MISSING есть аномалия с отчётом. Правило одно на оба терминала: сделка, не вошедшая вовсе и упавшая в ошибочное состояние, доходит до АВАРИЙНОГО терминала (из ERROR другого ребра нет) и обязана получить там NOT_APPLICABLE, а не MISSING. Писатели по тропам — docs/lifecycles/Deal.md §«Признаки отбора на рёбрах в терминал».",
+      "expr": "if(!hadEntry, 'NOT_APPLICABLE', if(riskBenchmarkResolved, 'AVAILABLE', 'MISSING'))"
     },
     {
       "name": "transitionAllowed",
@@ -62,7 +96,7 @@
     {
       "case": "сделка уходит в координированный выход из сопровождения",
       "state": {
-        "from": "ACTIVE", "to": "EXIT_PENDING", "position": { "live": true },
+        "from": "ACTIVE", "to": "EXIT_PENDING", "position": { "live": true, "externalSize": 3 },
         "tranches": [ { "status": "MANAGING", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
         "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true
       },
@@ -71,17 +105,17 @@
     {
       "case": "статусов входа у агрегата нет: ребра в подтверждённый вход не существует",
       "state": {
-        "from": "ACTIVE", "to": "ENTRY_FINALIZED", "position": { "live": true },
-        "tranches": [ { "status": "ENTRY_SUBMITTED", "orders": [], "protections": [] } ],
-        "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true
+        "from": "ACTIVE", "to": "ENTRY_FINALIZED", "position": { "live": true, "externalSize": 0 },
+        "tranches": [ { "status": "ENTRY_SUBMITTED", "orders": [ { "type": "ENTRY", "status": "PENDING", "accumulatedFillSize": 0 } ], "protections": [] } ],
+        "resultProfit": null, "resultProfitCurrency": null, "hadEntry": false
       },
       "expect": { "edgeDeclared": false, "transitionAllowed": false }
     },
     {
       "case": "из ошибочного состояния в штатный терминал ребра нет",
       "state": {
-        "from": "ERROR", "to": "CLOSED", "position": { "live": false },
-        "tranches": [ { "status": "CLOSED", "orders": [], "protections": [] } ],
+        "from": "ERROR", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
         "resultProfit": 12.5, "resultProfitCurrency": "USDT", "hadEntry": true
       },
       "expect": { "edgeDeclared": false, "transitionAllowed": false }
@@ -89,7 +123,7 @@
     {
       "case": "штатный терминал при живом транше не применяется",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": true },
+        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": true, "externalSize": 3 },
         "tranches": [
           { "status": "CLOSED", "orders": [], "protections": [] },
           { "status": "EXIT_PENDING", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] }
@@ -101,7 +135,7 @@
     {
       "case": "штатный терминал применяется, когда все транши закрыты и живого риска нет",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false },
+        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
         "tranches": [
           { "status": "CLOSED", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] },
           { "status": "CLOSED", "orders": [], "protections": [] }
@@ -113,8 +147,8 @@
     {
       "case": "штатный терминал без числа не применяется",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false },
-        "tranches": [ { "status": "CLOSED", "orders": [], "protections": [] } ],
+        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
         "resultProfit": null, "resultProfitCurrency": "USDT", "hadEntry": true
       },
       "expect": { "cleanTerminalContract": false, "transitionAllowed": false }
@@ -122,7 +156,7 @@
     {
       "case": "закрытие без входа: валюта не резолвилась, число есть — терминал применяется",
       "state": {
-        "from": "ACTIVE", "to": "CLOSED", "position": { "live": false },
+        "from": "ACTIVE", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
         "tranches": [ { "status": "CLOSED", "orders": [], "protections": [] } ],
         "resultProfit": 0, "resultProfitCurrency": null, "hadEntry": false
       },
@@ -131,8 +165,8 @@
     {
       "case": "состоявшаяся сделка без валюты результата штатный терминал не проходит",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false },
-        "tranches": [ { "status": "CLOSED", "orders": [], "protections": [] } ],
+        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
         "resultProfit": 12.5, "resultProfitCurrency": null, "hadEntry": true
       },
       "expect": { "cleanTerminalContract": false, "transitionAllowed": false }
@@ -140,7 +174,7 @@
     {
       "case": "аварийный терминал допускает пустое число и незакрытую строку транша, но не живой риск",
       "state": {
-        "from": "ERROR", "to": "EMERGENCY_CLOSED", "position": { "live": false },
+        "from": "ERROR", "to": "EMERGENCY_CLOSED", "position": { "live": false, "externalSize": 0 },
         "tranches": [ { "status": "MANAGING", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
         "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true
       },
@@ -149,11 +183,90 @@
     {
       "case": "аварийный терминал при живой входной заявке транша не применяется",
       "state": {
-        "from": "ERROR", "to": "EMERGENCY_CLOSED", "position": { "live": false },
+        "from": "ERROR", "to": "EMERGENCY_CLOSED", "position": { "live": false, "externalSize": 0 },
         "tranches": [ { "status": "MANAGING", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 } ], "protections": [] } ],
-        "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true
+        "resultProfit": null, "resultProfitCurrency": null, "hadEntry": false
       },
       "expect": { "dealRiskBearing": true, "riskProvenAbsent": false, "transitionAllowed": false }
+    },
+    {
+      "case": "живая отдельная защита транша терминал не пропускает: экспозиции нет, живая условная заявка есть",
+      "state": {
+        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 } ]
+          }
+        ],
+        "resultProfit": 12.5, "resultProfitCurrency": "USDT", "hadEntry": true
+      },
+      "expect": { "dealRiskBearing": false, "anyLiveProtection": true, "riskProvenAbsent": false, "transitionAllowed": false }
+    },
+    {
+      "case": "живая reduce-only заявка транша терминал не пропускает: входное множество её не видит",
+      "state": {
+        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "orders": [
+              { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 },
+              { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 },
+              { "type": "REDUCE_ONLY", "status": "ACTIVE", "accumulatedFillSize": 0 }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": 12.5, "resultProfitCurrency": "USDT", "hadEntry": true
+      },
+      "expect": { "dealRiskBearing": false, "anyLiveOrder": true, "riskProvenAbsent": false, "transitionAllowed": false }
+    },
+    {
+      "case": "расхождение суммы экспозиций с нетто-размером терминал не пропускает",
+      "state": {
+        "from": "EXIT_PENDING", "to": "CLOSED", "position": { "live": false, "externalSize": 40 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
+        "resultProfit": 12.5, "resultProfitCurrency": "USDT", "hadEntry": true
+      },
+      "expect": { "dealExposure": 0, "exposureReconciled": false, "riskProvenAbsent": false, "transitionAllowed": false }
+    },
+    {
+      "case": "третья тропа закрытия без входа: вход отправлен, движения не дал, валюта не резолвилась — терминал применяется",
+      "state": {
+        "from": "ACTIVE", "to": "CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "CANCELED", "accumulatedFillSize": 0 } ], "protections": [] } ],
+        "resultProfit": 0, "resultProfitCurrency": null, "hadEntry": false
+      },
+      "expect": { "riskProvenAbsent": true, "cleanTerminalContract": true, "transitionAllowed": true }
+    },
+    {
+      "case": "состоявшаяся сделка без валюты результата доходит до терминала аварийной тропой",
+      "state": {
+        "from": "ERROR", "to": "EMERGENCY_CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
+        "resultProfit": 12.5, "resultProfitCurrency": null, "hadEntry": true
+      },
+      "expect": { "riskProvenAbsent": true, "cleanTerminalContract": false, "transitionAllowed": true }
+    },
+    {
+      "case": "не вошедшая сделка доходит до аварийного терминала, и знаменатель там неприменим, а не отсутствует",
+      "state": {
+        "from": "ERROR", "to": "EMERGENCY_CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "CANCELED", "accumulatedFillSize": 0 } ], "protections": [] } ],
+        "resultProfit": 0, "resultProfitCurrency": null, "hadEntry": false, "riskBenchmarkResolved": false
+      },
+      "expect": { "riskProvenAbsent": true, "transitionAllowed": true, "benchmarkAvailabilityOnTerminal": "NOT_APPLICABLE" }
+    },
+    {
+      "case": "вошедшая сделка без знаменателя получает на терминале аномалию, а не «неприменимо»",
+      "state": {
+        "from": "ERROR", "to": "EMERGENCY_CLOSED", "position": { "live": false, "externalSize": 0 },
+        "tranches": [ { "status": "CLOSED", "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [] } ],
+        "resultProfit": 12.5, "resultProfitCurrency": "USDT", "hadEntry": true, "riskBenchmarkResolved": false
+      },
+      "expect": { "transitionAllowed": true, "benchmarkAvailabilityOnTerminal": "MISSING" }
     },
     {
       "case": "ошибочное состояние активно и держит слот инструмента",
