@@ -14,8 +14,8 @@ positions»). При расхождении с офдоком побеждает
 источнику и по задаче «актуализируй»
 (`.claude/processes/api-docs-completion.md`, канал чтения —
 `.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
-(прогон 1 — соответствие positions/close-position; прогон 3 —
-positions-history поле-уровнево).
+(соответствие positions/close-position; positions-history
+поле-уровнево).
 
 ## Endpoints
 
@@ -42,7 +42,7 @@ positions-history поле-уровнево).
 Ретраи на refresh — только при технических/API проблемах (timeout,
 connection reset, 5xx, rate limit, temporary error).
 
-## История закрытых позиций (источник числа `resultProfit` — шаг 7)
+## История закрытых позиций (источник числа `resultProfit`)
 
 `GET /api/v5/account/positions-history`. Permission `Read`; rate
 limit 10 req / 2 s по User ID. Глубина — 3 месяца, сортировка по

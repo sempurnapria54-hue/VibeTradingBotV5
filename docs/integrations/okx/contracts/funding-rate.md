@@ -13,11 +13,11 @@ funding rate history»). При расхождении с офдоком поб�
 источнику и по задаче «актуализируй»
 (`.claude/processes/api-docs-completion.md`, канал чтения —
 `.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
-(прогон 3, поле-уровневая дистилляция).
+(поле-уровневая дистилляция).
 
 ## Статус использования
 
-**В-6 / OKX-Q3 разрешены.** Funding в число
+**Путь выбран.** Funding в число
 `resultProfit` идёт через positions-history (внутри готового net
 `realizedPnl`) + bills (`subType` 173/174 — категорийная разбивка,
 `account-bills.md`) — путь (1). `funding-rate-history` (`realizedRate`,

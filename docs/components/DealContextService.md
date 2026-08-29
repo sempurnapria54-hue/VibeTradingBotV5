@@ -17,6 +17,12 @@
 
 ## Объёмы загрузки
 
+**Дом предикатов полноты — исполнимая спецификация**
+`docs/spec/deal-context-load.json` (`contextComplete`,
+`computationAllowed`, `coverageAnswerDistorted`, `exitAnswerDistorted`):
+там же примеры того, как усечённая загрузка искажает ответ в обе
+стороны.
+
 Всё, по чему считаются персистируемые числа сделки, грузится **целиком**,
 иначе число выходит заниженным молча.
 
@@ -50,3 +56,4 @@
 - Модель контекста — `docs/components/models/DealContext.md`.
 - Добыча фактов — `docs/components/SystemActionExecutor.md`.
 - Покрытие защиты — `docs/rules/live-risk-protection.md`.
+- Предикаты полноты и примеры — `docs/spec/deal-context-load.json`.

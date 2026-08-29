@@ -181,16 +181,14 @@ cost-price SL для split). `tpTriggerPx` vs `tpTriggerRatio` —
 attached материализуется в standalone algo —
 обычный algo-REPLACE.
 
-### OKX status resolver
+### Резолв статуса
 
-| OKX raw `state` | Domain status | closeReason |
-|---|---|---|
-| `live` | `ACTIVE` | `null` |
-| `partially_filled` | `PARTIALLY_COMPLETED` | `null` |
-| `filled` | `COMPLETED` | `FILLED` |
-| `canceled` | `CANCELED` | context-dependent |
-| `mmp_canceled` | `CANCELED` | context-dependent (резолвер closeReason не ставит — как `canceled`; заполняет handler) |
-| unknown value | — | бросает `ExternalStatusException(UNKNOWN_EXTERNAL_STATUS)` → safety-каскад |
+Таблица резолва сырого статуса, ветка отказа и правило
+write-once для причины закрытия —
+`docs/spec/external-status-resolution.json` (`orderStatus`,
+`refusalReason`, `closeReasonApplied`). Причина отмены берётся из
+нашего намерения, не из статуса источника: отмена по
+защитному механизму биржи резолвится так же, как обычная.
 
 ### OKX evidence-cycle / not found
 

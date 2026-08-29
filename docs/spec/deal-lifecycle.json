@@ -1,6 +1,6 @@
 {
   "subject": "deal-lifecycle",
-  "question": "Какие переходы статуса сделки допустимы и какие инварианты держит терминал",
+  "question": "Какие переходы статуса сделки допустимы",
   "home": "docs/lifecycles/Deal.md",
 
   "operands": {

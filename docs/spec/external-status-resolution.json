@@ -1,0 +1,139 @@
+{
+  "subject": "external-status-resolution",
+  "question": "Во что резолвится сырой статус источника",
+  "home": "docs/rules/external-status-resolution.md",
+
+  "operands": {
+    "entity": "какая сущность резолвится: ORDER, ALGO_ORDER, POSITION",
+    "rawStatus": "сырой статус источника; у позиции его нет",
+    "snapshotFound": "снапшот получен от источника",
+    "cycleExhausted": "цикл добычи пройден полностью",
+    "currentCloseReason": "причина закрытия, уже стоящая на сущности",
+    "cancelIntentReason": "причина, объявленная нашим намерением отмены"
+  },
+
+  "values": [
+    {
+      "name": "orderStatus",
+      "note": "Резолв статуса обычной заявки.",
+      "expr": "if(rawStatus == 'live', 'ACTIVE', if(rawStatus == 'partially_filled', 'PARTIALLY_COMPLETED', if(rawStatus == 'filled', 'COMPLETED', if(in(rawStatus, 'canceled', 'mmp_canceled'), 'CANCELED', 'REFUSED'))))"
+    },
+    {
+      "name": "algoStatus",
+      "note": "Резолв статуса условной заявки. Приостановленная считается активной: она ещё существует и влияет на риск.",
+      "expr": "if(in(rawStatus, 'live', 'pause'), 'ACTIVE', if(rawStatus == 'partially_effective', 'PARTIALLY_COMPLETED', if(rawStatus == 'effective', 'COMPLETED', if(rawStatus == 'canceled', 'CANCELED', 'REFUSED'))))"
+    },
+    {
+      "name": "resolvedStatus",
+      "note": "Резолв применяется только к полученному снапшоту. Ненайденность — не статус источника: сырого статуса нет, и трактовать его нечем.",
+      "expr": "if(!snapshotFound, if(entity == 'POSITION', 'CLOSED', 'ABSENT'), if(entity == 'ORDER', orderStatus, if(entity == 'ALGO_ORDER', algoStatus, 'ACTIVE')))"
+    },
+    {
+      "name": "refusesInsteadOfMapping",
+      "note": "Неизвестный и проблемный статус не маппятся молча: резолвер бросает контролируемое исключение. Ошибочное состояние результатом маппинга не бывает.",
+      "expr": "resolvedStatus == 'REFUSED'"
+    },
+    {
+      "name": "refusalReason",
+      "expr": "if(!refusesInsteadOfMapping, null, if(rawStatus == 'order_failed', 'ORDER_FAILED', if(rawStatus == 'partially_failed', 'PARTIALLY_FAILED', 'UNKNOWN_EXTERNAL_STATUS')))"
+    },
+    {
+      "name": "positionAbsenceIsNormal",
+      "note": "У позиции успешная пустота — нормальный факт закрытия на бирже, а не ненайденность.",
+      "expr": "entity == 'POSITION' && !snapshotFound"
+    },
+    {
+      "name": "notFoundIsTerminal",
+      "note": "Ненайденность становится терминалом только после полного цикла добычи. Пустой ответ одного источника основанием не является.",
+      "expr": "!snapshotFound && !positionAbsenceIsNormal && cycleExhausted"
+    },
+    {
+      "name": "notFoundPending",
+      "note": "Цикл не исчерпан — факт просто не добыт: звено повторяется, а не выносит терминал.",
+      "expr": "!snapshotFound && !positionAbsenceIsNormal && !cycleExhausted"
+    },
+    {
+      "name": "closeReasonCandidate",
+      "note": "Кандидат причины: у отмены он приходит из нашего намерения, а не из статуса источника.",
+      "expr": "if(refusesInsteadOfMapping, refusalReason, if(notFoundIsTerminal, 'MISSING_AFTER_REFRESH', if(resolvedStatus == 'COMPLETED' && entity != 'POSITION', if(entity == 'ORDER', 'FILLED', 'TRIGGERED'), if(resolvedStatus == 'CANCELED', cancelIntentReason, if(positionAbsenceIsNormal, 'EXTERNAL_CLOSE', null)))))"
+    },
+    {
+      "name": "closeReasonApplied",
+      "note": "Причина write-once: ранее установленная не перетирается.",
+      "expr": "if(notNull(currentCloseReason), currentCloseReason, closeReasonCandidate)"
+    },
+    {
+      "name": "raisesExchangeStepTwo",
+      "note": "Оба исхода — «биржа повела себя неожиданно»: реакция одна, биржевая ступень сворачивания.",
+      "expr": "refusesInsteadOfMapping || notFoundIsTerminal"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "живая заявка резолвится в активную",
+      "state": { "entity": "ORDER", "rawStatus": "live", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "resolvedStatus": "ACTIVE", "closeReasonApplied": null, "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "исполненная заявка получает свою причину закрытия",
+      "state": { "entity": "ORDER", "rawStatus": "filled", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "resolvedStatus": "COMPLETED", "closeReasonApplied": "FILLED" }
+    },
+    {
+      "case": "отменённая заявка берёт причину из нашего намерения, а не из статуса источника",
+      "state": { "entity": "ORDER", "rawStatus": "canceled", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": "REPLACED_BY_STRATEGY" },
+      "expect": { "resolvedStatus": "CANCELED", "closeReasonApplied": "REPLACED_BY_STRATEGY" }
+    },
+    {
+      "case": "ранее установленная причина не перетирается",
+      "state": { "entity": "ORDER", "rawStatus": "canceled", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": "KILL_SWITCH", "cancelIntentReason": "CANCELED_BY_STRATEGY" },
+      "expect": { "closeReasonApplied": "KILL_SWITCH" }
+    },
+    {
+      "case": "неизвестный статус не маппится молча — резолвер отказывает",
+      "state": { "entity": "ORDER", "rawStatus": "something_new", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "refusesInsteadOfMapping": true, "refusalReason": "UNKNOWN_EXTERNAL_STATUS", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "приостановленная условная заявка считается активной",
+      "state": { "entity": "ALGO_ORDER", "rawStatus": "pause", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "resolvedStatus": "ACTIVE", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "сработавшая условная заявка получает причину срабатывания",
+      "state": { "entity": "ALGO_ORDER", "rawStatus": "effective", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "resolvedStatus": "COMPLETED", "closeReasonApplied": "TRIGGERED" }
+    },
+    {
+      "case": "частичное срабатывание — состояние восстановления, а не отказ",
+      "state": { "entity": "ALGO_ORDER", "rawStatus": "partially_effective", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "resolvedStatus": "PARTIALLY_COMPLETED", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "отказ постановки условной заявки — контролируемое исключение своей причины",
+      "state": { "entity": "ALGO_ORDER", "rawStatus": "order_failed", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "refusalReason": "ORDER_FAILED", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "частичный отказ — своё проблемное состояние: часть могла исполниться",
+      "state": { "entity": "ALGO_ORDER", "rawStatus": "partially_failed", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "refusalReason": "PARTIALLY_FAILED", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "позиции нет на бирже — это нормальный факт закрытия, не ненайденность",
+      "state": { "entity": "POSITION", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "positionAbsenceIsNormal": true, "resolvedStatus": "CLOSED", "closeReasonApplied": "EXTERNAL_CLOSE", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "заявка не найдена, цикл не исчерпан — факт не добыт, терминала нет",
+      "state": { "entity": "ORDER", "rawStatus": null, "snapshotFound": false, "cycleExhausted": false, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "notFoundPending": true, "notFoundIsTerminal": false, "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "заявка не найдена после полного цикла — терминал и биржевая реакция",
+      "state": { "entity": "ORDER", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null },
+      "expect": { "notFoundIsTerminal": true, "closeReasonApplied": "MISSING_AFTER_REFRESH", "raisesExchangeStepTwo": true }
+    }
+  ]
+}

@@ -117,8 +117,8 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
   намерение на нём считать.
 
 Численные пороги — **хвост пользователя** (per-настройка
-`MarketStructureParams`), включая `trendEfficiencyThreshold` (D2) и
-`levelToleranceAtrMultiplier` (D3); их значения провизорны (STRUCT-Q1).
+`MarketStructureParams`), включая `trendEfficiencyThreshold` и
+`levelToleranceAtrMultiplier`; их значения провизорны.
 Точная арифметика (окно/формула ER, дефолты при `null`-порогах) — деталь
 реализации (`CODE`).
 
@@ -181,7 +181,7 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
   (`MarketStructureResolver` его выводит), не вход настройки. Реестра
   конфигураций и «идентичности конфигурации» больше нет — результат
   ключуется настройкой-владельцем; канонизация `params` не нужна.
-  - **Бывший краевой случай STRUCT-Q2 снят по построению.** Soft-ключи
+  - **Краевой случай разногласия конфигураций снят по построению.** Soft-ключи
     входов резолвера `efficiencyRatioKey` / `atrKey` живут на настройке;
     при owner-ключевании каждая настройка структуры (со своими ER/ATR-
     ключами) пишет в **свою** строку под своим

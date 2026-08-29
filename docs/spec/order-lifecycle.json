@@ -1,0 +1,168 @@
+{
+  "subject": "order-lifecycle",
+  "question": "Какие переходы состояний допустимы у заявки вместе с её встроенной защитой",
+  "home": "docs/lifecycles/Order.md",
+
+  "operands": {
+    "from": "текущий статус",
+    "to": "предполагаемый статус",
+    "status": "статус для проверки свойств",
+    "parentStatus": "статус родительской заявки — операнд политики отсутствующей защиты",
+    "attachedInSnapshot": "встроенная защита найдена в снапшоте родителя по клиентскому идентификатору",
+    "failCode": "код отказа постановки встроенной защиты",
+    "positionLive": "живая позиция существует",
+    "standaloneProtectionExists": "отдельная основная защита существует"
+  },
+
+  "values": [
+    {
+      "name": "orderIsLive",
+      "note": "Живая заявка: подтверждения ещё нет либо она может исполниться.",
+      "expr": "in(status, 'CREATED', 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED')"
+    },
+    {
+      "name": "orderIsFinal",
+      "expr": "in(status, 'COMPLETED', 'CANCELED', 'ERROR')"
+    },
+    {
+      "name": "orderCarriesLiveRisk",
+      "note": "Живой риск на бирже: у созданной его нет, у отправленной он неизвестен.",
+      "expr": "in(status, 'ACTIVE', 'PARTIALLY_COMPLETED')"
+    },
+    {
+      "name": "orderTransitionAllowed",
+      "note": "Активный статус ставится только по наблюдённому факту, не по подтверждению приёма.",
+      "expr": "(isNull(from) && to == 'CREATED') || (from == 'CREATED' && in(to, 'PENDING', 'ERROR')) || (from == 'PENDING' && in(to, 'ACTIVE', 'PARTIALLY_COMPLETED', 'COMPLETED', 'CANCELED', 'ERROR')) || (from == 'ACTIVE' && in(to, 'PARTIALLY_COMPLETED', 'COMPLETED', 'CANCELED', 'ERROR')) || (from == 'PARTIALLY_COMPLETED' && in(to, 'COMPLETED', 'CANCELED', 'ERROR'))"
+    },
+
+    {
+      "name": "attachedIsActiveLike",
+      "note": "Множество живых у встроенной защиты уже: состояния «частично сработала» у неё нет.",
+      "expr": "in(status, 'PENDING', 'ACTIVE')"
+    },
+    {
+      "name": "attachedTransitionAllowed",
+      "expr": "(isNull(from) && to == 'CREATED') || (from == 'CREATED' && in(to, 'PENDING', 'ERROR')) || (from == 'PENDING' && in(to, 'ACTIVE', 'CANCELED', 'ERROR')) || (from == 'ACTIVE' && in(to, 'COMPLETED', 'CANCELED', 'ERROR'))"
+    },
+    {
+      "name": "attachedBecomesActive",
+      "note": "Подтверждение живости — только наблюдением родителя: защита найдена в его снапшоте и отказа постановки нет.",
+      "expr": "attachedInSnapshot && isNull(failCode)"
+    },
+    {
+      "name": "attachedFailsToPlace",
+      "note": "Заполненный код отказа означает, что заявка на бирже не встала.",
+      "expr": "notNull(failCode)"
+    },
+    {
+      "name": "missingAttachedOutcome",
+      "note": "Отсутствие защиты в одном снапшоте — не финальный факт. Исход зависит от статуса родителя.",
+      "expr": "if(in(parentStatus, 'CREATED', 'PENDING'), 'WAIT', if(in(parentStatus, 'ACTIVE', 'PARTIALLY_COMPLETED'), 'SEARCH_MORE', if(parentStatus == 'CANCELED', 'CANCEL_BY_PARENT', if(parentStatus == 'ERROR', 'ERROR', if(positionLive && !standaloneProtectionExists, 'PROTECTION_LOST', 'ANALYSE_HISTORY')))))"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "заявка живёт до наблюдения факта, а активной становится только по нему",
+      "state": { "status": "PENDING" },
+      "expect": { "orderIsLive": true, "orderIsFinal": false, "orderCarriesLiveRisk": false }
+    },
+    {
+      "case": "частично исполненная заявка несёт живой риск",
+      "state": { "status": "PARTIALLY_COMPLETED" },
+      "expect": { "orderIsLive": true, "orderCarriesLiveRisk": true }
+    },
+    {
+      "case": "созданная заявка живого риска на бирже не несёт",
+      "state": { "status": "CREATED" },
+      "expect": { "orderIsLive": true, "orderCarriesLiveRisk": false }
+    },
+    {
+      "case": "из созданной сразу в активную перейти нельзя — сперва отправка",
+      "state": { "from": "CREATED", "to": "ACTIVE" },
+      "expect": { "orderTransitionAllowed": false }
+    },
+    {
+      "case": "отправленная заявка может оказаться сразу исполненной либо отменённой",
+      "state": { "from": "PENDING", "to": "COMPLETED" },
+      "expect": { "orderTransitionAllowed": true }
+    },
+    {
+      "case": "терминальная заявка переходов не имеет",
+      "state": { "from": "COMPLETED", "to": "CANCELED" },
+      "expect": { "orderTransitionAllowed": false }
+    },
+    {
+      "case": "исполненная заявка обратно в частично исполненную не возвращается",
+      "state": { "from": "COMPLETED", "to": "PARTIALLY_COMPLETED" },
+      "expect": { "orderTransitionAllowed": false }
+    },
+
+    {
+      "case": "у встроенной защиты состояния «частично сработала» нет",
+      "state": { "from": "ACTIVE", "to": "PARTIALLY_COMPLETED" },
+      "expect": { "attachedTransitionAllowed": false }
+    },
+    {
+      "case": "встроенная защита срабатывает только из активной",
+      "state": { "from": "PENDING", "to": "COMPLETED" },
+      "expect": { "attachedTransitionAllowed": false }
+    },
+    {
+      "case": "встроенная защита отменяется и из отправленной, и из активной",
+      "state": { "from": "PENDING", "to": "CANCELED" },
+      "expect": { "attachedTransitionAllowed": true }
+    },
+    {
+      "case": "живой считается встроенная защита в отправленной и активной",
+      "state": { "status": "PENDING" },
+      "expect": { "attachedIsActiveLike": true }
+    },
+    {
+      "case": "созданная встроенная защита живой не считается: подтверждения нет",
+      "state": { "status": "CREATED" },
+      "expect": { "attachedIsActiveLike": false }
+    },
+    {
+      "case": "защита найдена в снапшоте родителя и отказа нет — становится активной",
+      "state": { "attachedInSnapshot": true, "failCode": null },
+      "expect": { "attachedBecomesActive": true, "attachedFailsToPlace": false }
+    },
+    {
+      "case": "заполненный код отказа переводит защиту в ошибочное состояние",
+      "state": { "attachedInSnapshot": true, "failCode": "51000" },
+      "expect": { "attachedBecomesActive": false, "attachedFailsToPlace": true }
+    },
+
+    {
+      "case": "родитель ещё не подтверждён — отсутствие защиты в снапшоте ждёт наблюдения",
+      "state": { "parentStatus": "PENDING", "positionLive": false, "standaloneProtectionExists": false },
+      "expect": { "missingAttachedOutcome": "WAIT" }
+    },
+    {
+      "case": "родитель живой — по одному снапшоту вывода не делаем, ищем дальше",
+      "state": { "parentStatus": "ACTIVE", "positionLive": true, "standaloneProtectionExists": false },
+      "expect": { "missingAttachedOutcome": "SEARCH_MORE" }
+    },
+    {
+      "case": "родитель исполнен, позиция жива, отдельной защиты нет — покрытие потеряно",
+      "state": { "parentStatus": "COMPLETED", "positionLive": true, "standaloneProtectionExists": false },
+      "expect": { "missingAttachedOutcome": "PROTECTION_LOST" }
+    },
+    {
+      "case": "родитель исполнен, отдельная защита есть — потери покрытия нет",
+      "state": { "parentStatus": "COMPLETED", "positionLive": true, "standaloneProtectionExists": true },
+      "expect": { "missingAttachedOutcome": "ANALYSE_HISTORY" }
+    },
+    {
+      "case": "родитель отменён — защита закрывается по родителю",
+      "state": { "parentStatus": "CANCELED", "positionLive": false, "standaloneProtectionExists": false },
+      "expect": { "missingAttachedOutcome": "CANCEL_BY_PARENT" }
+    },
+    {
+      "case": "родитель в ошибочном состоянии — защита туда же",
+      "state": { "parentStatus": "ERROR", "positionLive": true, "standaloneProtectionExists": false },
+      "expect": { "missingAttachedOutcome": "ERROR" }
+    }
+  ]
+}

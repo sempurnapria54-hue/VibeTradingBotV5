@@ -194,8 +194,7 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 **Правило.** Исход `OBSERVED_ABSENT` **закрывает** гейтящее предусловие
 `CODE`, и одновременно **обязывает** записать допущение явно: в реестре
-предусловий (`docs/rules/pnl-reconciliation.md` §«Предусловия
-`CODE` шага 7») у соответствующего пункта появляется строка «посылка
+предусловий (`docs/rules/pnl-reconciliation.md`) у соответствующего пункта появляется строка «посылка
 проверкой **не подтверждена**: событие за прогон не наблюдалось;
 допущение — <формулировка>». Молча закрыть гейт этим исходом нельзя.
 
@@ -711,8 +710,8 @@ M19*.history.
 - **Действие при «цена выставления»:** операнд калибровки меняется —
   берётся `avgPx` связанного ordinary-ордера, а не `actualPx`;
   эскалация на `trading-specialist` + `solution-designer`, правка
-  `docs/models/domain/core/Position.md` §«Цена фактического выхода» и
-  `docs/rules/risk-policy.md` §«Без поправки на проскок».
+  `docs/models/domain/core/Position.md` и
+  `docs/rules/risk-policy.md`.
 - **Статус:** ⏳ **PENDING**. Провенанс — H21 `DOCS_CHECK_11` (новый
   хвост, вскрыт при опровержении посылки «полей фактического исполнения
   у алго-сущности нет»).
@@ -1383,12 +1382,11 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
   - **Почему вопрос больше не имеет силы:** нижнюю границу пишет
     **единственный** писатель — `SubmitOrderExecutor`,
     `Order.externalCreatedAt` первой отправленной ноги, **всегда** при
-    постановке (`docs/models/domain/aggregate/Deal.md` §«Почему у нижней
-    границы один писатель»). Комиссия входа возникает при **филле**, филл —
+    постановке (`docs/models/domain/aggregate/Deal.md`). Комиссия входа возникает при **филле**, филл —
     не раньше постановки ⇒ `ts(entry-fee) ≥ externalCreatedAt` **по
     построению**, при любом ответе источника. Окно шире, но лишних движений
     не захватывает: активная сделка на инструмент одна
-    (`docs/models/domain/other/DealCashFlow.md` §«Линковка к `Deal`»).
+    (`docs/models/domain/other/DealCashFlow.md`).
   - **Наблюдение остаётся полезным, но не обязательным:** если фикстура и
     так собрана, сравнение `ts(entry-fee)` с `cTime` фиксируется как факт
     источника в `docs/integrations/okx/contracts/account-bills.md`. Гейта
@@ -1426,7 +1424,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 `fundingFee` возвращён в used-набор (H20 `DOCS_CHECK_11`) как
 авторитетный операнд де-микширования R-мультипликатора
-(`docs/rules/risk-policy.md` §«Асимметрия числителя и знаменателя»).
+(`docs/rules/risk-policy.md`).
 
 - **Что верифицировать (1) — горизонт `fundingFee`:** накоплен ли
   `fundingFee` финализированной записи **за всю жизнь `posId`** или только
@@ -1437,7 +1435,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 - **Что верифицировать (2) — фактические знаки трёх операндов** (H15
   `DOCS_CHECK_16`, добавлено к тому же кейсу — фикстура та же):
   - знак `fundingFee` в записи (нормализация выполняется в одном месте,
-    `docs/models/mapping/PositionCloseResult.md` §«Знак `fundingFee`»);
+    `docs/models/mapping/PositionCloseResult.md`);
   - знак `fee` в записи — сейчас **заявлен утверждением без прогона**
     («минус — комиссия, плюс — ребейт»);
   - знак `liqPenalty` в записи — сейчас **не заявлен вовсе** («сырой знак»
@@ -1659,8 +1657,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
   комбинированную** (`balChg` = pnl + fee).
 - **Почему не гейтит доки:** маппинг взят суперсетом — native `fee` в used,
   категории резолвятся по `type`/`subType`, `balChg` остаётся под
-  сумму-сверку (`docs/models/mapping/DealCashFlow.md` §«Разделение ролей
-  `balChg` и `fee`»). **Claim суперсета ограничен** (H15 `GAPS_CLOSE_5`,
+  сумму-сверку (`docs/models/mapping/DealCashFlow.md`). **Claim суперсета ограничен** (H15 `GAPS_CLOSE_5`,
   дотянуто до плана H11 `GAPS_CLOSE_6`): гранулярность-независимы
   **Σ`amount`** и **realized-слагаемое**; для **Σ`externalFee`** —
   **не держится**. Поэтому ответ меняет не маппинг, а то, какая ветка
@@ -2276,7 +2273,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
 **Назначает носитель курса пересчёта cross-ccy движений.** Решение H25
 `DOCS_CHECK_11`: курс берётся **из свечи на момент операции**, секундного
 разрешения при доступности, с деградацией к более грубому
-(`docs/components/RefreshBillsExecutor.md` §«Носитель курса»). До
+(`docs/components/RefreshBillsExecutor.md`). До
 назначения эндпоинта пересчёт неисполним, и **все** cross-ccy строки
 уходят в `rateStatus = RATE_UNAVAILABLE`.
 
@@ -2300,7 +2297,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
   **отсутствует** — это цена выбора.
 - **Действие по итогу:** завести строку операции в
   `.claude/processes/api-docs-completion.md`, зафиксировать разрешение
-  и правило деградации в `RefreshBillsExecutor.md` §«Носитель курса».
+  и правило деградации в `RefreshBillsExecutor.md`.
 - **Статус:** ⏳ **PENDING**. Провенанс — H25 `DOCS_CHECK_11`.
 
 ## MG8. Index candles history — GET /api/v5/market/history-index-candles (Market Data)
@@ -2378,8 +2375,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
 ликвидация достижима раньше стопа при формально выполненном инварианте
 (`docs/components/RiskValidator.md`
 §`STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`,
-`docs/rules/live-risk-protection.md` §«Ценовая база триггера
-защиты объявляется стратегией и доезжает до биржи»). До наблюдения
+`docs/rules/live-risk-protection.md`). До наблюдения
 величина не калибруется, поэтому `MARK` — **не рекомендация, а
 единственная принимаемая база**: create отвергает
 `triggerPriceType ∈ {LAST, INDEX}` реджектом
@@ -2407,8 +2403,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
   рынке и растёт на импульсах; ни величина, ни знак заранее не
   утверждаются.
 - **Действие по итогу:** записать наблюдённые значения в
-  `docs/rules/live-risk-protection.md` §«Остаточный `грунт` —
-  величина базиса» и, если запас нужен, назначить его там же.
+  `docs/rules/live-risk-protection.md` и, если запас нужен, назначить его там же.
 - **Почему не гейтит:** при `triggerPriceType = MARK` вопрос не
   возникает вовсе, а выбор базы объявляет стратегия. Гейтом стало бы
   только требование поддержать `LAST` с калиброванным запасом.

@@ -12,7 +12,7 @@ details (last 3 days / last 3 months)»). При расхождении с оф�
 побеждает офдок; синхронизация — перевыкачка + дифф при каждом
 заходе интегратора (`.claude/processes/api-docs-completion.md`,
 канал — `.claude/skills/integration-okx.md`). Последняя сверка:
-2026-06-11 (прогон 1 — соответствие спеке подтверждено).
+2026-06-11 (соответствие спеке подтверждено).
 
 ## Endpoints
 
@@ -20,8 +20,8 @@ details (last 3 days / last 3 months)»). При расхождении с оф�
   `GET /api/v5/trade/fills`. Permission: Read. Rate limit: 60 req / 2 s
   по User ID.
 - **Fills 3 месяца**: `GET /api/v5/trade/fills-history`. Permission: Read.
-  Rate limit: 10 req / 2 s по User ID. Архив 3m+ (`fills-archive`,
-  async-флоу) — `OKX-Q2` (шаг 7).
+  Rate limit: 10 req / 2 s по User ID. Архив глубже 3 месяцев (`fills-archive`,
+  асинхронный флоу) — потребителя пока нет.
 
 ## Query (одинаковые для обоих)
 

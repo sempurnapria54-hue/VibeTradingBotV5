@@ -137,6 +137,8 @@
 
 - Принцип, из которого выведено, — `docs/concept.md` (П1).
 - Формула, предикат и примеры — `docs/spec/protection-coverage.json`.
+- Проход эталонной сделки пошагово — `docs/spec/strategy-walkthrough.json`.
+- Резолв цели снятия по цепочке замещений — `docs/rules/replace-not-amend.md`.
 - Реакция ступени 2 — `docs/rules/exchange-hold.md`.
 - Когда зовётся преконтроль — `docs/rules/risk-validator-scope.md`.
 - Лимиты и сайзинг — `docs/rules/risk-policy.md`.

@@ -1,0 +1,199 @@
+{
+  "subject": "deal-context-load",
+  "question": "Какой объём графа сделки обязан быть загружен",
+  "home": "docs/components/DealContextService.md",
+  "includes": ["protection-coverage"],
+
+  "operands": {
+    "episodes[].loaded": "эпизод позиции попал в загруженный контекст",
+    "episodes[].exitAt": "положение закрытия эпизода добыто",
+    "legs[].loaded": "нога сделки попала в загруженный контекст",
+    "legs[].protections[].loaded": "встроенная защита ноги попала в загруженный контекст",
+    "legs[].protections[]": "остальные поля — как в protection-coverage",
+    "algoOrders[].loaded": "отдельная условная заявка попала в загруженный контекст",
+    "algoOrders[].required": "заявка входит в обязательный объём: живая либо защитная терминальная",
+    "position.externalSize": "живая экспозиция эпизода"
+  },
+
+  "values": [
+    {
+      "name": "episodesComplete",
+      "note": "Эпизоды грузятся все, включая закрытые: по ним считается результат сделки.",
+      "op": "all",
+      "over": "episodes",
+      "of": "loaded"
+    },
+    {
+      "name": "legsComplete",
+      "op": "all",
+      "over": "legs",
+      "of": "loaded"
+    },
+    {
+      "name": "attachedComplete",
+      "note": "Встроенные защиты грузятся вместе со своей ногой целиком, включая терминальные.",
+      "op": "all",
+      "over": "legs[].protections[]",
+      "of": "loaded"
+    },
+    {
+      "name": "algoComplete",
+      "op": "all",
+      "over": "algoOrders",
+      "where": "required",
+      "of": "loaded"
+    },
+    {
+      "name": "contextComplete",
+      "expr": "episodesComplete && legsComplete && attachedComplete && algoComplete"
+    },
+    {
+      "name": "computationAllowed",
+      "note": "Неполный контекст не даёт заниженного числа: он даёт отказ. Направление ошибки — консервативное.",
+      "expr": "contextComplete"
+    },
+
+    {
+      "name": "coverageLoaded",
+      "note": "Покрытие, посчитанное по тому, что реально загружено.",
+      "op": "sum",
+      "over": "legs[].protections[]",
+      "where": "loaded && isProtection",
+      "of": "coveredSize"
+    },
+    {
+      "name": "coverageFull",
+      "note": "Покрытие по полному множеству защит сделки.",
+      "op": "sum",
+      "over": "legs[].protections[]",
+      "where": "isProtection",
+      "of": "coveredSize"
+    },
+    {
+      "name": "coverageAnswerLoaded",
+      "expr": "coverageLoaded >= position.externalSize"
+    },
+    {
+      "name": "coverageAnswerFull",
+      "expr": "coverageFull >= position.externalSize"
+    },
+    {
+      "name": "coverageAnswerDistorted",
+      "note": "Недогруженная защита занижает покрытие: штатная сделка выглядит нарушителем.",
+      "expr": "coverageAnswerLoaded != coverageAnswerFull"
+    },
+
+    {
+      "name": "exitObtainedLoaded",
+      "op": "all",
+      "over": "episodes",
+      "where": "loaded",
+      "of": "notNull(exitAt)"
+    },
+    {
+      "name": "exitObtainedFull",
+      "op": "all",
+      "over": "episodes",
+      "of": "notNull(exitAt)"
+    },
+    {
+      "name": "exitAnswerDistorted",
+      "note": "Недогруженный эпизод делает предикат «положение закрытия добыто у всех» истинным молча — искажение в разрешающую сторону.",
+      "expr": "exitObtainedLoaded != exitObtainedFull"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "полный контекст: посчитанное совпадает с фактическим",
+      "state": {
+        "position": { "externalSize": 3 },
+        "episodes": [ { "loaded": true, "exitAt": 100 }, { "loaded": true, "exitAt": 200 } ],
+        "legs": [
+          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] },
+          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "required": true } ]
+      },
+      "expect": {
+        "contextComplete": true, "computationAllowed": true,
+        "coverageLoaded": 3, "coverageFull": 3,
+        "coverageAnswerLoaded": true, "coverageAnswerDistorted": false
+      }
+    },
+    {
+      "case": "нога не загружена — покрытие занижено, штатная сделка выглядит нарушителем",
+      "state": {
+        "position": { "externalSize": 3 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "legs": [
+          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] },
+          { "loaded": false, "protections": [ { "loaded": false, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "required": true } ]
+      },
+      "expect": {
+        "legsComplete": false, "attachedComplete": false, "contextComplete": false, "computationAllowed": false,
+        "coverageLoaded": 2, "coverageFull": 3,
+        "coverageAnswerLoaded": false, "coverageAnswerFull": true, "coverageAnswerDistorted": true
+      }
+    },
+    {
+      "case": "терминальные встроенные защиты не загружены — на покрытие не влияют, но объём всё равно неполон",
+      "state": {
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "legs": [
+          { "loaded": true, "protections": [
+            { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 },
+            { "loaded": false, "carrier": "ATTACHED", "status": "CANCELED", "kind": "STOP", "size": 2, "parentFillSize": 2 }
+          ] }
+        ],
+        "algoOrders": [ { "loaded": true, "required": true } ]
+      },
+      "expect": {
+        "attachedComplete": false, "contextComplete": false,
+        "coverageLoaded": 2, "coverageFull": 2, "coverageAnswerDistorted": false
+      }
+    },
+    {
+      "case": "закрытый эпизод не загружен — предикат добытости отвечает истиной молча",
+      "state": {
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 }, { "loaded": false, "exitAt": null } ],
+        "legs": [
+          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "required": true } ]
+      },
+      "expect": {
+        "episodesComplete": false, "contextComplete": false, "computationAllowed": false,
+        "exitObtainedLoaded": true, "exitObtainedFull": false, "exitAnswerDistorted": true
+      }
+    },
+    {
+      "case": "незагруженная незащитная терминальная условная заявка объёма не нарушает",
+      "state": {
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "legs": [
+          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "required": true }, { "loaded": false, "required": false } ]
+      },
+      "expect": { "algoComplete": true, "contextComplete": true, "computationAllowed": true }
+    },
+    {
+      "case": "живая условная заявка не загружена — объём неполон",
+      "state": {
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "legs": [
+          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": [ { "loaded": false, "required": true } ]
+      },
+      "expect": { "algoComplete": false, "contextComplete": false, "computationAllowed": false }
+    }
+  ]
+}

@@ -4,6 +4,11 @@
 
 Как определяется свежесть рыночных данных.
 
+**Дом формулы и предиката — исполнимая спецификация**
+`docs/spec/market-data-freshness.json` (`referencePoint`, `expiredAt`,
+`isFresh`, `reaction`, `actionBlocked`). Здесь — смысл, там — форма и
+примеры.
+
 ## Правило
 
 **Срок свежести задаёт стратегия** — параметром настройки, породившей
@@ -43,3 +48,4 @@ look-ahead») точкой отсчёта не является.
 - Что настраивает стратегия — `docs/rules/trading-configuration-ownership.md`.
 - Хранение результатов — `docs/rules/market-data-retention.md`.
 - Проверка свежести — `docs/components/MarketDataExpirationChecker.md`.
+- Формула и примеры — `docs/spec/market-data-freshness.json`.

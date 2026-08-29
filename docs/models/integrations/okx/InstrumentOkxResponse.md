@@ -7,10 +7,10 @@
 ## Поля DTO
 
 Coded DTO `InstrumentOkxResponse` несёт подмножество, релевантное
-идентичности инструмента (шаг 1), sizing/rounding-правилам
-(шаг 5) **и валютам (шаг 7)**. Один DTO питает оба снапшота:
+идентичности инструмента, sizing/rounding-правилам
+**и валютам**. Один DTO питает оба снапшота:
 identity-снапшот `InstrumentExternalSnapshot` (шаги 1 и 7) и rules-снапшот
-`InstrumentExternalRules` (шаг 5).
+`InstrumentExternalRules`.
 
 Identity/spec-поля, маппящиеся в `InstrumentExternalSnapshot`:
 

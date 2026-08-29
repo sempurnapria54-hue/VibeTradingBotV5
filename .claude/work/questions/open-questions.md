@@ -30,8 +30,7 @@ Per-entity `REFRESH_*` покрывает только **известные** с
 command-layer не предоставляет (bulk-команды сняты —
 `docs/rules/command-lifecycle.md`). Precheck-часть
 закрыта (2026-06-22): инструмент-скоупный exchange-read вне
-command-layer — `docs/components/IntegrationService.md`
-§«Инструмент-скоупный read», `docs/components/PrecheckHandler.md`.
+command-layer — `docs/components/IntegrationService.md`, `docs/components/PrecheckHandler.md`.
 
 **Остаток — orphan-скан шага 8** (`AnomalyJob`: чужие сущности при
 уже открытой сделке и по неведомым инструментам); владелец —
@@ -50,7 +49,7 @@ persisted-модель `TradeFillsArchive`. Runtime фазы 1 fills не чит
 вовсе (`REFRESH_FILLS` снята;
 `.claude/processes/api-docs-completion.md`) — остался чистый
 вопрос **off-band-аудита**; пофилловый аудит вынесен за фазу 1
-(`docs/models/domain/aggregate/Deal.md` §«Персист fills») —
+(`docs/models/domain/aggregate/Deal.md`) —
 отложение, не отказ.
 
 Варианты: (1) materialize с lifecycle
@@ -148,8 +147,7 @@ mapping-доков. До решения WS описаны короткими п�
 
 1. **`triggerPx` ликвидации/ADL.** Провенанс ликвидации/ADL на
    `Deal` доносится полем `closeOutcome` — эта половина закрыта
-   (`docs/models/domain/aggregate/Deal.md` §«Признаки отбора для
-   отчёта»), заново не проектировать. Остаток: нужен ли сверх него
+   (`docs/models/domain/aggregate/Deal.md`), заново не проектировать. Остаток: нужен ли сверх него
    `triggerPx` (цена триггера) как носитель измеримости отказа
    инварианта «ликвидация за стопом» — сегодня поле из маппинга
    выведено; корпус по ликвидационным каскадам объявляет дыру.
@@ -173,8 +171,7 @@ mapping-доков. До решения WS описаны короткими п�
    §«Ось упущенных возможностей» (фаза 3).
    - **Третий канал того же класса — недоступность `GET /public/time`**
      (N5 `DOCS_CHECK_21`). Сделка не создаётся вовсе
-     (`docs/components/EntryScannerJob.md` §«Отказ `public/time` ⇒
-     сделка не создаётся»), поэтому при устойчивом отказе встают **все**
+     (`docs/components/EntryScannerJob.md`), поэтому при устойчивом отказе встают **все**
      входы контура, и событие так же не счётно: строки `Deal` нет,
      носителя состояния (в отличие от `Exchange.HOLD`) — тоже. Канал
      решается тем же механизмом, что и два первых, и потому добавлен в
@@ -217,8 +214,7 @@ close'ом.
 
 Горизонт — конец фазы 1 перед тестами. Заведён `GAPS_CLOSE_18` (N2):
 прежде позиция маршрутизировалась в «пакет валидации», механизм выключен
-режимом автономии. Связано: `docs/rules/exit-teardown-order.md`
-§«Расхождение с ратифицированным порядком kill-switch»,
+режимом автономии. Связано: `docs/rules/exit-teardown-order.md`,
 `docs/components/KillSwitchExecutor.md`.
 
 ### FEE-Q1. Слот подгружаемой ставки комиссии в `InstrumentExternalRules` (владелец — `solution-designer` + `code-writer`)
@@ -228,7 +224,7 @@ close'ом.
 только слот появится и прочитанный инстанс будет сохранён, ставка
 уедет в `external_rules` — «копия на каждом инструменте», ради
 недопущения чего её выносили в свою таблицу
-(`docs/models/domain/other/TradeFeeRate.md` §«Масштаб модели»).
+(`docs/models/domain/other/TradeFeeRate.md`).
 Структурного запрета нет — «не персистится» держится дисциплиной.
 
 Варианты: (1) transient-слот с гарантией, что конвертер его не
@@ -278,7 +274,7 @@ close'ом.
 `docs/models/domain/core/Exchange.md` §Енумы,
 `docs/rules/exchange-hold.md` §«Границы и эскалация». Связано: `docs/models/domain/core/Instrument.md` §Енумы,
 `docs/lifecycles/Instrument.md` §Охват,
-`docs/rules/instrument-hold.md` §«Множества входа», backlog п.9.
+`docs/rules/instrument-hold.md`, backlog п.9.
 
 ### PHASE-Q2. Размещение `MarketPhase` после перехода в вычисляемое значение (классификация)
 

@@ -29,17 +29,17 @@ source ответ → `InstrumentExternalSnapshot` (транзиентный:
 шаге 1 в домен **не персистятся**. Их персистентный дом —
 `InstrumentExternalRules` (JSONB-навес на `Instrument`), материализуемый
 **на шаге 5** (риск-преконтроль), вне оркестрации рыночных данных шага 1
-(`docs/models/domain/other/InstrumentExternalRules.md`, закрыт
-INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/quote)
+(`docs/models/domain/other/InstrumentExternalRules.md`);
+`ctMult` навес не хранит. **Валюты (settle/base/quote)
 персистятся на самом `Instrument`** — с шага 7, см. таблицу шага 7 ниже.
 Роль `externalLeverage`/биржевой потолок плеча — там же
-(INSTR-Q2 закрыт на шаге 6: рабочее плечо пишется inline в
+(рабочее плечо пишется inline в
 `SubmitOrderExecutor` перед постановкой открывающего ордера,
 `docs/components/SubmitOrderExecutor.md`).
 
 ## OKX
 
-### `InstrumentOkxResponse` → snapshot → domain (идентичность + биржевые поля, шаг 1)
+### `InstrumentOkxResponse` → snapshot → domain (идентичность + биржевые поля)
 
 | OKX field | Snapshot field | → domain `Instrument` |
 |---|---|---|
@@ -55,7 +55,7 @@ INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/qu
 приходит (не путать с биржевым `externalLeverage`). `internalId` /
 `exchangeId` присваиваются системой при онбординге.
 
-### `InstrumentOkxResponse` → snapshot → domain (валюты, шаг 7)
+### `InstrumentOkxResponse` → snapshot → domain (валюты)
 
 | OKX field | Snapshot field | → domain `Instrument` |
 |---|---|---|
@@ -76,7 +76,7 @@ INSTR-Q1); `ctMult` навес не хранит. **Валюты (settle/base/qu
 ### Справочные поля OKX в шаге 1 (не персистятся)
 
 `lotSz`, `minSz`, `ctVal`, `ctMult`, `tickSz` — приходят в снапшоте, в
-домен шага 1 не мапятся (их дом — `InstrumentExternalRules`, шаг 5).
+домен идентичности не мапятся (их дом — `InstrumentExternalRules`).
 Биржевые `state`/`lever` из этого перечня исключены — они персистятся
 на `Instrument` (`externalStatus`/`externalLeverage`, см. таблицу выше);
 валюты из него исключены с шага 7 (таблица выше).

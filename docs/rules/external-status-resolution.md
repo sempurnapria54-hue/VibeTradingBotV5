@@ -4,6 +4,11 @@
 
 Как резолвится сырой статус источника.
 
+**Дом таблиц резолва и предикатов — исполнимая спецификация**
+`docs/spec/external-status-resolution.json` (`resolvedStatus`,
+`refusesInsteadOfMapping`, `notFoundIsTerminal`, `closeReasonApplied`,
+`raisesExchangeStepTwo`). Здесь — смысл, там — форма и примеры.
+
 ## Правило
 
 **Сырой статус источника FSM не видит.** Он проходит через resolver
@@ -44,3 +49,4 @@ Exchange → TRADE_BLOCKED (ступень 2, kill-switch flatten)
 - Категории контролируемых исключений —
   `docs/rules/controlled-exchange-exceptions.md`.
 - Перечни статусов источника — `docs/models/mapping/`.
+- Таблицы резолва и примеры — `docs/spec/external-status-resolution.json`.

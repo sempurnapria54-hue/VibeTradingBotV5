@@ -18,7 +18,7 @@
 | `ts` | string (epoch millis) | да | Время тикера. |
 
 Таблица выровнена под **худой coded DTO** (`OkxTickerResponse.java`:
-`instType`/`instId`/`last`/`askPx`/`bidPx`/`ts`; шаг 7 добавляет
+`instType`/`instId`/`last`/`askPx`/`bidPx`/`ts`; сопровождение сделки добавляет
 `askSz`/`bidSz`) — decision о ре-базе
 контура на сырьё (`.claude/decisions/source-api-target-rebase.md`,): держим только заведённые поля, карваута на полное зеркало
 биржи нет.

@@ -1,6 +1,6 @@
 {
   "subject": "risk-limits",
-  "question": "Чему равны операнды четырёх потолков риска и выполняются ли неравенства",
+  "question": "Выполняются ли потолки риска",
   "home": "docs/rules/risk-policy.md",
 
   "operands": {

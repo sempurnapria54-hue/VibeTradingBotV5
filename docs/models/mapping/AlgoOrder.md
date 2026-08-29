@@ -17,7 +17,7 @@
 | `externalSize` | `AlgoOrder.externalSize` | фактический размер срабатывания |
 | `externalPrice` | `AlgoOrder.externalPrice` | фактическая цена срабатывания |
 | `externalTriggerTime` | `AlgoOrder.externalTriggerTime` | время срабатывания |
-| `linkedOrderExternalIds` | `AlgoOrder.linkedOrderExternalIds` | связанные ordinary order ids (сохраняем; использование — ALGO-Q6) |
+| `linkedOrderExternalIds` | `AlgoOrder.linkedOrderExternalIds` | связанные ordinary order ids (сохраняем; потребителя пока нет) |
 | `condition.trigger.stopLoss.externalValue` | — | внешнее значение SL trigger |
 | `condition.trigger.stopLoss.externalType` | — | тип цены SL (`last`/`index`/`mark`) |
 | `condition.trigger.takeProfit.externalValue` | — | внешнее значение TP trigger |
@@ -155,17 +155,12 @@ cancel-пути). Amend advance-семьи биржей не поддержив�
 следствие снято решением REPLACE-only — домен не амендит ничего
 (`docs/rules/replace-not-amend.md`).
 
-### OKX status resolver
+### Резолв статуса
 
-`externalStatus` → `AlgoOrder.Status` (FSM напрямую не использует):
-- `live`/`pause` → `ACTIVE`;
-- `partially_effective` → `PARTIALLY_COMPLETED`;
-- `effective` → `COMPLETED`/`TRIGGERED`;
-- `canceled` → `CANCELED`;
-- `order_failed`/`partially_failed`/unknown →
-  `ExternalStatusException` → safety-каскад.
-
-Подробности — `docs/lifecycles/AlgoOrder.md`.
+Таблица резолва сырого статуса и ветки отказа —
+`docs/spec/external-status-resolution.json` (`algoStatus`,
+`refusalReason`, `closeReasonApplied`). Смысл состояний —
+`docs/lifecycles/AlgoOrder.md`.
 
 ### OKX request mapping — дополнения
 

@@ -13,7 +13,7 @@ index candlesticks», «Get index candlesticks history»). При
 дифф при каждом заходе интегратора по источнику и по задаче
 «актуализируй» (`.claude/processes/api-docs-completion.md`, канал
 чтения — `.claude/skills/integration-okx.md`). Последняя сверка:
-2026-06-11 (прогон 3, поле-уровневая дистилляция).
+2026-06-11 (поле-уровневая дистилляция).
 
 ## Статус использования
 

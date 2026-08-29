@@ -1,0 +1,136 @@
+{
+  "subject": "market-data-freshness",
+  "question": "Свежи ли рыночные данные",
+  "home": "docs/rules/market-data-freshness.md",
+
+  "operands": {
+    "kind": "вид результата: STRUCTURE, INDICATOR, PHASE",
+    "windowEndAt": "конец окна структуры рынка",
+    "candleTimestamp": "время свечи индикатора",
+    "confirmedAt": "момент подтверждения без look-ahead — точкой отсчёта не является",
+    "expirationDuration": "срок свежести настройки-владельца",
+    "now": "текущий момент",
+    "inputs": "входы фазы: свои точки отсчёта и сроки владельцев",
+    "expiredSetting": "реакция шага на устаревание: WAIT, BLOCK_STEP, GRACEFUL_CLOSE, KILL_SWITCH",
+    "actionKind": "род действия: DATA_DEPENDENT, REFRESH, CANCEL, CLOSE, SAFETY"
+  },
+
+  "values": [
+    {
+      "name": "referencePoint",
+      "note": "Точка отсчёта — момент данных, не момент подтверждения.",
+      "expr": "if(kind == 'STRUCTURE', windowEndAt, candleTimestamp)"
+    },
+    {
+      "name": "dataPresent",
+      "note": "У фазы своей точки отсчёта нет — её наличие данных означает наличие входов.",
+      "expr": "if(kind == 'PHASE', notNull(phaseExpiredAt), notNull(referencePoint))"
+    },
+    {
+      "name": "ownExpiredAt",
+      "note": "Срок владельца обязателен: пустое место — отказ, а не бессрочная свежесть.",
+      "expr": "referencePoint + expirationDuration"
+    },
+    {
+      "name": "phaseExpiredAt",
+      "note": "У фазы своего срока нет: она устаревает вместе с самым ранним из своих входов.",
+      "op": "min",
+      "over": "inputs[]",
+      "of": "referencePoint + expirationDuration"
+    },
+    {
+      "name": "expiredAt",
+      "expr": "if(kind == 'PHASE', phaseExpiredAt, ownExpiredAt)"
+    },
+    {
+      "name": "isFresh",
+      "expr": "dataPresent && now < expiredAt"
+    },
+    {
+      "name": "freshnessState",
+      "expr": "if(!dataPresent, 'MISSING', if(isFresh, 'FRESH', 'EXPIRED'))"
+    },
+    {
+      "name": "reaction",
+      "note": "Отсутствие данных и их устаревание ведут к одной реакции: обе — «данным доверять нельзя».",
+      "expr": "if(isFresh, 'PROCEED', expiredSetting)"
+    },
+    {
+      "name": "actionBlocked",
+      "note": "Блокировка шага режет только зависящее от данных. Рефреш, отмена, закрытие и safety идут независимо: иначе устаревание данных отнимало бы у нас способность свернуться.",
+      "expr": "in(reaction, 'BLOCK_STEP', 'WAIT') && actionKind == 'DATA_DEPENDENT'"
+    },
+    {
+      "name": "computationRefuses",
+      "note": "Проблема свежести при сборе контекста расчёта даёт контролируемую ошибку, а не счёт по старым данным.",
+      "expr": "!isFresh"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "структура свежа, пока не истёк срок настройки-владельца",
+      "state": { "kind": "STRUCTURE", "windowEndAt": 1000, "candleTimestamp": null, "confirmedAt": 1200, "expirationDuration": 300, "now": 1250, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT" },
+      "expect": { "referencePoint": 1000, "expiredAt": 1300, "isFresh": true, "freshnessState": "FRESH", "reaction": "PROCEED", "actionBlocked": false }
+    },
+    {
+      "case": "поздний момент подтверждения свежести не продлевает",
+      "state": { "kind": "STRUCTURE", "windowEndAt": 1000, "candleTimestamp": null, "confirmedAt": 1290, "expirationDuration": 300, "now": 1310, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT" },
+      "expect": { "expiredAt": 1300, "isFresh": false, "freshnessState": "EXPIRED", "reaction": "BLOCK_STEP", "actionBlocked": true, "computationRefuses": true }
+    },
+    {
+      "case": "граница срока принадлежит устареванию: ровно в момент истечения данные уже не свежи",
+      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1300, "expiredSetting": "WAIT", "actionKind": "DATA_DEPENDENT" },
+      "expect": { "isFresh": false, "freshnessState": "EXPIRED" }
+    },
+    {
+      "case": "у индикатора точка отсчёта — время свечи",
+      "state": { "kind": "INDICATOR", "windowEndAt": 9999, "candleTimestamp": 1000, "confirmedAt": 1050, "expirationDuration": 600, "now": 1400, "expiredSetting": "WAIT", "actionKind": "DATA_DEPENDENT" },
+      "expect": { "referencePoint": 1000, "expiredAt": 1600, "isFresh": true }
+    },
+    {
+      "case": "данных нет — это тот же отказ доверия, что и устаревание",
+      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": null, "confirmedAt": null, "expirationDuration": 600, "now": 1400, "expiredSetting": "GRACEFUL_CLOSE", "actionKind": "DATA_DEPENDENT" },
+      "expect": { "dataPresent": false, "freshnessState": "MISSING", "isFresh": false, "reaction": "GRACEFUL_CLOSE" }
+    },
+    {
+      "case": "фаза устаревает по самому раннему из своих входов",
+      "state": {
+        "kind": "PHASE", "windowEndAt": null, "candleTimestamp": null, "confirmedAt": null,
+        "expirationDuration": null, "now": 1250, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT",
+        "inputs": [
+          { "referencePoint": 1000, "expirationDuration": 200 },
+          { "referencePoint": 1000, "expirationDuration": 600 }
+        ]
+      },
+      "expect": { "expiredAt": 1200, "isFresh": false, "freshnessState": "EXPIRED" }
+    },
+    {
+      "case": "фаза свежа, пока свежи все её входы",
+      "state": {
+        "kind": "PHASE", "windowEndAt": null, "candleTimestamp": null, "confirmedAt": null,
+        "expirationDuration": null, "now": 1150, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT",
+        "inputs": [
+          { "referencePoint": 1000, "expirationDuration": 200 },
+          { "referencePoint": 1000, "expirationDuration": 600 }
+        ]
+      },
+      "expect": { "expiredAt": 1200, "isFresh": true, "reaction": "PROCEED" }
+    },
+    {
+      "case": "блокировка шага не отнимает у нас сворачивание: safety идёт по устаревшим данным",
+      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1900, "expiredSetting": "BLOCK_STEP", "actionKind": "SAFETY" },
+      "expect": { "isFresh": false, "actionBlocked": false }
+    },
+    {
+      "case": "рефреш по устаревшим данным не блокируется — им они и обновляются",
+      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1900, "expiredSetting": "WAIT", "actionKind": "REFRESH" },
+      "expect": { "actionBlocked": false }
+    },
+    {
+      "case": "аварийная реакция на устаревание не блокирует, а сворачивает",
+      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1900, "expiredSetting": "KILL_SWITCH", "actionKind": "DATA_DEPENDENT" },
+      "expect": { "reaction": "KILL_SWITCH", "actionBlocked": false }
+    }
+  ]
+}

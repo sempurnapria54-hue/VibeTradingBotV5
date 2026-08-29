@@ -6,115 +6,72 @@
 
 Структура модели — в `docs/models/domain/core/AlgoOrder.md`.
 
+**Дом матрицы переходов и предикатов** — `docs/spec/algo-order-lifecycle.json`
+(`algoTransitionAllowed`, `algoIsLive`, `algoIsActiveLike`,
+`transitionAccepted`); **дом резолва внешнего статуса** —
+`docs/spec/external-status-resolution.json`. Здесь — смысл состояний,
+там — форма и примеры.
+
 ## Кто управляет
 
-Статусы меняет refresh/service layer по exchange facts: сырой
-внешний статус нормализуется через `AlgoOrderExternalStatusResolver`
-(per-exchange, OKX — `OkxAlgoOrderExternalStatusResolver`), затем
-executor применяет результат через строгие transition-методы. FSM/
-handlers **не** используют `externalStatus` напрямую (см.
-`docs/rules/external-status-resolution.md`).
+Статусы меняет добыча фактов у биржи: сырой внешний статус
+нормализуется резолвером, затем исполнитель применяет результат
+строгим переходом. Обработчики FSM внешний статус напрямую не читают
+(`docs/rules/external-status-resolution.md`).
 
-## Статусы и live semantics
+## Состояния
 
-| Статус | Runtime-live | Live on exchange | Смысл |
+| Статус | Живой | Живой на бирже | Смысл |
 |---|---|---|---|
-| `CREATED` | да | нет | Локальный intent, на бирже не подтверждён. |
-| `PENDING` | да | неизвестно | Submit/cancel мог быть, нужен refresh/search/history. ACK не runtime truth (`docs/rules/ack-not-runtime-truth.md`). |
-| `ACTIVE` | да | да | Активен или ожидает срабатывания. |
-| `PARTIALLY_COMPLETED` | да | требует выяснения | Частично сработал — exchange-driven recovery-status, не цель стратегии. |
-| `COMPLETED` | нет | нет | Сработал. |
-| `CANCELED` | нет | нет | Отменён. |
-| `ERROR` | — | problem-final | Ошибочное состояние; сделка → safety/error-flow. |
+| `CREATED` | да | нет | Локальное намерение, на бирже не подтверждено. |
+| `PENDING` | да | неизвестно | Отправка или снятие могли произойти; факт не наблюдён. Приём заявки биржей состоянием не является (`docs/rules/ack-not-runtime-truth.md`). |
+| `ACTIVE` | да | да | Стоит на бирже и ждёт срабатывания. |
+| `PARTIALLY_COMPLETED` | да | да | Сработала частично: состояние восстановления по фактам, а не цель стратегии. Остаток жив и покрывает экспозицию. |
+| `COMPLETED` | нет | нет | Сработала. |
+| `CANCELED` | нет | нет | Отменена. |
+| `ERROR` | — | проблемный терминал | Ошибочное состояние; сделка идёт через сворачивание. |
 
-`isLive` = CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED. ACTIVE
-ставится только после refresh-факта, не по ACK.
+**Активной заявка становится только по наблюдённому факту**, не по
+приёму отправки.
 
-## Матрица переходов
+**Отмена и ошибка требуют непустой причины закрытия**; срабатывание
+ставит свою (`TRIGGERED`). Причина пишется один раз и не перетирается.
 
-Строгий `transitTo` (недопустимый переход → `IllegalStateException`):
+## Приостановленная заявка считается активной
 
-```text
-null                 -> CREATED
-CREATED              -> PENDING | ERROR
-PENDING              -> ACTIVE | COMPLETED | CANCELED | ERROR
-ACTIVE               -> PARTIALLY_COMPLETED | COMPLETED | CANCELED | ERROR
-PARTIALLY_COMPLETED  -> COMPLETED | CANCELED | ERROR
-COMPLETED | CANCELED | ERROR -> (терминальные)
-```
+Она продолжает существовать на бирже и влиять на риск и уборку —
+поэтому трактуется как активная, а не как выбывшая.
 
-`toComplete` ставит `COMPLETED` + `closeReason = TRIGGERED`;
-`toCancel(reason)`/`toError(reason)` требуют ненулевой reason.
+## Проблемные терминалы
 
-## Резолвинг статуса (OKX state → domain)
-
-`AlgoOrderExternalStatusResolver` отвечает только за `external status
-→ domain status`; не сохраняет сущность, не принимает FSM-решения, не
-создаёт команды, не запускает cleanup/kill-switch.
-
-| OKX `state` | Доменная реакция |
-|---|---|
-| `live` | `ACTIVE` |
-| `pause` | `ACTIVE` (active-like: ещё существует, влияет на risk/cleanup) |
-| `partially_effective` | `PARTIALLY_COMPLETED` (recovery-status, добрать факты) |
-| `effective` | `COMPLETED`, `closeReason = TRIGGERED` |
-| `canceled` | `CANCELED`, `closeReason` из cancel intent (не из state) |
-| `order_failed` | `ExternalStatusException(ORDER_FAILED)` |
-| `partially_failed` | `ExternalStatusException(PARTIALLY_FAILED)` (problem-state, часть могла выполниться) |
-| unknown | `ExternalStatusException(UNKNOWN_EXTERNAL_STATUS)` |
-
-Resolver не возвращает `Status.ERROR` как обычный mapping-результат —
-problem/unknown статусы идут через `ExternalStatusException` и
-safety-каскад (`docs/rules/external-status-resolution.md`).
-
-## ERROR-переходы (safety cascade)
-
-`AlgoOrder -> ERROR`, `Deal -> ERROR`, `Exchange -> TRADE_BLOCKED`
+Тропы в `ERROR` и дальше в сворачивание сделки и биржевую ступень
 (`docs/rules/external-status-resolution.md`, `docs/rules/exchange-hold.md`):
 
-- **Problem/unknown external status** (`order_failed` →
-  `ORDER_FAILED`; `partially_failed` → `PARTIALLY_FAILED`; unknown →
-  `UNKNOWN_EXTERNAL_STATUS`) — через `ExternalStatusException`.
-- **Exchange invariant violation** (`tdMode`/`posSide`/`side`/
-  `ordType`/`reduceOnly` mismatch) → `ExternalInvariantViolationException`
-  → `closeReason = EXCHANGE_INVARIANT_VIOLATION` (детали — в
-  `docs/models/mapping/AlgoOrder.md`).
-- **Not found после полного algo evidence-cycle** →
-  `ExternalNotFoundException` → `closeReason = MISSING_AFTER_REFRESH`.
-  Пустой `data=[]` одного endpoint — **не** основание; нужен полный
-  цикл algo-sources (details + pending + history).
+- **отказ постановки** и **частичный отказ** — резолвер отказывает, а не
+  маппит; у частичного отказа часть могла выполниться, поэтому это
+  отдельное проблемное состояние;
+- **неизвестный внешний статус** — причина `UNKNOWN_EXTERNAL_STATUS`;
+- **ненайденность после полного цикла добычи** — причина
+  `MISSING_AFTER_REFRESH`; пустой ответ одного источника основанием не
+  является;
+- **нарушение инварианта биржей** — причина
+  `EXCHANGE_INVARIANT_VIOLATION`, детали перехода — в
+  `docs/models/mapping/AlgoOrder.md`.
 
-Размеры **не** валидируются как hard invariant: `AlgoOrder.size` —
-рассчитанный intent, `externalSize` (`actualSz`) — внешний факт,
-могут отличаться из-за partial trigger/execution.
+**Размеры инвариантом не являются:** заданный размер — рассчитанное
+намерение, внешний — факт биржи; расхождение штатно при частичном
+срабатывании.
 
-## Cancel / replace (по фактам, не по ACK)
+## Снятие и замещение
 
-`CANCEL_ALGO_ORDER_COMMAND` не финализирует `AlgoOrder`: ACK не runtime
-truth. FSM сначала делает refresh, потом при необходимости создаёт
-cancel; executor отправляет команду, сохраняет ACK, не финализирует.
-После cancel intent верим exchange fact: `effective` →
-`COMPLETED`/`TRIGGERED`; `partially_effective` →
-`PARTIALLY_COMPLETED`; `canceled` → `CANCELED` + `closeReason` из
-cancel intent (`CANCELED_BY_STRATEGY` / `REPLACED_BY_STRATEGY` /
-`KILL_SWITCH` / `MANUAL_CANCEL`); `order_failed`/`partially_failed` →
-`ExternalStatusException`. После рестарта: собрать `DealContext`,
-refresh/history, верить фактам; если всё ещё live и cancel нужен —
-повторить.
+**Снятие не финализирует заявку** — финализирует наблюдённый факт.
+Порядок: рефреш → при необходимости снятие → вера факту. После снятия
+факт может показать срабатывание, частичное срабатывание или отмену —
+причина отмены берётся из нашего намерения, не из статуса источника.
 
-Ремоделирование (REPLACE) algo-order амендной команды не имеет:
-новая сущность ставится первой (protective-порядок), старая
-отменяется с `closeReason = REPLACED_BY_STRATEGY` после
-подтверждения новой фактом; цепочка — `replacesInternalId`
-(`docs/rules/replace-not-amend.md`).
+**Замещения на месте нет:** новая заявка ставится первой, старая
+снимается после подтверждения новой фактом; цепочка резолвится по
+указателю предшественника (`docs/rules/replace-not-amend.md`).
 
-## Граница refresh-executor
-
-`RefreshAlgoOrderExecutor` обновляет **только** `AlgoOrder` (по
-algo-order endpoints): `externalId`, `externalStatus`, `failCode`,
-`externalSize`, `externalPrice`, `externalTriggerTime`, condition
-external fields, `linkedOrderExternalIds`, `status` через resolver.
-Не ходит в ordinary orders / fills / positions — эти команды
-выбирает FSM/DealOrchestrator после анализа `DealContext`.
-`linkedOrderExternalIds` только сохраняются: на первом этапе не
-создают `Order`/`DealActionState`, не являются FSM-target.
+После рестарта: собрать контекст, добыть факты, поверить им; если
+заявка всё ещё жива и снятие нужно — повторить.

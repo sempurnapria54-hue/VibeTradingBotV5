@@ -58,6 +58,4 @@
   (`docs/rules/market-data-retention.md` пересмотра).
 - **Анти-whipsaw — операнд-уровневый.** Сглаживающие периоды индикаторов и
   структурный `breakoutConfirmationBars`; отдельной подтверждаемости/
-  гистерезиса фазы нет — открытый торговый вопрос PHASE-Q1
-  (`.claude/work/questions/open-questions.md`,
-  `docs/models/domain/other/MarketPhase.md` торговый вопрос).
+  гистерезиса фазы нет — это открытый торговый вопрос.

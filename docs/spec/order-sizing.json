@@ -1,6 +1,6 @@
 {
   "subject": "order-sizing",
-  "question": "Какой размер получает действие после округления и что происходит, когда он меньше минимального",
+  "question": "Какой размер получает действие",
   "home": "docs/components/SizeCalculator.md",
 
   "operands": {

@@ -13,17 +13,16 @@ configuration», «Set position mode», «Set leverage», «Get leverage»).
 перевыкачка + дифф при каждом заходе интегратора по источнику и по
 задаче «актуализируй» (`.claude/processes/api-docs-completion.md`,
 канал чтения — `.claude/skills/integration-okx.md`). Последняя
-сверка: 2026-06-11 (прогон 3, поле-уровневая дистилляция).
+сверка: 2026-06-11 (поле-уровневая дистилляция).
 
 ## Статус использования
 
-Не используется. Форвард-кандидат **В-9** (шаг 5 / bootstrap):
+Не используется. Форвард-кандидат на bootstrap:
 старт-валидация посылок адаптера — адаптер шлёт константы
 `tdMode=isolated`, `posSide=net` (`rules/adapter-constants.md`) как
 данность; `GET /account/config` позволяет подтвердить `posMode` и
-режим счёта на старте, `set-*` — привести к ожидаемым. Смежно:
-INSTR-Q2 (кто и когда выставляет плечо), В-2 (применимость
-precheck по `acctLv`).
+режим счёта на старте, `set-*` — привести к ожидаемым. Смежное: кто и когда выставляет плечо;
+применимость precheck по уровню счёта.
 
 ## GET /api/v5/account/config
 
@@ -37,7 +36,7 @@ Permission `Read`; rate limit 5 req / 2 s по User ID. Без параметр�
 | `perm` | Права текущего API-ключа: `read_only` / `trade` / `withdraw` (через запятую). |
 | `ip` | IP-привязки текущего ключа (`""` — без привязки). |
 | `uid` / `mainUid` | ID аккаунта / главного аккаунта (равны — мы на главном). |
-| `acctStpMode` | Аккаунт-уровневый self-trade prevention: `cancel_maker` (default) / `cancel_taker` / `cancel_both` (см. В-5: STP сознательно не используем — действует биржевой default). |
+| `acctStpMode` | Аккаунт-уровневый self-trade prevention: `cancel_maker` (default) / `cancel_taker` / `cancel_both` (STP сознательно не используем — действует биржевой default). |
 | `autoLoan` | Авто-заём в мульти-валютной марже. |
 | `ctIsoMode` / `mgnIsoMode` | Режим переводов маржи isolated-деривативов / isolated-маржи (automatic / autonomy / quick_margin...). |
 | `greeksType` | Формат греков (PA/BS) — OPTION. |

@@ -36,20 +36,38 @@ public final class Spec {
 
     private final List<Map<String, Object>> examples = new ArrayList<>();
 
-    private Spec(Map<String, Object> raw) {
+    private Spec(Map<String, Object> raw, Path directory) throws IOException {
         this.subject = String.valueOf(raw.get("subject"));
-        for (Object value : list(raw.get("values"))) {
-            Map<String, Object> definition = asMap(value);
-            values.put(String.valueOf(definition.get("name")), definition);
+        for (Object included : list(raw.get("includes"))) {
+            Path file = directory.resolve(String.valueOf(included) + ".json");
+            addValues(list(asMap(MAPPER.readValue(file.toFile(), Map.class)).get("values")),
+                    String.valueOf(included));
         }
+        addValues(list(raw.get("values")), subject);
         for (Object example : list(raw.get("examples"))) {
             examples.add(asMap(example));
         }
     }
 
+    /**
+     * Подключает величины: свои и заимствованные по {@code includes}.
+     * Одноимённая величина из двух источников — отказ: у формулы один дом.
+     */
+    private void addValues(List<Object> definitions, String origin) {
+        for (Object value : definitions) {
+            Map<String, Object> definition = asMap(value);
+            String name = String.valueOf(definition.get("name"));
+            if (values.containsKey(name)) {
+                throw new SpecException("Величина объявлена дважды: " + name + " (в " + origin + ")");
+            }
+            values.put(name, definition);
+        }
+    }
+
     /** Загружает спецификацию из файла. */
     public static Spec load(Path file) throws IOException {
-        return new Spec(MAPPER.readValue(file.toFile(), Map.class));
+        Path directory = file.getParent() == null ? Path.of(".") : file.getParent();
+        return new Spec(MAPPER.readValue(file.toFile(), Map.class), directory);
     }
 
     /** Все спецификации каталога, в порядке имён файлов. */

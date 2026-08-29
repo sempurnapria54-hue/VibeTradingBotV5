@@ -1,6 +1,6 @@
 {
   "subject": "protection-coverage",
-  "question": "Какое покрытие несут защиты живого эпизода, достаточно ли оно и законно ли снятие защиты",
+  "question": "Каково покрытие защиты живого эпизода",
   "home": "docs/rules/live-risk-protection.md",
 
   "operands": {

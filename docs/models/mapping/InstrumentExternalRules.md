@@ -76,7 +76,7 @@ contracts = baseQty / ctVal
 `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `INSTRUMENT_NOT_LIVE`). Решение —
 `docs/models/domain/other/InstrumentExternalRules.md`.
 
-### Разграничение со снапшотом инструмента (шаг 1)
+### Разграничение со снапшотом инструмента
 
 Биржевые `state`/`lever` приходят и на шаге 1 в доменный `Instrument`
 (`externalStatus`/`externalLeverage`, через `InstrumentExternalSnapshot`,
@@ -84,9 +84,8 @@ contracts = baseQty / ctVal
 на шаге 5. **Авторитетный для преконтроля источник** торгуемости и потолка
 плеча — rules (`Status`/`externalState`, `externalMaxLeverage`); одноимённые
 сырые поля на `Instrument` несут то же значение, но для преконтроля не
-авторитетны (дубль; устранение — мелкая чистка). Решение —
-`docs/models/domain/other/InstrumentExternalRules.md` (закрыт INSTR-Q1,
-снят leverage/HOLD-под-вопрос INSTR-Q2).
+авторитетны (дубль; устранение — мелкая чистка). Авторитетный носитель —
+`docs/models/domain/other/InstrumentExternalRules.md`.
 
 ### Не маппимые поля OKX
 

@@ -1,6 +1,6 @@
 {
   "subject": "pnl-reconciliation",
-  "question": "Чему равен допуск сверки, какие строки в него входят и сошлась ли сверка",
+  "question": "Сошлась ли сверка P&L",
   "home": "docs/rules/pnl-reconciliation.md",
 
   "operands": {

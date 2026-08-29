@@ -27,7 +27,7 @@
 | `subType` | подтип; funding `173` (expense) / `174` (income) → резолв `FUNDING`; сырой → `externalSubType`. Актуальный список — справочник OKX |
 | `ts` | время bill-события (Unix ms) → `DealCashFlow.externalCreatedAt` |
 | `balChg` | изменение баланса (знаковое) → `amount` |
-| `fee` | комиссионная/rebate-компонента записи (знаковая: минус = комиссия, плюс = ребейт) → `externalFee` — **число** комиссии; категорию **не определяет**: `TRADE_FEE`/`REBATE`, как и остальные категории, резолвятся из `type`/`subType` (H9) |
+| `fee` | комиссионная/rebate-компонента записи (знаковая: минус = комиссия, плюс = ребейт) → `externalFee` — **число** комиссии; категорию **не определяет**: `TRADE_FEE`/`REBATE`, как и остальные категории, резолвятся из `type`/`subType` |
 | `ccy` | валюта движения (`USDT`) → `ccy` (обязательно — cross-ccy guard) |
 | `ordId` | id ордера, если bill связан с ордером → `externalOrderId` (nullable) |
 | `instId` | инструмент движения → `externalInstrumentId` (сырой, nullable). Не только фильтр матчинга: **ось предиката линковки** и колонка отбора |
@@ -43,8 +43,8 @@
 самостоятельной fee-записи — рантайм-вопрос (контур source-api,
 `.claude/tests/source-api/okx/plan.md` **.5**, фикстура общая с.5;
 `docs/models/mapping/DealCashFlow.md`). Категорию `fee`
-не определяет — резолв категории идёт по `type`/`subType` (H9,
-`docs/models/mapping/DealCashFlow.md`).
+не определяет — резолв категории идёт по `type`/`subType`
+(`docs/models/mapping/DealCashFlow.md`).
 
 ### Не используется runtime фазы 1 (отбрасывается на маппинге)
 

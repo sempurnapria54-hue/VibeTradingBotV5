@@ -41,7 +41,7 @@ Rate limit: 20 req / 2 s по IP + Instrument Type. Query: `instType`
 обязателен (`SPOT`/`MARGIN`/`SWAP`/`FUTURES`/`OPTION`), `instId` опц.
 для точечного запроса.
 
-**Рантайм (2026-06-19, demo, контур source-api / M1; провенанс
+**Рантайм (2026-06-19, demo, контур source-api; провенанс
 `рантайм`):** несуществующий `instId` (при валидном `instType`) →
 **реджект** `51001` «Instrument ID … doesn't exist», а не `code=0` с
 пустым `data`. Поведение совпадает с ticker/candles/mark-price.
@@ -51,4 +51,4 @@ WS-альтернатива (на первом этапе не использу�
 `instruments` — событие приходит по одному/нескольким инструментам с
 теми же полями, что REST, плюс `uTime`. На обновление adapter
 перезаписывает поля спецификации и обновляет `sourceUpdatedAt`.
-Подробнее по WS-каналам — OKX-Q4 в open-questions.
+Состав WS-каналов подробно не разобран — вопрос открыт.

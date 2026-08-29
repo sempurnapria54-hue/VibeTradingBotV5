@@ -7,139 +7,97 @@
 
 Структура моделей — в `docs/models/domain/core/Order.md`.
 
+**Дом матриц переходов и предикатов — исполнимая спецификация**
+`docs/spec/order-lifecycle.json` (`orderTransitionAllowed`,
+`attachedTransitionAllowed`, `orderIsLive`, `orderCarriesLiveRisk`,
+`attachedIsActiveLike`, `attachedBecomesActive`,
+`missingAttachedOutcome`). Здесь — смысл состояний, там — форма и
+примеры.
+
 ## Кто управляет
 
-Статусы меняет refresh/search/history flow по exchange facts: сырой
-внешний статус нормализуется через `OrderExternalStatusResolver`
-(ordinary order) и `AttachedAlgoOrderStateResolver` (attached, по
-фактам), затем executor применяет результат. FSM/handlers **не**
-используют `externalStatus` напрямую (см.
-`docs/rules/external-status-resolution.md`).
+Статусы меняет добыча фактов у биржи: сырой внешний статус
+нормализуется резолвером, затем исполнитель применяет результат.
+Обработчики FSM внешний статус напрямую не читают
+(`docs/rules/external-status-resolution.md`).
 
-## `Order.Status`
+## Состояния `Order`
 
-| Статус | Runtime-active | Final | Live risk | Смысл |
+| Статус | Живой | Терминальный | Живой риск | Смысл |
 |---|---|---|---|---|
-| `CREATED` | да | нет | нет на бирже | Локальная запись создана, нужен submit/recovery. |
-| `PENDING` | да | нет | неизвестно | Submit был/мог быть, нужен refresh/search. ACK не runtime truth (`docs/rules/ack-not-runtime-truth.md`). |
-| `ACTIVE` | да | нет | да | Ордер live, может исполниться. |
-| `PARTIALLY_COMPLETED` | да | нет | да | Частично исполнен, есть live-остаток. |
-| `COMPLETED` | нет | да | нет | Полностью исполнен. |
-| `CANCELED` | нет | да | нет | Отменён. |
-| `ERROR` | — | problem-final | неизвестно | Problem state; сделка идёт через safety/recovery. |
+| `CREATED` | да | нет | нет на бирже | Локальная запись создана, отправки ещё не было. |
+| `PENDING` | да | нет | неизвестен | Отправка была или могла быть; факт не наблюдён. Приём заявки биржей состоянием не является (`docs/rules/ack-not-runtime-truth.md`). |
+| `ACTIVE` | да | нет | да | Заявка стоит на бирже и может исполниться. |
+| `PARTIALLY_COMPLETED` | да | нет | да | Часть налита, живой остаток есть. |
+| `COMPLETED` | нет | да | нет | Исполнена полностью. |
+| `CANCELED` | нет | да | нет | Отменена. |
+| `ERROR` | — | проблемный терминал | неизвестен | Проблемное состояние; сделка идёт через сворачивание. |
 
-`isLive` = CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED. ACTIVE
-ставится только после refresh/search факта, не по ACK.
+**Активной заявка становится только по наблюдённому факту.** Отправка
+даёт `PENDING`; из `PENDING` наблюдение может застать заявку уже
+исполненной или отменённой — поэтому переход туда напрямую допустим.
 
-## `AttachedAlgoOrder.Status` и матрица переходов
+## Состояния `AttachedAlgoOrder`
 
-| Статус | Active-like | Final | Смысл |
+| Статус | Живой на бирже | Терминальный | Смысл |
 |---|---|---|---|
-| `CREATED` | да | нет | Local intent вместе с parent Order. |
-| `PENDING` | да | нет | Parent отправлен/мог быть, active-факт не подтверждён. |
-| `ACTIVE` | да | нет | Подтверждена refresh-фактами, может сработать. |
+| `CREATED` | нет | нет | Намерение вместе с родительской заявкой. |
+| `PENDING` | да | нет | Родитель отправлен; живость защиты не подтверждена. |
+| `ACTIVE` | да | нет | Подтверждена наблюдением, может сработать. |
 | `COMPLETED` | нет | да | Сработала. |
-| `CANCELED` | нет | да | Отменена/снята. |
-| `ERROR` | — | problem-final | Ошибочное состояние. |
+| `CANCELED` | нет | да | Снята. |
+| `ERROR` | — | проблемный терминал | Ошибочное состояние. |
 
-`isActiveLike` = PENDING/ACTIVE. Допустимые переходы (`canTransitionTo`):
+**У встроенной защиты нет частичного срабатывания** — множество её
+состояний уже, чем у отдельной условной заявки.
 
-```text
-null     -> CREATED
-CREATED  -> PENDING | ERROR
-PENDING  -> ACTIVE | CANCELED | ERROR
-ACTIVE   -> COMPLETED | CANCELED | ERROR
-COMPLETED | CANCELED | ERROR -> (терминальные, переходов нет)
-```
+**Живость подтверждается только родителем:** защита найдена в его
+снапшоте по клиентскому идентификатору и кода отказа постановки нет.
+Заполненный код отказа означает, что на бирже заявки нет, — состояние
+`ERROR`.
 
-Недопустимый переход → `IllegalStateException`.
+Источник не даёт встроенной защите собственного статуса, поэтому она
+обновляется по набору фактов родителя, а не резолвом статуса.
 
-### PENDING vs ACTIVE
+## Отсутствие встроенной защиты в снапшоте
 
-```text
-PENDING -> после SUBMIT_ORDER_COMMAND parent order (attached могла быть
-           отправлена вместе с parent, active-факт не подтверждён)
-ACTIVE  -> только после REFRESH_ORDER_COMMAND, если
-           attached найдена в OrderExternalSnapshot.attachedAlgoOrders
-           по internalId и нет failCode / failReason
-```
+**Не финальный факт.** Исход зависит от состояния родителя — перечень и
+предикат в `docs/spec/order-lifecycle.json`
+(`missingAttachedOutcome`), смысл исходов:
 
-Заполненные `failCode`/`failReason` → `ERROR`.
+| Исход | Что значит | Причина закрытия |
+|---|---|---|
+| `WAIT` | Родитель ещё не подтверждён — наблюдаем дальше. | — |
+| `SEARCH_MORE` | Родитель живой: вывод по одному снапшоту не делается, цикл добычи продолжается. | — |
+| `PROTECTION_LOST` | Родитель исполнен, позиция жива, отдельной защиты нет: живой риск остался без покрытия. Защита и сделка — в `ERROR`. | `PROTECTION_LOST` |
+| `ANALYSE_HISTORY` | Покрытие не потеряно: позиция закрыта либо её несёт отдельная защита. Исход берётся из истории. | по найденному факту |
+| `CANCEL_BY_PARENT` | Родитель отменён — защита закрывается вместе с ним. | `PARENT_ORDER_CANCELED` |
+| `ERROR` | Родитель в проблемном состоянии — защита туда же. | `UNKNOWN` |
 
-## Attached protection resolving (по фактам)
+Отмена родителя с ненулевым налитым объёмом штатной тропой не возникает:
+замещение входа при непустом филле идёт «поставить новое → подтвердить →
+снять старое», поэтому налитое к моменту отмены уже покрыто новой ногой
+(`docs/rules/replace-not-amend.md`, `docs/rules/live-risk-protection.md`).
 
-У OKX `attachAlgoOrds` нет полноценного `state`, поэтому attached
-обновляется не простым status-resolver'ом, а по набору фактов.
-Матчинг: `AttachedAlgoOrder.internalId ==
-AttachedAlgoOrderExternalSnapshot.internalId` (OKX `attachAlgoClOrdId`).
+## Чем обновляется
 
-## Missing attached protection policy
+Команда рефреша заявки проходит цикл добычи внутри себя
+(`docs/rules/command-lifecycle.md`): точечный запрос заявки → список
+живых по инструменту → история. Ненайденность среди живых терминальным
+фактом не является; терминал даёт только исчерпанный цикл.
 
-Отсутствие `AttachedAlgoOrderExternalSnapshot` в одном
-`OrderExternalSnapshot.attachedAlgoOrders` — **не** финальный факт.
-Решение зависит от статуса parent `Order`:
+Числа налива (`accumulatedFillSize`, средняя цена, комиссия) приходят
+той же командой готовыми агрегатами — отдельной команды за филлами нет.
 
-```text
-parent CREATED / PENDING
-  -> attached остаётся PENDING; ждём refresh / retry / recovery.
+## Проблемные терминалы
 
-parent ACTIVE / PARTIALLY_COMPLETED
-  -> дополнительный search-cycle (REFRESH_ORDER_COMMAND — внутр. pending/history,
-     REFRESH_POSITION_COMMAND);
-     не делаем вывод по одному snapshot.
+Три тропы в `ERROR` и дальше в сворачивание сделки и биржевую ступень
+(`docs/rules/external-status-resolution.md`, `docs/rules/exchange-hold.md`):
 
-parent COMPLETED
-  -> если позиция active и standalone main protection отсутствует:
-       attached -> ERROR, closeReason = PROTECTION_LOST, Deal -> ERROR.
-  -> если позиция закрыта — анализ order-history / фактов позиции:
-       attached сработал -> COMPLETED / TRIGGERED;
-       закрыта иначе      -> CANCELED / UNKNOWN;
-       непонятно          -> ERROR / UNKNOWN.
-
-parent CANCELED
-  -> attached -> CANCELED, closeReason = PARENT_ORDER_CANCELED.
-     (Отмена родителя с НЕПУСТЫМ accumulatedFillSize штатной тропой
-      не возникает: entry-REPLACE при непустом филле идёт
-      place-new -> подтверждение -> cancel-old, поэтому налитый объём
-      к моменту отмены уже покрыт новой ногой —
-      docs/rules/replace-not-amend.md п.3,
-      docs/rules/live-risk-protection.md.)
-
-parent ERROR
-  -> attached -> ERROR, closeReason = UNKNOWN.
-```
-
-## Exchange facts, обновляющие Order
-
-- **`REFRESH_ORDER_COMMAND`** — обновляет `Order` из `OrderExternalSnapshot`
-  (externalId, externalStatus, status через resolver, side, price, size,
-  accumulatedFillSize, averagePrice, fee, attachedAlgoOrders), проходя
-  evidence-cycle **внутри команды**
-  (`docs/rules/command-lifecycle.md`):
-  - `GET /trade/order` — конкретный parent `Order`;
-  - `orders-pending` — список live/pending по инструменту; не найден среди
-    pending — **не** финальный факт отмены/исполнения;
-  - `orders-history` (+ archive) — terminal-факт (COMPLETED / CANCELED /
-    ERROR при нераспознанном статусе), когда не найден среди pending.
-
-  Order-fill-метрики (`accumulatedFillSize`, `averagePrice`, `fee`)
-  приходят в `Order` этим же `REFRESH_ORDER_COMMAND` — готовыми агрегатами из
-  `OkxOrderResponse` (`accFillSz`/`avgPx`); отдельной fill-команды нет.
-
-## ERROR-переходы (safety cascade)
-
-Оба сценария — cross-cutting safety-каскад `Order -> ERROR`,
-`Deal -> ERROR`, `Exchange -> TRADE_BLOCKED` (см.
-`docs/rules/external-status-resolution.md` и `docs/rules/exchange-hold.md`):
-
-- **Unknown external status**: resolver бросает
-  `ExternalStatusException(UNKNOWN_EXTERNAL_STATUS)` (не возвращает
-  `Status.ERROR` как обычный mapping-результат) → boundary ловит →
-  `Order.ERROR` + `closeReason = UNKNOWN_EXTERNAL_STATUS` → каскад.
-- **Not found после полного evidence-cycle**:
-  `ExternalNotFoundException` → `Order.ERROR` + `closeReason =
-  MISSING_AFTER_REFRESH` → каскад. Пустой ответ одного endpoint —
-  **не** основание для `MISSING_AFTER_REFRESH`.
-- **Exchange invariant violation** (`reduceOnly` mismatch и пр.):
-  `Order.ERROR` + `closeReason = EXCHANGE_INVARIANT_VIOLATION` →
-  каскад (детали — `docs/models/mapping/Order.md`).
+- **неизвестный внешний статус** — резолвер отказывает, а не маппит;
+  причина `UNKNOWN_EXTERNAL_STATUS`;
+- **ненайденность после полного цикла добычи** — причина
+  `MISSING_AFTER_REFRESH`;
+- **нарушение инварианта биржей** (например, несовпадение признака
+  «только на уменьшение») — причина `EXCHANGE_INVARIANT_VIOLATION`,
+  детали перехода — `docs/models/mapping/Order.md`.

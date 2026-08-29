@@ -1,6 +1,6 @@
 {
   "subject": "deal-risk-numbers",
-  "question": "Чему равны четыре числа риска сделки и по какому предикату отбираются их слагаемые",
+  "question": "Чему равны четыре числа риска сделки",
   "home": "docs/models/domain/aggregate/Deal.md",
 
   "operands": {

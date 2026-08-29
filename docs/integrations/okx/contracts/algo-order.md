@@ -15,7 +15,7 @@ order history»; changelog — `https://www.okx.com/docs-v5/log_en/`).
 перевыкачка + дифф при каждом заходе интегратора по источнику и по
 задаче «актуализируй» (`.claude/processes/api-docs-completion.md`,
 канал чтения — `.claude/skills/integration-okx.md`). Последняя
-сверка: 2026-06-11 (прогон 3 — cancel/amend/query поле-уровнево,
+сверка: 2026-06-11 (cancel/amend/query поле-уровнево,
 симметрия advance-семейства).
 
 **Рантайм-расхождение (2026-06-20, провенанс `рантайм`):**
@@ -65,8 +65,7 @@ order history»; changelog — `https://www.okx.com/docs-v5/log_en/`).
   limit 20 req / 2 s по User ID. История доступна за последние 3
   месяца. Query: **`ordType` обязателен** (вычисляется из
   `conditionType`); + одно из `state` (`effective`/`canceled`/
-  `order_failed` — `partially_failed` из текущего офдока ушёл,
-  дрейф зафиксирован прогоном 3) или `algoId`; опц. `instType`,
+  `order_failed` — `partially_failed` из текущего офдока ушёл) или `algoId`; опц. `instType`,
   `instId`, пагинация `after`/`before` по `algoId`, `limit` ≤ 100.
 
 ### Видимость advance-семьи в query (симметрия, офдок)
@@ -128,59 +127,31 @@ conditional) → `cancel-algos`; **advance** (trailing
 (`conditionType → ordType → семья`, маппинг —
 `docs/models/mapping/AlgoOrder.md`).
 
-### Находка И-2 (прогон 3): cancel-advance-algos выведен из офдока
+### Отмена advance-семьи: endpoint вне офдока, но живой
 
-Свежая сверка живого офдока (2026-06-11) меняет фактуру прогона 2:
+**Факт офдока.** `cancel-advance-algos` исключён из документации
+2025-04-24 и в текущем доке отсутствует. Нормативный текст «Cancel algo
+order» ограничения по семье не несёт, но пример той же секции
+называет iceberg / twap / trailing исключениями — страница противоречит
+себе.
 
-- **Changelog 2025-04-24:** «Delisted endpoints from the document —
-  Cancel Advance Algo Order». В текущем доке `cancel-advance-algos`
-  отсутствует (0 упоминаний на странице); добавлен был ~2021-09/10
-  вместе с WS-каналом advance algo.
-- **Конфликт внутри страницы:** нормативный текст «POST / Cancel
-  algo order» ограничения по семье **не несёт** («Cancel unfilled
-  algo orders»), но Python-пример той же секции комментирует
-  «not including Iceberg order, TWAP order, Trailing Stop order».
-- Фактура прогона 2 («две семьи cancel», офдок-провенанс через
-  okx.com-поиск) опиралась, по-видимому, на устаревший
-  индексированный контент.
+**Рантайм (2026-06-20, demo, контур source-api; провенанс `рантайм`).**
+Endpoint жив: постановка `move_order_stop` (и долевой, и абсолютный
+откат) с последующей отменой через `cancel-advance-algos` вернула успех;
+несуществующий идентификатор — реджект `51293`.
 
-**Следствие для решения (а) — провалидировано (пользователь,
-2026-06-11, принято без правки по существу):** ветвление (а) стоит
-как есть; advance-ветка сохраняет пометку «endpoint вне текущего
-офдока». Снятие И-2 — **runtime-проверка в demo trading**
-(постановка + отмена `move_order_stop` через `cancel-algos`) на
-`CODE` шага 4. Оговорка по исполнению: кредов demo trading пока нет
-— проверка ждёт их появления (креды — за пользователем); до
-проверки документальная фактура прогона 3 принимается как
-достоверная. Если `cancel-algos` отменит обе семьи — ветвление
-вырождается в один путь; если нет — advance-путь остаётся на
-выведенном из дока (но исторически рабочем) endpoint'е.
+**Следствие.** Ветвление по семье остаётся; расхождение
+офдок ↔ биржа держится на провенансе `рантайм`, офдок не
+подменяется (`.claude/rules/external-source-sync.md`). Отменяет ли
+`cancel-algos` также и advance-семью — не проверено; корректность
+ветвления это не блокирует.
 
-**Снятие И-2 — рантайм-подтверждено (2026-06-20, demo, контур
-source-api, кейсы M19tr/M19trs/M21; провенанс `рантайм` /
-`подтверждён-прогоном`):** `cancel-advance-algos` **жив на demo вопреки
-офдоку**. Постановка `move_order_stop` (`callbackRatio` и абсолютный
-`callbackSpread`) + отмена через `cancel-advance-algos` вернули
-`b.code="0"`, `data[0].sCode="0"` — endpoint рабочий. Фейк-`algoId` →
-`b.code="1"`, `data[0].sCode="51293"` «The bot doesn't exist or has
-already stopped». **Вывод:** advance-ветвь решения (а) (`cancel-advance-algos`
-для trailing) — рабочая; ветвление по семье остаётся как есть, оговорка
-«ждёт demo-кредов» снята. Endpoint остаётся вне офдока (delisted
-2025-04-24), но подтверждён живым — расхождение офдок↔биржа держится на
-провенансе `рантайм`, офдок не подменяется (канон `external-source-sync`;
-тот же канон — `cancel-advance-algos` в манифесте покрытия). Вырождение
-ветвления (отменяет ли `cancel-algos` и advance-семью) в этом прогоне не
-проверялось — отдельный вопрос, корректность ветвления (а) не блокирует.
+### Amend advance-семьи биржей не поддерживается
 
-### Находка И-3 (прогон 3) — следствие закрыто решением REPLACE-only
-
-Биржевой факт: `amend-algos` нормативно поддерживает только
-Stop/Trigger; standalone `move_order_stop` / iceberg / twap **не
-амендятся** (см. Endpoints → Amend). Следствие закрыто: домен не амендит **ничего** —
-ремоделирование любой сущности идёт REPLACE-оркестрацией
-(`docs/rules/replace-not-amend.md`); амендная асимметрия биржи
-перестала касаться доменного слоя (исторически И-3 — один из
-триггеров выбора REPLACE-only).
+`amend-algos` нормативно поддерживает только Stop/Trigger; standalone
+`move_order_stop` / iceberg / twap не амендятся. Доменного слоя это не
+касается: ремоделирование идёт только через замещение
+(`docs/rules/replace-not-amend.md`).
 
 ## Evidence-cycle
 
