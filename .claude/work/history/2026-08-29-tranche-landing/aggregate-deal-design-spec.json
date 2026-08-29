@@ -1,0 +1,526 @@
+{
+  "subject": "aggregate-deal-design",
+  "question": "Держатся ли инварианты агрегатной сделки и траншей на эталоне и на гриде",
+  "home": ".claude/work/history/2026-08-29-tranche-landing/aggregate-deal-design.md",
+
+  "note": "Аннекс дизайн-прохода, а не корпусная спецификация: проверяет предлагаемую конструкцию до её приземления. Прогон — SPEC_DIR=.claude/work/history/2026-08-29-tranche-landing bash tools/spec-run.sh. Конструкция приземлена: действующие дома величин — docs/spec/protection-coverage.json, docs/spec/deal-lifecycle.json, docs/spec/deal-tranche-lifecycle.json. Здесь — артефакт прохода, а не источник правды.",
+
+  "operands": {
+    "deal.status": "статус агрегата: ACTIVE, EXIT_PENDING, CLOSED, ERROR, EMERGENCY_CLOSED",
+    "position.externalSize": "Position.externalSize живого эпизода — биржевой факт агрегата",
+    "position.live": "Position.hasLiveRisk()",
+    "tranches[].status": "статус транша: PRECHECK … EXIT_PENDING, CLOSED",
+    "tranches[].reopenAllowed": "StrategyTranche.positionReopenAllowed — свойство транша, не сделки",
+    "tranches[].orders[]": "заявки транша: вход и reduce-only выход",
+    "tranches[].orders[].type": "ENTRY, ENTRY_ATTACHED_STOP_LOSS, REDUCE_ONLY",
+    "tranches[].orders[].status": "доменный статус заявки",
+    "tranches[].orders[].accumulatedFillSize": "накопленный филл заявки в контрактах",
+    "tranches[].protections[]": "защиты транша: встроенная в его входную заявку и standalone",
+    "tranches[].protections[].closedSize": "наблюдённый закрытый объём: externalSize у standalone; size у встроенной при терминальном срабатывании",
+    "tranches[].commitments[]": "строки исполнения защитных действий транша",
+    "from/to": "предполагаемое ребро статуса — агрегата либо транша"
+  },
+
+  "values": [
+    {
+      "name": "isEntryOrder",
+      "expr": "in(type, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')"
+    },
+    {
+      "name": "isLiveOrder",
+      "expr": "in(status, 'CREATED', 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED')"
+    },
+    {
+      "name": "trancheEntryFilled",
+      "note": "Сколько транш налил своими входными заявками.",
+      "op": "sum",
+      "over": "orders",
+      "where": "isEntryOrder",
+      "of": "accumulatedFillSize"
+    },
+    {
+      "name": "trancheReduceOnlyFilled",
+      "note": "Сколько транш закрыл своими reduce-only заявками.",
+      "op": "sum",
+      "over": "orders",
+      "where": "type == 'REDUCE_ONLY'",
+      "of": "accumulatedFillSize"
+    },
+    {
+      "name": "trancheProtectionClosed",
+      "note": "Сколько закрыли сработавшие защиты транша. У встроенной объём читается её размером — это законно ровно потому, что поногий инвариант требует покрытия филла целиком.",
+      "op": "sum",
+      "over": "protections",
+      "of": "coalesce(?closedSize, 0)"
+    },
+    {
+      "name": "trancheExposure",
+      "note": "Экспозиция транша — производная его собственных заявок, а не накопитель. Порядок событий на неё не влияет.",
+      "expr": "trancheEntryFilled - trancheReduceOnlyFilled - trancheProtectionClosed"
+    },
+    {
+      "name": "trancheHasLiveEntryOrder",
+      "op": "any",
+      "over": "orders",
+      "of": "isEntryOrder && isLiveOrder"
+    },
+
+    {
+      "name": "isLiveProtection",
+      "note": "Живая защита. CREATED не входит нигде: заявка на бирже не подтверждена.",
+      "expr": "if(carrier == 'ATTACHED', in(status, 'PENDING', 'ACTIVE'), in(status, 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED'))"
+    },
+    {
+      "name": "carriesActiveStopLevel",
+      "note": "Несёт действующий уровень остановки убытка. Форма не меняется дизайном — меняется только область, по которой она суммируется.",
+      "expr": "if(kind == 'TAKE_PROFIT', false, if(kind == 'TRAILING', isNull(?activationPrice) || notNull(?observedTrailingPrice), true))"
+    },
+    {
+      "name": "isProtection",
+      "expr": "isLiveProtection && carriesActiveStopLevel"
+    },
+    {
+      "name": "coveredSize",
+      "note": "Сколько реально закроет эта защита. У встроенной — не больше филла своей входной заявки; у standalone — остаток после срабатывания.",
+      "expr": "if(carrier == 'ATTACHED', min(size, parentFillSize), size - coalesce(?closedSize, 0))"
+    },
+    {
+      "name": "trancheCoverage",
+      "note": "Покрытие транша: только его собственные защиты. Кросс-траншевых слагаемых в сумме нет по построению.",
+      "op": "sum",
+      "over": "protections",
+      "where": "isProtection",
+      "of": "coveredSize"
+    },
+    {
+      "name": "trancheCovered",
+      "note": "Инвариант транша: каждый транш закрыт своим стопом.",
+      "expr": "trancheCoverage >= trancheExposure"
+    },
+    {
+      "name": "trancheHasCommitment",
+      "op": "any",
+      "over": "commitments",
+      "of": "!terminal && !budgetExhausted"
+    },
+    {
+      "name": "trancheViolated",
+      "expr": "trancheExposure > 0 && !trancheCovered && !trancheHasCommitment"
+    },
+    {
+      "name": "trancheCoverageAfterRemoval",
+      "note": "Покрытие транша после того, как снимаемая защита исчезнет. Операнд снятия — тоже траншевый.",
+      "op": "sum",
+      "over": "protections",
+      "where": "isProtection && id != cancelTargetId",
+      "of": "coveredSize"
+    },
+    {
+      "name": "trancheRemovalAllowed",
+      "expr": "trancheCoverageAfterRemoval >= trancheExposure"
+    },
+
+    {
+      "name": "allTranchesCovered",
+      "note": "Агрегатная достаточность выводится, а не проверяется отдельно.",
+      "op": "all",
+      "over": "tranches",
+      "of": "trancheCovered"
+    },
+    {
+      "name": "anyTrancheViolated",
+      "op": "any",
+      "over": "tranches",
+      "of": "trancheViolated"
+    },
+    {
+      "name": "dealExposure",
+      "op": "sum",
+      "over": "tranches",
+      "of": "trancheExposure"
+    },
+    {
+      "name": "dealCoverage",
+      "op": "sum",
+      "over": "tranches",
+      "of": "trancheCoverage"
+    },
+    {
+      "name": "aggregateCoverageSufficient",
+      "note": "Сегодняшняя форма предиката — глобальная сумма против нетто-размера. Держится в аннексе только для сравнения: поногий инвариант строже.",
+      "expr": "dealCoverage >= position.externalSize"
+    },
+    {
+      "name": "exposureReconciled",
+      "note": "Сверка модели с биржевым фактом: сумма экспозиций траншей равна нетто-позиции. Расхождение — неатрибутируемый живой риск.",
+      "expr": "dealExposure == position.externalSize"
+    },
+    {
+      "name": "dealRiskBearing",
+      "op": "any",
+      "over": "tranches",
+      "of": "trancheExposure > 0 || trancheHasLiveEntryOrder"
+    },
+    {
+      "name": "allTranchesTerminal",
+      "op": "all",
+      "over": "tranches",
+      "of": "status == 'CLOSED'"
+    },
+    {
+      "name": "newRiskAllowed",
+      "note": "Координационное правило: риск берут транши, но разрешение — агрегатное.",
+      "expr": "deal.status == 'ACTIVE'"
+    },
+
+    {
+      "name": "aggregateEdgeDeclared",
+      "note": "Статусная модель агрегата — пять значений, от потребности: слот, координированный выход, два терминала, остановка.",
+      "expr": "(from == 'ACTIVE' && in(to, 'EXIT_PENDING', 'CLOSED', 'ERROR')) || (from == 'EXIT_PENDING' && in(to, 'CLOSED', 'ERROR')) || (from == 'ERROR' && to == 'EMERGENCY_CLOSED')"
+    },
+    {
+      "name": "aggregateTransitionAllowed",
+      "note": "Терминал агрегата требует терминальности всех траншей и доказанного отсутствия живого риска.",
+      "expr": "aggregateEdgeDeclared && (!in(to, 'CLOSED', 'EMERGENCY_CLOSED') || (allTranchesTerminal && !dealRiskBearing && !position.live))"
+    },
+    {
+      "name": "trancheEdgeDeclared",
+      "note": "Статусная модель транша — сегодняшняя модель сделки минус два ошибочных статуса плюс ребро переоткрытия. Ребра в ERROR у транша нет: отказ поднимается в агрегат.",
+      "expr": "(from == 'PRECHECK' && in(to, 'ENTRY_SUBMITTED', 'CLOSED')) || (from == 'ENTRY_SUBMITTED' && in(to, 'ENTRY_FINALIZED', 'EXIT_PENDING', 'CLOSED')) || (from == 'ENTRY_FINALIZED' && in(to, 'PROTECTION_SWITCHED', 'MANAGING')) || (from == 'PROTECTION_SWITCHED' && to == 'MANAGING') || (from == 'MANAGING' && in(to, 'ENTRY_SUBMITTED', 'EXIT_PENDING')) || (from == 'EXIT_PENDING' && to == 'CLOSED')"
+    },
+    {
+      "name": "reopenEdge",
+      "expr": "from == 'MANAGING' && to == 'ENTRY_SUBMITTED'"
+    },
+    {
+      "name": "trancheTransitionAllowed",
+      "note": "Переоткрытие — объявленное ребро транша, разрешённое его собственным свойством при нулевой экспозиции и живой входной заявке.",
+      "expr": "trancheEdgeDeclared && (!reopenEdge || (reopenAllowed && trancheExposure == 0 && trancheHasLiveEntryOrder))"
+    },
+
+    {
+      "name": "isTradableDetail",
+      "expr": "phaseEntryPolicy != 'NO_TRADE'"
+    },
+    {
+      "name": "detailEntryActions",
+      "op": "count",
+      "over": "tranches[].stepsByStatus{}[].actions[]",
+      "where": "actionKind == 'ORDER' && in(?orderType, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')"
+    },
+    {
+      "name": "tradableDetailsCount",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "isTradableDetail"
+    },
+    {
+      "name": "detailsWithSingleEntryAction",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "isTradableDetail && detailEntryActions == 1"
+    },
+    {
+      "name": "referenceMapsToSingleTranche",
+      "note": "Эталон репозитория переведён в модель траншей вырожденно: одна торгуемая деталь — один транш с одним входным объявлением.",
+      "expr": "detailsWithSingleEntryAction == tradableDetailsCount"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "эталон, один транш: вход исполнен — экспозиция покрыта его же встроенной защитой",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 3, "live": true },
+        "cancelTargetId": null,
+        "tranches": [
+          {
+            "status": "ENTRY_FINALIZED",
+            "reopenAllowed": false,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "entry_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 3, "parentFillSize": 3 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealExposure": 3, "exposureReconciled": true, "allTranchesCovered": true, "anyTrancheViolated": false, "dealRiskBearing": true }
+    },
+    {
+      "case": "эталон: основная защита подтверждена — встроенная снимается законно, операнд снятия траншевый",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 3, "live": true },
+        "cancelTargetId": "entry_sl",
+        "tranches": [
+          {
+            "status": "PROTECTION_SWITCHED",
+            "reopenAllowed": false,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [
+              { "id": "entry_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 3, "parentFillSize": 3 },
+              { "id": "oco", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 3, "closedSize": 0 }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCoverage": 6, "allTranchesCovered": true }
+    },
+    {
+      "case": "эталон: безубыток не подтверждён — снятие откладывается, как и сегодня",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 3, "live": true },
+        "cancelTargetId": "oco",
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "reopenAllowed": false,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [
+              { "id": "oco", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 3, "closedSize": 0 },
+              { "id": "breakeven", "carrier": "STANDALONE", "kind": "STOP", "status": "CREATED", "size": 3, "closedSize": 0 }
+            ],
+            "commitments": [ { "terminal": false, "budgetExhausted": false } ]
+          }
+        ]
+      },
+      "expect": { "anyTrancheViolated": false }
+    },
+    {
+      "case": "грид из трёх траншей: полный налив, частичный налив, ненаступивший уровень — все покрыты, сумма сходится с нетто-позицией",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 8, "live": true },
+        "cancelTargetId": null,
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "status": "ENTRY_SUBMITTED",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "PARTIALLY_COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 5, "parentFillSize": 3 } ],
+            "commitments": []
+          },
+          {
+            "status": "PRECHECK",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 } ],
+            "protections": [ { "id": "l2_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "PENDING", "size": 5, "parentFillSize": 0 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealExposure": 8, "exposureReconciled": true, "dealCoverage": 8, "allTranchesCovered": true, "anyTrancheViolated": false }
+    },
+    {
+      "case": "грид: у одного транша защиты нет, у другого её с избытком — агрегатный предикат молчит, траншевый видит дыру",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 8, "live": true },
+        "cancelTargetId": null,
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_main", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 8, "closedSize": 0 } ],
+            "commitments": []
+          },
+          {
+            "status": "MANAGING",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_sl", "carrier": "STANDALONE", "kind": "STOP", "status": "CANCELED", "size": 3, "closedSize": 0 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCoverage": 8, "aggregateCoverageSufficient": true, "allTranchesCovered": false, "anyTrancheViolated": true }
+    },
+    {
+      "case": "грид: транш выбит своим стопом — его экспозиция ноль, сумма по-прежнему равна нетто-позиции",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 3, "live": true },
+        "cancelTargetId": null,
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "COMPLETED", "size": 5, "parentFillSize": 5, "closedSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "status": "MANAGING",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 3, "parentFillSize": 3 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealExposure": 3, "exposureReconciled": true, "anyTrancheViolated": false, "dealRiskBearing": true }
+    },
+    {
+      "case": "переоткрытие транша разрешено его собственным свойством: ребро в отправленный вход объявлено и допустимо",
+      "state": {
+        "from": "MANAGING",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": true,
+        "orders": [
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 }
+        ],
+        "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "COMPLETED", "size": 5, "parentFillSize": 5, "closedSize": 5 } ]
+      },
+      "expect": { "trancheExposure": 0, "trancheHasLiveEntryOrder": true, "trancheEdgeDeclared": true, "trancheTransitionAllowed": true }
+    },
+    {
+      "case": "переоткрытие запрещено свойством транша: то же ребро не применяется, транш идёт своим штатным выходом",
+      "state": {
+        "from": "MANAGING",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": false,
+        "orders": [
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 }
+        ],
+        "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "COMPLETED", "size": 5, "parentFillSize": 5, "closedSize": 5 } ]
+      },
+      "expect": { "trancheEdgeDeclared": true, "trancheTransitionAllowed": false }
+    },
+    {
+      "case": "выход транша объявлен из сопровождения — ребро есть и при запрещённом переоткрытии",
+      "state": {
+        "from": "MANAGING",
+        "to": "EXIT_PENDING",
+        "reopenAllowed": false,
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+        "protections": []
+      },
+      "expect": { "trancheEdgeDeclared": true, "trancheTransitionAllowed": true }
+    },
+    {
+      "case": "у транша нет ребра в ошибочный статус: отказ поднимается в агрегат",
+      "state": {
+        "from": "MANAGING",
+        "to": "ERROR",
+        "reopenAllowed": false,
+        "orders": [],
+        "protections": []
+      },
+      "expect": { "trancheEdgeDeclared": false }
+    },
+    {
+      "case": "агрегат уходит в остановку из сопровождения — ребро объявлено",
+      "state": {
+        "from": "ACTIVE",
+        "to": "ERROR",
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 8, "live": true },
+        "tranches": [
+          { "status": "MANAGING", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 8 } ], "protections": [], "commitments": [] }
+        ]
+      },
+      "expect": { "aggregateEdgeDeclared": true, "aggregateTransitionAllowed": true }
+    },
+    {
+      "case": "внешнее частичное сокращение позиции: сумма экспозиций траншей расходится с нетто-позицией",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 6, "live": true },
+        "cancelTargetId": null,
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "status": "MANAGING",
+            "reopenAllowed": true,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 3, "parentFillSize": 3 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealExposure": 8, "exposureReconciled": false, "allTranchesCovered": true }
+    },
+    {
+      "case": "терминал агрегата при живом транше не применяется",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 3, "live": true },
+        "tranches": [
+          { "status": "CLOSED", "orders": [], "protections": [], "commitments": [] },
+          { "status": "EXIT_PENDING", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [], "commitments": [] }
+        ]
+      },
+      "expect": { "allTranchesTerminal": false, "dealRiskBearing": true, "aggregateEdgeDeclared": true, "aggregateTransitionAllowed": false }
+    },
+    {
+      "case": "терминал агрегата применяется, когда все транши закрыты и живого риска нет",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 0, "live": false },
+        "tranches": [
+          { "status": "CLOSED", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 }, { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 5 } ], "protections": [], "commitments": [] },
+          { "status": "CLOSED", "orders": [], "protections": [], "commitments": [] }
+        ]
+      },
+      "expect": { "allTranchesTerminal": true, "dealRiskBearing": false, "dealExposure": 0, "exposureReconciled": true, "aggregateTransitionAllowed": true }
+    },
+    {
+      "case": "агрегат в координированном выходе: новый риск не берётся ни одним траншем",
+      "state": {
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 3, "live": true },
+        "tranches": [
+          { "status": "EXIT_PENDING", "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ], "protections": [], "commitments": [] }
+        ]
+      },
+      "expect": { "newRiskAllowed": false }
+    },
+    {
+      "case": "недопокрытие транша под его живым обязательством нарушением не является",
+      "state": {
+        "deal": { "status": "ACTIVE" },
+        "position": { "externalSize": 3, "live": true },
+        "cancelTargetId": null,
+        "tranches": [
+          {
+            "status": "ENTRY_FINALIZED",
+            "reopenAllowed": false,
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [],
+            "commitments": [ { "terminal": false, "budgetExhausted": false } ]
+          }
+        ]
+      },
+      "expect": { "dealExposure": 3, "allTranchesCovered": false, "anyTrancheViolated": false }
+    },
+    {
+      "case": "эталонная стратегия репозитория переводится одним траншем на торгуемую деталь",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": { "tradableDetailsCount": 2, "detailsWithSingleEntryAction": 2, "referenceMapsToSingleTranche": true }
+    }
+  ]
+}

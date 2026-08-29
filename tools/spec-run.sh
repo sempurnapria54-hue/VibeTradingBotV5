@@ -30,4 +30,4 @@ mkdir -p "$OUT"
     "$ROOT/src/test/java/com/example/tradingbot/spec/SpecScope.java"
 
 exec "$JDK/bin/java" -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 \
-    -cp "$OUT;$CP" com.example.tradingbot.spec.Spec "$ROOT/docs/spec"
+    -cp "$OUT;$CP" com.example.tradingbot.spec.Spec "$ROOT/${SPEC_DIR:-docs/spec}"

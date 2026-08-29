@@ -7,7 +7,8 @@
   "operands": {
     "episodes[].loaded": "эпизод позиции попал в загруженный контекст",
     "episodes[].exitAt": "положение закрытия эпизода добыто",
-    "legs[].loaded": "нога сделки попала в загруженный контекст",
+    "tranches[].loaded": "транш сделки попал в загруженный контекст",
+    "legs[].loaded": "нога (заявка) сделки попала в загруженный контекст; ноги собираются по всем траншам",
     "legs[].protections[].loaded": "встроенная защита ноги попала в загруженный контекст",
     "legs[].protections[]": "остальные поля — как в protection-coverage",
     "algoOrders[].loaded": "отдельная условная заявка попала в загруженный контекст",
@@ -21,6 +22,13 @@
       "note": "Эпизоды грузятся все, включая закрытые: по ним считается результат сделки.",
       "op": "all",
       "over": "episodes",
+      "of": "loaded"
+    },
+    {
+      "name": "tranchesComplete",
+      "note": "Нетерминальные транши грузятся все: невидимый транш делает свою экспозицию неатрибутируемой, и сверка суммы с нетто-размером ложно сработала бы.",
+      "op": "all",
+      "over": "tranches",
       "of": "loaded"
     },
     {
@@ -45,7 +53,7 @@
     },
     {
       "name": "contextComplete",
-      "expr": "episodesComplete && legsComplete && attachedComplete && algoComplete"
+      "expr": "tranchesComplete && episodesComplete && legsComplete && attachedComplete && algoComplete"
     },
     {
       "name": "computationAllowed",
@@ -136,6 +144,21 @@
         "legsComplete": false, "attachedComplete": false, "contextComplete": false, "computationAllowed": false,
         "coverageLoaded": 2, "coverageFull": 3,
         "coverageAnswerLoaded": false, "coverageAnswerFull": true, "coverageAnswerDistorted": true
+      }
+    },
+    {
+      "case": "транш не загружен — его экспозиция невидима, и сверка суммы с нетто-размером ложно сработала бы",
+      "state": {
+        "position": { "externalSize": 3 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true }, { "loaded": false } ],
+        "legs": [
+          { "loaded": true, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 3, "parentFillSize": 3 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "required": true } ]
+      },
+      "expect": {
+        "tranchesComplete": false, "legsComplete": true, "contextComplete": false, "computationAllowed": false
       }
     },
     {

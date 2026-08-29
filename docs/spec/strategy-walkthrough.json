@@ -1,24 +1,23 @@
 {
   "subject": "strategy-walkthrough",
-  "question": "Держится ли инвариант покрытия на каждом шаге прохода эталонной сделки",
+  "question": "Держится ли инвариант покрытия на каждом шаге прохода эталонного транша",
   "home": "docs/rules/live-risk-protection.md",
   "includes": ["protection-coverage"],
 
-  "note": "Проход одной длинной сделки по эталонной стратегии trend-following-ema: вход со встроенным стопом → основная защита → безубыток → трейлинг → выход. Каждый пример — состояние графа сделки на одном шаге. На всех шагах утверждается отсутствие биржевой реакции ступени 2: штатный проход её не даёт ни разу.",
+  "note": "Проход одного транша по эталонной стратегии trend-following-ema: вход со встроенным стопом → основная защита → безубыток → трейлинг → выход. Эталон объявляет один транш на торгуемую деталь, поэтому проход сделки и проход транша здесь совпадают. Каждый пример — состояние графа транша на одном шаге; операнды траншевые, соседних траншей в них нет по построению. На всех шагах утверждается отсутствие биржевой реакции ступени 2.",
 
   "operands": {
     "step": "шаг прохода — для читаемости отчёта",
-    "protections[].id": "идентификатор заявки",
     "protections[].chainRoot": "корень цепочки замещений: чем заявка была объявлена изначально",
     "declaredCancelTarget": "цель снятия, объявленная стратегией; может быть уже замещена",
-    "остальные операнды": "как в protection-coverage"
+    "остальные операнды": "как в protection-coverage, в траншевой области"
   },
 
   "values": [
     {
       "name": "noStageTwoReaction",
       "note": "Штатный проход не даёт биржевой ступени 2 ни на одном шаге.",
-      "expr": "!invariantViolated"
+      "expr": "!trancheViolated"
     },
     {
       "name": "cancelTargetCandidates",
@@ -40,7 +39,7 @@
       "case": "1. вход создан, отправки ещё не было — риска на бирже нет",
       "state": {
         "step": "PRECHECK / bull_entry CREATE",
-        "position": { "externalSize": 0, "live": false },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "CREATED", "accumulatedFillSize": 0 } ],
         "protections": [
           { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "CREATED", "kind": "STOP", "size": 3, "parentFillSize": 0 }
         ],
@@ -48,13 +47,13 @@
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "coverage": 0, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheExposure": 0, "trancheCoverage": 0, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
       "case": "2. вход отправлен, факт не наблюдён — экспозиции ещё нет",
       "state": {
         "step": "SUBMIT bull_entry",
-        "position": { "externalSize": 0, "live": false },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "PENDING", "accumulatedFillSize": 0 } ],
         "protections": [
           { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "PENDING", "kind": "STOP", "size": 3, "parentFillSize": 0 }
         ],
@@ -62,13 +61,13 @@
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "coverage": 0, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheExposure": 0, "trancheHasLiveEntryOrder": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
-      "case": "3. вход исполнен — экспозиция покрыта встроенным стопом с первого момента",
+      "case": "3. вход исполнен — экспозиция транша покрыта его встроенным стопом с первого момента",
       "state": {
         "step": "ENTRY_FINALIZED",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
           { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 3, "parentFillSize": 3 }
         ],
@@ -76,76 +75,76 @@
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "coverage": 3, "coverageSufficient": true, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheExposure": 3, "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
       "case": "4. основная защита подтверждена — встроенную можно снимать",
       "state": {
         "step": "MAIN_PROTECTION bull_protection_oco подтверждён",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
           { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 3, "parentFillSize": 3 },
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "triggeredSize": 0 }
+          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 }
         ],
         "commitments": [],
         "cancelTargetId": "entry_sl",
         "declaredCancelTarget": "bull_entry"
       },
-      "expect": { "coverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
+      "expect": { "trancheCoverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
     },
     {
       "case": "5. встроенная снята — покрытие несёт основная защита",
       "state": {
         "step": "MANAGING",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
           { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "CANCELED", "kind": "STOP", "size": 3, "parentFillSize": 3 },
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "triggeredSize": 0 }
+          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 }
         ],
         "commitments": [],
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "coverage": 3, "coverageSufficient": true, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
       "case": "6. безубыток: снятие старой защиты до подтверждения новой запрещено",
       "state": {
         "step": "PROTECTION_ADJUSTMENT bull_sl_to_breakeven создан, не подтверждён",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "triggeredSize": 0 },
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "CREATED", "kind": "STOP", "size": 3, "triggeredSize": 0 }
+          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
+          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "CREATED", "kind": "STOP", "size": 3, "closedSize": 0 }
         ],
         "commitments": [ { "terminal": false, "budgetExhausted": false } ],
         "cancelTargetId": "oco",
         "declaredCancelTarget": "bull_protection_oco"
       },
-      "expect": { "coverage": 3, "coverageAfterRemoval": 0, "removalAllowed": false, "removalDeferred": true, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheCoverage": 3, "coverageAfterRemoval": 0, "removalAllowed": false, "removalDeferred": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
       "case": "7. безубыток подтверждён — старая защита снимается законно",
       "state": {
         "step": "bull_sl_to_breakeven подтверждён",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "triggeredSize": 0 },
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "triggeredSize": 0 }
+          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
+          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 }
         ],
         "commitments": [],
         "cancelTargetId": "oco",
         "declaredCancelTarget": "bull_protection_oco"
       },
-      "expect": { "coverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
+      "expect": { "trancheCoverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
     },
     {
       "case": "8. трейлинг поставлен, но не активирован — снятие безубытка откладывается",
       "state": {
         "step": "bull_oco_cancel + bull_trailing",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "triggeredSize": 0 },
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "triggeredSize": 0, "activationPrice": 2040, "observedTrailingPrice": null }
+          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
+          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": null }
         ],
         "commitments": [ { "terminal": false, "budgetExhausted": false } ],
         "cancelTargetId": "breakeven",
@@ -153,11 +152,11 @@
       },
       "expect": {
         "cancelTargetCandidates": 1,
-        "coverage": 3,
+        "trancheCoverage": 3,
         "coverageAfterRemoval": 0,
         "removalAllowed": false,
         "removalDeferred": true,
-        "invariantViolated": false,
+        "trancheViolated": false,
         "noStageTwoReaction": true
       }
     },
@@ -165,59 +164,65 @@
       "case": "9. трейлинг активирован — он несёт уровень, снятие безубытка разрешается",
       "state": {
         "step": "трейлинг наблюдён с уровнем",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "triggeredSize": 0 },
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "triggeredSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
+          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
         ],
         "commitments": [],
         "cancelTargetId": "breakeven",
         "declaredCancelTarget": "bull_protection_oco"
       },
-      "expect": { "coverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
+      "expect": { "trancheCoverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
     },
     {
       "case": "10. безубыток снят — покрытие несёт трейлинг",
       "state": {
         "step": "bull_oco_cancel исполнен",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
         "protections": [
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "CANCELED", "kind": "STOP", "size": 3, "triggeredSize": 0 },
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "triggeredSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "CANCELED", "kind": "STOP", "size": 3, "closedSize": 0 },
+          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
         ],
         "commitments": [],
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "coverage": 3, "coverageSufficient": true, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
-      "case": "11. выход по смене тренда: экспозиция ещё жива и остаётся покрытой",
+      "case": "11. выход по смене тренда: reduce-only отправлен, экспозиция ещё жива и остаётся покрытой",
       "state": {
         "step": "EXIT bull_exit отправлен",
-        "position": { "externalSize": 3, "live": true },
+        "orders": [
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 },
+          { "type": "REDUCE_ONLY", "status": "ACTIVE", "accumulatedFillSize": 0 }
+        ],
         "protections": [
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "triggeredSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
         ],
         "commitments": [ { "terminal": false, "budgetExhausted": false } ],
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "coverage": 3, "coverageSufficient": true, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheExposure": 3, "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
-      "case": "12. позиция закрыта — покрывать нечего, инвариант держится",
+      "case": "12. reduce-only налился — экспозиция транша ноль, покрывать нечего, инвариант держится",
       "state": {
         "step": "позиция закрыта, уборка защит",
-        "position": { "externalSize": 0, "live": false },
+        "orders": [
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 },
+          { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 }
+        ],
         "protections": [
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "CANCELED", "kind": "TRAILING", "size": 3, "triggeredSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "CANCELED", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
         ],
         "commitments": [ { "terminal": true, "budgetExhausted": false } ],
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "coverage": 0, "invariantViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheExposure": 0, "trancheHasLiveEntryOrder": false, "trancheRiskBearing": false, "trancheViolated": false, "noStageTwoReaction": true }
     }
   ]
 }

@@ -13,7 +13,7 @@
     "stopCurrentLive": "наименее благоприятный уровень среди действующих защит; резолв — docs/spec/protection-coverage.json",
     "instrument.contractValue": "InstrumentExternalRules.externalContractValue",
     "instrument.takerFeeRate": "InstrumentExternalRules.takerFeeRate() — текущая ставка",
-    "entryLegs[]": "строки orders сделки с бизнес-типом входа",
+    "entryLegs[]": "строки orders сделки с бизнес-типом входа — по всем траншам: потолки агрегатные, транши их не множат",
     "limits.riskPerActionPercent": "StrategyDetail.riskPerActionPercent, проценты",
     "limits.cumulativeMultiplier": "StrategyDetail.cumulativeRiskPerDealMultiplier (K)",
     "limits.strategySimultaneousPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",

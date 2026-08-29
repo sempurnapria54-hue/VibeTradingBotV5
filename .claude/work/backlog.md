@@ -52,8 +52,72 @@
    состояние, а не дефект. Величины «про хвост» априорно не назначаются
    решением держателя — там же.
 
-2. **Продуктовый вопрос открыт** — должны ли эпизоды одной сделки
-   вестись одинаково (`.claude/work/progress/risk-contour-design.md`).
+2. **Продуктовый вопрос закрыт направлением** (2026-08-29): сделка
+   становится агрегатом над траншами, одинаковость эпизодов — свойство
+   транша. Приземлено в корпусе 2026-08-29; остаток — §«Агрегатная сделка и транши — CODE-дельта».
+
+## Агрегатная сделка и транши — CODE-дельта
+
+**Имя ратифицировано держателем — `Tranche`** (`StrategyTranche` /
+`DealTranche`); `DealDetail` и `DealFlow` отклонены. **Корпус приземлён**
+(2026-08-29): модели, lifecycles, спецификации, правила, процессы,
+компоненты и эталон стратегии переведены на транши, прогон зелёный.
+Конструкция и доводы — `.claude/work/progress/aggregate-deal-design.md`,
+итог приземления — `history/2026-08-29-tranche-landing.md`.
+
+Здесь — то, что осталось **коду**; в корпусе работы нет.
+
+- **Схема** (пре-лонч политика: таблицы пусты, бэкфилла нет,
+  `ALTER` сразу в целевой форме —
+  `.claude/rules/pre-launch-schema-changes.md`):
+  - `+deal_tranches`: `deal_id` FK `NOT NULL`, `internal_id`
+    (`varchar(64)`, уникален) `NOT NULL`, `status varchar(64)`
+    `NOT NULL`, `strategy_tranche_id` FK, `level int`,
+    `entry_step_type varchar(64)`, `close_reason varchar(64)`, аудит;
+    индексы `ix_deal_tranche_deal_status`, частичный
+    `uk_deal_tranche_declaration` (`deal_id`, `strategy_tranche_id`,
+    `level`) среди нетерминальных;
+  - `+orders.deal_tranche_id`, `+algo_orders.deal_tranche_id` — FK
+    `NOT NULL`;
+  - `+deal_strategy_action_states.deal_tranche_id` (FK, nullable у
+    системных), `+deal_system_action_states.deal_tranche_id`; **транш
+    входит в состав частичных ключей живых стратегийных исполнений** —
+    иначе N траншей сетки конфликтуют по одному объявлению;
+  - `−deals.entry_step_type` (уехал на транш); `entry_reason` остаётся на
+    сделке;
+  - `+strategy_tranches`: `strategy_detail_id` FK, `key`, `level_count
+    int`, `level_step numeric(36,18)`, `position_reopen_allowed`;
+    уникальность пары «деталь, ключ»;
+  - `−strategy_details.position_reopen_allowed`;
+    `−strategy_order_actions.level`, `−strategy_algo_order_actions.level`;
+  - `strategy_steps` ссылается на транш; шаги узкой агрегатной
+    поверхности (`EXIT`, `FAIL_SAFE`) — на деталь;
+  - `deals` и `positions` в остальном без изменений: слот, окно линковки,
+    результат, признаки отбора, четыре числа риска, эпизоды — агрегатные.
+- **Статусные енумы:** `Deal.Status` → `ACTIVE`, `EXIT_PENDING`,
+  `CLOSED`, `ERROR`, `EMERGENCY_CLOSED`; новый `DealTranche.Status` —
+  семь значений без ошибочных.
+- **FSM:** `DealStateMachine` выбирает из трёх обработчиков сделки
+  (`DealActiveHandler`, `DealExitPendingHandler`, `ErrorHandler`);
+  `DealTrancheStateMachine` прогоняет шесть обработчиков транша.
+  Ребро переоткрытия `MANAGING → ENTRY_SUBMITTED` — с тремя условиями
+  (`docs/spec/deal-tranche-lifecycle.json`).
+- **Экспозиция транша** — производная его заявок; **сверка Σ экспозиций
+  с `Position.externalSize`** в входных проверках активной сделки и в
+  `AnomalyJob`, реакция — существующая лестница.
+- **Преконтроль:** операнд покрытия траншевый, операнды потолков —
+  по всей сделке.
+- **Валидация create:** транши (≥1 у торгуемой детали, одно входное
+  объявление, признак переоткрытия, согласованность `levelCount` /
+  `levelStep`), узкая агрегатная поверхность
+  (`STRATEGY_DEAL_LEVEL_STEP_OUT_OF_SCOPE`), `N_overlap` = Σ
+  `levelCount`.
+- **Эталон** `strategy-examples/trend-following-ema.json` уже в новой
+  форме — api-модель обязана её принимать.
+
+**Названные цены, принятые держателем** (§G прохода): потраншевый `R` из
+фактов нетто-режима не выводится; внешнее частичное сокращение позиции
+становится громким (останов вместо молчаливого поглощения).
 
 ## Cross-cutting миграции
 
@@ -592,7 +656,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   permission `Trade` на биржу не уходит (`SUBMIT_*`, `CANCEL_*`,
   `CLOSE_POSITION_COMMAND`), открыт только read; единственное
   исключение — teardown самого kill-switch'а;
-- перевесить `markErrorStopless` / гейт `EntryFinalizedHandler` с
+- перевесить `markErrorStopless` / гейт `TrancheEntryFinalizedHandler` с
   L3-инструмента на ступень 2 (`Exchange.TRADE_BLOCKED` — живой риск
   без защиты);
 - снятие: `TRADE_BLOCKED` → только в `HOLD`; `HOLD` → в `ACTIVE`
@@ -612,9 +676,9 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   каждой** `CLOSED`-строки без него
   (`docs/lifecycles/Position.md` §«Смена эпизода»);
 - **`StrategyDetail.positionReopenAllowed`** + гейт в `MANAGING` при
-  `false` — наблюдатель и применитель `ManagingHandler`, входная
+  `false` — наблюдатель и применитель `TrancheManagingHandler`, входная
   классификация `ACTIVE && externalSize == 0` ветвится по параметру
-  (`docs/components/ManagingHandler.md` §«Входные проверки»);
+  (`docs/components/TrancheManagingHandler.md` §«Входные проверки»);
 - **`Deal.billsFetchedThrough`** — писатель `RefreshBillsExecutor`,
   монотонный `UPDATE`; предикаты завершения bills-звена и обязанности
   сверки переписываются на него;
@@ -629,7 +693,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   `AlgoOrder.condition.trailing.externalPrice` (B2 `DOCS_CHECK_20`; не
   плоское `externalPrice`, оно несёт `actualPx`);
 - **актор предиката неполноты числа** — выходная проверка
-  `ExitPendingHandler`; **`SystemActionExecutor` пишет `SKIPPED`** при
+  `TrancheExitPendingHandler`; **`SystemActionExecutor` пишет `SKIPPED`** при
   выводе стадии;
 - **реакция на `MISMATCHED`** — `HoldSignal.exchange(...)` из
   исполнителей терминального ребра при боевом режиме допуска; **флаг
@@ -664,8 +728,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     (`ALTER RENAME`), `+cumulative_risk_per_deal_multiplier`; правка
     `StrategyDetail` / api-модели / entity и двух
     `strategy-examples/*.json`;
-  - **глобальный конфиг** `globalSimultaneousRiskPerDealPercent = 1%`
-    (`@ConfigurationProperties`, колонки нет) **+ параметр стратегии**
+  - **глобальный конфиг** `globalSimultaneousRiskPerDealPercent`
+    (`@ConfigurationProperties`, колонки нет, **умолчания нет** — значение
+    задаёт держатель при запуске, `docs/rules/risk-policy.md`)
+    **+ параметр стратегии**
     `strategySimultaneousRiskPerDealPercent` (колонка есть — см.
     CODE-дельту `GAPS_CLOSE_21` ниже; C9 `DOCS_CHECK_21`);
   - `RiskCheckCode.RISK_PER_TRADE_EXCEEDED` → `RISK_PER_ACTION_EXCEEDED`,
@@ -735,7 +801,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     DealContext)`** — ревизия живых SYSTEM-исполнений на проходе
     оркестратора и на терминальном ребре; переход
     `RETRY_PENDING → SKIPPED` в матрице SYSTEM (A3, A14);
-  - **выходная проверка `ManagingHandler`** получает конъюнкт
+  - **выходная проверка `TrancheManagingHandler`** получает конъюнкт
     `positionReopenAllowed` + дизъюнкт «живых входных ног нет» (A4);
   - **`HoldService.hold(...)` на терминальном ребре — после коммита**
     транзакции терминала, обе тропы (A7);
@@ -796,8 +862,8 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     (статическая сумма долей = 100 при `actionType = CREATE`),
     `RiskValidator` ветка weakening (покрытие **после завершения
     ремодела** `≥ externalSize`, замещаемая — по `replacesInternalId`),
-    выходная проверка `ManagingHandler` (**новая**, четвёртая),
-    `EntryFinalizedHandler` / `ProtectionSwitchedHandler`;
+    выходная проверка `TrancheManagingHandler` (**новая**, четвёртая),
+    `TrancheEntryFinalizedHandler` / `TrancheProtectionSwitchedHandler`;
   - **два кода реджекта:** `STRATEGY_PROTECTION_COVERAGE_INCOMPLETE`
     (create, 400) и `PROTECTION_COVERAGE_REDUCED` (`RiskCheckCode`,
     рантайм; в `ERROR` не уводит — карв-аут
@@ -978,7 +1044,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     `docs/rules/no-partial-close.md`); команда закрытия одна —
     `CLOSE_POSITION_COMMAND`, эмитентов два. Дельта:
     - шаг `EXIT` может быть **условие-только** — пустой список
-      действий допустим, `ManagingHandler` по истинному условию делает
+      действий допустим, `TrancheManagingHandler` по истинному условию делает
       переход, валидация перестаёт требовать действия у этого типа
       шага;
     - третье значение `actionKind` — `POSITION`; третий подтип
@@ -991,7 +1057,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
       последовательность команд сам: отмена живых входных
       (не reduce-only) ног → `CLOSE_POSITION_COMMAND`; порядок —
       инвариант `docs/rules/exit-teardown-order.md`; **порядок
-      дочистки `ExitPendingHandler`** приводится к тому же инварианту
+      дочистки `TrancheExitPendingHandler`** приводится к тому же инварианту
       (прежняя редакция закрывала позицию первой);
     - в поставляемом примере `trend-following-ema.json` `actionType:
       "CLOSE_FULL"` → `"EXIT_ACTION"` (`:290`, `:477`); `actionKind:
@@ -1006,18 +1072,18 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     REPLACE — единственная операция ремоделирования
     (`docs/rules/replace-not-amend.md`). Терминал не гейтит —
     гейтит **управление** сделкой;
-  - **`ManagingHandler` не наблюдает состояние — сделка не выходит из
+  - **`TrancheManagingHandler` не наблюдает состояние — сделка не выходит из
     `MANAGING`** (inspection 2026-08-23, **несущий разрыв**). Handler
     не эмитит ни одной `REFRESH_*`-команды, контекст собирается только
     из persistence ⇒ срабатывание SL/TP на бирже локально не
     наблюдается ⇒ перехода в `EXIT_PENDING` нет ⇒ сделка удерживает
     слот бессрочно. Целевая форма — `REFRESH_DEAL_CONTEXT_ACTION`
     (`docs/components/SystemActionExecutor.md`); минимальная —
-    `ManagingHandler` эмитит `REFRESH_POSITION` / `REFRESH_ALGO_ORDER`,
+    `TrancheManagingHandler` эмитит `REFRESH_POSITION` / `REFRESH_ALGO_ORDER`,
     когда продвигать нечего;
   - **`FAIL_SAFE` — значение `StrategyStepType` без потребителя**
     (inspection 2026-08-23): `managingSteps()` перечисляет четыре
-    типа, javadoc и `docs/components/ManagingHandler.md` — пять.
+    типа, javadoc и `docs/components/TrancheManagingHandler.md` — пять.
     Подключить или снять; клейм полноты в доке ложен в любом случае —
     в пакет валидации;
   - **мёртвые поля `CreateOrderCommandPayload`** — `positionSide`,
@@ -1424,7 +1490,7 @@ Refinements, сознательно отложенные при `CODE` шага 
   проход» (`docs/rules/execution-hierarchy.md`);
   концепция — `replace-not-amend`, `DealActionState` §REPLACE.
   **Re-deferred за `CODE` шага 6 (deferral D1, 2026-06-22):** фабрика
-  REPLACE-ног возвращает `empty`, `ManagingHandler` стоит в `MANAGING`;
+  REPLACE-ног возвращает `empty`, `TrancheManagingHandler` стоит в `MANAGING`;
   самостоятельный объёмный refinement, не нужен базовой петле фазы 1.
 - **Refresh algo: external-поля дерева `condition`.** `updateFromSnapshot`
   игнорит `condition`; обновляются только top-level факты срабатывания.
@@ -1485,7 +1551,7 @@ Java-файлов, 20 подсистем, адверсариальная вер�
 - **🔴 B2. `EntryFinalizedHandler.java:128` — бесстоповая позиция проходит
   в `MANAGING`.** Гейт `toManagingIfProtected` проверяет **наличие**
   attached-algo, не его **активность**; терминальный (CANCELED/ERROR)
-  attached считается защитой. `ManagingHandler.checkEntry` перепроверяет
+  attached считается защитой. `TrancheManagingHandler.checkEntry` перепроверяет
   только `positionLiveRisk`, защиту — никогда.
 - **Связка B1 → B2:** B1 создаёт стоп без триггера ⇒ биржа его отвергает
   ⇒ B2 не ловит отсутствие активной защиты и пускает live-risk позицию в

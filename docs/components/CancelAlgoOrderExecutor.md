@@ -45,4 +45,4 @@ refresh/search/history. Если refresh/history показывает друго
 5. **снятие ступени защитной лестницы стратегией** (`CANCEL` защитного
    algo-order). Преконтроль эту тропу не видит — команда вне scope
    валидатора; падение покрытия ловит выходная проверка `MANAGING`
-   (`docs/components/ManagingHandler.md`).
+   (`docs/components/TrancheManagingHandler.md`).

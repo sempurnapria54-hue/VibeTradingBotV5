@@ -23,8 +23,8 @@ RiskBlockAction resolve(
 
 - `dealContext` — фактическое состояние сделки (позиция, live orders/algo,
   `DealActionState`, active risk);
-- `currentStatus` — различить `PRECHECK` и этапы, где live risk уже есть
-  или мог появиться;
+- `currentStatus` — статус **транша**: различить `PRECHECK` и этапы, где
+  live risk уже есть или мог появиться;
 - `riskValidationResult` — итоговое решение и конкретные `RiskCheckCode`.
 
 Параметры `strategyStep` / `strategyAction` / `calculatedAction` **не**

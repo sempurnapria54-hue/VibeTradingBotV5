@@ -185,16 +185,16 @@
 │   │   ├── CreateAlgoOrderExecutor.md — Кто исполняет создание отдельной условной заявки?
 │   │   ├── CreateOrderActionExecutor.md — Кто планирует CREATE-действие над ordinary order за проход?
 │   │   ├── CreateOrderExecutor.md — Кто исполняет создание обычной заявки?
+│   │   ├── DealActiveHandler.md — Что делает обработчик активной сделки?
 │   │   ├── DealContextService.md — Кто собирает контекст прохода FSM?
+│   │   ├── DealExitPendingHandler.md — Что делает обработчик координированного выхода сделки?
 │   │   ├── DealOpeningService.md — Кто атомарно создаёт `Deal`?
 │   │   ├── DealOrchestratorJob.md — Кто сопровождает уже созданные сделки?
 │   │   ├── DealStateMachine.md — Кто управляет статусами сделки?
-│   │   ├── EntryFinalizedHandler.md — Что делает обработчик статуса подтверждённого входа?
+│   │   ├── DealTrancheStateMachine.md — Кто управляет статусами транша?
 │   │   ├── EntryScannerJob.md — Кто ищет возможность создать новую сделку?
-│   │   ├── EntrySubmittedHandler.md — Что делает обработчик статуса отправленного входа?
 │   │   ├── ErrorHandler.md — Что делает обработчик ошибочного состояния сделки?
 │   │   ├── ExitActionExecutor.md — Кто исполняет действие выхода из сделки?
-│   │   ├── ExitPendingHandler.md — Что делает обработчик статуса выхода?
 │   │   ├── FinalizeDealEntryExecutor.md — Кто исполняет `FINALIZE_DEAL_ENTRY_COMMAND`?
 │   │   ├── FinalizeDealExitExecutor.md — Кто исполняет команду финализации штатного выхода?
 │   │   ├── HoldService.md — Кто исполняет блокировку по требованию детекторов?
@@ -205,7 +205,6 @@
 │   │   ├── IntegrationService.md — Кто является границей с биржей?
 │   │   ├── KillSwitchExecutor.md — Кто исполняет аварийное снятие живого риска?
 │   │   ├── KillSwitchService.md — Кто триггерит аварийное снятие риска для реактивной реакции?
-│   │   ├── ManagingHandler.md — Что делает обработчик статуса сопровождения сделки?
 │   │   ├── MarkDealClosedExecutor.md — Кто применяет терминал штатного закрытия сделки?
 │   │   ├── MarkDealEmergencyClosedExecutor.md — Кто применяет аварийный терминал сделки?
 │   │   ├── MarkDealErrorExecutor.md — Кто применяет ребро сделки в ошибочное состояние?
@@ -218,9 +217,7 @@
 │   │   ├── MarketStructureService.md — Кто отдаёт готовую структуру рынка?
 │   │   ├── OrderExternalStatusResolver.md — Кто переводит внешний статус ordinary order в доменный?
 │   │   ├── PositionStatusResolver.md — Кто определяет доменный статус позиции по факту её наличия?
-│   │   ├── PrecheckHandler.md — Что делает обработчик предвходовой проверки?
 │   │   ├── PriceCalculator.md — Кто рассчитывает цены действия?
-│   │   ├── ProtectionSwitchedHandler.md — Что делает обработчик статуса переключения защиты?
 │   │   ├── RefreshAlgoOrderExecutor.md — Кто исполняет добычу состояния условной заявки?
 │   │   ├── RefreshBalanceExecutor.md — Кто исполняет `REFRESH_BALANCE_COMMAND`?
 │   │   ├── RefreshBillsExecutor.md — Кто исполняет команду добычи движений средств?
@@ -238,8 +235,15 @@
 │   │   ├── StrategyConditionEvaluator.md — Кто проверяет применимость `StrategyCondition`?
 │   │   ├── SubmitAlgoOrderExecutor.md — Кто исполняет `SUBMIT_ALGO_ORDER_COMMAND`?
 │   │   ├── SubmitOrderExecutor.md — Кто исполняет отправку обычной заявки на биржу?
-│   │   └── SystemActionExecutor.md — Кто выдаёт следующую команду системного действия за проход?
-│   ├── dictionary/ — —
+│   │   ├── SystemActionExecutor.md — Кто выдаёт следующую команду системного действия за проход?
+│   │   ├── TrancheEntryFinalizedHandler.md — Что делает обработчик статуса подтверждённого входа транша?
+│   │   ├── TrancheEntrySubmittedHandler.md — Что делает обработчик статуса отправленного входа транша?
+│   │   ├── TrancheExitPendingHandler.md — Что делает обработчик статуса выхода транша?
+│   │   ├── TrancheManagingHandler.md — Что делает обработчик статуса сопровождения транша?
+│   │   ├── TranchePrecheckHandler.md — Что делает обработчик предвходовой проверки транша?
+│   │   └── TrancheProtectionSwitchedHandler.md — Что делает обработчик статуса переключения защиты транша?
+│   ├── dictionary/ — Что означает этот термин?
+│   │   └── leg-term.md — Что означает термин «нога»?
 │   ├── integrations/ — Что известно про источник?
 │   │   └── okx/ — Что известно про источник OKX?
 │   │       ├── contracts/ — Каков контракт и какие лимиты у этой операции источника?
@@ -282,6 +286,7 @@
 │   │   ├── AnomalyReport.md — Через какие состояния проходит `AnomalyReport`?
 │   │   ├── CandleGroup.md — Через какие состояния проходит загрузка свечей группы (`CandleGroup`)?
 │   │   ├── Deal.md — Через какие состояния проходит `Deal`?
+│   │   ├── DealTranche.md — Через какие состояния проходит `DealTranche`?
 │   │   ├── DealActionState.md — Через какие состояния проходит исполнение действия?
 │   │   ├── Instrument.md — Через какие состояния проходит онбординг инструмента (`Instrument`) в шаге 1?
 │   │   ├── Order.md — Через какие состояния проходит `Order` вместе со своей встроенной защитой?
@@ -293,6 +298,7 @@
 │   │   ├── domain/ — Какие у нас доменные модели?
 │   │   │   ├── aggregate/ — Что это за сущность без биржевой привязки, нужная для торговли?
 │   │   │   │   ├── Deal.md — Что это за сущность `Deal`?
+│   │   │   │   ├── DealTranche.md — Что это за сущность `DealTranche`?
 │   │   │   │   └── Strategy.md — Что это за сущность `Strategy`?
 │   │   │   ├── core/ — Что это за торговая модель с биржевым воплощением?
 │   │   │   │   ├── AlgoOrder.md — Что это за сущность `AlgoOrder` — отдельная условная заявка сделки?
@@ -385,16 +391,17 @@
 │   │   ├── algo-order-lifecycle.json — Какие переходы состояний допустимы у отдельной условной заявки?
 │   │   ├── deal-context-load.json — Какой объём графа сделки обязан быть загружен?
 │   │   ├── deal-lifecycle.json — Какие переходы статуса сделки допустимы?
+│   │   ├── deal-tranche-lifecycle.json — Какие переходы статуса транша допустимы?
 │   │   ├── deal-risk-numbers.json — Чему равны четыре числа риска сделки?
 │   │   ├── external-status-resolution.json — Во что резолвится сырой статус источника?
 │   │   ├── market-data-freshness.json — Свежи ли рыночные данные?
 │   │   ├── order-lifecycle.json — Какие переходы состояний допустимы у заявки вместе с её встроенной защитой?
 │   │   ├── order-sizing.json — Какой размер получает действие?
 │   │   ├── pnl-reconciliation.json — Сошлась ли сверка P&L?
-│   │   ├── protection-coverage.json — Каково покрытие защиты живого эпизода?
+│   │   ├── protection-coverage.json — Каково покрытие защиты транша?
 │   │   ├── risk-limits.json — Выполняются ли потолки риска?
 │   │   ├── strategy-reference.json — Проходит ли эталонная стратегия репозитория действующие требования к дереву стратегии?
-│   │   └── strategy-walkthrough.json — Держится ли инвариант покрытия на каждом шаге прохода эталонной сделки?
+│   │   └── strategy-walkthrough.json — Держится ли инвариант покрытия на каждом шаге прохода эталонного транша?
 │   └── concept.md — Из каких принципов выведена система?
 ├── src/ — (Код, не документация.)
 └── .claude-archive/ — (Архив старой инфраструктуры; не место для новых файлов.)

@@ -30,7 +30,7 @@ Per-entity `REFRESH_*` покрывает только **известные** с
 command-layer не предоставляет (bulk-команды сняты —
 `docs/rules/command-lifecycle.md`). Precheck-часть
 закрыта (2026-06-22): инструмент-скоупный exchange-read вне
-command-layer — `docs/components/IntegrationService.md`, `docs/components/PrecheckHandler.md`.
+command-layer — `docs/components/IntegrationService.md`, `docs/components/TranchePrecheckHandler.md`.
 
 **Остаток — orphan-скан шага 8** (`AnomalyJob`: чужие сущности при
 уже открытой сделке и по неведомым инструментам); владелец —

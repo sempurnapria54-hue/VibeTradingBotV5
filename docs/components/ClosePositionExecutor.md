@@ -13,12 +13,14 @@ safety checks, отправляет full close request, сохраняет ACK /
 результат; подтверждение факта закрытия — отдельным `REFRESH_POSITION_COMMAND`.
 
 `CLOSE_POSITION_COMMAND` всегда full close — partial close запрещён (см.
-`docs/rules/no-partial-close.md`). **Эмитентов команды два**: `ExitPendingHandler` на тропе
+`docs/rules/no-partial-close.md`). **Эмитентов команды два**: `DealExitPendingHandler` на тропе
 условия-перехода и `ExitActionExecutor` на тропе явного действия
-шага `EXIT`. Для самого исполнителя команды это различия не создаёт —
+шага `EXIT`. Оба — уровня сделки: полное закрытие нетто-экспозиции
+законно только при выходе всех траншей
+(`docs/rules/exit-teardown-order.md`). Для самого исполнителя команды это различия не создаёт —
 контракт один; различается **дочистка вокруг** неё, и её порядок задан
 инвариантом `docs/rules/exit-teardown-order.md` (сначала отмена живых
-входных ног, потом закрытие). Не блокируется `RiskValidator` (см.
+входных заявок траншей, потом закрытие). Не блокируется `RiskValidator` (см.
 `docs/rules/risk-validator-scope.md`). Не смешивает закрытие с доменной
 автоотменой ордеров: OKX adapter может технически проставить
 `autoCxl=true`, но handler всё равно подтверждает закрытие через

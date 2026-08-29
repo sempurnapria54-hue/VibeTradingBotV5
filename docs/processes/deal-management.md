@@ -32,14 +32,20 @@ EntryScannerJob
   -> DealOpeningService
 
 DealOpeningService
-  -> создаёт Deal (PRECHECK), pinned StrategyDetail, entryReason/entryStepType
+  -> создаёт Deal (ACTIVE), pinned StrategyDetail, entryReason
+  -> материализует DealTranche по объявлениям детали (шаблон -> levelCount штук),
+     каждый в PRECHECK, с pinned StrategyTranche и уровнем
 
 DealOrchestratorJob
   -> загружает DealContext (DealContextService) -> DealStateMachine
 
-DealStateMachine / handler
+DealStateMachine / handler сделки (DealActiveHandler, DealExitPendingHandler, ErrorHandler)
+  -> координация: прогон FSM каждого нетерминального транша,
+     шаги уровня сделки (EXIT, FAIL_SAFE), сверка Σ экспозиций с нетто-размером
+
+DealTrancheStateMachine / handler транша
   -> ветвь стратегии:
-       этап сделки, freshness step, StrategyCondition, выбор StrategyAction
+       этап транша, freshness step, StrategyCondition, выбор StrategyAction
        -> strategy-action-calculation: CalculationContext -> Price -> Size
        -> risk-evaluation: RiskValidator -> RiskBlockResolver (для risk-creating)
        -> StrategyActionOrchestrator (per-type StrategyActionExecutor) -> ServiceCommand
@@ -56,7 +62,8 @@ ServiceCommandExecutor -> конкретный Executor
 ```
 
 Компоненты: `EntryScannerJob`, `DealOpeningService`,
-`DealOrchestratorJob`, `DealStateMachine`, FSM handlers,
+`DealOrchestratorJob`, `DealStateMachine`, `DealTrancheStateMachine`,
+FSM handlers сделки и транша,
 `StrategyActionCalculator`, `StrategyActionOrchestrator`,
 `SystemActionExecutor`, `ServiceCommandExecutor`, executors
 (см. `docs/components/`). Контекст
@@ -64,9 +71,10 @@ ServiceCommandExecutor -> конкретный Executor
 
 ## Статусная механика и recovery
 
-Статусы `Deal` (PRECHECK … CLOSED/ERROR/EMERGENCY_CLOSED), инварианты
-переходов, graceful shutdown, live risk и recovery — у
-`docs/lifecycles/Deal.md` (здесь не дублируются). Ключевое: `ERROR` —
+Статусы `Deal` (ACTIVE, EXIT_PENDING, CLOSED, ERROR, EMERGENCY_CLOSED),
+статусы `DealTranche` (PRECHECK … CLOSED), инварианты переходов, graceful
+shutdown, live risk и recovery — у `docs/lifecycles/Deal.md` и
+`docs/lifecycles/DealTranche.md` (здесь не дублируются). Ключевое: `ERROR` —
 non-terminal; `ERROR → CLOSED` запрещён; `ERROR → EMERGENCY_CLOSED` —
 после подтверждения отсутствия live risk; для **чистого** terminal
 `CLOSED` обязательны `resultProfit`/`resultProfitCurrency` — **со
@@ -79,7 +87,8 @@ non-terminal; `ERROR → CLOSED` запрещён; `ERROR → EMERGENCY_CLOSED` 
 
 После рестарта pending `ServiceCommand` как очередь не восстанавливаются
 (см. `docs/rules/command-lifecycle.md`): FSM пересобирает состояние по
-`Deal` runtime graph, `DealContext`, `DealActionState` и exchange facts.
+runtime-графу сделки и её траншей, `DealContext`, `DealActionState` и
+exchange facts.
 Аудит/история не источник runtime-логики (см.
 `docs/rules/audit-not-runtime-source.md`).
 

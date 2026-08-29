@@ -42,12 +42,14 @@ absent/stale — добыча звеном `REFRESH_BALANCE_COMMAND` через
 ## Реакция на результат
 
 ```text
-PRECHECK + BLOCKED + live risk ещё нет
-  -> терминал CLOSED, closeReason = RISK_CONTROL       # не авария
+транш в PRECHECK + BLOCKED + живого риска у него ещё нет
+  -> терминал транша CLOSED, closeReason = RISK_CONTROL   # не авария
+     (сделка закрывается, когда так закрылись все её транши)
 
-ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING + BLOCKED
+транш в ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING + BLOCKED
   (для risk-creating / risk-weakening action)
-  -> ребро в ERROR -> ErrorHandler / safety-flow
+  -> ребро в ERROR **сделки** -> ErrorHandler / safety-flow
+     (ошибочного статуса у транша нет)
 
 WARNING  -> action не блокируется; фиксируется в логах / истории
 ALLOWED  -> StrategyActionOrchestrator создаёт команду
@@ -73,7 +75,7 @@ ALLOWED  -> StrategyActionOrchestrator создаёт команду
 Исчерпанный бюджет сделки — ожидаемый
 исход легитимной стратегии, а не рассогласование состояния: действие
 **не исполняется**, сделка остаётся в текущем статусе и ведётся до
-выхода имеющимися ногами. Ребро в `ERROR` означало бы, что нормальная работа
+выхода имеющимися траншами. Ребро в `ERROR` означало бы, что нормальная работа
 стратегии флагается как авария — и стоило бы teardown живого риска там,
 где риск под контролем.
 
@@ -85,14 +87,14 @@ ALLOWED  -> StrategyActionOrchestrator создаёт команду
 живой риск там, где он под контролем. Дом предиката —
 `docs/rules/live-risk-protection.md`.
 
-Карв-аут не новый по конструкции: тот же ряд, что `PRECHECK + BLOCKED +
-live risk ещё нет ⇒ терминал `CLOSED`, не авария` (схема выше). Ось
+Карв-аут не новый по конструкции: тот же ряд, что «транш в `PRECHECK` без
+живого риска ⇒ его терминал `CLOSED`, не авария» (схема выше). Ось
 разведения одна — **является ли реджект признаком рассогласования**.
 Все прочие коды `BLOCKED` на risk-creating / risk-weakening действии
 ведут в `ERROR` по-прежнему.
 
 **Статус здесь никто не присваивает.** Схема называет **исход**, а не
-писателя: терминал `CLOSED` пишет звено `MARK_DEAL_CLOSED_COMMAND`
+писателя: терминал сделки `CLOSED` пишет звено `MARK_DEAL_CLOSED_COMMAND`
 (`docs/components/MarkDealClosedExecutor.md`), ребро в `ERROR` — по
 карв-ауту природы тропы: решение handler'а ⇒ звено
 `MARK_DEAL_ERROR_COMMAND`, перехват ⇒ прямая запись петлёй
@@ -110,8 +112,8 @@ Actions выполняются последовательно; для каждо
 `CalculationContext` → расчёт → (risk-validation либо minimal
 safety/invariant checks) → одна актуальная команда. Если любое
 risk-creating действие step заблокировано — остальные actions step не
-выполняются (для `PRECHECK` без live risk → закрытие candidate Deal без
-ошибки; для этапов с live risk → `ERROR` и safety-flow). Если exit /
+выполняются (для транша в `PRECHECK` без живого риска → его закрытие без
+ошибки; для этапов с живым риском → `ERROR` сделки и safety-flow). Если exit /
 cleanup / safety действие не прошло minimal checks — step останавливается,
 flow уходит в recovery / ERROR / safety по контексту.
 

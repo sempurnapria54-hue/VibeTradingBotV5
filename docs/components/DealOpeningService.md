@@ -17,22 +17,28 @@ entry context).
 
 1. финальная защитная проверка, что по инструменту всё ещё нет активной
    сделки (gatekeeper: exchange/instrument/strategy/risk статусы);
-2. создаёт `Deal`, ставит `Deal.Status = PRECHECK`, пишет
+2. создаёт `Deal`, ставит `Deal.Status = ACTIVE`, пишет
    **`Deal.externalCreatedAt`** — биржевой момент создания сделки,
    полученный от scanner'а (`GET /public/time`, П7-B; на биржу за ним
    **этот** сервис не ходит —). Поле служит нижней границей
    окна линковки bills, когда `billsWindowBegin` пуст
    (`docs/models/domain/aggregate/Deal.md`);
 3. сохраняет pinned-связи с инструментом и `StrategyDetail`;
-4. передаёт `marketPhase` и подробный entry context в аудит/timeline
+4. **материализует транши детали**: по одному на объявление, по
+   `levelCount` на шаблон; каждый — в своём `PRECHECK`, с закреплённым
+   `strategyTrancheId` и уровнем
+   (`docs/models/domain/aggregate/DealTranche.md`). Материализация
+   эагерна: транш, чей вход так и не сработает, закроется истёкшим
+   условием, а «уровень объявлен и ждёт» обязано быть видно в данных;
+5. передаёт `marketPhase` и подробный entry context в аудит/timeline
    (в `Deal` подробный entry context не хранится);
-5. сохраняет `entryReason` / `entryStepType`;
-6. возвращает созданную сделку.
+6. сохраняет `entryReason` на сделке, `entryStepType` — на транше;
+7. возвращает созданную сделку.
 
 ## Не делает
 
 Не ищет стратегию, не выбирает `StrategyDetail`, не анализирует
 индикаторы, не проверяет condition, не создаёт order/algo-order, не
-ходит на биржу, не запускает FSM. Создание `Deal` — часть жизненного
+ходит на биржу, не запускает FSM — ни сделки, ни траншей. Создание `Deal` — часть жизненного
 цикла, но **не** часть FSM: FSM сопровождает уже созданную сделку (см.
 `docs/processes/deal-management.md`).

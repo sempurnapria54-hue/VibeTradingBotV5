@@ -4,7 +4,7 @@
   "home": "docs/models/domain/aggregate/Deal.md",
 
   "operands": {
-    "legs[].type": "Order.type — бизнес-тип ноги",
+    "legs[].type": "Order.type — бизнес-тип ноги; ноги собираются по всем траншам сделки: числа риска агрегатные",
     "legs[].status": "Order.status",
     "legs[].plannedRiskAmount": "Order.plannedRiskAmount — write-once на ноге",
     "legs[].plannedSizeContracts": "Order.plannedSizeContracts",
