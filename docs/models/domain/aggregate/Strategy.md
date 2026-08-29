@@ -94,6 +94,7 @@ JSONB на строке настройки.
 | `riskPerActionPercent` | `BigDecimal` | Поактный потолок риска. |
 | `cumulativeRiskPerDealMultiplier` | `BigDecimal` | Множитель кумулятивного потолка сделки. |
 | `strategySimultaneousRiskPerDealPercent` | `BigDecimal` | Максимум одновременного риска, который стратегия допускает под ударом на одной сделке. |
+| `strategyCatastrophicRiskPerDealMultiplier` | `BigDecimal` | Множитель катастрофического потолка сделки; ограничен сверху конфигурацией, проверяется на создании. |
 | `targetRiskRewardRatio` | `BigDecimal` | Ориентир соотношения риска и прибыли. |
 | `positionReopenAllowed` | `Boolean` | Допустимо ли переоткрытие позиции внутри сделки. |
 | `stepsByStatus` | `Map<Deal.Status, List<StrategyStep>>` | Шаги, сгруппированные по статусу сделки. |

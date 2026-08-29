@@ -17,8 +17,8 @@
     "limits.riskPerActionPercent": "StrategyDetail.riskPerActionPercent, проценты",
     "limits.cumulativeMultiplier": "StrategyDetail.cumulativeRiskPerDealMultiplier (K)",
     "limits.strategySimultaneousPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",
-    "limits.globalSimultaneousPercent": "globalSimultaneousRiskPerDealPercent, проценты",
-    "limits.dealNotionalMultiplier": "M — сделочный кэп нотинала в долях базы риска; умолчания нет",
+    "limits.globalSimultaneousPercent": "globalSimultaneousRiskPerDealPercent — максимальный риск на сделку, проценты; умолчания нет",
+    "limits.catastrophicMultiplier": "StrategyDetail.strategyCatastrophicRiskPerDealMultiplier — множитель катастрофического потолка; умолчания нет",
     "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening"
   },
 
@@ -99,8 +99,13 @@
     },
     {
       "name": "dealNotional",
-      "note": "Операнд сделочного кэпа экспозиции.",
+      "note": "Операнд катастрофического потолка: суммарная экспозиция сделки.",
       "expr": "liveLegsNotional + livePositionNotional"
+    },
+    {
+      "name": "catastrophicLossCeiling",
+      "note": "Катастрофический потолок потери сделки: максимальный риск на сделку, растянутый множителем стратегии. Он же кэп суммарного номинала — худший мыслимый ход принят равным 100 %.",
+      "expr": "limits.globalSimultaneousPercent / 100 * base * limits.catastrophicMultiplier"
     },
     {
       "name": "cumulativeBase",
@@ -125,8 +130,8 @@
     },
     {
       "name": "withinDealNotional",
-      "note": "Незаданный M отказывает вычислением, а не пропускает действие.",
-      "expr": "dealNotional <= limits.dealNotionalMultiplier * base"
+      "note": "Незаданное число риск-аппетита — множитель стратегии или максимальный риск на сделку — отказывает вычислением, а не пропускает действие.",
+      "expr": "dealNotional <= catastrophicLossCeiling"
     },
     {
       "name": "perContractRisk",
@@ -150,7 +155,7 @@
         "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": [
           { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000 }
         ]
@@ -166,7 +171,7 @@
         "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 3010,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": [
           { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000 }
         ]
@@ -182,7 +187,7 @@
         "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": [
           { "status": "CANCELED", "plannedRiskAmount": 100, "plannedSizeContracts": 100, "accumulatedFillSize": 30, "plannedEntryPrice": 3000 }
         ]
@@ -198,7 +203,7 @@
         "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": [
           { "status": "ACTIVE", "plannedRiskAmount": 0, "plannedSizeContracts": 0, "accumulatedFillSize": 0, "plannedEntryPrice": 3000 }
         ]
@@ -214,7 +219,7 @@
         "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": []
       },
       "expect": { "cumulativeBase": 8000 }
@@ -228,13 +233,13 @@
         "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": []
       },
       "expect": { "cumulativeBase": 10000 }
     },
     {
-      "case": "веер живых ног при полной аллокации выходит за сделочный кэп нотинала",
+      "case": "веер живых ног при полной аллокации выходит за катастрофический потолок",
       "state": {
         "base": 10000,
         "actRisk": 0,
@@ -242,15 +247,15 @@
         "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 2 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": [
           { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 70, "accumulatedFillSize": 0, "plannedEntryPrice": 3000 }
         ]
       },
-      "expect": { "liveLegsNotional": 21000, "livePositionNotional": 9000, "dealNotional": 30000, "withinDealNotional": false }
+      "expect": { "liveLegsNotional": 21000, "livePositionNotional": 9000, "dealNotional": 30000, "catastrophicLossCeiling": 10000, "withinDealNotional": false }
     },
     {
-      "case": "тот же веер при большем кэпе проходит",
+      "case": "тот же веер при множителе, ровно покрывающем экспозицию, проходит границей",
       "state": {
         "base": 10000,
         "actRisk": 0,
@@ -258,15 +263,15 @@
         "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 300 },
         "entryLegs": [
           { "status": "ACTIVE", "plannedRiskAmount": 100, "plannedSizeContracts": 70, "accumulatedFillSize": 0, "plannedEntryPrice": 3000 }
         ]
       },
-      "expect": { "dealNotional": 30000, "withinDealNotional": true }
+      "expect": { "dealNotional": 30000, "catastrophicLossCeiling": 30000, "withinDealNotional": true }
     },
     {
-      "case": "незаданный кэп нотинала отказывает, а не пропускает действие",
+      "case": "незаявленный множитель отказывает, а не пропускает действие",
       "state": {
         "base": 10000,
         "actRisk": 0,
@@ -274,10 +279,24 @@
         "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": null },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": null },
         "entryLegs": []
       },
-      "expectRefusal": { "withinDealNotional": "M не задан" }
+      "expectRefusal": { "catastrophicLossCeiling": "множитель стратегии не объявлен", "withinDealNotional": "множитель стратегии не объявлен" }
+    },
+    {
+      "case": "незаданный максимальный риск на сделку отказывает обоими потолками, которые на нём стоят",
+      "state": {
+        "base": 10000,
+        "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 30, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 20, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": null, "catastrophicMultiplier": 100 },
+        "entryLegs": []
+      },
+      "expectRefusal": { "withinGlobalSimultaneous": "максимальный риск на сделку не задан", "withinDealNotional": "максимальный риск на сделку не задан" }
     },
     {
       "case": "закрытая форма сайзинга: комиссия входит обеими ногами",
@@ -297,7 +316,7 @@
         "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": []
       },
       "expect": { "actWithinPerAction": true, "withinCumulative": true, "withinStrategySimultaneous": true }
@@ -311,7 +330,7 @@
         "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": []
       },
       "expect": { "actWithinPerAction": false }
@@ -325,7 +344,7 @@
         "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2700,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "dealNotionalMultiplier": 4 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": []
       },
       "expect": { "livePositionRiskAtStop": 302.85, "withinStrategySimultaneous": false }

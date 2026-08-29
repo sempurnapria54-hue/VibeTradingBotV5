@@ -7,7 +7,8 @@
     "details[].phaseEntryPolicy": "политика входа в фазе; NO_TRADE — неторгуемая деталь",
     "details[].stepsByStatus{}": "шаги, сгруппированные по статусу сделки",
     "steps[].actions[]": "пакет действий шага",
-    "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку (конфигурация)"
+    "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — максимальный риск на сделку (конфигурация)",
+    "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)"
   },
   "values": [
     {
@@ -17,7 +18,7 @@
     {
       "name": "hasRequiredRiskFields",
       "note": "У торгуемой детали риск-поля и признак переоткрытия обязательны и умолчаний не имеют.",
-      "expr": "notNull(?riskPerActionPercent) && notNull(?cumulativeRiskPerDealMultiplier) && notNull(?strategySimultaneousRiskPerDealPercent) && notNull(?positionReopenAllowed)"
+      "expr": "notNull(?riskPerActionPercent) && notNull(?cumulativeRiskPerDealMultiplier) && notNull(?strategySimultaneousRiskPerDealPercent) && notNull(?strategyCatastrophicRiskPerDealMultiplier) && notNull(?positionReopenAllowed)"
     },
     {
       "name": "usesLegacyRiskFieldName",
@@ -48,8 +49,8 @@
     },
     {
       "name": "riskChainHolds",
-      "note": "Инвариант вложенности потолков: поактный ≤ максимум стратегии ≤ глобальный. Вырожденный случай одного одновременно живого действия.",
-      "expr": "riskPerActionPercent <= strategySimultaneousRiskPerDealPercent && strategySimultaneousRiskPerDealPercent <= globalSimultaneousRiskPerDealPercent"
+      "note": "Инвариант вложенности потолков: поактный ≤ максимум стратегии ≤ глобальный, а множитель катастрофического потолка не выше конфигурационного. Вырожденный случай одного одновременно живого действия.",
+      "expr": "riskPerActionPercent <= strategySimultaneousRiskPerDealPercent && strategySimultaneousRiskPerDealPercent <= globalSimultaneousRiskPerDealPercent && strategyCatastrophicRiskPerDealMultiplier <= globalCatastrophicRiskPerDealMultiplier"
     },
     {
       "name": "detailsBreakingRiskChain",
@@ -212,9 +213,10 @@
       }
     },
     {
-      "case": "потолки эталона вложены: поактный не выше максимума стратегии, тот не выше глобального",
+      "case": "потолки эталона вложены: поактный не выше максимума стратегии, тот не выше глобального, множитель не выше конфигурационного",
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCatastrophicRiskPerDealMultiplier": 150.0
       },
       "stateFrom": {
         "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"

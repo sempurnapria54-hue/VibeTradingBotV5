@@ -118,6 +118,7 @@
       "riskPerActionPercent": 1.0,
       "cumulativeRiskPerDealMultiplier": 2.0,
       "strategySimultaneousRiskPerDealPercent": 1.0,
+      "strategyCatastrophicRiskPerDealMultiplier": 100.0,
       "positionReopenAllowed": false,
       "targetRiskRewardRatio": 2.5,
       "stepsByStatus": {
@@ -308,6 +309,7 @@
       "riskPerActionPercent": 1.0,
       "cumulativeRiskPerDealMultiplier": 2.0,
       "strategySimultaneousRiskPerDealPercent": 1.0,
+      "strategyCatastrophicRiskPerDealMultiplier": 100.0,
       "positionReopenAllowed": false,
       "targetRiskRewardRatio": 2.5,
       "stepsByStatus": {
