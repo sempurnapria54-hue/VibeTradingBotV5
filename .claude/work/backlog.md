@@ -8,7 +8,7 @@
 
 Продуктовое движение по фазам и шагам ведётся отдельно —
 `.claude/work/roadmap/roadmap.md` (главный) и
-`.claude/work/roadmap/phase-N.md` (детальные). Когда шаг роадмапа
+`.claude/work/roadmap/phase-1.md` (детальные). Когда шаг роадмапа
 берётся в работу, через процесс
 `.claude/processes/roadmap-step-execution.md` он порождает
 конкретные задачи в этот backlog. Backlog шире роадмапа: помимо
@@ -27,46 +27,43 @@
 `history/` (`tasks-<сущность>.md` / `tasks-<док>.md`); архивные доки
 в `.claude-archive/` не удалены — источник для оставшихся миграций.
 
-## Хвост переписывания корпуса (2026-08-29)
+## Хвост переписывания корпуса
 
-Корпус переписан по концепции: 234 файла и 1899 KB → 212 файлов и
-833 KB (снято 56 %). Раскладка и методика — `.claude/work/progress/corpus-rewrite-mapping.md`,
-отчёт исполнения — там же в конце. Остаток работы:
+Корпус переписан по концепции: 234 файла и 1899 KB → 215 файлов и 686 KB
+(снято 64 %). Методика и раскладка —
+`.claude/work/progress/corpus-rewrite-mapping.md`.
 
-1. **Компонент-доки переписаны не все.** Полностью переписаны десять
-   самых крупных; остальные семьдесят прошли механическую чистку
-   (снятие процессной арматуры, истории редакций, цитат-блоков и
-   §-адресов) и требуют содержательного прохода: свести пересказ политики
-   к ссылке на дом и привести к форме «что делает, что читает и пишет,
-   контракт, идемпотентность, границы».
+Закрыто вторым проходом: компонент-доки приведены к единой форме,
+составные вопросы переформулированы во всём корпусе, заведены ещё четыре
+предмета спецификации, эталонная стратегия прогоняется машинно,
+исполнители получили разделы под конструкцию риск-контура, остатков
+процессной арматуры в корпусе нет.
 
-2. **Составной вопрос в шапке.** Часть доков (преимущественно
-   компонентных) сохраняет вопрос, склеенный через «и»: «что делает, что
-   не делает и какие границы». По `.claude/rules/structure.md` вопрос
-   ровно один — переформулировать либо делить файл.
+Остаток:
 
-3. **Спецификация покрывает четыре предмета из примерно десяти.**
-   Заведены `protection-coverage`, `risk-limits`, `deal-risk-numbers`,
-   `pnl-reconciliation`. Не заведены: закрытая форма сайзинга в части
-   округления по шагу лота, предикат линковки движений, матрицы переходов
-   статусов, предикаты входных и выходных проверок обработчиков.
+1. **Спецификация покрывает восемь предметов.** Не заведены: матрицы
+   переходов заявки, условной заявки и встроенной защиты; предикат
+   резолва внешнего статуса; предикат свежести рыночных данных; область
+   загрузки графа прохода. Все шесть выразимы существующим языком
+   спецификации.
 
-4. **Набор примеров пока синтетический.** Эталонная стратегия репозитория
-   в примерах не прогоняется машинно — её прогон описан пошагово в
-   дизайн-проходе. Довести до исполнимого входа спецификации.
+2. **Набор примеров эталона проверяет дерево стратегии, но не проход
+   сделки.** Пошаговый прогон эталонной стратегии через состояния
+   (вход → защита → безубыток → трейлинг → выход) описан прозой в
+   дизайн-проходе и машинно не воспроизводится: для этого нужен пример,
+   несущий состояние сделки на каждом шаге.
 
-5. **Приземление дизайн-прохода в компонентах.** Правила и модели
-   переписаны под новую конструкцию; компонент-доки исполнителей
-   (`RiskValidator`, `ManagingHandler`, `EntryFinalizedHandler`,
-   `ProtectionSwitchedHandler`, `SizeCalculator`, `DealContextService`)
-   ссылаются на неё, но своих разделов под неё ещё не имеют — в
-   частности объём загрузки вложенной коллекции встроенных защит и
-   отложенное снятие защиты без расхода бюджета попыток.
-
-6. **Числа риск-аппетита не заданы.** Сделочный кэп нотинала введён
+3. **Числа риск-аппетита не заданы.** Сделочный кэп нотинала введён
    четвёртым неравенством, его величина — обязательный параметр без
    умолчания; пока не задан, риск-создающее действие отвергается. Это
    ожидаемое состояние, а не дефект.
+
+4. **Продуктовый вопрос C6 открыт** — должны ли эпизоды одной сделки
+   вестись одинаково (`.claude/work/progress/risk-contour-design.md`).
+
+5. **Мелкий остаток объёма** — контракт-доки источника и инвентари полей
+   нативных моделей: они чисты по составу, но местами длиннее нужного
+   (перечни, повторяющие таблицу полей соседнего дока).
 
 ## Cross-cutting миграции
 
@@ -91,7 +88,7 @@
 **Осталось:** модели `ServiceCommandExecutionHistory`, entity history,
 timeline, snapshot-формат; ~30 подвопросов. Связано с DEAL-Q1/DEAL-Q2.
 Финализация PnL закрыта отдельно
-(`docs/decisions/result-profit-source.md`); пофилловый аудит
+(`docs/models/domain/aggregate/Deal.md`); пофилловый аудит
 (`TradeFill`/`TradeFillsArchive`) — вне фазы 1.
 **Форвард-заметки:** `2026-05-28-.../tasks-аудит-и-история-исполнения.md`
 (§5/§8 подвопросы + Решения прохода 2); `2026-05-27-.../tasks-deal.md`
@@ -120,7 +117,7 @@ flow (`KillSwitchService`, kill-switch report, after-snapshot,
 
 Построенное (Strategy API, create-валидатор, «одна реализация») и
 scope-решения — `history/2026-06-05-phase-1-step-2-strategy.md`,
-`docs/decisions/strategy-materialization-and-validation.md`.
+`docs/rules/strategy-validation.md`.
 **Форвард-заметки:** `2026-05-27-.../tasks-strategy.md` (STR-FW8, FW9,
 FW10), `tasks-deal.md` (DEAL-FW8).
 
@@ -139,7 +136,7 @@ market-data.
 онбординг-путь lifecycle уже материализованы
 (`docs/models/domain/core/`, `docs/lifecycles/Instrument.md`).
 Разнобой имён биржевого safety-статуса и множества входа закрыты
-лестницей 2026-08-26 (`docs/decisions/exchange-safety-ladder.md`,
+лестницей 2026-08-26 (`docs/rules/exchange-hold.md`,
 `docs/rules/exchange-hold.md`); CODE-дельта лестницы — §Шаг 7.
 Блокировку торговли задаёт состав реакции error-политики, не
 `severity` отчёта (`docs/models/domain/other/AnomalyReport.md`
@@ -157,7 +154,7 @@ market-data.
   чистка per-таблица, горизонты видов могут различаться) — фаза 3.
   Строки копятся by design (`COMPLETED` жёстко терминален,
   слот-переиспользования нет); ретеншен — цена, явно отложенная за
-  границу фазы (`docs/decisions/command-action-boundary.md`
+  границу фазы (`docs/rules/command-lifecycle.md`
   §Отложено). Операнд ретеншена есть — `created_at` появляется вместе
   с audit-колонками обеих таблиц.
 - `linkedOrderExternalIds` — использование для fills/recovery/audit
@@ -256,7 +253,7 @@ market-data.
 **условием пересмотра данные**, а не срок.
 
 Сведение четырёх дыр воедино, счётная иллюстрация и перечень наблюдений —
-`docs/decisions/per-trade-risk-policy.md` §«Worst-case открывающего
+`docs/rules/risk-policy.md` §«Worst-case открывающего
 входа»; здесь — носитель со стороны **события**, чтобы условие не
 осталось внутри правила, которое читает только тот, кому оно и так
 нужно.
@@ -280,7 +277,7 @@ market-data.
 2. **Вернуться к развилке** «кэп нотинала на сделку **или** пол
    дистанции стопа в единицах волатильности» — на числах, а не на
    предположении; обе формы отложены, не отвергнуты
-   (`docs/decisions/per-trade-risk-policy.md` §Альтернативы).
+   (`docs/rules/risk-policy.md` §Альтернативы).
 3. **Смежное — C8:** тем же заходом пересматривается «филл отдыхающей
    ноги риск-контроля не проходит» (`per-trade-risk-policy.md`
    §«Филл отдыхающей входной ноги риск-контроля не проходит»): нужны
@@ -320,7 +317,7 @@ market-data.
 базиса `last` ↔ `mark` create отвергает
 `StopLossSettings.triggerPriceType ∈ {LAST, INDEX}`
 (`STRATEGY_TRIGGER_PRICE_TYPE_NOT_MARK`). Дом формулировки —
-`docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
+`docs/rules/live-risk-protection.md` §«Ценовая база триггера
 защиты объявляется стратегией и доезжает до биржи»; здесь — носитель со
 стороны **события**.
 
@@ -391,7 +388,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 
 Заметки владельцам шагов, **не действия сейчас**; решения — на самих
 шагах. Поле-уровневые контракты кандидатов скана готовы (см.
-`docs/integrations/okx/coverage-manifest.md`, прогон 3). Кандидаты,
+`.claude/processes/api-docs-completion.md`, прогон 3). Кандидаты,
 рассмотренные и не взятые (В-4 batch-write, В-5 STP), — итог в
 `history/2026-07-14-claude-docs-curation.md`.
 
@@ -413,10 +410,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   потолки размера (`contracts/max-size.md`); `position-tiers` —
   `maxLever`/`maxSz` по тирам — форвард к **риску на биржу/портфель**
   (фаза 3; экспозиционные лимиты,
-  `docs/decisions/per-trade-risk-policy.md`), не в валидаторе фазы 1
+  `docs/rules/risk-policy.md`), не в валидаторе фазы 1
   (`contracts/position-tiers.md`).
 - **Простой жёсткий предел плеча на сделку — отложен (ратифицировано
-  2026-06-20,** `docs/decisions/per-trade-risk-policy.md`**).**
+  2026-06-20,** `docs/rules/risk-policy.md`**).**
   Остаточный зазор: **узкий стоп → высокое плечо** при малом денежном
   убытке по стопу. **Вернуться после наблюдений** (бэктест / живые
   прогоны), когда станет видно, материализуется ли зазор на практике.
@@ -444,10 +441,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   перевод залипших L4-отчётов + порог «серия неудач» STRUCT-Q1 —
   **шаг 8**; (2) **PnL-финализация `EMERGENCY_CLOSED`** — число
   считается по той же формуле, что на чистой тропе (расчёт — шаг 7;
-  `docs/decisions/pnl-finalization-mechanics.md`). Связано с ANOM-Q2
+  `docs/rules/pnl-reconciliation.md`). Связано с ANOM-Q2
   (`history/2026-05-27-миграция-anomaly-report/tasks-anomaly-report.md`).
 - **Остаток Stage 3 FSM/action слоистости** (решение —
-  `docs/decisions/fsm-execution-layering.md`; Stage 1-2 построены на
+  `docs/processes/fsm-execution-layering.md`; Stage 1-2 построены на
   шаге 6): transition-conditions в модели стратегии +
   exit-as-transition (`MANAGING→EXIT_PENDING`) — сверить остаток с
   as-built шага 6. Полное закрытие выражается и условием-переходом, и
@@ -460,7 +457,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   (`open-questions.md`).
 - **Переоценка инварианта «ликвидация за стопом» — проектирование**
   (требование записано — `docs/components/AnomalyJob.md` §«Переоценка
-  инварианта», `docs/decisions/per-trade-risk-policy.md` §«Роль
+  инварианта», `docs/rules/risk-policy.md` §«Роль
   плеча»). Спроектировать на шаге: **такт** проверки; **гистерезис**
   против ложных срабатываний у широких стопов; выбор реакции —
   **перестановка защиты** vs **контролируемый выход**; код аномалии в
@@ -481,9 +478,9 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   `EntryScannerJob`, `DealOrchestratorJob`; **док есть, кода нет** —
   `AnomalyJob` (материализация — этот шаг); **только название** —
   `ReconciliationJob` (п.7), `TradeGuardJob`; **снят** —
-  `MarketPhaseJob` (`docs/decisions/market-phase-stateless.md`);
+  `MarketPhaseJob` (`docs/models/domain/other/MarketPhase.md`);
   **отвергнута** — `TradeFeeSyncJob`
-  (`docs/decisions/pnl-finalization-mechanics.md` реш.4). Пометки
+  (`docs/rules/pnl-reconciliation.md` реш.4). Пометки
   состояния носителей — **в самих компонент-доках** (образец —
   `docs/components/AnomalyJob.md` §«Состояние носителей»), отдельного
   инвентарь-дока не заводим.
@@ -501,7 +498,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   «запрет новых входов + ручное снятие», то есть цена отказа
   конвертируется ровно в эту ось. Развилка фазы 3: считать **сделку**
   или **время торговой недоступности** (uptime). Носитель признанной
-  цены — `docs/decisions/pnl-finalization-mechanics.md`
+  цены — `docs/rules/pnl-reconciliation.md`
   §«Форвард-фокус: ось упущенных возможностей». Смежное — `PNL-Q1`
   п.2.
 - **Разрешимость R-выборки при пропускной способности контура.**
@@ -551,9 +548,9 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 ## Шаг 7 (сделки и P&L) — исполнительный хвост
 
 **Концепция закрыта:** источник числа —
-`docs/decisions/result-profit-source.md`; механика/носители стадий 1-2
+`docs/models/domain/aggregate/Deal.md`; механика/носители стадий 1-2
 и реестр предусловий `CODE` —
-`docs/decisions/pnl-finalization-mechanics.md`; сверка bills↔net —
+`docs/rules/pnl-reconciliation.md`; сверка bills↔net —
 `docs/rules/pnl-reconciliation.md`. Ниже — **исполнительный хвост
 (CODE) + рантайм-верификация + форвард**, не выбор пути.
 
@@ -565,7 +562,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 
 - **чистый `DOCS_CHECK`**;
 - **грунт `integrator` / `tester`** — **одиннадцать** гейтящих
-  предусловий (`docs/decisions/pnl-finalization-mechanics.md`
+  предусловий (`docs/rules/pnl-reconciliation.md`
   §«Предусловия `CODE` шага 7», пп. 1, 2, 5, 6, 7, 9, 10, 14, 15, 16,
   **17**) и их кейсы: `AG1.5` (п. 1), `AG1.9` (пп. 1 и 15 — вторая
   половина кейса несёт самостоятельное предусловие), **`AG6.1` (пп. 2 и
@@ -584,7 +581,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 
 ⚠️ **Цена доведения шага 7 до `CODE` при незакрытых разрывах — принята
 и записана** (решение держателя 2026-08-23; реестр предусловий `CODE`
-п. 13, `docs/decisions/pnl-finalization-mechanics.md`; разведка —
+п. 13, `docs/rules/pnl-reconciliation.md`; разведка —
 `.claude/notes/2026-08-23-разрывы-спека-кода-на-тропе-живой-сделки.md`):
 клеймы полноты шага 7 непроверяемы до реализации системного слоя —
 «чисто» на `DOCS_CHECK` означает «доки не противоречат друг другу», а
@@ -596,7 +593,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 ### Лестница биржевых safety-состояний — CODE-дельта (2026-08-26)
 
 Дом правила — `docs/rules/exchange-hold.md`; решение —
-`docs/decisions/exchange-safety-ladder.md`; сигнал —
+`docs/rules/exchange-hold.md`; сигнал —
 `docs/components/models/HoldSignal.md`.
 
 Состав пересмотрен ревизией держателя (`GAPS_CLOSE_18`).
@@ -680,14 +677,14 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **ребро `* → ERROR` — карв-аут по природе тропы**: решение ⇒ звено
   `MARK_DEAL_ERROR_COMMAND`, перехват (enforcement холда, оба `catch`
   оркестратора) ⇒ прямая запись петлёй
-  (`docs/decisions/fsm-execution-layering.md`);
+  (`docs/processes/fsm-execution-layering.md`);
 - **`+deals.planned_risk_equity_base`** (write-once, пишет
   `CreateOrderExecutor` из восьмого поля `CreateOrderCommandPayload`);
 - **`+orders.position_id`** (FK, write-once, пишет
   `RefreshOrderExecutor` при первом филле ноги);
 - **три лимита риска внутри уровня «риск на сделку»** (C6
   `DOCS_CHECK_20` + `RISK-Q3-A`; дом —
-  `docs/decisions/per-trade-risk-policy.md`):
+  `docs/rules/risk-policy.md`):
   - `strategy_details.risk_per_trade_percent` → `risk_per_action_percent`
     (`ALTER RENAME`), `+cumulative_risk_per_deal_multiplier`; правка
     `StrategyDetail` / api-модели / entity и двух
@@ -702,11 +699,11 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     `+RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`; **три** новые
     проверки в `RiskValidator` — операнды считаются по runtime graph,
     носителя остатка не заводить (формулы — дом политики,
-    `docs/decisions/per-trade-risk-policy.md`);
+    `docs/rules/risk-policy.md`);
   - **статическая проверка на create стратегии**
     (`StrategyCreateRequestValidator`, 400): два правила — вложенность
     потолков и `N_overlap × riskPerActionPercent ≤` максимума стратегии
-    (`docs/decisions/strategy-materialization-and-validation.md`);
+    (`docs/rules/strategy-validation.md`);
   - `BLOCKED` по обоим сделочным кодам **в `ERROR` не уводит**
     (`docs/processes/risk-evaluation.md` §«Карв-аут исчерпанного бюджета
     сделки»);
@@ -715,7 +712,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   `DealOpeningService`, тот пишет `Deal.externalCreatedAt`; отказ
   эндпоинта ⇒ сделка не создаётся. Суррогат `Deal.createdAt` снят;
 - **`+trade_fee_rates.external_fee_level`**, **`+ix_anomaly_report_unfinished_state`**
-  (сборка — `docs/decisions/pnl-finalization-mechanics.md`
+  (сборка — `docs/rules/pnl-reconciliation.md`
   §«Schema-дельта шага 7»);
 - **приземление `condition.trailing.externalPrice`** при рефреше —
   `updateFromSnapshot` с `IGNORE`-стратегией null'ов
@@ -745,7 +742,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     `externalSize` / наименее благоприятного живого стопа, клэмп на
     слагаемом) и `dealRiskTaken = plannedRiskAmount + incurredCanceled`
     — C1-C3 `DOCS_CHECK_21`, дом —
-    `docs/decisions/per-trade-risk-policy.md`;
+    `docs/rules/risk-policy.md`;
   - **четыре неравенства вместо трёх** + новый код
     `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` в `RiskCheckCode`;
     база кумулятивного — `min(plannedRiskEquityBase, база риска)` (C7);
@@ -783,7 +780,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   - **create-валидация стратегии — третье правило**
     `StrategyCreateRequestValidator`: `triggerPriceType ∈ {LAST, INDEX}`
     ⇒ 400 `STRATEGY_TRIGGER_PRICE_TYPE_NOT_MARK` (C5, решение держателя;
-    дом — `docs/rules/risk-creating-entry-protection.md`). Енум
+    дом — `docs/rules/live-risk-protection.md`). Енум
     `TriggerPriceType` **не сужается**;
   - **предикат пары `protectionRelievedRiskAmount`** получает четвёртый
     конъюнкт `orders.position_id = livePosition().id` — обе половины
@@ -809,7 +806,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   пакет C1/C3 не был назван ни в одной секции; дома политик — в ссылках,
   здесь только «что сделать»):
   - **инвариант защиты — покрытие, а не наличие** (дом —
-    `docs/rules/risk-creating-entry-protection.md` §Правило):
+    `docs/rules/live-risk-protection.md` §Правило):
     `Σ` покрытия живых защит `≥ Position.externalSize`, где покрытие
     attached = `min(AttachedAlgoOrder.size, Order.accumulatedFillSize)`
     родительской ноги, standalone =
@@ -840,7 +837,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     класс»);
   - **порядок ног entry-`REPLACE` ветвится по филлу**: при
     `accumulatedFillSize > 0` — place-new → подтверждение → cancel-old
-    (`docs/decisions/replace-not-amend.md` §Решение п. 3);
+    (`docs/rules/replace-not-amend.md` §Решение п. 3);
   - **сужение набора неравенств по классу действия** (C3
     `DOCS_CHECK_23`): risk-weakening — три неравенства, «риск акта» = 0,
     `liveRiskNow` **пост-действенный**; поактное не применяется. Знают об
@@ -901,7 +898,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     нога 2.
 - **CODE R-слота и формулы риска** (дом политики —
   `docs/models/domain/aggregate/Deal.md` §«Плановый риск» / §«Взятый
-  риск», `docs/decisions/per-trade-risk-policy.md`):
+  риск», `docs/rules/risk-policy.md`):
   - **шесть колонок `orders`** (дом планового риска — нога, не
     сделка): `planned_risk_amount`, `planned_risk_currency`,
     `planned_entry_price`, `planned_size_contracts`,
@@ -955,7 +952,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
   - **javadoc `RiskValidator.checkRiskCreatingEntryProtection`**
     (`RiskValidator.java:142-148`) привести к принятому: определимый
     стоп — **встроенная attached-защита**, иной механизм формой защиты
-    не является (`docs/rules/risk-creating-entry-protection.md`
+    не является (`docs/rules/live-risk-protection.md`
     §Правило);
   - **ремодел основной защиты под увеличенную позицию** (Р3):
     исполнитель `StrategyActionType.REPLACE` под
@@ -1035,7 +1032,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     ⇒ действие молча не исполняется. Задет **весь ремодел защиты**
     (`PROTECTION_ADJUSTMENT`) и снятие grid-ног (`GRID_MANAGEMENT`);
     REPLACE — единственная операция ремоделирования
-    (`docs/decisions/replace-not-amend.md`). Терминал не гейтит —
+    (`docs/rules/replace-not-amend.md`). Терминал не гейтит —
     гейтит **управление** сделкой;
   - **`ManagingHandler` не наблюдает состояние — сделка не выходит из
     `MANAGING`** (inspection 2026-08-23, **несущий разрыв**). Handler
@@ -1066,7 +1063,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     по цене входа, выход по цене стопа), чтобы шорты не сайзились
     крупнее.
 - **CODE границы «команда ↔ действие»**
-  (`docs/decisions/command-action-boundary.md`; место истины
+  (`docs/rules/command-lifecycle.md`; место истины
   персистентности — `docs/models/domain/other/DealActionState.md`
   §Персистентность):
   - **носитель — две таблицы, не общая:** `deal_action_states`
@@ -1133,10 +1130,10 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **CODE cross-ccy** (политика —
   `docs/components/RefreshBillsExecutor.md` §«Носитель курса» /
   §«Политика отказа котировки и догон»,
-  `docs/decisions/pnl-finalization-mechanics.md` реш.5): сравнение
+  `docs/rules/pnl-reconciliation.md` реш.5): сравнение
   `ccy` движения с **расчётной валютой инструмента**
   (`Instrument.externalSettlementCurrency`,
-  `docs/decisions/instrument-currencies-home.md`); при несовпадении —
+  `docs/models/domain/core/Instrument.md`); при несовпадении —
   персист + линковка + курс **из свечи на момент операции** + запись
   `DealCashFlow.appliedRate` и `rateStatus` + `AnomalyReport`;
   слагаемое Σ(`amount` × `appliedRate`) по строкам `rateStatus =
@@ -1240,7 +1237,7 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
     типов из конфига исключений биржи;
   - **epsilon двухчастный** — форма закрыта, величины провизорны
     (`docs/rules/pnl-reconciliation.md`,
-    `docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon);
+    `docs/rules/pnl-reconciliation.md` реш.5 §epsilon);
   - **`Position.externalCloseAveragePrice`** + колонка
     `external_close_average_price`; маппится из `closeAvgPx`
     positions-history; потребитель — калибровка запаса на проскок
@@ -1278,7 +1275,7 @@ top-level эхо attached-защиты (`attachedAlgoInternalId`,
 решить, нужен ли ему носитель, или строки снапшота выводятся из состава
 (`docs/models/mapping/Order.md` §«`OrderExternalSnapshot` → `Order`»).
 Смежно: эхо `slTriggerPxType` не читается вовсе
-(`docs/rules/risk-creating-entry-protection.md` §«Названное
+(`docs/rules/live-risk-protection.md` §«Названное
 ограничение»).
 
 ### Грунт `integrator` для шага 7
@@ -1355,7 +1352,7 @@ top-level эхо attached-защиты (`attachedAlgoInternalId`,
   пользователь/бэктест; `k` вдобавок стоит предусловием `CODE` п. 8 и
   вторым основанием `PNL-Q1` п. 3. Форма закрыта
   (`docs/rules/pnl-reconciliation.md`,
-  `docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon).
+  `docs/rules/pnl-reconciliation.md` реш.5 §epsilon).
 - **H6 — добор недостающего числа на `EMERGENCY_CLOSED` (форвард,
   фаза 2 / шаг ожидаемости):** null = «неисчислимо» — отложенный долг,
   не финальный вердикт; направление принято (добор до истечения окна
@@ -1384,7 +1381,7 @@ top-level эхо attached-защиты (`attachedAlgoInternalId`,
     ожидаемость занижается. Радиус механизма **не сужен**: ревизия
     держателя (`GAPS_CLOSE_18`) вернула controlled-исключения и
     safety-каскад на ступень 2 с flatten — цена названа и принята
-    (`docs/decisions/exchange-safety-ladder.md` §«Названная цена
+    (`docs/rules/exchange-hold.md` §«Названная цена
     ревизии»);
   - **возможности × пессимистично:** taker-консерватизм при
     maker-входах = систематический недосайзинг
@@ -1411,7 +1408,7 @@ top-level эхо attached-защиты (`attachedAlgoInternalId`,
   аккаунт станет участником программы.
 - **`elpMaker` → `rpiMaker`** (прод OKX **2026-07-28**, параллельные
   имена до 2026-10-31): поле **unused**, механики нет по
-  `docs/decisions/source-model-change-absorption.md`; переоценка —
+  `docs/rules/raw-exchange-dto-boundary.md`; переоценка —
   только если поле станет used до конца окна.
 
 ## Хвост шага 4 (CODE-отложения, 2026-06-11)
@@ -1433,7 +1430,7 @@ Refinements, сознательно отложенные при `CODE` шага 
   цепочке `replacesInternalId` — не реализованы (фабрика покрывает
   CREATE/SUBMIT/REFRESH/CLOSE). Владелец оркестрации: секвенс ног ведёт
   петля/`DealStateMachine` по фактам, фабрика остаётся «одна команда за
-  проход» (`docs/decisions/action-orchestration-vs-command.md`);
+  проход» (`docs/rules/execution-hierarchy.md`);
   концепция — `replace-not-amend`, `DealActionState` §REPLACE.
   **Re-deferred за `CODE` шага 6 (deferral D1, 2026-06-22):** фабрика
   REPLACE-ног возвращает `empty`, `ManagingHandler` стоит в `MANAGING`;

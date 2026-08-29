@@ -2,60 +2,48 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто является границей биржевого клиента / adapter-layer (компонент):
-nullable contract, что не выходит наружу.
+Кто является границей с биржей.
 
-## Назначение
+## Что делает
 
-`IntegrationService` — adapter boundary к бирже: executor'ы и refresh-flow
-ходят на биржу только через него. Сырой биржевой DTO (например, OKX
-response) за `IntegrationService` / adapter-layer **не** выходит — наружу
-возвращаются только validated `*ExternalSnapshot` (см.
-`docs/rules/raw-exchange-dto-boundary.md`).
+Единственная точка выхода на биржу: исполнители и добыча ходят наружу
+только через неё.
 
-## Nullable contract
+**Сырой ответ источника за границу не выходит** — наружу возвращаются
+только проверенные граничные снапшоты
+(`docs/rules/raw-exchange-dto-boundary.md`).
 
-Общий контракт для read/refresh:
+## Контракт чтения
 
 ```text
-snapshot найден                  -> ExternalSnapshot
-snapshot не найден (успех)       -> null
-ошибка API / parse / invariant   -> exception
+снапшот найден               → граничный снапшот
+успешно, но не найдено       → null
+ошибка API, разбора, инварианта → исключение
 ```
 
-`null` означает «не найдено в этом источнике», а не ошибку. Трактовка
-`null` зависит от сущности: для `Position` успешный `null` = позиции на
-бирже нет; для `Order`/`AlgoOrder` последний `null` после полного
-evidence-cycle может быть error/recovery (см.
-`docs/rules/external-status-resolution.md`).
+`null` означает «не найдено в этом источнике», а не ошибку; трактовка
+зависит от сущности.
 
-## Инструмент-скоупный read (чистота / orphan) — вне command-layer
+**Исключение — баланс:** успешное чтение обязано вернуть валидный снапшот
+с расчётной валютой; иначе контролируемая ошибка, а не пустота.
 
-Перечисление **всего живого на инструменте** (позиции, live orders, live
-algo — включая **незнакомые** боту сущности) — отдельный
-инструмент-скоупный exchange-read **в `IntegrationService`**, **не**
-`ServiceCommand`. Дёргается:
+## Проверка инвариантов контракта
 
-- **`PrecheckHandler`** (шаг 6) — чистота инструмента перед входом: нет
-  открытой сделки → биржа по инструменту должна быть пуста
-  (`docs/components/PrecheckHandler.md`);
-- **`AnomalyJob`** (шаг 8) — orphan / чужой live risk при уже открытой
-  сделке и по неведомым инструментам (`docs/components/AnomalyJob.md`).
+Граница проверяет структуру ответа, обязательные поля и инварианты
+источника — режим маржи, сторону позиции, тип и признаки заявки,
+обязательные поля добытой записи закрытия.
 
-Per-entity `REFRESH_*` покрывает только **известные** сущности сделки;
-этот read видит и **неизвестные**. Возвращает validated snapshot'ы
-(сырой DTO за границу не выходит). Закрывает Precheck-часть CMD-Q4;
-orphan-часть — шаг 8.
+Нарушение даёт контролируемое исключение **здесь**, где ответ впервые
+разбирается, а не у потребителя.
 
-## Исключение: balance
+## Границы
 
-Для `REFRESH_BALANCE_COMMAND` normal `null` contract не используется: успешный
-refresh обязан вернуть валидный `BalanceContainerExternalSnapshot` с
-обязательной `settleCurrency`; пустой response / нет settleCurrency /
-invalid fields → controlled external/account error (см.
-`docs/models/domain/core/BalanceContainer.md`,
-`docs/models/mapping/Balance.md`).
+- Доменных решений не принимает и сущностей не сохраняет.
+- Константы интеграции (режим маржи, сторона позиции) ставит сама и в
+  домен не выносит.
 
-Контракт-интерфейс (ориентир): методы вроде `getPosition(exchange,
-instrument)` возвращают snapshot или `null`, бросают exception при
-API/parse/invariant error.
+## Связи
+
+- Граница снапшотов — `docs/rules/raw-exchange-dto-boundary.md`.
+- Категории контролируемых исключений — `docs/rules/controlled-exchange-exceptions.md`.
+- Контракты источника — `docs/integrations/okx/contracts/`.

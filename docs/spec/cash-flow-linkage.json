@@ -1,0 +1,165 @@
+{
+  "subject": "cash-flow-linkage",
+  "question": "По какому предикату движение средств привязывается к сделке",
+  "home": "docs/models/domain/other/DealCashFlow.md",
+
+  "operands": {
+    "deal.exchangeId": "биржа сделки",
+    "deal.instrumentExternalId": "имя инструмента сделки на бирже",
+    "deal.billsWindowBegin": "нижняя граница окна линковки; пусто — граница не добыта",
+    "deal.externalCreatedAt": "биржевой момент создания сделки — суррогат нижней границы",
+    "deal.terminal": "сделка терминальна",
+    "flows[].exchangeId": "биржа записи движения",
+    "flows[].externalInstrumentId": "сырой идентификатор инструмента записи; пусто — привязки к инструменту нет",
+    "flows[].externalCreatedAt": "время события источника",
+    "flows[].externalBillId": "идентификатор записи источника",
+    "sourceTime": "серверное время источника прохода — верхняя граница запроса"
+  },
+
+  "values": [
+    {
+      "name": "lowerBound",
+      "note": "Операнд один на все три роли: запрос, предикат линковки, признак структурной полноты. Пустая граница подставляется суррогатом; провенанс различается пустотой колонки, а не подставленным числом.",
+      "expr": "coalesce(deal.billsWindowBegin, deal.externalCreatedAt)"
+    },
+    {
+      "name": "boundResolved",
+      "note": "Ни границы, ни суррогата нет — подтропа не адресуема: у позиции вокруг чужого риска отправленной ноги входа не было.",
+      "expr": "notNull(lowerBound)"
+    },
+    {
+      "name": "inWindow",
+      "note": "Окно ограничено снизу и открыто сверху до времени источника прохода.",
+      "expr": "externalCreatedAt >= lowerBound && externalCreatedAt <= sourceTime"
+    },
+    {
+      "name": "sameExchange",
+      "expr": "exchangeId == deal.exchangeId"
+    },
+    {
+      "name": "sameInstrument",
+      "note": "Ответ источника аккаунт-широкий: без инструментной оси предикат подобрал бы движение чужого инструмента в том же окне. Пустая привязка в множество не входит.",
+      "expr": "notNull(externalInstrumentId) && externalInstrumentId == deal.instrumentExternalId"
+    },
+    {
+      "name": "linksToDeal",
+      "note": "Однозначность держит инвариант «одна активная сделка на инструмент»; терминальная сделка движений больше не принимает.",
+      "expr": "!deal.terminal && sameExchange && sameInstrument && inWindow"
+    },
+    {
+      "name": "linkedCount",
+      "op": "count",
+      "over": "flows",
+      "where": "linksToDeal"
+    },
+    {
+      "name": "distinctDedupeKeys",
+      "note": "Ключ идемпотентности — пара «биржа, идентификатор записи»: повторная добыча того же движения второй строки не порождает.",
+      "op": "count",
+      "over": "flows",
+      "where": "notNull(externalBillId)"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "движение своего инструмента внутри окна линкуется",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
+        "flows": [
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+        ]
+      },
+      "expect": { "lowerBound": 1000, "linkedCount": 1 }
+    },
+    {
+      "case": "движение чужого инструмента в том же окне не линкуется",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
+        "flows": [
+          { "exchangeId": 1, "externalInstrumentId": "BTC-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+        ]
+      },
+      "expect": { "linkedCount": 0 }
+    },
+    {
+      "case": "движение без инструментной привязки не линкуется",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
+        "flows": [
+          { "exchangeId": 1, "externalInstrumentId": null, "externalCreatedAt": 1500, "externalBillId": "b1" }
+        ]
+      },
+      "expect": { "linkedCount": 0 }
+    },
+    {
+      "case": "движение чужой биржи не линкуется",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
+        "flows": [
+          { "exchangeId": 2, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+        ]
+      },
+      "expect": { "linkedCount": 0 }
+    },
+    {
+      "case": "движение раньше нижней границы окна не линкуется",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
+        "flows": [
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 950, "externalBillId": "b1" }
+        ]
+      },
+      "expect": { "linkedCount": 0 }
+    },
+    {
+      "case": "граница не добыта — работает суррогат биржевого момента создания сделки",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": null, "externalCreatedAt": 900, "terminal": false },
+        "flows": [
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 950, "externalBillId": "b1" }
+        ]
+      },
+      "expect": { "lowerBound": 900, "boundResolved": true, "linkedCount": 1 }
+    },
+    {
+      "case": "ни границы, ни суррогата — подтропа не адресуема",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": null, "externalCreatedAt": null, "terminal": false },
+        "flows": []
+      },
+      "expect": { "boundResolved": false }
+    },
+    {
+      "case": "терминальная сделка движений больше не принимает",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": true },
+        "flows": [
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+        ]
+      },
+      "expect": { "linkedCount": 0 }
+    },
+    {
+      "case": "несколько движений окна линкуются все — сделка многоэпизодна",
+      "state": {
+        "sourceTime": 2000,
+        "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
+        "flows": [
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1100, "externalBillId": "b1" },
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b2" },
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1900, "externalBillId": "b3" }
+        ]
+      },
+      "expect": { "linkedCount": 3, "distinctDedupeKeys": 3 }
+    }
+  ]
+}

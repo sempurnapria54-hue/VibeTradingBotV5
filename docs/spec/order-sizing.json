@@ -1,0 +1,201 @@
+{
+  "subject": "order-sizing",
+  "question": "Какой размер получает действие после округления и что происходит, когда он меньше минимального",
+  "home": "docs/components/SizeCalculator.md",
+
+  "operands": {
+    "base": "база риска",
+    "instrument.contractValue": "размер контракта инструмента",
+    "instrument.lotSize": "шаг размера",
+    "instrument.minSize": "минимальный торговый размер",
+    "instrument.takerFeeRate": "ставка комиссии как издержка",
+    "entry.entryPrice": "цена входа действия",
+    "entry.stopPrice": "уровень стопа действия",
+    "entry.riskPerActionPercent": "поактный потолок риска, проценты",
+    "entry.allocationPercents": "желаемая доля базы под нотинал, проценты",
+    "position.externalSize": "живая экспозиция",
+    "exit.fraction": "объявленная доля выхода",
+    "ladder.previousStepsTotal": "сумма размеров уже поставленных ступеней набора",
+    "ladder.declaredStepSize": "размер ступени по объявленной доле"
+  },
+
+  "values": [
+    {
+      "name": "perContractRisk",
+      "note": "Закрытая форма: убыток на стопе одного контракта с round-trip комиссией.",
+      "expr": "(abs(entry.entryPrice - entry.stopPrice) + instrument.takerFeeRate * (entry.entryPrice + entry.stopPrice)) * instrument.contractValue"
+    },
+    {
+      "name": "riskBudget",
+      "expr": "entry.riskPerActionPercent / 100 * base"
+    },
+    {
+      "name": "contractsFromRisk",
+      "expr": "riskBudget / perContractRisk"
+    },
+    {
+      "name": "contractsFromAllocation",
+      "note": "Желаемый объём по доле аллокации; потолок риска — связывающий предел над ним.",
+      "expr": "base * entry.allocationPercents / 100 / (entry.entryPrice * instrument.contractValue)"
+    },
+    {
+      "name": "desiredContracts",
+      "expr": "min(contractsFromRisk, contractsFromAllocation)"
+    },
+    {
+      "name": "entryContracts",
+      "note": "Округление вниз по шагу лота, снизу — минимальный торговый размер.",
+      "expr": "max(floorTo(desiredContracts, instrument.lotSize), instrument.minSize)"
+    },
+    {
+      "name": "entryRiskAtStop",
+      "note": "Фактический риск ноги выбранного размера — операнд поактного неравенства.",
+      "expr": "perContractRisk * entryContracts"
+    },
+    {
+      "name": "entryWithinRiskBudget",
+      "note": "Размер упёрся в минимум и всё равно выходит за потолок — вход блокирует преконтроль, а не калькулятор.",
+      "expr": "entryRiskAtStop <= riskBudget"
+    },
+
+    {
+      "name": "rawExitSize",
+      "expr": "position.externalSize * exit.fraction"
+    },
+    {
+      "name": "exitSize",
+      "expr": "floorTo(rawExitSize, instrument.lotSize)"
+    },
+    {
+      "name": "exitRemainder",
+      "expr": "position.externalSize - exitSize"
+    },
+    {
+      "name": "exitOutcome",
+      "note": "Пола минимума у reduce-only выхода нет: подъём размера менял бы объявленное действие. Вместо пола — три исхода округления.",
+      "expr": "if(exitSize >= instrument.minSize, 'PARTIAL', if(exitRemainder < instrument.minSize, 'FULL', 'SKIPPED'))"
+    },
+
+    {
+      "name": "lastLadderStepSize",
+      "note": "Последняя ступень набора получает остаток: покрытие выходит ровно равным экспозиции.",
+      "expr": "position.externalSize - ladder.previousStepsTotal"
+    },
+    {
+      "name": "ladderStepRejected",
+      "note": "Ступень меньше минимального размера — явный отказ шага, а не тихий пропуск.",
+      "expr": "ladder.declaredStepSize < instrument.minSize"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "широкий стоп: размер связывает потолок риска",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 0 },
+        "exit": { "fraction": 0 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "perContractRisk": 9.2955, "riskBudget": 100, "contractsFromAllocation": 33.33333333333333, "entryContracts": 10, "entryWithinRiskBudget": true }
+    },
+    {
+      "case": "узкий стоп: связывает аллокация, а не потолок риска",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2997, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 0 },
+        "exit": { "fraction": 0 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "entryContracts": 33, "entryWithinRiskBudget": true }
+    },
+    {
+      "case": "размер упёрся в минимум и всё равно выходит за потолок — вход не проходит",
+      "state": {
+        "base": 100,
+        "instrument": { "contractValue": 1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 0 },
+        "exit": { "fraction": 0 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "entryContracts": 5, "entryWithinRiskBudget": false }
+    },
+    {
+      "case": "частичный выход объявленной доли проходит штатно",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 10 },
+        "exit": { "fraction": 0.5 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "exitSize": 5, "exitOutcome": "PARTIAL" }
+    },
+    {
+      "case": "доля меньше минимума, а остаток тоже меньше — выходим целиком и объявляем это",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 6 },
+        "exit": { "fraction": 0.5 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "exitSize": 3, "exitRemainder": 3, "exitOutcome": "FULL" }
+    },
+    {
+      "case": "доля меньше минимума, остаток достаточен — действие не исполняется",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 100 },
+        "exit": { "fraction": 0.02 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "exitSize": 2, "exitRemainder": 98, "exitOutcome": "SKIPPED" }
+    },
+    {
+      "case": "последняя ступень лестницы забирает остаток округления",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 103 },
+        "exit": { "fraction": 0 },
+        "ladder": { "previousStepsTotal": 75, "declaredStepSize": 25 }
+      },
+      "expect": { "lastLadderStepSize": 28, "ladderStepRejected": false }
+    },
+    {
+      "case": "ступень лестницы меньше минимального размера — отказ шага",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 12 },
+        "exit": { "fraction": 0 },
+        "ladder": { "previousStepsTotal": 9, "declaredStepSize": 3 }
+      },
+      "expect": { "ladderStepRejected": true }
+    },
+    {
+      "case": "пустая ставка комиссии отказывает, а не считается нулём",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": null },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 0 },
+        "exit": { "fraction": 0 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expectRefusal": { "entryContracts": "ставка не резолвится" }
+    }
+  ]
+}

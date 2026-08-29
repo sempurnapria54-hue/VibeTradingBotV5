@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `MarketDataExpirationResult`: структура,
-енум `Status`.
+Что это за `MarketDataExpirationResult`.
 
 ## Назначение
 

@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `CalculatedSize`: структура, енум
-`SizeMode`.
+Что это за `CalculatedSize`.
 
 ## Назначение
 

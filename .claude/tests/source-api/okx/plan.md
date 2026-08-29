@@ -92,7 +92,7 @@ POST {{base_url}}/api/proxy/okx/raw
 ## Скоуп
 
 **Весь in-perimeter манифеста, не субсет.** Источник набора —
-`docs/integrations/okx/coverage-manifest.md` (строки `есть-док`/`создан`/
+`.claude/processes/api-docs-completion.md` (строки `есть-док`/`создан`/
 `обновлён`); `вне-периметра`/`сознательно-вне` исключены. **60
 эндпоинтов** покрыты (см. §Инвариант полноты), каждый через `/raw` —
 включая прежние client-coverage-gap'ы (метода клиента нет — тело конверта
@@ -194,7 +194,7 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 
 **Правило.** Исход `OBSERVED_ABSENT` **закрывает** гейтящее предусловие
 `CODE`, и одновременно **обязывает** записать допущение явно: в реестре
-предусловий (`docs/decisions/pnl-finalization-mechanics.md` §«Предусловия
+предусловий (`docs/rules/pnl-reconciliation.md` §«Предусловия
 `CODE` шага 7») у соответствующего пункта появляется строка «посылка
 проверкой **не подтверждена**: событие за прогон не наблюдалось;
 допущение — <формулировка>». Молча закрыть гейт этим исходом нельзя.
@@ -222,7 +222,7 @@ write-кейсы gap-групп (batch/amend/DMS/precheck/account-write) с tear
 | Public-gaps | `PG1`–`PG8` | 8 | Public (mark-price, price-limit, funding×2, open-interest, position-tiers, server-time, insurance-fund) |
 | **Итого** | | **60** | весь in-perimeter ∖ {вне-периметра, сознательно-вне} |
 
-**Колонка покрытия манифеста** (`docs/integrations/okx/coverage-manifest.md`)
+**Колонка покрытия манифеста** (`.claude/processes/api-docs-completion.md`)
 подлежит **переразметке**: прежние `⚪ gap` (in-perimeter без метода
 клиента) ныне покрыты через `/raw` → `🟡 в плане`; легенда колонки —
 под `/raw`-семантику. Переразметка — отдельным проходом владельца колонки
@@ -712,7 +712,7 @@ M19*.history.
   берётся `avgPx` связанного ordinary-ордера, а не `actualPx`;
   эскалация на `trading-specialist` + `solution-designer`, правка
   `docs/models/domain/core/Position.md` §«Цена фактического выхода» и
-  `docs/decisions/per-trade-risk-policy.md` §«Без поправки на проскок».
+  `docs/rules/risk-policy.md` §«Без поправки на проскок».
 - **Статус:** ⏳ **PENDING**. Провенанс — H21 `DOCS_CHECK_11` (новый
   хвост, вскрыт при опровержении посылки «полей фактического исполнения
   у алго-сущности нет»).
@@ -1359,7 +1359,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 ### AG1.5 Содержательный (шаг 7, N11) — семантика агрегации partial-close ⏳ PENDING — **ГЕЙТИТ `CODE`** (предусловие п. 1)
 
-**Гейтит корректность числа `Deal.resultProfit`** (`docs/decisions/pnl-finalization-mechanics.md` реш.6). Форм-кейсы AG1.1-1.4 проверяют структуру пустого/битого ответа; здесь — **содержательный инвариант агрегации**, который выбранный путь берёт на веру.
+**Гейтит корректность числа `Deal.resultProfit`** (`docs/rules/pnl-reconciliation.md` реш.6). Форм-кейсы AG1.1-1.4 проверяют структуру пустого/битого ответа; здесь — **содержательный инвариант агрегации**, который выбранный путь берёт на веру.
 
 - **Что верифицировать:** после позиции с **частичным выходом** (partial TP `type` 1) и последующим **полным закрытием** (SL/close `type` 2) — отдаёт ли OKX **ОДНУ финализированную запись на `posId`**, чей `realizedPnl` **кумулятивен по обоим слайсам** (не только по последнему), и **в какой момент** запись финализирована (риск чтения послайсовой/нефинализированной записи → систематический недосчёт realized, усечение левого хвоста R).
 - **Требует фикстуры-цепочки** (не form-only): open position → partial reduce-only close → full close (или SL-триггер) → `REFRESH_POSITION` подтверждает flat → read `positions-history` по `posId`. На свежем demo нужна реальная закрытая позиция в окне — содержательный прогон, не пустой массив AG1.1.
@@ -1426,7 +1426,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 
 `fundingFee` возвращён в used-набор (H20 `DOCS_CHECK_11`) как
 авторитетный операнд де-микширования R-мультипликатора
-(`docs/decisions/per-trade-risk-policy.md` §«Асимметрия числителя и знаменателя»).
+(`docs/rules/risk-policy.md` §«Асимметрия числителя и знаменателя»).
 
 - **Что верифицировать (1) — горизонт `fundingFee`:** накоплен ли
   `fundingFee` финализированной записи **за всю жизнь `posId`** или только
@@ -1515,7 +1515,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
 ### AG1.9 Содержательный (шаг 7, T3) — окно с несколькими записями = эпизоды сделки ⏳ PENDING — **ГЕЙТИТ `CODE`** (предусловия пп. 1 и 15)
 
 Заведён решением держателя о многоэпизодной сделке
-(`docs/decisions/multi-episode-deal.md`, T3 `DOCS_CHECK_18`). Инвариант
+(`docs/models/domain/aggregate/Deal.md`, T3 `DOCS_CHECK_18`). Инвариант
 агрегации переформулирован с «одна сделка ↔ один `posId`» на «**один
 эпизод** ↔ один `posId`», и вторая половина инварианта — поведение
 источника, когда эпизодов несколько, — проверки не имела.
@@ -1641,7 +1641,7 @@ advance (И-1(а), `algo-order.md`). **Вердикт cancel частично н
     cross-ccy-движения в окне; отсутствие такого движения — не провал
     кейса, а «не наблюдалось».
   - **Провенанс посылки — `предположение`** до этого ответа
-    (`docs/decisions/pnl-finalization-mechanics.md` реш.5), по образцу
+    (`docs/rules/pnl-reconciliation.md` реш.5), по образцу
     инварианта агрегации N11.
 - **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/processes/roadmap-step-execution.md` §4). Провенанс — H8 отчёта
   `phase-1-step-7-gaps-close-3.md`; вторая проверка — H13
@@ -2299,7 +2299,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
   (агрегат площадок против одной), но метод клиента под неё
   **отсутствует** — это цена выбора.
 - **Действие по итогу:** завести строку операции в
-  `docs/integrations/okx/coverage-manifest.md`, зафиксировать разрешение
+  `.claude/processes/api-docs-completion.md`, зафиксировать разрешение
   и правило деградации в `RefreshBillsExecutor.md` §«Носитель курса».
 - **Статус:** ⏳ **PENDING**. Провенанс — H25 `DOCS_CHECK_11`.
 
@@ -2378,7 +2378,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
 ликвидация достижима раньше стопа при формально выполненном инварианте
 (`docs/components/RiskValidator.md`
 §`STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`,
-`docs/rules/risk-creating-entry-protection.md` §«Ценовая база триггера
+`docs/rules/live-risk-protection.md` §«Ценовая база триггера
 защиты объявляется стратегией и доезжает до биржи»). До наблюдения
 величина не калибруется, поэтому `MARK` — **не рекомендация, а
 единственная принимаемая база**: create отвергает
@@ -2407,7 +2407,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
   рынке и растёт на импульсах; ни величина, ни знак заранее не
   утверждаются.
 - **Действие по итогу:** записать наблюдённые значения в
-  `docs/rules/risk-creating-entry-protection.md` §«Остаточный `грунт` —
+  `docs/rules/live-risk-protection.md` §«Остаточный `грунт` —
   величина базиса» и, если запас нужен, назначить его там же.
 - **Почему не гейтит:** при `triggerPriceType = MARK` вопрос не
   возникает вовсе, а выбор базы объявляет стратегия. Гейтом стало бы
@@ -2704,7 +2704,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
 ## Закрытая развилка: нога amend — под `/raw` покрыта
 
 Прежде нога amend выпадала: метода клиента/типизированного прокси нет
-(REPLACE-only, `docs/decisions/replace-not-amend.md`). Под `/raw` тело
+(REPLACE-only, `docs/rules/replace-not-amend.md`). Под `/raw` тело
 конверта строится руками → **amend достижим напрямую** и покрыт: `TG3`
 (amend order), `TG4` (amend batch), `TG9` (amend algo). Продуктовый
 REPLACE-ремодел этим не предрешается — контур лишь подтверждает, что
@@ -2741,7 +2741,7 @@ REPLACE-ремодел этим не предрешается — контур �
 - Скиллы — `.claude/skills/{test-design,test-collection,test-code,test-run,test-review}.md`.
 - Роль-автор — `.claude/agents/tester.md`.
 - Манифест покрытия (источник набора, колонка покрытия) —
-  `docs/integrations/okx/coverage-manifest.md`.
+  `.claude/processes/api-docs-completion.md`.
 - Контракты OKX — `docs/integrations/okx/contracts/`; правила —
   `docs/integrations/okx/rules/`.
 - Generic-эндпоинт `/raw` и сырой клиент —

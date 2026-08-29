@@ -2,60 +2,40 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто рассчитывает runtime-параметры действия стратегии (компонент-
-оркестратор расчёта): контракт, что объединяет, границы.
+Кто рассчитывает runtime-параметры действия стратегии.
 
-## Назначение
+## Что делает
 
-`StrategyActionCalculator` — оркестратор расчёта параметров действия
-стратегии. Получает `StrategyAction + DealContext`, сам собирает свежие
-данные и возвращает готовые параметры команды. Это не только калькулятор
-цены: объединяет `CalculationContextFactory`, `PriceCalculator`,
-`SizeCalculator` (см. соответствующие компоненты).
-
-## Контракт
-
-Возвращает `StrategyActionCalculationResult` (`SUCCESS` с
-`CalculatedStrategyAction` либо `ERROR` с `CalculationError`):
+Оркеструет расчёт: собирает свежий контекст, считает цену, затем размер и
+возвращает готовые параметры команды.
 
 ```text
-CalculationContext = factory.build(action, dealContext)
-price = priceCalculator.calculate(context)
-size  = sizeCalculator.calculate(context, price)
--> CalculatedStrategyAction(action, price, size)
+контекст = фабрика.build(действие, контекст прохода)
+цена     = калькулятор цены.calculate(контекст)
+размер   = калькулятор размера.calculate(контекст, цена)
+        → рассчитанное действие
 ```
 
-Суб-калькуляторы при контролируемой ошибке расчёта бросают
-`CalculationException`; `StrategyActionCalculator` перехватывает его и
-возвращает `ERROR` с `CalculationError` (см.
-`docs/components/models/CalculationError.md`).
+Возвращает результат расчёта: успех с рассчитанным действием либо ошибку
+с описанием.
+
+## Контракт ошибки — возвратный, не бросковый
+
+Субкалькуляторы сигнализируют контролируемую ошибку броском внутреннего
+исключения; оркестратор его перехватывает и возвращает ошибку в
+результате.
+
+Неожиданные исключения так не оборачиваются — их ловит граница исполнения
+прохода.
 
 ## Границы
 
-- **Не** вызывает `RiskValidator` напрямую и не возвращает
-  `RiskValidationResult` / `CalculatedRiskMetrics` как часть успешного
-  расчёта. После успешного расчёта handler/orchestration решает, нужна ли
-  risk-policy validation (см. `docs/processes/risk-evaluation.md`).
-- **Не** создаёт `ServiceCommand` — на базе рассчитанных параметров команду
-  собирает per-type `StrategyActionExecutor` (`CreateOrderActionExecutor` /
-  `CreateAlgoOrderActionExecutor`) под диспетчером
-  `StrategyActionOrchestrator` (см.
-  `docs/components/StrategyActionExecutor.md`,
-  `docs/components/StrategyActionOrchestrator.md`).
-- **Не** считает тяжёлые данные (индикаторы, структуру) — читает готовые
-  результаты через сервисы (см.
-  `docs/processes/market-data-calculation.md`).
-- **Не** вызывает `REFRESH_BALANCE_COMMAND` / `IntegrationService` / OKX adapter;
-  freshness баланса обеспечивает FSM/handler.
-- **Не** рассчитывает data-dependent action, если FSM уже определила, что
-  данные step устарели и `marketDataExpiredSetting` запрещает выполнение
-  (см. `docs/rules/market-data-freshness.md`).
-- Controlled calculation errors возвращает как `error`-result, перехватывая
-  `CalculationException` суб-калькуляторов; unexpected exceptions в
-  `CalculationError` не превращает — они ловятся на границе
-  `DealOrchestratorJob` / FSM (см.
-  `docs/rules/runtime-error-classification.md`).
+- Решения о применимости действия не принимает — это делает обработчик.
+- Команд не эмитит: их строит исполнитель типа действия.
+- Тяжёлых данных не считает: читает готовые результаты.
 
-`entryReason` / `entryStepType` в формулах не участвуют. Условность
-`PROTECTION_SWITCHED` влияет только на выбор protection-switch flow, не на
-формулы.
+## Связи
+
+- Результат — `docs/components/models/StrategyActionCalculationResult.md`.
+- Контекст расчёта — `docs/components/models/CalculationContext.md`.
+- Ошибка расчёта — `docs/components/models/CalculationError.md`.

@@ -2,64 +2,31 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `MarketPriceData`: структура,
-boundary-snapshot, правила использования.
+Что это за runtime-цены инструмента.
 
 ## Назначение
 
-`MarketPriceData` — runtime-данные текущих цен инструмента (last / bid /
-ask + время тикера). RVO, **не** persisted (см.
-`.claude/decisions/runtime-value-object.md`): историю тикеров не ведём,
-кэш на первом этапе не используем, `Auditable` не наследует.
+Текущие цены инструмента: последняя, лучшая покупка, лучшая продажа и
+время котировки. Неизменяемый runtime-объект, **не хранится**: истории
+котировок не ведём, полей аудита у него нет.
 
-Нужен для входа, проверки условий и калькуляторов. Собирается в
-`CalculationContext` (см. `docs/components/models/CalculationContext.md`).
-Раздачей занимается `docs/components/MarketPriceDataService.md`.
-
-Flow:
+Нужен для входа, проверки условий и калькуляторов; попадает в контекст
+расчёта.
 
 ```text
-Client model OKX ticker
-  -> MarketPriceDataExternalSnapshot
-  -> MarketPriceData
-  -> CalculationContext
+ответ источника → граничный снапшот → runtime-цены → контекст расчёта
 ```
-
-## Структура
-
-| Поле | Тип | Назначение |
-|---|---|---|
-| `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `externalInstrumentType` | `String` | Тип инструмента на бирже. |
-| `externalInstrumentId` | `String` | ID инструмента на бирже. |
-| `externalLastPrice` | `BigDecimal` | Последняя цена сделки. |
-| `externalAskPrice` | `BigDecimal` | Лучшая цена продажи. |
-| `externalBidPrice` | `BigDecimal` | Лучшая цена покупки. |
-| `externalAskSize` | `BigDecimal` | Объём на лучшей цене продажи (глубина топа стакана). Вводится — операнд измерителя `Order.bookDepthAtPlacement`. |
-| `externalBidSize` | `BigDecimal` | Объём на лучшей цене покупки. Там же. |
-| `externalTimestamp` | `OffsetDateTime` | Время тикера на бирже. |
-
-`MID_PRICE` не хранится — вычисляется методом `midPrice`:
-`(externalBidPrice + externalAskPrice) / 2`; возвращает `null`, если
-одной из сторон нет.
-
-## MarketPriceDataExternalSnapshot (boundary)
-
-Выход маппера из client-модели биржи до сборки `MarketPriceData`
-(`raw-exchange-dto-boundary.md`). Поля: `externalInstrumentType`,
-`externalInstrumentId`, `externalLastPrice`, `externalAskPrice`,
-`externalBidPrice`, **`externalAskSize`**, **`externalBidSize`**,
-`externalTimestamp` (без `instrumentId` — внутренний
-ID добавляется уже при сборке `MarketPriceData`). Сырой OKX DTO за
-`IntegrationService` не выходит; OKX ticker → snapshot маппинг —
-`docs/models/mapping/MarketPriceData.md`.
 
 ## Правила использования
 
-- `MarketPriceData` можно переиспользовать внутри одного
-  `CalculationContext`, но не считать один общий context на весь
-  `StrategyStep` (один action = один свежий context, см.
-  `docs/processes/strategy-action-calculation.md`).
-- Если свежего `MarketPriceData` нет для расчёта — калькулятор возвращает
-  controlled calculation error, а не считает по старым данным (см.
-  `docs/components/models/CalculationError.md`).
+- **Цены живут в пределах прохода:** между проходами не переиспользуются.
+- **Свежесть — предусловие расчёта:** несвежие цены дают контролируемую
+  ошибку расчёта, а не приближение.
+- **Ценовой базой триггера защиты эти цены не служат** — база объявляется
+  стратегией и доезжает до биржи.
+
+## Связи
+
+- Кто раздаёт — `docs/components/MarketPriceDataService.md`.
+- Контекст расчёта — `docs/components/models/CalculationContext.md`.
+- Маппинг источника — `docs/models/mapping/MarketPriceData.md`.

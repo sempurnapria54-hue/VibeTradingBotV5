@@ -2,9 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как доменные `BalanceContainer` / `Balance` ложатся на нативные модели
-источников, нормализуются через `BalanceContainerExternalSnapshot` /
-`BalanceExternalSnapshot`, какие поля валидируются.
+Как баланс переходит между слоями.
 
 ## Source-agnostic ядро
 

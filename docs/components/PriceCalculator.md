@@ -2,118 +2,78 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто рассчитывает цены действия (компонент-калькулятор цены): контракт,
-формулы SL/TP/trailing/limit/structure, округление, вокабуляр источников
-цены.
+Кто рассчитывает цены действия.
 
-## Назначение
+## Что делает
 
-`PriceCalculator` отвечает только за расчёт цен и возвращает
-`CalculatedPrice` (см. `docs/components/models/CalculatedPrice.md`). Размер
-не считает, полный риск сделки не проверяет, не решает, нужно ли выполнять
-action. ATR/структуру по свечам не считает — берёт готовые `AtrValue` /
-`MarketStructure`.
+Считает цены и возвращает результат расчёта цены. Размер не считает,
+риск не проверяет и не решает, нужно ли выполнять действие.
 
-## Контракт
+Волатильность и структуру по свечам не считает — берёт готовые значения.
 
-`CalculatedPrice calculate(CalculationContext context)`.
+```java
+CalculatedPrice calculate(CalculationContext context);
+```
 
 ## Формулы
 
-**Limit placement:**
+**Лимитная цена:**
 
 ```text
-basePrice = resolveBasePrice(source)
-offset    = basePrice * percents / 100        # обычная цена
-offset    = (rangeHigh - rangeLow) * percents / 100   # для диапазона
-rawPrice  = basePrice + offset  (offsetSide = ABOVE)
-rawPrice  = basePrice - offset  (offsetSide = BELOW)
-roundedPrice = roundByTickSize(rawPrice)
+база     = цена объявленного источника
+смещение = база × проценты / 100                     — обычная цена
+смещение = (верх − низ диапазона) × проценты / 100   — для диапазона
+цена     = база ± смещение, по объявленной стороне
+цена     = округление по шагу цены
 ```
 
-**Stop-loss by entry percent:** LONG `SL = entry - entry*dist%/100`;
-SHORT `SL = entry + entry*dist%/100`.
+**Стоп от цены входа:** для длинной позиции ниже входа на долю, для
+короткой — выше.
 
-**Stop-loss by ATR** (`distancePercents = 150` = 1.5 ATR): LONG `SL =
-base - ATR*dist%/100`; SHORT `SL = base + ATR*dist%/100` (ATR из
-`AtrValue`).
+**Стоп по волатильности:** та же форма, где смещение — доля от значения
+волатильности.
 
-**Market structure stop-loss:** LONG `base = swingLow|rangeLow; SL = base
-- base*dist%/100`; SHORT `base = swingHigh|rangeHigh; SL = base +
-base*dist%/100`.
+**Стоп по структуре:** база — свинг или граница диапазона, дальше та же
+форма.
 
-**Take-profit:** LONG `TP = entry + entry*triggerProfit%/100`; SHORT `TP =
-entry - entry*triggerProfit%/100`.
+**Тейк:** от цены входа в сторону прибыли на объявленную долю.
 
-**Trailing activation:** при `activationProfitPercents = null` —
-`activePrice = null`, не отправляется. Иначе LONG `activePrice = entry +
-entry*activation%/100` (+ `activationBuffer%`); SHORT — симметрично вниз.
-Callback — ratio/percent на биржу.
+**Активация трейлинга:** доля прибыли от входа плюс буфер; доля не
+объявлена — трейлинг активен сразу.
 
-## Округление по tick size
+## Безубыток считается с комиссией
 
-Цена округляется по `InstrumentExternalRules.externalTickSize`
-**напрямую** через `RoundingMode` (DOWN/UP по направлению) —
-консервативно, защитная цена не ухудшается (отдельного enum политики
-округления нет):
+**Назначение «безубыток» — цена, при которой сделка не приносит убытка с
+учётом round-trip комиссии**, а не цена входа:
 
 ```text
-LIMIT BUY conservative  -> вниз
-LIMIT SELL conservative -> вверх
-LONG SL  -> вниз     SHORT SL -> вверх
-LONG TP  -> вверх    SHORT TP -> вниз
+безубыток(LONG)  = вход × (1 + 2 × ставка)
+безубыток(SHORT) = вход × (1 − 2 × ставка)
 ```
 
-## Что задаёт резолв цены (фактические драйверы)
+Ставка — та же, что в сайзинге, на момент **переноса** уровня.
 
-Резолв базовой цены в фазе 1 управляется не расширенным
-`StrategyPriceSource`, а связкой:
+**Почему с комиссией.** Уровень, равный цене входа, оставляет сделке
+убыток ровно в размере round-trip комиссии, и ошибка направлена **всегда
+в одну сторону**. Величина её равна уже вычисляемой величине, поэтому
+новых чисел назначение не вводит.
 
-- **`StrategyPriceBaseType`** (тип базы placement): `RANGE_LOW`,
-  `RANGE_HIGH`, `SWING_LOW`, `SWING_HIGH`, `SUPPORT`, `RESISTANCE`
-  (берутся из `MarketStructure` по `structureKey`), `ENTRY_PRICE`
-  (цена-ориентир входа), `MARKET_PRICE` (рыночная цена по
-  `StrategyPriceSource`);
-- **`StrategyPriceSource`** (подмножество для `MARKET_PRICE`-базы):
-  `LAST_PRICE`, `MARK_PRICE`, `INDEX_PRICE`, `BEST_BID_PRICE`,
-  `BEST_ASK_PRICE`, `MID_PRICE`;
-- **`StopLossCalculationType`** для SL: `ENTRY_PRICE_PERCENT`,
-  `ATR_PERCENT`, `MARKET_STRUCTURE_BUFFER_PERCENT`;
-- **`TrailingSettings`** для активации/callback трейлинга.
+Ставка не резолвится — контролируемая ошибка расчёта, а не подстановка
+цены входа.
 
-`MARK_PRICE`/`INDEX_PRICE` в фазе 1 **проксируются на last price**: OKX
-ticker не несёт mark/index, поэтому обе мапятся на
-`externalLastPrice`.
+## Округление
 
-Расширенный ~30-значный вокабуляр источников цены — **форвард**; в коде
-`StrategyPriceSource` не расширяется. Конфигурационное подмножество для
-placement (`LAST_PRICE` … `MID_PRICE`) — раздел `StrategyPriceSource` в
-`docs/models/domain/aggregate/Strategy.md`.
+Все цены округляются по шагу цены инструмента; направление округления —
+в консервативную сторону для защитных уровней.
 
-## Ветки условий algo (`conditionType`)
+## Границы
 
-`PriceCalculator` обрабатывает: `STOP_LOSS`/`PARTIAL_STOP_LOSS` (SL),
-`TAKE_PROFIT`/`PARTIAL_TAKE_PROFIT` (TP), `OCO_FULL` (SL + TP вместе),
-`TRAILING_PERCENTS`/`TRAILING_VALUE` (trailing).
+- Размер не считает и потолки риска не проверяет.
+- На биржу не ходит и готовые значения индикаторов не пересчитывает.
+- Цену нельзя безопасно посчитать — контролируемая ошибка расчёта.
 
-## Источник цены → тип цены (примеры)
+## Связи
 
-| Источник | Тип цены (`StrategyPricePurpose`) | Кейс |
-|---|---|---|
-| `LAST_PRICE`/`MARK_PRICE` | `ORDER_MARKET_REFERENCE_PRICE` | market-like entry: цену не шлём, reference для size/risk/audit |
-| `LAST_PRICE`/`MARK_PRICE`/bid/ask | `ORDER_LIMIT_PRICE` | лимитка от соответствующей цены |
-| `RANGE_LOW`/`RANGE_HIGH` | `ORDER_LIMIT_PRICE` | grid-уровни |
-| `SWING_LOW`/`SWING_HIGH`/`ATR_VALUE`/`ENTRY_AVERAGE_PRICE` | `STOP_LOSS_TRIGGER_PRICE` | структурный/ATR/процентный SL |
-| `ENTRY_AVERAGE_PRICE` | `TAKE_PROFIT_TRIGGER_PRICE` / `TRAILING_ACTIVATION_PRICE` | TP / активация trailing |
-| `BREAKEVEN_PRICE` | `STOP_LOSS_TRIGGER_PRICE` | перенос SL в безубыток |
-| `FILL_AVERAGE_PRICE` | `ACTUAL_EXECUTION_PRICE` | восстановление реальной цены по fills |
-| `POSITION_LIQUIDATION_PRICE` | `LIQUIDATION_GUARD_PRICE` | проверка близости к ликвидации |
-| `INSTRUMENT_TICK_SIZE` | `PRICE_ROUNDING_STEP` | шаг округления цены |
-
-## Контролируемые ошибки
-
-Сигнализирует контролируемую ошибку расчёта (бросает `CalculationException`,
-которое `StrategyActionCalculator` превращает в `CalculationError` в
-`ERROR`-результате — см. `docs/components/models/CalculationError.md`), если нет актуальной цены / entry
-price / ATR / market structure / `tickSize`, либо цена стала невалидной
-после округления (см. `docs/components/models/CalculationError.md`).
+- Результат расчёта — `docs/components/models/CalculatedPrice.md`.
+- Ставка комиссии — `docs/models/domain/other/TradeFeeRate.md`.
+- Что объявляет стратегия — `docs/models/domain/aggregate/Strategy.md`.

@@ -1,0 +1,227 @@
+{
+  "subject": "strategy-reference",
+  "question": "Проходит ли эталонная стратегия репозитория действующие требования к дереву стратегии",
+  "home": "docs/rules/strategy-validation.md",
+  "operands": {
+    "strategy": "src/main/resources/strategy-examples/trend-following-ema.json — исполнимый эталон",
+    "details[].phaseEntryPolicy": "политика входа в фазе; NO_TRADE — неторгуемая деталь",
+    "details[].stepsByStatus{}": "шаги, сгруппированные по статусу сделки",
+    "steps[].actions[]": "пакет действий шага",
+    "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку (конфигурация)"
+  },
+  "values": [
+    {
+      "name": "isTradableDetail",
+      "expr": "phaseEntryPolicy != 'NO_TRADE'"
+    },
+    {
+      "name": "hasRequiredRiskFields",
+      "note": "У торгуемой детали риск-поля и признак переоткрытия обязательны и умолчаний не имеют.",
+      "expr": "notNull(?riskPerActionPercent) && notNull(?cumulativeRiskPerDealMultiplier) && notNull(?strategySimultaneousRiskPerDealPercent) && notNull(?positionReopenAllowed)"
+    },
+    {
+      "name": "usesLegacyRiskFieldName",
+      "note": "Имя поактного потолка разведено суффиксом уровня; прежнее имя — дефект артефакта.",
+      "expr": "notNull(?riskPerTradePercent)"
+    },
+    {
+      "name": "tradableDetailsCount",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "isTradableDetail"
+    },
+    {
+      "name": "tradableDetailsWithRiskFields",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "isTradableDetail && hasRequiredRiskFields"
+    },
+    {
+      "name": "detailsWithLegacyRiskFieldName",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "usesLegacyRiskFieldName"
+    },
+    {
+      "name": "riskFieldsComplete",
+      "expr": "tradableDetailsWithRiskFields == tradableDetailsCount && detailsWithLegacyRiskFieldName == 0"
+    },
+    {
+      "name": "riskChainHolds",
+      "note": "Инвариант вложенности потолков: поактный ≤ максимум стратегии ≤ глобальный. Вырожденный случай одного одновременно живого действия.",
+      "expr": "riskPerActionPercent <= strategySimultaneousRiskPerDealPercent && strategySimultaneousRiskPerDealPercent <= globalSimultaneousRiskPerDealPercent"
+    },
+    {
+      "name": "detailsBreakingRiskChain",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "isTradableDetail && !riskChainHolds"
+    },
+    {
+      "name": "actionTypeKnown",
+      "note": "Словарь типов действия — с суффиксом уровня.",
+      "expr": "in(actionType, 'CREATE_ACTION', 'REPLACE_ACTION', 'CANCEL_ACTION', 'EXIT_ACTION')"
+    },
+    {
+      "name": "actionsWithUnknownType",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus{}[].actions[]",
+      "where": "!actionTypeKnown"
+    },
+    {
+      "name": "isProtectiveAction",
+      "note": "Защитное действие: условная заявка типа из множества защит.",
+      "expr": "actionKind == 'ALGO_ORDER' && in(?conditionType, 'STOP_LOSS', 'PARTIAL_STOP_LOSS', 'OCO_FULL', 'TRAILING_PERCENTS', 'TRAILING_VALUE')"
+    },
+    {
+      "name": "stepProtectiveCoverage",
+      "note": "Сумма долей защитных CREATE и REPLACE шага.",
+      "op": "sum",
+      "over": "actions",
+      "where": "isProtectiveAction && in(actionType, 'CREATE_ACTION', 'REPLACE_ACTION')",
+      "of": "coalesce(?closeFractionPercents, 0)"
+    },
+    {
+      "name": "stepHasProtectiveCancel",
+      "op": "any",
+      "over": "actions",
+      "of": "isProtectiveAction && actionType == 'CANCEL_ACTION'"
+    },
+    {
+      "name": "stepDeclaresFullProtectionSet",
+      "note": "Полный набор: первичная постановка защиты либо шаг, снимающий действующее покрытие.",
+      "expr": "stepType == 'MAIN_PROTECTION' || stepHasProtectiveCancel"
+    },
+    {
+      "name": "stepCoverageComplete",
+      "expr": "stepProtectiveCoverage == 100"
+    },
+    {
+      "name": "fullSetStepsCount",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus{}[]",
+      "where": "stepDeclaresFullProtectionSet"
+    },
+    {
+      "name": "fullSetStepsWithCompleteCoverage",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus{}[]",
+      "where": "stepDeclaresFullProtectionSet && stepCoverageComplete"
+    },
+    {
+      "name": "protectionCoverageComplete",
+      "expr": "fullSetStepsWithCompleteCoverage == fullSetStepsCount"
+    },
+    {
+      "name": "stepHasReplacementForCancel",
+      "note": "Снятие защиты законно только вместе с заменой в том же пакете: порядок пакета по риск-классу ставит установку раньше снятия.",
+      "op": "any",
+      "over": "actions",
+      "of": "isProtectiveAction && in(actionType, 'CREATE_ACTION', 'REPLACE_ACTION')"
+    },
+    {
+      "name": "cancelStepsWithoutReplacement",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus{}[]",
+      "where": "stepHasProtectiveCancel && !stepHasReplacementForCancel"
+    },
+    {
+      "name": "entryActionsWithoutAttachedProtection",
+      "note": "Risk-creating вход без встроенной защиты до биржи не доходит.",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus{}[].actions[]",
+      "where": "actionKind == 'ORDER' && ?orderType == 'ENTRY_ATTACHED_STOP_LOSS' && isNull(?attachedProtection)"
+    },
+    {
+      "name": "allocationOutOfRange",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus{}[].actions[]",
+      "where": "notNull(?allocationPercents) && (allocationPercents < 0 || allocationPercents > 100)"
+    },
+    {
+      "name": "detailsCount",
+      "op": "count",
+      "over": "strategy.details[]"
+    }
+  ],
+  "examples": [
+    {
+      "case": "эталонная стратегия объявляет деталь на каждый тип фазы",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "detailsCount": 4,
+        "tradableDetailsCount": 2
+      }
+    },
+    {
+      "case": "у торгуемых деталей эталона заполнены все риск-поля действующей модели",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "tradableDetailsWithRiskFields": 2,
+        "detailsWithLegacyRiskFieldName": 0,
+        "riskFieldsComplete": true
+      }
+    },
+    {
+      "case": "типы действий эталона — из действующего словаря",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "actionsWithUnknownType": 0
+      }
+    },
+    {
+      "case": "каждый шаг эталона, объявляющий полный набор защиты, покрывает позицию целиком",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "protectionCoverageComplete": true
+      }
+    },
+    {
+      "case": "снятие защиты в эталоне всегда идёт вместе с заменой в том же пакете",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "cancelStepsWithoutReplacement": 0
+      }
+    },
+    {
+      "case": "вход эталона несёт встроенную защиту",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "entryActionsWithoutAttachedProtection": 0
+      }
+    },
+    {
+      "case": "доли аллокации эталона структурно допустимы",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "allocationOutOfRange": 0
+      }
+    },
+    {
+      "case": "потолки эталона вложены: поактный не выше максимума стратегии, тот не выше глобального",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "detailsBreakingRiskChain": 0
+      }
+    }
+  ]
+}

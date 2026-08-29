@@ -2,7 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за сущность `Order` и вложенная в неё встроенная защита.
+Что это за сущность `Order`.
 
 ## Назначение
 
@@ -41,7 +41,7 @@
 | `bookDepthAtPlacement` | `BigDecimal` | **Наблюдаемая ёмкость стакана на момент постановки** — измеритель, не операнд. Write-once; пуст, когда свежих рыночных данных в контексте не было. |
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Встроенная защита. |
 
-**Доменные методы:** `isLive()`, `toCancel(reason)`, `toComplete()`,
+**Доменные методы:** `isLive`, `toCancel(reason)`, `toComplete`,
 `toError(reason)`.
 
 ## Шесть чисел планового риска: инвариант «шесть или ни одного»
@@ -143,7 +143,7 @@ write-once.
 | `stopLossTriggerPrice` | `BigDecimal` | Триггерная цена стопа. |
 | `triggerPriceType` | `TriggerPriceType` | **Ценовая база триггера**, объявленная стратегией и доезжающая до биржи. Обязательна: без неё применился бы биржевой умолчательный тип, а запас до ликвидации считается от марк-цены. |
 
-**Доменные методы:** `isActiveLike()` (`PENDING`, `ACTIVE`),
+**Доменные методы:** `isActiveLike` (`PENDING`, `ACTIVE`),
 `canTransitionTo(target)`, переходы состояний.
 
 **Енумы:** `Type` — `ATTACHED_STOP_LOSS`; `Status` — `CREATED`,

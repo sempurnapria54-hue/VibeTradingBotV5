@@ -2,9 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Каков контракт OKX-операций чтения mark price: текущее значение
-(`public/mark-price`) и свечи (`mark-price-candles`,
-`history-mark-price-candles`).
+Каков контракт операций чтения mark price.
 
 ## Внешний источник правды
 

@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `RiskValidationResult`: структура, енум
-`RiskDecision`.
+Что это за `RiskValidationResult`.
 
 ## Назначение
 

@@ -26,7 +26,11 @@ import java.util.function.Function;
  *   or      := and ('||' and)*
  * </pre>
  *
- * <p>Функции: {@code min max abs coalesce if isNull notNull in not}.
+ * <p>Функции: {@code min max abs floorTo coalesce if isNull notNull in not}.
+ *
+ * <p>Префикс {@code ?} перед идентификатором делает его необязательным:
+ * отсутствующее поле даёт пустоту вместо отказа. Нужен там, где предмет
+ * проверки — само наличие поля.
  */
 public final class SpecExpression {
 
@@ -170,6 +174,17 @@ public final class SpecExpression {
         if (Character.isDigit(current)) {
             return literal(readNumber());
         }
+        if (current == '?') {
+            position++;
+            String optional = readIdentifier();
+            return resolver -> {
+                try {
+                    return resolver.apply(optional);
+                } catch (SpecException absent) {
+                    return null;
+                }
+            };
+        }
         String identifier = readIdentifier();
         skipSpaces();
         if (position < source.length() && source.charAt(position) == '(') {
@@ -210,6 +225,14 @@ public final class SpecExpression {
             case "max" -> resolver -> number(arguments.get(0).eval(resolver))
                     .max(number(arguments.get(1).eval(resolver)));
             case "abs" -> resolver -> number(arguments.get(0).eval(resolver)).abs();
+            case "floorTo" -> resolver -> {
+                BigDecimal value = number(arguments.get(0).eval(resolver));
+                BigDecimal step = number(arguments.get(1).eval(resolver));
+                if (step.signum() == 0) {
+                    throw new SpecException("Шаг округления нулевой");
+                }
+                return value.divideToIntegralValue(step).multiply(step);
+            };
             case "not" -> resolver -> !truth(arguments.get(0).eval(resolver));
             case "isNull" -> resolver -> arguments.get(0).eval(resolver) == null;
             case "notNull" -> resolver -> arguments.get(0).eval(resolver) != null;
@@ -372,6 +395,60 @@ public final class SpecExpression {
             case ">=" -> sign >= 0;
             default -> throw new SpecException("Неизвестное сравнение: " + operator);
         };
+    }
+
+    /**
+     * Собирает элементы по пути с флэттенингом: сегмент {@code name[]} разворачивает
+     * список, {@code name&#123;&#125;} — значения словаря. Путь без флэттенинга даёт
+     * список из одного значения (сам список — как есть).
+     */
+    public static java.util.List<Object> collect(Map<String, Object> root, String path) {
+        java.util.List<Object> current = new ArrayList<>();
+        current.add(root);
+        boolean flattened = false;
+        for (String segment : path.split("[.]")) {
+            String name = segment;
+            java.util.List<String> operations = new ArrayList<>();
+            while (name.endsWith("[]") || name.endsWith("{}")) {
+                operations.add(0, name.substring(name.length() - 2));
+                name = name.substring(0, name.length() - 2);
+            }
+            java.util.List<Object> next = new ArrayList<>();
+            for (Object node : current) {
+                if (!(node instanceof Map)) {
+                    continue;
+                }
+                Object value = ((Map<?, ?>) node).get(name);
+                if (value != null) {
+                    next.add(value);
+                }
+            }
+            for (String operation : operations) {
+                java.util.List<Object> expanded = new ArrayList<>();
+                for (Object node : next) {
+                    if ("[]".equals(operation) && node instanceof java.util.List) {
+                        expanded.addAll((java.util.List<Object>) node);
+                    } else if ("{}".equals(operation) && node instanceof Map) {
+                        expanded.addAll(((Map<String, Object>) node).values());
+                    }
+                }
+                next = expanded;
+                flattened = true;
+            }
+            current = next;
+        }
+        if (!flattened && current.size() == 1 && current.get(0) instanceof java.util.List) {
+            return (java.util.List<Object>) current.get(0);
+        }
+        java.util.List<Object> result = new ArrayList<>();
+        for (Object node : current) {
+            if (node instanceof java.util.List) {
+                result.addAll((java.util.List<Object>) node);
+            } else {
+                result.add(node);
+            }
+        }
+        return result;
     }
 
     /** Достаёт значение по пути {@code a.b.c} из вложенных Map. */

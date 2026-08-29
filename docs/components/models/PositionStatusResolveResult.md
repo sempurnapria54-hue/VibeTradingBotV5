@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `PositionStatusResolveResult` и общий
-паттерн resolve-result.
+Что это за `PositionStatusResolveResult`.
 
 ## Назначение
 

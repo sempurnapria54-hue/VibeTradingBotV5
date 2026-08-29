@@ -2,55 +2,38 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `DealContext`: структура, scope одного
-прохода FSM, отношение к `CalculationContext`.
+Что это за контекст одного прохода FSM.
 
 ## Назначение
 
-`DealContext` — процессный runtime-context одного прохода FSM: какая
-runtime-картина нужна FSM прямо сейчас для обработки сделки. RVO, не
-persisted (см. `.claude/decisions/runtime-value-object.md`); собирается
-`DealContextService` (см. `docs/components/DealContextService.md`), **не**
-часть доменной модели `Deal`.
+Runtime-картина, нужная FSM прямо сейчас для обработки сделки.
+Неизменяемый объект, не хранится; частью доменной модели сделки не
+является.
 
-Не является универсальным контейнером всех свежих рыночных данных: для
-расчёта цены/размера/риска `StrategyActionCalculator` собирает отдельный
-свежий `CalculationContext` (см.
-`docs/components/models/CalculationContext.md`).
+Универсальным контейнером свежих рыночных данных он **не является**: для
+расчёта собирается отдельный свежий контекст расчёта.
 
 ## Структура
 
-## Runtime graph и сборка по фактам
+Сделка с графом, биржа, инструмент, закреплённая деталь стратегии,
+последний снимок баланса, строки исполнения обоих видов.
 
-`Order`/`AlgoOrder`/`Position` не дублируются отдельными полями — входят
-в `Deal` runtime graph (`deal.orders`/`deal.algoOrders`/`deal.positions` —
-**строки эпизодов**, живая ≤1;
-`docs/models/domain/aggregate/Deal.md`). Exchange facts сначала применяются
-refresh-командами к БД, затем `DealContext` собирает уже обновлённый
-graph:
+**Заявки и позиции отдельными полями не дублируются** — они входят в граф
+сделки; эпизоды позиции представлены строками, живая не более одной.
 
-```text
-exchange facts -> REFRESH_* -> обновлённые сущности в БД
-  -> Deal runtime graph -> DealContext -> FSM decision
-```
+**Встроенные защиты входят в граф вместе со своими ногами** — по ним
+считается покрытие.
 
-Live risk позиции вычисляется по **живому эпизоду**:
-`deal.livePosition != null && status == ACTIVE && externalSize > 0`
-(см. `docs/models/domain/core/Position.md`). Закрытые эпизоды в предикат
-не входят по построению — они не `ACTIVE`.
+## Сборка по фактам
 
-## Свежесть баланса и отдельные данные
+Факты биржи сперва применяются командами добычи к базе, затем контекст
+собирает уже обновлённый граф. Сырых ответов источника в контексте нет.
 
-Наличие `balanceContainer` не означает свежесть — её проверяет
-FSM/handler перед risk-sensitive flow; при absent/stale свежесть
-добывается звеном `REFRESH_BALANCE_COMMAND` через
-`REFRESH_DEAL_CONTEXT_ACTION` (handler добывающие `REFRESH_*` напрямую
-не эмитит, `docs/components/SystemActionExecutor.md`), и следующий
-проход пересобирает `DealContext` (см.
-`docs/models/domain/core/BalanceContainer.md`). Свежие `InstrumentExternalRules`,
-`MarketPriceData`, `IndicatorValue`, `MarketStructure`, `MarketPhase`,
-`CalculationContext` в `DealContext` не входят — собираются в
-`CalculationContext` в рантайме перед расчётом. Отдельный `PositionContext`
-не используется: эпизоды живут строками `deal.positions`, живой резолвится
-предикатом модели `livePosition()`
-(`docs/models/domain/aggregate/Deal.md`).
+**Свежесть баланса контекст не гарантирует** — её проверяет обработчик
+перед чувствительным к риску действием.
+
+## Связи
+
+- Кто собирает — `docs/components/DealContextService.md`.
+- Контекст расчёта — `docs/components/models/CalculationContext.md`.
+- Граф сделки — `docs/models/domain/aggregate/Deal.md`.

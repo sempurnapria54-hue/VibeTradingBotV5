@@ -2,150 +2,62 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `RiskCheckResult`: структура, енумы
-`RiskCheckStatus` и `RiskCheckCode`.
+Что это за результат одной риск-проверки.
 
 ## Назначение
 
-`RiskCheckResult` — результат одной конкретной risk-проверки внутри
-`RiskValidationResult` (см.
-`docs/components/models/RiskValidationResult.md`). RVO, не persisted (см.
-`.claude/decisions/runtime-value-object.md`).
+Результат одной конкретной проверки внутри результата преконтроля.
+Неизменяемый runtime-объект, не хранится.
 
 ## Структура
 
 | Поле | Тип | Назначение |
 |---|---|---|
 | `code` | `RiskCheckCode` | Машинный код проверки. |
-| `status` | `RiskCheckStatus` | Результат конкретной проверки. |
+| `status` | `RiskCheckStatus` | Исход конкретной проверки. |
 | `actualValue` | `BigDecimal` | Фактическое значение, если проверка числовая. |
 | `comment` | `String` | Короткое пояснение. |
-| `details` | `Map<String, Object>` | Дополнительные детали для диагностики. |
+| `details` | `Map<String, Object>` | Детали для диагностики. |
 
-`limitValue` отдельным полем не вводится: не у каждой проверки один
-понятный лимит, для сложных проверок порогов может быть несколько; при
-необходимости лимит кладётся в `details`.
+Отдельного поля предела нет: не у каждой проверки один понятный лимит, а
+у сложных их несколько; при надобности предел кладётся в детали.
 
 ## Енум `RiskCheckStatus`
 
-`PASSED`, `WARNING` (не блокирует), `BLOCKED`. В фазе 1 `RiskValidator`
-строит **только** `BLOCKED`-результаты — `PASSED`/`WARNING` определены,
-но ни одна проверка фазы 1 их не порождает.
+`PASSED`, `WARNING` (не блокирует), `BLOCKED`. В фазе 1 преконтроль
+строит **только** отказы: прочие значения определены, но ни одна проверка
+их не порождает.
 
 ## Енум `RiskCheckCode`
 
-Стартовый набор кодов:
-`RISK_PER_ACTION_EXCEEDED`, `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
+**Потолки риска:** `RISK_PER_ACTION_EXCEEDED`,
+`RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
 `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`,
-`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`,
-`RISK_CREATING_ENTRY_WITHOUT_STOP`,
-`EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `MARGIN_MODE_NOT_ISOLATED`,
-`BORROW_OR_DEBT_DETECTED`, `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`,
-`BALANCE_INVALID`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
-`SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`, `TAKE_PROFIT_INVALID_SIDE`,
-`STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
-`PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`,
-`MULTIPLE_POSITIONS_DETECTED`, `POSITION_STATE_UNKNOWN`,
-`INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`,
-`SETTLE_CURRENCY_UNAVAILABLE`, `CALCULATED_ACTION_INVALID`,
-`PROTECTION_COVERAGE_REDUCED`.
+`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`, `DEAL_NOTIONAL_EXCEEDED`.
 
-### Эмитятся `RiskValidator`'ом в фазе 1
+**Защита:** `RISK_CREATING_ENTRY_WITHOUT_STOP`,
+`PROTECTION_COVERAGE_REDUCED`, `PROTECTION_LADDER_STEP_BELOW_MIN_SIZE`.
 
-`RISK_PER_ACTION_EXCEEDED`, `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
-`RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`,
-`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`,
-`RISK_CREATING_ENTRY_WITHOUT_STOP`,
-`EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
-`MARGIN_MODE_NOT_ISOLATED`, `SIZE_BELOW_MIN`, `SIZE_LOT_STEP_INVALID`,
-`SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`, `TAKE_PROFIT_INVALID_SIDE`,
-`STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`, `INSTRUMENT_NOT_LIVE`,
-`INSTRUMENT_RULES_MISSING`, `FEE_RATE_UNAVAILABLE`,
-`SETTLE_CURRENCY_UNAVAILABLE`, `BALANCE_INVALID`,
-`CALCULATED_ACTION_INVALID`, `PROTECTION_COVERAGE_REDUCED`
-(см. `docs/components/RiskValidator.md`).
+**Контур и инструмент:** `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
+`MARGIN_MODE_NOT_ISOLATED`, `BORROW_OR_DEBT_DETECTED`,
+`INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`.
 
-`RISK_CREATING_ENTRY_WITHOUT_STOP` — risk-creating вход (открытие/наращивание
-позиции) без резолвимого стопа: `BLOCKED` вместо fail-open
-allocation-сайзинга в обход `RISK_PER_TRADE` (инвариант
-`docs/rules/live-risk-protection.md`). Reduce-only/закрывающие
-действия не затрагивает.
+**Баланс и ставка:** `BALANCE_INVALID`, `BALANCE_NOT_FRESH`,
+`BALANCE_NOT_ENOUGH`, `FEE_RATE_UNAVAILABLE`.
 
-`FEE_RATE_UNAVAILABLE` — прогнозная ставка комиссии недоступна: ставки не было
-**никогда** (ни одной строки `TradeFeeRate` по комиссионной группе инструмента
-либо у инструмента нет `externalFeeGroupId`) → `BLOCKED`. Срабатывает **только
-на `null`**. Не путать с **несвежей** ставкой: устаревание известной ставки
-ведёт к **холду инструментов группы**, не к этому коду
-(`docs/rules/instrument-hold.md`). Знаковая
-нормализация к этому коду тоже не относится — она сделана при маппинге
-(`docs/models/mapping/TradeFeeRate.md`), и до
-валидатора ставка доезжает **издержкой**. Fallback-ставка из конфига вместо
-реджекта отвергнута — довод в `docs/components/RiskValidator.md`.
+**Размер и уровни:** `CALCULATED_ACTION_INVALID`, `SIZE_BELOW_MIN`,
+`SIZE_LOT_STEP_INVALID`, `SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`,
+`TAKE_PROFIT_INVALID_SIDE`, `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`.
 
-`SETTLE_CURRENCY_UNAVAILABLE` — **расчётная валюта инструмента** не
-резолвится (навес не несёт её значения: поле новое, на существующих
-строках появляется только после ближайшего тика синка) → `BLOCKED`. Она — источник и `Deal.plannedRiskCurrency`, и
-`Deal.resultProfitCurrency`, а их совпадение — условие того, что
-R-мультипликатор вообще считается. Подставить `USDT` «по контуру»
-**отвергнуто** тем же доводом, что fallback ставки: подставленное число
-выглядит фактом, не будучи им. Ветка **зеркальна** `FEE_RATE_UNAVAILABLE`:
-реджект там, где риск ещё не взят; **после** взятия риска отказывать
-нельзя, и та же нехватка ведёт к `AnomalyReport`
-`SETTLE_CURRENCY_UNAVAILABLE` без блокировки
-(`docs/models/domain/aggregate/Deal.md`).
+**Инварианты частичного выхода:** `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
+`PARTIAL_EXIT_INCREASES_POSITION`,
+`DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`.
 
-### Определены, но в фазе 1 не эмитятся
+Коды отказа создания стратегии живут не здесь: их место — валидация
+создания.
 
-Форвард / handler / аномалия: `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`,
-`BORROW_OR_DEBT_DETECTED`, `MULTIPLE_POSITIONS_DETECTED`,
-`POSITION_STATE_UNKNOWN`, `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
-`PARTIAL_EXIT_INCREASES_POSITION`, `DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN`.
+## Связи
 
-Часть кодов — не risk-policy проверки `RiskValidator`, а safety/invariant
-violation exit-flow через reduce-only `Order`/`AlgoOrder`:
-`PARTIAL_EXIT_NOT_REDUCE_ONLY`, `PARTIAL_EXIT_INCREASES_POSITION`,
-`DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN` (см.
-`docs/rules/no-partial-close.md`, `docs/rules/risk-validator-scope.md`).
-
-Market data expired/missing — **не** risk-code первого уровня: сначала
-обрабатывается через `MarketDataExpirationChecker` и
-`StrategyStep.marketDataExpiredSetting` (см.
-`docs/rules/market-data-freshness.md`).
-
-### Риск и экспозиция (фаза 1)
-
-**Кодов лимита риска четыре — по числу неравенств**:
-
-`RISK_PER_ACTION_EXCEEDED` — **поактный** лимит: убыток
-на стопе одного risk-creating действия как % от базы риска
-превышает `StrategyDetail.riskPerActionPercent`. Срабатывает в том числе
-когда действие не укладывается в лимит **даже на минимальном размере
-инструмента** (`minSz`) — строгое блокирование без открытия.
-
-`RISK_PER_DEAL_CUMULATIVE_EXCEEDED` — **кумулятивный потолок сделки**:
-`dealRiskTaken` плюс риск нового действия превышает
-`cumulativeRiskPerDealMultiplier × riskPerActionPercent ×
-min(Deal.plannedRiskEquityBase, база риска текущая)`.
-
-`RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED` — **одновременный риск на сделку
-против максимума стратегии**: `liveRiskNow` плюс риск нового действия
-превышает `StrategyDetail.strategySimultaneousRiskPerDealPercent × база
-риска`.
-
-`RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` — тот же операнд против
-**глобального** максимума (`globalSimultaneousRiskPerDealPercent × база
-риска`, конфиг). Отдельный код, а не тот же: инвариант «максимум
-стратегии ≤ глобального» проверяется на create, поэтому срабатывание
-этого кода означает, что потолок изменила **система** после приёма
-стратегии, — иной разбор, чем «стратегия выбрала свой бюджет».
-
-**Все три сделочных кода — не авария ни в одном статусе**: действие
-не исполняется, сделка остаётся в текущем статусе и ведётся до выхода
-имеющимися ногами (`docs/processes/risk-evaluation.md`).
-
-Отдельного кода контроля **экспозиции/позиционного лимита поверх биржевого
-максимума** в фазе 1 **нет**: такой guard относится к уровню риска на
-биржу/портфель (фаза 3), а в фазе 1 **торгуется один инструмент** —
-агрегата нет по ограничению контура, и единственная позиция ограничена
-лимитом риска на сделку. `EXCHANGE_MAX_LEVERAGE_EXCEEDED` остаётся как
-предел биржи (не наш кэп плеча).
+- Кто строит — `docs/components/RiskValidator.md`.
+- Что означают потолки — `docs/rules/risk-policy.md`.
+- Покрытие защитой — `docs/rules/live-risk-protection.md`.

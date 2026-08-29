@@ -2,7 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `RiskBlockAction`: структура, енум `Type`.
+Что это за `RiskBlockAction`.
 
 ## Назначение
 

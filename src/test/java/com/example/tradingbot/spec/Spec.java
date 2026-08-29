@@ -74,7 +74,7 @@ public final class Spec {
         List<String> failures = new ArrayList<>();
         for (Map<String, Object> example : examples) {
             String label = String.valueOf(example.get("case"));
-            Map<String, Object> state = asMap(example.get("state"));
+            Map<String, Object> state = stateOf(example);
             for (Map.Entry<String, Object> expected : asMap(example.get("expect")).entrySet()) {
                 String name = expected.getKey();
                 try {
@@ -94,6 +94,24 @@ public final class Spec {
             }
         }
         return failures;
+    }
+
+    /**
+     * Состояние примера: объявленное в {@code state} плюс артефакты репозитория,
+     * подгружаемые по {@code stateFrom} — чтобы спецификация проверялась против
+     * реального входа, а не только против синтетики.
+     */
+    private static Map<String, Object> stateOf(Map<String, Object> example) {
+        Map<String, Object> state = new LinkedHashMap<>(asMap(example.get("state")));
+        for (Map.Entry<String, Object> entry : asMap(example.get("stateFrom")).entrySet()) {
+            Path file = Path.of(String.valueOf(entry.getValue()));
+            try {
+                state.put(entry.getKey(), MAPPER.readValue(file.toFile(), Map.class));
+            } catch (IOException failure) {
+                throw new SpecException("Артефакт не прочитан: " + file + " — " + failure.getMessage());
+            }
+        }
+        return state;
     }
 
     private List<String> checkRefusal(String label, Map<String, Object> state, Map<String, Object> refusal) {
@@ -122,7 +140,7 @@ public final class Spec {
         stack.push(name);
         try {
             if (definition.containsKey("over")) {
-                return aggregate(definition, state, stack);
+                return aggregate(definition, state, row, stack);
             }
             return SpecExpression.parse(String.valueOf(definition.get("expr")))
                     .eval(identifier -> resolve(identifier, state, row, stack));
@@ -131,10 +149,12 @@ public final class Spec {
         }
     }
 
-    private Object aggregate(Map<String, Object> definition, Map<String, Object> state, Deque<String> stack) {
-        Object collection = SpecExpression.path(state, String.valueOf(definition.get("over")));
-        if (collection == SpecScope.ABSENT) {
-            throw new SpecException("Коллекция не объявлена в состоянии: " + definition.get("over"));
+    private Object aggregate(Map<String, Object> definition, Map<String, Object> state,
+                            Map<String, Object> outerRow, Deque<String> stack) {
+        String over = String.valueOf(definition.get("over"));
+        List<Object> collection = SpecExpression.collect(outerRow, over);
+        if (collection.isEmpty()) {
+            collection = SpecExpression.collect(state, over);
         }
         String operation = String.valueOf(definition.get("op"));
         SpecExpression.Node where = definition.get("where") == null
@@ -150,7 +170,7 @@ public final class Spec {
         long count = 0;
         boolean any = false;
         boolean all = true;
-        for (Object element : list(collection)) {
+        for (Object element : collection) {
             Map<String, Object> row = asMap(element);
             if (where != null && !SpecExpression.truth(where.eval(id -> resolve(id, state, row, stack)))) {
                 continue;

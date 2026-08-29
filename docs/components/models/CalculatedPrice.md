@@ -2,16 +2,12 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `CalculatedPrice`: структура, енумы
-`PriceMode` / `StrategyPricePurpose`, под-объекты resolved-цен.
+Что это за рассчитанная цена действия.
 
 ## Назначение
 
-`CalculatedPrice` — рассчитанная цена (или набор цен) для действия,
-результат `PriceCalculator` (см. `docs/components/PriceCalculator.md`).
-RVO, не persisted (см. `.claude/decisions/runtime-value-object.md`).
-Формулы расчёта и таблица «источник цены → тип цены» — у компонента
-`PriceCalculator`, здесь только структура данных.
+Результат расчёта цены: неизменяемый runtime-объект, не хранится.
+Формулы — у калькулятора, здесь только структура.
 
 ## Структура
 
@@ -19,54 +15,38 @@ RVO, не persisted (см. `.claude/decisions/runtime-value-object.md`).
 |---|---|---|
 | `purpose` | `StrategyPricePurpose` | Назначение цены. |
 | `priceMode` | `PriceMode` | Режим цены. |
-| `basePrice` | `BigDecimal` | Базовая цена, от которой считали. |
-| `rawPrice` | `BigDecimal` | Сырая цена до округления. |
-| `roundedPrice` | `BigDecimal` | Цена после округления по tick size. |
+| `basePrice` | `BigDecimal` | База, от которой считали. |
+| `rawPrice` | `BigDecimal` | Цена до округления. |
+| `roundedPrice` | `BigDecimal` | Цена после округления по шагу цены. |
 | `sendPriceToExchange` | `Boolean` | Нужно ли отправлять цену на биржу. |
-| `stopLossPrice` | `ResolvedStopLossPrice` | SL-компонент, если action создаёт/замещает stop-loss. |
-| `takeProfitPrice` | `ResolvedTakeProfitPrice` | TP-компонент, если action создаёт/замещает take-profit. |
-| `trailingPrice` | `ResolvedTrailingPrice` | Trailing-компонент, если action создаёт/замещает trailing stop. |
-| `description` | `String` | Пояснение расчёта (целевое имя; legacy — `explanation`). |
+| `stopLossPrice` | `ResolvedStopLossPrice` | Компонент стопа, если действие его создаёт или замещает. |
+| `takeProfitPrice` | `ResolvedTakeProfitPrice` | Компонент тейка. |
+| `trailingPrice` | `ResolvedTrailingPrice` | Компонент трейлинга. |
+| `description` | `String` | Пояснение расчёта. |
 
-`ResolvedStopLossPrice` / `ResolvedTakeProfitPrice` / `ResolvedTrailingPrice`
-— под-объекты резолва конкретных защитных цен; без `CalculatedPrice`
-смысла не имеют → разделы, не отдельные RVO (см.
-`.claude/decisions/model-granularity.md`). Поля под-объектов:
+Резолвы конкретных защитных цен — **разделы этой модели**, а не
+самостоятельные объекты: без неё смысла они не имеют.
 
-- `ResolvedStopLossPrice` / `ResolvedTakeProfitPrice`: `triggerPrice`
-  (trigger срабатывания), `orderPrice` (нога после срабатывания; `null`
-  → рыночное исполнение), `triggerPriceType`
-  (`AlgoOrder.TriggerPriceType`: last/index/mark);
-- `ResolvedTrailingPrice`: `activationPrice` (цена активации; `null` →
-  не отправляется, активен сразу), `callbackRatio` (callback в %),
-  `callbackSpread` (callback абсолютным spread'ом; `null` для
-  процентного режима).
-
-## Енум `PriceMode`
-
-- `MARKET_LIKE` — цену на биржу не отправляем, но reference price нужна
-  для размера, риска и логов;
-- `EXPLICIT` — конкретная цена должна быть отправлена на биржу;
-- `NOT_REQUIRED` — цена для команды не нужна.
+- **резолв стопа и тейка:** триггерная цена, цена ноги после срабатывания
+  (пусто — рыночное исполнение), ценовая база триггера;
+- **резолв трейлинга:** цена активации (пусто — активен сразу), отступ,
+  ценовая база триггера.
 
 ## Енум `StrategyPricePurpose`
 
-В фазе 1 `PriceCalculator` эмитит **только** подмножество:
-`ORDER_LIMIT_PRICE`, `ORDER_MARKET_REFERENCE_PRICE`,
-`STOP_LOSS_TRIGGER_PRICE`, `TAKE_PROFIT_TRIGGER_PRICE`,
-`TRAILING_ACTIVATION_PRICE`. Остальные
-значения каталога определены, но в фазе 1 не порождаются (форвард).
+Назначения, эмитируемые в фазе 1: цена входа, уровень стопа, уровень
+тейка, параметры трейлинга и **безубыток**.
 
-## Округление цены
+**Безубыток считается с учётом round-trip комиссии**
+(`docs/components/PriceCalculator.md`): уровень, равный цене входа,
+оставлял бы сделке убыток ровно в размере комиссии.
 
-Отдельного enum политики округления нет: `PriceCalculator` округляет
-цену по tick size **напрямую** через `RoundingMode` (DOWN/UP по
-направлению), консервативно — защитная цена не ухудшается. Конкретные
-правила сторон округления — у `docs/components/PriceCalculator.md`.
+## Енум `PriceMode`
 
-## Источник цены
+Явная цена либо рыночное исполнение. Режим определяет, какой биржевой
+предел размера применяется при проверке.
 
-Вокабуляр источников цены (`StrategyPriceSource`) для резолва — у
-`docs/components/PriceCalculator.md` (расширенный набор калькулятора).
-Конфигурационный подмножество для placement — раздел `StrategyPriceSource`
-в `docs/models/domain/aggregate/Strategy.md`.
+## Связи
+
+- Кто считает — `docs/components/PriceCalculator.md`.
+- Что объявляет стратегия — `docs/models/domain/aggregate/Strategy.md`.

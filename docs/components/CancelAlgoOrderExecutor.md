@@ -2,7 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `CANCEL_ALGO_ORDER_COMMAND` (компонент-executor): что делает.
+Кто исполняет `CANCEL_ALGO_ORDER_COMMAND`.
 
 ## Назначение
 

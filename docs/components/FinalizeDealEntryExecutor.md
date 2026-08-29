@@ -2,9 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `FINALIZE_DEAL_ENTRY_COMMAND` (компонент-executor): что
-читает/пишет, статусное ребро `ENTRY_FINALIZED`, идемпотентность,
-retry-anchor.
+Кто исполняет `FINALIZE_DEAL_ENTRY_COMMAND`.
 
 ## Назначение
 

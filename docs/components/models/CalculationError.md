@@ -2,62 +2,37 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `CalculationError`: структура, енум
-`CalculationErrorType`, политика реакции.
+Что это за контролируемая ошибка расчёта.
 
 ## Назначение
 
-`CalculationError` — контролируемая ошибка расчёта параметров действия
-(возвращается в `StrategyActionCalculationResult` при `ERROR`). RVO, не
-persisted (см. `.claude/decisions/runtime-value-object.md`).
+Контролируемая ошибка расчёта параметров действия. Неизменяемый
+runtime-объект, не хранится.
 
-Используется только для контролируемых случаев: нет актуальной цены / entry
-price; нет ATR для ATR-based SL; нет market structure для structure-based
-SL; невозможно округлить цену по tick size; невозможно рассчитать размер
-из-за `minSz`/`lotSz`; не хватает обязательных input data. Unexpected
-exceptions в `CalculationError` **не** превращаются — для них коды
-`RuntimeErrorCode` (см. `docs/rules/runtime-error-classification.md`).
+**Только для контролируемых случаев:** нет актуальной цены или цены входа;
+нет значения волатильности для стопа по ней; нет структуры для стопа по
+структуре; цену нельзя округлить по шагу; размер нельзя привести к
+торговой единице; ступень защитной лестницы меньше минимального размера;
+не хватает обязательных входных данных.
+
+**Неожиданные исключения в неё не превращаются** — у них своя
+классификация (`docs/rules/runtime-error-classification.md`).
 
 ## Механизм сигнализации
 
-Контролируемую ошибку расчёта суб-калькуляторы (`CalculationContextFactory`,
-`PriceCalculator`, `SizeCalculator`) сигнализируют **броском** внутреннего
-`CalculationException`, несущего `CalculationError`. `StrategyActionCalculator`
-его перехватывает и возвращает `StrategyActionCalculationResult` со статусом
-`ERROR` и этим `CalculationError` — внешний контракт калькулятор-слоя возвратный
-(Result), не бросковый. Unexpected exceptions так не оборачиваются (ловятся на
-границе FSM, `RuntimeErrorCode`). `code` — freeform-строка; пример
-temporary-кода — `NO_MARKET_PRICE` (нет свежей рыночной цены).
+Субкалькуляторы бросают внутреннее исключение, несущее эту ошибку;
+оркестратор расчёта его перехватывает и возвращает результат с ошибкой.
+Внешний контракт слоя расчёта **возвратный**, а не бросковый.
 
 ## Структура
 
-| Поле | Тип | Назначение |
-|---|---|---|
-| `code` | `String` | Машинный код ошибки расчёта. |
-| `type` | `CalculationErrorType` | Тип ошибки расчёта. |
-| `message` | `String` | Человекочитаемое описание. |
-| `retryable` | `Boolean` | Можно ли повторить расчёт позже без изменения стратегии. |
+Код ошибки, тип и признак повторяемости, короткое пояснение.
 
-## Енум `CalculationErrorType`
+**Тип** разделяет временную нехватку данных и постоянную невыразимость:
+первая повторяется бюджетом действия, вторая — отказ шага.
 
-- `TEMPORARY` — данные задержались, сервис временно недоступен.
-- `PERMANENT` — action невозможно корректно рассчитать в текущей
-  конфигурации.
+## Связи
 
-## Политика реакции
-
-```text
-TEMPORARY
-  -> DealActionState = RETRY_PENDING
-  -> текущий StrategyStep ждёт retry текущего action;
-     следующие actions step не выполняются до разрешения текущего
-
-PERMANENT
-  -> DealActionState = FAILED
-  -> Deal -> ERROR для статусов, где live risk уже есть или мог появиться
-  -> дальше ErrorHandler / safety-flow
-```
-
-`DealActionState`-статусы — см. `docs/models/domain/other/DealActionState.md`
-(lifecycle — `docs/lifecycles/DealActionState.md`); реакция FSM —
-`docs/processes/deal-management.md`.
+- Кто возвращает — `docs/components/StrategyActionCalculator.md`.
+- Неожиданные ошибки — `docs/rules/runtime-error-classification.md`.
+- Свежесть данных — `docs/rules/market-data-freshness.md`.

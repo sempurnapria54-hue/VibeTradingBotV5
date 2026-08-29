@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `CLOSE_POSITION_COMMAND` (компонент-executor): что делает,
-инвариант full close.
+Кто исполняет `CLOSE_POSITION_COMMAND`.
 
 ## Назначение
 

@@ -3,7 +3,7 @@
 ## На какой вопрос отвечает этот файл
 
 Какие поля у `OkxRawApiRequest` — конверта запроса generic-эндпоинта
-`POST /api/proxy/okx/raw`, и как эндпоинт их читает.
+`POST /api/proxy/okx/raw`.
 
 ## Поля DTO
 

@@ -2,8 +2,8 @@
 
 ## На какой вопрос отвечает этот файл
 
-Через какие статусы проходят `Order` и embedded `AttachedAlgoOrder`,
-кто и при каких фактах их меняет.
+Через какие состояния проходит `Order` вместе со своей встроенной
+защитой.
 
 Структура моделей — в `docs/models/domain/core/Order.md`.
 
@@ -28,7 +28,7 @@
 | `CANCELED` | нет | да | нет | Отменён. |
 | `ERROR` | — | problem-final | неизвестно | Problem state; сделка идёт через safety/recovery. |
 
-`isLive()` = CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED. ACTIVE
+`isLive` = CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED. ACTIVE
 ставится только после refresh/search факта, не по ACK.
 
 ## `AttachedAlgoOrder.Status` и матрица переходов
@@ -42,7 +42,7 @@
 | `CANCELED` | нет | да | Отменена/снята. |
 | `ERROR` | — | problem-final | Ошибочное состояние. |
 
-`isActiveLike()` = PENDING/ACTIVE. Допустимые переходы (`canTransitionTo()`):
+`isActiveLike` = PENDING/ACTIVE. Допустимые переходы (`canTransitionTo`):
 
 ```text
 null     -> CREATED

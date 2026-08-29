@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `CalculatedStrategyAction`: структура,
-что в него входит и что сознательно не входит.
+Что это за `CalculatedStrategyAction`.
 
 ## Назначение
 

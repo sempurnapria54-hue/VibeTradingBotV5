@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Кто исполняет `REFRESH_BALANCE_COMMAND` (компонент-executor): что делает,
-особый контракт (не normal null, не RiskValidator).
+Кто исполняет `REFRESH_BALANCE_COMMAND`.
 
 ## Назначение
 

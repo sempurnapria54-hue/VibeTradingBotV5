@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Что это за runtime value object `StrategyActionCalculationResult`:
-структура, енум `Status`.
+Что это за `StrategyActionCalculationResult`.
 
 ## Назначение
 

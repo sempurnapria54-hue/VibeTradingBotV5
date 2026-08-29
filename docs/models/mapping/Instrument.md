@@ -2,9 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как `Instrument` переходит между слоями (источник ↔
-`InstrumentExternalSnapshot` ↔ domain) и что из снапшота
-персистится в шаге 1.
+Как `Instrument` переходит между слоями.
 
 ## Source-agnostic ядро
 

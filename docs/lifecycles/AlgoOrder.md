@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Через какие статусы проходит `AlgoOrder`, кто и при каких фактах их
-меняет.
+Через какие состояния проходит `AlgoOrder`.
 
 Структура модели — в `docs/models/domain/core/AlgoOrder.md`.
 
@@ -28,12 +27,12 @@ handlers **не** используют `externalStatus` напрямую (см.
 | `CANCELED` | нет | нет | Отменён. |
 | `ERROR` | — | problem-final | Ошибочное состояние; сделка → safety/error-flow. |
 
-`isLive()` = CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED. ACTIVE
+`isLive` = CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED. ACTIVE
 ставится только после refresh-факта, не по ACK.
 
 ## Матрица переходов
 
-Строгий `transitTo()` (недопустимый переход → `IllegalStateException`):
+Строгий `transitTo` (недопустимый переход → `IllegalStateException`):
 
 ```text
 null                 -> CREATED
@@ -44,7 +43,7 @@ PARTIALLY_COMPLETED  -> COMPLETED | CANCELED | ERROR
 COMPLETED | CANCELED | ERROR -> (терминальные)
 ```
 
-`toComplete()` ставит `COMPLETED` + `closeReason = TRIGGERED`;
+`toComplete` ставит `COMPLETED` + `closeReason = TRIGGERED`;
 `toCancel(reason)`/`toError(reason)` требуют ненулевой reason.
 
 ## Резолвинг статуса (OKX state → domain)

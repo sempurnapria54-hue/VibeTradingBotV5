@@ -2,8 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как доменный `MarketPriceData` ложится на нативные модели источников
-и нормализуется через `MarketPriceDataExternalSnapshot`.
+Как runtime-цены переходят между слоями.
 
 ## Source-agnostic ядро
 

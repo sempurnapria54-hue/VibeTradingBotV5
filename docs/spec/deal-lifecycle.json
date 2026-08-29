@@ -1,0 +1,116 @@
+{
+  "subject": "deal-lifecycle",
+  "question": "Какие переходы статуса сделки допустимы и какие инварианты держит терминал",
+  "home": "docs/lifecycles/Deal.md",
+
+  "operands": {
+    "from": "текущий статус сделки",
+    "to": "предполагаемый статус",
+    "livePosition": "живой эпизод существует",
+    "liveOrders": "живые заявки или условные заявки существуют",
+    "resultProfit": "число результата сделки; пусто — неисчислимо",
+    "resultProfitCurrency": "валюта результата; пусто — не резолвилась",
+    "hadEntry": "по сделке были операции на бирже",
+    "coverageSufficient": "покрытие защиты не ниже живой экспозиции; резолв — docs/spec/protection-coverage.json"
+  },
+
+  "values": [
+    {
+      "name": "isTerminal",
+      "expr": "in(status, 'CLOSED', 'EMERGENCY_CLOSED')"
+    },
+    {
+      "name": "isActive",
+      "note": "Ошибочное состояние активно: сделка держит слот инструмента, пока не дойдёт до терминала.",
+      "expr": "in(status, 'PRECHECK', 'ENTRY_SUBMITTED', 'ENTRY_FINALIZED', 'PROTECTION_SWITCHED', 'MANAGING', 'EXIT_PENDING', 'ERROR')"
+    },
+    {
+      "name": "edgeDeclared",
+      "note": "Объявленное ребро статусной машины.",
+      "expr": "(from == 'PRECHECK' && in(to, 'ENTRY_SUBMITTED', 'CLOSED', 'ERROR')) || (from == 'ENTRY_SUBMITTED' && in(to, 'ENTRY_FINALIZED', 'EXIT_PENDING', 'CLOSED', 'ERROR')) || (from == 'ENTRY_FINALIZED' && in(to, 'PROTECTION_SWITCHED', 'MANAGING', 'ERROR')) || (from == 'PROTECTION_SWITCHED' && in(to, 'MANAGING', 'ERROR')) || (from == 'MANAGING' && in(to, 'EXIT_PENDING', 'ERROR')) || (from == 'EXIT_PENDING' && in(to, 'CLOSED', 'ERROR')) || (from == 'ERROR' && to == 'EMERGENCY_CLOSED')"
+    },
+    {
+      "name": "riskProvenAbsent",
+      "note": "Живой риск снят и это подтверждено фактами.",
+      "expr": "!livePosition && !liveOrders"
+    },
+    {
+      "name": "cleanTerminalContract",
+      "note": "Штатный терминал: число обязательно всегда; валюта — кроме троп закрытия без входа, где она пишется, только если резолвится.",
+      "expr": "notNull(resultProfit) && (notNull(resultProfitCurrency) || !hadEntry)"
+    },
+    {
+      "name": "emergencyTerminalContract",
+      "note": "Аварийный терминал: число best-effort по доступности. Пусто допустимо и означает «неисчислимо», ноль — нет.",
+      "expr": "true"
+    },
+    {
+      "name": "transitionAllowed",
+      "note": "Переход разрешён: ребро объявлено и выполнен контракт целевого статуса.",
+      "expr": "edgeDeclared && (to != 'CLOSED' || (riskProvenAbsent && cleanTerminalContract)) && (to != 'EMERGENCY_CLOSED' || riskProvenAbsent)"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "штатная тропа: предвходовая проверка ведёт к отправке входа",
+      "state": { "from": "PRECHECK", "to": "ENTRY_SUBMITTED", "livePosition": false, "liveOrders": false, "resultProfit": null, "resultProfitCurrency": null, "hadEntry": false },
+      "expect": { "edgeDeclared": true, "transitionAllowed": true }
+    },
+    {
+      "case": "переключение защиты не обязательно: подтверждённый вход ведёт и прямо в сопровождение",
+      "state": { "from": "ENTRY_FINALIZED", "to": "MANAGING", "livePosition": true, "liveOrders": true, "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true },
+      "expect": { "edgeDeclared": true, "transitionAllowed": true }
+    },
+    {
+      "case": "из ошибочного состояния в штатный терминал ребра нет",
+      "state": { "from": "ERROR", "to": "CLOSED", "livePosition": false, "liveOrders": false, "resultProfit": 12.5, "resultProfitCurrency": "USDT", "hadEntry": true },
+      "expect": { "edgeDeclared": false, "transitionAllowed": false }
+    },
+    {
+      "case": "штатный терминал без числа не применяется",
+      "state": { "from": "EXIT_PENDING", "to": "CLOSED", "livePosition": false, "liveOrders": false, "resultProfit": null, "resultProfitCurrency": "USDT", "hadEntry": true },
+      "expect": { "edgeDeclared": true, "cleanTerminalContract": false, "transitionAllowed": false }
+    },
+    {
+      "case": "штатный терминал при живом риске не применяется",
+      "state": { "from": "EXIT_PENDING", "to": "CLOSED", "livePosition": true, "liveOrders": false, "resultProfit": 12.5, "resultProfitCurrency": "USDT", "hadEntry": true },
+      "expect": { "riskProvenAbsent": false, "transitionAllowed": false }
+    },
+    {
+      "case": "закрытие без входа: валюта не резолвилась, число есть — терминал применяется",
+      "state": { "from": "PRECHECK", "to": "CLOSED", "livePosition": false, "liveOrders": false, "resultProfit": 0, "resultProfitCurrency": null, "hadEntry": false },
+      "expect": { "cleanTerminalContract": true, "transitionAllowed": true }
+    },
+    {
+      "case": "состоявшаяся сделка без валюты результата штатный терминал не проходит",
+      "state": { "from": "EXIT_PENDING", "to": "CLOSED", "livePosition": false, "liveOrders": false, "resultProfit": 12.5, "resultProfitCurrency": null, "hadEntry": true },
+      "expect": { "cleanTerminalContract": false, "transitionAllowed": false }
+    },
+    {
+      "case": "аварийный терминал допускает пустое число, но не живой риск",
+      "state": { "from": "ERROR", "to": "EMERGENCY_CLOSED", "livePosition": false, "liveOrders": false, "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true },
+      "expect": { "transitionAllowed": true }
+    },
+    {
+      "case": "аварийный терминал при живых заявках не применяется",
+      "state": { "from": "ERROR", "to": "EMERGENCY_CLOSED", "livePosition": false, "liveOrders": true, "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true },
+      "expect": { "transitionAllowed": false }
+    },
+    {
+      "case": "ошибочное состояние активно и держит слот инструмента",
+      "state": { "status": "ERROR" },
+      "expect": { "isActive": true, "isTerminal": false }
+    },
+    {
+      "case": "терминальные статусы обработчиков не имеют",
+      "state": { "status": "CLOSED" },
+      "expect": { "isTerminal": true, "isActive": false }
+    },
+    {
+      "case": "прыжка через сопровождение из отправленного входа в терминал по выходу нет",
+      "state": { "from": "ENTRY_SUBMITTED", "to": "MANAGING", "livePosition": true, "liveOrders": true, "resultProfit": null, "resultProfitCurrency": null, "hadEntry": true },
+      "expect": { "edgeDeclared": false }
+    }
+  ]
+}

@@ -28,7 +28,7 @@ per-status handler'ы по образцу FSM сделки; (2) оркестра
 Per-entity `REFRESH_*` покрывает только **известные** сущности
 сделки; перечисления **неизвестных** live orders/algo по инструменту
 command-layer не предоставляет (bulk-команды сняты —
-`docs/decisions/refresh-evidence-cycle-ownership.md`). Precheck-часть
+`docs/rules/command-lifecycle.md`). Precheck-часть
 закрыта (2026-06-22): инструмент-скоупный exchange-read вне
 command-layer — `docs/components/IntegrationService.md`
 §«Инструмент-скоупный read», `docs/components/PrecheckHandler.md`.
@@ -37,7 +37,7 @@ command-layer — `docs/components/IntegrationService.md`
 уже открытой сделке и по неведомым инструментам); владелец —
 `solution-designer` / шаг 8. При проработке учесть легитимное окно
 двойной reduce-only защиты во время REPLACE-ремодела — не флагать
-аномалией (`docs/decisions/replace-not-amend.md` §Следствия).
+аномалией (`docs/rules/replace-not-amend.md` §Следствия).
 Связано: `docs/components/AnomalyJob.md`,
 `docs/components/ServiceCommandExecutor.md`.
 
@@ -48,9 +48,9 @@ OKX `POST/GET /trade/fills-archive` даёт fills старше 3 месяцев
 скачивание `fileHref`). Не решено: нужен ли async-executor и
 persisted-модель `TradeFillsArchive`. Runtime фазы 1 fills не читает
 вовсе (`REFRESH_FILLS` снята;
-`docs/integrations/okx/coverage-manifest.md`) — остался чистый
+`.claude/processes/api-docs-completion.md`) — остался чистый
 вопрос **off-band-аудита**; пофилловый аудит вынесен за фазу 1
-(`docs/decisions/result-profit-source.md` §«Персист fills») —
+(`docs/models/domain/aggregate/Deal.md` §«Персист fills») —
 отложение, не отказ.
 
 Варианты: (1) materialize с lifecycle
@@ -86,12 +86,12 @@ mapping-доков. До решения WS описаны короткими п�
 интерпретация якоря — деталь реализации `ruleType` / placement.
 Связано: `docs/models/domain/aggregate/Strategy.md` (§Условия,
 §StrategyPricePlacement),
-`docs/decisions/strategy-condition-authoring-contract.md`.
+`docs/rules/strategy-condition-contract.md`.
 
 ### IND-Q1. Надёжность биржевого объёма для volume-условий (wash trading) (якорь — фаза 4)
 
 Книжная часть закрыта
-(`docs/decisions/volume-condition-semantics.md`: объёмное условие —
+(`docs/models/domain/aggregate/Strategy.md`: объёмное условие —
 подтверждающий фильтр, не единственное основание `ENTRY`; OBV —
 только относительные формы). **Открыта крипто-часть:** надёжность
 спот-объёма CEX (накрутка / фейковый объём) — в корпусе ∅
@@ -121,7 +121,7 @@ mapping-доков. До решения WS описаны короткими п�
 ### PHASE-Q1. «Липкость» / гистерезис фазы при stateless-резолве (владелец — `trading-review`)
 
 `MarketPhase` stateless — вычисляется на лету, не персистится
-(`docs/decisions/market-phase-stateless.md`); у границы режимов фаза
+(`docs/models/domain/other/MarketPhase.md`); у границы режимов фаза
 может перескакивать тик за тиком. Не решено: нужна ли фазе отдельная
 подтверждаемость/гистерезис поверх операнд-уровневого сглаживания
 (периоды индикаторов, `breakoutConfirmationBars`) и как выразить её
@@ -136,7 +136,7 @@ mapping-доков. До решения WS описаны короткими п�
 Владелец — `trading-review` со специалистом; горизонт — торговая
 проработка фазы. До решения дополнительный гистерезис не вводится,
 анти-whipsaw остаётся операнд-уровневым. Связано:
-`docs/decisions/market-phase-conditional-classification.md`
+`docs/models/domain/other/MarketPhase.md`
 (§Анти-whipsaw), `docs/models/domain/aggregate/Strategy.md`
 (§StrategyMarketPhaseRule), `docs/components/MarketPhaseResolver.md`.
 
@@ -235,7 +235,7 @@ close'ом.
 сериализует; (2) не класть в модель вовсе — `DataService` отдаёт
 пару/RVO; (3) запретить сохранять прочитанный инстанс. Не гейтит:
 читателей ставки двое, финализатор `TradeFeeRate` не читает
-(`docs/decisions/pnl-finalization-mechanics.md` реш.5 §epsilon).
+(`docs/rules/pnl-reconciliation.md` реш.5 §epsilon).
 Связано: `docs/models/domain/other/InstrumentExternalRules.md`
 §«Ставка комиссии»,
 `docs/components/InstrumentExternalRulesDataService.md`.
@@ -296,7 +296,7 @@ value-объектом и оставить в `docs/models/domain/other/`; (в) 
 RVO-кластером Deal management, шаг 4+). Связано:
 `docs/models/domain/other/MarketPhase.md`,
 `.claude/decisions/models-core-vs-other.md`,
-`docs/decisions/market-phase-stateless.md`.
+`docs/models/domain/other/MarketPhase.md`.
 
 ## Открытые вопросы пайплайна
 
