@@ -1,0 +1,114 @@
+{
+  "subject": "loss-streak-halt",
+  "question": "Останавливается ли торговля после серии убытков",
+  "home": "docs/rules/loss-streak-halt.md",
+
+  "operands": {
+    "resultProfit": "итоговый результат закрытой сделки; пусто — результат недоступен",
+    "resultAvailable": "результат вычислен: финализация дошла до числа",
+    "consecutiveLossCountBefore": "Exchange.consecutiveLossCount до применения исхода сделки",
+    "lossLimit": "globalConsecutiveLossLimit — сколько подряд убыточных сделок останавливает торговлю; умолчания нет",
+    "manualClearance": "держатель снял холд ручным действием"
+  },
+
+  "values": [
+    {
+      "name": "limitConfigured",
+      "note": "Пустое место — отказ, а не бессрочная торговля: провизорное N не назначается.",
+      "expr": "notNull(lossLimit)"
+    },
+    {
+      "name": "riskCreatingRefused",
+      "note": "Пока порог не задан, risk-creating действие отвергается — как при прочих незаданных числах риск-аппетита.",
+      "expr": "!limitConfigured"
+    },
+    {
+      "name": "isLoss",
+      "note": "Убыток — строго отрицательный результат.",
+      "expr": "resultAvailable && notNull(resultProfit) && resultProfit < 0"
+    },
+    {
+      "name": "isProfit",
+      "note": "Обнуляет серию только строго положительный результат.",
+      "expr": "resultAvailable && notNull(resultProfit) && resultProfit > 0"
+    },
+    {
+      "name": "isNeutral",
+      "note": "Ноль серию не двигает: обнуление благоприятно, а безубыточная сделка прибыльной не является.",
+      "expr": "resultAvailable && notNull(resultProfit) && resultProfit == 0"
+    },
+    {
+      "name": "counterFrozen",
+      "note": "Недоступный результат не свидетельствует ни в одну сторону: увеличить — выдумать убыток, обнулить — дать благоприятное умолчание.",
+      "expr": "!resultAvailable || !notNull(resultProfit)"
+    },
+    {
+      "name": "consecutiveLossCountAfter",
+      "note": "Три исхода: убыток увеличивает, прибыль обнуляет, всё остальное оставляет как было.",
+      "expr": "if(isLoss, consecutiveLossCountBefore + 1, if(isProfit, 0, consecutiveLossCountBefore))"
+    },
+    {
+      "name": "haltTriggered",
+      "note": "Срабатывает на N-й сделке серии; порог не задан — срабатывать нечему, торговля уже отвергнута преконтролем.",
+      "expr": "limitConfigured && consecutiveLossCountAfter >= lossLimit"
+    },
+    {
+      "name": "exchangeStatusAfter",
+      "note": "Остановка выражается мягким холдом: новых сделок нет, живые сопровождаются, снятие — вручную. Сворачивание здесь неверно — серия убытков не основание рвать живую позицию.",
+      "expr": "if(haltTriggered, 'HOLD', 'ACTIVE')"
+    },
+    {
+      "name": "counterAfterClearance",
+      "note": "Снятие холда рукой обнуляет серию: она разобрана держателем.",
+      "expr": "if(manualClearance, 0, consecutiveLossCountAfter)"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "убыточная сделка увеличивает серию, порог не достигнут",
+      "state": { "resultProfit": -12.5, "resultAvailable": true, "consecutiveLossCountBefore": 0, "lossLimit": 3, "manualClearance": false },
+      "expect": { "isLoss": true, "consecutiveLossCountAfter": 1, "haltTriggered": false, "exchangeStatusAfter": "ACTIVE" }
+    },
+    {
+      "case": "N-я подряд убыточная сделка останавливает торговлю",
+      "state": { "resultProfit": -4.0, "resultAvailable": true, "consecutiveLossCountBefore": 2, "lossLimit": 3, "manualClearance": false },
+      "expect": { "isLoss": true, "consecutiveLossCountAfter": 3, "haltTriggered": true, "exchangeStatusAfter": "HOLD" }
+    },
+    {
+      "case": "прибыльная сделка обнуляет серию перед самым порогом",
+      "state": { "resultProfit": 0.01, "resultAvailable": true, "consecutiveLossCountBefore": 2, "lossLimit": 3, "manualClearance": false },
+      "expect": { "isProfit": true, "consecutiveLossCountAfter": 0, "haltTriggered": false, "exchangeStatusAfter": "ACTIVE" }
+    },
+    {
+      "case": "ноль серию не обнуляет и не увеличивает",
+      "state": { "resultProfit": 0, "resultAvailable": true, "consecutiveLossCountBefore": 2, "lossLimit": 3, "manualClearance": false },
+      "expect": { "isNeutral": true, "isProfit": false, "isLoss": false, "consecutiveLossCountAfter": 2, "haltTriggered": false }
+    },
+    {
+      "case": "недоступный результат серию не двигает и обнуления не даёт",
+      "state": { "resultProfit": null, "resultAvailable": false, "consecutiveLossCountBefore": 2, "lossLimit": 3, "manualClearance": false },
+      "expect": { "counterFrozen": true, "isLoss": false, "isProfit": false, "consecutiveLossCountAfter": 2, "haltTriggered": false }
+    },
+    {
+      "case": "недоступный результат на пороге холд не снимает и не ставит",
+      "state": { "resultProfit": null, "resultAvailable": false, "consecutiveLossCountBefore": 3, "lossLimit": 3, "manualClearance": false },
+      "expect": { "counterFrozen": true, "consecutiveLossCountAfter": 3, "haltTriggered": true, "exchangeStatusAfter": "HOLD" }
+    },
+    {
+      "case": "порог не задан — risk-creating действие отвергается, срабатывать нечему",
+      "state": { "resultProfit": -10, "resultAvailable": true, "consecutiveLossCountBefore": 5, "lossLimit": null, "manualClearance": false },
+      "expect": { "limitConfigured": false, "riskCreatingRefused": true, "haltTriggered": false }
+    },
+    {
+      "case": "ручное снятие холда обнуляет серию",
+      "state": { "resultProfit": -1, "resultAvailable": true, "consecutiveLossCountBefore": 2, "lossLimit": 3, "manualClearance": true },
+      "expect": { "consecutiveLossCountAfter": 3, "haltTriggered": true, "counterAfterClearance": 0 }
+    },
+    {
+      "case": "порог единица: первая же убыточная сделка останавливает торговлю",
+      "state": { "resultProfit": -0.5, "resultAvailable": true, "consecutiveLossCountBefore": 0, "lossLimit": 1, "manualClearance": false },
+      "expect": { "consecutiveLossCountAfter": 1, "haltTriggered": true, "exchangeStatusAfter": "HOLD" }
+    }
+  ]
+}

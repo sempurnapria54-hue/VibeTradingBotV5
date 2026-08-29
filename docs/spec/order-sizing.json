@@ -13,7 +13,8 @@
     "entry.stopPrice": "уровень стопа действия",
     "entry.riskPerActionPercent": "поактный потолок риска, проценты",
     "entry.allocationPercents": "желаемая доля базы под нотинал, проценты",
-    "position.externalSize": "живая экспозиция",
+    "position.externalSize": "Position.externalSize — нетто-размер живого эпизода; операнд агрегатных величин (доля выхода), не траншевых",
+    "ladder.trancheExposure": "экспозиция транша, которому принадлежит набор ступеней; резолв — docs/spec/protection-coverage.json",
     "exit.fraction": "объявленная доля выхода",
     "ladder.previousStepsTotal": "сумма размеров уже поставленных ступеней набора",
     "ladder.declaredStepSize": "размер ступени по объявленной доле"
@@ -78,8 +79,8 @@
 
     {
       "name": "lastLadderStepSize",
-      "note": "Последняя ступень набора получает остаток: покрытие выходит ровно равным экспозиции.",
-      "expr": "position.externalSize - ladder.previousStepsTotal"
+      "note": "Последняя ступень набора получает остаток: покрытие выходит ровно равным экспозиции ТРАНША. Нетто-размер позиции сюда не входит — на сетке он относится к нескольким траншам сразу, и последняя ступень каждого покрывала бы чужую экспозицию.",
+      "expr": "ladder.trancheExposure - ladder.previousStepsTotal"
     },
     {
       "name": "ladderStepRejected",
@@ -97,7 +98,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 0 },
         "exit": { "fraction": 0 },
-        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "perContractRisk": 9.2955, "riskBudget": 100, "contractsFromAllocation": 33.33333333333333, "entryContracts": 10, "entryWithinRiskBudget": true }
     },
@@ -109,7 +110,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2997, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 0 },
         "exit": { "fraction": 0 },
-        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "entryContracts": 33, "entryWithinRiskBudget": true }
     },
@@ -121,7 +122,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 0 },
         "exit": { "fraction": 0 },
-        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "entryContracts": 5, "entryWithinRiskBudget": false }
     },
@@ -133,7 +134,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 10 },
         "exit": { "fraction": 0.5 },
-        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "exitSize": 5, "exitOutcome": "PARTIAL" }
     },
@@ -145,7 +146,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 6 },
         "exit": { "fraction": 0.5 },
-        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "exitSize": 3, "exitRemainder": 3, "exitOutcome": "FULL" }
     },
@@ -157,7 +158,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 100 },
         "exit": { "fraction": 0.02 },
-        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "exitSize": 2, "exitRemainder": 98, "exitOutcome": "SKIPPED" }
     },
@@ -169,9 +170,21 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 103 },
         "exit": { "fraction": 0 },
-        "ladder": { "previousStepsTotal": 75, "declaredStepSize": 25 }
+        "ladder": { "trancheExposure": 103, "previousStepsTotal": 75, "declaredStepSize": 25 }
       },
       "expect": { "lastLadderStepSize": 28, "ladderStepRejected": false }
+    },
+    {
+      "case": "сетка: последняя ступень транша считается от его экспозиции, а не от нетто-позиции",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "position": { "externalSize": 300 },
+        "exit": { "fraction": 0 },
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 75, "declaredStepSize": 25 }
+      },
+      "expect": { "lastLadderStepSize": 25, "ladderStepRejected": false }
     },
     {
       "case": "ступень лестницы меньше минимального размера — отказ шага",
@@ -181,7 +194,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 12 },
         "exit": { "fraction": 0 },
-        "ladder": { "previousStepsTotal": 9, "declaredStepSize": 3 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 9, "declaredStepSize": 3 }
       },
       "expect": { "ladderStepRejected": true }
     },
@@ -193,7 +206,7 @@
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
         "position": { "externalSize": 0 },
         "exit": { "fraction": 0 },
-        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expectRefusal": { "entryContracts": "ставка не резолвится" }
     }

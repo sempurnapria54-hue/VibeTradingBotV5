@@ -4,13 +4,13 @@
   "home": "docs/rules/risk-policy.md",
 
   "operands": {
-    "base": "база риска — Balance.externalAvailableBalance расчётной валюты",
+    "base": "база риска сделки — Deal.plannedRiskEquityBase, снимок Exchange.riskBase, замороженный первым сайзингом; невозрастающая",
     "deal.plannedRiskAmount": "Deal.plannedRiskAmount — заявленный риск живых и исполнившихся ног",
-    "deal.plannedRiskEquityBase": "снимок базы, замороженный первым сайзингом",
+    "deal.plannedRiskEquityBase": "тот же снимок под собственным именем — операнд отчётности",
     "deal.direction": "Deal.direction — LONG или SHORT",
     "position.externalSize": "Position.externalSize живого эпизода",
     "position.externalAverageEntryPrice": "Position.externalAverageEntryPrice — фактическая средняя цена входа",
-    "stopCurrentLive": "наименее благоприятный уровень среди действующих защит; резолв — docs/spec/protection-coverage.json",
+    "stopCurrentLive": "наименее благоприятный уровень среди действующих защит ВСЕЙ ПОЗИЦИИ; резолв — docs/spec/protection-coverage.json, значение stopCurrentLive",
     "instrument.contractValue": "InstrumentExternalRules.externalContractValue",
     "instrument.takerFeeRate": "InstrumentExternalRules.takerFeeRate() — текущая ставка",
     "entryLegs[]": "строки orders сделки с бизнес-типом входа — по всем траншам: потолки агрегатные, транши их не множат",
@@ -19,7 +19,10 @@
     "limits.strategySimultaneousPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",
     "limits.globalSimultaneousPercent": "globalSimultaneousRiskPerDealPercent — максимальный риск на сделку, проценты; умолчания нет",
     "limits.catastrophicMultiplier": "StrategyDetail.strategyCatastrophicRiskPerDealMultiplier — множитель катастрофического потолка; умолчания нет",
-    "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening"
+    "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening",
+    "riskBaseBefore": "Exchange.riskBase до применения исхода сделки",
+    "freeBalanceAtFinalization": "свободный остаток расчётной валюты на момент финализации сделки",
+    "holderRaise": "явное действие держателя, поднимающее базу; пусто — действия не было"
   },
 
   "values": [
@@ -57,14 +60,14 @@
       "of": "legUnfilledRisk"
     },
     {
-      "name": "signedStopDistance",
+      "name": "positionSignedStopDistance",
       "note": "Дистанция до действующей защиты со знаком направления; за безубытком отрицательна.",
       "expr": "if(deal.direction == 'LONG', position.externalAverageEntryPrice - stopCurrentLive, stopCurrentLive - position.externalAverageEntryPrice)"
     },
     {
       "name": "livePositionRiskAtStop",
       "note": "Что стои́т под ударом: живой эпизод до действующей защиты, с round-trip комиссией. Клэмп нулём — здесь, а не на сумме.",
-      "expr": "max(0, signedStopDistance * position.externalSize * instrument.contractValue + instrument.takerFeeRate * (position.externalAverageEntryPrice + stopCurrentLive) * position.externalSize * instrument.contractValue)"
+      "expr": "max(0, positionSignedStopDistance * position.externalSize * instrument.contractValue + instrument.takerFeeRate * (position.externalAverageEntryPrice + stopCurrentLive) * position.externalSize * instrument.contractValue)"
     },
     {
       "name": "liveRiskNow",
@@ -108,9 +111,9 @@
       "expr": "limits.globalSimultaneousPercent / 100 * base * limits.catastrophicMultiplier"
     },
     {
-      "name": "cumulativeBase",
-      "note": "База кумулятивного потолка невозрастающая: просадка режет, рост не поднимает.",
-      "expr": "min(deal.plannedRiskEquityBase, base)"
+      "name": "riskBaseAfter",
+      "note": "База невозрастающая: вниз двигает финализация сделки автоматически, вверх — только явное действие держателя. Рост свободного остатка сам базу не поднимает.",
+      "expr": "if(notNull(holderRaise), holderRaise, min(riskBaseBefore, freeBalanceAtFinalization))"
     },
     {
       "name": "actWithinPerAction",
@@ -118,7 +121,7 @@
     },
     {
       "name": "withinCumulative",
-      "expr": "dealRiskTaken + actRisk <= limits.cumulativeMultiplier * limits.riskPerActionPercent / 100 * cumulativeBase"
+      "expr": "dealRiskTaken + actRisk <= limits.cumulativeMultiplier * limits.riskPerActionPercent / 100 * base"
     },
     {
       "name": "withinStrategySimultaneous",
@@ -211,10 +214,10 @@
       "expect": { "unfilledPlannedRisk": 0, "incurredCanceled": 0 }
     },
     {
-      "case": "кумулятивная база сжимается просадкой и не растёт вместе с депозитом",
+      "case": "все четыре потолка считаются от одной замороженной базы сделки",
       "state": {
-        "base": 8000,
-        "actRisk": 0,
+        "base": 10000,
+        "actRisk": 100,
         "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
         "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
@@ -222,21 +225,49 @@
         "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": []
       },
-      "expect": { "cumulativeBase": 8000 }
+      "expect": { "actWithinPerAction": true, "withinCumulative": true, "withinGlobalSimultaneous": false }
     },
     {
-      "case": "рост депозита кумулятивный потолок не поднимает",
+      "case": "просадка режет базу автоматически",
       "state": {
-        "base": 12000,
-        "actRisk": 0,
-        "deal": { "direction": "LONG", "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
-        "position": { "externalSize": 10, "externalAverageEntryPrice": 3000 },
+        "riskBaseBefore": 10000, "freeBalanceAtFinalization": 8000, "holderRaise": null,
+        "base": 10000, "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 0, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
         "stopCurrentLive": 2910,
         "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
         "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
         "entryLegs": []
       },
-      "expect": { "cumulativeBase": 10000 }
+      "expect": { "riskBaseAfter": 8000 }
+    },
+    {
+      "case": "рост свободного остатка базу не поднимает",
+      "state": {
+        "riskBaseBefore": 10000, "freeBalanceAtFinalization": 12000, "holderRaise": null,
+        "base": 10000, "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 0, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "entryLegs": []
+      },
+      "expect": { "riskBaseAfter": 10000 }
+    },
+    {
+      "case": "поднимает базу только явное действие держателя",
+      "state": {
+        "riskBaseBefore": 10000, "freeBalanceAtFinalization": 12000, "holderRaise": 12000,
+        "base": 10000, "actRisk": 0,
+        "deal": { "direction": "LONG", "plannedRiskAmount": 0, "plannedRiskEquityBase": 10000 },
+        "position": { "externalSize": 0, "externalAverageEntryPrice": 3000 },
+        "stopCurrentLive": 2910,
+        "instrument": { "contractValue": 0.1, "takerFeeRate": 0.0005 },
+        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "entryLegs": []
+      },
+      "expect": { "riskBaseAfter": 12000 }
     },
     {
       "case": "веер живых ног при полной аллокации выходит за катастрофический потолок",

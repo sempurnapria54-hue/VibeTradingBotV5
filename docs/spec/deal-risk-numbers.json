@@ -13,7 +13,7 @@
     "legs[].plannedStopPrice": "Order.plannedStopPrice",
     "legs[].plannedContractValue": "Order.plannedContractValue",
     "legs[].positionId": "Order.positionId — ось эпизода",
-    "legs[].stopCurrent": "действующий уровень защиты этой ноги; резолв — docs/spec/protection-coverage.json",
+    "legs[].stopCurrent": "действующий уровень защиты ЭТОЙ НОГИ — по приоритету носителя внутри её транша; резолв — docs/spec/protection-coverage.json, значение trancheStopCurrent",
     "livePosition.id": "Deal.livePosition().id",
     "livePosition.externalSize": "Position.externalSize живого эпизода",
     "direction": "Deal.direction"
@@ -46,14 +46,14 @@
       "expr": "(plannedRiskAmount / (plannedContractValue * plannedSizeContracts) - abs(plannedEntryPrice - plannedStopPrice)) / (plannedEntryPrice + plannedStopPrice)"
     },
     {
-      "name": "signedStopDistance",
+      "name": "legSignedStopDistance",
       "note": "Знаковая дистанция до действующего стопа: за безубытком отрицательна.",
       "expr": "if(direction == 'LONG', plannedEntryPrice - stopCurrent, stopCurrent - plannedEntryPrice)"
     },
     {
       "name": "legRiskAtCurrentStop",
       "note": "Риск ноги при действующем стопе: та же закрытая форма с подстановкой действующего стопа и фактического филла.",
-      "expr": "signedStopDistance * accumulatedFillSize * plannedContractValue + feeRate * (plannedEntryPrice + stopCurrent) * accumulatedFillSize * plannedContractValue"
+      "expr": "legSignedStopDistance * accumulatedFillSize * plannedContractValue + feeRate * (plannedEntryPrice + stopCurrent) * accumulatedFillSize * plannedContractValue"
     },
 
     {

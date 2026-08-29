@@ -18,6 +18,8 @@
     "tranches[].protections[].observedTrailingPrice": "AlgoOrder.condition.trailing.externalPrice (moveTriggerPx)",
     "tranches[].commitments[].terminal": "DealActionState защитного действия транша — терминальна ли",
     "tranches[].commitments[].budgetExhausted": "бюджет попыток строки исчерпан",
+    "deal.direction": "Deal.direction — LONG или SHORT: чем определяется, какой уровень менее благоприятен",
+    "tranches[].protections[].stopLevel": "объявленный уровень остановки убытка этой защиты; у трейлинга уровень наблюдаемый, а не объявленный",
     "position.externalSize": "Position.externalSize живого эпизода — биржевой факт агрегата",
     "position.live": "Position.hasLiveRisk()",
     "cancelTargetId": "id снимаемой защиты — операнд преконтроля снятия"
@@ -158,6 +160,70 @@
       "name": "exposureReconciled",
       "note": "Сверка модели с биржевым фактом: сумма экспозиций траншей равна нетто-позиции. Расхождение — живой риск, не приписанный ни одному траншу.",
       "expr": "dealExposure == position.externalSize"
+    },
+
+    {
+      "name": "protectionStopLevel",
+      "note": "Уровень остановки убытка одной защиты. У трейлинга он наблюдаемый: до наблюдения уровня нет, и такая защита в isProtection не попадает.",
+      "expr": "if(kind == 'TRAILING', ?observedTrailingPrice, ?stopLevel)"
+    },
+    {
+      "name": "attachedLowest",
+      "op": "min", "over": "protections",
+      "where": "isProtection && carrier == 'ATTACHED'",
+      "of": "protectionStopLevel"
+    },
+    {
+      "name": "attachedHighest",
+      "op": "max", "over": "protections",
+      "where": "isProtection && carrier == 'ATTACHED'",
+      "of": "protectionStopLevel"
+    },
+    {
+      "name": "standaloneStopLowest",
+      "op": "min", "over": "protections",
+      "where": "isProtection && carrier != 'ATTACHED' && kind != 'TRAILING'",
+      "of": "protectionStopLevel"
+    },
+    {
+      "name": "standaloneStopHighest",
+      "op": "max", "over": "protections",
+      "where": "isProtection && carrier != 'ATTACHED' && kind != 'TRAILING'",
+      "of": "protectionStopLevel"
+    },
+    {
+      "name": "trailingLowest",
+      "op": "min", "over": "protections",
+      "where": "isProtection && kind == 'TRAILING'",
+      "of": "protectionStopLevel"
+    },
+    {
+      "name": "trailingHighest",
+      "op": "max", "over": "protections",
+      "where": "isProtection && kind == 'TRAILING'",
+      "of": "protectionStopLevel"
+    },
+    {
+      "name": "trancheStopCurrent",
+      "note": "Действующий уровень защиты транша — по приоритету носителя: своя встроенная, затем отдельный стоп своего транша, затем его активированный трейлинг. Внутри класса берётся менее благоприятный: у LONG это нижний уровень, у SHORT — верхний. Защиты нет вовсе — пусто целиком, а не ноль.",
+      "expr": "if(deal.direction == 'LONG', coalesce(attachedLowest, standaloneStopLowest, trailingLowest), coalesce(attachedHighest, standaloneStopHighest, trailingHighest))"
+    },
+    {
+      "name": "dealStopLowest",
+      "op": "min", "over": "tranches",
+      "where": "notNull(trancheStopCurrent)",
+      "of": "trancheStopCurrent"
+    },
+    {
+      "name": "dealStopHighest",
+      "op": "max", "over": "tranches",
+      "where": "notNull(trancheStopCurrent)",
+      "of": "trancheStopCurrent"
+    },
+    {
+      "name": "stopCurrentLive",
+      "note": "Уровень на всю позицию — наименее благоприятный среди действующих защит всех траншей. Под лестницей разноуровневых защит оценка завышается: направление консервативное.",
+      "expr": "if(deal.direction == 'LONG', dealStopLowest, dealStopHighest)"
     }
   ],
 
@@ -481,6 +547,115 @@
         ]
       },
       "expectRefusal": { "allTranchesCovered": "пустой размер в арифметике" }
+    },
+
+    {
+      "case": "LONG: приоритет носителя — встроенная защита побеждает отдельный стоп, даже если тот ниже",
+      "state": {
+        "deal": { "direction": "LONG" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "a1", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 100, "parentFillSize": 100, "stopLevel": 2910 },
+              { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 100, "closedSize": 0, "stopLevel": 2800 }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "stopCurrentLive": 2910 }
+    },
+    {
+      "case": "LONG: внутри одного класса берётся менее благоприятный — нижний уровень",
+      "state": {
+        "deal": { "direction": "LONG" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 50, "closedSize": 0, "stopLevel": 2950 },
+              { "id": "s2", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 50, "closedSize": 0, "stopLevel": 2900 }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "stopCurrentLive": 2900 }
+    },
+    {
+      "case": "SHORT: менее благоприятен верхний уровень",
+      "state": {
+        "deal": { "direction": "SHORT" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 50, "closedSize": 0, "stopLevel": 3050 },
+              { "id": "s2", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 50, "closedSize": 0, "stopLevel": 3100 }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "stopCurrentLive": 3100 }
+    },
+    {
+      "case": "неактивированный трейлинг уровня не несёт: защиты нет вовсе — пусто, а не ноль",
+      "state": {
+        "deal": { "direction": "LONG" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "t1", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "closedSize": 0, "activationPrice": 3200, "observedTrailingPrice": null }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "stopCurrentLive": null, "anyTrancheViolated": true }
+    },
+    {
+      "case": "активированный трейлинг несёт наблюдённый уровень и берётся третьим по приоритету",
+      "state": {
+        "deal": { "direction": "LONG" },
+        "position": { "live": true, "externalSize": 100 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [
+              { "id": "t1", "carrier": "STANDALONE", "kind": "TRAILING", "status": "ACTIVE", "size": 100, "closedSize": 0, "activationPrice": 3200, "observedTrailingPrice": 3150 }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "stopCurrentLive": 3150 }
+    },
+    {
+      "case": "два транша с разными уровнями: на позицию берётся менее благоприятный из них",
+      "state": {
+        "deal": { "direction": "LONG" },
+        "position": { "live": true, "externalSize": 200 },
+        "tranches": [
+          {
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [ { "id": "s1", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 100, "closedSize": 0, "stopLevel": 2960 } ],
+            "commitments": []
+          },
+          {
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
+            "protections": [ { "id": "s2", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 100, "closedSize": 0, "stopLevel": 2890 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealExposure": 200, "exposureReconciled": true, "stopCurrentLive": 2890, "allTranchesCovered": true }
     }
   ]
 }
