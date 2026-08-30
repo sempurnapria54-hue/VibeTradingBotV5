@@ -93,9 +93,9 @@ snapshot полностью заменяет старый список currency 
 
 ## OKX
 
-### `OkxBalanceResponse` → snapshot
+### `BalanceOkxResponse` → snapshot
 
-См. инвентарь — `docs/models/integrations/okx/OkxBalanceResponse.md`.
+См. инвентарь — `docs/models/integrations/okx/BalanceOkxResponse.md`.
 
 **Account-level → `BalanceContainerExternalSnapshot`:**
 
@@ -120,7 +120,7 @@ snapshot полностью заменяет старый список currency 
 
 Числовые поля в snapshot остаются строками, но уже провалидированы
 как parseable decimal. Список не маппимых полей — в
-`docs/models/integrations/okx/OkxBalanceResponse.md`.
+`docs/models/integrations/okx/BalanceOkxResponse.md`.
 
 ### OKX validation notes
 

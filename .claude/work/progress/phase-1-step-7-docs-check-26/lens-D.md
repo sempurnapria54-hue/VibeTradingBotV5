@@ -22,8 +22,8 @@
 
 **Выборочно (грепом по предмету):** `models/domain/core/Order.md`,
 `models/mapping/MarketPriceData.md`, `models/mapping/PositionCloseResult.md`,
-`models/integrations/okx/OkxPositionsHistoryResponse.md`,
-`models/integrations/okx/OkxTickerResponse.md`,
+`models/integrations/okx/PositionsHistoryOkxResponse.md`,
+`models/integrations/okx/TickerOkxResponse.md`,
 `integrations/okx/contracts/funding-rate.md`.
 
 **Грунт:** `.claude/library/trading/distilled/` — `corpus-map`,
@@ -194,7 +194,7 @@ last-цене, а исполняется в марк-домене. Модель 
 (`PROFIT/LOSS_PERCENTS_REACHED -> Position.avgPrice + MarketPriceData`);
 `docs/components/models/MarketPriceData.md:9-10`;
 `docs/models/mapping/MarketPriceData.md:40-52`;
-`docs/models/integrations/okx/OkxTickerResponse.md:39-42` (`markPx`/`idxPx`
+`docs/models/integrations/okx/TickerOkxResponse.md:39-42` (`markPx`/`idxPx`
 в DTO **нет**); `docs/models/domain/aggregate/Strategy.md:198` («доменные
 правила плоские: тип плюс простые поля»), `:206-211`, `:229-230` (источник
 цены живёт только на ценовом операнде, которого у плоского правила нет);
@@ -221,7 +221,7 @@ momentum-трейдеры, «торгующие по тому, что видят
 **Трассировка.** Искал наивность к манипуляциям в петле сопровождения.
 Отрицательная посылка «марк-цены в `MarketPriceData` нет» проверена по трём
 носителям порознь (`components/models/MarketPriceData.md`,
-`models/mapping/MarketPriceData.md`, `OkxTickerResponse.md:39-42`). Посылка
+`models/mapping/MarketPriceData.md`, `TickerOkxResponse.md:39-42`). Посылка
 «источник цены на плоском правиле не выражается» — по `Strategy.md:198` и
 `:229-230`. Операнд при этом существует
 (`models/mapping/Position.md:109`) — вопрос доступности на поверхности
@@ -260,7 +260,7 @@ momentum-трейдеры, «торгующие по тому, что видят
 («Знаменатель R-мультипликатора»), `:141`, `:162`, `:131-160` (формула
 результата); `docs/rules/risk-policy.md:19-23` («финансирование… в риск
 **не входят**»);
-`docs/models/integrations/okx/OkxPositionsHistoryResponse.md:18`
+`docs/models/integrations/okx/PositionsHistoryOkxResponse.md:18`
 (`realizedPnl = pnl + fee + fundingFee + liqPenalty → Deal.resultProfit`),
 `:23` («Потребители — де-микширование R-мультипликатора
 (`docs/rules/risk-policy.md`)») — **а в `risk-policy.md` слова
@@ -281,7 +281,7 @@ R-мультипликаторов); с. 148-152 (нормировка на до
 
 **Целевой док.** Раздел в `docs/rules/risk-policy.md` + величина в
 `docs/spec/deal-risk-numbers.json`; плюс починка указателя в
-`OkxPositionsHistoryResponse.md:23`.
+`PositionsHistoryOkxResponse.md:23`.
 
 **Ожидаемый владелец.** `trading-specialist`.
 
@@ -289,7 +289,7 @@ R-мультипликаторов); с. 148-152 (нормировка на до
 Отрицательная посылка «дома у метрики нет» проверена грепом по `docs/`
 целиком, не обходом owner-доков. Далее сверены базы учёта половин:
 знаменатель — `risk-policy.md:19-23`, числитель —
-`OkxPositionsHistoryResponse.md:18`. Достижимость де-микширования
+`PositionsHistoryOkxResponse.md:18`. Достижимость де-микширования
 проверена: `Position.externalFundingCost` персистится
 (`models/mapping/PositionCloseResult.md:29`).
 

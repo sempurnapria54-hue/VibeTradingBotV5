@@ -95,7 +95,7 @@
   «конвенции api-слоя» **снята целиком** — она вела из корпуса в
   пайплайн, а её предмет (как пишется api-слой) продуктовым знанием не
   является. Тот же
-  обрыв, найденный свипом в `docs/models/integrations/okx/OkxTickerResponse.md`,
+  обрыв, найденный свипом в `docs/models/integrations/okx/TickerOkxResponse.md`,
   починен там же; контрольный греп `` `,) `` по живому корпусу — пусто.
 - **N7** (крен C) — два типа размещения без единого носителя сняты:
   строки `docs/models/externalSnapshot/` и `docs/models/persistence/`

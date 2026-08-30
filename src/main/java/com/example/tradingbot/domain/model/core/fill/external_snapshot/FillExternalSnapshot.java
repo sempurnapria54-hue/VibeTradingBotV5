@@ -11,7 +11,7 @@ import lombok.Value;
  * (OKX-Q1): RefreshFillsExecutor матчит fills с Order/AlgoOrder по
  * order id и агрегирует fillSize/fillPrice/fee в эти сущности. billId —
  * якорь пагинации. См. docs/models/mapping/TradeFill.md (стаб),
- * docs/models/integrations/okx/OkxFillResponse.md.
+ * docs/models/integrations/okx/FillOkxResponse.md.
  */
 @Value
 @Builder

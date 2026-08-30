@@ -2,7 +2,7 @@ package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
-import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse;
+import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
 import com.example.tradingbot.persistence.model.position.PositionEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -36,7 +36,7 @@ public interface PositionMapper {
     @Mapping(target = "externalUnrealizedProfit", source = "upl")
     @Mapping(target = "externalCreatedAt", source = "cTime")
     @Mapping(target = "externalModifiedAt", source = "uTime")
-    PositionExternalSnapshot integrationToSnapshot(OkxPositionResponse response);
+    PositionExternalSnapshot integrationToSnapshot(PositionOkxResponse response);
 
     /**
      * Обновление полей Position из снапшота (REFRESH-контур). Доменный

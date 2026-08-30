@@ -918,7 +918,7 @@ X5 усилен обоими фактами критика: у инструме�
 | `MarkDealClosedExecutor.md:63,87`, `loss-streak-halt.md:159`, `pnl-reconciliation.md:193` | «подъём холда идемпотентен» — о **мягкой** ступени | без правки: доведение — только полный режим, мягкой ступени клауза не касается |
 | `exchange-hold.md:129` | «мягкий холд анкером не является» | без правки — про эскалацию, не про повтор |
 | `HoldService.md:84` | снятие «несёт идемпотентность само» | без правки — своя тропа, свой механизм (названная ступень) |
-| `idempotency-via-unique.md`, `RefreshBillsExecutor.md`, `DealCashFlow.md`, `Candle.md`, `IndicatorJob.md`, `market-data-calculation.md`, `FinalizeDealExitExecutor.md`, `RefreshPositionExecutor.md`, `DealActionState.md`, `OkxAccountBillResponse.md`, `AnomalyReport.md:29`, `error-handling-policy.md:37` | идемпотентность **других** предметов (уникальность в БД, дедуп записей, пересчёт) | вне предмета |
+| `idempotency-via-unique.md`, `RefreshBillsExecutor.md`, `DealCashFlow.md`, `Candle.md`, `IndicatorJob.md`, `market-data-calculation.md`, `FinalizeDealExitExecutor.md`, `RefreshPositionExecutor.md`, `DealActionState.md`, `AccountBillOkxResponse.md`, `AnomalyReport.md:29`, `error-handling-policy.md:37` | идемпотентность **других** предметов (уникальность в БД, дедуп записей, пересчёт) | вне предмета |
 
 **S-B. Автоматические читатели повторной полной реакции.**
 `grep -rln "kill-switch\|KillSwitch\|снятие живого риска" docs/components docs/rules` — 19 файлов; из них по существу затронуты:

@@ -1,4 +1,4 @@
-# OkxAccountBillResponse (OKX account bill records)
+# AccountBillOkxResponse (OKX account bill records)
 
 ## На какой вопрос отвечает этот файл
 
@@ -41,8 +41,7 @@
 комиссионную компоненту из своей строки, а различитель гранулярности
 (наличие комиссионной строки расчётной валюты) отделяет комбинированную
 запись от **информационного эха** комиссии на торговой записи. Все три
-формы дают один результат — `docs/models/mapping/DealCashFlow.md`
-§«Арифметика левых сторон: `amount − externalFee = pnl`»,
+формы дают один результат — `docs/models/mapping/DealCashFlow.md`,
 `docs/spec/pnl-reconciliation.json` §`separateFeeGranularity`. Что именно
 несёт `fee` на самостоятельной fee-записи, остаётся рантайм-вопросом
 инвентаря (контур source-api,

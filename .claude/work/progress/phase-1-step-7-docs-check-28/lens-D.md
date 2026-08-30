@@ -597,7 +597,7 @@ ST, гл. 7, с. 153-154; AFTS, стратегии 10-11]. Механика фа
 `Position.externalFundingCost` («знак нормализован — издержка
 положительна»), и его названный потребитель —
 **«де-микширование R-мультипликатора (`docs/rules/risk-policy.md`)»**
-(`OkxPositionsHistoryResponse.md:23`; то же в `Position.md:50`). В
+(`PositionsHistoryOkxResponse.md:23`; то же в `Position.md:50`). В
 `docs/rules/risk-policy.md` секции о де-микшировании **нет** — указатель
 висит в пустоту, и операция, которую он называет, не описана ни одним
 доком.
@@ -612,7 +612,7 @@ ST, гл. 7, с. 153-154; AFTS, стратегии 10-11]. Механика фа
   «готовый net» и тождество источника с финансированием;
 - `docs/models/domain/core/Position.md:44`, `:50` — те же поля в домене;
 - `docs/rules/risk-policy.md:24-28` — фандинг вне определения риска;
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:23` —
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:23` —
   висящий указатель на «де-микширование R-мультипликатора».
 
 **Целевой док.** Дом операнда счётчика — `docs/rules/loss-streak-halt.md`

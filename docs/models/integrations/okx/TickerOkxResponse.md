@@ -1,4 +1,4 @@
-# OkxTickerResponse (OKX market ticker)
+# TickerOkxResponse (OKX market ticker)
 
 ## На какой вопрос отвечает этот файл
 
@@ -17,7 +17,7 @@
 | `bidSz` | string (decimal) | да | Объём на лучшем bid. Там же. |
 | `ts` | string (epoch millis) | да | Время тикера. |
 
-Таблица выровнена под **худой coded DTO** (`OkxTickerResponse.java`:
+Таблица выровнена под **худой coded DTO** (`TickerOkxResponse.java`:
 `instType`/`instId`/`last`/`askPx`/`bidPx`/`ts`; сопровождение сделки добавляет
 `askSz`/`bidSz`): держим только заведённые поля, карваута на полное
 зеркало биржи нет.

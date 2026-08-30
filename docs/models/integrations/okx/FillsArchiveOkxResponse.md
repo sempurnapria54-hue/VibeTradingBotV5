@@ -1,4 +1,4 @@
-# OkxFillsArchiveResponse (OKX trade fills archive)
+# FillsArchiveOkxResponse (OKX trade fills archive)
 
 ## На какой вопрос отвечает этот файл
 
@@ -30,7 +30,7 @@
 ## Содержимое архивного файла
 
 Файл — fills-выгрузка за квартал (формат — обычно CSV.gz). Структура
-строки соответствует полям `OkxFillResponse.md` (`tradeId`, `ordId`,
+строки соответствует полям `FillOkxResponse.md` (`tradeId`, `ordId`,
 `clOrdId`, `billId`, `fillPx`, `fillSz`, `side`, `posSide`, `execType`,
 `feeCcy`, `fee`, `ts`, `instType`, `instId`, `tag`). Точная схема
 выгрузки в архиве не зафиксирована; при материализации

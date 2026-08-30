@@ -8,11 +8,11 @@ import lombok.Setter;
  * snapshot-релевантное подмножество полей рыночной цены (last / ask /
  * bid + время); все приходят строками. Не выходит за
  * IntegrationService/adapter
- * (docs/models/integrations/okx/OkxTickerResponse.md).
+ * (docs/models/integrations/okx/TickerOkxResponse.md).
  */
 @Getter
 @Setter
-public class OkxTickerResponse {
+public class TickerOkxResponse {
 
     /** Тип инструмента (instType): SPOT/MARGIN/SWAP/FUTURES/OPTION. */
     private String instType;

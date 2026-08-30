@@ -77,7 +77,7 @@ Rules-поля (sizing/rounding/ограничители), питающие rule
 groupId should be used together to determine a trading fee group. Users should
 use this endpoint together with fee rates endpoint to get the trading fee of a
 specific symbol». Native-поля ставки —
-`docs/models/integrations/okx/OkxTradeFeeResponse.md`; контракт —
+`docs/models/integrations/okx/TradeFeeOkxResponse.md`; контракт —
 `docs/integrations/okx/contracts/trade-fee.md`.
 
 Числовые spec-поля OKX (`lotSz`/`minSz`/`ctVal`/`ctMult`/`tickSz`)

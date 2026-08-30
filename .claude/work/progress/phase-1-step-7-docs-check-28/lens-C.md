@@ -17,9 +17,9 @@
   `docs/components/models/HoldSignal.md`.
 - `docs/models/mapping/` — `DealCashFlow.md`, `PositionCloseResult.md`,
   `TradeFeeRate.md` (§Связи).
-- `docs/models/integrations/okx/` — `OkxAccountBillResponse.md`,
-  `OkxPositionsHistoryResponse.md`, `OkxFillResponse.md`,
-  `OkxFillsArchiveResponse.md` (шапки), `InstrumentOkxResponse.md`
+- `docs/models/integrations/okx/` — `AccountBillOkxResponse.md`,
+  `PositionsHistoryOkxResponse.md`, `FillOkxResponse.md`,
+  `FillsArchiveOkxResponse.md` (шапки), `InstrumentOkxResponse.md`
   (указатель).
 - `docs/integrations/okx/contracts/` — `account-bills.md`, `position.md`,
   `fills.md`, `fills-archive.md`, `instrument.md` (указатель),
@@ -229,7 +229,7 @@ note `cleanTerminalContract` в `docs/spec/deal-lifecycle.json`. Что имен
   CloseOutcome | Торговый исход закрытия — признак отбора для отчёта. |`
 - `docs/models/domain/core/Position.md:47` — `externalCloseType` — «сырой
   тип последнего закрытия источника. **Операнд** торгового исхода сделки».
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:25` —
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:25` —
   «`type` … (`1` частичное / `2` полное / `3` ликвидация / `4` частичная
   ликвидация / `5` ADL не полностью / `6` ADL полностью) →
   `Position.externalCloseType`; провенанс аварийного терминала **и операнд
@@ -477,7 +477,7 @@ best-effort, `deal-lifecycle.json:79-81`), в отличие от штатног
 
 **Цитаты (носители).**
 
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:28` —
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:28` —
   «**Какие значения источник фактически отдаёт — открытый хвост
   `integrator`** (перечень заводится в
   `docs/integrations/okx/contracts/position.md`)».
@@ -494,7 +494,7 @@ best-effort, `deal-lifecycle.json:79-81`), в отличие от штатног
 
 **Целевой док.** `docs/integrations/okx/contracts/position.md`
 §«История закрытых позиций» — перечень значений; либо снятие обещания в
-`docs/models/integrations/okx/OkxPositionsHistoryResponse.md:28` с переносом
+`docs/models/integrations/okx/PositionsHistoryOkxResponse.md:28` с переносом
 адреса.
 
 **Ожидаемый владелец.** `integrator` — предмет целиком на нативных
@@ -594,7 +594,7 @@ best-effort, `deal-lifecycle.json:79-81`), в отличие от штатног
   **Проверяемый признак, не источник** валюты результата сделки».
 - `docs/models/mapping/PositionCloseResult.md:24` — то же в составе
   граничного снапшота.
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:19` — «В
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:19` — «В
   `Deal.resultProfitCurrency` **не переходит** … а это поле **проверяемый
   признак**».
 - `docs/spec/deal-result.json:83-84` — «Пришедшая от биржи — проверяемый
@@ -652,16 +652,16 @@ best-effort, `deal-lifecycle.json:79-81`), в отличие от штатног
 
 ### C9. Инвентарь bill-записи не классифицирует поля, названные собственным контракт-доком корпуса
 
-**Вопрос.** Полон ли used/unused-инвентарь `OkxAccountBillResponse`, если
+**Вопрос.** Полон ли used/unused-инвентарь `AccountBillOkxResponse`, если
 контракт-док того же источника перечисляет колонки bill-записи, которых в
 инвентаре нет ни в одном из двух списков?
 
 **Цитаты (носители).**
 
-- `docs/models/integrations/okx/OkxAccountBillResponse.md:21-33` —
+- `docs/models/integrations/okx/AccountBillOkxResponse.md:21-33` —
   used-набор: `billId`, `type`, `subType`, `ts`, `balChg`, `fee`, `ccy`,
   `ordId`, `instId` (девять).
-- `docs/models/integrations/okx/OkxAccountBillResponse.md:54-65` —
+- `docs/models/integrations/okx/AccountBillOkxResponse.md:54-65` —
   «Не используется»: `bal`, `pnl`, `sz`, `posBalChg`, `posBal`, `from`,
   `to`, `notes` (восемь). Итого классифицировано семнадцать.
 - `docs/integrations/okx/contracts/account-bills.md:109-114` — «состав
@@ -672,11 +672,11 @@ best-effort, `deal-lifecycle.json:79-81`), в отличие от штатног
   жирным те, что в инвентаре не классифицированы; попутно в перечне
   контракта отсутствует `type`, который в инвентаре used.
 - Оговорка, которую находка не снимает:
-  `docs/models/integrations/okx/OkxAccountBillResponse.md:18-19` — «Пока не
+  `docs/models/integrations/okx/AccountBillOkxResponse.md:18-19` — «Пока не
   снято, перечень «Не используется» читается как «не используется из
   **известного**», а не как закрытый список».
 
-**Целевой док.** `docs/models/integrations/okx/OkxAccountBillResponse.md`
+**Целевой док.** `docs/models/integrations/okx/AccountBillOkxResponse.md`
 §«Не используется runtime фазы 1».
 
 **Ожидаемый владелец.** `integrator`.
@@ -768,7 +768,7 @@ used-набора под разбивку от их наличия не меня
   `SubmitOrderExecutor`» держится в трёх носителях согласованно
   (`Deal.md:42`, `DealContextService.md:94`, `SubmitOrderExecutor.md:22-28`),
   и снятая прежняя роль `cTime` названа явно
-  (`OkxPositionsHistoryResponse.md:29`). Уровень сверки: единственность
+  (`PositionsHistoryOkxResponse.md:29`). Уровень сверки: единственность
   писателя и согласованность операнда, не момент транзакции.
 - **Носитель предиката `closeRecordFetched`.** `RefreshPositionExecutor.md:35-37`
   указывает на `Position.md` §Персистентность — открыл: строки 122-129

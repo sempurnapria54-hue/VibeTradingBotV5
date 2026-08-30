@@ -44,7 +44,7 @@ margin mode**» — precheck работает только при `acctLv = 3 | 
 `posSide` (long/short-режим), `ordType`, `sz`, `px`, `reduceOnly`,
 `tgtCcy`, `attachAlgoOrds` (TP/SL/trailing — вкл. `callbackRatio`/
 `callbackSpread`/`activePx`). Состав и семантика полей — `order.md`,
-`OkxOrderResponse.md`.
+`OrderOkxResponse.md`.
 
 ### Response (`data[0]`) — снапшот «до / после»
 

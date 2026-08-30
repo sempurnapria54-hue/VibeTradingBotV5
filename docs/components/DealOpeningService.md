@@ -35,7 +35,12 @@ entry context.
    биржевой момент создания сделки, полученный от scanner'а
    (`GET /public/time`, П7-B; на биржу за ним **этот** сервис не ходит).
    Поле служит нижней границей окна линковки bills, когда
-   `billsWindowBegin` пуст (`docs/models/domain/aggregate/Deal.md`);
+   `billsWindowBegin` пуст (`docs/models/domain/aggregate/Deal.md`).
+   **Той же транзакцией пишет `Deal.entryMarketPhase`** — фазу,
+   по которой scanner выбрал деталь: она уже вычислена к этому моменту,
+   и второй раз её никто не считает. Поле write-once и служит
+   темпоральным операндом предиката смены тренда
+   (`docs/models/domain/other/MarketPhase.md`);
 3. сохраняет pinned-связи с инструментом и `StrategyDetail`;
 4. **материализует транши детали**: по одному на объявление, по
    `levelCount` на шаблон; каждый — в своём `PRECHECK`, с закреплённым

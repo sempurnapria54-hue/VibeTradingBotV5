@@ -29,7 +29,7 @@
 `docs/models/domain/other/DealActionState.md`,
 `docs/models/domain/other/DealCashFlow.md`,
 `docs/models/mapping/DealCashFlow.md`,
-`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`,
+`docs/models/integrations/okx/PositionsHistoryOkxResponse.md`,
 `docs/components/models/RiskCheckResult.md`,
 `docs/components/RiskValidator.md`,
 `docs/components/KillSwitchExecutor.md`,
@@ -287,7 +287,7 @@ Position.externalSize`) — то есть штатно закрывается CO
   `docs/models/domain/other/CandleGroup.md:69` («предусловие `CODE` п. 5»),
   `docs/models/mapping/TimeFrame.md:36` («открытое предусловие `CODE`
   п. 5»),
-  `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:69`
+  `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:69`
   («предусловие `CODE`** (п. 14»),
   `.claude/tests/source-api/okx/plan.md:1506` («записать допущение явно в
   **п. 10 реестра предусловий**»),
@@ -1043,7 +1043,7 @@ B крена не заявляю: это выбор владельца с зап
   факт не добыт**. Фильтр запроса — диапазон времени».
 - `docs/integrations/okx/contracts/account-bills.md:39,41` — «`after` /
   `before` — пагинация **по `billId`**»; «`limit` — ≤ 100 (default 100)».
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:30` —
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:30` —
   «`uTime`… (сортировка/**пагинация** positions-history — тоже по `uTime`)».
 
 **Целевой док.** `.claude/work/backlog.md` §«Хвост шага 4» — снять половину
@@ -1130,9 +1130,9 @@ positions-history. Гейта не образует именно потому, �
   round-trip тест»»; «**Влияние:**… → относится к **Фазе 3** prod
   read-only».
 - Шаг 7 вводит:
-  `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:29-30` —
-  поля `cTime` и `uTime`; плюс `OkxAccountBillResponse.md`,
-  `OkxTradeFeeResponse.md`.
+  `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:29-30` —
+  поля `cTime` и `uTime`; плюс `AccountBillOkxResponse.md`,
+  `TradeFeeOkxResponse.md`.
 - `uTime` — операнд границ:
   `.claude/work/backlog.md:702-707` — «`Deal.billsWindowEnd` — монотонное
   вперёд… guard `where bills_window_end is null or bills_window_end <

@@ -4,7 +4,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
-import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
+import com.example.tradingbot.integration.model.okx.response.TickerOkxResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -31,7 +31,7 @@ public interface MarketPriceDataMapper {
     @Mapping(target = "externalAskPrice", source = "askPx", qualifiedByName = "toBigDecimal")
     @Mapping(target = "externalBidPrice", source = "bidPx", qualifiedByName = "toBigDecimal")
     @Mapping(target = "externalTimestamp", source = "ts", qualifiedByName = "toTimestamp")
-    MarketPriceDataExternalSnapshot integrationToSnapshot(OkxTickerResponse response);
+    MarketPriceDataExternalSnapshot integrationToSnapshot(TickerOkxResponse response);
 
     MarketPriceData snapshotToDomain(MarketPriceDataExternalSnapshot snapshot, Long instrumentId);
 

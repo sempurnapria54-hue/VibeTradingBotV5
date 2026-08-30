@@ -25,9 +25,9 @@
 `docs/models/domain/other/` — `DealCashFlow`, `Auditable`;
 `docs/models/mapping/` — `Order`, `AlgoOrder` (§ядро), `Position`,
 `PositionCloseResult`, `DealCashFlow`; `docs/models/integrations/okx/` —
-`OkxAccountBillResponse`, `OkxPositionsHistoryResponse`, `OkxFillResponse`,
-`OkxFillsArchiveResponse` (+ точечно `OkxOrderResponse`,
-`OkxAlgoOrderResponse`); `docs/integrations/okx/contracts/` —
+`AccountBillOkxResponse`, `PositionsHistoryOkxResponse`, `FillOkxResponse`,
+`FillsArchiveOkxResponse` (+ точечно `OrderOkxResponse`,
+`AlgoOrderOkxResponse`); `docs/integrations/okx/contracts/` —
 `account-bills`, `position` (+ точечно прочие); lifecycles — `Order`,
 `AlgoOrder`, `Position`; `docs/models/api/OkxRawApiRequest.md`; правила —
 `ack-not-runtime-truth`, `command-lifecycle`, `audit-not-runtime-source`,
@@ -93,7 +93,7 @@ C3 (нерантайм-верифицированный инвариант аг�
   `externalResultCurrency`, `externalCloseAveragePrice`, `externalCloseType`,
   `externalRealizedProfitGross`; `:55` — «Состав ограничен полями с
   названным потребителем»; `:107-113` — персистентность без этих колонок.
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:22-24` —
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:22-24` —
   `fee` → `Position.externalFee`, `fundingFee` → `Position.externalFundingCost`
   (со снятием знака), `liqPenalty` → `Position.externalLiquidationPenalty`.
 - `docs/rules/pnl-reconciliation.md:18-21` — «четыре пары … против чисел
@@ -148,7 +148,7 @@ C3 (нерантайм-верифицированный инвариант аг�
   чего складывается сам `discrepancy`, не определено.
 - `docs/rules/pnl-reconciliation.md:18-21` — «слагаемые разбивки против
   чисел записей закрытия» без формулы слагаемого.
-- `docs/models/integrations/okx/OkxAccountBillResponse.md:53-55` —
+- `docs/models/integrations/okx/AccountBillOkxResponse.md:53-55` —
   «`REALIZED_PNL`-слагаемое разбивки резолвится из `balChg` за вычетом
   `fee`» (единственное место, где вычитание названо, и оно — в слое
   источника).
@@ -183,7 +183,7 @@ C3 (нерантайм-верифицированный инвариант аг�
 | **D. Крен B + отдельная величина «комиссия из комбинированной записи»** | если рантайм покажет, что `fee` на самостоятельной fee-записи дублирует `amount` | цена — вторая ось в спеке; ставится только по факту рантайма |
 
 Крен — **B**; зависимая от рантайм-вопроса о `fee` на самостоятельной
-fee-записи (он назван в `OkxAccountBillResponse.md:44-46`).
+fee-записи (он назван в `AccountBillOkxResponse.md:44-46`).
 
 **Ярлык исхода.** `варианты-с-креном`.
 
@@ -209,7 +209,7 @@ fee-записи (он назван в `OkxAccountBillResponse.md:44-46`).
   эпизодам`, net берётся готовым.
 - `docs/components/FinalizeDealExitExecutor.md:23-32` — «складывает готовые
   net закрытых эпизодов».
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:11-14,18` —
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:11-14,18` —
   «своих слагаемых не складываем».
 - `docs/rules/pnl-reconciliation.md:9-16` — «Число всегда авторитетно», без
   оговорки о непроверенности посылки.
@@ -417,7 +417,7 @@ fee-записи (он назван в `OkxAccountBillResponse.md:44-46`).
 `docs/integrations/okx/contracts/trade-fee.md:31`;
 `docs/models/integrations/okx/InstrumentOkxResponse.md:73`;
 `docs/models/mapping/TradeFeeRate.md:179,188`;
-`docs/models/integrations/okx/OkxPositionsHistoryResponse.md:69-70` («п. 14
+`docs/models/integrations/okx/PositionsHistoryOkxResponse.md:69-70` («п. 14
 реестра, `docs/rules/pnl-reconciliation.md`»). Цель —
 `docs/rules/pnl-reconciliation.md` (греп `реестр|реш\.` пуст).
 
@@ -450,7 +450,7 @@ fee-записи (он назван в `OkxAccountBillResponse.md:44-46`).
 обещан именно в контракте и там отсутствует. Резолв специфицировать нечем.
 
 **Цитаты (носители).**
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:28` — «Какие
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:28` — «Какие
   значения источник фактически отдаёт — открытый хвост `integrator`
   (перечень заводится в `docs/integrations/okx/contracts/position.md`)»;
   там же «незнакомое либо пустое — `ExternalInvariantViolationException`».
@@ -703,7 +703,7 @@ ACK», «история исполнения», «таймлайн» по `docs`
   … второй экземпляр паттерна N7»);
   `docs/integrations/okx/contracts/position.md:51-52` («выбран на шага 7
   (2026-07-03; **В-3 закрыт**)»), `:81` («N11»);
-  `docs/models/integrations/okx/OkxAccountBillResponse.md:14-20,35-47`
+  `docs/models/integrations/okx/AccountBillOkxResponse.md:14-20,35-47`
   («Гейтом `CODE` ограничение не является»; «Ранее `fee` отбрасывался с
   доводом …» — слой опровержения);
   `docs/models/api/OkxRawApiRequest.md:22` (обрыв ссылки «`…md`,)»).

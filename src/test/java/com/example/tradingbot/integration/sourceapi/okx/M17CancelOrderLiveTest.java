@@ -25,14 +25,32 @@ import org.junit.jupiter.api.Test;
 @Order(17)
 class M17CancelOrderLiveTest extends OkxSourceApiLiveTestBase {
 
-    /** Потолок риска цепочки M17.5: notional по {@code last} не выше 200 USDT. */
-    private static final BigDecimal RISK_CEILING_USDT = new BigDecimal("200");
+    /**
+     * Потолок риска цепочки M17.5 — <b>фикстурная конфигурация</b>, поднятая до
+     * величины, сопоставимой с объёмом лучшего уровня книги demo (решение
+     * держателя 2026-08-30). Прежние 200 USDT давали 0.81 контракта — меньше
+     * любого наблюдённого верхнего уровня, и всякая заявка под потолком
+     * наливалась целиком; частичный налив был недостижим по счёту, а не по
+     * гонке.
+     *
+     * <p><b>Это не продуктовая политика риска.</b> Продуктовые потолки живут в
+     * {@code docs/rules/risk-policy.md} и считаются от базы риска; константа
+     * ниже — размер фикстуры контура тестов источника, существует только в
+     * {@code src/test} и ни одним продовым путём не читается.
+     *
+     * <p><b>Чем ограничена величина.</b> 2500 USDT по {@code last} ≈ 10
+     * контрактов ETH-USDT-SWAP — вдвое ниже {@code maxBuy} demo-счёта при
+     * плече 3 и около шестой части свободного баланса, то есть заявка
+     * исполнима даже при полном наливе, который цепочка считает вырождением.
+     */
+    private static final BigDecimal FIXTURE_RISK_CEILING_USDT = new BigDecimal("2500");
     /** Шаг размера ETH-USDT-SWAP (spec: lotSz=minSz=0.01). */
     private static final BigDecimal LOT_SZ = new BigDecimal("0.01");
     /** Размер контракта ETH-USDT-SWAP в базовой валюте (spec: ctVal=0.1 ETH). */
     private static final BigDecimal CT_VAL = new BigDecimal("0.1");
     private static final String BOOKS_PATH = "/api/v5/market/books";
-    private static final int MAX_FILL_ATTEMPTS = 3;
+    private static final int MAX_FILL_ATTEMPTS = 5;
+    private static final BigDecimal TWO = new BigDecimal("2");
 
     @Test
     @Order(10)
@@ -137,18 +155,18 @@ class M17CancelOrderLiveTest extends OkxSourceApiLiveTestBase {
     @Order(50)
     @DisplayName("M17.5 Содержательный (шаг 7) — судьба встроенной защиты при отмене родителя")
     void m17_5_attachedProtectionOnParentCancel() {
-        boolean partialObserved = c17a_parentWithoutFill();
+        boolean baseObserved = c17a_parentWithoutFill();
         boolean b = c17b_parentWithPartialFill();
         boolean c = c17c_terminalWithoutOurCancel();
 
         if (!b && !c) {
             observeValue("M17.5", "п. 17 судьба встроенной защиты при непустом наливе",
-                    "НЕ НАБЛЮДЁН: частичный налив под потолком риска 200 USDT недостижим — "
-                            + "объём лучшего уровня книги demo кратно превышает половину потолка, "
-                            + "и всякая заявка под потолком наливается целиком. Слот остаётся PENDING: "
+                    "НЕ НАБЛЮДЁН: частичный налив не собран за " + MAX_FILL_ATTEMPTS
+                            + " попыток даже под поднятым фикстурным потолком "
+                            + FIXTURE_RISK_CEILING_USDT + " USDT. Слот остаётся PENDING: "
                             + "«фикстуру собрать не удалось» гейт не закрывает");
         }
-        assertThat(partialObserved)
+        assertThat(baseObserved)
                 .as("M17.5 → C17a: представление встроенной защиты у родителя наблюдено")
                 .isTrue();
     }
@@ -232,9 +250,11 @@ class M17CancelOrderLiveTest extends OkxSourceApiLiveTestBase {
     }
 
     /**
-     * C17b — родитель с непустым наливом (несущая цепочка). До трёх попыток;
-     * вырождение (полный либо нулевой налив) сворачивается teardown'ом.
-     * Возвращает {@code true}, только если {@code partially_filled} наблюдён.
+     * C17b — родитель с непустым наливом (несущая цепочка): отмена <b>нами</b>
+     * частично налитого родителя со встроенной защитой. До
+     * {@link #MAX_FILL_ATTEMPTS} попыток; вырождение (полный либо нулевой
+     * налив) сворачивается teardown'ом. Возвращает {@code true}, только если
+     * судьба защиты после отмены налитого родителя наблюдена.
      */
     private boolean c17b_parentWithPartialFill() {
         for (int attempt = 1; attempt <= MAX_FILL_ATTEMPTS; attempt++) {
@@ -242,75 +262,230 @@ class M17CancelOrderLiveTest extends OkxSourceApiLiveTestBase {
             assertThat(hasOpenPosition()).as("C17b.snapshot: позиции нет").isFalse();
 
             BigDecimal last = lastPrice();
-            BigDecimal ceilingContracts = RISK_CEILING_USDT.divide(CT_VAL.multiply(last), 8, RoundingMode.DOWN);
-            RawResponse books = get(BOOKS_PATH, map("instId", INST_ID, "sz", "5"), PUBLIC);
-            assertOk(books);
-            BigDecimal bestAskSz = new BigDecimal(books.d0().path("asks").path(0).path(1).asText("0"));
-            String bestAskPx = books.d0().path("asks").path(0).path(0).asText("");
-            observeValue("M17.5", "C17b.attempt" + attempt + ".book",
-                    "asks[0]=" + bestAskPx + " × " + bestAskSz + ", потолок=" + ceilingContracts + " контрактов");
-
-            // Объём лучшего уровня больше половины потолка ⇒ попытка пропускается.
-            if (bestAskSz.compareTo(ceilingContracts.divide(new BigDecimal("2"), 8, RoundingMode.DOWN)) > 0) {
-                observeValue("M17.5", "C17b.attempt" + attempt,
-                        "пропущена: объём лучшего аска (" + bestAskSz + ") больше половины потолка риска");
+            BigDecimal ceilingContracts = ceilingContracts(last);
+            Level level = bestAsk("C17b.attempt" + attempt, ceilingContracts);
+            if (level == null) {
                 continue;
             }
 
-            BigDecimal target = bestAskSz.multiply(new BigDecimal("2"))
-                    .divide(LOT_SZ, 0, RoundingMode.CEILING).multiply(LOT_SZ);
-            BigDecimal size = target.min(ceilingContracts.divide(LOT_SZ, 0, RoundingMode.DOWN).multiply(LOT_SZ));
+            // Размер — весь фикстурный потолок: остаток после налива верхнего
+            // уровня заведомо не меньше половины потолка, поэтому вырождение в
+            // `filled` требует, чтобы книга поглотила его целиком, а не лот.
+            String size = ceilingContracts.toPlainString();
+            String attachClOrdId = newId("b17");
             String ordId = null;
             try {
+                step("C17b.place");
                 RawResponse place = post(ORDER_PATH, map(
                         "instId", INST_ID, "tdMode", "isolated", "side", "buy", "ordType", "limit",
-                        "sz", size.toPlainString(), "px", bestAskPx, "clOrdId", newId("c17b"), "reduceOnly", false,
-                        "attachAlgoOrds", List.of(map("attachAlgoClOrdId", newId("b17"),
-                                "slTriggerPx", tickPrice(last, 0.5), "slOrdPx", "-1", "slTriggerPxType", "last"))), SIGNED);
+                        "sz", size, "px", level.px(), "clOrdId", newId("c17b"), "reduceOnly", false,
+                        "attachAlgoOrds", List.of(map("attachAlgoClOrdId", attachClOrdId,
+                                "slTriggerPx", tickPrice(last, 0.5), "slOrdPx", "-1",
+                                "slTriggerPxType", "last"))), SIGNED);
                 assertOk(place);
                 assertFirstElementOk(place);
                 ordId = place.d0().path("ordId").asText();
                 final String captured = ordId;
 
+                step("C17b.get");
                 pollUntilBool(() -> {
                     RawResponse g = get(ORDER_PATH, map("instId", INST_ID, "ordId", captured), SIGNED);
                     return g.codeZero() && !"live".equals(g.d0().path("state").asText());
                 }, pollTimeout);
                 RawResponse state = get(ORDER_PATH, map("instId", INST_ID, "ordId", captured), SIGNED);
+                String parentState = state.d0().path("state").asText();
+                String accFillSz = state.d0().path("accFillSz").asText();
                 observeValue("M17.5", "C17b.attempt" + attempt + ".state",
-                        state.d0().path("state").asText() + " accFillSz=" + state.d0().path("accFillSz").asText());
-                if (!"partially_filled".equals(state.d0().path("state").asText())) {
+                        parentState + " accFillSz=" + accFillSz + " из sz=" + size);
+                if (!"partially_filled".equals(parentState)) {
                     continue;
                 }
-                observeValue("M17.5", "C17b partially_filled достигнут", state.d0());
-                return true;
+                observeValue("M17.5", "C17b.partially_filled родитель", state.d0());
+
+                if (observeProtectionOnTerminal("C17b", captured, attachClOrdId, accFillSz, true)) {
+                    return true;
+                }
             } finally {
                 cancelOrderQuietly(ordId);
                 closePositionQuietly();
+                sweepConditionalAlgos("C17b");
             }
         }
         return false;
     }
 
     /**
-     * C17c — терминал при непустом наливе без нашей отмены ({@code ioc}).
-     * Дублёр C17b с другим инициатором терминала.
+     * C17c — терминал при непустом наливе <b>без нашей отмены</b>
+     * ({@code ordType=ioc}: остаток снимает биржа). Дублёр C17b с другим
+     * инициатором терминала; расхождение исходов — самостоятельный факт.
      */
     private boolean c17c_terminalWithoutOurCancel() {
-        step("C17c.books");
-        BigDecimal last = lastPrice();
-        BigDecimal ceilingContracts = RISK_CEILING_USDT.divide(CT_VAL.multiply(last), 8, RoundingMode.DOWN);
-        RawResponse books = get(BOOKS_PATH, map("instId", INST_ID, "sz", "5"), PUBLIC);
-        assertOk(books);
-        BigDecimal bestAskSz = new BigDecimal(books.d0().path("asks").path(0).path(1).asText("0"));
-        observeValue("M17.5", "C17c.book",
-                "asks[0] × " + bestAskSz + ", потолок=" + ceilingContracts + " контрактов");
-        if (bestAskSz.multiply(new BigDecimal("2")).compareTo(ceilingContracts) > 0) {
-            observeValue("M17.5", "C17c",
-                    "пропущена: ioc-размер 2×объём лучшего уровня (" + bestAskSz.multiply(new BigDecimal("2"))
-                            + ") выходит за потолок риска — гарантированный частичный налив недостижим");
-            return false;
+        for (int attempt = 1; attempt <= MAX_FILL_ATTEMPTS; attempt++) {
+            step("C17c.attempt" + attempt);
+            assertThat(hasOpenPosition()).as("C17c.snapshot: позиции нет").isFalse();
+
+            BigDecimal last = lastPrice();
+            BigDecimal ceilingContracts = ceilingContracts(last);
+            Level level = bestAsk("C17c.attempt" + attempt, ceilingContracts);
+            if (level == null) {
+                continue;
+            }
+
+            String size = ceilingContracts.toPlainString();
+            String attachClOrdId = newId("c17");
+            String ordId = null;
+            try {
+                step("C17c.place");
+                RawResponse place = post(ORDER_PATH, map(
+                        "instId", INST_ID, "tdMode", "isolated", "side", "buy", "ordType", "ioc",
+                        "sz", size, "px", level.px(), "clOrdId", newId("c17c"), "reduceOnly", false,
+                        "attachAlgoOrds", List.of(map("attachAlgoClOrdId", attachClOrdId,
+                                "slTriggerPx", tickPrice(last, 0.5), "slOrdPx", "-1",
+                                "slTriggerPxType", "last"))), SIGNED);
+                assertOk(place);
+                // Реджект сочетания ioc + attachAlgoOrds — факт контракта, а не фейл.
+                if (!"0".equals(place.d0().path("sCode").asText())) {
+                    observeValue("M17.5", "C17c.place реджект сочетания ioc+attachAlgoOrds",
+                            place.d0().path("sCode").asText() + " " + place.d0().path("sMsg").asText());
+                    return false;
+                }
+                ordId = place.d0().path("ordId").asText();
+                final String captured = ordId;
+
+                step("C17c.get");
+                pollUntilBool(() -> {
+                    RawResponse g = get(ORDER_PATH, map("instId", INST_ID, "ordId", captured), SIGNED);
+                    String st = g.d0().path("state").asText();
+                    return g.codeZero() && ("canceled".equals(st) || "filled".equals(st));
+                }, pollTimeout);
+                RawResponse state = get(ORDER_PATH, map("instId", INST_ID, "ordId", captured), SIGNED);
+                String parentState = state.d0().path("state").asText();
+                String accFillSz = state.d0().path("accFillSz").asText();
+                observeValue("M17.5", "C17c.attempt" + attempt + ".state",
+                        parentState + " accFillSz=" + accFillSz + " из sz=" + size);
+                // Несущее для C17c: терминал получен биржей, налив непустой.
+                if (!"canceled".equals(parentState) || new BigDecimal(accFillSz).signum() == 0) {
+                    continue;
+                }
+                observeValue("M17.5", "C17c.терминал биржей при непустом наливе", state.d0());
+
+                if (observeProtectionOnTerminal("C17c", captured, attachClOrdId, accFillSz, false)) {
+                    return true;
+                }
+            } finally {
+                cancelOrderQuietly(ordId);
+                closePositionQuietly();
+                sweepConditionalAlgos("C17c");
+            }
         }
         return false;
+    }
+
+    /**
+     * Общая половина C17b/C17c — судьба встроенной защиты у терминального
+     * родителя с непустым наливом. {@code ourCancel=true} — терминал наводим
+     * мы ({@code cancel-order}); {@code false} — терминал уже наступил (биржа
+     * сняла остаток {@code ioc}). Отвечает на несущий вопрос предусловия
+     * п. 17: остаётся ли на бирже <b>живая</b> защита на налитый объём.
+     */
+    private boolean observeProtectionOnTerminal(String chain, String ordId, String attachClOrdId,
+                                                String accFillSz, boolean ourCancel) {
+        step(chain + ".position");
+        RawResponse positions = get(POSITIONS_PATH, map("instType", INST_TYPE, "instId", INST_ID), SIGNED);
+        assertOk(positions);
+        observeValue("M17.5", chain + ".position",
+                "pos=" + positions.d0().path("pos").asText() + " posId="
+                        + positions.d0().path("posId").asText() + " против accFillSz=" + accFillSz);
+
+        if (ourCancel) {
+            step(chain + ".cancel");
+            RawResponse cancel = post(CANCEL_ORDER_PATH, map("instId", INST_ID, "ordId", ordId), SIGNED);
+            assertOk(cancel);
+            assertFirstElementOk(cancel);
+            waitUntil(chain + " частично налитый родитель отменён", () -> {
+                RawResponse g = get(ORDER_PATH, map("instId", INST_ID, "ordId", ordId), SIGNED);
+                return g.codeZero() && "canceled".equals(g.d0().path("state").asText());
+            });
+        }
+
+        step(chain + ".getAfter");
+        RawResponse after = get(ORDER_PATH, map("instId", INST_ID, "ordId", ordId), SIGNED);
+        assertOk(after);
+        observeValue("M17.5", chain + ".getAfter",
+                "state=" + after.d0().path("state").asText()
+                        + " accFillSz=" + after.d0().path("accFillSz").asText()
+                        + " cancelSource=" + after.d0().path("cancelSource").asText()
+                        + "/" + after.d0().path("cancelSourceReason").asText());
+        observeValue("M17.5", chain + ".getAfter.attachAlgoOrds[0]", after.d0().path("attachAlgoOrds").path(0));
+
+        step(chain + ".algoPending");
+        RawResponse algoPending = get(ALGO_PENDING_PATH,
+                map("instType", INST_TYPE, "instId", INST_ID, "ordType", "conditional"), SIGNED);
+        assertOk(algoPending);
+        boolean aliveByClient = containsField(algoPending, "algoClOrdId", attachClOrdId)
+                || containsField(algoPending, "attachAlgoClOrdId", attachClOrdId);
+        observeContent("M17.5." + chain + ".algoPending", algoPending);
+        observeValue("M17.5", chain + ".НЕСУЩЕЕ: живая защита после терминала родителя",
+                (aliveByClient ? "ЕСТЬ" : "НЕТ") + " (algoClOrdId=" + attachClOrdId
+                        + ", n=" + algoPending.dataSize() + ", накопленный налив=" + accFillSz + ")");
+
+        step(chain + ".algoHistory");
+        RawResponse algoHistory = get(ALGO_HISTORY_PATH, map("instType", INST_TYPE, "instId", INST_ID,
+                "ordType", "conditional", "state", "canceled"), SIGNED);
+        observeValue("M17.5", chain + ".algoHistory(canceled) содержит защиту",
+                containsField(algoHistory, "algoClOrdId", attachClOrdId)
+                        + " n=" + algoHistory.dataSize());
+        observeContent("M17.5." + chain + ".algoHistory", algoHistory);
+        return true;
+    }
+
+    /**
+     * Потолок фикстуры в контрактах: {@link #FIXTURE_RISK_CEILING_USDT} по
+     * {@code last}, округлённый <b>вниз</b> до {@link #LOT_SZ}.
+     */
+    private BigDecimal ceilingContracts(BigDecimal last) {
+        return FIXTURE_RISK_CEILING_USDT.divide(CT_VAL.multiply(last), 8, RoundingMode.DOWN)
+                .divide(LOT_SZ, 0, RoundingMode.DOWN).multiply(LOT_SZ);
+    }
+
+    /**
+     * Верхний уровень книги, пригодный для частичного налива: объём лучшего
+     * аска обязан быть не больше половины потолка — иначе заявка размером в
+     * потолок налилась бы целиком, и попытка пропускается с перечитыванием
+     * книги. {@code null} — уровень непригоден.
+     */
+    private Level bestAsk(String label, BigDecimal ceilingContracts) {
+        RawResponse books = get(BOOKS_PATH, map("instId", INST_ID, "sz", "5"), PUBLIC);
+        assertOk(books);
+        String px = books.d0().path("asks").path(0).path(0).asText("");
+        BigDecimal sz = new BigDecimal(books.d0().path("asks").path(0).path(1).asText("0"));
+        observeValue("M17.5", label + ".book",
+                "asks[0]=" + px + " × " + sz + ", потолок=" + ceilingContracts + " контрактов");
+        if (sz.signum() == 0 || px.isBlank()) {
+            return null;
+        }
+        if (sz.compareTo(ceilingContracts.divide(TWO, 8, RoundingMode.DOWN)) > 0) {
+            observeValue("M17.5", label,
+                    "пропущена: объём лучшего аска (" + sz + ") больше половины потолка фикстуры");
+            return null;
+        }
+        return new Level(px, sz);
+    }
+
+    /** Снять живые conditional-algo по инструменту (страховка teardown цепочки). */
+    private void sweepConditionalAlgos(String chain) {
+        try {
+            RawResponse pending = get(ALGO_PENDING_PATH,
+                    map("instType", INST_TYPE, "instId", INST_ID, "ordType", "conditional"), SIGNED);
+            for (JsonNode element : pending.data()) {
+                cancelAlgoQuietly(element.path("algoId").asText(null));
+            }
+        } catch (RuntimeException | AssertionError e) {
+            log.warn("{} sweepConditionalAlgos swallowed: {}", chain, e.getMessage());
+        }
+    }
+
+    /** Уровень книги: цена и объём. */
+    private record Level(String px, BigDecimal sz) {
     }
 }

@@ -1,4 +1,4 @@
-# OkxTradeFeeResponse (OKX fee rates)
+# TradeFeeOkxResponse (OKX fee rates)
 
 ## На какой вопрос отвечает этот файл
 

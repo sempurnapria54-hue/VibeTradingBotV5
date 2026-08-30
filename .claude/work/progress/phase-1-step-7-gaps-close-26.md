@@ -172,7 +172,7 @@
 | §Персистентность | правлено: `Position.md` (nullable, значащая пустота), `Exchange.md` (`consecutive_loss_count` `NOT NULL DEFAULT 0` — у серии пустоты нет) |
 | schema-дельта шага | правлено: `backlog.md` §«Агрегатная сделка и транши — CODE-дельта» |
 | состав `*ExternalSnapshot` | не требует правки: `PositionCloseResult.md` уже нёс все три поля |
-| used/unused нативного инвентаря | не требует правки: `OkxPositionsHistoryResponse.md` уже адресовал их в `Position` |
+| used/unused нативного инвентаря | не требует правки: `PositionsHistoryOkxResponse.md` уже адресовал их в `Position` |
 | mapping-таблицы | не требует правки: переход «одноимённые поля» уже записан |
 | инвентарь читателей | правлено: `pnl-reconciliation.json` (правые стороны пар), `deal-result.json` |
 

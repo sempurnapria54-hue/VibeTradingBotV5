@@ -1,4 +1,4 @@
-# OkxFillResponse (OKX trade fills)
+# FillOkxResponse (OKX trade fills)
 
 ## На какой вопрос отвечает этот файл
 

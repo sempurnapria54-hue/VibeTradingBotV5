@@ -34,7 +34,7 @@
 заявки у закрытия уровня сделки нет, `ordId` источник на него не отдаёт
 (рантайм-факт контура, `.claude/tests/source-api/okx/plan.md`,
 Cmarket.close, RUN 2026-06-20), филлы в фазе 1 не персистятся
-(`docs/models/integrations/okx/OkxFillResponse.md`). Durable-носителя
+(`docs/models/integrations/okx/FillOkxResponse.md`). Durable-носителя
 объёма у источника нет.
 
 **Почему окно — статус сделки, а не факт отправки команды.** Команда не

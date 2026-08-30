@@ -17,7 +17,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class OkxBalanceResponse {
+public class BalanceOkxResponse {
 
     /** Время обновления account snapshot (epoch ms). */
     @JsonProperty("uTime")
@@ -33,5 +33,5 @@ public class OkxBalanceResponse {
     private String availEq;
 
     /** Балансы по валютам. */
-    private List<OkxBalanceDetailResponse> details;
+    private List<BalanceDetailOkxResponse> details;
 }

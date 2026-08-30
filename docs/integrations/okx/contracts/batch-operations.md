@@ -33,7 +33,7 @@ orders»). При расхождении с офдоком побеждает о
   полями одиночного place order (`instId`, `tdMode`, `side`,
   `posSide`, `ordType`, `sz`, `px`, `clOrdId`, `reduceOnly`,
   `attachAlgoOrds` и т. д. — состав полей: `order.md`,
-  `OkxOrderResponse.md`).
+  `OrderOkxResponse.md`).
 - **Cancel batch:** `POST /api/v5/trade/cancel-batch-orders`.
   Permission `Trade`; rate limit 300 orders / 2 s (правила как у
   place batch); до 20 за запрос. Элемент: `instId` + одно из `ordId`

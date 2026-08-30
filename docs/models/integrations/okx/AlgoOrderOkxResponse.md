@@ -1,4 +1,4 @@
-# OkxAlgoOrderResponse (OKX algo-order)
+# AlgoOrderOkxResponse (OKX algo-order)
 
 ## На какой вопрос отвечает этот файл
 

@@ -1,4 +1,4 @@
-# OkxPositionResponse (OKX positions)
+# PositionOkxResponse (OKX positions)
 
 ## На какой вопрос отвечает этот файл
 
@@ -32,8 +32,8 @@
   `uplRatio`, `uplLastPx`, `uplRatioLastPx`.
 - **Risk-метрики:** `imr`, `mmr`, `mgnRatio`, `notionalUsd`, `adl`.
 - **Реализованный PnL и комиссии** (не у live `/positions` — приходят из
-  **positions-history**, native `OkxPositionsHistoryResponse`
-  (`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`); число
+  **positions-history**, native `PositionsHistoryOkxResponse`
+  (`docs/models/integrations/okx/PositionsHistoryOkxResponse.md`); число
   `Deal.resultProfit` = net `realizedPnl` оттуда, не из этого DTO):
   `realizedPnl`, `settledPnl`, `pnl`, `fee`, `fundingFee`, `liqPenalty`.
 - **Margin / debt / interest** (margin-режимы, для USDT-SWAP не

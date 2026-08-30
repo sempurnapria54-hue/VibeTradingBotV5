@@ -1,4 +1,4 @@
-# OkxOrderResponse (OKX ordinary order)
+# OrderOkxResponse (OKX ordinary order)
 
 ## На какой вопрос отвечает этот файл
 

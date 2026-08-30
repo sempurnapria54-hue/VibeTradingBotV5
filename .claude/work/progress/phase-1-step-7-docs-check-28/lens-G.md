@@ -459,13 +459,13 @@ C выбор B: политика различает **две области** (�
   контура на сырьё — `.claude/decisions/source-api-target-rebase.md`»
   — арматура «почему выбрано так» в корпусном доке
 - **Тот же обрыв ссылки повторён**:
-  `docs/models/integrations/okx/OkxTickerResponse.md:20-23` — «decision
+  `docs/models/integrations/okx/TickerOkxResponse.md:20-23` — «decision
   о ре-базе контура на сырьё
   (`.claude/decisions/source-api-target-rebase.md`**,)**: держим только
   заведённые поля…»
 
 **Целевой док.** `docs/models/api/OkxRawApiRequest.md` и
-`docs/models/integrations/okx/OkxTickerResponse.md`.
+`docs/models/integrations/okx/TickerOkxResponse.md`.
 
 **Ожидаемый владелец.** `integrator` — оба дока описывают поверхность
 источника и его контур (находки по нативным моделям идут

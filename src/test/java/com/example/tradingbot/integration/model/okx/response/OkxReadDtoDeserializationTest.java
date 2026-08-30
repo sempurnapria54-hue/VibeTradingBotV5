@@ -34,7 +34,7 @@ class OkxReadDtoDeserializationTest {
                 {"uTime":"1700000000000","totalEq":"77842.27","adjEq":"77000",\
                 "availEq":"5000","details":[{"ccy":"USDT","uTime":"1700000000000",\
                 "eq":"5000","cashBal":"5000","availBal":"5000","frozenBal":"0"}]}""";
-        assertAllFieldsBind(OkxBalanceResponse.class, json);
+        assertAllFieldsBind(BalanceOkxResponse.class, json);
     }
 
     @Test
@@ -42,7 +42,7 @@ class OkxReadDtoDeserializationTest {
         String json = """
                 {"ccy":"USDT","uTime":"1700000000000","eq":"5000","cashBal":"5000",\
                 "availBal":"5000","frozenBal":"0"}""";
-        assertAllFieldsBind(OkxBalanceDetailResponse.class, json);
+        assertAllFieldsBind(BalanceDetailOkxResponse.class, json);
     }
 
     @Test
@@ -52,7 +52,7 @@ class OkxReadDtoDeserializationTest {
                 "margin":"10","upl":"0","cTime":"1700000000000","uTime":"1700000000001",\
                 "instId":"ETH-USDT-SWAP","instType":"SWAP","posSide":"net","mgnMode":"isolated",\
                 "lever":"3"}""";
-        assertAllFieldsBind(OkxPositionResponse.class, json);
+        assertAllFieldsBind(PositionOkxResponse.class, json);
     }
 
     @Test
@@ -73,7 +73,7 @@ class OkxReadDtoDeserializationTest {
                 "slTriggerPx":"1500","slTriggerPxType":"last","tpTriggerPx":"1800",\
                 "tpTriggerPxType":"last","activePx":"1700","moveTriggerPx":"1690",\
                 "cTime":"1700000000000","uTime":"1700000000001"}""";
-        assertAllFieldsBind(OkxAlgoOrderResponse.class, json);
+        assertAllFieldsBind(AlgoOrderOkxResponse.class, json);
     }
 
     /**

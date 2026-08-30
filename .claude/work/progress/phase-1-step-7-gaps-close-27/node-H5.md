@@ -654,7 +654,7 @@ grep -rn "deal-without-operations" docs/ .claude/work/backlog.md
 | **Н4-Х3** (`hadEntry` — принятая редакция) | **исполнен раньше**, в §7 (хвост по `hadEntry`); критик откат воспроизвёл |
 | **Н4-Х4** (`MarkDealEmergencyClosedExecutor.md:20` — состав итога к ссылке на дом) | **исполнен в этом раунде** (Н5-3); внесён в таблицу полученных хенд-оффов |
 | **Н4-4** (клейм «двух конъюнктов `resultAvailable`») | **исполнен в этом раунде** той же правкой — обе части в одной строке, как и предупреждал Н4 |
-| Н4-Х1, Н4-Х2, Н4-Х5 | адресованы не мне (`trading-constraints.md`, `OkxAccountBillResponse.md`, тест-план) |
+| Н4-Х1, Н4-Х2, Н4-Х5 | адресованы не мне (`trading-constraints.md`, `AccountBillOkxResponse.md`, тест-план) |
 
 ### 8.3 Свипы раунда 1
 

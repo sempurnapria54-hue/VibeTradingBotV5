@@ -218,7 +218,7 @@ LC_ALL=C.UTF-8 grep -roP '§(?!П[0-9])' docs/ --exclude=concept.md  → 178
 «уровнем выше» как уровень модели — `TrancheManagingHandler.md:125`,
 `TranchePrecheckHandler.md:38`) и с добором того, что эвристика пропустила
 (заглавная «Перечень» в `trade-fee.md:61`, `Strategy.md:328`,
-`DealCashFlow.md:59`, `OkxAccountBillResponse.md:80`,
+`DealCashFlow.md:59`, `AccountBillOkxResponse.md:80`,
 `risk-evaluation.md:62`, `:162`, `command-lifecycle.md:57`,
 `risk-policy.md:667`, `order-sizing.json:127`, `:152`):
 
@@ -242,15 +242,15 @@ LC_ALL=C.UTF-8 grep -roP '§(?!П[0-9])' docs/ --exclude=concept.md  → 178
   `CancelOrderOkxRequest`, `ClosePositionOkxRequest`,
   `PlaceAlgoOrderOkxRequest`, `CancelAlgoOrderOkxRequest`,
   `SetLeverageOkxRequest`, `SetLeverageOkxResponse`).
-- Сторона нарушения: **6** (`OkxAlgoOrderResponse`, `OkxBalanceResponse`,
-  `OkxBalanceDetailResponse`, `OkxFillResponse`, `OkxPositionResponse`,
-  `OkxTickerResponse`) — счёт сходится.
+- Сторона нарушения: **6** (`AlgoOrderOkxResponse`, `BalanceOkxResponse`,
+  `BalanceDetailOkxResponse`, `FillOkxResponse`, `PositionOkxResponse`,
+  `TickerOkxResponse`) — счёт сходится.
 - Доки: **10** по нарушающей конвенции, **2** по правилу — сходится.
-- `docs/models/integrations/okx/OkxOrderResponse.md` при отсутствии
-  класса `OkxOrderResponse.java` и наличии `OrderOkxResponse.java` —
+- `docs/models/integrations/okx/OrderOkxResponse.md` при отсутствии
+  класса `OrderOkxResponse.java` и наличии `OrderOkxResponse.java` —
   подтверждено `find`-ом по каждому имени отдельно.
-- CODE-дельта: `backlog.md:1411` (`OkxPositionsHistoryResponse`) и
-  `:1730` (`OkxTradeFeeResponse`). Встречно: во **всём** бэклоге ровно
+- CODE-дельта: `backlog.md:1411` (`PositionsHistoryOkxResponse`) и
+  `:1730` (`TradeFeeOkxResponse`). Встречно: во **всём** бэклоге ровно
   два имени этого слоя, оба — по нарушающей стороне.
 
 Развилка действительно стои́т **до** `CODE` и запекается в имена классов,
@@ -267,7 +267,7 @@ LC_ALL=C.UTF-8 grep -roP '§(?!П[0-9])' docs/ --exclude=concept.md  → 178
 | 3 | `knowledge-curator.md:45` §«…не по» → `gap-report.md` | **подтверждён.** Цель — «…не по **симптому**» (:274): сокращение |
 | 4 | `notes/2026-08-23…:200` §«Состав конкретного цикла» → `SystemActionExecutor.md` | **подтверждён.** Пассаж — `## Состав цикла добычи` (:44) |
 | 5 | `notes/2026-08-23…:78`, `:199` → `docs/components/ManagingHandler.md` | **подтверждён.** Файла нет |
-| 6 | `plan.md:1931` §«Внешний источник правды» | **не подтверждён в заявленной форме.** Адрес указывает не в `external-source-sync.md`, а в **шапку дока, куда пишут**: `## Внешний источник правды` — штатное имя секции, реально существующее примерно в двадцати контракт-доках (`account-bills.md:8`, `algo-order.md:7`, …). Действительный дефект **другой**: названный получатель `OkxAccountBillResponse.md` такой секции не имеет — её несёт контракт-док `account-bills.md`. Указан не тот носитель, а не несуществующий пассаж |
+| 6 | `plan.md:1931` §«Внешний источник правды» | **не подтверждён в заявленной форме.** Адрес указывает не в `external-source-sync.md`, а в **шапку дока, куда пишут**: `## Внешний источник правды` — штатное имя секции, реально существующее примерно в двадцати контракт-доках (`account-bills.md:8`, `algo-order.md:7`, …). Действительный дефект **другой**: названный получатель `AccountBillOkxResponse.md` такой секции не имеет — её несёт контракт-док `account-bills.md`. Указан не тот носитель, а не несуществующий пассаж |
 | 7 | `tech-radar.md:45` → `backlog.md` §«Инфра-долг…» → §«I2…» | **снят.** Оба пассажа существуют (`backlog.md:2233` и `:2252`). Разрешимость не нарушена; претензия («цель названа голым именем файла») — другой и заметно более слабый класс, к «указателю, ведущему не туда» не относится |
 
 **Знаменатель не воспроизводится.** По объявленному линзой охвату мой

@@ -13,7 +13,7 @@
     "episodes[].externalRealizedProfit": "Position.externalRealizedProfit — готовый net эпизода, посчитанный биржей",
     "cashFlows[].amount": "DealCashFlow.amount — знаковая сумма движения",
     "cashFlows[].ccy": "DealCashFlow.ccy",
-    "cashFlows[].category": "DealCashFlow.category; OTHER — принимающая корзина нераспознанного (docs/models/mapping/DealCashFlow.md §«Резолв категории»)",
+    "cashFlows[].category": "DealCashFlow.category; OTHER — принимающая корзина нераспознанного (docs/models/mapping/DealCashFlow.md)",
     "cashFlows[].excludedByExchange": "тип движения входит в список исключений сверки этой биржи",
     "cashFlows[].rateStatus": "DealCashFlow.rateStatus: NOT_REQUIRED, APPLIED, RATE_UNAVAILABLE, SETTLE_CURRENCY_UNAVAILABLE",
     "cashFlows[].appliedRate": "курс пересчёта в расчётную валюту, взятый из свечи на момент операции"

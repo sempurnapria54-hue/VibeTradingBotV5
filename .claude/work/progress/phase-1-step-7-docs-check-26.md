@@ -93,7 +93,7 @@
   `inReconciliationScope` при этом **исполним** — асимметрия внутри одного
   предмета (V14).
 - **Правых операндов трёх пар сверки из четырёх нет в модели.**
-  `OkxPositionsHistoryResponse.md:22-24` и `PositionCloseResult.md:28-30,68`
+  `PositionsHistoryOkxResponse.md:22-24` и `PositionCloseResult.md:28-30,68`
   адресуют `Position.externalFee` / `externalFundingCost` /
   `externalLiquidationPenalty`, `PositionCloseResult.md:95-101` требует их
   непустыми при валидации — в `Position.md` их нет ни в §Структура, ни в
@@ -169,7 +169,7 @@
 `RefreshBillsExecutor.md:21-33` реализует двухоперандную подстановку,
 `Auditable.md:36-38` называет экземпляр прямо, `DealOpeningService.md:21-25`
 пишет поле и **атрибутирует клаузу дому, который её отрицает**. Четвёртая
-редакция — `OkxPositionsHistoryResponse.md:29`: роль **«снята»** (V11).
+редакция — `PositionsHistoryOkxResponse.md:29`: роль **«снята»** (V11).
 
 Окно линковки решает, какие движения атрибутируются сделке, — то есть это
 операнд разбивки P&L. **Владелец:** `solution-designer`.
@@ -181,7 +181,7 @@
 
 Корпус в четырёх местах обусловливает поведение нумерованными
 предусловиями `CODE` (`CandleGroup.md:68-69` и `mapping/TimeFrame.md:36-37`
-— п. 5; `OkxPositionsHistoryResponse.md:69` — п. 14;
+— п. 5; `PositionsHistoryOkxResponse.md:69` — п. 14;
 `mapping/DealCashFlow.md:72` — «предусловие запуска»), адресуя их
 `docs/rules/pnl-reconciliation.md`, где **никакого реестра нет**: заголовки
 дока — Что сверяется / Допуск / Реакция / Разведочный режим / Связи (V20).

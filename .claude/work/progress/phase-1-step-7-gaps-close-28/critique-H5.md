@@ -25,7 +25,7 @@
 | прогон спек | `bash tools/spec-run.sh` | **20 спецификаций, 370 примеров, зелёный** |
 | падающая проба D-6 | `cp docs/spec/*.json target/probe-crit5/` + возврат четырёх предикатов на `resultProfit` + `SPEC_DIR=target/probe-crit5 bash tools/spec-run.sh` | **РАСХОЖДЕНИЙ: 14**, падают **все три** новых примера — сходится с §5 отчёта построчно |
 | проба по исполнимой форме Г1 | `riskBaseObserved` → `expr: "false"`, `riskBaseAfterObservation` → `riskBaseBefore` в `target/probe-crit5g/risk-limits.json` | **РАСХОЖДЕНИЙ: 3** — форма первого наблюдения примерами действительно зажата |
-| арифметика `priceResult` (независимо) | из `OkxPositionsHistoryResponse.md:18,23`: `realizedPnl = pnl + fee + fundingFee + liqPenalty`, `externalFundingCost = −fundingFee` ⇒ `priceResult = Σ(pnl + fee + liqPenalty)` | финансирование снимается **точно**; знак и направление сходятся с примерами |
+| арифметика `priceResult` (независимо) | из `PositionsHistoryOkxResponse.md:18,23`: `realizedPnl = pnl + fee + fundingFee + liqPenalty`, `externalFundingCost = −fundingFee` ⇒ `priceResult = Σ(pnl + fee + liqPenalty)` | финансирование снимается **точно**; знак и направление сходятся с примерами |
 | достижимость carry-примеров | `docs/rules/trading-constraints.md:12` — контур торгует `SWAP` (перпетуалы) | фандинг существует, короткая сторона в положительной ставке достижима — **пример стои́т на достижимом состоянии** |
 | форма — пять запретов | `git diff HEAD -- <4 файла периметра> \| grep '^+' \| grep -E 'DOCS_CHECK\|GAPS_CLOSE\|прежн.{0,3} редакц\|снят.{0,3} редакц\|решение держателя\|ратифиц\|\.claude/\|§«'` | **пусто** по всем четырём файлам |
 | вердикт `RISK-Q2` | `awk`-проверка §«Вердикт гейтинга — обязательное поле вопроса» | **пусто** — вердикт стои́т первым абзацем; дублей среди `RISK-Q1`/`PNL-Q1` нет |
@@ -80,7 +80,7 @@
 `docs/spec/risk-limits.json:29,106-118` (+4 примера). Приняты узлом Н3
 (`node-H3.md:690-700` §«Хвост закрытия — приём двух позиций от узла Н5»).
 Х2 и Х5 тоже приземлены, Х4 и Х7 приземлились **в ходе моей критики**
-(`Position.md:51`, `OkxPositionsHistoryResponse.md:23`,
+(`Position.md:51`, `PositionsHistoryOkxResponse.md:23`,
 `risk-policy.md:28-29`). Отсюда: деление на периметр сработало —
 но **отчёт узла разошёлся с корпусом** (замечание K6).
 
@@ -227,7 +227,7 @@ EOF
 | Х1 | `docs/rules/risk-policy.md:161` (строка таблицы), `:165-172` (клауза) |
 | Х2 | `docs/models/domain/core/BalanceContainer.md:20-24` |
 | Х3 | `docs/spec/risk-limits.json:29,106-118` + 4 примера (проба даёт 3 расхождения) |
-| Х4 | `docs/models/domain/core/Position.md:51`, `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:23` |
+| Х4 | `docs/models/domain/core/Position.md:51`, `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:23` |
 | Х5 | `.claude/work/backlog.md:1050-1058,1059-1064` |
 | Х7 | `docs/rules/risk-policy.md:28-29` |
 
@@ -263,7 +263,7 @@ EOF
 
 `docs/rules/loss-streak-halt.md:22-27` определяет величину как «итог
 сделки **без** накопленного финансирования». Развернув через источник
-(`OkxPositionsHistoryResponse.md:18` — `realizedPnl = pnl + fee +
+(`PositionsHistoryOkxResponse.md:18` — `realizedPnl = pnl + fee +
 fundingFee + liqPenalty`; `:23` — `externalFundingCost = −fundingFee`),
 получаем `priceResult = Σ(pnl + fee + liqPenalty)`, то есть в число
 входит **штраф ликвидации**. Довод дома опирается на определение риска

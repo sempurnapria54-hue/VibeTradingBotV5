@@ -29,6 +29,13 @@ PROFIT/LOSS_PERCENTS_REACHED -> Position.avgPrice + MarketPriceData
 сам `TREND_CHANGED` (темпоральное несовместимо со stateless-классификатором
 — см. `docs/models/domain/aggregate/Strategy.md`).
 
+**Оба предиката фазы определены, и определены не здесь.** Форма —
+`docs/spec/market-phase-condition.json`, дом смысла —
+`docs/models/domain/other/MarketPhase.md`. Темпоральный операнд `TREND_CHANGED` берётся у
+**сделки** (`Deal.entryMarketPhase`), а не у истории фазы: истории у фазы
+нет по построению, и именно поэтому предикат прежде не имел определения
+ни в одном носителе.
+
 ## Границы
 
 Freshness нужных данных проверяется до evaluator'а

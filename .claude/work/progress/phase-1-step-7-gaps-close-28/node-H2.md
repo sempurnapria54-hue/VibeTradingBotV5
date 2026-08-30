@@ -308,7 +308,7 @@ B оказывается тем же, что у A (правка клаузы), �
 | `docs/components/MarkDealClosedExecutor.md` | **правлен** — дописано «условия по факту входа у валюты нет» |
 | `docs/spec/deal-lifecycle.json` `cleanTerminalContract` | согласован — пермиссивность к нерезолвимости остаётся точной |
 | `docs/models/domain/aggregate/Deal.md` (поле и «один авторитет») | вне периметра; **не требует правки** — вариант выбран так, чтобы этот дом стал верным без правки |
-| `docs/models/domain/core/Instrument.md`, `Position.md`, `mapping/PositionCloseResult.md`, `mapping/Instrument.md`, `models/integrations/okx/OkxPositionsHistoryResponse.md` | согласованы — все говорят «авторитет — расчётная валюта, биржевая — проверяемый признак»; условия по факту входа не несут |
+| `docs/models/domain/core/Instrument.md`, `Position.md`, `mapping/PositionCloseResult.md`, `mapping/Instrument.md`, `models/integrations/okx/PositionsHistoryOkxResponse.md` | согласованы — все говорят «авторитет — расчётная валюта, биржевая — проверяемый признак»; условия по факту входа не несут |
 | `docs/processes/deal-management.md` | согласован — «валюта пишется, только если резолвится» остаётся верным на всех тропах |
 | `docs/rules/deal-without-operations.md` | согласован — ссылается на форму, форму не пересказывает |
 | `.claude/work/backlog.md` §CODE-дельта «валюта результата» | согласован — инструкция уже безусловна («пишется из расчётной валюты инструмента») |

@@ -97,10 +97,10 @@ evidence-cycle (специфика per-source — см. подразделы). �
 
 ## OKX
 
-### `OkxOrderResponse` → `OrderExternalSnapshot`
+### `OrderOkxResponse` → `OrderExternalSnapshot`
 
 См. инвентарь полей нативной модели —
-`docs/models/integrations/okx/OkxOrderResponse.md`.
+`docs/models/integrations/okx/OrderOkxResponse.md`.
 
 | OKX field | Snapshot field |
 |---|---|
@@ -122,7 +122,7 @@ evidence-cycle (специфика per-source — см. подразделы). �
 | `slTriggerPx` | `stopLossTriggerPrice` |
 | `reduceOnly` | **не маппится** — только invariant validation в adapter (см. правила OKX) |
 
-### `OkxOrderResponse.attachAlgoOrds[*]` → `AttachedAlgoOrderExternalSnapshot`
+### `OrderOkxResponse.attachAlgoOrds[*]` → `AttachedAlgoOrderExternalSnapshot`
 
 | OKX field | Snapshot field | Комментарий |
 |---|---|---|
@@ -173,7 +173,7 @@ cost-price SL для split). `tpTriggerPx` vs `tpTriggerRatio` —
 (`reqId`/`cxlOnFail`/`pxAmendType`/`attachAlgoOrds[*]` с
 `new*`-полями) остаются описанными в контракте поверхности
 (`docs/integrations/okx/contracts/order.md`,
-`OkxOrderResponse.md`), в request-mapping домена не входят.
+`OrderOkxResponse.md`), в request-mapping домена не входят.
 Ремодел attached protection: до fill родителя — REPLACE
 родительского ордера вместе с attach-настройками; после fill
 attached материализуется в standalone algo —
@@ -200,7 +200,7 @@ write-once для причины закрытия —
 `MISSING_AFTER_REFRESH` выносит он же — см.
 `docs/rules/command-lifecycle.md`). Order-fill-метрики
 (`accFillSz` → `accumulatedFillSize`, `avgPx` → `averagePrice`, `fee`)
-приходят готовыми из того же `OkxOrderResponse` — отдельной fill-команды нет.
+приходят готовыми из того же `OrderOkxResponse` — отдельной fill-команды нет.
 Доп. факты сделки (`REFRESH_POSITION_COMMAND`) запрашиваются отдельной командой;
 `RefreshOrderExecutor` не сопровождает сделку целиком.
 

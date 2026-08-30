@@ -167,7 +167,7 @@
 | `controlled-exchange-exceptions.md:15` — три причины | **не требует правки**: это дом перечня, он полон и согласован со спекой; теперь на него ссылается дом смысла |
 | `AlgoOrder.md:66-69` — `CloseReason` условной заявки содержит обе причины | **не требует правки**: подтверждает принадлежность причин алго-перечню |
 | `Order.md:99-102` — `CloseReason` обычной заявки их не содержит | **не требует правки**: подтверждает недостижимость; расширять перечень (вариант C линзы) отвергнуто — причины алго-специфичны по существу |
-| `AlgoOrderExternalStatusResolver.md:27-28` — обе причины привязаны к условной заявке | **не требует правки**: согласован; подтверждён внешним грунтом (`docs/models/integrations/okx/OkxAlgoOrderResponse.md:17` — `order_failed`/`partially_failed` суть значения `state` **алго**-заявки) |
+| `AlgoOrderExternalStatusResolver.md:27-28` — обе причины привязаны к условной заявке | **не требует правки**: согласован; подтверждён внешним грунтом (`docs/models/integrations/okx/AlgoOrderOkxResponse.md:17` — `order_failed`/`partially_failed` суть значения `state` **алго**-заявки) |
 
 **Половина, зависящая от развилки, не приземлена в спеку — но её посылка
 записана инвариантом в доме:** добавлена клауза «причина отказа обязана
@@ -535,7 +535,7 @@ plannedStopPrice)"`; из обоих файлов копии удалить, в 
 `closeReasonApplied = 'UNKNOWN_EXTERNAL_STATUS'`,
 `raisesExchangeStepTwo = true`. Грунт: `order_failed` / `partially_failed` —
 значения `state` **алго**-заявки источника
-(`docs/models/integrations/okx/OkxAlgoOrderResponse.md:17`), в перечне
+(`docs/models/integrations/okx/AlgoOrderOkxResponse.md:17`), в перечне
 `Order.CloseReason` их нет. Инвариант, по которому правка резолвится,
 записан в `docs/rules/external-status-resolution.md`.
 

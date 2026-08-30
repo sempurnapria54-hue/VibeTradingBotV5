@@ -68,7 +68,7 @@ persisted-модель `TradeFillsArchive`. Runtime фазы 1 fills не чит
 (`REQUESTED → ONGOING → FINISHED|FAILED`) + executor; (2) архив вне
 runtime (off-band tool для аудита); (3) отложить до явной
 потребности — де-факто действует. Контракт зафиксирован:
-`docs/models/integrations/okx/OkxFillsArchiveResponse.md`,
+`docs/models/integrations/okx/FillsArchiveOkxResponse.md`,
 `docs/integrations/okx/contracts/fills-archive.md`.
 
 ### OKX-Q4. WS-каналы OKX — отдельный заход
@@ -218,7 +218,7 @@ mapping-доков. До решения WS описаны короткими п�
 `docs/models/mapping/PositionCloseResult.md`,
 `docs/components/EntryScannerJob.md`,
 `docs/rules/instrument-hold.md`, `.claude/work/backlog.md`
-§«Искажение измеряемой ожидаемости».
+§«Искажение измеряемой ожидаемости: две оси × две стороны (торговый форвард-фокус; владелец — фаза ожидаемости).».
 
 ### ORCH-Q2. Порядок teardown у kill-switch против инварианта дочистки (владелец — `solution-designer`)
 

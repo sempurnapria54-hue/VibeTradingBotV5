@@ -105,7 +105,7 @@ write-once.
 `REPLACED_BY_STRATEGY`, `KILL_SWITCH`,
 `CONDITION_EXPIRED`, `MISSING_AFTER_REFRESH`, `UNKNOWN_EXTERNAL_STATUS`,
 `EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`. `MANUAL_CANCEL` снят —
-`docs/rules/manual-halt.md` §«Точечных ручек в фазе 1 нет».
+`docs/rules/manual-halt.md`.
 
 ## Персистентность
 

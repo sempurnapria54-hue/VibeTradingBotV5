@@ -9,7 +9,7 @@
 ### Mapping-flow
 
 ```text
-trade-fee REST -> raw OkxTradeFeeResponse -> IntegrationService validation
+trade-fee REST -> raw TradeFeeOkxResponse -> IntegrationService validation
   -> TradeFeeRateMapper -> TradeFeeRateExternalSnapshot (по одному на группу)
   -> InstrumentExternalRulesSyncJob -> TradeFeeRate (persist)
 ```
@@ -93,9 +93,9 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 
 ## OKX
 
-### `OkxTradeFeeResponse` → `TradeFeeRateExternalSnapshot`
+### `TradeFeeOkxResponse` → `TradeFeeRateExternalSnapshot`
 
-Инвентарь полей — `docs/models/integrations/okx/OkxTradeFeeResponse.md`.
+Инвентарь полей — `docs/models/integrations/okx/TradeFeeOkxResponse.md`.
 
 | OKX field | Snapshot field |
 |---|---|
@@ -181,7 +181,7 @@ enum-список групп («actual return values shall prevail»; списо
 ## Связи
 
 - Доменная модель — `docs/models/domain/other/TradeFeeRate.md`.
-- Native — `docs/models/integrations/okx/OkxTradeFeeResponse.md`.
+- Native — `docs/models/integrations/okx/TradeFeeOkxResponse.md`.
 - Контракт — `docs/integrations/okx/contracts/trade-fee.md`.
 - Ключ группы на инструменте —
   `docs/models/mapping/InstrumentExternalRules.md`.

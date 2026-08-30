@@ -207,7 +207,7 @@
 ### Н4-9. Пять хенд-оффов не приземлены никем волны. **Гейтит: да** (это гейт самого узла)
 
 Проверено на месте: `docs/rules/trading-constraints.md:90` (Х1),
-`docs/models/integrations/okx/OkxAccountBillResponse.md:36-42` (Х2),
+`docs/models/integrations/okx/AccountBillOkxResponse.md:36-42` (Х2),
 `docs/components/MarkDealEmergencyClosedExecutor.md:25` (Х4),
 `.claude/tests/source-api/okx/plan.md:1864` (Х5) — формулировки на
 месте; Х3 разобран Н5. Ни один узел волны их не принял.

@@ -97,9 +97,9 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 
 ## OKX
 
-### `OkxPositionResponse` → `PositionExternalSnapshot`
+### `PositionOkxResponse` → `PositionExternalSnapshot`
 
-См. инвентарь — `docs/models/integrations/okx/OkxPositionResponse.md`.
+См. инвентарь — `docs/models/integrations/okx/PositionOkxResponse.md`.
 
 | OKX field | Snapshot field |
 |---|---|

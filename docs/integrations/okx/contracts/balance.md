@@ -58,5 +58,5 @@
 ```
 
 `data` содержит ровно один account snapshot. Поля и список не
-маппимых — в `docs/models/integrations/okx/OkxBalanceResponse.md`.
+маппимых — в `docs/models/integrations/okx/BalanceOkxResponse.md`.
 Validation — в `docs/models/mapping/Balance.md`.

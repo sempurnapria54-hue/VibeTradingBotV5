@@ -6,11 +6,11 @@ import lombok.Setter;
 /**
  * Сырой элемент OKX trade fills (GET /trade/fills, /trade/fills-history).
  * За adapter не выходит; нормализуется в FillExternalSnapshot. См.
- * docs/models/integrations/okx/OkxFillResponse.md.
+ * docs/models/integrations/okx/FillOkxResponse.md.
  */
 @Getter
 @Setter
-public class OkxFillResponse {
+public class FillOkxResponse {
 
     /** Инструмент. */
     private String instId;

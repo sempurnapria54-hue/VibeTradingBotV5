@@ -1,7 +1,7 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.core.fill.external_snapshot.FillExternalSnapshot;
-import com.example.tradingbot.integration.model.okx.response.OkxFillResponse;
+import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
@@ -9,7 +9,7 @@ import org.mapstruct.ReportingPolicy;
 /**
  * Маппинг OKX fill response → FillExternalSnapshot. Числовые поля
  * парсятся, ts → Instant через {@link OkxResponseConverter}. См.
- * docs/models/integrations/okx/OkxFillResponse.md,
+ * docs/models/integrations/okx/FillOkxResponse.md,
  * docs/models/mapping/TradeFill.md.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
@@ -24,5 +24,5 @@ public interface FillMapper {
     @Mapping(target = "fillSize", source = "fillSz")
     @Mapping(target = "feeCurrency", source = "feeCcy")
     @Mapping(target = "timestamp", source = "ts")
-    FillExternalSnapshot integrationToSnapshot(OkxFillResponse response);
+    FillExternalSnapshot integrationToSnapshot(FillOkxResponse response);
 }

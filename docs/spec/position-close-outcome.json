@@ -40,7 +40,7 @@
     },
     {
       "name": "closeOutcome",
-      "note": "Исход сделки по старшинству LIQUIDATION > FORCED_REDUCTION > UNDETERMINED > NORMAL_EXIT. Неизвестное выше штатного намеренно: обратный порядок скрывал бы ликвидацию соседнего эпизода за NORMAL_EXIT — благоприятное умолчание, запрещённое docs/concept.md §П1. Вошедшая сделка без единого эпизода даёт UNDETERMINED: утверждать штатный выход не из чего. Не входившая признака не получает вовсе — пусто означает «признак неприменим».",
+      "note": "Исход сделки по старшинству LIQUIDATION > FORCED_REDUCTION > UNDETERMINED > NORMAL_EXIT. Неизвестное выше штатного намеренно: обратный порядок скрывал бы ликвидацию соседнего эпизода за NORMAL_EXIT — благоприятное умолчание, запрещённое docs/concept.md Вошедшая сделка без единого эпизода даёт UNDETERMINED: утверждать штатный выход не из чего. Не входившая признака не получает вовсе — пусто означает «признак неприменим».",
       "expr": "if(!hadEntry, null, if(!graphComplete, 'UNDETERMINED', if(anyLiquidation, 'LIQUIDATION', if(anyForcedReduction, 'FORCED_REDUCTION', if(anyUndetermined || episodeCount == 0, 'UNDETERMINED', 'NORMAL_EXIT')))))"
     },
     {

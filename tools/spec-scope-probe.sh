@@ -55,7 +55,17 @@ probe "2. разрыв у собственной величины (дом не �
 probe "3. операнд-указатель признаётся тропой резолва" \
   'perl -0ni -e "s/^ *\"hasLiveEpisode\": \"[^\"]*\",\n//m; print" '"$DIR"'/stop-distance.json'
 
-probe "4. класс B: подмена дома гостевым состоянием"   'perl -0pi -e "s/\"includes\": \[\"risk-at-stop\", \"stop-distance\", \"protection-coverage\", \"order-lifecycle\"\]/\"includes\": [\"risk-at-stop\", \"stop-distance\"]/" '"$DIR"'/strategy-reference.json'
+# Мутация делается на уровне JSON, а не текста: текстовый якорь ломался от
+# любой переформатировки файла, и проба зеленела молча — то есть переставала
+# доказывать ось, ничего об этом не сообщая.
+probe "4. класс B: подмена дома гостевым состоянием" \
+  '"${PY[@]}" -c "
+import json, io
+p = \"'"$DIR"'/strategy-reference.json\"
+spec = json.load(io.open(p, encoding=\"utf-8\"))
+spec[\"includes\"] = [i for i in spec[\"includes\"] if i not in (\"protection-coverage\", \"order-lifecycle\")]
+json.dump(spec, io.open(p, \"w\", encoding=\"utf-8\"), ensure_ascii=False, indent=1)
+"'
 
 probe "C1. объявленное исключение снято — совпадение выражений снова находка" \
   'perl -0pi -e "s/\n *\"independentFrom\": \"[^\"]*\",\n *\"independentReason\": \"[^\"]*\",//g" '"$DIR"'/order-lifecycle.json'

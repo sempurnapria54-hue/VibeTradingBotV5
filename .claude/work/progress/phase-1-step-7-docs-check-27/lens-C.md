@@ -19,8 +19,8 @@
   `ServiceCommand`.
 - `docs/models/mapping/` — `DealCashFlow`, `PositionCloseResult`,
   `Instrument`, `Order` (точечно).
-- `docs/models/integrations/okx/` — `OkxAccountBillResponse`,
-  `OkxPositionsHistoryResponse`, `OkxFillResponse`.
+- `docs/models/integrations/okx/` — `AccountBillOkxResponse`,
+  `PositionsHistoryOkxResponse`, `FillOkxResponse`.
 - `docs/integrations/okx/contracts/` — `account-bills`, `position`,
   `server-time`, `trade-fee` (точечно); `integrations/okx/rules/` —
   точечно.
@@ -349,7 +349,7 @@ pnl`, «комиссия движения в разности сверки»), �
   `leftTradeFee`, `leftFunding`, `leftLiquidationPenalty` — все
   `of: "amount"`; `externalFee` строк разбивки в спеке не встречается ни
   разу (есть только `episodes[].externalFee` — правый операнд).
-- `docs/models/integrations/okx/OkxAccountBillResponse.md:36-42` —
+- `docs/models/integrations/okx/AccountBillOkxResponse.md:36-42` —
   «суперсет безопасен для **суммы-сверки** … и **realized-слагаемого**
   (`balChg − fee`)»; «Для **суммы комиссии** (Σ`externalFee`)
   гранулярность-независимости нет».
@@ -367,7 +367,7 @@ pnl`, «комиссия движения в разности сверки»), �
   исключение адресует несуществующее выражение.
 - `docs/models/domain/other/DealCashFlow.md:25` — «`externalFee` …
   Отвечает на вопрос «сколько комиссии»» (потребитель не назван).
-- Достижимость несущего примера: `OkxAccountBillResponse.md:37-39` — «при
+- Достижимость несущего примера: `AccountBillOkxResponse.md:37-39` — «при
   **комбинированном** trade-bill (`balChg = pnl + fee` одной записью) без
   `fee` комиссионная компонента не извлекается вовсе»; тогда
   `leftRealizedPnl = pnl + fee` против `rightRealizedPnl = pnl` и
@@ -388,7 +388,7 @@ pnl`, «комиссия движения в разности сверки»), �
 из `fee`) и не имеет читателя. Грепом по `docs/` (`externalFee`) собраны
 все носители; открыты `pnl-reconciliation.json` (все четыре левые
 стороны), `mapping/DealCashFlow.md` (цель битой ссылки из `trade-fee.md`),
-`absent-value-semantics.md` (исключение), `OkxAccountBillResponse.md`
+`absent-value-semantics.md` (исключение), `AccountBillOkxResponse.md`
 (довод, ради которого поле в used). Сработал детектор «X верно по
 существу, чинится Y»: соблазн объявить правой спеку и вычеркнуть три дока
 — но правой может оказаться и обратная сторона, поэтому выписаны обе.
@@ -398,7 +398,7 @@ pnl`, «комиссия движения в разности сверки»), �
 | Вариант | Что делает | Названная цена |
 |---|---|---|
 | (а) спека права: левые стороны — суммы `amount`; `externalFee` из модели удаляется, `fee` уходит в unused | минимальный след, поле без потребителя не заводится | ломается при комбинированной гранулярности: систематический `MISMATCHED` на всей популяции, причём **не** обнаружится до боевого прогона — в разведочном режиме расхождение лестницу не триггерит (`rules/pnl-reconciliation.md:98-101`) |
-| (б) доки правы: `leftRealizedPnl = Σ(amount − externalFee)` по `REALIZED_PNL`, `leftTradeFee = Σ externalFee` по экономическим категориям | гранулярность-независимая композиция: раздельная и комбинированная запись дают один результат | нужен разбор пустоты `externalFee` в обоих выражениях (то самое висящее исключение); что несёт `fee` на самостоятельной fee-записи — **непроверенная посылка**, помеченная рантайм-вопросом в `OkxAccountBillResponse.md:42-45` |
+| (б) доки правы: `leftRealizedPnl = Σ(amount − externalFee)` по `REALIZED_PNL`, `leftTradeFee = Σ externalFee` по экономическим категориям | гранулярность-независимая композиция: раздельная и комбинированная запись дают один результат | нужен разбор пустоты `externalFee` в обоих выражениях (то самое висящее исключение); что несёт `fee` на самостоятельной fee-записи — **непроверенная посылка**, помеченная рантайм-вопросом в `AccountBillOkxResponse.md:42-45` |
 | (в) композиция ветвится по наблюдённой гранулярности | верна при любом исходе прогона | две редакции одной формулы в одной спеке + признак гранулярности как настройка биржи (след: § правила + настройка) |
 
 **Крен:** (б) с явной пометкой непроверенной посылки — она
@@ -438,7 +438,7 @@ fee-записи — рантайм-факт источника) + `работа
 - `docs/spec/deal-result.json:27-30` — `netSum` суммирует
   `externalRealizedProfit` по эпизодам ⇒ посылка «одна финализированная
   запись на эпизод» несущая для числа.
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md:19` —
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md:19` —
   «`realizedPnl` … готовый net … посчитан биржей» (та же посылка).
 - `docs/components/RefreshPositionExecutor.md:20-28` — нога 2 берёт по
   каждой закрытой строке эпизода одну запись; послайсовая запись сломала
@@ -700,16 +700,16 @@ Query — отрицательная посылка верифицирована
 **Вопрос.** Перечень «не используется» собран из части полей; поля,
 названные тем же корпусом в контракте, не попали ни в used, ни в unused.
 
-**Цитаты.** `docs/models/integrations/okx/OkxAccountBillResponse.md:47-56`
+**Цитаты.** `docs/models/integrations/okx/AccountBillOkxResponse.md:47-56`
 — unused: `bal`, `pnl`, `sz`, `posBalChg`, `posBal`, `from`, `to`,
 `notes`; против —
 `docs/integrations/okx/contracts/account-bills.md:109-113` — состав колонок
 записи включает также `instType`, `px`, `mgnMode`, `execType`, `interest`,
 `tag`, `fillTime`, `tradeId`, `clOrdId` и `fill*`-поля. Док объявляет
-перечень открытым (`OkxAccountBillResponse.md:15-17`), но это не покрывает
+перечень открытым (`AccountBillOkxResponse.md:15-17`), но это не покрывает
 поля, уже названные соседним носителем корпуса.
 
-**Целевой док.** `docs/models/integrations/okx/OkxAccountBillResponse.md`
+**Целевой док.** `docs/models/integrations/okx/AccountBillOkxResponse.md`
 §«Не используется».
 
 **Ожидаемый владелец.** `integrator`.
@@ -736,7 +736,7 @@ Query — отрицательная посылка верифицирована
 недостижимой объявленную рядом ветку реакции.
 
 **Цитаты.**
-`docs/models/integrations/okx/OkxPositionsHistoryResponse.md:55-59` —
+`docs/models/integrations/okx/PositionsHistoryOkxResponse.md:55-59` —
 «**несобытийное** … `pnl`, `fee`, `fundingFee`, `liqPenalty` | **`ZERO`**»;
 `:61-68` — «Конвенция применяется **до** проверки обязательности контракта
 записи … контракт требует, чтобы эти четыре поля были заполнены …
@@ -748,7 +748,7 @@ Query — отрицательная посылка верифицирована
 **такой же записи здесь**».
 
 **Целевой док.** `docs/rules/absent-value-semantics.md` §«Названные
-исключения» (регистрация) + `OkxPositionsHistoryResponse.md` (снять
+исключения» (регистрация) + `PositionsHistoryOkxResponse.md` (снять
 недостижимую формулировку ветки).
 
 **Ожидаемый владелец.** `solution-designer` (дом правила); источниковая

@@ -13,8 +13,8 @@
 `docs/spec/deal-context-load.json` (величины полноты),
 `docs/spec/external-status-resolution.json`,
 `docs/spec/loss-streak-halt.json`;
-`docs/models/integrations/okx/OkxPositionsHistoryResponse.md`,
-`OkxAccountBillResponse.md`, `OkxPositionResponse.md`;
+`docs/models/integrations/okx/PositionsHistoryOkxResponse.md`,
+`AccountBillOkxResponse.md`, `PositionOkxResponse.md`;
 `docs/integrations/okx/contracts/position.md`, `account-bills.md`;
 `docs/models/domain/core/Position.md`, `Order.md` (§Енумы),
 `AlgoOrder.md` (§Енумы), `docs/models/domain/other/AnomalyReport.md`,
@@ -208,10 +208,10 @@ scope не затрагивает.
   доменное значение, нормализованное в слое интеграции`), `:36`
   (нормализация числовых и временных), `:39-52` (§«Знак финансирования
   нормализуется здесь, и только здесь»), §«Резолв направления».
-- `docs/models/integrations/okx/OkxPositionsHistoryResponse.md`, строка
+- `docs/models/integrations/okx/PositionsHistoryOkxResponse.md`, строка
   `direction` — «**Резолв сырого значения в доменный `Position.Direction`
   — в слое интеграции**, снапшот несёт уже доменное значение».
-- `docs/models/mapping/Position.md` §«`OkxPositionResponse` →
+- `docs/models/mapping/Position.md` §«`PositionOkxResponse` →
   `PositionExternalSnapshot`» — `pos` → `abs(pos)` → `externalSize`; знак
   → `direction`.
 - `src/main/java/.../position/external_snapshot/PositionExternalSnapshot.java:23-27`
@@ -239,7 +239,7 @@ scope не затрагивает.
 `*ExternalSnapshot`-классов и посмотрев типы полей у четырёх — трёх
 сырых и одного с доменным енумом. Затем проверил, не является ли
 `PositionExternalSnapshot` дефектом кода: `docs/models/mapping/Position.md`
-и `OkxPositionsHistoryResponse.md` предписывают ровно то, что в коде, и
+и `PositionsHistoryOkxResponse.md` предписывают ровно то, что в коде, и
 довод у них счётный (тихий отказ материализации без направления).
 
 **Варианты.**
@@ -304,7 +304,7 @@ scope не затрагивает.
   (последний абзац) — оба исполнителя гоняют контроль безусловно.
 - `docs/models/domain/core/Position.md:46`,
   `docs/models/mapping/PositionCloseResult.md:24`,
-  `docs/models/integrations/okx/OkxPositionsHistoryResponse.md` (строка
+  `docs/models/integrations/okx/PositionsHistoryOkxResponse.md` (строка
   `ccy`) — указатели на дом; ветки не несут (и не должны).
 - Дом правила о пустоте: `docs/rules/absent-value-semantics.md`
   §«Благоприятное умолчание запрещено», §Применение.
@@ -626,9 +626,9 @@ bills — встречную; у positions-history встречной пары �
 **Цитаты.** `docs/integrations/okx/contracts/position.md` §«Внешний
 источник правды» (дата и охват сверки), §«История закрытых позиций»
 (перечень P&L-полей и цен/объёмов), §«Перечни значений полей элемента»;
-`docs/models/integrations/okx/OkxPositionsHistoryResponse.md` §Используемые
+`docs/models/integrations/okx/PositionsHistoryOkxResponse.md` §Используемые
 (13 полей); контрпример полноты —
-`docs/models/integrations/okx/OkxAccountBillResponse.md` §«Полнота списка
+`docs/models/integrations/okx/AccountBillOkxResponse.md` §«Полнота списка
 сверена…» и `docs/integrations/okx/contracts/account-bills.md`
 («Каждое поле этого перечня классифицировано инвентарём…»).
 

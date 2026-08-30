@@ -104,10 +104,10 @@ reduceOnly == AlgoOrder.positionReducingOnly (если источник верн
 
 ## OKX
 
-### `OkxAlgoOrderResponse` → `AlgoOrderExternalSnapshot`
+### `AlgoOrderOkxResponse` → `AlgoOrderExternalSnapshot`
 
 См. инвентарь нативных полей —
-`docs/models/integrations/okx/OkxAlgoOrderResponse.md`.
+`docs/models/integrations/okx/AlgoOrderOkxResponse.md`.
 
 | OKX field | Snapshot field |
 |---|---|

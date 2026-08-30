@@ -45,7 +45,7 @@
 | `docs/models/mapping/PositionCloseResult.md` — «готовый net» и тождество источника с финансированием | **Не требует правки** — маппинг подтверждает посылку разведения (финансирование входит в net и приходит той же записью закрытия), сам меняться не обязан |
 | `docs/models/domain/core/Position.md` — `externalFundingCost`, потребитель «де-микширование R-мультипликатора» | **Приземлено по хенд-оффу Х4:** указатель перенацелен на `docs/rules/loss-streak-halt.md` — операция описана, дом появился |
 | `docs/rules/risk-policy.md` — финансирование вне определения риска | **Не требует правки** — именно эта клауза служит посылкой разведения; она не снимается, а получает второго потребителя |
-| `docs/models/integrations/okx/OkxPositionsHistoryResponse.md` — висящий указатель на де-микширование | **Приземлено по хенд-оффу Х4** (тот же текст) |
+| `docs/models/integrations/okx/PositionsHistoryOkxResponse.md` — висящий указатель на де-микширование | **Приземлено по хенд-оффу Х4** (тот же текст) |
 
 ---
 
@@ -220,7 +220,7 @@ grep -rn "externalFundingCost\|де-микшир\|фандинг\|финанси
 | Файл | Исход |
 |---|---|
 | `docs/models/domain/core/Position.md` | **согласован** — указатель «де-микширование R-мультипликатора» перенацелен на дом ценового результата (хенд-офф Х4 приземлён) |
-| `docs/models/integrations/okx/OkxPositionsHistoryResponse.md` | **согласован** — тот же указатель перенацелен (Х4) |
+| `docs/models/integrations/okx/PositionsHistoryOkxResponse.md` | **согласован** — тот же указатель перенацелен (Х4) |
 | `docs/models/mapping/PositionCloseResult.md` | **согласован** — нормализация знака и состав записи закрытия не менялись; именно на них стои́т арифметика `priceResult` |
 | `docs/spec/pnl-reconciliation.json`, `docs/rules/pnl-reconciliation.md` | **согласованы** — третья пара сверки читает то же поле в **сырой** знаковой конвенции и предметом не пересекается: сверка сравнивает разбивку с записью закрытия, счётчик меряет исход |
 | `docs/models/domain/other/DealCashFlow.md`, `docs/models/mapping/DealCashFlow.md` | **согласованы** — `FUNDING`-строки разбивки сверяют то же число и в ценовой результат не входят; клауза записана в операнде спеки, чтобы будущий читатель не сложил их вторым слагаемым |
@@ -233,7 +233,7 @@ grep -rn "externalFundingCost\|де-микшир\|фандинг\|финанси
 | §Структура доменной модели | `Exchange.riskBase` — правлен; `Position.externalFundingCost` — существует, правки не требует |
 | §Персистентность | **правок нет**: новых полей и колонок правка не вводит (`risk_base` уже nullable, `positions.external_funding_cost` уже заведена) |
 | schema-дельта шага | **правок нет** по той же причине; хенд-офф Х5 касается только текста CODE-инструкции |
-| состав `*ExternalSnapshot` и used/unused нативного инвентаря | `OkxBalanceResponse.availBal` — used, отражён; `OkxPositionsHistoryResponse.fundingFee` — used, отражён; правок нет |
+| состав `*ExternalSnapshot` и used/unused нативного инвентаря | `BalanceOkxResponse.availBal` — used, отражён; `PositionsHistoryOkxResponse.fundingFee` — used, отражён; правок нет |
 | mapping-таблицы (включая счёт цепочки) | `docs/models/mapping/Balance.md` (`details[*].availBal → externalAvailableBalance`) и `docs/models/mapping/PositionCloseResult.md` (`fundingFee → externalFundingCost`) — обе цепочки на месте, счёт не менялся |
 | инвентарь читателей у владельца данных | `BalanceContainer.md` §Назначение → хенд-офф Х2; `Position.md` → хенд-офф Х4 |
 
@@ -415,7 +415,7 @@ SPEC_DIR=target/probe-h5b bash tools/spec-run.sh
 | **Х1** | узел Н3, до закрытия своего прохода по `risk-policy.md` | клауза начального значения и строка таблицы писателей | `docs/rules/risk-policy.md` |
 | **Х2** | узел Н3, тем же проходом | §Назначение назвало второго актора-читателя остатка | `docs/models/domain/core/BalanceContainer.md` |
 | **Х3** | узел Н3, тем же проходом | величины первого наблюдения, признак ненаблюдения и четыре примера | `docs/spec/risk-limits.json` |
-| **Х4** | владелец моделей, до выхода из закрытия | указатель «де-микширование R-мультипликатора» перенацелен на дом ценового результата | `docs/models/domain/core/Position.md`, `docs/models/integrations/okx/OkxPositionsHistoryResponse.md` |
+| **Х4** | владелец моделей, до выхода из закрытия | указатель «де-микширование R-мультипликатора» перенацелен на дом ценового результата | `docs/models/domain/core/Position.md`, `docs/models/integrations/okx/PositionsHistoryOkxResponse.md` |
 | **Х5** | координатор, до перехода в `CODE` | CODE-инструкция получила писателя первого наблюдения и операнд счётчика | `.claude/work/backlog.md` |
 | **Х6** | **исполнен самим узлом хвостом критики** (первая редакция адресата не называла — см. §9) | четыре носителя приведены к дому, включая **оба компонент-дока писателей счётчика** | `docs/components/MarkDealClosedExecutor.md`, `docs/components/MarkDealEmergencyClosedExecutor.md`, `docs/components/HoldService.md`, `docs/rules/manual-halt.md` |
 | **Х7** | узел Н3 | у клаузы «финансирование вне определения риска» назван второй потребитель | `docs/rules/risk-policy.md` |

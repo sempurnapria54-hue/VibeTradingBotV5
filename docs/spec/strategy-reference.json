@@ -12,7 +12,7 @@
     "steps[].actions[].replacedCoverageFractionPercents": "доля ДЕЙСТВУЮЩЕГО покрытия, которую адресует это REPLACE- либо CANCEL-действие: объявленная доля его цели, резолвимой по targetActionKey (цепочка замещений — docs/rules/replace-not-amend.md). Цель защитой не является (снятие тейка) — покрытия действие не забирает, доля 0. Пусто — цель не разрешена; тогда действие считается адресующим ВСЁ покрытие: неизвестность не должна выводить шаг из-под проверки. Резолв по ключу — работа валидатора создания; в этой форме join по ключу невыразим, поэтому свойства цели приходят операндом",
     "details[].tranches[].levelCount": "сколько одновременно живых траншей объявляет эта запись; умолчания нет — пустое место мажорировалось бы единицей, то есть в разрешающую сторону",
     "steps[].actions[].allocationPercents": "объявленная доля базы под нотинал входного действия, проценты — операнд статической проверки запаса под катастрофическим потолком",
-    "notionalHeadroomShare": "доля катастрофического потолка, которая обязана остаться свободной после объявленного нотинала; величина риск-аппетита, дом — docs/rules/risk-policy.md §«Нотинал укладывается в потолок с запасом, а не в границу»",
+    "notionalHeadroomShare": "доля катастрофического потолка, которая обязана остаться свободной после объявленного нотинала; величина риск-аппетита, дом — docs/rules/risk-policy.md",
     "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — максимальный риск на сделку (конфигурация)",
     "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)"
   },
@@ -171,7 +171,7 @@
     },
     {
       "name": "notionalHeadroomSatisfied",
-      "note": "Объявленный нотинал детали укладывается в катастрофический потолок С ЗАПАСОМ, а не в равенство. Довод и число запаса — дом docs/rules/risk-policy.md §«Нотинал укладывается в потолок с запасом, а не в границу»: на границе запас округления нулевой, и проскок исполнения в считаные базисные пункты БЕССРОЧНО блокирует сопровождение — преконтроль отвергает всякое новое risk-creating действие сделки, а снять это состояние нечем, кроме выхода. Реджект создания — STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT.",
+      "note": "Объявленный нотинал детали укладывается в катастрофический потолок С ЗАПАСОМ, а не в равенство. Довод и число запаса — дом docs/rules/risk-policy.md: на границе запас округления нулевой, и проскок исполнения в считаные базисные пункты БЕССРОЧНО блокирует сопровождение — преконтроль отвергает всякое новое risk-creating действие сделки, а снять это состояние нечем, кроме выхода. Реджект создания — STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT.",
       "expr": "detailDeclaredNotionalShare <= ceilingShareOfBase * (1 - notionalHeadroomShare)"
     },
     {
@@ -281,7 +281,8 @@
       "name": "allocationOutOfRange",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
-      "where": "notNull(?allocationPercents) && (allocationPercents < 0 || allocationPercents > 100)"
+      "where": "notNull(?allocationPercents) && (allocationPercents <= 0 || allocationPercents > 100)",
+      "note": "Доля аллокации вне допустимого диапазона (0, 100]. Ноль ВХОДИТ в нарушение: нулевая аллокация — вход, которому не выделено ничего, а размер входа есть min(по риску, по аллокации), поэтому объявленный уровень не вошёл бы НИКОГДА и молча. Прежняя граница (< 0) ноль пропускала; отвергала его только аннотация api-модели, то есть ограничение жило лишь в коде."
     },
     {
       "name": "actionStopCalculationType",
@@ -1516,6 +1517,70 @@
         "detailDeclaredNotionalShare": 1.0,
         "notionalHeadroomSatisfied": true
       }
+    },
+    {
+      "case": "нулевая доля аллокации — нарушение диапазона, а не законный край",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerTradePercent": 1.0,
+              "stepsByStatus": {
+                "OPEN": [
+                  {
+                    "stepType": "MAIN_PROTECTION"
+                  }
+                ]
+              },
+              "tranches": [
+                {
+                  "key": "t1",
+                  "stepsByStatus": {
+                    "OPEN": [
+                      {
+                        "stepType": "ENTRY",
+                        "actions": [
+                          {
+                            "actionKind": "ORDER",
+                            "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                            "actionType": "LEGACY_LEVEL_ACTION",
+                            "level": 1,
+                            "allocationPercents": 0
+                          },
+                          {
+                            "actionKind": "ORDER",
+                            "orderType": "ENTRY",
+                            "actionType": "CREATE_ACTION",
+                            "attachedProtection": {
+                              "stopLossSettings": {
+                                "calculationType": "BOGUS_CALCULATION"
+                              }
+                            }
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "STOP_LOSS",
+                            "stopLossSettings": {
+                              "calculationType": "BREAKEVEN",
+                              "distancePercents": 5.0
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "allocationOutOfRange": 1
+      },
+      "note": "Граница (0, 100] со стороны нуля. Прежняя редакция предиката (allocationPercents < 0) ноль пропускала, и ни один пример её не трогал: контрпример подавал 140, то есть только верхнюю сторону. Пример падает при возврате прежней границы и потому фальсифицирует нижнюю."
     }
   ]
 }

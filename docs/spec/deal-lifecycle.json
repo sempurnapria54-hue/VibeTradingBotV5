@@ -3,7 +3,6 @@
   "question": "Какие переходы статуса сделки допустимы",
   "home": "docs/lifecycles/Deal.md",
   "includes": ["protection-coverage", "order-lifecycle"],
-
   "operands": {
     "from": "текущий статус сделки",
     "to": "предполагаемый статус",
@@ -13,7 +12,7 @@
     "position.status": "Position.status — статус биржевой записи эпизода; вместе с нетто-размером образует предикат живого эпизода, дом которого — docs/spec/protection-coverage.json, величина hasLiveEpisode",
     "position.externalSize": "нетто-размер позиции по данным биржи; правая сторона сверки экспозиции",
     "graphComplete": "граф сделки предъявлен контекстом прохода целиком; значение берётся из дома-спеки docs/spec/deal-context-load.json, величина graphComplete — форма здесь не переписывается. Охрана СИММЕТРИЧНА охране результата (docs/spec/deal-result.json) и охране торгового исхода (docs/spec/position-close-outcome.json): агрегаты живого риска считаются по ЗАГРУЖЕННЫМ траншам, и на недогруженном графе «живых заявок нет» ложно молча — то есть риск объявляется доказанно отсутствующим по неполному перечню, а направление ошибки разрешающее",
-    "riskBenchmarkResolved": "знаменатель R определён — операнд признака отбора «доступность знаменателя» (docs/models/domain/aggregate/Deal.md §Енумы, RiskBenchmarkAvailability)",
+    "riskBenchmarkResolved": "знаменатель R определён — операнд признака отбора «доступность знаменателя» (docs/models/domain/aggregate/Deal.md, RiskBenchmarkAvailability)",
     "resultProfit": "число результата сделки; пусто — неисчислимо",
     "resultProfitCurrency": "валюта результата; пусто — не резолвилась",
     "resultAvailable": "итог сделки доступен к расчёту НА ЭТОМ ПРОХОДЕ — операнд контракта аварийного терминала, применимый к числу, которое пишет само это ребро (оно пишет его своей транзакцией, поэтому проход и момент записи здесь совпадают). Форма не переписывается, значение берётся из дома-спеки: docs/spec/deal-result.json, величина resultAvailable",
@@ -22,7 +21,6 @@
     "tranches[].followingTranchesGross": "Σ gross-экспозиций траншей, материализованных позже этого; операнд порядка правила сопоставления — дом docs/models/domain/aggregate/DealTranche.md",
     "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака — docs/rules/deal-without-operations.md (признак «операций по сделке не было» есть его отрицание); форма здесь не переписывается. Значение берётся из дома-спеки: hadEntry = positionObserved (docs/spec/deal-context-load.json)"
   },
-
   "values": [
     {
       "name": "isTerminal",
@@ -81,8 +79,8 @@
     },
     {
       "name": "benchmarkAvailabilityOnTerminal",
-      "note": "Какое значение доступности знаменателя пишет терминал на своём ребре. Разделяет не тропа и не терминал, а ФАКТ ВХОДА: входа не было — NOT_APPLICABLE, нормальная популяция; вход был — AVAILABLE либо MISSING по факту знаменателя, и MISSING есть аномалия с отчётом. Правило одно на оба терминала: сделка, не вошедшая вовсе и упавшая в ошибочное состояние, доходит до АВАРИЙНОГО терминала (из ERROR другого ребра нет) и обязана получить там NOT_APPLICABLE, а не MISSING. Писатели по тропам — docs/lifecycles/Deal.md §«Признаки отбора на рёбрах в терминал».",
-      "expr": "if(!hadEntry, 'NOT_APPLICABLE', if(riskBenchmarkResolved, 'AVAILABLE', 'MISSING'))"
+      "note": "Какое значение доступности знаменателя пишет терминал на своём ребре; ПУСТО означает «не пишет — значение уже стои́т». Первая ветвь и есть охрана от перезаписи: признаки отбора пишет финализация выхода ТОЙ ЖЕ ТРАНЗАКЦИЕЙ, что и число (docs/components/FinalizeDealExitExecutor.md), поэтому durable-факт resultProfitFinalized свидетельствует и о них: если число финализировано, четвёрка записана на ПОЛНОМ графе, и аварийный терминал, приходящий на усечённом, пересчитывать её не вправе. Прежняя редакция была тотальна и ветки «уже стои́т» не имела вовсе — терминал перезаписывал посчитанное, и направление ошибки было разрешающим. Разделяет остальные две ветви не тропа и не терминал, а ФАКТ ВХОДА: входа не было — NOT_APPLICABLE, нормальная популяция; вход был — AVAILABLE либо MISSING по факту знаменателя, и MISSING есть аномалия с отчётом. Правило одно на оба терминала: сделка, не вошедшая вовсе и упавшая в ошибочное состояние, доходит до АВАРИЙНОГО терминала (из ERROR другого ребра нет) и обязана получить там NOT_APPLICABLE, а не MISSING. Писатели по тропам — docs/lifecycles/Deal.md.",
+      "expr": "if(resultProfitFinalized, null, if(!hadEntry, 'NOT_APPLICABLE', if(riskBenchmarkResolved, 'AVAILABLE', 'MISSING')))"
     },
     {
       "name": "transitionAllowed",
@@ -90,7 +88,6 @@
       "expr": "edgeDeclared && (to != 'CLOSED' || (allTranchesTerminal && riskProvenAbsent && cleanTerminalContract)) && (to != 'EMERGENCY_CLOSED' || (riskProvenAbsent && emergencyTerminalContract))"
     }
   ],
-
   "examples": [
     {
       "case": "сделка уходит в координированный выход из сопровождения",
@@ -971,7 +968,8 @@
         "hadEntry": false,
         "resultAvailable": true,
         "riskBenchmarkResolved": false,
-        "graphComplete": true
+        "graphComplete": true,
+        "resultProfitFinalized": false
       },
       "expect": {
         "riskProvenAbsent": true,
@@ -1014,7 +1012,8 @@
         "hadEntry": true,
         "resultAvailable": true,
         "riskBenchmarkResolved": false,
-        "graphComplete": true
+        "graphComplete": true,
+        "resultProfitFinalized": false
       },
       "expect": {
         "transitionAllowed": true,
@@ -1117,6 +1116,44 @@
       "expect": {
         "riskProvenAbsent": false,
         "transitionAllowed": false
+      }
+    },
+    {
+      "case": "аварийный терминал приходит на сделку с УЖЕ финализированным числом: признак отбора не пересчитывается",
+      "note": "Популяция третьего дизъюнкта emergencyTerminalContract. Признаки отбора записала финализация выхода на ПОЛНОМ графе; аварийный терминал приходит на усечённом, и знаменатель на нём не резолвится. Тотальная формула прежней редакции выдала бы MISSING и затёрла бы законное значение — пример падает при её возврате и потому фальсифицирует охрану, а не иллюстрирует её.",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "hadEntry": true,
+        "resultProfit": -30.0,
+        "resultProfitCurrency": "USDT",
+        "resultAvailable": false,
+        "resultProfitFinalized": true,
+        "riskBenchmarkResolved": false,
+        "graphComplete": false
+      },
+      "expect": {
+        "emergencyTerminalContract": true,
+        "benchmarkAvailabilityOnTerminal": null
+      }
+    },
+    {
+      "case": "аварийный терминал БЕЗ предшествующей финализации пишет признак сам — контрпример к охране",
+      "note": "Парный к предыдущему: охрана обязана пропускать ту популяцию, ради которой писатель на аварийной тропе и существует. Без этого примера ветвь «уже стои́т» могла бы стоять всегда, и терминал не писал бы признак НИКОГДА.",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "hadEntry": true,
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "resultAvailable": false,
+        "resultProfitFinalized": false,
+        "riskBenchmarkResolved": true,
+        "graphComplete": false
+      },
+      "expect": {
+        "emergencyTerminalContract": true,
+        "benchmarkAvailabilityOnTerminal": "AVAILABLE"
       }
     }
   ]

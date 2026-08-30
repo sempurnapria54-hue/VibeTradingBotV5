@@ -46,7 +46,9 @@ DealOrchestratorJob
   -> загружает DealContext (DealContextService) -> DealStateMachine
 
 DealStateMachine / handler сделки (DealActiveHandler, DealExitPendingHandler, ErrorHandler)
-  -> координация: прогон FSM каждого нетерминального транша,
+  -> координация: прогон FSM каждого нетерминального транша — у DealActiveHandler
+     и DealExitPendingHandler; ErrorHandler её не гоняет (дом ответа —
+     docs/processes/fsm-execution-layering.md),
      шаги уровня сделки (EXIT, FAIL_SAFE), сверка Σ экспозиций с нетто-размером
 
 DealTrancheStateMachine / handler транша
@@ -58,8 +60,7 @@ DealTrancheStateMachine / handler транша
   -> системная ветвь:
        SystemActionExecutor (REFRESH_DEAL_CONTEXT_ACTION / FINALIZE_DEAL_ENTRY_ACTION /
        FINALIZE_DEAL_EXIT_ACTION / FINALIZE_DEAL_ERROR_ACTION) -> звенья-команды;
-       перечень типов — место истины docs/models/domain/other/DealActionState.md
-       §Енумы, здесь он пересобирается из него; состав звена выводится из
+       перечень типов — место истины docs/models/domain/other/DealActionState.md, здесь он пересобирается из него; состав звена выводится из
        Deal.status (docs/components/SystemActionExecutor.md). Статусные рёбра,
        являющиеся исходом системного действия, пишет звено, а не handler
        (docs/processes/fsm-execution-layering.md)

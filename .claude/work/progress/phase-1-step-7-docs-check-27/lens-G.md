@@ -128,7 +128,7 @@
     `.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-strategy.md`
     (ссылка из живого дока в архив).
   - `docs/integrations/okx/contracts/position.md:90`,
-    `docs/models/integrations/okx/OkxAccountBillResponse.md:44`,
+    `docs/models/integrations/okx/AccountBillOkxResponse.md:44`,
     `docs/models/mapping/TradeFeeRate.md:167` →
     `.claude/tests/source-api/okx/plan.md`.
   - Запрет: `docs/concept.md:195-198` (П4).
@@ -161,7 +161,7 @@
     `## Уточнение пути (находка прогона 3)` плюс «Сторонний скелет
     указывал `GET /account/position-tiers`; … Манифестная пометка «путь к
     подтверждению» **снята**».
-  - `docs/models/integrations/okx/OkxAccountBillResponse.md:35-36` —
+  - `docs/models/integrations/okx/AccountBillOkxResponse.md:35-36` —
     «**Ранее** `fee` **отбрасывался** с доводом «знак несёт уже
     `balChg`» — верным **только** при…».
   - `docs/rules/risk-policy.md:165-171` — «**Почему записано именно
@@ -172,7 +172,7 @@
     чем знание было раньше»); `docs/concept.md:464`.
 - **Целевой док.** Правка трёх пассажей на месте.
 - **Ожидаемый владелец.** `knowledge-curator`; по
-  `OkxAccountBillResponse.md` и `position-tiers.md` — первым
+  `AccountBillOkxResponse.md` и `position-tiers.md` — первым
   `integrator` (владелец интеграционного знания источника по карте
   `question-delegation.md`): решение «что здесь остаётся фактом»
   касается полей источника.
@@ -183,11 +183,11 @@
 
   | Вариант | Что делает | Названная цена |
   |---|---|---|
-  | Переписать три пассажа действующим знанием («путь такой-то»; «`fee` в used, потому что при комбинированном bill компонента не извлекается»; клейм правила сформулировать сразу по стороне) | корпус приходит к `concept.md:509-518` | у `OkxAccountBillResponse.md` рядом лежит разбор гранулярности — при вырезании «Ранее…» его нельзя потерять: это знание, а не история |
+  | Переписать три пассажа действующим знанием («путь такой-то»; «`fee` в used, потому что при комбинированном bill компонента не извлекается»; клейм правила сформулировать сразу по стороне) | корпус приходит к `concept.md:509-518` | у `AccountBillOkxResponse.md` рядом лежит разбор гранулярности — при вырезании «Ранее…» его нельзя потерять: это знание, а не история |
   | Оставить как след: провенанс поля источника ценен | 0 правок | переоткрывает §«Опровержение правит на месте»; следующая ревизия добавит четвёртый слой |
   | Вынести провенанс в `docs/integrations/okx/rules/` отдельным носителем истории источника | 3 правки плюс новый файл | новый жанр в корпусе — больший след по шкале; и это ровно «реестр решений», который концепция отвергает (`concept.md:19-21`) |
 
-  **Крен — первый,** с оговоркой по `OkxAccountBillResponse.md`: тест
+  **Крен — первый,** с оговоркой по `AccountBillOkxResponse.md`: тест
   вычитанием (`concept.md:13-17`) оставляет разбор гранулярности и
   убирает «Ранее … отбрасывался».
 - **Ярлык исхода.** `варианты-с-креном`.
@@ -427,7 +427,7 @@
     «(`.claude/decisions/source-api-target-rebase.md`,).» — висящая
     запятая; `:28` и `:31` — ещё две ссылки в `.claude/`.
   - Тот же огрызок:
-    `docs/models/integrations/okx/OkxTickerResponse.md:23`.
+    `docs/models/integrations/okx/TickerOkxResponse.md:23`.
   - `docs/models/api/OkxRawApiRequest.md:31` — «Конвенции api-слоя —
     `.claude/rules/structure.md`»: в `structure.md` конвенций api-слоя
     нет, есть только строка типа («Слой-скаффолд»). Атрибуция проверена
@@ -435,7 +435,7 @@
   - Тип: `.claude/rules/structure.md`, строка `docs/models/api/`.
 - **Целевой док.** `docs/models/api/OkxRawApiRequest.md` (правка трёх
   ссылок и решение о размещении),
-  `docs/models/integrations/okx/OkxTickerResponse.md:23`.
+  `docs/models/integrations/okx/TickerOkxResponse.md:23`.
 - **Ожидаемый владелец.** `integrator` (модель поверхности источника);
   размещение — `knowledge-curator`.
 - **Трассировка.** `OkxRawApiRequest.md` прочитан целиком; открыт
@@ -561,7 +561,7 @@
 | H3 | Типы `docs/models/persistence/` и `docs/models/externalSnapshot/` зарегистрированы, каталогов нет; persistence-знание фактически живёт секциями `## Персистентность` внутри доменных доков — скаффолд, который может не понадобиться | `.claude/rules/structure.md:49`, `:53`; `docs/models/domain/**` §Персистентность |
 | H4 | `knowledge-tree.md:162` — «снапшоты v1–v82» при фактическом v93 в `.claude/snapshots/` (узел `:134` актуален) | `.claude/knowledge-tree.md:162` |
 | H5 | Каталог текущего прогона `.claude/work/progress/phase-1-step-7-docs-check-27/` в дереве не заведён (узел `progress/` — `knowledge-tree.md:151-157`); штатно для середины прогона, фиксируется как хвост курации при закрытии | `.claude/knowledge-tree.md:151-157` |
-| H6 | Огрызок ссылки — висящая запятая перед закрывающей скобкой, два носителя | `docs/models/api/OkxRawApiRequest.md:22`, `docs/models/integrations/okx/OkxTickerResponse.md:23` |
+| H6 | Огрызок ссылки — висящая запятая перед закрывающей скобкой, два носителя | `docs/models/api/OkxRawApiRequest.md:22`, `docs/models/integrations/okx/TickerOkxResponse.md:23` |
 | H7 | `.gitkeep` лежат в семи каталогах `docs/`, шесть из которых давно наполнены — остаток скаффолда | `docs/{components,components/models,dictionary,lifecycles,models,processes,rules}/.gitkeep` |
 | H8 | Пересказ политики вне дома в охвате линзы **не найден**: проверены кластеры «невозрастающая база» (дом `docs/rules/risk-policy.md`, у `Exchange.md:21` — строка-указатель) и «серия убытков» (дом `docs/rules/loss-streak-halt.md`, у `Exchange.md:23`, `:62`, `risk-policy.md:284` — указатели). `policy-home.md` в этой части исполнен | `docs/models/domain/core/Exchange.md:21`, `:23`, `:62`; `docs/rules/risk-policy.md:284` |
 | H9 | Процессная арматура в `docs/` — сводный счёт: 3 врезки решений (G-1), 1 заголовок с номером прогона (G-4), 5 ссылок в `work/**` и `tests/**` (G-3), 10 §-адресов (G-2). Ссылки `docs/ → .claude/{decisions,rules,processes,skills}` (26 штук) под находку не сведены: это указатели на устойчивые дома, а не на прогоны — но формулировка П4 их не разрешает, и это ближайший кандидат в следующий свип | `grep -rn '\.claude/' docs/` → 95 строк |

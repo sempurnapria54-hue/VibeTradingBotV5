@@ -36,7 +36,7 @@ epoch-millis-строка `ts` → `OffsetDateTime` UTC) и
 `snapshotToDomain(snapshot, Long instrumentId)` (snapshot + внутренний
 ID → доменный `MarketPriceData`).
 
-### `OkxTickerResponse` → snapshot
+### `TickerOkxResponse` → snapshot
 
 | OKX field | Snapshot field |
 |---|---|

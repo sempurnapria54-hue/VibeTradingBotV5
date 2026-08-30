@@ -16,7 +16,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class OkxBalanceDetailResponse {
+public class BalanceDetailOkxResponse {
 
     /** Валюта. */
     private String ccy;

@@ -105,7 +105,7 @@
   процесс — `.claude/skills/recognize-knowledge.md` +
   `.claude/skills/classify-type.md` (§«Компонент vs процесс»);
   проверка двухусловного критерия при размещении —
-  `.claude/skills/place-knowledge.md` (§«Кандидат в процесс»).
+  `.claude/skills/place-knowledge.md` (§«Кандидат в процесс: проверка материализации»).
 
 ## Обновление прогона: вынос `candle-loading` (шаг 1 Фазы 1, 2026-05-30)
 

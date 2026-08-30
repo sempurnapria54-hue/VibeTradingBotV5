@@ -80,9 +80,9 @@
   `docs/rules/error-handling-policy.md:56`,
   `docs/processes/market-data-calculation.md:15`,
   `docs/models/mapping/Order.md:31`, `docs/models/mapping/Candle.md:62`,
-  `docs/models/integrations/okx/OkxTradeFeeResponse.md:13`,
-  `docs/models/integrations/okx/OkxOrderResponse.md:35`,
-  `docs/models/integrations/okx/OkxBalanceResponse.md:45`,
+  `docs/models/integrations/okx/TradeFeeOkxResponse.md:13`,
+  `docs/models/integrations/okx/OrderOkxResponse.md:35`,
+  `docs/models/integrations/okx/BalanceOkxResponse.md:45`,
   `docs/models/domain/other/CandleGroup.md:26`,
   `docs/models/domain/aggregate/Strategy.md:100`,
   `docs/models/domain/aggregate/Deal.md:133`,
@@ -171,26 +171,26 @@ scope не касается.
   `PlaceOrderOkxRequest`, `CancelOrderOkxRequest`,
   `ClosePositionOkxRequest`, `PlaceAlgoOrderOkxRequest`,
   `CancelAlgoOrderOkxRequest`, `SetLeverageOkxRequest`/`Response`.
-- Код, сторона нарушения (6 классов): `OkxAlgoOrderResponse`,
-  `OkxBalanceResponse`, `OkxBalanceDetailResponse`, `OkxFillResponse`,
-  `OkxPositionResponse`, `OkxTickerResponse`.
+- Код, сторона нарушения (6 классов): `AlgoOrderOkxResponse`,
+  `BalanceOkxResponse`, `BalanceDetailOkxResponse`, `FillOkxResponse`,
+  `PositionOkxResponse`, `TickerOkxResponse`.
 - Доки инвентаря `docs/models/integrations/okx/` — 12 файлов, из них
-  **10** по нарушающей конвенции (`OkxAccountBillResponse.md`,
-  `OkxAlgoOrderResponse.md`, `OkxBalanceResponse.md`,
-  `OkxFillResponse.md`, `OkxFillsArchiveResponse.md`,
-  `OkxOrderResponse.md`, `OkxPositionResponse.md`,
-  `OkxPositionsHistoryResponse.md`, `OkxTickerResponse.md`,
-  `OkxTradeFeeResponse.md`) и **2** по правилу (`CandleOkxResponse.md`,
+  **10** по нарушающей конвенции (`AccountBillOkxResponse.md`,
+  `AlgoOrderOkxResponse.md`, `BalanceOkxResponse.md`,
+  `FillOkxResponse.md`, `FillsArchiveOkxResponse.md`,
+  `OrderOkxResponse.md`, `PositionOkxResponse.md`,
+  `PositionsHistoryOkxResponse.md`, `TickerOkxResponse.md`,
+  `TradeFeeOkxResponse.md`) и **2** по правилу (`CandleOkxResponse.md`,
   `InstrumentOkxResponse.md`).
-- `docs/models/integrations/okx/OkxOrderResponse.md:1` — «# OkxOrderResponse
-  (OKX ordinary order)». Класса `OkxOrderResponse` **не существует**;
+- `docs/models/integrations/okx/OrderOkxResponse.md:1` — «# OrderOkxResponse
+  (OKX ordinary order)». Класса `OrderOkxResponse` **не существует**;
   ordinary order в коде — `OrderOkxResponse.java`.
   `.claude/rules/structure.md:57` требует по этому типу «PascalCase
   (совпадает с DTO источника)» — не совпадает.
 - CODE-дельта шага 7 предписывает новые классы по нарушающей стороне:
-  `.claude/work/backlog.md:1411` (`OkxPositionsHistoryResponse`),
-  `.claude/work/backlog.md:1730` (`OkxTradeFeeResponse`); плюс инвентари
-  `OkxAccountBillResponse.md` и `OkxFillsArchiveResponse.md` без
+  `.claude/work/backlog.md:1411` (`PositionsHistoryOkxResponse`),
+  `.claude/work/backlog.md:1730` (`TradeFeeOkxResponse`); плюс инвентари
+  `AccountBillOkxResponse.md` и `FillsArchiveOkxResponse.md` без
   классов.
 
 **Верификация V3 (перечень существующего — по коду, не по обходу
@@ -212,7 +212,7 @@ owner-доков).** Кандидаты собраны
 
 **Целевой док.** `.claude/rules/codestyle.md` §«Нейминг по слоям» —
 строка приводится к исходу развилки. Второй адрес независимо от исхода
-— `docs/models/integrations/okx/OkxOrderResponse.md` (имя файла обязано
+— `docs/models/integrations/okx/OrderOkxResponse.md` (имя файла обязано
 совпасть с DTO).
 
 **Ожидаемый владелец.** `integrator` **первым** (нативные модели и поля
@@ -224,7 +224,7 @@ owner-доков).** Кандидаты собраны
 проверке «тип без файлов / файл без типа» → бросился в глаза раскол
 имён → `.claude/rules/structure.md:57` требует совпадения с DTO →
 сверил каждый док с `find src/main -name "<Имя>.java"` → нашёл, что
-`OkxOrderResponse.md` не имеет класса, а `OrderOkxResponse.java` не
+`OrderOkxResponse.md` не имеет класса, а `OrderOkxResponse.java` не
 имеет дока под своим именем → проверил дом конвенции в `codestyle.md`
 → проверил грепом, заводит ли шаг 7 новые классы этого слоя.
 

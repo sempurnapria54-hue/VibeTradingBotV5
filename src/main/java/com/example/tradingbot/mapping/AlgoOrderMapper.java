@@ -14,7 +14,7 @@ import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.Tri
 import com.example.tradingbot.integration.model.okx.request.CancelAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderAckOkxResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxAlgoOrderResponse;
+import com.example.tradingbot.integration.model.okx.response.AlgoOrderOkxResponse;
 import com.example.tradingbot.persistence.model.algoorder.AlgoOrderEntity;
 import com.example.tradingbot.util.Constants;
 import com.example.tradingbot.util.OkxParse;
@@ -54,7 +54,7 @@ public interface AlgoOrderMapper {
     void updateFromSnapshot(AlgoOrderExternalSnapshot snapshot, @MappingTarget AlgoOrder algoOrder);
 
     /** OKX algo response → snapshot: плоские OKX-поля → дерево condition. */
-    default AlgoOrderExternalSnapshot integrationToSnapshot(OkxAlgoOrderResponse response) {
+    default AlgoOrderExternalSnapshot integrationToSnapshot(AlgoOrderOkxResponse response) {
         if (isNull(response)) {
             return null;
         }
@@ -73,7 +73,7 @@ public interface AlgoOrderMapper {
                 .build();
     }
 
-    private ConditionExternalSnapshot toConditionSnapshot(OkxAlgoOrderResponse response) {
+    private ConditionExternalSnapshot toConditionSnapshot(AlgoOrderOkxResponse response) {
         return ConditionExternalSnapshot.builder()
                 .trigger(TriggerExternalSnapshot.builder()
                         .stopLoss(toTriggerPrice(response.getSlTriggerPxType(), response.getSlTriggerPx()))

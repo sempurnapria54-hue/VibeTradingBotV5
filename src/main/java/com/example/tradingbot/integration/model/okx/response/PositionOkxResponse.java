@@ -17,7 +17,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class OkxPositionResponse {
+public class PositionOkxResponse {
 
     /** Биржевой id позиции. */
     private String posId;

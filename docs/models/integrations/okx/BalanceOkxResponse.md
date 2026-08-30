@@ -1,4 +1,4 @@
-# OkxBalanceResponse (OKX account balance)
+# BalanceOkxResponse (OKX account balance)
 
 ## На какой вопрос отвечает этот файл
 

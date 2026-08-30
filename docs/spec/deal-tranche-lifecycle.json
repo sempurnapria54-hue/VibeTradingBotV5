@@ -3,18 +3,16 @@
   "question": "Какие переходы статуса транша допустимы",
   "home": "docs/lifecycles/DealTranche.md",
   "includes": ["protection-coverage", "order-lifecycle"],
-
   "operands": {
     "from": "текущий статус транша",
     "to": "предполагаемый статус",
     "reopenAllowed": "StrategyTranche.positionReopenAllowed закреплённого объявления",
     "orders[]": "заявки транша — операнды экспозиции и живой входной заявки",
     "protections[]": "защиты транша",
-    "deal.status": "Deal.status — операнд окна атрибуции закрывающего исполнения уровня сделки; форма окна — docs/spec/protection-coverage.json",
+    "deal.status": "Deal.status — операнд окна атрибуции закрывающего исполнения уровня сделки (форма окна — docs/spec/protection-coverage.json) И операнд запрета набора нового риска в окне сворачивания: дом запрета — docs/rules/exit-teardown-order.md",
     "followingTranchesGross": "Σ gross-экспозиций траншей, материализованных позже этого; операнд порядка правила сопоставления",
     "position.externalSize": "нетто-размер живого эпизода — правый операнд закрываемого объёма уровня сделки"
   },
-
   "values": [
     {
       "name": "isTrancheTerminal",
@@ -45,169 +43,524 @@
       "expr": "!trancheRiskBearing"
     },
     {
+      "name": "riskCreatingUnderCollapse",
+      "note": "Ребро, набирающее новый риск, под сворачиванием сделки. Единственное такое ребро у транша — вход в отправленный вход, и приходят в него ДВА разных ребра: штатный вход из предвходовой проверки и переоткрытие из сопровождения. Поэтому энфорсер один и стои́т на ЦЕЛИ перехода, а не на паре: гейт по паре пришлось бы дублировать и он разошёлся бы по рёбрам. Дом запрета — docs/rules/exit-teardown-order.md; прежде запрет не имел исполнимой формы вовсе, и вход посреди сворачивания проходил зелёным.",
+      "expr": "to == 'ENTRY_SUBMITTED' && deal.status == 'EXIT_PENDING'"
+    },
+    {
       "name": "transitionAllowed",
-      "expr": "edgeDeclared && (!reopenEdge || reopenPermitted) && (to != 'CLOSED' || terminalContract)"
+      "expr": "edgeDeclared && !riskCreatingUnderCollapse && (!reopenEdge || reopenPermitted) && (to != 'CLOSED' || terminalContract)"
     }
   ],
-
   "examples": [
     {
       "case": "штатная тропа: предвходовая проверка ведёт к отправке входа",
       "state": {
-        "from": "PRECHECK", "to": "ENTRY_SUBMITTED", "reopenAllowed": false,
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "CREATED", "accumulatedFillSize": 0 } ],
-        "protections": []
+        "from": "PRECHECK",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "CREATED",
+            "accumulatedFillSize": 0
+          }
+        ],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": true, "transitionAllowed": true }
+      "expect": {
+        "edgeDeclared": true,
+        "transitionAllowed": true
+      }
     },
     {
       "case": "переключение защиты не обязательно: подтверждённый вход ведёт и прямо в сопровождение",
       "state": {
-        "from": "ENTRY_FINALIZED", "to": "MANAGING", "reopenAllowed": false,
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
-        "protections": []
+        "from": "ENTRY_FINALIZED",
+        "to": "MANAGING",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": true, "transitionAllowed": true }
+      "expect": {
+        "edgeDeclared": true,
+        "transitionAllowed": true
+      }
     },
     {
       "case": "ошибочного статуса у транша нет: ребра в него не существует",
       "state": {
-        "from": "MANAGING", "to": "ERROR", "reopenAllowed": false,
-        "orders": [], "protections": []
+        "from": "MANAGING",
+        "to": "ERROR",
+        "reopenAllowed": false,
+        "orders": [],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": false, "transitionAllowed": false }
+      "expect": {
+        "edgeDeclared": false,
+        "transitionAllowed": false
+      }
     },
     {
       "case": "аварийного терминала у транша нет: ребра в него не существует",
       "state": {
-        "from": "MANAGING", "to": "EMERGENCY_CLOSED", "reopenAllowed": false,
-        "orders": [], "protections": []
+        "from": "MANAGING",
+        "to": "EMERGENCY_CLOSED",
+        "reopenAllowed": false,
+        "orders": [],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": false }
+      "expect": {
+        "edgeDeclared": false
+      }
     },
     {
       "case": "переоткрытие: экспозиция схлопнулась, живая входная заявка осталась, объявление разрешает",
       "state": {
-        "from": "MANAGING", "to": "ENTRY_SUBMITTED", "reopenAllowed": true,
+        "from": "MANAGING",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": true,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          },
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "ACTIVE",
+            "accumulatedFillSize": 0
+          }
         ],
-        "protections": [ { "id": "sl", "carrier": "ATTACHED", "kind": "STOP", "status": "COMPLETED", "size": 5, "parentFillSize": 5, "closedSize": 5 } ]
+        "protections": [
+          {
+            "id": "sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "COMPLETED",
+            "size": 5,
+            "parentFillSize": 5,
+            "closedSize": 5
+          }
+        ],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "trancheExposure": 0, "trancheHasLiveEntryOrder": true, "reopenPermitted": true, "transitionAllowed": true }
+      "expect": {
+        "trancheExposure": 0,
+        "trancheHasLiveEntryOrder": true,
+        "reopenPermitted": true,
+        "transitionAllowed": true
+      }
     },
     {
       "case": "переоткрытие запрещено объявлением: то же ребро не применяется",
       "state": {
-        "from": "MANAGING", "to": "ENTRY_SUBMITTED", "reopenAllowed": false,
+        "from": "MANAGING",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": false,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          },
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "ACTIVE",
+            "accumulatedFillSize": 0
+          }
         ],
-        "protections": [ { "id": "sl", "carrier": "ATTACHED", "kind": "STOP", "status": "COMPLETED", "size": 5, "parentFillSize": 5, "closedSize": 5 } ]
+        "protections": [
+          {
+            "id": "sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "COMPLETED",
+            "size": 5,
+            "parentFillSize": 5,
+            "closedSize": 5
+          }
+        ],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": true, "reopenPermitted": false, "transitionAllowed": false }
+      "expect": {
+        "edgeDeclared": true,
+        "reopenPermitted": false,
+        "transitionAllowed": false
+      }
     },
     {
       "case": "переоткрытия нет при живой экспозиции, даже когда объявление разрешает",
       "state": {
-        "from": "MANAGING", "to": "ENTRY_SUBMITTED", "reopenAllowed": true,
+        "from": "MANAGING",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": true,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          },
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "ACTIVE",
+            "accumulatedFillSize": 0
+          }
         ],
-        "protections": [ { "id": "sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 5, "parentFillSize": 5 } ]
+        "protections": [
+          {
+            "id": "sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 5,
+            "parentFillSize": 5
+          }
+        ],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "trancheExposure": 5, "reopenPermitted": false, "transitionAllowed": false }
+      "expect": {
+        "trancheExposure": 5,
+        "reopenPermitted": false,
+        "transitionAllowed": false
+      }
     },
     {
       "case": "при запрещённом переоткрытии транш уходит своим штатным выходом",
       "state": {
-        "from": "MANAGING", "to": "EXIT_PENDING", "reopenAllowed": false,
+        "from": "MANAGING",
+        "to": "EXIT_PENDING",
+        "reopenAllowed": false,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          },
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "ACTIVE",
+            "accumulatedFillSize": 0
+          }
         ],
-        "protections": [ { "id": "sl", "carrier": "ATTACHED", "kind": "STOP", "status": "COMPLETED", "size": 5, "parentFillSize": 5, "closedSize": 5 } ]
+        "protections": [
+          {
+            "id": "sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "COMPLETED",
+            "size": 5,
+            "parentFillSize": 5,
+            "closedSize": 5
+          }
+        ],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": true, "transitionAllowed": true }
+      "expect": {
+        "edgeDeclared": true,
+        "transitionAllowed": true
+      }
     },
     {
       "case": "терминал транша при живой входной заявке не применяется",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "reopenAllowed": false,
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "ACTIVE", "accumulatedFillSize": 0 } ],
-        "protections": []
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "ACTIVE",
+            "accumulatedFillSize": 0
+          }
+        ],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "trancheRiskBearing": true, "terminalContract": false, "transitionAllowed": false }
+      "expect": {
+        "trancheRiskBearing": true,
+        "terminalContract": false,
+        "transitionAllowed": false
+      }
     },
     {
       "case": "терминал транша применяется, когда живого риска у него нет",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "reopenAllowed": false,
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "reopenAllowed": false,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
-          { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 5 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          },
+          {
+            "type": "REDUCE_ONLY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          }
         ],
-        "protections": []
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "trancheExposure": 0, "trancheRiskBearing": false, "transitionAllowed": true }
+      "expect": {
+        "trancheExposure": 0,
+        "trancheRiskBearing": false,
+        "transitionAllowed": true
+      }
     },
     {
       "case": "терминал транша при живой отдельной защите не применяется: экспозиции нет, условная заявка жива",
       "note": "Терминал транша симметричен терминалу сделки: без третьего дизъюнкта транш ушёл бы в CLOSED, оставив стоп на бирже, и тот выпал бы из обхода известных сущностей сделки.",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "reopenAllowed": false,
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "reopenAllowed": false,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
-          { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 5 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          },
+          {
+            "type": "REDUCE_ONLY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          }
         ],
-        "protections": [ { "id": "main", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 5, "closedSize": 0 } ]
+        "protections": [
+          {
+            "id": "main",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 5,
+            "closedSize": 0
+          }
+        ],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "trancheExposure": 0, "trancheHasLiveProtection": true, "trancheRiskBearing": true, "terminalContract": false, "transitionAllowed": false }
+      "expect": {
+        "trancheExposure": 0,
+        "trancheHasLiveProtection": true,
+        "trancheRiskBearing": true,
+        "terminalContract": false,
+        "transitionAllowed": false
+      }
     },
     {
       "case": "терминал транша на общем выходе: reduce-only ноги нет, экспозицию гасит приписанный объём команды закрытия",
       "state": {
-        "from": "EXIT_PENDING", "to": "CLOSED", "reopenAllowed": false,
-        "deal": { "status": "EXIT_PENDING" },
-        "position": { "externalSize": 0 },
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "reopenAllowed": false,
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "position": {
+          "externalSize": 0
+        },
         "followingTranchesGross": 0,
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
-        "protections": [ { "id": "entry_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "CANCELED", "size": 5, "parentFillSize": 5 } ]
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          }
+        ],
+        "protections": [
+          {
+            "id": "entry_sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "CANCELED",
+            "size": 5,
+            "parentFillSize": 5
+          }
+        ]
       },
-      "expect": { "trancheCloseAttributed": 5, "trancheExposure": 0, "trancheRiskBearing": false, "terminalContract": true, "transitionAllowed": true }
+      "expect": {
+        "trancheCloseAttributed": 5,
+        "trancheExposure": 0,
+        "trancheRiskBearing": false,
+        "terminalContract": true,
+        "transitionAllowed": true
+      }
     },
     {
       "case": "транш, чьё условие входа истекло, закрывается прямо из предвходовой проверки",
       "state": {
-        "from": "PRECHECK", "to": "CLOSED", "reopenAllowed": false,
-        "orders": [], "protections": []
+        "from": "PRECHECK",
+        "to": "CLOSED",
+        "reopenAllowed": false,
+        "orders": [],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": true, "trancheRiskBearing": false, "transitionAllowed": true }
+      "expect": {
+        "edgeDeclared": true,
+        "trancheRiskBearing": false,
+        "transitionAllowed": true
+      }
     },
     {
       "case": "прыжка через сопровождение из отправленного входа в подтверждённый выход нет",
       "state": {
-        "from": "ENTRY_SUBMITTED", "to": "MANAGING", "reopenAllowed": false,
-        "orders": [], "protections": []
+        "from": "ENTRY_SUBMITTED",
+        "to": "MANAGING",
+        "reopenAllowed": false,
+        "orders": [],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
-      "expect": { "edgeDeclared": false }
+      "expect": {
+        "edgeDeclared": false
+      }
     },
     {
       "case": "терминальный транш активным не считается",
-      "state": { "status": "CLOSED" },
-      "expect": { "isTrancheTerminal": true, "isTrancheActive": false }
+      "state": {
+        "status": "CLOSED",
+        "deal": {
+          "status": "ACTIVE"
+        }
+      },
+      "expect": {
+        "isTrancheTerminal": true,
+        "isTrancheActive": false
+      }
     },
     {
       "case": "сопровождаемый транш активен и не терминален — контрпример к обоим предикатам состояния",
       "state": {
-        "status": "MANAGING"
+        "status": "MANAGING",
+        "deal": {
+          "status": "ACTIVE"
+        }
       },
       "expect": {
         "isTrancheTerminal": false,
         "isTrancheActive": true
+      }
+    },
+    {
+      "case": "вход из предвходовой проверки посреди сворачивания сделки не выпускается",
+      "note": "Энфорсер запрета «нового риска в окне сворачивания не берёт ни один транш». Ребро объявлено и вне сворачивания законно (пример «штатная тропа»), поэтому пример падает ровно на снятии энфорсера и фальсифицирует его.",
+      "state": {
+        "from": "PRECHECK",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "CREATED",
+            "accumulatedFillSize": 0
+          }
+        ],
+        "protections": [],
+        "deal": {
+          "status": "EXIT_PENDING"
+        }
+      },
+      "expect": {
+        "edgeDeclared": true,
+        "riskCreatingUnderCollapse": true,
+        "transitionAllowed": false
+      }
+    },
+    {
+      "case": "переоткрытие посреди сворачивания сделки не выпускается, хотя объявлением разрешено",
+      "note": "Вторая тропа того же ребра-цели: объявление разрешает, экспозиция схлопнулась, живая входная заявка есть — то есть reopenPermitted истинен, и без энфорсера переход прошёл бы. Пара примеров доказывает, что энфорсер стои́т на ЦЕЛИ, а не на одном из двух рёбер.",
+      "state": {
+        "from": "MANAGING",
+        "to": "ENTRY_SUBMITTED",
+        "reopenAllowed": true,
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 5
+          },
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "ACTIVE",
+            "accumulatedFillSize": 0
+          }
+        ],
+        "protections": [
+          {
+            "id": "sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "COMPLETED",
+            "size": 5,
+            "parentFillSize": 5,
+            "closedSize": 5
+          }
+        ],
+        "deal": {
+          "status": "EXIT_PENDING"
+        }
+      },
+      "expect": {
+        "reopenPermitted": true,
+        "riskCreatingUnderCollapse": true,
+        "transitionAllowed": false
+      }
+    },
+    {
+      "case": "терминал транша посреди сворачивания разрешён — энфорсер не запирает выход",
+      "note": "Контрпример к энфорсеру: он обязан гасить только набор риска. Транш, чьё условие входа истекло, обязан закрыться и под сворачиванием — иначе выходная проверка сделки «все транши терминальны» не сошлась бы никогда, и энфорсер останавливал бы выход вместо входа.",
+      "state": {
+        "from": "PRECHECK",
+        "to": "CLOSED",
+        "reopenAllowed": false,
+        "orders": [],
+        "protections": [],
+        "deal": {
+          "status": "EXIT_PENDING"
+        }
+      },
+      "expect": {
+        "riskCreatingUnderCollapse": false,
+        "transitionAllowed": true
       }
     }
   ]

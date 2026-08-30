@@ -13,12 +13,12 @@ import com.example.tradingbot.integration.model.okx.request.PlaceOrderOkxRequest
 import com.example.tradingbot.integration.model.okx.request.SetLeverageOkxRequest;
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxAlgoOrderResponse;
+import com.example.tradingbot.integration.model.okx.response.AlgoOrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxBalanceResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxFillResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
+import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.TickerOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.SetLeverageOkxResponse;
@@ -53,25 +53,25 @@ public class OkxRestClient {
     private static final ParameterizedTypeReference<OkxApiResponse<List<String>>> CANDLE_ARRAY_TYPE =
             new ParameterizedTypeReference<>() {
             };
-    private static final ParameterizedTypeReference<OkxApiResponse<OkxTickerResponse>> TICKER_TYPE =
+    private static final ParameterizedTypeReference<OkxApiResponse<TickerOkxResponse>> TICKER_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<OrderOkxResponse>> ORDER_TYPE =
             new ParameterizedTypeReference<>() {
             };
-    private static final ParameterizedTypeReference<OkxApiResponse<OkxPositionResponse>> POSITION_TYPE =
+    private static final ParameterizedTypeReference<OkxApiResponse<PositionOkxResponse>> POSITION_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<OrderAckOkxResponse>> ORDER_ACK_TYPE =
             new ParameterizedTypeReference<>() {
             };
-    private static final ParameterizedTypeReference<OkxApiResponse<OkxBalanceResponse>> BALANCE_TYPE =
+    private static final ParameterizedTypeReference<OkxApiResponse<BalanceOkxResponse>> BALANCE_TYPE =
             new ParameterizedTypeReference<>() {
             };
-    private static final ParameterizedTypeReference<OkxApiResponse<OkxFillResponse>> FILL_TYPE =
+    private static final ParameterizedTypeReference<OkxApiResponse<FillOkxResponse>> FILL_TYPE =
             new ParameterizedTypeReference<>() {
             };
-    private static final ParameterizedTypeReference<OkxApiResponse<OkxAlgoOrderResponse>> ALGO_ORDER_TYPE =
+    private static final ParameterizedTypeReference<OkxApiResponse<AlgoOrderOkxResponse>> ALGO_ORDER_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<AlgoOrderAckOkxResponse>> ALGO_ACK_TYPE =
@@ -146,7 +146,7 @@ public class OkxRestClient {
     }
 
     /** Тикер (рыночная цена: last/ask/bid + ts) инструмента: {@code instId} обязателен. Публичный endpoint. */
-    public OkxApiResponse<OkxTickerResponse> getTicker(String instId) {
+    public OkxApiResponse<TickerOkxResponse> getTicker(String instId) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         return dispatch(HttpMethod.GET, Constants.Okx.MARKET_TICKER_PATH, query, null, false, TICKER_TYPE);
@@ -167,7 +167,7 @@ public class OkxRestClient {
     }
 
     /** Live/pending algo orders по инструменту и ordType (звено evidence-cycle). */
-    public OkxApiResponse<OkxAlgoOrderResponse> getPendingAlgoOrders(String instId, String ordType) {
+    public OkxApiResponse<AlgoOrderOkxResponse> getPendingAlgoOrders(String instId, String ordType) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         query.put(Constants.Okx.PARAM_ORD_TYPE, ordType);
@@ -175,7 +175,7 @@ public class OkxRestClient {
     }
 
     /** История algo orders по инструменту и ordType (звено evidence-cycle). */
-    public OkxApiResponse<OkxAlgoOrderResponse> getAlgoOrderHistory(String instId, String ordType) {
+    public OkxApiResponse<AlgoOrderOkxResponse> getAlgoOrderHistory(String instId, String ordType) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         query.put(Constants.Okx.PARAM_ORD_TYPE, ordType);
@@ -183,7 +183,7 @@ public class OkxRestClient {
     }
 
     /** История исполнений (fills, 3 месяца): {@code after} — якорь по billId. Приватный endpoint. */
-    public OkxApiResponse<OkxFillResponse> getFillsHistory(String instId, String after, Integer limit) {
+    public OkxApiResponse<FillOkxResponse> getFillsHistory(String instId, String after, Integer limit) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         query.put(Constants.Okx.PARAM_AFTER, after);
@@ -204,7 +204,7 @@ public class OkxRestClient {
     }
 
     /** Позиции аккаунта по инструменту. Приватный endpoint (подпись). */
-    public OkxApiResponse<OkxPositionResponse> getPositions(String instId) {
+    public OkxApiResponse<PositionOkxResponse> getPositions(String instId) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_POSITIONS_PATH, query, null, true, POSITION_TYPE);
@@ -226,7 +226,7 @@ public class OkxRestClient {
     }
 
     /** Standalone algo-order по algoId (предпочтительно) или algoClOrdId. Приватный endpoint (подпись). */
-    public OkxApiResponse<OkxAlgoOrderResponse> getAlgoOrder(String instId, String algoId, String algoClOrdId) {
+    public OkxApiResponse<AlgoOrderOkxResponse> getAlgoOrder(String instId, String algoId, String algoClOrdId) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         query.put(Constants.Okx.PARAM_ALGO_ID, algoId);
@@ -250,7 +250,7 @@ public class OkxRestClient {
     }
 
     /** Исполнения (fills, последние 3 дня): {@code after} — якорь по billId. Приватный endpoint. */
-    public OkxApiResponse<OkxFillResponse> getFills(String instId, String after, Integer limit) {
+    public OkxApiResponse<FillOkxResponse> getFills(String instId, String after, Integer limit) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         query.put(Constants.Okx.PARAM_AFTER, after);
@@ -265,7 +265,7 @@ public class OkxRestClient {
     }
 
     /** Баланс аккаунта (опционально по валюте). Приватный endpoint (подпись). */
-    public OkxApiResponse<OkxBalanceResponse> getBalance(String ccy) {
+    public OkxApiResponse<BalanceOkxResponse> getBalance(String ccy) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_CCY, ccy);
         return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_BALANCE_PATH, query, null, true, BALANCE_TYPE);

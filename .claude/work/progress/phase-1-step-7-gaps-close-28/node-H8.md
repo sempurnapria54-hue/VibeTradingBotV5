@@ -191,7 +191,7 @@ grep -rn "\bfeeRate\b" docs/ src/ .claude/rules .claude/processes \
 | `docs/models/domain/other/DealCashFlow.md:106-111` | дом клейма ключа | **правлен**: назван носитель-ограничение |
 | `docs/components/RefreshBillsExecutor.md:64-69` | писатель строк, пересказывает дедуп прозой | **согласован** (пара та же); пересказ политики вне дома — хенд-офф §7.8 |
 | `docs/models/mapping/DealCashFlow.md` | маппинг источника | **не потребитель**: слов о дедупе и ключе не содержит |
-| `docs/models/integrations/okx/OkxAccountBillResponse.md:25` | инвентарь поля `billId` → `externalBillId` (`UNIQUE`) | **согласован**: уже называл ограничение базы, теперь совпадает с домом дословно |
+| `docs/models/integrations/okx/AccountBillOkxResponse.md:25` | инвентарь поля `billId` → `externalBillId` (`UNIQUE`) | **согласован**: уже называл ограничение базы, теперь совпадает с домом дословно |
 
 ### 2.5. Обход потребителей указателя уровня (E10)
 
@@ -218,7 +218,7 @@ grep -rn "\bfeeRate\b" docs/ src/ .claude/rules .claude/processes \
 | `grep -rn "legFeeRate" docs/ src/ .claude/rules .claude/processes .claude/skills .claude/decisions .claude/tests .claude/templates .claude/agents .claude/work/backlog.md .claude/work/questions .claude/work/roadmap .claude/snapshots .claude/knowledge-tree.md` | — | вывод пуст: живых носителей нет |
 | `grep -rn "distinctDedupeKeys" <тот же набор>` | — | вывод пуст: живых носителей нет (остались только отчёты прошлых прогонов в `progress/`, архив не чинится) |
 | `grep -rn "accumulatedFillSize / plannedSizeContracts" docs/ src/` | `docs/spec/deal-risk-numbers.json:32` | единственное вхождение — **сам дом** `filledShare`; инлайнов больше нет |
-| `grep -rn "идемпотентност" docs/ \| grep -i "cash\|движен\|bill"` | `DealCashFlow.md:106`, `RefreshBillsExecutor.md:64`, `OkxAccountBillResponse.md:25` | все три согласованы, дом один (§2.4) |
+| `grep -rn "идемпотентност" docs/ \| grep -i "cash\|движен\|bill"` | `DealCashFlow.md:106`, `RefreshBillsExecutor.md:64`, `AccountBillOkxResponse.md:25` | все три согласованы, дом один (§2.4) |
 | `grep -rn "Живое меряется от живой экспозиции" docs/ .claude/rules .claude/processes .claude/skills .claude/decisions .claude/work/backlog.md .claude/work/questions` | `concept.md:376`, `DealTranche.md:148`, `risk-policy.md:256,345,455`, `stop-distance.json:41` | из периметра снят только адрес в `Deal.md`; остальные адресуют § **по своему предмету** и правки не требуют (`DealTranche.md` и `stop-distance.json` ссылаются на `concept.md`, внутрифайловые — на `risk-policy.md`) |
 
 ### 3.2. Предмет 2 — введённая конструкция
@@ -425,7 +425,7 @@ F3, F6, F9, F10). Самая тяжёлая — F1: закрытие само п
 |---|---|
 | `docs/models/domain/other/DealCashFlow.md:36` | **не требует правки**: поле остаётся обязательным полем модели и половиной ключа — снят только операнд спеки линковки, чей предикат его не читает |
 | `docs/models/mapping/DealCashFlow.md:21` | не требует правки: маппинг поля живёт своим носителем |
-| `docs/models/integrations/okx/OkxAccountBillResponse.md:25` | не требует правки по этому предмету; по составу ключа — §7.11 |
+| `docs/models/integrations/okx/AccountBillOkxResponse.md:25` | не требует правки по этому предмету; по составу ключа — §7.11 |
 | `src/.../FillExternalSnapshot.java:30`, `src/.../FillMapper.java:22` | не потребители спеки линковки: другая сущность (`Fill`), поле своё |
 
 *Свип предмета 2 (конструкция):* предикат `linksToDeal` и его слагаемые
@@ -479,7 +479,7 @@ E11: доказана выразимость границы, а не повед�
 | 7.8 | `RefreshBillsExecutor.md:64-69` пересказывает ключ дедупа прозой вместо ссылки на дом (`policy-home`) | `knowledge-curator` | `.claude/work/backlog.md`, гигиена |
 | 7.9 | **P10 — закрыта частично.** Мутационная дыра снята у величин, которых узел касается: `feeRate` (проба E11-б), `feeRateBase` (проба E11-в), `filledShare` и `legExpectedFee` (прямые утверждения). Остальные ~71 форма корпуса вне периметра | `solution-designer` | `.claude/work/backlog.md` отдельной задачей — как и предлагает крен A линзы («объёмом — отдельной задачей») |
 | 7.10 | **P11 — закрыта частично.** Из перечня «не утверждается напрямую» выведены `feeRateBase` (значение и ветвь пустоты) и `feeRate` (отказ); `feeRate`, `filledShare` и `legExpectedFee` на живой тропе пиннятся через одноногие агрегаты — тесно, но транзитивно. Остальные вне периметра | `solution-designer` | там же, что 7.9 — обе закрываются одним ходом (добавлением примеров) |
-| 7.11 | **Клейм ключа у соседа не сведён с домом.** `docs/models/integrations/okx/OkxAccountBillResponse.md:25` объявляет `externalBillId` (`UNIQUE`) **одной колонкой**, тогда как ключ — пара `(exchange_id, external_bill_id)`; `docs/rules/idempotency-via-unique.md` запрещает молчаливый `UNIQUE` мимо состава ключа. Текстовым грепом по снимаемым терминам носитель не находится — инвентарь источника их не содержит | `knowledge-curator` | узел `GAPS_CLOSE_28`, ведущий `docs/models/integrations/**`; иначе `.claude/work/backlog.md`. Найдено критикой мини-петли |
+| 7.11 | **Клейм ключа у соседа не сведён с домом.** `docs/models/integrations/okx/AccountBillOkxResponse.md:25` объявляет `externalBillId` (`UNIQUE`) **одной колонкой**, тогда как ключ — пара `(exchange_id, external_bill_id)`; `docs/rules/idempotency-via-unique.md` запрещает молчаливый `UNIQUE` мимо состава ключа. Текстовым грепом по снимаемым терминам носитель не находится — инвентарь источника их не содержит | `knowledge-curator` | узел `GAPS_CLOSE_28`, ведущий `docs/models/integrations/**`; иначе `.claude/work/backlog.md`. Найдено критикой мини-петли |
 | 7.12 | **E10 не доведён до рабочего файла.** `.claude/work/backlog.md` §«Резолв действующего уровня защиты» называет обе величины, но не расписывает их по потребителям — та же конфляция уровней в файле, который читает исполнитель `CODE`. Правка: расписать пары (потраншевые числа риска ← `trancheStopCurrent`; одновременные потолки ← `stopCurrentLive`) либо свести строку к указателю на дом правила | `knowledge-curator` | `.claude/work/backlog.md` (вне периметра Н8). Найдено критикой мини-петли |
 
 **Новых форм без утверждающего примера узел не ввёл:** `feeRateBase`

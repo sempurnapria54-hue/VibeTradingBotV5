@@ -52,4 +52,4 @@ details архива). При расхождении с офдоком побе�
 
 - `fileHref` — обычно временная ссылка; скачивать без задержек.
 - Формат файла — обычно CSV.gz; структура строк —
-  `OkxFillResponse.md` fields.
+  `FillOkxResponse.md` fields.

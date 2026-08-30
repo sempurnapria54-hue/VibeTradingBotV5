@@ -41,7 +41,7 @@ bills/positions-history (`account-bills.md`,
 **прогноза** (сайзинг до входа) и сверки. Wiring — в коде сопровождения сделки.
 
 Native-инвентарь полей (used/unused) —
-`docs/models/integrations/okx/OkxTradeFeeResponse.md`; маппинг →
+`docs/models/integrations/okx/TradeFeeOkxResponse.md`; маппинг →
 `docs/models/mapping/TradeFeeRate.md`.
 
 ## GET /api/v5/account/trade-fee
@@ -76,7 +76,7 @@ Query: `instType` (обяз.: SPOT/MARGIN/SWAP/FUTURES/OPTION/**EVENTS**),
 | `ruleType`, `category`, `fiat[]` | Прочее; `category`/`fiat`/`ruleType=pre_market` — deprecated. |
 
 Что из этого используется (used/unused, с обоснованием) —
-`docs/models/integrations/okx/OkxTradeFeeResponse.md`.
+`docs/models/integrations/okx/TradeFeeOkxResponse.md`.
 
 ### Перечень групп не хардкодим
 

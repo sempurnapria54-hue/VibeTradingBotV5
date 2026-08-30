@@ -31,8 +31,7 @@
 единственное, чем в данных различаются основания одной и той же ступени,
 и он приходит от того правила, которое ступень запросило. Так, мягкую
 биржевую ступень по исчерпанию риск-бюджета контура поднимает код
-`LOSS_STREAK_LIMIT_REACHED` (`docs/rules/loss-streak-halt.md` §«Состав
-реакции — ступень, отчёт, машинный код причины»).
+`LOSS_STREAK_LIMIT_REACHED` (`docs/rules/loss-streak-halt.md`).
 
 Ручной вызов держателя поднимает ступень кодом `MANUAL_HALT_REQUESTED` —
 одним на обоих радиусах и обоих режимах (`docs/rules/manual-halt.md`).
@@ -76,7 +75,7 @@
 `(EXCHANGE, FREEZE)`, `(EXCHANGE, FULL)`, `(INSTRUMENT, SOFT)`,
 `(INSTRUMENT, FULL)`. Пар `(EXCHANGE, SOFT)` и `(INSTRUMENT, FREEZE)`
 нет: мягкий класс инструментного радиуса биржевым статусом не
-выражается, и наоборот (`docs/models/domain/core/Exchange.md` §Енум
+выражается, и наоборот (`docs/models/domain/core/Exchange.md`
 `Status`). Отсюда же берёт свои допустимые режимы ручная остановка —
 собственного перечня она не заводит (`docs/rules/manual-halt.md`).
 

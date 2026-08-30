@@ -26,12 +26,12 @@ import com.example.tradingbot.integration.model.okx.request.SetLeverageOkxReques
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.CandleOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxAlgoOrderResponse;
+import com.example.tradingbot.integration.model.okx.response.AlgoOrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxBalanceResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxFillResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxPositionResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxTickerResponse;
+import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.TickerOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.SetLeverageOkxResponse;
@@ -107,7 +107,7 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public MarketPriceDataExternalSnapshot getMarketPriceData(String externalInstrumentId) {
-        OkxApiResponse<OkxTickerResponse> response = execute(
+        OkxApiResponse<TickerOkxResponse> response = execute(
                 () -> okxRestClient.getTicker(externalInstrumentId),
                 "market-ticker", "instId=" + externalInstrumentId);
         verifyCode(response, "market-ticker", "instId=" + externalInstrumentId);
@@ -151,7 +151,7 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public AlgoOrderExternalSnapshot getAlgoOrder(String externalInstrumentId, String externalId, String internalId) {
-        OkxApiResponse<OkxAlgoOrderResponse> response = execute(
+        OkxApiResponse<AlgoOrderOkxResponse> response = execute(
                 () -> okxRestClient.getAlgoOrder(externalInstrumentId, externalId, internalId),
                 "order-algo", "instId=" + externalInstrumentId + " algoId=" + externalId);
         verifyCode(response, "order-algo", "instId=" + externalInstrumentId);
@@ -163,7 +163,7 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public PositionExternalSnapshot getPosition(String externalInstrumentId) {
-        OkxApiResponse<OkxPositionResponse> response = execute(
+        OkxApiResponse<PositionOkxResponse> response = execute(
                 () -> okxRestClient.getPositions(externalInstrumentId),
                 "account-positions", "instId=" + externalInstrumentId);
         verifyCode(response, "account-positions", "instId=" + externalInstrumentId);
@@ -242,7 +242,7 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public BalanceContainerExternalSnapshot getBalance(String settleCurrency) {
-        OkxApiResponse<OkxBalanceResponse> response = execute(() -> okxRestClient.getBalance(settleCurrency),
+        OkxApiResponse<BalanceOkxResponse> response = execute(() -> okxRestClient.getBalance(settleCurrency),
                 "account-balance", "ccy=" + settleCurrency);
         verifyCode(response, "account-balance", "ccy=" + settleCurrency);
         if (isEmpty(response.getData())) {
@@ -295,7 +295,7 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public List<FillExternalSnapshot> getFills(String externalInstrumentId, String afterBillId, Integer limit) {
-        OkxApiResponse<OkxFillResponse> response = execute(
+        OkxApiResponse<FillOkxResponse> response = execute(
                 () -> okxRestClient.getFills(externalInstrumentId, afterBillId, limit),
                 "trade-fills", "instId=" + externalInstrumentId);
         verifyCode(response, "trade-fills", "instId=" + externalInstrumentId);
@@ -327,7 +327,7 @@ public class OkxIntegrationService implements IntegrationService {
     public List<AlgoOrderExternalSnapshot> getPendingAlgoOrders(String externalInstrumentId,
                                                                 AlgoOrder.ConditionType conditionType) {
         String ordType = algoOrderMapper.resolveAlgoOrdType(conditionType);
-        OkxApiResponse<OkxAlgoOrderResponse> response = execute(
+        OkxApiResponse<AlgoOrderOkxResponse> response = execute(
                 () -> okxRestClient.getPendingAlgoOrders(externalInstrumentId, ordType),
                 "orders-algo-pending", "instId=" + externalInstrumentId);
         verifyCode(response, "orders-algo-pending", "instId=" + externalInstrumentId);
@@ -338,7 +338,7 @@ public class OkxIntegrationService implements IntegrationService {
     public List<AlgoOrderExternalSnapshot> getAlgoOrderHistory(String externalInstrumentId,
                                                                AlgoOrder.ConditionType conditionType) {
         String ordType = algoOrderMapper.resolveAlgoOrdType(conditionType);
-        OkxApiResponse<OkxAlgoOrderResponse> response = execute(
+        OkxApiResponse<AlgoOrderOkxResponse> response = execute(
                 () -> okxRestClient.getAlgoOrderHistory(externalInstrumentId, ordType),
                 "orders-algo-history", "instId=" + externalInstrumentId);
         verifyCode(response, "orders-algo-history", "instId=" + externalInstrumentId);
@@ -347,7 +347,7 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public List<FillExternalSnapshot> getFillsHistory(String externalInstrumentId, String afterBillId, Integer limit) {
-        OkxApiResponse<OkxFillResponse> response = execute(
+        OkxApiResponse<FillOkxResponse> response = execute(
                 () -> okxRestClient.getFillsHistory(externalInstrumentId, afterBillId, limit),
                 "fills-history", "instId=" + externalInstrumentId);
         verifyCode(response, "fills-history", "instId=" + externalInstrumentId);
@@ -364,7 +364,7 @@ public class OkxIntegrationService implements IntegrationService {
         return response.getData().stream().map(orderMapper::integrationToSnapshot).collect(toList());
     }
 
-    private List<AlgoOrderExternalSnapshot> toAlgoOrderSnapshots(OkxApiResponse<OkxAlgoOrderResponse> response) {
+    private List<AlgoOrderExternalSnapshot> toAlgoOrderSnapshots(OkxApiResponse<AlgoOrderOkxResponse> response) {
         if (isEmpty(response.getData())) {
             return List.of();
         }

@@ -18,7 +18,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class OkxAlgoOrderResponse {
+public class AlgoOrderOkxResponse {
 
     /** stable client id. */
     private String algoClOrdId;

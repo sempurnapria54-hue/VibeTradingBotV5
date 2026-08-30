@@ -10,8 +10,8 @@ import lombok.Setter;
  * Настройки трейлинг-стопа. Хранятся JSONB-полем на строке
  * strategy_algo_order_action. Ранняя активация трейлинга (без порога
  * прибыли) выбивается шумом — порог активации рекомендуем (СТ-1,
- * чек-лист авторинга). См. docs/models/domain/aggregate/Strategy.md
- * (§TrailingSettings).
+ * чек-лист авторинга). См. docs/models/domain/aggregate/Strategy.md, раздел о блоке
+ * настроек трейлинга.
  */
 @Getter
 @Setter

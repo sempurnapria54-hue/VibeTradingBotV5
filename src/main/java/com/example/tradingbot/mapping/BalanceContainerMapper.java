@@ -4,8 +4,8 @@ import com.example.tradingbot.domain.model.core.balance.Balance;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceExternalSnapshot;
-import com.example.tradingbot.integration.model.okx.response.OkxBalanceDetailResponse;
-import com.example.tradingbot.integration.model.okx.response.OkxBalanceResponse;
+import com.example.tradingbot.integration.model.okx.response.BalanceDetailOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
 import com.example.tradingbot.persistence.model.balance.BalanceContainerEntity;
 import com.example.tradingbot.persistence.model.balance.BalanceEntity;
 import org.mapstruct.Mapper;
@@ -28,7 +28,7 @@ public interface BalanceContainerMapper {
     @Mapping(target = "externalAdjustedEquity", source = "adjEq")
     @Mapping(target = "externalAvailableEquity", source = "availEq")
     @Mapping(target = "balances", source = "details")
-    BalanceContainerExternalSnapshot integrationToSnapshot(OkxBalanceResponse response);
+    BalanceContainerExternalSnapshot integrationToSnapshot(BalanceOkxResponse response);
 
     @Mapping(target = "externalCurrency", source = "ccy")
     @Mapping(target = "externalUpdatedAt", source = "uTime")
@@ -36,7 +36,7 @@ public interface BalanceContainerMapper {
     @Mapping(target = "externalCashBalance", source = "cashBal")
     @Mapping(target = "externalAvailableBalance", source = "availBal")
     @Mapping(target = "externalFrozenBalance", source = "frozenBal")
-    BalanceExternalSnapshot integrationToSnapshot(OkxBalanceDetailResponse detail);
+    BalanceExternalSnapshot integrationToSnapshot(BalanceDetailOkxResponse detail);
 
     BalanceContainerEntity domainToPersistence(BalanceContainer container);
 

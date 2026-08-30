@@ -67,8 +67,7 @@ runtime-сущность» живёт в строке исполнения, по
 `REPLACED_BY_STRATEGY`, `KILL_SWITCH`,
 `MISSING_AFTER_REFRESH`, `ORDER_FAILED`, `PARTIALLY_FAILED`,
 `UNKNOWN_EXTERNAL_STATUS`, `EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`.
-`MANUAL_CANCEL` снят — `docs/rules/manual-halt.md` §«Точечных ручек в
-фазе 1 нет».
+`MANUAL_CANCEL` снят — `docs/rules/manual-halt.md`.
 
 **`ConditionType`** — `STOP_LOSS`, `PARTIAL_STOP_LOSS`, `TAKE_PROFIT`,
 `PARTIAL_TAKE_PROFIT`, `OCO_FULL`, `TRAILING_PERCENTS`,
