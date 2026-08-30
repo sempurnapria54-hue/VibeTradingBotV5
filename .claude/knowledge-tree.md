@@ -44,6 +44,7 @@
 │   ├── decisions/ — Почему мы решили так, а не иначе? (пайплайн)
 │   │   ├── chat-vs-cc-knowledge-split.md — Как разделено знание по адресатам — чат vs Claude Code?
 │   │   ├── client-layer-docs.md — Где живут exchange-specific факты?
+│   │   ├── closure-mechanism-amendments.md — Почему механизмы закрытия поправлены четырьмя клаузами по итогам первого измерения?
 │   │   ├── code-templates-vs-examples.md — Почему код-шаблоны и find-code-examples — два разных инструмента?
 │   │   ├── component-vs-process.md — Как различать «компонент» и «процесс» при классификации?
 │   │   ├── context-cost-diet.md — Почему контекстная стоимость знаниевых файлов сокращена именно так?

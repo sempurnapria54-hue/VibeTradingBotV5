@@ -81,3 +81,7 @@
   (`.claude/rules/structure.md`).
 - Прогон-проверка на кейсе истории шага 7 —
   `.claude/work/history/2026-08-29-gaps-close-depth-mechanisms.md`.
+- Поправки по итогам первого измерения (`DOCS_CHECK_28`): обход
+  потребителей, ревью каждой правки, полная диспозиция находок, оси
+  проверочных команд —
+  `.claude/decisions/closure-mechanism-amendments.md`.
