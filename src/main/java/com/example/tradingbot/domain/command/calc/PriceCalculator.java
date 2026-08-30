@@ -44,6 +44,7 @@ public class PriceCalculator {
     private static final String MISSING_STOP_LOSS_SETTINGS = "MISSING_STOP_LOSS_SETTINGS";
     private static final String MISSING_DISTANCE = "MISSING_DISTANCE";
     private static final String INVALID_PRICE_AFTER_ROUNDING = "INVALID_PRICE_AFTER_ROUNDING";
+    private static final String BREAKEVEN_LEVEL_UNAVAILABLE = "BREAKEVEN_LEVEL_UNAVAILABLE";
 
     public CalculatedPrice calculate(CalculationContext context) {
         return switch (context.getAction()) {
@@ -131,6 +132,9 @@ public class PriceCalculator {
             case ATR_PERCENT -> applyDistance(entryPrice, percentOf(atrValue(settings, context),
                     requireDistance(settings.getDistancePercents())), isLong, false);
             case MARKET_STRUCTURE_BUFFER_PERCENT -> structureStop(settings, isLong, context);
+            case BREAKEVEN -> throw error(BREAKEVEN_LEVEL_UNAVAILABLE,
+                    "Breakeven level is not computed yet: the branch lands with the step-7 CODE delta"
+                            + " (docs/spec/stop-distance.json, breakevenLevel)");
         };
         RoundingMode mode = isLong ? RoundingMode.DOWN : RoundingMode.UP;
         return ResolvedStopLossPrice.builder()

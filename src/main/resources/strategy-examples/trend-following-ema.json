@@ -226,7 +226,7 @@
                     "actionType": "CREATE_ACTION",
                     "orderType": "ENTRY_ATTACHED_STOP_LOSS",
                     "direction": "LONG",
-                    "allocationPercents": 100,
+                    "allocationPercents": 95,
                     "attachedProtection": {
                       "attachedType": "ATTACHED_STOP_LOSS",
                       "stopLossSettings": {
@@ -469,7 +469,7 @@
                     "actionType": "CREATE_ACTION",
                     "orderType": "ENTRY_ATTACHED_STOP_LOSS",
                     "direction": "SHORT",
-                    "allocationPercents": 100,
+                    "allocationPercents": 95,
                     "attachedProtection": {
                       "attachedType": "ATTACHED_STOP_LOSS",
                       "stopLossSettings": {

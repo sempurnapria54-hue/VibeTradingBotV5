@@ -4,6 +4,7 @@
   "home": "docs/models/mapping/PositionCloseResult.md",
 
   "operands": {
+    "graphComplete": "граф сделки предъявлен контекстом прохода целиком; значение берётся из дома-спеки docs/spec/deal-context-load.json, величина graphComplete — форма здесь не переписывается. Охрана СИММЕТРИЧНА охране результата (docs/spec/deal-result.json): агрегат exists по НЕДОГРУЖЕННОМУ списку эпизодов ложен молча, и сделка с ликвидированным, но не загруженным эпизодом получила бы durable NORMAL_EXIT — единственное значение, которое входит в выборку R как штатное решение. Пустота нулём и «не нашли» отсутствием не подменяются",
     "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака — docs/rules/deal-without-operations.md (признак «операций по сделке не было» есть его отрицание); форма здесь не переписывается. Значение берётся из дома-спеки: hadEntry = positionObserved (docs/spec/deal-context-load.json)",
     "episodes[]": "эпизоды позиции сделки; закрытые и живой",
     "episodes[].closeRecordFetched": "запись закрытия этого эпизода добыта. Носитель предиката — непустота Position.externalRealizedProfit (docs/models/domain/core/Position.md); значение берётся из дома-спеки: closeRecordFetched в docs/spec/deal-result.json",
@@ -40,7 +41,7 @@
     {
       "name": "closeOutcome",
       "note": "Исход сделки по старшинству LIQUIDATION > FORCED_REDUCTION > UNDETERMINED > NORMAL_EXIT. Неизвестное выше штатного намеренно: обратный порядок скрывал бы ликвидацию соседнего эпизода за NORMAL_EXIT — благоприятное умолчание, запрещённое docs/concept.md §П1. Вошедшая сделка без единого эпизода даёт UNDETERMINED: утверждать штатный выход не из чего. Не входившая признака не получает вовсе — пусто означает «признак неприменим».",
-      "expr": "if(!hadEntry, null, if(anyLiquidation, 'LIQUIDATION', if(anyForcedReduction, 'FORCED_REDUCTION', if(anyUndetermined || episodeCount == 0, 'UNDETERMINED', 'NORMAL_EXIT'))))"
+      "expr": "if(!hadEntry, null, if(!graphComplete, 'UNDETERMINED', if(anyLiquidation, 'LIQUIDATION', if(anyForcedReduction, 'FORCED_REDUCTION', if(anyUndetermined || episodeCount == 0, 'UNDETERMINED', 'NORMAL_EXIT')))))"
     },
     {
       "name": "unrecognizedCloseTypeReported",
@@ -54,153 +55,327 @@
       "case": "полное закрытие одним эпизодом — штатный выход",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "2"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "NORMAL_EXIT", "unrecognizedCloseTypeReported": false }
+      "expect": {
+        "closeOutcome": "NORMAL_EXIT",
+        "unrecognizedCloseTypeReported": false
+      }
     },
     {
       "case": "частичное закрытие — тот же штатный выход, а не отдельный исход",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "1" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "1"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "NORMAL_EXIT" }
+      "expect": {
+        "closeOutcome": "NORMAL_EXIT"
+      }
     },
     {
       "case": "ликвидация имеет производителя: сырое значение 3",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "3" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "3"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "LIQUIDATION", "unrecognizedCloseTypeReported": false }
+      "expect": {
+        "closeOutcome": "LIQUIDATION",
+        "unrecognizedCloseTypeReported": false
+      }
     },
     {
       "case": "частичная ликвидация даёт то же значение, что полная",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "4" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "4"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "LIQUIDATION" }
+      "expect": {
+        "closeOutcome": "LIQUIDATION"
+      }
     },
     {
       "case": "принудительное сокращение имеет производителя: ADL не полностью",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "5" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "5"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "FORCED_REDUCTION" }
+      "expect": {
+        "closeOutcome": "FORCED_REDUCTION"
+      }
     },
     {
       "case": "ADL полностью — то же принудительное сокращение",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "6" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "6"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "FORCED_REDUCTION" }
+      "expect": {
+        "closeOutcome": "FORCED_REDUCTION"
+      }
     },
     {
       "case": "незнакомое значение не маппится в штатный выход: корзина плюс отчёт",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "7" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "7"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "UNDETERMINED", "unrecognizedCloseTypeReported": true }
+      "expect": {
+        "closeOutcome": "UNDETERMINED",
+        "unrecognizedCloseTypeReported": true
+      }
     },
     {
       "case": "недобытый операнд даёт ту же корзину, но отчёта не производит",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": false } ]
+        "episodes": [
+          {
+            "closeRecordFetched": false
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "UNDETERMINED", "unrecognizedCloseTypeReported": false }
+      "expect": {
+        "closeOutcome": "UNDETERMINED",
+        "unrecognizedCloseTypeReported": false
+      }
     },
     {
       "case": "добытая запись с пустым типом закрытия — непригодный операнд: корзина плюс отчёт, а не тихая недобытость",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": null } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": null
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "UNDETERMINED", "unrecognizedCloseTypeReported": true }
+      "expect": {
+        "closeOutcome": "UNDETERMINED",
+        "unrecognizedCloseTypeReported": true
+      }
     },
     {
       "case": "добытая запись с типом-пустой-строкой — та же непригодность, что и отсутствие ключа",
       "state": {
         "hadEntry": true,
-        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "" } ]
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": ""
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "UNDETERMINED", "unrecognizedCloseTypeReported": true }
+      "expect": {
+        "closeOutcome": "UNDETERMINED",
+        "unrecognizedCloseTypeReported": true
+      }
     },
     {
       "case": "ликвидация одного эпизода не тонет в штатных выходах соседей",
       "state": {
         "hadEntry": true,
         "episodes": [
-          { "closeRecordFetched": true, "externalCloseType": "2" },
-          { "closeRecordFetched": true, "externalCloseType": "3" },
-          { "closeRecordFetched": true, "externalCloseType": "2" }
-        ]
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "2"
+          },
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "3"
+          },
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "2"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "LIQUIDATION" }
+      "expect": {
+        "closeOutcome": "LIQUIDATION"
+      }
     },
     {
       "case": "ликвидация старше принудительного сокращения",
       "state": {
         "hadEntry": true,
         "episodes": [
-          { "closeRecordFetched": true, "externalCloseType": "6" },
-          { "closeRecordFetched": true, "externalCloseType": "3" }
-        ]
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "6"
+          },
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "3"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "LIQUIDATION" }
+      "expect": {
+        "closeOutcome": "LIQUIDATION"
+      }
     },
     {
       "case": "наблюдённое принудительное сокращение сильнее неизвестности соседа",
       "state": {
         "hadEntry": true,
         "episodes": [
-          { "closeRecordFetched": false },
-          { "closeRecordFetched": true, "externalCloseType": "5" }
-        ]
+          {
+            "closeRecordFetched": false
+          },
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "5"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "FORCED_REDUCTION" }
+      "expect": {
+        "closeOutcome": "FORCED_REDUCTION"
+      }
     },
     {
       "case": "неизвестность одного эпизода не даёт объявить сделке штатный выход",
       "state": {
         "hadEntry": true,
         "episodes": [
-          { "closeRecordFetched": true, "externalCloseType": "2" },
-          { "closeRecordFetched": false }
-        ]
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "2"
+          },
+          {
+            "closeRecordFetched": false
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "UNDETERMINED", "unrecognizedCloseTypeReported": false }
+      "expect": {
+        "closeOutcome": "UNDETERMINED",
+        "unrecognizedCloseTypeReported": false
+      }
     },
     {
       "case": "нераспознанное значение соседа тоже поднимает сделку в корзину, и отчёт заводится",
       "state": {
         "hadEntry": true,
         "episodes": [
-          { "closeRecordFetched": true, "externalCloseType": "2" },
-          { "closeRecordFetched": true, "externalCloseType": "liquidation" }
-        ]
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "2"
+          },
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "liquidation"
+          }
+        ],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": "UNDETERMINED", "unrecognizedCloseTypeReported": true }
+      "expect": {
+        "closeOutcome": "UNDETERMINED",
+        "unrecognizedCloseTypeReported": true
+      }
     },
     {
       "case": "вошедшая сделка без единого эпизода: утверждать штатный выход не из чего",
       "state": {
         "hadEntry": true,
-        "episodes": []
+        "episodes": [],
+        "graphComplete": true
       },
-      "expect": { "episodeCount": 0, "closeOutcome": "UNDETERMINED", "unrecognizedCloseTypeReported": false }
+      "expect": {
+        "episodeCount": 0,
+        "closeOutcome": "UNDETERMINED",
+        "unrecognizedCloseTypeReported": false
+      }
     },
     {
       "case": "тропа закрытия без входа: признак неприменим, а не UNDETERMINED",
       "state": {
         "hadEntry": false,
-        "episodes": []
+        "episodes": [],
+        "graphComplete": true
       },
-      "expect": { "closeOutcome": null, "unrecognizedCloseTypeReported": false }
+      "expect": {
+        "closeOutcome": null,
+        "unrecognizedCloseTypeReported": false
+      }
+    },
+    {
+      "case": "граф сделки предъявлен не целиком: исход не резолвится в штатный выход молча — недогруженный список эпизодов даёт UNDETERMINED, а не NORMAL_EXIT",
+      "state": {
+        "graphComplete": false,
+        "hadEntry": true,
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "2"
+          }
+        ]
+      },
+      "expect": {
+        "closeOutcome": "UNDETERMINED"
+      }
+    },
+    {
+      "case": "тот же расклад на полном графе — штатный выход: пара примеров и делает охрану полноты различающей",
+      "state": {
+        "graphComplete": true,
+        "hadEntry": true,
+        "episodes": [
+          {
+            "closeRecordFetched": true,
+            "externalCloseType": "2"
+          }
+        ]
+      },
+      "expect": {
+        "closeOutcome": "NORMAL_EXIT"
+      }
     }
   ]
 }

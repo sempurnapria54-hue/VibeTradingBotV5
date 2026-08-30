@@ -17,11 +17,15 @@
   "values": [
     {
       "name": "orderIsLive",
+      "independentFrom": "algo-order-lifecycle/algoIsLive",
+      "independentReason": "Совпадение с перечнем живых статусов условной заявки — совпадение у РАЗНЫХ предметов; перечни независимы.",
       "note": "Живая заявка: подтверждения ещё нет либо она может исполниться.",
       "expr": "in(status, 'CREATED', 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED')"
     },
     {
       "name": "orderIsFinal",
+      "independentFrom": "algo-order-lifecycle/algoIsFinal",
+      "independentReason": "То же для терминальных статусов: перечни двух жизненных циклов независимы.",
       "expr": "in(status, 'COMPLETED', 'CANCELED', 'ERROR')"
     },
     {
@@ -163,6 +167,15 @@
       "case": "родитель в ошибочном состоянии — защита туда же",
       "state": { "parentStatus": "ERROR", "positionLive": true, "standaloneProtectionExists": false },
       "expect": { "missingAttachedOutcome": "ERROR" }
+    },
+    {
+      "case": "отменённая заявка терминальна — контрпример к предикату терминальности: без него он удовлетворялся бы константой false",
+      "state": {
+        "status": "CANCELED"
+      },
+      "expect": {
+        "orderIsFinal": true
+      }
     }
   ]
 }

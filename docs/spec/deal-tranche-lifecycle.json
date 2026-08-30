@@ -199,6 +199,16 @@
       "case": "терминальный транш активным не считается",
       "state": { "status": "CLOSED" },
       "expect": { "isTrancheTerminal": true, "isTrancheActive": false }
+    },
+    {
+      "case": "сопровождаемый транш активен и не терминален — контрпример к обоим предикатам состояния",
+      "state": {
+        "status": "MANAGING"
+      },
+      "expect": {
+        "isTrancheTerminal": false,
+        "isTrancheActive": true
+      }
     }
   ]
 }

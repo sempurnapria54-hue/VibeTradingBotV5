@@ -74,6 +74,16 @@ Store: они печатают строку «Python» и завершаются
     "protection-coverage" из includes файла strategy-reference. Ожидание:
     1 находка класса B — заимствованная entryAnchor стои́т на hasLiveEpisode,
     у которого есть дом-величина, но в область видимости он не введён.
+  ось C — КОПИЯ ФОРМЫ ПОД СОБСТВЕННЫМ ИМЕНЕМ: переименовать величину-дом в
+    копию у соседа (или объявить второе имя с тем же выражением). Ожидание:
+    находка класса C — два имени несут одно выражение, и расхождение копий
+    ничем не ловится. Правило — .claude/rules/structure.md, строка docs/spec:
+    «копия формулы под другим именем или на другом префиксе операнда —
+    дефект». ИСКЛЮЧЕНИЕ, названное тем же правилом: совпадение выражений у
+    РАЗНЫХ ПРЕДМЕТОВ (два жизненных цикла, две сущности) дублем не считается —
+    перечни независимы и могут разойтись законно. Исключение объявляется в
+    самой спеке ключом "independentFrom": "<спека>/<величина>" на величине;
+    молчаливого пропуска нет — без объявления пара остаётся находкой.
 
 Зелёная проба означает, что мутация перестала попадать в носитель (файл
 переименован, форма изменилась), и проба переякоривается, а не удаляется.
@@ -123,6 +133,7 @@ for s in specs:
 
 bad = 0
 guest = 0
+copies = 0
 skipped = set()
 for name in specs:
     spec = load(name)
@@ -167,7 +178,48 @@ for name in specs:
                       % (name, v["name"], origin, ident, ", ".join(declared_in[ident])))
                 bad += 1
 
+# --- ось C: копия формы под собственным именем -------------------------------
+def form_of(v):
+    """Нормализованная форма величины: скаляр — выражение, агрегат — его части."""
+    if v.get("expr") is not None:
+        return re.sub(r"\s+", " ", str(v["expr"])).strip()
+    parts = {k: v.get(k) for k in ("op", "over", "where", "of") if v.get(k) is not None}
+    if not parts:
+        return None
+    return "АГРЕГАТ " + json.dumps(parts, ensure_ascii=False, sort_keys=True)
+
+
+forms = {}
+exempt = {}
+for name in specs:
+    for v in load(name).get("values", []):
+        form = form_of(v)
+        if form is None:
+            continue
+        forms.setdefault(form, []).append((name, v["name"]))
+        for target in ([v["independentFrom"]] if isinstance(v.get("independentFrom"), str)
+                       else v.get("independentFrom", [])):
+            exempt.setdefault((name, v["name"]), set()).add(target)
+
+for form, owners in sorted(forms.items()):
+    distinct = sorted({owner for owner in owners})
+    if len(distinct) < 2 or len({value for _, value in distinct}) < 2:
+        continue
+    labels = {owner: "%s/%s" % owner for owner in distinct}
+    unresolved = []
+    for owner in distinct:
+        others = [labels[other] for other in distinct if other != owner]
+        declared = exempt.get(owner, set())
+        if not all(other in declared for other in others):
+            unresolved.append(owner)
+    if not unresolved:
+        continue
+    print("КЛАСС C: одно выражение под разными именами — %s; форма: %s"
+          % (", ".join(labels[owner] for owner in distinct), form[:120]))
+    copies += 1
+
 print("РАЗРЫВОВ (A): %d; ПОДМЕН ДОМА ГОСТЕВЫМ СОСТОЯНИЕМ (B): %d; "
+      "КОПИЙ ФОРМЫ ПОД СОБСТВЕННЫМ ИМЕНЕМ (C): %d; "
       "ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ (не дефект): %d имён"
-      % (bad, guest, len(skipped)))
-sys.exit(1 if bad or guest else 0)
+      % (bad, guest, copies, len(skipped)))
+sys.exit(1 if bad or guest or copies else 0)

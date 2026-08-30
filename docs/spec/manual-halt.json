@@ -156,6 +156,7 @@
     },
     {
       "name": "counterMovedByOperation",
+      "provenBy": "consecutiveLossCountAfterOperation",
       "note": "Инвариант: ручная операция счётчик серии не двигает. Обнуление счётчика снятием холда гасило бы остановку П1 на холде, поднятом расхождением сверки, — к которой держатель не прикасался. Значение обязано быть false в каждом примере.",
       "expr": "consecutiveLossCountAfterOperation != consecutiveLossCountBefore"
     },
@@ -171,46 +172,55 @@
     },
     {
       "name": "holdClearedByRaise",
+      "provenBy": "rungRankAfter",
       "note": "Инвариант: постановка холд не снимает и ступень не понижает — ни срока действия, ни обратного хода у неё нет. Выражен через РАНГ, а не через членство в множестве ступеней: редакция «statusAfter не входит в перечень ступеней» была тождественно ложна (при постановке statusAfter всегда одна из ступеней) и понижения не ловила вовсе. Значение обязано быть false в каждом примере.",
       "expr": "isRaise && rungRankAfter < rungRankBefore"
     },
     {
       "name": "jumpFromTeardownToWorking",
+      "provenBy": "clearanceTarget",
       "note": "Инвариант: снятие биржевого сворачивания не ведёт сразу в рабочее состояние. Значение обязано быть false в каждом примере — оно и есть исполнимая форма клаузы «прыжка сразу в рабочее состояние нет».",
       "expr": "isClear && requestedScope == 'EXCHANGE' && hardStanding && statusAfter == 'ACTIVE'"
     },
     {
       "name": "clearedOverLiveRisk",
+      "provenBy": "clearanceApplied",
       "note": "Инвариант: сворачивание не снимается, пока на радиусе есть живой риск. Значение обязано быть false в каждом примере.",
       "expr": "clearanceApplied && requestedClass == 'FULL' && liveRiskOnScope"
     },
     {
       "name": "refusalUnobservable",
+      "provenBy": "launchForm",
       "note": "Инвариант: отказ при запуске не уходит в асинхронную форму. Асинхронный отказ невидим вызывающему — держатель получает 202 и считает, что остановил биржу, которая продолжает торговать. Значение обязано быть false в каждом примере.",
       "expr": "launchRefused && launchForm == 'ASYNC'"
     },
     {
       "name": "onboardingReadAsRung",
+      "provenBy": "softStanding",
       "note": "Инвариант: онбординговый статус инструмента не читается как стоящая ступень лестницы. Значение обязано быть false в каждом примере.",
       "expr": "onboardingStanding && (softStanding || hardStanding)"
     },
     {
       "name": "teardownWithoutExit",
+      "provenBy": "killSwitchRun",
       "note": "Инвариант: у ступени сворачивания с непогашенным риском есть выход — повторный полный вызов гоняет снятие риска заново. Значение обязано быть false в каждом примере: иначе объект стоит в жёсткой ступени, снятие отвергается предусловием, а повтор постановки ничего не делает — состояние без выхода, названное недопустимым в docs/concept.md.",
       "expr": "isRaise && callOrigin == 'HOLDER' && requestedClass == 'FULL' && validPair && !launchRefused && objectStatusBefore == requestedRung && liveRiskOnScope && !fullReactionRunningOnObject && !killSwitchRun"
     },
     {
       "name": "automaticRetryLoop",
+      "provenBy": "killSwitchRun",
       "note": "Инвариант: автоматический сигнал цикла повторного сворачивания не образует. Доведение недоделанного — право ТОЛЬКО явного вызова держателя: его частоту задаёт человек. У автоматического триггера производитель периодический (docs/components/AnomalyJob.md), и его детекторы держатся ровно тогда, когда снятие риска не подтвердилось — сняв для него поглощение, мы получили бы flatten на биржу каждым тиком и обесценили бы предел попыток KillSwitchExecutor как терминал (эскалировать со ступени 2 некуда). Значение обязано быть false в каждом примере.",
       "expr": "isRaise && callOrigin == 'DETECTOR' && requestedClass == 'FULL' && objectStatusBefore == requestedRung && liveRiskOnScope && killSwitchRun"
     },
     {
       "name": "concurrentKillSwitchOnScope",
+      "provenBy": "killSwitchRun",
       "note": "Инвариант: двух одновременных прогонов снятия риска по одному объекту радиуса не бывает. Прежний довод «конкурирующие вызовы сходятся на анкере статуса, и второй не находит работы» держался только пока анкер поглощал повтор; при непогашенном риске работу находят оба, и оба ушли бы в kill-switch по одному живому риску. Пока полная реакция объекта идёт, она сама служит анкером — второй вызов её не дублирует. Значение обязано быть false в каждом примере.",
       "expr": "killSwitchRun && fullReactionRunningOnObject"
     },
     {
       "name": "manualRetryUnlogged",
+      "provenBy": "reportProduced",
       "note": "Инвариант: ручное доведение поверх ступени, поднятой автоматикой, не остаётся без строки журнала. Ключ состояния включает code, коды ручной и автоматической троп не пересекаются — значит ручной строки по ключу нет, и молчание журнала означало бы, что человек перезапустил аварийное снятие риска, а журнал об этом не знает (против docs/concept.md, П3). Значение обязано быть false в каждом примере.",
       "expr": "riskTeardownRetry && !standingRungRaisedManually && !reportProduced"
     }
@@ -392,6 +402,28 @@
       "case": "постановка: второе доведение, пока полная реакция объекта уже идёт, второго kill-switch не запускает",
       "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": true, "fullReactionRunningOnObject": true, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": true, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
       "expect": { "riskTeardownRetry": true, "reactionApplied": true, "killSwitchRun": false, "concurrentKillSwitchOnScope": false, "teardownWithoutExit": false, "reportProduced": false, "statusAfter": "TRADE_BLOCKED", "holdClearedByRaise": false }
+    },
+    {
+      "case": "снятие мягкой ступени биржи возвращает объект в рабочее состояние: ранг после операции нулевой — контрпример к рангу, без него он удовлетворялся бы константой 2",
+      "state": {
+        "callOrigin": "HOLDER",
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "standingRungRaisedManually": true,
+        "fullReactionRunningOnObject": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 2
+      },
+      "expect": {
+        "statusAfter": "ACTIVE",
+        "rungRankBefore": 1,
+        "rungRankAfter": 0
+      }
     }
   ]
 }

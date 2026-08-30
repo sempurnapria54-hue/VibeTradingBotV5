@@ -131,6 +131,23 @@
       "case": "аварийная реакция на устаревание не блокирует, а сворачивает",
       "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1900, "expiredSetting": "KILL_SWITCH", "actionKind": "DATA_DEPENDENT" },
       "expect": { "reaction": "KILL_SWITCH", "actionBlocked": false }
+    },
+    {
+      "case": "свежий вход расчёту не отказывает — контрпример к предикату отказа: без него он удовлетворялся бы константой true",
+      "state": {
+        "kind": "STRUCTURE",
+        "windowEndAt": 1000,
+        "candleTimestamp": null,
+        "confirmedAt": 1200,
+        "expirationDuration": 300,
+        "now": 1250,
+        "expiredSetting": "BLOCK_STEP",
+        "actionKind": "DATA_DEPENDENT"
+      },
+      "expect": {
+        "isFresh": true,
+        "computationRefuses": false
+      }
     }
   ]
 }

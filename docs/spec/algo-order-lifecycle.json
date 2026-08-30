@@ -13,10 +13,14 @@
   "values": [
     {
       "name": "algoIsLive",
+      "independentFrom": "order-lifecycle/orderIsLive",
+      "independentReason": "Совпадение с перечнем живых статусов заявки — совпадение у РАЗНЫХ предметов: жизненный цикл условной заявки и жизненный цикл обычной независимы и могут разойтись законно (правило .claude/rules/structure.md, строка docs/spec).",
       "expr": "in(status, 'CREATED', 'PENDING', 'ACTIVE', 'PARTIALLY_COMPLETED')"
     },
     {
       "name": "algoIsFinal",
+      "independentFrom": "order-lifecycle/orderIsFinal",
+      "independentReason": "То же для терминальных статусов: перечни двух жизненных циклов независимы.",
       "expr": "in(status, 'COMPLETED', 'CANCELED', 'ERROR')"
     },
     {
@@ -84,6 +88,15 @@
       "case": "частично сработавшая доходит до полного срабатывания",
       "state": { "from": "PARTIALLY_COMPLETED", "to": "COMPLETED", "closeReason": null },
       "expect": { "transitionAccepted": true }
+    },
+    {
+      "case": "сработавшая условная заявка терминальна — контрпример к предикату терминальности: без него он удовлетворялся бы константой false",
+      "state": {
+        "status": "COMPLETED"
+      },
+      "expect": {
+        "algoIsFinal": true
+      }
     }
   ]
 }

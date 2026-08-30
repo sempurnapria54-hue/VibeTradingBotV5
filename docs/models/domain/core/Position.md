@@ -93,9 +93,15 @@
 позиция не создаётся локально до биржи, а частичное уменьшение — это
 активная позиция с обновлённым размером.
 
-**`CloseReason`** — `CLOSED_BY_STRATEGY`, `KILL_SWITCH`, `MANUAL_CLOSE`,
+**`CloseReason`** — `CLOSED_BY_STRATEGY`, `KILL_SWITCH`,
 `EXTERNAL_CLOSE` (закрылась на стороне биржи без нашего действия),
 `UNKNOWN_EXTERNAL_STATUS`, `EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`.
+
+**`MANUAL_CLOSE` в перечне нет** — решение держателя 2026-08-30: точечные
+ручки вне scope фазы 1, ручное закрытие отдельной позиции не заводится, а
+аварийное вмешательство идёт килл-свичем и несёт `KILL_SWITCH`. Дом
+решения и условие возврата — `docs/rules/manual-halt.md` §«Точечных ручек
+в фазе 1 нет».
 
 ## Живой риск
 

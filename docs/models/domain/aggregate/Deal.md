@@ -87,7 +87,8 @@
 
 **`CloseReason`** — `ENTRY_CONDITION_EXPIRED`, `STRATEGY_EXIT`,
 `TAKE_PROFIT`, `STOP_LOSS` (включая трейлинг), `TIME_STOP`,
-`RISK_CONTROL`, `MANUAL_CLOSE`, `EMERGENCY_CLOSE`, `UNKNOWN`. Описывает
+`RISK_CONTROL`, `EMERGENCY_CLOSE`, `UNKNOWN`. `MANUAL_CLOSE` снят —
+`docs/rules/manual-halt.md` §«Точечных ручек в фазе 1 нет». Описывает
 бизнес-причину, а не технический механизм закрытия. Енум общий с траншем:
 причина закрытия транша выражается теми же значениями.
 

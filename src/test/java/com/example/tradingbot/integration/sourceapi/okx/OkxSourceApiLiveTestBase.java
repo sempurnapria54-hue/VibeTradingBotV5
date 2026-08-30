@@ -375,6 +375,32 @@ abstract class OkxSourceApiLiveTestBase {
                 r.dataSize(), r.sCode(), r.sMsg());
     }
 
+    /**
+     * Логирует **состав** {@code data} кейса — по строке на элемент, целиком.
+     * Отдельный от {@link #observe} инструмент, потому что тот печатает
+     * {@code data.size} и три кода, то есть **мощность**, а не содержание:
+     * наблюдение, сохранённое счётом, не является добытым фактом (реестр
+     * `.claude/tests/source-api/okx/code-preconditions.md`, кейсы AG6.1,
+     * AG6.2, AG1.7, AG3.6). Расширять {@link #observe} нельзя — его зовут
+     * ~200 кейсов, часть из которых тянет ордера и позиции.
+     */
+    protected void observeContent(String caseId, RawResponse r) {
+        observe(caseId, r);
+        JsonNode data = r.data();
+        if (!data.isArray()) {
+            log.info("[{}] CONTENT — data не массив: {}", caseId, data);
+            return;
+        }
+        for (int i = 0; i < data.size(); i++) {
+            log.info("[{}] CONTENT[{}] {}", caseId, i, data.get(i));
+        }
+    }
+
+    /** Логирует именованное наблюдение кейса (величина, выведенная из ответа). */
+    protected void observeValue(String caseId, String name, Object value) {
+        log.info("[{}] VALUE {} = {}", caseId, name, value);
+    }
+
     // ---------------------------------------------------------------------
     // Поллинг (wait-until-condition) — троттл-пейсинг, per-case таймаут
     // ---------------------------------------------------------------------

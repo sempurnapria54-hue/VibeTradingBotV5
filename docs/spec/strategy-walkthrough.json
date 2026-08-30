@@ -18,6 +18,7 @@
   "values": [
     {
       "name": "noStageTwoReaction",
+      "provenBy": "trancheViolated",
       "note": "Штатный проход не даёт биржевой ступени 2 ни на одном шаге.",
       "expr": "!trancheViolated"
     },
@@ -230,6 +231,41 @@
         "declaredCancelTarget": null
       },
       "expect": { "trancheCloseAttributed": 3, "trancheExposure": 0, "trancheHasLiveEntryOrder": false, "trancheHasLiveProtection": false, "trancheRiskBearing": false, "trancheViolated": false, "noStageTwoReaction": true }
+    },
+    {
+      "case": "цель снятия объявлена корнем, которого в пакете нет: кандидатов ноль — контрпример к счётчику, без него он удовлетворялся бы константой 1",
+      "state": {
+        "step": "проба счётчика кандидатов снятия",
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
+        "protections": [
+          {
+            "id": "breakeven",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          }
+        ],
+        "commitments": [
+          {
+            "terminal": false,
+            "budgetExhausted": false
+          }
+        ],
+        "cancelTargetId": "breakeven",
+        "declaredCancelTarget": "bull_trailing"
+      },
+      "expect": {
+        "cancelTargetCandidates": 0
+      }
     }
   ]
 }

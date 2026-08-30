@@ -2,7 +2,7 @@
   "subject": "deal-context-load",
   "question": "Какой объём графа сделки обязан быть загружен",
   "home": "docs/components/DealContextService.md",
-  "includes": ["protection-coverage", "order-lifecycle", "algo-order-lifecycle", "deal-risk-numbers"],
+  "includes": ["risk-at-stop", "protection-coverage", "order-lifecycle", "algo-order-lifecycle", "deal-risk-numbers"],
 
   "operands": {
     "deal.billsWindowBegin": "Deal.billsWindowBegin — время создания первой ОТПРАВЛЕННОЙ входной заявки сделки; write-once, единственный писатель SubmitOrderExecutor (docs/models/domain/aggregate/Deal.md §Структура). Durable-колонка сделки: её значение не выводится из загружаемых коллекций и потому годится в удостоверители их пустоты",
@@ -10,6 +10,8 @@
     "episodes[].loaded": "эпизод позиции попал в загруженный контекст",
     "episodes[].exitAt": "положение закрытия эпизода добыто",
     "tranches[].loaded": "транш сделки попал в загруженный контекст; транши грузятся все, включая терминальные",
+    "legs[].entryAnchor": "плановая цена входа ноги — себестоимость её риска; операнд дома закрытой формы docs/spec/risk-at-stop.json",
+    "legs[].plannedStopPrice": "ПЛАНОВЫЙ уровень стопа ноги — операнд обратной задачи ставки комиссии (docs/spec/deal-risk-numbers.json, feeRate)",
     "legs[].loaded": "нога (заявка) сделки попала в загруженный контекст; ноги собираются обходом всех траншей",
     "legs[].type": "Order.type — бизнес-тип ноги; предикат ноги входа берётся из дома protection-coverage §isEntryOrder (подключён своим includes), здесь множество не переписывается",
     "legs[].accumulatedFillSize": "Order.accumulatedFillSize — исполненный объём ноги",
@@ -700,6 +702,171 @@
         "algoOrders": []
       },
       "expect": { "algoComplete": true, "computationAllowed": true }
+    },
+    {
+      "case": "полный контекст: обе стороны предиката добытости истинны, ответ не искажён — контрпример к трём предикатам разом",
+      "state": {
+        "flowsFetched": true,
+        "deal": {
+          "entryReason": "STRATEGY",
+          "billsWindowBegin": 10
+        },
+        "cashFlowsTruncated": false,
+        "position": {
+          "externalSize": 3
+        },
+        "episodes": [
+          {
+            "loaded": true,
+            "exitAt": 100
+          },
+          {
+            "loaded": true,
+            "exitAt": 200
+          }
+        ],
+        "tranches": [
+          {
+            "loaded": true
+          }
+        ],
+        "legs": [
+          {
+            "loaded": true,
+            "type": "ENTRY",
+            "accumulatedFillSize": 2,
+            "protections": [
+              {
+                "loaded": true,
+                "carrier": "ATTACHED",
+                "status": "ACTIVE",
+                "kind": "STOP",
+                "size": 2,
+                "parentFillSize": 2
+              }
+            ]
+          },
+          {
+            "loaded": true,
+            "type": "ENTRY",
+            "accumulatedFillSize": 1,
+            "protections": [
+              {
+                "loaded": true,
+                "carrier": "ATTACHED",
+                "status": "ACTIVE",
+                "kind": "STOP",
+                "size": 1,
+                "parentFillSize": 1
+              }
+            ]
+          }
+        ],
+        "algoOrders": [
+          {
+            "loaded": true,
+            "status": "ACTIVE",
+            "kind": "STOP"
+          }
+        ],
+        "cashFlows": [
+          {
+            "loaded": true
+          },
+          {
+            "loaded": true
+          }
+        ]
+      },
+      "expect": {
+        "flowsComplete": true,
+        "exitObtainedLoaded": true,
+        "exitObtainedFull": true,
+        "exitAnswerDistorted": false
+      }
+    },
+    {
+      "case": "загруженный эпизод без добытого закрытия: предикат добытости по загруженным ложен — контрпример",
+      "state": {
+        "deal": {
+          "entryReason": "STRATEGY",
+          "billsWindowBegin": 10
+        },
+        "episodes": [
+          {
+            "loaded": true,
+            "exitAt": 100
+          },
+          {
+            "loaded": true,
+            "exitAt": null
+          }
+        ]
+      },
+      "expect": {
+        "exitObtainedLoaded": false,
+        "exitObtainedFull": false,
+        "exitAnswerDistorted": false
+      }
+    },
+    {
+      "case": "покрытие ниже нетто-размера позиции: ответ о полноте покрытия ложен — контрпример",
+      "state": {
+        "deal": {
+          "entryReason": "STRATEGY",
+          "billsWindowBegin": 10
+        },
+        "cashFlowsTruncated": false,
+        "position": {
+          "externalSize": 3
+        },
+        "episodes": [
+          {
+            "loaded": true,
+            "exitAt": 100
+          }
+        ],
+        "tranches": [
+          {
+            "loaded": true
+          }
+        ],
+        "legs": [
+          {
+            "loaded": true,
+            "type": "ENTRY",
+            "accumulatedFillSize": 2,
+            "protections": [
+              {
+                "loaded": true,
+                "carrier": "ATTACHED",
+                "status": "ACTIVE",
+                "kind": "STOP",
+                "size": 2,
+                "parentFillSize": 2
+              },
+              {
+                "loaded": false,
+                "carrier": "ATTACHED",
+                "status": "CANCELED",
+                "kind": "STOP",
+                "size": 2,
+                "parentFillSize": 2
+              }
+            ]
+          }
+        ],
+        "algoOrders": [
+          {
+            "loaded": true,
+            "status": "ACTIVE",
+            "kind": "STOP"
+          }
+        ]
+      },
+      "expect": {
+        "coverageAnswerFull": false
+      }
     }
   ]
 }

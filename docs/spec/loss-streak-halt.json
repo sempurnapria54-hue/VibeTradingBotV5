@@ -76,6 +76,7 @@
     },
     {
       "name": "holdClearedByDealOutcome",
+      "provenBy": "holdStandingAfter",
       "note": "Исход сделки не снимает холд никогда — ни ценово-прибыльная сделка, ни несработавший порог, ни холд, поднятый по другой причине. Снятие любого холда есть ручное действие держателя. Редакция holdStandingAfter = haltTriggered (статус биржи как if(haltTriggered,'HOLD','ACTIVE')) на несработавшем пороге снимала бы стоявшую ступень, поэтому величина считается от стоящей ступени.",
       "expr": "holdStandingBefore && !holdStandingAfter"
     }
@@ -161,6 +162,38 @@
       "case": "финансирование съело ценовую прибыль ровно в ноль: счётчик не двигается",
       "state": { "resultProfit": -10.0, "fundingCost": 10.0, "resultAvailable": true, "dealTerminal": "CLOSED", "exchangeStatusBefore": "ACTIVE", "consecutiveLossCountBefore": 2, "lossLimit": 3 },
       "expect": { "priceResult": 0, "isNeutral": true, "isLoss": false, "isProfit": false, "consecutiveLossCountAfter": 2, "haltTriggered": false, "holdStandingAfter": false }
+    },
+    {
+      "case": "предел серии задан — risk-creating не отвергается: контрпример к предикату отказа",
+      "state": {
+        "resultProfit": -12.5,
+        "fundingCost": 0,
+        "resultAvailable": true,
+        "dealTerminal": "CLOSED",
+        "exchangeStatusBefore": "ACTIVE",
+        "consecutiveLossCountBefore": 0,
+        "lossLimit": 3
+      },
+      "expect": {
+        "limitConfigured": true,
+        "riskCreatingRefused": false
+      }
+    },
+    {
+      "case": "ненулевой ценовой результат нейтральным не считается, а счётчик не заморожен — контрпримеры к обоим предикатам",
+      "state": {
+        "resultProfit": -12.5,
+        "fundingCost": 0,
+        "resultAvailable": true,
+        "dealTerminal": "CLOSED",
+        "exchangeStatusBefore": "ACTIVE",
+        "consecutiveLossCountBefore": 0,
+        "lossLimit": 3
+      },
+      "expect": {
+        "isNeutral": false,
+        "counterFrozen": false
+      }
     }
   ]
 }

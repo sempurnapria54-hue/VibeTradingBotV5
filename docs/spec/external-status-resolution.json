@@ -55,7 +55,7 @@
     },
     {
       "name": "closeReasonCandidate",
-      "note": "Кандидат причины: у отмены он приходит из нашего намерения, а не из статуса источника. Намерения нет — причина всё равно непуста: UNKNOWN означает «отмена наблюдена, наше намерение не резолвится», и без неё отмена, инициированная не нами, упиралась бы в требование непустой причины на ребре в CANCELED (docs/spec/algo-order-lifecycle.json, reasonRequired). Ручная отмена от биржевой отличается прежним значением MANUAL_CANCEL нашего намерения и сырым статусом источника, сохранённым на сущности.",
+      "note": "Кандидат причины: у отмены он приходит из нашего намерения, а не из статуса источника. Намерения нет — причина всё равно непуста: UNKNOWN означает «отмена наблюдена, наше намерение не резолвится», и без неё отмена, инициированная не нами, упиралась бы в требование непустой причины на ребре в CANCELED (docs/spec/algo-order-lifecycle.json, reasonRequired). Отмена, инициированная нами, отличается от биржевой непустым намерением (CANCELED_BY_STRATEGY, REPLACED_BY_STRATEGY, KILL_SWITCH) и сырым статусом источника, сохранённым на сущности. Значения MANUAL_CANCEL в перечне нет: точечные ручки вне scope фазы 1 (docs/rules/manual-halt.md).",
       "expr": "if(refusesInsteadOfMapping, refusalReason, if(notFoundIsTerminal, 'MISSING_AFTER_REFRESH', if(resolvedStatus == 'COMPLETED' && entity != 'POSITION', if(entity == 'ORDER', 'FILLED', 'TRIGGERED'), if(resolvedStatus == 'CANCELED', coalesce(cancelIntentReason, 'UNKNOWN'), if(positionAbsenceIsNormal, 'EXTERNAL_CLOSE', null)))))"
     },
     {
@@ -150,6 +150,20 @@
       "case": "заявка не найдена после полного цикла — терминал и биржевая реакция",
       "state": { "entity": "ORDER", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null },
       "expect": { "notFoundIsTerminal": true, "closeReasonApplied": "MISSING_AFTER_REFRESH", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "снапшот получен — ожидание добычи не объявляется: контрпример к предикату «ещё не найдено»",
+      "state": {
+        "entity": "ORDER",
+        "rawStatus": "live",
+        "snapshotFound": true,
+        "cycleExhausted": false,
+        "currentCloseReason": null,
+        "cancelIntentReason": null
+      },
+      "expect": {
+        "notFoundPending": false
+      }
     }
   ]
 }

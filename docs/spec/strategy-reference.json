@@ -2,7 +2,7 @@
   "subject": "strategy-reference",
   "question": "Проходит ли эталонная стратегия репозитория действующие требования к дереву стратегии",
   "home": "docs/rules/strategy-validation.md",
-  "includes": ["stop-distance", "protection-coverage", "order-lifecycle"],
+  "includes": ["risk-at-stop", "stop-distance", "protection-coverage", "order-lifecycle"],
   "operands": {
     "strategy": "src/main/resources/strategy-examples/trend-following-ema.json — исполнимый эталон",
     "details[].phaseEntryPolicy": "политика входа в фазе; NO_TRADE — неторгуемая деталь",
@@ -11,6 +11,8 @@
     "feeRate": "прогнозная ставка комиссии — операнд величин уровня стопа, заимствованных у docs/spec/stop-distance.json вместе с её набором. Здесь он объявлен контрактом, а не подключением дома: одноимённая величина docs/spec/deal-risk-numbers.json — ДРУГАЯ ставка (обращённая из замороженных плановых чисел ноги), и подключение того дома подменило бы смысл",
     "steps[].actions[].replacedCoverageFractionPercents": "доля ДЕЙСТВУЮЩЕГО покрытия, которую адресует это REPLACE- либо CANCEL-действие: объявленная доля его цели, резолвимой по targetActionKey (цепочка замещений — docs/rules/replace-not-amend.md). Цель защитой не является (снятие тейка) — покрытия действие не забирает, доля 0. Пусто — цель не разрешена; тогда действие считается адресующим ВСЁ покрытие: неизвестность не должна выводить шаг из-под проверки. Резолв по ключу — работа валидатора создания; в этой форме join по ключу невыразим, поэтому свойства цели приходят операндом",
     "details[].tranches[].levelCount": "сколько одновременно живых траншей объявляет эта запись; умолчания нет — пустое место мажорировалось бы единицей, то есть в разрешающую сторону",
+    "steps[].actions[].allocationPercents": "объявленная доля базы под нотинал входного действия, проценты — операнд статической проверки запаса под катастрофическим потолком",
+    "notionalHeadroomShare": "доля катастрофического потолка, которая обязана остаться свободной после объявленного нотинала; величина риск-аппетита, дом — docs/rules/risk-policy.md §«Нотинал укладывается в потолок с запасом, а не в границу»",
     "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — максимальный риск на сделку (конфигурация)",
     "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)"
   },
@@ -145,6 +147,38 @@
       "op": "count",
       "over": "strategy.details[]",
       "where": "isTradableDetail && !overlapRiskSatisfiable"
+    },
+    {
+      "name": "ceilingShareOfBase",
+      "note": "Катастрофический потолок сделки в ДОЛЯХ базы: та же форма, что у docs/spec/risk-limits.json (catastrophicLossCeiling), но без множителя base — на создании стратегии база ещё не наблюдена, а отношение уже вычислимо. Обе величины стоят на одних и тех же двух числах, поэтому проверка создания и преконтроль рантайма меряют один потолок.",
+      "expr": "globalSimultaneousRiskPerDealPercent / 100 * strategyCatastrophicRiskPerDealMultiplier"
+    },
+    {
+      "name": "trancheDeclaredNotionalShare",
+      "note": "Нотинал, который объявляет один транш, в долях базы: объявленная доля аллокации входного действия. Больше одного входного объявления у транша не бывает (tranchesWithSingleEntry), поэтому сумма по объявлениям транша и есть его доля.",
+      "op": "sum",
+      "over": "stepsByStatus{}[].actions[]",
+      "where": "actionKind == 'ORDER' && in(?orderType, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')",
+      "of": "coalesce(?allocationPercents, 0) / 100"
+    },
+    {
+      "name": "detailDeclaredNotionalShare",
+      "note": "Нотинал детали в долях базы: сумма по одновременно живым траншам. levelCount учитывается тем же счётом, что и в вееере риска (detailOverlapCount).",
+      "op": "sum",
+      "over": "tranches",
+      "where": null,
+      "of": "trancheDeclaredNotionalShare * levelCount"
+    },
+    {
+      "name": "notionalHeadroomSatisfied",
+      "note": "Объявленный нотинал детали укладывается в катастрофический потолок С ЗАПАСОМ, а не в равенство. Довод и число запаса — дом docs/rules/risk-policy.md §«Нотинал укладывается в потолок с запасом, а не в границу»: на границе запас округления нулевой, и проскок исполнения в считаные базисные пункты БЕССРОЧНО блокирует сопровождение — преконтроль отвергает всякое новое risk-creating действие сделки, а снять это состояние нечем, кроме выхода. Реджект создания — STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT.",
+      "expr": "detailDeclaredNotionalShare <= ceilingShareOfBase * (1 - notionalHeadroomShare)"
+    },
+    {
+      "name": "detailsBreakingNotionalHeadroom",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "isTradableDetail && !notionalHeadroomSatisfied"
     },
     {
       "name": "actionTypeKnown",
@@ -432,10 +466,34 @@
                       {
                         "stepType": "MAIN_PROTECTION",
                         "actions": [
-                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_2",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_3",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_4",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          }
                         ]
                       },
                       {
@@ -482,10 +540,34 @@
                       {
                         "stepType": "MAIN_PROTECTION",
                         "actions": [
-                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_2",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_3",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_4",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          }
                         ]
                       },
                       {
@@ -538,10 +620,34 @@
                       {
                         "stepType": "MAIN_PROTECTION",
                         "actions": [
-                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_2",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_3",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_4",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          }
                         ]
                       },
                       {
@@ -594,10 +700,34 @@
                       {
                         "stepType": "MAIN_PROTECTION",
                         "actions": [
-                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
-                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_2",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_3",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_4",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25
+                          }
                         ]
                       },
                       {
@@ -641,8 +771,20 @@
                       {
                         "stepType": "MAIN_PROTECTION",
                         "actions": [
-                          { "actionKind": "ALGO_ORDER", "key": "protection_oco", "actionType": "CREATE_ACTION", "conditionType": "OCO_FULL", "closeFractionPercents": 100 },
-                          { "actionKind": "ALGO_ORDER", "key": "tp_1", "actionType": "CREATE_ACTION", "conditionType": "TAKE_PROFIT", "closeFractionPercents": 50 }
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "protection_oco",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "OCO_FULL",
+                            "closeFractionPercents": 100
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "tp_1",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "TAKE_PROFIT",
+                            "closeFractionPercents": 50
+                          }
                         ]
                       },
                       {
@@ -734,7 +876,11 @@
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 0.5,
               "strategyCatastrophicRiskPerDealMultiplier": 100.0,
-              "tranches": [ { "levelCount": 1 } ]
+              "tranches": [
+                {
+                  "levelCount": 1
+                }
+              ]
             }
           ]
         }
@@ -756,7 +902,11 @@
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 2.0,
               "strategyCatastrophicRiskPerDealMultiplier": 100.0,
-              "tranches": [ { "levelCount": 1 } ]
+              "tranches": [
+                {
+                  "levelCount": 1
+                }
+              ]
             }
           ]
         }
@@ -778,7 +928,11 @@
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 1.0,
               "strategyCatastrophicRiskPerDealMultiplier": 200.0,
-              "tranches": [ { "levelCount": 1 } ]
+              "tranches": [
+                {
+                  "levelCount": 1
+                }
+              ]
             }
           ]
         }
@@ -817,7 +971,10 @@
                             "actionType": "CREATE_ACTION",
                             "orderType": "ENTRY_ATTACHED_STOP_LOSS",
                             "attachedProtection": {
-                              "stopLossSettings": { "calculationType": "BREAKEVEN", "triggerPriceType": "MARK" }
+                              "stopLossSettings": {
+                                "calculationType": "BREAKEVEN",
+                                "triggerPriceType": "MARK"
+                              }
                             }
                           }
                         ]
@@ -853,7 +1010,10 @@
                             "actionKind": "ALGO_ORDER",
                             "actionType": "CREATE_ACTION",
                             "conditionType": "OCO_FULL",
-                            "stopLossSettings": { "calculationType": "BREAKEVEN", "triggerPriceType": "MARK" }
+                            "stopLossSettings": {
+                              "calculationType": "BREAKEVEN",
+                              "triggerPriceType": "MARK"
+                            }
                           }
                         ]
                       }
@@ -888,7 +1048,11 @@
               "phaseEntryPolicy": "FOLLOW_PHASE",
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 1.0,
-              "tranches": [ { "levelCount": 3 } ]
+              "tranches": [
+                {
+                  "levelCount": 3
+                }
+              ]
             }
           ]
         }
@@ -906,7 +1070,14 @@
               "phaseEntryPolicy": "FOLLOW_PHASE",
               "riskPerActionPercent": 0.5,
               "strategySimultaneousRiskPerDealPercent": 1.0,
-              "tranches": [ { "levelCount": 1 }, { "levelCount": 1 } ]
+              "tranches": [
+                {
+                  "levelCount": 1
+                },
+                {
+                  "levelCount": 1
+                }
+              ]
             }
           ]
         }
@@ -924,13 +1095,426 @@
               "phaseEntryPolicy": "FOLLOW_PHASE",
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 1.0,
-              "tranches": [ { "key": "t1" } ]
+              "tranches": [
+                {
+                  "key": "t1"
+                }
+              ]
             }
           ]
         }
       },
       "expectRefusal": {
         "detailsBreakingOverlap": "levelCount транша не объявлен"
+      }
+    },
+    {
+      "case": "объявление старой модели: риск-поля действующей не заполнены, поле риска — прежнего имени, фаза без торговли, тип шага вне сделочной поверхности, тип действия вне словаря",
+      "state": {
+        "riskPerTradePercent": 1.0,
+        "phaseEntryPolicy": "NO_TRADE",
+        "stepType": "MAIN_PROTECTION",
+        "actionType": "LEGACY_LEVEL_ACTION",
+        "tranches": []
+      },
+      "expect": {
+        "hasRequiredRiskFields": false,
+        "usesLegacyRiskFieldName": true,
+        "isTradableDetail": false,
+        "dealLevelStepTypeAllowed": false,
+        "actionTypeKnown": false,
+        "detailTrancheCount": 0
+      }
+    },
+    {
+      "case": "объявление действующей модели: те же предикаты на противоположном исходе — без второй стороны каждый из них удовлетворялся бы константой",
+      "state": {
+        "riskPerActionPercent": 1.0,
+        "cumulativeRiskPerDealMultiplier": 3.0,
+        "strategySimultaneousRiskPerDealPercent": 3.0,
+        "strategyCatastrophicRiskPerDealMultiplier": 10.0,
+        "phaseEntryPolicy": "FOLLOW_PHASE",
+        "stepType": "EXIT",
+        "actionType": "CREATE_ACTION",
+        "tranches": [
+          {
+            "key": "t1",
+            "positionReopenAllowed": false
+          }
+        ]
+      },
+      "expect": {
+        "hasRequiredRiskFields": true,
+        "usesLegacyRiskFieldName": false,
+        "isTradableDetail": true,
+        "dealLevelStepTypeAllowed": true,
+        "actionTypeKnown": true,
+        "detailTrancheCount": 1,
+        "trancheDeclaresReopen": true
+      }
+    },
+    {
+      "case": "транш без признака переоткрытия: предикат объявления ложен",
+      "state": {
+        "tranches": [
+          {
+            "key": "t1"
+          }
+        ]
+      },
+      "expect": {
+        "trancheDeclaresReopen": false,
+        "detailTrancheCount": 1
+      }
+    },
+    {
+      "case": "два входных объявления в одном транше: счётчик входов транша не равен единице",
+      "state": {
+        "stepsByStatus": {
+          "OPEN": [
+            {
+              "actions": [
+                {
+                  "actionKind": "ORDER",
+                  "orderType": "ENTRY"
+                },
+                {
+                  "actionKind": "ORDER",
+                  "orderType": "ENTRY_ATTACHED_STOP_LOSS"
+                },
+                {
+                  "actionKind": "ALGO_ORDER",
+                  "conditionType": "STOP_LOSS"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "trancheEntryActions": 2
+      }
+    },
+    {
+      "case": "стратегия, нарушающая действующую модель по всем счётчикам сразу: контрпример к инвариантам эталона — без него каждый счётчик удовлетворялся бы нулём, а каждый предикат константой",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerTradePercent": 1.0,
+              "stepsByStatus": {
+                "OPEN": [
+                  {
+                    "stepType": "MAIN_PROTECTION"
+                  }
+                ]
+              },
+              "tranches": [
+                {
+                  "key": "t1",
+                  "stepsByStatus": {
+                    "OPEN": [
+                      {
+                        "stepType": "ENTRY",
+                        "actions": [
+                          {
+                            "actionKind": "ORDER",
+                            "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                            "actionType": "LEGACY_LEVEL_ACTION",
+                            "level": 1,
+                            "allocationPercents": 140.0
+                          },
+                          {
+                            "actionKind": "ORDER",
+                            "orderType": "ENTRY",
+                            "actionType": "CREATE_ACTION",
+                            "attachedProtection": {
+                              "stopLossSettings": {
+                                "calculationType": "BOGUS_CALCULATION"
+                              }
+                            }
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "STOP_LOSS",
+                            "stopLossSettings": {
+                              "calculationType": "BREAKEVEN",
+                              "distancePercents": 5.0
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsCount": 1,
+        "tradableDetailsCount": 1,
+        "tradableDetailsWithRiskFields": 0,
+        "detailsWithLegacyRiskFieldName": 1,
+        "riskFieldsComplete": false,
+        "tranchesCount": 1,
+        "tradableDetailsWithTranches": 0,
+        "tranchesWithSingleEntry": 0,
+        "dealLevelStepsOutOfScope": 1,
+        "usesLegacyActionLevel": 1,
+        "actionsWithUnknownType": 1,
+        "entryActionsWithoutAttachedProtection": 1,
+        "allocationOutOfRange": 1,
+        "stopSettingsMisdeclared": 1,
+        "attachedStopSettingsMisdeclared": 1
+      }
+    },
+    {
+      "case": "нотинал эталона укладывается в катастрофический потолок с запасом, а не в равенство: доля аллокации 95 % против потолка в одну базу",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCatastrophicRiskPerDealMultiplier": 150.0,
+        "notionalHeadroomShare": 0.01
+      },
+      "expect": {
+        "detailsBreakingNotionalHeadroom": 0
+      }
+    },
+    {
+      "case": "доля аллокации 100 % при потолке в одну базу упирается в равенство: запаса нет, и конфигурация отвергается созданием — контрпример, на котором предикат запаса и различает",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCatastrophicRiskPerDealMultiplier": 150.0,
+        "notionalHeadroomShare": 0.01,
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 1.0,
+              "cumulativeRiskPerDealMultiplier": 2.0,
+              "strategySimultaneousRiskPerDealPercent": 1.0,
+              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+              "tranches": [
+                {
+                  "key": "t1",
+                  "levelCount": 1,
+                  "positionReopenAllowed": false,
+                  "stepsByStatus": {
+                    "PRECHECK": [
+                      {
+                        "stepType": "ENTRY",
+                        "actions": [
+                          {
+                            "actionKind": "ORDER",
+                            "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                            "actionType": "CREATE_ACTION",
+                            "allocationPercents": 100
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsBreakingNotionalHeadroom": 1
+      }
+    },
+    {
+      "case": "тот же расклад с долей 95 %: запас есть, конфигурация проходит — пара примеров и делает предикат различающим",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCatastrophicRiskPerDealMultiplier": 150.0,
+        "notionalHeadroomShare": 0.01,
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 1.0,
+              "cumulativeRiskPerDealMultiplier": 2.0,
+              "strategySimultaneousRiskPerDealPercent": 1.0,
+              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+              "tranches": [
+                {
+                  "key": "t1",
+                  "levelCount": 1,
+                  "positionReopenAllowed": false,
+                  "stepsByStatus": {
+                    "PRECHECK": [
+                      {
+                        "stepType": "ENTRY",
+                        "actions": [
+                          {
+                            "actionKind": "ORDER",
+                            "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                            "actionType": "CREATE_ACTION",
+                            "allocationPercents": 95
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsBreakingNotionalHeadroom": 0
+      }
+    },
+    {
+      "case": "предикат запаса на плоском объявлении: потолок в одну базу, объявленный нотинал в одну базу — запаса нет",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+        "notionalHeadroomShare": 0.01,
+        "tranches": [
+          {
+            "key": "t1",
+            "levelCount": 1,
+            "stepsByStatus": {
+              "PRECHECK": [
+                {
+                  "actions": [
+                    {
+                      "actionKind": "ORDER",
+                      "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                      "allocationPercents": 100
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expect": {
+        "ceilingShareOfBase": 1.0,
+        "detailDeclaredNotionalShare": 1.0,
+        "notionalHeadroomSatisfied": false
+      }
+    },
+    {
+      "case": "то же плоское объявление с долей 95 %: запас есть — пара примеров и делает предикат различающим",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+        "notionalHeadroomShare": 0.01,
+        "tranches": [
+          {
+            "key": "t1",
+            "levelCount": 1,
+            "stepsByStatus": {
+              "PRECHECK": [
+                {
+                  "actions": [
+                    {
+                      "actionKind": "ORDER",
+                      "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                      "allocationPercents": 95
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expect": {
+        "detailDeclaredNotionalShare": 0.95,
+        "notionalHeadroomSatisfied": true
+      }
+    },
+    {
+      "case": "два одновременно живых транша по 60 %: доля считается веером, а не одним объявлением — запас нарушен вдвое",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+        "notionalHeadroomShare": 0.01,
+        "tranches": [
+          {
+            "key": "t1",
+            "levelCount": 1,
+            "stepsByStatus": {
+              "PRECHECK": [
+                {
+                  "actions": [
+                    {
+                      "actionKind": "ORDER",
+                      "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                      "allocationPercents": 60
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "key": "t2",
+            "levelCount": 1,
+            "stepsByStatus": {
+              "PRECHECK": [
+                {
+                  "actions": [
+                    {
+                      "actionKind": "ORDER",
+                      "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                      "allocationPercents": 60
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expect": {
+        "detailDeclaredNotionalShare": 1.2,
+        "notionalHeadroomSatisfied": false
+      }
+    },
+    {
+      "case": "иные конфигурационные числа — иной потолок в долях базы: множитель 150 при глобальном проценте 1 даёт полторы базы, и доля 100 % в него укладывается с запасом",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "strategyCatastrophicRiskPerDealMultiplier": 150.0,
+        "notionalHeadroomShare": 0.01,
+        "tranches": [
+          {
+            "key": "t1",
+            "levelCount": 1,
+            "stepsByStatus": {
+              "PRECHECK": [
+                {
+                  "actions": [
+                    {
+                      "actionKind": "ORDER",
+                      "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                      "allocationPercents": 100
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expect": {
+        "ceilingShareOfBase": 1.5,
+        "detailDeclaredNotionalShare": 1.0,
+        "notionalHeadroomSatisfied": true
       }
     }
   ]
