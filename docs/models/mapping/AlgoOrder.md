@@ -67,8 +67,10 @@
 
 `closeFraction` (доля позиции при срабатывании) на первом этапе не
 используется: размер считает `SizeCalculator`
-(`closeFractionPercents + Position + InstrumentExternalRules →
-AlgoOrder.size → sz`).
+(`closeFractionPercents + экспозиция транша + InstrumentExternalRules →
+AlgoOrder.size → sz`). База доли — экспозиция **транша**, а не нетто-размер
+позиции: на сетке нетто относится к нескольким траншам сразу
+(`docs/spec/order-sizing.json`, операнд `tranche.exposure`).
 
 ### Status resolver (source-agnostic)
 
@@ -204,6 +206,6 @@ transition-методы. `Condition`: убрать `closeFraction`, остави
 `type`/`trigger`/`trailing`. `*Condition` constructors: убрать
 `closeFraction`. `AlgoOrderConditionValidator`: валидировать
 `type → trigger/trailing`, не `closeFraction`. `SizeCalculator`:
-`closeFractionPercents + position + instrument rules → size`. OKX
+`closeFractionPercents + tranche exposure + instrument rules → size`. OKX
 create algo mapper: `size → sz`, `closeFraction` не как основной
 механизм первого этапа.

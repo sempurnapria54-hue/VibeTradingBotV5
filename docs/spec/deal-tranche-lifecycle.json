@@ -9,7 +9,10 @@
     "to": "предполагаемый статус",
     "reopenAllowed": "StrategyTranche.positionReopenAllowed закреплённого объявления",
     "orders[]": "заявки транша — операнды экспозиции и живой входной заявки",
-    "protections[]": "защиты транша"
+    "protections[]": "защиты транша",
+    "deal.status": "Deal.status — операнд окна атрибуции закрывающего исполнения уровня сделки; форма окна — docs/spec/protection-coverage.json",
+    "followingTranchesGross": "Σ gross-экспозиций траншей, материализованных позже этого; операнд порядка правила сопоставления",
+    "position.externalSize": "нетто-размер живого эпизода — правый операнд закрываемого объёма уровня сделки"
   },
 
   "values": [
@@ -38,7 +41,7 @@
     },
     {
       "name": "terminalContract",
-      "note": "Терминал транша: живого риска у него нет.",
+      "note": "Терминал транша: живого риска у него нет — ни экспозиции, ни живой входной заявки, ни живой условной заявки (три дизъюнкта trancheRiskBearing; дом — docs/lifecycles/DealTranche.md).",
       "expr": "!trancheRiskBearing"
     },
     {
@@ -150,6 +153,31 @@
         "protections": []
       },
       "expect": { "trancheExposure": 0, "trancheRiskBearing": false, "transitionAllowed": true }
+    },
+    {
+      "case": "терминал транша при живой отдельной защите не применяется: экспозиции нет, условная заявка жива",
+      "note": "Терминал транша симметричен терминалу сделки: без третьего дизъюнкта транш ушёл бы в CLOSED, оставив стоп на бирже, и тот выпал бы из обхода известных сущностей сделки.",
+      "state": {
+        "from": "EXIT_PENDING", "to": "CLOSED", "reopenAllowed": false,
+        "orders": [
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 },
+          { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 5 }
+        ],
+        "protections": [ { "id": "main", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 5, "closedSize": 0 } ]
+      },
+      "expect": { "trancheExposure": 0, "trancheHasLiveProtection": true, "trancheRiskBearing": true, "terminalContract": false, "transitionAllowed": false }
+    },
+    {
+      "case": "терминал транша на общем выходе: reduce-only ноги нет, экспозицию гасит приписанный объём команды закрытия",
+      "state": {
+        "from": "EXIT_PENDING", "to": "CLOSED", "reopenAllowed": false,
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 0 },
+        "followingTranchesGross": 0,
+        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+        "protections": [ { "id": "entry_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "CANCELED", "size": 5, "parentFillSize": 5 } ]
+      },
+      "expect": { "trancheCloseAttributed": 5, "trancheExposure": 0, "trancheRiskBearing": false, "terminalContract": true, "transitionAllowed": true }
     },
     {
       "case": "транш, чьё условие входа истекло, закрывается прямо из предвходовой проверки",

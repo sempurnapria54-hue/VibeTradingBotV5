@@ -2,11 +2,11 @@
   "subject": "deal-context-load",
   "question": "Какой объём графа сделки обязан быть загружен",
   "home": "docs/components/DealContextService.md",
-  "includes": ["protection-coverage", "algo-order-lifecycle", "deal-risk-numbers"],
+  "includes": ["protection-coverage", "order-lifecycle", "algo-order-lifecycle", "deal-risk-numbers"],
 
   "operands": {
     "deal.billsWindowBegin": "Deal.billsWindowBegin — время создания первой ОТПРАВЛЕННОЙ входной заявки сделки; write-once, единственный писатель SubmitOrderExecutor (docs/models/domain/aggregate/Deal.md §Структура). Durable-колонка сделки: её значение не выводится из загружаемых коллекций и потому годится в удостоверители их пустоты",
-    "deal.entryReason": "Deal.entryReason; RECOVERY — сделка заведена восстановлением существующего живого риска, то есть позиция наблюдалась ДО её создания. Write-once при создании",
+    "deal.entryReason": "Deal.entryReason; RECOVERY — сделка заведена восстановлением существующего живого риска, то есть позиция наблюдалась ДО её создания. Пишет DealOpeningService при создании сделки, значением своей тропы: восстановительную зовёт AnomalyJob, нашедший активную позицию без объясняющей её сделки (docs/components/DealOpeningService.md). Write-once; пустым поле не бывает, и третьего значения у перечня нет",
     "episodes[].loaded": "эпизод позиции попал в загруженный контекст",
     "episodes[].exitAt": "положение закрытия эпизода добыто",
     "tranches[].loaded": "транш сделки попал в загруженный контекст; транши грузятся все, включая терминальные",
@@ -20,7 +20,14 @@
     "algoOrders[].kind": "STOP — фиксированный уровень; TRAILING — трейлинг; TAKE_PROFIT — тейк (та же классификация, что в protection-coverage)",
     "cashFlows[].loaded": "строка разбивки движений сделки попала в загруженный контекст",
     "cashFlowsTruncated": "выборка строк разбивки уперлась в потолок окна выборки: строки за его пределами не читались",
-    "position.externalSize": "живая экспозиция эпизода"
+    "flowsFetched": "добыча движений по сделке выполнялась — звено добычи разбивки эмитилось и отработало. Тот же факт, что duty.flowsFetched в docs/spec/pnl-reconciliation.json; ложен, когда добыча не запускалась вовсе: на аварийной тропе звено добычи не эмитится",
+    "position.externalSize": "живая экспозиция эпизода",
+    "deal.plannedRiskAmount": "Deal.plannedRiskAmount — значение колонки ДО транзакции писателя четвёрки: то, что останется в ней, если пересчёт не состоится",
+    "legs[].plannedRiskAmount": "Order.plannedRiskAmount — write-once число ноги; операнд суммы заявленного риска (docs/spec/deal-risk-numbers.json)",
+    "legs[].plannedSizeContracts": "Order.plannedSizeContracts — знаменатель доли филла (docs/spec/deal-risk-numbers.json)",
+    "legs[].status": "Order.status — по нему резолвится, входит нога заявленным риском целиком или налитой долей (docs/spec/deal-risk-numbers.json)",
+    "operandChanged": "транзакция писателя изменила операнд четвёрки чисел риска — то есть писатель обязан пересчитать. Перечень писателей и их триггеров — дом четырёх чисел риска (docs/models/domain/aggregate/Deal.md)",
+    "writerBudgetExhausted": "бюджет попыток строки исполнения писателя исчерпан (docs/models/domain/other/DealActionState.md)"
   },
 
   "values": [
@@ -39,7 +46,7 @@
     },
     {
       "name": "positionObserved",
-      "note": "Позиция по сделке наблюдалась: вход исполнялся либо сделка заведена восстановлением уже существующего живого риска. Два дизъюнкта несущие по отдельности — восстановленная сделка своих исполненных ног не имеет, а исполнившаяся стратегийная не имеет RECOVERY.",
+      "note": "Позиция по сделке наблюдалась: вход исполнялся либо сделка заведена восстановлением уже существующего живого риска. Два дизъюнкта несущие по отдельности — восстановленная сделка своих исполненных ног не имеет, а исполнившаяся стратегийная не имеет RECOVERY. Второй дизъюнкт исчерпывает популяцию заведённых вокруг наблюдённой позиции ровно потому, что троп создания две и ярлыков тоже два: значение ставит сам создатель по своей тропе, и разойтись с ней оно не может (docs/models/domain/aggregate/Deal.md).",
       "expr": "entryFilled || deal.entryReason == 'RECOVERY'"
     },
     {
@@ -128,13 +135,19 @@
       "expr": "cashFlowsAllLoaded && !cashFlowsTruncated"
     },
     {
-      "name": "contextComplete",
-      "expr": "tranchesComplete && episodesComplete && legsComplete && attachedComplete && algoComplete && cashFlowsComplete"
+      "name": "flowsComplete",
+      "note": "Разбивка движений добыта И предъявлена целиком. Два конъюнкта разные по природе: первый — что добыча вообще выполнялась, второй — что предъявленное не усечено потолком выборки. Имя своё, а не общее с обязанностью сверки: у той конъюнкта полноты нет, потому что полнота гейтит звено целиком выше по тропе. Доступность итогового числа сделки (docs/spec/deal-result.json) берёт значение этой величины операндом с указателем сюда.",
+      "expr": "flowsFetched && cashFlowsComplete"
+    },
+    {
+      "name": "graphComplete",
+      "note": "Граф сделки предъявлен целиком: транши, эпизоды, ноги, встроенные защиты и отдельные условные заявки. Строк разбивки среди конъюнктов НЕТ, и это несущее различие: операнды четвёрки чисел риска, экспозиции транша и омиссионного члена живут только в графе, а разбивка в них не входит. Упёршаяся в потолок выборка разбивки поэтому пересчёт четвёрки не запрещает: иначе долгая сделка с частым финансированием переставала бы вести собственный живой риск из-за длины своей истории движений. Читатели величины — писатели четвёрки чисел риска и преконтроль риска; их перечень живёт в доме четырёх чисел риска (docs/models/domain/aggregate/Deal.md).",
+      "expr": "tranchesComplete && episodesComplete && legsComplete && attachedComplete && algoComplete"
     },
     {
       "name": "computationAllowed",
-      "note": "Неполный контекст не даёт заниженного числа: он даёт отказ. Отказ срабатывает и на пустой коллекции, чья пустота не удостоверена фактом: op: all над пустотой истинен, и без требования непустоты предикат разрешал бы расчёт на пустом множестве — числа риска, экспозиция транша и омиссионный член вышли бы нулями, то есть в разрешающую сторону.",
-      "expr": "contextComplete"
+      "note": "Гейт ЗВЕНА, считающего итоговое число сделки: до расчёта проверяется, что предъявлены обе половины — граф даёт правые операнды пар сверки, разбивка левые. Не путать с доступностью самого числа (resultAvailable в docs/spec/deal-result.json): та строже и эту величину влечёт, потому что берёт полноту графа своим конъюнктом и требует сверх неё добытости движений, положений закрытия и резолва курса. Разные предметы: здесь — можно ли начинать расчёт, там — вышло ли число. Неполный контекст не даёт заниженного числа: он даёт отказ. Отказ срабатывает и на пустой коллекции, чья пустота не удостоверена фактом: op: all над пустотой истинен, и без требования непустоты предикат разрешал бы расчёт на пустом множестве — числа риска, экспозиция транша и омиссионный член вышли бы нулями, то есть в разрешающую сторону. Пересчёт четвёрки чисел риска гейтится более узким graphComplete, а не этой величиной.",
+      "expr": "graphComplete && cashFlowsComplete"
     },
 
     {
@@ -181,6 +194,44 @@
       "of": "notNull(exitAt)"
     },
     {
+      "name": "plannedRiskLoaded",
+      "note": "Заявленный риск сделки, посчитанный по ТОМУ, ЧТО ЗАГРУЖЕНО. От дома-формы (dealPlannedRisk, docs/spec/deal-risk-numbers.json, подключён через includes) отличается ровно конъюнктом loaded, а подушевой член берётся у дома именем (legPlannedRiskShare) — форма здесь не переписывается. Это то самое число, которое писатель четвёрки записал бы в колонку, не читая признака полноты.",
+      "op": "sum",
+      "over": "legs",
+      "where": "loaded && isEntryOrder && notNull(plannedRiskAmount)",
+      "of": "legPlannedRiskShare"
+    },
+    {
+      "name": "riskNumbersAnswerDistorted",
+      "note": "Недогруженная нога входа занижает заявленный риск: сумма по загруженному подмножеству не больше суммы по полному множеству, потому что каждое слагаемое неотрицательно. Направление РАЗРЕШАЮЩЕЕ — заниженный знаменатель R и заниженный операнд кумулятивного потолка (docs/spec/risk-limits.json), — и ровно поэтому пересчёт на неполном графе запрещён, а не «приблизителен».",
+      "expr": "plannedRiskLoaded != dealPlannedRisk"
+    },
+    {
+      "name": "riskNumbersRecomputed",
+      "note": "Решающее правило писателя четвёрки: числа переписываются этой транзакцией тогда и только тогда, когда писатель изменил операнд И граф предъявлен целиком. Два конъюнкта несущие порознь: без первого пересчитывал бы всякий проход, без второго — пересчитывал бы по неполному графу.",
+      "expr": "operandChanged && graphComplete"
+    },
+    {
+      "name": "plannedRiskWritten",
+      "note": "Что окажется в колонке Deal.plannedRiskAmount после транзакции писателя. На неполном графе там остаётся ПРЕЖНЕЕ значение, а не свежее заниженное: это и есть исполнимая форма запрета пересчёта. Подстановка свежего числа без охраны дала бы разрешающую ошибку молча.",
+      "expr": "if(riskNumbersRecomputed, plannedRiskLoaded, deal.plannedRiskAmount)"
+    },
+    {
+      "name": "recomputeLinkCompletes",
+      "note": "Звено писателя завершается, когда пересчитывать нечего либо граф полон. Незавершение при обязанности пересчитать — не отказ прохода: ходы, чисел не пишущие, продолжаются.",
+      "expr": "!operandChanged || graphComplete"
+    },
+    {
+      "name": "recomputeWaitContinues",
+      "note": "Повтор по бюджету попыток строки исполнения, пока бюджет жив. Пустое место здесь и есть бессрочное ожидание, запрещённое docs/rules/command-lifecycle.md.",
+      "expr": "operandChanged && !graphComplete && !writerBudgetExhausted"
+    },
+    {
+      "name": "recomputeErrorPathRequired",
+      "note": "Третий исход: обязанность пересчитать есть, граф неполон, бюджет исчерпан — звено отказывает штатной ошибочной тропой действия.",
+      "expr": "operandChanged && !graphComplete && writerBudgetExhausted"
+    },
+    {
       "name": "exitAnswerDistorted",
       "note": "Недогруженный эпизод делает предикат «положение закрытия добыто у всех» истинным молча — искажение в разрешающую сторону.",
       "expr": "exitObtainedLoaded != exitObtainedFull"
@@ -206,7 +257,7 @@
       "expect": {
         "entrySubmitted": true, "entryFilled": true, "positionObserved": true,
         "tranchesComplete": true, "cashFlowsComplete": true,
-        "contextComplete": true, "computationAllowed": true,
+        "computationAllowed": true,
         "coverageLoaded": 3, "coverageFull": 3,
         "coverageAnswerLoaded": true, "coverageAnswerDistorted": false
       }
@@ -226,7 +277,8 @@
         "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": {
-        "legsComplete": false, "attachedComplete": false, "contextComplete": false, "computationAllowed": false,
+        "legsComplete": false, "attachedComplete": false, "graphComplete": false,
+        "computationAllowed": false,
         "coverageLoaded": 2, "coverageFull": 3,
         "coverageAnswerLoaded": false, "coverageAnswerFull": true, "coverageAnswerDistorted": true
       }
@@ -246,7 +298,7 @@
       },
       "expect": {
         "tranchesAllLoaded": false, "tranchesPresent": true,
-        "tranchesComplete": false, "legsComplete": true, "contextComplete": false, "computationAllowed": false
+        "tranchesComplete": false, "legsComplete": true, "computationAllowed": false
       }
     },
     {
@@ -263,8 +315,8 @@
       "expect": {
         "tranchesAllLoaded": true, "tranchesPresent": false, "tranchesComplete": false,
         "legsAllLoaded": true, "legsPresent": false, "legsComplete": false,
-        "episodesComplete": true,
-        "contextComplete": false, "computationAllowed": false
+        "episodesComplete": true, "graphComplete": false,
+        "computationAllowed": false
       }
     },
     {
@@ -284,11 +336,11 @@
         "episodesPresent": false, "episodesComplete": true,
         "legsPresent": false, "legsComplete": true,
         "tranchesComplete": true, "cashFlowsComplete": true,
-        "contextComplete": true, "computationAllowed": true
+        "computationAllowed": true
       }
     },
     {
-      "case": "вход отправлен и снят до исполнения — эпизодов не было, их пустота законна, но пустота ног уже нет",
+      "case": "вход отправлен и снят до исполнения — эпизодов не было, их пустота законна, но пустота ног уже нет; встроенных защит нет ни одной",
       "state": {
         "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
         "cashFlowsTruncated": false,
@@ -303,7 +355,8 @@
         "entrySubmitted": true, "entryFilled": false, "positionObserved": false,
         "episodesPresent": false, "episodesComplete": true,
         "legsPresent": true, "legsComplete": true,
-        "contextComplete": true, "computationAllowed": true
+        "attachedComplete": true, "coverageLoaded": 0, "coverageFull": 0,
+        "graphComplete": true, "computationAllowed": true
       }
     },
     {
@@ -321,7 +374,7 @@
       "expect": {
         "entryFilled": true, "positionObserved": true,
         "episodesAllLoaded": true, "episodesPresent": false, "episodesComplete": false,
-        "contextComplete": false, "computationAllowed": false
+        "computationAllowed": false
       }
     },
     {
@@ -340,11 +393,11 @@
         "entrySubmitted": false, "entryFilled": false, "positionObserved": true,
         "legsPresent": false, "legsComplete": true,
         "episodesPresent": false, "episodesComplete": false,
-        "contextComplete": false, "computationAllowed": false
+        "computationAllowed": false
       }
     },
     {
-      "case": "восстановленная сделка с загруженным эпизодом полна: своих ног у неё нет по построению",
+      "case": "восстановленная сделка с загруженным эпизодом полна: ни ног, ни условных заявок у неё нет по построению — объявлений её транш не имеет",
       "state": {
         "deal": { "entryReason": "RECOVERY", "billsWindowBegin": null },
         "cashFlowsTruncated": false,
@@ -352,13 +405,13 @@
         "episodes": [ { "loaded": true, "exitAt": null } ],
         "tranches": [ { "loaded": true } ],
         "legs": [],
-        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ],
+        "algoOrders": [],
         "cashFlows": [ { "loaded": true } ]
       },
       "expect": {
         "positionObserved": true,
         "episodesComplete": true, "legsComplete": true, "tranchesComplete": true,
-        "contextComplete": true, "computationAllowed": true
+        "computationAllowed": true
       }
     },
     {
@@ -375,7 +428,7 @@
       "expect": {
         "tranchesPresent": false, "tranchesComplete": false,
         "episodesComplete": true, "legsComplete": true,
-        "contextComplete": false, "computationAllowed": false
+        "computationAllowed": false
       }
     },
     {
@@ -395,7 +448,7 @@
         "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": {
-        "attachedComplete": false, "contextComplete": false,
+        "attachedComplete": false,
         "coverageLoaded": 2, "coverageFull": 2, "coverageAnswerDistorted": false
       }
     },
@@ -413,7 +466,7 @@
         "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ]
       },
       "expect": {
-        "episodesComplete": false, "contextComplete": false, "computationAllowed": false,
+        "episodesComplete": false, "computationAllowed": false,
         "exitObtainedLoaded": true, "exitObtainedFull": false, "exitAnswerDistorted": true
       }
     },
@@ -432,14 +485,14 @@
         "cashFlows": [ { "loaded": true }, { "loaded": false } ]
       },
       "expect": {
-        "cashFlowsAllLoaded": false, "cashFlowsComplete": false, "contextComplete": false, "computationAllowed": false
+        "cashFlowsAllLoaded": false, "cashFlowsComplete": false, "computationAllowed": false
       }
     },
     {
       "case": "выборка разбивки уперлась в потолок окна — усечения не бывает молча, это неполнота",
       "state": {
         "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
-        "cashFlowsTruncated": true,
+        "cashFlowsTruncated": true, "flowsFetched": true,
         "position": { "externalSize": 2 },
         "episodes": [ { "loaded": true, "exitAt": 100 } ],
         "tranches": [ { "loaded": true } ],
@@ -451,7 +504,8 @@
       },
       "expect": {
         "cashFlowsAllLoaded": true, "cashFlowsComplete": false,
-        "contextComplete": false, "computationAllowed": false
+        "graphComplete": true, "flowsComplete": false,
+        "computationAllowed": false
       }
     },
     {
@@ -467,7 +521,7 @@
         ],
         "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" }, { "loaded": false, "status": "COMPLETED", "kind": "TAKE_PROFIT" } ]
       },
-      "expect": { "algoComplete": true, "contextComplete": true, "computationAllowed": true }
+      "expect": { "algoComplete": true, "computationAllowed": true }
     },
     {
       "case": "живая условная заявка не загружена — объём неполон",
@@ -482,7 +536,7 @@
         ],
         "algoOrders": [ { "loaded": false, "status": "ACTIVE", "kind": "STOP" } ]
       },
-      "expect": { "algoComplete": false, "contextComplete": false, "computationAllowed": false }
+      "expect": { "algoComplete": false, "computationAllowed": false }
     },
     {
       "case": "снятая защитная условная заявка не загружена — цепочка замещений не резолвится, объём неполон",
@@ -497,7 +551,140 @@
         ],
         "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "TRAILING" }, { "loaded": false, "status": "CANCELED", "kind": "STOP" } ]
       },
-      "expect": { "algoComplete": false, "contextComplete": false, "computationAllowed": false }
+      "expect": { "algoComplete": false, "computationAllowed": false }
+    },
+    {
+      "case": "добыча движений не запускалась — граф полон, но разбивка не добыта: полнота контекста и добытость разбивки различаются",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10 },
+        "cashFlowsTruncated": false, "flowsFetched": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": 100 } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "accumulatedFillSize": 2, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 2, "parentFillSize": 2 } ] }
+        ],
+        "algoOrders": [ { "loaded": true, "status": "ACTIVE", "kind": "STOP" } ],
+        "cashFlows": []
+      },
+      "expect": {
+        "cashFlowsComplete": true, "flowsComplete": false,
+        "graphComplete": true, "computationAllowed": true
+      }
+    },
+    {
+      "case": "полный граф: писатель пересчитывает, и в колонку идёт свежее число",
+      "note": "Обе ноги загружены, поэтому сумма по загруженному совпадает с суммой по полному множеству, искажения нет, пересчёт состоялся.",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10, "plannedRiskAmount": 100 },
+        "cashFlowsTruncated": false, "operandChanged": true, "writerBudgetExhausted": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": null } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 60, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] },
+          { "loaded": true, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 40, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+        ],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "graphComplete": true, "plannedRiskLoaded": 100, "dealPlannedRisk": 100,
+        "riskNumbersAnswerDistorted": false, "riskNumbersRecomputed": true,
+        "plannedRiskWritten": 100, "recomputeLinkCompletes": true,
+        "recomputeWaitContinues": false, "recomputeErrorPathRequired": false
+      }
+    },
+    {
+      "case": "нога входа не загружена: свежее число занижено, поэтому в колонке остаётся прежнее",
+      "note": "Ровно разрешающая ошибка, ради которой признак заведён: пересчёт по загруженному подмножеству дал бы 60 вместо 100 — заниженный знаменатель R и заниженный операнд кумулятивного потолка. Охрана оставляет в колонке прежние 100.",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10, "plannedRiskAmount": 100 },
+        "cashFlowsTruncated": false, "operandChanged": true, "writerBudgetExhausted": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": null } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 60, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] },
+          { "loaded": false, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 40, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": false, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+        ],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "legsAllLoaded": false, "legsComplete": false, "graphComplete": false,
+        "plannedRiskLoaded": 60, "dealPlannedRisk": 100,
+        "riskNumbersAnswerDistorted": true, "riskNumbersRecomputed": false,
+        "plannedRiskWritten": 100, "recomputeLinkCompletes": false,
+        "recomputeWaitContinues": true, "recomputeErrorPathRequired": false
+      }
+    },
+    {
+      "case": "неполный граф при исчерпанном бюджете писателя: ошибочная тропа, а не тихое ожидание",
+      "note": "Третий исход того же правила: числа по-прежнему не пишутся, но повторять больше нечем.",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10, "plannedRiskAmount": 100 },
+        "cashFlowsTruncated": false, "operandChanged": true, "writerBudgetExhausted": true,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": null } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 60, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] },
+          { "loaded": false, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 40, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": false, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+        ],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "graphComplete": false, "riskNumbersRecomputed": false, "plannedRiskWritten": 100,
+        "recomputeLinkCompletes": false, "recomputeWaitContinues": false,
+        "recomputeErrorPathRequired": true
+      }
+    },
+    {
+      "case": "операнд не менялся: пересчитывать нечего, звено завершается и на неполном графе",
+      "note": "Первый конъюнкт решающего правила несущий сам по себе: проход, не тронувший операнда, не обязан ждать полноты графа.",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10, "plannedRiskAmount": 100 },
+        "cashFlowsTruncated": false, "operandChanged": false, "writerBudgetExhausted": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": null } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 60, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] },
+          { "loaded": false, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 40, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": false, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+        ],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "graphComplete": false, "riskNumbersRecomputed": false, "plannedRiskWritten": 100,
+        "recomputeLinkCompletes": true, "recomputeWaitContinues": false,
+        "recomputeErrorPathRequired": false
+      }
+    },
+    {
+      "case": "граф полон, но операнд не менялся: колонка со старым числом этим проходом не чинится",
+      "note": "Состояние достижимо между заблокированной попыткой пересчёта и её удачным повтором: бюджет писателя ещё жив, дефект загрузки уже ушёл, а колонка несёт прежние 90 при свежих 100. Проход, операнда не тронувший, её не переписывает — иначе пересчёт шёл бы у всякого прохода, а не у писателя. Чинит её повтор того самого писателя.",
+      "state": {
+        "deal": { "entryReason": "STRATEGY", "billsWindowBegin": 10, "plannedRiskAmount": 90 },
+        "cashFlowsTruncated": false, "operandChanged": false, "writerBudgetExhausted": false,
+        "position": { "externalSize": 2 },
+        "episodes": [ { "loaded": true, "exitAt": null } ],
+        "tranches": [ { "loaded": true } ],
+        "legs": [
+          { "loaded": true, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 60, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] },
+          { "loaded": true, "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 40, "plannedSizeContracts": 1, "accumulatedFillSize": 1, "protections": [ { "loaded": true, "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 1, "parentFillSize": 1 } ] }
+        ],
+        "algoOrders": [],
+        "cashFlows": []
+      },
+      "expect": {
+        "graphComplete": true, "plannedRiskLoaded": 100, "riskNumbersAnswerDistorted": false,
+        "riskNumbersRecomputed": false, "plannedRiskWritten": 90,
+        "recomputeLinkCompletes": true, "recomputeWaitContinues": false,
+        "recomputeErrorPathRequired": false
+      }
     },
     {
       "case": "пустой список отдельных условных заявок законен: защита сделки бывает только встроенной",
@@ -512,7 +699,7 @@
         ],
         "algoOrders": []
       },
-      "expect": { "algoComplete": true, "contextComplete": true, "computationAllowed": true }
+      "expect": { "algoComplete": true, "computationAllowed": true }
     }
   ]
 }

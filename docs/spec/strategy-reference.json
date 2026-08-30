@@ -2,12 +2,14 @@
   "subject": "strategy-reference",
   "question": "Проходит ли эталонная стратегия репозитория действующие требования к дереву стратегии",
   "home": "docs/rules/strategy-validation.md",
-  "includes": ["stop-distance"],
+  "includes": ["stop-distance", "protection-coverage", "order-lifecycle"],
   "operands": {
     "strategy": "src/main/resources/strategy-examples/trend-following-ema.json — исполнимый эталон",
     "details[].phaseEntryPolicy": "политика входа в фазе; NO_TRADE — неторгуемая деталь",
     "details[].stepsByStatus{}": "шаги, сгруппированные по статусу сделки",
     "steps[].actions[]": "пакет действий шага",
+    "feeRate": "прогнозная ставка комиссии — операнд величин уровня стопа, заимствованных у docs/spec/stop-distance.json вместе с её набором. Здесь он объявлен контрактом, а не подключением дома: одноимённая величина docs/spec/deal-risk-numbers.json — ДРУГАЯ ставка (обращённая из замороженных плановых чисел ноги), и подключение того дома подменило бы смысл",
+    "steps[].actions[].replacedCoverageFractionPercents": "доля ДЕЙСТВУЮЩЕГО покрытия, которую адресует это REPLACE- либо CANCEL-действие: объявленная доля его цели, резолвимой по targetActionKey (цепочка замещений — docs/rules/replace-not-amend.md). Цель защитой не является (снятие тейка) — покрытия действие не забирает, доля 0. Пусто — цель не разрешена; тогда действие считается адресующим ВСЁ покрытие: неизвестность не должна выводить шаг из-под проверки. Резолв по ключу — работа валидатора создания; в этой форме join по ключу невыразим, поэтому свойства цели приходят операндом",
     "details[].tranches[].levelCount": "сколько одновременно живых траншей объявляет эта запись; умолчания нет — пустое место мажорировалось бы единицей, то есть в разрешающую сторону",
     "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — максимальный риск на сделку (конфигурация)",
     "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)"
@@ -80,7 +82,7 @@
     },
     {
       "name": "usesLegacyRiskFieldName",
-      "note": "Имя поактного потолка разведено суффиксом уровня; прежнее имя — дефект артефакта.",
+      "note": "Имя поактного потолка разведено суффиксом уровня; безсуффиксное riskPerTradePercent в дереве стратегии — дефект артефакта.",
       "expr": "notNull(?riskPerTradePercent)"
     },
     {
@@ -106,9 +108,19 @@
       "expr": "tradableDetailsWithRiskFields == tradableDetailsCount && detailsWithLegacyRiskFieldName == 0"
     },
     {
+      "name": "strategyRiskWithinGlobal",
+      "note": "Первое неравенство создания: максимум одновременного риска стратегии не выше конфигурационного. Свой реджект — STRATEGY_SIMULTANEOUS_RISK_ABOVE_GLOBAL.",
+      "expr": "strategySimultaneousRiskPerDealPercent <= globalSimultaneousRiskPerDealPercent"
+    },
+    {
+      "name": "catastrophicMultiplierWithinGlobal",
+      "note": "Третье неравенство создания: множитель катастрофического потолка не выше конфигурационного. Свой реджект — STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL.",
+      "expr": "strategyCatastrophicRiskPerDealMultiplier <= globalCatastrophicRiskPerDealMultiplier"
+    },
+    {
       "name": "riskChainHolds",
-      "note": "Инвариант вложенности потолков: поактный ≤ максимум стратегии ≤ глобальный, а множитель катастрофического потолка не выше конфигурационного. Число одновременно живых траншей сюда не входит — это отдельное неравенство с собственным реджектом (overlapRiskSatisfiable).",
-      "expr": "riskPerActionPercent <= strategySimultaneousRiskPerDealPercent && strategySimultaneousRiskPerDealPercent <= globalSimultaneousRiskPerDealPercent && strategyCatastrophicRiskPerDealMultiplier <= globalCatastrophicRiskPerDealMultiplier"
+      "note": "Первое и третье неравенства создания, названные домом одной величиной (docs/rules/strategy-validation.md, перечень исключений). Реджекты у них РАЗНЫЕ, поэтому каждое стои́т отдельной величиной выше: адресует отказ тот конъюнкт, который ложен. Неравенство «поактный ≤ максимум стратегии» сюда не входит вовсе: это случай N_overlap = 1 второго неравенства, у которого свой операнд, свой реджект ..._UNSATISFIABLE и своя величина overlapRiskSatisfiable — слияние отобрало бы у отказа адресность.",
+      "expr": "strategyRiskWithinGlobal && catastrophicMultiplierWithinGlobal"
     },
     {
       "name": "detailsBreakingRiskChain",
@@ -147,7 +159,7 @@
     },
     {
       "name": "isProtectiveAction",
-      "note": "Защитное действие: условная заявка типа из множества защит.",
+      "note": "Защитное действие: условная заявка типа из множества защит. Селектор годится там, где тип условия — СОБСТВЕННОЕ свойство действия, то есть у создающего и у замещающего: они объявляют, какую заявку ставят. У снимающего тип условия — денормализованная копия типа его цели, совпадение с оригиналом не проверяется, и решение на копии стоять не может: что действие ЗАБИРАЕТ, читается у цели (stepReplacedCoverage, stepHasProtectiveCancel). Поле обязательно у любого действия над условной заявкой (docs/rules/strategy-validation.md), поэтому пустым здесь оно не бывает.",
       "expr": "actionKind == 'ALGO_ORDER' && in(?conditionType, 'STOP_LOSS', 'PARTIAL_STOP_LOSS', 'OCO_FULL', 'TRAILING_PERCENTS', 'TRAILING_VALUE')"
     },
     {
@@ -160,17 +172,27 @@
     },
     {
       "name": "stepHasProtectiveCancel",
+      "note": "Шаг снимает действующее покрытие. Защита ли снимаемое — свойство ЦЕЛИ снятия, а не самого снятия: собственный conditionType снятия лишь копирует тип цели, и разошедшаяся копия выводила бы шаг из-под проверки. Снятие тейка покрытия не забирает (адресованная доля 0) и замены не требует.",
       "op": "any",
       "over": "actions",
-      "of": "isProtectiveAction && actionType == 'CANCEL_ACTION'"
+      "of": "actionKind == 'ALGO_ORDER' && actionType == 'CANCEL_ACTION' && coalesce(?replacedCoverageFractionPercents, 100) > 0"
+    },
+    {
+      "name": "stepReplacedCoverage",
+      "note": "Сколько действующего покрытия шаг адресует своими REPLACE и CANCEL. Отбор идёт по ФОРМЕ действия — условная заявка, замещающая либо снимающая, — а не по его собственному conditionType: что действие ЗАБИРАЕТ, есть свойство его ЦЕЛИ, а собственный тип условия снимающего действия — лишь копия типа цели, согласованность которой с оригиналом никто не проверяет. Копия, разошедшаяся с целью, выводила бы шаг из-под всех проверок покрытия сразу, поэтому решение стои́т на доле, прочитанной у цели. Цель не защита (снятие тейка) — адресованная доля покрытия 0, и такое снятие шага не задевает. Пустая доля цели читается сотней: цель не разрешилась, и трактовать это как «адресует мало» значило бы вывести шаг из-под проверки благоприятным умолчанием.",
+      "op": "sum",
+      "over": "actions",
+      "where": "actionKind == 'ALGO_ORDER' && in(actionType, 'REPLACE_ACTION', 'CANCEL_ACTION')",
+      "of": "coalesce(?replacedCoverageFractionPercents, 100)"
     },
     {
       "name": "stepDeclaresFullProtectionSet",
-      "note": "Полный набор: первичная постановка защиты либо шаг, снимающий действующее покрытие.",
-      "expr": "stepType == 'MAIN_PROTECTION' || stepHasProtectiveCancel"
+      "note": "Полный набор: первичная постановка защиты либо шаг, адресующий ВСЁ действующее покрытие — снятием, замещением или их смесью. Признак — сколько покрытия шаг забирает, а не каким типом действия: REPLACE, замещающий одну ступень лестницы из четырёх по 25 %, забирает 25 и полного набора не объявляет — после него остальные три ступени продолжают стоять, поэтому требовать от него сотни значило бы отвергать конфигурацию, которую дом объявляет законной. REPLACE, замещающий единственную защиту на 100 %, забирает всё и обязан вернуть столько же. Шаг, забирающий часть, из-под проверки не выходит: его связывает соседнее требование stepReturnsLessThanReplaced — возвращено не меньше забранного.",
+      "expr": "stepType == 'MAIN_PROTECTION' || stepReplacedCoverage >= 100"
     },
     {
       "name": "stepCoverageComplete",
+      "note": "Равенство, а не нижняя граница, и это намеренно: доли считаются от одной и той же позиции, поэтому сумма выше ста процентов — не усиленная защита, а невыполнимое объявление (закрыть больше, чем есть). Дом довода — docs/rules/live-risk-protection.md.",
       "expr": "stepProtectiveCoverage == 100"
     },
     {
@@ -195,6 +217,18 @@
       "op": "any",
       "over": "actions",
       "of": "isProtectiveAction && in(actionType, 'CREATE_ACTION', 'REPLACE_ACTION')"
+    },
+    {
+      "name": "stepReturnsLessThanReplaced",
+      "note": "Шаг забирает ЧАСТЬ действующего покрытия и возвращает меньше, чем забрал. Покрытие после шага = действующее − забранное + объявленное, поэтому такой шаг опускает его ниже ста процентов при любом рынке: снял ступень на 25 % и поставил взамен 10 % — осталось 85. Соседние предикаты этого не ловят: полного набора шаг не объявляет, а замена в пакете у него есть. Шаг, забирающий ВСЁ, проверяется не здесь, а равенством ста процентам (stepCoverageComplete): там же гасится завышение суммы забранного, которое даёт консервативное умолчание неразрешённой цели.",
+      "expr": "!stepDeclaresFullProtectionSet && stepProtectiveCoverage < stepReplacedCoverage"
+    },
+    {
+      "name": "partialStepsReturningLess",
+      "note": "Счётчик нарушителей. Реджект тот же — STRATEGY_PROTECTION_COVERAGE_INCOMPLETE: класс один — покрытие после шага ниже ста процентов.",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[]",
+      "where": "stepReturnsLessThanReplaced"
     },
     {
       "name": "cancelStepsWithoutReplacement",
@@ -321,12 +355,331 @@
       }
     },
     {
-      "case": "каждый шаг эталона, объявляющий полный набор защиты, покрывает позицию целиком",
+      "case": "каждый шаг эталона, объявляющий полный набор защиты, покрывает позицию целиком; под проверку попадают все шесть — по три на торгуемую деталь: первичная постановка, безубыток замещением и перевод на трейлинг снятием",
       "stateFrom": {
         "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
+        "fullSetStepsCount": 6,
+        "fullSetStepsWithCompleteCoverage": 6,
         "protectionCoverageComplete": true
+      }
+    },
+    {
+      "case": "замещается ВСЁ действующее покрытие, и возвращается только 60 % — конфигурация отвергается созданием",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "levelCount": 1,
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "MAIN_PROTECTION",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "protection_oco",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "OCO_FULL",
+                            "closeFractionPercents": 100
+                          }
+                        ]
+                      },
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_partial_replace",
+                            "targetActionKey": "protection_oco",
+                            "actionType": "REPLACE_ACTION",
+                            "conditionType": "OCO_FULL",
+                            "closeFractionPercents": 60,
+                            "replacedCoverageFractionPercents": 100
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "fullSetStepsCount": 2,
+        "fullSetStepsWithCompleteCoverage": 1,
+        "protectionCoverageComplete": false
+      }
+    },
+    {
+      "case": "лестница четырёх ступеней по 25 %: шаг, замещающий ОДНУ ступень своей же долей, полного набора не объявляет и созданию не мешает — остальные три ступени продолжают стоять",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "levelCount": 1,
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "MAIN_PROTECTION",
+                        "actions": [
+                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                        ]
+                      },
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1_remodel",
+                            "targetActionKey": "sl_1",
+                            "actionType": "REPLACE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 25,
+                            "replacedCoverageFractionPercents": 25
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "fullSetStepsCount": 1,
+        "fullSetStepsWithCompleteCoverage": 1,
+        "protectionCoverageComplete": true,
+        "partialStepsReturningLess": 0
+      }
+    },
+    {
+      "case": "шаг снимает ступень лестницы на 25 % и ставит взамен 10 %: полного набора он не объявляет, замена в пакете у него есть — оба соседних предиката молчат, и ловит его требование «возвращено не меньше забранного»",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "levelCount": 1,
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "MAIN_PROTECTION",
+                        "actions": [
+                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                        ]
+                      },
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1_cancel",
+                            "targetActionKey": "sl_1",
+                            "actionType": "CANCEL_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "replacedCoverageFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1_shrunk",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 10
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "fullSetStepsCount": 1,
+        "protectionCoverageComplete": true,
+        "cancelStepsWithoutReplacement": 0,
+        "partialStepsReturningLess": 1
+      }
+    },
+    {
+      "case": "тип условия снятия — денормализованная копия типа его цели, и совпадать с ней никто не обязывает: снятие с разошедшейся копией забирает 25 % и возвращает 10 %, а селектор по СОБСТВЕННОМУ conditionType выпустил бы шаг из-под всех трёх предикатов",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "levelCount": 1,
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "MAIN_PROTECTION",
+                        "actions": [
+                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                        ]
+                      },
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1_cancel",
+                            "targetActionKey": "sl_1",
+                            "actionType": "CANCEL_ACTION",
+                            "conditionType": "TAKE_PROFIT",
+                            "replacedCoverageFractionPercents": 25
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1_shrunk",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_STOP_LOSS",
+                            "closeFractionPercents": 10
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "fullSetStepsCount": 1,
+        "protectionCoverageComplete": true,
+        "cancelStepsWithoutReplacement": 0,
+        "partialStepsReturningLess": 1
+      }
+    },
+    {
+      "case": "то же снятие с разошедшейся копией типа, но без замены в пакете: замены нет, и снятие ловится своим счётчиком",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "levelCount": 1,
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "MAIN_PROTECTION",
+                        "actions": [
+                          { "actionKind": "ALGO_ORDER", "key": "sl_1", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_2", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_3", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 },
+                          { "actionKind": "ALGO_ORDER", "key": "sl_4", "actionType": "CREATE_ACTION", "conditionType": "PARTIAL_STOP_LOSS", "closeFractionPercents": 25 }
+                        ]
+                      },
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "sl_1_cancel",
+                            "targetActionKey": "sl_1",
+                            "actionType": "CANCEL_ACTION",
+                            "conditionType": "TAKE_PROFIT",
+                            "replacedCoverageFractionPercents": 25
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "cancelStepsWithoutReplacement": 1,
+        "partialStepsReturningLess": 1
+      }
+    },
+    {
+      "case": "снятие тейка покрытия не забирает: адресованная доля цели ноль, и шаг под проверку покрытия не попадает",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": [
+                {
+                  "levelCount": 1,
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "MAIN_PROTECTION",
+                        "actions": [
+                          { "actionKind": "ALGO_ORDER", "key": "protection_oco", "actionType": "CREATE_ACTION", "conditionType": "OCO_FULL", "closeFractionPercents": 100 },
+                          { "actionKind": "ALGO_ORDER", "key": "tp_1", "actionType": "CREATE_ACTION", "conditionType": "TAKE_PROFIT", "closeFractionPercents": 50 }
+                        ]
+                      },
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "key": "tp_1_cancel",
+                            "targetActionKey": "tp_1",
+                            "actionType": "CANCEL_ACTION",
+                            "conditionType": "TAKE_PROFIT",
+                            "replacedCoverageFractionPercents": 0
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "fullSetStepsCount": 1,
+        "protectionCoverageComplete": true,
+        "cancelStepsWithoutReplacement": 0,
+        "partialStepsReturningLess": 0
+      }
+    },
+    {
+      "case": "ни один шаг эталона не возвращает покрытия меньше, чем забирает",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "partialStepsReturningLess": 0
       }
     },
     {
@@ -357,7 +710,7 @@
       }
     },
     {
-      "case": "потолки эталона вложены: поактный не выше максимума стратегии, тот не выше глобального, множитель не выше конфигурационного",
+      "case": "потолки эталона вложены: максимум стратегии не выше глобального, множитель не выше конфигурационного",
       "state": {
         "globalSimultaneousRiskPerDealPercent": 1.0,
         "globalCatastrophicRiskPerDealMultiplier": 150.0
@@ -367,6 +720,72 @@
       },
       "expect": {
         "detailsBreakingRiskChain": 0
+      }
+    },
+    {
+      "case": "поактный выше максимума стратегии адресуется вееру, а не цепочке: нарушение считает detailsBreakingOverlap, реджект — ..._UNSATISFIABLE",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCatastrophicRiskPerDealMultiplier": 150.0,
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 1.0,
+              "strategySimultaneousRiskPerDealPercent": 0.5,
+              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+              "tranches": [ { "levelCount": 1 } ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsBreakingRiskChain": 0,
+        "detailsBreakingOverlap": 1
+      }
+    },
+    {
+      "case": "максимум стратегии выше конфигурационного ломает цепочку первым конъюнктом: реджект — ..._SIMULTANEOUS_RISK_ABOVE_GLOBAL",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCatastrophicRiskPerDealMultiplier": 150.0,
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 1.0,
+              "strategySimultaneousRiskPerDealPercent": 2.0,
+              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+              "tranches": [ { "levelCount": 1 } ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsBreakingRiskChain": 1,
+        "detailsBreakingOverlap": 0
+      }
+    },
+    {
+      "case": "множитель катастрофического потолка выше конфигурационного ломает цепочку вторым конъюнктом: реджект — ..._CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL",
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCatastrophicRiskPerDealMultiplier": 150.0,
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerActionPercent": 1.0,
+              "strategySimultaneousRiskPerDealPercent": 1.0,
+              "strategyCatastrophicRiskPerDealMultiplier": 200.0,
+              "tranches": [ { "levelCount": 1 } ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsBreakingRiskChain": 1,
+        "detailsBreakingOverlap": 0
       }
     },
     {

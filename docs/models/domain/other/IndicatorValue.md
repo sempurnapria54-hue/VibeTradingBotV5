@@ -100,8 +100,9 @@ OBV; сейчас не заведён (каталог расширяем по п
   у строки результата ровно один владелец, под него и оценивается
   свежесть (правило — `docs/rules/market-data-freshness.md`).
 - **Точка отсчёта свежести (`referencePoint`) — `candleTimestamp`.**
-  `expiredAt = candleTimestamp + ownerSetting.expirationDuration`
-  считается **на чтение**, колонкой не хранится (единый механизм без
-  хранимого состояния свежести; `docs/rules/market-data-freshness.md`).
+  Само устаревание считается **на чтение**, колонкой не хранится (единый
+  механизм без хранимого состояния свежести); правило —
+  `docs/rules/market-data-freshness.md`, форма —
+  `docs/spec/market-data-freshness.json`.
 - **Retention:** значения не чистятся (нет потребителя истории) —
   `docs/rules/market-data-retention.md`.

@@ -52,6 +52,12 @@
 
 **Числа риск-аппетита:** `LOSS_LIMIT_NOT_CONFIGURED`.
 
+**Полнота входа проверки:** `DEAL_GRAPH_INCOMPLETE`. Код отдельный, а не
+разновидность `CALCULATED_ACTION_INVALID`: тот говорит о самом
+рассчитанном действии, этот — о том, что операнды потолков считать не по
+чему, и различить их обязана диагностика. Вердиктом риск-политики он не
+является, и реакция на него своя (`docs/processes/risk-evaluation.md`).
+
 **Размер и уровни:** `CALCULATED_ACTION_INVALID`, `SIZE_BELOW_MIN`,
 `SIZE_LOT_STEP_INVALID`, `SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`,
 `TAKE_PROFIT_INVALID_SIDE`, `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`,

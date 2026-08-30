@@ -2,9 +2,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как организованы доменные и интеграционные модели в `docs/models/`,
-куда уходит не-модельное биржевое знание, как живёт маппинг между
-слоями.
+Как разложено по каталогам `docs/models/` модельное и биржевое знание.
 
 ## Контекст
 
@@ -54,7 +52,20 @@ integrations/{name}  →  externalSnapshot  →  domain  →  persistence
   unused). PascalCase, имя совпадает с DTO источника.
   Маппинг «native → externalSnapshot» **не здесь** — в `mapping/`.
 
-- **`docs/models/externalSnapshot/`** — нормализованные граничные
+**Два слоя-скаффолда сняты (`GAPS_CLOSE_28`, N7).** Каталоги
+`docs/models/externalSnapshot/` и `docs/models/persistence/` так и не
+получили ни одного носителя, тогда как знание, ради которого они
+вводились, живёт и потребляется в других домах: состав
+`*ExternalSnapshot` — в mapping-доке своей сущности, представление в
+хранимом слое — в §Персистентность доменного дока плюс
+`docs/rules/persistence-representation.md`. Строки сняты из
+`.claude/rules/structure.md` и `.claude/skills/classify-type.md`:
+исполняемая процедура классификации направляла фрагмент в несуществующий
+путь, и ошибка была тихой. Описание обоих слоёв ниже сохранено как
+**история решения**; если persistence-проекции появятся в `CODE`, тип
+вводится заново — этим решением, а не по памяти.
+
+- **`docs/models/externalSnapshot/`** (снят) — нормализованные граничные
   модели (`*ExternalSnapshot`). Единственное, что выходит за
   `ClientService` / adapter (см.
   `docs/rules/raw-exchange-dto-boundary.md`). Смыслово принадлежит
@@ -76,7 +87,7 @@ integrations/{name}  →  externalSnapshot  →  domain  →  persistence
 - **`docs/models/domain/other/`** — прочая хранимая модель (свечи,
   индикаторы, аудит, инструмент-rules, market structure / phase).
 
-- **`docs/models/persistence/`** — модель хранимого слоя
+- **`docs/models/persistence/`** (снят) — модель хранимого слоя
   (entity-классы / jsonb-снимки / persistence-проекции). На момент
   введения слой пуст — скаффолд.
 

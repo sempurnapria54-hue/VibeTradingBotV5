@@ -21,12 +21,19 @@
     "tranches[].commitments[].budgetExhausted": "бюджет попыток строки исчерпан",
     "deal.direction": "Deal.direction — LONG или SHORT: чем определяется, какой уровень менее благоприятен",
     "tranches[].protections[].stopLevel": "объявленный уровень остановки убытка этой защиты; у трейлинга уровень наблюдаемый, а не объявленный",
-    "position.externalSize": "Position.externalSize живого эпизода — биржевой факт агрегата",
-    "position.live": "Position.hasLiveRisk()",
-    "cancelTargetId": "id снимаемой защиты — операнд преконтроля снятия"
+    "position.externalSize": "Position.externalSize эпизода — биржевой факт агрегата; пусто либо 0 — нетто-размера нет",
+    "position.status": "Position.status — статус биржевой записи эпизода (ACTIVE, CLOSED, ERROR)",
+    "cancelTargetId": "id снимаемой защиты — операнд преконтроля снятия",
+    "deal.status": "Deal.status — durable-колонка статуса сделки. Окно атрибуции закрывающих исполнений уровня сделки открывает координированный выход; ошибочное состояние открывает его только при уже плоской позиции (форма — dealInTeardown)",
+    "tranches[].followingTranchesGross": "Σ gross-экспозиций траншей той же сделки, материализованных ПОЗЖЕ этого (больший DealTranche.id). Суффиксная сумма порядка FIFO: упорядочивание выражается ею, потому что сортировка коллекции в этой форме невыразима. Ключ порядка, перебор альтернатив и названные ограничения правила — docs/models/domain/aggregate/DealTranche.md"
   },
 
   "values": [
+    {
+      "name": "hasLiveEpisode",
+      "note": "Живой эпизод существует. ДОМ ПРЕДИКАТА — эта спека: он объявляется здесь и только здесь; спека, которой нужно его ЗНАЧЕНИЕ, объявляет операнд с указателем сюда. Конъюнкта два, и оба обязательны (docs/models/domain/core/Position.md): биржевая запись активна И нетто-размер положителен. Один конъюнкт ошибается с обеих сторон — активная запись с нулевым размером означает, что запись есть, а живого риска нет; положительный размер при неактивной записи означает закрытый эпизод, чей размер ещё не обнулён, и всё, что стои́т на живости, уехало бы на факты закрытого эпизода. Пустой либо нулевой размер — факт «эпизода нет», а не недобытая величина, и статус в этом случае не читается вовсе: конъюнкция короткозамкнута.",
+      "expr": "coalesce(?position.externalSize, 0) > 0 && position.status == 'ACTIVE'"
+    },
     {
       "name": "isEntryOrder",
       "expr": "in(type, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')"
@@ -55,20 +62,43 @@
       "of": "coalesce(?closedSize, 0)"
     },
     {
-      "name": "trancheExposure",
-      "note": "Экспозиция транша — производная его собственных заявок, а не накопитель: порядок событий на неё не влияет.",
+      "name": "trancheGrossExposure",
+      "note": "Экспозиция транша ДО атрибуции закрывающих исполнений уровня сделки — первые три слагаемых формулы дома.",
       "expr": "trancheEntryFilled - trancheReduceOnlyFilled - trancheProtectionClosed"
     },
     {
+      "name": "dealInTeardown",
+      "note": "Окно атрибуции. Координированный выход открывает его безусловно: закрытие уровня сделки там и идёт. Ошибочное состояние — только при уже плоской позиции: сделка живёт в нём до разбора, закрывающего действия там может не быть вовсе, и безусловное окно выключало бы детектор расхождения на всё это время. Плоская позиция означает, что сворачивание (в том числе kill-switch teardown) состоялось. Вне окна приписывать нечего — сокращение нетто-размера остаётся расхождением сверки.",
+      "expr": "coalesce(?deal.status, 'ACTIVE') == 'EXIT_PENDING' || (coalesce(?deal.status, 'ACTIVE') == 'ERROR' && coalesce(?position.externalSize, 0) == 0)"
+    },
+    {
+      "name": "trancheCloseAttributed",
+      "note": "Четвёртое слагаемое: объём закрывающего исполнения УРОВНЯ СДЕЛКИ, приписанный этому траншу. Правило сопоставления — FIFO по возрасту транша: старшие гасятся целиком, младшие остаются. Замкнутая форма: траншу достаётся его gross-экспозиция минус та часть нетто-размера, которую младшие транши покрыть не могут, — отсюда суффиксная сумма. Отсечки делают величину неотрицательной и не большей gross-экспозиции ПО ПОСТРОЕНИЮ; инвариант неотрицательности их и фиксирует как контракт, а не открывает как факт.",
+      "expr": "if(dealInTeardown, max(0, min(trancheGrossExposure, trancheGrossExposure + coalesce(?followingTranchesGross, 0) - coalesce(?position.externalSize, 0))), 0)"
+    },
+    {
+      "name": "trancheExposure",
+      "note": "Экспозиция транша — производная его собственных заявок и приписанного ему закрывающего исполнения уровня сделки, а не накопитель: порядок событий на неё не влияет.",
+      "expr": "trancheGrossExposure - trancheCloseAttributed"
+    },
+    {
       "name": "trancheHasLiveEntryOrder",
+      "note": "Опирается на orderIsLive — величину дома жизненного цикла заявки (docs/spec/order-lifecycle.json), подключённого сюда. includes нетранзитивен, поэтому файл, подключающий ЭТОТ набор, обязан подключить и order-lifecycle: иначе величина и всё, что её читает (trancheRiskBearing, dealRiskBearing), у него отказывает вычислением, а прогон молчит, пока ни один его пример величину не позовёт.",
       "op": "any",
       "over": "orders",
       "of": "isEntryOrder && orderIsLive"
     },
     {
+      "name": "trancheHasLiveProtection",
+      "note": "Живая условная заявка транша: встроенная либо отдельная. Живой считается по своему носителю (isLive).",
+      "op": "any",
+      "over": "protections",
+      "of": "isLive"
+    },
+    {
       "name": "trancheRiskBearing",
-      "note": "Живой риск транша: экспозиция либо живая входная заявка.",
-      "expr": "trancheExposure > 0 || trancheHasLiveEntryOrder"
+      "note": "Живой риск транша: экспозиция, живая входная заявка либо живая условная заявка. Третий дизъюнкт делает терминал транша симметричным терминалу сделки: живая защита переживает собственную экспозицию, и без него транш уходил бы в CLOSED со стопом на бирже.",
+      "expr": "trancheExposure > 0 || trancheHasLiveEntryOrder || trancheHasLiveProtection"
     },
     {
       "name": "isLive",
@@ -124,9 +154,15 @@
       "of": "coveredSize"
     },
     {
+      "name": "trancheOrderCount",
+      "note": "Сколько заявок транша предъявлено. Ноль ПРИ ЖИВОЙ ЗАЩИТЕ означает не «заявок нет», а «предъявлено не всё»: встроенная защита висит на входной заявке транша, отдельная заводится после её филла, и без заявок ни та ни другая существовать не может.",
+      "op": "count",
+      "over": "orders"
+    },
+    {
       "name": "removalAllowed",
-      "note": "Снятие законно: покрытие снимаемой защиты уже несёт другая подтверждённая защита того же транша.",
-      "expr": "coverageAfterRemoval >= trancheExposure"
+      "note": "Снятие законно: покрытие снимаемой защиты уже несёт другая подтверждённая защита того же транша. Живая защита при нуле предъявленных заявок — несогласованное состояние: экспозиция считается по заявкам транша и схлопывается в ноль, а сравнение с нулём разрешило бы снятие последней защиты над живой экспозицией. Пустота нулём не подменяется — предикат отказывает вычислением. Это половина, видимая по собственным операндам спеки: частичная недогрузка (часть заявок предъявлена) занижает экспозицию, инварианта не нарушая, и здесь не ловится. У каждого читателя предиката остаток закрыт своим основанием, и оснований этих два рода — гейт полноты у того, кто граф добывает, и отсутствие режима недогрузки у того, кто не добывает. Преконтроль (docs/components/RiskValidator.md) держит общий гейт полноты графа: fail-fast DEAL_GRAPH_INCOMPLETE до всех своих ветвей, исполнимая форма — docs/spec/risk-limits.json; здесь она не переписывается. Разбор прохода эталонного транша (docs/spec/strategy-walkthrough.json, removalDeferred) загруженного графа не потребляет вовсе — его состояния объявлены поимённо, а не добыты, поэтому недогрузка у него не режим; на охраняемой же ветви пустота приезжает к нему жёстким отказом вычисления, а не разрешающим false.",
+      "expr": "if(trancheHasLiveProtection && trancheOrderCount == 0, null, coverageAfterRemoval >= trancheExposure)"
     },
     {
       "name": "allTranchesCovered",
@@ -154,8 +190,39 @@
       "of": "trancheRiskBearing"
     },
     {
+      "name": "dealCloseAttributed",
+      "note": "Сколько закрывающего объёма уровня сделки правило сопоставления реально разложило по траншам.",
+      "op": "sum",
+      "over": "tranches",
+      "of": "trancheCloseAttributed"
+    },
+    {
+      "name": "dealGrossExposure",
+      "note": "Сумма экспозиций траншей ДО атрибуции — левая сторона недостачи против нетто-размера.",
+      "op": "sum",
+      "over": "tranches",
+      "of": "trancheGrossExposure"
+    },
+    {
+      "name": "dealCommandClosedSize",
+      "note": "Объём закрывающих исполнений УРОВНЯ СДЕЛКИ, подлежащий разложению по траншам. Своей заявки у такого исполнения нет, поэтому оно наблюдается недостачей суммы gross-экспозиций против нетто-размера — и только в окне сворачивания. Вне окна величина нулевая, и та же недостача остаётся расхождением сверки: этим различитель чужого закрытия и держится.",
+      "expr": "if(dealInTeardown, max(0, dealGrossExposure - coalesce(?position.externalSize, 0)), 0)"
+    },
+    {
+      "name": "attributionComplete",
+      "note": "ПЕРВЫЙ инвариант правила — полнота атрибуции: по траншам разложено ровно столько, сколько закрыло исполнение уровня сделки. Что он ловит: несогласованные суффиксные суммы порядка (подача, не образующая суффикса) — тогда сумма приписанного расходится с закрываемым объёмом. Чего он НЕ ловит: внутренне согласованный, но НЕВЕРНЫЙ порядок — он даёт ту же сумму. Чем ловится неверный порядок: ПРЕДИКАТАМИ ПОКРЫТИЯ, и только на состоянии, где обнулённый транш уже прошёл свою дочистку и остался без защиты — там перевёрнутый порядок оставляет экспозицию непокрытой. Пока защиты живы у всех траншей, различия не видит ни один предикат. Дочистка потраншевая и гейтится нулём собственной экспозиции транша, поэтому такое состояние достижимо; носитель — пример ниже. Дом правила — docs/models/domain/aggregate/DealTranche.md. Инвариант агрегатный: на состоянии одного транша (проход транша, где соседних траншей нет по построению) он не определён.",
+      "expr": "dealCloseAttributed == dealCommandClosedSize"
+    },
+    {
+      "name": "attributionNonNegative",
+      "note": "ВТОРОЙ инвариант правила: приписанное траншу не отрицательно и не больше его gross-экспозиции — транш не уводится в минус чужим закрытием. Инвариант КОНТРАКТНЫЙ: выражение trancheCloseAttributed обеспечивает его отсечками, и на состояниях он не расходится. Его предмет — реализация правила (ассерт кода и защита от подачи объёма, превышающего gross), а не обнаружение фактов; детектор фактов здесь один — exposureReconciled.",
+      "op": "all",
+      "over": "tranches",
+      "of": "trancheCloseAttributed >= 0 && trancheCloseAttributed <= trancheGrossExposure"
+    },
+    {
       "name": "exposureReconciled",
-      "note": "Сверка модели с биржевым фактом: сумма экспозиций траншей равна нетто-позиции. Расхождение — живой риск, не приписанный ни одному траншу.",
+      "note": "Сверка модели с биржевым фактом: сумма экспозиций траншей равна нетто-позиции. Расхождение — живой риск, не приписанный ни одному траншу. В окне сворачивания закрывающее исполнение уровня сделки приписывается ЧЕТВЁРТЫМ слагаемым экспозиции и потому расхождения не даёт — вместе с ним в окне поглощается и ЧУЖАЯ активность в обе стороны (названное ограничение, дом правила). Вне окна сверка различает чужое закрытие без оговорок.",
       "expr": "dealExposure == position.externalSize"
     },
 
@@ -206,7 +273,7 @@
     {
       "case": "встроенная защита на полностью налитой входной заявке покрывает свой транш",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -220,7 +287,7 @@
     {
       "case": "встроенная защита капится филлом своей заявки, а не своим размером",
       "state": {
-        "position": { "live": true, "externalSize": 30 },
+        "position": { "status": "ACTIVE", "externalSize": 30 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "PARTIALLY_COMPLETED", "accumulatedFillSize": 30 } ],
@@ -234,7 +301,7 @@
     {
       "case": "трейлинг до достижения цены активации защитой не считается",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -248,7 +315,7 @@
     {
       "case": "трейлинг без цены активации защищает сразу",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -262,7 +329,7 @@
     {
       "case": "активированный трейлинг покрывает: уровень наблюдён",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -276,7 +343,7 @@
     {
       "case": "тейк покрытием не является ни при каком статусе",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -290,7 +357,7 @@
     {
       "case": "частично сработавшая standalone-защита покрывает остаток своего транша",
       "state": {
-        "position": { "live": true, "externalSize": 60 },
+        "position": { "status": "ACTIVE", "externalSize": 60 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -304,7 +371,7 @@
     {
       "case": "CREATED не покрывает: подтверждения с биржи нет",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -330,6 +397,31 @@
       "expect": { "trancheExposure": 100, "trancheCoverage": 100, "coverageAfterRemoval": 0, "removalAllowed": false, "trancheViolated": false }
     },
     {
+      "case": "заявки транша не предъявлены, а защита жива: экспозиция схлопывается в ноль, и снятие последней защиты отказывает вычислением, а не разрешается",
+      "note": "Направление ошибки неполноты здесь РАЗРЕШАЮЩЕЕ: по предъявленному подмножеству экспозиция равна нулю, покрытие после снятия — тоже, и сравнение нуля с нулём даёт «снимать можно». Состояние несогласованно по собственным операндам спеки: живая отдельная защита заводится после филла входной заявки, поэтому нуля заявок при ней не бывает.",
+      "state": {
+        "cancelTargetId": "oco",
+        "orders": [],
+        "protections": [
+          {
+            "id": "oco",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0
+          }
+        ],
+        "commitments": []
+      },
+      "expect": {
+        "trancheExposure": 0,
+        "coverageAfterRemoval": 0,
+        "trancheOrderCount": 0,
+        "removalAllowed": null
+      }
+    },
+    {
       "case": "тот же пакет транша после активации трейлинга: снятие допускается",
       "state": {
         "cancelTargetId": "oco",
@@ -345,7 +437,7 @@
     {
       "case": "перевыставление входа транша: новая заявка с нулевым филлом покрытия не даёт, старая ещё несёт",
       "state": {
-        "position": { "live": true, "externalSize": 30 },
+        "position": { "status": "ACTIVE", "externalSize": 30 },
         "tranches": [
           {
             "orders": [
@@ -365,7 +457,7 @@
     {
       "case": "лестница частичных стопов транша на 25+25+25+15 его экспозицию не покрывает",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -384,7 +476,7 @@
     {
       "case": "лестница, где последняя ступень получила остаток, покрывает экспозицию транша ровно",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -403,7 +495,7 @@
     {
       "case": "недопокрытие под живым обязательством транша нарушением не является",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -417,7 +509,7 @@
     {
       "case": "недопокрытие при исчерпанном бюджете обязательства — нарушение",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -431,7 +523,7 @@
     {
       "case": "грид: полный налив, частичный налив и ненаступивший уровень — все транши покрыты, сумма сходится с нетто-позицией",
       "state": {
-        "position": { "live": true, "externalSize": 8 },
+        "position": { "status": "ACTIVE", "externalSize": 8 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
@@ -455,7 +547,7 @@
     {
       "case": "грид: чужая защита дыру не закрывает — избыток одного транша не покрывает непокрытый соседний",
       "state": {
-        "position": { "live": true, "externalSize": 8 },
+        "position": { "status": "ACTIVE", "externalSize": 8 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
@@ -474,7 +566,7 @@
     {
       "case": "транш выбит своим стопом: его экспозиция ноль, сумма по-прежнему равна нетто-позиции",
       "state": {
-        "position": { "live": true, "externalSize": 3 },
+        "position": { "status": "ACTIVE", "externalSize": 3 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
@@ -491,9 +583,148 @@
       "expect": { "dealExposure": 3, "exposureReconciled": true, "anyTrancheViolated": false, "dealRiskBearing": true }
     },
     {
-      "case": "внешнее частичное сокращение: сумма экспозиций траншей расходится с нетто-позицией",
+      "case": "полное закрытие сделки командой: закрывающий объём разложен по траншам, оба уходят в ноль",
+      "note": "Штатный выход эталона (actionKind POSITION / EXIT_ACTION): своей заявки у команды нет, объём приписывается правилом сопоставления. Четвёртое слагаемое здесь и работает: без него экспозиция равнялась бы 8 при нулевой позиции — биржевая ступень 2 на штатном выходе.",
       "state": {
-        "position": { "live": true, "externalSize": 6 },
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "status": "CLOSED", "externalSize": 0 },
+        "tranches": [
+          {
+            "followingTranchesGross": 3,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "CANCELED", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "followingTranchesGross": 0,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "CANCELED", "size": 3, "parentFillSize": 3 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCommandClosedSize": 8, "dealCloseAttributed": 8, "attributionComplete": true, "attributionNonNegative": true, "dealExposure": 0, "exposureReconciled": true, "anyTrancheViolated": false, "dealRiskBearing": false }
+    },
+    {
+      "case": "частичный филл команды закрытия: FIFO гасит старший транш целиком, младший остаётся под своей защитой",
+      "note": "Ключ порядка — материализация транша: старший идёт первым и гасится целиком, младший остаётся с экспозицией под своей защитой. Защиты здесь живы у обоих: дочистка транша ждёт нуля его собственной экспозиции, и старший её только что получил — снять свою защиту он успеет следующим проходом. На таком состоянии — покрытие каждого транша не ниже его gross — порядок не различается ни одним предикатом: перевёрнутый даёт ту же сумму, то же покрытие и ту же сверку. Пропорциональное распределение вместо этого оставило бы дробный остаток на каждом транше, и ни один не дошёл бы до нуля.",
+      "state": {
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "status": "ACTIVE", "externalSize": 3 },
+        "tranches": [
+          {
+            "followingTranchesGross": 3,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "followingTranchesGross": 0,
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_main", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 3, "closedSize": 0 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCommandClosedSize": 5, "dealCloseAttributed": 5, "attributionComplete": true, "attributionNonNegative": true, "dealExposure": 3, "exposureReconciled": true, "allTranchesCovered": true, "anyTrancheViolated": false }
+    },
+    {
+      "case": "тот же частичный филл проходом позже: старший транш дочищен и закрыт — порядок сопоставления становится наблюдаемым",
+      "note": "Следующее состояние той же тропы. Обнулённый старший транш прошёл свою дочистку: защита снята, живого риска нет, он терминален; младший продолжает нести экспозицию под своей живой защитой, и сделка всё ещё сворачивается. Здесь порядок и различается: перевёрнутый (LIFO — префиксные суммы вместо суффиксных) вернул бы экспозицию на старший транш, у которого покрытия уже нет, и дал бы allTranchesCovered false с anyTrancheViolated true — ложную биржевую ступень 2 на штатном выходе. Этим состоянием порядковая часть правила и держится.",
+      "state": {
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "status": "ACTIVE", "externalSize": 3 },
+        "tranches": [
+          {
+            "followingTranchesGross": 3,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "CANCELED", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "followingTranchesGross": 0,
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_main", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 3, "closedSize": 0 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCommandClosedSize": 5, "dealCloseAttributed": 5, "attributionComplete": true, "attributionNonNegative": true, "dealExposure": 3, "exposureReconciled": true, "allTranchesCovered": true, "anyTrancheViolated": false, "dealRiskBearing": true }
+    },
+    {
+      "case": "чужая активность внутри окна сворачивания сверкой не различается — названное ограничение",
+      "note": "Наш выход закрыл 5, кто-то извне открыл 2, нетто 5. Приписанный объём берётся ровно таким, каким сверка сходится, поэтому два контракта чужой живой экспозиции она не видит — ни в эту сторону, ни в обратную. Что удерживает ошибку: окно узкое (только сворачивание), терминал сделки всё равно требует отсутствия живой позиции, а чужой живой риск на инструменте имеет собственный детектор вне арифметики экспозиций (docs/components/AnomalyJob.md). Вне окна сверка различает чужое закрытие без оговорок — соседний пример.",
+      "state": {
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 5 },
+        "tranches": [
+          {
+            "followingTranchesGross": 3,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "a_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "followingTranchesGross": 0,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "b_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 3, "parentFillSize": 3 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCommandClosedSize": 3, "dealCloseAttributed": 3, "attributionComplete": true, "dealExposure": 5, "exposureReconciled": true, "anyTrancheViolated": false }
+    },
+    {
+      "case": "ошибочное состояние без завершённого сворачивания окна не открывает: атрибуции нет, расхождение остаётся",
+      "note": "Сделка живёт в ошибочном состоянии до разбора, и закрывающего действия там может не быть вовсе. Пока позиция не плоская, окно закрыто, и любое сокращение нетто-размера остаётся расхождением — первый триггер биржевой ступени 2 на таких сделках не выключается.",
+      "state": {
+        "deal": { "status": "ERROR" },
+        "position": { "externalSize": 5 },
+        "tranches": [
+          {
+            "followingTranchesGross": 3,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "a_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "followingTranchesGross": 0,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "b_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "ACTIVE", "size": 3, "parentFillSize": 3 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCommandClosedSize": 0, "dealCloseAttributed": 0, "dealExposure": 8, "exposureReconciled": false }
+    },
+    {
+      "case": "уход в ошибочное состояние при неплоской позиции закрывает окно: экспозиция возвращается к gross и у уже дочищенного транша",
+      "note": "Цена сужения окна, названная в доме. Сделка ушла в ошибочное состояние прямо из сворачивания, позиция не плоская — окно закрыто, приписанный объём обнулён у всех. Старший транш к этому моменту уже дочищен: его защита снята, он терминален, — и экспозиция возвращается к нему без покрытия. Направление консервативное: ошибочное состояние с неплоской позицией и означает живой риск, не приписанный никому, так что и расхождение сверки, и нарушение покрытия указывают туда, где риск действительно есть. Контракт терминала транша при этом гейтит переход, а не держится вечным инвариантом.",
+      "state": {
+        "deal": { "status": "ERROR" },
+        "position": { "status": "ACTIVE", "externalSize": 3 },
+        "tranches": [
+          {
+            "followingTranchesGross": 3,
+            "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
+            "protections": [ { "id": "l0_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "CANCELED", "size": 5, "parentFillSize": 5 } ],
+            "commitments": []
+          },
+          {
+            "followingTranchesGross": 0,
+            "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+            "protections": [ { "id": "l1_main", "carrier": "STANDALONE", "kind": "STOP", "status": "ACTIVE", "size": 3, "closedSize": 0 } ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": { "dealCommandClosedSize": 0, "dealCloseAttributed": 0, "dealExposure": 8, "exposureReconciled": false, "allTranchesCovered": false, "anyTrancheViolated": true }
+    },
+    {
+      "case": "внешнее частичное сокращение вне окна сворачивания: атрибуции нет, сумма экспозиций расходится с нетто-позицией",
+      "note": "Различитель чужого закрытия сохранён: та же недостача, что в окне сворачивания стала бы приписанным объёмом, вне его остаётся расхождением.",
+      "state": {
+        "position": { "status": "ACTIVE", "externalSize": 6 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 } ],
@@ -507,12 +738,12 @@
           }
         ]
       },
-      "expect": { "dealExposure": 8, "exposureReconciled": false, "allTranchesCovered": true }
+      "expect": { "dealExposure": 8, "dealCommandClosedSize": 0, "dealCloseAttributed": 0, "attributionComplete": true, "exposureReconciled": false, "allTranchesCovered": true }
     },
     {
       "case": "недобытый размер защиты отказывает, а не подставляет ноль",
       "state": {
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -528,7 +759,7 @@
       "case": "LONG: наименее благоприятный берётся среди всех защит транша — отдельный стоп ниже встроенной, и уровнем становится он",
       "state": {
         "deal": { "direction": "LONG" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -546,7 +777,7 @@
       "case": "LONG: внутри одного класса берётся менее благоприятный — нижний уровень",
       "state": {
         "deal": { "direction": "LONG" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -564,7 +795,7 @@
       "case": "SHORT: менее благоприятен верхний уровень",
       "state": {
         "deal": { "direction": "SHORT" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -582,7 +813,7 @@
       "case": "неактивированный трейлинг уровня не несёт: защиты нет вовсе — пусто, а не ноль",
       "state": {
         "deal": { "direction": "LONG" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -599,7 +830,7 @@
       "case": "активированный трейлинг несёт наблюдённый уровень и, будучи единственной действующей защитой, задаёт уровень транша",
       "state": {
         "deal": { "direction": "LONG" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -616,7 +847,7 @@
       "case": "SHORT: класс носителя отбор не сужает — верхний уровень несёт отдельный стоп, а не встроенная защита",
       "state": {
         "deal": { "direction": "SHORT" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -634,7 +865,7 @@
       "case": "окно двойной защиты: замена стои́т, старая ещё жива — уровнем остаётся худшая из двух, а не та, чей носитель приоритетнее",
       "state": {
         "deal": { "direction": "LONG" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -652,7 +883,7 @@
       "case": "трейлинг без цены активации покрывает, но уровня ещё не наблюдал — уровень транша отказывает вычислением, а не берётся у соседней защиты",
       "state": {
         "deal": { "direction": "LONG" },
-        "position": { "live": true, "externalSize": 100 },
+        "position": { "status": "ACTIVE", "externalSize": 100 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -670,7 +901,7 @@
       "case": "два транша с разными уровнями: на позицию берётся менее благоприятный из них",
       "state": {
         "deal": { "direction": "LONG" },
-        "position": { "live": true, "externalSize": 200 },
+        "position": { "status": "ACTIVE", "externalSize": 200 },
         "tranches": [
           {
             "orders": [ { "type": "ENTRY", "status": "COMPLETED", "accumulatedFillSize": 100 } ],
@@ -685,6 +916,34 @@
         ]
       },
       "expect": { "dealExposure": 200, "exposureReconciled": true, "stopCurrentLive": 2890, "allTranchesCovered": true }
+    },
+    {
+      "case": "живой эпизод: запись активна и нетто-размер положителен",
+      "state": {
+        "position": { "status": "ACTIVE", "externalSize": 10 }
+      },
+      "expect": { "hasLiveEpisode": true }
+    },
+    {
+      "case": "активная запись с нулевым размером живого риска не несёт: запись есть, эпизода нет",
+      "state": {
+        "position": { "status": "ACTIVE", "externalSize": 0 }
+      },
+      "expect": { "hasLiveEpisode": false }
+    },
+    {
+      "case": "запись закрыта, а нетто-размер ещё не обнулён (закрытие наблюдено, размер тем же рефрешем не переписан): живого эпизода нет — по размеру в одиночку он был бы объявлен живым",
+      "state": {
+        "position": { "status": "CLOSED", "externalSize": 10 }
+      },
+      "expect": { "hasLiveEpisode": false }
+    },
+    {
+      "case": "эпизода нет вовсе (первый вход сделки): пустой размер — факт, а не недобытая величина; статус при этом не читается",
+      "state": {
+        "position": { "externalSize": null }
+      },
+      "expect": { "hasLiveEpisode": false }
     }
   ]
 }

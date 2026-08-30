@@ -62,7 +62,9 @@ Rules-поля (sizing/rounding/ограничители), питающие rule
 `InstrumentExternalRulesExternalSnapshot` + строка маппера. Цена: миграций
 не требует, новых вызовов биржи не добавляет (`/public/instruments` уже
 читается). **Без этого** `externalFeeGroupId` остаётся `null`, ставка не
-резолвится и `FEE_RATE_UNAVAILABLE` блокирует **каждый** risk-creating вход
+резолвится и `FEE_RATE_UNAVAILABLE` блокирует **всякое** валидируемое
+действие: не только вход, но и перенос уровня, и ослабление защиты —
+ставка стои́т операндом живого слагаемого одновременного потолка
 (`docs/models/domain/other/InstrumentExternalRules.md`).
 
 **`groupId` — ключ, а не ставка.** Инструмент несёт только id своей

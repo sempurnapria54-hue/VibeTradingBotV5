@@ -2,7 +2,7 @@
   "subject": "pnl-reconciliation",
   "question": "Сошлась ли сверка P&L",
   "home": "docs/rules/pnl-reconciliation.md",
-  "includes": ["deal-risk-numbers", "protection-coverage"],
+  "includes": ["deal-risk-numbers", "protection-coverage", "order-lifecycle"],
 
   "operands": {
     "cashFlows[].amount": "DealCashFlow.amount — знаковая сумма движения",
@@ -40,18 +40,13 @@
       "of": "abs(amount)"
     },
     {
-      "name": "legFeeRate",
-      "note": "Ставка, под которую нога сайзилась, восстановленная обращением закрытой формы сайзинга.",
-      "expr": "(plannedRiskAmount / (plannedContractValue * plannedSizeContracts) - abs(plannedEntryPrice - plannedStopPrice)) / (plannedEntryPrice + plannedStopPrice)"
-    },
-    {
       "name": "legExpectedFee",
-      "note": "Ожидаемая round-trip комиссия ноги, взвешенная филлом: комиссионный поток порождают филлы.",
-      "expr": "legFeeRate * (plannedEntryPrice + plannedStopPrice) * plannedSizeContracts * plannedContractValue * (if(plannedSizeContracts == 0, 0, accumulatedFillSize / plannedSizeContracts))"
+      "note": "Ожидаемая round-trip комиссия ноги, взвешенная филлом: комиссионный поток порождают филлы. Ни ставка, ни доля филла здесь не переписываются — обе берутся у дома чисел риска: docs/spec/deal-risk-numbers.json, величины feeRate и filledShare, подключённые через includes.",
+      "expr": "feeRate * (plannedEntryPrice + plannedStopPrice) * plannedSizeContracts * plannedContractValue * filledShare"
     },
     {
       "name": "expectedDealFee",
-      "note": "Ожидаемая комиссия сделки. Множество ног — предикат взятого риска, а не заявленного. Бизнес-типы ноги входа здесь не переписываются: множество берётся у дома (docs/spec/protection-coverage.json §isEntryOrder) через includes — подключение прямое, потому что includes нетранзитивен: дом, подключённый в deal-risk-numbers, отсюда не виден.",
+      "note": "Ожидаемая комиссия сделки. Множество ног — предикат взятого риска, а не заявленного. Бизнес-типы ноги входа здесь не переписываются: множество берётся у дома docs/spec/protection-coverage.json, величина isEntryOrder, через includes — подключение прямое, потому что includes нетранзитивен: дом, подключённый в deal-risk-numbers, отсюда не виден. По той же причине дом чисел риска подключён здесь напрямую: ставка ноги и доля её филла живут в нём. И по ней же подключён order-lifecycle: подключая набор protection-coverage, файл берёт его целиком, а часть величин того набора стоит на величинах жизненного цикла заявки.",
       "op": "sum",
       "over": "legs",
       "where": "isEntryOrder && accumulatedFillSize > 0 && notNull(plannedRiskAmount)",
@@ -422,6 +417,20 @@
         "episodes": [ { "externalRealizedProfitGross": 0, "externalFee": -0.75, "externalFundingCost": 0, "externalLiquidationPenalty": 0 } ]
       },
       "expect": { "leftTradeFee": -0.75, "rightTradeFee": -0.75, "discrepancyTradeFee": 0, "matched": true }
+    },
+    {
+      "case": "ожидаемая комиссия ноги взвешена филлом: ставка и доля филла резолвятся у дома чисел риска, своей копии здесь нет",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": { "relativeShare": 0.005, "omissionMultiplier": 0.5, "floor": 0.01 },
+        "duty": { "closeRecordsFetchedForAllEpisodes": true, "windowClosed": true, "flowsFetched": true },
+        "cashFlows": [],
+        "legs": [
+          { "type": "ENTRY", "plannedRiskAmount": 929.55, "plannedSizeContracts": 100, "accumulatedFillSize": 40, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1 }
+        ],
+        "episodes": []
+      },
+      "expect": { "expectedDealFee": 11.82 }
     }
   ]
 }

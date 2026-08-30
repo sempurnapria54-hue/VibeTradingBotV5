@@ -13,9 +13,8 @@
     "entry.stopPrice": "уровень стопа действия",
     "entry.riskPerActionPercent": "поактный потолок риска, проценты",
     "entry.allocationPercents": "желаемая доля базы под нотинал, проценты",
-    "position.externalSize": "Position.externalSize — нетто-размер живого эпизода; операнд агрегатных величин (доля выхода), не траншевых",
-    "ladder.trancheExposure": "экспозиция транша, которому принадлежит набор ступеней; резолв — docs/spec/protection-coverage.json",
-    "exit.fraction": "объявленная доля выхода",
+    "tranche.exposure": "экспозиция транша, которому принадлежит действие (выход либо набор ступеней); резолв — docs/spec/protection-coverage.json. Нетто-размер позиции операндом этой спеки не значится: на сетке он относится к нескольким траншам сразу, и любая величина размера, взятая от него, покрывала бы чужую экспозицию",
+    "exit.fraction": "объявленная доля выхода; область определения — (0, 1]: нулевая доля действием не объявляется и до расчёта не доходит — она отвергается создáнием стратегии как непозитивная доля объявления (docs/rules/strategy-validation.md, реджект STRATEGY_ACTION_FRACTION_NOT_POSITIVE)",
     "ladder.previousStepsTotal": "сумма размеров уже поставленных ступеней набора",
     "ladder.declaredStepSize": "размер ступени по объявленной доле"
   },
@@ -36,12 +35,22 @@
     },
     {
       "name": "contractsFromAllocation",
-      "note": "Желаемый объём по доле аллокации; потолок риска — связывающий предел над ним.",
+      "note": "Желаемый объём по доле аллокации. Связывает МЕНЬШИЙ из двух пределов, и какой именно — зависит от дистанции стопа: при стопе уже (riskPerActionPercent/allocationPercents) доли цены за вычетом round-trip комиссии связывает аллокация, при более широком — потолок риска.",
       "expr": "base * entry.allocationPercents / 100 / (entry.entryPrice * instrument.contractValue)"
     },
     {
       "name": "desiredContracts",
       "expr": "min(contractsFromRisk, contractsFromAllocation)"
+    },
+    {
+      "name": "riskCeilingBinds",
+      "note": "Который из двух пределов связывает размер: истина — потолок риска, ложь — доля аллокации. Форма сторонне-независима и сравнивает ЦЕНОВЫЕ величины, без множителя стоимости контракта: связывает потолок риска ровно тогда, когда ценовой убыток на единицу экспозиции (дистанция стопа плюс round-trip комиссия обеих ног) превосходит долю (riskPerActionPercent / allocationPercents) цены входа. Дом политики «поактный потолок — предел, а не цель» — docs/rules/risk-policy.md.",
+      "expr": "contractsFromRisk < contractsFromAllocation"
+    },
+    {
+      "name": "bindingStopDistance",
+      "note": "Дистанция стопа, на которой оба предела дают один размер: шире — связывает потолок риска, теснее — доля аллокации. Выведена для стопа на убыточной стороне длинного входа (S = P - d) из равенства contractsFromRisk = contractsFromAllocation. От заявленного уровня стопа не зависит — это свойство цены входа, обоих процентов и ставки.",
+      "expr": "entry.entryPrice * (entry.riskPerActionPercent / entry.allocationPercents - 2 * instrument.takerFeeRate) / (1 - instrument.takerFeeRate)"
     },
     {
       "name": "entryContracts",
@@ -50,7 +59,7 @@
     },
     {
       "name": "entryRiskAtStop",
-      "note": "Фактический риск ноги выбранного размера — операнд поактного неравенства.",
+      "note": "Фактический риск ноги выбранного размера — операнд поактного неравенства. riskPerActionPercent — ПОТОЛОК, не цель: фактический риск ниже объявленного (когда размер связала аллокация) — штатное следствие, а не дефект сайзинга. Дом политики — docs/rules/risk-policy.md.",
       "expr": "perContractRisk * entryContracts"
     },
     {
@@ -61,7 +70,8 @@
 
     {
       "name": "rawExitSize",
-      "expr": "position.externalSize * exit.fraction"
+      "note": "Объявленная доля берётся от экспозиции ТРАНША, которому принадлежит действие, — не от нетто-размера эпизода. Тот же довод, что у lastLadderStepSize: на сетке нетто относится к нескольким траншам сразу, и доля, взятая от него, уводила бы экспозицию транша в минус, а сверка exposureReconciled этого класса не ловит — сумма сходится.",
+      "expr": "tranche.exposure * exit.fraction"
     },
     {
       "name": "exitSize",
@@ -69,18 +79,28 @@
     },
     {
       "name": "exitRemainder",
-      "expr": "position.externalSize - exitSize"
+      "expr": "tranche.exposure - exitSize"
     },
     {
       "name": "exitOutcome",
-      "note": "Пола минимума у reduce-only выхода нет: подъём размера менял бы объявленное действие. Вместо пола — исходы округления. Полных выходов два, и они разведены значением: FULL_BY_FRACTION — объявленная доля забрала экспозицию целиком, ничего не округлялось, журнальный отчёт не заводится; FULL — «частично» на этом размере невыразимо, выход целиком объявляется отчётом PARTIAL_EXIT_ROUNDED_TO_FULL. Одно значение на оба исхода заставляло бы потребителя перевыводить exitSize >= minSize, чтобы решить, какой отчёт заводить.",
-      "expr": "if(exitSize >= instrument.minSize, if(exitRemainder == 0, 'FULL_BY_FRACTION', 'PARTIAL'), if(exitRemainder < instrument.minSize, 'FULL', 'SKIPPED'))"
+      "note": "Пола минимума у reduce-only выхода нет: подъём размера менял бы объявленное действие. Вместо пола — исходы округления, и внешний признак ветвления — ОСТАТОК, а не размер выхода. Остаток нулевой — объявленная доля забрала экспозицию целиком (FULL_BY_FRACTION): округление ни при чём, журнальный отчёт не заводится, и признак этот не зависит от того, выразим ли сам размер минимальным торговым. Остаток положительный, но ниже минимального торгового размера — «частично» на этом размере невыразимо: остаток не получит ни перестановки защиты (ступень такого размера отвергается), ни собственной закрывающей заявки, поэтому выход идёт целиком (FULL) и объявляется отчётом PARTIAL_EXIT_ROUNDED_TO_FULL. Остаток жизнеспособен — исполняется объявленная доля (PARTIAL) либо, если она сама ниже минимума, действие не исполняется (SKIPPED). Разведение двух полных выходов существует ради единственного решения потребителя — заводить ли отчёт об округлении.",
+      "expr": "if(exitRemainder == 0, 'FULL_BY_FRACTION', if(exitRemainder < instrument.minSize, 'FULL', if(exitSize >= instrument.minSize, 'PARTIAL', 'SKIPPED')))"
+    },
+    {
+      "name": "exitSizeFinal",
+      "note": "Размер, который уезжает в заявку выхода. На штатном частичном выходе он равен exitSize; на обоих полных исходах — экспозиция транша целиком; при SKIPPED заявки нет вовсе.",
+      "expr": "if(exitOutcome == 'SKIPPED', 0, if(exitOutcome == 'PARTIAL', exitSize, tranche.exposure))"
+    },
+    {
+      "name": "exitLeavesNoDust",
+      "note": "Инвариант выхода: остаток экспозиции после выхода либо нулевой, либо не меньше минимального торгового размера. Остаток между ними — дробь, которую нечем ни защитить, ни закрыть; исход, который её порождал бы, переводится в полный выход. Дом политики — docs/rules/no-partial-close.md.",
+      "expr": "tranche.exposure - exitSizeFinal == 0 || tranche.exposure - exitSizeFinal >= instrument.minSize"
     },
 
     {
       "name": "lastLadderStepSize",
       "note": "Последняя ступень набора получает остаток: покрытие выходит ровно равным экспозиции ТРАНША. Нетто-размер позиции сюда не входит — на сетке он относится к нескольким траншам сразу, и последняя ступень каждого покрывала бы чужую экспозицию.",
-      "expr": "ladder.trancheExposure - ladder.previousStepsTotal"
+      "expr": "tranche.exposure - ladder.previousStepsTotal"
     },
     {
       "name": "ladderStepRejected",
@@ -96,23 +116,61 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 0 },
-        "exit": { "fraction": 0 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
-      "expect": { "perContractRisk": 9.2955, "riskBudget": 100, "contractsFromAllocation": 33.33333333333333, "entryContracts": 10, "entryRiskAtStop": 92.955, "entryWithinRiskBudget": true }
+      "expect": { "perContractRisk": 9.2955, "riskBudget": 100, "contractsFromAllocation": 33.33333333333333, "entryContracts": 10, "entryRiskAtStop": 92.955, "entryWithinRiskBudget": true, "riskCeilingBinds": true }
     },
     {
-      "case": "узкий стоп: связывает аллокация, а не потолок риска",
+      "case": "граница связывания сверху: стоп чуть ШИРЕ переломной дистанции — связывает потолок риска",
+      "note": "Пара с примером ниже зажимает переломную дистанцию между 26 и 28 при цене 3000, то есть 0.87 % и 0.93 % цены. Ошибочный порог — например 30 (0.01 x цены, посчитанный без round-trip комиссии) — этой парой ловится: он предсказал бы на 28 связывающую аллокацию.",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2972, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "bindingStopDistance": 27.013506753376688, "contractsFromRisk": 32.27263925643839, "contractsFromAllocation": 33.33333333333333, "riskCeilingBinds": true, "entryContracts": 32 }
+    },
+    {
+      "case": "граница связывания снизу: стоп чуть ТЕСНЕЕ переломной дистанции — связывает доля аллокации",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2974, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "bindingStopDistance": 27.013506753376688, "contractsFromRisk": 34.49822333816885, "contractsFromAllocation": 33.33333333333333, "riskCeilingBinds": false, "entryContracts": 33 }
+    },
+    {
+      "case": "рост ставки комиссии СНИЖАЕТ переломную дистанцию: при вдвое большей ставке тот же стоп 26 связывает уже потолок риска, а не долю аллокации",
+      "note": "Пара с примером выше — единственное место, где ставка варьируется, и она пришпиливает ЗНАК зависимости: дистанция убывает с ростом ставки (30.000 при нулевой, 27.0135 при 5 б.п., 24.024 при 10 б.п.). Утверждение о возрастании этой парой ловится сразу.",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.001 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2974, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "bindingStopDistance": 24.024024024024023, "contractsFromRisk": 31.275411271658223, "contractsFromAllocation": 33.33333333333333, "riskCeilingBinds": true, "entryContracts": 31 }
+    },
+    {
+      "case": "узкий стоп: связывает аллокация, риск на действие остаётся НИЖЕ объявленного потолка — штатное следствие, не дефект (риск 0.198 % базы при потолке 1 %)",
       "state": {
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2997, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 0 },
-        "exit": { "fraction": 0 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
-      "expect": { "entryContracts": 33, "entryWithinRiskBudget": true }
+      "expect": { "perContractRisk": 0.59985, "contractsFromRisk": 166.70834375260484, "contractsFromAllocation": 33.33333333333333, "entryContracts": 33, "entryRiskAtStop": 19.79505, "entryWithinRiskBudget": true }
     },
     {
       "case": "размер упёрся в минимум и всё равно выходит за потолок — вход не проходит",
@@ -120,9 +178,9 @@
         "base": 100,
         "instrument": { "contractValue": 1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 0 },
-        "exit": { "fraction": 0 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expect": { "entryContracts": 5, "entryWithinRiskBudget": false }
     },
@@ -132,11 +190,11 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 10 },
         "exit": { "fraction": 0.5 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "tranche": { "exposure": 10 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
-      "expect": { "exitSize": 5, "exitOutcome": "PARTIAL" }
+      "expect": { "exitSize": 5, "exitOutcome": "PARTIAL", "exitSizeFinal": 5, "exitLeavesNoDust": true }
     },
     {
       "case": "объявленная доля забрала экспозицию целиком — полный выход по доле, а не округление",
@@ -144,11 +202,11 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 10 },
         "exit": { "fraction": 1 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "tranche": { "exposure": 10 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
-      "expect": { "exitSize": 10, "exitRemainder": 0, "exitOutcome": "FULL_BY_FRACTION" }
+      "expect": { "exitSize": 10, "exitRemainder": 0, "exitOutcome": "FULL_BY_FRACTION", "exitSizeFinal": 10, "exitLeavesNoDust": true }
     },
     {
       "case": "доля меньше минимума, а остаток тоже меньше — выходим целиком и объявляем это",
@@ -156,11 +214,35 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 6 },
         "exit": { "fraction": 0.5 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "tranche": { "exposure": 6 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
-      "expect": { "exitSize": 3, "exitRemainder": 3, "exitOutcome": "FULL" }
+      "expect": { "exitSize": 3, "exitRemainder": 3, "exitOutcome": "FULL", "exitSizeFinal": 6, "exitLeavesNoDust": true }
+    },
+    {
+      "case": "доля исполнима, а остаток ниже минимума — выходим целиком: дробь, которую нечем ни защитить, ни закрыть, не заводится",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "exit": { "fraction": 0.85 },
+        "tranche": { "exposure": 6 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "exitSize": 5, "exitRemainder": 1, "exitOutcome": "FULL", "exitSizeFinal": 6, "exitLeavesNoDust": true }
+    },
+    {
+      "case": "экспозиция ниже минимального размера (вход налился частично и был снят), объявленная доля забирает её целиком — полный выход по доле, округлять нечего",
+      "state": {
+        "base": 10000,
+        "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
+        "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 3 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
+      },
+      "expect": { "exitSize": 3, "exitRemainder": 0, "exitOutcome": "FULL_BY_FRACTION", "exitSizeFinal": 3, "exitLeavesNoDust": true }
     },
     {
       "case": "доля меньше минимума, остаток достаточен — действие не исполняется",
@@ -168,11 +250,11 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 100 },
         "exit": { "fraction": 0.02 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
-      "expect": { "exitSize": 2, "exitRemainder": 98, "exitOutcome": "SKIPPED" }
+      "expect": { "exitSize": 2, "exitRemainder": 98, "exitOutcome": "SKIPPED", "exitSizeFinal": 0, "exitLeavesNoDust": true }
     },
     {
       "case": "последняя ступень лестницы забирает остаток округления",
@@ -180,21 +262,21 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 103 },
-        "exit": { "fraction": 0 },
-        "ladder": { "trancheExposure": 103, "previousStepsTotal": 75, "declaredStepSize": 25 }
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 103 },
+        "ladder": { "previousStepsTotal": 75, "declaredStepSize": 25 }
       },
       "expect": { "lastLadderStepSize": 28, "ladderStepRejected": false }
     },
     {
-      "case": "сетка: последняя ступень транша считается от его экспозиции, а не от нетто-позиции",
+      "case": "сетка: ступень транша считается от его экспозиции; нетто-размер сделки операндом спеки не значится вовсе, поэтому форма от нетто здесь не выражается",
       "state": {
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 300 },
-        "exit": { "fraction": 0 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 75, "declaredStepSize": 25 }
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 75, "declaredStepSize": 25 }
       },
       "expect": { "lastLadderStepSize": 25, "ladderStepRejected": false }
     },
@@ -204,9 +286,9 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 5, "takerFeeRate": 0.0005 },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 12 },
-        "exit": { "fraction": 0 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 9, "declaredStepSize": 3 }
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 9, "declaredStepSize": 3 }
       },
       "expect": { "ladderStepRejected": true }
     },
@@ -216,9 +298,9 @@
         "base": 10000,
         "instrument": { "contractValue": 0.1, "lotSize": 1, "minSize": 1, "takerFeeRate": null },
         "entry": { "entryPrice": 3000, "stopPrice": 2910, "riskPerActionPercent": 1, "allocationPercents": 100 },
-        "position": { "externalSize": 0 },
-        "exit": { "fraction": 0 },
-        "ladder": { "trancheExposure": 100, "previousStepsTotal": 0, "declaredStepSize": 0 }
+        "exit": { "fraction": 1 },
+        "tranche": { "exposure": 100 },
+        "ladder": { "previousStepsTotal": 0, "declaredStepSize": 0 }
       },
       "expectRefusal": { "entryContracts": "ставка не резолвится" }
     }

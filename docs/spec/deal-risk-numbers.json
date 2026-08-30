@@ -2,7 +2,7 @@
   "subject": "deal-risk-numbers",
   "question": "Чему равны четыре числа риска сделки",
   "home": "docs/models/domain/aggregate/Deal.md",
-  "includes": ["protection-coverage"],
+  "includes": ["protection-coverage", "order-lifecycle"],
 
   "operands": {
     "legs[].type": "Order.type — бизнес-тип ноги; ноги собираются по всем траншам сделки: числа риска агрегатные. Предикат ноги входа — дом docs/spec/protection-coverage.json, величина isEntryOrder, подключена через includes; множество здесь не переписывается",
@@ -37,9 +37,14 @@
       "expr": "notNull(positionId) && positionId == livePosition.id"
     },
     {
+      "name": "feeRateBase",
+      "note": "База обращения: нотинал ноги, помноженный на сумму цен входа и стопа. Ноль означает, что операнды есть и нулём оказался один из сомножителей — размер, стоимость контракта либо сумма цен; ПУСТОЙ операнд до этой ветви не доходит, на нём отказывает уже сравнение. Вырожденная база даёт ПУСТОТУ, а не ноль, и ставка на ней отказывает вычислением: нулевая ставка была бы благоприятным умолчанием — комиссионное слагаемое риска ноги исчезло бы, и риск занизился в разрешающую сторону. Соседняя filledShare гасит свой вырожденный знаменатель нулём законно: там ноль означает «филла нет», а не «ставки нет».",
+      "expr": "if(plannedContractValue * plannedSizeContracts * (plannedEntryPrice + plannedStopPrice) == 0, null, plannedContractValue * plannedSizeContracts * (plannedEntryPrice + plannedStopPrice))"
+    },
+    {
       "name": "feeRate",
-      "note": "Ставка, под которую нога сайзилась, восстановленная обращением закрытой формы сайзинга. Нового поля не требует.",
-      "expr": "(plannedRiskAmount / (plannedContractValue * plannedSizeContracts) - abs(plannedEntryPrice - plannedStopPrice)) / (plannedEntryPrice + plannedStopPrice)"
+      "note": "Ставка, под которую нога сайзилась, восстановленная обращением закрытой формы сайзинга. Нового поля не требует. Знаменатель — охранённая база feeRateBase: деления на ноль у величины нет ни в одном состоянии.",
+      "expr": "(plannedRiskAmount - abs(plannedEntryPrice - plannedStopPrice) * plannedContractValue * plannedSizeContracts) / feeRateBase"
     },
     {
       "name": "legSignedStopDistance",
@@ -53,16 +58,21 @@
     },
 
     {
+      "name": "legPlannedRiskShare",
+      "note": "Доля заявленного риска, которой нога входит в число сделки: живая либо исполнившаяся — целиком, выбывшая — налитой долей. Вынесена именем, потому что её переиспользует спека полноты контекста (docs/spec/deal-context-load.json) для той же суммы по ЗАГРУЖЕННОМУ подмножеству ног; копия формулы под другим именем там была бы дефектом.",
+      "expr": "if(isLiveOrCompleted, plannedRiskAmount, plannedRiskAmount * filledShare)"
+    },
+    {
       "name": "dealPlannedRisk",
       "note": "Риск, принятый сделкой на входах, — знаменатель R и операнд кумулятивного потолка. Живая либо исполнившаяся нога входит заявленным риском целиком; выбывшая (снятая, ERROR) — только налитой долей: за неисполненную долю сделка не рисковала, а за налитую рисковала и продолжает. Перевыставление входа знаменатель не раздувает и не обнуляет.",
       "op": "sum",
       "over": "legs",
       "where": "isEntryOrder && notNull(plannedRiskAmount)",
-      "of": "if(isLiveOrCompleted, plannedRiskAmount, plannedRiskAmount * filledShare)"
+      "of": "legPlannedRiskShare"
     },
     {
       "name": "dealIncurredRisk",
-      "note": "Взятый на входе риск. Предикат свой, без конъюнкта по статусу: у живой и исполнившейся ноги берётся НАЛИТАЯ доля, а не полный заявленный риск. Прежняя контрастная рамка «снятая с филлом нога СЮДА входит» снята: после новой формы dealPlannedRisk она входит и туда — своей налитой долей; различие двух чисел проходит по доле, а не по множеству (дом — docs/models/domain/aggregate/Deal.md §«Четыре числа риска»).",
+      "note": "Взятый на входе риск. Предикат свой, без конъюнкта по статусу: у живой и исполнившейся ноги берётся НАЛИТАЯ доля, а не полный заявленный риск. Различие с dealPlannedRisk проходит по ДОЛЕ, а не по множеству ног: снятая с филлом нога входит в оба числа, только в заявленное — своей налитой долей (дом — docs/models/domain/aggregate/Deal.md, правило четырёх чисел риска).",
       "op": "sum",
       "over": "legs",
       "where": "isEntryOrder && accumulatedFillSize > 0 && notNull(plannedRiskAmount)",
@@ -98,8 +108,8 @@
     },
     {
       "name": "dealCurrentRisk",
-      "note": "Неотработанная доля взятого на входе риска.",
-      "expr": "if(episodeFilledSize == 0, 0, dealIncurredRisk * livePosition.externalSize / episodeFilledSize)"
+      "note": "Неотработанная доля взятого на входе риска — слагаемая по эпизодам: у каждого эпизода берётся его взятый риск, помноженный на остаточную долю его филла. У ЗАКРЫТОГО эпизода остаточная доля равна нулю (объёма не осталось), поэтому сумма сводится к слагаемому живого эпизода, и обход по эпизодам не нужен. Числитель и знаменатель обязаны быть отобраны ОДНИМ предикатом (onLiveEpisode): пожизненный числитель при знаменателе живого эпизода завышал бы величину кратно числу закрытых эпизодов.",
+      "expr": "if(episodeFilledSize == 0, 0, episodeIncurredRisk * livePosition.externalSize / episodeFilledSize)"
     }
   ],
 
@@ -159,7 +169,7 @@
           { "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 464.775, "plannedSizeContracts": 50, "accumulatedFillSize": 50, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 2, "stopCurrent": 2910 }
         ]
       },
-      "expect": { "dealIncurredRisk": 1394.325, "episodeIncurredRisk": 464.775, "protectionRelievedRisk": 0 }
+      "expect": { "dealIncurredRisk": 1394.325, "episodeIncurredRisk": 464.775, "protectionRelievedRisk": 0, "dealCurrentRisk": 464.775 }
     },
     {
       "case": "нога с пустым идентификатором эпизода в пару не входит",
@@ -193,6 +203,26 @@
         ]
       },
       "expect": { "dealIncurredRisk": 0, "dealCurrentRisk": 0 }
+    },
+    {
+      "case": "ставка ноги восстанавливается обращением сайзинга: при вдвое большей ставке те же размер и цены требуют большего заявленного риска, и риск при недвинутом стопе равен ему",
+      "state": {
+        "direction": "LONG",
+        "livePosition": { "id": 1, "externalSize": 100 },
+        "legs": [
+          { "type": "ENTRY", "status": "COMPLETED", "plannedRiskAmount": 959.1, "plannedSizeContracts": 100, "accumulatedFillSize": 100, "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1, "positionId": 1, "stopCurrent": 2910 }
+        ]
+      },
+      "expect": { "episodeIncurredRisk": 959.1, "episodeRiskAtCurrentStop": 959.1, "protectionRelievedRisk": 0 }
+    },
+    {
+      "case": "строка-состояние одной ноги: без базы обращения ставка отказывает вычислением, а не подставляет ноль. Через коллекцию ног эта граница недостижима — оба читателя ставки отбирают только ноги с филлом, а филл не бывает больше планового размера",
+      "state": {
+        "plannedRiskAmount": 0, "plannedSizeContracts": 0, "accumulatedFillSize": 0,
+        "plannedEntryPrice": 3000, "plannedStopPrice": 2910, "plannedContractValue": 0.1
+      },
+      "expect": { "feeRateBase": null, "filledShare": 0 },
+      "expectRefusal": { "feeRate": "нулевая база обращения: ставка не восстановима" }
     }
   ]
 }

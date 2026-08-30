@@ -15,7 +15,7 @@
 чтения — `.claude/skills/integration-okx.md`). Последняя сверка:
 2026-06-11 (поле-уровневая дистилляция).
 
-## Уточнение пути (находка прогона 3)
+## Путь эндпоинта
 
 Сторонний скелет указывал `GET /account/position-tiers`; по офдоку
 endpoint живёт в **Public Data**: `GET /api/v5/public/position-tiers`

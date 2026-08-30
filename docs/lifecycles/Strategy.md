@@ -11,10 +11,8 @@
 `Strategy.Status` описывает **административное** состояние стратегии и
 задаёт жизненный цикл всех вложенных immutable-настроек. Он **не**
 описывает runtime-свежесть рыночных данных: устаревшие свечи /
-индикаторы / структура / фаза рынка статус не меняют (свежесть —
-`MarketDataExpirationChecker` + `StrategyStep.marketDataExpiredSetting`;
-форвард-заметка в
-`.claude/work/history/2026-05-27-миграция-торговых-сущностей/tasks-strategy.md`).
+индикаторы / структура / фаза рынка статус не меняют (свежесть — `MarketDataExpirationChecker` +
+`StrategyStep.marketDataExpiredSetting`).
 
 ## Статусы
 

@@ -4,12 +4,14 @@
   "home": "docs/rules/live-risk-protection.md",
   "includes": ["protection-coverage", "order-lifecycle"],
 
-  "note": "Проход одного транша по эталонной стратегии trend-following-ema: вход со встроенным стопом → основная защита → безубыток → трейлинг → выход. Эталон объявляет один транш на торгуемую деталь, поэтому проход сделки и проход транша здесь совпадают. Каждый пример — состояние графа транша на одном шаге; операнды траншевые, соседних траншей в них нет по построению. На всех шагах утверждается отсутствие биржевой реакции ступени 2.",
+  "note": "Проход одного транша по эталонной стратегии trend-following-ema: вход со встроенным стопом → основная защита → безубыток → трейлинг → выход. Эталон объявляет один транш на торгуемую деталь, поэтому проход сделки и проход транша здесь совпадают — на шагах выхода это и делает законными операнды уровня сделки (окно сворачивания, нетто-размер): соседних траншей у эталона нет, и суффиксная сумма порядка нулевая. Каждый пример — состояние графа транша на одном шаге. На всех шагах утверждается отсутствие биржевой реакции ступени 2.",
 
   "operands": {
     "step": "шаг прохода — для читаемости отчёта",
     "protections[].chainRoot": "корень цепочки замещений: чем заявка была объявлена изначально",
     "declaredCancelTarget": "цель снятия, объявленная стратегией; может быть уже замещена",
+    "deal.status": "Deal.status — операнд окна атрибуции закрывающего исполнения уровня сделки",
+    "followingTranchesGross": "Σ gross-экспозиций траншей, материализованных позже этого; у эталона транш один, поэтому величина нулевая",
     "остальные операнды": "как в protection-coverage, в траншевой области"
   },
 
@@ -191,12 +193,14 @@
       "expect": { "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
-      "case": "11. выход по смене тренда: reduce-only отправлен, экспозиция ещё жива и остаётся покрытой",
+      "case": "11. выход по смене тренда: команда закрытия отправлена, подтверждения нет — экспозиция ещё жива и остаётся покрытой",
+      "note": "Эталон объявляет выход actionKind POSITION / EXIT_ACTION, то есть команду закрытия позиции: своей reduce-only ноги у транша на этой тропе не появляется. Пока команда не подтверждена, приписывать нечего.",
       "state": {
-        "step": "EXIT bull_exit отправлен",
+        "step": "EXIT bull_exit — CLOSE_POSITION_COMMAND отправлена",
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 3 },
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 },
-          { "type": "REDUCE_ONLY", "status": "ACTIVE", "accumulatedFillSize": 0 }
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 }
         ],
         "protections": [
           { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
@@ -208,12 +212,15 @@
       "expect": { "trancheExposure": 3, "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
     },
     {
-      "case": "12. reduce-only налился — экспозиция транша ноль, покрывать нечего, инвариант держится",
+      "case": "12. закрытие подтверждено — приписанный объём команды обнуляет экспозицию транша, живого риска не остаётся",
+      "note": "Четвёртое слагаемое экспозиции. У транша один вход и одно объявление, поэтому траншей после него нет, суффиксная сумма нулевая и весь закрываемый объём достаётся ему.",
       "state": {
         "step": "позиция закрыта, уборка защит",
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 0 },
+        "followingTranchesGross": 0,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 },
-          { "type": "REDUCE_ONLY", "status": "COMPLETED", "accumulatedFillSize": 3 }
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 }
         ],
         "protections": [
           { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "CANCELED", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
@@ -222,7 +229,7 @@
         "cancelTargetId": null,
         "declaredCancelTarget": null
       },
-      "expect": { "trancheExposure": 0, "trancheHasLiveEntryOrder": false, "trancheRiskBearing": false, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": { "trancheCloseAttributed": 3, "trancheExposure": 0, "trancheHasLiveEntryOrder": false, "trancheHasLiveProtection": false, "trancheRiskBearing": false, "trancheViolated": false, "noStageTwoReaction": true }
     }
   ]
 }

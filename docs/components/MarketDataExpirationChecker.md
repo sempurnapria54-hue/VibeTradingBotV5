@@ -31,10 +31,9 @@
 ## Вычисление свежести (на чтение)
 
 Свежесть вычисляется на чтение, в БД не хранится:
-`expiredAt = referencePoint + ownerSetting.expirationDuration`,
-свежо ⟺ `now < expiredAt`. `referencePoint` — `windowEndAt` (структура) /
-`candleTimestamp` (индикатор); `confirmedAt` — гейт без look-ahead, не
-точка отсчёта. Результат ключуется настройкой-владельцем (owner-ключевание,
+форма — `docs/spec/market-data-freshness.json` (`expiredAt`,
+`referencePoint`), здесь она не переписывается. `confirmedAt` — гейт без
+look-ahead, не точка отсчёта. Результат ключуется настройкой-владельцем (owner-ключевание,
 `docs/rules/market-data-freshness.md`): у строки один
 владелец, под его `expirationDuration` и оценивается свежесть — общей
 строки с несколькими запрашивающими больше нет. Правило —

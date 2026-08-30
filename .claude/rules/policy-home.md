@@ -54,3 +54,5 @@
   `.claude/rules/design-simplicity.md`.
 - Механика свипа закрытия —
   `.claude/processes/roadmap-step-execution.md` §3.
+- Обобщение единственности дома на стыковые решения —
+  `.claude/rules/carrier-levels.md`.

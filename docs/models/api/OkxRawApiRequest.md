@@ -18,14 +18,10 @@
 `signed` обязателен — конверт явно указывает приватность вызова;
 `dispatch` дополнительно null-безопасен (`isTrue(signed)` трактует
 `null` как public). `body` сырой (`JsonNode`), а не типизированный
-DTO: контур проверяет контракт биржи, не наш слой
-(`.claude/decisions/source-api-target-rebase.md`,).
+DTO: контур проверяет контракт биржи, не наш слой.
 
 ## Связи
 
 - Эндпоинт / делегирование — `OkxProxyController`, `OkxRestClient.dispatch`.
-- Решение о ре-базе контура на сырьё —
-  `.claude/decisions/source-api-target-rebase.md`.
 - Обёртка ответа — `docs/models/integrations/okx/` (OKX native DTO),
   конверт ответа `OkxApiResponse<JsonNode>`.
-- Конвенции api-слоя — `.claude/rules/structure.md`.

@@ -31,10 +31,16 @@ EntryScannerJob
   -> MarketPhase -> StrategyDetail -> ENTRY/GRID_ENTRY condition
   -> DealOpeningService
 
-DealOpeningService
-  -> создаёт Deal (ACTIVE), pinned StrategyDetail, entryReason
+DealOpeningService (входная тропа)
+  -> создаёт Deal (ACTIVE), pinned StrategyDetail, entryReason = STRATEGY
   -> материализует DealTranche по объявлениям детали (шаблон -> levelCount штук),
      каждый в PRECHECK, с pinned StrategyTranche и уровнем
+
+AnomalyJob (активная позиция без объясняющей её сделки)
+  -> DealOpeningService (восстановительная тропа)
+     -> создаёт Deal (ACTIVE), entryReason = RECOVERY, БЕЗ pinned StrategyDetail
+     -> материализует один DealTranche без pinned StrategyTranche, сразу в MANAGING
+     -> дальше сделку ведёт её собственный инвариант экспозиции
 
 DealOrchestratorJob
   -> загружает DealContext (DealContextService) -> DealStateMachine
@@ -50,8 +56,10 @@ DealTrancheStateMachine / handler транша
        -> risk-evaluation: RiskValidator -> RiskBlockResolver (для risk-creating)
        -> StrategyActionOrchestrator (per-type StrategyActionExecutor) -> ServiceCommand
   -> системная ветвь:
-       SystemActionExecutor (REFRESH_DEAL_CONTEXT_ACTION / FINALIZE_DEAL_EXIT_ACTION /
-       FINALIZE_DEAL_ERROR_ACTION) -> звенья-команды; состав звена выводится из
+       SystemActionExecutor (REFRESH_DEAL_CONTEXT_ACTION / FINALIZE_DEAL_ENTRY_ACTION /
+       FINALIZE_DEAL_EXIT_ACTION / FINALIZE_DEAL_ERROR_ACTION) -> звенья-команды;
+       перечень типов — место истины docs/models/domain/other/DealActionState.md
+       §Енумы, здесь он пересобирается из него; состав звена выводится из
        Deal.status (docs/components/SystemActionExecutor.md). Статусные рёбра,
        являющиеся исходом системного действия, пишет звено, а не handler
        (docs/processes/fsm-execution-layering.md)

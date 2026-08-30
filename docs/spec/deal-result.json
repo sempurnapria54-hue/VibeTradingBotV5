@@ -4,12 +4,12 @@
   "home": "docs/models/domain/aggregate/Deal.md",
 
   "operands": {
-    "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака, его операнды по тропам и durable-резолв — docs/rules/deal-without-operations.md; форма здесь не переписывается. Отправка заявки, не давшая движения средств, входом не считается",
+    "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака — docs/rules/deal-without-operations.md (признак «операций по сделке не было» есть его отрицание); форма здесь не переписывается. Значение берётся из дома-спеки: hadEntry = positionObserved (docs/spec/deal-context-load.json)",
     "settleCurrency": "расчётная валюта инструмента — единственный авторитет валюты результата",
-    "flowsComplete": "строки разбивки движений добыты И предъявлены целиком. Конъюнкт первый — добыча движений по сделке выполнялась (тот же факт, что duty.flowsFetched в docs/spec/pnl-reconciliation.json; ложен, когда добыча не запускалась вовсе — на аварийной тропе звено добычи не эмитится). Конъюнкт второй — выборка разбивки в контекст не упёрлась в потолок (docs/spec/deal-context-load.json §computationAllowed). Имя своё, а не общее с обязанностью сверки: у той конъюнкта полноты нет, потому что полнота гейтит звено целиком выше по тропе",
+    "graphComplete": "граф сделки предъявлен целиком: транши, эпизоды, ноги, встроенные защиты, отдельные условные заявки. Значение берётся из дома-спеки: graphComplete в docs/spec/deal-context-load.json; здесь форма не переписывается",
+    "flowsComplete": "строки разбивки движений добыты И предъявлены целиком. Значение берётся из дома-спеки: flowsComplete в docs/spec/deal-context-load.json, где живут и оба её конъюнкта; здесь форма не переписывается",
     "fetchBudgetExhausted": "бюджет попыток исполнения системного действия добычи исчерпан — строка DealActionState в отказе (docs/components/RetryPolicyService.md)",
     "episodes[]": "эпизоды позиции сделки; закрытые и живой",
-    "episodes[].closeRecordFetched": "запись закрытия этого эпизода добыта",
     "episodes[].externalRealizedProfit": "Position.externalRealizedProfit — готовый net эпизода, посчитанный биржей",
     "cashFlows[].amount": "DealCashFlow.amount — знаковая сумма движения",
     "cashFlows[].ccy": "DealCashFlow.ccy",
@@ -20,6 +20,11 @@
   },
 
   "values": [
+    {
+      "name": "closeRecordFetched",
+      "note": "Запись закрытия эпизода добыта. Отдельной колонки-признака под неё нет: носитель — непустота Position.externalRealizedProfit, потому что net есть КОНТРАКТНОЕ поле границы: запись, его не несущая, границу не проходит вовсе (docs/models/domain/core/Position.md). Равносильность держится на контрактности этого поля, а НЕ на комплекте: тип закрытия и средняя цена выхода в контракт границы не входят, и их пустота о добытости записи не свидетельствует — состояние «запись добыта, тип пуст» существует и имеет свою развязку (docs/models/mapping/PositionCloseResult.md). Предикат — величина, а не отдельный операнд: поданный независимо от числа, он делал выразимым состояние «запись добыта, числа нет», которое дом предиката объявляет несуществующим, и netSum отказывал бы там арифметикой, а не проверкой инварианта.",
+      "expr": "notNull(externalRealizedProfit)"
+    },
     {
       "name": "allCloseRecordsFetched",
       "note": "Пустое слагаемое нулём не подставляется: эпизод без записи закрытия делает сумму недоступной, а не заниженной.",
@@ -32,12 +37,12 @@
     },
     {
       "name": "inCrossCurrencyScope",
-      "note": "Область СЛАГАЕМОГО чужой валюты: движение вне расчётной валюты, вне списка исключений биржи, экономической категории; при нерезолвимой расчётной валюте область пуста. Обе причины расхождения с областью блокировки, их довод и направления ошибки — docs/models/mapping/DealCashFlow.md §«Асимметрия областей: из суммы исключено, из блокировки — нет»; здесь не переписываются.",
+      "note": "Область СЛАГАЕМОГО чужой валюты: движение вне расчётной валюты, вне списка исключений биржи, экономической категории; при нерезолвимой расчётной валюте область пуста. Обе причины расхождения с областью блокировки, их довод и направления ошибки — docs/rules/pnl-reconciliation.md — дом политики асимметрии областей; здесь не переписываются.",
       "expr": "notNull(settleCurrency) && ccy != settleCurrency && !excludedByExchange && category != 'OTHER'"
     },
     {
       "name": "inCrossCurrencyBlockingScope",
-      "note": "Область БЛОКИРОВКИ шире области слагаемого: на принимающую корзину, а при нерезолвимой расчётной валюте — на все неисключённые строки. Шире именно ОБЛАСТЬ, а не блокировка: попадание в неё необходимо, но не достаточно — блокирует строка со статусом курса RATE_UNAVAILABLE либо SETTLE_CURRENCY_UNAVAILABLE (см. rateBlocking). Разделитель популяции и обе её ветви — docs/models/mapping/DealCashFlow.md §«Асимметрия областей: из суммы исключено, из блокировки — нет»; здесь не переписываются.",
+      "note": "Область БЛОКИРОВКИ шире области слагаемого: на принимающую корзину, а при нерезолвимой расчётной валюте — на все неисключённые строки. Шире именно ОБЛАСТЬ, а не блокировка: попадание в неё необходимо, но не достаточно — блокирует строка со статусом курса RATE_UNAVAILABLE либо SETTLE_CURRENCY_UNAVAILABLE (см. rateBlocking). Разделитель популяции и обе её ветви — docs/rules/pnl-reconciliation.md — дом политики асимметрии областей; здесь не переписываются.",
       "expr": "!excludedByExchange && (isNull(settleCurrency) || ccy != settleCurrency)"
     },
     {
@@ -56,8 +61,8 @@
     },
     {
       "name": "resultAvailable",
-      "note": "Доступен, когда добыты все записи закрытия, разбивка движений предъявлена целиком и ни одна строка чужой валюты не ждёт курса. Конъюнкт про разбивку несущий: без него недобытая разбивка давала бы слагаемое чужой валюты, молча равное нулю, при истинной доступности — разрешающая ошибка. Тропа закрытия без входа доступна всегда: движений там нет по построению.",
-      "expr": "!hadEntry || (allCloseRecordsFetched && flowsComplete && !rateBlocking)"
+      "note": "Доступен, когда граф сделки предъявлен целиком (транши, эпизоды, ноги, встроенные защиты, отдельные условные заявки — состав у graphComplete в доме-спеке), добыты все записи закрытия, разбивка движений ДОБЫТА и предъявлена целиком, и ни одна строка чужой валюты не ждёт курса. Конъюнкт про граф несущий по той же причине, что и про разбивку: allCloseRecordsFetched — агрегат op: all над загруженными эпизодами, и на недогруженном списке он истинен молча, то есть занижает сумму в разрешающую сторону. Конъюнкт про разбивку: без него недобытая разбивка давала бы слагаемое чужой валюты, молча равное нулю; добытость и предъявленность здесь оба нужны, потому что первая ложна на аварийной тропе, где звено добычи не эмитится. Тропа закрытия без входа доступна всегда: ни эпизодов, ни движений там нет по построению.",
+      "expr": "!hadEntry || (graphComplete && allCloseRecordsFetched && flowsComplete && !rateBlocking)"
     },
     {
       "name": "resultProfit",
@@ -81,8 +86,8 @@
     },
     {
       "name": "resultProfitCurrency",
-      "note": "Валюта результата — расчётная валюта инструмента. Пришедшая от биржи — проверяемый признак, а не источник.",
-      "expr": "if(hadEntry, settleCurrency, null)"
+      "note": "Валюта результата — расчётная валюта инструмента, один авторитет и одно правило на все тропы: факт входа её не разделяет. На тропе закрытия без входа она называет, в чём выражен ноль, и потому пишется там наравне с остальными; пусто означает ровно одно — расчётная валюта не резолвилась, и именно этот случай смягчает контракт штатного терминала (docs/spec/deal-lifecycle.json, cleanTerminalContract). Пришедшая от биржи — проверяемый признак, а не источник; актор проверки, её момент и реакция — docs/rules/pnl-reconciliation.md — дом правила проверки валюты чисел записей закрытия (расхождение даёт отчёт RESULT_CURRENCY_MISMATCH и итог не блокирует, поэтому конъюнкта в resultAvailable у него нет).",
+      "expr": "settleCurrency"
     }
   ],
 
@@ -90,8 +95,8 @@
     {
       "case": "один эпизод в расчётной валюте: итог равен net эпизода",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 12.5 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 12.5 } ],
         "cashFlows": [ { "amount": -0.5, "ccy": "USDT", "category": "TRADE_FEE", "excludedByExchange": false, "rateStatus": "NOT_REQUIRED", "appliedRate": null } ]
       },
       "expect": { "allCloseRecordsFetched": true, "netSum": 12.5, "crossCurrencyTerm": 0, "resultAvailable": true, "resultProfit": 12.5, "resultProfitCurrency": "USDT" }
@@ -99,8 +104,8 @@
     {
       "case": "два эпизода: итог — сумма, а не число последнего",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 12.5 }, { "closeRecordFetched": true, "externalRealizedProfit": -4 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 12.5 }, { "externalRealizedProfit": -4 } ],
         "cashFlows": []
       },
       "expect": { "netSum": 8.5, "resultProfit": 8.5 }
@@ -108,17 +113,27 @@
     {
       "case": "недобытая запись закрытия одного эпизода делает итог недоступным, а не заниженным",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 12.5 }, { "closeRecordFetched": false, "externalRealizedProfit": null } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 12.5 }, { "externalRealizedProfit": null } ],
         "cashFlows": []
       },
       "expect": { "allCloseRecordsFetched": false, "resultAvailable": false, "resultProfit": null, "finalizationCompletes": false }
     },
     {
+      "case": "граф сделки предъявлен не целиком: записи закрытия у загруженных эпизодов добыты, а итог всё равно недоступен",
+      "note": "Без конъюнкта полноты графа агрегат op: all по загруженному подмножеству истинен молча, и сумма вышла бы заниженной — ровно ошибка в разрешающую сторону, а не отказ.",
+      "state": {
+        "hadEntry": true, "graphComplete": false, "settleCurrency": "USDT", "flowsComplete": true, "fetchBudgetExhausted": false,
+        "episodes": [ { "externalRealizedProfit": 12.5 } ],
+        "cashFlows": []
+      },
+      "expect": { "allCloseRecordsFetched": true, "netSum": 12.5, "resultAvailable": false, "resultProfit": null, "finalizationCompletes": false, "waitContinues": true }
+    },
+    {
       "case": "движения не добывались: итог недоступен, а не равен net без слагаемого чужой валюты",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": false, "fetchBudgetExhausted": false,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": false, "fetchBudgetExhausted": false,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": []
       },
       "expect": { "allCloseRecordsFetched": true, "rateBlocking": false, "resultAvailable": false, "resultProfit": null, "finalizationCompletes": false, "waitContinues": true }
@@ -126,8 +141,8 @@
     {
       "case": "движение чужой валюты с применённым курсом входит слагаемым",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -0.002, "ccy": "BTC", "category": "TRADE_FEE", "excludedByExchange": false, "rateStatus": "APPLIED", "appliedRate": 30000 } ]
       },
       "expect": { "crossCurrencyTerm": -60, "resultProfit": 40, "resultAvailable": true }
@@ -135,8 +150,8 @@
     {
       "case": "строка с неполученным курсом блокирует итог и финализацию",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -0.002, "ccy": "BTC", "category": "TRADE_FEE", "excludedByExchange": false, "rateStatus": "RATE_UNAVAILABLE", "appliedRate": null } ]
       },
       "expect": { "rateBlocking": true, "resultAvailable": false, "resultProfit": null, "finalizationCompletes": false }
@@ -144,8 +159,8 @@
     {
       "case": "строка без курса при живом бюджете добычи: ожидание продолжается, ошибочная тропа не поднимается",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true, "fetchBudgetExhausted": false,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true, "fetchBudgetExhausted": false,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -0.002, "ccy": "BTC", "category": "TRADE_FEE", "excludedByExchange": false, "rateStatus": "RATE_UNAVAILABLE", "appliedRate": null } ]
       },
       "expect": { "rateBlocking": true, "resultAvailable": false, "resultProfit": null, "finalizationCompletes": false, "waitContinues": true, "errorPathRequired": false }
@@ -153,8 +168,8 @@
     {
       "case": "та же строка при исчерпанном бюджете добычи: третий исход — ошибочная тропа, а не продолжение ожидания",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true, "fetchBudgetExhausted": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true, "fetchBudgetExhausted": true,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -0.002, "ccy": "BTC", "category": "TRADE_FEE", "excludedByExchange": false, "rateStatus": "RATE_UNAVAILABLE", "appliedRate": null } ]
       },
       "expect": { "rateBlocking": true, "resultAvailable": false, "resultProfit": null, "finalizationCompletes": false, "waitContinues": false, "errorPathRequired": true }
@@ -162,8 +177,8 @@
     {
       "case": "нерезолвимая расчётная валюта блокирует так же, как неполученный курс",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -0.002, "ccy": "BTC", "category": "FUNDING", "excludedByExchange": false, "rateStatus": "SETTLE_CURRENCY_UNAVAILABLE", "appliedRate": null } ]
       },
       "expect": { "rateBlocking": true, "resultAvailable": false, "resultProfit": null }
@@ -171,8 +186,8 @@
     {
       "case": "исключённое биржей движение чужой валюты итог не блокирует и в слагаемое не входит",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -0.002, "ccy": "BTC", "category": "TRADE_FEE", "excludedByExchange": true, "rateStatus": "RATE_UNAVAILABLE", "appliedRate": null } ]
       },
       "expect": { "rateBlocking": false, "crossCurrencyTerm": 0, "resultAvailable": true, "resultProfit": 100 }
@@ -180,8 +195,8 @@
     {
       "case": "нераспознанная категория без курса итог БЛОКИРУЕТ, хотя в слагаемое не входит",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true, "fetchBudgetExhausted": false,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true, "fetchBudgetExhausted": false,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -1, "ccy": "BTC", "category": "OTHER", "excludedByExchange": false, "rateStatus": "RATE_UNAVAILABLE", "appliedRate": null } ]
       },
       "expect": { "rateBlocking": true, "crossCurrencyTerm": 0, "resultAvailable": false, "resultProfit": null, "waitContinues": true }
@@ -189,8 +204,8 @@
     {
       "case": "нераспознанная категория с применённым курсом не блокирует и в слагаемое не входит",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -1, "ccy": "BTC", "category": "OTHER", "excludedByExchange": false, "rateStatus": "APPLIED", "appliedRate": 30000 } ]
       },
       "expect": { "rateBlocking": false, "crossCurrencyTerm": 0, "resultAvailable": true, "resultProfit": 100 }
@@ -198,13 +213,12 @@
     {
       "case": "нерезолвимая расчётная валюта, строка со сломанным статусом курса: первая ветвь — итог недоступен",
       "state": {
-        "hadEntry": true,
+        "hadEntry": true, "graphComplete": true,
         "settleCurrency": null,
         "flowsComplete": true,
         "fetchBudgetExhausted": false,
         "episodes": [
           {
-            "closeRecordFetched": true,
             "externalRealizedProfit": 100
           }
         ],
@@ -231,12 +245,11 @@
     {
       "case": "нерезолвимая расчётная валюта, строка с применённым курсом: вторая ветвь — число есть, валюты нет; в слагаемое строка НЕ входит",
       "state": {
-        "hadEntry": true,
+        "hadEntry": true, "graphComplete": true,
         "settleCurrency": null,
         "flowsComplete": true,
         "episodes": [
           {
-            "closeRecordFetched": true,
             "externalRealizedProfit": 100
           }
         ],
@@ -262,12 +275,11 @@
     {
       "case": "нерезолвимая расчётная валюта без строк разбивки: та же вторая ветвь — блокировать некому",
       "state": {
-        "hadEntry": true,
+        "hadEntry": true, "graphComplete": true,
         "settleCurrency": null,
         "flowsComplete": true,
         "episodes": [
           {
-            "closeRecordFetched": true,
             "externalRealizedProfit": 100
           }
         ],
@@ -282,9 +294,20 @@
       }
     },
     {
-      "case": "тропа закрытия без входа: ноль как результат расчёта, а не как умолчание",
+      "case": "тропа закрытия без входа: ноль как результат расчёта, а не как умолчание, и валюта у этого нуля есть",
+      "note": "Валюта резолвится — значит пишется: она называет, в чём выражен ноль. Условия по факту входа у валюты нет.",
       "state": {
         "hadEntry": false, "settleCurrency": "USDT", "flowsComplete": false,
+        "episodes": [],
+        "cashFlows": []
+      },
+      "expect": { "resultAvailable": true, "resultProfit": 0, "resultProfitCurrency": "USDT", "finalizationCompletes": true }
+    },
+    {
+      "case": "тропа закрытия без входа при нерезолвимой расчётной валюте: ноль без валюты — отличимый случай, а не общее правило тропы",
+      "note": "Ветка, ради различимости которой валюта и пишется безусловно: пустая валюта здесь означает нерезолвимость, а не «сделка не входила». Именно её смягчает контракт штатного терминала и сопровождает журнальный отчёт.",
+      "state": {
+        "hadEntry": false, "settleCurrency": null, "flowsComplete": false,
         "episodes": [],
         "cashFlows": []
       },
@@ -293,8 +316,8 @@
     {
       "case": "движение в расчётной валюте слагаемым чужой валюты не является",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 100 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 100 } ],
         "cashFlows": [ { "amount": -0.5, "ccy": "USDT", "category": "TRADE_FEE", "excludedByExchange": false, "rateStatus": "NOT_REQUIRED", "appliedRate": null } ]
       },
       "expect": { "crossCurrencyTerm": 0, "resultProfit": 100 }
@@ -302,11 +325,21 @@
     {
       "case": "ноль как посчитанный результат отличим от недоступности",
       "state": {
-        "hadEntry": true, "settleCurrency": "USDT", "flowsComplete": true,
-        "episodes": [ { "closeRecordFetched": true, "externalRealizedProfit": 0 } ],
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 0 } ],
         "cashFlows": []
       },
       "expect": { "resultAvailable": true, "resultProfit": 0, "finalizationCompletes": true }
+    },
+    {
+      "case": "нулевой net считается добытой записью закрытия: предикат стои́т на непустоте числа, а не на его истинности",
+      "note": "Граница отделяет ноль от пустоты. Оба эпизода добыты, поэтому сумма доступна и равна ненулевому слагаемому, а не «недоступна из-за нуля».",
+      "state": {
+        "hadEntry": true, "graphComplete": true, "settleCurrency": "USDT", "flowsComplete": true,
+        "episodes": [ { "externalRealizedProfit": 0 }, { "externalRealizedProfit": 7 } ],
+        "cashFlows": []
+      },
+      "expect": { "allCloseRecordsFetched": true, "netSum": 7, "resultAvailable": true, "resultProfit": 7 }
     }
   ]
 }

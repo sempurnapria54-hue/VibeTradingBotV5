@@ -189,9 +189,10 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
     возникала коллизия, нет (см.
     `docs/models/domain/other/MarketStructure.md` случай
     идентичности).
-- **Свежесть на чтение:** `expiredAt = windowEndAt +
-  ownerSetting.expirationDuration` считается в runtime, колонкой не
-  хранится; у строки результата один владелец, под него и оценивается
-  свежесть (`docs/rules/market-data-freshness.md`).
+- **Свежесть на чтение:** точка отсчёта — `windowEndAt`; устаревание
+  считается в runtime, колонкой не хранится; у строки результата один
+  владелец, под него и оценивается свежесть. Правило —
+  `docs/rules/market-data-freshness.md`, форма —
+  `docs/spec/market-data-freshness.json`.
 - **Retention:** результаты не чистятся (нет потребителя истории) —
   `docs/rules/market-data-retention.md`.

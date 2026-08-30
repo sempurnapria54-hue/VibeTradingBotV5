@@ -12,7 +12,6 @@
     "flows[].exchangeId": "биржа записи движения",
     "flows[].externalInstrumentId": "сырой идентификатор инструмента записи; пусто — привязки к инструменту нет",
     "flows[].externalCreatedAt": "время события источника",
-    "flows[].externalBillId": "идентификатор записи источника",
     "sourceTime": "серверное время источника прохода — верхняя граница запроса"
   },
 
@@ -51,13 +50,6 @@
       "op": "count",
       "over": "flows",
       "where": "linksToDeal"
-    },
-    {
-      "name": "distinctDedupeKeys",
-      "note": "Ключ идемпотентности — пара «биржа, идентификатор записи»: повторная добыча того же движения второй строки не порождает.",
-      "op": "count",
-      "over": "flows",
-      "where": "notNull(externalBillId)"
     }
   ],
 
@@ -68,7 +60,7 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
         "flows": [
-          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500 }
         ]
       },
       "expect": { "lowerBound": 1000, "linkedCount": 1 }
@@ -79,7 +71,7 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
         "flows": [
-          { "exchangeId": 1, "externalInstrumentId": "BTC-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+          { "exchangeId": 1, "externalInstrumentId": "BTC-USDT-SWAP", "externalCreatedAt": 1500 }
         ]
       },
       "expect": { "linkedCount": 0 }
@@ -90,7 +82,7 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
         "flows": [
-          { "exchangeId": 1, "externalInstrumentId": null, "externalCreatedAt": 1500, "externalBillId": "b1" }
+          { "exchangeId": 1, "externalInstrumentId": null, "externalCreatedAt": 1500 }
         ]
       },
       "expect": { "linkedCount": 0 }
@@ -101,7 +93,7 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
         "flows": [
-          { "exchangeId": 2, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+          { "exchangeId": 2, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500 }
         ]
       },
       "expect": { "linkedCount": 0 }
@@ -112,7 +104,7 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
         "flows": [
-          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 950, "externalBillId": "b1" }
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 950 }
         ]
       },
       "expect": { "linkedCount": 0 }
@@ -123,7 +115,7 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": null, "externalCreatedAt": 900, "terminal": false },
         "flows": [
-          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 950, "externalBillId": "b1" }
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 950 }
         ]
       },
       "expect": { "lowerBound": 900, "boundResolved": true, "linkedCount": 1 }
@@ -143,7 +135,7 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": true },
         "flows": [
-          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b1" }
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500 }
         ]
       },
       "expect": { "linkedCount": 0 }
@@ -154,12 +146,12 @@
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": 1000, "externalCreatedAt": 900, "terminal": false },
         "flows": [
-          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1100, "externalBillId": "b1" },
-          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500, "externalBillId": "b2" },
-          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1900, "externalBillId": "b3" }
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1100 },
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1500 },
+          { "exchangeId": 1, "externalInstrumentId": "ETH-USDT-SWAP", "externalCreatedAt": 1900 }
         ]
       },
-      "expect": { "linkedCount": 3, "distinctDedupeKeys": 3 }
+      "expect": { "linkedCount": 3 }
     }
   ]
 }

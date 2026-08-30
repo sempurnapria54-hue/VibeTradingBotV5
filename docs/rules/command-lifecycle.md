@@ -81,5 +81,5 @@ FSM.
 
 - Принцип — `docs/concept.md`, «Биржа — источник истины».
 - Подтверждение приёма — `docs/rules/ack-not-runtime-truth.md`.
-- Граница «команда — действие» — `docs/rules/command-lifecycle.md`.
+- Граница «команда — действие» — `docs/rules/execution-hierarchy.md`.
 - Структура команды — `docs/components/models/ServiceCommand.md`.

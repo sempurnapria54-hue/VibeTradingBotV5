@@ -106,12 +106,16 @@ source-api).** Полный happy-path (заявка → `result`-ACK → `GET` 
 success — его верификация выполняется ад-хок на проде вне контура.
 
 Файл — CSV (zip), записи в обратном хронологическом порядке по
-`billId`; состав колонок — как у bill-записи (instType, billId,
+`billId`; состав колонок — как у bill-записи (instType, billId, **type**,
 subType, ts, balChg/posBalChg, bal/posBal, sz, px (семантика зависит
 от subType), ccy, pnl, fee, mgnMode, instId, ordId, execType,
 interest, tag, fillTime, tradeId, clOrdId, fill*-поля). Для окон
 старше квартала границы диапазона — [начало квартала, начало
 следующего), для файлов после 2024-10-11.
+
+Каждое поле этого перечня классифицировано инвентарём нативной модели —
+used либо «не используется»
+(`docs/models/integrations/okx/OkxAccountBillResponse.md`).
 
 ## Справочник bill types
 
