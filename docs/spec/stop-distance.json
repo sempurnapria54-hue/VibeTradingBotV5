@@ -2,8 +2,9 @@
   "subject": "stop-distance",
   "question": "Допустим ли объявленный уровень остановки убытка",
   "home": "docs/rules/risk-policy.md",
-  "includes": ["risk-at-stop"],
-
+  "includes": [
+    "risk-at-stop"
+  ],
   "operands": {
     "direction": "направление ноги — LONG или SHORT",
     "plannedEntryPrice": "плановая цена входа своей ноги — якорь уровня, пока живого эпизода нет",
@@ -13,9 +14,9 @@
     "feeRate": "прогнозная ставка комиссии как издержка — InstrumentExternalRules.takerFeeRate(); пусто — уровень не проверяется, действие отвергается FEE_RATE_UNAVAILABLE",
     "calculationType": "объявленный стратегией способ расчёта уровня (StopLossSettings.calculationType)",
     "distancePercents": "объявленная доля дистанции; у BREAKEVEN не объявляется — уровень выводится из ставки",
-    "placementRole": "роль объявления: PRIMARY — первичная постановка уровня (встроенная защита входа, первичная защитная заявка); TRANSFER — перенос уже стоящего уровня защитным REPLACE с указанной целью"
+    "placementRole": "роль объявления: PRIMARY — первичная постановка уровня (встроенная защита входа, первичная защитная заявка); TRANSFER — перенос уже стоящего уровня защитным REPLACE с указанной целью",
+    "levelSource": "чем задан уровень действия: DECLARED — способом расчёта, объявленным стратегией (StopLossSettings); OBSERVED — наблюдением после активации (трейлинг, TrailingSettings). Признак ПОЛОЖИТЕЛЬНЫЙ и читается с объявления действия, а не выводится из пустоты соседнего операнда: пустота отличала бы «уровень наблюдаемый» от «настройки забыли» никак"
   },
-
   "values": [
     {
       "name": "calculationTypeKnown",
@@ -48,93 +49,420 @@
       "expr": "signedStopDistance > 0"
     },
     {
+      "name": "primaryStopOnLossSide",
+      "note": "Первичный уровень остановки убытка обязан лечь на УБЫТОЧНУЮ сторону от якоря: иначе worst-case выхода у позиции нет, а П1 следствие 1 требует знать его до входа. Ограничение по ИСХОДУ, а не по способу расчёта: уровень, посчитанный от живой структуры (MARKET_STRUCTURE_BUFFER_PERCENT), уезжает на прибыльную сторону штатно — лимитный вход ниже растущей структуры даёт это расхождение без всякой ошибки конфигурации. Запрет BREAKEVEN первичной защитой (breakevenRoleAllowed) — частный случай того же правила, взятый по способу и потому ловящий его на дереве стратегии; здесь тот же запрет берётся по исходу и ловит остальные способы. ОБЛАСТЬ ОГРАНИЧЕНА ДЕЙСТВИЯМИ С ОБЪЯВЛЕННЫМ УРОВНЕМ (levelSource = DECLARED): у защитного создания с НАБЛЮДАЕМЫМ уровнем (трейлинг) уровня в момент постановки нет вовсе, и требовать от него стороны значило бы отвергать ступень, ради которой держится прибыль. Дыры это не открывает: такое создание охраняет не сторона уровня, а инвариант покрытия — снять прежнюю защиту, пока трейлинг уровня не показал, не даёт removalAllowed (docs/spec/protection-coverage.json), поэтому позиция без worst-case выхода не остаётся ни на одном проходе. Перенос (TRANSFER) под ограничение не подпадает по той же оси: перевод в безубыток и трейлинг за безубыток — их прямое назначение. Дом правила — docs/rules/risk-policy.md, реджект — STOP_LOSS_INVALID_SIDE.",
+      "expr": "placementRole != 'PRIMARY' || levelSource != 'DECLARED' || stopOnLossSide"
+    },
+    {
       "name": "stopDistanceAboveFloor",
       "note": "Предикат преконтроля: на убыточной стороне дистанция обязана покрывать round-trip комиссию, иначе STOP_DISTANCE_BELOW_FLOOR. За безубытком пол не применяется — там срабатывание убытка не фиксирует.",
       "expr": "!stopOnLossSide || signedStopDistance >= stopDistanceFloor"
     }
   ],
-
   "examples": [
     {
       "case": "LONG: точный безубыток лежит выше себестоимости, и убыток на нём равен нулю",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": true, "positionAverageEntryPrice": 3000, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
-      "expect": { "entryAnchor": 3000, "breakevenLevel": 3003.001500750375, "lossAtStopPerUnit": 0, "stopOnLossSide": false, "stopDistanceAboveFloor": true, "distanceDeclaredWhenNeeded": true, "calculationTypeKnown": true, "breakevenRoleAllowed": true }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "stopPrice": 3003.001500750375,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "entryAnchor": 3000,
+        "breakevenLevel": 3003.001500750375,
+        "lossAtStopPerUnit": 0,
+        "stopOnLossSide": false,
+        "stopDistanceAboveFloor": true,
+        "distanceDeclaredWhenNeeded": true,
+        "calculationTypeKnown": true,
+        "breakevenRoleAllowed": true
+      }
     },
     {
       "case": "SHORT: точный безубыток лежит ниже себестоимости, и убыток на нём равен нулю",
-      "state": { "direction": "SHORT", "plannedEntryPrice": 3000, "hasLiveEpisode": true, "positionAverageEntryPrice": 3000, "stopPrice": 2997.001499250375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
-      "expect": { "breakevenLevel": 2997.001499250375, "lossAtStopPerUnit": 0, "stopOnLossSide": false }
+      "state": {
+        "direction": "SHORT",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "stopPrice": 2997.001499250375,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "breakevenLevel": 2997.001499250375,
+        "lossAtStopPerUnit": 0,
+        "stopOnLossSide": false
+      }
     },
     {
       "case": "линейное приближение безубытком не является: на уровне вход умножить на (1 + 2 ставки) остаётся убыток",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 3003, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.1, "placementRole": "TRANSFER" },
-      "expect": { "lossAtStopPerUnit": 0.0015, "stopOnLossSide": false }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 3003,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 0.1,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "lossAtStopPerUnit": 0.0015,
+        "stopOnLossSide": false
+      }
     },
     {
       "case": "BREAKEVEN первичной защитой не объявляется: уровень на прибыльной стороне worst-case выхода не задаёт",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "PRIMARY" },
-      "expect": { "calculationTypeKnown": true, "distanceDeclaredWhenNeeded": true, "breakevenRoleAllowed": false }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 3003.001500750375,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "calculationTypeKnown": true,
+        "distanceDeclaredWhenNeeded": true,
+        "breakevenRoleAllowed": false
+      }
     },
     {
       "case": "перенос на живой позиции считается от ФАКТИЧЕСКОЙ средней: плановая цена дала бы уровень на убыточной стороне",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": true, "positionAverageEntryPrice": 3020, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
-      "expect": { "entryAnchor": 3020, "breakevenLevel": 3023.021510755378, "stopOnLossSide": true }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3020,
+        "stopPrice": 3003.001500750375,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "entryAnchor": 3020,
+        "breakevenLevel": 3023.021510755378,
+        "stopOnLossSide": true
+      }
     },
     {
       "case": "тот же перенос по фактической средней даёт нулевой убыток",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": true, "positionAverageEntryPrice": 3020, "stopPrice": 3023.021510755378, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
-      "expect": { "lossAtStopPerUnit": 0, "stopOnLossSide": false }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3020,
+        "stopPrice": 3023.021510755378,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "lossAtStopPerUnit": 0,
+        "stopOnLossSide": false
+      }
     },
     {
       "case": "SHORT с проскоком: перенос по фактической средней даёт нулевой убыток и на короткой стороне",
-      "state": { "direction": "SHORT", "plannedEntryPrice": 3000, "hasLiveEpisode": true, "positionAverageEntryPrice": 2980, "stopPrice": 2977.021489255372, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "placementRole": "TRANSFER" },
-      "expect": { "entryAnchor": 2980, "breakevenLevel": 2977.021489255372, "lossAtStopPerUnit": 0, "stopOnLossSide": false }
+      "state": {
+        "direction": "SHORT",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 2980,
+        "stopPrice": 2977.021489255372,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "entryAnchor": 2980,
+        "breakevenLevel": 2977.021489255372,
+        "lossAtStopPerUnit": 0,
+        "stopOnLossSide": false
+      }
     },
     {
       "case": "стоп 0.1 % от входа на убыточной стороне сидит ровно на полу — комиссия составляет половину убытка на стопе",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 2997, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.1, "placementRole": "TRANSFER" },
-      "expect": { "signedStopDistance": 3, "stopOnLossSide": true, "stopDistanceFloor": 2.9985, "lossAtStopPerUnit": 5.9985, "stopDistanceAboveFloor": true }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 2997,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 0.1,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "signedStopDistance": 3,
+        "stopOnLossSide": true,
+        "stopDistanceFloor": 2.9985,
+        "lossAtStopPerUnit": 5.9985,
+        "stopDistanceAboveFloor": true
+      }
     },
     {
       "case": "стоп вдвое ближе пола отвергается: срабатывание фиксировало бы убыток, которого рынок не сделал",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 2998.5, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.05, "placementRole": "PRIMARY" },
-      "expect": { "signedStopDistance": 1.5, "stopDistanceFloor": 2.99925, "stopDistanceAboveFloor": false }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 2998.5,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 0.05,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "signedStopDistance": 1.5,
+        "stopDistanceFloor": 2.99925,
+        "stopDistanceAboveFloor": false
+      }
     },
     {
       "case": "SHORT: стоп ближе пола отвергается зеркально",
-      "state": { "direction": "SHORT", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 3001.5, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.05, "placementRole": "PRIMARY" },
-      "expect": { "signedStopDistance": 1.5, "stopDistanceAboveFloor": false }
+      "state": {
+        "direction": "SHORT",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 3001.5,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 0.05,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "signedStopDistance": 1.5,
+        "stopDistanceAboveFloor": false
+      }
     },
     {
       "case": "волатильностный стоп эталона от пола далеко",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 2985, "feeRate": 0.0005, "calculationType": "ATR_PERCENT", "distancePercents": 150, "placementRole": "PRIMARY" },
-      "expect": { "signedStopDistance": 15, "stopDistanceFloor": 2.9925, "stopDistanceAboveFloor": true, "breakevenRoleAllowed": true }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 2985,
+        "feeRate": 0.0005,
+        "calculationType": "ATR_PERCENT",
+        "distancePercents": 150,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "signedStopDistance": 15,
+        "stopDistanceFloor": 2.9925,
+        "stopDistanceAboveFloor": true,
+        "breakevenRoleAllowed": true
+      }
     },
     {
       "case": "стоп по плановой цене на живой позиции с проскоком: якорь фактический, и от него дистанция ниже пола",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": true, "positionAverageEntryPrice": 3020, "stopPrice": 3019, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.03, "placementRole": "TRANSFER" },
-      "expect": { "entryAnchor": 3020, "signedStopDistance": 1, "stopOnLossSide": true, "stopDistanceAboveFloor": false }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3020,
+        "stopPrice": 3019,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 0.03,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "entryAnchor": 3020,
+        "signedStopDistance": 1,
+        "stopOnLossSide": true,
+        "stopDistanceAboveFloor": false
+      }
     },
     {
       "case": "BREAKEVEN с объявленной долей отвергается на создании: доля есть функция ставки, а не выбор автора",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 3003.001500750375, "feeRate": 0.0005, "calculationType": "BREAKEVEN", "distancePercents": 0.1, "placementRole": "TRANSFER" },
-      "expect": { "distanceDeclaredWhenNeeded": false }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 3003.001500750375,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": 0.1,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "distanceDeclaredWhenNeeded": false
+      }
     },
     {
       "case": "способ расчёта вне закрытого перечня отвергается",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 2985, "feeRate": 0.0005, "calculationType": "ENTRY_PRICE_ABSOLUTE", "distancePercents": 15, "placementRole": "PRIMARY" },
-      "expect": { "calculationTypeKnown": false }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 2985,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_ABSOLUTE",
+        "distancePercents": 15,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "calculationTypeKnown": false
+      }
     },
     {
       "case": "живой эпизод есть, а средняя цена входа ещё не наблюдена — якорь отказывает вычислением, а не откатывается к плановой цене",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": true, "positionAverageEntryPrice": null, "stopPrice": 2985, "feeRate": 0.0005, "calculationType": "ATR_PERCENT", "distancePercents": 150, "placementRole": "TRANSFER" },
-      "expect": { "entryAnchor": null },
-      "expectRefusal": { "breakevenLevel": "якорь пуст", "stopDistanceFloor": "якорь пуст", "stopDistanceAboveFloor": "якорь пуст" }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 2985,
+        "feeRate": 0.0005,
+        "calculationType": "ATR_PERCENT",
+        "distancePercents": 150,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "entryAnchor": null
+      },
+      "expectRefusal": {
+        "breakevenLevel": "якорь пуст",
+        "stopDistanceFloor": "якорь пуст",
+        "stopDistanceAboveFloor": "якорь пуст"
+      }
     },
     {
       "case": "пустая ставка отказывает вычислением пола, а не подставляет ноль",
-      "state": { "direction": "LONG", "plannedEntryPrice": 3000, "hasLiveEpisode": false, "positionAverageEntryPrice": null, "stopPrice": 2997, "feeRate": null, "calculationType": "ENTRY_PRICE_PERCENT", "distancePercents": 0.1, "placementRole": "PRIMARY" },
-      "expectRefusal": { "stopDistanceFloor": "ставка комиссии не резолвится", "breakevenLevel": "ставка комиссии не резолвится" }
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 2997,
+        "feeRate": null,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 0.1,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expectRefusal": {
+        "stopDistanceFloor": "ставка комиссии не резолвится",
+        "breakevenLevel": "ставка комиссии не резолвится"
+      }
+    },
+    {
+      "case": "первичный уровень уехал на ПРИБЫЛЬНУЮ сторону: буфер от растущей структуры выше плановой цены лимитного входа — постановка отвергается",
+      "note": "Ветвь достижима без ошибки конфигурации: MARKET_STRUCTURE_BUFFER_PERCENT считается от живой структуры, плановая цена — от объявления действия. Способ расчёта при этом законный, доля объявлена, пол дистанции пройден (он применяется только на убыточной стороне) — не проходит ровно ограничение по исходу.",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 3100,
+        "feeRate": 0.0005,
+        "calculationType": "MARKET_STRUCTURE_BUFFER_PERCENT",
+        "distancePercents": 1,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "calculationTypeKnown": true,
+        "distanceDeclaredWhenNeeded": true,
+        "breakevenRoleAllowed": true,
+        "stopOnLossSide": false,
+        "stopDistanceAboveFloor": true,
+        "primaryStopOnLossSide": false
+      }
+    },
+    {
+      "case": "тот же уровень на убыточной стороне первичной постановкой проходит",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 2910,
+        "feeRate": 0.0005,
+        "calculationType": "MARKET_STRUCTURE_BUFFER_PERCENT",
+        "distancePercents": 3,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "stopOnLossSide": true,
+        "stopDistanceAboveFloor": true,
+        "primaryStopOnLossSide": true
+      }
+    },
+    {
+      "case": "перенос за безубыток ограничением по исходу не отвергается — в этом его назначение",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "stopPrice": 3050,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 1.67,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "stopOnLossSide": false,
+        "primaryStopOnLossSide": true
+      }
+    },
+    {
+      "case": "трейлинг эталона: защитное создание с наблюдаемым уровнем — предикат первичного уровня его не отвергает",
+      "note": "Эталон объявляет трейлинг созданием без targetActionKey, поэтому роль объявления у него PRIMARY, а источник уровня — наблюдение: в момент постановки уровня нет, и операнд пуст. Ограничение области ровно об этом; охрана здесь — инвариант покрытия, а не сторона уровня.",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": null,
+        "feeRate": 0.0005,
+        "calculationType": null,
+        "distancePercents": null,
+        "placementRole": "PRIMARY",
+        "levelSource": "OBSERVED"
+      },
+      "expect": {
+        "primaryStopOnLossSide": true
+      },
+      "expectRefusal": {
+        "stopOnLossSide": "уровня в момент постановки нет"
+      }
     }
   ]
 }

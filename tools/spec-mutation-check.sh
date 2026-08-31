@@ -5,53 +5,52 @@
 # сходятся; что они ЧТО-ТО ПРОВЕРЯЮТ — не показывает. Величина, заменённая
 # константой и оставившая прогон зелёным, не различает ничего: любая ошибка
 # её формы пройдёт незамеченной. Замер подменяет каждую объявленную величину
-# константой (true / false / 0 / 1 / -1) и гоняет ВЕСЬ каталог спецификаций;
-# величина доказательна, если падает на каждой константе.
+# константой (true / false / 0 / 1 / null плюс литералы ожиданий корпуса) и
+# гоняет ВЕСЬ каталог спецификаций; величина доказательна, если падает на
+# каждой константе.
 #
 # Замер идёт по ВСЕМУ телу спек, а не по дельте правки: стандарт приёмки —
 # .claude/processes/roadmap-step-execution.md §«Мутационная проба — условие
 # приёмки спеки, а не только правки».
 #
+# ФОРМЫ ПРЕДМЕТА, КОТОРЫЕ ЗАМЕР ВИДИТ (объявлено, доказано осями батареи):
+#   — скалярная величина (ключ expr) и агрегат (op/over/where/of): обе
+#     подменяются одинаково, целиком определением;
+#   — величина, проверяемая примерами СОСЕДНЕЙ спеки через includes: мутация
+#     гоняет весь каталог, а не файл-дом;
+#   — число, ожидаемое одним и тем же номиналом: набор констант дополняется
+#     литералами ожиданий самого корпуса;
+#   — охранный инвариант, ожидаемый одним исходом везде: доказывается
+#     предъявленным контрпримером (ключ unreachable у примера), а не ярлыком;
+#   — ПОПУЛЯЦИЯ (ключ populations): перечень состояний, на которых правило
+#     спеки обязано выполняться. Непокрытый член, недостижимость без
+#     контрпримера и пример вне перечня — препятствия базового гейта, то есть
+#     замер на таком корпусе НЕ ПРОВОДИТСЯ. Дом нормы —
+#     .claude/processes/roadmap-step-execution.md §«Популяция правила
+#     предъявляется до правки, а не после».
+# Форма, которой в этом перечне нет, замером НЕ измерена — на неё он клейма
+# не даёт.
+#
+# БАТАРЕЯ ОСЕЙ ИСПОЛНЯЕТСЯ ЭТОЙ ЖЕ КОМАНДОЙ, до замера (SpecMutation.battery):
+# отдельный скрипт-проба принимался бы по факту, что его когда-то прогоняли.
+# Недоказанная ось => замер не проводится вовсе (код 2), а не отчитывается.
+#
 # Запуск (из корня репозитория):  bash tools/spec-mutation-check.sh
 # Код возврата: 0 — все величины доказательны; 1 — есть недоказательные
-# (перечень в stdout); 2 — не собрался раннер.
+# (перечень в stdout); 2 — ЗАМЕР НЕ ПРОВОДИЛСЯ (ось не доказана, базовый
+# гейт не пройден, корпус отказал под мутацией, раннер не собрался).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-command -v cygpath >/dev/null && ROOT="$(cygpath -m "$ROOT")"
+# shellcheck source=tools/spec-runner-env.sh
+source "$(dirname "$0")/spec-runner-env.sh"
 
-# Разделитель classpath и дефолтный JDK — по платформе (как в spec-run.sh).
-if command -v cygpath >/dev/null; then
-  SEP=';'
-  DEFAULT_JDK="C:/Users/RomanKrd/.jdks/corretto-25.0.3"
+cd "$SPEC_ROOT"
+if [ -n "${2:-}" ]; then
+  WORK="$2"
 else
-  SEP=':'
-  DEFAULT_JDK="$HOME/.jdks/corretto-25"
+  WORK="$(mktemp -d)"
+  # Каталог мутированных копий — свой у запуска и убирается за собой:
+  # общий рабочий каталог делал одновременные прогоны небезопасными.
+  trap 'rm -rf "$SPEC_CLASSES" "$WORK"' EXIT
 fi
-JDK="${SPEC_JDK:-$DEFAULT_JDK}"
-M2="${SPEC_M2:-$HOME/.m2/repository}"
-OUT="$ROOT/target/spec-runner-classes"
-
-jar() {
-  local found
-  found="$(find "$M2/$1" -name "$2" ! -name '*sources*' | sort | tail -1)"
-  command -v cygpath >/dev/null && found="$(cygpath -m "$found")"
-  printf '%s' "$found"
-}
-
-CP="$(jar com/fasterxml/jackson/core/jackson-databind 'jackson-databind-*.jar')"
-CP="$CP$SEP$(jar com/fasterxml/jackson/core/jackson-core 'jackson-core-*.jar')"
-CP="$CP$SEP$(jar com/fasterxml/jackson/core/jackson-annotations 'jackson-annotations-*.jar')"
-
-mkdir -p "$OUT"
-"$JDK/bin/javac" -encoding UTF-8 -cp "$CP" -d "$OUT" \
-    "$ROOT/src/test/java/com/example/tradingbot/spec/Spec.java" \
-    "$ROOT/src/test/java/com/example/tradingbot/spec/SpecExpression.java" \
-    "$ROOT/src/test/java/com/example/tradingbot/spec/SpecException.java" \
-    "$ROOT/src/test/java/com/example/tradingbot/spec/SpecScope.java" \
-    "$ROOT/src/test/java/com/example/tradingbot/spec/SpecMutation.java" || exit 2
-
-cd "$ROOT"
-exec "$JDK/bin/java" -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 \
-    -cp "$OUT$SEP$CP" com.example.tradingbot.spec.SpecMutation \
-    "${1:-docs/spec}" "${2:-target/spec-mutation}"
+"${JAVA[@]}" com.example.tradingbot.spec.SpecMutation "${1:-docs/spec}" "$WORK"

@@ -29,8 +29,10 @@
   открытые сделки продолжают сопровождаться по pinned
   `StrategyDetail` (`Deal.strategyDetailId`).
 - **`DELETED`** — логически удалённая. Новые расчёты и сделки по ней
-  не запускаются; уже открытые сделки переводятся в **graceful
-  shutdown** (`Deal.shutdownReason = STRATEGY_DELETED`, см.
+  не запускаются; уже открытые сделки **обработчик активной сделки**
+  выходными проверками уводит в координированный выход, записывая
+  `Deal.shutdownReason = STRATEGY_DELETED` той же транзакцией
+  (`docs/components/DealActiveHandler.md`; дом события —
   `docs/lifecycles/Deal.md`).
 
 ## Эффекты на сделки (сводка)

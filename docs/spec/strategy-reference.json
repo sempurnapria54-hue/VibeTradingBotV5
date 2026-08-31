@@ -2,7 +2,12 @@
   "subject": "strategy-reference",
   "question": "Проходит ли эталонная стратегия репозитория действующие требования к дереву стратегии",
   "home": "docs/rules/strategy-validation.md",
-  "includes": ["risk-at-stop", "stop-distance", "protection-coverage", "order-lifecycle"],
+  "includes": [
+    "risk-at-stop",
+    "stop-distance",
+    "protection-coverage",
+    "order-lifecycle"
+  ],
   "operands": {
     "strategy": "src/main/resources/strategy-examples/trend-following-ema.json — исполнимый эталон",
     "details[].phaseEntryPolicy": "политика входа в фазе; NO_TRADE — неторгуемая деталь",
@@ -12,14 +17,27 @@
     "steps[].actions[].replacedCoverageFractionPercents": "доля ДЕЙСТВУЮЩЕГО покрытия, которую адресует это REPLACE- либо CANCEL-действие: объявленная доля его цели, резолвимой по targetActionKey (цепочка замещений — docs/rules/replace-not-amend.md). Цель защитой не является (снятие тейка) — покрытия действие не забирает, доля 0. Пусто — цель не разрешена; тогда действие считается адресующим ВСЁ покрытие: неизвестность не должна выводить шаг из-под проверки. Резолв по ключу — работа валидатора создания; в этой форме join по ключу невыразим, поэтому свойства цели приходят операндом",
     "details[].tranches[].levelCount": "сколько одновременно живых траншей объявляет эта запись; умолчания нет — пустое место мажорировалось бы единицей, то есть в разрешающую сторону",
     "steps[].actions[].allocationPercents": "объявленная доля базы под нотинал входного действия, проценты — операнд статической проверки запаса под катастрофическим потолком",
-    "notionalHeadroomShare": "доля катастрофического потолка, которая обязана остаться свободной после объявленного нотинала; величина риск-аппетита, дом — docs/rules/risk-policy.md",
+    "notionalHeadroomShare": "доля катастрофического потолка, которая обязана остаться свободной после объявленного нотинала. КОНСТАНТА ПРАВИЛА (0.01), а не число риск-аппетита: она выведена из наблюдаемой величины проскока, а не назначена по вкусу, поля конфигурации не имеет и отказа при незаданности не даёт. Дом — docs/rules/risk-policy.md",
     "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — максимальный риск на сделку (конфигурация)",
-    "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)"
+    "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)",
+    "details[].marketPhaseType": "тип рыночной фазы детали — BULL_TREND, BEAR_TREND, RANGE, UNKNOWN"
   },
   "values": [
     {
       "name": "isTradableDetail",
       "expr": "phaseEntryPolicy != 'NO_TRADE'"
+    },
+    {
+      "name": "phaseEntryPolicyAllowed",
+      "note": "Матрица допустимости «фаза × политика входа» — инвариант доменной модели, проверяемый при создании стратегии (дом — docs/models/domain/aggregate/Strategy.md, правило проверки — docs/rules/strategy-validation.md). NO_TRADE допустим в любой фазе; следование и контр-игра — только в трендовых; сетка — только в диапазоне; неизвестная фаза допускает лишь отказ от торговли. Перечень пар объявлен популяцией этой спеки: каждый класс пары обязан быть предъявлен примером, иначе матрица записана и не проверена.",
+      "expr": "if(phaseEntryPolicy == 'NO_TRADE', true, if(in(phaseEntryPolicy, 'FOLLOW_PHASE', 'CONTRARIAN'), in(marketPhaseType, 'BULL_TREND', 'BEAR_TREND'), if(phaseEntryPolicy == 'GRID', marketPhaseType == 'RANGE', false)))"
+    },
+    {
+      "name": "allDetailsWithinPhaseMatrix",
+      "note": "Все детали стратегии укладываются в матрицу допустимости. Клейм счётный, поэтому и объявлен величиной: перечень пар без прогона против эталона был бы абзацем.",
+      "op": "all",
+      "over": "details",
+      "of": "phaseEntryPolicyAllowed"
     },
     {
       "name": "hasRequiredRiskFields",
@@ -302,15 +320,31 @@
       "where": "actionStopCalculationType == 'BREAKEVEN' && !actionIsLevelTransfer"
     },
     {
+      "name": "priceSourceUnavailable",
+      "note": "Объявления размещения цены, чей источник источник данных не отдаёт. Тикер OKX несёт последнюю цену и лучшие бид/аск; марк-цены и индексной цены в нём нет (docs/models/mapping/MarketPriceData.md). Стратегия, объявившая MARK_PRICE или INDEX_PRICE, отвергается на создании — STRATEGY_PRICE_SOURCE_UNAVAILABLE: проксирование последней ценой подменяет ценовой домен молча, и расхождение марк-цены с последней (базис) уезжает прямо в цену входа. Условие возврата значений — поддержка источником, а не наше решение; носитель — .claude/work/backlog.md.",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[].placement",
+      "where": "baseType == 'MARKET_PRICE' && in(priceSource, 'MARK_PRICE', 'INDEX_PRICE')"
+    },
+    {
+      "name": "conditionPriceSourceUnavailable",
+      "note": "То же ограничение на ВТОРОМ носителе источника цены — ценовом операнде условия (docs/models/domain/aggregate/Strategy.md). Перечень StrategyPriceSource у операнда и у размещения один, и отвергать их порознь нельзя: условие «цена ≥ марк-цена ± %» проходило бы создание, а калькулятор подставлял бы последнюю цену — та же подмена ценового домена, только другой тропой.",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].condition.rules[]",
+      "where": "in(?leftOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE') || in(?rightOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE')"
+    },
+    {
       "name": "stopSettingsMisdeclared",
-      "note": "Объявления уровня стопа в защитных действиях транша: способ расчёта — из закрытого перечня, доля дистанции согласована со способом (у BREAKEVEN не объявляется). Предикаты — дом docs/spec/stop-distance.json.",
+      "note": "Объявления уровня стопа в защитных действиях транша: способ расчёта — из закрытого перечня, доля дистанции согласована со способом (у BREAKEVEN не объявляется). Предикаты — дом docs/spec/stop-distance.json. Предмет — настройки САМОГО защитного действия; настройки встроенной защиты входной заявки — другой предмет и другой перечень, потому объявлена независимость.",
+      "independentFrom": "strategy-reference/attachedStopSettingsMisdeclared",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[].stopLossSettings",
       "where": "!calculationTypeKnown || !distanceDeclaredWhenNeeded"
     },
     {
       "name": "attachedStopSettingsMisdeclared",
-      "note": "То же для встроенной защиты входной заявки.",
+      "note": "То же для встроенной защиты входной заявки. Перечень независим от настроек защитного действия транша: это разные предметы объявления, и разойтись они могут законно — потому пара объявлена независимой, а не сведена к одному имени.",
+      "independentFrom": "strategy-reference/stopSettingsMisdeclared",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[].attachedProtection.stopLossSettings",
       "where": "!calculationTypeKnown || !distanceDeclaredWhenNeeded"
@@ -1581,6 +1615,333 @@
         "allocationOutOfRange": 1
       },
       "note": "Граница (0, 100] со стороны нуля. Прежняя редакция предиката (allocationPercents < 0) ноль пропускала, и ни один пример её не трогал: контрпример подавал 140, то есть только верхнюю сторону. Пример падает при возврате прежней границы и потому фальсифицирует нижнюю."
+    },
+    {
+      "case": "эталон источников, которых источник не отдаёт, не объявляет",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "priceSourceUnavailable": 0,
+        "conditionPriceSourceUnavailable": 0
+      }
+    },
+    {
+      "case": "размещение входа по марк-цене отвергается на создании: источник её не отдаёт",
+      "note": "Проксирование марк-цены последней подменяет ценовой домен молча: базис (расхождение марк-цены с последней) уезжает прямо в цену входа, а объявление стратегии продолжает читаться как «вход по марк-цене». Отказ честный — STRATEGY_PRICE_SOURCE_UNAVAILABLE.",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "ACTIVE": [
+                      {
+                        "actions": [
+                          {
+                            "placement": {
+                              "baseType": "MARKET_PRICE",
+                              "priceSource": "MARK_PRICE"
+                            }
+                          },
+                          {
+                            "placement": {
+                              "baseType": "MARKET_PRICE",
+                              "priceSource": "LAST_PRICE"
+                            }
+                          },
+                          {
+                            "placement": {
+                              "baseType": "ENTRY_PRICE",
+                              "priceSource": null
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "priceSourceUnavailable": 1
+      }
+    },
+    {
+      "case": "индексная цена отвергается тем же счётом — перечень отвергаемых источников из двух значений",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "ACTIVE": [
+                      {
+                        "actions": [
+                          {
+                            "placement": {
+                              "baseType": "MARKET_PRICE",
+                              "priceSource": "INDEX_PRICE"
+                            }
+                          },
+                          {
+                            "placement": {
+                              "baseType": "MARKET_PRICE",
+                              "priceSource": "MARK_PRICE"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "priceSourceUnavailable": 2
+      }
+    },
+    {
+      "case": "ценовой операнд условия по марк-цене отвергается тем же ограничением: перечень источников у операнда и у размещения один",
+      "note": "Второй носитель источника цены. Отвергать порознь нельзя: условие «цена ≥ марк-цена ± %» проходило бы создание, а калькулятор подставлял бы последнюю — та же подмена ценового домена, только другой тропой.",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "PRECHECK": [
+                      {
+                        "condition": {
+                          "rules": [
+                            {
+                              "level": 1,
+                              "ruleType": "PRICE_COMPARE",
+                              "leftOperand": {
+                                "sourceType": "PRICE",
+                                "priceSource": "MARK_PRICE"
+                              },
+                              "rightOperand": {
+                                "sourceType": "CONSTANT"
+                              }
+                            },
+                            {
+                              "level": 2,
+                              "ruleType": "PRICE_COMPARE",
+                              "leftOperand": {
+                                "sourceType": "PRICE",
+                                "priceSource": "LAST_PRICE"
+                              },
+                              "rightOperand": {
+                                "sourceType": "CONSTANT"
+                              }
+                            }
+                          ]
+                        },
+                        "actions": []
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "conditionPriceSourceUnavailable": 1,
+        "priceSourceUnavailable": 0
+      }
+    },
+    {
+      "case": "матрица: следование по фазе допустимо в бычьем тренде",
+      "state": {
+        "marketPhaseType": "BULL_TREND",
+        "phaseEntryPolicy": "FOLLOW_PHASE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: контр-игра допустима в медвежьем тренде",
+      "state": {
+        "marketPhaseType": "BEAR_TREND",
+        "phaseEntryPolicy": "CONTRARIAN"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: сетка допустима в диапазоне",
+      "state": {
+        "marketPhaseType": "RANGE",
+        "phaseEntryPolicy": "GRID"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: в неизвестной фазе допустим только отказ от торговли",
+      "state": {
+        "marketPhaseType": "UNKNOWN",
+        "phaseEntryPolicy": "NO_TRADE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: следование по фазе в диапазоне отвергается",
+      "state": {
+        "marketPhaseType": "RANGE",
+        "phaseEntryPolicy": "FOLLOW_PHASE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": false
+      }
+    },
+    {
+      "case": "матрица: сетка в тренде отвергается",
+      "state": {
+        "marketPhaseType": "BULL_TREND",
+        "phaseEntryPolicy": "GRID"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": false
+      }
+    },
+    {
+      "case": "матрица: контр-игра в неизвестной фазе отвергается",
+      "state": {
+        "marketPhaseType": "UNKNOWN",
+        "phaseEntryPolicy": "CONTRARIAN"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": false
+      }
+    },
+    {
+      "case": "эталонная стратегия укладывается в матрицу допустимости целиком",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "allDetailsWithinPhaseMatrix": true
+      }
+    },
+    {
+      "case": "все детали укладываются в матрицу: две торгуемые, две отказные",
+      "state": {
+        "details": [
+          {
+            "marketPhaseType": "BULL_TREND",
+            "phaseEntryPolicy": "FOLLOW_PHASE"
+          },
+          {
+            "marketPhaseType": "BEAR_TREND",
+            "phaseEntryPolicy": "FOLLOW_PHASE"
+          },
+          {
+            "marketPhaseType": "RANGE",
+            "phaseEntryPolicy": "NO_TRADE"
+          },
+          {
+            "marketPhaseType": "UNKNOWN",
+            "phaseEntryPolicy": "NO_TRADE"
+          }
+        ]
+      },
+      "expect": {
+        "allDetailsWithinPhaseMatrix": true
+      }
+    },
+    {
+      "case": "одна деталь вне матрицы — весь набор отвергается",
+      "state": {
+        "details": [
+          {
+            "marketPhaseType": "BULL_TREND",
+            "phaseEntryPolicy": "FOLLOW_PHASE"
+          },
+          {
+            "marketPhaseType": "RANGE",
+            "phaseEntryPolicy": "CONTRARIAN"
+          },
+          {
+            "marketPhaseType": "UNKNOWN",
+            "phaseEntryPolicy": "NO_TRADE"
+          }
+        ]
+      },
+      "expect": {
+        "allDetailsWithinPhaseMatrix": false
+      }
+    }
+  ],
+  "populations": [
+    {
+      "axis": "классы пары «фаза × политика входа»",
+      "note": "Матрица допустимости целиком, по классам, которые различает правило. Фильтр участия — наличие обеих осей у примера.",
+      "keys": [
+        "marketPhaseType",
+        "phaseEntryPolicy"
+      ],
+      "members": [
+        {
+          "member": [
+            "BULL_TREND",
+            "FOLLOW_PHASE"
+          ]
+        },
+        {
+          "member": [
+            "BEAR_TREND",
+            "CONTRARIAN"
+          ]
+        },
+        {
+          "member": [
+            "RANGE",
+            "GRID"
+          ]
+        },
+        {
+          "member": [
+            "UNKNOWN",
+            "NO_TRADE"
+          ]
+        },
+        {
+          "member": [
+            "RANGE",
+            "FOLLOW_PHASE"
+          ]
+        },
+        {
+          "member": [
+            "BULL_TREND",
+            "GRID"
+          ]
+        },
+        {
+          "member": [
+            "UNKNOWN",
+            "CONTRARIAN"
+          ]
+        }
+      ]
     }
   ]
 }

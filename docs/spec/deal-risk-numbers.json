@@ -10,7 +10,7 @@
     "legs[].plannedRiskAmount": "Order.plannedRiskAmount — write-once на ноге",
     "legs[].plannedSizeContracts": "Order.plannedSizeContracts",
     "legs[].accumulatedFillSize": "Order.accumulatedFillSize",
-    "legs[].entryAnchor": "Order.entryAnchor",
+    "legs[].entryAnchor": "плановая цена своей ноги — Order.plannedEntryPrice. Имя операнда согласовано с домом закрытой формы (docs/spec/risk-at-stop.json, величина entryAnchor): у ноги сделки якорем служит её плановая цена, у переноса уровня — фактическая средняя эпизода. Поля Order.entryAnchor не существует ни в модели, ни в коде, и атрибуция к нему была ложной",
     "legs[].plannedStopPrice": "Order.plannedStopPrice",
     "legs[].plannedContractValue": "Order.plannedContractValue",
     "legs[].positionId": "Order.positionId — ось эпизода",

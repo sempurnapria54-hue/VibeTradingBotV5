@@ -62,9 +62,11 @@
 живого риска **больше** объявленного, то есть ошибался бы в разрешающую
 сторону.
 
-Форма исходов, итоговый размер и инвариант остатка —
-`docs/spec/order-sizing.json` (`exitOutcome`, `exitSizeFinal`,
-`exitLeavesNoDust`); смысл исходов — `docs/components/SizeCalculator.md`.
+Форма исходов и итоговый размер —
+`docs/spec/order-sizing.json` (`exitOutcome`, `exitSizeFinal`): ветвление
+исходов и есть исполнимая форма правила «остаток либо нулевой, либо не
+меньше минимального торгового», и носители клейма — примеры всех четырёх
+исходов. Смысл исходов — `docs/components/SizeCalculator.md`.
 
 **Коды нарушения инварианта:** `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 `PARTIAL_EXIT_INCREASES_POSITION`,

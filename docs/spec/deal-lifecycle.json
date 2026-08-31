@@ -2,7 +2,10 @@
   "subject": "deal-lifecycle",
   "question": "Какие переходы статуса сделки допустимы",
   "home": "docs/lifecycles/Deal.md",
-  "includes": ["protection-coverage", "order-lifecycle"],
+  "includes": [
+    "protection-coverage",
+    "order-lifecycle"
+  ],
   "operands": {
     "from": "текущий статус сделки",
     "to": "предполагаемый статус",
@@ -19,7 +22,8 @@
     "resultProfitFinalized": "число уже стояло на сделке ДО этого ребра — durable-факт: его записала финализация выхода, а она завершается только по доступному итогу (docs/spec/deal-result.json, finalizationCompletes). Аварийный терминал такое число не пересчитывает и не затирает, поэтому его законность проверена не здесь, а тем, кто его писал",
     "deal.status": "Deal.status — операнд окна атрибуции закрывающих исполнений уровня сделки; форма окна — docs/spec/protection-coverage.json. Подаётся явно и совпадает с from: from/to здесь адресуют РЕБРО перехода, а не состояние, и в соседней спеке те же имена принадлежат статусу транша — вычислять окно из них значило бы читать чужой субъект",
     "tranches[].followingTranchesGross": "Σ gross-экспозиций траншей, материализованных позже этого; операнд порядка правила сопоставления — дом docs/models/domain/aggregate/DealTranche.md",
-    "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака — docs/rules/deal-without-operations.md (признак «операций по сделке не было» есть его отрицание); форма здесь не переписывается. Значение берётся из дома-спеки: hadEntry = positionObserved (docs/spec/deal-context-load.json)"
+    "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака — docs/rules/deal-without-operations.md (признак «операций по сделке не было» есть его отрицание); форма здесь не переписывается. Значение берётся из дома-спеки: hadEntry = positionObserved (docs/spec/deal-context-load.json)",
+    "tranches[].closeReason": "DealTranche.closeReason — причина закрытия транша; пусто у транша, не получившего терминала. Операнд старшинства причин на маршруте «все транши терминальны»"
   },
   "values": [
     {
@@ -48,6 +52,26 @@
       "op": "any",
       "over": "orders",
       "of": "orderIsLive"
+    },
+    {
+      "name": "trancheHasLiveEntryLeg",
+      "note": "У транша есть живая ВХОДНАЯ нога. Отличается от trancheHasLiveOrder тем, что берёт только входные заявки: порядок сворачивания адресует именно их — reduce-only ноги риск снимают, а не создают, и закрытию нетто-экспозиции не мешают.",
+      "op": "any",
+      "over": "orders",
+      "where": "isEntryOrder",
+      "of": "orderIsLive"
+    },
+    {
+      "name": "netCloseAllowed",
+      "note": "Можно ли закрывать нетто-экспозицию одной командой уровня сделки. Порядок «сначала отменяются живые входные ноги, потом закрывается позиция» — общий для ОБЕИХ законных форм полного выхода (docs/rules/exit-teardown-order.md); на форме «шаг EXIT несёт только условие» его энфорсит это предусловие, на форме явного действия — стадии исполнителя действия. Первый конъюнкт — охрана полнотой графа, та же, что у терминалов: агрегат считается по ЗАГРУЖАЕМЫМ заявкам, и на недогруженном графе «живой входной ноги нет» ложно молча — позиция закрылась бы при живой входной ноге, а её филл открыл бы позицию заново под уже снятой защитой.",
+      "expr": "graphComplete && !anyTrancheHasLiveEntryLeg"
+    },
+    {
+      "name": "anyTrancheHasLiveEntryLeg",
+      "note": "Есть ли живая входная нога хоть у одного транша сделки.",
+      "op": "any",
+      "over": "tranches",
+      "of": "trancheHasLiveEntryLeg"
     },
     {
       "name": "anyLiveOrder",
@@ -83,9 +107,121 @@
       "expr": "if(resultProfitFinalized, null, if(!hadEntry, 'NOT_APPLICABLE', if(riskBenchmarkResolved, 'AVAILABLE', 'MISSING')))"
     },
     {
+      "name": "closeReasonWriter",
+      "note": "Кто пишет Deal.closeReason на этом ребре — исполнимая форма правила писателя; дом правила — docs/lifecycles/Deal.md. Значения: DealActiveHandler — затребователь рёбер из активного статуса, пишет причину той же транзакцией, которой гейтит ребро; ErrorHandler — затребователь аварийного терминала, пишет EMERGENCY_CLOSE; NONE_ON_ERROR_EDGE — на ребре в ошибочное состояние причина не пишется (ERROR не терминал, итоговая причина ещё не определена, а тропа перехвата обработчика не имеет вовсе и записать её некому); NONE_ALREADY_STANDS — ребро EXIT_PENDING → CLOSED причину не пишет, она стои́т с ребра ACTIVE → EXIT_PENDING. Терминальные исполнители (MarkDealClosedExecutor, MarkDealEmergencyClosedExecutor) ребро применяют и причины не пишут: решение о причине принято затребователем раньше.",
+      "expr": "if(!edgeDeclared, null, if(to == 'ERROR', 'NONE_ON_ERROR_EDGE', if(to == 'EMERGENCY_CLOSED', 'ErrorHandler', if(from == 'EXIT_PENDING', 'NONE_ALREADY_STANDS', 'DealActiveHandler'))))"
+    },
+    {
+      "name": "trancheCloseReasonRank",
+      "note": "Ранг причины закрытия транша в закрытом перечне старшинства (1 — старшая). Порядок объявлен домом docs/lifecycles/Deal.md: RISK_CONTROL, STOP_LOSS, TIME_STOP, STRATEGY_EXIT, TAKE_PROFIT, ENTRY_CONDITION_EXPIRED. Значение вне перечня даёт 99 — оно не выигрывает никогда; у транша таких значений нет: EMERGENCY_CLOSE на транше не пишется, UNKNOWN тоже (docs/lifecycles/DealTranche.md).",
+      "expr": "if(closeReason == 'RISK_CONTROL', 1, if(closeReason == 'STOP_LOSS', 2, if(closeReason == 'TIME_STOP', 3, if(closeReason == 'STRATEGY_EXIT', 4, if(closeReason == 'TAKE_PROFIT', 5, if(closeReason == 'ENTRY_CONDITION_EXPIRED', 6, 99))))))"
+    },
+    {
+      "name": "topTrancheReasonRank",
+      "note": "Ранг СТАРШЕЙ причины среди траншей, несущих причину. Пусто — ни один транш причины не несёт: на терминальном ребре сделки такое состояние не достигается, у сделки с терминальными траншами причину несёт хотя бы один.",
+      "op": "min",
+      "over": "tranches",
+      "where": "notNull(?closeReason)",
+      "of": "trancheCloseReasonRank"
+    },
+    {
+      "name": "dealCloseReasonBySeniority",
+      "note": "Причина закрытия сделки на маршрутах, где её дают транши: «все транши терминальны при состоявшемся входе» (ребро ACTIVE - EXIT_PENDING) и тропы закрытия без входа (ребро ACTIVE - CLOSED). Резолв детерминирован и операнда сверх причин траншей не требует: сделку объясняет самый далёкий от плана исход среди её траншей. Дом порядка — docs/lifecycles/Deal.md; перечень значений объявлен популяцией этой спеки.",
+      "expr": "if(topTrancheReasonRank == 1, 'RISK_CONTROL', if(topTrancheReasonRank == 2, 'STOP_LOSS', if(topTrancheReasonRank == 3, 'TIME_STOP', if(topTrancheReasonRank == 4, 'STRATEGY_EXIT', if(topTrancheReasonRank == 5, 'TAKE_PROFIT', if(topTrancheReasonRank == 6, 'ENTRY_CONDITION_EXPIRED', null))))))"
+    },
+    {
       "name": "transitionAllowed",
       "note": "Переход разрешён: ребро объявлено и выполнен контракт целевого статуса. Контракт читается у обоих терминалов — штатный дополнительно требует терминальности всех траншей, аварийный не требует её намеренно.",
       "expr": "edgeDeclared && (to != 'CLOSED' || (allTranchesTerminal && riskProvenAbsent && cleanTerminalContract)) && (to != 'EMERGENCY_CLOSED' || (riskProvenAbsent && emergencyTerminalContract))"
+    }
+  ],
+  "populations": [
+    {
+      "axis": "рёбра статусной машины сделки — у каждого назван писатель причины закрытия",
+      "note": "Перечень объявленных рёбер (величина edgeDeclared) целиком. Фильтр where отсекает примеры, предъявляющие спеке НЕобъявленную пару намеренно — пробы недопустимых переходов: их предмет — ложность edgeDeclared, а не писатель. Каждый член обязан быть предъявлен примером, иначе правило писателя остаётся на нём непроверенным; пример, предъявляющий пару вне перечня, роняет прогон. Чего прогон НЕ держит: равенство перечня членов и перечня рёбер величины edgeDeclared — ребро, добавленное туда и не предъявленное ни одним примером, проходит молча. Клейма полноты в эту сторону здесь поэтому нет; оба перечня живут в одном файле и правятся одним ходом.",
+      "keys": [
+        "from",
+        "to"
+      ],
+      "where": "edgeDeclared",
+      "members": [
+        {
+          "member": [
+            "ACTIVE",
+            "EXIT_PENDING"
+          ]
+        },
+        {
+          "member": [
+            "ACTIVE",
+            "CLOSED"
+          ]
+        },
+        {
+          "member": [
+            "ACTIVE",
+            "ERROR"
+          ]
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "CLOSED"
+          ]
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "ERROR"
+          ]
+        },
+        {
+          "member": [
+            "ERROR",
+            "EMERGENCY_CLOSED"
+          ]
+        }
+      ]
+    },
+    {
+      "axis": "значения причины закрытия сделки, резолвимые старшинством причин траншей",
+      "note": "Перечень старшинства целиком. Каждое значение обязано выигрывать хотя бы на одном примере, иначе порядок объявлен и не проверен. Фильтр участия — непустой резолв: примеры без причин траншей осей этой популяции не предъявляют.",
+      "keys": [
+        "dealCloseReasonBySeniority"
+      ],
+      "where": "notNull(dealCloseReasonBySeniority)",
+      "members": [
+        {
+          "member": [
+            "RISK_CONTROL"
+          ]
+        },
+        {
+          "member": [
+            "STOP_LOSS"
+          ]
+        },
+        {
+          "member": [
+            "TIME_STOP"
+          ]
+        },
+        {
+          "member": [
+            "STRATEGY_EXIT"
+          ]
+        },
+        {
+          "member": [
+            "TAKE_PROFIT"
+          ]
+        },
+        {
+          "member": [
+            "ENTRY_CONDITION_EXPIRED"
+          ]
+        }
+      ]
     }
   ],
   "examples": [
@@ -121,7 +257,8 @@
       },
       "expect": {
         "edgeDeclared": true,
-        "transitionAllowed": true
+        "transitionAllowed": true,
+        "closeReasonWriter": "DealActiveHandler"
       }
     },
     {
@@ -238,7 +375,8 @@
         "allTranchesTerminal": false,
         "dealRiskBearing": true,
         "riskProvenAbsent": false,
-        "transitionAllowed": false
+        "transitionAllowed": false,
+        "closeReasonWriter": "NONE_ALREADY_STANDS"
       }
     },
     {
@@ -422,7 +560,8 @@
       },
       "expect": {
         "cleanTerminalContract": true,
-        "transitionAllowed": true
+        "transitionAllowed": true,
+        "closeReasonWriter": "DealActiveHandler"
       }
     },
     {
@@ -503,7 +642,8 @@
       "expect": {
         "allTranchesTerminal": false,
         "riskProvenAbsent": true,
-        "transitionAllowed": true
+        "transitionAllowed": true,
+        "closeReasonWriter": "ErrorHandler"
       }
     },
     {
@@ -1154,6 +1294,352 @@
       "expect": {
         "emergencyTerminalContract": true,
         "benchmarkAvailabilityOnTerminal": "AVAILABLE"
+      }
+    },
+    {
+      "case": "закрытие нетто-экспозиции не эмитится, пока у транша жива ВХОДНАЯ нога: порядок сворачивания общий для обеих форм выхода",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "EXIT_PENDING",
+        "position": {
+          "status": "ACTIVE",
+          "externalSize": 5
+        },
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY",
+                "status": "ACTIVE",
+                "accumulatedFillSize": 2
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "anyTrancheHasLiveEntryLeg": true,
+        "netCloseAllowed": false
+      }
+    },
+    {
+      "case": "живых входных ног не осталось — закрытие нетто-экспозиции разрешено",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "EXIT_PENDING",
+        "position": {
+          "status": "ACTIVE",
+          "externalSize": 5
+        },
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY",
+                "status": "CANCELED",
+                "accumulatedFillSize": 2
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "anyTrancheHasLiveEntryLeg": false,
+        "netCloseAllowed": true
+      }
+    },
+    {
+      "case": "тот же расклад на НЕПОЛНОМ графе: закрытие не разрешается — «живой входной ноги нет» на усечённой загрузке ложно молча",
+      "note": "Без охраны позиция закрылась бы при живой входной ноге, а её филл открыл бы позицию заново под уже снятой защитой — дословно механизм, против которого написан порядок сворачивания.",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "EXIT_PENDING",
+        "position": {
+          "status": "ACTIVE",
+          "externalSize": 5
+        },
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY",
+                "status": "CANCELED",
+                "accumulatedFillSize": 2
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": false
+      },
+      "expect": {
+        "anyTrancheHasLiveEntryLeg": false,
+        "netCloseAllowed": false
+      }
+    },
+    {
+      "case": "решение обработчика уводит активную сделку в ошибочное состояние: причина закрытия на этом ребре не пишется",
+      "note": "Ребро ACTIVE → ERROR достижимо решением обработчика активной сделки (расхождение экспозиций, отказ транша) и перехватом петли (энфорсмент жёсткой ступени холда, контролируемое исключение). Обе тропы ведут в НЕтерминальный статус, поэтому итоговая бизнес-причина ещё не определена и не пишется; тропа перехвата обработчика не имеет вовсе (docs/processes/fsm-execution-layering.md), и назначать ей писателя было бы некому.",
+      "state": {
+        "from": "ACTIVE",
+        "to": "ERROR",
+        "position": {
+          "status": "ACTIVE",
+          "externalSize": 3
+        },
+        "deal": {
+          "status": "ACTIVE"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "edgeDeclared": true,
+        "transitionAllowed": true,
+        "closeReasonWriter": "NONE_ON_ERROR_EDGE"
+      }
+    },
+    {
+      "case": "сделка в координированном выходе уходит в ошибочное состояние: причина уже стоя́ла и не переписывается",
+      "note": "Ребро EXIT_PENDING → ERROR: причина закрытия записана ещё на ребре ACTIVE → EXIT_PENDING, а ошибочное состояние её не трогает — перезапись посчитанного запрещена тем же доводом, что и у признаков отбора (дом — docs/lifecycles/Deal.md).",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "ERROR",
+        "position": {
+          "status": "ACTIVE",
+          "externalSize": 2
+        },
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "tranches": [
+          {
+            "status": "EXIT_PENDING",
+            "orders": [
+              {
+                "type": "ENTRY",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 2
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "edgeDeclared": true,
+        "transitionAllowed": true,
+        "closeReasonWriter": "NONE_ON_ERROR_EDGE"
+      }
+    },
+    {
+      "case": "старшинство: вмешавшийся контроль старше адверсного выхода",
+      "state": {
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "closeReason": "STOP_LOSS",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "RISK_CONTROL",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "TAKE_PROFIT",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "RISK_CONTROL"
+      }
+    },
+    {
+      "case": "старшинство: адверсный выход старше временного и планового",
+      "state": {
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "closeReason": "TAKE_PROFIT",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "STOP_LOSS",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "TIME_STOP",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "STOP_LOSS"
+      }
+    },
+    {
+      "case": "старшинство: временной стоп старше планового выхода",
+      "state": {
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "closeReason": "STRATEGY_EXIT",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "TIME_STOP",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "TIME_STOP"
+      }
+    },
+    {
+      "case": "старшинство: плановый выход старше прибыльного",
+      "state": {
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "closeReason": "TAKE_PROFIT",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "STRATEGY_EXIT",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "STRATEGY_EXIT"
+      }
+    },
+    {
+      "case": "старшинство: сетка вышла тейками — прибыльный исход и объясняет сделку",
+      "state": {
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "closeReason": "TAKE_PROFIT",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "TAKE_PROFIT",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "TAKE_PROFIT"
+      }
+    },
+    {
+      "case": "тропа закрытия без входа: истечение условия входа младше всех",
+      "state": {
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "closeReason": "ENTRY_CONDITION_EXPIRED",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "ENTRY_CONDITION_EXPIRED",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "ENTRY_CONDITION_EXPIRED"
+      }
+    },
+    {
+      "case": "тропа закрытия без входа: бессрочный отказ преконтроля старше истечения условия",
+      "state": {
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "closeReason": "ENTRY_CONDITION_EXPIRED",
+            "orders": [],
+            "protections": []
+          },
+          {
+            "status": "CLOSED",
+            "closeReason": "RISK_CONTROL",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "RISK_CONTROL"
       }
     }
   ]

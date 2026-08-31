@@ -15,3 +15,7 @@
 /.claude/library/trading/raw/
 /.claude/work/run-logs/okx_demo.py
 /.claude/work/run-logs/run.sh
+
+# Python — байткод инструментов пайплайна
+__pycache__/
+*.pyc

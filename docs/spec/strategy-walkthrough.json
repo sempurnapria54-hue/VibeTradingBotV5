@@ -2,25 +2,43 @@
   "subject": "strategy-walkthrough",
   "question": "Держится ли инвариант покрытия на каждом шаге прохода эталонного транша",
   "home": "docs/rules/live-risk-protection.md",
-  "includes": ["protection-coverage", "order-lifecycle"],
-
-  "note": "Проход одного транша по эталонной стратегии trend-following-ema: вход со встроенным стопом → основная защита → безубыток → трейлинг → выход. Эталон объявляет один транш на торгуемую деталь, поэтому проход сделки и проход транша здесь совпадают — на шагах выхода это и делает законными операнды уровня сделки (окно сворачивания, нетто-размер): соседних траншей у эталона нет, и суффиксная сумма порядка нулевая. Каждый пример — состояние графа транша на одном шаге. На всех шагах утверждается отсутствие биржевой реакции ступени 2.",
-
+  "includes": [
+    "protection-coverage",
+    "order-lifecycle"
+  ],
+  "note": "Штатный проход биржевой ступени 2 не даёт ни на одном шаге: носители клейма — ожидания trancheViolated: false у каждого шага прохода; отдельного имени-алиаса для него не заводится. Проход одного транша по эталонной стратегии trend-following-ema: вход со встроенным стопом → основная защита → безубыток → трейлинг → выход. Эталон объявляет один транш на торгуемую деталь, поэтому проход сделки и проход транша здесь совпадают — на шагах выхода это и делает законными операнды уровня сделки (окно сворачивания, нетто-размер): соседних траншей у эталона нет, и суффиксная сумма порядка нулевая. Каждый пример — состояние графа транша на одном шаге. На всех шагах утверждается отсутствие биржевой реакции ступени 2.",
   "operands": {
     "step": "шаг прохода — для читаемости отчёта",
     "protections[].chainRoot": "корень цепочки замещений: чем заявка была объявлена изначально",
     "declaredCancelTarget": "цель снятия, объявленная стратегией; может быть уже замещена",
     "deal.status": "Deal.status — операнд окна атрибуции закрывающего исполнения уровня сделки",
     "followingTranchesGross": "Σ gross-экспозиций траншей, материализованных позже этого; у эталона транш один, поэтому величина нулевая",
-    "остальные операнды": "как в protection-coverage, в траншевой области"
+    "остальные операнды": "как в protection-coverage, в траншевой области",
+    "strategy": "эталонный артефакт стратегии, подгружаемый примером через stateFrom. Спека читает его как ВХОД: имена действий в состояниях примеров резолвятся против объявленных ключей артефакта, а не сверяются глазами",
+    "actionKey": "ключ действия эталона, к которому относится шаг примера. Операнд связи с артефактом: величина actionDeclaredInArtifact падает, если ключа в артефакте нет",
+    "stepConditionTrue": "условие шага истинно на этом проходе (пороги лестницы сопровождения уровневые: истинны, пока цена держится выше порога)",
+    "stepActionRows[]": "строки исполнения действий ЭТОГО шага (docs/models/domain/other/DealActionState.md): каждая несёт trancheEpisodeSeq и status",
+    "currentTrancheEpisodeSeq": "DealTranche.episodeSeq — номер ТЕКУЩЕГО эпизода транша; +1 на каждом ребре переоткрытия. Имя разведено с одноимённым полем строки исполнения намеренно: в отборе строк оба имени встречаются рядом, и совпадение имён отдало бы оба значения строке"
   },
-
   "values": [
     {
-      "name": "noStageTwoReaction",
-      "provenBy": "trancheViolated",
-      "note": "Штатный проход не даёт биржевой ступени 2 ни на одном шаге.",
-      "expr": "!trancheViolated"
+      "name": "actionDeclaredInArtifact",
+      "note": "Действие, названное шагом примера, объявлено в эталонном артефакте. Без этой величины связь спеки с эталоном держалась ТОЛЬКО НА ИМЕНИ: замена всех имён действий на несуществующие оставляла прогон зелёным, то есть клейм «проход эталонного транша» не имел основания. Обход идёт по обоим уровням объявления — траншевому и агрегатному.",
+      "op": "exists",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
+      "where": "key == actionKey"
+    },
+    {
+      "name": "actionDeclaredAtDealLevel",
+      "note": "То же для шагов уровня СДЕЛКИ: их действия объявлены не в транше, а в details[].stepsByStatus.",
+      "op": "exists",
+      "over": "strategy.details[].stepsByStatus{}[].actions[]",
+      "where": "key == actionKey"
+    },
+    {
+      "name": "walkthroughAnchoredToArtifact",
+      "note": "Шаг примера привязан к эталону: его действие объявлено артефактом на траншевом либо агрегатном уровне. Ложь означает, что пример описывает проход, которого эталон не производит.",
+      "expr": "actionDeclaredInArtifact || actionDeclaredAtDealLevel"
     },
     {
       "name": "cancelTargetCandidates",
@@ -34,124 +52,373 @@
       "name": "removalDeferred",
       "note": "Снятие отложено, а не отказано: покрытие снимаемой защиты пока не несёт никто другой.",
       "expr": "notNull(cancelTargetId) && !removalAllowed"
+    },
+    {
+      "name": "stepAppliedOnEpisode",
+      "note": "Шаг уже применялся на ТЕКУЩЕМ эпизоде транша. Отбор двойной: номер эпизода строки равен текущему (одного dealTrancheId не хватает — переоткрытие идёт тем же траншем, и строки копятся) и статус строки не SKIPPED и не FAILED (SKIPPED — не применялся; FAILED — попытки исчерпаны, надобность осталась, новая строка законна). Дом правила — docs/rules/strategy-step-once-per-episode.md.",
+      "op": "exists",
+      "over": "stepActionRows",
+      "where": "trancheEpisodeSeq == currentTrancheEpisodeSeq && !in(status, 'SKIPPED', 'FAILED')"
+    },
+    {
+      "name": "stepEligible",
+      "note": "Шаг допустим к применению: условие истинно И на текущем эпизоде транша он ещё не применялся. Второй конъюнкт и есть то, чем едет лестница: порог нижней ступени остаётся истинным и после её применения, поэтому без выпадения first-match выбирал бы её каждым проходом, перевыставляя безубыток бессрочно, а ступень трейлинга не исполнялась бы ни разу. Дом правила — docs/rules/strategy-step-once-per-episode.md.",
+      "expr": "stepConditionTrue && !stepAppliedOnEpisode"
     }
   ],
-
   "examples": [
     {
       "case": "1. вход создан, отправки ещё не было — риска на бирже нет",
       "state": {
         "step": "PRECHECK / bull_entry CREATE",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "CREATED", "accumulatedFillSize": 0 } ],
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "CREATED",
+            "accumulatedFillSize": 0
+          }
+        ],
         "protections": [
-          { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "CREATED", "kind": "STOP", "size": 3, "parentFillSize": 0 }
+          {
+            "id": "entry_sl",
+            "chainRoot": "bull_entry",
+            "carrier": "ATTACHED",
+            "status": "CREATED",
+            "kind": "STOP",
+            "size": 3,
+            "parentFillSize": 0
+          }
         ],
         "commitments": [],
         "cancelTargetId": null,
-        "declaredCancelTarget": null
+        "declaredCancelTarget": null,
+        "actionKey": "bull_entry"
       },
-      "expect": { "trancheExposure": 0, "trancheCoverage": 0, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheExposure": 0,
+        "trancheCoverage": 0,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "2. вход отправлен, факт не наблюдён — экспозиции ещё нет",
       "state": {
         "step": "SUBMIT bull_entry",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "PENDING", "accumulatedFillSize": 0 } ],
-        "protections": [
-          { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "PENDING", "kind": "STOP", "size": 3, "parentFillSize": 0 }
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "PENDING",
+            "accumulatedFillSize": 0
+          }
         ],
-        "commitments": [ { "terminal": false, "budgetExhausted": false } ],
+        "protections": [
+          {
+            "id": "entry_sl",
+            "chainRoot": "bull_entry",
+            "carrier": "ATTACHED",
+            "status": "PENDING",
+            "kind": "STOP",
+            "size": 3,
+            "parentFillSize": 0
+          }
+        ],
+        "commitments": [
+          {
+            "terminal": false,
+            "budgetExhausted": false
+          }
+        ],
         "cancelTargetId": null,
-        "declaredCancelTarget": null
+        "declaredCancelTarget": null,
+        "actionKey": "bull_entry"
       },
-      "expect": { "trancheExposure": 0, "trancheHasLiveEntryOrder": true, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheExposure": 0,
+        "trancheHasLiveEntryOrder": true,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "3. вход исполнен — экспозиция транша покрыта его встроенным стопом с первого момента",
       "state": {
         "step": "ENTRY_FINALIZED",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
         "protections": [
-          { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 3, "parentFillSize": 3 }
+          {
+            "id": "entry_sl",
+            "chainRoot": "bull_entry",
+            "carrier": "ATTACHED",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "parentFillSize": 3
+          }
         ],
         "commitments": [],
         "cancelTargetId": null,
-        "declaredCancelTarget": null
+        "declaredCancelTarget": null,
+        "actionKey": "bull_entry"
       },
-      "expect": { "trancheExposure": 3, "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheExposure": 3,
+        "trancheCoverage": 3,
+        "trancheCovered": true,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "4. основная защита подтверждена — встроенную можно снимать",
       "state": {
         "step": "MAIN_PROTECTION bull_protection_oco подтверждён",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
         "protections": [
-          { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "ACTIVE", "kind": "STOP", "size": 3, "parentFillSize": 3 },
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 }
+          {
+            "id": "entry_sl",
+            "chainRoot": "bull_entry",
+            "carrier": "ATTACHED",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "parentFillSize": 3
+          },
+          {
+            "id": "oco",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          }
         ],
         "commitments": [],
         "cancelTargetId": "entry_sl",
-        "declaredCancelTarget": "bull_entry"
+        "declaredCancelTarget": "bull_entry",
+        "actionKey": "bull_protection_oco"
       },
-      "expect": { "trancheCoverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheCoverage": 6,
+        "coverageAfterRemoval": 3,
+        "removalAllowed": true,
+        "removalDeferred": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "5. встроенная снята — покрытие несёт основная защита",
       "state": {
         "step": "MANAGING",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
         "protections": [
-          { "id": "entry_sl", "chainRoot": "bull_entry", "carrier": "ATTACHED", "status": "CANCELED", "kind": "STOP", "size": 3, "parentFillSize": 3 },
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 }
+          {
+            "id": "entry_sl",
+            "chainRoot": "bull_entry",
+            "carrier": "ATTACHED",
+            "status": "CANCELED",
+            "kind": "STOP",
+            "size": 3,
+            "parentFillSize": 3
+          },
+          {
+            "id": "oco",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          }
         ],
         "commitments": [],
         "cancelTargetId": null,
-        "declaredCancelTarget": null
+        "declaredCancelTarget": null,
+        "actionKey": "bull_protection_oco"
       },
-      "expect": { "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheCoverage": 3,
+        "trancheCovered": true,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "6. безубыток: снятие старой защиты до подтверждения новой запрещено",
       "state": {
         "step": "PROTECTION_ADJUSTMENT bull_sl_to_breakeven создан, не подтверждён",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
-        "protections": [
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "CREATED", "kind": "STOP", "size": 3, "closedSize": 0 }
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
         ],
-        "commitments": [ { "terminal": false, "budgetExhausted": false } ],
+        "protections": [
+          {
+            "id": "oco",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          },
+          {
+            "id": "breakeven",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "CREATED",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          }
+        ],
+        "commitments": [
+          {
+            "terminal": false,
+            "budgetExhausted": false
+          }
+        ],
         "cancelTargetId": "oco",
-        "declaredCancelTarget": "bull_protection_oco"
+        "declaredCancelTarget": "bull_protection_oco",
+        "actionKey": "bull_sl_to_breakeven"
       },
-      "expect": { "trancheCoverage": 3, "coverageAfterRemoval": 0, "removalAllowed": false, "removalDeferred": true, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheCoverage": 3,
+        "coverageAfterRemoval": 0,
+        "removalAllowed": false,
+        "removalDeferred": true,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "7. безубыток подтверждён — старая защита снимается законно",
       "state": {
         "step": "bull_sl_to_breakeven подтверждён",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
         "protections": [
-          { "id": "oco", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 }
+          {
+            "id": "oco",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          },
+          {
+            "id": "breakeven",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          }
         ],
         "commitments": [],
         "cancelTargetId": "oco",
-        "declaredCancelTarget": "bull_protection_oco"
+        "declaredCancelTarget": "bull_protection_oco",
+        "actionKey": "bull_sl_to_breakeven"
       },
-      "expect": { "trancheCoverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheCoverage": 6,
+        "coverageAfterRemoval": 3,
+        "removalAllowed": true,
+        "removalDeferred": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "8. трейлинг поставлен, но не активирован — снятие безубытка откладывается",
       "state": {
         "step": "bull_oco_cancel + bull_trailing",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
-        "protections": [
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": null }
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
         ],
-        "commitments": [ { "terminal": false, "budgetExhausted": false } ],
+        "protections": [
+          {
+            "id": "breakeven",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          },
+          {
+            "id": "trailing",
+            "chainRoot": "bull_trailing",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "TRAILING",
+            "size": 3,
+            "closedSize": 0,
+            "activationPrice": 2040,
+            "observedTrailingPrice": null
+          }
+        ],
+        "commitments": [
+          {
+            "terminal": false,
+            "budgetExhausted": false
+          }
+        ],
         "cancelTargetId": "breakeven",
-        "declaredCancelTarget": "bull_protection_oco"
+        "declaredCancelTarget": "bull_protection_oco",
+        "actionKey": "bull_oco_cancel"
       },
       "expect": {
         "cancelTargetCandidates": 1,
@@ -160,77 +427,215 @@
         "removalAllowed": false,
         "removalDeferred": true,
         "trancheViolated": false,
-        "noStageTwoReaction": true
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
       }
     },
     {
       "case": "9. трейлинг активирован — он несёт уровень, снятие безубытка разрешается",
       "state": {
         "step": "трейлинг наблюдён с уровнем",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
         "protections": [
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "STOP", "size": 3, "closedSize": 0 },
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          {
+            "id": "breakeven",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          },
+          {
+            "id": "trailing",
+            "chainRoot": "bull_trailing",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "TRAILING",
+            "size": 3,
+            "closedSize": 0,
+            "activationPrice": 2040,
+            "observedTrailingPrice": 2055
+          }
         ],
         "commitments": [],
         "cancelTargetId": "breakeven",
-        "declaredCancelTarget": "bull_protection_oco"
+        "declaredCancelTarget": "bull_protection_oco",
+        "actionKey": "bull_trailing"
       },
-      "expect": { "trancheCoverage": 6, "coverageAfterRemoval": 3, "removalAllowed": true, "removalDeferred": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheCoverage": 6,
+        "coverageAfterRemoval": 3,
+        "removalAllowed": true,
+        "removalDeferred": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "10. безубыток снят — покрытие несёт трейлинг",
       "state": {
         "step": "bull_oco_cancel исполнен",
-        "orders": [ { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 } ],
+        "orders": [
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
         "protections": [
-          { "id": "breakeven", "chainRoot": "bull_protection_oco", "carrier": "STANDALONE", "status": "CANCELED", "kind": "STOP", "size": 3, "closedSize": 0 },
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          {
+            "id": "breakeven",
+            "chainRoot": "bull_protection_oco",
+            "carrier": "STANDALONE",
+            "status": "CANCELED",
+            "kind": "STOP",
+            "size": 3,
+            "closedSize": 0
+          },
+          {
+            "id": "trailing",
+            "chainRoot": "bull_trailing",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "TRAILING",
+            "size": 3,
+            "closedSize": 0,
+            "activationPrice": 2040,
+            "observedTrailingPrice": 2055
+          }
         ],
         "commitments": [],
         "cancelTargetId": null,
-        "declaredCancelTarget": null
+        "declaredCancelTarget": null,
+        "actionKey": "bull_oco_cancel"
       },
-      "expect": { "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheCoverage": 3,
+        "trancheCovered": true,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "11. выход по смене тренда: команда закрытия отправлена, подтверждения нет — экспозиция ещё жива и остаётся покрытой",
       "note": "Эталон объявляет выход actionKind POSITION / EXIT_ACTION, то есть команду закрытия позиции: своей reduce-only ноги у транша на этой тропе не появляется. Пока команда не подтверждена, приписывать нечего.",
       "state": {
         "step": "EXIT bull_exit — CLOSE_POSITION_COMMAND отправлена",
-        "deal": { "status": "EXIT_PENDING" },
-        "position": { "externalSize": 3 },
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "position": {
+          "externalSize": 3
+        },
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
         ],
         "protections": [
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "ACTIVE", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          {
+            "id": "trailing",
+            "chainRoot": "bull_trailing",
+            "carrier": "STANDALONE",
+            "status": "ACTIVE",
+            "kind": "TRAILING",
+            "size": 3,
+            "closedSize": 0,
+            "activationPrice": 2040,
+            "observedTrailingPrice": 2055
+          }
         ],
-        "commitments": [ { "terminal": false, "budgetExhausted": false } ],
+        "commitments": [
+          {
+            "terminal": false,
+            "budgetExhausted": false
+          }
+        ],
         "cancelTargetId": null,
-        "declaredCancelTarget": null
+        "declaredCancelTarget": null,
+        "actionKey": "bull_exit"
       },
-      "expect": { "trancheExposure": 3, "trancheCoverage": 3, "trancheCovered": true, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheExposure": 3,
+        "trancheCoverage": 3,
+        "trancheCovered": true,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "12. закрытие подтверждено — приписанный объём команды обнуляет экспозицию транша, живого риска не остаётся",
       "note": "Четвёртое слагаемое экспозиции. У транша один вход и одно объявление, поэтому траншей после него нет, суффиксная сумма нулевая и весь закрываемый объём достаётся ему.",
       "state": {
         "step": "позиция закрыта, уборка защит",
-        "deal": { "status": "EXIT_PENDING" },
-        "position": { "externalSize": 0 },
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "position": {
+          "externalSize": 0
+        },
         "followingTranchesGross": 0,
         "orders": [
-          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 3 }
+          {
+            "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
         ],
         "protections": [
-          { "id": "trailing", "chainRoot": "bull_trailing", "carrier": "STANDALONE", "status": "CANCELED", "kind": "TRAILING", "size": 3, "closedSize": 0, "activationPrice": 2040, "observedTrailingPrice": 2055 }
+          {
+            "id": "trailing",
+            "chainRoot": "bull_trailing",
+            "carrier": "STANDALONE",
+            "status": "CANCELED",
+            "kind": "TRAILING",
+            "size": 3,
+            "closedSize": 0,
+            "activationPrice": 2040,
+            "observedTrailingPrice": 2055
+          }
         ],
-        "commitments": [ { "terminal": true, "budgetExhausted": false } ],
+        "commitments": [
+          {
+            "terminal": true,
+            "budgetExhausted": false
+          }
+        ],
         "cancelTargetId": null,
-        "declaredCancelTarget": null
+        "declaredCancelTarget": null,
+        "actionKey": "bull_exit"
       },
-      "expect": { "trancheCloseAttributed": 3, "trancheExposure": 0, "trancheHasLiveEntryOrder": false, "trancheHasLiveProtection": false, "trancheRiskBearing": false, "trancheViolated": false, "noStageTwoReaction": true }
+      "expect": {
+        "trancheCloseAttributed": 3,
+        "trancheExposure": 0,
+        "trancheHasLiveEntryOrder": false,
+        "trancheHasLiveProtection": false,
+        "trancheRiskBearing": false,
+        "trancheViolated": false,
+        "walkthroughAnchoredToArtifact": true
+      },
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      }
     },
     {
       "case": "цель снятия объявлена корнем, которого в пакете нет: кандидатов ноль — контрпример к счётчику, без него он удовлетворялся бы константой 1",
@@ -266,6 +671,195 @@
       "expect": {
         "cancelTargetCandidates": 0
       }
+    },
+    {
+      "case": "контрпример привязки: имя действия, которого эталон не объявляет",
+      "unreachable": "эталон таких ключей не содержит — состояние предъявлено затем, чтобы показать, что привязка ловит переименование действия",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "state": {
+        "step": "проба привязки",
+        "actionKey": "bull_ghost_never_declared"
+      },
+      "expect": {
+        "walkthroughAnchoredToArtifact": false
+      }
+    },
+    {
+      "case": "ступень +1 %: условие истинно, строк исполнения нет — шаг допустим",
+      "note": "Первый проход, на котором цена перешла порог безубытка.",
+      "state": {
+        "stepConditionTrue": true,
+        "stepActionRows": [],
+        "currentTrancheEpisodeSeq": 2
+      },
+      "expect": {
+        "stepAppliedOnEpisode": false,
+        "stepEligible": true
+      }
+    },
+    {
+      "case": "ступень +1 %: условие всё ещё истинно, а строка текущего эпизода завершена — шаг выпал из набора",
+      "note": "Ровно то состояние, на котором лестница застревала: порог уровневый и остаётся истинным.",
+      "state": {
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2
+      },
+      "expect": {
+        "stepAppliedOnEpisode": true,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "ступень +2 %: условие ещё ложно — не допустим",
+      "note": "Цена не дошла до порога трейлинга.",
+      "state": {
+        "stepConditionTrue": false,
+        "stepActionRows": [],
+        "currentTrancheEpisodeSeq": 2
+      },
+      "expect": {
+        "stepAppliedOnEpisode": false,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "переоткрытый эпизод: строки ПРЕЖНЕГО эпизода признака не дают — дорожка проходится заново",
+      "note": "Строки копятся и несут прежний номер; отбор по номеру эпизода их исключает. Без номера эпизода отбор одним dealTrancheId дал бы «применён» навсегда.",
+      "state": {
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          },
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 3
+      },
+      "expect": {
+        "stepAppliedOnEpisode": false,
+        "stepEligible": true
+      }
+    },
+    {
+      "case": "исчерпанный бюджет: строка текущего эпизода в FAILED — шаг остаётся допустимым",
+      "note": "Надобность осталась, новая строка законна. Считать FAILED применением значило бы выключить ступень до конца эпизода молча.",
+      "state": {
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2
+      },
+      "expect": {
+        "stepAppliedOnEpisode": false,
+        "stepEligible": true
+      }
+    },
+    {
+      "case": "пропущенная строка: SKIPPED признака не даёт",
+      "note": "Шаг не применялся — строка лишь фиксирует, что он рассматривался.",
+      "state": {
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "SKIPPED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2
+      },
+      "expect": {
+        "stepAppliedOnEpisode": false,
+        "stepEligible": true
+      }
+    },
+    {
+      "case": "строка текущего эпизода в полёте (SUBMITTED) — шаг уже применён",
+      "note": "Применение — факт заведения строки, а не её завершения: иначе шаг повторился бы, пока первая попытка в полёте.",
+      "state": {
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "SUBMITTED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2
+      },
+      "expect": {
+        "stepAppliedOnEpisode": true,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "ступень, применённая на текущем эпизоде, при ложном условии — недопустима обоими конъюнктами",
+      "note": "Контроль: ложность даёт условие, а не признак применения; оба конъюнкта проверяются раздельно.",
+      "state": {
+        "stepConditionTrue": false,
+        "currentTrancheEpisodeSeq": 2,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          }
+        ]
+      },
+      "expect": {
+        "stepAppliedOnEpisode": true,
+        "stepEligible": false
+      }
+    }
+  ],
+  "populations": [
+    {
+      "axis": "состояния допустимости шага лестницы сопровождения",
+      "note": "Перечень состояний, на которых правило однократности обязано выполняться: обе ступени лестницы до и после применения плюс переоткрытие эпизода. Признак применения — ВЫЧИСЛЯЕМЫЙ (величина stepAppliedOnEpisode), поэтому член перечня предъявляется строками исполнения и номером эпизода, а не подачей булева операнда.",
+      "keys": [
+        "stepConditionTrue",
+        "stepAppliedOnEpisode"
+      ],
+      "where": "notNull(?stepConditionTrue)",
+      "members": [
+        {
+          "member": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "true"
+          ]
+        }
+      ]
     }
   ]
 }

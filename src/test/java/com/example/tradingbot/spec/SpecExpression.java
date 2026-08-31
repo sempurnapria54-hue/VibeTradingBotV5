@@ -140,8 +140,22 @@ public final class SpecExpression {
             Node l = left;
             left = resolver -> "*".equals(operator)
                     ? number(l.eval(resolver)).multiply(number(right.eval(resolver)), MC)
-                    : number(l.eval(resolver)).divide(number(right.eval(resolver)), MC);
+                    : divide(number(l.eval(resolver)), number(right.eval(resolver)));
         }
+    }
+
+    /**
+     * Деление с нулевым делителем — <b>контролируемый</b> отказ вычисления, а не
+     * {@code ArithmeticException}. Неперехватываемое исключение уносит весь
+     * прогон и читается снаружи как отказ корпуса («мерить нечем»), тогда как
+     * вырожденный знаменатель — свойство состояния, и место ему в перечне
+     * расхождений, где его видно поимённо.
+     */
+    private static java.math.BigDecimal divide(java.math.BigDecimal left, java.math.BigDecimal right) {
+        if (right.signum() == 0) {
+            throw new SpecException("деление на ноль: " + left + " / 0");
+        }
+        return left.divide(right, MC);
     }
 
     private Node unary() {

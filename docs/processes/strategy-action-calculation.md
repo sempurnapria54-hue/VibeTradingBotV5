@@ -52,7 +52,10 @@ transaction.
   `REFRESH_BALANCE_COMMAND`/`IntegrationService`.
 - Controlled calculation errors → `CalculationError` (суб-калькуляторы бросают
   `CalculationException`, `StrategyActionCalculator` перехватывает →
-  `ERROR`-результат; `TEMPORARY`→RETRY_PENDING / `PERMANENT`→FAILED→Deal ERROR);
+  `ERROR`-результат; `TEMPORARY`→RETRY_PENDING / `PERMANENT`→FAILED→Deal ERROR,
+  **кроме отказа по стороне уровня** — он есть сработавший контроль и
+  ведёт к неисполнению шага, а не к аварии
+  (`docs/processes/risk-evaluation.md` — дом развязки исходов));
   unexpected exceptions ловятся на границе FSM (см.
   `docs/rules/runtime-error-classification.md`).
 - Для reduce-only partial exit `RiskValidator` не вызывается; handler

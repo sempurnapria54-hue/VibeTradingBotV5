@@ -2,7 +2,6 @@
   "subject": "market-data-freshness",
   "question": "Свежи ли рыночные данные",
   "home": "docs/rules/market-data-freshness.md",
-
   "operands": {
     "kind": "вид результата: STRUCTURE, INDICATOR, PHASE",
     "windowEndAt": "конец окна структуры рынка",
@@ -11,10 +10,14 @@
     "expirationDuration": "срок свежести настройки-владельца",
     "now": "текущий момент",
     "inputs": "входы фазы: свои точки отсчёта и сроки владельцев",
-    "expiredSetting": "реакция шага на устаревание: WAIT, BLOCK_STEP, GRACEFUL_CLOSE, KILL_SWITCH",
-    "actionKind": "род действия: DATA_DEPENDENT, REFRESH, CANCEL, CLOSE, SAFETY"
+    "expiredSetting": "РАЗВЕДЁННАЯ ПАРА реакций шага на устаревание: protectedPositionAction и unprotectedPositionAction. Здесь операнд означает РЕЗОЛЬВЕННОЕ значение пары — какая из двух ветвей выбрана; выбор делает величина protectionBranch",
+    "actionKind": "род действия: DATA_DEPENDENT, REFRESH, CANCEL, CLOSE, SAFETY",
+    "protectedPositionAction": "реакция шага, когда живой риск транша покрыт либо его нет вовсе (StrategyMarketDataExpiredSetting)",
+    "unprotectedPositionAction": "реакция шага, когда у транша есть живой риск и он НЕ покрыт (StrategyMarketDataExpiredSetting)",
+    "trancheRiskBearing": "транш несёт живой риск; значение берётся из дома-спеки docs/spec/protection-coverage.json",
+    "trancheCovered": "инвариант покрытия транша выполнен; значение берётся из дома-спеки docs/spec/protection-coverage.json",
+    "dealStopUnresolved": "уровень защиты на всю позицию не резолвится: транш с экспозицией не несёт своего уровня (docs/spec/protection-coverage.json)"
   },
-
   "values": [
     {
       "name": "referencePoint",
@@ -51,6 +54,16 @@
       "expr": "if(!dataPresent, 'MISSING', if(isFresh, 'FRESH', 'EXPIRED'))"
     },
     {
+      "name": "protectionBranch",
+      "note": "Какая ветвь пары реакций выбрана. Незащищённой считается ТОЛЬКО позиция, у которой есть живой риск И он не покрыт: «нечего защищать» и «покрыто» — разные факты, и оба ведут в ветвь защищённой, потому что реакция GRACEFUL_CLOSE на них закрывала бы то, чего нет, либо то, что под контролем. Умолчания здесь нет ни в одну сторону: обе пустоты названы. Неразрешимый уровень защиты (dealStopUnresolved) считается НЕПОКРЫТЫМ: риск есть, а чем он ограничен — неизвестно, и благоприятного прочтения у этой пустоты быть не может.",
+      "expr": "if(trancheRiskBearing && (!trancheCovered || dealStopUnresolved), 'UNPROTECTED', 'PROTECTED')"
+    },
+    {
+      "name": "expiredSettingResolved",
+      "note": "Значение реакции, выбранное ветвью. Операнд expiredSetting резолвится этой величиной; call-site подставляет её значение.",
+      "expr": "if(protectionBranch == 'UNPROTECTED', unprotectedPositionAction, protectedPositionAction)"
+    },
+    {
       "name": "reaction",
       "note": "Отсутствие данных и их устаревание ведут к одной реакции: обе — «данным доверять нельзя».",
       "expr": "if(isFresh, 'PROCEED', expiredSetting)"
@@ -66,71 +79,208 @@
       "expr": "!isFresh"
     }
   ],
-
   "examples": [
     {
       "case": "структура свежа, пока не истёк срок настройки-владельца",
-      "state": { "kind": "STRUCTURE", "windowEndAt": 1000, "candleTimestamp": null, "confirmedAt": 1200, "expirationDuration": 300, "now": 1250, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT" },
-      "expect": { "referencePoint": 1000, "expiredAt": 1300, "isFresh": true, "freshnessState": "FRESH", "reaction": "PROCEED", "actionBlocked": false }
+      "state": {
+        "kind": "STRUCTURE",
+        "windowEndAt": 1000,
+        "candleTimestamp": null,
+        "confirmedAt": 1200,
+        "expirationDuration": 300,
+        "now": 1250,
+        "expiredSetting": "BLOCK_STEP",
+        "actionKind": "DATA_DEPENDENT"
+      },
+      "expect": {
+        "referencePoint": 1000,
+        "expiredAt": 1300,
+        "isFresh": true,
+        "freshnessState": "FRESH",
+        "reaction": "PROCEED",
+        "actionBlocked": false
+      }
     },
     {
       "case": "поздний момент подтверждения свежести не продлевает",
-      "state": { "kind": "STRUCTURE", "windowEndAt": 1000, "candleTimestamp": null, "confirmedAt": 1290, "expirationDuration": 300, "now": 1310, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT" },
-      "expect": { "expiredAt": 1300, "isFresh": false, "freshnessState": "EXPIRED", "reaction": "BLOCK_STEP", "actionBlocked": true, "computationRefuses": true }
+      "state": {
+        "kind": "STRUCTURE",
+        "windowEndAt": 1000,
+        "candleTimestamp": null,
+        "confirmedAt": 1290,
+        "expirationDuration": 300,
+        "now": 1310,
+        "expiredSetting": "BLOCK_STEP",
+        "actionKind": "DATA_DEPENDENT"
+      },
+      "expect": {
+        "expiredAt": 1300,
+        "isFresh": false,
+        "freshnessState": "EXPIRED",
+        "reaction": "BLOCK_STEP",
+        "actionBlocked": true,
+        "computationRefuses": true
+      }
     },
     {
       "case": "граница срока принадлежит устареванию: ровно в момент истечения данные уже не свежи",
-      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1300, "expiredSetting": "WAIT", "actionKind": "DATA_DEPENDENT" },
-      "expect": { "isFresh": false, "freshnessState": "EXPIRED" }
+      "state": {
+        "kind": "INDICATOR",
+        "windowEndAt": null,
+        "candleTimestamp": 1000,
+        "confirmedAt": 1000,
+        "expirationDuration": 300,
+        "now": 1300,
+        "expiredSetting": "WAIT",
+        "actionKind": "DATA_DEPENDENT"
+      },
+      "expect": {
+        "isFresh": false,
+        "freshnessState": "EXPIRED"
+      }
     },
     {
       "case": "у индикатора точка отсчёта — время свечи",
-      "state": { "kind": "INDICATOR", "windowEndAt": 9999, "candleTimestamp": 1000, "confirmedAt": 1050, "expirationDuration": 600, "now": 1400, "expiredSetting": "WAIT", "actionKind": "DATA_DEPENDENT" },
-      "expect": { "referencePoint": 1000, "expiredAt": 1600, "isFresh": true }
+      "state": {
+        "kind": "INDICATOR",
+        "windowEndAt": 9999,
+        "candleTimestamp": 1000,
+        "confirmedAt": 1050,
+        "expirationDuration": 600,
+        "now": 1400,
+        "expiredSetting": "WAIT",
+        "actionKind": "DATA_DEPENDENT"
+      },
+      "expect": {
+        "referencePoint": 1000,
+        "expiredAt": 1600,
+        "isFresh": true
+      }
     },
     {
       "case": "данных нет — это тот же отказ доверия, что и устаревание",
-      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": null, "confirmedAt": null, "expirationDuration": 600, "now": 1400, "expiredSetting": "GRACEFUL_CLOSE", "actionKind": "DATA_DEPENDENT" },
-      "expect": { "dataPresent": false, "freshnessState": "MISSING", "isFresh": false, "reaction": "GRACEFUL_CLOSE" }
+      "state": {
+        "kind": "INDICATOR",
+        "windowEndAt": null,
+        "candleTimestamp": null,
+        "confirmedAt": null,
+        "expirationDuration": 600,
+        "now": 1400,
+        "expiredSetting": "GRACEFUL_CLOSE",
+        "actionKind": "DATA_DEPENDENT"
+      },
+      "expect": {
+        "dataPresent": false,
+        "freshnessState": "MISSING",
+        "isFresh": false,
+        "reaction": "GRACEFUL_CLOSE"
+      }
     },
     {
       "case": "фаза устаревает по самому раннему из своих входов",
       "state": {
-        "kind": "PHASE", "windowEndAt": null, "candleTimestamp": null, "confirmedAt": null,
-        "expirationDuration": null, "now": 1250, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT",
+        "kind": "PHASE",
+        "windowEndAt": null,
+        "candleTimestamp": null,
+        "confirmedAt": null,
+        "expirationDuration": null,
+        "now": 1250,
+        "expiredSetting": "BLOCK_STEP",
+        "actionKind": "DATA_DEPENDENT",
         "inputs": [
-          { "referencePoint": 1000, "expirationDuration": 200 },
-          { "referencePoint": 1000, "expirationDuration": 600 }
+          {
+            "referencePoint": 1000,
+            "expirationDuration": 200
+          },
+          {
+            "referencePoint": 1000,
+            "expirationDuration": 600
+          }
         ]
       },
-      "expect": { "expiredAt": 1200, "isFresh": false, "freshnessState": "EXPIRED" }
+      "expect": {
+        "expiredAt": 1200,
+        "isFresh": false,
+        "freshnessState": "EXPIRED"
+      }
     },
     {
       "case": "фаза свежа, пока свежи все её входы",
       "state": {
-        "kind": "PHASE", "windowEndAt": null, "candleTimestamp": null, "confirmedAt": null,
-        "expirationDuration": null, "now": 1150, "expiredSetting": "BLOCK_STEP", "actionKind": "DATA_DEPENDENT",
+        "kind": "PHASE",
+        "windowEndAt": null,
+        "candleTimestamp": null,
+        "confirmedAt": null,
+        "expirationDuration": null,
+        "now": 1150,
+        "expiredSetting": "BLOCK_STEP",
+        "actionKind": "DATA_DEPENDENT",
         "inputs": [
-          { "referencePoint": 1000, "expirationDuration": 200 },
-          { "referencePoint": 1000, "expirationDuration": 600 }
+          {
+            "referencePoint": 1000,
+            "expirationDuration": 200
+          },
+          {
+            "referencePoint": 1000,
+            "expirationDuration": 600
+          }
         ]
       },
-      "expect": { "expiredAt": 1200, "isFresh": true, "reaction": "PROCEED" }
+      "expect": {
+        "expiredAt": 1200,
+        "isFresh": true,
+        "reaction": "PROCEED"
+      }
     },
     {
       "case": "блокировка шага не отнимает у нас сворачивание: safety идёт по устаревшим данным",
-      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1900, "expiredSetting": "BLOCK_STEP", "actionKind": "SAFETY" },
-      "expect": { "isFresh": false, "actionBlocked": false }
+      "state": {
+        "kind": "INDICATOR",
+        "windowEndAt": null,
+        "candleTimestamp": 1000,
+        "confirmedAt": 1000,
+        "expirationDuration": 300,
+        "now": 1900,
+        "expiredSetting": "BLOCK_STEP",
+        "actionKind": "SAFETY"
+      },
+      "expect": {
+        "isFresh": false,
+        "actionBlocked": false
+      }
     },
     {
       "case": "рефреш по устаревшим данным не блокируется — им они и обновляются",
-      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1900, "expiredSetting": "WAIT", "actionKind": "REFRESH" },
-      "expect": { "actionBlocked": false }
+      "state": {
+        "kind": "INDICATOR",
+        "windowEndAt": null,
+        "candleTimestamp": 1000,
+        "confirmedAt": 1000,
+        "expirationDuration": 300,
+        "now": 1900,
+        "expiredSetting": "WAIT",
+        "actionKind": "REFRESH"
+      },
+      "expect": {
+        "actionBlocked": false
+      }
     },
     {
       "case": "аварийная реакция на устаревание не блокирует, а сворачивает",
-      "state": { "kind": "INDICATOR", "windowEndAt": null, "candleTimestamp": 1000, "confirmedAt": 1000, "expirationDuration": 300, "now": 1900, "expiredSetting": "KILL_SWITCH", "actionKind": "DATA_DEPENDENT" },
-      "expect": { "reaction": "KILL_SWITCH", "actionBlocked": false }
+      "state": {
+        "kind": "INDICATOR",
+        "windowEndAt": null,
+        "candleTimestamp": 1000,
+        "confirmedAt": 1000,
+        "expirationDuration": 300,
+        "now": 1900,
+        "expiredSetting": "KILL_SWITCH",
+        "actionKind": "DATA_DEPENDENT"
+      },
+      "expect": {
+        "reaction": "KILL_SWITCH",
+        "actionBlocked": false
+      }
     },
     {
       "case": "свежий вход расчёту не отказывает — контрпример к предикату отказа: без него он удовлетворялся бы константой true",
@@ -148,6 +298,104 @@
         "isFresh": true,
         "computationRefuses": false
       }
+    },
+    {
+      "case": "позиции нет вовсе: защищать нечего — ветвь защищённой",
+      "state": {
+        "trancheRiskBearing": false,
+        "trancheCovered": false,
+        "dealStopUnresolved": false,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "PROTECTED",
+        "expiredSettingResolved": "WAIT"
+      }
+    },
+    {
+      "case": "риск есть и покрыт — ветвь защищённой",
+      "state": {
+        "trancheRiskBearing": true,
+        "trancheCovered": true,
+        "dealStopUnresolved": false,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "PROTECTED",
+        "expiredSettingResolved": "WAIT"
+      }
+    },
+    {
+      "case": "риск есть и не покрыт — ветвь незащищённой",
+      "state": {
+        "trancheRiskBearing": true,
+        "trancheCovered": false,
+        "dealStopUnresolved": false,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "UNPROTECTED",
+        "expiredSettingResolved": "GRACEFUL_CLOSE"
+      }
+    },
+    {
+      "case": "риск есть, покрытие формально выполнено, но уровень не резолвится — ветвь незащищённой",
+      "state": {
+        "trancheRiskBearing": true,
+        "trancheCovered": true,
+        "dealStopUnresolved": true,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "UNPROTECTED",
+        "expiredSettingResolved": "GRACEFUL_CLOSE"
+      }
+    }
+  ],
+  "populations": [
+    {
+      "axis": "ветви пары реакций на устаревание данных",
+      "note": "Перечень состояний, различимых дискриминатором: риска нет; риск есть и покрыт; риск есть и не покрыт; риск есть, а уровень не резолвится.",
+      "keys": [
+        "trancheRiskBearing",
+        "trancheCovered",
+        "dealStopUnresolved"
+      ],
+      "where": "notNull(?trancheRiskBearing)",
+      "members": [
+        {
+          "member": [
+            "false",
+            "false",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "true",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "false",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "true",
+            "true"
+          ]
+        }
+      ]
     }
   ]
 }

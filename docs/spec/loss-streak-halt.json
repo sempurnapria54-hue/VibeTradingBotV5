@@ -4,6 +4,7 @@
   "home": "docs/rules/loss-streak-halt.md",
   "operands": {
     "resultProfit": "итоговый результат закрытой сделки — Deal.resultProfit, дом формы docs/spec/deal-result.json; пусто — результат недоступен. Поле DURABLE: его пишет либо финализация выхода (она завершается только по доступному итогу), либо аварийный терминал под своим контрактом (docs/spec/deal-lifecycle.json, emergencyTerminalContract). Поэтому НЕПУСТОТА этого поля и есть свидетельство законности числа — отдельного операнда доступности счётчику не нужно",
+    "graphComplete": "граф сделки предъявлен контекстом прохода целиком; значение берётся из дома-спеки docs/spec/deal-context-load.json, величина graphComplete — форма здесь не переписывается. Охрана СИММЕТРИЧНА охране результата (docs/spec/deal-result.json), терминала сделки (docs/spec/deal-lifecycle.json) и терминала транша (docs/spec/deal-tranche-lifecycle.json): второе слагаемое ценового результата — сумма по ЗАГРУЖЕННЫМ эпизодам, и на усечённой загрузке она выходит нулём молча, то есть счётчик мерил бы ИТОГ, а не ценовой результат — ровно на той тропе, ради которой предикат заморозки и стои́т на непустоте записанного числа",
     "fundingCost": "накопленное финансирование сделки — сумма Position.externalFundingCost по её эпизодам; знак нормализован, издержка положительна. Берётся из записи закрытия эпизода, а не из строк разбивки движений: FUNDING-строки разбивки сверяют то же число и в ценовой результат не входят. Приходит той же записью, что и net эпизода, поэтому своей ветви доступности не имеет: пусто ровно тогда, когда пуст итог",
     "dealTerminal": "терминал, которым закрылась сделка: CLOSED — штатный, EMERGENCY_CLOSED — аварийный; ERROR терминалом не является — сделка идёт дальше аварийной тропой",
     "exchangeStatusBefore": "Exchange.status до применения исхода сделки; мягкая ступень — HOLD, сворачивание — TRADE_BLOCKED, прочие значения ступенью не являются",
@@ -29,7 +30,7 @@
     {
       "name": "priceResult",
       "note": "Ценовой результат закрытой сделки — итог без накопленного финансирования. Знак финансирования в домене нормализован издержкой, поэтому возврат издержки в число есть сложение. Серия меряет, реализовалась ли допустимая потеря, а финансирование в определение риска не входит (docs/rules/risk-policy.md): число серии и число «сколько сделка принесла» — разные величины. Итог недоступен — недоступен и ценовой результат: слагаемое финансирования приходит той же записью закрытия эпизода.",
-      "expr": "if(notNull(resultProfit), resultProfit + fundingCost, null)"
+      "expr": "if(graphComplete && notNull(resultProfit), resultProfit + fundingCost, null)"
     },
     {
       "name": "isLoss",
@@ -68,20 +69,15 @@
     },
     {
       "name": "holdStandingAfter",
-      "note": "Стоявшая ступень переживает исход сделки: подняться она может (haltTriggered), опуститься или сняться от исхода сделки — нет. Спека утверждает только это; какая именно ступень получится при подъёме и как согласуется эскалация — предмет лестницы (docs/rules/exchange-hold.md), второй редакции этих правил здесь нет.",
+      "note": "Стоявшая ступень переживает исход сделки: подняться она может (haltTriggered), опуститься или сняться от исхода сделки — нет: ни ценово-прибыльная сделка, ни несработавший порог, ни холд, поднятый по другой причине, стоящую ступень не гасят, а снятие любого холда есть ручное действие держателя. Редакция holdStandingAfter = haltTriggered (статус биржи как if(haltTriggered,'HOLD','ACTIVE')) на несработавшем пороге снимала бы стоявшую ступень — поэтому величина считается ОТ СТОЯЩЕЙ ступени. Носители клейма — примеры с живым холдом до сделки, где holdStandingAfter истинен при ложном haltTriggered. Спека утверждает только это; какая именно ступень получится при подъёме и как согласуется эскалация — предмет лестницы (docs/rules/exchange-hold.md), второй редакции этих правил здесь нет.",
       "expr": "holdStandingBefore || haltTriggered"
-    },
-    {
-      "name": "holdClearedByDealOutcome",
-      "provenBy": "holdStandingAfter",
-      "note": "Исход сделки не снимает холд никогда — ни ценово-прибыльная сделка, ни несработавший порог, ни холд, поднятый по другой причине. Снятие любого холда есть ручное действие держателя. Редакция holdStandingAfter = haltTriggered (статус биржи как if(haltTriggered,'HOLD','ACTIVE')) на несработавшем пороге снимала бы стоявшую ступень, поэтому величина считается от стоящей ступени.",
-      "expr": "holdStandingBefore && !holdStandingAfter"
     }
   ],
   "examples": [
     {
       "case": "убыточная сделка увеличивает серию, порог не достигнут",
       "state": {
+        "graphComplete": true,
         "resultProfit": -12.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -93,13 +89,13 @@
         "isLoss": true,
         "consecutiveLossCountAfter": 1,
         "haltTriggered": false,
-        "holdStandingAfter": false,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": false
       }
     },
     {
       "case": "N-я подряд убыточная сделка запрашивает мягкую ступень",
       "state": {
+        "graphComplete": true,
         "resultProfit": -4.0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -111,13 +107,13 @@
         "isLoss": true,
         "consecutiveLossCountAfter": 3,
         "haltTriggered": true,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "ценово-прибыльная сделка обнуляет серию перед самым порогом",
       "state": {
+        "graphComplete": true,
         "resultProfit": 0.01,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -129,13 +125,13 @@
         "isProfit": true,
         "consecutiveLossCountAfter": 0,
         "haltTriggered": false,
-        "holdStandingAfter": false,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": false
       }
     },
     {
       "case": "ценово-прибыльная сделка при живом холде: счётчик обнулён, холд сохранён",
       "state": {
+        "graphComplete": true,
         "resultProfit": 55.0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -148,13 +144,13 @@
         "consecutiveLossCountAfter": 0,
         "haltTriggered": false,
         "holdStandingBefore": true,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "убыток при уже достигнутом пороге: запрос ступени повторяется, снятия нет",
       "state": {
+        "graphComplete": true,
         "resultProfit": -1.0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -166,13 +162,13 @@
         "isLoss": true,
         "consecutiveLossCountAfter": 4,
         "haltTriggered": true,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "аварийный терминал убыточной сделки входит в популяцию счётчика и холд не снимает",
       "state": {
+        "graphComplete": true,
         "resultProfit": -30.0,
         "fundingCost": 0,
         "dealTerminal": "EMERGENCY_CLOSED",
@@ -185,13 +181,13 @@
         "isLoss": true,
         "consecutiveLossCountAfter": 2,
         "haltTriggered": false,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "аварийный терминал с неисчислимым числом: счётчик не двигается, сворачивание не снимается и не понижается",
       "state": {
+        "graphComplete": true,
         "resultProfit": null,
         "fundingCost": null,
         "dealTerminal": "EMERGENCY_CLOSED",
@@ -207,13 +203,13 @@
         "consecutiveLossCountAfter": 2,
         "haltTriggered": false,
         "holdStandingBefore": true,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "ошибочное состояние терминалом не является — счётчик не двигается, холд стоит",
       "state": {
+        "graphComplete": true,
         "resultProfit": -5.0,
         "fundingCost": 0,
         "dealTerminal": "ERROR",
@@ -227,13 +223,13 @@
         "isLoss": false,
         "consecutiveLossCountAfter": 2,
         "haltTriggered": false,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "ноль серию не обнуляет и не увеличивает, и холда не снимает",
       "state": {
+        "graphComplete": true,
         "resultProfit": 0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -247,13 +243,13 @@
         "isLoss": false,
         "consecutiveLossCountAfter": 2,
         "haltTriggered": false,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "недоступный результат серию не двигает и обнуления не даёт",
       "state": {
+        "graphComplete": true,
         "resultProfit": null,
         "fundingCost": null,
         "dealTerminal": "CLOSED",
@@ -273,6 +269,7 @@
     {
       "case": "недоступный результат на пороге холд не снимает и запрос не гасит",
       "state": {
+        "graphComplete": true,
         "resultProfit": null,
         "fundingCost": null,
         "dealTerminal": "CLOSED",
@@ -284,13 +281,13 @@
         "counterFrozen": true,
         "consecutiveLossCountAfter": 3,
         "haltTriggered": true,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "порог не задан — risk-creating действие отвергается, срабатывать нечему, стоящий холд остаётся",
       "state": {
+        "graphComplete": true,
         "resultProfit": -10,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -302,13 +299,13 @@
         "limitConfigured": false,
         "riskCreatingRefused": true,
         "haltTriggered": false,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "порог единица: первая же убыточная сделка запрашивает ступень",
       "state": {
+        "graphComplete": true,
         "resultProfit": -0.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -319,13 +316,13 @@
       "expect": {
         "consecutiveLossCountAfter": 1,
         "haltTriggered": true,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "carry-доход маскирует ценовой убыток: серия растёт и доводит до ступени",
       "state": {
+        "graphComplete": true,
         "resultProfit": 2.0,
         "fundingCost": -29.7,
         "dealTerminal": "CLOSED",
@@ -339,13 +336,13 @@
         "isProfit": false,
         "consecutiveLossCountAfter": 3,
         "haltTriggered": true,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "carry-издержка съела ценовую прибыль: серия обнуляется, стоящий холд остаётся",
       "state": {
+        "graphComplete": true,
         "resultProfit": -5.0,
         "fundingCost": 30.0,
         "dealTerminal": "CLOSED",
@@ -359,13 +356,13 @@
         "isLoss": false,
         "consecutiveLossCountAfter": 0,
         "haltTriggered": false,
-        "holdStandingAfter": true,
-        "holdClearedByDealOutcome": false
+        "holdStandingAfter": true
       }
     },
     {
       "case": "финансирование съело ценовую прибыль ровно в ноль: счётчик не двигается",
       "state": {
+        "graphComplete": true,
         "resultProfit": -10.0,
         "fundingCost": 10.0,
         "dealTerminal": "CLOSED",
@@ -386,6 +383,7 @@
     {
       "case": "предел серии задан — risk-creating не отвергается: контрпример к предикату отказа",
       "state": {
+        "graphComplete": true,
         "resultProfit": -12.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -401,6 +399,7 @@
     {
       "case": "ненулевой ценовой результат нейтральным не считается, а счётчик не заморожен — контрпримеры к обоим предикатам",
       "state": {
+        "graphComplete": true,
         "resultProfit": -12.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
@@ -417,6 +416,7 @@
       "case": "аварийный терминал с УЖЕ ПОСЧИТАННЫМ числом: убыток считается, хотя итог на этом проходе недоступен",
       "note": "Популяция третьего дизъюнкта emergencyTerminalContract: число законно записала финализация выхода до ухода сделки в ошибочное состояние, а доступность на аварийном проходе ложна (граф усечён). Прежняя редакция здесь замораживала счётчик; пример падает при возврате конъюнкта доступности и потому фальсифицирует правку, а не иллюстрирует её.",
       "state": {
+        "graphComplete": true,
         "resultProfit": -30.0,
         "fundingCost": 0,
         "dealTerminal": "EMERGENCY_CLOSED",
@@ -431,6 +431,46 @@
         "consecutiveLossCountAfter": 3,
         "haltTriggered": true,
         "holdStandingAfter": true
+      }
+    },
+    {
+      "case": "граф загружен не целиком: счётчик серии ЗАМОРАЖИВАЕТСЯ, а не обнуляется убыточной сделкой, прочитанной как прибыльная",
+      "note": "Второе слагаемое ценового результата — сумма финансирования по ЗАГРУЖЕННЫМ эпизодам; без охраны она выходит нулём молча, ценовой результат подменяется итогом, и убыточная carry-сделка читается прибыльной: серия 2 обнулялась бы в 0 вместо 3, а ступень не поднималась бы. Заморозка — консервативный исход: счётчик не двигается ни вверх, ни вниз.",
+      "state": {
+        "graphComplete": false,
+        "resultProfit": 5,
+        "fundingCost": -12,
+        "dealTerminal": "CLOSED",
+        "exchangeStatusBefore": "ACTIVE",
+        "consecutiveLossCountBefore": 2,
+        "lossLimit": 3
+      },
+      "expect": {
+        "priceResult": null,
+        "counterFrozen": true,
+        "isLoss": false,
+        "isProfit": false,
+        "consecutiveLossCountAfter": 2,
+        "haltTriggered": false
+      }
+    },
+    {
+      "case": "тот же расклад на полном графе: carry-издержка съела ценовую прибыль, серия растёт и достигает предела",
+      "state": {
+        "graphComplete": true,
+        "resultProfit": 5,
+        "fundingCost": -12,
+        "dealTerminal": "CLOSED",
+        "exchangeStatusBefore": "ACTIVE",
+        "consecutiveLossCountBefore": 2,
+        "lossLimit": 3
+      },
+      "expect": {
+        "priceResult": -7,
+        "counterFrozen": false,
+        "isLoss": true,
+        "consecutiveLossCountAfter": 3,
+        "haltTriggered": true
       }
     }
   ]

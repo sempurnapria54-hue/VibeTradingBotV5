@@ -44,6 +44,9 @@ look-ahead, не точка отсчёта. Результат ключуетс�
 Поведение при expired/missing задаётся не здесь, а в
 `StrategyStep.marketDataExpiredSetting` (`WAIT` / `BLOCK_STEP` /
 `GRACEFUL_CLOSE` / `KILL_SWITCH`, см. `docs/models/domain/aggregate/Strategy.md`).
+Настройка — **пара** реакций, защищённой и незащищённой позиции; ветвь
+выбирает предикат покрытия транша, и этот выбор тоже не здесь — дом
+`docs/rules/market-data-freshness.md`.
 Применение результата в FSM — `docs/processes/deal-management.md`,
 `docs/lifecycles/Deal.md`. Сквозное правило свежести —
 `docs/rules/market-data-freshness.md`.

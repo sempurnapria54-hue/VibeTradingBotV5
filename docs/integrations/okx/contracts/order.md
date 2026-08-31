@@ -107,7 +107,7 @@ refresh/search/history.
 
 ## Evidence-cycle
 
-Полный цикл для evidence-not-found: `GET /trade/order` →
-`orders-pending` → `orders-history` → `orders-history-archive` (если
-history не покрывает период). Подробно — в `mapping/Order.md`
-evidence-cycle.
+Состав цикла и параметры каждого источника — **дом
+`docs/models/mapping/Order.md`**, раздел evidence-cycle; здесь перечень не
+дублируется. Цикл добычи материализованной защиты адресует условные заявки и живёт в
+контракте `docs/integrations/okx/contracts/algo-order.md`.

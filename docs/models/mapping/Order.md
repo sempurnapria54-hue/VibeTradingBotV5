@@ -90,10 +90,11 @@ evidence-cycle (специфика per-source — см. подразделы). �
 
 Один элемент `attachedAlgoOrders[*]` → `AttachedAlgoOrderExternalSnapshot`;
 матчинг по `internalId` (client id вложенного TP/SL). Status: `PENDING`
-после `SUBMIT_ORDER_COMMAND`; `ACTIVE` только после `REFRESH_ORDER_COMMAND`, если
-найден по `internalId` и нет
-`failCode`/`failReason`; заполненные `failCode`/`failReason` →
-`ERROR`. Missing-policy по статусу parent — `docs/lifecycles/Order.md`.
+после `SUBMIT_ORDER_COMMAND`; `ACTIVE` — по предикату
+`docs/spec/order-lifecycle.json`, величина `attachedBecomesActive`
+(присутствия в снапшоте недостаточно: нужен непустой налив родителя и
+пустой код отказа); заполненные `failCode`/`failReason` → `ERROR`.
+Судьба защиты по фактам родителя (класс состояния + налив) — `docs/lifecycles/Order.md`.
 
 ## OKX
 
@@ -192,10 +193,54 @@ write-once для причины закрытия —
 
 ### OKX evidence-cycle / not found
 
-Полный цикл: `GET /trade/order` → `orders-pending` →
-`orders-history` → `orders-history-archive` (если history не
-покрывает период). Поиск: есть `externalId` → по `ordId`; нет → по
-`clOrdId = internalId`. Цикл обходит `RefreshOrderExecutor` **внутри одной
+Полный цикл — **пять источников**:
+
+| # | Эндпоинт | Параметры запроса | Матч |
+|---|---|---|---|
+| 1 | `GET /api/v5/trade/order` | `instId` + `ordId` либо `clOrdId` | точечный |
+| 2 | `GET /api/v5/trade/orders-pending` | `instId` | по `ordId` / `clOrdId` в ответе |
+| 3 | `GET /api/v5/trade/orders-history` | `instId`, `instType` | там же |
+| 4 | `GET /api/v5/trade/orders-history-archive` | то же (если history не покрывает период) | там же |
+
+Поиск: есть `externalId` → по `ordId`; нет → по `clOrdId = internalId`.
+Терминал исчерпанного цикла — `MISSING_AFTER_REFRESH`.
+
+### OKX: цикл добычи материализованной защиты
+
+**Это второй цикл, а не пятая нога первого.** Он ищет **другой предмет**
+(встроенную защиту, развёрнутую источником в самостоятельную условную
+заявку), **другим ключом** (`algoClOrdId`) и запускается **после** того,
+как родитель найден, — на исходе `SEARCH_MORE`
+(`docs/lifecycles/Order.md`). Правило обрыва первого цикла на него не
+распространяется, и терминал у него свой.
+
+| # | Эндпоинт | Параметры запроса | Что даёт |
+|---|---|---|---|
+| 1 | `GET /api/v5/trade/orders-algo-pending` | `instType`, `instId`, `ordType=conditional` | живую запись — матч по `algoClOrdId` **в ответе** |
+| 2 | `GET /api/v5/trade/orders-algo-history` | то же плюс окно | сработавшую либо снятую запись — источник исходов `TRIGGERED` и `ANALYSE_HISTORY` |
+
+Фильтра по клиентскому идентификатору у обоих эндпоинтов нет
+(`docs/integrations/okx/contracts/algo-order.md`), поэтому запрос идёт по
+инструменту и типу, а совпадение ищется **в ответе**: `algoClOrdId`
+записи равен `attachAlgoClOrdId` родителя. Обратной ссылки на родителя у
+записи нет, и `algoId` записи с `attachAlgoId` родителя не совпадает —
+клиентский идентификатор единственный сходящийся операнд.
+
+**Исчерпанный цикл даёт вторую ступень исхода**
+(`searchExhaustedOutcome`): `PROTECTION_LOST` либо `ANALYSE_HISTORY`, а не
+`MISSING_AFTER_REFRESH` — тот терминализует **заявку**, а здесь предмет
+другой.
+
+**`ordType = conditional` верен, пока встроенная защита одноместна.**
+Перечень `AttachedAlgoOrder.Type` сегодня несёт только
+`ATTACHED_STOP_LOSS`; появление пары «тейк + стоп» дало бы `oco`, и
+запрос его не увидит — условие названо здесь, чтобы расширение перечня
+не прошло молча.
+
+**Форма записи — `AlgoOrderOkxResponse`**, а не элемент
+`attachAlgoOrds[*]`: источник разворачивает встроенную защиту в
+самостоятельную условную заявку. Её маппинг в снапшот встроенной защиты
+описан отдельной таблицей этого же файла. Цикл обходит `RefreshOrderExecutor` **внутри одной
 команды** `REFRESH_ORDER_COMMAND` (обрыв на первом успешном эндпоинте; терминал
 `MISSING_AFTER_REFRESH` выносит он же — см.
 `docs/rules/command-lifecycle.md`). Order-fill-метрики
@@ -203,6 +248,26 @@ write-once для причины закрытия —
 приходят готовыми из того же `OrderOkxResponse` — отдельной fill-команды нет.
 Доп. факты сделки (`REFRESH_POSITION_COMMAND`) запрашиваются отдельной командой;
 `RefreshOrderExecutor` не сопровождает сделку целиком.
+
+### `AlgoOrderOkxResponse` → `AttachedAlgoOrderExternalSnapshot`
+
+Тропа второго цикла: найденная самостоятельная условная заявка
+приземляется в снапшот **встроенной** защиты — доменная строка у неё та
+же, потому что это она и есть, развёрнутая источником.
+
+| Поле источника | Поле снапшота | Замечание |
+|---|---|---|
+| `algoClOrdId` | ключ матча | равен `attachAlgoClOrdId` родителя; связь только по нему |
+| `algoId` | `externalId` | **не** равен `attachAlgoId` родителя |
+| `state` | — | статуса встроенной защите источник не даёт: её живость выводит `attachedBecomesActive` по фактам родителя (`docs/spec/order-lifecycle.json`), и второй редакции здесь не заводится |
+| `sz` | `size` | объявленный размер записи — операнд покрытия (`docs/spec/protection-coverage.json`) |
+| `slTriggerPx` / `slOrdPx` | уровень защиты | сторона и тип триггера — как у элемента `attachAlgoOrds` |
+| `reduceOnly` | — | в снапшот не переносится; adapter сверяет его при разборе ответа и на несовпадении бросает нарушение биржевого инварианта (`docs/rules/external-status-resolution.md`) |
+
+**Вход резолвера при этом двухместный:** снапшот встроенной защиты
+приходит либо из тела родителя (`attachAlgoOrds[*]`), либо из
+самостоятельной записи цикла добычи защиты
+(`docs/components/AttachedAlgoOrderStateResolver.md`).
 
 ### OKX pagination
 

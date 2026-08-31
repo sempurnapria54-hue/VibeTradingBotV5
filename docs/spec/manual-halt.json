@@ -2,9 +2,8 @@
   "subject": "manual-halt",
   "question": "В какое состояние ручная операция приводит объект блокировки",
   "home": "docs/rules/manual-halt.md",
-
   "operands": {
-    "callOrigin": "кто собрал сигнал: HOLDER — явный вызов держателя ручной поверхностью, DETECTOR — автоматический триггер лестницы. Различает ТОЛЬКО право на доведение недоделанного; на состав и порядок реакции не влияет (docs/components/SafetyHoldCoordinator.md)",
+    "callOrigin": "кто собрал сигнал: HOLDER — явный вызов держателя ручной поверхностью, DETECTOR — автоматический триггер лестницы. Различает право на доведение недоделанного И наличие строки журнала у ПОГЛОЩЁННОГО вызова: ручное вмешательство — единственный вход в лестницу без детектора, поэтому его основание обязано попасть в журнал; у автоматического триггера строка уже заведена его собственной тропой. На состав и порядок реакции не влияет (docs/components/SafetyHoldCoordinator.md)",
     "standingRungRaisedManually": "стоящая на объекте ступень поднята ручным вызовом, то есть строка отчёта по ключу состояния несёт ручной код; при автоматическом происхождении ступени ручной строки по ключу нет — коды не пересекаются",
     "fullReactionRunningOnObject": "полная реакция по этому объекту радиуса уже идёт (исключающий ключ занят)",
     "operation": "операция ручной поверхности: RAISE — постановка ступени, CLEAR — снятие названной ступени",
@@ -17,7 +16,6 @@
     "onboardingIncomplete": "инструмент не завершил онбординг к моменту подъёма ступени (спецификация не синхронизирована либо свечи не догружены); на биржевом радиусе значения не имеет и всегда false",
     "consecutiveLossCountBefore": "Exchange.consecutiveLossCount до вызова; дом величины — docs/rules/loss-streak-halt.md"
   },
-
   "values": [
     {
       "name": "isRaise",
@@ -51,7 +49,7 @@
     },
     {
       "name": "onboardingStanding",
-      "note": "Инструмент стоит в онбординговом HOLD — это не ступень лестницы и множеством входа мягкой ступени не является.",
+      "note": "Инструмент стоит в онбординговом HOLD — это не ступень лестницы и множеством входа мягкой ступени не является. Пересечения с лестницей нет по построению: softStanding на инструментном радиусе требует ENTRY_BLOCKED, hardStanding — TRADE_BLOCKED, и ни один с HOLD не совпадает. Носители клейма — примеры онбординга, где onboardingStanding истинен при ложном softStanding.",
       "expr": "requestedScope == 'INSTRUMENT' && objectStatusBefore == 'HOLD'"
     },
     {
@@ -66,17 +64,17 @@
     },
     {
       "name": "clearanceRefused",
-      "note": "Отказ при запуске снятия, три основания. Недопустимая пара — как у постановки. Названа мягкая ступень, а стоит жёсткая — прыжка через ступень нет: прежде снимают сворачивание (docs/rules/exchange-hold.md, §«Снятие — вручную и только в HOLD»). Снятие сворачивания при непогашенном живом риске — предусловие машинное, а не заявляемое: реакция сворачивания best-effort по составу, kill-switch мог не подтвердиться, и снятие вернуло бы вход в торговлю поверх живого риска (разрешающая ошибка, П1 следствие 3).",
+      "note": "Отказ при запуске снятия, три основания. Недопустимая пара — как у постановки. Названа мягкая ступень, а стоит жёсткая — прыжка через ступень нет: прежде снимают сворачивание (docs/rules/exchange-hold.md, §«Снятие — вручную и только в HOLD»). Снятие сворачивания при непогашенном живом риске — предусловие машинное, а не заявляемое: реакция сворачивания best-effort по составу, kill-switch мог не подтвердиться, и снятие вернуло бы вход в торговлю поверх живого риска (разрешающая ошибка, П1 следствие 3). Отсюда клейм: пока на радиусе есть живой риск, сворачивание не снимается — носители клейма примеры отказа при живом риске нетерминальной сделки и при недоказанном снятии у терминальной.",
       "expr": "isClear && (!validPair || (requestedClass != 'FULL' && hardStanding) || (requestedClass == 'FULL' && hardStanding && liveRiskOnScope))"
     },
     {
       "name": "launchRefused",
-      "note": "Обе операции отвечают за запуск. Отказ обязан быть виден вызывающему сразу — отсюда синхронная форма у всего, что может отказать (см. launchForm и инвариант refusalUnobservable).",
+      "note": "Обе операции отвечают за запуск. Отказ обязан быть виден вызывающему сразу — отсюда синхронная форма у всего, что может отказать (см. launchForm: асинхронна только полная постановка, и отказные примеры все несут SYNC).",
       "expr": "raiseRefused || clearanceRefused"
     },
     {
       "name": "launchForm",
-      "note": "Форма запуска. Асинхронна только полная постановка: она и есть операция, чей ход идёт на биржу с повторами, а исход несёт AnomalyReport, — признак применимости асинхронной формы из docs/rules/error-handling-policy.md, §«Внешняя поверхность». Мягкая постановка на биржу не ходит и повторов не имеет, поэтому синхронна по тому же доводу, что и снятие. Безусловно-асинхронная редакция делала невидимым отказ по недопустимой паре — самой названной ошибке держателя: 202 в ответ, ступень не поднята, отчёта нет.",
+      "note": "Форма запуска. Асинхронна только полная постановка: она и есть операция, чей ход идёт на биржу с повторами, а исход несёт AnomalyReport, — признак применимости асинхронной формы из docs/rules/error-handling-policy.md, §«Внешняя поверхность». Мягкая постановка на биржу не ходит и повторов не имеет, поэтому синхронна по тому же доводу, что и снятие. Безусловно-асинхронная редакция делала невидимым отказ по недопустимой паре — самой названной ошибке держателя: 202 в ответ, ступень не поднята, отчёта нет. Отсюда клейм: отказ при запуске в асинхронную форму не уходит никогда — все отказные примеры несут SYNC.",
       "expr": "if(isRaise && requestedClass == 'FULL', 'ASYNC', 'SYNC')"
     },
     {
@@ -86,7 +84,7 @@
     },
     {
       "name": "riskTeardownRetry",
-      "note": "Выход из ступени сворачивания при неподтверждённом kill-switch: повторный полный вызов ДЕРЖАТЕЛЯ на уже стоящей жёсткой ступени, пока на радиусе остался живой риск, анкером НЕ поглощается и гоняет снятие риска заново. Право на доведение имеет ТОЛЬКО явный вызов держателя (callOrigin): автоматический сигнал того же класса анкер по-прежнему поглощает, иначе периодический детектор непогашенного риска слал бы flatten каждым тиком (инвариант automaticRetryLoop). Без этой тропы состояние не имело бы выхода вовсе: снятие отвергается предусловием, а повтор постановки гасился бы анкером — то самое «система, попав в холд, не смогла бы из него выйти», которое docs/concept.md называет недопустимым. Анкер идемпотентности от этого не отменяется, а уточняется: он стоит на паре «статус стоит И риск погашен» (docs/components/SafetyHoldCoordinator.md, §Последовательность) — это и есть обещанное политикой отказов «следующий проход доводит недоделанное».",
+      "note": "Выход из ступени сворачивания при неподтверждённом kill-switch: повторный полный вызов ДЕРЖАТЕЛЯ на уже стоящей жёсткой ступени, пока на радиусе остался живой риск, анкером НЕ поглощается и гоняет снятие риска заново. Право на доведение имеет ТОЛЬКО явный вызов держателя (callOrigin): автоматический сигнал того же класса анкер по-прежнему поглощает, иначе периодический детектор непогашенного риска слал бы flatten каждым тиком. Без этой тропы состояние не имело бы выхода вовсе: снятие отвергается предусловием, а повтор постановки гасился бы анкером — то самое «система, попав в холд, не смогла бы из него выйти», которое docs/concept.md называет недопустимым. Анкер идемпотентности от этого не отменяется, а уточняется: он стоит на паре «статус стоит И риск погашен» (docs/components/SafetyHoldCoordinator.md, §Последовательность) — это и есть обещанное политикой отказов «следующий проход доводит недоделанное».",
       "expr": "isRaise && callOrigin == 'HOLDER' && validPair && !launchRefused && requestedClass == 'FULL' && objectStatusBefore == requestedRung && liveRiskOnScope"
     },
     {
@@ -106,7 +104,7 @@
     },
     {
       "name": "killSwitchRun",
-      "note": "Снятие живого риска — состав только полной реакции постановки. Повторный полный вызов держателя на стоящей жёсткой ступени kill-switch заново не гоняет, ПОКА риск погашен; при непогашенном — гоняет (riskTeardownRetry). Пока полная реакция объекта уже идёт, второй прогон не запускается: идущая реакция служит тем же анкером, что и стоящий статус (инвариант concurrentKillSwitchOnScope). Операция снятия холда kill-switch не гоняет никогда — она на биржу не ходит.",
+      "note": "Снятие живого риска — состав только полной реакции постановки. Повторный полный вызов держателя на стоящей жёсткой ступени kill-switch заново не гоняет, ПОКА риск погашен; при непогашенном — гоняет (riskTeardownRetry). Пока полная реакция объекта уже идёт, второй прогон не запускается: идущая реакция служит тем же анкером, что и стоящий статус — двух одновременных прогонов снятия риска по одному объекту радиуса не бывает. У ступени сворачивания с непогашенным риском при этом есть выход: повторный полный вызов ДЕРЖАТЕЛЯ гоняет снятие заново (riskTeardownRetry снимает поглощение повтора) — иначе объект стоял бы в жёсткой ступени, снятие отвергалось бы предусловием, а повтор постановки не делал бы ничего: состояние без выхода, названное недопустимым в docs/concept.md. Автоматический сигнал цикла не образует: доведение недоделанного — право ТОЛЬКО явного вызова держателя, его частоту задаёт человек; у детектора производитель периодический (docs/components/AnomalyJob.md), и снятое поглощение дало бы flatten на биржу каждым тиком. Носители трёх клеймов — примеры «повторный полный вызов при неподтверждённом kill-switch» (выход есть: killSwitchRun истинен), «АВТОМАТИЧЕСКИЙ повторный полный сигнал при непогашенном риске» и «тот же автоматический сигнал на инструментном радиусе» (цикла нет: ложен), «второе доведение, пока полная реакция объекта идёт» (второго прогона нет: ложен). Операция снятия холда kill-switch не гоняет никогда — она на биржу не ходит.",
       "expr": "reactionApplied && requestedClass == 'FULL' && !fullReactionRunningOnObject"
     },
     {
@@ -121,7 +119,7 @@
     },
     {
       "name": "clearanceTarget",
-      "note": "Куда ведёт снятие. Биржевое сворачивание снимается ТОЛЬКО в мягкую ступень: два условия снятия лестница проверяет по одному, прыжка сразу в рабочее состояние нет. Инструмент, у которого ступень затёрла незавершённый онбординг, возвращается в ОНБОРДИНГОВЫЙ HOLD, а не в ACTIVE: снятие safety-ступени не выдаёт права торговать, которого у объекта не было до её подъёма, — иначе инструмент с несинхронизированной спецификацией попадал бы в выборку входа (docs/lifecycles/Instrument.md, §Охват). Остальные снятия ведут в рабочее состояние ACTIVE. Инструментное сворачивание сегодня одноходовое — поверхность наследует редакцию лестницы, своей не вводит; асимметрия названа в доме.",
+      "note": "Куда ведёт снятие. Биржевое сворачивание снимается ТОЛЬКО в мягкую ступень: два условия снятия лестница проверяет по одному, прыжка сразу в рабочее состояние нет. Инструмент, у которого ступень затёрла незавершённый онбординг, возвращается в ОНБОРДИНГОВЫЙ HOLD, а не в ACTIVE: снятие safety-ступени не выдаёт права торговать, которого у объекта не было до её подъёма, — иначе инструмент с несинхронизированной спецификацией попадал бы в выборку входа (docs/lifecycles/Instrument.md, §Охват). Остальные снятия ведут в рабочее состояние ACTIVE. Отсюда клейм: снятие биржевого сворачивания сразу в рабочее состояние не ведёт — носитель клейма пример «снятие: биржевое сворачивание при погашенном риске даёт мягкую ступень». Инструментное сворачивание сегодня одноходовое — поверхность наследует редакцию лестницы, своей не вводит; асимметрия названа в доме.",
       "expr": "if(clearanceApplied, if(requestedClass == 'FULL' && requestedScope == 'EXCHANGE', 'HOLD', if(requestedScope == 'INSTRUMENT' && onboardingIncomplete, 'HOLD', 'ACTIVE')), null)"
     },
     {
@@ -131,8 +129,8 @@
     },
     {
       "name": "reportProduced",
-      "note": "Новая строка журнала. Ручное вмешательство — единственный вход в лестницу без детектора, поэтому применённая операция строку заводит. Поглощение, отказ, холостое снятие и вызов поверх идущей реакции её не заводят. Доведение недоделанного второй строки не заводит ТОЛЬКО тогда, когда стоящая ступень поднята тем же ручным вызовом: тогда отчёт по ключу состояния уже стоит и по гейту терминала остаётся незакрытым, пока снятие риска не подтверждено (docs/components/SafetyHoldCoordinator.md, §«Гейт терминала отчёта»), — он и есть наблюдаемый след неподтверждённого kill-switch. Если же ступень подняла автоматика, ручной строки по ключу нет вовсе (ключ включает code, коды не пересекаются), и доведение заводит свою — иначе перезапуск аварийного снятия риска человеком журналу неизвестен (инвариант manualRetryUnlogged).",
-      "expr": "clearanceApplied || (reactionApplied && !fullReactionRunningOnObject && (!riskTeardownRetry || !standingRungRaisedManually))"
+      "note": "Новая строка журнала. Ручное вмешательство — единственный вход в лестницу без детектора, поэтому применённая операция строку заводит. Отказ, холостое снятие и вызов поверх идущей реакции её не заводят. ПОГЛОЩЕНИЕ и ПОВТОР НА СТОЯЩЕЙ СТУПЕНИ гасят смену статуса и состав реакции, но не отчёт: отчёт идемпотентен по СВОЕМУ ключу (объект + code + severity), и у ручного основания поверх ступени, поднятой АВТОМАТИКОЙ, строки по этому ключу нет — коды троп не пересекаются. Оба поглощённых класса разведены одной парой операндов (callOrigin == 'HOLDER' и !standingRungRaisedManually), а не соотношением запрошенной и стоящей ступени: довод у них общий, и асимметрии между «запрос слабее» и «запрос равен» правило не знает. Поглощённый вызов поверх ступени, поднятой ТЕМ ЖЕ ручным вызовом, строки не заводит: она уже стоит. Дом стыковой истины — docs/rules/error-handling-policy.md",
+      "expr": "clearanceApplied || ((absorbed || repeatAtSameRung) && callOrigin == 'HOLDER' && !standingRungRaisedManually) || (reactionApplied && (!fullReactionRunningOnObject || riskTeardownRetry) && (!riskTeardownRetry || !standingRungRaisedManually))"
     },
     {
       "name": "reportCode",
@@ -141,7 +139,7 @@
     },
     {
       "name": "reportKind",
-      "note": "Холд — состояние: пока держится, второй отчёт по ключу состояния не заводится (ключ назван в docs/models/domain/other/AnomalyReport.md, §«Ключ поиска незавершённого у STATE»). Снятие — происшествие своего момента: каждое снятие обязано дать свою строку, иначе холд, поднятый и снятый трижды, оставил бы один след.",
+      "note": "Холд — состояние: пока держится, второй отчёт по ключу состояния не заводится; операнд дедупа — стоящее состояние ОБЪЕКТА, а не статус отчёта, и ключ назван в docs/models/domain/other/AnomalyReport.md. Снятие — происшествие своего момента: каждое снятие обязано дать свою строку, иначе холд, поднятый и снятый трижды, оставил бы один след.",
       "expr": "if(reportProduced, if(isRaise, 'STATE', 'EVENT'), null)"
     },
     {
@@ -151,14 +149,8 @@
     },
     {
       "name": "consecutiveLossCountAfterOperation",
-      "note": "Значение счётчика серии после ручной операции. Это НЕ переобъявление величины loss-streak: там формула исхода сделки (docs/spec/loss-streak-halt.json — дом), здесь утверждается ровно одно — ручная поверхность счётчика не касается. Имя разведено, чтобы одноимённых величин с разными формулами в наборе не было: величина объявляется ровно в одной спеке.",
+      "note": "Значение счётчика серии после ручной операции. Это НЕ переобъявление величины loss-streak: там формула исхода сделки (docs/spec/loss-streak-halt.json — дом), здесь утверждается ровно одно — ручная поверхность счётчика не касается. Имя разведено, чтобы одноимённых величин с разными формулами в наборе не было: величина объявляется ровно в одной спеке. Обнуление счётчика ручной операцией гасило бы остановку П1 на холде, поднятом расхождением сверки, к которому держатель не прикасался; носитель клейма — пример «снятие: счётчик серии убытков снятием холда не обнуляется».",
       "expr": "consecutiveLossCountBefore"
-    },
-    {
-      "name": "counterMovedByOperation",
-      "provenBy": "consecutiveLossCountAfterOperation",
-      "note": "Инвариант: ручная операция счётчик серии не двигает. Обнуление счётчика снятием холда гасило бы остановку П1 на холде, поднятом расхождением сверки, — к которой держатель не прикасался. Значение обязано быть false в каждом примере.",
-      "expr": "consecutiveLossCountAfterOperation != consecutiveLossCountBefore"
     },
     {
       "name": "rungRankBefore",
@@ -167,241 +159,920 @@
     },
     {
       "name": "rungRankAfter",
-      "note": "Ранг ступени после вызова — по той же шкале и тому же радиусу.",
+      "note": "Ранг ступени после вызова — по той же шкале и тому же радиусу. Постановка холд не снимает и ступень не понижает: ни срока действия, ни обратного хода у неё нет. Клейм выражен РАНГОМ, а не членством в перечне ступеней: редакция «statusAfter не входит в перечень ступеней» тождественно ложна (при постановке statusAfter всегда одна из ступеней) и понижения не ловила вовсе. Носители клейма — примеры поглощения, где rungRankBefore = rungRankAfter = 2.",
       "expr": "if(statusAfter == 'TRADE_BLOCKED', 2, if((requestedScope == 'EXCHANGE' && statusAfter == 'HOLD') || (requestedScope == 'INSTRUMENT' && statusAfter == 'ENTRY_BLOCKED'), 1, 0))"
-    },
-    {
-      "name": "holdClearedByRaise",
-      "provenBy": "rungRankAfter",
-      "note": "Инвариант: постановка холд не снимает и ступень не понижает — ни срока действия, ни обратного хода у неё нет. Выражен через РАНГ, а не через членство в множестве ступеней: редакция «statusAfter не входит в перечень ступеней» была тождественно ложна (при постановке statusAfter всегда одна из ступеней) и понижения не ловила вовсе. Значение обязано быть false в каждом примере.",
-      "expr": "isRaise && rungRankAfter < rungRankBefore"
-    },
-    {
-      "name": "jumpFromTeardownToWorking",
-      "provenBy": "clearanceTarget",
-      "note": "Инвариант: снятие биржевого сворачивания не ведёт сразу в рабочее состояние. Значение обязано быть false в каждом примере — оно и есть исполнимая форма клаузы «прыжка сразу в рабочее состояние нет».",
-      "expr": "isClear && requestedScope == 'EXCHANGE' && hardStanding && statusAfter == 'ACTIVE'"
-    },
-    {
-      "name": "clearedOverLiveRisk",
-      "provenBy": "clearanceApplied",
-      "note": "Инвариант: сворачивание не снимается, пока на радиусе есть живой риск. Значение обязано быть false в каждом примере.",
-      "expr": "clearanceApplied && requestedClass == 'FULL' && liveRiskOnScope"
-    },
-    {
-      "name": "refusalUnobservable",
-      "provenBy": "launchForm",
-      "note": "Инвариант: отказ при запуске не уходит в асинхронную форму. Асинхронный отказ невидим вызывающему — держатель получает 202 и считает, что остановил биржу, которая продолжает торговать. Значение обязано быть false в каждом примере.",
-      "expr": "launchRefused && launchForm == 'ASYNC'"
-    },
-    {
-      "name": "onboardingReadAsRung",
-      "provenBy": "softStanding",
-      "note": "Инвариант: онбординговый статус инструмента не читается как стоящая ступень лестницы. Значение обязано быть false в каждом примере.",
-      "expr": "onboardingStanding && (softStanding || hardStanding)"
-    },
-    {
-      "name": "teardownWithoutExit",
-      "provenBy": "killSwitchRun",
-      "note": "Инвариант: у ступени сворачивания с непогашенным риском есть выход — повторный полный вызов гоняет снятие риска заново. Значение обязано быть false в каждом примере: иначе объект стоит в жёсткой ступени, снятие отвергается предусловием, а повтор постановки ничего не делает — состояние без выхода, названное недопустимым в docs/concept.md.",
-      "expr": "isRaise && callOrigin == 'HOLDER' && requestedClass == 'FULL' && validPair && !launchRefused && objectStatusBefore == requestedRung && liveRiskOnScope && !fullReactionRunningOnObject && !killSwitchRun"
-    },
-    {
-      "name": "automaticRetryLoop",
-      "provenBy": "killSwitchRun",
-      "note": "Инвариант: автоматический сигнал цикла повторного сворачивания не образует. Доведение недоделанного — право ТОЛЬКО явного вызова держателя: его частоту задаёт человек. У автоматического триггера производитель периодический (docs/components/AnomalyJob.md), и его детекторы держатся ровно тогда, когда снятие риска не подтвердилось — сняв для него поглощение, мы получили бы flatten на биржу каждым тиком и обесценили бы предел попыток KillSwitchExecutor как терминал (эскалировать со ступени 2 некуда). Значение обязано быть false в каждом примере.",
-      "expr": "isRaise && callOrigin == 'DETECTOR' && requestedClass == 'FULL' && objectStatusBefore == requestedRung && liveRiskOnScope && killSwitchRun"
-    },
-    {
-      "name": "concurrentKillSwitchOnScope",
-      "provenBy": "killSwitchRun",
-      "note": "Инвариант: двух одновременных прогонов снятия риска по одному объекту радиуса не бывает. Прежний довод «конкурирующие вызовы сходятся на анкере статуса, и второй не находит работы» держался только пока анкер поглощал повтор; при непогашенном риске работу находят оба, и оба ушли бы в kill-switch по одному живому риску. Пока полная реакция объекта идёт, она сама служит анкером — второй вызов её не дублирует. Значение обязано быть false в каждом примере.",
-      "expr": "killSwitchRun && fullReactionRunningOnObject"
-    },
-    {
-      "name": "manualRetryUnlogged",
-      "provenBy": "reportProduced",
-      "note": "Инвариант: ручное доведение поверх ступени, поднятой автоматикой, не остаётся без строки журнала. Ключ состояния включает code, коды ручной и автоматической троп не пересекаются — значит ручной строки по ключу нет, и молчание журнала означало бы, что человек перезапустил аварийное снятие риска, а журнал об этом не знает (против docs/concept.md, П3). Значение обязано быть false в каждом примере.",
-      "expr": "riskTeardownRetry && !standingRungRaisedManually && !reportProduced"
     }
   ],
-
   "examples": [
     {
       "case": "постановка: мягкий режим на бирже в рабочем состоянии поднимает ступень 1",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FREEZE", "objectStatusBefore": "ACTIVE", "objectInWorkingState": true, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": true, "launchRefused": false, "launchForm": "SYNC", "requestedRung": "HOLD", "reactionApplied": true, "killSwitchRun": false, "statusAfter": "HOLD", "reportProduced": true, "reportCode": "MANUAL_HALT_REQUESTED", "reportKind": "STATE", "reportSeverity": "NON_CRITICAL", "holdClearedByRaise": false, "refusalUnobservable": false, "counterMovedByOperation": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "ACTIVE",
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": true,
+        "launchRefused": false,
+        "launchForm": "SYNC",
+        "requestedRung": "HOLD",
+        "reactionApplied": true,
+        "killSwitchRun": false,
+        "statusAfter": "HOLD",
+        "reportProduced": true,
+        "reportCode": "MANUAL_HALT_REQUESTED",
+        "reportKind": "STATE",
+        "reportSeverity": "NON_CRITICAL"
+      }
     },
     {
       "case": "постановка: полный режим на бирже поднимает ступень 2 и гоняет kill-switch",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "ACTIVE", "objectInWorkingState": true, "nonTerminalDealWithLiveRiskOnScope": true, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 2 },
-      "expect": { "validPair": true, "requestedRung": "TRADE_BLOCKED", "launchForm": "ASYNC", "reactionApplied": true, "killSwitchRun": true, "statusAfter": "TRADE_BLOCKED", "reportProduced": true, "reportCode": "MANUAL_HALT_REQUESTED", "reportSeverity": "CRITICAL", "consecutiveLossCountAfterOperation": 2, "counterMovedByOperation": false, "holdClearedByRaise": false, "refusalUnobservable": false, "teardownWithoutExit": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "ACTIVE",
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 2
+      },
+      "expect": {
+        "validPair": true,
+        "requestedRung": "TRADE_BLOCKED",
+        "launchForm": "ASYNC",
+        "reactionApplied": true,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": true,
+        "reportCode": "MANUAL_HALT_REQUESTED",
+        "reportSeverity": "CRITICAL",
+        "consecutiveLossCountAfterOperation": 2
+      }
     },
     {
       "case": "постановка: мягкий режим на инструменте даёт запрет входов, kill-switch не гоняется",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "SOFT", "objectStatusBefore": "ACTIVE", "objectInWorkingState": true, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": true, "requestedRung": "ENTRY_BLOCKED", "launchForm": "SYNC", "reactionApplied": true, "killSwitchRun": false, "statusAfter": "ENTRY_BLOCKED", "reportSeverity": "NON_CRITICAL", "holdClearedByRaise": false, "onboardingReadAsRung": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "ACTIVE",
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": true,
+        "requestedRung": "ENTRY_BLOCKED",
+        "launchForm": "SYNC",
+        "reactionApplied": true,
+        "killSwitchRun": false,
+        "statusAfter": "ENTRY_BLOCKED",
+        "reportSeverity": "NON_CRITICAL"
+      }
     },
     {
       "case": "постановка: полный режим на инструменте — жёсткий статус и снятие риска по инструменту",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "FULL", "objectStatusBefore": "ACTIVE", "objectInWorkingState": true, "nonTerminalDealWithLiveRiskOnScope": true, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": true, "requestedRung": "TRADE_BLOCKED", "reactionApplied": true, "killSwitchRun": true, "statusAfter": "TRADE_BLOCKED", "reportSeverity": "CRITICAL", "holdClearedByRaise": false, "teardownWithoutExit": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "ACTIVE",
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": true,
+        "requestedRung": "TRADE_BLOCKED",
+        "reactionApplied": true,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportSeverity": "CRITICAL"
+      }
     },
     {
       "case": "постановка: мягкий вызов на онбординговом инструменте отвергается — онбординговый HOLD ступенью не является",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "SOFT", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": true, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": true, "onboardingStanding": true, "softStanding": false, "onboardingReadAsRung": false, "launchRefused": true, "launchForm": "SYNC", "refusalUnobservable": false, "reactionApplied": false, "escalationApplied": false, "statusAfter": "HOLD", "reportProduced": false, "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": true,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": true,
+        "onboardingStanding": true,
+        "softStanding": false,
+        "launchRefused": true,
+        "launchForm": "SYNC",
+        "reactionApplied": false,
+        "escalationApplied": false,
+        "statusAfter": "HOLD",
+        "reportProduced": false
+      }
     },
     {
       "case": "постановка: полный вызов на онбординговом инструменте применяется — авария приоритетнее онбординга, но эскалацией мягкой ступени не является",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "FULL", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": true, "consecutiveLossCountBefore": 0 },
-      "expect": { "onboardingStanding": true, "softStanding": false, "escalationApplied": false, "reactionApplied": true, "killSwitchRun": true, "statusAfter": "TRADE_BLOCKED", "reportProduced": true, "reportSeverity": "CRITICAL", "holdClearedByRaise": false, "onboardingReadAsRung": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": true,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "onboardingStanding": true,
+        "softStanding": false,
+        "escalationApplied": false,
+        "reactionApplied": true,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": true,
+        "reportSeverity": "CRITICAL"
+      }
     },
     {
       "case": "мягкий класс на биржевом радиусе — недопустимая пара, фабрики нет, отказ при запуске виден сразу",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "SOFT", "objectStatusBefore": "ACTIVE", "objectInWorkingState": true, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": false, "requestedRung": null, "launchRefused": true, "launchForm": "SYNC", "refusalUnobservable": false, "reactionApplied": false, "killSwitchRun": false, "statusAfter": "ACTIVE", "reportProduced": false, "reportCode": null, "reportSeverity": null, "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "ACTIVE",
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": false,
+        "requestedRung": null,
+        "launchRefused": true,
+        "launchForm": "SYNC",
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "ACTIVE",
+        "reportProduced": false,
+        "reportCode": null,
+        "reportSeverity": null
+      }
     },
     {
       "case": "мягкая биржевая ступень на инструментном радиусе — недопустимая пара",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "FREEZE", "objectStatusBefore": "ACTIVE", "objectInWorkingState": true, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": false, "launchRefused": true, "launchForm": "SYNC", "refusalUnobservable": false, "reactionApplied": false, "statusAfter": "ACTIVE", "reportProduced": false, "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "ACTIVE",
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": false,
+        "launchRefused": true,
+        "launchForm": "SYNC",
+        "reactionApplied": false,
+        "statusAfter": "ACTIVE",
+        "reportProduced": false
+      }
     },
     {
-      "case": "постановка: повторный мягкий вызов на уже стоящей мягкой ступени — второй реакции и второго отчёта нет",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FREEZE", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 3 },
-      "expect": { "validPair": true, "launchRefused": false, "repeatAtSameRung": true, "reactionApplied": false, "reportProduced": false, "statusAfter": "HOLD", "consecutiveLossCountAfterOperation": 3, "holdClearedByRaise": false }
+      "case": "постановка: повторный мягкий вызов на ступени, поднятой АВТОМАТИКОЙ — второй реакции нет, а строка журнала есть",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 3
+      },
+      "expect": {
+        "validPair": true,
+        "launchRefused": false,
+        "repeatAtSameRung": true,
+        "reactionApplied": false,
+        "reportProduced": true,
+        "statusAfter": "HOLD",
+        "consecutiveLossCountAfterOperation": 3
+      },
+      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё перезапуск вмешательства человеком журналу неизвестен, а довод «за что стоял холд, различается машинным кодом» перестаёт выполняться."
     },
     {
-      "case": "постановка: повторный полный вызов на уже стоящем сворачивании при погашенном риске — kill-switch заново не гоняется",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": true, "hardStanding": true, "absorbed": false, "riskTeardownRetry": false, "repeatAtSameRung": true, "reactionApplied": false, "killSwitchRun": false, "statusAfter": "TRADE_BLOCKED", "reportProduced": false, "holdClearedByRaise": false, "teardownWithoutExit": false }
+      "case": "постановка: повторный полный вызов на сворачивании, поднятом АВТОМАТИКОЙ — kill-switch заново не гоняется, строка журнала заводится",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": true,
+        "hardStanding": true,
+        "absorbed": false,
+        "riskTeardownRetry": false,
+        "repeatAtSameRung": true,
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": true
+      },
+      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё перезапуск вмешательства человеком журналу неизвестен, а довод «за что стоял холд, различается машинным кодом» перестаёт выполняться."
     },
     {
       "case": "постановка: повторный полный вызов при неподтверждённом kill-switch гоняет снятие риска заново — это и есть выход из ступени сворачивания",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": true, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": true, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "liveRiskOnScope": true, "hardStanding": true, "riskTeardownRetry": true, "repeatAtSameRung": false, "reactionApplied": true, "killSwitchRun": true, "teardownWithoutExit": false, "statusAfter": "TRADE_BLOCKED", "reportProduced": false, "reportCode": null, "holdClearedByRaise": false, "counterMovedByOperation": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": true,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": true,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "liveRiskOnScope": true,
+        "hardStanding": true,
+        "riskTeardownRetry": true,
+        "repeatAtSameRung": false,
+        "reactionApplied": true,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false,
+        "reportCode": null
+      }
     },
     {
       "case": "постановка: тот же повторный полный вызов на инструментном радиусе — тропа выхода одна на оба радиуса",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": true, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": true, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "liveRiskOnScope": true, "riskTeardownRetry": true, "repeatAtSameRung": false, "killSwitchRun": true, "teardownWithoutExit": false, "statusAfter": "TRADE_BLOCKED", "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": true,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": true,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "liveRiskOnScope": true,
+        "riskTeardownRetry": true,
+        "repeatAtSameRung": false,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED"
+      }
     },
     {
       "case": "постановка: эскалация полного режима поверх стоящей мягкой ступени проходит",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": true, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 4 },
-      "expect": { "softStanding": true, "escalationApplied": true, "reactionApplied": true, "killSwitchRun": true, "statusAfter": "TRADE_BLOCKED", "reportProduced": true, "reportSeverity": "CRITICAL", "consecutiveLossCountAfterOperation": 4, "counterMovedByOperation": false, "holdClearedByRaise": false, "teardownWithoutExit": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 4
+      },
+      "expect": {
+        "softStanding": true,
+        "escalationApplied": true,
+        "reactionApplied": true,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": true,
+        "reportSeverity": "CRITICAL",
+        "consecutiveLossCountAfterOperation": 4
+      }
     },
     {
-      "case": "постановка: мягкий вызов поверх сворачивания поглощается — понижения нет, реакции нет",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FREEZE", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": true, "launchRefused": false, "absorbed": true, "reactionApplied": false, "killSwitchRun": false, "statusAfter": "TRADE_BLOCKED", "rungRankBefore": 2, "rungRankAfter": 2, "reportProduced": false, "holdClearedByRaise": false }
+      "case": "постановка: мягкий вызов поверх сворачивания поглощается — понижения нет, реакции нет, но СТРОКА ЖУРНАЛА заводится: ступень подняла автоматика, и по ручному коду строки нет",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": true,
+        "launchRefused": false,
+        "absorbed": true,
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "rungRankBefore": 2,
+        "rungRankAfter": 2,
+        "reportProduced": true
+      }
     },
     {
-      "case": "постановка: мягкий вызов поверх жёсткого холда инструмента поглощается так же",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "SOFT", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "absorbed": true, "reactionApplied": false, "statusAfter": "TRADE_BLOCKED", "rungRankBefore": 2, "rungRankAfter": 2, "reportProduced": false, "holdClearedByRaise": false }
+      "case": "постановка: мягкий вызов поверх жёсткого холда инструмента поглощается так же — и так же заводит строку журнала",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "absorbed": true,
+        "reactionApplied": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "rungRankBefore": 2,
+        "rungRankAfter": 2,
+        "reportProduced": true
+      }
     },
     {
       "case": "постановка: мягкий режим на объекте вне рабочего состояния и без стоящей ступени — отказ при запуске",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FREEZE", "objectStatusBefore": "CLOSED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": true, "launchRefused": true, "launchForm": "SYNC", "refusalUnobservable": false, "reactionApplied": false, "statusAfter": "CLOSED", "reportProduced": false, "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "CLOSED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": true,
+        "launchRefused": true,
+        "launchForm": "SYNC",
+        "reactionApplied": false,
+        "statusAfter": "CLOSED",
+        "reportProduced": false
+      }
     },
     {
       "case": "постановка: полный режим из нерабочего состояния применяется — авария застаёт объект в любом статусе",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "ERROR", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": true, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "launchRefused": false, "reactionApplied": true, "killSwitchRun": true, "statusAfter": "TRADE_BLOCKED", "reportProduced": true, "reportSeverity": "CRITICAL", "holdClearedByRaise": false, "teardownWithoutExit": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "ERROR",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "launchRefused": false,
+        "reactionApplied": true,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": true,
+        "reportSeverity": "CRITICAL"
+      }
     },
     {
-      "case": "постановка: мягкий инструментный вызов на инструменте под запретом входов — повтор, реакции нет",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "SOFT", "objectStatusBefore": "ENTRY_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "softStanding": true, "repeatAtSameRung": true, "reactionApplied": false, "statusAfter": "ENTRY_BLOCKED", "reportProduced": false, "holdClearedByRaise": false, "onboardingReadAsRung": false }
+      "case": "постановка: мягкий инструментный вызов на инструменте, закрытом для входов АВТОМАТИКОЙ — реакции нет, строка журнала есть",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "ENTRY_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "softStanding": true,
+        "onboardingStanding": false,
+        "repeatAtSameRung": true,
+        "reactionApplied": false,
+        "statusAfter": "ENTRY_BLOCKED",
+        "reportProduced": true
+      },
+      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё перезапуск вмешательства человеком журналу неизвестен, а довод «за что стоял холд, различается машинным кодом» перестаёт выполняться."
     },
-
     {
       "case": "снятие: биржевое сворачивание при погашенном риске даёт мягкую ступень, а не рабочее состояние",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 3 },
-      "expect": { "clearanceRefused": false, "clearanceNoop": false, "clearanceApplied": true, "clearanceTarget": "HOLD", "statusAfter": "HOLD", "launchForm": "SYNC", "killSwitchRun": false, "reportProduced": true, "reportCode": "MANUAL_HALT_CLEARED", "reportKind": "EVENT", "reportSeverity": "NON_CRITICAL", "jumpFromTeardownToWorking": false, "clearedOverLiveRisk": false, "consecutiveLossCountAfterOperation": 3, "counterMovedByOperation": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 3
+      },
+      "expect": {
+        "clearanceRefused": false,
+        "clearanceNoop": false,
+        "clearanceApplied": true,
+        "clearanceTarget": "HOLD",
+        "statusAfter": "HOLD",
+        "launchForm": "SYNC",
+        "killSwitchRun": false,
+        "reportProduced": true,
+        "reportCode": "MANUAL_HALT_CLEARED",
+        "reportKind": "EVENT",
+        "reportSeverity": "NON_CRITICAL",
+        "consecutiveLossCountAfterOperation": 3
+      }
     },
     {
       "case": "снятие: сворачивание при живом риске нетерминальной сделки отвергается предусловием",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": true, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 3 },
-      "expect": { "liveRiskOnScope": true, "clearanceRefused": true, "launchRefused": true, "launchForm": "SYNC", "refusalUnobservable": false, "clearanceApplied": false, "clearanceTarget": null, "statusAfter": "TRADE_BLOCKED", "reportProduced": false, "clearedOverLiveRisk": false, "jumpFromTeardownToWorking": false, "consecutiveLossCountAfterOperation": 3 }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 3
+      },
+      "expect": {
+        "liveRiskOnScope": true,
+        "clearanceRefused": true,
+        "launchRefused": true,
+        "launchForm": "SYNC",
+        "clearanceApplied": false,
+        "clearanceTarget": null,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false,
+        "consecutiveLossCountAfterOperation": 3
+      }
     },
     {
       "case": "снятие: каскад увёл сделки радиуса в терминал, но снятие риска не доказано — снятие отвергается тем же предусловием",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": true, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "liveRiskOnScope": true, "clearanceRefused": true, "launchRefused": true, "clearanceApplied": false, "clearanceTarget": null, "statusAfter": "TRADE_BLOCKED", "reportProduced": false, "clearedOverLiveRisk": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": true,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "liveRiskOnScope": true,
+        "clearanceRefused": true,
+        "launchRefused": true,
+        "clearanceApplied": false,
+        "clearanceTarget": null,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
+      }
     },
     {
       "case": "снятие: мягкая биржевая ступень при погашенном риске возвращает рабочее состояние",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "FREEZE", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 5 },
-      "expect": { "clearanceRefused": false, "clearanceApplied": true, "clearanceTarget": "ACTIVE", "statusAfter": "ACTIVE", "reportCode": "MANUAL_HALT_CLEARED", "reportKind": "EVENT", "jumpFromTeardownToWorking": false, "consecutiveLossCountAfterOperation": 5, "counterMovedByOperation": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 5
+      },
+      "expect": {
+        "clearanceRefused": false,
+        "onboardingStanding": false,
+        "clearanceApplied": true,
+        "clearanceTarget": "ACTIVE",
+        "statusAfter": "ACTIVE",
+        "reportCode": "MANUAL_HALT_CLEARED",
+        "reportKind": "EVENT",
+        "consecutiveLossCountAfterOperation": 5
+      }
     },
     {
       "case": "снятие: счётчик серии убытков снятием холда не обнуляется",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "FREEZE", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 3 },
-      "expect": { "clearanceApplied": true, "statusAfter": "ACTIVE", "consecutiveLossCountAfterOperation": 3, "counterMovedByOperation": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 3
+      },
+      "expect": {
+        "clearanceApplied": true,
+        "statusAfter": "ACTIVE",
+        "consecutiveLossCountAfterOperation": 3
+      }
     },
     {
       "case": "снятие: мягкая ступень названа, а стоит сворачивание — отказ, прыжка через ступень нет",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "FREEZE", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "clearanceRefused": true, "launchRefused": true, "refusalUnobservable": false, "clearanceApplied": false, "statusAfter": "TRADE_BLOCKED", "reportProduced": false, "jumpFromTeardownToWorking": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "clearanceRefused": true,
+        "launchRefused": true,
+        "clearanceApplied": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
+      }
     },
     {
       "case": "снятие: повторный вызов «снять сворачивание» на бирже, уже спущенной в мягкую ступень, по лестнице не шагает",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 3 },
-      "expect": { "clearanceRefused": false, "clearanceNoop": true, "clearanceApplied": false, "statusAfter": "HOLD", "reportProduced": false, "jumpFromTeardownToWorking": false, "consecutiveLossCountAfterOperation": 3 }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 3
+      },
+      "expect": {
+        "clearanceRefused": false,
+        "clearanceNoop": true,
+        "clearanceApplied": false,
+        "statusAfter": "HOLD",
+        "reportProduced": false,
+        "consecutiveLossCountAfterOperation": 3
+      }
     },
     {
       "case": "снятие: названной ступени на объекте нет вовсе — холостой вызов, не отказ",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "INSTRUMENT", "requestedClass": "SOFT", "objectStatusBefore": "ACTIVE", "objectInWorkingState": true, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "clearanceRefused": false, "clearanceNoop": true, "clearanceApplied": false, "statusAfter": "ACTIVE", "reportProduced": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "ACTIVE",
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "clearanceRefused": false,
+        "clearanceNoop": true,
+        "clearanceApplied": false,
+        "statusAfter": "ACTIVE",
+        "reportProduced": false
+      }
     },
     {
       "case": "снятие: холд инструмента с kill-switch снимается одним ходом — сегодняшняя редакция инструментной лестницы",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "INSTRUMENT", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "clearanceApplied": true, "clearanceTarget": "ACTIVE", "statusAfter": "ACTIVE", "reportCode": "MANUAL_HALT_CLEARED", "reportKind": "EVENT", "jumpFromTeardownToWorking": false, "clearedOverLiveRisk": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "clearanceApplied": true,
+        "clearanceTarget": "ACTIVE",
+        "statusAfter": "ACTIVE",
+        "reportCode": "MANUAL_HALT_CLEARED",
+        "reportKind": "EVENT"
+      }
     },
     {
       "case": "снятие: инструмент, заблокированный из незавершённого онбординга, возвращается в онбординговый HOLD, а не в торговлю",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "INSTRUMENT", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": true, "consecutiveLossCountBefore": 0 },
-      "expect": { "clearanceApplied": true, "clearanceTarget": "HOLD", "statusAfter": "HOLD", "reportCode": "MANUAL_HALT_CLEARED", "reportKind": "EVENT", "clearedOverLiveRisk": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": true,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "clearanceApplied": true,
+        "clearanceTarget": "HOLD",
+        "statusAfter": "HOLD",
+        "reportCode": "MANUAL_HALT_CLEARED",
+        "reportKind": "EVENT"
+      }
     },
     {
       "case": "снятие: мягкий запрет входов на инструменте возвращает рабочее состояние",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "INSTRUMENT", "requestedClass": "SOFT", "objectStatusBefore": "ENTRY_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "clearanceApplied": true, "clearanceTarget": "ACTIVE", "statusAfter": "ACTIVE", "reportKind": "EVENT", "reportSeverity": "NON_CRITICAL", "onboardingReadAsRung": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "ENTRY_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "clearanceApplied": true,
+        "clearanceTarget": "ACTIVE",
+        "statusAfter": "ACTIVE",
+        "reportKind": "EVENT",
+        "reportSeverity": "NON_CRITICAL"
+      }
     },
     {
       "case": "снятие: недопустимая пара отвергается так же, как у постановки",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "EXCHANGE", "requestedClass": "SOFT", "objectStatusBefore": "HOLD", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "validPair": false, "clearanceRefused": true, "launchRefused": true, "refusalUnobservable": false, "clearanceApplied": false, "statusAfter": "HOLD", "reportProduced": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "validPair": false,
+        "clearanceRefused": true,
+        "launchRefused": true,
+        "clearanceApplied": false,
+        "statusAfter": "HOLD",
+        "reportProduced": false
+      }
     },
     {
       "case": "снятие: инструментное сворачивание при живом риске отвергается тем же предусловием",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "CLEAR", "requestedScope": "INSTRUMENT", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": true, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "clearanceRefused": true, "clearanceApplied": false, "statusAfter": "TRADE_BLOCKED", "reportProduced": false, "clearedOverLiveRisk": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "clearanceRefused": true,
+        "clearanceApplied": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
+      }
     },
     {
       "case": "постановка: АВТОМАТИЧЕСКИЙ повторный полный сигнал при непогашенном риске поглощается анкером — цикла повторного сворачивания нет",
-      "state": { "callOrigin": "DETECTOR", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": true, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "liveRiskOnScope": true, "riskTeardownRetry": false, "repeatAtSameRung": true, "reactionApplied": false, "killSwitchRun": false, "automaticRetryLoop": false, "statusAfter": "TRADE_BLOCKED", "reportProduced": false, "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "DETECTOR",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": true,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "liveRiskOnScope": true,
+        "riskTeardownRetry": false,
+        "repeatAtSameRung": true,
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
+      }
     },
     {
       "case": "постановка: тот же автоматический сигнал на инструментном радиусе — поглощается так же",
-      "state": { "callOrigin": "DETECTOR", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "INSTRUMENT", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": true, "terminalDealWithUnprovenRiskOnScope": false, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "riskTeardownRetry": false, "repeatAtSameRung": true, "killSwitchRun": false, "automaticRetryLoop": false, "statusAfter": "TRADE_BLOCKED", "reportProduced": false }
+      "state": {
+        "callOrigin": "DETECTOR",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "riskTeardownRetry": false,
+        "repeatAtSameRung": true,
+        "killSwitchRun": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
+      }
     },
     {
       "case": "постановка: ручное доведение поверх ступени, поднятой АВТОМАТИКОЙ, заводит свою строку журнала",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": false, "fullReactionRunningOnObject": false, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": true, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "riskTeardownRetry": true, "killSwitchRun": true, "teardownWithoutExit": false, "reportProduced": true, "reportCode": "MANUAL_HALT_REQUESTED", "reportKind": "STATE", "reportSeverity": "CRITICAL", "manualRetryUnlogged": false, "statusAfter": "TRADE_BLOCKED", "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": true,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "riskTeardownRetry": true,
+        "killSwitchRun": true,
+        "reportProduced": true,
+        "reportCode": "MANUAL_HALT_REQUESTED",
+        "reportKind": "STATE",
+        "reportSeverity": "CRITICAL",
+        "statusAfter": "TRADE_BLOCKED"
+      }
     },
     {
       "case": "постановка: второе доведение, пока полная реакция объекта уже идёт, второго kill-switch не запускает",
-      "state": { "callOrigin": "HOLDER", "standingRungRaisedManually": true, "fullReactionRunningOnObject": true, "operation": "RAISE", "requestedScope": "EXCHANGE", "requestedClass": "FULL", "objectStatusBefore": "TRADE_BLOCKED", "objectInWorkingState": false, "nonTerminalDealWithLiveRiskOnScope": false, "terminalDealWithUnprovenRiskOnScope": true, "onboardingIncomplete": false, "consecutiveLossCountBefore": 0 },
-      "expect": { "riskTeardownRetry": true, "reactionApplied": true, "killSwitchRun": false, "concurrentKillSwitchOnScope": false, "teardownWithoutExit": false, "reportProduced": false, "statusAfter": "TRADE_BLOCKED", "holdClearedByRaise": false }
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": true,
+        "fullReactionRunningOnObject": true,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": true,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "riskTeardownRetry": true,
+        "reactionApplied": true,
+        "killSwitchRun": false,
+        "reportProduced": false,
+        "statusAfter": "TRADE_BLOCKED"
+      }
     },
     {
       "case": "снятие мягкой ступени биржи возвращает объект в рабочее состояние: ранг после операции нулевой — контрпример к рангу, без него он удовлетворялся бы константой 2",
@@ -423,6 +1094,34 @@
         "statusAfter": "ACTIVE",
         "rungRankBefore": 1,
         "rungRankAfter": 0
+      }
+    },
+    {
+      "case": "постановка: ручное доведение поверх АВТОМАТИЧЕСКИ поднятой ступени, пока полная реакция объекта идёт — строка журнала заводится",
+      "note": "Гейт «вызов поверх идущей реакции строку не заводит» доведение держателя не поглощает. Ручной строки по ключу состояния здесь нет вовсе — ступень подняла автоматика, коды ручной и автоматической троп не пересекаются, — и молчание журнала означало бы, что человек перезапустил аварийное снятие риска, а журнал об этом не знает (docs/concept.md, П3). Второй прогон kill-switch при этом не запускается: анкером служит идущая реакция.",
+      "state": {
+        "callOrigin": "HOLDER",
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": true,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 3
+      },
+      "expect": {
+        "riskTeardownRetry": true,
+        "repeatAtSameRung": false,
+        "reactionApplied": true,
+        "killSwitchRun": false,
+        "reportProduced": true,
+        "reportCode": "MANUAL_HALT_REQUESTED",
+        "reportSeverity": "CRITICAL",
+        "statusAfter": "TRADE_BLOCKED"
       }
     }
   ]

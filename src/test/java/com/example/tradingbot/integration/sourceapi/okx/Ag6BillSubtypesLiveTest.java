@@ -50,7 +50,10 @@ class Ag6BillSubtypesLiveTest extends OkxSourceApiLiveTestBase {
         }
         observeValue("AG6.1", "typeCount", r.dataSize());
         observeValue("AG6.1", "typeSubTypePairCount", pairs.size());
-        pairs.forEach(pair -> observeValue("AG6.1", "pair", pair));
+        // Исход кейса — ПЕРЕЧЕНЬ, поэтому он уходит в персистентный носитель,
+        // а не только в лог: слот предусловия, закрытый фактом из лога, закрыт
+        // не был (docs/concept.md — сослаться на лог при разборе нельзя).
+        persistObservation("AG6.1", "справочник пар type/subType счёта", pairs);
         assertThat(pairs).as("AG6.1 → перечень пар type/subType непуст").isNotEmpty();
     }
 }

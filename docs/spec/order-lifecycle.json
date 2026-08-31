@@ -7,11 +7,11 @@
     "to": "предполагаемый статус",
     "status": "статус для проверки свойств",
     "parentStatus": "статус родительской заявки — операнд политики отсутствующей защиты",
-    "attachedInSnapshot": "встроенная защита найдена в снапшоте родителя по клиентскому идентификатору",
+    "attachedInSnapshot": "снапшот встроенной защиты ПРЕДЪЯВЛЕН — либо элементом attachAlgoOrds в теле родителя, либо самостоятельной условной заявкой, найденной циклом добычи материализованной защиты (docs/models/mapping/Order.md). Вход резолвера двухместный, и предикат живости стои́т на факте предъявления, а не на месте, откуда снапшот пришёл",
     "failCode": "код отказа постановки встроенной защиты",
     "positionLive": "живая позиция существует",
     "standaloneProtectionExists": "отдельная основная защита существует",
-    "parentAccumulatedFillSize": "накопленный налив РОДИТЕЛЬСКОЙ заявки, Order.accumulatedFillSize родителя. Дискриминатор материализации встроенной защиты: источник превращает её в самостоятельную живую заявку РОВНО НА НАЛИТЫЙ ОБЪЁМ (наблюдено 2026-08-30, .claude/tests/source-api/okx/plan.md), поэтому судьбу защиты решает налив родителя, а не его статус"
+    "parentAccumulatedFillSize": "накопленный налив РОДИТЕЛЬСКОЙ заявки, Order.accumulatedFillSize родителя. Дискриминатор материализации встроенной защиты: источник превращает её в самостоятельную живую заявку РОВНО НА НАЛИТЫЙ ОБЪЁМ (наблюдено 2026-08-30, .claude/tests/source-api/okx/plan.md). ПУСТО достижимо (колонка nullable) и НУЛЁМ НЕ ПОДМЕНЯЕТСЯ: подмена дала бы CANCEL_BY_PARENT на недобытом факте, то есть пометила бы снятой защиту, которая может быть жива — благоприятное умолчание, запрещённое docs/rules/absent-value-semantics.md"
   },
   "values": [
     {
@@ -57,9 +57,60 @@
       "expr": "notNull(failCode)"
     },
     {
-      "name": "missingAttachedOutcome",
-      "note": "Отсутствие защиты в одном снапшоте — не финальный факт. Исход зависит от статуса родителя И ОТ ЕГО НАЛИВА. Отменённый родитель с НЕПУСТЫМ наливом защиту с собой НЕ уносит: источник материализует её самостоятельной живой conditional-заявкой ровно на налитый объём — наблюдено обеими цепочками 2026-08-30, и исход не зависит от того, кто навёл терминал (наша отмена либо снятие остатка биржей). Поэтому CANCEL_BY_PARENT остаётся только за нулевым наливом; при непустом вывод по снапшоту родителя не делается вовсе, и цикл добычи ищет живую запись по КЛИЕНТСКОМУ идентификатору. Прежняя редакция помечала бы живую защиту CANCELED: покрытие недосчитывалось бы, и гейт покрытия уводил бы штатную сделку в биржевую ступень 2 с flatten по ЛОЖНОМУ факту.",
-      "expr": "if(in(parentStatus, 'CREATED', 'PENDING'), 'WAIT', if(in(parentStatus, 'ACTIVE', 'PARTIALLY_COMPLETED'), 'SEARCH_MORE', if(parentStatus == 'CANCELED', if(parentAccumulatedFillSize > 0, 'SEARCH_MORE', 'CANCEL_BY_PARENT'), if(parentStatus == 'ERROR', 'ERROR', if(positionLive && !standaloneProtectionExists, 'PROTECTION_LOST', 'ANALYSE_HISTORY')))))"
+      "name": "attachedParentClass",
+      "note": "Класс состояния родителя, различимый политикой встроенной защиты. Классов шесть, и различает их не статус сам по себе, а ПАРА «терминален ли родитель» + «каков налив»: до терминала налив исхода не меняет, на терминале он его и определяет. UNCONFIRMED — родитель отправлен, но не подтверждён; LIVE — стои́т на бирже и может исполниться; PROBLEM — проблемный терминал; TERMINAL_FILLED — терминален с непустым наливом; TERMINAL_EMPTY — терминален с наливом РОВНО НОЛЬ; TERMINAL_FILL_UNKNOWN — терминален, а налив не добыт. Последний класс заведён затем, чтобы пустота не подменялась нулём: подмена уводила бы недобытый факт в CANCEL_BY_PARENT. Пара «COMPLETED + нулевой налив» недостижима по определению статуса: COMPLETED и означает полный налив, поэтому TERMINAL_EMPTY производит только отменённый родитель. Перечень классов объявлен популяцией этой спеки.",
+      "expr": "if(in(parentStatus, 'CREATED', 'PENDING'), 'UNCONFIRMED', if(in(parentStatus, 'ACTIVE', 'PARTIALLY_COMPLETED'), 'LIVE', if(parentStatus == 'ERROR', 'PROBLEM', if(isNull(?parentAccumulatedFillSize), 'TERMINAL_FILL_UNKNOWN', if(parentAccumulatedFillSize > 0, 'TERMINAL_FILLED', 'TERMINAL_EMPTY')))))"
+    },
+    {
+      "name": "attachedOutcomeByParent",
+      "note": "Исход встроенной защиты по фактам РОДИТЕЛЯ. Вычисляется независимо от того, откуда пришёл снапшот защиты: присутствие элемента в теле родителя живости не доказывает — он остаётся в теле ОТМЕНЁННОГО родителя с прежними значениями и пустым кодом отказа (наблюдено 2026-08-30, .claude/tests/source-api/okx/plan.md, цепочки C17a-C17c). Дискриминатор терминала — НАЛИВ. У ОТМЕНЁННОГО родителя он наблюдён обеими цепочками: при непустом наливе источник материализует защиту самостоятельной живой conditional-заявкой ровно на налитый объём, при нулевом самостоятельной записи не появляется. На ИСПОЛНЕННОГО родителя тот же дискриминатор распространён ВЫВОДОМ, а не наблюдением: контур полного исполнения не производил (провенанс — .claude/work/backlog.md, слот наблюдения). Вывод консервативен по направлению: лишний поиск дешевле ложного PROTECTION_LOST, который объявляет покрытие потерянным, не поискав. Недобытый налив уводит в поиск по той же причине.",
+      "expr": "if(attachedParentClass == 'UNCONFIRMED', 'WAIT', if(attachedParentClass == 'LIVE', 'SEARCH_MORE', if(attachedParentClass == 'PROBLEM', 'ERROR', if(attachedParentClass == 'TERMINAL_EMPTY', 'CANCEL_BY_PARENT', 'SEARCH_MORE'))))"
+    },
+    {
+      "name": "searchExhaustedOutcome",
+      "note": "Исход, когда цикл добычи прошёл до конца и живой записи защиты не нашёл. Это ВТОРАЯ ступень: первая (attachedOutcomeByParent) говорит, надо ли искать; эта — что значит ненайденность. Позиция жива и отдельной основной защиты нет — живой риск остался без покрытия (PROTECTION_LOST); иначе покрытие не потеряно и исход берётся из истории. Разведение ступеней несущее: без него исход «покрытие потеряно» выводился бы у исполненного родителя ДО поиска — то есть ровно у той популяции, где источник защиту материализует.",
+      "expr": "if(positionLive && !standaloneProtectionExists, 'PROTECTION_LOST', 'ANALYSE_HISTORY')"
+    }
+  ],
+  "populations": [
+    {
+      "axis": "классы состояния родителя, различимые политикой встроенной защиты",
+      "note": "Перечень классов величины attachedParentClass целиком. Правило узла — «у встроенной защиты назван исход при каждом достижимом состоянии родителя»; классов шесть, и каждый обязан быть предъявлен примером.",
+      "keys": [
+        "attachedParentClass"
+      ],
+      "members": [
+        {
+          "member": [
+            "UNCONFIRMED"
+          ]
+        },
+        {
+          "member": [
+            "LIVE"
+          ]
+        },
+        {
+          "member": [
+            "PROBLEM"
+          ]
+        },
+        {
+          "member": [
+            "TERMINAL_FILLED"
+          ]
+        },
+        {
+          "member": [
+            "TERMINAL_EMPTY"
+          ]
+        },
+        {
+          "member": [
+            "TERMINAL_FILL_UNKNOWN"
+          ]
+        }
+      ]
     }
   ],
   "examples": [
@@ -213,7 +264,8 @@
         "standaloneProtectionExists": false
       },
       "expect": {
-        "missingAttachedOutcome": "WAIT"
+        "attachedOutcomeByParent": "WAIT",
+        "attachedParentClass": "UNCONFIRMED"
       }
     },
     {
@@ -224,30 +276,39 @@
         "standaloneProtectionExists": false
       },
       "expect": {
-        "missingAttachedOutcome": "SEARCH_MORE"
+        "attachedOutcomeByParent": "SEARCH_MORE",
+        "attachedParentClass": "LIVE"
       }
     },
     {
-      "case": "родитель исполнен, позиция жива, отдельной защиты нет — покрытие потеряно",
+      "case": "родитель исполнен, цикл добычи прошёл до конца, позиция жива, отдельной защиты нет — покрытие потеряно",
       "state": {
         "parentStatus": "COMPLETED",
         "positionLive": true,
-        "standaloneProtectionExists": false
+        "standaloneProtectionExists": false,
+        "parentAccumulatedFillSize": 5
       },
       "expect": {
-        "missingAttachedOutcome": "PROTECTION_LOST"
-      }
+        "attachedParentClass": "TERMINAL_FILLED",
+        "attachedOutcomeByParent": "SEARCH_MORE",
+        "searchExhaustedOutcome": "PROTECTION_LOST"
+      },
+      "note": "Первая ступень у исполненного родителя — SEARCH_MORE: налив непуст по определению статуса, и защита материализована. PROTECTION_LOST либо ANALYSE_HISTORY — исход ВТОРОЙ ступени, когда цикл добычи живой записи не нашёл."
     },
     {
-      "case": "родитель исполнен, отдельная защита есть — потери покрытия нет",
+      "case": "родитель исполнен, цикл добычи прошёл до конца, отдельная защита есть — потери покрытия нет",
       "state": {
         "parentStatus": "COMPLETED",
         "positionLive": true,
-        "standaloneProtectionExists": true
+        "standaloneProtectionExists": true,
+        "parentAccumulatedFillSize": 5
       },
       "expect": {
-        "missingAttachedOutcome": "ANALYSE_HISTORY"
-      }
+        "attachedParentClass": "TERMINAL_FILLED",
+        "attachedOutcomeByParent": "SEARCH_MORE",
+        "searchExhaustedOutcome": "ANALYSE_HISTORY"
+      },
+      "note": "Первая ступень у исполненного родителя — SEARCH_MORE: налив непуст по определению статуса, и защита материализована. PROTECTION_LOST либо ANALYSE_HISTORY — исход ВТОРОЙ ступени, когда цикл добычи живой записи не нашёл."
     },
     {
       "case": "родитель отменён — защита закрывается по родителю",
@@ -255,11 +316,13 @@
         "parentStatus": "CANCELED",
         "positionLive": false,
         "standaloneProtectionExists": false,
-        "parentAccumulatedFillSize": 0
+        "parentAccumulatedFillSize": 0,
+        "attachedInSnapshot": true
       },
       "expect": {
-        "missingAttachedOutcome": "CANCEL_BY_PARENT"
-      }
+        "attachedOutcomeByParent": "CANCEL_BY_PARENT"
+      },
+      "note": "Элемент защиты стои́т в теле отменённого родителя (наблюдено), и это исхода не меняет: дискриминатор — налив, а не присутствие."
     },
     {
       "case": "родитель в ошибочном состоянии — защита туда же",
@@ -269,7 +332,8 @@
         "standaloneProtectionExists": false
       },
       "expect": {
-        "missingAttachedOutcome": "ERROR"
+        "attachedOutcomeByParent": "ERROR",
+        "attachedParentClass": "PROBLEM"
       }
     },
     {
@@ -293,22 +357,24 @@
         "standaloneProtectionExists": true
       },
       "expect": {
-        "missingAttachedOutcome": "SEARCH_MORE"
+        "attachedOutcomeByParent": "SEARCH_MORE",
+        "attachedParentClass": "TERMINAL_FILLED"
       }
     },
     {
       "case": "отменённый родитель БЕЗ налива уносит защиту с собой — контрпример к дискриминатору",
-      "note": "Парный: цепочка C17a наблюдала, что при нулевом наливе самостоятельной живой записи не появляется ни до отмены, ни после. Без этого примера дискриминатор мог бы стоять всегда, и CANCEL_BY_PARENT не производился бы никогда.",
+      "note": "Контрпример к дискриминатору налива, приведённый к НАБЛЮДЁННОМУ состоянию: элемент присутствует в снапшоте отменённого родителя, налив нулевой — самостоятельной живой записи не появляется ни до отмены, ни после, и защита уходит с родителем.",
       "state": {
         "parentStatus": "CANCELED",
         "parentAccumulatedFillSize": 0,
-        "attachedInSnapshot": false,
+        "attachedInSnapshot": true,
         "failCode": null,
         "positionLive": false,
         "standaloneProtectionExists": false
       },
       "expect": {
-        "missingAttachedOutcome": "CANCEL_BY_PARENT"
+        "attachedOutcomeByParent": "CANCEL_BY_PARENT",
+        "attachedParentClass": "TERMINAL_EMPTY"
       }
     },
     {
@@ -321,6 +387,34 @@
       },
       "expect": {
         "attachedBecomesActive": false
+      }
+    },
+    {
+      "case": "исполненный родитель с непустым наливом: исход тот же, что у отменённого — дискриминатор один",
+      "note": "Дискриминатор налива работает и у исполненного родителя: наблюдение источника от инициатора терминала не зависит, поэтому исход у обоих терминальных статусов один. Без операнда налива на этой ветви покрытие объявлялось бы потерянным до поиска.",
+      "state": {
+        "parentStatus": "COMPLETED",
+        "parentAccumulatedFillSize": 3,
+        "attachedInSnapshot": true,
+        "failCode": null,
+        "positionLive": true,
+        "standaloneProtectionExists": true
+      },
+      "expect": {
+        "attachedParentClass": "TERMINAL_FILLED",
+        "attachedOutcomeByParent": "SEARCH_MORE"
+      }
+    },
+    {
+      "case": "терминальный родитель с НЕДОБЫТЫМ наливом: пустота не подменяется нулём — идём искать",
+      "note": "Колонка налива nullable, и пустота достижима. Подмена нулём дала бы CANCEL_BY_PARENT на недобытом факте, то есть пометила бы снятой защиту, которая может быть жива.",
+      "state": {
+        "parentStatus": "CANCELED",
+        "attachedInSnapshot": true
+      },
+      "expect": {
+        "attachedParentClass": "TERMINAL_FILL_UNKNOWN",
+        "attachedOutcomeByParent": "SEARCH_MORE"
       }
     }
   ]

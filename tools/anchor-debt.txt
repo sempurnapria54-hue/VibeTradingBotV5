@@ -1,0 +1,59 @@
+# Объявленный долг §-адресов `.claude/**` — адреса, неразрешимые на момент
+# ввода расширенного детектора (три письменные формы вместо одной).
+# Формат: <файл>\t<имя пассажа без §>. Номеров строк нет намеренно: номер
+# дрейфует от любой правки, и реестр начал бы врать раньше, чем долг погасится.
+# Погашенный адрес обязан уйти отсюда — прогон падает на устаревшей строке.
+# Владелец погашения — knowledge-curator; носитель задачи — .claude/work/backlog.md
+# §«Долг §-адресов `.claude/**` — погашение по реестру».
+.claude/agents/knowledge-curator.md	«Находка-дубль классифицируется по природе расхождения, не по»
+.claude/decisions/executor-payload-file-granularity.md	10
+.claude/decisions/executor-payload-file-granularity.md	13
+.claude/decisions/model-layer-ontology.md	Персистентность
+.claude/decisions/proof-method-change.md	«Дизайн-проход смены способа доказательства — вход `GAPS_CLOSE_29`»
+.claude/decisions/proof-method-change.md	«Энфорсер запрета копии формулы в исполнимой спецификации»
+.claude/decisions/source-api-target-rebase.md	«Неиспользуемый код»
+.claude/decisions/source-api-target-rebase.md	Нерешённое
+.claude/processes/question-delegation.md	4
+.claude/skills/classify-type.md	Персистентность
+.claude/skills/place-knowledge.md	«Первоисточник правила»
+.claude/skills/stagnation-detection.md	«Реестр прогонов»
+.claude/skills/stagnation-detection.md	Сброс
+.claude/skills/update-roadmap-progress.md	6a
+.claude/skills/update-roadmap-progress.md	«Закрытие гейтящего узла проходит мини-петлю критики до приземления в корпус»
+.claude/skills/update-roadmap-progress.md	«Закрытие фазы N …»
+.claude/tests/source-api/okx/code-preconditions.md	AG1.9
+.claude/tests/source-api/okx/code-preconditions.md	«Гейт грунта»
+.claude/tests/source-api/okx/code-preconditions.md	«Грунт `integrator`»
+.claude/tests/source-api/okx/code-preconditions.md	«Что это значит для гейта»
+.claude/tests/source-api/okx/plan.md	AG1.5/§AG3.4/§AG3.5
+.claude/tests/source-api/okx/plan.md	Climit.
+.claude/tests/source-api/okx/plan.md	MG-базис
+.claude/tests/source-api/okx/plan.md	Validation
+.claude/tests/source-api/okx/plan.md	«Внешний источник правды»
+.claude/tests/source-api/okx/plan.md	«Идентификация записи»
+.claude/tests/source-api/okx/plan.md	Нерешённое
+.claude/work/backlog.md	5/§8
+.claude/work/backlog.md	I3
+.claude/work/backlog.md	Runtime
+.claude/work/backlog.md	«Остаточный `грунт` — величина базиса»
+.claude/work/backlog.md	«Переоценка инварианта»
+.claude/work/backlog.md	«Прочие ремарки»
+.claude/work/backlog.md	Чего
+.claude/work/backlog.md	Что
+.claude/work/decision-digest.md	2
+.claude/work/decision-digest.md	3
+.claude/work/decision-digest.md	4
+.claude/work/decision-digest.md	5a
+.claude/work/decision-digest.md	C4
+.claude/work/decision-digest.md	E
+.claude/work/decision-digest.md	H25
+.claude/work/decision-digest.md	MG-базис
+.claude/work/decision-digest.md	«Предусловия `CODE`»
+.claude/work/decision-digest.md	Слово
+.claude/work/questions/open-questions.md	MarketStructureParams
+.claude/work/questions/open-questions.md	StrategyMarketPhaseRule
+.claude/work/questions/open-questions.md	epsilon
+.claude/work/questions/open-questions.md	«Ось упущенных возможностей»
+.claude/work/questions/open-questions.md	«Порядок исполнения»
+.claude/work/questions/open-questions.md	Следствия
+.claude/work/roadmap/roadmap.md	IND-Q1.

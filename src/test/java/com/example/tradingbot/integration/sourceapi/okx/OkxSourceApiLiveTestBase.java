@@ -14,7 +14,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -399,6 +405,55 @@ abstract class OkxSourceApiLiveTestBase {
     /** Логирует именованное наблюдение кейса (величина, выведенная из ответа). */
     protected void observeValue(String caseId, String name, Object value) {
         log.info("[{}] VALUE {} = {}", caseId, name, value);
+    }
+
+    /**
+     * Сохраняет наблюдение кейса в <b>персистентный</b> носитель —
+     * {@code .claude/tests/source-api/okx/observations/<caseId>.md}.
+     *
+     * <p><b>Зачем отдельно от лога.</b> Лог носителем наблюдаемости не
+     * является: {@code docs/concept.md} прямо говорит, что сослаться на него
+     * при разборе нельзя. Слот предусловия, закрытый фактом, живущим только в
+     * логе, закрыт не был — перечень исчезает вместе с консолью прогона.
+     * Поэтому кейс, чей исход есть <b>перечень</b>, а не мощность, пишет его
+     * сюда, и файл коммитится вместе с реестром.
+     *
+     * @param caseId идентификатор кейса плана (AG6.1 и т. п.)
+     * @param title  что за перечень сохранён
+     * @param lines  строки перечня в порядке наблюдения
+     */
+    protected void persistObservation(String caseId, String title, List<String> lines) {
+        Path file = Path.of(".claude", "tests", "source-api", "okx", "observations",
+                caseId.replace('.', '_') + ".md");
+        List<String> body = new ArrayList<>();
+        if (!Files.exists(file)) {
+            body.add("# Наблюдения кейса " + caseId);
+            body.add("");
+            body.add("## На какой вопрос отвечает этот файл");
+            body.add("");
+            body.add("Что наблюдал в источнике кейс " + caseId + "?");
+            body.add("");
+            body.add("Файл пишет прогон кейса (`persistObservation`), руками не правится:");
+            body.add("расхождение с источником чинится перепрогоном, а не редактурой.");
+            body.add("Записи **дописываются**: исход каждого прогона — свой факт своего");
+            body.add("момента, и затирание прежнего стирало бы добытое.");
+        }
+        body.add("");
+        body.add("## Прогон " + Instant.now().atZone(ZoneOffset.UTC).toLocalDate() + " — " + title);
+        body.add("");
+        body.add("- **Строк перечня:** " + lines.size());
+        body.add("");
+        body.add("```text");
+        body.addAll(lines);
+        body.add("```");
+        try {
+            Files.createDirectories(file.getParent());
+            Files.write(file, body, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            log.info("[{}] СОХРАНЕНО в {} — строк {}", caseId, file, lines.size());
+        } catch (IOException failure) {
+            throw new IllegalStateException("наблюдение " + caseId + " не сохранено: " + failure.getMessage(),
+                    failure);
+        }
     }
 
     // ---------------------------------------------------------------------

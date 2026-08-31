@@ -2,7 +2,9 @@
   "subject": "protection-coverage",
   "question": "Каково покрытие защиты транша",
   "home": "docs/rules/live-risk-protection.md",
-  "includes": ["order-lifecycle"],
+  "includes": [
+    "order-lifecycle"
+  ],
   "operands": {
     "tranches[]": "транши сделки; у каждого свои заявки, защиты и обязательства",
     "tranches[].orders[].type": "ENTRY, ENTRY_ATTACHED_STOP_LOSS, REDUCE_ONLY",
@@ -105,8 +107,8 @@
     },
     {
       "name": "carriesActiveStopLevel",
-      "note": "Несёт действующий уровень остановки убытка. Тейк не несёт никогда; трейлинг — только пока цена активации пуста либо уровень уже наблюдён.",
-      "expr": "if(kind == 'TAKE_PROFIT', false, if(kind == 'TRAILING', isNull(?activationPrice) || notNull(?observedTrailingPrice), true))"
+      "note": "Несёт ДЕЙСТВУЮЩИЙ уровень остановки убытка. Тейк не несёт никогда; трейлинг — только после того, как уровень НАБЛЮДЁН. Цена активации роли не играет: трейлинг без порога активен сразу, но уровня до первого наблюдения у него всё равно нет, а защита без уровня worst-case выхода не даёт. Считать такую заявку защитой значило бы разрешить снятие прежней защиты по РАЗМЕРУ при нерезолвимом уровне — позиция осталась бы с покрытием по объёму и без worst-case выхода.",
+      "expr": "if(kind == 'TAKE_PROFIT', false, if(kind == 'TRAILING', notNull(?observedTrailingPrice), true))"
     },
     {
       "name": "isProtection",
@@ -208,13 +210,11 @@
     },
     {
       "name": "attributionComplete",
-      "provenBy": "dealCommandClosedSize",
       "note": "ПЕРВЫЙ инвариант правила — полнота атрибуции: по траншам разложено ровно столько, сколько закрыло исполнение уровня сделки. Что он ловит: несогласованные суффиксные суммы порядка (подача, не образующая суффикса) — тогда сумма приписанного расходится с закрываемым объёмом. Чего он НЕ ловит: внутренне согласованный, но НЕВЕРНЫЙ порядок — он даёт ту же сумму. Чем ловится неверный порядок: ПРЕДИКАТАМИ ПОКРЫТИЯ, и только на состоянии, где обнулённый транш уже прошёл свою дочистку и остался без защиты — там перевёрнутый порядок оставляет экспозицию непокрытой. Пока защиты живы у всех траншей, различия не видит ни один предикат. Дочистка потраншевая и гейтится нулём собственной экспозиции транша, поэтому такое состояние достижимо; носитель — пример ниже. Дом правила — docs/models/domain/aggregate/DealTranche.md. Инвариант агрегатный: на состоянии одного транша (проход транша, где соседних траншей нет по построению) он не определён.",
       "expr": "dealCloseAttributed == dealCommandClosedSize"
     },
     {
       "name": "attributionNonNegative",
-      "provenBy": "trancheCloseAttributed",
       "note": "ВТОРОЙ инвариант правила: приписанное траншу не отрицательно и не больше его gross-экспозиции — транш не уводится в минус чужим закрытием. Инвариант КОНТРАКТНЫЙ: выражение trancheCloseAttributed обеспечивает его отсечками, и на состояниях он не расходится. Его предмет — реализация правила (ассерт кода и защита от подачи объёма, превышающего gross), а не обнаружение фактов; детектор фактов здесь один — exposureReconciled.",
       "op": "all",
       "over": "tranches",
@@ -227,7 +227,7 @@
     },
     {
       "name": "protectionStopLevel",
-      "note": "Уровень остановки убытка одной защиты. У трейлинга он НАБЛЮДАЕМЫЙ: до первого наблюдения уровня нет, и величина пуста. Из isProtection такая защита выпадает только тогда, когда объявлена цена активации и та ещё не достигнута (carriesActiveStopLevel); трейлинг БЕЗ цены активации защищает сразу, в isProtection входит и уровня при этом не несёт — тогда trancheStopCurrent отказывает вычислением, а не берёт уровень у соседней защиты.",
+      "note": "Уровень остановки убытка одной защиты. У трейлинга он НАБЛЮДАЕМЫЙ: до первого наблюдения уровня нет, и величина пуста. Из isProtection такая защита выпадает до наблюдения уровня — независимо от того, объявлена ли цена активации: носителем покрытия она становится вместе с уровнем, а не раньше.",
       "expr": "if(kind == 'TRAILING', ?observedTrailingPrice, ?stopLevel)"
     },
     {
@@ -390,7 +390,7 @@
       }
     },
     {
-      "case": "трейлинг без цены активации защищает сразу",
+      "case": "трейлинг без цены активации, но БЕЗ наблюдённого уровня, покрытием не является",
       "state": {
         "position": {
           "status": "ACTIVE",
@@ -422,9 +422,10 @@
         ]
       },
       "expect": {
-        "allTranchesCovered": true,
-        "anyTrancheViolated": false
-      }
+        "allTranchesCovered": false,
+        "anyTrancheViolated": true
+      },
+      "note": "Активность без порога не делает заявку носителем worst-case выхода: уровня у неё до первого наблюдения нет. Если такой трейлинг — единственная защита транша, транш не покрыт, и это верное чтение: снимать прежнюю защиту под него нельзя, а если её уже нет — покрытия нет по существу."
     },
     {
       "case": "активированный трейлинг покрывает: уровень наблюдён",
@@ -1901,7 +1902,7 @@
       }
     },
     {
-      "case": "трейлинг без цены активации покрывает, но уровня ещё не наблюдал — уровень транша отказывает вычислением, а не берётся у соседней защиты",
+      "case": "трейлинг без наблюдённого уровня в покрытие не входит: действующий уровень берётся у той защиты, что его несёт",
       "state": {
         "deal": {
           "direction": "LONG"
@@ -1944,8 +1945,11 @@
           }
         ]
       },
-      "expectRefusal": {
-        "stopCurrentLive": "защита без наблюдённого уровня"
+      "note": "Подмены чужим уровнем здесь нет: заявка без уровня носителем покрытия не является вовсе, и уровень транша даёт встроенная защита входа. Транш при этом покрыт по существу — worst-case выход у позиции есть.",
+      "expect": {
+        "stopCurrentLive": 2910,
+        "allTranchesCovered": true,
+        "anyTrancheViolated": false
       }
     },
     {
@@ -2177,6 +2181,140 @@
         "stopCurrentLive": null,
         "anyTrancheViolated": false,
         "allTranchesCovered": false
+      }
+    },
+    {
+      "case": "контрпример: суффиксные суммы траншей не образуют суффикса — разложение закрывающего объёма расходится с закрываемым",
+      "unreachable": "followingTranchesGross — суффиксная сумма, которую проход собирает обходом траншей по порядку: у транша она равна gross всех следующих за ним. Подача, не образующая суффикса, состоянием прохода не производится; предъявлена здесь затем, чтобы инвариант полноты атрибуции имел падающее состояние, а не принимался ярлыком.",
+      "state": {
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "position": {
+          "status": "OPEN",
+          "externalSize": 4
+        },
+        "tranches": [
+          {
+            "followingTranchesGross": 0,
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 5
+              }
+            ],
+            "protections": [],
+            "commitments": []
+          },
+          {
+            "followingTranchesGross": 0,
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              }
+            ],
+            "protections": [],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": {
+        "dealCommandClosedSize": 4,
+        "dealCloseAttributed": 1,
+        "attributionComplete": false,
+        "attributionNonNegative": true
+      }
+    },
+    {
+      "case": "контрпример: закрытый защитой объём превышает налитый — приписанное траншу выходит за его gross-экспозицию",
+      "unreachable": "закрытый объём не превышает налитый: closedSize защиты пишется наблюдением её же исполнения, а исполнить она может не больше родительского филла. Отрицательная gross-экспозиция — учётная аномалия, а не состояние прохода; предъявлена затем, чтобы у контрактного инварианта было падающее состояние.",
+      "state": {
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "position": {
+          "status": "CLOSED",
+          "externalSize": 0
+        },
+        "tranches": [
+          {
+            "followingTranchesGross": 0,
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 2
+              }
+            ],
+            "protections": [
+              {
+                "id": "l0_sl",
+                "carrier": "ATTACHED",
+                "kind": "STOP",
+                "status": "COMPLETED",
+                "size": 2,
+                "parentFillSize": 2,
+                "closedSize": 5
+              }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expect": {
+        "dealGrossExposure": -3,
+        "attributionNonNegative": false
+      }
+    },
+    {
+      "case": "защита, входящая в покрытие, но без уровня — уровень транша отказывает вычислением, а не берётся у соседа",
+      "note": "Охрана от подмены чужим уровнем стои́т на защитах, которые в покрытие ВХОДЯТ: у них уровень обязателен.",
+      "state": {
+        "deal": {
+          "direction": "LONG"
+        },
+        "position": {
+          "status": "ACTIVE",
+          "externalSize": 100
+        },
+        "tranches": [
+          {
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 100
+              }
+            ],
+            "protections": [
+              {
+                "id": "a1",
+                "carrier": "ATTACHED",
+                "kind": "STOP",
+                "status": "ACTIVE",
+                "size": 100,
+                "parentFillSize": 100,
+                "stopLevel": 2910
+              },
+              {
+                "id": "s2",
+                "carrier": "STANDALONE",
+                "kind": "STOP",
+                "status": "ACTIVE",
+                "size": 100,
+                "closedSize": 0,
+                "stopLevel": null
+              }
+            ],
+            "commitments": []
+          }
+        ]
+      },
+      "expectRefusal": {
+        "stopCurrentLive": "защита покрытия без уровня"
       }
     }
   ]

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Разрывы области видимости исполнимых спецификаций (docs/spec).
+"""Разрывы области видимости и копии формы в исполнимых спецификациях.
 
 ПРЕДМЕТ ПРОВЕРКИ. Механизм `includes` нетранзитивен: раннер
 (src/test/java/com/example/tradingbot/spec/Spec.java) разворачивает у
@@ -8,91 +8,61 @@
 которые этот набор опирается. Иначе заимствованная величина отказывает
 вычислением, а прогон tools/spec-run.sh МОЛЧИТ до тех пор, пока какой-нибудь
 пример эту величину не позовёт. Скрипт ищет такие разрывы статически, без
-примеров.
+примеров. Второй предмет — копия формы: у величины один дом.
 
 КОМАНДА ЗАПУСКА (из корня репозитория):
 
-    py -3 tools/spec-scope-check.py docs/spec
+    python3 tools/spec-scope-check.py docs/spec
 
-ИМЕННО `py`. В этой среде `python` и `python3` в PATH — заглушки Windows
-Store: они печатают строку «Python» и завершаются с кодом 49, не выполнив
-скрипт. Перечня разрывов при этом нет и итоговой строки тоже нет, поэтому по
-ВЫВОДУ такой запуск читается как чистый прогон — ложный зелёный, хотя проверка
-не исполнялась вовсе. Настоящий интерпретатор поднимает только лаунчер `py`;
-код 49 без итоговой строки означает «скрипт не запускался», а не «разрывов
-нет».
+Лаунчер проверяется прогоном, а не шапкой: команда, не выполнившая файл,
+печатает пустой перечень, который читается как чистый прогон. Признак
+исполнения — строка батареи осей первым же выводом; её нет — скрипт не
+запускался.
 
-Код возврата: 0 — разрывов нет; 1 — есть (перечень в stdout).
-
-КАК СЧИТАЕТСЯ. Для каждого файла строится его область видимости ровно как в
-раннере: свои `values` плюс `values` файлов из `includes`, нетранзитивно.
-Затем идентификаторы ВСЕХ величин области (в том числе заимствованных)
-резолвятся против имён величин этой области, операндов проверяемого файла,
-операндов файла-источника величины и функций языка. Нерезолвимое имя даёт
-находку одного из двух классов.
+ФОРМЫ ПРЕДМЕТА, КОТОРЫЕ ДЕТЕКТОР ВИДИТ (объявлено, доказано осями батареи):
 
   КЛАСС A — РАЗРЫВ: имя не резолвится ничем и при этом объявлено величиной
     где-то в корпусе. Вызов такой величины откажет вычислением.
   КЛАСС B — ПОДМЕНА ДОМА ГОСТЕВЫМ СОСТОЯНИЕМ: имя резолвится ТОЛЬКО
     операндом файла-источника, а у самого имени есть дом-величина в корпусе.
-    То есть величина, у которой в корпусе есть вычислимый дом, приезжает к
-    потребителю сырым состоянием — и приедет ли, он не объявлял. Класс живой:
-    именно так величина, уехавшая из `values` в `operands`, тихо ломает
-    область видимости у тех, кто подключал её дом.
+    Величина, у которой в корпусе есть вычислимый дом, приезжает к
+    потребителю сырым состоянием — и приедет ли, он не объявлял.
+  КЛАСС C — КОПИЯ ФОРМЫ, в ДВУХ письменных формах, обе обязательны:
+    C.1 дословная — одно выражение под разными именами;
+    C.2 префиксная — одна форма на разных префиксах операнда
+        (`deal.entryPrice - deal.stopPrice` против
+         `tranche.entryPrice - tranche.stopPrice`).
+    Правило — .claude/rules/structure.md, строка docs/spec: «копия формулы
+    под другим именем ИЛИ НА ДРУГОМ ПРЕФИКСЕ ОПЕРАНДА — дефект». Прежняя
+    редакция мерила только C.1, то есть половину собственного правила.
+    ИСКЛЮЧЕНИЕ, названное тем же правилом: совпадение выражений у РАЗНЫХ
+    ПРЕДМЕТОВ (два жизненных цикла, две сущности) дублем не считается.
+    Объявляется ключом "independentFrom": "<спека>/<величина>" на величине;
+    молчаливого пропуска нет — без объявления пара остаётся находкой.
 
 ЧЕГО ИНСТРУМЕНТ НЕ МЕРИТ (названо, чтобы им не удостоверяли лишнего): общий
 операндный контракт — имена полей строк (`type`, `size`, `status`, `carrier`,
 …), которые приходят из состояния примера и дома-величины в корпусе не имеют.
 Это нормальный режим корпуса, а не дефект: файл законно берёт набор целиком и
 пользуется частью. Сколько таких имён — печатает сам прогон полем «ПРОПУЩЕНО
-ПО ОПЕРАНДНОМУ КОНТРАКТУ» итоговой строки (определение — РАЗЛИЧНЫЕ имена,
-которые не резолвятся ни величиной области, ни операндом, и дома-величины в
-корпусе не имеют). Числом в шапке оно не фиксируется: корпус живой, число
-дрейфует с каждой новой величиной, и замороженный клейм устаревает молча.
+ПО ОПЕРАНДНОМУ КОНТРАКТУ» итоговой строки. Числом в шапке оно не фиксируется:
+корпус живой, число дрейфует с каждой новой величиной.
 
-ОБЪЯВЛЕННЫЕ ОСИ И ИХ ПАДАЮЩИЕ ПРОБЫ. Инструмент, чьи оси не доказаны
-падением, ничего не удостоверяет. Каждая проба — мутация во временной копии
-(cp docs/spec/*.json target/probe-scope/), вносящая дефект ровно этой оси;
-засчитывается только при коде возврата 1. Батарея воспроизводима целиком:
+БАТАРЕЯ ОСЕЙ ИСПОЛНЯЕТСЯ ЭТОЙ ЖЕ КОМАНДОЙ, до проверки. Каждая ось —
+самодостаточная фикстура с дефектом ровно этой оси плюс контроль на ложное
+срабатывание; фикстура самодостаточна намеренно: проба, заякоренная на
+величину живого корпуса, зеленеет от любой правки этого корпуса, и
+переякоривание проб становится постоянной работой.
 
-    bash tools/spec-scope-probe.sh
-
-  ось 1 — РАЗРЫВ У ЗАИМСТВОВАННОЙ ВЕЛИЧИНЫ (класс, ради которого скрипт
-    заведён): снять "order-lifecycle" из includes файла deal-risk-numbers.
-    Ожидание: 1 разрыв — trancheHasLiveEntryOrder (из protection-coverage)
-    зовёт orderIsLive.
-  ось 2 — РАЗРЫВ У СОБСТВЕННОЙ ВЕЛИЧИНЫ: снять "order-lifecycle" из includes
-    файла protection-coverage. Ожидание: 1 разрыв — в самом
-    protection-coverage, на его собственной величине trancheHasLiveEntryOrder.
-    Потребители при этом чисты: каждый подключает order-lifecycle сам — именно
-    поэтому ось 2 не выводится из оси 1 и доказывается отдельно.
-  ось 3 — ОПЕРАНД-УКАЗАТЕЛЬ ПРИЗНАЁТСЯ ТРОПОЙ РЕЗОЛВА: удалить объявление
-    операнда hasLiveEpisode из stop-distance. Ожидание: разрыв на entryAnchor
-    — то есть молчание скрипта на действительном состоянии обеспечено именно
-    объявленным операндом, а не пропуском имени.
-  ось 4 — КЛАСС B, ПОДМЕНА ДОМА ГОСТЕВЫМ СОСТОЯНИЕМ: снять
-    "protection-coverage" из includes файла strategy-reference. Ожидание:
-    1 находка класса B — заимствованная entryAnchor стои́т на hasLiveEpisode,
-    у которого есть дом-величина, но в область видимости он не введён.
-  ось C — КОПИЯ ФОРМЫ ПОД СОБСТВЕННЫМ ИМЕНЕМ: переименовать величину-дом в
-    копию у соседа (или объявить второе имя с тем же выражением). Ожидание:
-    находка класса C — два имени несут одно выражение, и расхождение копий
-    ничем не ловится. Правило — .claude/rules/structure.md, строка docs/spec:
-    «копия формулы под другим именем или на другом префиксе операнда —
-    дефект». ИСКЛЮЧЕНИЕ, названное тем же правилом: совпадение выражений у
-    РАЗНЫХ ПРЕДМЕТОВ (два жизненных цикла, две сущности) дублем не считается —
-    перечни независимы и могут разойтись законно. Исключение объявляется в
-    самой спеке ключом "independentFrom": "<спека>/<величина>" на величине;
-    молчаливого пропуска нет — без объявления пара остаётся находкой.
-
-Зелёная проба означает, что мутация перестала попадать в носитель (файл
-переименован, форма изменилась), и проба переякоривается, а не удаляется.
+Код возврата: 0 — находок нет; 1 — есть (перечень в stdout); 2 — ПРОВЕРКА НЕ
+ПРОВОДИЛАСЬ (ось не доказана, каталога нет, спецификаций нет).
 """
 import io
 import json
 import os
 import re
 import sys
+import tempfile
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -101,125 +71,274 @@ FUNCS = {"true", "false", "null", "min", "max", "abs", "floorTo", "not",
          "isNull", "notNull", "coalesce", "if", "in"}
 IDENT = re.compile(r"\??[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*")
 
-d = sys.argv[1] if len(sys.argv) > 1 else "docs/spec"
 
-
-def load(name):
-    with io.open(os.path.join(d, name + ".json"), encoding="utf-8") as f:
-        return json.load(f)
+def load(directory, name):
+    with io.open(os.path.join(directory, name + ".json"), encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def operand_tokens(spec):
     """Имена, приходящие из состояния примера: путь операнда и его сегменты."""
-    t = set()
+    tokens = set()
     for key in spec.get("operands", {}):
         clean = key.replace("[]", "").replace("{}", "")
-        t.add(clean)
-        for seg in clean.split("."):
-            if seg:
-                t.add(seg)
-    return t
+        tokens.add(clean)
+        for segment in clean.split("."):
+            if segment:
+                tokens.add(segment)
+    return tokens
 
 
-def strip_literals(e):
-    return re.sub(r"'[^']*'", "''", e)
+def strip_literals(expression):
+    return re.sub(r"'[^']*'", "''", expression)
 
 
-specs = sorted(f[:-5] for f in os.listdir(d) if f.endswith(".json"))
-declared_in = {}
-for s in specs:
-    for v in load(s).get("values", []):
-        declared_in.setdefault(v["name"], []).append(s)
-
-bad = 0
-guest = 0
-copies = 0
-skipped = set()
-for name in specs:
-    spec = load(name)
-    incs = spec.get("includes", [])
-    scope, names = [], set()
-    for inc in incs:
-        for v in load(inc).get("values", []):
-            scope.append((inc, v))
-            names.add(v["name"])
-    for v in spec.get("values", []):
-        scope.append((name, v))
-        names.add(v["name"])
-    ops = operand_tokens(spec)
-    ops_of = {name: ops}
-    for inc in incs:
-        ops_of[inc] = operand_tokens(load(inc))
-    seen = set()
-    for origin, v in scope:
-        for slot in ("expr", "where", "of"):
-            if slot not in v or v[slot] is None:
-                continue
-            for m in IDENT.finditer(strip_literals(str(v[slot]))):
-                ident = m.group(0).lstrip("?")
-                if "." in ident or ident in FUNCS or ident in names or ident in ops:
-                    continue
-                if ident not in declared_in:
-                    skipped.add(ident)
-                    continue
-                key = (name, v["name"], ident)
-                if key in seen:
-                    continue
-                seen.add(key)
-                if ident in ops_of.get(origin, set()):
-                    if origin != name:
-                        print("КЛАСС B %s: заимствованная %s (из %s) стои́т на %s — "
-                              "дом-величина %s, но в область видимости не введена и "
-                              "приходит только состоянием"
-                              % (name, v["name"], origin, ident, ", ".join(declared_in[ident])))
-                        guest += 1
-                    continue
-                print("КЛАСС A %s: %s (из %s) зовёт %s — дом %s, в область видимости не входит"
-                      % (name, v["name"], origin, ident, ", ".join(declared_in[ident])))
-                bad += 1
-
-# --- ось C: копия формы под собственным именем -------------------------------
-def form_of(v):
+def form_of(value):
     """Нормализованная форма величины: скаляр — выражение, агрегат — его части."""
-    if v.get("expr") is not None:
-        return re.sub(r"\s+", " ", str(v["expr"])).strip()
-    parts = {k: v.get(k) for k in ("op", "over", "where", "of") if v.get(k) is not None}
+    if value.get("expr") is not None:
+        return re.sub(r"\s+", " ", str(value["expr"])).strip()
+    parts = {key: value.get(key) for key in ("op", "over", "where", "of")
+             if value.get(key) is not None}
     if not parts:
         return None
     return "АГРЕГАТ " + json.dumps(parts, ensure_ascii=False, sort_keys=True)
 
 
-forms = {}
-exempt = {}
-for name in specs:
-    for v in load(name).get("values", []):
-        form = form_of(v)
-        if form is None:
-            continue
-        forms.setdefault(form, []).append((name, v["name"]))
-        for target in ([v["independentFrom"]] if isinstance(v.get("independentFrom"), str)
-                       else v.get("independentFrom", [])):
-            exempt.setdefault((name, v["name"]), set()).add(target)
+def unprefixed(form):
+    """Форма без ПЕРВОГО сегмента точечных имён: deal.x - deal.y -> x - y."""
+    if form is None:
+        return None
+    return re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\.(?=[A-Za-z_])", "", form)
 
-for form, owners in sorted(forms.items()):
-    distinct = sorted({owner for owner in owners})
-    if len(distinct) < 2 or len({value for _, value in distinct}) < 2:
-        continue
-    labels = {owner: "%s/%s" % owner for owner in distinct}
-    unresolved = []
-    for owner in distinct:
-        others = [labels[other] for other in distinct if other != owner]
-        declared = exempt.get(owner, set())
-        if not all(other in declared for other in others):
-            unresolved.append(owner)
-    if not unresolved:
-        continue
-    print("КЛАСС C: одно выражение под разными именами — %s; форма: %s"
-          % (", ".join(labels[owner] for owner in distinct), form[:120]))
-    copies += 1
 
-print("РАЗРЫВОВ (A): %d; ПОДМЕН ДОМА ГОСТЕВЫМ СОСТОЯНИЕМ (B): %d; "
-      "КОПИЙ ФОРМЫ ПОД СОБСТВЕННЫМ ИМЕНЕМ (C): %d; "
-      "ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ (не дефект): %d имён"
-      % (bad, guest, copies, len(skipped)))
-sys.exit(1 if bad or guest or copies else 0)
+def scope_findings(directory, specs, declared_in, out):
+    """Классы A и B: область видимости величин."""
+    broken, guest, skipped = 0, 0, set()
+    for name in specs:
+        spec = load(directory, name)
+        includes = spec.get("includes", [])
+        scope, names = [], set()
+        for included in includes:
+            for value in load(directory, included).get("values", []):
+                scope.append((included, value))
+                names.add(value["name"])
+        for value in spec.get("values", []):
+            scope.append((name, value))
+            names.add(value["name"])
+        operands = {name: operand_tokens(spec)}
+        for included in includes:
+            operands[included] = operand_tokens(load(directory, included))
+        seen = set()
+        for origin, value in scope:
+            for slot in ("expr", "where", "of"):
+                if slot not in value or value[slot] is None:
+                    continue
+                for match in IDENT.finditer(strip_literals(str(value[slot]))):
+                    ident = match.group(0).lstrip("?")
+                    if "." in ident or ident in FUNCS or ident in names or ident in operands[name]:
+                        continue
+                    if ident not in declared_in:
+                        skipped.add(ident)
+                        continue
+                    key = (name, value["name"], ident)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    if ident in operands.get(origin, set()):
+                        if origin != name:
+                            out.append("КЛАСС B %s: заимствованная %s (из %s) стои́т на %s — "
+                                       "дом-величина %s, но в область видимости не введена и "
+                                       "приходит только состоянием"
+                                       % (name, value["name"], origin, ident,
+                                          ", ".join(declared_in[ident])))
+                            guest += 1
+                        continue
+                    out.append("КЛАСС A %s: %s (из %s) зовёт %s — дом %s, в область "
+                               "видимости не входит"
+                               % (name, value["name"], origin, ident, ", ".join(declared_in[ident])))
+                    broken += 1
+    return broken, guest, skipped
+
+
+def copy_findings(directory, specs, out):
+    """Класс C: копия формы — дословная и на другом префиксе операнда."""
+    literal, prefixless, exempt = {}, {}, {}
+    for name in specs:
+        for value in load(directory, name).get("values", []):
+            form = form_of(value)
+            if form is None:
+                continue
+            literal.setdefault(form, []).append((name, value["name"]))
+            prefixless.setdefault(unprefixed(form), []).append((name, value["name"]))
+            declared = value.get("independentFrom", [])
+            for target in [declared] if isinstance(declared, str) else declared:
+                exempt.setdefault((name, value["name"]), set()).add(target)
+
+    def report(groups, label, seen):
+        found = 0
+        for form, owners in sorted(groups.items()):
+            distinct = sorted(set(owners))
+            if len(distinct) < 2 or len({value for _, value in distinct}) < 2:
+                continue
+            key = tuple(distinct)
+            if key in seen:
+                continue
+            seen.add(key)
+            labels = {owner: "%s/%s" % owner for owner in distinct}
+            resolved = all(
+                all(labels[other] in exempt.get(owner, set())
+                    for other in distinct if other != owner)
+                for owner in distinct)
+            if resolved:
+                continue
+            out.append("%s: %s; форма: %s"
+                       % (label, ", ".join(labels[owner] for owner in distinct), form[:120]))
+            found += 1
+        return found
+
+    seen = set()
+    copies = report(literal, "КЛАСС C.1: одно выражение под разными именами", seen)
+    copies += report(prefixless, "КЛАСС C.2: одна форма на разных префиксах операнда", seen)
+    return copies
+
+
+def scan(directory):
+    """Полный разбор каталога. Возвращает (строки, счёт) либо отказ."""
+    if not os.path.isdir(directory):
+        return None, "каталог спецификаций %s не найден" % directory
+    specs = sorted(name[:-5] for name in os.listdir(directory) if name.endswith(".json"))
+    if not specs:
+        return None, "в каталоге %s нет ни одной спецификации — проверять нечего" % directory
+    declared_in = {}
+    for name in specs:
+        for value in load(directory, name).get("values", []):
+            declared_in.setdefault(value["name"], []).append(name)
+    if not declared_in:
+        return None, "ни одной величины не объявлено — проверять нечего"
+    out = []
+    broken, guest, skipped = scope_findings(directory, specs, declared_in, out)
+    copies = copy_findings(directory, specs, out)
+    return (out, (broken, guest, copies, len(skipped))), None
+
+
+# --- батарея осей ------------------------------------------------------------
+
+def write(directory, name, body):
+    with io.open(os.path.join(directory, name + ".json"), "w", encoding="utf-8") as handle:
+        json.dump(body, handle, ensure_ascii=False)
+
+
+def value(name, expr, **extra):
+    body = {"name": name, "note": "фикстура батареи", "expr": expr}
+    body.update(extra)
+    return body
+
+
+def battery():
+    axes = []
+    with tempfile.TemporaryDirectory() as work:
+        def area(name):
+            path = os.path.join(work, name)
+            os.makedirs(path, exist_ok=True)
+            return path
+
+        def axis(title, directory, marker, expected):
+            result, refusal = scan(directory)
+            if refusal:
+                axes.append((title, False, "отказ: " + refusal))
+                return
+            lines, _counts = result
+            hits = [line for line in lines if line.startswith(marker)]
+            axes.append((title, bool(hits) == expected,
+                         "находок «%s»: %d (всего %d)" % (marker, len(hits), len(lines))))
+
+        # A: дом заимствованной величины не подключён потребителем
+        one = area("a")
+        write(one, "base", {"subject": "base", "values": [value("orderIsLive", "status == 'LIVE'")]})
+        write(one, "mid", {"subject": "mid", "includes": ["base"],
+                           "values": [value("trancheHasLive", "orderIsLive")]})
+        write(one, "top", {"subject": "top", "includes": ["mid"],
+                           "values": [value("dealHasLive", "trancheHasLive")]})
+        axis("1. класс A: дом заимствованной величины не подключён", one, "КЛАСС A", True)
+
+        # контроль A: тот же расклад, но дом подключён
+        two = area("b")
+        write(two, "base", {"subject": "base", "values": [value("orderIsLive", "status == 'LIVE'")]})
+        write(two, "mid", {"subject": "mid", "includes": ["base"],
+                           "values": [value("trancheHasLive", "orderIsLive")]})
+        write(two, "top", {"subject": "top", "includes": ["mid", "base"],
+                           "values": [value("dealHasLive", "trancheHasLive")]})
+        axis("2. контроль: дом подключён — разрыва нет", two, "КЛАСС A", False)
+
+        # B: имя приходит операндом источника, а дом-величина есть в корпусе
+        three = area("c")
+        write(three, "base", {"subject": "base", "values": [value("orderIsLive", "status == 'LIVE'")]})
+        write(three, "mid", {"subject": "mid", "operands": {"orderIsLive": "приходит состоянием"},
+                             "values": [value("trancheHasLive", "orderIsLive")]})
+        write(three, "top", {"subject": "top", "includes": ["mid"],
+                             "values": [value("dealHasLive", "trancheHasLive")]})
+        axis("3. класс B: дом подменён гостевым состоянием", three, "КЛАСС B", True)
+
+        # C.1: одно выражение под разными именами
+        four = area("d")
+        write(four, "left", {"subject": "left", "operands": {"deal.entryPrice": "", "deal.stopPrice": ""},
+                             "values": [value("riskLeft", "deal.entryPrice - deal.stopPrice")]})
+        write(four, "right", {"subject": "right", "operands": {"deal.entryPrice": "", "deal.stopPrice": ""},
+                              "values": [value("riskRight", "deal.entryPrice - deal.stopPrice")]})
+        axis("4. класс C.1: одно выражение под разными именами", four, "КЛАСС C.1", True)
+
+        # C.2: та же форма на другом префиксе операнда
+        five = area("e")
+        write(five, "left", {"subject": "left", "operands": {"deal.entryPrice": "", "deal.stopPrice": ""},
+                             "values": [value("riskLeft", "deal.entryPrice - deal.stopPrice")]})
+        write(five, "right", {"subject": "right", "operands": {"tranche.entryPrice": "", "tranche.stopPrice": ""},
+                              "values": [value("riskRight", "tranche.entryPrice - tranche.stopPrice")]})
+        axis("5. класс C.2: одна форма на разных префиксах операнда", five, "КЛАСС C.2", True)
+
+        # контроль C: объявленная независимость снимает находку
+        six = area("f")
+        write(six, "left", {"subject": "left", "operands": {"deal.entryPrice": "", "deal.stopPrice": ""},
+                            "values": [value("riskLeft", "deal.entryPrice - deal.stopPrice",
+                                             independentFrom="right/riskRight")]})
+        write(six, "right", {"subject": "right", "operands": {"tranche.entryPrice": "", "tranche.stopPrice": ""},
+                             "values": [value("riskRight", "tranche.entryPrice - tranche.stopPrice",
+                                              independentFrom="left/riskLeft")]})
+        axis("6. контроль: объявленная независимость снимает находку класса C", six, "КЛАСС C", False)
+
+        # базовый гейт
+        _, refusal = scan(os.path.join(work, "нет-такого"))
+        axes.append(("7. каталога нет — проверка отказывает", bool(refusal),
+                     refusal or "проверка отчиталась"))
+        _, refusal = scan(area("g"))
+        axes.append(("8. спецификаций нет — проверка отказывает", bool(refusal),
+                     refusal or "проверка отчиталась"))
+    return axes
+
+
+def main():
+    directory = sys.argv[1] if len(sys.argv) > 1 else "docs/spec"
+    axes = battery()
+    print("--- батарея осей детектора (исполняется той же командой)")
+    for title, passed, observed in axes:
+        print("  %s: %s — %s" % ("доказана" if passed else "НЕ ДОКАЗАНА", title, observed))
+    broken = [title for title, passed, _ in axes if not passed]
+    if broken:
+        print("ПРОВЕРКА НЕ ПРОВОДИТСЯ: недоказанных осей %d — перечень находок "
+              "ничего не удостоверял бы" % len(broken))
+        return 2
+
+    result, refusal = scan(directory)
+    if refusal:
+        print("ПРОВЕРКА НЕ ПРОВОДИТСЯ: " + refusal)
+        return 2
+    lines, (gaps, guest, copies, skipped) = result
+    for line in lines:
+        print(line)
+    print("РАЗРЫВОВ (A): %d; ПОДМЕН ДОМА ГОСТЕВЫМ СОСТОЯНИЕМ (B): %d; "
+          "КОПИЙ ФОРМЫ (C): %d; ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ (не дефект): %d имён"
+          % (gaps, guest, copies, skipped))
+    return 1 if gaps or guest or copies else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

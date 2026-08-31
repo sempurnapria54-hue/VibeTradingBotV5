@@ -1,36 +1,29 @@
 # Vibe Trading Bot
 
+Алготрейдинговый бот. Java 25 + Spring Boot 4 + PostgreSQL.
+Базовые правила проекта — `CLAUDE.md`; карта базы знания —
+`.claude/knowledge-tree.md`.
+
 ## Запуск зависимостей (Postgres + Vault)
 
 ```bash
 docker compose up -d
 ```
 
-Vault UI будет доступен по адресу: <http://localhost:8200>
+Vault UI — <http://localhost:8200>. Инициализация, unseal и запись
+секретов, а также проброс `VAULT_TOKEN` — `.claude/tests/source-api/okx/`
+`code-preconditions.md` §«Воспроизводимые команды»: там же живут
+проверенные прогоном пути JDK и Maven.
 
-Подробная инструкция по инициализации Vault, unseal и записи секретов:
+## Сборка и запуск
 
-- `docs/ops/vault_local.md`
+Команда сборки и лаунчер Python **здесь не дублируются** — у них один дом
+(`.claude/tests/source-api/okx/code-preconditions.md` §«Среда контура —
+проверено прогоном, не выведено»). Копия в этом файле стареет первой: две
+прежние редакции README предписывали `./mvnw` и `mvn`, которых в среде
+нет.
 
-## Подготовка переменной окружения VAULT_TOKEN
-
-После инициализации и логина в Vault экспортируйте токен:
-
-```bash
-export VAULT_TOKEN=<ROOT_TOKEN>
-```
-
-## Запуск сервиса
-
-```bash
-./mvnw spring-boot:run
-```
-
-Если Maven Wrapper недоступен, используйте:
-
-```bash
-mvn spring-boot:run
-```
+Рантайм-прогон приложения делает пользователь в IDEA.
 
 ## Проверка
 

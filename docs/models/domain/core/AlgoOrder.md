@@ -63,10 +63,22 @@ runtime-сущность» живёт в строке исполнения, по
 **`Status`** — `CREATED`, `PENDING`, `ACTIVE`, `PARTIALLY_COMPLETED`,
 `COMPLETED`, `CANCELED`, `ERROR`.
 
-**`CloseReason`** — `TRIGGERED`, `CANCELED_BY_STRATEGY`,
-`REPLACED_BY_STRATEGY`, `KILL_SWITCH`,
-`MISSING_AFTER_REFRESH`, `ORDER_FAILED`, `PARTIALLY_FAILED`,
-`UNKNOWN_EXTERNAL_STATUS`, `EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`.
+**`CloseReason`** — у каждого значения назван производитель
+(`docs/rules/writer-named-for-every-value.md`):
+
+| Значение | Кто производит |
+|---|---|
+| `TRIGGERED` | резолвер внешнего статуса на сработавшей условной заявке (`docs/rules/external-status-resolution.md`) |
+| `CANCELED_BY_STRATEGY` | исполнитель отмены условной заявки по объявленному действию |
+| `REPLACED_BY_STRATEGY` | исполнитель замещения — на снимаемом звене цепочки (`docs/rules/replace-not-amend.md`) |
+| `KILL_SWITCH` | исполнитель снятия живого риска (`docs/components/KillSwitchExecutor.md`) |
+| `MISSING_AFTER_REFRESH` | исполнитель добычи условной заявки, исчерпавший цикл источников |
+| `ORDER_FAILED` | резолвер внешнего статуса: биржа отвергла постановку целиком |
+| `PARTIALLY_FAILED` | он же: часть пакета встала, часть отвергнута |
+| `UNKNOWN_EXTERNAL_STATUS` | резолвер внешнего статуса, ветвь `REFUSED` (`docs/spec/external-status-resolution.json`) |
+| `EXCHANGE_INVARIANT_VIOLATION` | исполнитель, наблюдавший нарушение биржевого инварианта |
+| `UNKNOWN` | умолчание разбора |
+
 `MANUAL_CANCEL` снят — `docs/rules/manual-halt.md`.
 
 **`ConditionType`** — `STOP_LOSS`, `PARTIAL_STOP_LOSS`, `TAKE_PROFIT`,

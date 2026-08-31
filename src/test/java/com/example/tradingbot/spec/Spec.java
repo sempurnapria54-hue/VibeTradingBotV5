@@ -1,5 +1,6 @@
 package com.example.tradingbot.spec;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -27,14 +28,60 @@ public final class Spec {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /**
+     * Разбор со <b>строгим</b> отношением к повторному ключу.
+     *
+     * <p><b>Зачем.</b> Обычный разбор молча оставляет ПОСЛЕДНЮЮ пару, и
+     * действующей декларацией становится та редакция, которая случайно
+     * оказалась ниже, — а предыдущая исчезает без следа. Ни один детектор
+     * корпуса этого не видит: он читает уже разобранное дерево, где дубля
+     * нет. Замер по всему телу спек нашёл ровно один такой ключ, и выживала
+     * неверная половина: контракт операнда противоречил и величине, которая
+     * его резолвит, и собственному примеру спеки.
+     */
+    private static final ObjectMapper STRICT_MAPPER = new ObjectMapper()
+            .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+
     /** Спецификация проверяет алгебру, а не десятичный шум округления. */
     private static final BigDecimal TOLERANCE = new BigDecimal("1e-9");
+
+    /**
+     * Префикс расхождения, вызванного отказом корпуса, а не содержанием
+     * примера: нечитаемый артефакт {@code stateFrom}, неразобранный файл.
+     *
+     * <p>Различение обязательно. Потребитель, считающий падением <b>любое</b>
+     * расхождение, на сломанном корпусе получает «упало везде» и читает это
+     * как «проверка сработала везде»: сломанный корпус выглядит лучше
+     * здорового. Системный отказ означает «мерить нечем», а не «мутация
+     * замечена».
+     */
+    public static final String SYSTEM_FAILURE = "СИСТЕМНЫЙ ОТКАЗ: ";
 
     private final String subject;
 
     private final Map<String, Map<String, Object>> values = new LinkedHashMap<>();
 
     private final List<Map<String, Object>> examples = new ArrayList<>();
+
+    /**
+     * Объявленные популяции: перечни состояний, на которых правило спеки
+     * обязано выполняться.
+     *
+     * <p><b>Зачем.</b> Прогон примеров показывает, что объявленные величины
+     * сходятся на тех состояниях, которые кто-то догадался подать. Он не
+     * показывает, что поданы <b>все</b> состояния, где правило обязано
+     * выполняться: правка, верная на состоянии-источнике находки, проходит
+     * зелёной, а достижимое состояние без примера остаётся неизмеренным и
+     * возвращается следующим прогоном. Популяция делает перечень таких
+     * состояний исполнимым: каждый объявленный член обязан быть предъявлен
+     * примером, а объявленный недостижимым — контрпримером, называющим, чем
+     * состояние исключено.
+     *
+     * <p>Дом нормы — {@code .claude/processes/roadmap-step-execution.md}
+     * §«Популяция правила предъявляется до правки, а не после»; процедура —
+     * {@code .claude/skills/closure-population.md}.
+     */
+    private final List<Map<String, Object>> populations = new ArrayList<>();
 
     private Spec(Map<String, Object> raw, Path directory) throws IOException {
         this.subject = String.valueOf(raw.get("subject"));
@@ -46,6 +93,9 @@ public final class Spec {
         addValues(list(raw.get("values")), subject);
         for (Object example : list(raw.get("examples"))) {
             examples.add(asMap(example));
+        }
+        for (Object population : list(raw.get("populations"))) {
+            populations.add(asMap(population));
         }
     }
 
@@ -92,7 +142,14 @@ public final class Spec {
         List<String> failures = new ArrayList<>();
         for (Map<String, Object> example : examples) {
             String label = String.valueOf(example.get("case"));
-            Map<String, Object> state = stateOf(example);
+            Map<String, Object> state;
+            try {
+                state = stateOf(example);
+            } catch (RuntimeException failure) {
+                failures.add(SYSTEM_FAILURE + "%s / %s — состояние не собрано: %s"
+                        .formatted(subject, label, failure.getMessage()));
+                continue;
+            }
             for (Map.Entry<String, Object> expected : asMap(example.get("expect")).entrySet()) {
                 String name = expected.getKey();
                 try {
@@ -101,7 +158,10 @@ public final class Spec {
                         failures.add("%s / %s: %s ожидалось %s, получено %s"
                                 .formatted(subject, label, name, expected.getValue(), actual));
                     }
-                } catch (SpecException failure) {
+                } catch (RuntimeException failure) {
+                    // Любой отказ ВЫЧИСЛЕНИЯ — расхождение примера, а не отказ
+                    // корпуса: пример его заметил. Отказ корпуса (несобранное
+                    // состояние, неразобранный файл) помечен отдельно.
                     failures.add("%s / %s: %s — отказ вычисления: %s"
                             .formatted(subject, label, name, failure.getMessage()));
                 }
@@ -111,7 +171,133 @@ public final class Spec {
                 failures.addAll(checkRefusal(label, state, asMap(refusal)));
             }
         }
+        failures.addAll(populationFailures());
         return failures;
+    }
+
+    /**
+     * Проверка объявленных популяций: каждый член предъявлен примером.
+     *
+     * <p>Три вида расхождения, и все три обязательны:
+     * <ul>
+     *   <li>объявленный достижимым член, которого не предъявил ни один
+     *       обычный пример, — состояние, на котором правило не проверялось;
+     *   <li>объявленный недостижимым член без контрпримера — недостижимость
+     *       осталась прозой, а проза перечнем не проверяется;
+     *   <li>пример, предъявляющий члена, которого перечень не объявляет, —
+     *       перечень неполон, и его клейм полноты ложен.
+     * </ul>
+     *
+     * <p>Пример, у которого хоть одно ключевое выражение не разрешается,
+     * в популяции не участвует (у него нет её осей). Необязательный ключ
+     * {@code where} сужает участие явным условием — им отсекаются примеры,
+     * предъявляющие спеке состояние <b>вне</b> популяции намеренно (проба
+     * недопустимого перехода при популяции допустимых). Популяция, в которой
+     * не участвовал ни один пример, — расхождение: перечень объявлен и не
+     * измерен ничем.
+     */
+    private List<String> populationFailures() {
+        List<String> failures = new ArrayList<>();
+        for (Map<String, Object> population : populations) {
+            String axis = String.valueOf(population.get("axis"));
+            List<Object> keys = list(population.get("keys"));
+            Object filter = population.get("where");
+            Map<String, Integer> byOrdinary = new LinkedHashMap<>();
+            Map<String, Integer> byCounter = new LinkedHashMap<>();
+            Map<String, String> firstCase = new LinkedHashMap<>();
+            int participants = 0;
+            for (Map<String, Object> example : examples) {
+                Map<String, Object> state;
+                try {
+                    state = stateOf(example);
+                } catch (RuntimeException failure) {
+                    continue;
+                }
+                if (filter != null) {
+                    try {
+                        if (!SpecExpression.truth(SpecExpression.parse(String.valueOf(filter))
+                                .eval(id -> resolve(id, state, Map.of(), new ArrayDeque<>())))) {
+                            continue;
+                        }
+                    } catch (RuntimeException failure) {
+                        continue;
+                    }
+                }
+                List<String> tuple = new ArrayList<>();
+                boolean participates = true;
+                for (Object key : keys) {
+                    try {
+                        Object actual = SpecExpression.parse(String.valueOf(key))
+                                .eval(id -> resolve(id, state, Map.of(), new ArrayDeque<>()));
+                        tuple.add(String.valueOf(actual));
+                    } catch (RuntimeException failure) {
+                        participates = false;
+                        break;
+                    }
+                }
+                if (!participates) {
+                    continue;
+                }
+                participants++;
+                String member = String.join(" → ", tuple);
+                boolean counter = example.containsKey("unreachable");
+                (counter ? byCounter : byOrdinary).merge(member, 1, Integer::sum);
+                firstCase.putIfAbsent(member, String.valueOf(example.get("case")));
+            }
+            if (participants == 0) {
+                failures.add("%s / популяция «%s»: не измерена ни одним примером — "
+                        .formatted(subject, axis)
+                        + "перечень объявлен, и ни один пример не предъявил его осей");
+                continue;
+            }
+            List<String> declared = new ArrayList<>();
+            for (Object entry : list(population.get("members"))) {
+                Map<String, Object> single = asMap(entry);
+                List<Object> parts = list(single.get("member"));
+                List<String> asText = new ArrayList<>();
+                for (Object part : parts) {
+                    asText.add(String.valueOf(part));
+                }
+                String member = String.join(" → ", asText);
+                declared.add(member);
+                boolean unreachable = single.containsKey("unreachable");
+                if (unreachable) {
+                    if (byCounter.getOrDefault(member, 0) == 0) {
+                        failures.add(("%s / популяция «%s»: член «%s» объявлен недостижимым, "
+                                + "а контрпримера, предъявляющего это состояние, нет — "
+                                + "недостижимость осталась прозой")
+                                .formatted(subject, axis, member));
+                    }
+                } else if (byOrdinary.getOrDefault(member, 0) == 0) {
+                    failures.add(("%s / популяция «%s»: член «%s» не предъявлен ни одним "
+                            + "примером — состояние, на котором правило не проверялось")
+                            .formatted(subject, axis, member));
+                }
+            }
+            for (String observed : firstCase.keySet()) {
+                if (!declared.contains(observed)) {
+                    failures.add(("%s / популяция «%s»: пример «%s» предъявляет члена «%s», "
+                            + "которого перечень не объявляет — клейм полноты перечня ложен")
+                            .formatted(subject, axis, firstCase.get(observed), observed));
+                }
+            }
+        }
+        return failures;
+    }
+
+    /** Число объявленных членов популяций каталога и из них недостижимых. */
+    public int[] populationSize() {
+        int members = 0;
+        int unreachable = 0;
+        for (Map<String, Object> population : populations) {
+            for (Object entry : list(population.get("members"))) {
+                members++;
+                if (asMap(entry).containsKey("unreachable")) {
+                    unreachable++;
+                }
+            }
+        }
+        return new int[] {populations.size(), members, unreachable};
     }
 
     /**
@@ -248,6 +434,176 @@ public final class Spec {
         return expected.toString().equals(actual.toString());
     }
 
+    /**
+     * Базовый гейт корпуса: есть ли что мерить и цел ли вход.
+     *
+     * <p><b>Зачем.</b> Всякая измерительная команда, у которой нет базового
+     * гейта, на сломанном входе отчитывается вместо отказа: перечень пуст,
+     * последняя строка зелена, и это читается как «дефектов нет». Гейт
+     * отделяет «измерено, дефектов нет» от «мерить было нечем».
+     *
+     * <p>Проверяется: каталог непуст; каждый файл разбирается и загружается;
+     * каждый пример сходится (включая системные отказы — нечитаемый
+     * {@code stateFrom}); ни одна величина не несёт снятый ключ
+     * {@code provenBy}; каждый контрпример называет, чем его состояние
+     * исключено.
+     *
+     * @return перечень препятствий; пустой — гейт пройден
+     */
+    public static List<String> baseGate(Path directory) {
+        List<String> obstacles = new ArrayList<>();
+        List<Path> files;
+        try {
+            files = specFiles(directory);
+        } catch (IOException failure) {
+            return List.of("каталог спецификаций не прочитан: " + directory + " — " + failure.getMessage());
+        }
+        if (files.isEmpty()) {
+            return List.of("в каталоге " + directory + " нет ни одной спецификации — мерить нечего");
+        }
+        obstacles.addAll(hiddenSpecFiles(directory));
+        int declared = 0;
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            Map<String, Object> raw;
+            try {
+                raw = asMap(MAPPER.readValue(file.toFile(), Map.class));
+            } catch (IOException | RuntimeException failure) {
+                obstacles.add(name + " — файл не разобран: " + failure.getMessage());
+                continue;
+            }
+            Object values = raw.get("values");
+            if (values != null && !(values instanceof List)) {
+                obstacles.add(name + " — ключ values не список: корпус структурно битый, а не «дефектов нет»");
+                continue;
+            }
+            declared += list(values).size();
+            obstacles.addAll(duplicateKeyObstacles(name, file));
+            obstacles.addAll(structuralObstacles(name, raw));
+            try {
+                load(file).run().stream()
+                        .map(failure -> name + " — " + failure)
+                        .forEach(obstacles::add);
+            } catch (IOException | RuntimeException failure) {
+                obstacles.add(name + " — спецификация не загружена: " + failure.getMessage());
+            }
+        }
+        if (declared == 0) {
+            obstacles.add("в каталоге " + directory + " не объявлено ни одной величины — мерить нечего");
+        }
+        return obstacles;
+    }
+
+    /**
+     * Повторный ключ JSON в одном объекте.
+     *
+     * <p>Форма предмета, которой не видит ни один детектор корпуса: они
+     * читают разобранное дерево, а в нём дубля уже нет — парсер оставил
+     * последнюю пару. Поэтому проверка идёт <b>строгим разбором самого
+     * файла</b>, а не обходом дерева.
+     */
+    private static List<String> duplicateKeyObstacles(String name, Path file) {
+        try {
+            STRICT_MAPPER.readValue(file.toFile(), Map.class);
+            return List.of();
+        } catch (IOException | RuntimeException failure) {
+            return List.of(name + " — повторный ключ JSON: парсер молча оставляет последнюю пару, "
+                    + "и предыдущая редакция исчезает без следа (" + failure.getMessage() + ")");
+        }
+    }
+
+    /**
+     * Спецификации, лежащие в ПОДКАТАЛОГАХ каталога спек.
+     *
+     * <p>Перечень файлов нерекурсивен намеренно — область измерения должна
+     * быть плоской и обозримой. Но файл, уехавший в подкаталог, тогда молча
+     * выпадает из замера, а прогон остаётся зелёным: «измерено» и «не
+     * попало в измерение» перестают различаться. Поэтому такой файл —
+     * препятствие базового гейта, а не тихий пропуск.
+     */
+    private static List<String> hiddenSpecFiles(Path directory) {
+        List<String> hidden = new ArrayList<>();
+        try (Stream<Path> paths = Files.walk(directory)) {
+            paths.filter(path -> path.getFileName().toString().endsWith(".json"))
+                    .filter(path -> !directory.equals(path.getParent()))
+                    .forEach(path -> hidden.add(path + " — спецификация в подкаталоге: в область измерения "
+                            + "не попадает, а прогон остаётся зелёным"));
+        } catch (IOException failure) {
+            hidden.add("каталог " + directory + " не обойдён: " + failure.getMessage());
+        }
+        return hidden;
+    }
+
+    /**
+     * Структурные препятствия одного файла: снятый ключ-исключение и
+     * контрпример без названного основания недостижимости.
+     */
+    private static List<String> structuralObstacles(String name, Map<String, Object> raw) {
+        List<String> obstacles = new ArrayList<>();
+        for (Object value : list(raw.get("values"))) {
+            Map<String, Object> definition = asMap(value);
+            if (definition.containsKey("provenBy")) {
+                obstacles.add(name + " / " + definition.get("name") + " — ключ provenBy снят: "
+                        + "класс «величина-теорема» упразднён, охранный инвариант доказывается "
+                        + "предъявленным контрпримером (см. .claude/processes/roadmap-step-execution.md "
+                        + "§«Охранный инвариант доказывается предъявленным контрпримером»)");
+            }
+        }
+        for (Object population : list(raw.get("populations"))) {
+            Map<String, Object> single = asMap(population);
+            String axis = String.valueOf(single.get("axis"));
+            if (list(single.get("keys")).isEmpty()) {
+                obstacles.add(name + " / популяция «" + axis + "» — не объявлены ключи оси: "
+                        + "по чему перебирается перечень, неизвестно");
+            }
+            if (list(single.get("members")).isEmpty()) {
+                obstacles.add(name + " / популяция «" + axis + "» — перечень членов пуст: "
+                        + "популяция без членов зелена всегда и не мерит ничего");
+            }
+            for (Object entry : list(single.get("members"))) {
+                Map<String, Object> member = asMap(entry);
+                if (list(member.get("member")).isEmpty()) {
+                    obstacles.add(name + " / популяция «" + axis + "» — член без ключа member");
+                }
+                if (member.containsKey("unreachable")
+                        && String.valueOf(member.get("unreachable")).trim().isEmpty()) {
+                    obstacles.add(name + " / популяция «" + axis + "» — член "
+                            + member.get("member") + " объявлен недостижимым, "
+                            + "но не назвал, чем состояние исключено");
+                }
+            }
+        }
+        for (Object example : list(raw.get("examples"))) {
+            Map<String, Object> single = asMap(example);
+            if (!single.containsKey("unreachable")) {
+                continue;
+            }
+            String reason = String.valueOf(single.get("unreachable")).trim();
+            if (reason.isEmpty() || "null".equals(reason)) {
+                obstacles.add(name + " / " + single.get("case")
+                        + " — контрпример не называет, чем его состояние исключено");
+            }
+            if (asMap(single.get("expect")).isEmpty() && single.get("expectRefusal") == null) {
+                obstacles.add(name + " / " + single.get("case")
+                        + " — контрпример ничего не ожидает: он не предъявляет падения");
+            }
+        }
+        return obstacles;
+    }
+
+    /** Число примеров-контрпримеров каталога: состояний, исключённых по построению. */
+    public static int counterExamples(Path directory) throws IOException {
+        int counter = 0;
+        for (Path file : specFiles(directory)) {
+            for (Object example : list(asMap(MAPPER.readValue(file.toFile(), Map.class)).get("examples"))) {
+                if (asMap(example).containsKey("unreachable")) {
+                    counter++;
+                }
+            }
+        }
+        return counter;
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(Object value) {
         return value == null ? Map.of() : (Map<String, Object>) value;
@@ -258,18 +614,59 @@ public final class Spec {
         return value == null ? List.of() : (List<Object>) value;
     }
 
-    /** Автономный прогон: {@code java Spec <каталог-спецификаций>}. */
+    /**
+     * Автономный прогон: {@code java Spec <каталог-спецификаций>}.
+     *
+     * <p>Код возврата: 0 — примеры сошлись; 1 — есть расхождения; 2 — прогон
+     * <b>не состоялся</b> (каталога нет, спецификаций нет, файл не разобран,
+     * состояние примера не собрано). Третий код заведён затем, чтобы
+     * «прогонять было нечего» не читалось как «расхождений нет».
+     */
     public static void main(String[] args) throws IOException {
         Path directory = Path.of(args.length > 0 ? args[0] : "docs/spec");
-        List<String> failures = new ArrayList<>();
-        int cases = 0;
-        for (Path file : specFiles(directory)) {
-            Spec spec = load(file);
-            cases += spec.examples().size();
-            failures.addAll(spec.run());
+        if (!Files.isDirectory(directory)) {
+            System.out.println("ПРОГОН НЕ СОСТОЯЛСЯ: каталог спецификаций не найден — " + directory);
+            System.exit(2);
         }
-        System.out.println("Спецификаций: " + specFiles(directory).size() + ", примеров: " + cases);
+        List<Path> files = specFiles(directory);
+        if (files.isEmpty()) {
+            System.out.println("ПРОГОН НЕ СОСТОЯЛСЯ: в каталоге " + directory
+                    + " нет ни одной спецификации — прогонять нечего");
+            System.exit(2);
+        }
+        List<String> failures = new ArrayList<>();
+        List<String> refusals = new ArrayList<>();
+        int cases = 0;
+        int populations = 0;
+        int members = 0;
+        int unreachableMembers = 0;
+        for (Path file : files) {
+            try {
+                Spec spec = load(file);
+                cases += spec.examples().size();
+                int[] size = spec.populationSize();
+                populations += size[0];
+                members += size[1];
+                unreachableMembers += size[2];
+                failures.addAll(spec.run());
+            } catch (IOException | RuntimeException failure) {
+                refusals.add(file.getFileName() + " — спецификация не загружена: " + failure.getMessage());
+            }
+        }
+        failures.stream().filter(failure -> failure.startsWith(SYSTEM_FAILURE)).forEach(refusals::add);
+        failures.removeIf(failure -> failure.startsWith(SYSTEM_FAILURE));
+
+        System.out.println("Спецификаций: " + files.size() + ", примеров: " + cases
+                + " (из них контрпримеров: " + counterExamples(directory) + ")");
+        System.out.println("Популяций: " + populations + ", объявленных членов: " + members
+                + " (из них недостижимых: " + unreachableMembers + ")");
+        refusals.forEach(System.out::println);
         failures.forEach(System.out::println);
+        if (!refusals.isEmpty()) {
+            System.out.println("ПРОГОН НЕ СОСТОЯЛСЯ: отказов корпуса " + refusals.size()
+                    + " — часть примеров не исполнялась, и зелёный остаток ничего не удостоверяет");
+            System.exit(2);
+        }
         System.out.println(failures.isEmpty() ? "ВСЕ ПРИМЕРЫ СОШЛИСЬ" : "РАСХОЖДЕНИЙ: " + failures.size());
         if (!failures.isEmpty()) {
             System.exit(1);

@@ -11,6 +11,7 @@
     "protections[]": "защиты транша",
     "deal.status": "Deal.status — операнд окна атрибуции закрывающего исполнения уровня сделки (форма окна — docs/spec/protection-coverage.json) И операнд запрета набора нового риска в окне сворачивания: дом запрета — docs/rules/exit-teardown-order.md",
     "followingTranchesGross": "Σ gross-экспозиций траншей, материализованных позже этого; операнд порядка правила сопоставления",
+    "graphComplete": "граф сделки предъявлен контекстом прохода целиком; значение берётся из дома-спеки docs/spec/deal-context-load.json, величина graphComplete — форма здесь не переписывается. Охрана СИММЕТРИЧНА охране терминала сделки (docs/spec/deal-lifecycle.json, величина riskProvenAbsent): три дизъюнкта trancheRiskBearing считаются агрегатами по ЗАГРУЖЕННЫМ коллекциям заявок и защит, и на недогруженном графе «живой заявки нет» ложно молча — транш ушёл бы в CLOSED, а обработчика у него больше нет, то есть направление ошибки разрешающее и необратимое",
     "position.externalSize": "нетто-размер живого эпизода — правый операнд закрываемого объёма уровня сделки"
   },
   "values": [
@@ -39,12 +40,12 @@
     },
     {
       "name": "terminalContract",
-      "note": "Терминал транша: живого риска у него нет — ни экспозиции, ни живой входной заявки, ни живой условной заявки (три дизъюнкта trancheRiskBearing; дом — docs/lifecycles/DealTranche.md).",
-      "expr": "!trancheRiskBearing"
+      "note": "Терминал транша: граф предъявлен целиком И живого риска у транша нет — ни экспозиции, ни живой входной заявки, ни живой условной заявки (три дизъюнкта trancheRiskBearing; дом — docs/lifecycles/DealTranche.md). Первый конъюнкт — та же охрана полнотой графа, что у терминала сделки: без неё недогруженная живая заявка или защита делают агрегаты ложными молча, транш закрывается, и обработчика у него больше нет.",
+      "expr": "graphComplete && !trancheRiskBearing"
     },
     {
       "name": "riskCreatingUnderCollapse",
-      "note": "Ребро, набирающее новый риск, под сворачиванием сделки. Единственное такое ребро у транша — вход в отправленный вход, и приходят в него ДВА разных ребра: штатный вход из предвходовой проверки и переоткрытие из сопровождения. Поэтому энфорсер один и стои́т на ЦЕЛИ перехода, а не на паре: гейт по паре пришлось бы дублировать и он разошёлся бы по рёбрам. Дом запрета — docs/rules/exit-teardown-order.md; прежде запрет не имел исполнимой формы вовсе, и вход посреди сворачивания проходил зелёным.",
+      "note": "Ребро, набирающее новый риск, под сворачиванием сделки. Единственное такое ребро у транша — вход в отправленный вход, и приходят в него ДВА разных ребра: штатный вход из предвходовой проверки и переоткрытие из сопровождения. Поэтому энфорсер один и стои́т на ЦЕЛИ перехода, а не на паре: гейт по паре пришлось бы дублировать и он разошёлся бы по рёбрам. Окно сворачивания — два статуса сделки, EXIT_PENDING и ERROR (перечень объявляет дом); ЭТОТ энфорсер читает только первый, потому что в ошибочном состоянии FSM траншей не прогоняется вовсе и ребро недостижимо. Второй статус читает преконтроль (docs/spec/risk-limits.json, величина riskCreatingUnderCollapseRejected). Дом запрета — docs/rules/exit-teardown-order.md; прежде запрет не имел исполнимой формы вовсе, и вход посреди сворачивания проходил зелёным.",
       "expr": "to == 'ENTRY_SUBMITTED' && deal.status == 'EXIT_PENDING'"
     },
     {
@@ -56,6 +57,7 @@
     {
       "case": "штатная тропа: предвходовая проверка ведёт к отправке входа",
       "state": {
+        "graphComplete": true,
         "from": "PRECHECK",
         "to": "ENTRY_SUBMITTED",
         "reopenAllowed": false,
@@ -79,6 +81,7 @@
     {
       "case": "переключение защиты не обязательно: подтверждённый вход ведёт и прямо в сопровождение",
       "state": {
+        "graphComplete": true,
         "from": "ENTRY_FINALIZED",
         "to": "MANAGING",
         "reopenAllowed": false,
@@ -102,6 +105,7 @@
     {
       "case": "ошибочного статуса у транша нет: ребра в него не существует",
       "state": {
+        "graphComplete": true,
         "from": "MANAGING",
         "to": "ERROR",
         "reopenAllowed": false,
@@ -119,6 +123,7 @@
     {
       "case": "аварийного терминала у транша нет: ребра в него не существует",
       "state": {
+        "graphComplete": true,
         "from": "MANAGING",
         "to": "EMERGENCY_CLOSED",
         "reopenAllowed": false,
@@ -135,6 +140,7 @@
     {
       "case": "переоткрытие: экспозиция схлопнулась, живая входная заявка осталась, объявление разрешает",
       "state": {
+        "graphComplete": true,
         "from": "MANAGING",
         "to": "ENTRY_SUBMITTED",
         "reopenAllowed": true,
@@ -175,6 +181,7 @@
     {
       "case": "переоткрытие запрещено объявлением: то же ребро не применяется",
       "state": {
+        "graphComplete": true,
         "from": "MANAGING",
         "to": "ENTRY_SUBMITTED",
         "reopenAllowed": false,
@@ -214,6 +221,7 @@
     {
       "case": "переоткрытия нет при живой экспозиции, даже когда объявление разрешает",
       "state": {
+        "graphComplete": true,
         "from": "MANAGING",
         "to": "ENTRY_SUBMITTED",
         "reopenAllowed": true,
@@ -252,6 +260,7 @@
     {
       "case": "при запрещённом переоткрытии транш уходит своим штатным выходом",
       "state": {
+        "graphComplete": true,
         "from": "MANAGING",
         "to": "EXIT_PENDING",
         "reopenAllowed": false,
@@ -290,6 +299,7 @@
     {
       "case": "терминал транша при живой входной заявке не применяется",
       "state": {
+        "graphComplete": true,
         "from": "EXIT_PENDING",
         "to": "CLOSED",
         "reopenAllowed": false,
@@ -314,6 +324,7 @@
     {
       "case": "терминал транша применяется, когда живого риска у него нет",
       "state": {
+        "graphComplete": true,
         "from": "EXIT_PENDING",
         "to": "CLOSED",
         "reopenAllowed": false,
@@ -344,6 +355,7 @@
       "case": "терминал транша при живой отдельной защите не применяется: экспозиции нет, условная заявка жива",
       "note": "Терминал транша симметричен терминалу сделки: без третьего дизъюнкта транш ушёл бы в CLOSED, оставив стоп на бирже, и тот выпал бы из обхода известных сущностей сделки.",
       "state": {
+        "graphComplete": true,
         "from": "EXIT_PENDING",
         "to": "CLOSED",
         "reopenAllowed": false,
@@ -384,6 +396,7 @@
     {
       "case": "терминал транша на общем выходе: reduce-only ноги нет, экспозицию гасит приписанный объём команды закрытия",
       "state": {
+        "graphComplete": true,
         "from": "EXIT_PENDING",
         "to": "CLOSED",
         "reopenAllowed": false,
@@ -423,6 +436,7 @@
     {
       "case": "транш, чьё условие входа истекло, закрывается прямо из предвходовой проверки",
       "state": {
+        "graphComplete": true,
         "from": "PRECHECK",
         "to": "CLOSED",
         "reopenAllowed": false,
@@ -441,6 +455,7 @@
     {
       "case": "прыжка через сопровождение из отправленного входа в подтверждённый выход нет",
       "state": {
+        "graphComplete": true,
         "from": "ENTRY_SUBMITTED",
         "to": "MANAGING",
         "reopenAllowed": false,
@@ -457,6 +472,7 @@
     {
       "case": "терминальный транш активным не считается",
       "state": {
+        "graphComplete": true,
         "status": "CLOSED",
         "deal": {
           "status": "ACTIVE"
@@ -470,6 +486,7 @@
     {
       "case": "сопровождаемый транш активен и не терминален — контрпример к обоим предикатам состояния",
       "state": {
+        "graphComplete": true,
         "status": "MANAGING",
         "deal": {
           "status": "ACTIVE"
@@ -484,6 +501,7 @@
       "case": "вход из предвходовой проверки посреди сворачивания сделки не выпускается",
       "note": "Энфорсер запрета «нового риска в окне сворачивания не берёт ни один транш». Ребро объявлено и вне сворачивания законно (пример «штатная тропа»), поэтому пример падает ровно на снятии энфорсера и фальсифицирует его.",
       "state": {
+        "graphComplete": true,
         "from": "PRECHECK",
         "to": "ENTRY_SUBMITTED",
         "reopenAllowed": false,
@@ -509,6 +527,7 @@
       "case": "переоткрытие посреди сворачивания сделки не выпускается, хотя объявлением разрешено",
       "note": "Вторая тропа того же ребра-цели: объявление разрешает, экспозиция схлопнулась, живая входная заявка есть — то есть reopenPermitted истинен, и без энфорсера переход прошёл бы. Пара примеров доказывает, что энфорсер стои́т на ЦЕЛИ, а не на одном из двух рёбер.",
       "state": {
+        "graphComplete": true,
         "from": "MANAGING",
         "to": "ENTRY_SUBMITTED",
         "reopenAllowed": true,
@@ -549,6 +568,7 @@
       "case": "терминал транша посреди сворачивания разрешён — энфорсер не запирает выход",
       "note": "Контрпример к энфорсеру: он обязан гасить только набор риска. Транш, чьё условие входа истекло, обязан закрыться и под сворачиванием — иначе выходная проверка сделки «все транши терминальны» не сошлась бы никогда, и энфорсер останавливал бы выход вместо входа.",
       "state": {
+        "graphComplete": true,
         "from": "PRECHECK",
         "to": "CLOSED",
         "reopenAllowed": false,
@@ -561,6 +581,30 @@
       "expect": {
         "riskCreatingUnderCollapse": false,
         "transitionAllowed": true
+      }
+    },
+    {
+      "case": "тот же терминал на НЕПОЛНОМ графе не применяется: заявки и защиты загружены не целиком, и «живого риска нет» ложно молча",
+      "note": "Охрана симметрична охране терминала сделки (docs/spec/deal-lifecycle.json, величина riskProvenAbsent). Направление ошибки без неё разрешающее и необратимое: транш уходит в CLOSED, обработчика у него больше нет, а живая заявка или защита остаётся на бирже.",
+      "state": {
+        "graphComplete": false,
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "reopenAllowed": false,
+        "deal": { "status": "EXIT_PENDING" },
+        "position": { "externalSize": 0 },
+        "followingTranchesGross": 0,
+        "orders": [
+          { "type": "ENTRY_ATTACHED_STOP_LOSS", "status": "COMPLETED", "accumulatedFillSize": 5 }
+        ],
+        "protections": [
+          { "id": "entry_sl", "carrier": "ATTACHED", "kind": "STOP", "status": "CANCELED", "size": 5, "parentFillSize": 5 }
+        ]
+      },
+      "expect": {
+        "trancheRiskBearing": false,
+        "terminalContract": false,
+        "transitionAllowed": false
       }
     }
   ]

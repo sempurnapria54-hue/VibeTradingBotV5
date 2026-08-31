@@ -91,9 +91,10 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 `CLOSE_POSITION_COMMAND` payload несёт `requestedCloseReason`. Допустимы:
 `CLOSED_BY_STRATEGY`, `KILL_SWITCH`. Не используются
 как requested reason: `EXTERNAL_CLOSE` (закрытие на стороне источника
-без команды), `EXCHANGE_INVARIANT_VIOLATION` (problem reason),
-`UNKNOWN` (fallback). `RefreshPositionExecutor` не перетирает уже
-заполненный `Position.closeReason` (write-once).
+без команды), `EXCHANGE_INVARIANT_VIOLATION` (problem reason).
+`RefreshPositionExecutor` не перетирает уже заполненный
+`Position.closeReason` (write-once). Перечень значений — четыре, каждое с
+названным производителем (`docs/models/domain/core/Position.md`).
 
 ## OKX
 

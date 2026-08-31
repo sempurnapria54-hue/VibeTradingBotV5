@@ -101,11 +101,25 @@ write-once.
 **`Status`** — `CREATED`, `PENDING`, `ACTIVE`, `PARTIALLY_COMPLETED`,
 `COMPLETED`, `CANCELED`, `ERROR`.
 
-**`CloseReason`** — `FILLED`, `CANCELED_BY_STRATEGY`,
-`REPLACED_BY_STRATEGY`, `KILL_SWITCH`,
-`CONDITION_EXPIRED`, `MISSING_AFTER_REFRESH`, `UNKNOWN_EXTERNAL_STATUS`,
-`EXCHANGE_INVARIANT_VIOLATION`, `UNKNOWN`. `MANUAL_CANCEL` снят —
-`docs/rules/manual-halt.md`.
+**`CloseReason`** — у каждого значения назван производитель
+(`docs/rules/writer-named-for-every-value.md`):
+
+| Значение | Кто производит |
+|---|---|
+| `FILLED` | резолвер внешнего статуса на полном исполнении (`docs/rules/external-status-resolution.md`) |
+| `CANCELED_BY_STRATEGY` | исполнитель отмены заявки по объявленному действию стратегии |
+| `REPLACED_BY_STRATEGY` | исполнитель замещения — на снимаемом звене цепочки (`docs/rules/replace-not-amend.md`) |
+| `KILL_SWITCH` | исполнитель снятия живого риска (`docs/components/KillSwitchExecutor.md`) |
+| `MISSING_AFTER_REFRESH` | исполнитель добычи заявки, исчерпавший цикл источников (`docs/components/RefreshOrderExecutor.md`) |
+| `UNKNOWN_EXTERNAL_STATUS` | резолвер внешнего статуса, ветвь `REFUSED` (`docs/spec/external-status-resolution.json`) |
+| `EXCHANGE_INVARIANT_VIOLATION` | исполнитель, наблюдавший нарушение биржевого инварианта на своей заявке |
+| `UNKNOWN` | умолчание разбора: причина не резолвится ни одной ветвью |
+
+`MANUAL_CANCEL` снят — `docs/rules/manual-halt.md`. **`CONDITION_EXPIRED`
+снят тем же ходом:** истечение условия входа — терминал **транша**, а не
+заявки (`ENTRY_CONDITION_EXPIRED`, `docs/lifecycles/DealTranche.md`);
+производителя у значения на заявке нет ни одного, и оставленное оно
+приглашало бы выдумать тропу.
 
 ## Персистентность
 
@@ -131,9 +145,15 @@ write-once.
 ## Встроенная защита (`AttachedAlgoOrder`)
 
 Защитная заявка, созданная вместе с родительской и уходящая на биржу той
-же командой. Это раздел модели `Order`, а не отдельная сущность:
-самостоятельной условной заявкой она не материализуется, даже если в
-снапшоте есть её идентификаторы.
+же командой. Это раздел модели `Order`, **а не отдельная сущность у нас**:
+собственной доменной строки и собственного `internalId`-владельца она не
+получает.
+
+**На бирже она самостоятельной заявкой материализуется** — при непустом
+наливе родителя источник разворачивает её в живую условную заявку ровно на
+налитый объём, и терминал родителя её с собой не уносит. Факт наблюдён
+контуром обеими несущими цепочками; дом факта и его следствия для судьбы
+защиты — `docs/lifecycles/Order.md`.
 
 | Поле | Тип | Назначение |
 |---|---|---|
@@ -155,10 +175,25 @@ write-once.
 `canTransitionTo(target)`, переходы состояний.
 
 **Енумы:** `Type` — `ATTACHED_STOP_LOSS`; `Status` — `CREATED`,
-`PENDING`, `ACTIVE`, `COMPLETED`, `CANCELED`, `ERROR`; `CloseReason` —
-`TRIGGERED`, `SWITCHED_BY_STRATEGY`, `PARENT_ORDER_CANCELED`,
-`KILL_SWITCH`, `MISSING_AFTER_REFRESH`,
-`PROTECTION_LOST`, `UNKNOWN_EXTERNAL_STATUS`, `UNKNOWN`.
+`PENDING`, `ACTIVE`, `COMPLETED`, `CANCELED`, `ERROR`.
+
+**`CloseReason` встроенной защиты — с производителем у каждого значения:**
+
+| Значение | Кто производит |
+|---|---|
+| `TRIGGERED` | исполнитель добычи защиты, наблюдавший её исполнение во второй ноге своего цикла — истории условных заявок (`docs/models/mapping/Order.md`)|
+| `SWITCHED_BY_STRATEGY` | обработчик смены защиты транша, снимающий встроенную в пользу отдельной (`docs/components/TrancheProtectionSwitchedHandler.md`) |
+| `PARENT_ORDER_CANCELED` | исполнитель добычи родителя на исходе `CANCEL_BY_PARENT` — родитель **отменён при нулевом наливе**. Исполненный родитель этого исхода не даёт: полный налив и есть его определение (`docs/lifecycles/Order.md`) |
+| `KILL_SWITCH` | исполнитель снятия живого риска |
+| `MISSING_AFTER_REFRESH` | у встроенной защиты **не производится**: цикл добычи защиты — второй и свой, и его исчерпание даёт исход второй ступени, а не терминал заявки (`docs/models/mapping/Order.md`) |
+| `PROTECTION_LOST` | исполнитель добычи **материализованной защиты** на исходе второй ступени `PROTECTION_LOST` — цикл прошёл до конца и живой записи не нашёл; а также отказ постановки: заполненный код отказа означает, что защиты на бирже нет (`docs/lifecycles/Order.md`) |
+| `UNKNOWN` | умолчание разбора |
+
+**`UNKNOWN_EXTERNAL_STATUS` у встроенной защиты снят:** собственного
+внешнего статуса у неё нет — она обновляется по набору фактов родителя
+(`docs/components/AttachedAlgoOrderStateResolver.md`), а операнд `entity`
+резолвера внешних статусов её не принимает. Тот же довод снял это
+значение у `Position`.
 
 ### Персистентность встроенной защиты
 
