@@ -386,17 +386,22 @@ bash tools/preconditions-check.sh                     # действительн
 (`./mvnw`, `py -3`) — падение громкое, но дефект предписания остаётся
 дефектом.
 
+**Среда сменилась 2026-08-31:** хост — Windows 11 (`MINGW64_NT-10.0-26200`;
+IDEA 2026.1, Git Bash / PowerShell), Vault пересоздан в не-dev режиме,
+демо-ключ OKX сменился. Таблица и команды ниже — редакция, проверенная
+прогоном из новой среды; строки прежней среды сняты этой же правкой.
+
 | Что нужно контуру | Состояние | Чем проверено |
 |---|---|---|
-| JDK 25 | **есть** — `~/.jdks/corretto-25`, Corretto 25.0.0.36.2 | `~/.jdks/corretto-25/bin/java -version` |
-| Maven | **есть** — дистрибутив wrapper'а `~/.m2/wrapper/dists/apache-maven-3.9.11-bin/*/apache-maven-3.9.11`; на `PATH` его нет, `mvnw` в репозитории по-прежнему нет | `$MAVEN_HOME/bin/mvn -v` → 3.9.11 на JDK 25 |
+| JDK 25 | **есть** — `~/.jdks/corretto-25.0.3`, Corretto 25.0.3.9.1; прежнего пути `~/.jdks/corretto-25` больше нет | `~/.jdks/corretto-25.0.3/bin/java -version` |
+| Maven | **есть** — встроенный в IDEA: `C:/Program Files/JetBrains/IntelliJ IDEA 2026.1/plugins/maven/lib/maven3`, 3.9.11; на `PATH` нет, `mvnw` в репозитории по-прежнему нет, кэш `~/.m2/wrapper/dists` прежней записи исчез; `~/.m2/repository` жив | `"$MAVEN_HOME/bin/mvn" -v` → 3.9.11 на JDK 25.0.3 |
 | Docker + контур `docker-compose.yml` | **есть** — три контейнера подняты | `docker ps` → `vibetradingbotv5-{vault,postgres,postgres-test}` |
-| Vault `127.0.0.1:8200` | **распечатан** (`sealed:false`), `secret/tradingbot/okx-test` и `secret/tradingbot/postgres-test` читаются | `curl /v1/sys/health`; чтение путей токеном из `.env.vault.test.local` |
-| Postgres-test `5441` | **слушает**, Flyway накатывает схему при подъёме профиля `test` | подъём `@SpringBootTest` профиля `test` → `Database version: 16.13` |
-| Сеть до биржи | **есть** | `GET /api/v5/public/time` → `HTTP 200` |
-| Лаунчер Python | **`python3`** — настоящий интерпретатор; `py` в среде **отсутствует** | `python3 -c "print(1)"` → `1`; `py` → `command not found` |
-| Сборка дерева | `JAVA_HOME=~/.jdks/corretto-25 $MAVEN_HOME/bin/mvn -o test-compile`; `./mvnw` и `mvn` на `PATH` **отсутствуют** | прогон команды → `BUILD SUCCESS` |
-| Демо-контур кредов | **доказан отрицанием** | тот же ключ **без** заголовка `x-simulated-trading` → `50101 APIKey does not match current environment`; с заголовком → `code=0`, `label=BotV5-test`, `acctLv=2`, `posMode=net_mode` |
+| Vault `127.0.0.1:8200` | **не-dev режим**: file storage, shamir 1/1 (`vault.hcl`); listener в контейнере — `18200`, наружу проброшен `8200`; после каждого рестарта контейнера **запечатан** — нужен `vault operator unseal` (ключ у держателя); сейчас распечатан, `secret/tradingbot/okx-test` и `secret/tradingbot/postgres-test` заведены и читаются | `vault status` → `sealed:false`, `storage:file`, shamir 1/1; `vault kv get secret/tradingbot/okx-test` токеном CLI контейнера (CLI внутри контейнера требует `VAULT_ADDR=http://127.0.0.1:18200`) |
+| Postgres-test `5441` | **слушает** (БД `tradingbot_test`); профиль `test` из IDEA поднимается: Vault-импорт отработал, Flyway накатил 10 миграций на чистую базу | запуск приложения профиля `test` из IDEA, 2026-08-31 |
+| Сеть до биржи | **есть** | `GET /api/v5/public/time` → `HTTP 200`, `code=0` |
+| Лаунчер Python | **`py -3`** → Python 3.11.9; `python3` и `python` в Git Bash — заглушки WindowsApps: печатают `Python` без версии, код не исполняют. Ровно инверсия прежней записи этой строки | `py -3 -c "print(1)"` → `1`; `python3 -c "print(1)"` → исполнения нет |
+| Сборка дерева | `JAVA_HOME=~/.jdks/corretto-25.0.3 "$MAVEN_HOME/bin/mvn" -o test-compile` (`MAVEN_HOME` — maven3 из IDEA, см. строку Maven); `./mvnw` и `mvn` на `PATH` **отсутствуют** | прогон команды 2026-08-31 → `BUILD SUCCESS` |
+| Демо-контур кредов | **доказан отрицанием** — перепроверено из новой среды 2026-08-31; ключ сменился: `label=TestKeyW` (был `BotV5-test`) | тот же ключ **без** заголовка `x-simulated-trading` → `HTTP 401`, `50101 APIKey does not match current environment`; с заголовком → `code=0` на `account/balance` и `account/config` (`label=TestKeyW`, `acctLv=2`, `posMode=net_mode`) |
 
 **Проверка демо-контура — падающая проба, а не флаг конфигурации.**
 Клейм «ключ демо-контура» доказывается тем, что боевой контур этот ключ
@@ -406,11 +411,13 @@ bash tools/preconditions-check.sh                     # действительн
 ### Воспроизводимые команды
 
 ```bash
-export JAVA_HOME="$HOME/.jdks/corretto-25"
-export MAVEN_HOME="$HOME/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11"
+export JAVA_HOME="$HOME/.jdks/corretto-25.0.3"
+export MAVEN_HOME="C:/Program Files/JetBrains/IntelliJ IDEA 2026.1/plugins/maven/lib/maven3"
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
-source .env.vault.test.local                 # VAULT_TOKEN профиля test
+source .env.vault.test.local                 # VAULT_TOKEN профиля test — токен сейчас протухший, см. §«Что среда всё ещё не даёт»
 docker compose up -d vault postgres-test     # если контур опущен
+docker exec -e VAULT_ADDR=http://127.0.0.1:18200 vibetradingbotv5-vault \
+  vault operator unseal                      # после каждого рестарта контейнера Vault; unseal-ключ у держателя
 
 # джобы гасятся, чтобы состояние счёта за прогон меняли только кейсы
 export CANDLE_JOB_ENABLED=false INDICATOR_JOB_ENABLED=false \
@@ -582,15 +589,31 @@ cross-ccy-издержке) этой фикстурой **не разрешен�
 
 ### Что среда всё ещё не даёт
 
-- **`mvnw` в репозитории нет.** Прогон опирается на дистрибутив Maven,
-  лежащий в кэше wrapper'а пользователя, и на ручной `PATH`. Состав работ
+- **`mvnw` в репозитории нет.** Прогон опирается на maven3, встроенный в
+  IDEA (кэш wrapper'а `~/.m2/wrapper/dists` прежней записи исчез), и на
+  ручной `PATH`. Состав работ
   — `.claude/work/backlog.md` §«Средовой дефицит автономного RUN тестов
   (контур source-api)».
-- **Токен `.env.vault.test.local` читает и prod-пути.** Проверено: тем же
-  токеном отвечают `secret/tradingbot/okx` и `secret/tradingbot/postgres`,
-  тогда как `.env.vault.test.local.example` требует токена, ограниченного
-  тестовыми путями. Это расхождение среды с собственным требованием, не
-  дефект кода; адресат — шаг 9 «Безопасность».
+- **Токен `.env.vault.test.local` невалиден.** Пересозданный Vault
+  отвечает `403 permission denied` и на чтение test-путей, и на
+  `auth/token/lookup-self` — токен остался от прежнего инстанса. Валидные
+  токены сейчас: в run-конфигурации IDEA (ею поднят профиль `test`) и у
+  CLI контейнера (`/root/.vault-token`, корневой). Нужен перевыпуск
+  токена, ограниченного тестовыми путями (требование
+  `.env.vault.test.local.example`); scoped-политики — адресат шага 9
+  «Безопасность». Прежний факт этой строки («токен читает и prod-пути»)
+  ушёл вместе со старым инстансом.
+- **Команды корпуса, записанные как `python3 tools/…`, напрямую не
+  исполняются:** `python3` на этой машине — заглушка (строка «Лаунчер
+  Python» таблицы выше). Исполнение — `py -3 tools/…`; носители команд
+  не переписываются, дом факта — эта таблица.
+- **`tools/anchor-check.py` из этой среды не прогоняем:** индекс файлов
+  строится Windows-путями (`\`), адреса корпуса и строки долга несут `/`
+  — здоровый корпус даёт массовые ложные «неразрешимые», все строки
+  долга читаются как «не в корпусе». Вторично: печать находок падает на
+  cp1251-консоли без `PYTHONIOENCODING=utf-8`. Механизм и состав починки
+  — `.claude/work/backlog.md` §«Средовой дефицит автономного RUN тестов
+  (контур source-api)».
 - **`tools/spec-run.sh` не переносим на Linux:** путь JDK по умолчанию —
   `C:/Users/...`, разделитель classpath — `;`. Переменные `SPEC_JDK`/`SPEC_M2`
   первое обходят, второе — нет.
