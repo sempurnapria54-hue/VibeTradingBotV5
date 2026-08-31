@@ -88,7 +88,7 @@
     },
     {
       "name": "riskProvenAbsent",
-      "note": "Живой риск снят и это подтверждено фактами прохода. Признаков живого риска пять (перечень — docs/lifecycles/Deal.md), резолвятся здесь ЧЕТЫРЕ: позиция, заявка, условная заявка, расхождение (строки 1, 2, 3, 5 перечня). Конъюнктов тоже ЧЕТЫРЕ: dealRiskBearing покрывает сразу ТРИ признака — экспозицию транша, его живую входную заявку и его живую условную заявку (дом определения — docs/lifecycles/DealTranche.md), — а anyLiveOrder расширяет второй признак до заявок вне входного множества; это перекрытие намеренное. Отдельного конъюнкта под условную заявку здесь нет: anyLiveProtection поглощён третьим дизъюнктом живого риска транша (anyLiveProtection ⇒ dealRiskBearing), и состояния, где он блокирует один, не существует. Величина сохранена как диагностическая — она называет признак 3 явно в разборе примера. Признак 4, «неизвестная живая сущность на бирже», операндами прохода не резолвится по построению (добыча ходит по известным сущностям сделки) и держится другим носителем: инструмент-скоупным сбором чистоты инструмента, см. ту же секцию дома.",
+      "note": "Живой риск снят и это подтверждено фактами прохода. Признаков живого риска пять (перечень — docs/lifecycles/Deal.md), резолвятся здесь ЧЕТЫРЕ: позиция, заявка, условная заявка, расхождение (строки 1, 2, 3, 5 перечня). Конъюнктов ПЯТЬ: dealRiskBearing покрывает сразу ТРИ признака — экспозицию транша, его живую входную заявку и его живую условную заявку (дом определения — docs/lifecycles/DealTranche.md), — а anyLiveOrder расширяет второй признак до заявок вне входного множества; это перекрытие намеренное. ПЯТЫЙ конъюнкт — graphComplete: охрана от терминала на НЕДОГРУЖЕННОМ графе, без неё пустота «мы не всё прочитали» читалась бы как «риска нет». Прежняя редакция ноты и дока-дома называла четыре конъюнкта при пяти — невключённым оказался ровно graphComplete. Отдельного конъюнкта под условную заявку здесь нет: anyLiveProtection поглощён третьим дизъюнктом живого риска транша (anyLiveProtection ⇒ dealRiskBearing), и состояния, где он блокирует один, не существует. Величина сохранена как диагностическая — она называет признак 3 явно в разборе примера. Признак 4, «неизвестная живая сущность на бирже», операндами прохода не резолвится по построению (добыча ходит по известным сущностям сделки) и держится другим носителем: инструмент-скоупным сбором чистоты инструмента, см. ту же секцию дома.",
       "expr": "graphComplete && !hasLiveEpisode && !dealRiskBearing && !anyLiveOrder && exposureReconciled"
     },
     {
@@ -113,12 +113,12 @@
     },
     {
       "name": "trancheCloseReasonRank",
-      "note": "Ранг причины закрытия транша в закрытом перечне старшинства (1 — старшая). Порядок объявлен домом docs/lifecycles/Deal.md: RISK_CONTROL, STOP_LOSS, TIME_STOP, STRATEGY_EXIT, TAKE_PROFIT, ENTRY_CONDITION_EXPIRED. Значение вне перечня даёт 99 — оно не выигрывает никогда; у транша таких значений нет: EMERGENCY_CLOSE на транше не пишется, UNKNOWN тоже (docs/lifecycles/DealTranche.md).",
-      "expr": "if(closeReason == 'RISK_CONTROL', 1, if(closeReason == 'STOP_LOSS', 2, if(closeReason == 'TIME_STOP', 3, if(closeReason == 'STRATEGY_EXIT', 4, if(closeReason == 'TAKE_PROFIT', 5, if(closeReason == 'ENTRY_CONDITION_EXPIRED', 6, 99))))))"
+      "note": "Ранг причины закрытия транша в закрытом перечне старшинства (1 — старшая). Порядок объявлен домом docs/lifecycles/Deal.md: EXTERNAL_CLOSE, RISK_CONTROL, STOP_LOSS, TIME_STOP, STRATEGY_EXIT, TAKE_PROFIT, ENTRY_CONDITION_EXPIRED. Значение вне перечня даёт 99 — оно не выигрывает никогда; у транша таких значений нет: EMERGENCY_CLOSE на транше не пишется, UNKNOWN тоже (docs/lifecycles/DealTranche.md).",
+      "expr": "if(closeReason == 'EXTERNAL_CLOSE', 1, if(closeReason == 'RISK_CONTROL', 2, if(closeReason == 'STOP_LOSS', 3, if(closeReason == 'TIME_STOP', 4, if(closeReason == 'STRATEGY_EXIT', 5, if(closeReason == 'TAKE_PROFIT', 6, if(closeReason == 'ENTRY_CONDITION_EXPIRED', 7, 99)))))))"
     },
     {
       "name": "topTrancheReasonRank",
-      "note": "Ранг СТАРШЕЙ причины среди траншей, несущих причину. Пусто — ни один транш причины не несёт: на терминальном ребре сделки такое состояние не достигается, у сделки с терминальными траншами причину несёт хотя бы один.",
+      "note": "Ранг СТАРШЕЙ причины среди траншей, несущих причину. Пусто — ни один транш причины не несёт. На ребре, потребляющем резолв, состояние исключено ПОЛНОТОЙ ПЕРЕЧНЯ ПИСАТЕЛЕЙ ТРАНША: у каждого терминального ребра транша перечень значений закрыт и непуст (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша — обработчик терминального ребра»). Прежняя редакция ноты стояла на неполном перечне — у ребра EXIT_PENDING - CLOSED не было значения для тропы «инициатора выхода нет», и восстановленная сделка доходила до штатного терминала с пустой причиной.",
       "op": "min",
       "over": "tranches",
       "where": "notNull(?closeReason)",
@@ -127,7 +127,7 @@
     {
       "name": "dealCloseReasonBySeniority",
       "note": "Причина закрытия сделки на маршрутах, где её дают транши: «все транши терминальны при состоявшемся входе» (ребро ACTIVE - EXIT_PENDING) и тропы закрытия без входа (ребро ACTIVE - CLOSED). Резолв детерминирован и операнда сверх причин траншей не требует: сделку объясняет самый далёкий от плана исход среди её траншей. Дом порядка — docs/lifecycles/Deal.md; перечень значений объявлен популяцией этой спеки.",
-      "expr": "if(topTrancheReasonRank == 1, 'RISK_CONTROL', if(topTrancheReasonRank == 2, 'STOP_LOSS', if(topTrancheReasonRank == 3, 'TIME_STOP', if(topTrancheReasonRank == 4, 'STRATEGY_EXIT', if(topTrancheReasonRank == 5, 'TAKE_PROFIT', if(topTrancheReasonRank == 6, 'ENTRY_CONDITION_EXPIRED', null))))))"
+      "expr": "if(topTrancheReasonRank == 1, 'EXTERNAL_CLOSE', if(topTrancheReasonRank == 2, 'RISK_CONTROL', if(topTrancheReasonRank == 3, 'STOP_LOSS', if(topTrancheReasonRank == 4, 'TIME_STOP', if(topTrancheReasonRank == 5, 'STRATEGY_EXIT', if(topTrancheReasonRank == 6, 'TAKE_PROFIT', if(topTrancheReasonRank == 7, 'ENTRY_CONDITION_EXPIRED', null)))))))"
     },
     {
       "name": "transitionAllowed",
@@ -138,12 +138,22 @@
   "populations": [
     {
       "axis": "рёбра статусной машины сделки — у каждого назван писатель причины закрытия",
-      "note": "Перечень объявленных рёбер (величина edgeDeclared) целиком. Фильтр where отсекает примеры, предъявляющие спеке НЕобъявленную пару намеренно — пробы недопустимых переходов: их предмет — ложность edgeDeclared, а не писатель. Каждый член обязан быть предъявлен примером, иначе правило писателя остаётся на нём непроверенным; пример, предъявляющий пару вне перечня, роняет прогон. Чего прогон НЕ держит: равенство перечня членов и перечня рёбер величины edgeDeclared — ребро, добавленное туда и не предъявленное ни одним примером, проходит молча. Клейма полноты в эту сторону здесь поэтому нет; оба перечня живут в одном файле и правятся одним ходом.",
+      "note": "Перечень выводится из ПЕРЕЧНЯ СТАТУСОВ дока-дома полным произведением без петель (двадцать рёбер), а не из списка объявленных рёбер: список объявленных — это то, что кто-то написал, и он молчит о ребре, которого в нём нет. Шесть рёбер объявлены и покрыты примерами; четырнадцать объявлены недостижимыми и предъявляют контрпример с названной причиной исключения. Прежняя редакция несла шесть членов и фильтр where по вычисленной величине edgeDeclared — он выводил из популяции ровно недостижимые рёбра, то есть всё, о чём перечень обязан высказаться.",
+      "rule": [
+        "closeReasonWriter"
+      ],
+      "derive": {
+        "command": "bash tools/derive/deal-status-edges.sh",
+        "from": [
+          "docs/lifecycles/Deal.md"
+        ]
+      },
       "keys": [
         "from",
         "to"
       ],
-      "where": "edgeDeclared",
+      "where": "in(from, 'ACTIVE', 'EXIT_PENDING', 'CLOSED', 'ERROR', 'EMERGENCY_CLOSED') && in(to, 'ACTIVE', 'EXIT_PENDING', 'CLOSED', 'ERROR', 'EMERGENCY_CLOSED') && from != to",
+      "excludes": "два класса примеров, у которых ребра статусной машины сделки нет вовсе: пробы с чужим статусом (ENTRY_FINALIZED и прочие статусы транша — их предмет в том, что ребра не существует) и строки без смены статуса (from == to: перехода нет). Ни один из двух классов не содержит достижимого ребра, поэтому фальсифицирующее состояние фильтром не выводится.",
       "members": [
         {
           "member": [
@@ -165,6 +175,20 @@
         },
         {
           "member": [
+            "ACTIVE",
+            "EMERGENCY_CLOSED"
+          ],
+          "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "ACTIVE"
+          ],
+          "unreachable": "EXIT_PENDING — durable-факт «выходим целиком», возврата в набор риска нет (docs/lifecycles/Deal.md §Статусы)"
+        },
+        {
+          "member": [
             "EXIT_PENDING",
             "CLOSED"
           ]
@@ -177,20 +201,119 @@
         },
         {
           "member": [
+            "EXIT_PENDING",
+            "EMERGENCY_CLOSED"
+          ],
+          "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "ACTIVE"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "EXIT_PENDING"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "ERROR"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "EMERGENCY_CLOSED"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+        },
+        {
+          "member": [
+            "ERROR",
+            "ACTIVE"
+          ],
+          "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+        },
+        {
+          "member": [
+            "ERROR",
+            "EXIT_PENDING"
+          ],
+          "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+        },
+        {
+          "member": [
+            "ERROR",
+            "CLOSED"
+          ],
+          "unreachable": "из ошибочного состояния в штатный терминал ребра нет (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+        },
+        {
+          "member": [
             "ERROR",
             "EMERGENCY_CLOSED"
           ]
+        },
+        {
+          "member": [
+            "EMERGENCY_CLOSED",
+            "ACTIVE"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+        },
+        {
+          "member": [
+            "EMERGENCY_CLOSED",
+            "EXIT_PENDING"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+        },
+        {
+          "member": [
+            "EMERGENCY_CLOSED",
+            "CLOSED"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+        },
+        {
+          "member": [
+            "EMERGENCY_CLOSED",
+            "ERROR"
+          ],
+          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
         }
       ]
     },
     {
       "axis": "значения причины закрытия сделки, резолвимые старшинством причин траншей",
-      "note": "Перечень старшинства целиком. Каждое значение обязано выигрывать хотя бы на одном примере, иначе порядок объявлен и не проверен. Фильтр участия — непустой резолв: примеры без причин траншей осей этой популяции не предъявляют.",
+      "note": "Область значений резолва целиком: перечень старшинства дока-дома ПЛЮС пустой резолв — член по построению агрегата (минимум по пустому множеству причин). Прежняя редакция несла шесть значений и фильтр where по САМОЙ проверяемой величине (notNull(dealCloseReasonBySeniority)) — он выводил из популяции ровно то состояние, которое правило опровергает: сделку, дошедшую до штатного терминала с пустой причиной. Правило популяции — dealCloseReasonBySeniority: член покрыт, только когда пример ожидает эту величину.",
+      "rule": [
+        "dealCloseReasonBySeniority"
+      ],
+      "derive": {
+        "command": "bash tools/derive/deal-close-reason-seniority.sh",
+        "from": [
+          "docs/lifecycles/Deal.md"
+        ]
+      },
       "keys": [
         "dealCloseReasonBySeniority"
       ],
-      "where": "notNull(dealCloseReasonBySeniority)",
+      "where": "in(to, 'EXIT_PENDING', 'CLOSED')",
+      "excludes": "примеры, не предъявляющие ребра, на котором резолв ПОТРЕБЛЯЕТСЯ. Резолв читают два ребра — ACTIVE → EXIT_PENDING (маршрут «все транши терминальны») и ACTIVE → CLOSED (тропы без входа); на прочих рёбрах причина либо уже стои́т, либо не пишется вовсе (docs/lifecycles/Deal.md §«Причина закрытия — писатель и момент»). Фильтр выражен операндом состояния и ни одного значения резолва из перечня не выводит: фальсифицирующее состояние (пустая причина на потребляющем ребре) фильтр ПРОПУСКАЕТ и предъявляется членом «null».",
       "members": [
+        {
+          "member": [
+            "EXTERNAL_CLOSE"
+          ]
+        },
         {
           "member": [
             "RISK_CONTROL"
@@ -220,6 +343,12 @@
           "member": [
             "ENTRY_CONDITION_EXPIRED"
           ]
+        },
+        {
+          "member": [
+            "null"
+          ],
+          "unreachable": "на ребре, потребляющем резолв, пустого значения не бывает: у каждого терминального ребра транша перечень значений причины закрыт и непуст (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша — обработчик терминального ребра»), поэтому у сделки со всеми терминальными траншами причину несёт хотя бы один"
         }
       ]
     }
@@ -298,6 +427,7 @@
     },
     {
       "case": "из ошибочного состояния в штатный терминал ребра нет",
+      "unreachable": "из ошибочного состояния в штатный терминал ребра нет (docs/lifecycles/Deal.md §«Инварианты переходов»): аварийный терминал — единственный выход из ERROR",
       "state": {
         "from": "ERROR",
         "to": "CLOSED",
@@ -333,7 +463,8 @@
       },
       "expect": {
         "edgeDeclared": false,
-        "transitionAllowed": false
+        "transitionAllowed": false,
+        "closeReasonWriter": null
       }
     },
     {
@@ -1479,6 +1610,7 @@
     {
       "case": "старшинство: вмешавшийся контроль старше адверсного выхода",
       "state": {
+        "to": "EXIT_PENDING",
         "tranches": [
           {
             "status": "CLOSED",
@@ -1507,6 +1639,7 @@
     {
       "case": "старшинство: адверсный выход старше временного и планового",
       "state": {
+        "to": "EXIT_PENDING",
         "tranches": [
           {
             "status": "CLOSED",
@@ -1535,6 +1668,7 @@
     {
       "case": "старшинство: временной стоп старше планового выхода",
       "state": {
+        "to": "EXIT_PENDING",
         "tranches": [
           {
             "status": "CLOSED",
@@ -1557,6 +1691,7 @@
     {
       "case": "старшинство: плановый выход старше прибыльного",
       "state": {
+        "to": "EXIT_PENDING",
         "tranches": [
           {
             "status": "CLOSED",
@@ -1579,6 +1714,7 @@
     {
       "case": "старшинство: сетка вышла тейками — прибыльный исход и объясняет сделку",
       "state": {
+        "to": "EXIT_PENDING",
         "tranches": [
           {
             "status": "CLOSED",
@@ -1601,6 +1737,7 @@
     {
       "case": "тропа закрытия без входа: истечение условия входа младше всех",
       "state": {
+        "to": "CLOSED",
         "tranches": [
           {
             "status": "CLOSED",
@@ -1623,6 +1760,7 @@
     {
       "case": "тропа закрытия без входа: бессрочный отказ преконтроля старше истечения условия",
       "state": {
+        "to": "CLOSED",
         "tranches": [
           {
             "status": "CLOSED",
@@ -1640,6 +1778,208 @@
       },
       "expect": {
         "dealCloseReasonBySeniority": "RISK_CONTROL"
+      }
+    },
+    {
+      "case": "ребро ACTIVE → EMERGENCY_CLOSED: недостижимо",
+      "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "state": {
+        "from": "ACTIVE",
+        "to": "EMERGENCY_CLOSED"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро EXIT_PENDING → ACTIVE: недостижимо",
+      "unreachable": "EXIT_PENDING — durable-факт «выходим целиком», возврата в набор риска нет (docs/lifecycles/Deal.md §Статусы)",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "ACTIVE"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро EXIT_PENDING → EMERGENCY_CLOSED: недостижимо",
+      "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "EMERGENCY_CLOSED"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро CLOSED → ACTIVE: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "CLOSED",
+        "to": "ACTIVE"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро CLOSED → EXIT_PENDING: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "CLOSED",
+        "to": "EXIT_PENDING"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро CLOSED → ERROR: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "CLOSED",
+        "to": "ERROR"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро CLOSED → EMERGENCY_CLOSED: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "CLOSED",
+        "to": "EMERGENCY_CLOSED"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро ERROR → ACTIVE: недостижимо",
+      "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "state": {
+        "from": "ERROR",
+        "to": "ACTIVE"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро ERROR → EXIT_PENDING: недостижимо",
+      "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "state": {
+        "from": "ERROR",
+        "to": "EXIT_PENDING"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро EMERGENCY_CLOSED → ACTIVE: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "EMERGENCY_CLOSED",
+        "to": "ACTIVE"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро EMERGENCY_CLOSED → EXIT_PENDING: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "EMERGENCY_CLOSED",
+        "to": "EXIT_PENDING"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро EMERGENCY_CLOSED → CLOSED: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "EMERGENCY_CLOSED",
+        "to": "CLOSED"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "ребро EMERGENCY_CLOSED → ERROR: недостижимо",
+      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "state": {
+        "from": "EMERGENCY_CLOSED",
+        "to": "ERROR"
+      },
+      "expect": {
+        "edgeDeclared": false,
+        "closeReasonWriter": null
+      }
+    },
+    {
+      "case": "старшинство: закрытие вне нашего ведения старше вмешавшегося контроля",
+      "state": {
+        "to": "EXIT_PENDING",
+        "tranches": [
+          {
+            "closeReason": "RISK_CONTROL"
+          },
+          {
+            "closeReason": "EXTERNAL_CLOSE"
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "EXTERNAL_CLOSE"
+      }
+    },
+    {
+      "case": "восстановленная сделка: транш закрыт нулевой экспозицией без нашего инициатора",
+      "state": {
+        "to": "EXIT_PENDING",
+        "tranches": [
+          {
+            "closeReason": "EXTERNAL_CLOSE"
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": "EXTERNAL_CLOSE"
+      }
+    },
+    {
+      "case": "контрпример: у сделки со всеми терминальными траншами причины не несёт ни один",
+      "unreachable": "перечень значений причины у каждого терминального ребра транша закрыт и непуст (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша — обработчик терминального ребра»): клетку тропы «инициатора выхода нет» закрывает EXTERNAL_CLOSE, поэтому терминальный транш без причины не производится ничем",
+      "state": {
+        "to": "EXIT_PENDING",
+        "tranches": [
+          {
+            "closeReason": null
+          }
+        ]
+      },
+      "expect": {
+        "dealCloseReasonBySeniority": null
       }
     }
   ]

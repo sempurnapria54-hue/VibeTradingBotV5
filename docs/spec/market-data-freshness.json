@@ -314,6 +314,62 @@
       }
     },
     {
+      "case": "живого риска нет, а уровень сделки не резолвится — защищать всё равно нечего",
+      "state": {
+        "trancheRiskBearing": false,
+        "trancheCovered": false,
+        "dealStopUnresolved": true,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "PROTECTED",
+        "expiredSettingResolved": "WAIT"
+      }
+    },
+    {
+      "case": "живого риска нет при формально выполненном покрытии — ветвь защищённой",
+      "state": {
+        "trancheRiskBearing": false,
+        "trancheCovered": true,
+        "dealStopUnresolved": false,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "PROTECTED",
+        "expiredSettingResolved": "WAIT"
+      }
+    },
+    {
+      "case": "живого риска нет, покрытие формально выполнено и уровень не резолвится — ветвь защищённой",
+      "state": {
+        "trancheRiskBearing": false,
+        "trancheCovered": true,
+        "dealStopUnresolved": true,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "PROTECTED",
+        "expiredSettingResolved": "WAIT"
+      }
+    },
+    {
+      "case": "риск есть, не покрыт и уровень сделки не резолвится — ветвь незащищённой",
+      "state": {
+        "trancheRiskBearing": true,
+        "trancheCovered": false,
+        "dealStopUnresolved": true,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "protectionBranch": "UNPROTECTED",
+        "expiredSettingResolved": "GRACEFUL_CLOSE"
+      }
+    },
+    {
       "case": "риск есть и покрыт — ветвь защищённой",
       "state": {
         "trancheRiskBearing": true,
@@ -359,40 +415,77 @@
   "populations": [
     {
       "axis": "ветви пары реакций на устаревание данных",
-      "note": "Перечень состояний, различимых дискриминатором: риска нет; риск есть и покрыт; риск есть и не покрыт; риск есть, а уровень не резолвится.",
+      "note": "Классы различимости задаёт САМА ФОРМУЛА дискриминатора (величина protectionBranch): перечень — полное произведение её булевых операндов, восемь членов, а не четыре состояния, описанные прозой таблицы дома. Прежняя редакция несла четыре члена и фильтр where по операнду, из-за чего пустота операнда trancheRiskBearing выводилась из популяции, а не разбиралась (остаток узла 12 GAPS_CLOSE_31). Правило популяции — protectionBranch и expiredSettingResolved: член покрыт, только когда пример ожидает одну из этих величин.",
+      "rule": [
+        "protectionBranch",
+        "expiredSettingResolved"
+      ],
+      "derive": {
+        "command": "bash tools/derive/freshness-branch-classes.sh",
+        "from": [
+          "docs/spec/market-data-freshness.json"
+        ]
+      },
       "keys": [
         "trancheRiskBearing",
         "trancheCovered",
         "dealStopUnresolved"
       ],
-      "where": "notNull(?trancheRiskBearing)",
       "members": [
-        {
-          "member": [
-            "false",
-            "false",
-            "false"
-          ]
-        },
-        {
-          "member": [
-            "true",
-            "true",
-            "false"
-          ]
-        },
-        {
-          "member": [
-            "true",
-            "false",
-            "false"
-          ]
-        },
         {
           "member": [
             "true",
             "true",
             "true"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "true",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "false",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "false",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "true",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "true",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "false",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "false",
+            "false"
           ]
         }
       ]

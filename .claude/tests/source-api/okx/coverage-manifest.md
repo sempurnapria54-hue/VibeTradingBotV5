@@ -96,11 +96,21 @@
 покрытие читается в `plan.md`, полнота гейтящих слотов — в
 `code-preconditions.md`.
 
-**Счёт (пересобран из таблиц ниже, 2026-08-30).** In-perimeter строк —
-**60**: `🟢 в коде` — **49**, `🟡 в плане` — **9**, `⚪ не-runtime` —
+**Счёт (пересобран из таблиц ниже, 2026-08-31).** In-perimeter строк —
+**60**: `🟢 в коде` — **53**, `🟡 в плане` — **5**, `⚪ не-runtime` —
 **2** (`Fills 3d`, `Fills 3m`); `🔴` — нет. Вне периметра —
-**10** строк с `—`. Девять `🟡` — ровно те девять методов плана, у
-которых есть **непокрытые** кейсы (16 кейсов; из них 9 гейтят `CODE`).
+**10** строк с `—`. Пять `🟡` — ровно те пять методов плана, у
+которых есть **непокрытые** кейсы (7 кейсов; из них гейтящих `CODE` —
+ни одного: все гейтящие слоты реестра предусловий носители имеют,
+состояние наблюдения читается колонкой реестра).
+
+Прежний счёт (девять `🟡`, 16 кейсов) не пересобирался после того, как
+код-тесты были дописаны, и метки четырёх строк отстали от фактики. Сама
+проверочная команда при этом была слепа в двух местах, и оба исправлены
+здесь же: она засчитывала носителем упоминание кейса **в комментарии**
+(javadoc базового класса) и не видела делегирования цепочке, записанного
+формой «Покрыт**ы** цепочкой» — множественное число мимо шаблона
+`^Покрыт ` — и в заголовке, объявляющем **два** кейса сразу.
 
 Счёт **самой колонки** пересобирается из неё же:
 
@@ -121,18 +131,22 @@ P=.claude/tests/source-api/okx/plan.md
 T=src/test/java/com/example/tradingbot/integration/sourceapi/okx/
 for c in $(grep '^### ' "$P" | grep -oE '[A-Za-z]+[0-9]+[.][0-9]+' | sort -u); do
   re="(^|[^0-9A-Za-z.])${c//./\\.}([^0-9A-Za-z.]|\\.[^0-9A-Za-z]|\\.$|$)"
-  grep -rqE -- "$re" "$T" && continue                     # свой код-тест
-  awk -v id="$c" '$0 ~ "^### "id"[ .]" {f=1; next} /^### |^## /{if(f)exit} f' "$P" \
-    | grep -q '^Покрыт ' && continue                      # делегирован цепочке
+  # носитель — ИСПОЛНИМАЯ строка: упоминание кейса в javadoc им не является
+  grep -rE -- "$re" "$T" | grep -qvE ':[[:space:]]*(\*|//)' && continue
+  # делегирование ищется по ЗАГОЛОВКУ, содержащему кейс (заголовок объявляет
+  # два кейса сразу), и по любой форме слова «Покрыт»
+  awk -v id="$c" 'index($0,"### ")==1 && index($0,id)>0 {f=1; next} /^### |^## /{if(f)exit} f' "$P" \
+    | grep -qE '^Покрыт' && continue                      # делегирован цепочке
   echo "$c"
 done
 ```
 
-→ **16** кейсов; их `##`-методы — `M1`, `M15`, `M17`, `AG1`, `AG3`,
-`AG6`, `AG12`, `MG7`, `MG9`: **девять**, и ровно они несут `🟡`. Без
-второй половины (делегирование) проверка даёт 19 и три ложных отката —
-`M18.3`, `M20.2`, `M21.2` покрыты цепочками `Cmarket` / `M19*.cancel`
-(поймано мини-петлёй критики `GAPS_CLOSE_28`).
+→ **7** кейсов (`AG12.4`, `AG12.5`, `AG3.5`, `AG3.6`, `M15.7`, `M1.7`,
+`MG9.5`); их `##`-методы — `M1`, `M15`, `AG3`, `AG12`, `MG9`: **пять**, и
+ровно они несут `🟡`. Без второй половины (делегирование) проверка даёт
+больше и даёт ложные откаты — `M18.3`, `M20.2`, `M21.2`, `M7.3`, `M7.4`,
+`M13.3`, `M13.4` покрыты цепочками `Cmarket` / `Climit` / `M19*`
+(поймано мини-петлёй критики `GAPS_CLOSE_28` и прогоном `_32`).
 
 **Граница кейса — та же, что у проверки реестра.** Кейс ищется как
 идентификатор, а не как регулярка: точка экранируется, границы стоят с
@@ -183,7 +197,7 @@ done
 |---|---|---|---|---|---|
 | Place order | POST `/trade/order` | есть-док | 🟢 в коде | офдок | `contracts/order.md`, `OrderOkxResponse`; `placeOrder` (limit/market) |
 | Place batch orders | POST `/trade/batch-orders` | **создан** | 🟢 в коде | офдок | `batch-operations.md`; до 20, лимит считается ордерами; **В-4 рассмотрено, не берём** — метода клиента нет |
-| Cancel order | POST `/trade/cancel-order` | есть-док | 🟡 в плане | офдок | `order.md`; `cancelOrder`. Откат 🟢→🟡: кейс `M17.5` (судьба встроенной защиты при отмене родителя) не покрыт (ни код-теста, ни делегирования) и **гейтит `CODE`** (`code-preconditions.md`, п. 17) |
+| Cancel order | POST `/trade/cancel-order` | есть-док | 🟢 в коде | офдок | `order.md`; `cancelOrder`. Покрытие: `M17.5` несёт код-тест `M17CancelOrderLiveTest.m17_5_attachedProtectionOnParentCancel`; состояние наблюдения слота — колонка реестра (`code-preconditions.md`, п. 17) |
 | Cancel batch orders | POST `/trade/cancel-batch-orders` | **создан** | 🟢 в коде | офдок | `batch-operations.md`; В-4 — метода клиента нет |
 | Amend order | POST `/trade/amend-order` | есть-док | 🟢 в коде | офдок | `order.md`; доменом не используется — REPLACE-only (`replace-not-amend`); метода клиента нет |
 | Amend batch orders | POST `/trade/amend-batch-orders` | **создан** | 🟢 в коде | офдок | `batch-operations.md`; В-4 — метода клиента нет |
@@ -218,12 +232,12 @@ done
 |---|---|---|---|---|---|
 | Get balance | GET `/account/balance` | есть-док | 🟢 в коде | офдок | `balance.md`, `BalanceOkxResponse`; `getBalance` |
 | Get positions | GET `/account/positions` | есть-док | 🟢 в коде | офдок | `position.md`, `PositionOkxResponse`; `getPositions` |
-| Positions history | GET `/account/positions-history` | **обновлён** | 🟡 в плане | офдок | `position.md`; **В-3 закрыт**: источник числа `resultProfit` (net `realizedPnl`); native `PositionsHistoryOkxResponse`, снапшот `PositionCloseResult`; **:** добывается **второй ногой `REFRESH_POSITION_COMMAND`** (evidence-cycle live → history), результат — поля положения закрытия на `Position` (отдельной команды `REFRESH_POSITIONS_HISTORY` нет); инвариант агрегации — рантайм-верификация (N11, `.claude/tests/source-api/okx/plan.md`); пагинация по `uTime`; метода клиента нет. Откат 🟢→🟡: пять непокрытых кейсов — `AG1.5`, `AG1.6`, `AG1.7`, `AG1.8`, `AG1.9`, все **гейтят `CODE`** (`code-preconditions.md`, пп. 1, 6, 7, 10, 14, 15) |
+| Positions history | GET `/account/positions-history` | **обновлён** | 🟢 в коде | офдок | `position.md`; **В-3 закрыт**: источник числа `resultProfit` (net `realizedPnl`); native `PositionsHistoryOkxResponse`, снапшот `PositionCloseResult`; **:** добывается **второй ногой `REFRESH_POSITION_COMMAND`** (evidence-cycle live → history), результат — поля положения закрытия на `Position` (отдельной команды `REFRESH_POSITIONS_HISTORY` нет); инвариант агрегации — рантайм-верификация (N11, `.claude/tests/source-api/okx/plan.md`); пагинация по `uTime`; метода клиента нет. Покрытие: все девять кейсов `AG1.*` несут код-тесты (`Ag1PositionsHistoryLiveTest`, `Ag1DealFixtureLiveTest`, `Ag1FundingHorizonLiveTest`); пункт следа автоделевериджа **выведен из-под гейта** 2026-08-30 (`.claude/decisions/unorderable-fact-substitutes.md`) |
 | Account & position risk | GET `/account/account-position-risk` | **создан** | 🟢 в коде | офдок | `account-position-risk.md`; единый временной срез; метода клиента нет |
-| Bills 7d | GET `/account/bills` | есть-док | 🟡 в плане | офдок | `account-bills.md`, `AccountBillOkxResponse`; **:** команда **`REFRESH_BILLS_COMMAND`** → `DealCashFlow` (разбивка P&L; `DealCashFlow.md`), линковка по **окну + `instId`**, дедуп по паре (`exchangeId`, `billId`); метода клиента нет. Откат 🟢→🟡: три непокрытых кейса — `AG3.4` (**гейтит `CODE`**, п. 9), `AG3.5`, `AG3.6` |
+| Bills 7d | GET `/account/bills` | есть-док | 🟡 в плане | офдок | `account-bills.md`, `AccountBillOkxResponse`; **:** команда **`REFRESH_BILLS_COMMAND`** → `DealCashFlow` (разбивка P&L; `DealCashFlow.md`), линковка по **окну + `instId`**, дедуп по паре (`exchangeId`, `billId`); метода клиента нет. Откат 🟢→🟡: два непокрытых кейса — `AG3.5` и `AG3.6` (`AG3.4` покрыт `Ag1DealFixtureLiveTest.ag3_4_feeCurrency`; `AG3.6` тест-метода не имеет — единственное упоминание в javadoc базового класса, носителем оно не является) |
 | Bills archive 3m | GET `/account/bills-archive` | **обновлён** | 🟢 в коде | офдок | `account-bills.md`; поле-уровнево сверен (прогон 3); метода клиента нет |
 | Bills deep-архив (с 2021) | POST+GET `/account/bills-history-archive` | **создан** | 🟢 в коде | офдок | `account-bills.md`; поквартально, async-файл; 12 заявок/сутки; метода клиента нет. **Success-контракт на demo неверифицируем** (заявка → `50026`, GET → `51604`): прямой кейс проверяется **на проде ад-хок, вне контура** — зелёный контур-тест подтверждает только demo-реджект, не success |
-| Bill types | GET `/account/subtypes` | **создан** | 🟡 в плане | офдок | `account-bills.md` bill types; метода клиента нет. Откат 🟢→🟡: `AG6.2` не покрыт (ни код-теста, ни делегирования) и **гейтит `CODE`** (п. 2); у `AG6.1` код-тест есть, но ассертит мощность справочника, а предусловиям пп. 2 и 16 нужен перечень |
+| Bill types | GET `/account/subtypes` | **создан** | 🟢 в коде | офдок | `account-bills.md` bill types; метода клиента нет. Покрытие: оба кейса несут код-тесты (`Ag6BillSubtypesLiveTest.ag6_1_directDictionary`, `Ag1DealFixtureLiveTest.ag6_2_typesOutsideDealEconomics`); оба пишут исход-перечень персистентно, состояние наблюдения слотов — колонка реестра (`code-preconditions.md`, пп. 2, 16) |
 | Account config | GET `/account/config` | **создан** | 🟢 в коде | офдок | `account-config.md`; **В-9** → шаг 5 / bootstrap; `getAccountConfig` (диагностический сырой String) |
 | Set position mode | POST `/account/set-position-mode` | **создан** | 🟢 в коде | офдок | `account-config.md`; метода клиента нет |
 | Set leverage | POST `/account/set-leverage` | **создан** | 🟢 в коде | офдок | `account-config.md`; INSTR-Q2; метода клиента нет |
@@ -248,7 +262,7 @@ done
 | Public trades | GET `/market/trades` | **создан** | 🟢 в коде | офдок | `public-trades.md`; ≤ 500; метода клиента нет |
 | Trades history | GET `/market/history-trades` | **создан** | 🟢 в коде | офдок | `public-trades.md`; 3 месяца; метода клиента нет |
 | Index tickers | GET `/market/index-tickers` | **создан** | 🟢 в коде | офдок | `index-data.md`; метода клиента нет. Носителем курса cross-ccy не выбран (см. свечные строки ниже) |
-| Index candles | GET `/market/index-candles` | **создан** | 🟡 в плане | офдок | `index-data.md`; 1440 точек; метода клиента нет. **Кандидат носителя курса cross-ccy**: курс берётся из свечи на момент операции, секундное разрешение при доступности. Индексная свеча не требует онбординга спота, но метод клиента пришлось бы строить. Откат 🟢→🟡: кейс `MG7.5` (носитель курса cross-ccy) не покрыт (ни код-теста, ни делегирования) и **гейтит `CODE`** (п. 5) |
+| Index candles | GET `/market/index-candles` | **создан** | 🟢 в коде | офдок | `index-data.md`; 1440 точек; метода клиента нет. **Кандидат носителя курса cross-ccy**: курс берётся из свечи на момент операции, секундное разрешение при доступности. Индексная свеча не требует онбординга спота, но метод клиента пришлось бы строить. Покрытие: `MG7.5` несёт код-тест `Mg7IndexCandlesLiveTest`; состояние наблюдения слота — колонка реестра (`code-preconditions.md`, п. 5) |
 | Index candles history | GET `/market/history-index-candles` | **создан** | 🟢 в коде | офдок | `index-data.md`; метода клиента нет. **Кандидат носителя курса cross-ccy** для операций за пределами окна свежих свечей — глубина хранения и доступность секундного разрешения проверяются прогоном. **Выбор носителя, разрешения и правила деградации — за `integrator`** (`docs/components/RefreshBillsExecutor.md`); после выбора строка операции заводится здесь |
 | Mark price candles | GET `/market/mark-price-candles` | **создан** | 🟡 в плане | офдок | `mark-price.md`; релевантно `tpTriggerPxType=mark`; метода клиента нет. Откат 🟢→🟡: кейс `MG9.5` (базис `last` ↔ `mark`) не покрыт: ни код-теста, ни делегирования цепочке |
 | Mark price candles history | GET `/market/history-mark-price-candles` | **создан** | 🟢 в коде | офдок | `mark-price.md`; метода клиента нет |

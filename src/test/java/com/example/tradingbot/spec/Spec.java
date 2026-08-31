@@ -72,10 +72,25 @@ public final class Spec {
      * показывает, что поданы <b>все</b> состояния, где правило обязано
      * выполняться: правка, верная на состоянии-источнике находки, проходит
      * зелёной, а достижимое состояние без примера остаётся неизмеренным и
-     * возвращается следующим прогоном. Популяция делает перечень таких
-     * состояний исполнимым: каждый объявленный член обязан быть предъявлен
-     * примером, а объявленный недостижимым — контрпримером, называющим, чем
-     * состояние исключено.
+     * возвращается следующим прогоном.
+     *
+     * <p><b>Происхождение перечня и критерий покрытия</b> (редакция
+     * 2026-08-31, решение держателя): перечень, согласованный с наличным
+     * текстом, самореферентен — он молчит обо всём, чего в тексте нет.
+     * Поэтому у популяции обязательны три ключа сверх {@code keys}:
+     * <ul>
+     *   <li>{@code rule} — величины <b>правила</b> популяции. Пример
+     *       засчитывается покрытием члена, только если ожидает хотя бы одну
+     *       из них: присутствие кортежа покрытием не является;
+     *   <li>{@code derive} — происхождение перечня: {@code command} (команда
+     *       вывода членов из предмета, сверяется
+     *       {@code tools/population-derive-check.py}) либо {@code incomplete}
+     *       (названная причина, по которой ось выводима только грунтом);
+     *   <li>{@code excludes} — обязателен при {@code where}: имя класса,
+     *       который фильтр выводит из популяции. Фильтр, ссылающийся на
+     *       величину правила или на производную от неё, запрещён: он выводит
+     *       из перечня ровно те состояния, на которых правило проверяется.
+     * </ul>
      *
      * <p>Дом нормы — {@code .claude/processes/roadmap-step-execution.md}
      * §«Популяция правила предъявляется до правки, а не после»; процедура —
@@ -202,9 +217,18 @@ public final class Spec {
             String axis = String.valueOf(population.get("axis"));
             List<Object> keys = list(population.get("keys"));
             Object filter = population.get("where");
+            List<String> rule = new ArrayList<>();
+            for (Object name : list(population.get("rule"))) {
+                rule.add(String.valueOf(name));
+            }
+            failures.addAll(contractFailures(axis, rule, population));
+            if (rule.isEmpty()) {
+                continue;
+            }
             Map<String, Integer> byOrdinary = new LinkedHashMap<>();
             Map<String, Integer> byCounter = new LinkedHashMap<>();
             Map<String, String> firstCase = new LinkedHashMap<>();
+            Map<String, String> seenWithoutRule = new LinkedHashMap<>();
             int participants = 0;
             for (Map<String, Object> example : examples) {
                 Map<String, Object> state;
@@ -239,10 +263,16 @@ public final class Spec {
                     continue;
                 }
                 participants++;
-                String member = String.join(" → ", tuple);
+                String member = String.join(" \u2192 ", tuple);
+                firstCase.putIfAbsent(member, String.valueOf(example.get("case")));
+                if (!checksRule(example, rule)) {
+                    // Пример предъявляет кортеж, но правила на нём не проверяет:
+                    // членом он его не делает. Полноту перечня — делает.
+                    seenWithoutRule.putIfAbsent(member, String.valueOf(example.get("case")));
+                    continue;
+                }
                 boolean counter = example.containsKey("unreachable");
                 (counter ? byCounter : byOrdinary).merge(member, 1, Integer::sum);
-                firstCase.putIfAbsent(member, String.valueOf(example.get("case")));
             }
             if (participants == 0) {
                 failures.add("%s / популяция «%s»: не измерена ни одним примером — "
@@ -258,20 +288,22 @@ public final class Spec {
                 for (Object part : parts) {
                     asText.add(String.valueOf(part));
                 }
-                String member = String.join(" → ", asText);
+                String member = String.join(" \u2192 ", asText);
                 declared.add(member);
                 boolean unreachable = single.containsKey("unreachable");
                 if (unreachable) {
                     if (byCounter.getOrDefault(member, 0) == 0) {
                         failures.add(("%s / популяция «%s»: член «%s» объявлен недостижимым, "
-                                + "а контрпримера, предъявляющего это состояние, нет — "
-                                + "недостижимость осталась прозой")
-                                .formatted(subject, axis, member));
+                                + "а контрпримера, предъявляющего это состояние и проверяющего на нём "
+                                + "правило (%s), нет — недостижимость осталась прозой")
+                                .formatted(subject, axis, member, String.join(", ", rule))
+                                + hint(seenWithoutRule.get(member)));
                     }
                 } else if (byOrdinary.getOrDefault(member, 0) == 0) {
-                    failures.add(("%s / популяция «%s»: член «%s» не предъявлен ни одним "
-                            + "примером — состояние, на котором правило не проверялось")
-                            .formatted(subject, axis, member));
+                    failures.add(("%s / популяция «%s»: член «%s» не покрыт — ни один пример не "
+                            + "проверяет на нём правило (%s); присутствие кортежа покрытием не является")
+                            .formatted(subject, axis, member, String.join(", ", rule))
+                            + hint(seenWithoutRule.get(member)));
                 }
             }
             for (String observed : firstCase.keySet()) {
@@ -284,6 +316,115 @@ public final class Spec {
         }
         return failures;
     }
+
+    /** Подсказка о примере, который кортеж предъявил, а правило на нём не проверял. */
+    private static String hint(String caseName) {
+        return caseName == null ? ""
+                : " (кортеж предъявлен примером «" + caseName + "», но правила он не ожидает)";
+    }
+
+    /**
+     * Ожидает ли пример хотя бы одну величину правила — прямым ожиданием
+     * ({@code expect}) либо ожиданием отказа ({@code expectRefusal}).
+     *
+     * <p>Критерий покрытия: член покрыт <b>проверкой правила на нём</b>, а не
+     * присутствием кортежа. Прежняя редакция считала покрытие присутствием, и
+     * снятие всех ожиданий проверяемой величины оставляло прогон зелёным.
+     */
+    private static boolean checksRule(Map<String, Object> example, List<String> rule) {
+        for (String name : rule) {
+            if (asMap(example.get("expect")).containsKey(name)
+                    || asMap(example.get("expectRefusal")).containsKey(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Контракт популяции: величины правила, происхождение перечня и
+     * законность фильтра участия.
+     *
+     * <p>Три проверки — против трёх способов сделать полноту самореферентной:
+     * перечень без названного правила меряет присутствие; перечень без
+     * названного происхождения собран из того же текста, который проверяет;
+     * фильтр, ссылающийся на величину правила, выводит из популяции ровно
+     * фальсифицирующее состояние.
+     */
+    private List<String> contractFailures(String axis, List<String> rule,
+                                          Map<String, Object> population) {
+        List<String> failures = new ArrayList<>();
+        String prefix = "%s / популяция «%s»: ".formatted(subject, axis);
+        if (rule.isEmpty()) {
+            failures.add(prefix + "не названа величина правила (ключ rule) — покрытие считалось бы "
+                    + "присутствием кортежа, а не проверкой правила на нём");
+        }
+        for (String name : rule) {
+            if (!values.containsKey(name)) {
+                failures.add(prefix + "величина правила «" + name + "» не объявлена в спеке");
+            }
+        }
+        Map<String, Object> derive = asMap(population.get("derive"));
+        Object command = derive.get("command");
+        Object incomplete = derive.get("incomplete");
+        if (derive.isEmpty()) {
+            failures.add(prefix + "не названо происхождение перечня (ключ derive) — перечень, "
+                    + "выведенный из того же текста, который он проверяет, самореферентен");
+        } else if (command == null && incomplete == null) {
+            failures.add(prefix + "ключ derive не несёт ни command (команду вывода членов из "
+                    + "предмета), ни incomplete (названную причину, по которой ось выводима "
+                    + "только грунтом)");
+        } else if (command != null && incomplete != null) {
+            failures.add(prefix + "ключ derive несёт и command, и incomplete — происхождение "
+                    + "перечня объявлено двумя несовместимыми способами");
+        } else if (command != null && list(derive.get("from")).isEmpty()) {
+            failures.add(prefix + "команда вывода не называет артефакт-предмет (ключ derive.from) — "
+                    + "команда, ни на что не ссылающаяся, может печатать перечень из себя самой");
+        } else if (incomplete != null && String.valueOf(incomplete).trim().isEmpty()) {
+            failures.add(prefix + "неполнота перечня объявлена пустой причиной");
+        }
+        Object filter = population.get("where");
+        if (filter == null) {
+            return failures;
+        }
+        Object excludes = population.get("excludes");
+        if (excludes == null || String.valueOf(excludes).trim().isEmpty()) {
+            failures.add(prefix + "фильтр участия (where) не называет класс, который он выводит "
+                    + "из популяции (ключ excludes)");
+        }
+        for (String referenced : identifiers(String.valueOf(filter))) {
+            if (values.containsKey(referenced)) {
+                failures.add(prefix + "фильтр участия ссылается на объявленную величину «"
+                        + referenced + "» — фильтр выразим только операндами состояния: "
+                        + "вычисленный вердикт в условии участия выводит из популяции ровно "
+                        + "те состояния, на которых правило и проверяется");
+            }
+        }
+        return failures;
+    }
+
+    /**
+     * Имена, на которые ссылается выражение: корни идентификаторов без путей.
+     * Строковые литералы вырезаются — {@code 'ACTIVE'} ссылкой на величину не
+     * является, и совпадение литерала с именем не должно читаться как ссылка.
+     */
+    private static List<String> identifiers(String expression) {
+        List<String> names = new ArrayList<>();
+        java.util.regex.Matcher matcher = IDENTIFIER.matcher(LITERAL.matcher(expression).replaceAll(" "));
+        while (matcher.find()) {
+            String name = matcher.group();
+            if (!names.contains(name)) {
+                names.add(name);
+            }
+        }
+        return names;
+    }
+
+    private static final java.util.regex.Pattern IDENTIFIER =
+            java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+    private static final java.util.regex.Pattern LITERAL =
+            java.util.regex.Pattern.compile("'[^']*'");
 
     /** Число объявленных членов популяций каталога и из них недостижимых. */
     public int[] populationSize() {

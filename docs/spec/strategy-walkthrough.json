@@ -17,7 +17,8 @@
     "strategy": "эталонный артефакт стратегии, подгружаемый примером через stateFrom. Спека читает его как ВХОД: имена действий в состояниях примеров резолвятся против объявленных ключей артефакта, а не сверяются глазами",
     "actionKey": "ключ действия эталона, к которому относится шаг примера. Операнд связи с артефактом: величина actionDeclaredInArtifact падает, если ключа в артефакте нет",
     "stepConditionTrue": "условие шага истинно на этом проходе (пороги лестницы сопровождения уровневые: истинны, пока цена держится выше порога)",
-    "stepActionRows[]": "строки исполнения действий ЭТОГО шага (docs/models/domain/other/DealActionState.md): каждая несёт trancheEpisodeSeq и status",
+    "stepActionRows[]": "строки исполнения действий ЭТОГО шага (docs/models/domain/other/DealActionState.md): каждая несёт trancheEpisodeSeq и status. Строка на действие в эпизоде одна: бюджет попыток живёт ВНУТРИ строки, повтора строки он не производит",
+    "stepDeclaredActions[]": "действия, ОБЪЯВЛЕННЫЕ пакетом этого шага в артефакте стратегии. Шаг есть ПАКЕТ действий (docs/components/StrategyActionOrchestrator.md §«Пакет шага исполняется целиком; за проход — одно действие»), поэтому признак применённости стои́т на исчерпании пакета, а не на факте первой строки",
     "currentTrancheEpisodeSeq": "DealTranche.episodeSeq — номер ТЕКУЩЕГО эпизода транша; +1 на каждом ребре переоткрытия. Имя разведено с одноимённым полем строки исполнения намеренно: в отборе строк оба имени встречаются рядом, и совпадение имён отдало бы оба значения строке"
   },
   "values": [
@@ -54,11 +55,27 @@
       "expr": "notNull(cancelTargetId) && !removalAllowed"
     },
     {
-      "name": "stepAppliedOnEpisode",
-      "note": "Шаг уже применялся на ТЕКУЩЕМ эпизоде транша. Отбор двойной: номер эпизода строки равен текущему (одного dealTrancheId не хватает — переоткрытие идёт тем же траншем, и строки копятся) и статус строки не SKIPPED и не FAILED (SKIPPED — не применялся; FAILED — попытки исчерпаны, надобность осталась, новая строка законна). Дом правила — docs/rules/strategy-step-once-per-episode.md.",
-      "op": "exists",
+      "name": "stepActionRowsApplied",
+      "note": "Сколько действий пакета исполнено на ТЕКУЩЕМ эпизоде транша. Отбор двойной: номер эпизода строки равен текущему (одного dealTrancheId не хватает — переоткрытие идёт тем же траншем, и строки копятся) и статус строки не SKIPPED и не FAILED (SKIPPED — не применялся; FAILED — попытки исчерпаны, надобность осталась, новая строка законна).",
+      "op": "count",
       "over": "stepActionRows",
       "where": "trancheEpisodeSeq == currentTrancheEpisodeSeq && !in(status, 'SKIPPED', 'FAILED')"
+    },
+    {
+      "name": "stepDeclaredActionCount",
+      "note": "Сколько действий объявлено пакетом шага. Операнд полноты пакета: шаг применён, когда исполнены ВСЕ его действия, а не первое.",
+      "op": "count",
+      "over": "stepDeclaredActions"
+    },
+    {
+      "name": "stepPackageProgress",
+      "note": "Состояние исполнения пакета шага на текущем эпизоде — три класса, и они и есть ось популяции: НИ_ОДНОГО (пакет не начат), ЧАСТЬ (пакет начат и не исчерпан), ВСЕ (пакет исчерпан). Дом классов — docs/rules/strategy-step-once-per-episode.md §«Пакет исполняется по действию за проход, и применённым шаг становится на последнем».",
+      "expr": "if(stepActionRowsApplied == 0, 'НИ_ОДНОГО', if(stepActionRowsApplied < stepDeclaredActionCount, 'ЧАСТЬ', 'ВСЕ'))"
+    },
+    {
+      "name": "stepAppliedOnEpisode",
+      "note": "Шаг применён на ТЕКУЩЕМ эпизоде транша — то есть ПАКЕТ ЕГО ДЕЙСТВИЙ ИСЧЕРПАН. Прежняя редакция стояла на exists над строками действий: строка ПЕРВОГО действия гасила шаг целиком, и двухдейственная ступень эталона (снятие OCO плюс постановка трейлинга) не доигрывалась — снятие не исполнялось никогда, до конца сделки жили обе защиты, действующим уровнем оставался безубыток. Дом правила — docs/rules/strategy-step-once-per-episode.md.",
+      "expr": "stepActionRowsApplied >= stepDeclaredActionCount"
     },
     {
       "name": "stepEligible",
@@ -690,6 +707,11 @@
       "case": "ступень +1 %: условие истинно, строк исполнения нет — шаг допустим",
       "note": "Первый проход, на котором цена перешла порог безубытка.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": true,
         "stepActionRows": [],
         "currentTrancheEpisodeSeq": 2
@@ -703,6 +725,11 @@
       "case": "ступень +1 %: условие всё ещё истинно, а строка текущего эпизода завершена — шаг выпал из набора",
       "note": "Ровно то состояние, на котором лестница застревала: порог уровневый и остаётся истинным.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": true,
         "stepActionRows": [
           {
@@ -721,6 +748,11 @@
       "case": "ступень +2 %: условие ещё ложно — не допустим",
       "note": "Цена не дошла до порога трейлинга.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": false,
         "stepActionRows": [],
         "currentTrancheEpisodeSeq": 2
@@ -734,6 +766,11 @@
       "case": "переоткрытый эпизод: строки ПРЕЖНЕГО эпизода признака не дают — дорожка проходится заново",
       "note": "Строки копятся и несут прежний номер; отбор по номеру эпизода их исключает. Без номера эпизода отбор одним dealTrancheId дал бы «применён» навсегда.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": true,
         "stepActionRows": [
           {
@@ -756,6 +793,11 @@
       "case": "исчерпанный бюджет: строка текущего эпизода в FAILED — шаг остаётся допустимым",
       "note": "Надобность осталась, новая строка законна. Считать FAILED применением значило бы выключить ступень до конца эпизода молча.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": true,
         "stepActionRows": [
           {
@@ -774,6 +816,11 @@
       "case": "пропущенная строка: SKIPPED признака не даёт",
       "note": "Шаг не применялся — строка лишь фиксирует, что он рассматривался.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": true,
         "stepActionRows": [
           {
@@ -792,6 +839,11 @@
       "case": "строка текущего эпизода в полёте (SUBMITTED) — шаг уже применён",
       "note": "Применение — факт заведения строки, а не её завершения: иначе шаг повторился бы, пока первая попытка в полёте.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": true,
         "stepActionRows": [
           {
@@ -810,6 +862,11 @@
       "case": "ступень, применённая на текущем эпизоде, при ложном условии — недопустима обоими конъюнктами",
       "note": "Контроль: ложность даёт условие, а не признак применения; оба конъюнкта проверяются раздельно.",
       "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
         "stepConditionTrue": false,
         "currentTrancheEpisodeSeq": 2,
         "stepActionRows": [
@@ -823,40 +880,114 @@
         "stepAppliedOnEpisode": true,
         "stepEligible": false
       }
+    },
+    {
+      "case": "ступень трейлинга эталона: снятие OCO исполнено, постановка трейлинга — нет; пакет не исчерпан, шаг остаётся допустимым",
+      "state": {
+        "stepConditionTrue": true,
+        "currentTrancheEpisodeSeq": 2,
+        "stepDeclaredActions": [
+          {
+            "key": "bull_oco_cancel"
+          },
+          {
+            "key": "bull_trailing"
+          }
+        ],
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          }
+        ]
+      },
+      "expect": {
+        "stepPackageProgress": "ЧАСТЬ",
+        "stepAppliedOnEpisode": false,
+        "stepEligible": true
+      }
+    },
+    {
+      "case": "пакет исполнен частично, а условие ступени уже ложно — допустимой она не становится",
+      "state": {
+        "stepConditionTrue": false,
+        "currentTrancheEpisodeSeq": 2,
+        "stepDeclaredActions": [
+          {
+            "key": "bull_oco_cancel"
+          },
+          {
+            "key": "bull_trailing"
+          }
+        ],
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          }
+        ]
+      },
+      "expect": {
+        "stepPackageProgress": "ЧАСТЬ",
+        "stepAppliedOnEpisode": false,
+        "stepEligible": false
+      }
     }
   ],
   "populations": [
     {
       "axis": "состояния допустимости шага лестницы сопровождения",
-      "note": "Перечень состояний, на которых правило однократности обязано выполняться: обе ступени лестницы до и после применения плюс переоткрытие эпизода. Признак применения — ВЫЧИСЛЯЕМЫЙ (величина stepAppliedOnEpisode), поэтому член перечня предъявляется строками исполнения и номером эпизода, а не подачей булева операнда.",
+      "note": "Оси — истинность условия шага и СОСТОЯНИЕ ИСПОЛНЕНИЯ ПАКЕТА его действий (три класса дока-дома). Прежняя редакция брала вторую ось из формы уже написанной величины («применён / не применён»), а не из предмета («шаг — это пакет действий»), и класс «пакет исполнен частично» в перечень не попадал вовсе: ступень трейлинга эталона не доигрывалась, снятие OCO не исполнялось никогда. Правило популяции — stepEligible.",
+      "rule": [
+        "stepEligible"
+      ],
+      "derive": {
+        "command": "bash tools/derive/step-eligibility-classes.sh",
+        "from": [
+          "docs/rules/strategy-step-once-per-episode.md"
+        ]
+      },
       "keys": [
         "stepConditionTrue",
-        "stepAppliedOnEpisode"
+        "stepPackageProgress"
       ],
       "where": "notNull(?stepConditionTrue)",
+      "excludes": "примеры, не предъявляющие условия шага вовсе: их предмет — соседние величины этой спеки (привязка прохода к эталонному артефакту, резолв цели снятия по цепочке замещений), а не допустимость шага. Фильтр выражен операндом состояния и ни одного класса пакета из перечня не выводит.",
       "members": [
         {
           "member": [
             "true",
-            "false"
+            "НИ_ОДНОГО"
           ]
         },
         {
           "member": [
             "true",
-            "true"
+            "ЧАСТЬ"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "ВСЕ"
           ]
         },
         {
           "member": [
             "false",
-            "false"
+            "НИ_ОДНОГО"
           ]
         },
         {
           "member": [
             "false",
-            "true"
+            "ЧАСТЬ"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "ВСЕ"
           ]
         }
       ]

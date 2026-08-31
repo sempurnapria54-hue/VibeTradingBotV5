@@ -22,7 +22,8 @@
 Контур — **demo/non-prod** (prod вне контура).
 
 Скилл строит план; он его **не ревьюит** (это `reviewer`, фокус
-`test-review`), не материализует в коллекцию (`test-collection`), не
+`test-review`), не собирает необязательную справочную коллекцию
+(`test-collection`), не
 пишет код-тесты (`test-code`) и не прогоняет (`test-run`).
 
 ## Известный скелет
@@ -192,7 +193,8 @@ demo-рантайме.
 - Шаблон плана/кейса — `.claude/templates/docs/test-plan.md`.
 - Процесс контура — `.claude/processes/source-api-testing.md`.
 - Источник набора — манифест `.claude/tests/{testType}/{source}/coverage-manifest.md`.
-- Построение коллекции — `.claude/skills/test-collection.md`;
+- Построение коллекции (необязательная справка) —
+  `.claude/skills/test-collection.md`;
   написание код-тестов — `.claude/skills/test-code.md`;
   прогон — `.claude/skills/test-run.md`; ревью — `.claude/skills/test-review.md`.
 - Консультант по контрактам — `.claude/agents/integrator.md`.

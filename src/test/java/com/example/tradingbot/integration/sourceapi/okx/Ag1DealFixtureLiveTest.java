@@ -401,6 +401,10 @@ class Ag1DealFixtureLiveTest extends OkxSourceApiLiveTestBase {
             }
         }
         observeValue("AG6.2", "pairsNotInDealWindowCount", outsideWindow.size());
+        // Исход кейса есть ПЕРЕЧЕНЬ, и перечень пишется персистентно: слот
+        // предусловия закрывается составом списка исключений, а мощность
+        // состава не даёт (.claude/processes/source-api-testing.md §RUN).
+        persistObservation("AG6.2", "пары справочника вне окна экономики сделки", outsideWindow);
         assertThat(outsideWindow)
                 .as("AG6.2 → список исключений сверки непуст: справочник шире экономики сделки")
                 .isNotEmpty();

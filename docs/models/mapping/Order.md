@@ -193,7 +193,7 @@ write-once для причины закрытия —
 
 ### OKX evidence-cycle / not found
 
-Полный цикл — **пять источников**:
+Полный цикл — **четыре источника**:
 
 | # | Эндпоинт | Параметры запроса | Матч |
 |---|---|---|---|
@@ -217,7 +217,17 @@ write-once для причины закрытия —
 | # | Эндпоинт | Параметры запроса | Что даёт |
 |---|---|---|---|
 | 1 | `GET /api/v5/trade/orders-algo-pending` | `instType`, `instId`, `ordType=conditional` | живую запись — матч по `algoClOrdId` **в ответе** |
-| 2 | `GET /api/v5/trade/orders-algo-history` | то же плюс окно | сработавшую либо снятую запись — источник исходов `TRIGGERED` и `ANALYSE_HISTORY` |
+| 2 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=effective` | `instType`, `instId`, `ordType=conditional`, `state=effective` | сработавшую запись — источник исхода `TRIGGERED` |
+| 3 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=canceled` | то же со `state=canceled` | снятую запись — источник исхода `ANALYSE_HISTORY` |
+
+**У истории условных заявок временно́го окна нет, а `state` либо `algoId`
+обязателен** (`docs/integrations/okx/contracts/algo-order.md`; рантайм-факт
+прогона: без него `code=50015` «Either parameter state or algoId is
+required»). `algoId` материализованной записи нам неизвестен по построению
+— он не равен `attachAlgoId` родителя, — поэтому обязательный операнд
+закрывается **`state`**, и ног у истории две: терминальные состояния
+`effective` и `canceled` разделены самим эндпоинтом. Глубина задаётся
+пагинацией `after` по `algoId` и `limit` ≤ 100, не окном.
 
 Фильтра по клиентскому идентификатору у обоих эндпоинтов нет
 (`docs/integrations/okx/contracts/algo-order.md`), поэтому запрос идёт по
@@ -240,10 +250,7 @@ write-once для причины закрытия —
 **Форма записи — `AlgoOrderOkxResponse`**, а не элемент
 `attachAlgoOrds[*]`: источник разворачивает встроенную защиту в
 самостоятельную условную заявку. Её маппинг в снапшот встроенной защиты
-описан отдельной таблицей этого же файла. Цикл обходит `RefreshOrderExecutor` **внутри одной
-команды** `REFRESH_ORDER_COMMAND` (обрыв на первом успешном эндпоинте; терминал
-`MISSING_AFTER_REFRESH` выносит он же — см.
-`docs/rules/command-lifecycle.md`). Order-fill-метрики
+описан отдельной таблицей этого же файла. Order-fill-метрики
 (`accFillSz` → `accumulatedFillSize`, `avgPx` → `averagePrice`, `fee`)
 приходят готовыми из того же `OrderOkxResponse` — отдельной fill-команды нет.
 Доп. факты сделки (`REFRESH_POSITION_COMMAND`) запрашиваются отдельной командой;
@@ -259,7 +266,9 @@ write-once для причины закрытия —
 |---|---|---|
 | `algoClOrdId` | ключ матча | равен `attachAlgoClOrdId` родителя; связь только по нему |
 | `algoId` | `externalId` | **не** равен `attachAlgoId` родителя |
-| `state` | — | статуса встроенной защите источник не даёт: её живость выводит `attachedBecomesActive` по фактам родителя (`docs/spec/order-lifecycle.json`), и второй редакции здесь не заводится |
+| `state` | `externalStatus` | сырой статус **самостоятельной записи**: у неё он есть, в отличие от элемента `attachAlgoOrds[*]` родителя. Резолв — `docs/spec/external-status-resolution.json`; он и даёт операнд исходам `TRIGGERED` (`effective`) и `ANALYSE_HISTORY` (`canceled`). Живость защиты, найденной **в теле родителя**, по-прежнему выводит `attachedBecomesActive` по фактам родителя — второй редакции для той тропы здесь не заводится |
+| `failCode` | `failCode` | код отказа постановки; операнд ветви `attachedFailsToPlace` (`docs/spec/order-lifecycle.json`) |
+| `failReason` | `failReason` | причина отказа постановки; в снапшоте поле уже объявлено |
 | `sz` | `size` | объявленный размер записи — операнд покрытия (`docs/spec/protection-coverage.json`) |
 | `slTriggerPx` / `slOrdPx` | уровень защиты | сторона и тип триггера — как у элемента `attachAlgoOrds` |
 | `reduceOnly` | — | в снапшот не переносится; adapter сверяет его при разборе ответа и на несовпадении бросает нарушение биржевого инварианта (`docs/rules/external-status-resolution.md`) |

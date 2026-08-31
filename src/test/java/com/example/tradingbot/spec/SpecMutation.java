@@ -367,6 +367,8 @@ public final class SpecMutation {
              ],
              "populations": [
               { "axis": "рёбра пробы",
+                "rule": ["probePopulationVaried"],
+                "derive": { "incomplete": "перечень рёбер пробы задан фикстурой, а не выводим из корпуса" },
                 "keys": ["from", "to"],
                 "members": [
                  { "member": ["A", "B"] },
@@ -478,7 +480,8 @@ public final class SpecMutation {
         axes.add(accepts(sandbox, "23. фильтр where исключает непричастный пример",
                 FIXTURE_POPULATION
                         .replace("\"keys\": [\"from\", \"to\"],",
-                                "\"keys\": [\"from\", \"to\"], \"where\": \"amount < 9\",")
+                                "\"keys\": [\"from\", \"to\"], \"where\": \"amount < 9\", "
+                                        + "\"excludes\": \"пробы, поданные спеке вне популяции рёбер\",")
                         .replace("\"examples\": [",
                                 "\"examples\": [\n"
                                         + "  { \"case\": \"вне популяции: члена X-Y перечень не объявляет\",\n"
@@ -490,6 +493,39 @@ public final class SpecMutation {
                                 + "  { \"case\": \"вне популяции: члена X-Y перечень не объявляет\",\n"
                                 + "    \"state\": { \"from\": \"X\", \"to\": \"Y\", \"amount\": 9 },\n"
                                 + "    \"expect\": { \"probePopulationVaried\": 18 } },")));
+
+        // --- происхождение перечня и критерий покрытия (редакция 2026-08-31)
+        // Три способа сделать полноту самореферентной: перечень без названного
+        // правила меряет ПРИСУТСТВИЕ кортежа; перечень без названного
+        // происхождения собран из того же текста, который проверяет; фильтр,
+        // выраженный вычисленным вердиктом, выводит из популяции ровно
+        // фальсифицирующее состояние. Каждый способ — своя ось.
+        axes.add(refuses(sandbox, "25. популяция не называет величину правила — замер отказывает",
+                FIXTURE_POPULATION.replace("\"rule\": [\"probePopulationVaried\"],", "")));
+        axes.add(refuses(sandbox, "26. величина правила не объявлена в спеке — замер отказывает",
+                FIXTURE_POPULATION.replace("\"rule\": [\"probePopulationVaried\"],",
+                        "\"rule\": [\"probeНетТакойВеличины\"],")));
+        axes.add(refuses(sandbox, "27. кортеж предъявлен, а правило на нём не проверяется — член не покрыт",
+                FIXTURE_POPULATION.replace(
+                        "\"expect\": { \"probePopulationVaried\": 4 } }",
+                        "\"expect\": {} }")));
+        axes.add(refuses(sandbox, "28. популяция без объявленного происхождения перечня — замер отказывает",
+                FIXTURE_POPULATION.replace(
+                        "\"derive\": { \"incomplete\": \"перечень рёбер пробы задан фикстурой, "
+                                + "а не выводим из корпуса\" },", "")));
+        axes.add(refuses(sandbox, "29. команда вывода не называет артефакт-предмет — замер отказывает",
+                FIXTURE_POPULATION.replace(
+                        "\"incomplete\": \"перечень рёбер пробы задан фикстурой, а не выводим из корпуса\"",
+                        "\"command\": \"printf 'A\\\\tB'\"")));
+        axes.add(refuses(sandbox, "30. фильтр участия не называет исключаемый класс — замер отказывает",
+                FIXTURE_POPULATION.replace("\"keys\": [\"from\", \"to\"],",
+                        "\"keys\": [\"from\", \"to\"], \"where\": \"amount < 9\",")));
+        axes.add(refuses(sandbox, "31. фильтр участия выражен вычисленным вердиктом — замер отказывает",
+                FIXTURE_POPULATION.replace("\"keys\": [\"from\", \"to\"],",
+                        "\"keys\": [\"from\", \"to\"], \"where\": \"probePopulationVaried < 99\", "
+                                + "\"excludes\": \"пробы с большим номиналом\",")));
+        axes.add(accepts(sandbox, "32. контроль: объявленная неполнота перечня замер не роняет",
+                FIXTURE_POPULATION));
         return axes;
     }
 

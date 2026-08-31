@@ -191,7 +191,16 @@ cancel старой, `REPLACED_BY_STRATEGY`). Биржевой amend-контр�
 
 Полный цикл: `GET /trade/order-algo` → `orders-algo-pending` →
 `orders-algo-history`. Поиск: есть `externalId` → по `algoId`; нет →
-по `algoClOrdId`. Пустой `data=[]` одного endpoint — не финал. Цикл
+по `algoClOrdId`.
+
+**У ноги истории обязателен `state` либо `algoId`**
+(`docs/integrations/okx/contracts/algo-order.md`; рантайм-факт прогона:
+иначе `code=50015`). При непустом `externalId` обязательный операнд
+закрывается `algoId`; при пустом — **`state`**, и нога истории идёт
+двумя вызовами, `state=effective` и `state=canceled`. Временно́го окна у
+эндпоинта нет.
+
+Пустой `data=[]` одного endpoint — не финал. Цикл
 обходит `RefreshAlgoOrderExecutor` **внутри одной команды**
 `REFRESH_ALGO_ORDER_COMMAND`; терминал `MISSING_AFTER_REFRESH` выносит он же (см.
 `docs/rules/command-lifecycle.md`).

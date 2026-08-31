@@ -61,11 +61,14 @@ Tester дёргает его по контрактам **front-load, итера�
 
 - Построение тест-плана и кейсов (`.claude/skills/test-design.md`) —
   источник набора запросов — манифест покрытия, периметр ∩ сырой клиент.
-- Построение Postman-коллекции по плану (`.claude/skills/test-collection.md`).
+- Построение справочной Postman-коллекции по плану — **по желанию**,
+  аппрув-артефактом она не является
+  (`.claude/skills/test-collection.md`,
+  `.claude/decisions/collection-not-approval-artifact.md`).
 - Написание `@SpringBootTest`-код-тестов по утверждённому плану
   (`.claude/skills/test-code.md`).
 - Прогон код-тестов и отчёт (`.claude/skills/test-run.md`).
-- Правка плана / коллекции / код-тестов / отчёта по замечаниям ревьюера
+- Правка плана / код-тестов / отчёта по замечаниям ревьюера
   в петле REVIEW (tester — автор, чинит забракованное).
 - Front-load консультаций интегратора по контрактам.
 
@@ -111,10 +114,10 @@ Tester дёргает его по контрактам **front-load, итера�
 ## Связи
 
 - Построение плана / кейсов — `.claude/skills/test-design.md`.
-- Построение коллекции — `.claude/skills/test-collection.md`.
+- Построение справочной коллекции — `.claude/skills/test-collection.md`.
 - Написание код-тестов — `.claude/skills/test-code.md`.
 - Прогон код-тестов — `.claude/skills/test-run.md`.
-- Ревью-фокус (план + коллекция + код-тесты + отчёт) —
+- Ревью-фокус (план + код-тесты + отчёт) —
   `.claude/skills/test-review.md`.
 - Процесс контура — `.claude/processes/source-api-testing.md`.
 - Решение о ре-базе на сырьё — `.claude/decisions/source-api-target-rebase.md`.

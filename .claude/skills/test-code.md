@@ -8,14 +8,14 @@
 ## Когда применять
 
 Этап **CODE-тесты** процесса
-`.claude/processes/source-api-testing.md` — после аппрува плана +
-коллекции. Роль — `tester`.
+`.claude/processes/source-api-testing.md` — после аппрува **плана**.
+Роль — `tester`.
 
 ## Назначение и границы
 
 По **утверждённому** плану строятся `@SpringBootTest`-код-тесты —
-**исполнитель** прогона контура (коллекция — ревью/аппрув-артефакт,
-не исполнитель). Покрывают весь план: каждый кейс плана → код-тест.
+**исполнитель** прогона контура (коллекция — необязательная справка,
+не исполнитель, и аппрув-артефактом не является). Покрывают весь план: каждый кейс плана → код-тест.
 Скилл **пишет** код-тесты; ревью — `reviewer` (`test-review`), прогон —
 `test-run`. Скоуп — **сырьё** (сырой клиент + сырые DTO).
 
@@ -25,12 +25,11 @@
   `src/test/.../integration/model/okx/response/*DeserializationTest`).
   `@SpringBootTest` с профилем `test` (demo-креды из Vault test).
 
-- **Механика — тот же A2-passthrough, что и коллекция.** Код-тест бьёт
+- **Механика — A2-passthrough.** Код-тест бьёт
   в `POST /api/proxy/okx/raw` (под Spring Boot 4 — JDK `HttpClient` по
   `@LocalServerPort`; `TestRestTemplate` в SB4 удалён), получает **сырой**
   ответ OKX (`{code, msg, data}` как JsonNode) и ассертит сырые поля
-  AssertJ. Механика 1:1 с коллекцией — код-тест проверяет то же, что
-  ревьюится в коллекции.
+  AssertJ.
 
 - **Расположение и изоляция.** Живые тесты — отдельным пакетом
   `src/test/java/.../integration/sourceapi/{source}/`, **не** смешивать с
@@ -117,7 +116,7 @@
 
 ## Вход / Выход
 
-- **Вход:** утверждённый тест-план + коллекция
+- **Вход:** утверждённый тест-план
   (`.claude/tests/{testType}/{source}/`); A2-passthrough; сырые DTO.
 - **Выход:** код-тесты в `src/test/java/.../integration/sourceapi/{source}/`
   (`@Tag("source-api-live")`, профиль-гейт, teardown в каждом кейсе),
@@ -127,7 +126,8 @@
 
 - Процесс контура — `.claude/processes/source-api-testing.md`.
 - Построение плана — `.claude/skills/test-design.md`;
-  коллекции (тот же passthrough) — `.claude/skills/test-collection.md`.
+  коллекции — необязательной справки (тот же passthrough) —
+  `.claude/skills/test-collection.md`.
 - Прогон код-тестов — `.claude/skills/test-run.md`;
   ревью — `.claude/skills/test-review.md`.
 - Роль-автор — `.claude/agents/tester.md`.

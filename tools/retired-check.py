@@ -115,16 +115,25 @@ ROOTS = ('CLAUDE.md', 'README.md',
 RETIRED = [
     {
         'name': 'невозрастающая база риска',
-        'pattern': r'невозрастающ\w*\s+баз\w*|база\s+риска\s+не\s+(?:растёт|растет|возрастает)'
-                   r'|риск-баз\w*\s+не\s+возрастает|база\s+расти\s+сама\s+не\s+должна',
+        'pattern': r'невозраста\w+\s*(?:баз\w*)?|база\s+риска\s+не\s+(?:растёт|растет|возрастает)'
+                   r'|риск-баз\w*\s+не\s+возрастает|база\s+расти\s+сама\s+не\s+должна'
+                   r'|вверх\s+баз\w*\s+автоматически\s+не\s+ходит',
         'arrived': r'следует\s+за\s+(?:свободным\s+остатком|балансом)\s+в\s+обе\s+стороны'
                    r'|в\s+обе\s+стороны',
         'date': '2026-08-30',
         'source': 'решение держателя: база риска следует за балансом в обе стороны',
-        'allowed': ('.claude/decisions/risk-base-follows-balance.md',),
+        'allowed': ('.claude/decisions/risk-base-follows-balance.md',
+                    '.claude/work/decision-digest.md',
+                    '.claude/knowledge-tree.md'),
+        # Форма «невозраста-ЕМОСТЬ» шаблоном «невозраста-ЮЩ» не ловилась, и
+        # носитель-исполнитель в популяции не стоя́л вовсе: зелёный прогон
+        # означал «форм из перечня нет», а не «снятой редакции нет».
         'population': (('docs/rules/risk-policy.md', None),
                        ('docs/models/domain/core/Exchange.md', None),
-                       ('docs/spec/risk-limits.json', None)),
+                       ('docs/spec/risk-limits.json',
+                        r'вверх\s+автоматически\s+не\s+ходит'),
+                       ('docs/components/RefreshBalanceExecutor.md',
+                        r'решает\s+её\s+дом|risk-base-follows-balance')),
     },
     {
         'name': 'закрывающая сила исхода OBSERVED_ABSENT',
@@ -227,6 +236,104 @@ RETIRED = [
         'population': (('docs/models/domain/core/Position.md', None),
                        ('docs/models/mapping/Position.md', None),
                        ('docs/lifecycles/Position.md', None)),
+    },
+    {
+        'name': 'величина-счётчик покрытия популяции',
+        # Механизм такой величины не производит и никогда не производил:
+        # покрытие считает раннер по ключу populations. Предписание жило в
+        # ТРЁХ носителях сразу и было неисполнимо в каждом.
+        'pattern': r'величин\w*-счётчик\w*\s+покрытия|счётчик\w*\s+покрытия',
+        'arrived': r'ключ\w*\s+`?populations`?|`rule`|проверк\w+\s+правила\s+на\s+нём',
+        'date': '2026-08-31',
+        'source': 'решение держателя: происхождение перечня и критерий покрытия '
+                  '(.claude/decisions/population-origin-and-code-gate.md)',
+        'allowed': ('.claude/decisions/population-origin-and-code-gate.md',
+                    '.claude/work/decision-digest.md'),
+        'population': (('.claude/processes/roadmap-step-execution.md', None),
+                       ('.claude/skills/closure-population.md', None),
+                       ('.claude/skills/update-roadmap-progress.md', None),
+                       ('.claude/decisions/closure-completeness-by-population.md', None)),
+    },
+    {
+        'name': 'гейт CODE — чистый DOCS_CHECK',
+        # Утвердительная форма: «гейт CODE — чистый прогон», «прогон прошёл
+        # чисто ⇒ статус CODE». Действующая редакция говорит о КЛАССАХ
+        # находок и о нуле незакрытых в двух из них.
+        'pattern': r'[Гг]ейт\s+`?CODE`?\s*[—:-]\s*чист\w+'
+                   r'|чист\w+\s+`?DOCS_CHECK`?[^.\n]{0,40}(?:услови\w+|гейт)'
+                   r'|до\s+чистого\s+прогона\s+статус\s+`?CODE`?',
+        'arrived': r'классы?\s+«?`?КОД`?»?\s+и\s+«?`?РИСК`?»?|code-gate-check|в\s+ноль\s+незакрытых',
+        'date': '2026-08-31',
+        'source': 'решение держателя: исполнимый критерий выхода в CODE по классам '
+                  '(.claude/decisions/population-origin-and-code-gate.md)',
+        'allowed': ('.claude/decisions/population-origin-and-code-gate.md',
+                    '.claude/work/decision-digest.md'),
+        'population': (('.claude/processes/roadmap-step-execution.md',
+                        r'в\s+ноль\s+незакрытых'),
+                       ('.claude/skills/update-roadmap-progress.md',
+                        r'code-gate-check'),
+                       ('.claude/skills/classify-code-blocking.md', None)),
+    },
+    {
+        'name': 'пятый источник цикла добычи',
+        # Закрытие развело добычу заявки и добычу материализованной защиты на
+        # ДВА цикла; редакция «пятая нога первого» жила в трёх носителях, а
+        # счёт «пять источников» стоя́л над таблицей из четырёх строк.
+        'pattern': r'пят\w+\s+(?:источник\w*|ног\w+)\s+цикла\s+добычи|пять\s+источников',
+        'unless': r'не\s+пят\w+\s+ног\w+|а\s+не\s+пятая',
+        'arrived': r'цикл\w*\s+добычи\s+материализованной\s+защиты|четыре\s+источника|второй\s+цикл',
+        'date': '2026-08-31',
+        'source': 'закрытие GAPS_CLOSE_32: цикл добычи материализованной защиты — '
+                  'второй цикл, а не пятая нога первого',
+        'allowed': ('.claude/work/decision-digest.md',),
+        'population': (('docs/models/mapping/Order.md', None),
+                       ('docs/components/AttachedAlgoOrderStateResolver.md', None),
+                       ('docs/models/integrations/okx/AlgoOrderOkxResponse.md', None)),
+    },
+    {
+        'name': 'пункт 10 реестра предусловий гейтит CODE',
+        # Гейтящий статус снят решением держателя 2026-08-30: эпизод ADL
+        # инициирует биржа, на demo он не заказуем. Слот выведен из-под гейта
+        # и строки в таблице реестра не имеет.
+        'pattern': r'п\.\s*10[^.\n]{0,60}(?:гейт\w+|предуслови\w+)\s+`?CODE`?'
+                   r'|предусловие\s+`?CODE`?\s+п\.\s*10'
+                   r'|пп\.\s*[\d,\s]*\b10\b[\d,\s]*\)',
+        'arrived': r'выведен\w*\s+из-под\s+гейта|гейтящ\w+\s+статус\s+снят',
+        'date': '2026-08-30',
+        'source': 'решение держателя: неупорядочиваемый факт закрывается заменителями '
+                  '(.claude/decisions/unorderable-fact-substitutes.md)',
+        'allowed': ('.claude/decisions/unorderable-fact-substitutes.md',
+                    '.claude/work/decision-digest.md'),
+        'population': (('.claude/tests/source-api/okx/plan.md',
+                        r'выведен\w*\s+из-под\s+гейта'),
+                       ('.claude/tests/source-api/okx/coverage-manifest.md',
+                        r'выведен\w*\s+из-под\s+гейта'),
+                       ('.claude/tests/source-api/okx/code-preconditions.md', None)),
+    },
+    {
+        'name': 'Postman-коллекция — обязательный аппрув-артефакт контура',
+        # Утвердительная форма: аппрув на ПАРУ, ревью плана И коллекции,
+        # коллекция как ревью/аппрув-артефакт. Действующая редакция:
+        # аппрув-артефакт — план, коллекция необязательна.
+        'pattern': r'пар\w+\s+«?план\s*\+\s*коллекц\w+'
+                   r'|план\s*\+\s*коллекци\w+\s+(?:прошли|уход\w+|аппрув\w+)'
+                   r'|коллекци\w+\s+—\s+ревью/аппрув-\s*артефакт'
+                   r'|аппрув\w*\s+плана\s*\+\s*коллекции',
+        'arrived': r'аппрув-артефакт\w*\s+(?:контура\s+)?—\s+план|коллекци\w+\s+необязательн\w+'
+                   r'|аппрув-артефактом[^.\n]{0,24}не\s+(?:являетс|служ)\w+'
+                   r'|необязательн\w+\s+справк\w+',
+        'date': '2026-08-31',
+        'source': 'решение держателя: коллекция не аппрув-артефакт '
+                  '(.claude/decisions/collection-not-approval-artifact.md)',
+        'allowed': ('.claude/decisions/collection-not-approval-artifact.md',
+                    '.claude/work/decision-digest.md'),
+        'population': (('.claude/processes/source-api-testing.md', None),
+                       ('.claude/skills/test-collection.md', None),
+                       ('.claude/skills/test-review.md', None),
+                       ('.claude/skills/test-code.md', None),
+                       ('.claude/skills/test-design.md', None),
+                       ('.claude/agents/tester.md', None),
+                       ('.claude/tests/source-api/okx/plan.md', None)),
     },
 ]
 

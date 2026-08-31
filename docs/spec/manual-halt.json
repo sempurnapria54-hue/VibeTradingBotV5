@@ -5,6 +5,7 @@
   "operands": {
     "callOrigin": "кто собрал сигнал: HOLDER — явный вызов держателя ручной поверхностью, DETECTOR — автоматический триггер лестницы. Различает право на доведение недоделанного И наличие строки журнала у ПОГЛОЩЁННОГО вызова: ручное вмешательство — единственный вход в лестницу без детектора, поэтому его основание обязано попасть в журнал; у автоматического триггера строка уже заведена его собственной тропой. На состав и порядок реакции не влияет (docs/components/SafetyHoldCoordinator.md)",
     "standingRungRaisedManually": "стоящая на объекте ступень поднята ручным вызовом, то есть строка отчёта по ключу состояния несёт ручной код; при автоматическом происхождении ступени ручной строки по ключу нет — коды не пересекаются",
+    "standingManualReportSeverity": "severity СТОЯЩЕЙ ручной строки отчёта на объекте радиуса; пусто — ручной строки на объекте нет вовсе. Операнд ключа дедупа, а не происхождения ступени: ключ STATE-отчёта — тройка «объект радиуса + code + severity» (docs/rules/error-handling-policy.md), и по разным severity строки РАЗНЫЕ. Прежняя редакция разводила поглощённые классы парой операндов, о severity умалчивавшей, и гасила строку там, где по ключу дома её нет: мягкий ручной вызов поверх СВОЕЙ ЖЕ жёсткой ступени.",
     "fullReactionRunningOnObject": "полная реакция по этому объекту радиуса уже идёт (исключающий ключ занят)",
     "operation": "операция ручной поверхности: RAISE — постановка ступени, CLEAR — снятие названной ступени",
     "requestedScope": "радиус вызова: EXCHANGE либо INSTRUMENT; групповых значений нет",
@@ -130,7 +131,7 @@
     {
       "name": "reportProduced",
       "note": "Новая строка журнала. Ручное вмешательство — единственный вход в лестницу без детектора, поэтому применённая операция строку заводит. Отказ, холостое снятие и вызов поверх идущей реакции её не заводят. ПОГЛОЩЕНИЕ и ПОВТОР НА СТОЯЩЕЙ СТУПЕНИ гасят смену статуса и состав реакции, но не отчёт: отчёт идемпотентен по СВОЕМУ ключу (объект + code + severity), и у ручного основания поверх ступени, поднятой АВТОМАТИКОЙ, строки по этому ключу нет — коды троп не пересекаются. Оба поглощённых класса разведены одной парой операндов (callOrigin == 'HOLDER' и !standingRungRaisedManually), а не соотношением запрошенной и стоящей ступени: довод у них общий, и асимметрии между «запрос слабее» и «запрос равен» правило не знает. Поглощённый вызов поверх ступени, поднятой ТЕМ ЖЕ ручным вызовом, строки не заводит: она уже стоит. Дом стыковой истины — docs/rules/error-handling-policy.md",
-      "expr": "clearanceApplied || ((absorbed || repeatAtSameRung) && callOrigin == 'HOLDER' && !standingRungRaisedManually) || (reactionApplied && (!fullReactionRunningOnObject || riskTeardownRetry) && (!riskTeardownRetry || !standingRungRaisedManually))"
+      "expr": "clearanceApplied || ((absorbed || repeatAtSameRung) && callOrigin == 'HOLDER' && (isNull(?standingManualReportSeverity) || standingManualReportSeverity != 'NON_CRITICAL')) || (reactionApplied && (!fullReactionRunningOnObject || riskTeardownRetry) && (!riskTeardownRetry || !standingRungRaisedManually))"
     },
     {
       "name": "reportCode",
@@ -1122,6 +1123,58 @@
         "reportCode": "MANUAL_HALT_REQUESTED",
         "reportSeverity": "CRITICAL",
         "statusAfter": "TRADE_BLOCKED"
+      }
+    },
+    {
+      "case": "постановка: мягкий вызов поверх СВОЕЙ ЖЕ жёсткой ступени — строка по ключу дома не стои́т, и она заводится",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": true,
+        "standingManualReportSeverity": "CRITICAL",
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "absorbed": true,
+        "reactionApplied": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "rungRankBefore": 2,
+        "rungRankAfter": 2,
+        "reportProduced": true,
+        "reportSeverity": "NON_CRITICAL"
+      }
+    },
+    {
+      "case": "постановка: повтор ТОЙ ЖЕ мягкой ступени, поднятой тем же ручным вызовом, — строка по ключу уже стои́т",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": true,
+        "standingManualReportSeverity": "NON_CRITICAL",
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE",
+        "requestedClass": "FREEZE",
+        "objectStatusBefore": "HOLD",
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "terminalDealWithUnprovenRiskOnScope": false,
+        "onboardingIncomplete": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "reactionApplied": false,
+        "rungRankBefore": 1,
+        "rungRankAfter": 1,
+        "reportProduced": false,
+        "reportSeverity": null
       }
     }
   ]

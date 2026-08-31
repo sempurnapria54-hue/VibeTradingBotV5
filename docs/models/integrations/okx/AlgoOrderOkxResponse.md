@@ -16,7 +16,7 @@
 | `algoClOrdId` | string | client id (stable, основной матчинг) |
 | `state` | string | сырой статус (`live`/`pause`/`effective`/`canceled`/`order_failed`/`partially_failed`/`partially_effective`) |
 | `failCode` | string | код ошибки |
-| `sz` | string-decimal | **объявленный** размер записи — операнд покрытия у материализованной встроенной защиты, найденной пятым источником цикла добычи (`docs/models/mapping/Order.md`; форма — `docs/spec/protection-coverage.json`) |
+| `sz` | string-decimal | **объявленный** размер записи — операнд покрытия у материализованной встроенной защиты, найденной циклом добычи материализованной защиты (`docs/models/mapping/Order.md`; форма — `docs/spec/protection-coverage.json`) |
 | `actualSz` | string-decimal | фактический размер срабатывания |
 | `actualPx` | string-decimal | фактическая цена срабатывания |
 | `triggerTime` | string-ms | время срабатывания |

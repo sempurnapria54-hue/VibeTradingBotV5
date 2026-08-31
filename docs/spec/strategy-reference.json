@@ -320,6 +320,23 @@
       "where": "actionStopCalculationType == 'BREAKEVEN' && !actionIsLevelTransfer"
     },
     {
+      "name": "actionSetsLevel",
+      "note": "Действие СТАВИТ уровень защиты: защитное создание либо защитное замещение над условной заявкой. Снимающее (CANCEL_ACTION) и выходные действия уровня не ставят вовсе — дом области: docs/rules/risk-policy.md §«снятие и выходные действия уровня не ставят вовсе».",
+      "expr": "isProtectiveAction && in(actionType, 'CREATE_ACTION', 'REPLACE_ACTION')"
+    },
+    {
+      "name": "actionDeclaresLevelSource",
+      "note": "Действие объявило источник своего уровня: способ расчёта стопа (свой либо у встроенной защиты входа) или настройки трейлинга.",
+      "expr": "notNull(?stopLossSettings) || notNull(?trailingSettings) || notNull(?attachedProtection.stopLossSettings)"
+    },
+    {
+      "name": "actionsSettingLevelWithoutSource",
+      "note": "Исполнимая форма клаузы создания docs/rules/strategy-validation.md §«защитное действие, СТАВЯЩЕЕ уровень, объявляет его источник». Считает нарушителей: ставящие уровень действия без объявленного источника. Область сужена до ставящих намеренно — безусловная редакция отвергала эталон репозитория (bull_oco_cancel / bear_oco_cancel защитны, а уровня не ставят), и исполнимой формы у неё не было вовсе, поэтому прогон её не мерил.",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
+      "where": "actionSetsLevel && !actionDeclaresLevelSource"
+    },
+    {
       "name": "priceSourceUnavailable",
       "note": "Объявления размещения цены, чей источник источник данных не отдаёт. Тикер OKX несёт последнюю цену и лучшие бид/аск; марк-цены и индексной цены в нём нет (docs/models/mapping/MarketPriceData.md). Стратегия, объявившая MARK_PRICE или INDEX_PRICE, отвергается на создании — STRATEGY_PRICE_SOURCE_UNAVAILABLE: проксирование последней ценой подменяет ценовой домен молча, и расхождение марк-цены с последней (базис) уезжает прямо в цену входа. Условие возврата значений — поддержка источником, а не наше решение; носитель — .claude/work/backlog.md.",
       "op": "count",
@@ -1833,6 +1850,96 @@
       }
     },
     {
+      "case": "матрица: контр-игра допустима в бычьем тренде",
+      "state": {
+        "marketPhaseType": "BULL_TREND",
+        "phaseEntryPolicy": "CONTRARIAN"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: отказ от торговли допустим в бычьем тренде",
+      "state": {
+        "marketPhaseType": "BULL_TREND",
+        "phaseEntryPolicy": "NO_TRADE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: следование по фазе допустимо в медвежьем тренде",
+      "state": {
+        "marketPhaseType": "BEAR_TREND",
+        "phaseEntryPolicy": "FOLLOW_PHASE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: сетка в медвежьем тренде отвергается",
+      "state": {
+        "marketPhaseType": "BEAR_TREND",
+        "phaseEntryPolicy": "GRID"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": false
+      }
+    },
+    {
+      "case": "матрица: отказ от торговли допустим в медвежьем тренде",
+      "state": {
+        "marketPhaseType": "BEAR_TREND",
+        "phaseEntryPolicy": "NO_TRADE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: контр-игра в диапазоне отвергается",
+      "state": {
+        "marketPhaseType": "RANGE",
+        "phaseEntryPolicy": "CONTRARIAN"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": false
+      }
+    },
+    {
+      "case": "матрица: отказ от торговли допустим в диапазоне",
+      "state": {
+        "marketPhaseType": "RANGE",
+        "phaseEntryPolicy": "NO_TRADE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": true
+      }
+    },
+    {
+      "case": "матрица: следование по фазе в неизвестной фазе отвергается",
+      "state": {
+        "marketPhaseType": "UNKNOWN",
+        "phaseEntryPolicy": "FOLLOW_PHASE"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": false
+      }
+    },
+    {
+      "case": "матрица: сетка в неизвестной фазе отвергается",
+      "state": {
+        "marketPhaseType": "UNKNOWN",
+        "phaseEntryPolicy": "GRID"
+      },
+      "expect": {
+        "phaseEntryPolicyAllowed": false
+      }
+    },
+    {
       "case": "эталонная стратегия укладывается в матрицу допустимости целиком",
       "stateFrom": {
         "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
@@ -1888,12 +1995,69 @@
       "expect": {
         "allDetailsWithinPhaseMatrix": false
       }
+    },
+    {
+      "case": "эталонная стратегия: каждое ставящее уровень действие объявляет его источник, а снимающие из области выведены",
+      "stateFrom": {
+        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "actionsSettingLevelWithoutSource": 0
+      }
+    },
+    {
+      "case": "нарушитель клаузы создания: защитное создание без способа расчёта и без трейлинга",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "actions": [
+                          {
+                            "key": "sl_without_source",
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "STOP_LOSS"
+                          },
+                          {
+                            "key": "oco_cancel",
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CANCEL_ACTION",
+                            "conditionType": "OCO_FULL"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "actionsSettingLevelWithoutSource": 1
+      }
     }
   ],
   "populations": [
     {
       "axis": "классы пары «фаза × политика входа»",
-      "note": "Матрица допустимости целиком, по классам, которые различает правило. Фильтр участия — наличие обеих осей у примера.",
+      "note": "Матрица допустимости ЦЕЛИКОМ — полное произведение двух закрытых перечней, а не множество пар, встретившихся в примерах. Прежняя редакция перечисляла семь пар, совпадавших один в один с наличными примерами, и законная пара BEAR_TREND × FOLLOW_PHASE из эталонного артефакта репозитория роняла прогон как «клейм полноты ложен». Правило популяции — phaseEntryPolicyAllowed: член покрыт, только когда пример ожидает эту величину.",
+      "rule": [
+        "phaseEntryPolicyAllowed"
+      ],
+      "derive": {
+        "command": "bash tools/derive/phase-entry-policy-matrix.sh",
+        "from": [
+          "docs/models/domain/other/MarketPhase.md",
+          "docs/models/domain/aggregate/Strategy.md"
+        ]
+      },
       "keys": [
         "marketPhaseType",
         "phaseEntryPolicy"
@@ -1907,19 +2071,43 @@
         },
         {
           "member": [
+            "BULL_TREND",
+            "CONTRARIAN"
+          ]
+        },
+        {
+          "member": [
+            "BULL_TREND",
+            "GRID"
+          ]
+        },
+        {
+          "member": [
+            "BULL_TREND",
+            "NO_TRADE"
+          ]
+        },
+        {
+          "member": [
+            "BEAR_TREND",
+            "FOLLOW_PHASE"
+          ]
+        },
+        {
+          "member": [
             "BEAR_TREND",
             "CONTRARIAN"
           ]
         },
         {
           "member": [
-            "RANGE",
+            "BEAR_TREND",
             "GRID"
           ]
         },
         {
           "member": [
-            "UNKNOWN",
+            "BEAR_TREND",
             "NO_TRADE"
           ]
         },
@@ -1931,14 +2119,44 @@
         },
         {
           "member": [
-            "BULL_TREND",
+            "RANGE",
+            "CONTRARIAN"
+          ]
+        },
+        {
+          "member": [
+            "RANGE",
             "GRID"
+          ]
+        },
+        {
+          "member": [
+            "RANGE",
+            "NO_TRADE"
+          ]
+        },
+        {
+          "member": [
+            "UNKNOWN",
+            "FOLLOW_PHASE"
           ]
         },
         {
           "member": [
             "UNKNOWN",
             "CONTRARIAN"
+          ]
+        },
+        {
+          "member": [
+            "UNKNOWN",
+            "GRID"
+          ]
+        },
+        {
+          "member": [
+            "UNKNOWN",
+            "NO_TRADE"
           ]
         }
       ]
