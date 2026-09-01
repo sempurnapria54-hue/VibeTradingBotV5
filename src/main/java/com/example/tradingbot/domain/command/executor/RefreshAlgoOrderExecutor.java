@@ -84,7 +84,11 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
         if (nonNull(pending)) {
             return pending;
         }
-        return matchByInternalId(integrationService.getAlgoOrderHistory(instId, conditionType),
+        // Обязательный операнд истории закрывается идентификатором записи,
+        // если он известен, иначе — терминальными состояниями (adapter);
+        // без обоих эндпоинт отвечает отказом, а не пустой историей.
+        return matchByInternalId(
+                integrationService.getAlgoOrderHistory(instId, conditionType, algoOrder.getExternalId()),
                 algoOrder.getInternalId());
     }
 

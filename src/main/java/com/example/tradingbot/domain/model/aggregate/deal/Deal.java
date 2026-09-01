@@ -118,6 +118,28 @@ public class Deal extends Auditable {
                 .anyMatch(tranche -> isTrue(tranche.isRiskBearing()));
     }
 
+    /**
+     * Риск ВСЕХ траншей сделки покрыт защитой (docs/spec/protection-coverage.json,
+     * величина {@code allTranchesCovered}) — агрегатный аналог покрытия транша.
+     * Терминальный транш экспозиции не несёт и покрыт тривиально, поэтому
+     * перечень не сужается до живых: сужение меняло бы ответ только там, где
+     * покрывать нечего.
+     */
+    public Boolean allTranchesCovered() {
+        return emptyIfNull(tranches).stream()
+                .allMatch(tranche -> isTrue(tranche.isCovered()));
+    }
+
+    /**
+     * Уровень защиты на всю позицию не резолвится: хоть один транш с
+     * экспозицией не несёт своего уровня (docs/spec/protection-coverage.json,
+     * величина {@code dealStopUnresolved}).
+     */
+    public Boolean stopUnresolved() {
+        return emptyIfNull(tranches).stream()
+                .anyMatch(tranche -> isTrue(tranche.stopUnresolved()));
+    }
+
     /** Живые транши сделки: те, что ещё занимают место в проходе. */
     public List<DealTranche> liveTranches() {
         return emptyIfNull(tranches).stream()

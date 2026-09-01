@@ -5,8 +5,10 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.domain.command.ExchangeAck;
+import com.example.tradingbot.domain.command.resolve.ProtectionHistoryLeg;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
@@ -15,6 +17,7 @@ import com.example.tradingbot.domain.model.core.instrument.external_snapshot.Ins
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
@@ -57,6 +60,7 @@ import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.mapping.TradeFeeRateMapper;
 import com.example.tradingbot.util.OkxParse;
 import com.example.tradingbot.util.Constants;
+import java.util.ArrayList;
 import java.util.List;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -416,15 +420,74 @@ public class OkxIntegrationService implements IntegrationService {
         return toAlgoOrderSnapshots(response);
     }
 
+    /**
+     * Обязательный операнд истории закрывается идентификатором записи,
+     * если он известен, иначе — терминальными состояниями двумя вызовами
+     * (`docs/models/mapping/AlgoOrder.md` §«OKX evidence-cycle / not
+     * found»). Без обоих эндпоинт отвечает отказом, а не пустой историей.
+     */
     @Override
     public List<AlgoOrderExternalSnapshot> getAlgoOrderHistory(String externalInstrumentId,
-                                                               AlgoOrder.ConditionType conditionType) {
+                                                               AlgoOrder.ConditionType conditionType,
+                                                               String externalId) {
         String ordType = algoOrderMapper.resolveAlgoOrdType(conditionType);
+        if (isNotBlank(externalId)) {
+            return algoHistoryPage(externalInstrumentId, ordType, externalId, null);
+        }
+        List<AlgoOrderExternalSnapshot> found = new ArrayList<>(
+                algoHistoryPage(externalInstrumentId, ordType, null, Constants.Okx.ALGO_STATE_EFFECTIVE));
+        found.addAll(algoHistoryPage(externalInstrumentId, ordType, null, Constants.Okx.ALGO_STATE_CANCELED));
+        return found;
+    }
+
+    @Override
+    public List<AttachedAlgoOrderExternalSnapshot> getPendingMaterializedProtections(String externalInstrumentId) {
         OkxApiResponse<AlgoOrderOkxResponse> response = execute(
-                () -> okxRestClient.getAlgoOrderHistory(externalInstrumentId, ordType),
-                "orders-algo-history", "instId=" + externalInstrumentId);
-        verifyCode(response, "orders-algo-history", "instId=" + externalInstrumentId);
+                () -> okxRestClient.getPendingAlgoOrders(externalInstrumentId,
+                        Constants.Okx.ALGO_ORD_TYPE_CONDITIONAL),
+                "orders-algo-pending", "instId=" + externalInstrumentId);
+        verifyCode(response, "orders-algo-pending", "instId=" + externalInstrumentId);
+        return toProtectionSnapshots(response);
+    }
+
+    @Override
+    public List<AttachedAlgoOrderExternalSnapshot> getMaterializedProtectionHistory(String externalInstrumentId,
+                                                                                    ProtectionHistoryLeg leg) {
+        String state = protectionHistoryState(leg);
+        String context = "instId=" + externalInstrumentId + " state=" + state;
+        OkxApiResponse<AlgoOrderOkxResponse> response = execute(
+                () -> okxRestClient.getAlgoOrderHistory(externalInstrumentId,
+                        Constants.Okx.ALGO_ORD_TYPE_CONDITIONAL, null, state),
+                "orders-algo-history", context);
+        verifyCode(response, "orders-algo-history", context);
+        return toProtectionSnapshots(response);
+    }
+
+    /** Нога разбора истории → терминальное состояние записи в query источника. */
+    private String protectionHistoryState(ProtectionHistoryLeg leg) {
+        return switch (leg) {
+            case EFFECTIVE -> Constants.Okx.ALGO_STATE_EFFECTIVE;
+            case CANCELED -> Constants.Okx.ALGO_STATE_CANCELED;
+            case ORDER_FAILED -> Constants.Okx.ALGO_STATE_ORDER_FAILED;
+        };
+    }
+
+    private List<AlgoOrderExternalSnapshot> algoHistoryPage(String externalInstrumentId, String ordType,
+                                                            String algoId, String state) {
+        String context = "instId=" + externalInstrumentId + " state=" + state;
+        OkxApiResponse<AlgoOrderOkxResponse> response = execute(
+                () -> okxRestClient.getAlgoOrderHistory(externalInstrumentId, ordType, algoId, state),
+                "orders-algo-history", context);
+        verifyCode(response, "orders-algo-history", context);
         return toAlgoOrderSnapshots(response);
+    }
+
+    private List<AttachedAlgoOrderExternalSnapshot> toProtectionSnapshots(
+            OkxApiResponse<AlgoOrderOkxResponse> response) {
+        if (isEmpty(response.getData())) {
+            return List.of();
+        }
+        return response.getData().stream().map(orderMapper::integrationToSnapshot).collect(toList());
     }
 
     @Override

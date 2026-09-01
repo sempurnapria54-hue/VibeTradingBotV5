@@ -10,6 +10,7 @@ import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExt
 import com.example.tradingbot.integration.model.okx.request.CancelAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.CancelOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceOrderOkxRequest;
+import com.example.tradingbot.integration.model.okx.response.AlgoOrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.AttachAlgoOrdOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
@@ -74,6 +75,27 @@ public interface OrderMapper {
     @Mapping(target = "triggerPriceType", source = "slTriggerPxType",
             qualifiedByName = "okxTriggerPriceType")
     AttachedAlgoOrderExternalSnapshot integrationToSnapshot(AttachAlgoOrdOkxResponse response);
+
+    /**
+     * Вторая форма того же снапшота: САМОСТОЯТЕЛЬНАЯ условная заявка, в
+     * которую источник развернул встроенную защиту, — её находит цикл
+     * добычи материализованной защиты. Ключ связи один — клиентский
+     * идентификатор ({@code algoClOrdId} записи равен
+     * {@code attachAlgoClOrdId} родителя); {@code algoId} записи с
+     * {@code attachAlgoId} родителя НЕ совпадает, обратной ссылки на
+     * родителя у записи нет. Свой {@code state} у записи есть, и он
+     * приземляется диагностикой: исход кодирует нога, нашедшая запись.
+     * См. docs/models/mapping/Order.md §«AlgoOrderOkxResponse →
+     * AttachedAlgoOrderExternalSnapshot».
+     */
+    @Mapping(target = "internalId", source = "algoClOrdId")
+    @Mapping(target = "externalId", source = "algoId")
+    @Mapping(target = "externalStatus", source = "state")
+    @Mapping(target = "size", source = "sz")
+    @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx")
+    @Mapping(target = "triggerPriceType", source = "slTriggerPxType",
+            qualifiedByName = "okxTriggerPriceType")
+    AttachedAlgoOrderExternalSnapshot integrationToSnapshot(AlgoOrderOkxResponse response);
 
     /**
      * Обновление полей Order из снапшота (REFRESH-контур). internalId

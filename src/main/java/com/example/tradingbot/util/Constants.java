@@ -40,6 +40,12 @@ public final class Constants {
 
         /** L4-эскалация: kill-switch не подтвердил flat в пределах лимита попыток (остаточный риск, HOLD-Q1). */
         public static final String EXCHANGE_KILL_SWITCH_RESIDUAL = "EXCHANGE_KILL_SWITCH_RESIDUAL";
+
+        /** L3: шаг стратегии велел сворачиваться аварийно из-за устаревших рыночных данных. */
+        public static final String INSTRUMENT_MARKET_DATA_EXPIRED = "INSTRUMENT_MARKET_DATA_EXPIRED";
+
+        /** L3, мягкая: разбор истории не предъявил записи защиты — её судьба неизвестна. */
+        public static final String INSTRUMENT_PROTECTION_FATE_UNKNOWN = "INSTRUMENT_PROTECTION_FATE_UNKNOWN";
     }
 
     /** Константы интеграции с OKX: коды, флаги, заголовки, пути и имена полей запроса, таймфреймы. */
@@ -156,6 +162,21 @@ public final class Constants {
 
         /** Имя query/body-параметра algoClOrdId (stable client algo id). */
         public static final String PARAM_ALGO_CL_ORD_ID = "algoClOrdId";
+
+        /**
+         * Имя query-параметра state истории условных заявок. У эндпоинта
+         * обязателен он либо algoId (иначе code=50015).
+         */
+        public static final String PARAM_STATE = "state";
+
+        /** Терминальное состояние условной заявки: сработала. */
+        public static final String ALGO_STATE_EFFECTIVE = "effective";
+
+        /** Терминальное состояние условной заявки: снята. */
+        public static final String ALGO_STATE_CANCELED = "canceled";
+
+        /** Терминальное состояние условной заявки: сработала, заявка не исполнилась. */
+        public static final String ALGO_STATE_ORDER_FAILED = "order_failed";
 
         /** Adapter-константа режима маржи. */
         public static final String TD_MODE_ISOLATED = "isolated";

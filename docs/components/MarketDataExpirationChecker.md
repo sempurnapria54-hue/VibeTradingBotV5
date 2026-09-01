@@ -15,10 +15,26 @@
 
 ## Контракт
 
+- `Boolean isFresh(referencePoint, expirationDuration)` — свежесть одного
+  значения под срок его настройки-владельца; на нём стои́т раздача готовых
+  результатов (`docs/components/IndicatorService.md`,
+  `docs/components/MarketStructureService.md`);
+- `Boolean stepDataFresh(StrategyStep step, ConditionEvaluationContext
+  context)` — свежи ли данные, нужные **именно этому шагу**: каждая
+  настройка, на которую ссылается его условие, отдала значение;
 - `MarketDataExpirationResult checkForEntry(Strategy strategy)` — данные
   для поиска нового входа;
 - `MarketDataExpirationResult checkForStep(DealContext dealContext,
   StrategyStep step)` — данные, нужные конкретному `StrategyStep`.
+
+**Отсутствие и устаревание на поверхности шага неразличимы, и различать их
+незачем:** обе пустоты означают «данным доверять нельзя» и ведут к одной
+реакции (`docs/spec/market-data-freshness.json`, величина `reaction`).
+Устаревшее значение до контекста оценки не доходит — свежесть под срок
+настройки-владельца гейтят раздатчики, — поэтому отсутствие ключа в
+контексте и есть признак «не свежо». Четырёхзначный
+`MarketDataExpirationResult` этой реакции не нужен: он различает то, что
+реакция не читает.
 
 ## Источник сроков
 

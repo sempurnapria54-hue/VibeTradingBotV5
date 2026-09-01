@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -37,6 +38,20 @@ public class AttachedAlgoOrderStateResolver {
     /** Класс состояния родителя, различимый политикой встроенной защиты. */
     private enum ParentClass {
         UNCONFIRMED, LIVE, PROBLEM, TERMINAL_FILLED, TERMINAL_EMPTY, TERMINAL_FILL_UNKNOWN
+    }
+
+    /**
+     * Запускается ли цикл добычи материализованной защиты для родителя в
+     * таком состоянии. Предикат публичен затем, чтобы добытчик фактов не
+     * заводил СВОЮ копию гейта: гейт один, и живёт он здесь — иначе
+     * добытчик ходил бы к источнику там, где решение на ответ не смотрит,
+     * либо молчал бы там, где ответ решению нужен.
+     */
+    public Boolean runsSearchCycle(Order.Status parentStatus, BigDecimal parentAccumulatedFillSize) {
+        if (isNull(parentStatus)) {
+            return false;
+        }
+        return runsSearchCycle(parentClass(parentStatus, parentAccumulatedFillSize));
     }
 
     public AttachedProtectionResolution resolve(AttachedProtectionFacts facts) {
@@ -74,11 +89,15 @@ public class AttachedAlgoOrderStateResolver {
      * его и определяет. Пустой налив нулём НЕ подменяется.
      */
     private ParentClass parentClass(AttachedProtectionFacts facts) {
-        return switch (facts.getParentStatus()) {
+        return parentClass(facts.getParentStatus(), facts.getParentAccumulatedFillSize());
+    }
+
+    private ParentClass parentClass(Order.Status parentStatus, BigDecimal parentAccumulatedFillSize) {
+        return switch (parentStatus) {
             case CREATED, PENDING -> ParentClass.UNCONFIRMED;
             case ACTIVE, PARTIALLY_COMPLETED -> ParentClass.LIVE;
             case ERROR -> ParentClass.PROBLEM;
-            case COMPLETED, CANCELED -> terminalClass(facts.getParentAccumulatedFillSize());
+            case COMPLETED, CANCELED -> terminalClass(parentAccumulatedFillSize);
         };
     }
 

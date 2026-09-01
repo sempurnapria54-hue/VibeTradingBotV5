@@ -29,8 +29,10 @@ import org.springframework.stereotype.Service;
 /**
  * Ведёт {@link AnomalyReport} по lifecycle реактивной реакции холда:
  * CREATED (before-слепок) → IN_PROGRESS → KILL_SWITCH_EXECUTED → COMPLETED
- * (after-слепок), либо ERROR при сбое обработки. Severity в реактивном
- * контуре всегда CRITICAL (граница захода). Слепок двухносительный: локальное
+ * (after-слепок), либо ERROR при сбое обработки. Severity приходит СО
+ * СТУПЕНЬЮ сигнала: жёсткая (kill-switch в составе реакции) — CRITICAL,
+ * мягкая (запрет новых входов без снятия риска) — NON_CRITICAL
+ * (docs/rules/instrument-hold.md). Слепок двухносительный: локальное
  * (БД) состояние из {@link DealContext} + внешнее (биржа) состояние по instId
  * триггера (позиция + pending-ордера), читаемое через {@link IntegrationService}.
  * Чтение биржи best-effort: сбой read'а не валит реакцию — фиксируется маркером
@@ -53,17 +55,39 @@ public class AnomalyReportService {
 
     /** Создать отчёт в CREATED с before-слепками (локальный БД + внешний биржевой). */
     public AnomalyReport open(DealContext dealContext, HoldSignal signal) {
+        return create(dealContext, signal, AnomalyReport.Status.CREATED);
+    }
+
+    /**
+     * Журнальный отчёт: создаётся <b>уже завершённым</b> — обрабатывать
+     * нечего, снятие риска в составе реакции отсутствует, и снимки
+     * собираются один раз, при создании (docs/lifecycles/AnomalyReport.md
+     * §«Две тропы обработки»). After-слепков у него нет по построению:
+     * между «до» и «после» ничего не происходило.
+     */
+    public AnomalyReport journal(DealContext dealContext, HoldSignal signal) {
+        return create(dealContext, signal, AnomalyReport.Status.COMPLETED);
+    }
+
+    private AnomalyReport create(DealContext dealContext, HoldSignal signal, AnomalyReport.Status status) {
         AnomalyReport report = new AnomalyReport();
         report.setInternalId(ClientIdGenerator.generate());
         report.setExchangeId(dealContext.getExchange().getId());
         report.setInstrumentId(dealContext.getInstrument().getId());
         report.setScope(signal.getScope());
-        report.setSeverity(AnomalyReport.Severity.CRITICAL);
-        report.setStatus(AnomalyReport.Status.CREATED);
+        report.setSeverity(severityOf(signal));
+        report.setStatus(status);
         report.setCode(signal.getCode());
         report.setInternalBefore(internalSnapshot(dealContext));
         report.setExternalBefore(externalSnapshot(dealContext));
         return dataService.save(report);
+    }
+
+    /** Класс отчёта по ступени сигнала: снимает ли реакция принятый риск. */
+    private AnomalyReport.Severity severityOf(HoldSignal signal) {
+        return isTrue(signal.tearsDownRisk())
+                ? AnomalyReport.Severity.CRITICAL
+                : AnomalyReport.Severity.NON_CRITICAL;
     }
 
     /** Продвинуть отчёт в указанный статус (IN_PROGRESS / KILL_SWITCH_EXECUTED). */

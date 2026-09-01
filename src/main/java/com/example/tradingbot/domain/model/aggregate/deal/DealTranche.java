@@ -12,6 +12,7 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -156,6 +157,54 @@ public class DealTranche extends Auditable {
     }
 
     /**
+     * У транша есть ОТДЕЛЬНАЯ живая защита — операнд второй ступени исхода
+     * цикла добычи (docs/spec/order-lifecycle.json, {@code
+     * standaloneProtectionExists}). Встроенная сюда не входит по
+     * построению: предикат отвечает на вопрос «останется ли покрытие,
+     * если встроенная не нашлась».
+     */
+    public Boolean hasStandaloneProtection() {
+        return emptyIfNull(algoOrders).stream()
+                .anyMatch(algo -> isTrue(algo.isExchangeLive()) && isTrue(algo.carriesActiveStopLevel()));
+    }
+
+    /**
+     * Инвариант покрытия транша выполнен: покрытие живых защит не ниже
+     * его экспозиции (docs/spec/protection-coverage.json, величина
+     * {@code trancheCovered}).
+     *
+     * <p>Объект, не несущий живой экспозиции, покрыт ТРИВИАЛЬНО —
+     * покрывать нечего: покрытие считается ОТ несомого риска, и пара
+     * «риска нет, не покрыт» моделью не производится.
+     */
+    public Boolean isCovered() {
+        return coverage().compareTo(exposure()) >= 0;
+    }
+
+    /**
+     * Уровень остановки убытка транша не резолвится: экспозиция есть, а
+     * действующего уровня не несёт ни одна его живая защита
+     * (docs/spec/protection-coverage.json, величина
+     * {@code dealStopUnresolved} — её потраншевый член).
+     *
+     * <p>Предикат спрашивает <b>разрешимость</b>, а не само число: ветвь
+     * реакции на устаревание читает только её. Худший уровень как величина
+     * ({@code trancheStopCurrent}) приезжает вместе с числами риска сделки.
+     */
+    public Boolean stopUnresolved() {
+        return exposure().signum() > 0 && isFalse(hasActiveStopLevel());
+    }
+
+    /** Хоть одна живая защита транша несёт действующий уровень остановки убытка. */
+    private Boolean hasActiveStopLevel() {
+        boolean attached = emptyIfNull(orders).stream()
+                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                .anyMatch(protection -> isTrue(protection.isActiveLike())
+                        && nonNull(protection.getStopLossTriggerPrice()));
+        return attached || isTrue(hasStandaloneProtection());
+    }
+
+    /**
      * Покрытие транша ПОСЛЕ того, как снимаемая отдельная защита
      * исчезнет (docs/spec/protection-coverage.json, величина
      * {@code coverageAfterRemoval}) — операнд преконтроля снятия. Сумма
@@ -184,13 +233,30 @@ public class DealTranche extends Auditable {
         return coverageWithoutAlgoOrder(algoOrderId).compareTo(exposure()) >= 0;
     }
 
-    /** Сумма покрытий защит транша, кроме отдельной защиты с указанным id. */
+    /** Сумма покрытий всех живых защит транша — встроенных и отдельных. */
+    private BigDecimal coverage() {
+        return coverageOf(algo -> true);
+    }
+
+    /**
+     * Сумма покрытий защит транша, кроме отдельной защиты с указанным id.
+     *
+     * <p>Исключение выражено ПРЕДИКАТОМ, а не «пустым id значит никого»:
+     * при пустом сентинеле незаписанная защита (id ещё нет) совпала бы с ним
+     * по {@code Objects.equals} и выпала бы из суммы — покрытая позиция
+     * читалась бы непокрытой.
+     */
     private BigDecimal coverageWithout(Long excludedAlgoOrderId) {
+        return coverageOf(algo -> isFalse(Objects.equals(excludedAlgoOrderId, algo.getId())));
+    }
+
+    /** Покрытие транша по отдельным защитам, прошедшим фильтр участия, плюс встроенные. */
+    private BigDecimal coverageOf(Predicate<AlgoOrder> standaloneFilter) {
         BigDecimal attached = emptyIfNull(orders).stream()
                 .map(this::attachedCoverageOf)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal standalone = emptyIfNull(algoOrders).stream()
-                .filter(algo -> isFalse(Objects.equals(excludedAlgoOrderId, algo.getId())))
+                .filter(standaloneFilter)
                 .filter(algo -> isTrue(algo.isExchangeLive()) && isTrue(algo.carriesActiveStopLevel()))
                 .map(AlgoOrder::coveredSize)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

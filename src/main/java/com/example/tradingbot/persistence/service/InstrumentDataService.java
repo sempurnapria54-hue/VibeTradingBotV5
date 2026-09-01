@@ -65,16 +65,39 @@ public class InstrumentDataService {
     }
 
     /**
-     * Заморозка торговли по аварии: ACTIVE → TRADE_BLOCKED (гардирована статусом,
-     * только из ACTIVE — decision B). Возвращает {@code true}, если переход
-     * применился (инструмент был ACTIVE) — анкер идемпотентности реакции холда.
-     * Обратный переход (ручная разморозка TRADE_BLOCKED → ACTIVE) — с операцией
-     * un-hold (step 9 / backlog п.9), здесь не вводится превентивно.
+     * Заморозка торговли по аварии: ACTIVE либо ENTRY_BLOCKED →
+     * TRADE_BLOCKED. Возвращает {@code true}, если переход применился —
+     * анкер идемпотентности реакции холда.
+     *
+     * <p><b>Исходных статуса два, и это эскалация, а не послабление.</b>
+     * Мягкая ступень стоящей на инструменте не отменяет права поднять
+     * жёсткую: монотонность лестницы разрешает подъём и запрещает
+     * понижение (docs/rules/exchange-hold.md §«Границы и эскалация»).
+     * Гард только из ACTIVE запирал бы инструмент с мягкой ступенью в
+     * ней навсегда — жёсткая реакция на него не встала бы ни разу.
+     * Обратный переход (ручная разморозка) — {@link #unblockTrade}.
      */
     @Transactional
     public Boolean blockTrade(Long id) {
-        return repository.updateStatus(id, Instrument.Status.ACTIVE.name(),
+        return repository.updateStatusFromAny(id,
+                List.of(Instrument.Status.ACTIVE.name(), Instrument.Status.ENTRY_BLOCKED.name()),
                 Instrument.Status.TRADE_BLOCKED.name()) > 0;
+    }
+
+    /**
+     * Мягкая safety-ступень: ACTIVE → ENTRY_BLOCKED (гардирована статусом,
+     * только из ACTIVE). Возвращает {@code true}, если переход применился —
+     * анкер идемпотентности мягкой реакции.
+     *
+     * <p>Из TRADE_BLOCKED мягкая ступень НЕ ставится: это понижение, а
+     * понижение даёт только снятие (`docs/rules/instrument-hold.md`
+     * §«Снятие — вручную у обоих классов»). Запрос слабее стоящей ступени
+     * поглощается — гард и есть механизм поглощения.
+     */
+    @Transactional
+    public Boolean blockEntry(Long id) {
+        return repository.updateStatus(id, Instrument.Status.ACTIVE.name(),
+                Instrument.Status.ENTRY_BLOCKED.name()) > 0;
     }
 
     /**
@@ -85,6 +108,22 @@ public class InstrumentDataService {
     @Transactional
     public Boolean unblockTrade(Long id) {
         return repository.updateStatus(id, Instrument.Status.TRADE_BLOCKED.name(),
+                Instrument.Status.ACTIVE.name()) > 0;
+    }
+
+    /**
+     * Ручное снятие мягкой ступени: ENTRY_BLOCKED → ACTIVE (гардировано
+     * статусом). Возвращает {@code true}, если переход применился.
+     *
+     * <p>Обратная сторона {@link #blockEntry}. Без неё инструмент, вставший
+     * в мягкую ступень, из неё бы не вышел: автоматического снятия по
+     * восстановлению признака нет ни у одного класса
+     * (`docs/rules/instrument-hold.md` §«Снятие — вручную у обоих
+     * классов»), а жёсткая разморозка гардирована своим статусом.
+     */
+    @Transactional
+    public Boolean unblockEntry(Long id) {
+        return repository.updateStatus(id, Instrument.Status.ENTRY_BLOCKED.name(),
                 Instrument.Status.ACTIVE.name()) > 0;
     }
 

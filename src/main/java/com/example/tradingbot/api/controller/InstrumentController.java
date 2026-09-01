@@ -77,6 +77,14 @@ public class InstrumentController {
         return toResponse(instrumentService.unblockTrade(internalId));
     }
 
+    @PostMapping("/{internalId}/entry-unblock")
+    @Operation(summary = "Снять мягкую safety-ступень инструмента (ENTRY_BLOCKED → ACTIVE)")
+    public InstrumentApiResponse unblockEntry(
+            @Parameter(description = "Межсервисный идентификатор инструмента", required = true)
+            @PathVariable @NotBlank String internalId) {
+        return toResponse(instrumentService.unblockEntry(internalId));
+    }
+
     private InstrumentApiResponse toResponse(Instrument instrument) {
         String exchangeInternalId = exchangeService.getRequiredInternalIdById(instrument.getExchangeId());
         return mapper.domainToApi(instrument, exchangeInternalId);

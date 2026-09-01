@@ -20,7 +20,7 @@ import com.example.tradingbot.persistence.service.DealTrancheDataService;
 import com.example.tradingbot.domain.deal.DealStateMachine;
 import com.example.tradingbot.domain.deal.DealTransition;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
-import com.example.tradingbot.domain.safety.SafetyHoldCoordinator;
+import com.example.tradingbot.domain.safety.HoldService;
 import com.example.tradingbot.persistence.service.DealDataService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +57,7 @@ public class DealOrchestratorJob {
     private final DealTrancheStateMachine dealTrancheStateMachine;
     private final DealTrancheDataService dealTrancheDataService;
     private final ServiceCommandExecutor serviceCommandExecutor;
-    private final SafetyHoldCoordinator safetyHoldCoordinator;
+    private final HoldService holdService;
 
     @Scheduled(cron = "${deal-orchestrator.cron}")
     public void tick() {
@@ -136,9 +136,15 @@ public class DealOrchestratorJob {
         reactToHoldSignal(transition, dealContext);
     }
 
+    /**
+     * Исполнение команд перехода. Ступень safety, ЗАТРЕБОВАННАЯ звеном,
+     * поднимается здесь — как и переход: исход звена есть намерение, а не
+     * право (docs/processes/fsm-execution-layering.md).
+     */
     private void executeCommands(List<ServiceCommand> commands, DealContext dealContext) {
         for (ServiceCommand command : commands) {
             ServiceCommandExecutionResult result = serviceCommandExecutor.execute(command, dealContext);
+            holdService.raise(result.getHoldSignal(), dealContext);
             if (isFalse(result.getSuccess())) {
                 // Команда провалилась (учёт retry/terminal сделал диспетчер) — остальные команды
                 // перехода в этом проходе не гоним; handler разберёт FAILED-якорь на следующем тике.
@@ -210,10 +216,14 @@ public class DealOrchestratorJob {
         return null;
     }
 
-    /** Поднятый handler'ом safety-холд координируется над сделкой (после применения перехода). */
+    /**
+     * Поднятая handler'ом ступень исполняется над сделкой (после применения
+     * перехода). Ступень приходит СО СИГНАЛОМ, и кто ведёт реакцию —
+     * решает общий исполнитель блокировки, а не этот проход.
+     */
     private void reactToHoldSignal(DealTransition transition, DealContext dealContext) {
         if (nonNull(transition.getHoldSignal())) {
-            safetyHoldCoordinator.react(transition.getHoldSignal(), dealContext);
+            holdService.raise(transition.getHoldSignal(), dealContext);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.example.tradingbot.integration.service;
 
 import com.example.tradingbot.domain.command.ExchangeAck;
+import com.example.tradingbot.domain.command.resolve.ProtectionHistoryLeg;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
@@ -9,6 +10,7 @@ import com.example.tradingbot.domain.model.core.instrument.external_snapshot.Ins
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
@@ -126,9 +128,38 @@ public interface IntegrationService {
     /**
      * История algo orders по инструменту и типу условия (звено algo
      * evidence-cycle).
+     *
+     * <p><b>Обязательный операнд эндпоинта закрывается по наличию
+     * {@code externalId}:</b> он есть — запрос идёт по {@code algoId} одним
+     * вызовом; его нет — по терминальным {@code state}, и нога идёт двумя
+     * вызовами ({@code effective}, {@code canceled}). Третье терминальное
+     * состояние здесь отдельным вызовом не опрашивается — запись в любом
+     * состоянии предъявляет первая нога цикла, точечный поиск по
+     * клиентскому идентификатору (`docs/models/mapping/AlgoOrder.md`
+     * §«OKX evidence-cycle / not found»).
      */
     List<AlgoOrderExternalSnapshot> getAlgoOrderHistory(String externalInstrumentId,
-                                                        AlgoOrder.ConditionType conditionType);
+                                                        AlgoOrder.ConditionType conditionType,
+                                                        String externalId);
+
+    /**
+     * Живые записи материализованной встроенной защиты по инструменту —
+     * нога живых цикла добычи (`orders-algo-pending`, {@code ordType =
+     * conditional}). Фильтра по клиентскому идентификатору у эндпоинта
+     * нет, поэтому совпадение ищет вызывающий — по {@code internalId} в
+     * ответе (`docs/models/mapping/Order.md` §«OKX: цикл добычи
+     * материализованной защиты»).
+     */
+    List<AttachedAlgoOrderExternalSnapshot> getPendingMaterializedProtections(String externalInstrumentId);
+
+    /**
+     * Записи материализованной встроенной защиты в истории по ОДНОМУ
+     * терминальному состоянию — нога разбора цикла добычи. Ног три, по
+     * числу терминальных состояний контракта эндпоинта; вызов на каждое
+     * делает вызывающий, совпадение ищет там же.
+     */
+    List<AttachedAlgoOrderExternalSnapshot> getMaterializedProtectionHistory(String externalInstrumentId,
+                                                                             ProtectionHistoryLeg leg);
 
     /**
      * Позиция по инструменту с биржи.

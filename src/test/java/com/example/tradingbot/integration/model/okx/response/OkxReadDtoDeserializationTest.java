@@ -69,6 +69,7 @@ class OkxReadDtoDeserializationTest {
     void algoOrderResponseBindsAllFields() {
         String json = """
                 {"algoClOrdId":"algo-1","algoId":"aid-1","state":"live","failCode":"0",\
+                "failReason":"","sz":"0.01",\
                 "actualSz":"0.01","actualPx":"0","triggerTime":"1700000000000","ordIdList":["o1"],\
                 "slTriggerPx":"1500","slTriggerPxType":"last","tpTriggerPx":"1800",\
                 "tpTriggerPxType":"last","activePx":"1700","moveTriggerPx":"1690",\

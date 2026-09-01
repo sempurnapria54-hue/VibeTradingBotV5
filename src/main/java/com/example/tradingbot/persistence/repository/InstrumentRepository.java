@@ -22,6 +22,16 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     @Query("update InstrumentEntity i set i.status = :to where i.id = :id and i.status = :from")
     int updateStatus(@Param("id") Long id, @Param("from") String from, @Param("to") String to);
 
+    /**
+     * Тот же гардированный переход с НЕСКОЛЬКИМИ допустимыми исходными
+     * статусами — эскалация ступени, у которой исходных состояний больше
+     * одного (мягкая ступень стои́т либо не стои́т).
+     */
+    @Modifying
+    @Query("update InstrumentEntity i set i.status = :to where i.id = :id and i.status in :from")
+    int updateStatusFromAny(@Param("id") Long id, @Param("from") Collection<String> from,
+                            @Param("to") String to);
+
     /** Проекция: JSONB-навес внешних правил по id — без вытягивания всей сущности. */
     @Query("select i.externalRules from InstrumentEntity i where i.id = :id")
     Optional<String> findExternalRulesById(@Param("id") Long id);

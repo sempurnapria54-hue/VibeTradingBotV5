@@ -32,6 +32,12 @@ public class AlgoOrderOkxResponse {
     /** Внешний код ошибки. */
     private String failCode;
 
+    /** Диагностика отказа (в колонку не садится, идёт в лог). */
+    private String failReason;
+
+    /** Объявленный размер записи — операнд покрытия у материализованной встроенной защиты. */
+    private String sz;
+
     /** Фактический размер срабатывания. */
     private String actualSz;
 

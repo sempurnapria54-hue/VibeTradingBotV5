@@ -187,11 +187,22 @@ public class OkxRestClient {
         return dispatch(HttpMethod.GET, Constants.Okx.TRADE_ORDERS_ALGO_PENDING_PATH, query, null, true, ALGO_ORDER_TYPE);
     }
 
-    /** История algo orders по инструменту и ordType (звено evidence-cycle). */
-    public OkxApiResponse<AlgoOrderOkxResponse> getAlgoOrderHistory(String instId, String ordType) {
+    /**
+     * История algo orders по инструменту и ordType (звено evidence-cycle).
+     *
+     * <p><b>Сверх ordType эндпоинт требует ОДИН из двух операндов</b> —
+     * {@code algoId} либо {@code state}; без обоих отвечает
+     * {@code code=50015} «Either parameter state or algoId is required»
+     * (`docs/integrations/okx/contracts/algo-order.md`). Пустой из пары в
+     * query не попадает.
+     */
+    public OkxApiResponse<AlgoOrderOkxResponse> getAlgoOrderHistory(String instId, String ordType,
+                                                                    String algoId, String state) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         query.put(Constants.Okx.PARAM_ORD_TYPE, ordType);
+        query.put(Constants.Okx.PARAM_ALGO_ID, algoId);
+        query.put(Constants.Okx.PARAM_STATE, state);
         return dispatch(HttpMethod.GET, Constants.Okx.TRADE_ORDERS_ALGO_HISTORY_PATH, query, null, true, ALGO_ORDER_TYPE);
     }
 

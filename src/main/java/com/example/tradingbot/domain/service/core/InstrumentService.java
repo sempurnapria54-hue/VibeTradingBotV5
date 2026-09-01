@@ -72,6 +72,25 @@ public class InstrumentService {
         return instrument;
     }
 
+    /**
+     * Ручное снятие МЯГКОЙ safety-ступени инструмента (L3):
+     * ENTRY_BLOCKED → ACTIVE. Гардировано статусом; если инструмент не в
+     * ENTRY_BLOCKED — переход не применяется (IllegalStateException → 409).
+     *
+     * <p>Операция отдельна от разморозки жёсткой ступени, потому что
+     * отдельны сами ступени: снятие даёт единственный переход вверх по
+     * лестнице, и объединять их значило бы позволить снять жёсткую
+     * ступень запросом мягкой.
+     */
+    public Instrument unblockEntry(String internalId) {
+        Instrument instrument = instrumentDataService.getRequiredByInternalId(internalId);
+        if (isFalse(instrumentDataService.unblockEntry(instrument.getId()))) {
+            throw new IllegalStateException("Instrument is not entry-blocked: " + internalId);
+        }
+        instrument.setStatus(Instrument.Status.ACTIVE);
+        return instrument;
+    }
+
     /** Резолв internalId инструмента по числовому id (для api-ответов смежных сущностей). */
     public String getRequiredInternalIdById(Long id) {
         return instrumentDataService.getRequiredInternalIdById(id);
