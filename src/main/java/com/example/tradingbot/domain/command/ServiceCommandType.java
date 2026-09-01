@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.command;
 
 /**
- * Тип атомарной операции команды над runtime-сущностью (16 значений).
+ * Тип атомарной операции команды над runtime-сущностью (17 значений).
  * Амендных команд нет: AMEND_* сняты, ремоделирование — REPLACE-
  * оркестрация существующих команд (docs/decisions/replace-not-amend.md).
  * Refresh-набор — ровно по одной команде на сущность (bulk-команды
@@ -40,6 +40,13 @@ public enum ServiceCommandType {
 
     /** Отменить algo-order. */
     CANCEL_ALGO_ORDER,
+
+    /**
+     * Снять ВСТРОЕННУЮ защиту. Своя команда, а не адресат в CANCEL_ALGO_ORDER:
+     * цель — другая сущность с непересекающимся словарём причин
+     * (docs/components/models/ServiceCommand.md).
+     */
+    CANCEL_ATTACHED_PROTECTION,
 
     /** Обновить algo-order по фактам (evidence-cycle внутри команды). */
     REFRESH_ALGO_ORDER,

@@ -12,6 +12,7 @@ import com.example.tradingbot.domain.model.core.balance.external_snapshot.Balanc
 import com.example.tradingbot.domain.model.core.fill.external_snapshot.FillExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalRulesExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
@@ -207,6 +208,15 @@ public class OkxIntegrationService implements IntegrationService {
                         : okxRestClient.cancelAlgos(body),
                 "cancel-algo", "instId=" + externalInstrumentId + " algoId=" + algoOrder.getExternalId());
         return toAlgoAck(response, "cancel-algo", externalInstrumentId);
+    }
+
+    @Override
+    public ExchangeAck cancelAttachedProtection(AttachedAlgoOrder attached, String externalInstrumentId) {
+        CancelAlgoOrderOkxRequest request = orderMapper.domainToCancelRequest(attached, externalInstrumentId);
+        List<CancelAlgoOrderOkxRequest> body = List.of(request);
+        OkxApiResponse<AlgoOrderAckOkxResponse> response = execute(() -> okxRestClient.cancelAlgos(body),
+                "cancel-attached", "instId=" + externalInstrumentId + " algoId=" + attached.getExternalId());
+        return toAlgoAck(response, "cancel-attached", externalInstrumentId);
     }
 
     @Override

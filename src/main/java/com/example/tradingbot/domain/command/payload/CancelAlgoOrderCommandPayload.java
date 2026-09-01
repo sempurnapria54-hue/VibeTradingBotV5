@@ -7,7 +7,10 @@ import lombok.Value;
 /**
  * Параметры CANCEL_ALGO_ORDER: локальный algoOrderId и причина отмены.
  * Cancel-endpoint ветвится по семье algo (из conditionType загруженной
- * сущности). См. docs/components/CancelAlgoOrderExecutor.md.
+ * сущности). ВСТРОЕННУЮ защиту эта команда не адресует — у неё своя
+ * команда и свой словарь причин
+ * (docs/components/CancelAttachedProtectionExecutor.md). См.
+ * docs/components/CancelAlgoOrderExecutor.md.
  */
 @Value
 public class CancelAlgoOrderCommandPayload implements ServiceCommandPayload {
@@ -15,6 +18,6 @@ public class CancelAlgoOrderCommandPayload implements ServiceCommandPayload {
     /** Локальный id отменяемого algo-order. */
     Long algoOrderId;
 
-    /** Причина отмены (CANCELED_BY_STRATEGY / REPLACED_BY_STRATEGY / KILL_SWITCH / MANUAL_CANCEL). */
+    /** Причина отмены (CANCELED_BY_STRATEGY / REPLACED_BY_STRATEGY / KILL_SWITCH). */
     AlgoOrder.CloseReason cancelReason;
 }

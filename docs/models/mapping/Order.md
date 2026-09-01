@@ -93,8 +93,16 @@ evidence-cycle (специфика per-source — см. подразделы). �
 после `SUBMIT_ORDER_COMMAND`; `ACTIVE` — по предикату
 `docs/spec/order-lifecycle.json`, величина `attachedBecomesActive`
 (присутствия в снапшоте недостаточно: нужен непустой налив родителя и
-пустой код отказа); заполненные `failCode`/`failReason` → `ERROR`.
+пустой код отказа); заполненный `failCode` → `ERROR` с
+`PROTECTION_PLACEMENT_FAILED`.
 Судьба защиты по фактам родителя (класс состояния + налив) — `docs/lifecycles/Order.md`.
+
+**Ценовая база триггера приезжает эхом и сверяется.** `triggerPriceType`
+снапшота — операнд сверки объявленной базы `MARK`
+(`docs/models/domain/core/AlgoOrder.md`): расхождение **непустого** эха с
+объявленным — нарушение биржевого инварианта; пустое эхо сверку не
+запускает. Состав снапшота и довод — `docs/models/domain/core/Order.md`
+§«Граничные снапшоты» и §«Персистентность встроенной защиты».
 
 ## OKX
 
@@ -134,8 +142,9 @@ evidence-cycle (специфика per-source — см. подразделы). �
 | `tpOrdKind` | `externalType` / future | для SL-only можно не использовать |
 | `sz` | `size` | string→`BigDecimal` |
 | `slTriggerPx` | `stopLossTriggerPrice` | trigger SL |
-| `failCode` | `failCode` | если заполнен → attached ERROR |
-| `failReason` | `failReason` | диагностика ошибки |
+| `slTriggerPxType` | `triggerPriceType` | **операнд сверки объявленной базы** `MARK`; `last`/`index`/`mark` → доменный енум, пусто → пусто |
+| `failCode` | `failCode` | если заполнен → attached `ERROR` с `PROTECTION_PLACEMENT_FAILED`; **персистится** — операнд разбора тропы |
+| `failReason` | `failReason` | диагностика ошибки; в колонку не садится (лог) |
 
 У `attachAlgoOrds` нет полноценного `state` как у ordinary order —
 attached резолвится по набору фактов (`docs/lifecycles/Order.md`).
@@ -219,7 +228,7 @@ write-once для причины закрытия —
 | 1 | `GET /api/v5/trade/orders-algo-pending` | `instType`, `instId`, `ordType=conditional` | живую запись — матч по `algoClOrdId` **в ответе**; нога живых, идёт всегда |
 | 2 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=effective` | `instType`, `instId`, `ordType=conditional`, `state=effective` | сработавшую запись — терминал `TRIGGERED`; нога разбора истории (ветвь `ANALYSE_HISTORY` второй ступени) |
 | 3 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=canceled` | то же со `state=canceled` | снятую запись — терминал `CANCELED` по стоящему намерению; та же ветвь |
-| 4 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=order_failed` | то же со `state=order_failed` | сработавшую и неисполнившуюся запись — терминал `ERROR`/`PROTECTION_LOST` с фактическим кодом отказа; та же ветвь |
+| 4 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=order_failed` | то же со `state=order_failed` | сработавшую и неисполнившуюся запись — терминал `ERROR` / `PROTECTION_TRIGGER_FAILED` с фактическим кодом отказа; та же ветвь |
 
 **У истории условных заявок временно́го окна нет, а `state` либо `algoId`
 обязателен** (`docs/integrations/okx/contracts/algo-order.md`; рантайм-факт
@@ -292,10 +301,11 @@ required»). `algoId` материализованной записи нам н�
 | `algoClOrdId` | ключ матча | равен `attachAlgoClOrdId` родителя; связь только по нему |
 | `algoId` | `externalId` | **не** равен `attachAlgoId` родителя |
 | `state` | `externalStatus` | сырой статус **самостоятельной записи**: у неё он есть, в отличие от элемента `attachAlgoOrds[*]` родителя. Через резолвер внешних статусов (`docs/spec/external-status-resolution.json`) **не идёт**: его операнд `entity` защиту не принимает, а словарь отказных причин чужой — исход кодирует **нога, нашедшая запись** (таблица разбора — `docs/lifecycles/Order.md`), `state` — диагностика. Живость в **обеих** тропах предъявления выводит один предикат `attachedBecomesActive`: предъявленная самостоятельная запись — его второй дизъюнкт (`docs/spec/order-lifecycle.json`) |
-| `failCode` | `failCode` | код отказа постановки; операнд ветви `attachedFailsToPlace` в `docs/spec/order-lifecycle.json` |
-| `failReason` | `failReason` | причина отказа постановки; в снапшоте поле уже объявлено |
+| `failCode` | `failCode` | код отказа; операнд ветви `attachedFailsToPlace` в `docs/spec/order-lifecycle.json` и **операнд разбора тропы** у записи `state=order_failed` — персистится |
+| `failReason` | `failReason` | причина отказа; в снапшоте поле уже объявлено, в колонку не садится (лог) |
 | `sz` | `size` | объявленный размер записи — операнд покрытия (`docs/spec/protection-coverage.json`) |
-| `slTriggerPx` / `slOrdPx` | уровень защиты | сторона и тип триггера — как у элемента `attachAlgoOrds` |
+| `slTriggerPx` / `slOrdPx` | уровень защиты | сторона — как у элемента `attachAlgoOrds` |
+| `slTriggerPxType` | `triggerPriceType` | **операнд сверки объявленной базы** `MARK`; поле объявлено инвентарём и этой формы (`docs/models/integrations/okx/AlgoOrderOkxResponse.md`) |
 | `reduceOnly` | — | в снапшот не переносится; adapter сверяет его при разборе ответа и на несовпадении бросает нарушение биржевого инварианта (`docs/rules/external-status-resolution.md`) |
 
 **Вход резолвера при этом двухместный:** снапшот встроенной защиты

@@ -7,6 +7,7 @@ import com.example.tradingbot.domain.model.core.balance.external_snapshot.Balanc
 import com.example.tradingbot.domain.model.core.fill.external_snapshot.FillExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalRulesExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
@@ -150,6 +151,18 @@ public interface IntegrationService {
      * @return нормализованный ACK биржи.
      */
     ExchangeAck cancelAlgoOrder(AlgoOrder algoOrder, String externalInstrumentId);
+
+    /**
+     * Снятие ВСТРОЕННОЙ защиты на бирже. Операция та же, что у отдельной
+     * условной заявки — снятие по algoId материализованной записи, иначе
+     * по клиентскому идентификатору, — а сущность другая: у встроенной
+     * защиты нет ни conditionType, ни семьи algo, она всегда ordinary.
+     * Адресат существует только после материализации
+     * (docs/components/CancelAttachedProtectionExecutor.md).
+     *
+     * @return нормализованный ACK биржи.
+     */
+    ExchangeAck cancelAttachedProtection(AttachedAlgoOrder attached, String externalInstrumentId);
 
     /**
      * Закрытие позиции по инструменту (market reduce-only). ACK не

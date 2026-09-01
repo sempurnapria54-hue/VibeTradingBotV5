@@ -31,6 +31,12 @@ public class AttachAlgoOrdOkxResponse {
     /** Trigger SL. */
     private String slTriggerPx;
 
+    /**
+     * Ценовая база триггера SL (last/index/mark) — объявлена инвентарём
+     * источника у обеих форм. Операнд сверки объявленной базы MARK.
+     */
+    private String slTriggerPxType;
+
     /** Код ошибки биржи (если заполнен — attached ERROR). */
     private String failCode;
 

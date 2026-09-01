@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.command.executor;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.domain.command.DealActionState;
@@ -13,6 +14,8 @@ import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.command.resolve.AttachedAlgoOrderStateResolver;
+import com.example.tradingbot.domain.command.resolve.AttachedProtectionFacts;
+import com.example.tradingbot.domain.command.resolve.AttachedProtectionResolution;
 import com.example.tradingbot.domain.command.resolve.OrderExternalStatusResolver;
 import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
@@ -119,18 +122,47 @@ public class RefreshOrderExecutor implements CommandExecutor {
         }
     }
 
+    /**
+     * НАЗВАННОЕ ОГРАНИЧЕНИЕ: здесь собираются только факты ПЕРВОЙ ступени —
+     * снапшот из тела родителя, его статус и налив. Цикл 2 (нога живых по
+     * orders-algo-pending и три ноги разбора истории по терминальным state)
+     * поверхности в IntegrationService ещё не имеет, поэтому
+     * standaloneRecordFound и historyLegFound приходят пустыми: у
+     * ТЕРМИНАЛЬНОГО родителя резолвер отдаёт вторую ступень либо «исход не
+     * определён», и оба исхода консервативны — покрытие не объявляется
+     * снятым. Достройка цикла 2 — ход по RefreshOrderExecutor
+     * (docs/components/RefreshOrderExecutor.md §«Что делает»).
+     */
     private void resolveAttached(Order order, OrderExternalSnapshot snapshot) {
         if (isEmpty(order.getAttachedAlgoOrders())) {
             return;
         }
-        order.getAttachedAlgoOrders().forEach(attached -> {
-            StatusResolveResult<AttachedAlgoOrder.Status, AttachedAlgoOrder.CloseReason> result =
-                    attachedStateResolver.resolve(matchAttached(snapshot, attached.getInternalId()), order.getStatus());
-            attached.setStatus(result.getStatus());
-            if (isNull(attached.getCloseReason()) && nonNull(result.getCloseReason())) {
-                attached.setCloseReason(result.getCloseReason());
-            }
-        });
+        order.getAttachedAlgoOrders().forEach(attached -> applyResolution(attached,
+                attachedStateResolver.resolve(AttachedProtectionFacts.builder()
+                        .snapshot(matchAttached(snapshot, attached.getInternalId()))
+                        .parentStatus(order.getStatus())
+                        .parentAccumulatedFillSize(order.getAccumulatedFillSize())
+                        .standaloneRecordFound(false)
+                        .trancheExposure(null)
+                        .standaloneProtectionExists(false)
+                        .historyLegFound(null)
+                        .cancelIntentStanding(nonNull(attached.getCloseReason()))
+                        .build())));
+    }
+
+    /**
+     * «Исход не определён» статуса не двигает и причины не пишет; сигнал
+     * (аномалия плюс холд инструмента) поднимает владелец цикла 2 —
+     * достраивается тем же ходом, что и сам цикл.
+     */
+    private void applyResolution(AttachedAlgoOrder attached, AttachedProtectionResolution resolution) {
+        if (isFalse(resolution.hasStatus())) {
+            return;
+        }
+        attached.setStatus(resolution.getStatus());
+        if (isNull(attached.getCloseReason()) && nonNull(resolution.getCloseReason())) {
+            attached.setCloseReason(resolution.getCloseReason());
+        }
     }
 
     private AttachedAlgoOrderExternalSnapshot matchAttached(OrderExternalSnapshot snapshot, String internalId) {

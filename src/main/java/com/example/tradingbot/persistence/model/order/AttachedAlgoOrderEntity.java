@@ -51,8 +51,16 @@ public class AttachedAlgoOrderEntity extends AuditableEntity {
     @Column(name = "external_status")
     private String externalStatus;
 
+    /** Код отказа источника — операнд разбора тропы потери покрытия. */
+    @Column(name = "fail_code")
+    private String failCode;
+
     @Column(name = "external_type")
     private String externalType;
+
+    /** Ценовая база триггера; nullable — пустое эхо есть недобытый факт. */
+    @Column(name = "trigger_price_type")
+    private String triggerPriceType;
 
     @Column(name = "size")
     private BigDecimal size;

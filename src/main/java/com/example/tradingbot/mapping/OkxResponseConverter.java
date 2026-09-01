@@ -1,6 +1,7 @@
 package com.example.tradingbot.mapping;
 
 import static java.util.Objects.isNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.position.Position;
@@ -9,6 +10,7 @@ import com.example.tradingbot.util.OkxParse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
 import org.mapstruct.Named;
@@ -75,5 +77,23 @@ public class OkxResponseConverter {
     @Named("okxTriggerType")
     public String triggerType(AlgoOrder.TriggerPriceType type) {
         return isNull(type) ? null : type.name().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * OKX эхо slTriggerPxType (last/index/mark) → доменный тип. Пустое эхо
+     * даёт пустой тип: молчание источника — недобытый факт, а не разрешение
+     * подставить умолчание. Значение вне перечня тоже пусто — сверку базы
+     * запускает только распознанное эхо
+     * (docs/models/mapping/Order.md §«AttachedAlgoOrder (attached protection)»).
+     */
+    @Named("okxTriggerPriceType")
+    public AlgoOrder.TriggerPriceType triggerPriceType(String rawType) {
+        if (isBlank(rawType)) {
+            return null;
+        }
+        return Arrays.stream(AlgoOrder.TriggerPriceType.values())
+                .filter(type -> type.name().equalsIgnoreCase(rawType.trim()))
+                .findFirst()
+                .orElse(null);
     }
 }

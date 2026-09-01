@@ -71,12 +71,14 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
         if (StrategyActionCalculationResult.Status.ERROR.equals(calculation.getStatus())) {
             return ActionPlan.calcError(calculation.getError());
         }
-        return ActionPlan.command(createAlgoCommand(action, calculation.getCalculatedAction(), state, dealContext));
+        return ActionPlan.command(createAlgoCommand(action, calculation.getCalculatedAction(), state,
+                dealContext, tranche));
     }
 
     private ServiceCommand createAlgoCommand(StrategyAlgoOrderAction action, CalculatedStrategyAction calculated,
-                                             DealActionState state, DealContext dealContext) {
+                                             DealActionState state, DealContext dealContext, DealTranche tranche) {
         CreateAlgoOrderCommandPayload payload = CreateAlgoOrderCommandPayload.builder()
+                .dealTrancheId(tranche.getId())
                 .conditionType(action.getConditionType())
                 .direction(closeDirection(dealContext.getDeal().getDirection()))
                 .instrumentExternalId(dealContext.getInstrument().getExternalId())

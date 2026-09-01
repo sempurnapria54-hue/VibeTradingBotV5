@@ -27,6 +27,11 @@
 (`docs/rules/live-risk-protection.md`); разобраться с конфликтующими
 заявками.
 
+Снятие идёт командой `CANCEL_ATTACHED_PROTECTION` с причиной
+`SWITCHED_BY_STRATEGY`
+(`docs/components/CancelAttachedProtectionExecutor.md`) — у встроенной
+защиты свой адресат и свой перечень причин.
+
 ## Выходные проверки
 
 Позиция активна; **основная защита покрывает экспозицию транша целиком**

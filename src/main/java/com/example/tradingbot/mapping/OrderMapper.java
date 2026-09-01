@@ -7,6 +7,7 @@ import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.integration.model.okx.request.CancelAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.CancelOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.response.AttachAlgoOrdOkxResponse;
@@ -60,11 +61,18 @@ public interface OrderMapper {
     @Mapping(target = "attachedAlgoOrders", source = "attachAlgoOrds")
     OrderExternalSnapshot integrationToSnapshot(OrderOkxResponse response);
 
+    /**
+     * Элемент attachAlgoOrds родителя. Своего {@code state} у него нет —
+     * externalStatus остаётся пустым; ценовая база триггера приезжает
+     * эхом slTriggerPxType и служит операндом сверки объявленной базы MARK.
+     */
     @Mapping(target = "externalAttachedId", source = "attachAlgoId")
     @Mapping(target = "internalId", source = "attachAlgoClOrdId")
     @Mapping(target = "externalId", source = "algoId")
     @Mapping(target = "externalType", source = "tpOrdKind")
     @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx")
+    @Mapping(target = "triggerPriceType", source = "slTriggerPxType",
+            qualifiedByName = "okxTriggerPriceType")
     AttachedAlgoOrderExternalSnapshot integrationToSnapshot(AttachAlgoOrdOkxResponse response);
 
     /**
@@ -92,6 +100,16 @@ public interface OrderMapper {
     @Mapping(target = "ordId", source = "order.externalId")
     @Mapping(target = "clOrdId", source = "order.internalId")
     CancelOrderOkxRequest domainToCancelRequest(Order order, String instId);
+
+    /**
+     * Снятие встроенной защиты адресует МАТЕРИАЛИЗОВАННУЮ запись: algoId
+     * предпочтительно, иначе клиентский идентификатор (он же
+     * attachAlgoClOrdId родителя). Семьи algo у встроенной защиты нет —
+     * она всегда ordinary.
+     */
+    @Mapping(target = "algoId", source = "attached.externalId")
+    @Mapping(target = "algoClOrdId", source = "attached.internalId")
+    CancelAlgoOrderOkxRequest domainToCancelRequest(AttachedAlgoOrder attached, String instId);
 
     /**
      * OKX ack → {@link ExchangeAck}. {@code code}/{@code message} —

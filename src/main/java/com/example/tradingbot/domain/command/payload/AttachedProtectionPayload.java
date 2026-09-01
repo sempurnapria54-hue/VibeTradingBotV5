@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.command.payload;
 
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import java.math.BigDecimal;
 import lombok.Builder;
@@ -19,6 +20,14 @@ public class AttachedProtectionPayload {
 
     /** Триггерная цена SL. */
     BigDecimal stopLossTriggerPrice;
+
+    /**
+     * Ценовая база триггера, объявленная стратегией. Доезжает до биржи
+     * всегда: биржевой умолчательный тип не используется, а запас до
+     * ликвидации считается от марк-цены
+     * (docs/models/mapping/Order.md §«Domain Order → OKX request»).
+     */
+    AlgoOrder.TriggerPriceType triggerPriceType;
 
     /** Размер (контракты). */
     BigDecimal size;

@@ -66,6 +66,31 @@ public class OrderDataService {
                 .collect(Collectors.toList());
     }
 
+    /** Встроенная защита по своему локальному id — цель снятия. */
+    @Transactional(readOnly = true)
+    public AttachedAlgoOrder getRequiredAttachedById(Long id) {
+        return mapper.persistenceToDomain(attachedAlgoOrderRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("AttachedAlgoOrder not found: " + id)));
+    }
+
+    /**
+     * Родительская заявка встроенной защиты — источник инструмента для
+     * снятия. Тянем проекцию ссылки, а не строку защиты целиком.
+     */
+    @Transactional(readOnly = true)
+    public Long getRequiredOrderIdByAttachedId(Long id) {
+        return attachedAlgoOrderRepository.findOrderIdById(id)
+                .orElseThrow(() -> new IllegalArgumentException("AttachedAlgoOrder not found: " + id));
+    }
+
+    @Transactional
+    public AttachedAlgoOrder saveAttached(AttachedAlgoOrder attached) {
+        AttachedAlgoOrderEntity entity = mapper.domainToPersistence(attached);
+        entity.setOrderId(attachedAlgoOrderRepository.findOrderIdById(attached.getId())
+                .orElseThrow(() -> new IllegalArgumentException("AttachedAlgoOrder not found: " + attached.getId())));
+        return mapper.persistenceToDomain(attachedAlgoOrderRepository.save(entity));
+    }
+
     private List<AttachedAlgoOrder> saveAttached(Long orderId, List<AttachedAlgoOrder> attached) {
         if (isEmpty(attached)) {
             return null;

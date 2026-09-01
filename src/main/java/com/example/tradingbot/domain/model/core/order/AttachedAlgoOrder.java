@@ -4,9 +4,11 @@ import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.Auditable;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -49,8 +51,19 @@ public class AttachedAlgoOrder extends Auditable {
     /** Внутренний тип attached-защиты. */
     private Type type;
 
-    /** Сырой внешний статус (у OKX attachAlgoOrds полноценного state нет). */
+    /**
+     * Сырой внешний статус — {@code state} самостоятельной записи цикла
+     * добычи; у элемента attachAlgoOrds родителя пуст (своего статуса тот
+     * не несёт). Диагностика: исход кодирует нога разбора, не этот статус.
+     */
     private String externalStatus;
+
+    /**
+     * Код отказа источника — операнд разбора того, какая из троп потери
+     * покрытия сработала. Пишут обе несущие его тропы: отказ постановки и
+     * найденная разбором запись state=order_failed.
+     */
+    private String failCode;
 
     /** Биржевой тип attached protection. */
     private String externalType;
@@ -60,6 +73,13 @@ public class AttachedAlgoOrder extends Auditable {
 
     /** Триггерная цена SL (текущий проект — attached SL). */
     private BigDecimal stopLossTriggerPrice;
+
+    /**
+     * Ценовая база триггера, объявленная стратегией и доезжающая до биржи.
+     * Пуста, пока эхо источника её не принесло: пустое эхо — недобытый
+     * факт, а не разрешение (docs/rules/absent-value-semantics.md).
+     */
+    private AlgoOrder.TriggerPriceType triggerPriceType;
 
     private static final Set<Status> ACTIVE_LIKE_STATUSES = EnumSet.of(Status.PENDING, Status.ACTIVE);
 
@@ -108,6 +128,21 @@ public class AttachedAlgoOrder extends Auditable {
     public void toError(CloseReason reason) {
         requireReason(reason);
         transitTo(Status.ERROR);
+        applyCloseReason(reason);
+    }
+
+    /**
+     * Применить НАБЛЮДЁННЫЙ терминал: защита, ещё стоящая в PENDING,
+     * активируется тем же наблюдением (PENDING -> ACTIVE -> терминал одной
+     * транзакцией). Ребра PENDING -> COMPLETED в матрице нет намеренно —
+     * терминал по найденному факту без активации применить было бы нечем.
+     * См. docs/lifecycles/Order.md §«Разбор истории».
+     */
+    public void applyObservedTerminal(Status terminal, CloseReason reason) {
+        if (Objects.equals(Status.PENDING, status) && isFalse(canTransitionTo(terminal))) {
+            transitTo(Status.ACTIVE);
+        }
+        transitTo(terminal);
         applyCloseReason(reason);
     }
 
@@ -168,25 +203,43 @@ public class AttachedAlgoOrder extends Auditable {
         /** Снята после подтверждения standalone main protection. */
         SWITCHED_BY_STRATEGY,
 
-        /** Parent order отменён. */
+        /**
+         * Родитель отменён ПРИ НУЛЕВОМ НАЛИВЕ — защита ушла вместе с ним.
+         * Производитель один: исполнитель добычи родителя на исходе
+         * CANCEL_BY_PARENT. Исполненный родитель этого исхода не даёт.
+         */
         PARENT_ORDER_CANCELED,
 
         /** Аварийный safety-flow / kill-switch. */
         KILL_SWITCH,
 
-        /** Ручная отмена. */
-        MANUAL_CANCEL,
-
-        /** Не найдена после refresh. */
+        /**
+         * У встроенной защиты НЕ производится: цикл её добычи — второй и
+         * свой, и его исчерпание даёт исход второй ступени, а не терминал
+         * заявки (docs/models/domain/core/Order.md).
+         */
         MISSING_AFTER_REFRESH,
 
-        /** Была активной, больше не подтверждается, и standalone protection отсутствует. */
+        /**
+         * Тропа 1 из трёх: защита НЕ ВСТАЛА — код отказа постановки
+         * заполнен, на бирже её никогда не было.
+         */
+        PROTECTION_PLACEMENT_FAILED,
+
+        /**
+         * Тропа 2 из трёх: защита ПРОПАЛА — нога живых пуста при
+         * положительной экспозиции транша без отдельной защиты того же
+         * транша; разбор истории не ждётся.
+         */
         PROTECTION_LOST,
 
-        /** Неизвестный внешний статус. */
-        UNKNOWN_EXTERNAL_STATUS,
+        /**
+         * Тропа 3 из трёх: защита СРАБОТАЛА, а результирующая заявка не
+         * исполнилась (нога разбора state=order_failed).
+         */
+        PROTECTION_TRIGGER_FAILED,
 
-        /** Fallback. */
+        /** Fallback: причина не резолвится ни одной ветвью. */
         UNKNOWN
     }
 }

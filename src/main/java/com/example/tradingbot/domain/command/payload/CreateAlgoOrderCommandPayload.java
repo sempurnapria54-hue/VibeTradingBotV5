@@ -18,6 +18,14 @@ import lombok.Value;
 @Builder
 public class CreateAlgoOrderCommandPayload implements ServiceCommandPayload {
 
+    /**
+     * Транш, которому принадлежит условная заявка. Обязателен наравне со
+     * сделкой: покрытие считается потраншево, и защита без транша не
+     * атрибутируема — то есть в инварианте покрытия не участвует, оставаясь
+     * при этом живым риском (docs/models/domain/core/AlgoOrder.md).
+     */
+    Long dealTrancheId;
+
     /** Тип условия срабатывания (SL/TP/OCO/PARTIAL/TRAILING). */
     AlgoOrder.ConditionType conditionType;
 

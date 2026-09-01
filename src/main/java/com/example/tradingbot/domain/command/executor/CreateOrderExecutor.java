@@ -79,6 +79,7 @@ public class CreateOrderExecutor implements CommandExecutor {
         attached.setStatus(AttachedAlgoOrder.Status.CREATED);
         attached.setType(protection.getAttachedType());
         attached.setStopLossTriggerPrice(protection.getStopLossTriggerPrice());
+        attached.setTriggerPriceType(protection.getTriggerPriceType());
         attached.setSize(protection.getSize());
         return List.of(attached);
     }

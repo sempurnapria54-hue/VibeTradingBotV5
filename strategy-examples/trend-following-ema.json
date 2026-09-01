@@ -1,0 +1,647 @@
+{
+  "internalId": "eth-usdt-swap-trend-ema-v1",
+  "instrumentInternalId": "eth-usdt-swap",
+  "name": "EMA trend following (1H phase / 15m signal / 5m timing)",
+  "marketPhaseSetting": {
+    "phaseRules": [
+      {
+        "type": "RANGE",
+        "condition": {
+          "rules": [
+            {
+              "level": 1,
+              "ruleType": "MARKET_STRUCTURE_IS",
+              "operator": "EQ",
+              "leftOperand": {
+                "sourceType": "MARKET_STRUCTURE",
+                "structureKey": "phase_structure_1h"
+              },
+              "rightOperand": {
+                "sourceType": "CONSTANT",
+                "valueType": "ENUM",
+                "value": "RANGE"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "BULL_TREND",
+        "condition": {
+          "rules": [
+            {
+              "level": 1,
+              "ruleType": "INDICATOR_COMPARE",
+              "operator": "GT",
+              "leftOperand": {
+                "sourceType": "INDICATOR",
+                "indicatorKey": "phase_ema_fast_1h"
+              },
+              "rightOperand": {
+                "sourceType": "INDICATOR",
+                "indicatorKey": "phase_ema_slow_1h"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "BEAR_TREND",
+        "condition": {
+          "rules": [
+            {
+              "level": 1,
+              "ruleType": "INDICATOR_COMPARE",
+              "operator": "LT",
+              "leftOperand": {
+                "sourceType": "INDICATOR",
+                "indicatorKey": "phase_ema_fast_1h"
+              },
+              "rightOperand": {
+                "sourceType": "INDICATOR",
+                "indicatorKey": "phase_ema_slow_1h"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "indicatorSettings": [
+    {
+      "key": "phase_ema_fast_1h",
+      "indicatorType": "EMA",
+      "params": {
+        "timeframe": "ONE_HOUR",
+        "period": 20
+      },
+      "destiny": "MARKET_PHASE",
+      "expirationDuration": "PT2H"
+    },
+    {
+      "key": "phase_ema_slow_1h",
+      "indicatorType": "EMA",
+      "params": {
+        "timeframe": "ONE_HOUR",
+        "period": 80
+      },
+      "destiny": "MARKET_PHASE",
+      "expirationDuration": "PT2H"
+    },
+    {
+      "key": "ema_fast_15m",
+      "indicatorType": "EMA",
+      "params": {
+        "timeframe": "FIFTEEN_MINUTES",
+        "period": 10
+      },
+      "destiny": "ENTRY_CONDITION",
+      "expirationDuration": "PT30M"
+    },
+    {
+      "key": "ema_slow_15m",
+      "indicatorType": "EMA",
+      "params": {
+        "timeframe": "FIFTEEN_MINUTES",
+        "period": 50
+      },
+      "destiny": "ENTRY_CONDITION",
+      "expirationDuration": "PT30M"
+    },
+    {
+      "key": "rsi_5m",
+      "indicatorType": "RSI",
+      "params": {
+        "timeframe": "FIVE_MINUTES",
+        "period": 14
+      },
+      "destiny": "ENTRY_CONDITION",
+      "expirationDuration": "PT15M"
+    },
+    {
+      "key": "atr_15m",
+      "indicatorType": "ATR",
+      "params": {
+        "timeframe": "FIFTEEN_MINUTES",
+        "period": 14
+      },
+      "destiny": "PROTECTION",
+      "expirationDuration": "PT30M"
+    }
+  ],
+  "marketStructureSettings": [
+    {
+      "key": "phase_structure_1h",
+      "timeframe": "ONE_HOUR",
+      "params": {
+        "lookbackBars": 96,
+        "minTouches": 2,
+        "minRangeWidthPercents": 1.0,
+        "maxRangeWidthPercents": 8.0,
+        "breakoutBufferPercents": 15,
+        "breakoutConfirmationBars": 2,
+        "swingLookbackBars": 5,
+        "trendEfficiencyThreshold": 0.3,
+        "levelToleranceAtrMultiplier": 0.5
+      },
+      "destiny": "MARKET_PHASE",
+      "expirationDuration": "PT2H"
+    }
+  ],
+  "details": [
+    {
+      "marketPhaseType": "BULL_TREND",
+      "phaseEntryPolicy": "FOLLOW_PHASE",
+      "riskPerActionPercent": 1.0,
+      "cumulativeRiskPerDealMultiplier": 2.0,
+      "strategySimultaneousRiskPerDealPercent": 1.0,
+      "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+      "targetRiskRewardRatio": 2.5,
+      "tranches": [
+        {
+          "key": "bull_main",
+          "levelCount": 1,
+          "positionReopenAllowed": false,
+          "stepsByStatus": {
+            "PRECHECK": [
+              {
+                "stepType": "ENTRY",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "NO_OPEN_POSITION"
+                    },
+                    {
+                      "level": 2,
+                      "ruleType": "MARKET_PHASE_IS",
+                      "operator": "EQ",
+                      "leftOperand": {
+                        "sourceType": "MARKET_PHASE"
+                      },
+                      "rightOperand": {
+                        "sourceType": "CONSTANT",
+                        "valueType": "ENUM",
+                        "value": "BULL_TREND"
+                      }
+                    },
+                    {
+                      "level": 3,
+                      "ruleType": "INDICATOR_COMPARE",
+                      "operator": "GT",
+                      "leftOperand": {
+                        "sourceType": "INDICATOR",
+                        "indicatorKey": "ema_fast_15m"
+                      },
+                      "rightOperand": {
+                        "sourceType": "INDICATOR",
+                        "indicatorKey": "ema_slow_15m"
+                      }
+                    },
+                    {
+                      "level": 4,
+                      "ruleType": "INDICATOR_COMPARE",
+                      "operator": "GTE",
+                      "leftOperand": {
+                        "sourceType": "INDICATOR",
+                        "indicatorKey": "rsi_5m"
+                      },
+                      "rightOperand": {
+                        "sourceType": "CONSTANT",
+                        "valueType": "NUMBER",
+                        "value": "50"
+                      }
+                    },
+                    {
+                      "level": 5,
+                      "ruleType": "CANDLE_CLOSED",
+                      "timeframe": "FIVE_MINUTES"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ORDER",
+                    "key": "bull_entry",
+                    "actionType": "CREATE_ACTION",
+                    "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                    "direction": "LONG",
+                    "allocationPercents": 95,
+                    "attachedProtection": {
+                      "attachedType": "ATTACHED_STOP_LOSS",
+                      "stopLossSettings": {
+                        "calculationType": "ATR_PERCENT",
+                        "distancePercents": 150,
+                        "triggerPriceType": "MARK",
+                        "indicatorKey": "atr_15m"
+                      }
+                    }
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "BLOCK_STEP",
+                  "unprotectedPositionAction": "BLOCK_STEP"
+                }
+              }
+            ],
+            "ENTRY_FINALIZED": [
+              {
+                "stepType": "MAIN_PROTECTION",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "POSITION_OPENED"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bull_protection_oco",
+                    "actionType": "CREATE_ACTION",
+                    "conditionType": "OCO_FULL",
+                    "stopLossSettings": {
+                      "calculationType": "ATR_PERCENT",
+                      "distancePercents": 150,
+                      "triggerPriceType": "MARK",
+                      "indicatorKey": "atr_15m"
+                    },
+                    "closeFractionPercents": 100,
+                    "triggerProfitPercents": 3.0,
+                    "triggerPriceType": "MARK"
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "WAIT",
+                  "unprotectedPositionAction": "GRACEFUL_CLOSE"
+                }
+              }
+            ],
+            "MANAGING": [
+              {
+                "stepType": "PROTECTION_ADJUSTMENT",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "POSITION_OPENED"
+                    },
+                    {
+                      "level": 2,
+                      "ruleType": "PROFIT_PERCENTS_REACHED",
+                      "percents": 1.0
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bull_sl_to_breakeven",
+                    "targetActionKey": "bull_protection_oco",
+                    "actionType": "REPLACE_ACTION",
+                    "conditionType": "OCO_FULL",
+                    "stopLossSettings": {
+                      "calculationType": "BREAKEVEN",
+                      "triggerPriceType": "MARK"
+                    },
+                    "closeFractionPercents": 100,
+                    "triggerProfitPercents": 3.0,
+                    "triggerPriceType": "MARK"
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "WAIT",
+                  "unprotectedPositionAction": "GRACEFUL_CLOSE"
+                }
+              },
+              {
+                "stepType": "PROTECTION_ADJUSTMENT",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "POSITION_OPENED"
+                    },
+                    {
+                      "level": 2,
+                      "ruleType": "PROFIT_PERCENTS_REACHED",
+                      "percents": 2.0
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bull_oco_cancel",
+                    "targetActionKey": "bull_protection_oco",
+                    "actionType": "CANCEL_ACTION",
+                    "conditionType": "OCO_FULL"
+                  },
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bull_trailing",
+                    "actionType": "CREATE_ACTION",
+                    "conditionType": "TRAILING_PERCENTS",
+                    "trailingSettings": {
+                      "activationProfitPercents": 2.0,
+                      "callbackPercents": 0.8,
+                      "activationBufferPercents": 0.1
+                    },
+                    "closeFractionPercents": 100,
+                    "triggerPriceType": "MARK"
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "WAIT",
+                  "unprotectedPositionAction": "GRACEFUL_CLOSE"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "stepsByStatus": {
+        "ACTIVE": [
+          {
+            "stepType": "EXIT",
+            "condition": {
+              "rules": [
+                {
+                  "level": 1,
+                  "ruleType": "POSITION_OPENED"
+                },
+                {
+                  "level": 2,
+                  "ruleType": "TREND_CHANGED"
+                }
+              ]
+            },
+            "actions": [
+              {
+                "actionKind": "POSITION",
+                "key": "bull_exit",
+                "actionType": "EXIT_ACTION"
+              }
+            ],
+            "marketDataExpiredSetting": {
+              "protectedPositionAction": "WAIT",
+              "unprotectedPositionAction": "GRACEFUL_CLOSE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "marketPhaseType": "BEAR_TREND",
+      "phaseEntryPolicy": "FOLLOW_PHASE",
+      "riskPerActionPercent": 1.0,
+      "cumulativeRiskPerDealMultiplier": 2.0,
+      "strategySimultaneousRiskPerDealPercent": 1.0,
+      "strategyCatastrophicRiskPerDealMultiplier": 100.0,
+      "targetRiskRewardRatio": 2.5,
+      "tranches": [
+        {
+          "key": "bear_main",
+          "levelCount": 1,
+          "positionReopenAllowed": false,
+          "stepsByStatus": {
+            "PRECHECK": [
+              {
+                "stepType": "ENTRY",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "NO_OPEN_POSITION"
+                    },
+                    {
+                      "level": 2,
+                      "ruleType": "MARKET_PHASE_IS",
+                      "operator": "EQ",
+                      "leftOperand": {
+                        "sourceType": "MARKET_PHASE"
+                      },
+                      "rightOperand": {
+                        "sourceType": "CONSTANT",
+                        "valueType": "ENUM",
+                        "value": "BEAR_TREND"
+                      }
+                    },
+                    {
+                      "level": 3,
+                      "ruleType": "INDICATOR_COMPARE",
+                      "operator": "LT",
+                      "leftOperand": {
+                        "sourceType": "INDICATOR",
+                        "indicatorKey": "ema_fast_15m"
+                      },
+                      "rightOperand": {
+                        "sourceType": "INDICATOR",
+                        "indicatorKey": "ema_slow_15m"
+                      }
+                    },
+                    {
+                      "level": 4,
+                      "ruleType": "INDICATOR_COMPARE",
+                      "operator": "LTE",
+                      "leftOperand": {
+                        "sourceType": "INDICATOR",
+                        "indicatorKey": "rsi_5m"
+                      },
+                      "rightOperand": {
+                        "sourceType": "CONSTANT",
+                        "valueType": "NUMBER",
+                        "value": "50"
+                      }
+                    },
+                    {
+                      "level": 5,
+                      "ruleType": "CANDLE_CLOSED",
+                      "timeframe": "FIVE_MINUTES"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ORDER",
+                    "key": "bear_entry",
+                    "actionType": "CREATE_ACTION",
+                    "orderType": "ENTRY_ATTACHED_STOP_LOSS",
+                    "direction": "SHORT",
+                    "allocationPercents": 95,
+                    "attachedProtection": {
+                      "attachedType": "ATTACHED_STOP_LOSS",
+                      "stopLossSettings": {
+                        "calculationType": "ATR_PERCENT",
+                        "distancePercents": 150,
+                        "triggerPriceType": "MARK",
+                        "indicatorKey": "atr_15m"
+                      }
+                    }
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "BLOCK_STEP",
+                  "unprotectedPositionAction": "BLOCK_STEP"
+                }
+              }
+            ],
+            "ENTRY_FINALIZED": [
+              {
+                "stepType": "MAIN_PROTECTION",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "POSITION_OPENED"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bear_protection_oco",
+                    "actionType": "CREATE_ACTION",
+                    "conditionType": "OCO_FULL",
+                    "stopLossSettings": {
+                      "calculationType": "ATR_PERCENT",
+                      "distancePercents": 150,
+                      "triggerPriceType": "MARK",
+                      "indicatorKey": "atr_15m"
+                    },
+                    "closeFractionPercents": 100,
+                    "triggerProfitPercents": 3.0,
+                    "triggerPriceType": "MARK"
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "WAIT",
+                  "unprotectedPositionAction": "GRACEFUL_CLOSE"
+                }
+              }
+            ],
+            "MANAGING": [
+              {
+                "stepType": "PROTECTION_ADJUSTMENT",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "POSITION_OPENED"
+                    },
+                    {
+                      "level": 2,
+                      "ruleType": "PROFIT_PERCENTS_REACHED",
+                      "percents": 1.0
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bear_sl_to_breakeven",
+                    "targetActionKey": "bear_protection_oco",
+                    "actionType": "REPLACE_ACTION",
+                    "conditionType": "OCO_FULL",
+                    "stopLossSettings": {
+                      "calculationType": "BREAKEVEN",
+                      "triggerPriceType": "MARK"
+                    },
+                    "closeFractionPercents": 100,
+                    "triggerProfitPercents": 3.0,
+                    "triggerPriceType": "MARK"
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "WAIT",
+                  "unprotectedPositionAction": "GRACEFUL_CLOSE"
+                }
+              },
+              {
+                "stepType": "PROTECTION_ADJUSTMENT",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "POSITION_OPENED"
+                    },
+                    {
+                      "level": 2,
+                      "ruleType": "PROFIT_PERCENTS_REACHED",
+                      "percents": 2.0
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bear_oco_cancel",
+                    "targetActionKey": "bear_protection_oco",
+                    "actionType": "CANCEL_ACTION",
+                    "conditionType": "OCO_FULL"
+                  },
+                  {
+                    "actionKind": "ALGO_ORDER",
+                    "key": "bear_trailing",
+                    "actionType": "CREATE_ACTION",
+                    "conditionType": "TRAILING_PERCENTS",
+                    "trailingSettings": {
+                      "activationProfitPercents": 2.0,
+                      "callbackPercents": 0.8,
+                      "activationBufferPercents": 0.1
+                    },
+                    "closeFractionPercents": 100,
+                    "triggerPriceType": "MARK"
+                  }
+                ],
+                "marketDataExpiredSetting": {
+                  "protectedPositionAction": "WAIT",
+                  "unprotectedPositionAction": "GRACEFUL_CLOSE"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "stepsByStatus": {
+        "ACTIVE": [
+          {
+            "stepType": "EXIT",
+            "condition": {
+              "rules": [
+                {
+                  "level": 1,
+                  "ruleType": "POSITION_OPENED"
+                },
+                {
+                  "level": 2,
+                  "ruleType": "TREND_CHANGED"
+                }
+              ]
+            },
+            "actions": [
+              {
+                "actionKind": "POSITION",
+                "key": "bear_exit",
+                "actionType": "EXIT_ACTION"
+              }
+            ],
+            "marketDataExpiredSetting": {
+              "protectedPositionAction": "WAIT",
+              "unprotectedPositionAction": "GRACEFUL_CLOSE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "marketPhaseType": "RANGE",
+      "phaseEntryPolicy": "NO_TRADE"
+    },
+    {
+      "marketPhaseType": "UNKNOWN",
+      "phaseEntryPolicy": "NO_TRADE"
+    }
+  ]
+}

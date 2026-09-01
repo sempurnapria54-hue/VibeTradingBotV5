@@ -13,6 +13,9 @@ public enum TargetEntityType {
     /** Standalone algo-order. */
     ALGO_ORDER,
 
+    /** Встроенная защита — раздел модели Order, не отдельная сущность. */
+    ATTACHED_PROTECTION,
+
     /** Позиция. */
     POSITION,
 

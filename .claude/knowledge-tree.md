@@ -200,6 +200,8 @@
 │       │   ├── phase-1-step-7-docs-check-34.md — Какие пробелы концепции нашёл прогон `_34`?
 │       │   ├── phase-1-step-7-docs-check-34/ — (приложения прогона `_34`: мандат линз и отчёты семи линз)
 │       │   ├── phase-1-step-7-code-transition.md — Как исполнено решение держателя о выходе шага 7 в код?
+│       │   ├── phase-1-step-7-code-pass-4.md — Что сделал кодовый заход 4 шага 7?
+│       │   ├── phase-1-step-7-code-tail.md — Что осталось дописать в компонентах, переведённых в «в работе»?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили? (общие вопросы пайплайна и продукта)
 │       │   └── tasks/ — Что неясно по этой конкретной активной задаче?
@@ -232,6 +234,7 @@
 │   │   ├── AttachedAlgoOrderStateResolver.md — Кто определяет доменный статус встроенной защиты?
 │   │   ├── CalculationContextFactory.md — Кто собирает контекст расчёта?
 │   │   ├── CancelAlgoOrderExecutor.md — Кто исполняет `CANCEL_ALGO_ORDER_COMMAND`?
+│   │   ├── CancelAttachedProtectionExecutor.md — Кто исполняет `CANCEL_ATTACHED_PROTECTION_COMMAND`?
 │   │   ├── CancelOrderExecutor.md — Кто исполняет `CANCEL_ORDER_COMMAND`?
 │   │   ├── CandleJob.md — Кто готовит базовые свечные данные?
 │   │   ├── ClosePositionExecutor.md — Кто исполняет `CLOSE_POSITION_COMMAND`?

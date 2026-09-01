@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.model.core.order.external_snapshot;
 
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import java.math.BigDecimal;
 import lombok.Builder;
 import lombok.Value;
@@ -32,9 +33,24 @@ public class AttachedAlgoOrderExternalSnapshot {
     /** Trigger SL (OKX slTriggerPx). */
     BigDecimal stopLossTriggerPrice;
 
+    /**
+     * Ценовая база триггера — эхо OKX slTriggerPxType, объявленное
+     * инвентарём ОБЕИХ форм (элемент attachAlgoOrds родителя и
+     * самостоятельная запись). Операнд сверки объявленной базы MARK;
+     * пусто — источник промолчал, сверка не запускается.
+     */
+    AlgoOrder.TriggerPriceType triggerPriceType;
+
+    /**
+     * Сырой статус САМОСТОЯТЕЛЬНОЙ записи цикла добычи (OKX state); у
+     * элемента attachAlgoOrds родителя пуст. Диагностика: через резолвер
+     * внешних статусов не идёт — его операнд entity защиту не принимает.
+     */
+    String externalStatus;
+
     /** Код ошибки биржи (OKX failCode) — если заполнен, attached ERROR. */
     String failCode;
 
-    /** Диагностика ошибки (OKX failReason). */
+    /** Диагностика ошибки (OKX failReason); в колонку не садится. */
     String failReason;
 }
