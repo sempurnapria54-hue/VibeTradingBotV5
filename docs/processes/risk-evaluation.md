@@ -42,8 +42,13 @@ absent/stale — добыча звеном `REFRESH_BALANCE_COMMAND` через
 
 ```text
 транш в PRECHECK + BLOCKED + живого риска у него ещё нет
-  -> терминал транша CLOSED, closeReason = RISK_CONTROL   # не авария
-     (сделка закрывается, когда так закрылись все её транши)
+  -> род реакции даёт СТАДИЯ, а бессрочность вердикта — его коды:
+     вердикт бессрочен  -> терминал транша CLOSED, closeReason = RISK_CONTROL   # не авария
+                           (сделка закрывается, когда так закрылись все её транши)
+     вердикт временный  -> SKIP_ACTION: действие не исполняется, транш ждёт
+                           следующего прохода (бюджет освободится выходом соседа)
+     операнд не добыт   -> REQUEST_REFRESH
+     Карта и определение бессрочности — docs/components/RiskBlockResolver.md
 
 транш в ENTRY_SUBMITTED / ENTRY_FINALIZED / PROTECTION_SWITCHED / MANAGING + BLOCKED
   (для risk-creating / risk-weakening action)
@@ -78,6 +83,7 @@ ALLOWED  -> StrategyActionOrchestrator создаёт команду
 
 | Код | Почему не признак рассогласования |
 |---|---|
+| `SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET` | **неделимый лот**, а не расхождение расчёта: размер поднят до `instrument.minSize` и на нём вышел за поактный потолок. Ветвь подъёма до минимума потолком не ограничена вовсе и отвергается своим неравенством (`docs/spec/order-sizing.json` §`entryWithinRiskBudget`); вход просто не состоялся |
 | `RISK_PER_DEAL_CUMULATIVE_EXCEEDED` | исчерпанный бюджет сделки — ожидаемый исход легитимной стратегии |
 | `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED` | то же; либо операнд слева вырос фактом исполнения |
 | `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` | потолок изменила система — повод внутренний |
@@ -166,9 +172,12 @@ ALLOWED  -> StrategyActionOrchestrator создаёт команду
 Карв-аут не новый по конструкции: тот же ряд, что «транш в `PRECHECK` без
 живого риска ⇒ его терминал `CLOSED`, не авария» (схема выше). Ось
 разведения одна — **является ли реджект признаком рассогласования**.
-Коды, которых в перечне нет, ведут в `ERROR`, и каждый — по своему
-классу: `RISK_PER_ACTION_EXCEEDED` (сайзинг обязан был уложить действие в
-поактный потолок — расхождение расчёта), `RISK_CREATING_ENTRY_WITHOUT_STOP`
+Коды, которых в перечне нет, ведут в `ERROR` **на стадиях с живым
+риском**; на `PRECHECK` род реакции задаёт стадия, а не код
+(`docs/components/RiskBlockResolver.md` §«Карта «вердикт → действие»»).
+Каждый — по своему классу: `RISK_PER_ACTION_EXCEEDED` (**расчёт
+разошёлся**: сайзинг обязан был уложить действие в поактный потолок — и
+мог, потому что размер не упирался в пол), `RISK_CREATING_ENTRY_WITHOUT_STOP`
 (акт создаёт непокрытый риск), шесть кодов контура и инструмента,
 `BALANCE_INVALID` и `BALANCE_NOT_FRESH`, `FEE_RATE_UNAVAILABLE`,
 `DEAL_GRAPH_INCOMPLETE`, `CALCULATED_ACTION_INVALID`, три кода размера,

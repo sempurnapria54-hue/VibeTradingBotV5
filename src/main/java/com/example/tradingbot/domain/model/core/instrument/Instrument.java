@@ -85,6 +85,24 @@ public class Instrument extends Auditable {
         return Objects.equals(status, Status.TRADE_BLOCKED);
     }
 
+    /**
+     * По инструменту стои́т safety-ступень с блок-сетом — мягкая
+     * ({@code ENTRY_BLOCKED}) либо жёсткая ({@code TRADE_BLOCKED}).
+     *
+     * <p>Это операнд гейта повтора отказавшей надобности
+     * (docs/rules/strategy-step-once-per-episode.md §«Надобность после
+     * исчерпания бюджета — гейт по стоящей ступени»). Область — ровно две
+     * ступени: рабочее состояние и онбординговые статусы значения не дают,
+     * а БИРЖЕВОЙ радиус в неё не входит вовсе — под мягкой биржевой
+     * ступенью живые сделки сопровождаются полностью
+     * (docs/rules/exchange-hold.md), и морозить повтор там значило бы
+     * отменять то, что ступень обязана сохранять.
+     */
+    public Boolean hasStandingSafetyRung() {
+        return Objects.equals(status, Status.ENTRY_BLOCKED)
+                || Objects.equals(status, Status.TRADE_BLOCKED);
+    }
+
     /** Онбординг-статус инструмента в системе (готовность к торговле). */
     public enum Status {
 
@@ -102,6 +120,15 @@ public class Instrument extends Auditable {
          * Отдельный смысл от онбординг-{@code HOLD}.
          */
         TRADE_BLOCKED,
+
+        /**
+         * Новые входы по инструменту запрещены МЯГКОЙ safety-ступенью
+         * (docs/rules/instrument-hold.md §Enforcement): живые сделки не
+         * сворачиваются и доживают под своей защитой, но наращивание и
+         * ОСЛАБЛЕНИЕ защиты блокируются. Отличается от TRADE_BLOCKED тем,
+         * что принятый риск покрыт — рвать его нечем.
+         */
+        ENTRY_BLOCKED,
 
         /** Идёт синхронизация спецификации с биржей. */
         SYNC,

@@ -104,18 +104,17 @@ public class DealFsmSupport {
     /**
      * Стои́т ли ступень радиуса действия — операнд гейта повтора.
      *
-     * <p><b>Названное ограничение.</b> Точный операнд — ступень, поднятая
-     * ИСЧЕРПАНИЕМ БЮДЖЕТА на радиусе действия
-     * (docs/rules/instrument-hold.md); собственного носителя у неё пока
-     * нет, и проход читает ближайший существующий признак — блокировку
-     * торговли по инструменту. Признак ШИРЕ нужного: он поднимается и по
-     * другим основаниям, поэтому гейт иногда придержит надобность, которую
-     * мог бы пропустить. Направление ошибки ЗАПРЕЩАЮЩЕЕ — лишний повтор к
-     * бирже не уходит, — и потому ограничение принимается до захода
-     * лестниц и холдов, который заводит носитель ступени.
+     * <p>Область — ровно две ступени инструмента, мягкая и жёсткая
+     * (docs/rules/strategy-step-once-per-episode.md §«Надобность после
+     * исчерпания бюджета — гейт по стоящей ступени»). Связь «строка →
+     * причина ступени» не хранится намеренно: ступень читается по
+     * ИНСТРУМЕНТУ, и чужая ступень того же инструмента замораживает повтор
+     * наравне со своей — направление консервативное, лишнее ожидание
+     * вместо петли вызовов по неустранённой причине. Биржевой радиус в
+     * область не входит (docs/rules/exchange-hold.md).
      */
     private Boolean standingRungOnActionRadius(DealContext dealContext) {
-        return dealContext.getInstrument().isTradeBlocked();
+        return dealContext.getInstrument().hasStandingSafetyRung();
     }
 
     /** Контекст оценки условий (свежие/предыдущие индикаторы, структуры, цена). */
@@ -306,18 +305,44 @@ public class DealFsmSupport {
     }
 
     /**
-     * Реакция транша на план действия. Отличается от сделочной ровно
-     * уровнем результата: команда и «остаться» выражаются траншевым
-     * переходом, а блок и ошибка расчёта — решения УРОВНЯ СДЕЛКИ
-     * (закрытие кандидата, увод в ошибку), и транш их не принимает: он
-     * возвращает «остаться», а сделочный проход разбирает то же
-     * состояние своим обработчиком.
+     * Реакция ТРАНША на план действия. Род реакции на блок даёт карта
+     * вердикта (`docs/components/RiskBlockResolver.md`), и на траншевом
+     * уровне применимы ровно два её исхода:
+     *
+     * <ul>
+     *   <li>{@code CLOSE_CANDIDATE_DEAL} — терминал ТРАНША: отказ бессрочен,
+     *       вход по этому объявлению не состоится. Сделка закрывается, когда
+     *       так закрылись все её транши, и решает это её собственный проход;</li>
+     *   <li>{@code SKIP_ACTION} — отказ временный: действие не исполняется,
+     *       транш остаётся в своём статусе и ждёт следующего прохода. Именно
+     *       эта ветвь сохраняет уровень сетки, отвергнутый занятым бюджетом:
+     *       бюджет освободится выходом соседнего транша.</li>
+     * </ul>
+     *
+     * <p>Увод СДЕЛКИ в ошибку транш не принимает — он его просит
+     * ({@link TrancheTransition#escalateToDealError()}): статус сделки
+     * пишет сделочный проход.
      */
     public TrancheTransition reactToTranchePlan(ActionPlan plan) {
         if (nonNull(plan.getCommand())) {
             return TrancheTransition.command(plan.getCommand());
         }
+        if (nonNull(plan.getBlockAction())) {
+            return reactToTrancheBlock(plan.getBlockAction());
+        }
         return TrancheTransition.stay();
+    }
+
+    private TrancheTransition reactToTrancheBlock(RiskBlockAction block) {
+        return switch (block.getType()) {
+            case CLOSE_CANDIDATE_DEAL -> TrancheTransition.builder()
+                    .nextStatus(DealTranche.Status.CLOSED)
+                    .closeReason(DealTranche.CloseReason.RISK_CONTROL)
+                    .build();
+            case MOVE_DEAL_TO_ERROR -> TrancheTransition.escalateToDealError();
+            case REQUEST_REFRESH, SKIP_ACTION -> TrancheTransition.stay();
+            default -> TrancheTransition.stay();
+        };
     }
 
     /**

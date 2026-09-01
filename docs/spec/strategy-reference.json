@@ -337,6 +337,18 @@
       "expr": "notNull(?stopLossSettings) || notNull(?trailingSettings) || notNull(?attachedProtection.stopLossSettings)"
     },
     {
+      "name": "actionLevelSource",
+      "note": "РЕЗОЛВ операнда levelSource: чем задан уровень действия. Читается по ОБЪЯВЛЕННОМУ БЛОКУ настроек, а не по отдельному полю: блок настроек трейлинга означает уровень, наблюдаемый после активации (OBSERVED); блок настроек стопа — уровень, объявленный способом расчёта (DECLARED). Прежде операнд не имел ни поля, ни писателя, ни правила резолва, а единственный правдоподобный вывод запрещала его же нота — то есть охрана клетки «вход × полоса» стояла на величине, которую нечем вычислить (D5 DOCS_CHECK_34). Собственного поля в дереве стратегии не заводится: значение выводимо из блока (.claude/rules/design-simplicity.md), а неоднозначность «объявлены оба блока» отвергается созданием (levelSourceAmbiguous).",
+      "expr": "if(notNull(?trailingSettings), 'OBSERVED', 'DECLARED')"
+    },
+    {
+      "name": "levelSourceAmbiguous",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
+      "where": "actionSetsLevel && notNull(?trailingSettings) && notNull(?stopLossSettings)",
+      "note": "Действие объявило ОБА блока настроек уровня — резолв источника неоднозначен. Реджект создания STRATEGY_LEVEL_SOURCE_AMBIGUOUS (docs/rules/strategy-validation.md): без него у actionLevelSource пришлось бы вводить приоритет блоков, то есть отвечать за автора там, где он сам себе противоречит."
+    },
+    {
       "name": "actionsSettingLevelWithoutSource",
       "note": "Исполнимая форма клаузы создания docs/rules/strategy-validation.md §«защитное действие, СТАВЯЩЕЕ уровень, объявляет его источник». Считает нарушителей: ставящие уровень действия без объявленного источника. Область сужена до ставящих намеренно — безусловная редакция отвергала эталон репозитория (bull_oco_cancel / bear_oco_cancel защитны, а уровня не ставят), и исполнимой формы у неё не было вовсе, поэтому прогон её не мерил.",
       "op": "count",
@@ -908,7 +920,8 @@
       },
       "expect": {
         "allocationOutOfRange": 0,
-        "allocationNotDeclared": 0
+        "allocationNotDeclared": 0,
+        "levelSourceAmbiguous": 0
       }
     },
     {
@@ -2050,6 +2063,72 @@
       },
       "expect": {
         "actionsSettingLevelWithoutSource": 1
+      }
+    },
+    {
+      "case": "действие объявило оба блока настроек уровня — источник неоднозначен",
+      "note": "Контрпример к резолву actionLevelSource: он читает источник по объявленному блоку, и на действии с обоими блоками вывод неоднозначен. Отвергается созданием, а не приоритетом блоков: приоритет отвечал бы за автора там, где он сам себе противоречит (D5 DOCS_CHECK_34).",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerTradePercent": 1.0,
+              "tranches": [
+                {
+                  "key": "t1",
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "REPLACE_ACTION",
+                            "conditionType": "STOP_LOSS",
+                            "stopLossSettings": {
+                              "calculationType": "BREAKEVEN"
+                            },
+                            "trailingSettings": {
+                              "activationPercents": 2.0
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "levelSourceAmbiguous": 1
+      }
+    },
+    {
+      "case": "объявлен только блок трейлинга — источник уровня наблюдаемый",
+      "note": "Контроль резолва: один блок даёт однозначный источник и реджекта не вызывает.",
+      "state": {
+        "trailingSettings": {
+          "activationPercents": 2.0
+        }
+      },
+      "expect": {
+        "actionLevelSource": "OBSERVED"
+      }
+    },
+    {
+      "case": "объявлен только блок стопа — источник уровня объявленный",
+      "note": "Вторая сторона резолва: охрана клетки «вход × полоса» режет область именно по нему.",
+      "state": {
+        "stopLossSettings": {
+          "calculationType": "ATR_PERCENT"
+        }
+      },
+      "expect": {
+        "actionLevelSource": "DECLARED"
       }
     }
   ],

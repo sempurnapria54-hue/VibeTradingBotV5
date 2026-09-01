@@ -20,7 +20,7 @@
     "stepActionRows[]": "строки исполнения действий ЭТОГО шага (docs/models/domain/other/DealActionState.md): каждая несёт trancheEpisodeSeq и status. Строка на действие в эпизоде одна: бюджет попыток живёт ВНУТРИ строки, повтора строки он не производит",
     "stepDeclaredActions[]": "действия, ОБЪЯВЛЕННЫЕ пакетом этого шага в артефакте стратегии. Шаг есть ПАКЕТ действий (docs/components/StrategyActionOrchestrator.md §«Пакет шага исполняется целиком; за проход — одно действие»), поэтому признак применённости стои́т на исчерпании пакета, а не на факте первой строки",
     "currentTrancheEpisodeSeq": "DealTranche.episodeSeq — номер ТЕКУЩЕГО эпизода транша; +1 на каждом ребре переоткрытия. Имя разведено с одноимённым полем строки исполнения намеренно: в отборе строк оба имени встречаются рядом, и совпадение имён отдало бы оба значения строке",
-    "standingRungOnActionRadius": "на радиусе объекта действия стоит safety-ступень (любая — своя или чужая по причине): связь «строка -> причина ступени» не хранится, ступень читается по радиусу; операнд гейта повтора отказавшей надобности (дом — docs/rules/strategy-step-once-per-episode.md §«Надобность после исчерпания бюджета — гейт по стоящей ступени»)"
+    "instrumentSafetyRungStanding": "инструмент действия стои́т в safety-ступени с блок-сетом — Instrument.ENTRY_BLOCKED либо TRADE_BLOCKED (дом области — docs/rules/instrument-hold.md §Enforcement; то же имя и та же область, что у операнда docs/spec/risk-limits.json). Рабочее состояние и онбординговые статусы значения не дают; ЧУЖАЯ ступень того же инструмента — своя или поднятая по другой причине — значение даёт наравне со своей. БИРЖЕВОЙ радиус в область НЕ входит: под мягкой биржевой ступенью живые сделки сопровождаются полностью (docs/rules/exchange-hold.md), и морозить повтор там значило бы отменять то, что ступень обязана сохранять."
   },
   "values": [
     {
@@ -88,7 +88,7 @@
     {
       "name": "stepRetryGated",
       "note": "Гейт повтора отказавшей надобности: новая строка того же шага на том же эпизоде не заводится, пока стоит ступень радиуса, поднятая исчерпанием бюджета; снятие ступени возобновляет надобность. Прежде судьба надобности после FAILED имела три несовместимых прочтения по трём носителям — петля без предела / застревание first-match / снос сделки (B3 DOCS_CHECK_33). Дом — docs/rules/strategy-step-once-per-episode.md §«Надобность после исчерпания бюджета — гейт по стоящей ступени».",
-      "expr": "stepFailedRowOnEpisode && standingRungOnActionRadius"
+      "expr": "stepFailedRowOnEpisode && instrumentSafetyRungStanding"
     },
     {
       "name": "stepEligible",
@@ -848,7 +848,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": false
+        "instrumentSafetyRungStanding": false
       },
       "expect": {
         "stepAppliedOnEpisode": false,
@@ -993,7 +993,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": true
+        "instrumentSafetyRungStanding": true
       },
       "expect": {
         "stepFailedRowOnEpisode": true,
@@ -1019,7 +1019,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": false
+        "instrumentSafetyRungStanding": false
       },
       "expect": {
         "stepFailedRowOnEpisode": true,
@@ -1051,7 +1051,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": true
+        "instrumentSafetyRungStanding": true
       },
       "expect": {
         "stepPackageProgress": "ЧАСТЬ",
@@ -1080,7 +1080,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": true
+        "instrumentSafetyRungStanding": true
       },
       "expect": {
         "stepPackageProgress": "ВСЕ",
@@ -1105,7 +1105,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": true
+        "instrumentSafetyRungStanding": true
       },
       "expect": {
         "stepPackageProgress": "НИ_ОДНОГО",
@@ -1137,7 +1137,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": true
+        "instrumentSafetyRungStanding": true
       },
       "expect": {
         "stepPackageProgress": "ЧАСТЬ",
@@ -1166,7 +1166,7 @@
           }
         ],
         "currentTrancheEpisodeSeq": 2,
-        "standingRungOnActionRadius": true
+        "instrumentSafetyRungStanding": true
       },
       "expect": {
         "stepPackageProgress": "ВСЕ",

@@ -31,9 +31,43 @@
 ## Енум `RiskCheckCode`
 
 **Потолки риска:** `RISK_PER_ACTION_EXCEEDED`,
+`SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET`,
 `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`,
 `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`,
 `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`, `DEAL_NOTIONAL_EXCEEDED`.
+
+**Две тропы одного превышения разведены значением, а не операндом.**
+`RISK_PER_ACTION_EXCEEDED` означает **расхождение расчёта**: сайзинг мог
+уложить действие в поактный потолок и не уложил.
+`SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET` означает **неделимый лот**: размер
+поднят до `instrument.minSize`, и на нём потолок превышен — ветвь подъёма
+потолком не ограничена вовсе (`docs/rules/risk-policy.md`). Один код на оба
+исхода делает карв-аут неразрешимым: у эталона при малой базе неделимый
+минимальный лот превышает бюджет **каждым** входом, и сделка без живого
+риска уходила бы в аварийный контур по ожидаемому отказу. Различение сделано
+значением, чтобы «не проверяли» и «проверили, лот неделим» различались **в
+данных**, а не вычислялись операндом (`docs/concept.md` П3).
+
+## Бессрочность отказа
+
+**Признак объявляется рядом со значением** — здесь, а не в карте реакции:
+второй носитель разошёлся бы с этим первой же правкой
+(`.claude/rules/carrier-levels.md`). Отказ **бессрочен**, когда повторная
+проверка того же действия не даст иного исхода без изменения стратегии;
+**временный** — когда исход зависит от состояния, которое меняется само.
+
+| Код | Отказ |
+|---|---|
+| `RISK_PER_ACTION_EXCEEDED` | бессрочный — расчёт разошёлся, повтор даст то же |
+| `SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET` | бессрочный — лот неделим, база от прохода к проходу его не поделит |
+| `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`, `DEAL_NOTIONAL_EXCEEDED` | **временный** — бюджет освободится выходом соседнего транша |
+| `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`, `FEE_RATE_UNAVAILABLE`, `DEAL_GRAPH_INCOMPLETE` | **временный** — операнд добудется следующим проходом |
+| `INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `INSTRUMENT_SETTLE_CURRENCY_MISSING`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `MARGIN_MODE_NOT_ISOLATED`, `BORROW_OR_DEBT_DETECTED` | бессрочные — состояние контура сменится не проходом, а внешним действием |
+| прочие (конфигурация, стороны уровней, инварианты частичного выхода) | бессрочные — меняются только правкой стратегии |
+
+Признак читает карта реакции (`docs/components/RiskBlockResolver.md`
+§«Карта «вердикт → действие»»); свёртка многокодового вердикта берёт
+**конъюнкцию**: вердикт бессрочен, только если бессрочны все его коды.
 
 **Защита:** `RISK_CREATING_ENTRY_WITHOUT_STOP`,
 `PROTECTION_COVERAGE_REDUCED`, `PROTECTION_LADDER_STEP_BELOW_MIN_SIZE`.

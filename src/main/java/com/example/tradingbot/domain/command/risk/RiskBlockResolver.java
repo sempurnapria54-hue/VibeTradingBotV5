@@ -1,6 +1,8 @@
 package com.example.tradingbot.domain.command.risk;
 
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
@@ -10,6 +12,8 @@ import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckStatu
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.position.Position;
+import java.util.stream.Collectors;
+import java.util.List;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
@@ -65,11 +69,44 @@ public class RiskBlockResolver {
                     .comment("risk blocked with live risk present: " + result.getComment())
                     .build();
         }
+        // Живого риска нет: род реакции даёт СТАДИЯ, а терминал ставит только
+        // БЕССРОЧНЫЙ вердикт. Временный отказ (занятый бюджет, несвежий
+        // баланс) закрывал бы уровень сетки навсегда — бюджет освободится
+        // выходом соседнего транша, а транша, который должен был войти, уже
+        // не будет (docs/components/RiskBlockResolver.md §«Карта «вердикт →
+        // действие»»).
+        if (isFalse(verdictPermanent(result))) {
+            return RiskBlockAction.builder()
+                    .type(RiskBlockAction.Type.SKIP_ACTION)
+                    .comment("risk blocked temporarily before live risk: " + result.getComment())
+                    .build();
+        }
         return RiskBlockAction.builder()
                 .type(RiskBlockAction.Type.CLOSE_CANDIDATE_DEAL)
                 .closeReason(Deal.CloseReason.RISK_CONTROL)
-                .comment("risk blocked before live risk: " + result.getComment())
+                .comment("risk blocked permanently before live risk: " + result.getComment())
                 .build();
+    }
+
+    /**
+     * Бессрочность ВЕРДИКТА — конъюнкция бессрочности его кодов: один
+     * временный код делает вердикт временным, потому что повтор может
+     * пройти. Свёртка нужна оттого, что вердикт несёт ПЕРЕЧЕНЬ отказов, а
+     * действие односоставно; род действия при этом берёт стадия, и от
+     * состава перечня он не зависит.
+     *
+     * <p>Пустой перечень бессрочным не считается: вердикт `BLOCKED` без
+     * единого блокирующего кода — рассогласование самого валидатора, и
+     * терминал по нему был бы решением по недобытому факту.
+     */
+    private Boolean verdictPermanent(RiskValidationResult result) {
+        List<RiskCheckResult> blocking = result.getChecks().stream()
+                .filter(check -> RiskCheckStatus.BLOCKED.equals(check.getStatus()))
+                .collect(Collectors.toList());
+        if (isEmpty(blocking)) {
+            return false;
+        }
+        return blocking.stream().allMatch(check -> isTrue(check.getCode().isPermanent()));
     }
 
     private Boolean liveRiskExists(DealContext dealContext, DealTranche.Status currentStatus) {
