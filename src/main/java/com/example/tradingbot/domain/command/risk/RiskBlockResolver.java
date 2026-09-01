@@ -8,6 +8,7 @@ import com.example.tradingbot.domain.command.RuntimeErrorCode;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckStatus;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.util.EnumSet;
 import java.util.Objects;
@@ -26,14 +27,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class RiskBlockResolver {
 
-    private static final Set<Deal.Status> LIVE_RISK_STATUSES = EnumSet.of(
-            Deal.Status.ENTRY_SUBMITTED,
-            Deal.Status.ENTRY_FINALIZED,
-            Deal.Status.PROTECTION_SWITCHED,
-            Deal.Status.MANAGING,
-            Deal.Status.EXIT_PENDING);
+    private static final Set<DealTranche.Status> LIVE_RISK_STATUSES = EnumSet.of(
+            DealTranche.Status.ENTRY_SUBMITTED,
+            DealTranche.Status.ENTRY_FINALIZED,
+            DealTranche.Status.PROTECTION_SWITCHED,
+            DealTranche.Status.MANAGING,
+            DealTranche.Status.EXIT_PENDING);
 
-    public RiskBlockAction resolve(DealContext dealContext, Deal.Status currentStatus,
+    public RiskBlockAction resolve(DealContext dealContext, DealTranche.Status currentStatus,
                                    RiskValidationResult riskValidationResult) {
         return switch (riskValidationResult.getDecision()) {
             case ALLOWED -> RiskBlockAction.builder()
@@ -48,7 +49,7 @@ public class RiskBlockResolver {
         };
     }
 
-    private RiskBlockAction resolveBlocked(DealContext dealContext, Deal.Status currentStatus,
+    private RiskBlockAction resolveBlocked(DealContext dealContext, DealTranche.Status currentStatus,
                                            RiskValidationResult result) {
         if (hasBlockingCode(result, RiskCheckCode.BALANCE_NOT_FRESH)
                 || hasBlockingCode(result, RiskCheckCode.BALANCE_INVALID)) {
@@ -71,7 +72,7 @@ public class RiskBlockResolver {
                 .build();
     }
 
-    private Boolean liveRiskExists(DealContext dealContext, Deal.Status currentStatus) {
+    private Boolean liveRiskExists(DealContext dealContext, DealTranche.Status currentStatus) {
         Deal deal = dealContext.getDeal();
         Position position = deal.getPosition();
         if (Objects.nonNull(position) && isTrue(position.hasLiveRisk())) {

@@ -9,7 +9,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
 import com.example.tradingbot.domain.deal.DealTransition;
-import com.example.tradingbot.domain.deal.FsmHandler;
+import com.example.tradingbot.domain.deal.DealFsmHandler;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class ErrorHandler implements FsmHandler {
+public class ErrorHandler implements DealFsmHandler {
 
     private final DealFsmSupport support;
 

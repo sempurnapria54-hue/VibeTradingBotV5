@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.deal.action;
 
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.deal.ActionPlan;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -27,5 +28,6 @@ public interface StrategyActionExecutor {
      * {@link DealActionState}, либо пустой {@link ActionPlan}, если действие
      * ещё не готово продвигаться / завершено.
      */
-    ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext);
+    ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext,
+                    DealTranche tranche);
 }

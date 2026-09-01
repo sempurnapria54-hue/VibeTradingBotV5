@@ -33,6 +33,13 @@ public class Order extends Auditable {
     /** Сделка, к которой относится ордер. */
     private Long dealId;
 
+    /**
+     * Транш, чью экспозицию заявка создаёт или гасит. Заявка принадлежит
+     * траншу; deal-уровень остаётся агрегатным представлением.
+     */
+    private Long dealTrancheId;
+
+
     /** Межсервисный id; stable client id (OKX clOrdId). */
     private String internalId;
 

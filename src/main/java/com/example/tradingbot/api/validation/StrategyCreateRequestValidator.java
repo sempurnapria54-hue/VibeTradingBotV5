@@ -27,7 +27,7 @@ import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiMo
 import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyStepApiModel;
-import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.MarketDataExpiredAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.PhaseEntryPolicy;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
@@ -351,7 +351,7 @@ public class StrategyCreateRequestValidator {
         }
         Set<String> actionKeys = collectActionKeys(stepsByStatus, path, violations);
         stepsByStatus.forEach((status, steps) -> {
-            validateEnum(Deal.Status.class, status, path + ".stepsByStatus key", violations);
+            validateEnum(DealTranche.Status.class, status, path + ".stepsByStatus key", violations);
             for (int index = 0; index < steps.size(); index++) {
                 validateStep(steps.get(index), path + ".stepsByStatus[" + status + "][" + index + "]",
                         indicatorTypes, structureKeys, actionKeys, violations);

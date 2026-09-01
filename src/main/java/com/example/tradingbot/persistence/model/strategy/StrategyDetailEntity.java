@@ -55,6 +55,9 @@ public class StrategyDetailEntity extends AuditableEntity {
             precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal targetRiskRewardRatio;
 
+    @Column(name = "position_reopen_allowed")
+    private Boolean positionReopenAllowed;
+
     @OneToMany(mappedBy = "detail", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<StrategyStepEntity> steps;
 }

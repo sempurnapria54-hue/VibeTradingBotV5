@@ -30,6 +30,9 @@ public class OrderEntity extends AuditableEntity {
     @Column(name = "deal_id", nullable = false)
     private Long dealId;
 
+    @Column(name = "deal_tranche_id")
+    private Long dealTrancheId;
+
     @Column(name = "internal_id", nullable = false, updatable = false)
     private String internalId;
 

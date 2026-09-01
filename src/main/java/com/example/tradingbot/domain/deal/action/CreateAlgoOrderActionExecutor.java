@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandPayload;
@@ -54,16 +55,18 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
     }
 
     @Override
-    public ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext) {
+    public ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext,
+                           DealTranche tranche) {
         return switch (state.getStatus()) {
-            case PLANNED -> initialCommand((StrategyAlgoOrderAction) action, state, dealContext);
+            case PLANNED -> initialCommand((StrategyAlgoOrderAction) action, state, dealContext, tranche);
             case CREATED -> submitCommand(state, dealContext);
             case SUBMITTED -> refreshCommand(state, dealContext);
             default -> ActionPlan.empty();
         };
     }
 
-    private ActionPlan initialCommand(StrategyAlgoOrderAction action, DealActionState state, DealContext dealContext) {
+    private ActionPlan initialCommand(StrategyAlgoOrderAction action, DealActionState state, DealContext dealContext,
+                                      DealTranche tranche) {
         StrategyActionCalculationResult calculation = calculator.calculate(action, dealContext);
         if (StrategyActionCalculationResult.Status.ERROR.equals(calculation.getStatus())) {
             return ActionPlan.calcError(calculation.getError());

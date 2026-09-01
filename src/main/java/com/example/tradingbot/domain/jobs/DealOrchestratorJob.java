@@ -10,7 +10,13 @@ import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.executor.ServiceCommandExecutor;
+import com.example.tradingbot.domain.command.RetryBudgetExhaustedException;
 import com.example.tradingbot.domain.deal.DealContextService;
+import com.example.tradingbot.domain.deal.DealTrancheStateMachine;
+import com.example.tradingbot.domain.deal.TrancheTransition;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.integration.service.ControlledExchangeException;
+import com.example.tradingbot.persistence.service.DealTrancheDataService;
 import com.example.tradingbot.domain.deal.DealStateMachine;
 import com.example.tradingbot.domain.deal.DealTransition;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -48,6 +54,8 @@ public class DealOrchestratorJob {
     private final DealDataService dealDataService;
     private final DealContextService dealContextService;
     private final DealStateMachine dealStateMachine;
+    private final DealTrancheStateMachine dealTrancheStateMachine;
+    private final DealTrancheDataService dealTrancheDataService;
     private final ServiceCommandExecutor serviceCommandExecutor;
     private final SafetyHoldCoordinator safetyHoldCoordinator;
 
@@ -72,21 +80,101 @@ public class DealOrchestratorJob {
             if (enforceHold(dealContext)) {
                 return;
             }
-            DealTransition transition = dealStateMachine.advance(dealContext);
-            for (ServiceCommand command : transition.getCommands()) {
-                ServiceCommandExecutionResult result = serviceCommandExecutor.execute(command, dealContext);
-                if (isFalse(result.getSuccess())) {
-                    // Команда провалилась (учёт retry/terminal сделал диспетчер) — остальные команды
-                    // перехода в этом проходе не гоним; handler разберёт FAILED-якорь на следующем тике.
-                    break;
-                }
+            advanceTranches(dealContext);
+            advanceDeal(dealContext);
+        } catch (ControlledExchangeException e) {
+            // Выделенный обработчик, класс броска 1: биржа отвергла поимённо
+            // опознанным отказом. Биржевая ступень безусловна, и сделка
+            // уходит ошибочной тропой независимо от уровня строки
+            // (docs/rules/controlled-exchange-exceptions.md).
+            log.warn("Controlled exchange violation dealId={}", deal.getId(), e);
+            moveToErrorSafely(deal);
+        } catch (RetryBudgetExhaustedException e) {
+            // Выделенный обработчик, класс броска 2: бюджет попыток
+            // исчерпан. Ошибочной тропой уводится только СИСТЕМНАЯ
+            // (финализационная) строка; у стратегийной сделка остаётся в
+            // своём статусе — реакцию даёт лестница, а повтор надобности
+            // гейтится стоящей ступенью
+            // (docs/components/DealOrchestratorJob.md).
+            if (isTrue(e.getStrategyLevel())) {
+                log.warn("Retry budget exhausted on strategy row dealId={} — deal stays in status {}",
+                        deal.getId(), deal.getStatus(), e);
+                return;
             }
-            applyTransition(deal, transition);
-            reactToHoldSignal(transition, dealContext);
+            log.warn("Retry budget exhausted on system row dealId={}", deal.getId(), e);
+            moveToErrorSafely(deal);
         } catch (RuntimeException e) {
+            // Общий обработчик: всё остальное — сборка контекста, прогон
+            // FSM, применение перехода — без радиусной реакции.
             log.error("Deal orchestration failed dealId={}", deal.getId(), e);
             moveToErrorSafely(deal);
         }
+    }
+
+    /**
+     * Проход по живым траншам сделки. Каждый транш продвигается своей
+     * машиной; намерение перехода применяется, только если контракт
+     * переходов транша его разрешил.
+     */
+    private void advanceTranches(DealContext dealContext) {
+        for (DealTranche tranche : dealContext.getDeal().liveTranches()) {
+            TrancheTransition transition = dealTrancheStateMachine.advance(dealContext, tranche);
+            executeCommands(transition.getCommands(), dealContext);
+            if (isTrue(transition.getEscalateDealToError())) {
+                moveToErrorSafely(dealContext.getDeal());
+                return;
+            }
+            applyTrancheTransition(dealContext, tranche, transition);
+        }
+    }
+
+    /** Проход по самой сделке: намерение перехода проверяется гейтом сделки. */
+    private void advanceDeal(DealContext dealContext) {
+        DealTransition transition = dealStateMachine.advance(dealContext);
+        executeCommands(transition.getCommands(), dealContext);
+        applyTransition(dealContext, transition);
+        reactToHoldSignal(transition, dealContext);
+    }
+
+    private void executeCommands(List<ServiceCommand> commands, DealContext dealContext) {
+        for (ServiceCommand command : commands) {
+            ServiceCommandExecutionResult result = serviceCommandExecutor.execute(command, dealContext);
+            if (isFalse(result.getSuccess())) {
+                // Команда провалилась (учёт retry/terminal сделал диспетчер) — остальные команды
+                // перехода в этом проходе не гоним; handler разберёт FAILED-якорь на следующем тике.
+                return;
+            }
+        }
+    }
+
+    /**
+     * Применить намерение перехода транша — только через контракт
+     * переходов: исход прохода есть намерение, а не право.
+     */
+    private void applyTrancheTransition(DealContext dealContext, DealTranche tranche,
+                                        TrancheTransition transition) {
+        if (isNull(transition.getNextStatus())) {
+            return;
+        }
+        Boolean reopenAllowed = dealContext.getStrategyDetail().getPositionReopenAllowed();
+        if (isFalse(dealTrancheStateMachine.transitionAllowed(tranche, transition.getNextStatus(),
+                dealContext.getDeal(), reopenAllowed, graphComplete(dealContext)))) {
+            log.debug("Tranche transition is not allowed trancheId={} to={}",
+                    tranche.getId(), transition.getNextStatus());
+            return;
+        }
+        tranche.setStatus(transition.getNextStatus());
+        dealTrancheDataService.save(tranche);
+    }
+
+    /**
+     * Полнота графа исполнения прохода. Пока признак не считается
+     * отдельным носителем, проход опирается на то, что контекст собран
+     * целиком: это НАЗВАННОЕ ограничение — доводится вместе с добычей
+     * положений закрытия (заход движений счёта и P&L).
+     */
+    private Boolean graphComplete(DealContext dealContext) {
+        return nonNull(dealContext.getDeal().getTranches());
     }
 
     /**
@@ -129,8 +217,15 @@ public class DealOrchestratorJob {
         }
     }
 
-    private void applyTransition(Deal deal, DealTransition transition) {
+    private void applyTransition(DealContext dealContext, DealTransition transition) {
+        Deal deal = dealContext.getDeal();
         if (isNull(transition.getNextStatus())) {
+            return;
+        }
+        if (isFalse(dealStateMachine.transitionAllowed(dealContext, transition.getNextStatus(),
+                graphComplete(dealContext)))) {
+            log.debug("Deal transition is not allowed dealId={} to={}",
+                    deal.getId(), transition.getNextStatus());
             return;
         }
         deal.setStatus(transition.getNextStatus());

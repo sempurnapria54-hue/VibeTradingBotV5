@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.deal.handler;
+package com.example.tradingbot.domain.deal.tranche;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
@@ -11,10 +11,11 @@ import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
-import com.example.tradingbot.domain.deal.DealTransition;
-import com.example.tradingbot.domain.deal.FsmHandler;
+import com.example.tradingbot.domain.deal.TrancheTransition;
+import com.example.tradingbot.domain.deal.TrancheFsmHandler;
 import com.example.tradingbot.domain.deal.action.StrategyActionOrchestrator;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -33,45 +34,45 @@ import org.springframework.stereotype.Component;
  * Инвариант docs/rules/risk-creating-entry-protection.md: позицию с live
  * risk без подтверждённой защиты в MANAGING не уводим (нет ни main, ни
  * attached → ERROR). Позиция уже закрылась → recovery EXIT_PENDING. См.
- * docs/components/EntryFinalizedHandler.md.
+ * docs/components/TrancheEntryFinalizedHandler.md.
  */
 @Component
 @RequiredArgsConstructor
-public class EntryFinalizedHandler implements FsmHandler {
+public class TrancheEntryFinalizedHandler implements TrancheFsmHandler {
 
     private final DealFsmSupport support;
     private final StrategyActionOrchestrator actionOrchestrator;
 
     @Override
-    public Deal.Status supportedStatus() {
-        return Deal.Status.ENTRY_FINALIZED;
+    public DealTranche.Status supportedStatus() {
+        return DealTranche.Status.ENTRY_FINALIZED;
     }
 
     @Override
-    public Optional<DealTransition> checkEntry(DealContext dealContext) {
+    public Optional<TrancheTransition> checkEntry(DealContext dealContext, DealTranche tranche) {
         Deal deal = dealContext.getDeal();
         if (isFalse(support.positionLiveRisk(deal))) {
             // Нет живой позиции — защиту финализировать не над чем.
             return Optional.of(nonNull(deal.getPosition())
-                    ? DealTransition.transition(Deal.Status.EXIT_PENDING)
-                    : support.markError(dealContext));
+                    ? TrancheTransition.transition(DealTranche.Status.EXIT_PENDING)
+                    : TrancheTransition.escalateToDealError());
         }
         return Optional.empty();
     }
 
     @Override
-    public Optional<DealTransition> checkTransition(DealContext dealContext) {
-        for (StrategyStep step : protectionSteps(dealContext)) {
+    public Optional<TrancheTransition> checkTransition(DealContext dealContext, DealTranche tranche) {
+        for (StrategyStep step : protectionSteps(dealContext, tranche)) {
             for (StrategyAction action : nullSafe(step)) {
-                DealActionState state = support.findActionState(dealContext, action).orElse(null);
+                DealActionState state = support.findActionState(dealContext, tranche, action).orElse(null);
                 if (isNull(state)) {
                     continue;
                 }
                 if (DealActionStateStatus.SUBMITTED.equals(state.getStatus())) {
-                    return Optional.of(DealTransition.transition(Deal.Status.PROTECTION_SWITCHED));
+                    return Optional.of(TrancheTransition.transition(DealTranche.Status.PROTECTION_SWITCHED));
                 }
                 if (DealActionStateStatus.FAILED.equals(state.getStatus())) {
-                    return Optional.of(support.markError(dealContext));
+                    return Optional.of(TrancheTransition.escalateToDealError());
                 }
             }
         }
@@ -79,57 +80,57 @@ public class EntryFinalizedHandler implements FsmHandler {
     }
 
     @Override
-    public DealTransition handle(DealContext dealContext) {
-        List<StrategyStep> protectionSteps = protectionSteps(dealContext);
+    public TrancheTransition handle(DealContext dealContext, DealTranche tranche) {
+        List<StrategyStep> protectionSteps = protectionSteps(dealContext, tranche);
         if (isEmpty(protectionSteps)) {
-            return toManagingIfProtected(dealContext);
+            return toManagingIfProtected(dealContext, tranche);
         }
-        DealTransition inProgress = continueProtection(protectionSteps, dealContext);
+        TrancheTransition inProgress = continueProtection(protectionSteps, dealContext, tranche);
         if (nonNull(inProgress)) {
             return inProgress;
         }
-        return startProtection(protectionSteps, dealContext);
+        return startProtection(protectionSteps, dealContext, tranche);
     }
 
-    private List<StrategyStep> protectionSteps(DealContext dealContext) {
+    private List<StrategyStep> protectionSteps(DealContext dealContext, DealTranche tranche) {
         return support.stepsOfType(
-                support.stepsFor(dealContext, Deal.Status.ENTRY_FINALIZED), StrategyStepType.MAIN_PROTECTION);
+                support.stepsFor(dealContext, DealTranche.Status.ENTRY_FINALIZED), StrategyStepType.MAIN_PROTECTION);
     }
 
     /** Прогресс уже начатого (active) protection-действия; переходы (SUBMITTED/FAILED) отсеяны в checkTransition. */
-    private DealTransition continueProtection(List<StrategyStep> protectionSteps, DealContext dealContext) {
+    private TrancheTransition continueProtection(List<StrategyStep> protectionSteps, DealContext dealContext, DealTranche tranche) {
         for (StrategyStep step : protectionSteps) {
             for (StrategyAction action : nullSafe(step)) {
-                DealActionState state = support.findActionState(dealContext, action).orElse(null);
+                DealActionState state = support.findActionState(dealContext, tranche, action).orElse(null);
                 if (nonNull(state) && isActiveStage(state.getStatus())) {
-                    return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
+                    return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));
                 }
             }
         }
         return null;
     }
 
-    private DealTransition startProtection(List<StrategyStep> protectionSteps, DealContext dealContext) {
+    private TrancheTransition startProtection(List<StrategyStep> protectionSteps, DealContext dealContext, DealTranche tranche) {
         ConditionEvaluationContext conditionContext = support.conditionContext(dealContext);
         for (StrategyStep step : protectionSteps) {
             if (isTrue(support.conditionMet(step, conditionContext)) && isNotEmpty(step.getActions())) {
                 StrategyAction action = step.getActions().getFirst();
-                DealActionState state = support.findOrCreateActionState(dealContext, action);
-                return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
+                DealActionState state = support.findOrCreateActionState(dealContext, tranche, action);
+                return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));
             }
         }
         // MAIN_PROTECTION есть, но условие не сработало — attached защита держит → MANAGING.
-        return toManagingIfProtected(dealContext);
+        return toManagingIfProtected(dealContext, tranche);
     }
 
     /** В MANAGING только если live risk покрыт защитой (attached SL входа); иначе ERROR + L3-холд. */
-    private DealTransition toManagingIfProtected(DealContext dealContext) {
+    private TrancheTransition toManagingIfProtected(DealContext dealContext, DealTranche tranche) {
         Order entry = support.entryOrder(dealContext.getDeal());
         if (nonNull(entry) && isTrue(entry.hasActiveAttachedProtection())) {
-            return DealTransition.transition(Deal.Status.MANAGING);
+            return TrancheTransition.transition(DealTranche.Status.MANAGING);
         }
         // Live risk без резолвимой защиты = бесстоповая позиция постфактум → L3 (§8.C).
-        return support.markErrorStopless(dealContext);
+        return TrancheTransition.escalateToDealError();
     }
 
     private boolean isActiveStage(DealActionStateStatus status) {

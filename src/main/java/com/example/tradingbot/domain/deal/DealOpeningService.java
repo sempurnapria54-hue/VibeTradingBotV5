@@ -38,7 +38,7 @@ public class DealOpeningService {
         deal.setInternalId(ClientIdGenerator.generate());
         deal.setInstrumentId(instrumentId);
         deal.setStrategyDetailId(strategyDetailId);
-        deal.setStatus(Deal.Status.PRECHECK);
+        deal.setStatus(Deal.Status.ACTIVE);
         deal.setDirection(direction);
         deal.setEntryReason(entryReason);
         deal.setEntryStepType(entryStepType);

@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.deal.action;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.deal.ActionPlan;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
@@ -38,7 +39,8 @@ public class StrategyActionOrchestrator {
     private final List<StrategyActionExecutor> executors;
     private final DealActionStateDataService dealActionStateDataService;
 
-    public ActionPlan plan(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext) {
+    public ActionPlan plan(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext,
+                           DealTranche tranche) {
         if (isRetryPending(state)) {
             if (isFalse(retryDue(state))) {
                 return ActionPlan.empty();
@@ -46,7 +48,7 @@ public class StrategyActionOrchestrator {
             rearmForRetry(state);
         }
         return executorFor(action)
-                .map(executor -> executor.next(step, action, state, dealContext))
+                .map(executor -> executor.next(step, action, state, dealContext, tranche))
                 .orElseGet(ActionPlan::empty);
     }
 

@@ -21,7 +21,7 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * Persistence-проекция {@link StrategyStep} (таблица strategy_steps).
- * Map stepsByStatus детали хранится плоскими строками: deal_status —
+ * Map stepsByStatus детали хранится плоскими строками: tranche_status —
  * ключ map, step_index — порядок в списке; в домене map пересобирает
  * маппер. Условие шага и политика устаревания — JSONB на этой строке.
  * Действия — дочерние строки strategy_actions (cascade ALL).
@@ -40,8 +40,8 @@ public class StrategyStepEntity extends AuditableEntity {
     @JoinColumn(name = "strategy_detail_id", nullable = false, updatable = false)
     private StrategyDetailEntity detail;
 
-    @Column(name = "deal_status", nullable = false)
-    private String dealStatus;
+    @Column(name = "tranche_status", nullable = false)
+    private String trancheStatus;
 
     @Column(name = "step_index", nullable = false)
     private Integer stepIndex;

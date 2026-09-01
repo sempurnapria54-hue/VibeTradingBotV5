@@ -7,7 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
-import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.util.List;
@@ -43,11 +43,24 @@ public class StrategyDetail extends Auditable {
     /** Риск на сделку, % от капитала (percent-risk модель сайзинга). */
     private BigDecimal riskPerTradePercent;
 
+    /**
+     * Допускает ли стратегия ПЕРЕОТКРЫТИЕ эпизода транша: сопровождение
+     * снова отправляет вход тем же траншем. Операнд охраны переоткрытия
+     * (docs/spec/deal-tranche-lifecycle.json §reopenPermitted); пусто
+     * читается как «не допускает» — разрешение объявляется явно, а не
+     * умолчанием.
+     */
+    private Boolean positionReopenAllowed;
+
     /** High-level ориентир risk/reward. */
     private BigDecimal targetRiskRewardRatio;
 
-    /** Шаги, сгруппированные по статусу сделки. */
-    private Map<Deal.Status, List<StrategyStep>> stepsByStatus;
+    /**
+     * Шаги, сгруппированные по статусу ТРАНША: шаг принадлежит
+     * траншу, кроме узкой агрегатной поверхности (её несёт тип шага,
+     * не ключ группировки).
+     */
+    private Map<DealTranche.Status, List<StrategyStep>> stepsByStatus;
 
     /**
      * Entry-шаги детали: шаги PRECHECK-группы типов ENTRY/GRID_ENTRY в
@@ -57,7 +70,7 @@ public class StrategyDetail extends Auditable {
         if (isNull(stepsByStatus)) {
             return List.of();
         }
-        List<StrategyStep> precheckSteps = stepsByStatus.get(Deal.Status.PRECHECK);
+        List<StrategyStep> precheckSteps = stepsByStatus.get(DealTranche.Status.PRECHECK);
         if (isEmpty(precheckSteps)) {
             return List.of();
         }

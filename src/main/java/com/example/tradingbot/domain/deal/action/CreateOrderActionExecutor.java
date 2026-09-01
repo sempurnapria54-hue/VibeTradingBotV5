@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandPayload;
@@ -54,23 +55,25 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     }
 
     @Override
-    public ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext) {
+    public ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state, DealContext dealContext,
+                           DealTranche tranche) {
         return switch (state.getStatus()) {
-            case PLANNED -> initialCommand((StrategyOrderAction) action, state, dealContext);
+            case PLANNED -> initialCommand((StrategyOrderAction) action, state, dealContext, tranche);
             case CREATED -> submitCommand(state, dealContext);
             case SUBMITTED -> refreshCommand(state, dealContext);
             default -> ActionPlan.empty();
         };
     }
 
-    private ActionPlan initialCommand(StrategyOrderAction action, DealActionState state, DealContext dealContext) {
+    private ActionPlan initialCommand(StrategyOrderAction action, DealActionState state, DealContext dealContext,
+                                      DealTranche tranche) {
         StrategyActionCalculationResult calculation = calculator.calculate(action, dealContext);
         if (StrategyActionCalculationResult.Status.ERROR.equals(calculation.getStatus())) {
             return ActionPlan.calcError(calculation.getError());
         }
         CalculatedStrategyAction calculated = calculation.getCalculatedAction();
         if (isRiskCreating(action)) {
-            ActionPlan blocked = applyRisk(calculated, dealContext);
+            ActionPlan blocked = applyRisk(calculated, dealContext, tranche);
             if (nonNull(blocked)) {
                 return blocked;
             }
@@ -79,12 +82,13 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     }
 
     /** null = риск разрешил продолжить; иначе — блокирующая реакция risk-layer. */
-    private ActionPlan applyRisk(CalculatedStrategyAction calculated, DealContext dealContext) {
+    private ActionPlan applyRisk(CalculatedStrategyAction calculated, DealContext dealContext,
+                                 DealTranche tranche) {
         RiskValidationResult risk = riskValidator.validate(calculated, dealContext);
         if (RiskValidationResult.RiskDecision.ALLOWED.equals(risk.getDecision())) {
             return null;
         }
-        RiskBlockAction blockAction = riskBlockResolver.resolve(dealContext, dealContext.getDeal().getStatus(), risk);
+        RiskBlockAction blockAction = riskBlockResolver.resolve(dealContext, tranche.getStatus(), risk);
         if (isBlocking(blockAction.getType())) {
             return ActionPlan.blocked(blockAction);
         }

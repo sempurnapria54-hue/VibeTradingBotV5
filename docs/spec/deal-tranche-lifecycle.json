@@ -25,7 +25,7 @@
       "expr": "in(status, 'PRECHECK', 'ENTRY_SUBMITTED', 'ENTRY_FINALIZED', 'PROTECTION_SWITCHED', 'MANAGING', 'EXIT_PENDING')"
     },
     {
-      "name": "edgeDeclared",
+      "name": "trancheEdgeDeclared",
       "note": "Матрица транша — сегодняшняя матрица сделки минус ошибочные статусы плюс ребро переоткрытия.",
       "expr": "(from == 'PRECHECK' && in(to, 'ENTRY_SUBMITTED', 'CLOSED')) || (from == 'ENTRY_SUBMITTED' && in(to, 'ENTRY_FINALIZED', 'EXIT_PENDING', 'CLOSED')) || (from == 'ENTRY_FINALIZED' && in(to, 'PROTECTION_SWITCHED', 'MANAGING')) || (from == 'PROTECTION_SWITCHED' && to == 'MANAGING') || (from == 'MANAGING' && in(to, 'ENTRY_SUBMITTED', 'EXIT_PENDING')) || (from == 'EXIT_PENDING' && to == 'CLOSED')"
     },
@@ -49,8 +49,8 @@
       "expr": "to == 'ENTRY_SUBMITTED' && deal.status == 'EXIT_PENDING'"
     },
     {
-      "name": "transitionAllowed",
-      "expr": "edgeDeclared && !riskCreatingUnderCollapse && (!reopenEdge || reopenPermitted) && (to != 'CLOSED' || terminalContract)"
+      "name": "trancheTransitionAllowed",
+      "expr": "trancheEdgeDeclared && !riskCreatingUnderCollapse && (!reopenEdge || reopenPermitted) && (to != 'CLOSED' || terminalContract)"
     }
   ],
   "examples": [
@@ -74,8 +74,8 @@
         }
       },
       "expect": {
-        "edgeDeclared": true,
-        "transitionAllowed": true
+        "trancheEdgeDeclared": true,
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -98,8 +98,8 @@
         }
       },
       "expect": {
-        "edgeDeclared": true,
-        "transitionAllowed": true
+        "trancheEdgeDeclared": true,
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -116,8 +116,8 @@
         }
       },
       "expect": {
-        "edgeDeclared": false,
-        "transitionAllowed": false
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -134,7 +134,7 @@
         }
       },
       "expect": {
-        "edgeDeclared": false
+        "trancheEdgeDeclared": false
       }
     },
     {
@@ -175,7 +175,7 @@
         "trancheExposure": 0,
         "trancheHasLiveEntryOrder": true,
         "reopenPermitted": true,
-        "transitionAllowed": true
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -213,9 +213,9 @@
         }
       },
       "expect": {
-        "edgeDeclared": true,
+        "trancheEdgeDeclared": true,
         "reopenPermitted": false,
-        "transitionAllowed": false
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -254,7 +254,7 @@
       "expect": {
         "trancheExposure": 5,
         "reopenPermitted": false,
-        "transitionAllowed": false
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -292,8 +292,8 @@
         }
       },
       "expect": {
-        "edgeDeclared": true,
-        "transitionAllowed": true
+        "trancheEdgeDeclared": true,
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -318,7 +318,7 @@
       "expect": {
         "trancheRiskBearing": true,
         "terminalContract": false,
-        "transitionAllowed": false
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -348,7 +348,7 @@
       "expect": {
         "trancheExposure": 0,
         "trancheRiskBearing": false,
-        "transitionAllowed": true
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -390,7 +390,7 @@
         "trancheHasLiveProtection": true,
         "trancheRiskBearing": true,
         "terminalContract": false,
-        "transitionAllowed": false
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -430,7 +430,7 @@
         "trancheExposure": 0,
         "trancheRiskBearing": false,
         "terminalContract": true,
-        "transitionAllowed": true
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -447,9 +447,9 @@
         }
       },
       "expect": {
-        "edgeDeclared": true,
+        "trancheEdgeDeclared": true,
         "trancheRiskBearing": false,
-        "transitionAllowed": true
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -466,7 +466,7 @@
         }
       },
       "expect": {
-        "edgeDeclared": false
+        "trancheEdgeDeclared": false
       }
     },
     {
@@ -518,9 +518,9 @@
         }
       },
       "expect": {
-        "edgeDeclared": true,
+        "trancheEdgeDeclared": true,
         "riskCreatingUnderCollapse": true,
-        "transitionAllowed": false
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -561,7 +561,7 @@
       "expect": {
         "reopenPermitted": true,
         "riskCreatingUnderCollapse": true,
-        "transitionAllowed": false
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -580,7 +580,7 @@
       },
       "expect": {
         "riskCreatingUnderCollapse": false,
-        "transitionAllowed": true
+        "trancheTransitionAllowed": true
       }
     },
     {
@@ -604,7 +604,7 @@
       "expect": {
         "trancheRiskBearing": false,
         "terminalContract": false,
-        "transitionAllowed": false
+        "trancheTransitionAllowed": false
       }
     }
   ]

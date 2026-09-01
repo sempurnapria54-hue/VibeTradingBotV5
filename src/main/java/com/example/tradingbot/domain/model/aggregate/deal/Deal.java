@@ -73,8 +73,33 @@ public class Deal extends Auditable {
     /** Standalone algo-orders сделки. */
     private List<AlgoOrder> algoOrders;
 
-    /** Текущая позиция (≤1 на Deal). */
+    /** Текущая позиция (≤1 живая на Deal). */
     private Position position;
+
+    /**
+     * Транши сделки — единицы принятия и сопровождения риска. Стадии
+     * входа и сопровождения принадлежат им, а не сделке.
+     */
+    private List<DealTranche> tranches;
+
+    /** Все транши сделки терминальны — предусловие терминала сделки. */
+    public Boolean allTranchesTerminal() {
+        return emptyIfNull(tranches).stream()
+                .allMatch(tranche -> isTrue(tranche.isTerminal()));
+    }
+
+    /** Хоть один транш сделки несёт живой риск. */
+    public Boolean anyTrancheRiskBearing() {
+        return emptyIfNull(tranches).stream()
+                .anyMatch(tranche -> isTrue(tranche.isRiskBearing()));
+    }
+
+    /** Живые транши сделки: те, что ещё занимают место в проходе. */
+    public List<DealTranche> liveTranches() {
+        return emptyIfNull(tranches).stream()
+                .filter(tranche -> isTrue(tranche.isActive()))
+                .collect(Collectors.toList());
+    }
 
     /** Live ordinary orders сделки (остаточный live-risk для teardown); пусто — нет. */
     public List<Order> liveOrders() {
@@ -102,29 +127,21 @@ public class Deal extends Auditable {
      */
     public enum Status {
 
-        /** Кандидат: повторная проверка entry-условий до live-риска. */
-        PRECHECK,
+        /**
+         * Сделка ведётся: транши живут своими жизненными циклами внутри
+         * неё. Стадии входа и сопровождения принадлежат ТРАНШУ, не сделке
+         * ({@link DealTranche.Status}) — сделка их не повторяет.
+         */
+        ACTIVE,
 
-        /** Входной ордер отправлен на биржу. */
-        ENTRY_SUBMITTED,
-
-        /** Входной ордер финализирован (исполнен/частично — позиция есть). */
-        ENTRY_FINALIZED,
-
-        /** Защита переключена с attached на standalone. */
-        PROTECTION_SWITCHED,
-
-        /** Сопровождение открытой позиции. */
-        MANAGING,
-
-        /** Запущен выход — ждём завершения закрывающих действий. */
+        /** Запущено сворачивание — ждём завершения закрывающих действий. */
         EXIT_PENDING,
-
-        /** Сделка завершена штатно. */
-        CLOSED,
 
         /** Ошибка цикла сделки. */
         ERROR,
+
+        /** Сделка завершена штатно. */
+        CLOSED,
 
         /** Сделка завершена аварийно (emergency close). */
         EMERGENCY_CLOSED

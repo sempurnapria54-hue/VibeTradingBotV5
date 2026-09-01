@@ -1,4 +1,4 @@
-package com.example.tradingbot.domain.deal.handler;
+package com.example.tradingbot.domain.deal.tranche;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
@@ -11,10 +11,11 @@ import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
-import com.example.tradingbot.domain.deal.DealTransition;
-import com.example.tradingbot.domain.deal.FsmHandler;
+import com.example.tradingbot.domain.deal.TrancheTransition;
+import com.example.tradingbot.domain.deal.TrancheFsmHandler;
 import com.example.tradingbot.domain.deal.action.StrategyActionOrchestrator;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -32,42 +33,42 @@ import org.springframework.stereotype.Component;
  * calc → risk → команды). EXIT → CLOSE_POSITION → EXIT_PENDING. Ремодел
  * защиты (PROTECTION_ADJUSTMENT, REPLACE) секвенсит петля по фактам —
  * leg-оркестрация — forward-refinement (фабрика REPLACE-ног пока не
- * порождает). См. docs/components/ManagingHandler.md.
+ * порождает). См. docs/components/TrancheManagingHandler.md.
  */
 @Component
 @RequiredArgsConstructor
-public class ManagingHandler implements FsmHandler {
+public class TrancheManagingHandler implements TrancheFsmHandler {
 
     private final DealFsmSupport support;
     private final StrategyActionOrchestrator actionOrchestrator;
 
     @Override
-    public Deal.Status supportedStatus() {
-        return Deal.Status.MANAGING;
+    public DealTranche.Status supportedStatus() {
+        return DealTranche.Status.MANAGING;
     }
 
     @Override
-    public Optional<DealTransition> checkEntry(DealContext dealContext) {
+    public Optional<TrancheTransition> checkEntry(DealContext dealContext, DealTranche tranche) {
         if (isFalse(support.positionLiveRisk(dealContext.getDeal()))) {
             // Нет живой позиции — сопровождать нечего; дочистка в EXIT_PENDING.
-            return Optional.of(DealTransition.transition(Deal.Status.EXIT_PENDING));
+            return Optional.of(TrancheTransition.transition(DealTranche.Status.EXIT_PENDING));
         }
         return Optional.empty();
     }
 
     @Override
-    public Optional<DealTransition> checkTransition(DealContext dealContext) {
-        for (StrategyStep step : managingSteps(dealContext)) {
+    public Optional<TrancheTransition> checkTransition(DealContext dealContext, DealTranche tranche) {
+        for (StrategyStep step : managingSteps(dealContext, tranche)) {
             for (StrategyAction action : nullSafe(step)) {
-                DealActionState state = support.findActionState(dealContext, action).orElse(null);
+                DealActionState state = support.findActionState(dealContext, tranche, action).orElse(null);
                 if (isNull(state)) {
                     continue;
                 }
                 if (DealActionStateStatus.FAILED.equals(state.getStatus())) {
-                    return Optional.of(support.markError(dealContext));
+                    return Optional.of(TrancheTransition.escalateToDealError());
                 }
                 if (isExitSubmitted(step, state.getStatus())) {
-                    return Optional.of(DealTransition.transition(Deal.Status.EXIT_PENDING));
+                    return Optional.of(TrancheTransition.transition(DealTranche.Status.EXIT_PENDING));
                 }
             }
         }
@@ -75,44 +76,44 @@ public class ManagingHandler implements FsmHandler {
     }
 
     @Override
-    public DealTransition handle(DealContext dealContext) {
-        List<StrategyStep> steps = managingSteps(dealContext);
-        DealTransition inProgress = continueInProgress(steps, dealContext);
+    public TrancheTransition handle(DealContext dealContext, DealTranche tranche) {
+        List<StrategyStep> steps = managingSteps(dealContext, tranche);
+        TrancheTransition inProgress = continueInProgress(steps, dealContext, tranche);
         if (nonNull(inProgress)) {
             return inProgress;
         }
-        return startApplicable(steps, dealContext);
+        return startApplicable(steps, dealContext, tranche);
     }
 
-    private List<StrategyStep> managingSteps(DealContext dealContext) {
-        return support.stepsOfType(support.stepsFor(dealContext, Deal.Status.MANAGING),
+    private List<StrategyStep> managingSteps(DealContext dealContext, DealTranche tranche) {
+        return support.stepsOfType(support.stepsFor(dealContext, DealTranche.Status.MANAGING),
                 StrategyStepType.PROTECTION_ADJUSTMENT, StrategyStepType.PARTIAL_EXIT,
                 StrategyStepType.GRID_MANAGEMENT, StrategyStepType.EXIT);
     }
 
     /** Прогресс уже начатого (active) действия; переходы (FAILED/exit) отсеяны в checkTransition. */
-    private DealTransition continueInProgress(List<StrategyStep> steps, DealContext dealContext) {
+    private TrancheTransition continueInProgress(List<StrategyStep> steps, DealContext dealContext, DealTranche tranche) {
         for (StrategyStep step : steps) {
             for (StrategyAction action : nullSafe(step)) {
-                DealActionState state = support.findActionState(dealContext, action).orElse(null);
+                DealActionState state = support.findActionState(dealContext, tranche, action).orElse(null);
                 if (nonNull(state) && isActiveStage(state.getStatus())) {
-                    return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
+                    return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));
                 }
             }
         }
         return null;
     }
 
-    private DealTransition startApplicable(List<StrategyStep> steps, DealContext dealContext) {
+    private TrancheTransition startApplicable(List<StrategyStep> steps, DealContext dealContext, DealTranche tranche) {
         ConditionEvaluationContext conditionContext = support.conditionContext(dealContext);
         for (StrategyStep step : steps) {
             if (isTrue(support.conditionMet(step, conditionContext)) && isNotEmpty(step.getActions())) {
                 StrategyAction action = step.getActions().getFirst();
-                DealActionState state = support.findOrCreateActionState(dealContext, action);
-                return support.reactToPlan(actionOrchestrator.plan(step, action, state, dealContext), dealContext);
+                DealActionState state = support.findOrCreateActionState(dealContext, tranche, action);
+                return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));
             }
         }
-        return DealTransition.stay();
+        return TrancheTransition.stay();
     }
 
     private boolean isExitSubmitted(StrategyStep step, DealActionStateStatus status) {

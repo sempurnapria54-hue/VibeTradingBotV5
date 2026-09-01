@@ -441,6 +441,12 @@ RETIRED = [
                        ('docs/rules/instrument-hold.md',
                         r'стоящ\w+\s+ступень\w*|гейт\w*\s+по\s+стоящей'),
                        ('docs/lifecycles/DealActionState.md', None),
+                       # Носитель, который отказ и ЛОВИТ. В популяцию не входил,
+                       # и свип его не видел: ячейка выделенного обработчика
+                       # называла оба класса броска одной развязкой «уводит
+                       # сделку ошибочной тропой» (B5 DOCS_CHECK_34).
+                       ('docs/components/DealOrchestratorJob.md',
+                        r'стоящ\w+\s+ступень\w*|остаётся\s+в\s+своём\s+статусе'),
                        ('docs/spec/strategy-walkthrough.json', None)),
     },
     {

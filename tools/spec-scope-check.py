@@ -39,6 +39,16 @@
     ПРЕДМЕТОВ (два жизненных цикла, две сущности) дублем не считается.
     Объявляется ключом "independentFrom": "<спека>/<величина>" на величине;
     молчаливого пропуска нет — без объявления пара остаётся находкой.
+  КЛАСС D — ДВА ДОМА У ОДНОГО ИМЕНИ: имя величины объявлено более чем в
+    одной спеке. Правило — .claude/rules/structure.md, строка docs/spec:
+    «величина объявляется ровно в одной спеке»; docs/concept.md §Ссылки
+    ставит на машинной проверке этого правила законность §`имя`-ссылок.
+    Класс D — та самая машинная проверка: до его ввода правило не мерил
+    никто, а индекс домов tools/spec-pointer-check.py при двух домах
+    вырождается в МНОЖЕСТВО и признаёт верным указатель на не тот дом.
+    Исключение "independentFrom" сюда НЕ распространяется: оно снимает
+    совпадение ВЫРАЖЕНИЙ у разных предметов, а два предмета под одним
+    ИМЕНЕМ остаются неразличимыми для читателя и для указателя.
 
 ЧЕГО ИНСТРУМЕНТ НЕ МЕРИТ (названо, чтобы им не удостоверяли лишнего): общий
 операндный контракт — имена полей строк (`type`, `size`, `status`, `carrier`,
@@ -218,7 +228,21 @@ def scan(directory):
     out = []
     broken, guest, skipped = scope_findings(directory, specs, declared_in, out)
     copies = copy_findings(directory, specs, out)
-    return (out, (broken, guest, copies, len(skipped))), None
+    homes = home_findings(declared_in, out)
+    return (out, (broken, guest, copies, homes, len(skipped))), None
+
+
+def home_findings(declared_in, out):
+    """КЛАСС D: имя величины объявлено более чем в одной спеке."""
+    found = 0
+    for name in sorted(declared_in):
+        homes = sorted(set(declared_in[name]))
+        if len(homes) > 1:
+            found += 1
+            out.append("КЛАСС D: имя «%s» объявлено в %d спеках (%s) — "
+                       "у величины один дом, иначе указатель на неё неразличим"
+                       % (name, len(homes), ", ".join(homes)))
+    return found
 
 
 # --- батарея осей ------------------------------------------------------------
@@ -305,6 +329,34 @@ def battery():
                                               independentFrom="left/riskLeft")]})
         axis("6. контроль: объявленная независимость снимает находку класса C", six, "КЛАСС C", False)
 
+        # D: одно имя объявлено в двух спеках. Выражения РАЗНЫЕ намеренно —
+        # иначе сработал бы класс C и ось меряла бы не свой предмет.
+        nine = area("h")
+        write(nine, "deal", {"subject": "deal", "operands": {"deal.from": "", "deal.to": ""},
+                             "values": [value("transitionAllowed", "deal.from != deal.to")]})
+        write(nine, "tranche", {"subject": "tranche", "operands": {"tranche.stage": ""},
+                                "values": [value("transitionAllowed", "tranche.stage > 0")]})
+        axis("9. класс D: одно имя объявлено в двух спеках", nine, "КЛАСС D", True)
+
+        # контроль D: те же два предмета под РАЗНЫМИ именами находки не дают
+        ten = area("i")
+        write(ten, "deal", {"subject": "deal", "operands": {"deal.from": "", "deal.to": ""},
+                            "values": [value("transitionAllowed", "deal.from != deal.to")]})
+        write(ten, "tranche", {"subject": "tranche", "operands": {"tranche.stage": ""},
+                               "values": [value("trancheTransitionAllowed", "tranche.stage > 0")]})
+        axis("10. контроль: разные имена у разных предметов находки не дают", ten, "КЛАСС D", False)
+
+        # контроль D: объявленная независимость класс D НЕ снимает — она про
+        # совпадение выражений, а не про одноимённость домов.
+        eleven = area("j")
+        write(eleven, "deal", {"subject": "deal", "operands": {"deal.from": "", "deal.to": ""},
+                               "values": [value("transitionAllowed", "deal.from != deal.to",
+                                                independentFrom="tranche/transitionAllowed")]})
+        write(eleven, "tranche", {"subject": "tranche", "operands": {"tranche.stage": ""},
+                                  "values": [value("transitionAllowed", "tranche.stage > 0",
+                                                   independentFrom="deal/transitionAllowed")]})
+        axis("11. объявленная независимость класс D не снимает", eleven, "КЛАСС D", True)
+
         # базовый гейт
         _, refusal = scan(os.path.join(work, "нет-такого"))
         axes.append(("7. каталога нет — проверка отказывает", bool(refusal),
@@ -331,13 +383,14 @@ def main():
     if refusal:
         print("ПРОВЕРКА НЕ ПРОВОДИТСЯ: " + refusal)
         return 2
-    lines, (gaps, guest, copies, skipped) = result
+    lines, (gaps, guest, copies, homes, skipped) = result
     for line in lines:
         print(line)
     print("РАЗРЫВОВ (A): %d; ПОДМЕН ДОМА ГОСТЕВЫМ СОСТОЯНИЕМ (B): %d; "
-          "КОПИЙ ФОРМЫ (C): %d; ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ (не дефект): %d имён"
-          % (gaps, guest, copies, skipped))
-    return 1 if gaps or guest or copies else 0
+          "КОПИЙ ФОРМЫ (C): %d; ДВУХ ДОМОВ У ИМЕНИ (D): %d; "
+          "ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ (не дефект): %d имён"
+          % (gaps, guest, copies, homes, skipped))
+    return 1 if gaps or guest or copies or homes else 0
 
 
 if __name__ == "__main__":

@@ -5,16 +5,18 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import java.util.Optional;
 
 /**
- * Per-status FSM handler сделки. Каждый поддерживает один
+ * Per-status FSM handler СДЕЛКИ. Каждый поддерживает один
  * {@link Deal.Status}; {@link DealStateMachine} маршрутизирует по нему.
  * Три роли прохода: {@link #checkEntry} (условия входа) → {@link #checkTransition}
  * (условия перехода) → {@link #handle} (рабочая логика). Петля пробует их по
  * порядку — первый непустой результат есть исход прохода, иначе {@code handle}.
- * Terminal-статусы (CLOSED / EMERGENCY_CLOSED) handler'ов не имеют. См.
+ * Стадии входа и сопровождения принадлежат ТРАНШУ и здесь не
+ * обрабатываются ({@link TrancheFsmHandler}). Terminal-статусы (CLOSED /
+ * EMERGENCY_CLOSED) handler'ов не имеют. См.
  * docs/components/DealStateMachine.md,
  * docs/decisions/fsm-execution-layering.md.
  */
-public interface FsmHandler {
+public interface DealFsmHandler {
 
     /** Статус сделки, который обрабатывает этот handler. */
     Deal.Status supportedStatus();

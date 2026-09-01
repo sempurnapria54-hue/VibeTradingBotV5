@@ -1,13 +1,14 @@
-package com.example.tradingbot.domain.deal.handler;
+package com.example.tradingbot.domain.deal.tranche;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
-import com.example.tradingbot.domain.deal.DealTransition;
-import com.example.tradingbot.domain.deal.FsmHandler;
+import com.example.tradingbot.domain.deal.TrancheTransition;
+import com.example.tradingbot.domain.deal.TrancheFsmHandler;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import java.util.List;
 import java.util.Optional;
@@ -21,48 +22,48 @@ import org.springframework.stereotype.Component;
  * protection активна — переход в MANAGING. Перекрытие attached + main
  * (обе reduce-only) безопасно — окна без защиты нет
  * (docs/decisions/replace-not-amend.md); точечная отмена attached —
- * forward-refinement. См. docs/components/ProtectionSwitchedHandler.md.
+ * forward-refinement. См. docs/components/TrancheProtectionSwitchedHandler.md.
  */
 @Component
 @RequiredArgsConstructor
-public class ProtectionSwitchedHandler implements FsmHandler {
+public class TrancheProtectionSwitchedHandler implements TrancheFsmHandler {
 
     private final DealFsmSupport support;
 
     @Override
-    public Deal.Status supportedStatus() {
-        return Deal.Status.PROTECTION_SWITCHED;
+    public DealTranche.Status supportedStatus() {
+        return DealTranche.Status.PROTECTION_SWITCHED;
     }
 
     @Override
-    public Optional<DealTransition> checkEntry(DealContext dealContext) {
+    public Optional<TrancheTransition> checkEntry(DealContext dealContext, DealTranche tranche) {
         Deal deal = dealContext.getDeal();
         if (isFalse(support.positionLiveRisk(deal))) {
-            return Optional.of(DealTransition.transition(Deal.Status.EXIT_PENDING));
+            return Optional.of(TrancheTransition.transition(DealTranche.Status.EXIT_PENDING));
         }
         if (isEmpty(support.liveAlgoOrders(deal))) {
             // Позиция с live risk, но main protection не подтверждена live — защита потеряна
             // → бесстоповая позиция постфактум → L3-холд инструмента (§8.C).
-            return Optional.of(support.markErrorStopless(dealContext));
+            return Optional.of(TrancheTransition.escalateToDealError());
         }
         return Optional.empty();
     }
 
     @Override
-    public Optional<DealTransition> checkTransition(DealContext dealContext) {
+    public Optional<TrancheTransition> checkTransition(DealContext dealContext, DealTranche tranche) {
         boolean allActive = support.liveAlgoOrders(dealContext.getDeal()).stream()
                 .allMatch(algoOrder -> AlgoOrder.Status.ACTIVE.equals(algoOrder.getStatus()));
         // Main protection активна и подтверждена → сделка готова к сопровождению.
-        return allActive ? Optional.of(DealTransition.transition(Deal.Status.MANAGING)) : Optional.empty();
+        return allActive ? Optional.of(TrancheTransition.transition(DealTranche.Status.MANAGING)) : Optional.empty();
     }
 
     @Override
-    public DealTransition handle(DealContext dealContext) {
+    public TrancheTransition handle(DealContext dealContext, DealTranche tranche) {
         for (AlgoOrder algoOrder : support.liveAlgoOrders(dealContext.getDeal())) {
             if (isFalse(AlgoOrder.Status.ACTIVE.equals(algoOrder.getStatus()))) {
-                return DealTransition.command(support.refreshAlgoOrderCommand(dealContext, algoOrder.getId()));
+                return TrancheTransition.command(support.refreshAlgoOrderCommand(dealContext, algoOrder.getId()));
             }
         }
-        return DealTransition.stay();
+        return TrancheTransition.stay();
     }
 }

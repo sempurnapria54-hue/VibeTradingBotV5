@@ -961,6 +961,73 @@
     },
     {
       "case": "расхождение суммы экспозиций с нетто-размером терминал не пропускает",
+      "note": "Изолирует ИМЕННО конъюнкт сверки: транш терминален, живых заявок нет, риска транш не несёт, граф полон — все прочие конъюнкты riskProvenAbsent истинны. Ложен только exposureReconciled: наш выход закрыл 2 из 5, оставшиеся 3 закрыл КТО-ТО ИЗВНЕ, и приписанного объёма у траншей на эти 3 нет. Пример стои́т ВНЕ окна сворачивания намеренно: в окне четвёртое слагаемое поглощает чужую активность в обе стороны (названное ограничение дома правила), и там расхождения не возникает по построению — dealInTeardown на ошибочной тропе требует уже плоской строки, а строка несёт необнулённый размер. Прежняя редакция примера стояла на закрытой строке с необнулённым размером ПРИ полностью погашенных траншах, то есть на ШТАТНОМ исходе всякой вошедшей сделки — обнулителя externalSize при закрытии в корпусе нет, — и требовала от него ЛОЖНОЙ сверки, то есть незакрывающейся сделки.",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "position": {
+          "status": "CLOSED",
+          "externalSize": 40
+        },
+        "deal": {
+          "status": "ERROR"
+        },
+        "tranches": [
+          {
+            "status": "CLOSED",
+            "orders": [
+              {
+                "type": "ENTRY",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 5
+              },
+              {
+                "type": "REDUCE_ONLY",
+                "status": "COMPLETED",
+                "accumulatedFillSize": 2
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": 12.5,
+        "resultProfitCurrency": "USDT",
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "dealExposure": 3,
+        "exposureReconciled": false,
+        "riskProvenAbsent": false,
+        "transitionAllowed": false
+      }
+    },
+    {
+      "case": "терминал сделки, у которой эпизода не было вовсе: правого операнда сверки нет, и это факт «живой экспозиции нет»",
+      "note": "Самая частая тропа сканера (docs/lifecycles/Deal.md): вход отвергнут преконтролем либо не дал движения, строки эпизода не заводится ни одной (docs/components/RefreshPositionExecutor.md — «позиция НЕ наблюдалась ⇒ строка не заводится»). Ключа position в состоянии НЕТ — так и должно быть. Прежняя редакция exposureReconciled читала операнд СТРОГО и на этом состоянии отказывала вычислением, то есть гейт терминала был неисчислим ровно на самой частой тропе.",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "CLOSED",
+        "deal": {
+          "status": "EXIT_PENDING"
+        },
+        "tranches": [],
+        "resultProfit": 0,
+        "resultProfitCurrency": "USDT",
+        "hadEntry": false,
+        "graphComplete": true
+      },
+      "expect": {
+        "dealExposure": 0,
+        "hasLiveEpisode": false,
+        "exposureReconciled": true,
+        "riskProvenAbsent": true,
+        "transitionAllowed": true
+      }
+    },
+    {
+      "case": "терминал после закрытия эпизода: размер строки не обнулён, живого эпизода нет — сверка сходится нулём",
+      "note": "ШТАТНЫЙ исход всякой вошедшей сделки: externalSize пишется только из снимка (docs/models/mapping/Position.md), при закрытии снимка нет, обнулителя поля в корпусе нет ни одного — закрытая строка доживает с последним ненулевым размером. Ноту hasLiveEpisode это состояние называет достижимым дословно. Правый операнд сверки здесь — НОЛЬ по отсутствию живого эпизода, и ноль удостоверён hasLiveEpisode, а не подставлен умолчанием. Прежняя редакция читала строку как есть и давала вечно ложный предикат: сделка висела активной при снятом живом риске, держа слот инструмента.",
       "state": {
         "from": "EXIT_PENDING",
         "to": "CLOSED",
@@ -978,12 +1045,12 @@
               {
                 "type": "ENTRY",
                 "status": "COMPLETED",
-                "accumulatedFillSize": 3
+                "accumulatedFillSize": 40
               },
               {
                 "type": "REDUCE_ONLY",
                 "status": "COMPLETED",
-                "accumulatedFillSize": 3
+                "accumulatedFillSize": 40
               }
             ],
             "protections": []
@@ -996,9 +1063,10 @@
       },
       "expect": {
         "dealExposure": 0,
-        "exposureReconciled": false,
-        "riskProvenAbsent": false,
-        "transitionAllowed": false
+        "hasLiveEpisode": false,
+        "exposureReconciled": true,
+        "riskProvenAbsent": true,
+        "transitionAllowed": true
       }
     },
     {

@@ -35,6 +35,10 @@ public class AlgoOrder extends Auditable {
     /** Сделка. */
     private Long dealId;
 
+    /** Транш, чью экспозицию защищает эта заявка. */
+    private Long dealTrancheId;
+
+
     /** stable client id (OKX algoClOrdId). */
     private String internalId;
 

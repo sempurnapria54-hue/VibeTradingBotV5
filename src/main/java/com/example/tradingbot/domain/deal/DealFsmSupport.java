@@ -26,6 +26,7 @@ import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.command.risk.RiskBlockAction;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -65,8 +66,8 @@ public class DealFsmSupport {
     private final DealFinalizationCommandFactory finalizationFactory;
     private final IntegrationService integrationService;
 
-    /** Допустимые шаги стратегии для текущего статуса сделки (упорядочены = приоритет). */
-    public List<StrategyStep> stepsFor(DealContext dealContext, Deal.Status status) {
+    /** Допустимые шаги стратегии для текущего статуса ТРАНША (упорядочены = приоритет). */
+    public List<StrategyStep> stepsFor(DealContext dealContext, DealTranche.Status status) {
         List<StrategyStep> steps = dealContext.getStrategyDetail().getStepsByStatus().get(status);
         return nonNull(steps) ? steps : List.of();
     }
@@ -89,24 +90,51 @@ public class DealFsmSupport {
         return conditionContextFactory.build(dealContext.getInstrument());
     }
 
-    /** Состояние выполнения action: существующее из контекста либо новая PLANNED-строка. */
-    public DealActionState findOrCreateActionState(DealContext dealContext, StrategyAction action) {
-        return findActionState(dealContext, action).orElseGet(() -> createPlanned(dealContext, action));
+    /** Состояние выполнения потраншевого action: существующее либо новая PLANNED-строка. */
+    public DealActionState findOrCreateActionState(DealContext dealContext, DealTranche tranche,
+                                                   StrategyAction action) {
+        return findActionState(dealContext, tranche, action)
+                .orElseGet(() -> createPlanned(dealContext, tranche, action));
     }
 
-    /** Состояние выполнения action из контекста прохода, если уже есть. */
-    public Optional<DealActionState> findActionState(DealContext dealContext, StrategyAction action) {
+    /**
+     * Состояние выполнения потраншевого action из контекста прохода.
+     * Отбор идёт парой «транш + номер эпизода»: переоткрытие ведётся ТЕМ
+     * ЖЕ траншем, поэтому без номера эпизода строки прошлого эпизода
+     * неотличимы от строк текущего и шаг читался бы применённым.
+     */
+    public Optional<DealActionState> findActionState(DealContext dealContext, DealTranche tranche,
+                                                     StrategyAction action) {
         if (isEmpty(dealContext.getActionStates())) {
             return Optional.empty();
         }
         return dealContext.getActionStates().stream()
                 .filter(state -> Objects.equals(action.getId(), state.getStrategyActionId()))
+                .filter(state -> Objects.equals(tranche.getId(), state.getDealTrancheId()))
+                .filter(state -> Objects.equals(tranche.getEpisodeSeq(), state.getTrancheEpisodeSeq()))
                 .findFirst();
     }
 
-    private DealActionState createPlanned(DealContext dealContext, StrategyAction action) {
+    /**
+     * Состояние выполнения АГРЕГАТНОГО action (шаг уровня сделки): транша
+     * у него нет ни одного, и отбор идёт без него.
+     */
+    public Optional<DealActionState> findDealLevelActionState(DealContext dealContext, StrategyAction action) {
+        if (isEmpty(dealContext.getActionStates())) {
+            return Optional.empty();
+        }
+        return dealContext.getActionStates().stream()
+                .filter(state -> Objects.equals(action.getId(), state.getStrategyActionId()))
+                .filter(state -> isNull(state.getDealTrancheId()))
+                .findFirst();
+    }
+
+    private DealActionState createPlanned(DealContext dealContext, DealTranche tranche,
+                                          StrategyAction action) {
         DealActionState state = new DealActionState();
         state.setDealId(dealContext.getDeal().getId());
+        state.setDealTrancheId(tranche.getId());
+        state.setTrancheEpisodeSeq(tranche.getEpisodeSeq());
         state.setStrategyActionId(action.getId());
         state.setStatus(DealActionStateStatus.PLANNED);
         return dealActionStateDataService.save(state);
@@ -242,6 +270,21 @@ public class DealFsmSupport {
             return reactToCalcError(plan.getCalcError(), dealContext);
         }
         return DealTransition.stay();
+    }
+
+    /**
+     * Реакция транша на план действия. Отличается от сделочной ровно
+     * уровнем результата: команда и «остаться» выражаются траншевым
+     * переходом, а блок и ошибка расчёта — решения УРОВНЯ СДЕЛКИ
+     * (закрытие кандидата, увод в ошибку), и транш их не принимает: он
+     * возвращает «остаться», а сделочный проход разбирает то же
+     * состояние своим обработчиком.
+     */
+    public TrancheTransition reactToTranchePlan(ActionPlan plan) {
+        if (nonNull(plan.getCommand())) {
+            return TrancheTransition.command(plan.getCommand());
+        }
+        return TrancheTransition.stay();
     }
 
     /**
