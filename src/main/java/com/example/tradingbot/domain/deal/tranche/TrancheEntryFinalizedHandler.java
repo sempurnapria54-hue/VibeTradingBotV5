@@ -53,7 +53,7 @@ public class TrancheEntryFinalizedHandler implements TrancheFsmHandler {
         Deal deal = dealContext.getDeal();
         if (isFalse(support.positionLiveRisk(deal))) {
             // Нет живой позиции — защиту финализировать не над чем.
-            return Optional.of(nonNull(deal.getPosition())
+            return Optional.of(nonNull(deal.livePosition())
                     ? TrancheTransition.transition(DealTranche.Status.EXIT_PENDING)
                     : TrancheTransition.escalateToDealError());
         }

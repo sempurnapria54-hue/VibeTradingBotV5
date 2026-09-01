@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -33,7 +34,7 @@ public class DealEntity extends AuditableEntity {
     @Column(name = "instrument_id", nullable = false)
     private Long instrumentId;
 
-    @Column(name = "strategy_detail_id", nullable = false)
+    @Column(name = "strategy_detail_id")
     private Long strategyDetailId;
 
     @Column(name = "status", nullable = false)
@@ -48,6 +49,9 @@ public class DealEntity extends AuditableEntity {
     @Column(name = "entry_step_type")
     private String entryStepType;
 
+    @Column(name = "entry_market_phase")
+    private String entryMarketPhase;
+
     @Column(name = "shutdown_reason")
     private String shutdownReason;
 
@@ -59,4 +63,7 @@ public class DealEntity extends AuditableEntity {
 
     @Column(name = "result_profit_currency")
     private String resultProfitCurrency;
+
+    @Column(name = "coverage_proven_through")
+    private OffsetDateTime coverageProvenThrough;
 }

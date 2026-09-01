@@ -96,7 +96,7 @@ public class AnomalyReportService {
         Deal deal = dealContext.getDeal();
         Instrument instrument = dealContext.getInstrument();
         Exchange exchange = dealContext.getExchange();
-        Position position = deal.getPosition();
+        Position position = deal.livePosition();
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("dealId", deal.getId());
         snapshot.put("dealInternalId", deal.getInternalId());

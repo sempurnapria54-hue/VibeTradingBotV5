@@ -276,7 +276,7 @@ public class DealFsmSupport {
 
     /** Чужой live risk на инструменте при отсутствии локальной позиции сделки (Precheck-чистота). */
     public Boolean foreignLiveRisk(DealContext dealContext) {
-        if (nonNull(dealContext.getDeal().getPosition())) {
+        if (nonNull(dealContext.getDeal().livePosition())) {
             return false;
         }
         PositionExternalSnapshot snapshot = integrationService.getPosition(

@@ -10,9 +10,11 @@ import com.example.tradingbot.domain.model.core.instrument.external_snapshot.Ins
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -119,7 +121,27 @@ public interface IntegrationService {
      * @return снапшот; {@code null} — позиции на бирже нет (успешный
      *         запрос; closed-on-exchange).
      */
+    /**
+     * Серверное время источника — якорь биржевого временного домена там,
+     * где у события нет собственной метки источника. Системные часы
+     * хоста этой роли не исполняют: сравнение с биржевыми таймстампами
+     * стало бы межстрановым (docs/rules/time-utc.md).
+     */
+    OffsetDateTime getServerTime();
+
     PositionExternalSnapshot getPosition(String externalInstrumentId);
+
+    /**
+     * Записи истории закрытых позиций инструмента, окно снизу — по
+     * времени ОБНОВЛЕНИЯ записи. Сверху окно открыто: верхнюю границу
+     * задаёт сам источник. Идентификатором эпизода запрос не сужается —
+     * источник переиспользует его и на фильтр не реагирует
+     * (docs/components/RefreshPositionExecutor.md §«Адресация записи
+     * истории»). Записей нет — пустой список, не null: отсутствие записи
+     * есть недобытый факт, а не нарушение контракта.
+     */
+    List<PositionCloseResultExternalSnapshot> getPositionCloseRecords(String externalInstrumentId,
+                                                                     OffsetDateTime windowBegin);
 
     /**
      * Постановка ordinary order на биржу. ACK не runtime-truth:

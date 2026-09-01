@@ -111,7 +111,7 @@ public class RiskBlockResolver {
 
     private Boolean liveRiskExists(DealContext dealContext, DealTranche.Status currentStatus) {
         Deal deal = dealContext.getDeal();
-        Position position = deal.getPosition();
+        Position position = deal.livePosition();
         if (Objects.nonNull(position) && isTrue(position.hasLiveRisk())) {
             return Boolean.TRUE;
         }

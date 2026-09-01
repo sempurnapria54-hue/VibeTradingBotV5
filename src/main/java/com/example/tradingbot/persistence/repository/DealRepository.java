@@ -2,11 +2,13 @@ package com.example.tradingbot.persistence.repository;
 
 import com.example.tradingbot.persistence.model.deal.DealEntity;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,4 +31,19 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
             order by d.id asc""")
     List<DealEntity> findActiveByExchangeId(@Param("exchangeId") Long exchangeId,
                                             @Param("statuses") Collection<String> statuses);
+
+    /**
+     * Монотонное вперёд движение порога доказанного покрытия. Охрана
+     * стои́т в самом запросе, а не в вызывающем коде: число наблюдений
+     * равно числу закрывшихся эпизодов, и порог обязан накрывать
+     * движения всех — откат назад стёр бы покрытие раннего эпизода
+     * (docs/models/domain/aggregate/Deal.md §Персистентность).
+     */
+    @Modifying
+    @Query("""
+            update DealEntity d set d.coverageProvenThrough = :observedAt
+            where d.id = :dealId
+              and (d.coverageProvenThrough is null or d.coverageProvenThrough < :observedAt)""")
+    int advanceCoverageProvenThrough(@Param("dealId") Long dealId,
+                                     @Param("observedAt") OffsetDateTime observedAt);
 }

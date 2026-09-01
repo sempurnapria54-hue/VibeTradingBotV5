@@ -13,8 +13,10 @@ import lombok.Setter;
 
 /**
  * Persistence-проекция {@link com.example.tradingbot.domain.model.core.position.Position}
- * (таблица positions, ≤1 на deal). Хранит данные сопровождения live-risk;
- * итоговый PnL — у Deal. Enum'ы хранятся строкой.
+ * (таблица positions — строка на ЭПИЗОД, живой не более одного).
+ * Хранит данные сопровождения живого риска и положение закрытия
+ * эпизода; заголовочное число сделки — у Deal. Уникальна тройка
+ * (deal_id, external_id, external_created_at). Enum'ы хранятся строкой.
  */
 @Getter
 @Setter
@@ -58,4 +60,28 @@ public class PositionEntity extends AuditableEntity {
 
     @Column(name = "external_unrealized_profit")
     private BigDecimal externalUnrealizedProfit;
+
+    @Column(name = "external_realized_profit")
+    private BigDecimal externalRealizedProfit;
+
+    @Column(name = "external_result_currency")
+    private String externalResultCurrency;
+
+    @Column(name = "external_close_average_price")
+    private BigDecimal externalCloseAveragePrice;
+
+    @Column(name = "external_close_type")
+    private String externalCloseType;
+
+    @Column(name = "external_realized_profit_gross")
+    private BigDecimal externalRealizedProfitGross;
+
+    @Column(name = "external_fee")
+    private BigDecimal externalFee;
+
+    @Column(name = "external_funding_cost")
+    private BigDecimal externalFundingCost;
+
+    @Column(name = "external_liquidation_penalty")
+    private BigDecimal externalLiquidationPenalty;
 }

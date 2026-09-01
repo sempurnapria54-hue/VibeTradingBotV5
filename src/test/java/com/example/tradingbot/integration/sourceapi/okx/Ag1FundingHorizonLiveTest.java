@@ -54,11 +54,23 @@ class Ag1FundingHorizonLiveTest extends OkxSourceApiLiveTestBase {
     private static final String BILL_TYPE_FUNDING = "8";
 
     /**
-     * Инструмент фикстуры: четырёхчасовой интервал расчёта фандинга. Живёт
-     * только в {@code src/test} и продуктовыми путями не читается —
-     * фикстурная величина, как {@code M17CancelOrderLiveTest.FIXTURE_RISK_CEILING_USDT}.
+     * Инструмент фикстуры: четырёхчасовой интервал расчёта фандинга <b>и</b>
+     * пара, торгуемая этим аккаунтом. Живёт только в {@code src/test} и
+     * продуктовыми путями не читается — фикстурная величина, как
+     * {@code M17CancelOrderLiveTest.FIXTURE_RISK_CEILING_USDT}.
+     *
+     * <p><b>Вторая ось выбора — торгуемость — добыта пробой, а не предположена.</b>
+     * Аккаунт контура отвечает на часть пар кодом {@code 51155} («You can't trade
+     * this pair … due to local compliance restrictions»), и интервал расчёта об
+     * этом ничего не говорит. Проба, не создающая заявки: постановка лимитной
+     * заявки заведомо вне ценового лимита — торгуемая пара отвечает
+     * {@code 51006} (цена вне лимита), рестриктнутая — {@code 51155} (проверка
+     * соответствия идёт раньше ценовой). Замер 2026-09-01: {@code ACT-USDT-SWAP}
+     * — {@code 51155}; {@code AVAX/TRX/DOT-USDT-SWAP} — {@code 51006}, то есть
+     * торгуемы. Нотинал 500 USDT даёт на {@code AVAX} ≈69 контрактов при
+     * {@code lotSz=0.1}, поэтому и половина размера кратна лоту.
      */
-    private static final String FUNDING_INST_ID = "ACT-USDT-SWAP";
+    private static final String FUNDING_INST_ID = "AVAX-USDT-SWAP";
     /**
      * Целевой нотинал позиции, USDT. Ставка фандинга — доли процента, поэтому
      * на минимальном лоте расчёт округлился бы до нуля и наблюдение было бы

@@ -102,7 +102,7 @@ class DealStateMachineTest {
         Deal deal = new Deal();
         deal.setId(1L);
         deal.setStatus(status);
-        deal.setPosition(position);
+        deal.setPositions(java.util.Objects.isNull(position) ? java.util.List.of() : java.util.List.of(position));
         deal.setTranches(tranches);
         return deal;
     }

@@ -69,7 +69,7 @@
 | `externalCloseType` | `externalCloseType` | обе |
 | `externalRealizedPnlGross` | `externalRealizedProfitGross` | обе |
 | `externalFee`, `externalFundingCost`, `externalLiquidationPenalty` | одноимённые поля | обе |
-| `externalModifiedAt` | `externalModifiedAt` **и верхняя граница окна линковки на сделке** — той же транзакцией | обе |
+| `externalModifiedAt` | `externalModifiedAt` **и порог доказанного покрытия на сделке** (`Deal.coverageProvenThrough`) — той же транзакцией | обе |
 | `externalPosId` + `externalCreatedAt` | сверка **парой** со строкой эпизода (дом единицы — `docs/models/domain/core/Position.md`): одинокого идентификатора мало, `posId` переиспользуется | обновление |
 | `externalInstrumentId` | сверка с инструментом запроса | обе |
 | `externalPosId` | `externalId` — **запись** | материализация |

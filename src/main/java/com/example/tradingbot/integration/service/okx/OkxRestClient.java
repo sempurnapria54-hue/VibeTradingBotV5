@@ -18,6 +18,8 @@ import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.ServerTimeOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.TickerOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
@@ -60,6 +62,12 @@ public class OkxRestClient {
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<PositionOkxResponse>> POSITION_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<OkxApiResponse<PositionsHistoryOkxResponse>>
+            POSITIONS_HISTORY_TYPE = new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<OkxApiResponse<ServerTimeOkxResponse>> SERVER_TIME_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<OrderAckOkxResponse>> ORDER_ACK_TYPE =
@@ -208,6 +216,27 @@ public class OkxRestClient {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(Constants.Okx.PARAM_INST_ID, instId);
         return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_POSITIONS_PATH, query, null, true, POSITION_TYPE);
+    }
+
+    /**
+     * История закрытых позиций инструмента. Окно снизу — по времени
+     * обновления записи ({@code before}); сверху не задаётся. Фильтр по
+     * идентификатору позиции не ставится: источник его переиспользует и
+     * выборку им не сужает. Приватный endpoint (подпись).
+     */
+    public OkxApiResponse<PositionsHistoryOkxResponse> getPositionsHistory(String instId, String beforeMillis) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(Constants.Okx.PARAM_INST_TYPE, Constants.Okx.INST_TYPE_SWAP);
+        query.put(Constants.Okx.PARAM_INST_ID, instId);
+        query.put(Constants.Okx.PARAM_BEFORE, beforeMillis);
+        query.put(Constants.Okx.PARAM_LIMIT, Constants.Okx.POSITIONS_HISTORY_PAGE_LIMIT);
+        return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_POSITIONS_HISTORY_PATH, query, null, true,
+                POSITIONS_HISTORY_TYPE);
+    }
+
+    /** Серверное время источника. Публичный endpoint (без подписи). */
+    public OkxApiResponse<ServerTimeOkxResponse> getServerTime() {
+        return dispatch(HttpMethod.GET, Constants.Okx.PUBLIC_TIME_PATH, null, null, false, SERVER_TIME_TYPE);
     }
 
     /** Постановка ordinary order. Приватный endpoint (подпись POST). */

@@ -63,7 +63,7 @@ public class MarkDealClosedExecutor implements CommandExecutor {
         if (Deal.Status.CLOSED.equals(deal.getStatus())) {
             return complete(state);
         }
-        if (hasLiveRisk(deal.getPosition()) || hasLiveEntities(deal)) {
+        if (hasLiveRisk(deal.livePosition()) || hasLiveEntities(deal)) {
             return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR,
                     "Cannot mark deal CLOSED while live risk (position / orders / algo) remains");
         }

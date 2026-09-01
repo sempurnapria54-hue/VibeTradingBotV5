@@ -74,6 +74,16 @@ public class DealTranche extends Auditable {
      */
     private BigDecimal closeAttributed;
 
+    /**
+     * По траншу состоялось входное исполнение. Дизъюнкт признака
+     * «позиция по сделке наблюдалась» (docs/spec/deal-context-load.json,
+     * positionObserved): его вторая половина — ярлык восстановительной
+     * тропы, и порознь они популяцию не исчерпывают.
+     */
+    public Boolean hasEntryFill() {
+        return zeroIfNull(entryFilled).signum() > 0;
+    }
+
     /** Транш терминален: дальше по жизненному циклу он не идёт. */
     public Boolean isTerminal() {
         return Status.CLOSED.equals(status);

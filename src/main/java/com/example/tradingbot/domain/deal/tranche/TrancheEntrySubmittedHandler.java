@@ -57,7 +57,7 @@ public class TrancheEntrySubmittedHandler implements TrancheFsmHandler {
         if (isTrue(support.positionLiveRisk(deal))) {
             return finalizeEntry(dealContext, tranche);
         }
-        if (nonNull(deal.getPosition())) {
+        if (nonNull(deal.livePosition())) {
             // Позиция есть, но live risk нет (закрылась на бирже SL/TP) — штатная дочистка.
             return TrancheTransition.transition(DealTranche.Status.EXIT_PENDING);
         }

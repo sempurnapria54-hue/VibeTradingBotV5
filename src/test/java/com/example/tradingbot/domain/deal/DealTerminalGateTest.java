@@ -91,7 +91,7 @@ class DealTerminalGateTest {
     private Deal deal(Position position) {
         Deal deal = new Deal();
         deal.setId(1L);
-        deal.setPosition(position);
+        deal.setPositions(java.util.Objects.isNull(position) ? java.util.List.of() : java.util.List.of(position));
         return deal;
     }
 

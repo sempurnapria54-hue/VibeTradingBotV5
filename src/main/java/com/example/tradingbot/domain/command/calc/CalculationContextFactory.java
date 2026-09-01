@@ -80,7 +80,7 @@ public class CalculationContextFactory {
                 // MarketPhaseService.getCurrentPhase повторно перечитал бы те же индикаторы/
                 // структуры. Заполняется, когда появится потребитель (форвард).
                 .balanceContainer(dealContext.getBalanceContainer())
-                .activePosition(dealContext.getDeal().getPosition())
+                .activePosition(dealContext.getDeal().livePosition())
                 .entryOrder(resolveEntryOrder(dealContext))
                 .strategyDirection(dealContext.getDeal().getDirection())
                 .indicatorSettings(indicatorSettings)

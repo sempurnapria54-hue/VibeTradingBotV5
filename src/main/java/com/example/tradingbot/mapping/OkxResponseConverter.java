@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.integration.service.ExternalInvariantViolationException;
 import com.example.tradingbot.util.Constants;
 import com.example.tradingbot.util.OkxParse;
 import java.math.BigDecimal;
@@ -54,6 +55,54 @@ public class OkxResponseConverter {
             return null;
         }
         return value.signum() > 0 ? Position.Direction.LONG : Position.Direction.SHORT;
+    }
+
+    /**
+     * Числовое поле записи закрытия НЕСОБЫТИЙНОЙ природы (слагаемые
+     * тождества: pnl, fee, fundingFee, liqPenalty) → BigDecimal; пустое
+     * значение — НОЛЬ, а не пустота: величина существует всегда, а «не
+     * было события» означает нулевую величину. Конвенция применяется ДО
+     * проверки обязательности контракта записи — иначе валидация границы
+     * реджектила бы каждую сделку без фондирования
+     * (docs/models/integrations/okx/PositionsHistoryOkxResponse.md).
+     */
+    @Named("okxNonEventDecimal")
+    public BigDecimal nonEventDecimal(String value) {
+        BigDecimal parsed = okxDecimal(value);
+        return isNull(parsed) ? BigDecimal.ZERO : parsed;
+    }
+
+    /**
+     * Накопленное финансирование записи закрытия → доменная ИЗДЕРЖКА:
+     * знак снимается. В тождестве источника слагаемое знаковое («сколько
+     * прибавилось к результату»), домен же хранит уплаченное
+     * фондирование положительным. Нормализация делается ЗДЕСЬ и только
+     * здесь — иначе каждый потребитель нормализовал бы сам, и знак
+     * разошёлся бы молча (docs/models/mapping/PositionCloseResult.md).
+     */
+    @Named("okxFundingCost")
+    public BigDecimal fundingCost(String value) {
+        return nonEventDecimal(value).negate();
+    }
+
+    /**
+     * Направление закрытой позиции (long/short) → доменное значение.
+     * Резолв идёт в слое интеграции, симметрично живой ноге; пустое либо
+     * незнакомое значение — нарушение биржевого инварианта, а не
+     * пустота: без направления материализация эпизода отказала бы ТИХО
+     * (docs/models/mapping/PositionCloseResult.md).
+     */
+    @Named("okxCloseDirection")
+    public Position.Direction closeDirection(String rawDirection) {
+        if (isBlank(rawDirection)) {
+            throw new ExternalInvariantViolationException(
+                    "positions-history: направление закрытой позиции пусто — эпизод не материализуем");
+        }
+        return Arrays.stream(Position.Direction.values())
+                .filter(value -> value.name().equalsIgnoreCase(rawDirection.trim()))
+                .findFirst()
+                .orElseThrow(() -> new ExternalInvariantViolationException(
+                        "positions-history: направление вне перечня: " + rawDirection));
     }
 
     /** BigDecimal → OKX строка суммы (plain, без экспоненты); null→null. */

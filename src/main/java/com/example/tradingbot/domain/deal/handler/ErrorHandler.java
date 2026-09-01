@@ -56,7 +56,7 @@ public class ErrorHandler implements DealFsmHandler {
     public DealTransition handle(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         if (isTrue(support.positionLiveRisk(deal))) {
-            return reduceOrConfirmPosition(dealContext, deal.getPosition());
+            return reduceOrConfirmPosition(dealContext, deal.livePosition());
         }
         DealTransition orderSafety = reduceOrConfirmOrders(dealContext, support.liveOrders(deal));
         if (nonNull(orderSafety)) {

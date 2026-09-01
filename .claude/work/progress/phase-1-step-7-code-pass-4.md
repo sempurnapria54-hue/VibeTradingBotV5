@@ -189,5 +189,5 @@ call-site, а не выводится из пустого поля.
 
 - Реестр гейтов — `.claude/work/code-gate-ledger.json`.
 - Конструкция узла — `.claude/work/progress/phase-1-step-7-gaps-close-33.md` §«Узел 1 — встроенная защита: вторая ступень и цикл добычи (C1, C2, C3, C4, C8)».
-- Решения захода — `.claude/work/decision-digest.md` (Д262-Д268).
+- Решения захода — `.claude/work/decision-digest.md` (Д291-Д297; номера переназначены при починке столкновения — разбор в отчёте захода 5).
 - Хвост кода — `.claude/work/progress/phase-1-step-7-code-tail.md`.

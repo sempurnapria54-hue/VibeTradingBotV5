@@ -75,7 +75,7 @@ public class RiskValidator {
 
         BigDecimal sizeContracts = size.getSizeContracts();
         BigDecimal equity = balance.getExternalAvailableEquity();
-        Position position = dealContext.getDeal().getPosition();
+        Position position = dealContext.getDeal().livePosition();
         StrategyTradeDirection direction = dealContext.getDeal().getDirection();
         BigDecimal entryReference = entryReference(position, price);
 

@@ -42,7 +42,7 @@ public class TrancheExitPendingHandler implements TrancheFsmHandler {
     public TrancheTransition handle(DealContext dealContext, DealTranche tranche) {
         Deal deal = dealContext.getDeal();
         if (isTrue(support.positionLiveRisk(deal))) {
-            return TrancheTransition.command(support.closePositionCommand(dealContext, deal.getPosition().getId(),
+            return TrancheTransition.command(support.closePositionCommand(dealContext, deal.livePosition().getId(),
                     Position.CloseReason.CLOSED_BY_STRATEGY));
         }
         List<Order> liveOrders = support.liveOrders(deal);

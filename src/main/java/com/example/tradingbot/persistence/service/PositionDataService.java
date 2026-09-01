@@ -3,14 +3,19 @@ package com.example.tradingbot.persistence.service;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.repository.PositionRepository;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Граница domain ↔ persistence для {@link Position}. Позиция
- * адресуется по deal_id (≤1 на сделку); собственного internalId нет.
+ * Граница domain ↔ persistence для {@link Position}. Строка адресуется
+ * сделкой и парой «биржевой идентификатор, биржевое время создания»:
+ * одного идентификатора мало — источник переиспользует его у
+ * переоткрытой позиции (docs/models/domain/core/Position.md).
+ * Собственного internalId у эпизода нет.
  */
 @Service
 @RequiredArgsConstructor
@@ -24,9 +29,19 @@ public class PositionDataService {
         return mapper.persistenceToDomain(repository.save(mapper.domainToPersistence(position)));
     }
 
+    /** Эпизоды сделки — закрытые и живой, в порядке возникновения. */
     @Transactional(readOnly = true)
-    public Optional<Position> findByDealId(Long dealId) {
-        return repository.findByDealId(dealId).map(mapper::persistenceToDomain);
+    public List<Position> findEpisodes(Long dealId) {
+        return repository.findByDealIdOrderByExternalCreatedAtAsc(dealId).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
+
+    /** Живой эпизод сделки либо пусто. */
+    @Transactional(readOnly = true)
+    public Optional<Position> findLiveEpisode(Long dealId) {
+        return repository.findFirstByDealIdAndStatus(dealId, Position.Status.ACTIVE.name())
+                .map(mapper::persistenceToDomain);
     }
 
     @Transactional(readOnly = true)

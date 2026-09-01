@@ -98,7 +98,7 @@ public class DealTerminalGate {
         if (isFalse(graphComplete)) {
             return false;
         }
-        Position position = deal.getPosition();
+        Position position = deal.livePosition();
         if (isTrue(hasLiveEpisode(position))) {
             return false;
         }

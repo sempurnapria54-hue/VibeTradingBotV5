@@ -40,6 +40,8 @@ class Ag1DealFixtureLiveTest extends OkxSourceApiLiveTestBase {
     private static final String EPISODE_1_SZ = "0.02";
     /** Тип bill'а торгового движения (справочник AG6.1: 2 — Trade). */
     private static final String BILL_TYPE_TRADE = "2";
+    /** Подтип торгового bill'а на покупку (справочник AG6.1: 2/1 — Trade / Buy). */
+    private static final String BILL_SUBTYPE_BUY = "1";
     /** Тип bill'а funding-расчёта (справочник AG6.1: 8 — Funding rate). */
     private static final String BILL_TYPE_FUNDING = "8";
     /** Тип bill'а маржинального перевода (справочник AG6.1: 6 — Margin transfer). */
@@ -167,6 +169,44 @@ class Ag1DealFixtureLiveTest extends OkxSourceApiLiveTestBase {
         assertThat(Long.parseLong(episode1.path("uTime").asText()))
                 .as("AG1.5 → запись финализирована не раньше открытия эпизода")
                 .isGreaterThan(Long.parseLong(episode1.path("cTime").asText()));
+
+        // (6) ПОРЯДОК МЕТОК ИСТОЧНИКА на эпизоде — несущая посылка однородности
+        // покрытий сверки у ВОССТАНОВЛЕННОЙ сделки: её окно линковки начинается
+        // с cTime позиции, и комиссия входного филла попадёт в окно, только если
+        // ts своего bill'а не раньше этой метки. Посылка стои́т в трёх доках; до
+        // этого замера она не была подтверждена ничем
+        // (`.claude/work/code-gate-ledger.json`, A4а). Цена ложной посылки
+        // счётна: допуск сверки вырождается в пол, и каждая восстановленная
+        // сделка уходит в MISMATCHED.
+        long episode1CreatedAt = Long.parseLong(episode1.path("cTime").asText());
+        JsonNode entryFillBill = null;
+        for (JsonNode bill : windowBills()) {
+            if (BILL_TYPE_TRADE.equals(bill.path("type").asText(""))
+                    && BILL_SUBTYPE_BUY.equals(bill.path("subType").asText(""))
+                    && (entryFillBill == null
+                        || Long.parseLong(bill.path("ts").asText())
+                           < Long.parseLong(entryFillBill.path("ts").asText()))) {
+                entryFillBill = bill;
+            }
+        }
+        assertThat(entryFillBill).as("AG1.5 → в окне есть bill входного филла (type=2/subType=1)").isNotNull();
+        long entryFillTs = Long.parseLong(entryFillBill.path("ts").asText());
+        observeValue("AG1.5", "entryFillBill.ts", entryFillTs);
+        observeValue("AG1.5", "entryFillBill.ts − episode1.cTime, мс", entryFillTs - episode1CreatedAt);
+        persistObservation("AG1.5", "порядок меток источника: ts bill'а входного филла против cTime эпизода",
+                List.of(
+                        "инструмент фикстуры: " + INST_ID,
+                        "эпизод 1 cTime (открытие позиции): " + episode1CreatedAt,
+                        "bill входного филла ts: " + entryFillTs,
+                        "bill.subType: " + entryFillBill.path("subType").asText(),
+                        "разница ts − cTime, мс: " + (entryFillTs - episode1CreatedAt),
+                        "посылка «ts входного филла НЕ РАНЬШЕ cTime позиции»: "
+                                + (entryFillTs >= episode1CreatedAt ? "подтверждена" : "ОПРОВЕРГНУТА"),
+                        "предикат окна включающий (>=), поэтому равенство меток посылку не ломает"));
+        assertThat(entryFillTs)
+                .as("AG1.5 → ts bill'а входного филла не раньше cTime эпизода "
+                        + "(несущая посылка однородности покрытий сверки)")
+                .isGreaterThanOrEqualTo(episode1CreatedAt);
     }
 
     @Test

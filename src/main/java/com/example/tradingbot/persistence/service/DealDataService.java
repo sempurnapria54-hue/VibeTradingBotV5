@@ -3,6 +3,7 @@ package com.example.tradingbot.persistence.service;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.mapping.DealMapper;
 import com.example.tradingbot.persistence.repository.DealRepository;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,15 @@ public class DealDataService {
     @Transactional(readOnly = true)
     public Boolean existsActiveByInstrumentId(Long instrumentId) {
         return repository.existsByInstrumentIdAndStatusNotIn(instrumentId, TERMINAL_STATUSES);
+    }
+
+    /**
+     * Двигает порог доказанного покрытия сделки вперёд по наблюдённому
+     * моменту. Монотонность обеспечивает охрана запроса, не вызывающий.
+     */
+    @Transactional
+    public void advanceCoverageProvenThrough(Long dealId, OffsetDateTime observedAt) {
+        repository.advanceCoverageProvenThrough(dealId, observedAt);
     }
 
     /** Активные сделки всех инструментов биржи — для каскадного exchange-scoped kill-switch (L4). */

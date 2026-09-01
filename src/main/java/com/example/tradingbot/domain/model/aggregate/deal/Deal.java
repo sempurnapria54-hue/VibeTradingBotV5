@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.model.aggregate.deal;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -9,7 +10,9 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTra
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Getter;
@@ -55,6 +58,14 @@ public class Deal extends Auditable {
     /** Тип entry-step (не управляет FSM). */
     private EntryStepType entryStepType;
 
+    /**
+     * Фаза рынка при входе сделки. Write-once, пишет DealOpeningService
+     * на тропе входа по объявлению той же транзакцией, что заводит
+     * сделку. Пусто ровно у восстановленной сделки — входа по
+     * объявлению у неё не было.
+     */
+    private MarketPhase.Type entryMarketPhase;
+
     /** Причина graceful shutdown / controlled close (если запущен). Не заменяет closeReason. */
     private ShutdownReason shutdownReason;
 
@@ -67,14 +78,27 @@ public class Deal extends Auditable {
     /** Валюта результата (для ETH-USDT-SWAP обычно USDT). */
     private String resultProfitCurrency;
 
+    /**
+     * Порог доказанного покрытия — до какого момента наблюдался факт
+     * закрытия эпизода. В предикате линковки движений НЕ участвует:
+     * сверху окно открыто до времени источника прохода. Пишет
+     * наблюдатель факта закрытия эпизода, монотонно вперёд; пусто —
+     * закрытие не добыто ни у одного эпизода. Потребитель —
+     * обязанность сверки (docs/models/domain/aggregate/Deal.md).
+     */
+    private OffsetDateTime coverageProvenThrough;
+
     /** Ordinary orders сделки (attached protection — внутри Order). */
     private List<Order> orders;
 
     /** Standalone algo-orders сделки. */
     private List<AlgoOrder> algoOrders;
 
-    /** Текущая позиция (≤1 живая на Deal). */
-    private Position position;
+    /**
+     * Эпизоды позиции: одна биржевая позиция — одна строка. Живой
+     * эпизод не более одного, закрытые остаются.
+     */
+    private List<Position> positions;
 
     /**
      * Транши сделки — единицы принятия и сопровождения риска. Стадии
@@ -115,9 +139,48 @@ public class Deal extends Auditable {
                 .collect(Collectors.toList());
     }
 
+    /** Живой эпизод позиции сделки либо пусто. */
+    public Position livePosition() {
+        return emptyIfNull(positions).stream()
+                .filter(episode -> isTrue(episode.hasLiveRisk()) || Position.Status.ACTIVE == episode.getStatus())
+                .findFirst()
+                .orElse(null);
+    }
+
     /** Позиция сделки несёт live market risk (есть и в статусе с живым риском). */
     public Boolean hasLivePositionRisk() {
-        return nonNull(position) && isTrue(position.hasLiveRisk());
+        Position live = livePosition();
+        return nonNull(live) && isTrue(live.hasLiveRisk());
+    }
+
+    /** Эпизоды, ждущие положения закрытия: строка закрыта и записи закрытия не несёт. */
+    public List<Position> episodesAwaitingCloseRecord() {
+        return emptyIfNull(positions).stream()
+                .filter(episode -> isTrue(episode.awaitsCloseRecord()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Позиция по сделке наблюдалась: вход исполнялся либо сделка
+     * заведена восстановлением уже существующего живого риска. Два
+     * дизъюнкта несущие по отдельности — восстановленная сделка своих
+     * исполненных ног не имеет, а исполнившаяся стратегийная не имеет
+     * RECOVERY (docs/spec/deal-context-load.json, positionObserved).
+     */
+    public Boolean positionObserved() {
+        return EntryReason.RECOVERY == entryReason
+                || emptyIfNull(tranches).stream().anyMatch(tranche -> isTrue(tranche.hasEntryFill()));
+    }
+
+    /**
+     * Порог доказанного покрытия двигается ТОЛЬКО вперёд: число
+     * наблюдений равно числу закрывшихся эпизодов, и порог обязан
+     * накрывать движения всех.
+     */
+    public void advanceCoverageProvenThrough(OffsetDateTime observedAt) {
+        if (nonNull(observedAt) && (isNull(coverageProvenThrough) || coverageProvenThrough.isBefore(observedAt))) {
+            coverageProvenThrough = observedAt;
+        }
     }
 
     /**

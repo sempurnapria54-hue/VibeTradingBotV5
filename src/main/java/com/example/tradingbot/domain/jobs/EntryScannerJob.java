@@ -8,6 +8,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.config.EntryScannerProperties;
 import com.example.tradingbot.domain.deal.DealOpeningService;
+import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.domain.deal.MarketConditionContextFactory;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
@@ -61,6 +62,7 @@ public class EntryScannerJob {
     private final StrategyConditionEvaluator conditionEvaluator;
     private final DealDataService dealDataService;
     private final DealOpeningService dealOpeningService;
+    private final IntegrationService integrationService;
 
     @Scheduled(cron = "${entry-scanner.cron}")
     public void tick() {
@@ -102,10 +104,10 @@ public class EntryScannerJob {
         if (isNull(detail) || isFalse(detail.allowsEntryFor(phase.getType()))) {
             return;
         }
-        evaluateEntry(instrument, detail);
+        evaluateEntry(instrument, detail, phase.getType());
     }
 
-    private void evaluateEntry(Instrument instrument, StrategyDetail detail) {
+    private void evaluateEntry(Instrument instrument, StrategyDetail detail, MarketPhase.Type phaseType) {
         List<StrategyStep> entrySteps = detail.entrySteps();
         if (isEmpty(entrySteps)) {
             return;
@@ -119,8 +121,11 @@ public class EntryScannerJob {
             if (isNull(entryAction)) {
                 continue;
             }
+            // Фаза уже вычислена к этому моменту, и второй раз её никто не
+            // считает; биржевой момент создания добывается ЗДЕСЬ — сервис
+            // создания на биржу за ним не ходит.
             dealOpeningService.openDeal(instrument.getId(), detail.getId(), entryAction.getDirection(),
-                    Deal.EntryReason.STRATEGY, entryStepType(step.getStepType()));
+                    entryStepType(step.getStepType()), phaseType, integrationService.getServerTime());
             return;
         }
     }

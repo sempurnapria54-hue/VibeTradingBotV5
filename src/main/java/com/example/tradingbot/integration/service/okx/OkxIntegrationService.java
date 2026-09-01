@@ -15,6 +15,7 @@ import com.example.tradingbot.domain.model.core.instrument.external_snapshot.Ins
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
@@ -32,6 +33,8 @@ import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.ServerTimeOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.TickerOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
@@ -46,9 +49,12 @@ import com.example.tradingbot.mapping.InstrumentExternalRulesMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.mapping.MarketPriceDataMapper;
 import com.example.tradingbot.mapping.OrderMapper;
+import com.example.tradingbot.integration.service.ExternalInvariantViolationException;
 import com.example.tradingbot.mapping.PositionMapper;
+import com.example.tradingbot.util.OkxParse;
 import com.example.tradingbot.util.Constants;
 import java.util.List;
+import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -163,6 +169,16 @@ public class OkxIntegrationService implements IntegrationService {
     }
 
     @Override
+    public OffsetDateTime getServerTime() {
+        OkxApiResponse<ServerTimeOkxResponse> response = execute(okxRestClient::getServerTime, "public-time", "");
+        verifyCode(response, "public-time", "");
+        if (isEmpty(response.getData())) {
+            throw new ExternalInvariantViolationException("public/time: ответ без серверного времени");
+        }
+        return OkxParse.offsetTime(response.getData().getFirst().getTs());
+    }
+
+    @Override
     public PositionExternalSnapshot getPosition(String externalInstrumentId) {
         OkxApiResponse<PositionOkxResponse> response = execute(
                 () -> okxRestClient.getPositions(externalInstrumentId),
@@ -172,6 +188,39 @@ public class OkxIntegrationService implements IntegrationService {
             return null;
         }
         return positionMapper.integrationToSnapshot(response.getData().getFirst());
+    }
+
+    @Override
+    public List<PositionCloseResultExternalSnapshot> getPositionCloseRecords(String externalInstrumentId,
+                                                                            OffsetDateTime windowBegin) {
+        String before = String.valueOf(windowBegin.toInstant().toEpochMilli());
+        OkxApiResponse<PositionsHistoryOkxResponse> response = execute(
+                () -> okxRestClient.getPositionsHistory(externalInstrumentId, before),
+                "positions-history", "instId=" + externalInstrumentId + " before=" + before);
+        verifyCode(response, "positions-history", "instId=" + externalInstrumentId);
+        if (isEmpty(response.getData())) {
+            return List.of();
+        }
+        return response.getData().stream()
+                .map(record -> verifyBelongsToInstrument(record, externalInstrumentId))
+                .map(positionMapper::integrationToCloseSnapshot)
+                .collect(toList());
+    }
+
+    /**
+     * Структурная проверка принадлежности записи запрошенному
+     * инструменту. Без неё корректность чтения держалась бы только
+     * фильтром запроса — знанием вызывающего, а не фактом ответа
+     * (docs/models/mapping/PositionCloseResult.md).
+     */
+    private PositionsHistoryOkxResponse verifyBelongsToInstrument(PositionsHistoryOkxResponse record,
+                                                                  String externalInstrumentId) {
+        if (isFalse(Objects.equals(externalInstrumentId, record.getInstId()))) {
+            throw new ExternalInvariantViolationException(
+                    "positions-history: запись чужого инструмента: ожидался " + externalInstrumentId
+                            + ", пришёл " + record.getInstId());
+        }
+        return record;
     }
 
     @Override

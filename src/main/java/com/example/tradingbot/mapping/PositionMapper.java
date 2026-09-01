@@ -1,8 +1,10 @@
 package com.example.tradingbot.mapping;
 
 import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.tradingbot.persistence.model.position.PositionEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -44,4 +46,51 @@ public interface PositionMapper {
      */
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateFromSnapshot(PositionExternalSnapshot snapshot, @MappingTarget Position position);
+
+    /**
+     * Запись истории позиций → граничный снапшот положения закрытия.
+     * Четыре слагаемых тождества конвертируются по НЕСОБЫТИЙНОЙ природе
+     * (пусто → ноль), финансирование дополнительно нормализуется в
+     * издержку, направление резолвится в доменное значение здесь же.
+     */
+    @Mapping(target = "externalPosId", source = "posId")
+    @Mapping(target = "externalInstrumentId", source = "instId")
+    @Mapping(target = "externalRealizedPnl", source = "realizedPnl")
+    @Mapping(target = "externalResultCurrency", source = "ccy")
+    @Mapping(target = "externalCloseAveragePrice", source = "closeAvgPx")
+    @Mapping(target = "externalCloseType", source = "type")
+    @Mapping(target = "externalRealizedPnlGross", source = "pnl", qualifiedByName = "okxNonEventDecimal")
+    @Mapping(target = "externalFee", source = "fee", qualifiedByName = "okxNonEventDecimal")
+    @Mapping(target = "externalFundingCost", source = "fundingFee", qualifiedByName = "okxFundingCost")
+    @Mapping(target = "externalLiquidationPenalty", source = "liqPenalty", qualifiedByName = "okxNonEventDecimal")
+    @Mapping(target = "direction", source = "direction", qualifiedByName = "okxCloseDirection")
+    @Mapping(target = "externalCreatedAt", source = "cTime")
+    @Mapping(target = "externalModifiedAt", source = "uTime")
+    PositionCloseResultExternalSnapshot integrationToCloseSnapshot(PositionsHistoryOkxResponse response);
+
+    /**
+     * Наполнение строки эпизода положением закрытия — тропа ОБНОВЛЕНИЯ:
+     * строку закрыла нога 1, здесь появляются реализованные факты.
+     * Идентичность эпизода (пара) и направление уже стоят — снапшот их
+     * не перезаписывает.
+     */
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "externalRealizedProfit", source = "externalRealizedPnl")
+    @Mapping(target = "externalRealizedProfitGross", source = "externalRealizedPnlGross")
+    @Mapping(target = "externalId", ignore = true)
+    @Mapping(target = "direction", ignore = true)
+    @Mapping(target = "externalCreatedAt", ignore = true)
+    void updateFromCloseSnapshot(PositionCloseResultExternalSnapshot snapshot, @MappingTarget Position position);
+
+    /**
+     * Наполнение строки эпизода положением закрытия — тропа
+     * МАТЕРИАЛИЗАЦИИ: позиция впервые увидена уже закрытой, поэтому
+     * ложатся и данные идентичности (идентификатор, время создания) и
+     * направление.
+     */
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "externalRealizedProfit", source = "externalRealizedPnl")
+    @Mapping(target = "externalRealizedProfitGross", source = "externalRealizedPnlGross")
+    @Mapping(target = "externalId", source = "externalPosId")
+    void materializeFromCloseSnapshot(PositionCloseResultExternalSnapshot snapshot, @MappingTarget Position position);
 }

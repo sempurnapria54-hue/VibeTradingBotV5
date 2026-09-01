@@ -335,13 +335,19 @@ RETIRED = [
                   '(.claude/decisions/collection-not-approval-artifact.md)',
         'allowed': ('.claude/decisions/collection-not-approval-artifact.md',
                     '.claude/work/decision-digest.md'),
+        # Реестра предусловий в популяции НЕ БЫЛО, и он единственный нёс
+        # роль коллекции в клейме ИЗМЕРЕНИЯ («ось 3 грепает и по коллекции»),
+        # а не в клейме аппрува: свип по форме снятой редакции такую фразу не
+        # видит, и прогон был зелен при ложном клейме дома реестра
+        # (F5а DOCS_CHECK_34).
         'population': (('.claude/processes/source-api-testing.md', None),
                        ('.claude/skills/test-collection.md', None),
                        ('.claude/skills/test-review.md', None),
                        ('.claude/skills/test-code.md', None),
                        ('.claude/skills/test-design.md', None),
                        ('.claude/agents/tester.md', None),
-                       ('.claude/tests/source-api/okx/plan.md', None)),
+                       ('.claude/tests/source-api/okx/plan.md', None),
+                       ('.claude/tests/source-api/okx/code-preconditions.md', None)),
     },
     {
         'name': 'две ноги истории цикла добычи защиты',
@@ -384,6 +390,14 @@ RETIRED = [
         'allowed': ('.claude/decisions/recovered-deal-linkage-window-bound.md',
                     '.claude/work/decision-digest.md',
                     '.claude/work/code-gate-ledger.json'),
+        # Дом адресуемой единицы эпизода в популяции НЕ СТОЯ́Л, и это была
+        # ровно та дыра, которую ось 4 закрывает: он выражал снятую редакцию
+        # ДРУГИМИ СЛОВАМИ («операнда нижней границы нет — адресация на
+        # восстановительной подтропе не определена»), поэтому оси 1-3 его не
+        # видели, а прогон был зелен при доме, противоречащем трём
+        # потребителям (A1/A2 DOCS_CHECK_34). Свой шаблон пришедшей у него
+        # потому, что дом деталей истину стыка не пересказывает, а
+        # ссылается на дом окна (`.claude/rules/carrier-levels.md`).
         'population': (('docs/models/domain/aggregate/Deal.md', None),
                        ('docs/components/DealOpeningService.md', None),
                        ('docs/components/RefreshBillsExecutor.md', None),
@@ -391,7 +405,38 @@ RETIRED = [
                        ('docs/lifecycles/Deal.md', None),
                        ('docs/components/SubmitOrderExecutor.md', None),
                        ('docs/integrations/okx/contracts/server-time.md', None),
+                       ('docs/models/domain/core/Position.md',
+                        r'подтроп\w+\s+исключением\s+не\s+явля'),
                        ('docs/spec/cash-flow-linkage.json', None)),
+    },
+    {
+        'name': 'верхняя граница окна линковки — поле сделки',
+        # Снятая редакция: поле сделки объявлено ВЕРХНЕЙ ГРАНИЦЕЙ окна
+        # линковки движений. Дом предиката (docs/spec/cash-flow-linkage.json
+        # §inWindow) держит «окно открыто сверху до времени источника
+        # прохода», и поле в предикате не участвует вовсе; реализация по
+        # снятому имени не прилинковала бы у ЖИВОЙ сделки ни одного движения
+        # (поле у неё пусто). Пришедшая: поле несёт ПОРОГ ДОКАЗАННОГО
+        # ПОКРЫТИЯ и переименовано под свою роль — coverageProvenThrough,
+        # потребитель один (обязанность сверки, duty.coverageProven).
+        'pattern': r'billsWindowEnd|bills_window_end|windowClosed'
+                   r'|верхн\w+\s+границ\w+\s+окна\s+линковки',
+        'arrived': r'порог\w*\s+доказанн\w+\s+покрыти\w*|доказанного\s+покрытия'
+                   r'|coverageProvenThrough|coverage_proven_through|coverageProven',
+        'date': '2026-09-01',
+        'source': 'A3 DOCS_CHECK_34: поле не участвует в предикате линковки, '
+                  'кодовый заход 5 шага 7',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/work/code-gate-ledger.json',
+                    'tools/retired-check.py'),
+        'population': (('docs/models/domain/aggregate/Deal.md', None),
+                       ('docs/components/RefreshPositionExecutor.md', None),
+                       ('docs/models/domain/core/Position.md', None),
+                       ('docs/lifecycles/Position.md', None),
+                       ('docs/models/mapping/PositionCloseResult.md', None),
+                       ('docs/rules/pnl-reconciliation.md', None),
+                       ('docs/spec/pnl-reconciliation.json', None),
+                       ('.claude/work/backlog.md', None)),
     },
     {
         'name': 'радиус шире инструмента — набором строк',

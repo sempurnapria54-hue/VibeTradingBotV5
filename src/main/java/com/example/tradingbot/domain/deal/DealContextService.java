@@ -81,7 +81,7 @@ public class DealContextService {
         List<AlgoOrder> algoOrders = algoOrderDataService.findByDealId(deal.getId());
         deal.setOrders(orders);
         deal.setAlgoOrders(algoOrders);
-        deal.setPosition(positionDataService.findByDealId(deal.getId()).orElse(null));
+        deal.setPositions(positionDataService.findEpisodes(deal.getId()));
         deal.setTranches(withOwnOrders(dealTrancheDataService.findByDealId(deal.getId()), orders, algoOrders));
     }
 

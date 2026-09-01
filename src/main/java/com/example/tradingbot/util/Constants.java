@@ -85,6 +85,12 @@ public final class Constants {
         /** Путь позиций аккаунта (GET). Приватный endpoint. */
         public static final String ACCOUNT_POSITIONS_PATH = "/api/v5/account/positions";
 
+        /** Путь серверного времени источника. Публичный endpoint. */
+        public static final String PUBLIC_TIME_PATH = "/api/v5/public/time";
+
+        /** Путь истории закрытых позиций аккаунта. Приватный endpoint. */
+        public static final String ACCOUNT_POSITIONS_HISTORY_PATH = "/api/v5/account/positions-history";
+
         /** Путь отмены ordinary order (POST). Приватный endpoint. */
         public static final String TRADE_CANCEL_ORDER_PATH = "/api/v5/trade/cancel-order";
 
@@ -180,6 +186,15 @@ public final class Constants {
 
         /** Имя query-параметра after. */
         public static final String PARAM_AFTER = "after";
+
+        /** Имя query-параметра before (нижняя граница окна по времени). */
+        public static final String PARAM_BEFORE = "before";
+
+        /** Класс инструментов контура: бессрочный своп. */
+        public static final String INST_TYPE_SWAP = "SWAP";
+
+        /** Размер страницы истории позиций (потолок источника — 100). */
+        public static final String POSITIONS_HISTORY_PAGE_LIMIT = "100";
 
         /** Имя query-параметра limit. */
         public static final String PARAM_LIMIT = "limit";
