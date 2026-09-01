@@ -1,46 +1,65 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Исполнимый критерий выхода в `CODE`: диспозиция находок прогона по классам.
+"""Исполнимый критерий выхода в `CODE`: покомпонентный гейт реестра находок.
 
-ПРЕДМЕТ. Прежний гейт требовал ЧИСТОГО полнокорпусного прогона. За семь
-прогонов чистого не было ни одного, а планка росла вместе с усилением
-измерения: закрытие производило ~69 % находок следующего прогона. Условие,
-которое не достигается ни при какой добросовестной работе, гейтом не
-является — оно означает «не входим в CODE никогда».
+ПРЕДМЕТ. Прежние две редакции гейта требовали состояния ШАГА: сперва
+ЧИСТОГО полнокорпусного прогона (снята 2026-08-31 как недостижимая — за
+семь прогонов чистого не было ни одного), затем НУЛЯ незакрытых находок
+классов КОД и РИСК до перевода статуса (снята 2026-09-01 как
+несходящаяся — девять прогонов подряд закрытие производило больше
+половины находок следующего).
 
-Эта команда меряет ДРУГОЕ условие, решением держателя 2026-08-31: гейтящие
-находки прогона разложены по классам, классы «блокирует код» (КОД) и
-«рисковая механика» (РИСК) — в НОЛЬ незакрытых, а всякая прочая гейтящая
-находка ЗАДИСПОЗИЦИОНИРОВАНА — закрыта либо явно припаркована с адресатом и
-условием возврата.
+Действующая редакция (решение держателя 2026-09-01,
+.claude/decisions/code-contact-as-gate.md) меряет НЕ шаг, а КОМПОНЕНТ:
 
-Вход — реестр диспозиции `.claude/work/code-gate-ledger.json`; сверяется с
-итогом прогона, названного в самом реестре, чтобы гейт нельзя было пройти
+  * КОД   — позиция закрыта до или в момент кодирования СВОЕГО компонента;
+            компонент начат при открытой позиции — гейт НЕ пройден;
+  * РИСК  — все позиции класса закрыты ПРЕЖДЕ, чем начат любой компонент
+            торговой тропы (признак — величина компонента, не суждение);
+  * прочие классы — задиспозиционированы (закрыта либо припаркована с
+            адресатом и условием возврата);
+  * открытый слот гейта грунта гейтит СВОЙ компонент так же, как находка.
+
+Вход — реестр `.claude/work/code-gate-ledger.json`: таблица компонентов
+(статус кодирования, признак торговой тропы, ожидаемые слоты грунта) плюс
+позиции с привязкой к компонентам. Счёт позиций сверяется с итогом
+прогона, названного самим реестром, чтобы гейт нельзя было пройти
 умолчанием находки.
 
 ОСИ, КОТОРЫЕ КОМАНДА ОБЪЯВЛЯЕТ (доказаны батареей, исполняемой этим же
 прогоном, до замера):
-  1. контроль: полный реестр с нулём КОД/РИСК — гейт пройден;
-  2. незакрытая находка класса КОД — гейт НЕ пройден;
-  3. незакрытая находка класса РИСК — гейт НЕ пройден;
-  4. контроль: припаркованная находка прочего класса гейт не роняет;
-  5. припарковка без адресата — гейт НЕ пройден;
-  6. припарковка без условия возврата — гейт НЕ пройден;
-  7. адресат припарковки не разрешается (файла нет либо §-пассажа в нём
-     нет) — гейт НЕ пройден;
-  8. класс вне закрытого перечня — гейт НЕ пройден;
-  9. закрытая находка без указания, ЧЕМ закрыта, — гейт НЕ пройден;
- 10. счёт реестра расходится со счётом гейтящих в отчёте прогона — гейт НЕ
-     пройден (умолчанная находка не проходит);
- 11. счёт расходится ПОЛИНЗОВО при сошедшемся итоге — гейт НЕ пройден;
- 12. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
- 13. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
- 14. отчёта прогона, названного реестром, нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
- 15. в отчёте нет сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2).
+  1. контроль: ни один компонент не начат — гейт пройден при открытых КОД;
+  2. КОД открыта, её компонент в работе — гейт НЕ пройден;
+  3. КОД открыта, её компонент закодирован — гейт НЕ пройден;
+  4. РИСК открыта, начат компонент торговой тропы — гейт НЕ пройден;
+  5. контроль: РИСК открыта, начат НЕ торговый компонент — гейт не роняет;
+  6. позиция без компонента — гейт НЕ пройден;
+  7. позиция называет компонент вне таблицы — гейт НЕ пройден;
+  8. «вне компонентов» без названной причины — гейт НЕ пройден;
+  9. прочий класс не задиспозиционирован — гейт НЕ пройден;
+ 10. припарковка без адресата — гейт НЕ пройден;
+ 11. припарковка без условия возврата — гейт НЕ пройден;
+ 12. адресат припарковки не разрешается — гейт НЕ пройден;
+ 13. класс вне закрытого перечня — гейт НЕ пройден;
+ 14. закрытая позиция без указания, ЧЕМ закрыта, — гейт НЕ пройден;
+ 15. компонент с открытым слотом грунта начат — гейт НЕ пройден;
+ 16. статус компонента вне закрытого перечня — гейт НЕ пройден;
+ 17. умолчанная находка (счёт реестра меньше отчёта) — гейт НЕ пройден;
+ 18. полинзовое расхождение при сошедшемся итоге — гейт НЕ пройден;
+ 19. контроль: поздняя таблица отчёта счёт линзы НЕ перебивает (сводка
+     читается только из своей секции — ремонт ложно-зелёного F1
+     DOCS_CHECK_34);
+ 20. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 21. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 22. таблицы компонентов нет либо она пуста — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 23. отчёта прогона, названного реестром, нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 24. в отчёте нет секции сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2).
 
 Форма, которой в этом перечне нет, замером НЕ измерена.
 
 Запуск (из корня репозитория):  python3 tools/code-gate-check.py
+Прогоняется при переводе шага в `CODE` И перед КАЖДЫМ кодовым заходом,
+после простановки статуса кодирования компонента.
 Код возврата: 0 — критерий выхода в CODE пройден; 1 — не пройден (чем
 именно — в stdout); 2 — ЗАМЕР НЕ ПРОВОДИЛСЯ.
 """
@@ -70,7 +89,24 @@ CLASSES = BLOCKING + OTHER
 
 CLOSED = 'закрыта'
 PARKED = 'припаркована'
+OPEN = 'не закрыта'
+DISPOSITIONS = (CLOSED, PARKED, OPEN)
 
+# Статус кодирования компонента. «не начат» — единственный, при котором
+# открытая позиция класса КОД гейт не роняет.
+NOT_STARTED = 'не начат'
+COMPONENT_STATES = (NOT_STARTED, 'в работе', 'закодирован')
+
+OUTSIDE = 'вне компонентов'
+
+# Секция отчёта, в которой живёт сводка счётом. Контракт «сводка отчёта ↔
+# реестр» объявлен в доме формата отчёта (.claude/templates/docs/gap-report.md
+# §«Сводка счётом — форма, читаемая гейтом»), здесь он исполняется.
+# Прежняя редакция брала ЛЮБУЮ строку корпуса, начинающуюся с ячейки A-G,
+# и поздняя таблица молча перебивала счёт линзы (ложно-зелёный F1
+# DOCS_CHECK_34); теперь разбирается только тело своей секции.
+SUMMARY_HEADING = re.compile(r'^##\s+Сводка счётом\s*$')
+NEXT_HEADING = re.compile(r'^##\s+')
 SUMMARY_ROW = re.compile(r'^\|\s*([A-G])\s*\|[^|]*\|\s*(\d+)\s*\|')
 ANCHOR = re.compile(r'§«([^»]+)»')
 
@@ -88,17 +124,26 @@ def _resolver():
 
 
 def report_counts(path, root):
-    """Гейтящие находки прогона по линзам — из сводки счётом отчёта."""
+    """Позиции реестра по линзам — из сводки счётом отчёта, из ЕЁ секции."""
     file = root / path
     if not file.is_file():
         raise Refusal('отчёта прогона нет: %s' % path)
     counts = {}
+    inside = False
     for line in file.read_text(encoding='utf-8').splitlines():
+        if SUMMARY_HEADING.match(line):
+            inside = True
+            continue
+        if inside and NEXT_HEADING.match(line):
+            break
+        if not inside:
+            continue
         found = SUMMARY_ROW.match(line.strip())
         if found:
             counts[found.group(1)] = int(found.group(2))
     if not counts:
-        raise Refusal('в отчёте %s нет сводки счётом: гейтящие находки не пересчитываются' % path)
+        raise Refusal('в отчёте %s нет секции «Сводка счётом» с таблицей линз: '
+                      'позиции не пересчитываются' % path)
     return counts
 
 
@@ -121,11 +166,82 @@ def anchor_resolves(target, name, root):
     return _RESOLVER_MODULE.Resolver([path]).resolves(_RESOLVER_MODULE.norm(name), [path])
 
 
+def _components(ledger):
+    """Таблица компонентов реестра: имя → запись. Пустая таблица — отказ."""
+    rows = ledger.get('компоненты')
+    if not rows:
+        raise Refusal('реестр не несёт таблицы компонентов: покомпонентный гейт не измерим')
+    table = {}
+    for row in rows:
+        name = str(row.get('имя', '')).strip()
+        if not name:
+            raise Refusal('в таблице компонентов есть строка без имени')
+        table[name] = row
+    return table
+
+
+def _component_reasons(table):
+    """Дефекты самой таблицы компонентов: статус и ожидание грунта."""
+    reasons = []
+    for name, row in sorted(table.items()):
+        state = row.get('статус')
+        if state not in COMPONENT_STATES:
+            reasons.append('компонент %s: статус «%s» вне закрытого перечня (%s)'
+                           % (name, state, ', '.join(COMPONENT_STATES)))
+            continue
+        pending = [str(slot) for slot in row.get('ждёт-грунта', []) if str(slot).strip()]
+        if pending and state != NOT_STARTED:
+            reasons.append('компонент %s: начат при открытых слотах гейта грунта (%s)'
+                           % (name, ', '.join(pending)))
+    return reasons
+
+
+def _started(table):
+    """Компоненты, кодирование которых начато (любой статус, кроме «не начат»)."""
+    return {name for name, row in table.items()
+            if row.get('статус') in COMPONENT_STATES and row.get('статус') != NOT_STARTED}
+
+
+def _trading_started(table):
+    """Начатые компоненты торговой тропы — операнд гейта класса РИСК."""
+    return sorted(name for name in _started(table) if table[name].get('торговая-тропа'))
+
+
+def _position_components(entry, table, name, reasons):
+    """Компоненты позиции: список имён либо «вне компонентов» с причиной.
+
+    Возвращает множество имён из таблицы (для «вне компонентов» — пустое).
+    """
+    declared = entry.get('компонент')
+    if isinstance(declared, str):
+        declared = [declared]
+    declared = [str(item).strip() for item in (declared or []) if str(item).strip()]
+    if not declared:
+        reasons.append('%s: не названо ни одного компонента — непривязанная позиция не гейтит ничего'
+                       % name)
+        return set()
+    if OUTSIDE in declared:
+        if len(declared) > 1:
+            reasons.append('%s: «%s» вместе с именами компонентов — привязка неоднозначна'
+                           % (name, OUTSIDE))
+        elif not str(entry.get('причина', '')).strip():
+            reasons.append('%s: «%s» без названной причины' % (name, OUTSIDE))
+        return set()
+    known = set()
+    for item in declared:
+        if item in table:
+            known.add(item)
+        else:
+            reasons.append('%s: компонент «%s» не назван в таблице компонентов реестра'
+                           % (name, item))
+    return known
+
+
 def check(ledger_path=LEDGER, root=ROOT):
-    """Проверка реестра диспозиции. Возвращает список причин непрохождения."""
+    """Проверка реестра гейтов. Возвращает список причин непрохождения."""
     file = root / ledger_path
     if not file.is_file():
-        raise Refusal('реестра диспозиции нет: %s' % ledger_path)
+        raise Refusal('реестра гейтов нет: %s' % ledger_path)
     try:
         ledger = json.loads(file.read_text(encoding='utf-8'))
     except (ValueError, OSError) as failure:
@@ -133,8 +249,11 @@ def check(ledger_path=LEDGER, root=ROOT):
     report = ledger.get('отчёт')
     if not report:
         raise Refusal('реестр не называет отчёт прогона, с которым сверяется')
+    table = _components(ledger)
     counts = report_counts(report, root)
-    reasons = []
+    reasons = _component_reasons(table)
+    started = _started(table)
+    trading = _trading_started(table)
     seen = {}
     for entry in ledger.get('находки', []):
         name = entry.get('id', '<без id>')
@@ -145,34 +264,52 @@ def check(ledger_path=LEDGER, root=ROOT):
         if klass not in CLASSES:
             reasons.append('%s: класс «%s» вне закрытого перечня (%s)' % (name, klass, ', '.join(CLASSES)))
             continue
+        bound = _position_components(entry, table, name, reasons)
+        if disposition not in DISPOSITIONS:
+            reasons.append('%s: диспозиция «%s» — исходом не является (ожидается %s)'
+                           % (name, disposition, ', '.join('«%s»' % item for item in DISPOSITIONS)))
+            continue
         if disposition == CLOSED:
             if not str(entry.get('чем', '')).strip():
                 reasons.append('%s: объявлена закрытой, но не сказано, чем именно' % name)
             continue
-        if disposition != PARKED:
-            reasons.append('%s: диспозиция «%s» — исходом не является (ожидается «%s» либо «%s»)'
-                           % (name, disposition, CLOSED, PARKED))
+        if disposition == PARKED:
+            if klass in BLOCKING:
+                reasons.append('%s: класс %s припаркован — классы %s закрываются, а не паркуются'
+                               % (name, klass, ' и '.join(BLOCKING)))
+            addressee = str(entry.get('адресат', '')).strip()
+            if not addressee:
+                reasons.append('%s: припаркована без адресата (владелец + носитель)' % name)
+            else:
+                target = addressee.split('§')[0].strip().rstrip(' —')
+                anchor = ANCHOR.search(addressee)
+                if not (root / target).is_file():
+                    reasons.append('%s: адресат припарковки не разрешается — файла «%s» нет' % (name, target))
+                elif anchor and not anchor_resolves(target, anchor.group(1), root):
+                    reasons.append('%s: адресат припарковки не разрешается — в «%s» нет пассажа «%s»'
+                                   % (name, target, anchor.group(1)))
+            if not str(entry.get('условие-возврата', '')).strip():
+                reasons.append('%s: припаркована без условия возврата' % name)
             continue
-        if klass in BLOCKING:
-            reasons.append('%s: класс %s припаркован — классы %s обязаны быть в ноль'
-                           % (name, klass, ' и '.join(BLOCKING)))
-        addressee = str(entry.get('адресат', '')).strip()
-        if not addressee:
-            reasons.append('%s: припаркована без адресата (владелец + носитель)' % name)
+        # Диспозиция «не закрыта»: гейтит ли она что-нибудь ПРЯМО СЕЙЧАС —
+        # зависит от класса и от статуса кодирования её компонентов.
+        if klass == 'КОД':
+            active = sorted(bound & started)
+            if active:
+                reasons.append('%s: класс КОД не закрыт, а компонент начат (%s) — закрытие обязано '
+                               'предшествовать кодированию либо идти тем же ходом'
+                               % (name, ', '.join(active)))
+        elif klass == 'РИСК':
+            if trading:
+                reasons.append('%s: класс РИСК не закрыт, а компонент торговой тропы начат (%s)'
+                               % (name, ', '.join(trading)))
         else:
-            target = addressee.split('§')[0].strip().rstrip(' —')
-            anchor = ANCHOR.search(addressee)
-            if not (root / target).is_file():
-                reasons.append('%s: адресат припарковки не разрешается — файла «%s» нет' % (name, target))
-            elif anchor and not anchor_resolves(target, anchor.group(1), root):
-                reasons.append('%s: адресат припарковки не разрешается — в «%s» нет пассажа «%s»'
-                               % (name, target, anchor.group(1)))
-        if not str(entry.get('условие-возврата', '')).strip():
-            reasons.append('%s: припаркована без условия возврата' % name)
+            reasons.append('%s: класс %s не задиспозиционирован (ожидается «%s» либо «%s»)'
+                           % (name, klass, CLOSED, PARKED))
     for lens, expected in sorted(counts.items()):
         actual = seen.get(lens, 0)
         if actual != expected:
-            reasons.append('линза %s: отчёт прогона насчитал %d гейтящих, реестр несёт %d — '
+            reasons.append('линза %s: отчёт прогона насчитал %d позиций, реестр несёт %d — '
                            'умолчанная находка гейт не проходит' % (lens, expected, actual))
     for lens in sorted(set(seen) - set(counts)):
         reasons.append('реестр несёт находки линзы %s, которой в сводке отчёта нет' % lens)
@@ -185,11 +322,19 @@ REPORT = """# Проба отчёта прогона
 
 ## Сводка счётом
 
-| Линза | Предмет | Гейтящих | Прочих |
+| Линза | Предмет | Позиций | Прочих |
 |---|---|---|---|
 | A | ядро | 2 | 3 |
-| B | правила | 1 | 0 |
-| **Итого** | | **3** | **3** |
+| B | правила | 2 | 0 |
+| **Итого** | | **4** | **3** |
+
+## Узлы гейтящих находок
+
+Поздняя таблица, которая прежней редакцией перебивала счёт линзы:
+
+| A | ядро сделки | 9 | — |
+|---|---|---|---|
+| B | правила | 9 | — |
 """
 
 BACKLOG = """# Бэклог пробы
@@ -201,7 +346,7 @@ BACKLOG = """# Бэклог пробы
 
 
 def _fixture(mutate=None, report=REPORT):
-    """Песочница: реестр, отчёт прогона и файл-адресат припарковки."""
+    """Песочница: реестр с таблицей компонентов, отчёт прогона и файл-адресат."""
     root = Path(tempfile.mkdtemp())
     (root / '.claude' / 'work').mkdir(parents=True)
     (root / '.claude' / 'work' / 'backlog.md').write_text(BACKLOG, encoding='utf-8')
@@ -209,12 +354,21 @@ def _fixture(mutate=None, report=REPORT):
     ledger = {
         'прогон': 'проба',
         'отчёт': 'отчёт.md',
+        'компоненты': [
+            {'имя': 'Каркас', 'заход': 1, 'торговая-тропа': False, 'статус': NOT_STARTED},
+            {'имя': 'Тропа', 'заход': 2, 'торговая-тропа': True, 'статус': NOT_STARTED},
+            {'имя': 'Движения', 'заход': 3, 'торговая-тропа': True, 'статус': NOT_STARTED,
+             'ждёт-грунта': ['п. 2 × AG6.1']},
+        ],
         'находки': [
-            {'id': 'A1', 'линза': 'A', 'класс': 'КОД', 'диспозиция': CLOSED, 'чем': 'правило дописано'},
-            {'id': 'A2', 'линза': 'A', 'класс': 'РИСК', 'диспозиция': CLOSED, 'чем': 'формула сведена к дому'},
-            {'id': 'B1', 'линза': 'B', 'класс': 'НОСИТЕЛЬ', 'диспозиция': PARKED,
+            {'id': 'A1', 'линза': 'A', 'класс': 'КОД', 'компонент': ['Каркас'], 'диспозиция': OPEN},
+            {'id': 'A2', 'линза': 'A', 'класс': 'РИСК', 'компонент': ['Тропа'], 'диспозиция': OPEN},
+            {'id': 'B1', 'линза': 'B', 'класс': 'НОСИТЕЛЬ', 'компонент': [OUTSIDE],
+             'причина': 'машинерия проверки', 'диспозиция': PARKED,
              'адресат': '.claude/work/backlog.md §«Название припарковки»',
              'условие-возврата': 'курационный заход после закрытия шага'},
+            {'id': 'B2', 'линза': 'B', 'класс': 'КОД', 'компонент': ['Тропа'],
+             'диспозиция': CLOSED, 'чем': 'правило дописано, доки правлены тем же ходом'},
         ],
     }
     if mutate:
@@ -239,6 +393,15 @@ def _fails(mutate, marker, report=REPORT):
     return probe
 
 
+def _holds(mutate, marker, report=REPORT):
+    """Контроль: мутация НЕ поднимает причину с этим маркером."""
+    def probe():
+        reasons, _, _ = check(LEDGER, _fixture(mutate, report))
+        return (not any(marker in reason for reason in reasons),
+                '; '.join(reasons) or 'причин нет')
+    return probe
+
+
 def _refuses(prepare):
     def probe():
         try:
@@ -249,86 +412,106 @@ def _refuses(prepare):
     return probe
 
 
+def _state(ledger, index, state):
+    ledger['компоненты'][index]['статус'] = state
+
+
 def battery():
     """Оси команды. Каждая — фикстура с заведомо известным исходом."""
     axes = []
 
     def clean():
         reasons, gating, entries = check(LEDGER, _fixture())
-        return (not reasons and gating == 3 and entries == 3,
-                'причин непрохождения %d, гейтящих в отчёте %d, записей реестра %d'
+        return (not reasons and gating == 4 and entries == 4,
+                'причин непрохождения %d, позиций в отчёте %d, записей реестра %d'
                 % (len(reasons), gating, entries))
-    axes.append(_axis('1. контроль: полный реестр с нулём КОД/РИСК — гейт пройден', clean))
+    axes.append(_axis('1. контроль: ни один компонент не начат — гейт пройден при открытых КОД', clean))
 
-    def park_code(ledger):
-        ledger['находки'][0].update({'диспозиция': PARKED, 'чем': '',
-                                     'адресат': '.claude/work/backlog.md §«Название припарковки»',
-                                     'условие-возврата': 'потом'})
-    axes.append(_axis('2. незакрытая находка класса КОД — гейт НЕ пройден',
-                      _fails(park_code, 'класс КОД припаркован')))
-
-    def park_risk(ledger):
-        ledger['находки'][1].update({'диспозиция': PARKED, 'чем': '',
-                                     'адресат': '.claude/work/backlog.md §«Название припарковки»',
-                                     'условие-возврата': 'потом'})
-    axes.append(_axis('3. незакрытая находка класса РИСК — гейт НЕ пройден',
-                      _fails(park_risk, 'класс РИСК припаркован')))
-
-    def parked_other():
-        reasons, _, _ = check(LEDGER, _fixture())
-        return (not any('B1' in reason for reason in reasons),
-                '; '.join(reasons) or 'припаркованная находка прочего класса гейт не роняет')
-    axes.append(_axis('4. контроль: припаркованная находка прочего класса гейт не роняет', parked_other))
-
-    axes.append(_axis('5. припарковка без адресата — гейт НЕ пройден',
+    axes.append(_axis('2. КОД открыта, её компонент в работе — гейт НЕ пройден',
+                      _fails(lambda l: _state(l, 0, 'в работе'), 'A1: класс КОД не закрыт')))
+    axes.append(_axis('3. КОД открыта, её компонент закодирован — гейт НЕ пройден',
+                      _fails(lambda l: _state(l, 0, 'закодирован'), 'A1: класс КОД не закрыт')))
+    axes.append(_axis('4. РИСК открыта, начат компонент торговой тропы — гейт НЕ пройден',
+                      _fails(lambda l: _state(l, 1, 'в работе'), 'A2: класс РИСК не закрыт')))
+    axes.append(_axis('5. контроль: РИСК открыта, начат НЕ торговый компонент — гейт не роняет',
+                      _holds(lambda l: _state(l, 0, 'в работе'), 'A2: класс РИСК не закрыт')))
+    axes.append(_axis('6. позиция без компонента — гейт НЕ пройден',
+                      _fails(lambda l: l['находки'][0].update({'компонент': []}),
+                             'не названо ни одного компонента')))
+    axes.append(_axis('7. позиция называет компонент вне таблицы — гейт НЕ пройден',
+                      _fails(lambda l: l['находки'][0].update({'компонент': ['Небывалый']}),
+                             'не назван в таблице компонентов')))
+    axes.append(_axis('8. «вне компонентов» без названной причины — гейт НЕ пройден',
+                      _fails(lambda l: l['находки'][2].pop('причина'), 'без названной причины')))
+    axes.append(_axis('9. прочий класс не задиспозиционирован — гейт НЕ пройден',
+                      _fails(lambda l: l['находки'][2].update({'диспозиция': OPEN}),
+                             'класс НОСИТЕЛЬ не задиспозиционирован')))
+    axes.append(_axis('10. припарковка без адресата — гейт НЕ пройден',
                       _fails(lambda l: l['находки'][2].pop('адресат'), 'без адресата')))
-    axes.append(_axis('6. припарковка без условия возврата — гейт НЕ пройден',
+    axes.append(_axis('11. припарковка без условия возврата — гейт НЕ пройден',
                       _fails(lambda l: l['находки'][2].pop('условие-возврата'), 'без условия возврата')))
-    axes.append(_axis('7. адресат припарковки не разрешается — гейт НЕ пройден',
+    axes.append(_axis('12. адресат припарковки не разрешается — гейт НЕ пройден',
                       _fails(lambda l: l['находки'][2].update(
                           {'адресат': '.claude/work/backlog.md §«Пассажа с таким именем нет»'}),
                           'нет пассажа')))
-    axes.append(_axis('8. класс вне закрытого перечня — гейт НЕ пройден',
+    axes.append(_axis('13. класс вне закрытого перечня — гейт НЕ пройден',
                       _fails(lambda l: l['находки'][0].update({'класс': 'ПРОЧЕЕ'}),
                              'вне закрытого перечня')))
-    axes.append(_axis('9. закрытая находка без указания, чем закрыта, — гейт НЕ пройден',
-                      _fails(lambda l: l['находки'][0].update({'чем': '  '}), 'не сказано, чем именно')))
-    axes.append(_axis('10. умолчанная находка (счёт реестра меньше отчёта) — гейт НЕ пройден',
+    axes.append(_axis('14. закрытая позиция без указания, чем закрыта, — гейт НЕ пройден',
+                      _fails(lambda l: l['находки'][3].update({'чем': '  '}), 'не сказано, чем именно')))
+    axes.append(_axis('15. компонент с открытым слотом грунта начат — гейт НЕ пройден',
+                      _fails(lambda l: _state(l, 2, 'в работе'), 'при открытых слотах гейта грунта')))
+    axes.append(_axis('16. статус компонента вне закрытого перечня — гейт НЕ пройден',
+                      _fails(lambda l: _state(l, 0, 'почти готов'), 'вне закрытого перечня')))
+    axes.append(_axis('17. умолчанная находка (счёт реестра меньше отчёта) — гейт НЕ пройден',
                       _fails(lambda l: l['находки'].pop(1), 'умолчанная находка гейт не проходит')))
 
     def lens_swap(ledger):
         ledger['находки'][1]['линза'] = 'B'
-    axes.append(_axis('11. полинзовое расхождение при сошедшемся итоге — гейт НЕ пройден',
+    axes.append(_axis('18. полинзовое расхождение при сошедшемся итоге — гейт НЕ пройден',
                       _fails(lens_swap, 'умолчанная находка гейт не проходит')))
+
+    def late_table():
+        # Отчёт пробы несёт ПОСЛЕ сводки таблицу тех же линз с числом 9.
+        # Прежняя редакция брала её и объявляла расхождение (либо, при
+        # обратном раскладе, молча пропускала умолчанную находку).
+        reasons, gating, _ = check(LEDGER, _fixture())
+        return (not any('умолчанная находка' in reason for reason in reasons) and gating == 4,
+                'позиций по сводке %d, причин расхождения %d' % (gating, len(reasons)))
+    axes.append(_axis('19. контроль: поздняя таблица отчёта счёт линзы НЕ перебивает', late_table))
 
     def no_ledger():
         root = _fixture()
         (root / LEDGER).unlink()
         return root
-    axes.append(_axis('12. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_ledger)))
+    axes.append(_axis('20. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_ledger)))
 
     def broken_ledger():
         root = _fixture()
         (root / LEDGER).write_text('{не json', encoding='utf-8')
         return root
-    axes.append(_axis('13. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(broken_ledger)))
+    axes.append(_axis('21. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(broken_ledger)))
+
+    def no_components():
+        return _fixture(lambda l: l.update({'компоненты': []}))
+    axes.append(_axis('22. таблицы компонентов нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_components)))
 
     def no_report():
         root = _fixture()
         (root / 'отчёт.md').unlink()
         return root
-    axes.append(_axis('14. отчёта прогона нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_report)))
+    axes.append(_axis('23. отчёта прогона нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_report)))
 
     def no_summary():
-        return _fixture(report='# Отчёт без сводки счётом\n\nТекст.\n')
-    axes.append(_axis('15. в отчёте нет сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_summary)))
+        return _fixture(report='# Отчёт без секции сводки\n\n## Прочее\n\n| A | х | 1 |\n')
+    axes.append(_axis('24. в отчёте нет секции сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_summary)))
     return axes
 
 
 def main(argv):
     ledger = argv[1] if len(argv) > 1 else LEDGER
     axes = battery()
-    print('Батарея осей критерия выхода в CODE:')
+    print('Батарея осей покомпонентного критерия выхода в CODE:')
     for name, passed, observed in axes:
         print('  %s: %s — %s' % ('доказана' if passed else 'НЕ ДОКАЗАНА', name, observed))
     broken = [name for name, passed, _ in axes if not passed]
@@ -340,7 +523,7 @@ def main(argv):
     except Refusal as refusal:
         print('ЗАМЕР НЕ ПРОВОДИЛСЯ: %s' % refusal)
         return 2
-    print('Гейтящих находок в отчёте прогона: %d; записей реестра: %d' % (gating, entries))
+    print('Позиций в сводке отчёта: %d; записей реестра: %d' % (gating, entries))
     for reason in reasons:
         print('  %s' % reason)
     print('КРИТЕРИЙ ВЫХОДА В CODE ПРОЙДЕН' if not reasons
