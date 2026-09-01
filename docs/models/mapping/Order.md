@@ -216,18 +216,37 @@ write-once для причины закрытия —
 
 | # | Эндпоинт | Параметры запроса | Что даёт |
 |---|---|---|---|
-| 1 | `GET /api/v5/trade/orders-algo-pending` | `instType`, `instId`, `ordType=conditional` | живую запись — матч по `algoClOrdId` **в ответе** |
-| 2 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=effective` | `instType`, `instId`, `ordType=conditional`, `state=effective` | сработавшую запись — источник исхода `TRIGGERED` |
-| 3 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=canceled` | то же со `state=canceled` | снятую запись — источник исхода `ANALYSE_HISTORY` |
+| 1 | `GET /api/v5/trade/orders-algo-pending` | `instType`, `instId`, `ordType=conditional` | живую запись — матч по `algoClOrdId` **в ответе**; нога живых, идёт всегда |
+| 2 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=effective` | `instType`, `instId`, `ordType=conditional`, `state=effective` | сработавшую запись — терминал `TRIGGERED`; нога разбора истории (ветвь `ANALYSE_HISTORY` второй ступени) |
+| 3 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=canceled` | то же со `state=canceled` | снятую запись — терминал `CANCELED` по стоящему намерению; та же ветвь |
+| 4 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=order_failed` | то же со `state=order_failed` | сработавшую и неисполнившуюся запись — терминал `ERROR`/`PROTECTION_LOST` с фактическим кодом отказа; та же ветвь |
 
 **У истории условных заявок временно́го окна нет, а `state` либо `algoId`
 обязателен** (`docs/integrations/okx/contracts/algo-order.md`; рантайм-факт
 прогона: без него `code=50015` «Either parameter state or algoId is
 required»). `algoId` материализованной записи нам неизвестен по построению
 — он не равен `attachAlgoId` родителя, — поэтому обязательный операнд
-закрывается **`state`**, и ног у истории две: терминальные состояния
-`effective` и `canceled` разделены самим эндпоинтом. Глубина задаётся
-пагинацией `after` по `algoId` и `limit` ≤ 100, не окном.
+закрывается **`state`**, и ног у разбора истории **три — по числу
+терминальных значений `state` у контракта эндпоинта** (`effective`,
+`canceled`, `order_failed`): перечень ног выводится из контракта, а не из
+пары значений, которые имелись в виду, — неопрошенный `order_failed`
+исчерпывал бы разбор на существующем факте (сработала и не исполнилась —
+запись достижима гонкой срабатывания защиты с закрытием позиции другим
+актором). Ноги разбора идут только на ветви `ANALYSE_HISTORY` второй
+ступени; исходы каждой — таблица разбора в `docs/lifecycles/Order.md`
+§«Исход ненайденности — вторая ступень». Глубина задаётся пагинацией
+`after` по `algoId` и `limit` ≤ 100, не окном.
+
+**Названное ограничение: опрашиваемые `state` — не весь домен состояний
+записи.** Инвентарь источника несёт и `partially_effective` /
+`partially_failed`; запись защиты в таком состоянии не найдёт ни одна
+нога разбора — исход «пустой разбор» с диагностически ложной причиной.
+Четвёртую ногу построить нечем: параметр `state` истории этих значений
+не принимает, `algoId` записи неизвестен. Денежное направление держит
+предусловие самой ветви `ANALYSE_HISTORY` (позиция закрыта либо
+отдельная защита есть — покрытие не страдает); снятие ограничения —
+точечная нога details по `algoClOrdId`, если её поведение на
+материализованной источником записи будет подтверждено наблюдением.
 
 Фильтра по клиентскому идентификатору у обоих эндпоинтов нет
 (`docs/integrations/okx/contracts/algo-order.md`), поэтому запрос идёт по
@@ -266,8 +285,8 @@ required»). `algoId` материализованной записи нам н�
 |---|---|---|
 | `algoClOrdId` | ключ матча | равен `attachAlgoClOrdId` родителя; связь только по нему |
 | `algoId` | `externalId` | **не** равен `attachAlgoId` родителя |
-| `state` | `externalStatus` | сырой статус **самостоятельной записи**: у неё он есть, в отличие от элемента `attachAlgoOrds[*]` родителя. Резолв — `docs/spec/external-status-resolution.json`; он и даёт операнд исходам `TRIGGERED` (`effective`) и `ANALYSE_HISTORY` (`canceled`). Живость защиты, найденной **в теле родителя**, по-прежнему выводит `attachedBecomesActive` по фактам родителя — второй редакции для той тропы здесь не заводится |
-| `failCode` | `failCode` | код отказа постановки; операнд ветви `attachedFailsToPlace` (`docs/spec/order-lifecycle.json`) |
+| `state` | `externalStatus` | сырой статус **самостоятельной записи**: у неё он есть, в отличие от элемента `attachAlgoOrds[*]` родителя. Через резолвер внешних статусов (`docs/spec/external-status-resolution.json`) **не идёт**: его операнд `entity` защиту не принимает, а словарь отказных причин чужой — исход кодирует **нога, нашедшая запись** (таблица разбора — `docs/lifecycles/Order.md`), `state` — диагностика. Живость в **обеих** тропах предъявления выводит один предикат `attachedBecomesActive`: предъявленная самостоятельная запись — его второй дизъюнкт (`docs/spec/order-lifecycle.json`) |
+| `failCode` | `failCode` | код отказа постановки; операнд ветви `attachedFailsToPlace` в `docs/spec/order-lifecycle.json` |
 | `failReason` | `failReason` | причина отказа постановки; в снапшоте поле уже объявлено |
 | `sz` | `size` | объявленный размер записи — операнд покрытия (`docs/spec/protection-coverage.json`) |
 | `slTriggerPx` / `slOrdPx` | уровень защиты | сторона и тип триггера — как у элемента `attachAlgoOrds` |

@@ -23,6 +23,13 @@ class SpecRunnerTest {
     @TestFactory
     List<DynamicTest> specificationsMatchTheirExamples() throws IOException {
         List<DynamicTest> tests = new ArrayList<>();
+        // Препятствия базового гейта (дубль ключа, спека в подкаталоге,
+        // структурные дефекты) исполняются и этой тропой, не только
+        // мутационной командой (E4 DOCS_CHECK_33).
+        tests.add(DynamicTest.dynamicTest("базовый гейт корпуса", () -> {
+            List<String> obstacles = Spec.baseGate(SPEC_DIRECTORY);
+            assertTrue(obstacles.isEmpty(), String.join("\n", obstacles));
+        }));
         for (Path file : Spec.specFiles(SPEC_DIRECTORY)) {
             Spec spec = Spec.load(file);
             tests.add(DynamicTest.dynamicTest(spec.subject(), () -> {

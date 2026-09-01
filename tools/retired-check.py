@@ -82,6 +82,14 @@ import re
 import sys
 import tempfile
 
+# Печать не зависит от кодировки консоли вызывающего: на cp1251-консоли
+# объявленной среды вывод падал UnicodeEncodeError (класс описан в backlog
+# у anchor-check; тот же ремонт исполнимости, DOCS_CHECK_33 узел 9).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 SKIP = ('/.claude-archive/', '/.claude/work/history/', '/.claude/work/progress/',
         '/.claude/library/', '/target/', '/.git/')
 
@@ -334,6 +342,137 @@ RETIRED = [
                        ('.claude/skills/test-design.md', None),
                        ('.claude/agents/tester.md', None),
                        ('.claude/tests/source-api/okx/plan.md', None)),
+    },
+    {
+        'name': 'две ноги истории цикла добычи защиты',
+        # Перечень ног был собран из пары state, которые имелись в виду,
+        # а не из контракта эндпоинта, у которого терминальных state ТРИ:
+        # order_failed не опрашивался, разбор «исчерпывался» на
+        # существующем факте (сработала и не исполнилась). Встречная
+        # форма «идёт двумя вызовами» у самостоятельной условной заявки
+        # (mapping/AlgoOrder.md) законна, потому что третий терминал там
+        # предъявляет точечная нога details, — негативный просмотр
+        # пропускает носителя, называющего order_failed рядом.
+        'pattern': r'ног\s+у\s+истории\s+две'
+                   r'|истори\w+\s+ид[её]т\s+двумя\s+вызовами(?!.{0,400}order_failed)',
+        'arrived': r'order_failed',
+        'date': '2026-09-01',
+        'source': 'C2 DOCS_CHECK_33: перечень ног выводится из контракта '
+                  'эндпоинта (терминалов три), узел 1 GAPS_CLOSE_33',
+        'allowed': ('.claude/work/code-gate-ledger.json',),
+        'population': (('docs/models/mapping/Order.md', None),
+                       ('docs/models/mapping/AlgoOrder.md', None),
+                       ('docs/lifecycles/Order.md', None),
+                       ('docs/components/RefreshOrderExecutor.md', None)),
+    },
+    {
+        'name': 'суррогат границы — биржевой момент создания сделки',
+        # Снятая редакция: нижняя граница окна (линковки движений и
+        # адресации истории позиций) при пустой колонке — «биржевой
+        # момент создания сделки» БЕЗ оговорки тропы. Пришедшая: суррогат
+        # берётся значением externalCreatedAt, куда восстановительная
+        # тропа пишет биржевое время ОТКРЫТИЯ наблюдённой позиции
+        # (решение держателя 2026-09-01). Фраза «биржевой момент создания
+        # сделки» сама по себе законна у штатной тропы — шаблон ловит
+        # только связку с пустой колонкой/суррогатом в снятом порядке.
+        'pattern': r'пуст\w+\s+колонк\w+[^.]{0,80}биржевы?м?\s+момент\w*\s+создания\s+сделки'
+                   r'|суррогат[^.]{0,60}биржев\w+\s+момент\w*\s+создания\s+сделки',
+        'arrived': r'открыти[яе]\s+наблюдённой\s+позиции|ОТКРЫТИЯ\s+наблюдённой',
+        'date': '2026-09-01',
+        'source': 'решение держателя: граница — время открытия наблюдённой позиции '
+                  '(.claude/decisions/recovered-deal-linkage-window-bound.md)',
+        'allowed': ('.claude/decisions/recovered-deal-linkage-window-bound.md',
+                    '.claude/work/decision-digest.md',
+                    '.claude/work/code-gate-ledger.json'),
+        'population': (('docs/models/domain/aggregate/Deal.md', None),
+                       ('docs/components/DealOpeningService.md', None),
+                       ('docs/components/RefreshBillsExecutor.md', None),
+                       ('docs/components/RefreshPositionExecutor.md', None),
+                       ('docs/lifecycles/Deal.md', None),
+                       ('docs/components/SubmitOrderExecutor.md', None),
+                       ('docs/integrations/okx/contracts/server-time.md', None),
+                       ('docs/spec/cash-flow-linkage.json', None)),
+    },
+    {
+        'name': 'радиус шире инструмента — набором строк',
+        # Встречная форма снятой редакции «групповой И БИРЖЕВОЙ радиусы
+        # выражаются набором строк»: «шире инструмента» покрывает и
+        # биржу, для которой клауза ложна — у неё своё значение
+        # HoldScope.EXCHANGE, своя строка статуса и своя строка отчёта
+        # (а на ручной поверхности — один вызов, не набор). Пришедшая
+        # редакция разводит: набором строк/вызовов — только групповой,
+        # биржевой — своим значением, своей строкой, одним вызовом.
+        # Шаблон ловит и форму «набор вызовов» — четвёртый носитель нашла
+        # мини-петля после свипа по «набором строк».
+        'pattern': r'радиус\w*\s+шире\s+инструмента\s+выража\w+\s+набором'
+                   r'|шире\s+инструмента\s+—\s+набор\w*\s+(строк|вызовов)',
+        'arrived': r'групповой\s+радиус[^.]{0,120}набор\w*\s+(строк|вызовов)'
+                   r'|биржев\w+\s+радиус\s+сюда\s+не\s+относится',
+        'date': '2026-09-01',
+        'source': 'B1 DOCS_CHECK_33: встречная форма снятой редакции, '
+                  'узел 5 GAPS_CLOSE_33',
+        'allowed': ('.claude/work/code-gate-ledger.json',),
+        'population': (('docs/rules/error-handling-policy.md', None),
+                       ('docs/rules/instrument-hold.md', None),
+                       ('docs/components/models/HoldSignal.md', None),
+                       ('docs/models/domain/other/AnomalyReport.md', None),
+                       ('docs/rules/manual-halt.md', None)),
+    },
+    {
+        'name': 'после FAILED новая строка законна безусловно',
+        # Снятая редакция: отказавшая надобность повторяется новой строкой
+        # без гейта («новая строка законна») — петля «N попыток -> FAILED ->
+        # новая строка» без предела. Пришедшая: повтор гейтится стоящей
+        # ступенью радиуса и возобновляется её снятием.
+        # Ограничение негативного просмотра объявлено: возрождение,
+        # упоминающее «ступень»/«гейт» в радиусе 200 символов в ЛЮБОМ
+        # качестве («…законна, ступень ни при чём»), шаблон пропустит —
+        # его держит популяция носителей (пришедшая редакция обязана
+        # стоять в каждом), как у записей «двух ног» и суррогата.
+        'pattern': r'нов\w+\s+строк\w+\s+законн(?!.{0,200}(ступен|гейт))',
+        'arrived': r'гейт\w*\s+по\s+стоящей\s+ступени|стоящ\w+\s+ступень\w*|stepRetryGated'
+                   r'|после\s+снятия\s+ступени',
+        'date': '2026-09-01',
+        'source': 'B3 DOCS_CHECK_33: судьба надобности после FAILED — гейт '
+                  'по стоящей ступени, узел 5 GAPS_CLOSE_33',
+        'allowed': ('.claude/work/code-gate-ledger.json',),
+        'population': (('docs/rules/strategy-step-once-per-episode.md', None),
+                       ('docs/components/StrategyActionOrchestrator.md', None),
+                       ('docs/rules/instrument-hold.md',
+                        r'стоящ\w+\s+ступень\w*|гейт\w*\s+по\s+стоящей'),
+                       ('docs/lifecycles/DealActionState.md', None),
+                       ('docs/spec/strategy-walkthrough.json', None)),
+    },
+    {
+        'name': 'популяция предиката стороны — только после входа',
+        # Снятая редакция: primaryStopOnLossSide охраняет «первичную
+        # защитную заявку ПОСЛЕ входа», а «на входной тропе первым
+        # отказывает сайзинг» безусловно; рубежи «охраняют РАЗНЫЕ
+        # популяции». В полосе между якорем и безубытком (ширина
+        # ~2f*P/(1-f)) знаменатель положителен, сайзинг проходит, и
+        # исключённый из популяции вход не охранял никто. Пришедшая:
+        # популяция предиката — вся первичная постановка с объявленным
+        # уровнем, вход включая; рубежи различаются предметом.
+        # Широта шаблона объявлена: альтернации — родовые фразы, и
+        # будущий законный текст о ДРУГОМ предмете может их произнести
+        # без возрождения снятой редакции; ложное срабатывание тогда
+        # разбирается вручную (та же цена, что у записей «двух ног»,
+        # суррогата и гейта повтора, — популяция носителей важнее
+        # точности шаблона).
+        'pattern': r'защитн\w+\s+заявк\w+\s+после\s+входа'
+                   r'|охраня\w+\s+РАЗНЫЕ\s+популяции'
+                   r'|разные\s+популяции\s+действий',
+        'arrived': r'вход\w*\s+включая|включает\s+\**вход|полос\w+\s+(между|у)\s+якор'
+                   r'|клетку\s+«вход',
+        'date': '2026-09-01',
+        'source': 'D-G1 DOCS_CHECK_33: клетка «вход × полоса» без охраны, '
+                  'узел 6 GAPS_CLOSE_33',
+        'allowed': ('.claude/work/code-gate-ledger.json',),
+        'population': (('docs/rules/risk-policy.md', None),
+                       ('docs/spec/order-sizing.json', None),
+                       ('docs/components/SizeCalculator.md', None),
+                       ('docs/spec/stop-distance.json',
+                        r'ПОЛОСЕ\s+между\s+якорем|полос\w+\s+между\s+якорем')),
     },
 ]
 

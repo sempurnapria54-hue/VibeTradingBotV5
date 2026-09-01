@@ -7,7 +7,7 @@
     "deal.exchangeId": "биржа сделки",
     "deal.instrumentExternalId": "имя инструмента сделки на бирже",
     "deal.billsWindowBegin": "нижняя граница окна линковки; пусто — граница не добыта",
-    "deal.externalCreatedAt": "биржевой момент создания сделки — суррогат нижней границы",
+    "deal.externalCreatedAt": "суррогат нижней границы при пустом billsWindowBegin. На восстановительной тропе писатель кладёт сюда биржевое время ОТКРЫТИЯ наблюдённой позиции (docs/components/DealOpeningService.md), поэтому суррогатная граница накрывает экономику эпизода с открытия — комиссию входного филла и финансирование; покрытия сторон сверки однородны",
     "deal.terminal": "сделка терминальна",
     "flows[].exchangeId": "биржа записи движения",
     "flows[].externalInstrumentId": "сырой идентификатор инструмента записи; пусто — привязки к инструменту нет",
@@ -110,7 +110,7 @@
       "expect": { "linkedCount": 0 }
     },
     {
-      "case": "граница не добыта — работает суррогат биржевого момента создания сделки",
+      "case": "граница не добыта — работает суррогат из externalCreatedAt (на восстановительной тропе — время открытия наблюдённой позиции)",
       "state": {
         "sourceTime": 2000,
         "deal": { "exchangeId": 1, "instrumentExternalId": "ETH-USDT-SWAP", "billsWindowBegin": null, "externalCreatedAt": 900, "terminal": false },

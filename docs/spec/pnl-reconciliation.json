@@ -2,7 +2,12 @@
   "subject": "pnl-reconciliation",
   "question": "Сошлась ли сверка P&L",
   "home": "docs/rules/pnl-reconciliation.md",
-  "includes": ["risk-at-stop", "deal-risk-numbers", "protection-coverage", "order-lifecycle"],
+  "includes": [
+    "risk-at-stop",
+    "deal-risk-numbers",
+    "protection-coverage",
+    "order-lifecycle"
+  ],
   "operands": {
     "cashFlows[].amount": "DealCashFlow.amount — знаковая сумма движения",
     "cashFlows[].externalFee": "DealCashFlow.externalFee — знаковая комиссионная компонента записи, СЫРОЙ знак. Может отсутствовать: у события комиссионной компоненты не бывает (docs/models/domain/other/DealCashFlow.md)",
@@ -54,7 +59,7 @@
     },
     {
       "name": "epsilon",
-      "note": "Допуск один на сделку. Тест двухчастный, срабатывает меньший член; пол общий и вынесен наружу.",
+      "note": "Допуск один на сделку. Тест двухчастный, срабатывает меньший член; пол общий и вынесен наружу. На популяции сделок БЕЗ входных ног (восстановленная сделка) омиссионный член равен нулю — expectedDealFee пуст по множеству, — min схлопывается, и допуск вырождается в пол при любом обороте: тест одночастный, охрану композиции держит только пол. Поведение названо домом (docs/rules/pnl-reconciliation.md §Допуск) и закреплено примером «сделка без входных ног».",
       "expr": "max(tolerance.floor, min(tolerance.relativeShare * grossTurnover, tolerance.omissionMultiplier * expectedDealFee))"
     },
     {
@@ -1213,6 +1218,56 @@
         "matched": false,
         "mismatched": true
       }
+    },
+    {
+      "case": "сделка без входных ног: омиссионный член нулевой, допуск вырождается в пол",
+      "state": {
+        "settleCurrency": "USDT",
+        "tolerance": {
+          "relativeShare": 0.005,
+          "omissionMultiplier": 0.5,
+          "floor": 0.01
+        },
+        "duty": {
+          "closeRecordsFetchedForAllEpisodes": true,
+          "windowClosed": true,
+          "flowsFetched": true
+        },
+        "cashFlows": [
+          {
+            "amount": -100,
+            "ccy": "USDT",
+            "category": "REALIZED_PNL",
+            "excludedByExchange": false
+          },
+          {
+            "amount": -0.5,
+            "ccy": "USDT",
+            "category": "TRADE_FEE",
+            "excludedByExchange": false
+          },
+          {
+            "amount": 2,
+            "ccy": "USDT",
+            "category": "FUNDING",
+            "excludedByExchange": false
+          }
+        ],
+        "legs": [],
+        "episodes": [
+          {
+            "externalRealizedProfitGross": -100.2,
+            "externalFee": -0.4,
+            "externalFundingCost": -2,
+            "externalLiquidationPenalty": 0
+          }
+        ]
+      },
+      "expect": {
+        "expectedDealFee": 0,
+        "epsilon": 0.01
+      },
+      "note": "Популяция восстановленной сделки: входных ног нет ни одной, expectedDealFee = 0, min(относительный, омиссионный) = 0, epsilon = пол при любом обороте. Тест одночастный — названное поведение формулы (дом: docs/rules/pnl-reconciliation.md §Допуск)."
     }
   ]
 }

@@ -230,7 +230,7 @@
 
 **Носитель предиката «запись закрытия эпизода добыта» — непустота
 `externalRealizedProfit`.** Предикат один на весь корпус и зовётся везде
-`closeRecordFetched` (`docs/spec/deal-result.json`); отдельной
+`closeRecordFetched` в `docs/spec/deal-result.json`; отдельной
 колонки-признака под него нет, потому что net — **контрактное поле
 границы**: запись, его не несущая, границу не проходит вовсе
 (`docs/models/mapping/PositionCloseResult.md`, структурная валидация до

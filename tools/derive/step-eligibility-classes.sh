@@ -12,9 +12,12 @@
 #
 # Печатает по строке на пару: условие TAB класс пакета.
 set -euo pipefail
+# LC_ALL=C.UTF-8 обязателен у grep -P на объявленной среде (дом ловушки —
+# .claude/processes/roadmap-step-execution.md §«`grep -P` в этой среде
+# требует `LC_ALL=C.UTF-8`»; B2/E2/G-6 `DOCS_CHECK_33`).
 classes=$(sed -n '/^### Пакет исполняется по действию за проход/,/^\*\*Применённым шаг делает/p' \
               docs/rules/strategy-step-once-per-episode.md \
-          | grep -oP '^\| `\K[A-Z_А-Я_]+(?=`)')
+          | LC_ALL=C.UTF-8 grep -oP '^\| `\K[A-Z_А-Я_]+(?=`)')
 for condition in true false; do
   for class in $classes; do
     printf '%s\t%s\n' "$condition" "$class"

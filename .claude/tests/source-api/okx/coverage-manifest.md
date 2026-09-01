@@ -131,8 +131,16 @@ P=.claude/tests/source-api/okx/plan.md
 T=src/test/java/com/example/tradingbot/integration/sourceapi/okx/
 for c in $(grep '^### ' "$P" | grep -oE '[A-Za-z]+[0-9]+[.][0-9]+' | sort -u); do
   re="(^|[^0-9A-Za-z.])${c//./\\.}([^0-9A-Za-z.]|\\.[^0-9A-Za-z]|\\.$|$)"
-  # носитель — ИСПОЛНИМАЯ строка: упоминание кейса в javadoc им не является
-  grep -rE -- "$re" "$T" | grep -qvE ':[[:space:]]*(\*|//)' && continue
+  # носитель — ИСПОЛНИМАЯ строка: комментарии вычищаются ИЗ строк до грепа
+  # (trailing-//, однострочный /*...*/, открывающий /*, продолжения javadoc)
+  # — тот же фильтр, что у оси 3 tools/preconditions-check.sh; прежняя форма
+  # отбрасывала только строки, НАЧИНАЮЩИЕСЯ с маркера (F-1 DOCS_CHECK_33)
+  found=""
+  for f in $(grep -rlE -- "$re" "$T" 2>/dev/null); do
+    sed -e 's@//.*$@@' -e 's@/\*.*\*/@@g' -e 's@/\*.*$@@' \
+        -e 's@^[[:space:]]*\*.*@@' "$f" | grep -qE -- "$re" && { found=1; break; }
+  done
+  [ -n "$found" ] && continue
   # делегирование ищется по ЗАГОЛОВКУ, содержащему кейс (заголовок объявляет
   # два кейса сразу), и по любой форме слова «Покрыт»
   awk -v id="$c" 'index($0,"### ")==1 && index($0,id)>0 {f=1; next} /^### |^## /{if(f)exit} f' "$P" \

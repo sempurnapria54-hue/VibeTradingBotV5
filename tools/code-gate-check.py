@@ -51,6 +51,14 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Печать не зависит от кодировки консоли вызывающего: на cp1251-консоли
+# объявленной среды вывод падал UnicodeEncodeError (класс описан в backlog
+# у anchor-check; тот же ремонт исполнимости, DOCS_CHECK_33 узел 9).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parent.parent
 LEDGER = '.claude/work/code-gate-ledger.json'
 

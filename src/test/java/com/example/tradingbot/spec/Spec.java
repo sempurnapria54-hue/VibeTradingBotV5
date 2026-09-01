@@ -662,6 +662,9 @@ public final class Spec {
      * попало в измерение» перестают различаться. Поэтому такой файл —
      * препятствие базового гейта, а не тихий пропуск.
      */
+    // Сообщение препятствия читается контрфактически: без этого гейта файл
+    // молча выпадал бы из замера при зелёном прогоне; теперь прогон на нём
+    // отказывает кодом 2 (E4 DOCS_CHECK_33).
     private static List<String> hiddenSpecFiles(Path directory) {
         List<String> hidden = new ArrayList<>();
         try (Stream<Path> paths = Files.walk(directory)) {
@@ -760,8 +763,9 @@ public final class Spec {
      *
      * <p>Код возврата: 0 — примеры сошлись; 1 — есть расхождения; 2 — прогон
      * <b>не состоялся</b> (каталога нет, спецификаций нет, файл не разобран,
-     * состояние примера не собрано). Третий код заведён затем, чтобы
-     * «прогонять было нечего» не читалось как «расхождений нет».
+     * состояние примера не собрано, есть препятствие базового гейта — дубль
+     * ключа, спека в подкаталоге, структурный дефект). Третий код заведён
+     * затем, чтобы «прогонять было нечего» не читалось как «расхождений нет».
      */
     public static void main(String[] args) throws IOException {
         Path directory = Path.of(args.length > 0 ? args[0] : "docs/spec");
@@ -773,6 +777,26 @@ public final class Spec {
         if (files.isEmpty()) {
             System.out.println("ПРОГОН НЕ СОСТОЯЛСЯ: в каталоге " + directory
                     + " нет ни одной спецификации — прогонять нечего");
+            System.exit(2);
+        }
+        // Препятствия базового гейта (дубль ключа строгим разбором, спека в
+        // подкаталоге, структурные дефекты) исполняются и штатной тропой, а не
+        // только мутационной командой: дефект этих классов, внесённый правкой
+        // примера, прежде проходил штатный прогон зелёным (E4 DOCS_CHECK_33).
+        List<String> structural = new ArrayList<>(hiddenSpecFiles(directory));
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            structural.addAll(duplicateKeyObstacles(name, file));
+            try {
+                structural.addAll(structuralObstacles(name, asMap(MAPPER.readValue(file.toFile(), Map.class))));
+            } catch (IOException | RuntimeException failure) {
+                structural.add(name + " — файл не разобран: " + failure.getMessage());
+            }
+        }
+        if (!structural.isEmpty()) {
+            structural.forEach(System.out::println);
+            System.out.println("ПРОГОН НЕ СОСТОЯЛСЯ: препятствий базового гейта " + structural.size()
+                    + " — корпус структурно битый, а не «расхождений нет»");
             System.exit(2);
         }
         List<String> failures = new ArrayList<>();

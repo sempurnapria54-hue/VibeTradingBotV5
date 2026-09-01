@@ -19,7 +19,8 @@
     "stepConditionTrue": "условие шага истинно на этом проходе (пороги лестницы сопровождения уровневые: истинны, пока цена держится выше порога)",
     "stepActionRows[]": "строки исполнения действий ЭТОГО шага (docs/models/domain/other/DealActionState.md): каждая несёт trancheEpisodeSeq и status. Строка на действие в эпизоде одна: бюджет попыток живёт ВНУТРИ строки, повтора строки он не производит",
     "stepDeclaredActions[]": "действия, ОБЪЯВЛЕННЫЕ пакетом этого шага в артефакте стратегии. Шаг есть ПАКЕТ действий (docs/components/StrategyActionOrchestrator.md §«Пакет шага исполняется целиком; за проход — одно действие»), поэтому признак применённости стои́т на исчерпании пакета, а не на факте первой строки",
-    "currentTrancheEpisodeSeq": "DealTranche.episodeSeq — номер ТЕКУЩЕГО эпизода транша; +1 на каждом ребре переоткрытия. Имя разведено с одноимённым полем строки исполнения намеренно: в отборе строк оба имени встречаются рядом, и совпадение имён отдало бы оба значения строке"
+    "currentTrancheEpisodeSeq": "DealTranche.episodeSeq — номер ТЕКУЩЕГО эпизода транша; +1 на каждом ребре переоткрытия. Имя разведено с одноимённым полем строки исполнения намеренно: в отборе строк оба имени встречаются рядом, и совпадение имён отдало бы оба значения строке",
+    "standingRungOnActionRadius": "на радиусе объекта действия стоит safety-ступень (любая — своя или чужая по причине): связь «строка -> причина ступени» не хранится, ступень читается по радиусу; операнд гейта повтора отказавшей надобности (дом — docs/rules/strategy-step-once-per-episode.md §«Надобность после исчерпания бюджета — гейт по стоящей ступени»)"
   },
   "values": [
     {
@@ -56,7 +57,7 @@
     },
     {
       "name": "stepActionRowsApplied",
-      "note": "Сколько действий пакета исполнено на ТЕКУЩЕМ эпизоде транша. Отбор двойной: номер эпизода строки равен текущему (одного dealTrancheId не хватает — переоткрытие идёт тем же траншем, и строки копятся) и статус строки не SKIPPED и не FAILED (SKIPPED — не применялся; FAILED — попытки исчерпаны, надобность осталась, новая строка законна).",
+      "note": "Сколько действий пакета исполнено на ТЕКУЩЕМ эпизоде транша. Отбор двойной: номер эпизода строки равен текущему (одного dealTrancheId не хватает — переоткрытие идёт тем же траншем, и строки копятся) и статус строки не SKIPPED и не FAILED (SKIPPED — не применялся; FAILED — попытки исчерпаны, надобность осталась; повтор гейтится стоящей ступенью — stepRetryGated).",
       "op": "count",
       "over": "stepActionRows",
       "where": "trancheEpisodeSeq == currentTrancheEpisodeSeq && !in(status, 'SKIPPED', 'FAILED')"
@@ -78,9 +79,21 @@
       "expr": "stepActionRowsApplied >= stepDeclaredActionCount"
     },
     {
+      "name": "stepFailedRowOnEpisode",
+      "note": "Отказавшая строка той же надобности на текущем эпизоде: попытки исчерпаны, надобность осталась. Признаком применённости не является (дом — docs/rules/strategy-step-once-per-episode.md); операнд гейта повтора.",
+      "op": "exists",
+      "over": "stepActionRows",
+      "where": "trancheEpisodeSeq == currentTrancheEpisodeSeq && status == 'FAILED'"
+    },
+    {
+      "name": "stepRetryGated",
+      "note": "Гейт повтора отказавшей надобности: новая строка того же шага на том же эпизоде не заводится, пока стоит ступень радиуса, поднятая исчерпанием бюджета; снятие ступени возобновляет надобность. Прежде судьба надобности после FAILED имела три несовместимых прочтения по трём носителям — петля без предела / застревание first-match / снос сделки (B3 DOCS_CHECK_33). Дом — docs/rules/strategy-step-once-per-episode.md §«Надобность после исчерпания бюджета — гейт по стоящей ступени».",
+      "expr": "stepFailedRowOnEpisode && standingRungOnActionRadius"
+    },
+    {
       "name": "stepEligible",
       "note": "Шаг допустим к применению: условие истинно И на текущем эпизоде транша он ещё не применялся. Второй конъюнкт и есть то, чем едет лестница: порог нижней ступени остаётся истинным и после её применения, поэтому без выпадения first-match выбирал бы её каждым проходом, перевыставляя безубыток бессрочно, а ступень трейлинга не исполнялась бы ни разу. Дом правила — docs/rules/strategy-step-once-per-episode.md.",
-      "expr": "stepConditionTrue && !stepAppliedOnEpisode"
+      "expr": "stepConditionTrue && !stepAppliedOnEpisode && !stepRetryGated"
     }
   ],
   "examples": [
@@ -790,8 +803,8 @@
       }
     },
     {
-      "case": "исчерпанный бюджет: строка текущего эпизода в FAILED — шаг остаётся допустимым",
-      "note": "Надобность осталась, новая строка законна. Считать FAILED применением значило бы выключить ступень до конца эпизода молча.",
+      "case": "исчерпанный бюджет при снятой ступени: FAILED-строка признака не даёт, шаг снова допустим",
+      "note": "FAILED — не применение: иначе исчерпанный бюджет молча выключал бы ступень до конца эпизода. Повтор надобности гейтится стоящей ступенью (stepRetryGated); здесь ступень снята — надобность возобновляется. Дом — docs/rules/strategy-step-once-per-episode.md §«Надобность после исчерпания бюджета — гейт по стоящей ступени».",
       "state": {
         "stepDeclaredActions": [
           {
@@ -805,7 +818,8 @@
             "status": "FAILED"
           }
         ],
-        "currentTrancheEpisodeSeq": 2
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": false
       },
       "expect": {
         "stepAppliedOnEpisode": false,
@@ -931,6 +945,57 @@
         "stepPackageProgress": "ЧАСТЬ",
         "stepAppliedOnEpisode": false,
         "stepEligible": false
+      }
+    },
+    {
+      "case": "надобность отказала, ступень стоит — повтор не заводится",
+      "note": "Гейт повтора: бюджет попыток исчерпан (FAILED-строка текущего эпизода), поднятая отказом ступень стоит — шаг не выбирается, петли «N попыток -> FAILED -> новая строка» нет. Пример падает при возврате прежней формы stepEligible (без третьего конъюнкта).",
+      "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": true
+      },
+      "expect": {
+        "stepFailedRowOnEpisode": true,
+        "stepRetryGated": true,
+        "stepAppliedOnEpisode": false,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "ступень снята — надобность возобновляется новой строкой",
+      "note": "Снятие ступени — «причина понята»: first-match снова видит шаг, оркестратор заводит новую строку с новым бюджетом. FAILED-строка признака применённости не даёт.",
+      "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "одно действие пакета"
+          }
+        ],
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": false
+      },
+      "expect": {
+        "stepFailedRowOnEpisode": true,
+        "stepRetryGated": false,
+        "stepEligible": true
       }
     }
   ],

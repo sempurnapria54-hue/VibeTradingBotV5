@@ -51,6 +51,14 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Печать не зависит от кодировки консоли вызывающего: на cp1251-консоли
+# объявленной среды вывод падал UnicodeEncodeError (класс описан в backlog
+# у anchor-check; тот же ремонт исполнимости, DOCS_CHECK_33 узел 9).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parent.parent
 SEPARATOR = " → "
 
@@ -84,8 +92,12 @@ def derive(population, root):
     """Выводит членов командой популяции. Отказ команды — Refusal."""
     command = population["derive"]["command"]
     try:
+        # Кодировка чтения — UTF-8 явно: команды вывода печатают UTF-8, а
+        # text=True без encoding декодирует локалью консоли (cp1251 на
+        # объявленной среде) и падал в reader-thread (узел 9 DOCS_CHECK_33).
         done = subprocess.run(["bash", "-c", command], cwd=str(root),
-                              capture_output=True, text=True, timeout=120)
+                              capture_output=True, text=True, timeout=120,
+                              encoding="utf-8", errors="replace")
     except OSError as failure:
         raise Refusal("команда вывода не запустилась: %s" % failure) from failure
     if done.returncode != 0:

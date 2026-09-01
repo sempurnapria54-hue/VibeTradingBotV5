@@ -38,7 +38,9 @@
 # Запуск (из корня репозитория):  bash tools/spec-mutation-check.sh
 # Код возврата: 0 — все величины доказательны; 1 — есть недоказательные
 # (перечень в stdout); 2 — ЗАМЕР НЕ ПРОВОДИЛСЯ (ось не доказана, базовый
-# гейт не пройден, корпус отказал под мутацией, раннер не собрался).
+# гейт не пройден, корпус отказал под мутацией, раннер не собрался, JVM не
+# запустила раннер — прежде незапуск приезжал кодом 1 «есть недоказательные»,
+# G-7 `DOCS_CHECK_33`).
 set -euo pipefail
 
 # shellcheck source=tools/spec-runner-env.sh
@@ -53,4 +55,17 @@ else
   # общий рабочий каталог делал одновременные прогоны небезопасными.
   trap 'rm -rf "$SPEC_CLASSES" "$WORK"' EXIT
 fi
-"${JAVA[@]}" com.example.tradingbot.spec.SpecMutation "${1:-docs/spec}" "$WORK"
+# Та же конвертация, что у SPEC_CLASSES в оснастке: POSIX-форма mktemp
+# в аргументе Windows-Java не читается (G-7 `DOCS_CHECK_33`).
+command -v cygpath >/dev/null && WORK="$(cygpath -m "$WORK")"
+err_log="$SPEC_CLASSES/stderr.log"
+set +e
+"${JAVA[@]}" com.example.tradingbot.spec.SpecMutation "${1:-docs/spec}" "$WORK" 2>"$err_log"
+rc=$?
+set -e
+cat "$err_log" >&2
+if [ "$rc" -ne 0 ] && grep -q 'Could not find or load main class' "$err_log"; then
+  echo "ЗАМЕР НЕ ПРОВОДИЛСЯ: JVM не запустила раннер (системный отказ, не недоказательность)" >&2
+  exit 2
+fi
+exit "$rc"

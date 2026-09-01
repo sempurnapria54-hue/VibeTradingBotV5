@@ -463,6 +463,29 @@
       "expectRefusal": {
         "stopOnLossSide": "уровня в момент постановки нет"
       }
+    },
+    {
+      "case": "первичный уровень в ПОЛОСЕ между якорем и безубытком: знаменатель положителен, пол молчит — ловит только предикат стороны",
+      "note": "LONG, якорь 3000, уровень 3001 ниже безубытка 3003.0015: дистанция отрицательна (сторона прибыльная), но комиссии перекрывают её — lossAtStopPerUnit = −1 + 3.0005 = +2.0005 > 0, и сайзинг НЕ отказывает; пол дистанции применяется только на убыточной стороне и молчит. Ширина полосы ≈ 2f·P/(1−f) — три пункта на цене 3000 при ставке 5 б.п., не доли тика. Клетку «вход × полоса» охраняет ровно primaryStopOnLossSide: популяция предиката — ВСЯ первичная постановка с объявленным уровнем, вход включая (дом области и порядка — docs/rules/risk-policy.md §«Порядок рубежей — по порядку прохода»). Достижимость — той же тропой, что у примера прибыльной стороны: буфер рыночной структуры — непрерывная величина, уровень 3001 достижим так же, как 3100.",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "stopPrice": 3001,
+        "feeRate": 0.0005,
+        "calculationType": "MARKET_STRUCTURE_BUFFER_PERCENT",
+        "distancePercents": 1,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "signedStopDistance": -1,
+        "lossAtStopPerUnit": 2.0005,
+        "stopOnLossSide": false,
+        "stopDistanceAboveFloor": true,
+        "primaryStopOnLossSide": false
+      }
     }
   ]
 }

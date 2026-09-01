@@ -46,6 +46,11 @@ CP="$CP$SPEC_SEP$(spec_jar com/fasterxml/jackson/core/jackson-core 'jackson-core
 CP="$CP$SPEC_SEP$(spec_jar com/fasterxml/jackson/core/jackson-annotations 'jackson-annotations-*.jar')"
 
 SPEC_CLASSES="$(mktemp -d)"
+# Каталог классов конвертируется тем же ходом, что SPEC_ROOT и jar'ы выше:
+# POSIX-форма mktemp внутри составного аргумента -cp Windows-Java не
+# читается, и оба спек-гейта падали кодом 1 на здоровом корпусе
+# (E1/G-7 `DOCS_CHECK_33`).
+command -v cygpath >/dev/null && SPEC_CLASSES="$(cygpath -m "$SPEC_CLASSES")"
 trap 'rm -rf "$SPEC_CLASSES"' EXIT
 
 "$SPEC_JDK_HOME/bin/javac" -encoding UTF-8 -nowarn -cp "$CP" -d "$SPEC_CLASSES" \

@@ -75,7 +75,7 @@ runtime-сущность» живёт в строке исполнения, по
 | `MISSING_AFTER_REFRESH` | исполнитель добычи условной заявки, исчерпавший цикл источников |
 | `ORDER_FAILED` | резолвер внешнего статуса: биржа отвергла постановку целиком |
 | `PARTIALLY_FAILED` | он же: часть пакета встала, часть отвергнута |
-| `UNKNOWN_EXTERNAL_STATUS` | резолвер внешнего статуса, ветвь `REFUSED` (`docs/spec/external-status-resolution.json`) |
+| `UNKNOWN_EXTERNAL_STATUS` | резолвер внешнего статуса, ветвь `REFUSED` в `docs/spec/external-status-resolution.json` |
 | `EXCHANGE_INVARIANT_VIOLATION` | исполнитель, наблюдавший нарушение биржевого инварианта |
 | `UNKNOWN` | умолчание разбора |
 

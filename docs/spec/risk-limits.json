@@ -2,7 +2,10 @@
   "subject": "risk-limits",
   "question": "Выполняются ли потолки риска",
   "home": "docs/rules/risk-policy.md",
-  "includes": ["order-lifecycle", "risk-at-stop"],
+  "includes": [
+    "order-lifecycle",
+    "risk-at-stop"
+  ],
   "operands": {
     "graphComplete": "граф сделки предъявлен контекстом прохода целиком: транши, эпизоды, ноги, встроенные защиты, отдельные условные заявки. Значение берётся из дома-спеки: graphComplete в docs/spec/deal-context-load.json; здесь форма не переписывается, признак читается готовым и преконтролем не пересобирается (docs/components/models/DealContext.md). Ложен — операнды, которые преконтроль считает по этому же графу (dealRiskTaken, liveRiskNow, dealNotional), пусты, и стоящие на них потолки отказывают вычислением: преконтроль отвечает fail-fast отказом DEAL_GRAPH_INCOMPLETE (docs/components/RiskValidator.md). Ответ по загруженному подмножеству был бы ЗАНИЖЕННЫМ, то есть разрешающим; пустота нулём не подменяется. Поактное неравенство на графе не стои́т и остаётся вычислимым — но преконтроль до него не доходит: отказ у него fail-fast, а не накопительный (docs/components/RiskValidator.md)",
     "deal.plannedRiskAmount": "Deal.plannedRiskAmount — риск, принятый сделкой: заявленный живыми и исполнившимися входными ногами плюс налитая доля выбывших; резолв — docs/spec/deal-risk-numbers.json, значение dealPlannedRisk",
@@ -30,7 +33,9 @@
     "freeBalanceAtFinalization": "свободный остаток расчётной валюты на момент финализации сделки; пусто — строки расчётной валюты в снимке нет",
     "balanceSnapshotAfterTerminal": "снимок BalanceContainer сделан не раньше терминала сделки; false — снимок устарел относительно исхода",
     "riskBaseObservationCandidate": "доступный остаток строки расчётной валюты в приземляемом снимке средств — операнд первого наблюдения базы; пусто — строки расчётной валюты в снимке нет",
-    "exchangeRiskBase": "Exchange.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)"
+    "exchangeRiskBase": "Exchange.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)",
+    "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.ENTRY_BLOCKED либо TRADE_BLOCKED (docs/rules/instrument-hold.md §Enforcement). Рабочее состояние и онбординговые статусы значения не дают",
+    "actInSafetyBlockSet": "класс проверяемого акта входит в блок-сет safety-ступени: risk-creating, risk-increasing либо risk-weakening (ослабление защиты). Снятие риска и reduce-only-выход в блок-сет не входят — сделки доживают под своей защитой (docs/rules/instrument-hold.md)"
   },
   "values": [
     {
@@ -140,6 +145,11 @@
       "expr": "dealCollapsing && actRiskCreating"
     },
     {
+      "name": "safetyRungBlocksAction",
+      "note": "Блок-сет стоящей safety-ступени инструмента: действие блокируемого класса отвергается преконтролем кодом INSTRUMENT_SAFETY_HOLD, реакция — карв-аут (docs/processes/risk-evaluation.md), возобновление — снятием ступени. Прежде у блок-сета, объявленного домом лестницы, не было ни кода проверки, ни строки развязки — по букве схемы отказ в сопровождении уводил сделку в ERROR вопреки «доживают под защитой» (B4 DOCS_CHECK_33). Дом — docs/rules/instrument-hold.md §Enforcement.",
+      "expr": "instrumentSafetyRungStanding && actInSafetyBlockSet"
+    },
+    {
       "name": "actWithinPerAction",
       "expr": "actRisk <= limits.riskPerActionPercent / 100 * base"
     },
@@ -165,7 +175,7 @@
     {
       "case": "живой риск: неисполненная доля ноги плюс живой эпизод до стопа",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -214,7 +224,7 @@
     {
       "case": "стоп за безубытком: живое слагаемое гаснет, плановый риск живой ноги — нет",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -262,7 +272,7 @@
     {
       "case": "кумулятивный потолок считает принятый сделкой риск вместе с риском акта",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 100,
@@ -302,7 +312,7 @@
     {
       "case": "вырожденный знаменатель даёт ноль, а не деление",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -350,7 +360,7 @@
     {
       "case": "все четыре потолка считаются от одной замороженной базы сделки",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 100,
@@ -391,7 +401,7 @@
     {
       "case": "первое наблюдение: пустую базу заполняет положительный остаток приземляемого снимка",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": null,
@@ -435,7 +445,7 @@
     {
       "case": "нулевой остаток наблюдением не считается: база остаётся пустой, ненаблюдение различимо",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": null,
@@ -479,7 +489,7 @@
     {
       "case": "отрицательный остаток наблюдением не считается по той же причине, что и нулевой",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": null,
@@ -523,7 +533,7 @@
     {
       "case": "непустую базу приземление снимка не трогает: наблюдение однократно и только из пустоты",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": 10000,
@@ -567,7 +577,7 @@
     {
       "case": "просадка режет базу автоматически",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": 10000,
@@ -611,7 +621,7 @@
     {
       "case": "рост свободного остатка поднимает базу автоматически — тем же ходом, что просадка её режет: движение симметрично, и писателя вверх рукой больше нет",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": 10000,
@@ -653,7 +663,7 @@
     {
       "case": "значение берётся из остатка целиком, а не мажорируется прежней базой — контрпример к снятой редакции с min()",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": 10000,
@@ -696,7 +706,7 @@
     {
       "case": "строки расчётной валюты в снимке нет — база не двигается, ход отмечен омиссией",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": 10000,
@@ -740,7 +750,7 @@
     {
       "case": "снимок баланса старше терминала — база не двигается, ход отмечен омиссией",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "riskBaseBefore": 10000,
@@ -784,7 +794,7 @@
     {
       "case": "первый вход выше катастрофического потолка отвергается на создании: ни живых ног, ни эпизода, ни защиты ещё нет",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 92.955,
@@ -829,7 +839,7 @@
     {
       "case": "первый вход ровно в потолок проходит границей — РАНТАЙМОМ; конфигурация с нулевым запасом до рантайма не доходит, её отвергает создание",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 92.955,
@@ -870,7 +880,7 @@
     {
       "case": "добор поверх ровно заполненного потолка отвергается, хотя существующая экспозиция в него укладывается",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -919,7 +929,7 @@
     {
       "case": "частично налитая живая нога не задваивает свой филл: нотинал считается неисполненной долей плюс живым эпизодом",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -970,7 +980,7 @@
     {
       "case": "вход после частичного выхода: исполнившаяся нога в нотинал не идёт, экспозицию несёт ужавшийся эпизод",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1020,7 +1030,7 @@
     {
       "case": "вход после частичного выхода при живой недоналитой ноге: доля ноги и ужавшийся эпизод складываются без задвоения",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1071,7 +1081,7 @@
     {
       "case": "веер живых ног при полной аллокации выходит за катастрофический потолок — рантайм-предел; статический запас такую конфигурацию отвергает раньше (docs/spec/strategy-reference.json)",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1122,7 +1132,7 @@
     {
       "case": "тот же веер при множителе, ровно покрывающем экспозицию, проходит границей",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1171,7 +1181,7 @@
     {
       "case": "незаявленный множитель отказывает, а не пропускает действие",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1211,7 +1221,7 @@
     {
       "case": "незаданный максимальный риск на сделку отказывает обоими потолками, которые на нём стоят",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1251,7 +1261,7 @@
     {
       "case": "поактное неравенство: нога под бюджет проходит, вдвое большая — нет",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 92.955,
@@ -1292,7 +1302,7 @@
     {
       "case": "риск акта вдвое выше поактного бюджета отвергается",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 185.91,
@@ -1332,7 +1342,7 @@
       "case": "ослабление защиты считается всеми четырьмя потолками: три проходят, катастрофическое отвергает — нотинал живого эпизода вырос проскоком входа выше одобренного преконтролем",
       "note": "Состояние достижимо ходом эталонной тропы: вход при доле аллокации 100 сайзится в 33 контракта (тесный стоп — связывает аллокация, docs/spec/order-sizing.json), его плановый риск 19.79505 укладывается в поактный бюджет 100, плановый нотинал 33 x 0.1 x 3000 = 9900 проходит катастрофический потолок 9900 равенством. Филл идёт по 3020 — проскок поднимает нотинал живого эпизода до 9966, и следующее действие, даже нулевое по риску и нотиналу, катастрофическим неравенством отвергается.",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1385,7 +1395,7 @@
     {
       "case": "ослабление защиты: риск акта нулевой, но одновременный потолок считается по новой защите",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1426,7 +1436,7 @@
       "case": "нога сделки в контекст не попала: потолки, стоящие на графе, отказывают, а не разрешают",
       "note": "Состояние достижимо: у сделки два веерных входа, второй транш в контекст прохода не попал, поэтому его нога невидима, а колонка Deal.plannedRiskAmount несёт прежние 100 — писатель четвёрки на этом же неполном графе её не переписывал (docs/spec/deal-context-load.json, plannedRiskWritten). Оба операнда занижены ровно на невидимую ногу, и по загруженному подмножеству все четыре неравенства прошли бы: 100 + 0 <= 100 у одновременного, 100 + 0 <= 300 у кумулятивного, 21000 + 0 <= 30000 у катастрофического. На полном графе вторая нога удваивает каждое левое слагаемое (200 против 100, 42000 против 30000), и те же три потолка отвергают действие. Направление ошибки неполноты РАЗРЕШАЮЩЕЕ, поэтому ответ подменяется отказом.",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": false,
         "actRisk": 0,
@@ -1485,7 +1495,7 @@
       "case": "эпизод в контекст не попал: живой риск позиции невидим, и одновременный потолок отказывает вместо разрешения",
       "note": "Вторая тропа неполноты, не выводимая из первой: ноги загружены все и терминальны, а эпизод позиции в контекст не попал, поэтому живого эпизода преконтроль не видит и живой риск по загруженному подмножеству равен нулю. Действие риском 90 прошло бы одновременный бюджет 100, тогда как живой эпизод до своей защиты несёт около 300 и на полном графе тот же акт отвергается. Пустой операнд нулём не подменяется: ноль здесь означал бы «риска нет», а не «риск не предъявлен».",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": false,
         "actRisk": 90,
@@ -1543,7 +1553,7 @@
     {
       "case": "первое действие сделки: снимка базы ещё нет, делителем служит живая база счёта",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1591,7 +1601,7 @@
     {
       "case": "снимок базы есть и разошёлся с живой базой — делит снимок, а не счёт",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1640,7 +1650,7 @@
       "case": "детектор нарушения риск-политики при живой защите: те же неравенства с нулевым актом",
       "note": "Триггер уровня 3 «нарушение риск-политики при живой защите» (docs/rules/instrument-hold.md) не имел ни детектора, ни операнда. Собственных величин ему не заводится: он гоняет ТЕ ЖЕ неравенства при actRisk = 0 и actNotional = 0, то есть спрашивает «уложилась бы живая сделка в потолки, не делая ничего». Популяция достижима без единого нашего действия: база следует за балансом ВНИЗ (docs/rules/risk-policy.md), и просадка опускает потолок под уже принятый риск. Пример падает, если неравенства перестанут различать нулевой акт, и потому фальсифицирует детектор.",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 0,
@@ -1689,17 +1699,30 @@
       "case": "добор объёма в окне сворачивания отвергается преконтролем — статусного ребра он не двигает и прежде не гейтился ничем",
       "note": "Ветвь достижима у транша в сопровождении: сделка ушла в EXIT_PENDING, транш жив, действие замещения увеличивает объём. Ребро транша при этом не применяется — статус не меняется, — поэтому энфорсер обязан стоять и в преконтроле.",
       "state": {
-                "dealCollapsing": true,
+        "dealCollapsing": true,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 50,
         "actNotional": 1000,
         "direction": "LONG",
-        "deal": { "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
         "hasLiveEpisode": false,
-        "position": { "externalSize": 0 },
-        "instrument": { "contractValue": 0.1 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
         "entryLegs": [],
         "entryAnchor": 3000,
         "stopPrice": 2910,
@@ -1708,22 +1731,37 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000
       },
-      "expect": { "riskCreatingUnderCollapseRejected": true }
+      "expect": {
+        "riskCreatingUnderCollapseRejected": true
+      }
     },
     {
       "case": "то же действие вне окна сворачивания преконтролем не отвергается",
       "state": {
-                "dealCollapsing": false,
+        "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 50,
         "actNotional": 1000,
         "direction": "LONG",
-        "deal": { "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
         "hasLiveEpisode": false,
-        "position": { "externalSize": 0 },
-        "instrument": { "contractValue": 0.1 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
         "entryLegs": [],
         "entryAnchor": 3000,
         "stopPrice": 2910,
@@ -1732,22 +1770,37 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000
       },
-      "expect": { "riskCreatingUnderCollapseRejected": false }
+      "expect": {
+        "riskCreatingUnderCollapseRejected": false
+      }
     },
     {
       "case": "снятие риска в окне сворачивания проходит: запрет адресует НАБОР риска, а не всякое действие",
       "state": {
-                "dealCollapsing": true,
+        "dealCollapsing": true,
         "actRiskCreating": false,
         "graphComplete": true,
         "actRisk": 0,
         "actNotional": 0,
         "direction": "LONG",
-        "deal": { "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
         "hasLiveEpisode": false,
-        "position": { "externalSize": 0 },
-        "instrument": { "contractValue": 0.1 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
         "entryLegs": [],
         "entryAnchor": 3000,
         "stopPrice": 2910,
@@ -1756,7 +1809,9 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000
       },
-      "expect": { "riskCreatingUnderCollapseRejected": false }
+      "expect": {
+        "riskCreatingUnderCollapseRejected": false
+      }
     },
     {
       "case": "постановка основной защиты после адверсного проскока входа: потолок меряется по УСТАНАВЛИВАЕМОМУ уровню, и действие проходит",
@@ -1768,11 +1823,24 @@
         "actRisk": 0,
         "actNotional": 0,
         "direction": "LONG",
-        "deal": { "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
         "hasLiveEpisode": true,
-        "position": { "externalSize": 31 },
-        "instrument": { "contractValue": 0.1 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "position": {
+          "externalSize": 31
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
         "entryLegs": [],
         "entryAnchor": 3001.125,
         "stopPrice": 2982,
@@ -1797,11 +1865,24 @@
         "actRisk": 0,
         "actNotional": 0,
         "direction": "LONG",
-        "deal": { "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
         "hasLiveEpisode": true,
-        "position": { "externalSize": 31 },
-        "instrument": { "contractValue": 0.1 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "position": {
+          "externalSize": 31
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
         "entryLegs": [],
         "entryAnchor": 3001.125,
         "stopPrice": 2970,
@@ -1826,11 +1907,24 @@
         "actRisk": 0,
         "actNotional": 0,
         "direction": "LONG",
-        "deal": { "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
         "hasLiveEpisode": true,
-        "position": { "externalSize": 31 },
-        "instrument": { "contractValue": 0.1 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "position": {
+          "externalSize": 31
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
         "entryLegs": [],
         "entryAnchor": 3001.125,
         "stopPrice": null,
@@ -1839,7 +1933,10 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000
       },
-      "expect": { "stopPriceAfterAct": null, "stopPriceIsAfterAct": true },
+      "expect": {
+        "stopPriceAfterAct": null,
+        "stopPriceIsAfterAct": true
+      },
       "expectRefusal": {
         "livePositionRiskAtStop": "уровня после акта нет",
         "withinStrategySimultaneous": "потолок не считается без уровня",
@@ -1856,11 +1953,24 @@
         "actRisk": 0,
         "actNotional": 0,
         "direction": "LONG",
-        "deal": { "plannedRiskAmount": 100, "plannedRiskEquityBase": 10000 },
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
         "hasLiveEpisode": true,
-        "position": { "externalSize": 31 },
-        "instrument": { "contractValue": 0.1 },
-        "limits": { "riskPerActionPercent": 1, "cumulativeMultiplier": 3, "strategySimultaneousPercent": 1, "globalSimultaneousPercent": 1, "catastrophicMultiplier": 100 },
+        "position": {
+          "externalSize": 31
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
         "entryLegs": [],
         "entryAnchor": 3001.125,
         "stopPrice": 2970,
@@ -1869,7 +1979,135 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000
       },
-      "expect": { "stopPriceAfterAct": 2982, "stopPriceIsAfterAct": false }
+      "expect": {
+        "stopPriceAfterAct": 2982,
+        "stopPriceIsAfterAct": false
+      }
+    },
+    {
+      "case": "перестановка защиты на инструменте под мягкой ступенью отвергается блок-сетом",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 50,
+        "actNotional": 1000,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "stopPrice": 2910,
+        "actStopPrice": null,
+        "liveStopPrice": 2910,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 10000,
+        "instrumentSafetyRungStanding": true,
+        "actInSafetyBlockSet": true
+      },
+      "expect": {
+        "safetyRungBlocksAction": true
+      },
+      "note": "Тропа — сама цель ENTRY_BLOCKED: ослабление защиты (risk-weakening REPLACE) блокируется наравне с созданием нового риска; действие ждёт снятия ступени, сделка остаётся в статусе (карв-аут)."
+    },
+    {
+      "case": "reduce-only-выход на том же инструменте блок-сет не трогает — сделки доживают под защитой",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 50,
+        "actNotional": 1000,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "stopPrice": 2910,
+        "actStopPrice": null,
+        "liveStopPrice": 2910,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 10000,
+        "instrumentSafetyRungStanding": true,
+        "actInSafetyBlockSet": false
+      },
+      "expect": {
+        "safetyRungBlocksAction": false
+      },
+      "note": "Снятие риска в блок-сет не входит: постановка тейка и выход проходят при стоящей ступени."
+    },
+    {
+      "case": "то же действие на инструменте в рабочем состоянии проходит",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 50,
+        "actNotional": 1000,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeMultiplier": 3,
+          "strategySimultaneousPercent": 1,
+          "globalSimultaneousPercent": 1,
+          "catastrophicMultiplier": 100
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "stopPrice": 2910,
+        "actStopPrice": null,
+        "liveStopPrice": 2910,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 10000,
+        "instrumentSafetyRungStanding": false,
+        "actInSafetyBlockSet": true
+      },
+      "expect": {
+        "safetyRungBlocksAction": false
+      }
     }
   ]
 }

@@ -27,6 +27,11 @@
 (скобочную) и печатала число, выглядевшее полным: 106 указателей при 173
 в корпусе.
 
+ФОРМЫ ПУТИ — ОБЕ: SKIP-фильтр архивных каталогов сверяется по пути с
+нормализованным разделителем ('/' и '\\' Windows-glob — оси 13-14);
+прежде подстрочная сверка со '/'-шаблонами на Windows была мертва, и 42
+архивных дефекта делали детектор перманентно красным (E3 `DOCS_CHECK_33`).
+
 ПРИВЯЗКА СМЕЖНАЯ, НЕ ОКОННАЯ. Между ссылкой и именем стои́т только
 разделитель формы (скобка, §, поясняющее слово, запятая, предлог). Замер
 отверг привязку «по ближайшей ссылке в окне 160 символов»: имя, названное
@@ -60,8 +65,24 @@ import re
 import sys
 import tempfile
 
+# Печать не зависит от кодировки консоли вызывающего: на cp1251-консоли
+# объявленной среды вывод падал UnicodeEncodeError (класс описан в backlog
+# у anchor-check; тот же ремонт исполнимости, DOCS_CHECK_33 узел 9).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 SPEC_DIR = 'docs/spec'
 SKIP = ('/history/', '/library/', '.claude-archive', '/progress/')
+
+
+def skipped(path):
+    """Архивный ли путь. Разделитель нормализуется до '/': на Windows glob
+    возвращает '\\'-пути, и подстрочная сверка со '/'-шаблонами SKIP была
+    мертва — 42 ложных дефекта из архивных отчётов (E3 `DOCS_CHECK_33`)."""
+    normal = '/' + path.replace('\\', '/')
+    return any(skip in normal for skip in SKIP)
 
 SPEC_REF = re.compile(r'`docs/spec/([\w-]+\.json)`')
 FILE_REF = re.compile(r'`?docs/spec/[\w-]+\.json`?')
@@ -159,7 +180,7 @@ def scan(spec_dir, roots):
     if not index:
         return None, 'индекс домов величин пуст — проверять нечего'
     files = [path for pattern in roots for path in glob.glob(pattern, recursive=True)
-             if not any(skip in '/' + path for skip in SKIP)]
+             if not skipped(path)]
     if not files:
         return None, 'ни одного файла корпуса не найдено — проверять нечего'
     bad, checked = [], 0
@@ -252,6 +273,16 @@ def battery():
         _, refusal = scan(SPEC_DIR, [os.path.join(work, 'нет-такого', '*.md')])
         axes.append(('12. корпус пуст — проверка отказывает', bool(refusal),
                      refusal or 'проверка отчиталась'))
+        # ось формы пути: SKIP обязан работать на ОБЕИХ письменных формах
+        # разделителя — '/' (POSIX) и '\\' (Windows-glob); фикстуры выше
+        # строятся os.path.join и на POSIX эту форму не предъявляют
+        axes.append(('13. SKIP отбрасывает архивный путь Windows-формы (\\)',
+                     skipped('.claude\\work\\progress\\x\\п.md')
+                     and skipped('.claude/work/progress/x/п.md'),
+                     'обе формы разделителя отброшены'))
+        axes.append(('14. контроль: живой файл корпуса SKIP не отбрасывает',
+                     not skipped('docs\\rules\\п.md') and not skipped('docs/rules/п.md'),
+                     'обе формы разделителя пропущены'))
     return axes
 
 

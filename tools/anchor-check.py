@@ -78,6 +78,14 @@ import re
 import sys
 import tempfile
 
+# Печать не зависит от кодировки консоли вызывающего: на cp1251-консоли
+# объявленной среды вывод падал UnicodeEncodeError (класс описан в backlog
+# у anchor-check; тот же ремонт исполнимости, DOCS_CHECK_33 узел 9).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 SKIP = ('/history/', '/library/', '/progress/', '/.claude-archive/')
 
 # Объявленное исключение: файл-запись наблюдения на дату описывает КОРПУС ТОГО
@@ -158,12 +166,21 @@ def spec_values(base='.'):
     return names
 
 
+def to_slash(path):
+    """'/'-форма пути. glob на Windows возвращает '\\'-пути, а адреса корпуса,
+    SKIP-шаблоны и строки долга несут '/': без нормализации SKIP мёртв,
+    сравнение с долгом не сходится, и здоровый корпус давал тысячи ложных
+    «неразрешимых» плюс весь долг «устаревшим» (backlog §«Средовой дефицит
+    автономного RUN тестов»; починено `GAPS_CLOSE_33`, узел 9)."""
+    return path.replace('\\', '/')
+
+
 def index_files(base='.'):
     """Файлы, по которым разрешаются имена целей (по умолчанию — весь репозиторий)."""
     patterns = ('**/*.md', '**/*.json', '.claude/**/*.md', '.claude/**/*.json')
-    return [path for pattern in patterns
+    return [to_slash(path) for pattern in patterns
             for path in glob.glob(os.path.join(base, pattern), recursive=True)
-            if not os.path.relpath(path, base).startswith(('.git/', 'target/', '.claude-archive/'))]
+            if not to_slash(os.path.relpath(path, base)).startswith(('.git/', 'target/', '.claude-archive/'))]
 
 
 class Resolver:
@@ -269,8 +286,8 @@ def scan(root, index_base='.'):
     values = spec_values(index_base)
     if not resolver.by_base:
         return None, 'индекс имён пуст — разрешать не по чему'
-    pages = [path for path in sorted(glob.glob(root + '/**/*.md', recursive=True))
-             if not any(skip in '/' + path for skip in SKIP)]
+    pages = [to_slash(path) for path in sorted(glob.glob(root + '/**/*.md', recursive=True))
+             if not any(skip in '/' + to_slash(path) for skip in SKIP)]
     if not pages:
         return None, 'в области %s нет ни одного файла — проверять нечего' % root
     bad, total, retrospective, illustrations = [], 0, [], 0
@@ -424,6 +441,21 @@ def battery():
         axes.append(('19. строка долга без вхождения в корпусе роняет прогон',
                      not fresh and len(stale) == 1,
                      'новых %d, устаревших %d' % (len(fresh), len(stale))))
+
+        # ось формы пути: источники дефектов и сверка с долгом — '/'-форма
+        # на любой платформе (Windows-glob отдаёт '\\'; см. to_slash)
+        nested_root = os.path.join(work, 'формапути')
+        os.makedirs(os.path.join(nested_root, 'вложено'), exist_ok=True)
+        with open(os.path.join(nested_root, 'вложено', 'f.md'), 'w', encoding='utf-8') as handle:
+            handle.write('# Ф\n\nСм. §«Пассажа такого нет вовсе».\n')
+        result, refusal = scan(nested_root, nested_root)
+        path_ok = bool(result) and len(result[1]) == 1 and \
+            all('\\' not in source for source, _line, _name in result[1])
+        axes.append(('22. источник дефекта — «/»-форма пути на любой платформе',
+                     path_ok,
+                     'дефектов %d; форм с обратной косой: %d'
+                     % (len(result[1]) if result else -1,
+                        sum(1 for s, _l, _n in (result[1] if result else []) if '\\' in s))))
 
         result, refusal = scan(os.path.join(work, 'нет-такого'), work)
         axes.append(('20. каталог не найден — проверка отказывает', bool(refusal),

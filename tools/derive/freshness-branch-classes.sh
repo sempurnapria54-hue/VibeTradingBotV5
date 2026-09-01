@@ -11,7 +11,12 @@
 # Печатает по строке на член, значения операндов через TAB, в порядке
 # объявления операндов в формуле (он же — порядок ключей популяции).
 set -euo pipefail
-python3 - "$@" <<'PY'
+# Лаунчер Python — переносимая форма: на объявленной среде python3 — заглушка
+# WindowsApps, исполняет только py -3 (дом фактов среды —
+# .claude/tests/source-api/okx/code-preconditions.md §«Среда контура»,
+# строка «Лаунчер Python»; B2/E2/G-6 `DOCS_CHECK_33`).
+if command -v py >/dev/null 2>&1; then PY_LAUNCHER=(py -3); else PY_LAUNCHER=(python3); fi
+"${PY_LAUNCHER[@]}" - "$@" <<'PY'
 import itertools
 import json
 import re

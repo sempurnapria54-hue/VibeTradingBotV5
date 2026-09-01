@@ -27,9 +27,11 @@
   `docs/models/domain/aggregate/Deal.md`). Обе величины сравниваются с биржевым `uTime`, а
   границы биржевых окон сравниваются только с биржевыми таймстампами
   (`docs/rules/time-utc.md`);
-- **биржевой момент создания сделки** — `Deal.externalCreatedAt`, он же
-  суррогат **нижней** границы того же окна при пустом
-  `Deal.billsWindowBegin` (П7-B, вариант (г)). Читает
+- **биржевой момент создания сделки на штатной тропе** —
+  `Deal.externalCreatedAt`, он же суррогат **нижней** границы того же
+  окна при пустом `Deal.billsWindowBegin` (П7-B, вариант (г); на
+  восстановительной тропе поле пишет детектор временем открытия
+  наблюдённой позиции — `docs/models/domain/aggregate/Deal.md`). Читает
   `EntryScannerJob` перед вызовом `DealOpeningService`; отказ эндпоинта
   ⇒ сделка не создаётся (`docs/components/EntryScannerJob.md`).
 

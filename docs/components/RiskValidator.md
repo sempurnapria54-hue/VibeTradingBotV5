@@ -99,6 +99,7 @@ fail-fast отказ `DEAL_GRAPH_INCOMPLETE`, а не проверка по то
 | `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED` | то же против глобального максимума |
 | `STOP_DISTANCE_BELOW_FLOOR` | уровень стопа на убыточной стороне ближе якоря, чем round-trip комиссия (`docs/rules/risk-policy.md`) |
 | `RISK_CREATING_UNDER_COLLAPSE` | сделка в окне сворачивания, а проверяемый акт создаёт риск (`docs/rules/exit-teardown-order.md`); форма — `docs/spec/risk-limits.json`, величина `riskCreatingUnderCollapseRejected` |
+| `INSTRUMENT_SAFETY_HOLD` | инструмент действия стои́т в safety-ступени (`ENTRY_BLOCKED` либо `TRADE_BLOCKED`), а класс акта входит в блок-сет ступени — risk-creating, risk-increasing либо risk-weakening (`docs/rules/instrument-hold.md` §Enforcement). Снятие риска и reduce-only-выход под проверку не подпадают: сделки доживают под своей защитой. Реакция на отказ — карв-аут, не ребро в `ERROR` (`docs/processes/risk-evaluation.md`); форма — `docs/spec/risk-limits.json`, величина `safetyRungBlocksAction` |
 | `DEAL_NOTIONAL_EXCEEDED` | нотинал неисполненной доли живых ног, живого эпизода и проверяемого акта выше катастрофического потолка сделки |
 | `PROTECTION_COVERAGE_REDUCED` | покрытие транша после завершения действия ниже его экспозиции |
 
