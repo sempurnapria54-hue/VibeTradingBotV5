@@ -6,7 +6,7 @@ package com.example.tradingbot.domain.command;
  * (дискриминатор — ServiceCommandType; отдельного поля-дискриминатора в
  * payload'е нет). Подтипы (CreateOrderCommandPayload, …) документируются
  * разделом дока своего executor'а; амендных payload'ов нет
- * (docs/decisions/replace-not-amend.md). База даёт единый тип поля и
+ * (docs/rules/replace-not-amend.md). База даёт единый тип поля и
  * границу generic-диспетча ServiceCommandExecutor. См.
  * docs/components/models/ServiceCommandPayload.md,
  * docs/decisions/service-command-payload-base-type.md.

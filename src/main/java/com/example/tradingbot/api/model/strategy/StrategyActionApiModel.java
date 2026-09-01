@@ -13,7 +13,7 @@ import lombok.Setter;
  * дискриминатором actionKind: ORDER/ALGO_ORDER (только форма
  * сериализации, не поле домена). Позиционного действия нет: выход из
  * позиции — условие-перехода MANAGING → EXIT_PENDING, не действие
- * (docs/decisions/fsm-execution-layering.md).
+ * (docs/processes/fsm-execution-layering.md).
  */
 @Getter
 @Setter

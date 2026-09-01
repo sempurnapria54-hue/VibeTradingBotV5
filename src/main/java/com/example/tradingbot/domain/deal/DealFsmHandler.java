@@ -14,7 +14,7 @@ import java.util.Optional;
  * обрабатываются ({@link TrancheFsmHandler}). Terminal-статусы (CLOSED /
  * EMERGENCY_CLOSED) handler'ов не имеют. См.
  * docs/components/DealStateMachine.md,
- * docs/decisions/fsm-execution-layering.md.
+ * docs/processes/fsm-execution-layering.md.
  */
 public interface DealFsmHandler {
 

@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
  * не reduce-only) → CREATE_ORDER; CREATED → SUBMIT_ORDER; SUBMITTED →
  * REFRESH_ORDER. На продвинутых стадиях расчёт/риск не повторяются (нога по
  * фактам из target). Risk-block отдаётся {@link ActionPlan}'ом (реакцию
- * решает resolver в handler'е). См. docs/decisions/fsm-execution-layering.md.
+ * решает resolver в handler'е). См. docs/processes/fsm-execution-layering.md.
  */
 @Component
 @RequiredArgsConstructor

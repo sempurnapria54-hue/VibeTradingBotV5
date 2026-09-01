@@ -3,7 +3,7 @@ package com.example.tradingbot.domain.command;
 /**
  * Тип атомарной операции команды над runtime-сущностью (17 значений).
  * Амендных команд нет: AMEND_* сняты, ремоделирование — REPLACE-
- * оркестрация существующих команд (docs/decisions/replace-not-amend.md).
+ * оркестрация существующих команд (docs/rules/replace-not-amend.md).
  * Refresh-набор — ровно по одной команде на сущность (bulk-команды
  * сняты, CMD-Q3). Graceful shutdown / protection switch / REPLACE /
  * safety-flow собираются из этих команд, отдельных типов под них нет.

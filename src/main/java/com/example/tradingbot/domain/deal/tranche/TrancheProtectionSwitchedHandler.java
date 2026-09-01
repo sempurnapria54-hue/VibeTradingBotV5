@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
  * логика: REFRESH_ALGO_ORDER для неподтверждённых live algo; когда main
  * protection активна — переход в MANAGING. Перекрытие attached + main
  * (обе reduce-only) безопасно — окна без защиты нет
- * (docs/decisions/replace-not-amend.md); точечная отмена attached —
+ * (docs/rules/replace-not-amend.md); точечная отмена attached —
  * forward-refinement. См. docs/components/TrancheProtectionSwitchedHandler.md.
  */
 @Component

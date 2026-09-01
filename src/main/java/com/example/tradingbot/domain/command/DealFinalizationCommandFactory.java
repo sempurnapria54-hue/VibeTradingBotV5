@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
  * на ошибочную тропу выводит handler, DEAL-Q2). Материализует строку (upsert
  * по UNIQUE(deal_id, type)) при первом обращении; команда привязывается к
  * dealFinalizationStateId. Strategy-action команды эмитят per-type
- * StrategyActionExecutor'ы (docs/decisions/fsm-execution-layering.md).
+ * StrategyActionExecutor'ы (docs/processes/fsm-execution-layering.md).
  */
 @Service
 @RequiredArgsConstructor

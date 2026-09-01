@@ -36,7 +36,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
  * это делает handler/оркестратор петли. Обобщает прежний
  * {@code DealActionPlanner} (стадии/повтор) поверх per-type executor'ов
  * (обобщение {@code ServiceCommandFactory}). См.
- * docs/decisions/fsm-execution-layering.md.
+ * docs/processes/fsm-execution-layering.md.
  */
 @Slf4j
 @Component

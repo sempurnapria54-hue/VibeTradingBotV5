@@ -43,7 +43,7 @@ import org.springframework.stereotype.Component;
  * включая покрывающую экспозицию полностью): действие reduce-only и
  * позицию не открывает, поэтому оба слагаемых акта нулевые, но состав
  * неравенств классом действия не сужается. Направление — закрывающее к
- * направлению сделки. См. docs/decisions/fsm-execution-layering.md.
+ * направлению сделки. См. docs/processes/fsm-execution-layering.md.
  */
 @Component
 @RequiredArgsConstructor

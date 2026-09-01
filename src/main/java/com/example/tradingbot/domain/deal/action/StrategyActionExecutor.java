@@ -16,7 +16,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAct
  * (CMD-Q6). Диспетчер {@link StrategyActionOrchestrator} маршрутизирует по
  * {@link #supports(StrategyAction)}. Обобщает прежние {@code DealActionPlanner}
  * + {@code ServiceCommandFactory}, разложенные по типам действий. См.
- * docs/decisions/fsm-execution-layering.md.
+ * docs/processes/fsm-execution-layering.md.
  */
 public interface StrategyActionExecutor {
 
