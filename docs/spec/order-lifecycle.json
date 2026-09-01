@@ -9,10 +9,11 @@
     "parentStatus": "статус родительской заявки — операнд политики отсутствующей защиты",
     "attachedInSnapshot": "снапшот встроенной защиты ПРЕДЪЯВЛЕН — либо элементом attachAlgoOrds в теле родителя, либо самостоятельной условной заявкой, найденной циклом добычи материализованной защиты (docs/models/mapping/Order.md). Вход резолвера двухместный, и предикат живости стои́т на факте предъявления, а не на месте, откуда снапшот пришёл",
     "failCode": "код отказа постановки встроенной защиты",
-    "positionLive": "живая позиция существует",
     "standaloneProtectionExists": "отдельная основная защита ТОГО ЖЕ ТРАНША существует: инвариант покрытия потраншевый (docs/components/TrancheProtectionSwitchedHandler.md), и защита соседнего транша покрытия этому не даёт",
     "parentAccumulatedFillSize": "накопленный налив РОДИТЕЛЬСКОЙ заявки, Order.accumulatedFillSize родителя. Дискриминатор материализации встроенной защиты: источник превращает её в самостоятельную живую заявку РОВНО НА НАЛИТЫЙ ОБЪЁМ (наблюдено 2026-08-30, .claude/tests/source-api/okx/plan.md). ПУСТО достижимо (колонка nullable) и НУЛЁМ НЕ ПОДМЕНЯЕТСЯ: подмена дала бы CANCEL_BY_PARENT на недобытом факте, то есть пометила бы снятой защиту, которая может быть жива — благоприятное умолчание, запрещённое docs/rules/absent-value-semantics.md",
-    "standaloneRecordFound": "снапшот встроенной защиты предъявлен САМОСТОЯТЕЛЬНОЙ условной заявкой, найденной циклом добычи материализованной защиты (нога живых либо разбор истории). Предъявленная запись — самостоятельное доказательство материализации: источник материализует защиту ровно на налитый объём, поэтому запись влечёт непустой налив, и активация не зависит от добытости налива родителя. Ложь — снапшот из тела родителя (attachAlgoOrds) либо записи нет"
+    "standaloneRecordFound": "снапшот встроенной защиты предъявлен САМОСТОЯТЕЛЬНОЙ условной заявкой, найденной циклом добычи материализованной защиты (нога живых либо разбор истории). Предъявленная запись — самостоятельное доказательство материализации: источник материализует защиту ровно на налитый объём, поэтому запись влечёт непустой налив, и активация не зависит от добытости налива родителя. Ложь — снапшот из тела родителя (attachAlgoOrds) либо записи нет",
+    "positionLive": "живая позиция СДЕЛКИ существует. Факт уровня сделки: на многотраншевой сделке его даёт ЛЮБОЙ транш. Исходом второй ступени НЕ читается — там предикат потраншевый (trancheExposure); операнд оставлен, чтобы состояние «живую позицию держит сосед» было выразимо примером, а не подразумевалось.",
+    "tranche.exposure": "экспозиция ТРАНША, чью встроенную защиту ищет цикл: дом величины — docs/spec/protection-coverage.json §trancheExposure; здесь она приходит ОПЕРАНДОМ состояния под префиксным именем, а не заимствованной величиной: одноимённый операнд у потребителей этой спеки подменял бы дом гостевым состоянием. Операнд заменил positionLive: инвариант покрытия потраншевый целиком (docs/rules/live-risk-protection.md), а «живая позиция» — факт УРОВНЯ СДЕЛКИ, и на транше без собственной экспозиции живую позицию держит СОСЕДНИЙ транш. Прежняя форма объявляла на таком состоянии покрытие потерянным и уводила сделку в аварийный контур с flatten по ложному факту (C1 DOCS_CHECK_34)."
   },
   "values": [
     {
@@ -69,8 +70,8 @@
     },
     {
       "name": "searchExhaustedOutcome",
-      "note": "Исход второй ступени: НОГА ЖИВЫХ цикла добычи материализованной защиты пуста — живой записи нет. PROTECTION_LOST — терминал сразу, разбор истории не ждётся: любой её факт на этой ветви оставляет покрытие потерянным, а аварийная реакция не ждёт диагностики. ANALYSE_HISTORY — не терминал, а запуск РАЗБОРА ИСТОРИИ (три ноги по терминальным state контракта: effective, canceled, order_failed); терминал даёт найденный факт либо пустой разбор (docs/lifecycles/Order.md §«Исход ненайденности — вторая ступень»). Вторая ступень определена ТОЛЬКО у терминального родителя: цикл запускается его классом, а не исходом первой ступени (docs/components/RefreshOrderExecutor.md §«Гейт запуска — класс родителя, а не исход первой ступени»); у живого родителя SEARCH_MORE значит «наблюдаем дальше», цикла нет и исчерпывать нечего — без гейта терминальности исчерпание на живом родителе давало бы ложный PROTECTION_LOST: защита и сделка в ERROR, биржевая ступень 2 с flatten по ложному факту (гейт закреплён примером «второй ступени НЕТ»).",
-      "expr": "if(!in(attachedParentClass, 'TERMINAL_FILLED', 'TERMINAL_FILL_UNKNOWN'), null, if(positionLive && !standaloneProtectionExists, 'PROTECTION_LOST', 'ANALYSE_HISTORY'))"
+      "note": "Исход второй ступени: НОГА ЖИВЫХ цикла добычи материализованной защиты пуста — живой записи нет. ОБЕ стороны предиката ТРАНШЕВЫЕ: экспозиция транша и отдельная защита того же транша. PROTECTION_LOST — терминал сразу, разбор истории не ждётся: любой её факт на этой ветви оставляет покрытие потерянным, а аварийная реакция не ждёт диагностики. ANALYSE_HISTORY — не терминал, а запуск РАЗБОРА ИСТОРИИ (три ноги по терминальным state контракта: effective, canceled, order_failed); терминал даёт найденный факт либо пустой разбор (docs/lifecycles/Order.md §«Исход ненайденности — вторая ступень»). Вторая ступень определена ТОЛЬКО у терминального родителя: цикл запускается его классом, а не исходом первой ступени (docs/components/RefreshOrderExecutor.md §«Гейт запуска — класс родителя, а не исход первой ступени»); у живого родителя SEARCH_MORE значит «наблюдаем дальше», цикла нет и исчерпывать нечего — без гейта терминальности исчерпание на живом родителе давало бы ложный PROTECTION_LOST: защита и сделка в ERROR, биржевая ступень 2 с flatten по ложному факту (гейт закреплён примером «второй ступени НЕТ»).",
+      "expr": "if(!in(attachedParentClass, 'TERMINAL_FILLED', 'TERMINAL_FILL_UNKNOWN'), null, if(tranche.exposure > 0 && !standaloneProtectionExists, 'PROTECTION_LOST', 'ANALYSE_HISTORY'))"
     }
   ],
   "populations": [
@@ -270,8 +271,10 @@
       "case": "родитель ещё не подтверждён — отсутствие защиты в снапшоте ждёт наблюдения",
       "state": {
         "parentStatus": "PENDING",
-        "positionLive": false,
-        "standaloneProtectionExists": false
+        "standaloneProtectionExists": false,
+        "tranche": {
+          "exposure": 0
+        }
       },
       "expect": {
         "attachedOutcomeByParent": "WAIT",
@@ -282,8 +285,10 @@
       "case": "родитель живой — по одному снапшоту вывода не делаем, ищем дальше",
       "state": {
         "parentStatus": "ACTIVE",
-        "positionLive": true,
-        "standaloneProtectionExists": false
+        "standaloneProtectionExists": false,
+        "tranche": {
+          "exposure": 5
+        }
       },
       "expect": {
         "attachedOutcomeByParent": "SEARCH_MORE",
@@ -294,9 +299,11 @@
       "case": "родитель исполнен, нога живых пуста, позиция жива, отдельной защиты нет — покрытие потеряно, разбор истории не ждётся",
       "state": {
         "parentStatus": "COMPLETED",
-        "positionLive": true,
         "standaloneProtectionExists": false,
-        "parentAccumulatedFillSize": 5
+        "parentAccumulatedFillSize": 5,
+        "tranche": {
+          "exposure": 5
+        }
       },
       "expect": {
         "attachedParentClass": "TERMINAL_FILLED",
@@ -309,9 +316,11 @@
       "case": "родитель исполнен, нога живых пуста, отдельная защита есть — потери покрытия нет, запускается разбор истории",
       "state": {
         "parentStatus": "COMPLETED",
-        "positionLive": true,
         "standaloneProtectionExists": true,
-        "parentAccumulatedFillSize": 5
+        "parentAccumulatedFillSize": 5,
+        "tranche": {
+          "exposure": 5
+        }
       },
       "expect": {
         "attachedParentClass": "TERMINAL_FILLED",
@@ -324,10 +333,12 @@
       "case": "родитель отменён — защита закрывается по родителю",
       "state": {
         "parentStatus": "CANCELED",
-        "positionLive": false,
         "standaloneProtectionExists": false,
         "parentAccumulatedFillSize": 0,
-        "attachedInSnapshot": true
+        "attachedInSnapshot": true,
+        "tranche": {
+          "exposure": 0
+        }
       },
       "expect": {
         "attachedOutcomeByParent": "CANCEL_BY_PARENT"
@@ -338,8 +349,10 @@
       "case": "родитель в ошибочном состоянии — защита туда же",
       "state": {
         "parentStatus": "ERROR",
-        "positionLive": true,
-        "standaloneProtectionExists": false
+        "standaloneProtectionExists": false,
+        "tranche": {
+          "exposure": 5
+        }
       },
       "expect": {
         "attachedOutcomeByParent": "ERROR",
@@ -363,8 +376,10 @@
         "parentAccumulatedFillSize": 2.03,
         "attachedInSnapshot": false,
         "failCode": null,
-        "positionLive": true,
-        "standaloneProtectionExists": true
+        "standaloneProtectionExists": true,
+        "tranche": {
+          "exposure": 5
+        }
       },
       "expect": {
         "attachedOutcomeByParent": "SEARCH_MORE",
@@ -379,8 +394,10 @@
         "parentAccumulatedFillSize": 0,
         "attachedInSnapshot": true,
         "failCode": null,
-        "positionLive": false,
-        "standaloneProtectionExists": false
+        "standaloneProtectionExists": false,
+        "tranche": {
+          "exposure": 0
+        }
       },
       "expect": {
         "attachedOutcomeByParent": "CANCEL_BY_PARENT",
@@ -418,8 +435,10 @@
       "note": "Гейт терминальности второй ступени, закреплённый примером: у живого родителя цикла добычи нет и исчерпывать нечего — searchExhaustedOutcome пуст. Пример падает при возврате прежней редакции (вторая ступень без гейта терминальности давала на живом родителе ложный PROTECTION_LOST: защита и сделка в ERROR, биржевая ступень 2 с flatten по ложному факту).",
       "state": {
         "parentStatus": "ACTIVE",
-        "positionLive": true,
-        "standaloneProtectionExists": false
+        "standaloneProtectionExists": false,
+        "tranche": {
+          "exposure": 5
+        }
       },
       "expect": {
         "attachedParentClass": "LIVE",
@@ -435,8 +454,10 @@
         "parentAccumulatedFillSize": 3,
         "attachedInSnapshot": true,
         "failCode": null,
-        "positionLive": true,
-        "standaloneProtectionExists": true
+        "standaloneProtectionExists": true,
+        "tranche": {
+          "exposure": 5
+        }
       },
       "expect": {
         "attachedParentClass": "TERMINAL_FILLED",
@@ -453,6 +474,23 @@
       "expect": {
         "attachedParentClass": "TERMINAL_FILL_UNKNOWN",
         "attachedOutcomeByParent": "SEARCH_MORE"
+      }
+    },
+    {
+      "case": "соседний транш держит живую позицию, у своего экспозиции нет — покрытие НЕ потеряно",
+      "note": "Многотраншевая сделка — штатная форма (уровень сетки). Транш B: вход отменён, налив не добыт (TERMINAL_FILL_UNKNOWN), нога живых пуста, собственной экспозиции нет; живую позицию держит транш A. Прежняя форма читала «живая позиция существует» как факт СВОЕГО транша и объявляла покрытие потерянным — сделка уходила в аварийный контур с flatten живой позиции СОСЕДА по ложному факту (C1 DOCS_CHECK_34).",
+      "state": {
+        "parentStatus": "CANCELED",
+        "parentAccumulatedFillSize": null,
+        "standaloneProtectionExists": false,
+        "positionLive": true,
+        "tranche": {
+          "exposure": 0
+        }
+      },
+      "expect": {
+        "attachedParentClass": "TERMINAL_FILL_UNKNOWN",
+        "searchExhaustedOutcome": "ANALYSE_HISTORY"
       }
     }
   ]

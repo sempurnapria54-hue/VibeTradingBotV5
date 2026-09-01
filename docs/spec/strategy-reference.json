@@ -173,11 +173,11 @@
     },
     {
       "name": "trancheDeclaredNotionalShare",
-      "note": "Нотинал, который объявляет один транш, в долях базы: объявленная доля аллокации входного действия. Больше одного входного объявления у транша не бывает (tranchesWithSingleEntry), поэтому сумма по объявлениям транша и есть его доля.",
+      "note": "Нотинал, который объявляет один транш, в долях базы: объявленная доля аллокации входного действия. Больше одного входного объявления у транша не бывает (tranchesWithSingleEntry), поэтому сумма по объявлениям транша и есть его доля. Операнд читается СТРОГО: пустая доля отвергается своей проверкой (allocationNotDeclared) до всякого счёта, и подставлять вместо неё ноль означало бы читать «уровень не занял ничего» там, где автор просто забыл поле.",
       "op": "sum",
       "over": "stepsByStatus{}[].actions[]",
       "where": "actionKind == 'ORDER' && in(?orderType, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS')",
-      "of": "coalesce(?allocationPercents, 0) / 100"
+      "of": "allocationPercents / 100"
     },
     {
       "name": "detailDeclaredNotionalShare",
@@ -296,11 +296,18 @@
       "where": "actionKind == 'ORDER' && ?orderType == 'ENTRY_ATTACHED_STOP_LOSS' && isNull(?attachedProtection)"
     },
     {
+      "name": "allocationNotDeclared",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
+      "where": "actionKind == 'ORDER' && in(?orderType, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS') && isNull(?allocationPercents)",
+      "note": "Входное действие не объявило доли аллокации. Обязательность записана здесь, а не только аннотацией api-модели: без неё пустота проходила ОБЕ прежние проверки — фильтр диапазона исключал её условием notNull, а сумма объявленного нотинала читала её нулём через coalesce, — и опустить поле было ВЫГОДНЕЕ, чем объявить 100 %: тот же расклад со 100 давал реджект по превышению статического запаса. Молчаливая коррекция пустоты в благоприятную сторону запрещена docs/concept.md §П1. Код реджекта — STRATEGY_ACTION_ALLOCATION_NOT_DECLARED (docs/rules/strategy-validation.md)."
+    },
+    {
       "name": "allocationOutOfRange",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
       "where": "notNull(?allocationPercents) && (allocationPercents <= 0 || allocationPercents > 100)",
-      "note": "Доля аллокации вне допустимого диапазона (0, 100]. Ноль ВХОДИТ в нарушение: нулевая аллокация — вход, которому не выделено ничего, а размер входа есть min(по риску, по аллокации), поэтому объявленный уровень не вошёл бы НИКОГДА и молча. Прежняя граница (< 0) ноль пропускала; отвергала его только аннотация api-модели, то есть ограничение жило лишь в коде."
+      "note": "Доля аллокации вне допустимого диапазона (0, 100]. Охрана пустоты в фильтре ОСТАВЛЕНА намеренно: предмет этой проверки — диапазон, а отсутствие доли мерит allocationNotDeclared; строгое чтение здесь давало бы отказ вычисления там, где уже есть свой реджект. Ноль ВХОДИТ в нарушение: нулевая аллокация — вход, которому не выделено ничего, а размер входа есть min(по риску, по аллокации), поэтому объявленный уровень не вошёл бы НИКОГДА и молча. Прежняя граница (< 0) ноль пропускала; отвергала его только аннотация api-модели, то есть ограничение жило лишь в коде."
     },
     {
       "name": "actionStopCalculationType",
@@ -900,7 +907,8 @@
         "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
-        "allocationOutOfRange": 0
+        "allocationOutOfRange": 0,
+        "allocationNotDeclared": 0
       }
     },
     {
@@ -1320,6 +1328,7 @@
         "actionsWithUnknownType": 1,
         "entryActionsWithoutAttachedProtection": 1,
         "allocationOutOfRange": 1,
+        "allocationNotDeclared": 1,
         "stopSettingsMisdeclared": 1,
         "attachedStopSettingsMisdeclared": 1
       }

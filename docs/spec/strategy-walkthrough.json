@@ -57,7 +57,7 @@
     },
     {
       "name": "stepActionRowsApplied",
-      "note": "Сколько действий пакета исполнено на ТЕКУЩЕМ эпизоде транша. Отбор двойной: номер эпизода строки равен текущему (одного dealTrancheId не хватает — переоткрытие идёт тем же траншем, и строки копятся) и статус строки не SKIPPED и не FAILED (SKIPPED — не применялся; FAILED — попытки исчерпаны, надобность осталась; повтор гейтится стоящей ступенью — stepRetryGated).",
+      "note": "Сколько действий пакета исполнено на ТЕКУЩЕМ эпизоде ОБЪЕКТА ШАГА. Объект шага — транш у потраншевого шага и САМА СДЕЛКА у шага агрегатной поверхности (EXIT, FAIL_SAFE): у сделки переоткрытия нет, поэтому её эпизод один и область вырождается в саму сделку. Дискриминатор уровня — наличие транша у строки (dealTrancheId). Отбор двойной: номер эпизода строки равен текущему (у потраншевого шага одного dealTrancheId не хватает — переоткрытие идёт тем же траншем, и строки копятся) и статус строки не SKIPPED и не FAILED (SKIPPED — не применялся; FAILED — попытки исчерпаны, надобность осталась; повтор гейтится стоящей ступенью — stepRetryGated).",
       "op": "count",
       "over": "stepActionRows",
       "where": "trancheEpisodeSeq == currentTrancheEpisodeSeq && !in(status, 'SKIPPED', 'FAILED')"
@@ -75,12 +75,12 @@
     },
     {
       "name": "stepAppliedOnEpisode",
-      "note": "Шаг применён на ТЕКУЩЕМ эпизоде транша — то есть ПАКЕТ ЕГО ДЕЙСТВИЙ ИСЧЕРПАН. Прежняя редакция стояла на exists над строками действий: строка ПЕРВОГО действия гасила шаг целиком, и двухдейственная ступень эталона (снятие OCO плюс постановка трейлинга) не доигрывалась — снятие не исполнялось никогда, до конца сделки жили обе защиты, действующим уровнем оставался безубыток. Дом правила — docs/rules/strategy-step-once-per-episode.md.",
-      "expr": "stepActionRowsApplied >= stepDeclaredActionCount"
+      "note": "Шаг применён на ТЕКУЩЕМ эпизоде транша — то есть ПАКЕТ ЕГО ДЕЙСТВИЙ ИСЧЕРПАН. Прежняя редакция стояла на exists над строками действий: строка ПЕРВОГО действия гасила шаг целиком, и двухдейственная ступень эталона (снятие OCO плюс постановка трейлинга) не доигрывалась — снятие не исполнялось никогда, до конца сделки жили обе защиты, действующим уровнем оставался безубыток. ПЕРВЫЙ КОНЪЮНКТ — охрана ПУСТОГО ПАКЕТА: у шага, не объявляющего ни одного действия, правая часть неравенства равна нулю, и без охраны предикат истинен С РОЖДЕНИЯ, а шаг не допустим НИКОГДА. Между тем пустой пакет — законная форма полного выхода («шаг EXIT несёт только условие», docs/rules/no-partial-close.md), то есть одна из двух объявленных форм выхода не проходила бы отбор ни одним проходом. Гасит такой шаг переход статуса, а не признак применённости: он остаётся допустимым, пока сделка не ушла в сворачивание. Для каких типов шага пустой пакет законен — docs/rules/strategy-validation.md.",
+      "expr": "stepDeclaredActionCount > 0 && stepActionRowsApplied >= stepDeclaredActionCount"
     },
     {
       "name": "stepFailedRowOnEpisode",
-      "note": "Отказавшая строка той же надобности на текущем эпизоде: попытки исчерпаны, надобность осталась. Признаком применённости не является (дом — docs/rules/strategy-step-once-per-episode.md); операнд гейта повтора.",
+      "note": "Отказавшая строка той же надобности на текущем эпизоде ОБЪЕКТА ШАГА (транша либо самой сделки — см. stepActionRowsApplied): попытки исчерпаны, надобность осталась. Гейт повтора покрывает ОБА уровня: на агрегатной поверхности отбор по номеру эпизода транша невозможен — его у строки нет, — и без обобщения области петля «FAILED → новая строка» оставалась бы живой ровно на тропе выхода. Признаком применённости не является (дом — docs/rules/strategy-step-once-per-episode.md); операнд гейта повтора.",
       "op": "exists",
       "over": "stepActionRows",
       "where": "trancheEpisodeSeq == currentTrancheEpisodeSeq && status == 'FAILED'"
@@ -717,6 +717,35 @@
       }
     },
     {
+      "case": "шаг EXIT несёт только условие: пакет пуст, шаг допустим — вторая законная форма полного выхода",
+      "note": "Форма объявлена docs/rules/no-partial-close.md таблицей двух законных форм полного выхода, и на неё опирается предусловие netCloseAllowed. Без охраны пустого пакета stepAppliedOnEpisode истинен С РОЖДЕНИЯ (0 >= 0), stepEligible ложен всегда, и сделка, чей автор объявил выход условием-переходом, не ушла бы в координированный выход НИ ОДНИМ проходом. Гасит такой шаг переход статуса, а не признак применённости.",
+      "state": {
+        "stepDeclaredActions": [],
+        "stepConditionTrue": true,
+        "stepActionRows": [],
+        "currentTrancheEpisodeSeq": 1
+      },
+      "expect": {
+        "stepPackageProgress": "НИ_ОДНОГО",
+        "stepAppliedOnEpisode": false,
+        "stepEligible": true
+      }
+    },
+    {
+      "case": "шаг EXIT только с условием при ложном условии допустимым не становится",
+      "note": "Контроль к соседнему примеру: охрана пустого пакета снимает ЛОЖНУЮ применённость, а не вводит безусловную допустимость.",
+      "state": {
+        "stepDeclaredActions": [],
+        "stepConditionTrue": false,
+        "stepActionRows": [],
+        "currentTrancheEpisodeSeq": 1
+      },
+      "expect": {
+        "stepAppliedOnEpisode": false,
+        "stepEligible": false
+      }
+    },
+    {
       "case": "ступень +1 %: условие истинно, строк исполнения нет — шаг допустим",
       "note": "Первый проход, на котором цена перешла порог безубытка.",
       "state": {
@@ -997,6 +1026,153 @@
         "stepRetryGated": false,
         "stepEligible": true
       }
+    },
+    {
+      "case": "гейт повтора при частично исполненном пакете: ступень стои́т — шаг ждёт её снятия",
+      "note": "Пакет начат и не исчерпан, надобность отказала, ступень радиуса стои́т. Без третьей оси популяции это состояние лежало в одном классе с «шаг допустим».",
+      "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "действие 1"
+          },
+          {
+            "key": "действие 2"
+          }
+        ],
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          },
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": true
+      },
+      "expect": {
+        "stepPackageProgress": "ЧАСТЬ",
+        "stepRetryGated": true,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "гейт повтора при исчерпанном пакете: шаг и так применён",
+      "note": "Контроль: на исчерпанном пакете допустимость гасит признак применённости, а гейт лишь совпадает с ним. Различать классы всё равно нужно — иначе снятие ступени читалось бы как возобновление применённого шага.",
+      "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "действие 1"
+          }
+        ],
+        "stepConditionTrue": true,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          },
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": true
+      },
+      "expect": {
+        "stepPackageProgress": "ВСЕ",
+        "stepRetryGated": true,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "ложное условие при стоящей ступени и непочатом пакете",
+      "note": "Ось условия и ось гейта независимы: ложное условие гасит допустимость само по себе, и снятие ступени её не вернёт.",
+      "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "действие 1"
+          }
+        ],
+        "stepConditionTrue": false,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": true
+      },
+      "expect": {
+        "stepPackageProgress": "НИ_ОДНОГО",
+        "stepRetryGated": true,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "ложное условие при стоящей ступени и частично исполненном пакете",
+      "note": "Тот же класс на другом состоянии пакета — член перечня, а не повтор соседнего.",
+      "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "действие 1"
+          },
+          {
+            "key": "действие 2"
+          }
+        ],
+        "stepConditionTrue": false,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          },
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": true
+      },
+      "expect": {
+        "stepPackageProgress": "ЧАСТЬ",
+        "stepRetryGated": true,
+        "stepEligible": false
+      }
+    },
+    {
+      "case": "ложное условие при стоящей ступени и исчерпанном пакете",
+      "note": "Замыкает перебор: все три конъюнкта ложны одновременно, и допустимости нет ни по одному основанию.",
+      "state": {
+        "stepDeclaredActions": [
+          {
+            "key": "действие 1"
+          }
+        ],
+        "stepConditionTrue": false,
+        "stepActionRows": [
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "COMPLETED"
+          },
+          {
+            "trancheEpisodeSeq": 2,
+            "status": "FAILED"
+          }
+        ],
+        "currentTrancheEpisodeSeq": 2,
+        "standingRungOnActionRadius": true
+      },
+      "expect": {
+        "stepPackageProgress": "ВСЕ",
+        "stepRetryGated": true,
+        "stepEligible": false
+      }
     }
   ],
   "populations": [
@@ -1014,7 +1190,8 @@
       },
       "keys": [
         "stepConditionTrue",
-        "stepPackageProgress"
+        "stepPackageProgress",
+        "stepRetryGated"
       ],
       "where": "notNull(?stepConditionTrue)",
       "excludes": "примеры, не предъявляющие условия шага вовсе: их предмет — соседние величины этой спеки (привязка прохода к эталонному артефакту, резолв цели снятия по цепочке замещений), а не допустимость шага. Фильтр выражен операндом состояния и ни одного класса пакета из перечня не выводит.",
@@ -1022,37 +1199,85 @@
         {
           "member": [
             "true",
-            "НИ_ОДНОГО"
+            "НИ_ОДНОГО",
+            "true"
           ]
         },
         {
           "member": [
             "true",
-            "ЧАСТЬ"
+            "НИ_ОДНОГО",
+            "false"
           ]
         },
         {
           "member": [
             "true",
-            "ВСЕ"
+            "ЧАСТЬ",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "ЧАСТЬ",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "ВСЕ",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "ВСЕ",
+            "false"
           ]
         },
         {
           "member": [
             "false",
-            "НИ_ОДНОГО"
+            "НИ_ОДНОГО",
+            "true"
           ]
         },
         {
           "member": [
             "false",
-            "ЧАСТЬ"
+            "НИ_ОДНОГО",
+            "false"
           ]
         },
         {
           "member": [
             "false",
-            "ВСЕ"
+            "ЧАСТЬ",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "ЧАСТЬ",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "ВСЕ",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "ВСЕ",
+            "false"
           ]
         }
       ]

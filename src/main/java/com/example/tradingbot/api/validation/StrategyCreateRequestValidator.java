@@ -395,12 +395,37 @@ public class StrategyCreateRequestValidator {
                         indicatorTypes, structureKeys, violations);
             }
         }
+        validateStepPackageNotEmpty(step, path, violations);
         if (nonNull(step.getActions())) {
             for (int index = 0; index < step.getActions().size(); index++) {
                 validateAction(step.getActions().get(index), path + ".actions[" + index + "]",
                         indicatorTypes, structureKeys, actionKeys, violations);
             }
         }
+    }
+
+    /**
+     * Пустой пакет действий законен ТОЛЬКО у шага {@code EXIT}: это вторая
+     * объявленная форма полного выхода — «шаг EXIT несёт только условие»
+     * (docs/rules/no-partial-close.md), и всю работу делает
+     * условие-переход в статус выхода. У прочих типов шаг без действий не
+     * делает ничего и остаётся допустимым вечно.
+     *
+     * <p>Прежде обязательность жила аннотацией {@code @NotEmpty}, то есть
+     * код запрещал форму, которую корпус объявляет и на которую опирается
+     * предусловие {@code netCloseAllowed}. Дом правила —
+     * docs/rules/strategy-validation.md.
+     */
+    private void validateStepPackageNotEmpty(StrategyStepApiModel step, String path,
+                                             List<String> violations) {
+        if (isNotEmpty(step.getActions())) {
+            return;
+        }
+        if (StrategyStepType.EXIT.name().equals(step.getStepType())) {
+            return;
+        }
+        violations.add(path + ".actions STRATEGY_STEP_ACTIONS_EMPTY: пакет действий пуст, "
+                + "а пустой пакет законен только у шага EXIT");
     }
 
     private void validateRule(StrategyConditionRuleApiModel rule, String path,
@@ -633,11 +658,34 @@ public class StrategyCreateRequestValidator {
         }
     }
 
+    /**
+     * Доля аллокации ОБЪЯВЛЕНА у входного действия. Аннотацией это не
+     * выражается: поле живёт на общей модели действия-заявки, а
+     * обязательно только у входа.
+     *
+     * <p>Без проверки пустота проходила обе прежние: фильтр диапазона
+     * исключал её условием непустоты, а сумма объявленного нотинала
+     * читала её нулём — и опустить поле было ВЫГОДНЕЕ, чем объявить
+     * 100 %, потому что тот же расклад со 100 давал реджект по
+     * статическому запасу. Дом правила —
+     * docs/rules/strategy-validation.md.
+     */
+    private void validateEntryAllocationDeclared(StrategyOrderActionApiModel action, String path,
+                                                 List<String> violations) {
+        boolean entry = Objects.equals(action.getOrderType(), Order.Type.ENTRY.name())
+                || Objects.equals(action.getOrderType(), Order.Type.ENTRY_ATTACHED_STOP_LOSS.name());
+        if (entry && isNull(action.getAllocationPercents())) {
+            violations.add(path + ".allocationPercents STRATEGY_ACTION_ALLOCATION_NOT_DECLARED: "
+                    + "входное действие обязано объявить долю аллокации");
+        }
+    }
+
     private void validateOrderAction(StrategyOrderActionApiModel action, String path,
                                      Map<String, IndicatorValue.Type> indicatorTypes,
                                      Set<String> structureKeys, List<String> violations) {
         validateEnum(Order.Type.class, action.getOrderType(), path + ".orderType", violations);
         validateEnum(StrategyTradeDirection.class, action.getDirection(), path + ".direction", violations);
+        validateEntryAllocationDeclared(action, path, violations);
         if (nonNull(action.getPlacement())) {
             validatePlacement(action, path + ".placement", structureKeys, violations);
         }

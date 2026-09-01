@@ -107,7 +107,7 @@ public class TrancheManagingHandler implements TrancheFsmHandler {
     private TrancheTransition startApplicable(List<StrategyStep> steps, DealContext dealContext, DealTranche tranche) {
         ConditionEvaluationContext conditionContext = support.conditionContext(dealContext);
         for (StrategyStep step : steps) {
-            if (isTrue(support.conditionMet(step, conditionContext)) && isNotEmpty(step.getActions())) {
+            if (isTrue(support.stepEligible(step, dealContext, tranche, conditionContext)) && isNotEmpty(step.getActions())) {
                 StrategyAction action = step.getActions().getFirst();
                 DealActionState state = support.findOrCreateActionState(dealContext, tranche, action);
                 return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));

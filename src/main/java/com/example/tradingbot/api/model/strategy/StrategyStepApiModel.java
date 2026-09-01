@@ -3,7 +3,6 @@ package com.example.tradingbot.api.model.strategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.Getter;
@@ -25,9 +24,10 @@ public class StrategyStepApiModel {
     private StrategyConditionApiModel condition;
 
     @Valid
-    @NotEmpty
-    @Schema(description = "Пакет действий; выполняется целиком при истинном условии",
-            requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Пакет действий; выполняется целиком при истинном условии. "
+            + "Пуст только у шага EXIT — это вторая законная форма полного выхода "
+            + "(«шаг EXIT несёт только условие»); у прочих типов непустота проверяется "
+            + "валидатором по типу шага, а не аннотацией")
     private List<StrategyActionApiModel> actions;
 
     @Valid

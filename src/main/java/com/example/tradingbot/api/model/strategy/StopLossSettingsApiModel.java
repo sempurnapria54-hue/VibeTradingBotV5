@@ -21,10 +21,10 @@ public class StopLossSettingsApiModel {
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String calculationType;
 
-    @NotNull
     @Positive
-    @Schema(description = "Дистанция, % по способу расчёта (ATR_PERCENT: 150 = 1.5 ATR)",
-            requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Дистанция, % по способу расчёта (ATR_PERCENT: 150 = 1.5 ATR). "
+            + "Не объявляется при BREAKEVEN — уровень безубытка дистанции не имеет; "
+            + "обязательность по способу расчёта проверяет валидатор, а не аннотация")
     private BigDecimal distancePercents;
 
     @NotBlank

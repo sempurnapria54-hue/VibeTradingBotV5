@@ -25,6 +25,7 @@ import com.example.tradingbot.domain.command.payload.RefreshBalanceCommandPayloa
 import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.command.risk.RiskBlockAction;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult;
+import com.example.tradingbot.domain.deal.action.StrategyStepEligibility;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
@@ -65,6 +66,7 @@ public class DealFsmSupport {
     private final MarketConditionContextFactory conditionContextFactory;
     private final DealFinalizationCommandFactory finalizationFactory;
     private final IntegrationService integrationService;
+    private final StrategyStepEligibility stepEligibility;
 
     /** Допустимые шаги стратегии для текущего статуса ТРАНША (упорядочены = приоритет). */
     public List<StrategyStep> stepsFor(DealContext dealContext, DealTranche.Status status) {
@@ -83,6 +85,37 @@ public class DealFsmSupport {
     /** Условие шага выполнено по текущим рыночным данным. */
     public Boolean conditionMet(StrategyStep step, ConditionEvaluationContext context) {
         return conditionEvaluator.evaluate(step.getCondition(), context);
+    }
+
+    /**
+     * Шаг допустим к применению: условие истинно, на текущем эпизоде
+     * объекта шага он ещё не применён и повтор не гейтится стоящей
+     * ступенью. Прежде проход проверял ОДНО условие — порог нижней
+     * ступени остаётся истинным и после применения, поэтому first-match
+     * выбирал бы её каждым проходом, а ступень выше не исполнялась бы ни
+     * разу. Дом правила — docs/rules/strategy-step-once-per-episode.md.
+     */
+    public Boolean stepEligible(StrategyStep step, DealContext dealContext, DealTranche tranche,
+                                ConditionEvaluationContext conditionContext) {
+        return stepEligibility.eligible(step, tranche, dealContext.getActionStates(),
+                conditionMet(step, conditionContext), standingRungOnActionRadius(dealContext));
+    }
+
+    /**
+     * Стои́т ли ступень радиуса действия — операнд гейта повтора.
+     *
+     * <p><b>Названное ограничение.</b> Точный операнд — ступень, поднятая
+     * ИСЧЕРПАНИЕМ БЮДЖЕТА на радиусе действия
+     * (docs/rules/instrument-hold.md); собственного носителя у неё пока
+     * нет, и проход читает ближайший существующий признак — блокировку
+     * торговли по инструменту. Признак ШИРЕ нужного: он поднимается и по
+     * другим основаниям, поэтому гейт иногда придержит надобность, которую
+     * мог бы пропустить. Направление ошибки ЗАПРЕЩАЮЩЕЕ — лишний повтор к
+     * бирже не уходит, — и потому ограничение принимается до захода
+     * лестниц и холдов, который заводит носитель ступени.
+     */
+    private Boolean standingRungOnActionRadius(DealContext dealContext) {
+        return dealContext.getInstrument().isTradeBlocked();
     }
 
     /** Контекст оценки условий (свежие/предыдущие индикаторы, структуры, цена). */

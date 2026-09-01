@@ -16,7 +16,10 @@
     "unprotectedPositionAction": "реакция шага, когда у транша есть живой риск и он НЕ покрыт (StrategyMarketDataExpiredSetting)",
     "trancheRiskBearing": "транш несёт живой риск; значение берётся из дома-спеки docs/spec/protection-coverage.json",
     "trancheCovered": "инвариант покрытия транша выполнен; значение берётся из дома-спеки docs/spec/protection-coverage.json",
-    "dealStopUnresolved": "уровень защиты на всю позицию не резолвится: транш с экспозицией не несёт своего уровня (docs/spec/protection-coverage.json)"
+    "dealStopUnresolved": "уровень защиты на всю позицию не резолвится: транш с экспозицией не несёт своего уровня (docs/spec/protection-coverage.json)",
+    "stepIsDealLevel": "шаг принадлежит агрегатной поверхности стратегии (EXIT / FAIL_SAFE уровня сделки): транша у него нет ни одного",
+    "dealRiskBearing": "хоть один транш сделки несёт живой риск — агрегатный аналог trancheRiskBearing",
+    "allTranchesCovered": "риск ВСЕХ живых траншей сделки покрыт защитой — агрегатный аналог trancheCovered"
   },
   "values": [
     {
@@ -54,9 +57,19 @@
       "expr": "if(!dataPresent, 'MISSING', if(isFresh, 'FRESH', 'EXPIRED'))"
     },
     {
+      "name": "branchRiskBearing",
+      "note": "Живой риск ОБЪЕКТА ШАГА. У потраншевого шага объект — его транш, у шага агрегатной поверхности (EXIT, FAIL_SAFE уровня сделки) транша нет ни одного, и объектом становится сама сделка. Разведение по уровню обязательно: эталон объявляет marketDataExpiredSetting у шага уровня сделки, а траншевые операнды на нём не определены — ветвь не резолвилась бы ничем (B8 кодового захода 2). Дом осей — docs/rules/market-data-freshness.md §«Оси дискриминатора ветви».",
+      "expr": "if(stepIsDealLevel, dealRiskBearing, trancheRiskBearing)"
+    },
+    {
+      "name": "branchCovered",
+      "note": "Покрытие риска ОБЪЕКТА ШАГА — по тому же разведению уровня, что и branchRiskBearing. Агрегатная сторона переиспользует allTranchesCovered: та же величина читается формой реакции на исчерпание бюджета, новой сущности разведение не заводит.",
+      "expr": "if(stepIsDealLevel, allTranchesCovered, trancheCovered)"
+    },
+    {
       "name": "protectionBranch",
-      "note": "Какая ветвь пары реакций выбрана. Незащищённой считается ТОЛЬКО позиция, у которой есть живой риск И он не покрыт: «нечего защищать» и «покрыто» — разные факты, и оба ведут в ветвь защищённой, потому что реакция GRACEFUL_CLOSE на них закрывала бы то, чего нет, либо то, что под контролем. Умолчания здесь нет ни в одну сторону: обе пустоты названы. Неразрешимый уровень защиты (dealStopUnresolved) считается НЕПОКРЫТЫМ: риск есть, а чем он ограничен — неизвестно, и благоприятного прочтения у этой пустоты быть не может.",
-      "expr": "if(trancheRiskBearing && (!trancheCovered || dealStopUnresolved), 'UNPROTECTED', 'PROTECTED')"
+      "note": "Какая ветвь пары реакций выбрана. Операнды читаются ПО УРОВНЮ ОБЪЕКТА ШАГА (branchRiskBearing / branchCovered), поэтому величина покрывает и потраншевые шаги, и агрегатную поверхность. Незащищённой считается ТОЛЬКО позиция, у которой есть живой риск И он не покрыт: «нечего защищать» и «покрыто» — разные факты, и оба ведут в ветвь защищённой, потому что реакция GRACEFUL_CLOSE на них закрывала бы то, чего нет, либо то, что под контролем. Умолчания здесь нет ни в одну сторону: обе пустоты названы. Неразрешимый уровень защиты (dealStopUnresolved) считается НЕПОКРЫТЫМ: риск есть, а чем он ограничен — неизвестно, и благоприятного прочтения у этой пустоты быть не может.",
+      "expr": "if(branchRiskBearing && (!branchCovered || dealStopUnresolved), 'UNPROTECTED', 'PROTECTED')"
     },
     {
       "name": "expiredSettingResolved",
@@ -306,12 +319,14 @@
         "trancheCovered": false,
         "dealStopUnresolved": false,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "PROTECTED",
         "expiredSettingResolved": "WAIT"
-      }
+      },
+      "unreachable": "состояние недостижимо по формулам дома операндов: покрытие считается ОТ несомого риска (docs/spec/protection-coverage.json §trancheCovered / §allTranchesCovered), и объект, не несущий живого риска, покрыт ТРИВИАЛЬНО — покрывать нечего. Пара (риска нет, не покрыт) не встречается ни на траншевом уровне, ни на агрегатном. Прежде эти два члена популяции объявлялись достижимыми и «покрывались» обычными примерами: перечень предъявлял состояние, которого модель не производит (E2 DOCS_CHECK_34)."
     },
     {
       "case": "живого риска нет, а уровень сделки не резолвится — защищать всё равно нечего",
@@ -320,12 +335,14 @@
         "trancheCovered": false,
         "dealStopUnresolved": true,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "PROTECTED",
         "expiredSettingResolved": "WAIT"
-      }
+      },
+      "unreachable": "состояние недостижимо по формулам дома операндов: покрытие считается ОТ несомого риска (docs/spec/protection-coverage.json §trancheCovered / §allTranchesCovered), и объект, не несущий живого риска, покрыт ТРИВИАЛЬНО — покрывать нечего. Пара (риска нет, не покрыт) не встречается ни на траншевом уровне, ни на агрегатном. Прежде эти два члена популяции объявлялись достижимыми и «покрывались» обычными примерами: перечень предъявлял состояние, которого модель не производит (E2 DOCS_CHECK_34)."
     },
     {
       "case": "живого риска нет при формально выполненном покрытии — ветвь защищённой",
@@ -334,7 +351,8 @@
         "trancheCovered": true,
         "dealStopUnresolved": false,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "PROTECTED",
@@ -348,7 +366,8 @@
         "trancheCovered": true,
         "dealStopUnresolved": true,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "PROTECTED",
@@ -362,7 +381,8 @@
         "trancheCovered": false,
         "dealStopUnresolved": true,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "UNPROTECTED",
@@ -376,7 +396,8 @@
         "trancheCovered": true,
         "dealStopUnresolved": false,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "PROTECTED",
@@ -390,7 +411,8 @@
         "trancheCovered": false,
         "dealStopUnresolved": false,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "UNPROTECTED",
@@ -404,11 +426,48 @@
         "trancheCovered": true,
         "dealStopUnresolved": true,
         "protectedPositionAction": "WAIT",
-        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+        "unprotectedPositionAction": "GRACEFUL_CLOSE",
+        "stepIsDealLevel": false
       },
       "expect": {
         "protectionBranch": "UNPROTECTED",
         "expiredSettingResolved": "GRACEFUL_CLOSE"
+      }
+    },
+    {
+      "case": "шаг уровня сделки: ветвь выбирается покрытием ВСЕХ живых траншей, а не одного",
+      "note": "Эталон объявляет marketDataExpiredSetting у шага уровня сделки (GRACEFUL_CLOSE на незащищённой). Траншевые операнды на таком шаге не определены — прежняя редакция дискриминатора читала только их, и ветвь не резолвилась ничем (B8 DOCS_CHECK_34). Здесь риск сделки живой и покрыт НЕ ВЕСЬ: ветвь незащищённой.",
+      "state": {
+        "stepIsDealLevel": true,
+        "dealRiskBearing": true,
+        "allTranchesCovered": false,
+        "dealStopUnresolved": false,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "branchRiskBearing": true,
+        "branchCovered": false,
+        "protectionBranch": "UNPROTECTED",
+        "expiredSettingResolved": "GRACEFUL_CLOSE"
+      }
+    },
+    {
+      "case": "шаг уровня сделки при полном покрытии траншей — ветвь защищённой",
+      "note": "Контроль к соседнему примеру: разведение по уровню выбирает агрегатные операнды, а не включает незащищённую ветвь безусловно. GRACEFUL_CLOSE на покрытой сделке закрывал бы то, что под контролем.",
+      "state": {
+        "stepIsDealLevel": true,
+        "dealRiskBearing": true,
+        "allTranchesCovered": true,
+        "dealStopUnresolved": false,
+        "protectedPositionAction": "WAIT",
+        "unprotectedPositionAction": "GRACEFUL_CLOSE"
+      },
+      "expect": {
+        "branchRiskBearing": true,
+        "branchCovered": true,
+        "protectionBranch": "PROTECTED",
+        "expiredSettingResolved": "WAIT"
       }
     }
   ],
@@ -423,12 +482,12 @@
       "derive": {
         "command": "bash tools/derive/freshness-branch-classes.sh",
         "from": [
-          "docs/spec/market-data-freshness.json"
+          "docs/rules/market-data-freshness.md"
         ]
       },
       "keys": [
-        "trancheRiskBearing",
-        "trancheCovered",
+        "branchRiskBearing",
+        "branchCovered",
         "dealStopUnresolved"
       ],
       "members": [
@@ -479,14 +538,16 @@
             "false",
             "false",
             "true"
-          ]
+          ],
+          "unreachable": "покрытие считается ОТ несомого риска (docs/spec/protection-coverage.json), и объект без живого риска покрыт тривиально: пара «риска нет, не покрыт» не производится моделью ни на траншевом уровне, ни на агрегатном"
         },
         {
           "member": [
             "false",
             "false",
             "false"
-          ]
+          ],
+          "unreachable": "покрытие считается ОТ несомого риска (docs/spec/protection-coverage.json), и объект без живого риска покрыт тривиально: пара «риска нет, не покрыт» не производится моделью ни на траншевом уровне, ни на агрегатном"
         }
       ]
     }
