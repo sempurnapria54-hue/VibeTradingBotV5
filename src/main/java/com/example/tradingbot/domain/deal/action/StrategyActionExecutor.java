@@ -24,6 +24,17 @@ public interface StrategyActionExecutor {
     Boolean supports(StrategyAction action);
 
     /**
+     * Готово ли действие начать исполнение — вопрос задаётся ДО того, как
+     * заведена строка исполнения. Умолчание {@code READY}: у действия,
+     * которое ничего не снимает и ничьего покрытия не забирает,
+     * предусловия сверх условия шага нет, а условие шага проверил
+     * обработчик.
+     */
+    default ActionReadiness readiness(StrategyAction action, DealContext dealContext, DealTranche tranche) {
+        return ActionReadiness.READY;
+    }
+
+    /**
      * Следующая команда действия за этот проход по стадии
      * {@link DealActionState}, либо пустой {@link ActionPlan}, если действие
      * ещё не готово продвигаться / завершено.

@@ -33,7 +33,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * {@code marketStructureSettings}) включены, чтобы калькулятор резолвил
  * готовые значения по «мягкому» ключу (indicatorKey / structureKey).
  * Риск-настройки сделки берутся из {@code strategyDetail}
- * (riskPerTradePercent). См. docs/components/models/CalculationContext.md.
+ * (riskPerActionPercent). См. docs/components/models/CalculationContext.md.
  */
 @Value
 @Builder

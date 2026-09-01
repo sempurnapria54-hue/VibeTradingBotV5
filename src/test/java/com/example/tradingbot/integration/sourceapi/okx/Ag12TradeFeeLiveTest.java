@@ -2,6 +2,9 @@ package com.example.tradingbot.integration.sourceapi.okx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -29,7 +32,30 @@ class Ag12TradeFeeLiveTest extends OkxSourceApiLiveTestBase {
         assertThat(r.d0().path("taker").isMissingNode()).isFalse();
         assertThat(r.d0().path("feeGroup").isArray()).isTrue();
         assertThat(r.d0().path("instType").asText()).isEqualTo(INST_TYPE);
-        observe("AG12.1", r);
+        observeContent("AG12.1", r);
+        persistObservation("AG12.1", "ставки комиссий по группам (instType=" + INST_TYPE + ")", feeGroups(r));
+    }
+
+    /**
+     * Перечень групп со ставками — исход кейса есть ПЕРЕЧЕНЬ, а не мощность:
+     * ставка резолвится по паре (instType, groupId), а знак источника
+     * определяет, снимается ли он маппингом. И то и другое проверяемо только
+     * по содержанию ответа.
+     */
+    private List<String> feeGroups(RawResponse r) {
+        List<String> lines = new ArrayList<>();
+        lines.add("level=" + r.d0().path("level").asText(""));
+        lines.add("instType=" + r.d0().path("instType").asText(""));
+        lines.add("плоские (deprecated) taker=" + r.d0().path("taker").asText("")
+                + " maker=" + r.d0().path("maker").asText(""));
+        for (JsonNode group : r.d0().path("feeGroup")) {
+            lines.add("groupId=" + group.path("groupId").asText("")
+                    + " taker=" + group.path("taker").asText("")
+                    + " maker=" + group.path("maker").asText("")
+                    + " elpMaker=" + group.path("elpMaker").asText("")
+                    + " rpiMaker=" + group.path("rpiMaker").asText(""));
+        }
+        return lines;
     }
 
     @Test

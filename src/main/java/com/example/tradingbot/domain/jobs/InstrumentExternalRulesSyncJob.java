@@ -1,6 +1,12 @@
 package com.example.tradingbot.domain.jobs;
 
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.toSet;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.config.InstrumentExternalRulesSyncProperties;
@@ -11,7 +17,11 @@ import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.mapping.InstrumentExternalRulesMapper;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.persistence.service.InstrumentExternalRulesDataService;
+import com.example.tradingbot.domain.model.other.external_snapshot.TradeFeeRateExternalSnapshot;
+import com.example.tradingbot.mapping.TradeFeeRateMapper;
+import com.example.tradingbot.persistence.service.TradeFeeRateDataService;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +54,8 @@ public class InstrumentExternalRulesSyncJob {
     private final InstrumentExternalRulesMapper rulesMapper;
     private final InstrumentExternalRulesSyncProperties properties;
     private final JobExecutionGuard executionGuard;
+    private final TradeFeeRateDataService tradeFeeRateDataService;
+    private final TradeFeeRateMapper tradeFeeRateMapper;
 
     @Scheduled(cron = "${instrument-external-rules-sync.cron}")
     public void tick() {
@@ -55,12 +67,47 @@ public class InstrumentExternalRulesSyncJob {
 
     private void run() {
         List<Instrument> instruments = instrumentDataService.findByStatusIn(SYNCED_STATUSES);
+        syncFeeRates(instruments);
         for (Instrument instrument : instruments) {
             try {
                 syncRules(instrument);
             } catch (RuntimeException e) {
                 log.error("Instrument external rules sync failed for {}", instrument.getId(), e);
             }
+        }
+    }
+
+    /**
+     * Ставки комиссий — ОДИН вызов на тик по типу инструмента, не по
+     * инструменту: ставка есть атрибут комиссионной группы счёта, и N
+     * вызовов на N инструментов размножили бы одно и то же значение
+     * (docs/integrations/okx/contracts/trade-fee.md). Тип берётся у
+     * онбордженных инструментов — контур фазы 1 SWAP-only, но перечень
+     * читается из данных, а не хардкодится.
+     */
+    private void syncFeeRates(List<Instrument> instruments) {
+        Map<Long, Set<String>> typesByExchange = instruments.stream()
+                .filter(instrument -> nonNull(instrument.getExchangeId())
+                        && isNotBlank(instrument.getExternalType()))
+                .collect(groupingBy(Instrument::getExchangeId,
+                        mapping(Instrument::getExternalType, toSet())));
+        typesByExchange.forEach((exchangeId, instrumentTypes) -> instrumentTypes.forEach(instrumentType -> {
+            try {
+                recordFeeRates(exchangeId, instrumentType);
+            } catch (RuntimeException e) {
+                log.error("Trade fee rates sync failed for exchange={} instType={}", exchangeId, instrumentType, e);
+            }
+        }));
+    }
+
+    private void recordFeeRates(Long exchangeId, String instrumentType) {
+        List<TradeFeeRateExternalSnapshot> snapshots = integrationService.getTradeFeeRates(instrumentType);
+        if (isEmpty(snapshots)) {
+            log.warn("Trade fee rates not returned for instType={}", instrumentType);
+            return;
+        }
+        for (TradeFeeRateExternalSnapshot snapshot : snapshots) {
+            tradeFeeRateDataService.record(tradeFeeRateMapper.snapshotToDomain(snapshot, exchangeId));
         }
     }
 

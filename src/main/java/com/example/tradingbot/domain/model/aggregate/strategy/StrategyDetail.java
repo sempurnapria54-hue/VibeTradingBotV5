@@ -2,16 +2,20 @@ package com.example.tradingbot.domain.model.aggregate.strategy;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -40,8 +44,30 @@ public class StrategyDetail extends Auditable {
     /** Политика торговли в этой фазе. */
     private PhaseEntryPolicy phaseEntryPolicy;
 
-    /** Риск на сделку, % от капитала (percent-risk модель сайзинга). */
-    private BigDecimal riskPerTradePercent;
+    /** Поактный потолок риска: сколько берёт ОДНО действие, % базы риска. */
+    private BigDecimal riskPerActionPercent;
+
+    /**
+     * Множитель кумулятивного потолка: во сколько раз сделка за жизнь
+     * вправе превысить поактный потолок. Ни снизу, ни сверху не
+     * валидируется — выбор автора стратегии; при множителе меньше единицы
+     * первая же нога не проходит, и отказ громкий (docs/rules/risk-policy.md).
+     */
+    private BigDecimal cumulativeRiskPerDealMultiplier;
+
+    /**
+     * Максимум ОДНОВРЕМЕННОГО риска сделки, % базы риска. Вкладывается в
+     * конфигурационный максимум риск-аппетита: на создании проверяется
+     * «стратегия ≤ конфигурация».
+     */
+    private BigDecimal strategySimultaneousRiskPerDealPercent;
+
+    /**
+     * Множитель катастрофического потолка сделки: во сколько раз
+     * растягивается максимальный риск на сделку. Сверяется с
+     * конфигурационным пределом на создании.
+     */
+    private BigDecimal strategyCatastrophicRiskPerDealMultiplier;
 
     /**
      * Допускает ли стратегия ПЕРЕОТКРЫТИЕ эпизода транша: сопровождение
@@ -77,6 +103,24 @@ public class StrategyDetail extends Auditable {
         return precheckSteps.stream()
                 .filter(step -> isTrue(step.isEntryStep()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Действие детали по стабильному ключу — резолв цели, объявленной
+     * действием {@code REPLACE}/{@code CANCEL} ({@code targetActionKey}).
+     * Ключ уникален в рамках детали, поэтому совпадение одно; ключа нет —
+     * {@code null}.
+     */
+    public StrategyAction actionByKey(String key) {
+        if (isBlank(key) || isNull(stepsByStatus)) {
+            return null;
+        }
+        return stepsByStatus.values().stream()
+                .flatMap(steps -> emptyIfNull(steps).stream())
+                .flatMap(step -> emptyIfNull(step.getActions()).stream())
+                .filter(action -> Objects.equals(key, action.getKey()))
+                .findFirst()
+                .orElse(null);
     }
 
     /** Разрешён ли вход в фазе: политика задана, не NO_TRADE и допускает фазу. */

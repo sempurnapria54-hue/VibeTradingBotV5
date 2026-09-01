@@ -49,11 +49,27 @@
  19. контроль: поздняя таблица отчёта счёт линзы НЕ перебивает (сводка
      читается только из своей секции — ремонт ложно-зелёного F1
      DOCS_CHECK_34);
- 20. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
- 21. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
- 22. таблицы компонентов нет либо она пуста — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
- 23. отчёта прогона, названного реестром, нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
- 24. в отчёте нет секции сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2).
+ 20. ожидание грунта со сроком: срок наступил — гейт НЕ пройден;
+ 21. контроль: срок ожидания грунта не наступил — гейт не роняет;
+ 22. припарковка со сроком: срок наступил — гейт НЕ пройден;
+ 23. срок без названного исхода (поле «по-сроку») — гейт НЕ пройден;
+ 24. срок записан не датой ISO — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 25. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 26. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 27. таблицы компонентов нет либо она пуста — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 28. отчёта прогона, названного реестром, нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+ 29. в отчёте нет секции сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2).
+
+СРОК ДИСПОЗИЦИИ (оси 20-24). Диспозиция, выданная НА СРОК, по его
+истечении ИСЧЕРПАНА: позиция, которую держали «пока ждём», снова не
+задиспозиционирована, и гейт обязан сказать это громко — иначе условие
+живёт только в файле, который прочтёт лишь тот, кому оно и так нужно
+(класс — .claude/rules/pre-launch-schema-changes.md §«Снятие обеспечено
+встречным якорем, а не этой строкой»). Поле `срок` (дата ISO) законно
+и у строки компонента рядом с `ждёт-грунта`, и у припаркованной позиции
+рядом с `условие-возврата`; парное поле `по-сроку` называет исход —
+без него сообщение гейта нечем закрыть. Замер сравнивает срок с
+КАЛЕНДАРНЫМ ДНЁМ ПРОГОНА: срок наступает В сам день (today >= срок).
 
 Форма, которой в этом перечне нет, замером НЕ измерена.
 
@@ -68,6 +84,7 @@ import json
 import re
 import sys
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 # Печать не зависит от кодировки консоли вызывающего: на cp1251-консоли
@@ -98,6 +115,13 @@ NOT_STARTED = 'не начат'
 COMPONENT_STATES = (NOT_STARTED, 'в работе', 'закодирован')
 
 OUTSIDE = 'вне компонентов'
+
+# Срок диспозиции и парный исход. Дом действующего срока — реестр; почему
+# срок объявлен машине, а не одной строкой решения —
+# .claude/decisions/env-wait-deadline.md §«Встречный якорь: чем срок
+# срабатывает».
+DEADLINE = 'срок'
+OUTCOME = 'по-сроку'
 
 # Секция отчёта, в которой живёт сводка счётом. Контракт «сводка отчёта ↔
 # реестр» объявлен в доме формата отчёта (.claude/templates/docs/gap-report.md
@@ -180,8 +204,34 @@ def _components(ledger):
     return table
 
 
-def _component_reasons(table):
-    """Дефекты самой таблицы компонентов: статус и ожидание грунта."""
+def _deadline_reasons(entry, name, reasons, today):
+    """Срок диспозиции: наступил — диспозиция исчерпана, позиция снова открыта.
+
+    Поля необязательны; объявленный срок обязан быть датой ISO (иначе мерить
+    нечем — отказ) и обязан называть исход (иначе сообщение гейта нечем
+    закрыть).
+    """
+    raw = entry.get(DEADLINE)
+    if raw is None:
+        return
+    text = str(raw).strip()
+    try:
+        due = date.fromisoformat(text)
+    except ValueError:
+        raise Refusal('%s: срок «%s» — не дата ISO (YYYY-MM-DD); наступил он '
+                      'или нет, замер сказать не может' % (name, text))
+    outcome = str(entry.get(OUTCOME, '')).strip()
+    if not outcome:
+        reasons.append('%s: срок %s объявлен без исхода (поле «%s») — по наступлении '
+                       'не сказано, что делать' % (name, text, OUTCOME))
+    if today >= due:
+        reasons.append('%s: срок %s наступил — диспозиция, выданная на срок, исчерпана; '
+                       'требуется пере-диспозиция: %s'
+                       % (name, text, outcome or 'исход не назван'))
+
+
+def _component_reasons(table, today):
+    """Дефекты самой таблицы компонентов: статус, ожидание грунта и его срок."""
     reasons = []
     for name, row in sorted(table.items()):
         state = row.get('статус')
@@ -193,6 +243,7 @@ def _component_reasons(table):
         if pending and state != NOT_STARTED:
             reasons.append('компонент %s: начат при открытых слотах гейта грунта (%s)'
                            % (name, ', '.join(pending)))
+        _deadline_reasons(row, 'компонент %s' % name, reasons, today)
     return reasons
 
 
@@ -237,8 +288,9 @@ def _position_components(entry, table, name, reasons):
     return known
 
 
-def check(ledger_path=LEDGER, root=ROOT):
+def check(ledger_path=LEDGER, root=ROOT, today=None):
     """Проверка реестра гейтов. Возвращает список причин непрохождения."""
+    today = today or date.today()
     file = root / ledger_path
     if not file.is_file():
         raise Refusal('реестра гейтов нет: %s' % ledger_path)
@@ -251,7 +303,7 @@ def check(ledger_path=LEDGER, root=ROOT):
         raise Refusal('реестр не называет отчёт прогона, с которым сверяется')
     table = _components(ledger)
     counts = report_counts(report, root)
-    reasons = _component_reasons(table)
+    reasons = _component_reasons(table, today)
     started = _started(table)
     trading = _trading_started(table)
     seen = {}
@@ -290,6 +342,7 @@ def check(ledger_path=LEDGER, root=ROOT):
                                    % (name, target, anchor.group(1)))
             if not str(entry.get('условие-возврата', '')).strip():
                 reasons.append('%s: припаркована без условия возврата' % name)
+            _deadline_reasons(entry, name, reasons, today)
             continue
         # Диспозиция «не закрыта»: гейтит ли она что-нибудь ПРЯМО СЕЙЧАС —
         # зависит от класса и от статуса кодирования её компонентов.
@@ -480,31 +533,55 @@ def battery():
                 'позиций по сводке %d, причин расхождения %d' % (gating, len(reasons)))
     axes.append(_axis('19. контроль: поздняя таблица отчёта счёт линзы НЕ перебивает', late_table))
 
+    # Срок диспозиции. Даты пробы строятся ОТ ДНЯ ПРОГОНА (вчера/послезавтра),
+    # поэтому пробы не протухают вместе с календарём.
+    passed_day = (date.today() - timedelta(days=1)).isoformat()
+    future_day = (date.today() + timedelta(days=30)).isoformat()
+
+    def wait_deadline(ledger, when):
+        ledger['компоненты'][2].update({DEADLINE: when, OUTCOME: 'вернуть вопрос держателю'})
+
+    axes.append(_axis('20. ожидание грунта со сроком: срок наступил — гейт НЕ пройден',
+                      _fails(lambda l: wait_deadline(l, passed_day), 'наступил — диспозиция')))
+    axes.append(_axis('21. контроль: срок ожидания грунта не наступил — гейт не роняет',
+                      _holds(lambda l: wait_deadline(l, future_day), 'наступил — диспозиция')))
+    axes.append(_axis('22. припарковка со сроком: срок наступил — гейт НЕ пройден',
+                      _fails(lambda l: l['находки'][2].update(
+                          {DEADLINE: passed_day, OUTCOME: 'вернуться курационным заходом'}),
+                          'наступил — диспозиция')))
+    axes.append(_axis('23. срок без названного исхода — гейт НЕ пройден',
+                      _fails(lambda l: l['компоненты'][2].update({DEADLINE: future_day}),
+                             'без исхода')))
+
+    def bad_deadline():
+        return _fixture(lambda l: wait_deadline(l, 'через неделю'))
+    axes.append(_axis('24. срок записан не датой ISO — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(bad_deadline)))
+
     def no_ledger():
         root = _fixture()
         (root / LEDGER).unlink()
         return root
-    axes.append(_axis('20. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_ledger)))
+    axes.append(_axis('25. реестра нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_ledger)))
 
     def broken_ledger():
         root = _fixture()
         (root / LEDGER).write_text('{не json', encoding='utf-8')
         return root
-    axes.append(_axis('21. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(broken_ledger)))
+    axes.append(_axis('26. реестр не разобран — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(broken_ledger)))
 
     def no_components():
         return _fixture(lambda l: l.update({'компоненты': []}))
-    axes.append(_axis('22. таблицы компонентов нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_components)))
+    axes.append(_axis('27. таблицы компонентов нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_components)))
 
     def no_report():
         root = _fixture()
         (root / 'отчёт.md').unlink()
         return root
-    axes.append(_axis('23. отчёта прогона нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_report)))
+    axes.append(_axis('28. отчёта прогона нет — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_report)))
 
     def no_summary():
         return _fixture(report='# Отчёт без секции сводки\n\n## Прочее\n\n| A | х | 1 |\n')
-    axes.append(_axis('24. в отчёте нет секции сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_summary)))
+    axes.append(_axis('29. в отчёте нет секции сводки счётом — ЗАМЕР НЕ ПРОВОДИЛСЯ', _refuses(no_summary)))
     return axes
 
 

@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.model.aggregate.deal;
 
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -10,6 +11,7 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -137,6 +139,70 @@ public class DealTranche extends Auditable {
         return emptyIfNull(orders).stream()
                 .anyMatch(order -> isTrue(order.isLive())
                         && isFalse(order.getPositionReducingOnly()));
+    }
+
+    /**
+     * У транша есть живая защита — встроенная либо отдельная
+     * (docs/spec/protection-coverage.json, величина
+     * {@code trancheHasLiveProtection}). Живость читается по носителю, и
+     * уровень остановки убытка здесь не спрашивается: предикат отвечает
+     * «защита существует», а не «защита покрывает».
+     */
+    public Boolean hasLiveProtection() {
+        boolean attached = emptyIfNull(orders).stream()
+                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                .anyMatch(protection -> isTrue(protection.isActiveLike()));
+        return attached || emptyIfNull(algoOrders).stream().anyMatch(algo -> isTrue(algo.isExchangeLive()));
+    }
+
+    /**
+     * Покрытие транша ПОСЛЕ того, как снимаемая отдельная защита
+     * исчезнет (docs/spec/protection-coverage.json, величина
+     * {@code coverageAfterRemoval}) — операнд преконтроля снятия. Сумма
+     * идёт по живым защитам транша, несущим действующий уровень
+     * остановки убытка; защиты соседних траншей в неё не входят по
+     * построению.
+     */
+    public BigDecimal coverageWithoutAlgoOrder(Long algoOrderId) {
+        return coverageWithout(algoOrderId);
+    }
+
+    /**
+     * Снятие отдельной защиты законно: остающееся покрытие не ниже
+     * экспозиции транша (величина {@code removalAllowed}).
+     *
+     * <p>{@code null} — предикат ОТКАЗЫВАЕТ ВЫЧИСЛЕНИЕМ: живая защита
+     * при нуле предъявленных заявок означает «предъявлено не всё», а не
+     * «заявок нет». Экспозиция считается по заявкам транша и в этом
+     * состоянии схлопывается в ноль, а сравнение с нулём разрешило бы
+     * снятие последней защиты над живой экспозицией.
+     */
+    public Boolean removalAllowed(Long algoOrderId) {
+        if (isTrue(hasLiveProtection()) && isEmpty(orders)) {
+            return null;
+        }
+        return coverageWithoutAlgoOrder(algoOrderId).compareTo(exposure()) >= 0;
+    }
+
+    /** Сумма покрытий защит транша, кроме отдельной защиты с указанным id. */
+    private BigDecimal coverageWithout(Long excludedAlgoOrderId) {
+        BigDecimal attached = emptyIfNull(orders).stream()
+                .map(this::attachedCoverageOf)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal standalone = emptyIfNull(algoOrders).stream()
+                .filter(algo -> isFalse(Objects.equals(excludedAlgoOrderId, algo.getId())))
+                .filter(algo -> isTrue(algo.isExchangeLive()) && isTrue(algo.carriesActiveStopLevel()))
+                .map(AlgoOrder::coveredSize)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return attached.add(standalone);
+    }
+
+    /** Покрытие встроенными защитами одной заявки: каждая — не больше её налива. */
+    private BigDecimal attachedCoverageOf(Order order) {
+        return emptyIfNull(order.getAttachedAlgoOrders()).stream()
+                .filter(protection -> isTrue(protection.isActiveLike()))
+                .map(protection -> protection.coveredSize(order.getAccumulatedFillSize()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**

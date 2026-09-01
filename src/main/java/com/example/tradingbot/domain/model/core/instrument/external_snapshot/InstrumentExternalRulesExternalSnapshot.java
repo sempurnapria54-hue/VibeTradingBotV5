@@ -58,4 +58,10 @@ public class InstrumentExternalRulesExternalSnapshot {
 
     /** Сырой статус инструмента биржи (OKX state). */
     String externalState;
+
+    /**
+     * Ключ комиссионной группы инструмента (OKX groupId) — половина ключа
+     * резолва ставки; сама ставка на навесе не живёт.
+     */
+    String externalFeeGroupId;
 }

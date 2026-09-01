@@ -35,6 +35,7 @@ public interface InstrumentExternalRulesMapper {
     @Mapping(target = "externalMaxStopSize", source = "maxStopSz")
     @Mapping(target = "externalMaxLeverage", source = "lever")
     @Mapping(target = "externalState", source = "state")
+    @Mapping(target = "externalFeeGroupId", source = "groupId")
     InstrumentExternalRulesExternalSnapshot integrationToSnapshot(InstrumentOkxResponse response);
 
     /**

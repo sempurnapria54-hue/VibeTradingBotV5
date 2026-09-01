@@ -2,6 +2,7 @@ package com.example.tradingbot.integration.service.okx;
 
 import static java.util.Objects.isNull;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
@@ -17,6 +18,7 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.other.external_snapshot.TradeFeeRateExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
 import com.example.tradingbot.integration.model.okx.request.CancelAlgoOrderOkxRequest;
@@ -36,6 +38,7 @@ import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse
 import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.ServerTimeOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.TickerOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.TradeFeeOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.SetLeverageOkxResponse;
@@ -51,6 +54,7 @@ import com.example.tradingbot.mapping.MarketPriceDataMapper;
 import com.example.tradingbot.mapping.OrderMapper;
 import com.example.tradingbot.integration.service.ExternalInvariantViolationException;
 import com.example.tradingbot.mapping.PositionMapper;
+import com.example.tradingbot.mapping.TradeFeeRateMapper;
 import com.example.tradingbot.util.OkxParse;
 import com.example.tradingbot.util.Constants;
 import java.util.List;
@@ -85,6 +89,7 @@ public class OkxIntegrationService implements IntegrationService {
     private final BalanceContainerMapper balanceContainerMapper;
     private final AlgoOrderMapper algoOrderMapper;
     private final FillMapper fillMapper;
+    private final TradeFeeRateMapper tradeFeeRateMapper;
 
     @Override
     public InstrumentExternalSnapshot getInstrument(String externalInstrumentId, String externalInstrumentType) {
@@ -110,6 +115,24 @@ public class OkxIntegrationService implements IntegrationService {
             return null;
         }
         return instrumentExternalRulesMapper.integrationToSnapshot(response.getData().getFirst());
+    }
+
+    @Override
+    public List<TradeFeeRateExternalSnapshot> getTradeFeeRates(String externalInstrumentType) {
+        OkxApiResponse<TradeFeeOkxResponse> response = execute(
+                () -> okxRestClient.getTradeFee(externalInstrumentType),
+                "trade-fee", "instType=" + externalInstrumentType);
+        verifyCode(response, "trade-fee", "instType=" + externalInstrumentType);
+        if (isEmpty(response.getData())) {
+            return List.of();
+        }
+        TradeFeeOkxResponse rates = response.getData().getFirst();
+        // Ставка живёт только в группах: плоские поля верхнего уровня офдок
+        // для SWAP/FUTURES помечает deprecated, и прогон контура застал их
+        // пустыми (наблюдение AG12.1).
+        return emptyIfNull(rates.getFeeGroup()).stream()
+                .map(group -> tradeFeeRateMapper.integrationToSnapshot(rates, group))
+                .collect(toList());
     }
 
     @Override

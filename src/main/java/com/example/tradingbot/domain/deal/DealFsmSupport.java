@@ -137,14 +137,7 @@ public class DealFsmSupport {
      */
     public Optional<DealActionState> findActionState(DealContext dealContext, DealTranche tranche,
                                                      StrategyAction action) {
-        if (isEmpty(dealContext.getActionStates())) {
-            return Optional.empty();
-        }
-        return dealContext.getActionStates().stream()
-                .filter(state -> Objects.equals(action.getId(), state.getStrategyActionId()))
-                .filter(state -> Objects.equals(tranche.getId(), state.getDealTrancheId()))
-                .filter(state -> Objects.equals(tranche.getEpisodeSeq(), state.getTrancheEpisodeSeq()))
-                .findFirst();
+        return dealContext.actionState(action.getId(), tranche);
     }
 
     /**

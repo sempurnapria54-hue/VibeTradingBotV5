@@ -32,6 +32,10 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     @Query("select i.internalId from InstrumentEntity i where i.id = :id")
     Optional<String> findInternalIdById(@Param("id") Long id);
 
+    /** Проекция: биржа инструмента по id — операнд резолва ставки комиссии. */
+    @Query("select i.exchangeId from InstrumentEntity i where i.id = :id")
+    Optional<Long> findExchangeIdById(@Param("id") Long id);
+
     @Query("select i.id from InstrumentEntity i where i.internalId = :internalId")
     Optional<Long> findIdByInternalId(@Param("internalId") String internalId);
 }

@@ -51,7 +51,9 @@ import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
+import com.example.tradingbot.config.RiskAppetiteProperties;
 import com.example.tradingbot.util.IndicatorComponents;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -61,6 +63,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.EnumUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -81,7 +84,10 @@ import org.springframework.web.server.ResponseStatusException;
  * derive — у реализаций индикаторов (шаг 3).
  */
 @Component
+@RequiredArgsConstructor
 public class StrategyCreateRequestValidator {
+
+    private final RiskAppetiteProperties riskAppetite;
 
     /** Допустимые ruleType в контексте классификации фазы (сравнивающие + структурно-событийные). */
     private static final Set<String> PHASE_ALLOWED_RULE_TYPES = Set.of(
@@ -224,7 +230,74 @@ public class StrategyCreateRequestValidator {
         validateEnum(MarketPhase.Type.class, detail.getMarketPhaseType(), path + ".marketPhaseType", violations);
         validateEnum(PhaseEntryPolicy.class, detail.getPhaseEntryPolicy(), path + ".phaseEntryPolicy", violations);
         validatePolicyMatrix(detail, path, violations);
+        validateRiskNumbers(detail, path, violations);
         validateSteps(detail, path, indicatorTypes, structureKeys, violations);
+    }
+
+    /**
+     * Риск-числа торгуемой детали: объявлены все четыре, и два из них
+     * вложены в конфигурационный риск-аппетит
+     * (docs/spec/strategy-reference.json, величины
+     * {@code hasRequiredRiskFields}, {@code strategyRiskWithinGlobal},
+     * {@code catastrophicMultiplierWithinGlobal}).
+     *
+     * <p><b>Незаданное конфигурационное число отвергает создание, а не
+     * пропускает его:</b> сверять объявление автора не с чем, и
+     * пропуск был бы разрешающей ошибкой ровно там, где стои́т охрана.
+     * Реджекты у неравенств РАЗНЫЕ — адресует отказ тот конъюнкт,
+     * который ложен (П3).
+     */
+    private void validateRiskNumbers(StrategyDetailApiModel detail, String path, List<String> violations) {
+        if (isFalse(tradableDetail(detail))) {
+            return;
+        }
+        requireDeclared(detail.getRiskPerActionPercent(), path + ".riskPerActionPercent", violations);
+        requireDeclared(detail.getCumulativeRiskPerDealMultiplier(),
+                path + ".cumulativeRiskPerDealMultiplier", violations);
+        requireDeclared(detail.getStrategySimultaneousRiskPerDealPercent(),
+                path + ".strategySimultaneousRiskPerDealPercent", violations);
+        requireDeclared(detail.getStrategyCatastrophicRiskPerDealMultiplier(),
+                path + ".strategyCatastrophicRiskPerDealMultiplier", violations);
+        validateWithinGlobal(detail.getStrategySimultaneousRiskPerDealPercent(),
+                riskAppetite.getGlobalSimultaneousRiskPerDealPercent(),
+                path + ".strategySimultaneousRiskPerDealPercent",
+                "STRATEGY_SIMULTANEOUS_RISK_ABOVE_GLOBAL",
+                "максимум одновременного риска стратегии выше конфигурационного", violations);
+        validateWithinGlobal(detail.getStrategyCatastrophicRiskPerDealMultiplier(),
+                riskAppetite.getGlobalCatastrophicRiskPerDealMultiplier(),
+                path + ".strategyCatastrophicRiskPerDealMultiplier",
+                "STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL",
+                "множитель катастрофического потолка выше конфигурационного предела", violations);
+    }
+
+    /** Деталь торгуема: политика фазы объявлена и она не NO_TRADE. */
+    private Boolean tradableDetail(StrategyDetailApiModel detail) {
+        return EnumUtils.isValidEnum(PhaseEntryPolicy.class, detail.getPhaseEntryPolicy())
+                && isFalse(PhaseEntryPolicy.NO_TRADE.equals(
+                        PhaseEntryPolicy.valueOf(detail.getPhaseEntryPolicy())));
+    }
+
+    private void requireDeclared(BigDecimal value, String path, List<String> violations) {
+        if (isNull(value)) {
+            violations.add(path + " STRATEGY_RISK_NUMBER_NOT_DECLARED: у торгуемой детали риск-число "
+                    + "обязательно, умолчания нет");
+        }
+    }
+
+    /** Объявление автора не выше конфигурационного предела; предела нет — отказ. */
+    private void validateWithinGlobal(BigDecimal declared, BigDecimal configured, String path,
+                                      String code, String message, List<String> violations) {
+        if (isNull(declared)) {
+            return;
+        }
+        if (isNull(configured)) {
+            violations.add(path + " RISK_APPETITE_NOT_CONFIGURED: конфигурационное число риск-аппетита "
+                    + "не задано — объявленное стратегией сверять не с чем");
+            return;
+        }
+        if (declared.compareTo(configured) > 0) {
+            violations.add(path + " " + code + ": " + message);
+        }
     }
 
     /** Матрица допустимости политика×фаза — инвариант доменной модели (PhaseEntryPolicy.isAllowedFor). */
@@ -729,10 +802,26 @@ public class StrategyCreateRequestValidator {
         }
     }
 
+    /**
+     * Действие объявило ОБА блока настроек уровня — резолв источника
+     * неоднозначен (docs/spec/strategy-reference.json, величина
+     * {@code levelSourceAmbiguous}). Без реджекта пришлось бы вводить
+     * приоритет блоков, то есть отвечать за автора там, где он сам себе
+     * противоречит. Дом правила — docs/rules/strategy-validation.md.
+     */
+    private void validateLevelSourceUnambiguous(StrategyAlgoOrderActionApiModel action, String path,
+                                                List<String> violations) {
+        if (nonNull(action.getTrailingSettings()) && nonNull(action.getStopLossSettings())) {
+            violations.add(path + " STRATEGY_LEVEL_SOURCE_AMBIGUOUS: действие объявило и блок трейлинга, "
+                    + "и блок стопа — источник уровня не резолвится");
+        }
+    }
+
     private void validateAlgoOrderAction(StrategyAlgoOrderActionApiModel action, String path,
                                          Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
                                          List<String> violations) {
         validateEnum(AlgoOrder.ConditionType.class, action.getConditionType(), path + ".conditionType", violations);
+        validateLevelSourceUnambiguous(action, path, violations);
         if (nonNull(action.getTriggerPriceType())) {
             validateEnum(AlgoOrder.TriggerPriceType.class, action.getTriggerPriceType(),
                     path + ".triggerPriceType", violations);

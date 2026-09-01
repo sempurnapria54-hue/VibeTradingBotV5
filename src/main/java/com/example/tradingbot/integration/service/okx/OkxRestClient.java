@@ -21,6 +21,7 @@ import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse
 import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.ServerTimeOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.TickerOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.TradeFeeOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.SetLeverageOkxResponse;
@@ -48,6 +49,10 @@ import org.springframework.web.client.RestClient;
 @Component
 @RequiredArgsConstructor
 public class OkxRestClient {
+
+    private static final ParameterizedTypeReference<OkxApiResponse<TradeFeeOkxResponse>> TRADE_FEE_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
 
     private static final ParameterizedTypeReference<OkxApiResponse<InstrumentOkxResponse>> INSTRUMENT_TYPE =
             new ParameterizedTypeReference<>() {
@@ -291,6 +296,20 @@ public class OkxRestClient {
     public OkxApiResponse<SetLeverageOkxResponse> setLeverage(SetLeverageOkxRequest request) {
         return dispatch(HttpMethod.POST, Constants.Okx.ACCOUNT_SET_LEVERAGE_PATH, null, request, true,
                 SET_LEVERAGE_TYPE);
+    }
+
+    /**
+     * Ставки комиссий счёта по типу инструмента. Приватный endpoint (подпись).
+     *
+     * <p>Ось запроса — <b>тип</b>, не инструмент: один вызов на тик отдаёт
+     * группы всего типа, а {@code instId}/{@code instFamily} в запросе
+     * вернули бы ставки с учётом market-maker incentive вместо organic base
+     * rates (docs/integrations/okx/contracts/trade-fee.md).
+     */
+    public OkxApiResponse<TradeFeeOkxResponse> getTradeFee(String instType) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(Constants.Okx.PARAM_INST_TYPE, instType);
+        return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_TRADE_FEE_PATH, query, null, true, TRADE_FEE_TYPE);
     }
 
     /** Баланс аккаунта (опционально по валюте). Приватный endpoint (подпись). */

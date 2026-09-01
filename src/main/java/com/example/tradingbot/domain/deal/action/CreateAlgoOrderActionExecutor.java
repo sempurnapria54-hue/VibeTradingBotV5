@@ -38,15 +38,19 @@ import org.springframework.stereotype.Component;
  * Per-pass executor CREATE-действия над standalone algo-order (SL/TP/OCO/
  * trailing). По стадии {@link DealActionState}: PLANNED → расчёт →
  * CREATE_ALGO_ORDER; CREATED → SUBMIT_ALGO_ORDER; SUBMITTED →
- * REFRESH_ALGO_ORDER. Risk-валидацию не проходит: algo-защита reduce-only,
- * позицию не открывает (docs/rules/risk-validator-scope.md). Направление —
- * закрывающее к направлению сделки. См. docs/decisions/fsm-execution-layering.md.
+ * REFRESH_ALGO_ORDER. **Прогоняет преконтроль по ветке ослабления защиты**
+ * (docs/rules/risk-validator-scope.md: создание защитной заявки — любой,
+ * включая покрывающую экспозицию полностью): действие reduce-only и
+ * позицию не открывает, поэтому оба слагаемых акта нулевые, но состав
+ * неравенств классом действия не сужается. Направление — закрывающее к
+ * направлению сделки. См. docs/decisions/fsm-execution-layering.md.
  */
 @Component
 @RequiredArgsConstructor
 public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
 
     private final StrategyActionCalculator calculator;
+    private final ActionRiskGate riskGate;
 
     @Override
     public Boolean supports(StrategyAction action) {
@@ -71,8 +75,12 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
         if (StrategyActionCalculationResult.Status.ERROR.equals(calculation.getStatus())) {
             return ActionPlan.calcError(calculation.getError());
         }
-        return ActionPlan.command(createAlgoCommand(action, calculation.getCalculatedAction(), state,
-                dealContext, tranche));
+        CalculatedStrategyAction calculated = calculation.getCalculatedAction();
+        ActionPlan blocked = riskGate.blockingPlan(calculated, dealContext, tranche);
+        if (nonNull(blocked)) {
+            return blocked;
+        }
+        return ActionPlan.command(createAlgoCommand(action, calculated, state, dealContext, tranche));
     }
 
     private ServiceCommand createAlgoCommand(StrategyAlgoOrderAction action, CalculatedStrategyAction calculated,

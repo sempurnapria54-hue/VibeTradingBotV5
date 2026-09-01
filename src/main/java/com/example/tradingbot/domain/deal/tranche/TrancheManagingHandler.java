@@ -3,9 +3,7 @@ package com.example.tradingbot.domain.deal.tranche;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
-import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
-import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
@@ -104,11 +102,21 @@ public class TrancheManagingHandler implements TrancheFsmHandler {
         return null;
     }
 
+    /**
+     * Запуск ОЧЕРЕДНОГО действия пакета первого применимого шага.
+     * Действие выбирает оркестратор: пакет исполняется целиком, за
+     * проход — одно действие, снимающие защиту идут после
+     * устанавливающих (docs/components/StrategyActionOrchestrator.md
+     * §«Порядок выбора действия»).
+     */
     private TrancheTransition startApplicable(List<StrategyStep> steps, DealContext dealContext, DealTranche tranche) {
         ConditionEvaluationContext conditionContext = support.conditionContext(dealContext);
         for (StrategyStep step : steps) {
-            if (isTrue(support.stepEligible(step, dealContext, tranche, conditionContext)) && isNotEmpty(step.getActions())) {
-                StrategyAction action = step.getActions().getFirst();
+            if (isFalse(support.stepEligible(step, dealContext, tranche, conditionContext))) {
+                continue;
+            }
+            StrategyAction action = actionOrchestrator.nextAction(step, dealContext, tranche).orElse(null);
+            if (nonNull(action)) {
                 DealActionState state = support.findOrCreateActionState(dealContext, tranche, action);
                 return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));
             }

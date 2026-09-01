@@ -61,7 +61,7 @@
 | `RISK_PER_ACTION_EXCEEDED` | бессрочный — расчёт разошёлся, повтор даст то же |
 | `SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET` | бессрочный — лот неделим, база от прохода к проходу его не поделит |
 | `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`, `DEAL_NOTIONAL_EXCEEDED` | **временный** — бюджет освободится выходом соседнего транша |
-| `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`, `FEE_RATE_UNAVAILABLE`, `DEAL_GRAPH_INCOMPLETE` | **временный** — операнд добудется следующим проходом |
+| `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`, `FEE_RATE_UNAVAILABLE`, `DEAL_GRAPH_INCOMPLETE`, `LOSS_LIMIT_NOT_CONFIGURED`, `RISK_APPETITE_NOT_CONFIGURED` | **временный** — операнд добудется следующим проходом либо придёт правкой конфигурации |
 | `INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `INSTRUMENT_SETTLE_CURRENCY_MISSING`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `MARGIN_MODE_NOT_ISOLATED`, `BORROW_OR_DEBT_DETECTED` | бессрочные — состояние контура сменится не проходом, а внешним действием |
 | прочие (конфигурация, стороны уровней, инварианты частичного выхода) | бессрочные — меняются только правкой стратегии |
 
@@ -84,7 +84,11 @@
 **Баланс и ставка:** `BALANCE_INVALID`, `BALANCE_NOT_FRESH`,
 `BALANCE_NOT_ENOUGH`, `FEE_RATE_UNAVAILABLE`.
 
-**Числа риск-аппетита:** `LOSS_LIMIT_NOT_CONFIGURED`.
+**Числа риск-аппетита:** `LOSS_LIMIT_NOT_CONFIGURED`,
+`RISK_APPETITE_NOT_CONFIGURED`. Кодов два, а не один: пустой порог серии
+убытков и пустой максимальный риск на сделку — **разные** незаданные
+операнды, и П3 требует различать их в данных. Оба **временны́е**:
+исход меняется правкой конфигурации, а не стратегии.
 
 **Полнота входа проверки:** `DEAL_GRAPH_INCOMPLETE`. Код отдельный, а не
 разновидность `CALCULATED_ACTION_INVALID`: тот говорит о самом

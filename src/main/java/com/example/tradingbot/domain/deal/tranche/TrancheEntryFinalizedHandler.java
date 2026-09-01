@@ -3,7 +3,6 @@ package com.example.tradingbot.domain.deal.tranche;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
-import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -110,14 +109,29 @@ public class TrancheEntryFinalizedHandler implements TrancheFsmHandler {
         return null;
     }
 
+    /**
+     * Запуск ОЧЕРЕДНОГО действия пакета применимого шага защиты;
+     * действие выбирает оркестратор (пакет целиком, за проход — одно).
+     */
     private TrancheTransition startProtection(List<StrategyStep> protectionSteps, DealContext dealContext, DealTranche tranche) {
         ConditionEvaluationContext conditionContext = support.conditionContext(dealContext);
+        boolean anyEligible = false;
         for (StrategyStep step : protectionSteps) {
-            if (isTrue(support.stepEligible(step, dealContext, tranche, conditionContext)) && isNotEmpty(step.getActions())) {
-                StrategyAction action = step.getActions().getFirst();
+            if (isFalse(support.stepEligible(step, dealContext, tranche, conditionContext))) {
+                continue;
+            }
+            anyEligible = true;
+            StrategyAction action = actionOrchestrator.nextAction(step, dealContext, tranche).orElse(null);
+            if (nonNull(action)) {
                 DealActionState state = support.findOrCreateActionState(dealContext, tranche, action);
                 return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));
             }
+        }
+        if (anyEligible) {
+            // Шаг защиты допустим, а начинать нечего — ждём следующего прохода:
+            // переход по ветви «условие не сработало» подписал бы ожидание
+            // чужой причиной.
+            return TrancheTransition.stay();
         }
         // MAIN_PROTECTION есть, но условие не сработало — attached защита держит → MANAGING.
         return toManagingIfProtected(dealContext, tranche);

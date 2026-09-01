@@ -101,6 +101,18 @@ public class AttachedAlgoOrder extends Auditable {
         return allowed.contains(target);
     }
 
+    /**
+     * Сколько эта защита реально закрывает: не больше налива своей
+     * родительской заявки (docs/spec/protection-coverage.json, величина
+     * {@code coveredSize} носителя ATTACHED). Уровень остановки убытка
+     * встроенная несёт всегда — тип у неё один.
+     */
+    public BigDecimal coveredSize(BigDecimal parentFillSize) {
+        BigDecimal declared = isNull(size) ? BigDecimal.ZERO : size;
+        BigDecimal filled = isNull(parentFillSize) ? BigDecimal.ZERO : parentFillSize;
+        return declared.min(filled);
+    }
+
     /** Отправлена вместе с parent; active-факт не подтверждён. */
     public void toPending() {
         transitTo(Status.PENDING);

@@ -9,13 +9,13 @@
     "dealTerminal": "терминал, которым закрылась сделка: CLOSED — штатный, EMERGENCY_CLOSED — аварийный; ERROR терминалом не является — сделка идёт дальше аварийной тропой",
     "exchangeStatusBefore": "Exchange.status до применения исхода сделки; мягкая ступень — HOLD, сворачивание — TRADE_BLOCKED, прочие значения ступенью не являются",
     "consecutiveLossCountBefore": "Exchange.consecutiveLossCount до применения исхода сделки",
-    "lossLimit": "globalConsecutiveLossLimit — сколько подряд убыточных сделок останавливает торговлю; умолчания нет"
+    "globalConsecutiveLossLimit": "globalConsecutiveLossLimit — сколько подряд убыточных сделок останавливает торговлю; умолчания нет"
   },
   "values": [
     {
       "name": "limitConfigured",
       "note": "Пустое место — отказ, а не бессрочная торговля: провизорное N не назначается.",
-      "expr": "notNull(lossLimit)"
+      "expr": "notNull(globalConsecutiveLossLimit)"
     },
     {
       "name": "riskCreatingRefused",
@@ -60,7 +60,7 @@
     {
       "name": "haltTriggered",
       "note": "Запрос мягкой биржевой ступени, а не статус биржи: срабатывает на N-й сделке серии и подаётся идемпотентной точкой входа исполнителя блокировки после коммита терминала. Какой статус получится — дело лестницы (docs/rules/exchange-hold.md): монотонность ступеней и согласование эскалации живут там, спека их не дублирует. Порог не задан — срабатывать нечему, торговля уже отвергнута преконтролем.",
-      "expr": "limitConfigured && consecutiveLossCountAfter >= lossLimit"
+      "expr": "limitConfigured && consecutiveLossCountAfter >= globalConsecutiveLossLimit"
     },
     {
       "name": "holdStandingBefore",
@@ -83,7 +83,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "isLoss": true,
@@ -101,7 +101,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "isLoss": true,
@@ -119,7 +119,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "isProfit": true,
@@ -137,7 +137,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 3,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "isProfit": true,
@@ -156,7 +156,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 3,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "isLoss": true,
@@ -174,7 +174,7 @@
         "dealTerminal": "EMERGENCY_CLOSED",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 1,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "countedTerminal": true,
@@ -193,7 +193,7 @@
         "dealTerminal": "EMERGENCY_CLOSED",
         "exchangeStatusBefore": "TRADE_BLOCKED",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "countedTerminal": true,
@@ -215,7 +215,7 @@
         "dealTerminal": "ERROR",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "countedTerminal": false,
@@ -235,7 +235,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "isNeutral": true,
@@ -255,7 +255,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "counterFrozen": true,
@@ -275,7 +275,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 3,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "counterFrozen": true,
@@ -293,7 +293,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 5,
-        "lossLimit": null
+        "globalConsecutiveLossLimit": null
       },
       "expect": {
         "limitConfigured": false,
@@ -311,7 +311,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
-        "lossLimit": 1
+        "globalConsecutiveLossLimit": 1
       },
       "expect": {
         "consecutiveLossCountAfter": 1,
@@ -328,7 +328,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "priceResult": -27.7,
@@ -348,7 +348,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "priceResult": 25.0,
@@ -368,7 +368,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "priceResult": 0,
@@ -389,7 +389,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "limitConfigured": true,
@@ -405,7 +405,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "isNeutral": false,
@@ -422,7 +422,7 @@
         "dealTerminal": "EMERGENCY_CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "countedTerminal": true,
@@ -443,7 +443,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "priceResult": null,
@@ -463,7 +463,7 @@
         "dealTerminal": "CLOSED",
         "exchangeStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
-        "lossLimit": 3
+        "globalConsecutiveLossLimit": 3
       },
       "expect": {
         "priceResult": -7,

@@ -62,9 +62,45 @@ class RiskBlockResolverTest {
         for (DealTranche.Status status : List.of(DealTranche.Status.ENTRY_SUBMITTED,
                 DealTranche.Status.MANAGING, DealTranche.Status.EXIT_PENDING)) {
             RiskBlockAction action = resolver.resolve(context(), status,
-                    blocked(RiskCheckCode.BALANCE_NOT_ENOUGH));
+                    blocked(RiskCheckCode.MARGIN_MODE_NOT_ISOLATED));
             assertEquals(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR, action.getType(),
                     "стадия " + status + " несёт живой риск");
+        }
+    }
+
+    @Test
+    @DisplayName("Карв-аут при живом риске не уводит в ERROR: действие просто не исполняется")
+    void carveOutSkipsActionUnderLiveRisk() {
+        // Сделка доживает под своей защитой; увод в ERROR создавал бы исполнение
+        // по рынку там, где риск уже под контролем, и загрязнял бы R-выборку
+        // (docs/processes/risk-evaluation.md §«Карв-аут исчерпанного бюджета сделки»).
+        for (RiskCheckCode code : List.of(RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
+                RiskCheckCode.BALANCE_NOT_ENOUGH, RiskCheckCode.STOP_LOSS_INVALID_SIDE)) {
+            RiskBlockAction action = resolver.resolve(context(), DealTranche.Status.MANAGING, blocked(code));
+            assertEquals(RiskBlockAction.Type.SKIP_ACTION, action.getType(), "код " + code);
+        }
+    }
+
+    @Test
+    @DisplayName("Членство в карв-ауте — конъюнкция: код вне перечня возвращает вердикт на тропу ошибки")
+    void carveOutIsConjunction() {
+        RiskBlockAction action = resolver.resolve(context(), DealTranche.Status.MANAGING,
+                blocked(RiskCheckCode.PROTECTION_COVERAGE_REDUCED, RiskCheckCode.MARGIN_MODE_NOT_ISOLATED));
+
+        assertEquals(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR, action.getType());
+    }
+
+    @Test
+    @DisplayName("Неполнота графа уводит ошибочной тропой на ЛЮБОЙ стадии — вердиктом риск-политики она не является")
+    void graphIncompleteMovesDealToErrorOnEveryStage() {
+        // Схема «стадия → реакция» к нему не применяется ни одной строкой: иначе
+        // разбор по данным перестал бы отличать «риск не позволил» от «контекст
+        // не загрузился» (docs/processes/risk-evaluation.md).
+        for (DealTranche.Status status : List.of(DealTranche.Status.PRECHECK, DealTranche.Status.MANAGING)) {
+            RiskBlockAction action = resolver.resolve(context(), status,
+                    blocked(RiskCheckCode.DEAL_GRAPH_INCOMPLETE));
+            assertEquals(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR, action.getType(), "стадия " + status);
+            assertEquals(null, action.getCloseReason(), "терминала кандидата тут нет");
         }
     }
 

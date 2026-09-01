@@ -31,6 +31,23 @@ import org.springframework.stereotype.Component;
 @Component
 public class RiskBlockResolver {
 
+    /**
+     * Коды, не уводящие сделку в ERROR при живом риске. Дом перечня —
+     * docs/processes/risk-evaluation.md §«Карв-аут исчерпанного бюджета
+     * сделки»; здесь стоя́т те его члены, чьи коды в перечне
+     * {@link RiskCheckCode} уже заведены. Остальные приезжают вместе со
+     * своими кодами (потолки риска на сделку, пол дистанции стопа,
+     * ступень safety-холда).
+     */
+    private static final Set<RiskCheckCode> DEAL_ERROR_CARVE_OUT = EnumSet.of(
+            RiskCheckCode.SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET,
+            RiskCheckCode.BALANCE_NOT_ENOUGH,
+            RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
+            RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+            RiskCheckCode.STOP_LOSS_INVALID_SIDE,
+            RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
+            RiskCheckCode.PROTECTION_COVERAGE_REDUCED);
+
     private static final Set<DealTranche.Status> LIVE_RISK_STATUSES = EnumSet.of(
             DealTranche.Status.ENTRY_SUBMITTED,
             DealTranche.Status.ENTRY_FINALIZED,
@@ -55,6 +72,17 @@ public class RiskBlockResolver {
 
     private RiskBlockAction resolveBlocked(DealContext dealContext, DealTranche.Status currentStatus,
                                            RiskValidationResult result) {
+        if (hasBlockingCode(result, RiskCheckCode.DEAL_GRAPH_INCOMPLETE)) {
+            // Не вердикт риск-политики: операндов не предъявлено. Схема по
+            // стадиям к нему не применяется ни одной строкой — на всех стадиях
+            // тропа ошибки сделки, чтобы разбор по данным отличал «риск не
+            // позволил» от «контекст не загрузился» (docs/processes/risk-evaluation.md).
+            return RiskBlockAction.builder()
+                    .type(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR)
+                    .errorCode(RuntimeErrorCode.INTERNAL_ERROR)
+                    .comment("deal graph incomplete: " + result.getComment())
+                    .build();
+        }
         if (hasBlockingCode(result, RiskCheckCode.BALANCE_NOT_FRESH)
                 || hasBlockingCode(result, RiskCheckCode.BALANCE_INVALID)) {
             return RiskBlockAction.builder()
@@ -63,6 +91,17 @@ public class RiskBlockResolver {
                     .build();
         }
         if (isTrue(liveRiskExists(dealContext, currentStatus))) {
+            // Карв-аут исчерпанного бюджета сделки: реджект, который НЕ является
+            // признаком рассогласования, действие просто не исполняет — сделка
+            // остаётся в статусе и доживает под своей защитой. Увод в ERROR
+            // создавал бы исполнение по рынку там, где риск уже под контролем
+            // (docs/processes/risk-evaluation.md §«Карв-аут исчерпанного бюджета сделки»).
+            if (isTrue(carvedOut(result))) {
+                return RiskBlockAction.builder()
+                        .type(RiskBlockAction.Type.SKIP_ACTION)
+                        .comment("risk blocked within carve-out, action skipped: " + result.getComment())
+                        .build();
+            }
             return RiskBlockAction.builder()
                     .type(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR)
                     .errorCode(RuntimeErrorCode.VALIDATION_ERROR)
@@ -89,6 +128,29 @@ public class RiskBlockResolver {
     }
 
     /**
+     * Вердикт целиком лежит в карв-ауте исчерпанного бюджета сделки —
+     * перечень членства держит `docs/processes/risk-evaluation.md`
+     * §«Карв-аут исчерпанного бюджета сделки», здесь он исполняется.
+     *
+     * <p>Свёртка — конъюнкция по блокирующим кодам, а не дизъюнкция:
+     * один код вне карв-аута возвращает вердикт на тропу ошибки.
+     * Направление консервативное — членство освобождает от аварийного
+     * контура, и освобождать по одному коду из перечня, когда рядом
+     * стои́т признак рассогласования, было бы разрешающей ошибкой.
+     *
+     * <p>Пустой перечень блокирующих кодов членством не считается — тот
+     * же довод, что у бессрочности: терминал по нему был бы решением по
+     * недобытому факту.
+     */
+    private Boolean carvedOut(RiskValidationResult result) {
+        List<RiskCheckResult> blocking = blockingChecks(result);
+        if (isEmpty(blocking)) {
+            return false;
+        }
+        return blocking.stream().allMatch(check -> DEAL_ERROR_CARVE_OUT.contains(check.getCode()));
+    }
+
+    /**
      * Бессрочность ВЕРДИКТА — конъюнкция бессрочности его кодов: один
      * временный код делает вердикт временным, потому что повтор может
      * пройти. Свёртка нужна оттого, что вердикт несёт ПЕРЕЧЕНЬ отказов, а
@@ -100,13 +162,17 @@ public class RiskBlockResolver {
      * терминал по нему был бы решением по недобытому факту.
      */
     private Boolean verdictPermanent(RiskValidationResult result) {
-        List<RiskCheckResult> blocking = result.getChecks().stream()
-                .filter(check -> RiskCheckStatus.BLOCKED.equals(check.getStatus()))
-                .collect(Collectors.toList());
+        List<RiskCheckResult> blocking = blockingChecks(result);
         if (isEmpty(blocking)) {
             return false;
         }
         return blocking.stream().allMatch(check -> isTrue(check.getCode().isPermanent()));
+    }
+
+    private List<RiskCheckResult> blockingChecks(RiskValidationResult result) {
+        return result.getChecks().stream()
+                .filter(check -> RiskCheckStatus.BLOCKED.equals(check.getStatus()))
+                .collect(Collectors.toList());
     }
 
     private Boolean liveRiskExists(DealContext dealContext, DealTranche.Status currentStatus) {

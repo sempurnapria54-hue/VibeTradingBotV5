@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.model.core.instrument;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.util.Objects;
 import lombok.AllArgsConstructor;
@@ -82,6 +83,37 @@ public class InstrumentExternalRules {
 
     /** Сырой статус инструмента биржи (OKX state). */
     private String externalState;
+
+    /**
+     * Ключ комиссионной группы инструмента (OKX groupId) — половина пары
+     * резолва ставки; вторая половина — сырой тип инструмента. Ставки
+     * навес не хранит: она атрибут комиссионного уровня счёта
+     * (docs/models/domain/other/TradeFeeRate.md).
+     */
+    private String externalFeeGroupId;
+
+    /**
+     * Ставка taker комиссионной группы, ГИДРИРОВАННАЯ хранилищным слоем
+     * навеса при чтении (docs/integrations/okx/contracts/trade-fee.md):
+     * поверхность чтения не двинулась — калькуляторы и преконтроль берут
+     * ставку отсюда и о модели ставки не знают.
+     *
+     * <p>В JSONB-навес поле не попадает: значение принадлежит группе, а
+     * не справочнику инструмента, и копия на инструменте разошлась бы со
+     * сменой тира счёта.
+     */
+    @JsonIgnore
+    private String externalTakerFeeRate;
+
+    /**
+     * Прогнозная ставка комиссии как ИЗДЕРЖКА; {@code null} — ставка не
+     * резолвится, и всякое валидируемое действие отвергается
+     * {@code FEE_RATE_UNAVAILABLE}: подставленное число выглядит фактом,
+     * не будучи им, и ошибается в разрешающую сторону.
+     */
+    public BigDecimal takerFeeRate() {
+        return toDecimal(externalTakerFeeRate);
+    }
 
     /** Инструмент торгуем (статус LIVE). */
     public Boolean isLive() {

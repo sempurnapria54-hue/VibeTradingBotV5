@@ -1,5 +1,7 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.action;
 
+import static java.util.Objects.nonNull;
+
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import java.math.BigDecimal;
@@ -52,4 +54,18 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
 
     /** Тип trigger-цены биржи. */
     private AlgoOrder.TriggerPriceType triggerPriceType;
+
+    /**
+     * Источник уровня читается по ОБЪЯВЛЕННОМУ БЛОКУ настроек: блок
+     * трейлинга означает уровень, наблюдаемый после активации, блок стопа
+     * — уровень, объявленный способом расчёта. Конфигурация с обоими
+     * блоками до сюда не доезжает — она отвергается созданием
+     * (docs/rules/strategy-validation.md,
+     * `STRATEGY_LEVEL_SOURCE_AMBIGUOUS`), поэтому приоритета блоков здесь
+     * нет и быть не должно.
+     */
+    @Override
+    public StrategyLevelSource levelSource() {
+        return nonNull(trailingSettings) ? StrategyLevelSource.OBSERVED : StrategyLevelSource.DECLARED;
+    }
 }

@@ -21,10 +21,10 @@
     "instrument.contractValue": "InstrumentExternalRules.externalContractValue",
     "entryLegs[]": "строки orders сделки с бизнес-типом входа — по всем траншам: потолки агрегатные, транши их не множат",
     "limits.riskPerActionPercent": "StrategyDetail.riskPerActionPercent, проценты",
-    "limits.cumulativeMultiplier": "StrategyDetail.cumulativeRiskPerDealMultiplier (K)",
-    "limits.strategySimultaneousPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",
-    "limits.globalSimultaneousPercent": "globalSimultaneousRiskPerDealPercent — максимальный риск на сделку, проценты; умолчания нет",
-    "limits.catastrophicMultiplier": "StrategyDetail.strategyCatastrophicRiskPerDealMultiplier — множитель катастрофического потолка; умолчания нет",
+    "limits.cumulativeRiskPerDealMultiplier": "StrategyDetail.cumulativeRiskPerDealMultiplier (K)",
+    "limits.strategySimultaneousRiskPerDealPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",
+    "limits.globalSimultaneousRiskPerDealPercent": "globalSimultaneousRiskPerDealPercent — максимальный риск на сделку, проценты; умолчания нет",
+    "limits.strategyCatastrophicRiskPerDealMultiplier": "StrategyDetail.strategyCatastrophicRiskPerDealMultiplier — множитель катастрофического потолка; умолчания нет",
     "dealCollapsing": "сделка в окне сворачивания НА ТРОПЕ ПРЕКОНТРОЛЯ — её статус EXIT_PENDING. Ошибочное состояние в операнд не входит: risk-creating акт при deal.status = ERROR до преконтроля не доходит ни одной тропой (FSM траншей там не прогоняется, а на safety-, аварийных и восстановительных тропах преконтроль не вызывается), и обе половины окна закрыты разным — дом разведения docs/rules/exit-teardown-order.md. Операнд приходит контекстом прохода: преконтроль его не выводит",
     "actRiskCreating": "проверяемый акт создаёт риск: отправка входной заявки, добор объёма, замещение с увеличением. Определение — docs/rules/risk-policy.md",
     "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening; резолв — docs/spec/order-sizing.json, значение entryRiskAtStop",
@@ -107,7 +107,7 @@
     {
       "name": "catastrophicLossCeiling",
       "note": "Катастрофический потолок потери сделки: максимальный риск на сделку, растянутый множителем стратегии. Он же кэп суммарного номинала — худший мыслимый ход принят равным 100 %.",
-      "expr": "limits.globalSimultaneousPercent / 100 * base * limits.catastrophicMultiplier"
+      "expr": "limits.globalSimultaneousRiskPerDealPercent / 100 * base * limits.strategyCatastrophicRiskPerDealMultiplier"
     },
     {
       "name": "baseOperandResolved",
@@ -155,15 +155,15 @@
     },
     {
       "name": "withinCumulative",
-      "expr": "dealRiskTaken + actRisk <= limits.cumulativeMultiplier * limits.riskPerActionPercent / 100 * base"
+      "expr": "dealRiskTaken + actRisk <= limits.cumulativeRiskPerDealMultiplier * limits.riskPerActionPercent / 100 * base"
     },
     {
       "name": "withinStrategySimultaneous",
-      "expr": "liveRiskNow + actRisk <= limits.strategySimultaneousPercent / 100 * base"
+      "expr": "liveRiskNow + actRisk <= limits.strategySimultaneousRiskPerDealPercent / 100 * base"
     },
     {
       "name": "withinGlobalSimultaneous",
-      "expr": "liveRiskNow + actRisk <= limits.globalSimultaneousPercent / 100 * base"
+      "expr": "liveRiskNow + actRisk <= limits.globalSimultaneousRiskPerDealPercent / 100 * base"
     },
     {
       "name": "withinDealNotional",
@@ -194,10 +194,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -243,10 +243,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -291,10 +291,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -331,10 +331,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -379,10 +379,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -423,10 +423,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -467,10 +467,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -511,10 +511,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -555,10 +555,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -599,10 +599,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -643,10 +643,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -685,10 +685,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -728,10 +728,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -772,10 +772,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -813,10 +813,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 0.5,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 0.5,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": null,
@@ -858,10 +858,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": null,
@@ -899,10 +899,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 300
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 300
         },
         "entryLegs": [
           {
@@ -948,10 +948,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 300
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 300
         },
         "entryLegs": [
           {
@@ -999,10 +999,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 300
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 300
         },
         "entryLegs": [
           {
@@ -1049,10 +1049,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 300
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 300
         },
         "entryLegs": [
           {
@@ -1100,10 +1100,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -1151,10 +1151,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 300
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 300
         },
         "entryLegs": [
           {
@@ -1200,10 +1200,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": null
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": null
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1240,10 +1240,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 20,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": null,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 20,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": null,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1280,10 +1280,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1321,10 +1321,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1361,10 +1361,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 2,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 99
+          "cumulativeRiskPerDealMultiplier": 2,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 99
         },
         "entryLegs": [
           {
@@ -1414,10 +1414,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1455,10 +1455,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 300
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 300
         },
         "entryLegs": [
           {
@@ -1514,10 +1514,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -1572,10 +1572,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -1620,10 +1620,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -1669,10 +1669,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [
           {
@@ -1718,10 +1718,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1757,10 +1757,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1796,10 +1796,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1836,10 +1836,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -1878,10 +1878,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -1920,10 +1920,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -1966,10 +1966,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -2006,10 +2006,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -2048,10 +2048,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -2090,10 +2090,10 @@
         },
         "limits": {
           "riskPerActionPercent": 1,
-          "cumulativeMultiplier": 3,
-          "strategySimultaneousPercent": 1,
-          "globalSimultaneousPercent": 1,
-          "catastrophicMultiplier": 100
+          "cumulativeRiskPerDealMultiplier": 3,
+          "strategySimultaneousRiskPerDealPercent": 1,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "strategyCatastrophicRiskPerDealMultiplier": 100
         },
         "entryLegs": [],
         "entryAnchor": 3000,

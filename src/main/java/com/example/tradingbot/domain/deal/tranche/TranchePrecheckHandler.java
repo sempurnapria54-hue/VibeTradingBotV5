@@ -3,7 +3,6 @@ package com.example.tradingbot.domain.deal.tranche;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
-import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -109,15 +108,33 @@ public class TranchePrecheckHandler implements TrancheFsmHandler {
         return null;
     }
 
-    /** Рабочая логика: первый entry-step с выполненным условием → запуск действия. */
+    /**
+     * Рабочая логика: первый entry-step с выполненным условием → запуск
+     * ОЧЕРЕДНОГО действия его пакета. Действие выбирает оркестратор:
+     * пакет исполняется целиком, за проход — одно действие
+     * (docs/components/StrategyActionOrchestrator.md §«Порядок выбора
+     * действия»).
+     */
     private TrancheTransition evaluateEntry(List<StrategyStep> entrySteps, DealContext dealContext, DealTranche tranche) {
         ConditionEvaluationContext conditionContext = support.conditionContext(dealContext);
+        boolean anyEligible = false;
         for (StrategyStep step : entrySteps) {
-            if (isTrue(support.stepEligible(step, dealContext, tranche, conditionContext)) && isNotEmpty(step.getActions())) {
-                StrategyAction action = step.getActions().getFirst();
+            if (isFalse(support.stepEligible(step, dealContext, tranche, conditionContext))) {
+                continue;
+            }
+            anyEligible = true;
+            StrategyAction action = actionOrchestrator.nextAction(step, dealContext, tranche).orElse(null);
+            if (nonNull(action)) {
                 DealActionState state = support.findOrCreateActionState(dealContext, tranche, action);
                 return support.reactToTranchePlan(actionOrchestrator.plan(step, action, state, dealContext, tranche));
             }
+        }
+        if (anyEligible) {
+            // Шаг допустим, а начинать нечего: пакет исчерпан либо очередное
+            // действие ждёт предусловия. Терминал кандидата ставит ТОЛЬКО
+            // невыполненное условие входа, и подписывать им ожидание значило
+            // бы закрывать транш по чужой причине.
+            return TrancheTransition.stay();
         }
         // Условие входа не выполнено, live risk ещё нет — закрыть кандидата без ошибки.
         return TrancheTransition.builder()

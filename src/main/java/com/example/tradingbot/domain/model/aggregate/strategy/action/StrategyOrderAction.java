@@ -50,4 +50,13 @@ public class StrategyOrderAction extends Auditable implements StrategyAction {
 
     /** Attached-защита (для ENTRY_ATTACHED_STOP_LOSS обязательна, для ENTRY null). */
     private StrategyAttachedProtectionSettings attachedProtection;
+
+    /**
+     * У заявки уровень задаёт только встроенная защита, а она объявляется
+     * блоком настроек стопа — наблюдаемого уровня у неё не бывает.
+     */
+    @Override
+    public StrategyLevelSource levelSource() {
+        return StrategyLevelSource.DECLARED;
+    }
 }

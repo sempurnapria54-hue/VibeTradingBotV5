@@ -100,6 +100,9 @@ public final class Constants {
         /** Путь баланса аккаунта (GET). Приватный endpoint. */
         public static final String ACCOUNT_BALANCE_PATH = "/api/v5/account/balance";
 
+        /** Ставки комиссий счёта: ось запроса — тип инструмента, не инструмент. */
+        public static final String ACCOUNT_TRADE_FEE_PATH = "/api/v5/account/trade-fee";
+
         /** Путь конфигурации аккаунта (acctLv/posMode, GET). Приватный endpoint. */
         public static final String ACCOUNT_CONFIG_PATH = "/api/v5/account/config";
 

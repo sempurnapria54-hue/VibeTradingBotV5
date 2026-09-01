@@ -12,6 +12,7 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.other.external_snapshot.TradeFeeRateExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
 import java.time.OffsetDateTime;
@@ -48,6 +49,20 @@ public interface IntegrationService {
      */
     InstrumentExternalRulesExternalSnapshot getInstrumentRules(String externalInstrumentId,
                                                                String externalInstrumentType);
+
+    /**
+     * Ставки комиссий счёта по ТИПУ инструмента — по снапшоту на
+     * комиссионную группу ответа.
+     *
+     * <p>Ось запроса — тип, не инструмент: один вызов отдаёт группы всего
+     * типа, а указание инструмента вернуло бы ставки с учётом
+     * market-maker incentive вместо organic base rates
+     * (docs/integrations/okx/contracts/trade-fee.md). Знак источника
+     * снимается здесь же: наружу ставка выходит издержкой.
+     *
+     * @return снапшоты групп; пусто — групп в ответе нет.
+     */
+    List<TradeFeeRateExternalSnapshot> getTradeFeeRates(String externalInstrumentType);
 
     /**
      * Текущие цены инструмента (last/bid/ask + время тикера) →

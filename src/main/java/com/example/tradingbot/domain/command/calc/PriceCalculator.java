@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.command.calc;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossSettings;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
@@ -45,6 +46,8 @@ public class PriceCalculator {
     private static final String MISSING_DISTANCE = "MISSING_DISTANCE";
     private static final String INVALID_PRICE_AFTER_ROUNDING = "INVALID_PRICE_AFTER_ROUNDING";
     private static final String BREAKEVEN_LEVEL_UNAVAILABLE = "BREAKEVEN_LEVEL_UNAVAILABLE";
+    private static final String ENTRY_ANCHOR_UNAVAILABLE = "ENTRY_ANCHOR_UNAVAILABLE";
+    private static final String FEE_RATE_UNAVAILABLE = "FEE_RATE_UNAVAILABLE";
 
     public CalculatedPrice calculate(CalculationContext context) {
         return switch (context.getAction()) {
@@ -97,7 +100,7 @@ public class PriceCalculator {
 
     private CalculatedPrice algoPrice(StrategyAlgoOrderAction action, CalculationContext context) {
         StrategyTradeDirection direction = context.getStrategyDirection();
-        BigDecimal entryPrice = entryReference(context);
+        BigDecimal entryPrice = levelAnchor(context);
         CalculatedPrice.CalculatedPriceBuilder builder = CalculatedPrice.builder()
                 .priceMode(PriceMode.NOT_REQUIRED)
                 .sendPriceToExchange(Boolean.FALSE)
@@ -132,15 +135,58 @@ public class PriceCalculator {
             case ATR_PERCENT -> applyDistance(entryPrice, percentOf(atrValue(settings, context),
                     requireDistance(settings.getDistancePercents())), isLong, false);
             case MARKET_STRUCTURE_BUFFER_PERCENT -> structureStop(settings, isLong, context);
-            case BREAKEVEN -> throw error(BREAKEVEN_LEVEL_UNAVAILABLE,
-                    "Breakeven level is not computed yet: the branch lands with the step-7 CODE delta"
-                            + " (docs/spec/stop-distance.json, breakevenLevel)");
+            case BREAKEVEN -> breakevenLevel(entryPrice, isLong, context);
         };
-        RoundingMode mode = isLong ? RoundingMode.DOWN : RoundingMode.UP;
+        RoundingMode mode = conservativeMode(trigger, entryPrice);
         return ResolvedStopLossPrice.builder()
                 .triggerPrice(requirePositive(roundToTick(trigger, context, mode)))
                 .triggerPriceType(settings.getTriggerPriceType())
                 .build();
+    }
+
+    /**
+     * Цена нулевого P&L с учётом round-trip комиссии, ТОЧНО: из
+     * q·[(S − P) − f·(P + S)] = 0 следует S = P·(1 + f)/(1 − f) для LONG и
+     * S = P·(1 − f)/(1 + f) для SHORT (docs/spec/stop-distance.json,
+     * величина {@code breakevenLevel}). Линейное приближение оставляет
+     * знако-асимметричный по стороне остаток и потому не берётся.
+     *
+     * <p>Ставка не резолвится — контролируемая ошибка расчёта, а не
+     * подстановка цены входа: уровень, равный входу, оставляет сделке
+     * убыток ровно в размер round-trip комиссии, и ошибка эта направлена
+     * всегда против сделки.
+     */
+    private BigDecimal breakevenLevel(BigDecimal anchor, boolean isLong, CalculationContext context) {
+        BigDecimal feeRate = feeRate(context);
+        BigDecimal numerator = isLong ? BigDecimal.ONE.add(feeRate) : BigDecimal.ONE.subtract(feeRate);
+        BigDecimal denominator = isLong ? BigDecimal.ONE.subtract(feeRate) : BigDecimal.ONE.add(feeRate);
+        if (denominator.signum() == 0) {
+            throw error(BREAKEVEN_LEVEL_UNAVAILABLE, "Fee rate degenerates the breakeven denominator");
+        }
+        return anchor.multiply(numerator).divide(denominator, Constants.Calc.MATH_CONTEXT);
+    }
+
+    /** Прогнозная ставка комиссии как издержка; нет ставки — считать безубыток не из чего. */
+    private BigDecimal feeRate(CalculationContext context) {
+        InstrumentExternalRules rules = context.getInstrumentExternalRules();
+        BigDecimal feeRate = isNull(rules) ? null : rules.takerFeeRate();
+        if (isNull(feeRate)) {
+            throw error(FEE_RATE_UNAVAILABLE,
+                    "Taker fee rate is not resolved: breakeven level is a function of it");
+        }
+        return feeRate;
+    }
+
+    /**
+     * Консервативная сторона округления защитного уровня — ПРОЧЬ ОТ
+     * ЯКОРЯ: уровень на убыточной стороне не подтягивается ближе (стоп не
+     * ужимается), уровень на прибыльной — не опускается ниже истинного
+     * безубытка. Единого направления по стороне сделки не хватает:
+     * перенос в безубыток кладёт уровень по другую сторону якоря.
+     */
+    private RoundingMode conservativeMode(BigDecimal level, BigDecimal anchor) {
+        boolean aboveAnchor = nonNull(anchor) && level.compareTo(anchor) > 0;
+        return aboveAnchor ? RoundingMode.UP : RoundingMode.DOWN;
     }
 
     private ResolvedTakeProfitPrice resolveTakeProfit(StrategyAlgoOrderAction action, BigDecimal entryPrice,
@@ -223,6 +269,53 @@ public class PriceCalculator {
         throw error(NO_REFERENCE_PRICE, "No market reference price available");
     }
 
+    /**
+     * Якорь уровня — ОДИН на все уровни действия (стоп любого способа,
+     * тейк, активация трейлинга, безубыток). Форма —
+     * docs/spec/stop-distance.json, величина {@code entryAnchor}.
+     *
+     * <p><b>Ветвь, а не coalesce.</b> Живого эпизода нет — факта
+     * себестоимости не существует, и якорь есть плановая цена своей ноги.
+     * Эпизод есть — якорь есть ФАКТИЧЕСКАЯ средняя цена входа: заявленная
+     * смещала бы контроль в разрешающую сторону тем сильнее, чем больше
+     * проскок (docs/rules/risk-policy.md). Эпизод есть, а средняя ещё не
+     * наблюдена — расчёт ОТКАЗЫВАЕТ: откат к плановой был бы
+     * благоприятным умолчанием на непредъявленном факте.
+     */
+    private BigDecimal levelAnchor(CalculationContext context) {
+        Position position = context.getActivePosition();
+        if (nonNull(position) && isTrue(position.hasLiveRisk())) {
+            BigDecimal observed = position.getExternalAverageEntryPrice();
+            if (isNull(observed)) {
+                throw error(ENTRY_ANCHOR_UNAVAILABLE,
+                        "Live episode has no observed average entry price: level anchor is empty");
+            }
+            return observed;
+        }
+        return plannedEntryPrice(context);
+    }
+
+    /**
+     * Плановая цена входа своей ноги — якорь, пока живого эпизода нет.
+     * Наливом входной заявки якорь не подменяется: пока эпизода нет,
+     * себестоимости позиции не существует, а частичный налив её не
+     * заменяет.
+     */
+    private BigDecimal plannedEntryPrice(CalculationContext context) {
+        Order entryOrder = context.getEntryOrder();
+        if (nonNull(entryOrder) && nonNull(entryOrder.getPrice())) {
+            return entryOrder.getPrice();
+        }
+        return marketReference(context);
+    }
+
+    /**
+     * База размещения ЗАЯВКИ, объявленной от цены входа
+     * ({@code StrategyPriceBaseType.ENTRY_PRICE}), — не уровень защиты, и
+     * потому это не якорь уровня: перечень потребителей якоря закрыт
+     * (docs/spec/stop-distance.json). Здесь берётся факт, если он есть,
+     * иначе плановая цена.
+     */
     private BigDecimal entryReference(CalculationContext context) {
         Position position = context.getActivePosition();
         if (nonNull(position) && nonNull(position.getExternalAverageEntryPrice())) {
@@ -232,10 +325,7 @@ public class PriceCalculator {
         if (nonNull(entryOrder) && nonNull(entryOrder.getAveragePrice())) {
             return entryOrder.getAveragePrice();
         }
-        if (nonNull(entryOrder) && nonNull(entryOrder.getPrice())) {
-            return entryOrder.getPrice();
-        }
-        return marketReference(context);
+        return plannedEntryPrice(context);
     }
 
     private BigDecimal resolveBasePrice(StrategyPricePlacement placement, CalculationContext context) {

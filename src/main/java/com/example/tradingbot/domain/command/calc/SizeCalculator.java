@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * Рассчитывает размер order/algo action и возвращает
  * {@link CalculatedSize} (docs/components/SizeCalculator.md). Для
  * risk-creating входа со стопом размер ограничен лимитом риска на сделку:
- * убыток на стопе ≤ riskPerTradePercent × externalAvailableEquity; размер
+ * убыток на стопе ≤ riskPerActionPercent × externalAvailableEquity; размер
  * округляется по lotSz и снизу ограничен minSz (если даже на minSz убыток
  * превышает лимит — возвращается minSz-пол, блокирует RiskValidator).
  * Полного закрытия позиции как действия нет: выход — условие-перехода,
@@ -88,14 +88,14 @@ public class SizeCalculator {
             return contracts;
         }
         StrategyDetail detail = context.getStrategyDetail();
-        if (isNull(detail) || isNull(detail.getRiskPerTradePercent())) {
+        if (isNull(detail) || isNull(detail.getRiskPerActionPercent())) {
             return contracts;
         }
         BigDecimal stopDistance = entryPrice.subtract(calculatedPrice.getStopLossPrice().getTriggerPrice()).abs();
         if (stopDistance.signum() <= 0) {
             return contracts;
         }
-        BigDecimal riskBudget = equity.multiply(fraction(detail.getRiskPerTradePercent()));
+        BigDecimal riskBudget = equity.multiply(fraction(detail.getRiskPerActionPercent()));
         BigDecimal maxByRisk = riskBudget.divide(stopDistance.multiply(ctVal), Constants.Calc.MATH_CONTEXT);
         return contracts.min(maxByRisk);
     }

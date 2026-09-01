@@ -1,5 +1,7 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.action;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 /**
  * Ожидаемое действие стратегии. Это не ServiceCommand: действие
  * описывает, что должно быть создано/изменено/отменено; runtime-
@@ -30,4 +32,22 @@ public interface StrategyAction {
 
     /** Уровень действия внутри стратегии (не переносится в runtime-сущности). */
     Integer getLevel();
+
+    /**
+     * Чем задан уровень действия. Резолв — по объявленному блоку настроек
+     * (docs/spec/strategy-reference.json, величина
+     * {@code actionLevelSource}); собственного поля у него нет.
+     */
+    StrategyLevelSource levelSource();
+
+    /**
+     * Роль объявления уровня: замещение с указанной целью переносит уже
+     * стоящий уровень, всякое иное объявление ставит его впервые
+     * (docs/spec/stop-distance.json, операнд {@code placementRole}).
+     */
+    default StrategyPlacementRole placementRole() {
+        return StrategyActionType.REPLACE.equals(getActionType()) && isNotBlank(getTargetActionKey())
+                ? StrategyPlacementRole.TRANSFER
+                : StrategyPlacementRole.PRIMARY;
+    }
 }

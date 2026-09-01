@@ -2,7 +2,6 @@ package com.example.tradingbot.domain.deal.action;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 
 import com.example.tradingbot.domain.command.DealActionState;
@@ -18,10 +17,6 @@ import com.example.tradingbot.domain.command.calc.StrategyActionCalculator;
 import com.example.tradingbot.domain.command.payload.CreateOrderCommandPayload;
 import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.command.payload.SubmitOrderCommandPayload;
-import com.example.tradingbot.domain.command.risk.RiskBlockAction;
-import com.example.tradingbot.domain.command.risk.RiskBlockResolver;
-import com.example.tradingbot.domain.command.risk.RiskValidationResult;
-import com.example.tradingbot.domain.command.risk.RiskValidator;
 import com.example.tradingbot.domain.deal.ActionPlan;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -45,8 +40,7 @@ import org.springframework.stereotype.Component;
 public class CreateOrderActionExecutor implements StrategyActionExecutor {
 
     private final StrategyActionCalculator calculator;
-    private final RiskValidator riskValidator;
-    private final RiskBlockResolver riskBlockResolver;
+    private final ActionRiskGate riskGate;
 
     @Override
     public Boolean supports(StrategyAction action) {
@@ -73,26 +67,12 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
         }
         CalculatedStrategyAction calculated = calculation.getCalculatedAction();
         if (isRiskCreating(action)) {
-            ActionPlan blocked = applyRisk(calculated, dealContext, tranche);
+            ActionPlan blocked = riskGate.blockingPlan(calculated, dealContext, tranche);
             if (nonNull(blocked)) {
                 return blocked;
             }
         }
         return ActionPlan.command(createOrderCommand(action, calculated, state, dealContext));
-    }
-
-    /** null = риск разрешил продолжить; иначе — блокирующая реакция risk-layer. */
-    private ActionPlan applyRisk(CalculatedStrategyAction calculated, DealContext dealContext,
-                                 DealTranche tranche) {
-        RiskValidationResult risk = riskValidator.validate(calculated, dealContext);
-        if (RiskValidationResult.RiskDecision.ALLOWED.equals(risk.getDecision())) {
-            return null;
-        }
-        RiskBlockAction blockAction = riskBlockResolver.resolve(dealContext, tranche.getStatus(), risk);
-        if (isBlocking(blockAction.getType())) {
-            return ActionPlan.blocked(blockAction);
-        }
-        return null;
     }
 
     private ServiceCommand createOrderCommand(StrategyOrderAction action, CalculatedStrategyAction calculated,
@@ -142,11 +122,6 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     /** Risk-creating действие — открывающий/наращивающий (не reduce-only) ордер. */
     private Boolean isRiskCreating(StrategyOrderAction action) {
         return isNotTrue(action.getPositionReducingOnly());
-    }
-
-    private boolean isBlocking(RiskBlockAction.Type type) {
-        return isFalse(RiskBlockAction.Type.CONTINUE.equals(type))
-                && isFalse(RiskBlockAction.Type.CONTINUE_WITH_WARNING.equals(type));
     }
 
     private String toSide(StrategyTradeDirection direction) {

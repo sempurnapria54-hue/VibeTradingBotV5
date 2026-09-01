@@ -47,7 +47,7 @@ entry-скана. Командного блок-сета у ступени не�
 | Триггер | Чем детектируется | Кто запрашивает ступень |
 |---|---|---|
 | расхождение сверки P&L за **калиброванным** допуском | `Deal.reconciliationStatus = MISMATCHED` ⇒ `Exchange.HOLD` + `AnomalyReport` + ручной разбор; машинный код причины — `PNL_RECONCILIATION_MISMATCH`; в разведочном режиме допуска сверка признак пишет и отчёт заводит, но лестницу не триггерит | исполнители терминального ребра, после коммита терминала (`docs/rules/pnl-reconciliation.md`) |
-| исчерпание риск-бюджета контура — `N` подряд убыточных закрытых сделок | `Exchange.consecutiveLossCount` достиг `globalConsecutiveLossLimit` ⇒ `Exchange.HOLD` + `AnomalyReport` + ручной разбор; машинный код причины — `LOSS_STREAK_LIMIT_REACHED` | те же исполнители, тем же ходом (`docs/rules/loss-streak-halt.md`) |
+| исчерпание риск-бюджета контура — `globalConsecutiveLossLimit` подряд убыточных закрытых сделок | `Exchange.consecutiveLossCount` достиг `globalConsecutiveLossLimit` ⇒ `Exchange.HOLD` + `AnomalyReport` + ручной разбор; машинный код причины — `LOSS_STREAK_LIMIT_REACHED` | те же исполнители, тем же ходом (`docs/rules/loss-streak-halt.md`) |
 
 Ступень 1, а не 2, у обоих: расхождение сверки — подозрение на наш счёт,
 серия убытков — исчерпание нашего риск-бюджета. Ни то ни другое не есть

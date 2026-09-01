@@ -31,8 +31,24 @@ public class StrategyDetailApiModel {
 
     @Positive
     @DecimalMax("100")
-    @Schema(description = "Риск на сделку, % от капитала (0; 100]; торгово-суждённые пороги — семантика activate")
-    private BigDecimal riskPerTradePercent;
+    @Schema(description = "Поактный потолок риска: сколько берёт ОДНО действие, % базы риска (0; 100]")
+    private BigDecimal riskPerActionPercent;
+
+    @Positive
+    @Schema(description = "Множитель кумулятивного потолка: во сколько раз сделка за жизнь вправе "
+            + "превысить поактный потолок")
+    private BigDecimal cumulativeRiskPerDealMultiplier;
+
+    @Positive
+    @DecimalMax("100")
+    @Schema(description = "Максимум ОДНОВРЕМЕННОГО риска сделки, % базы риска; вкладывается в "
+            + "конфигурационный максимум риск-аппетита")
+    private BigDecimal strategySimultaneousRiskPerDealPercent;
+
+    @Positive
+    @Schema(description = "Множитель катастрофического потолка сделки; сверяется с конфигурационным "
+            + "пределом на создании")
+    private BigDecimal strategyCatastrophicRiskPerDealMultiplier;
 
     @Positive
     @Schema(description = "High-level ориентир risk/reward")

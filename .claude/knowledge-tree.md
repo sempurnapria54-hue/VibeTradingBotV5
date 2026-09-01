@@ -55,6 +55,7 @@
 │   │   ├── component-vs-process.md — Как различать «компонент» и «процесс» при классификации?
 │   │   ├── context-cost-diet.md — Почему контекстная стоимость знаниевых файлов сокращена именно так?
 │   │   ├── cross-cutting-parking.md — Как мигрируем сущность, чьё знание частично относится к другим кластерам?
+│   │   ├── env-wait-deadline.md — Почему ожидание восстановления demo-контура получило срок и что происходит по его наступлении?
 │   │   ├── executor-payload-file-granularity.md — Почему документация command-layer гранулируется file-per-executor?
 │   │   ├── forward-notes-after-task-closure.md — Где живут форвард-заметки после закрытия задачи-источника?
 │   │   ├── fsm-handler-as-component.md — Где живёт handler-per-status FSM-сущности?
@@ -147,7 +148,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v102.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v103.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -202,6 +203,9 @@
 │       │   ├── phase-1-step-7-code-transition.md — Как исполнено решение держателя о выходе шага 7 в код?
 │       │   ├── phase-1-step-7-code-pass-4.md — Что сделал кодовый заход 4 шага 7?
 │       │   ├── phase-1-step-7-code-pass-5.md — Что сделал кодовый заход 5 шага 7?
+│       │   ├── phase-1-step-7-code-pass-fee-and-appetite.md — Что сделано заходом по ставке комиссии и читателю чисел риск-аппетита?
+│       │   ├── phase-1-step-7-code-pass-precontrol.md — Что сделано заходом по преконтролю и что он оставил названным?
+│       │   ├── phase-1-step-7-code-pass-levels.md — Что сделано заходом по уровням и что он оставил названным?
 │       │   ├── phase-1-step-7-code-tail.md — Что осталось дописать в компонентах, переведённых в «в работе»?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили? (общие вопросы пайплайна и продукта)
@@ -230,10 +234,12 @@
 │   │   │   ├── ServiceCommand.md — Что это за атомарная команда над runtime-сущностью?
 │   │   │   ├── ServiceCommandPayload.md — Что это за параметры команды?
 │   │   │   └── StrategyActionCalculationResult.md — Что это за `StrategyActionCalculationResult`?
+│   │   ├── ActionRiskGate.md — Кто связывает преконтроль риска с планом действия за проход?
 │   │   ├── AlgoOrderExternalStatusResolver.md — Кто переводит внешний статус standalone algo-order в доменный?
 │   │   ├── AnomalyJob.md — Кто ищет нарушения базовых инвариантов системы?
 │   │   ├── AttachedAlgoOrderStateResolver.md — Кто определяет доменный статус встроенной защиты?
 │   │   ├── CalculationContextFactory.md — Кто собирает контекст расчёта?
+│   │   ├── CancelAlgoOrderActionExecutor.md — Кто планирует CANCEL-действие над standalone algo-order за проход?
 │   │   ├── CancelAlgoOrderExecutor.md — Кто исполняет `CANCEL_ALGO_ORDER_COMMAND`?
 │   │   ├── CancelAttachedProtectionExecutor.md — Кто исполняет `CANCEL_ATTACHED_PROTECTION_COMMAND`?
 │   │   ├── CancelOrderExecutor.md — Кто исполняет `CANCEL_ORDER_COMMAND`?

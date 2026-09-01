@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.model.core.algo_order;
 
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.Auditable;
@@ -90,6 +91,15 @@ public class AlgoOrder extends Auditable {
     private static final Set<Status> LIVE_STATUSES =
             EnumSet.of(Status.CREATED, Status.PENDING, Status.ACTIVE, Status.PARTIALLY_COMPLETED);
 
+    private static final Set<Status> EXCHANGE_LIVE_STATUSES =
+            EnumSet.of(Status.PENDING, Status.ACTIVE, Status.PARTIALLY_COMPLETED);
+
+    private static final Set<ConditionType> TAKE_PROFIT_TYPES =
+            EnumSet.of(ConditionType.TAKE_PROFIT, ConditionType.PARTIAL_TAKE_PROFIT);
+
+    private static final Set<ConditionType> TRAILING_TYPES =
+            EnumSet.of(ConditionType.TRAILING_PERCENTS, ConditionType.TRAILING_VALUE);
+
     private static final Map<Status, Set<Status>> ALLOWED_TRANSITIONS = Map.of(
             Status.CREATED, EnumSet.of(Status.PENDING, Status.ERROR),
             Status.PENDING, EnumSet.of(Status.ACTIVE, Status.COMPLETED, Status.CANCELED, Status.ERROR),
@@ -99,6 +109,46 @@ public class AlgoOrder extends Auditable {
     /** Live: ещё существует / влияет на risk (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED). */
     public Boolean isLive() {
         return LIVE_STATUSES.contains(status);
+    }
+
+    /**
+     * Заявка стои́т на бирже. Множество у́же {@link #isLive()} ровно на
+     * {@code CREATED}: локально созданная заявка на биржу не отправлена и
+     * не покрывает ничего, — поэтому покрытие считается по этому
+     * предикату, а не по живости (docs/spec/protection-coverage.json,
+     * величина {@code isLive} носителя STANDALONE).
+     */
+    public Boolean isExchangeLive() {
+        return EXCHANGE_LIVE_STATUSES.contains(status);
+    }
+
+    /**
+     * Несёт ДЕЙСТВУЮЩИЙ уровень остановки убытка
+     * (docs/spec/protection-coverage.json, величина
+     * {@code carriesActiveStopLevel}). Тейк не несёт никогда; трейлинг —
+     * только после того, как уровень наблюдён: до первого наблюдения
+     * worst-case выхода у него нет, и защитой по размеру он быть не
+     * может.
+     */
+    public Boolean carriesActiveStopLevel() {
+        if (TAKE_PROFIT_TYPES.contains(conditionType)) {
+            return false;
+        }
+        if (TRAILING_TYPES.contains(conditionType)) {
+            return nonNull(condition) && nonNull(condition.getTrailing())
+                    && nonNull(condition.getTrailing().getExternalPrice());
+        }
+        return true;
+    }
+
+    /**
+     * Сколько эта защита реально закрывает: остаток размера после
+     * срабатывания (docs/spec/protection-coverage.json, величина
+     * {@code coveredSize} носителя STANDALONE).
+     */
+    public BigDecimal coveredSize() {
+        BigDecimal declared = isNull(size) ? BigDecimal.ZERO : size;
+        return declared.subtract(isNull(externalSize) ? BigDecimal.ZERO : externalSize);
     }
 
     /** Отправлен на биржу; факт не подтверждён. */

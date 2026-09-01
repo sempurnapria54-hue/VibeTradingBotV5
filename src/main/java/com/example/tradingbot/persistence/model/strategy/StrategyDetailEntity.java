@@ -47,9 +47,21 @@ public class StrategyDetailEntity extends AuditableEntity {
     @Column(name = "phase_entry_policy", nullable = false)
     private String phaseEntryPolicy;
 
-    @Column(name = "risk_per_trade_percent",
+    @Column(name = "risk_per_action_percent",
             precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
-    private BigDecimal riskPerTradePercent;
+    private BigDecimal riskPerActionPercent;
+
+    @Column(name = "cumulative_risk_per_deal_multiplier",
+            precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
+    private BigDecimal cumulativeRiskPerDealMultiplier;
+
+    @Column(name = "strategy_simultaneous_risk_per_deal_percent",
+            precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
+    private BigDecimal strategySimultaneousRiskPerDealPercent;
+
+    @Column(name = "strategy_catastrophic_risk_per_deal_multiplier",
+            precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
+    private BigDecimal strategyCatastrophicRiskPerDealMultiplier;
 
     @Column(name = "target_risk_reward_ratio",
             precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)

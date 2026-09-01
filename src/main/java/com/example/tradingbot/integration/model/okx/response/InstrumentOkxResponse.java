@@ -43,6 +43,13 @@ public class InstrumentOkxResponse {
     /** Множитель контракта (ctMult, decimal-строка). */
     private String ctMult;
 
+    /**
+     * Идентификатор комиссионной группы инструмента (groupId) — КЛЮЧ
+     * резолва ставки: пара (instType, groupId). Сама ставка приходит
+     * отдельным эндпоинтом и живёт в своей модели.
+     */
+    private String groupId;
+
     /** Тип контракта (ctType): linear/inverse. */
     private String ctType;
 

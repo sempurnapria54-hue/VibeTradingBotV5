@@ -1,5 +1,7 @@
 package com.example.tradingbot.persistence.service;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.mapping.InstrumentExternalRulesJsonConverter;
 import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
@@ -23,11 +25,37 @@ public class InstrumentExternalRulesDataService {
 
     private final InstrumentRepository repository;
     private final InstrumentExternalRulesJsonConverter converter;
+    private final TradeFeeRateDataService tradeFeeRateDataService;
 
-    /** Актуальные внешние правила инструмента; пусто — навес ещё не материализован. */
+    /**
+     * Актуальные внешние правила инструмента; пусто — навес ещё не
+     * материализован. Ставка комиссии ГИДРИРУЕТСЯ здесь: на навесе живёт
+     * только ключ группы, а сама ставка — атрибут комиссионного уровня
+     * счёта (docs/models/domain/other/TradeFeeRate.md). Тропы чтения
+     * навеса две (контекст расчёта и преконтроль), и обе проходят через
+     * эту границу — поэтому гидрирует она, а не каждый читатель.
+     */
     @Transactional(readOnly = true)
     public Optional<InstrumentExternalRules> findByInstrumentId(Long instrumentId) {
-        return repository.findExternalRulesById(instrumentId).map(converter::jsonToRules);
+        Optional<InstrumentExternalRules> rules = repository.findExternalRulesById(instrumentId)
+                .map(converter::jsonToRules);
+        rules.ifPresent(carried -> hydrateFeeRate(instrumentId, carried));
+        return rules;
+    }
+
+    /**
+     * Ставка группы по паре сырых значений внутри биржи инструмента.
+     * Ключа группы нет либо группа не наблюдалась — поле остаётся пустым,
+     * и потребитель отвергает действие: пустота нулём не подменяется.
+     */
+    private void hydrateFeeRate(Long instrumentId, InstrumentExternalRules rules) {
+        if (isBlank(rules.getExternalFeeGroupId()) || isBlank(rules.getExternalInstrumentType())) {
+            return;
+        }
+        repository.findExchangeIdById(instrumentId)
+                .flatMap(exchangeId -> tradeFeeRateDataService.findCurrent(exchangeId,
+                        rules.getExternalInstrumentType(), rules.getExternalFeeGroupId()))
+                .ifPresent(rate -> rules.setExternalTakerFeeRate(rate.getExternalTakerFeeRate()));
     }
 
     /** Сохраняет/обновляет актуальный навес правил на строке-владельце. */
