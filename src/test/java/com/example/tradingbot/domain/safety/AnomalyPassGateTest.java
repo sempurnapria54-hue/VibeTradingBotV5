@@ -62,7 +62,7 @@ class AnomalyPassGateTest {
 
         verify(exchangeDataService).markPass(EXCHANGE_ID, true);
         verify(holdService, never()).raise(any(), any());
-        verify(reportService, never()).journal(any(), any());
+        verify(reportService, never()).journalState(any(), any(), any());
     }
 
     @Test
@@ -72,7 +72,7 @@ class AnomalyPassGateTest {
 
         passGate.apply(false, exchange());
 
-        verify(reportService).journal(any(), any());
+        verify(reportService).journalState(any(), any(), any());
         verify(holdService, never()).raise(any(), any());
     }
 

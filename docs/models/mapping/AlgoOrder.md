@@ -12,6 +12,7 @@
 |---|---|---|
 | `internalId` | `AlgoOrder.internalId` | stable client id |
 | `externalId` | `AlgoOrder.externalId` | биржевой algo id |
+| `externalInstrumentId` | — | биржевое имя инструмента (`instId`). Приземляется в снапшот ради **счёт-широкого среза**: он читается по счёту, и строку адресует инструментом только это поле (`docs/components/AnomalyJob.md`). В `AlgoOrder` не идёт — там инструмент известен из графа сделки |
 | `externalStatus` | — | raw статус (diagnostic, не FSM) |
 | `failCode` | `AlgoOrder.failCode` | внешний код ошибки |
 | `externalSize` | `AlgoOrder.externalSize` | фактический размер срабатывания |

@@ -57,7 +57,14 @@
 - **Pending** (звено цикла `REFRESH_ORDER_COMMAND`): `GET /api/v5/trade/orders-pending`.
   Permission `Read`; rate limit 60 req / 2 s по User ID. Фильтры:
   `instType`, `instId`, `ordType`, `state` (`live`/`partially_filled`),
-  пагинация `after`/`before` по `ordId`, `limit` ≤ 100.
+  пагинация `after`/`before` по `ordId`, `limit` ≤ 100. **Применяется и
+  счёт-широко** (`instType=SWAP`, `instId` не задаётся): срез живых
+  заявок счёта читает проактивная детекция
+  (`docs/components/AnomalyJob.md`), и лимит здесь по User ID, а не по
+  инструменту — поштучный обход рос бы с числом инструментов и выбирал
+  бы ту же корзину, что торговая петля. `limit` задаётся явно потолком
+  страницы: полная страница означает усечение, и оно обязано быть
+  наблюдаемым.
 - **History** (звено цикла `REFRESH_ORDER_COMMAND`):
   `GET /api/v5/trade/orders-history` (последние 7 дней; permission
   `Read`; rate limit 40 req / 2 s по User ID),

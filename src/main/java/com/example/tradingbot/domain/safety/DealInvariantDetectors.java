@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.safety;
 
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -13,6 +14,7 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.util.Constants;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -70,13 +72,15 @@ public class DealInvariantDetectors {
      * по КАЖДОМУ живому траншу каждым проходом.
      *
      * <p><b>Недопокрытие под живым обязательством нарушением не
-     * является</b> — это наш собственный незавершённый ход, и его
-     * различает сам предикат транша. Гистерезис к структурному гейту
-     * добавляется, а не подменяет его.
+     * является</b> — это наш собственный незавершённый ход
+     * (docs/components/AnomalyJob.md §Границы). Гейт обязательства
+     * структурный, и гистерезис к нему добавляется, а не подменяет его:
+     * постановка защиты и трейлинг без наблюдённой цены — состояния
+     * легальные и достижимые, а реакция здесь жёсткая.
      */
     private void uncoveredLiveRisk(DealContext context, Exchange exchange) {
         for (DealTranche tranche : context.getDeal().getTranches()) {
-            if (isFalse(tranche.isRiskBearing()) || isTrue(tranche.isCovered())) {
+            if (isFalse(trancheViolated(context, tranche))) {
                 continue;
             }
             log.warn("[anomaly] живой риск без покрытия dealId={} trancheId={}",
@@ -91,6 +95,35 @@ public class DealInvariantDetectors {
                     .build(), exchange);
             return;
         }
+    }
+
+    /**
+     * Нарушение инварианта покрытия — величина {@code trancheViolated}
+     * исполнимой спеки (docs/spec/protection-coverage.json): экспозиция
+     * транша без покрытия <b>и без обязательства</b>. Форма читается по
+     * дому, а не пересобирается: третья конъюнкта — не смягчение, а
+     * граница области, и без неё детектор снимал бы риск в окне, где
+     * защита ещё ставится.
+     */
+    private Boolean trancheViolated(DealContext context, DealTranche tranche) {
+        return tranche.exposure().signum() > 0
+                && isFalse(tranche.isCovered())
+                && isFalse(hasLiveCommitment(context, tranche));
+    }
+
+    /**
+     * Действующее обязательство покрытия транша: живая строка исполнения,
+     * объявленная на этом транше. Живость строки и есть «нетерминальна и
+     * бюджет не исчерпан» — исчерпание бюджета выводит её из живых, и у
+     * него свой ратифицированный триггер
+     * (docs/rules/instrument-hold.md §Триггеры), поэтому обязательство не
+     * может глушить детектор бесконечно.
+     */
+    private Boolean hasLiveCommitment(DealContext context, DealTranche tranche) {
+        return emptyIfNull(context.getActionStates()).stream()
+                .filter(state -> isTrue(state.isTrancheLevel()))
+                .filter(state -> Objects.equals(state.getDealTrancheId(), tranche.getId()))
+                .anyMatch(state -> isTrue(state.isLive()));
     }
 
     /**

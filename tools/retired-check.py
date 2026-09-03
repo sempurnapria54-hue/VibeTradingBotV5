@@ -122,6 +122,47 @@ ROOTS = ('CLAUDE.md', 'README.md',
 #                снималась.
 RETIRED = [
     {
+        'name': 'поле `kind` как носитель природы факта отчёта',
+        # Снято сверкой SYNC_DOCS_FROM_CODE шага 8: поля kind и енума Kind не
+        # существовало ни на одном слое ни одного дня, а читателя, которому
+        # природа нужна ПОСТФАКТУМ по данным, в корпусе нет ни одного.
+        # Дискриминатор живёт на тропе писателя: journalState против journal.
+        # Ловятся три письменные формы — имя поля, обе константы енума и
+        # прозаический клейм «дискриминатор идемпотентности».
+        'pattern': r'`kind`\s*\|\s*`Kind`'
+                   r'|`kind`\s+`(?:STATE|EVENT)`'
+                   r'|`?kind`?\s*=\s*`?(?:STATE|EVENT)`?'
+                   r'|Дискриминатор\s+идемпотентности',
+        'arrived': r'[Пп]рирода\s+факта\s+—\s+свойство\s+тропы'
+                   r'|природа\s+—\s+(?:\*\*)?(?:состояние|происшествие)'
+                   r'|природа\s+\|\s+\*\*(?:состояние|происшествие)\*\*'
+                   r'|та\s+же\s+природа',
+        'date': '2026-09-04',
+        'source': 'SYNC_DOCS_FROM_CODE шага 8, расхождение R1',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/work/progress/phase-1-step-8-closure.md',
+                    '.claude/knowledge-tree.md',
+                    'tools/retired-check.py'),
+        'population': (('docs/models/domain/other/AnomalyReport.md',
+                        r'[Пп]рирода\s+факта\s+—\s+свойство\s+тропы'),
+                       ('docs/lifecycles/AnomalyReport.md',
+                        r'[Пп]рироду\s+несёт\s+тропа'),
+                       ('docs/rules/manual-halt.md',
+                        r'природа\s+—\s+\*\*(?:состояние|происшествие)\*\*'),
+                       ('docs/rules/instrument-hold.md',
+                        r'природа\s+—\s+состояние'),
+                       ('docs/models/mapping/DealCashFlow.md',
+                        r'природа\s+\|\s+\*\*состояние\*\*'),
+                       ('docs/components/RefreshBalanceExecutor.md',
+                        r'природа\s+\|\s+\*\*состояние\*\*'),
+                       ('docs/components/MarkDealClosedExecutor.md',
+                        r'природа\s+—\s+происшествие'),
+                       ('docs/components/MarkDealEmergencyClosedExecutor.md',
+                        r'природа\s+—\s+происшествие'),
+                       ('.claude/work/backlog.md',
+                        r'снята\s+как\s+редакция')),
+    },
+    {
         'name': 'перечень детекторов построен на один из тринадцати',
         # Снято кодовой фазой шага 8: построены одиннадцать детекторов из
         # двенадцати живых, кода нет только у A13 — она форвард шага

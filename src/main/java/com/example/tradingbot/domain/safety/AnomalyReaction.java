@@ -115,7 +115,7 @@ public class AnomalyReaction {
      */
     private void journal(AnomalyFinding finding, DealContext context) {
         try {
-            reportService.journal(context, observationSignal(finding), finding.getSubjectExternalId());
+            reportService.journalState(context, observationSignal(finding), finding.getSubjectExternalId());
         } catch (RuntimeException e) {
             log.error("[anomaly] журнальная строка не заведена code={}", finding.getCode(), e);
         }

@@ -15,6 +15,7 @@ Snapshot — нормализованный граничный объект; е�
 |---|---|---|
 | `internalId` | `Order.internalId` | stable client id (сверка) |
 | `externalId` | `Order.externalId` | биржевой id (сохраняется при первом известном значении) |
+| `externalInstrumentId` | — | биржевое имя инструмента (`instId`). Приземляется в снапшот ради **счёт-широкого среза**: он читается по счёту, и строку адресует инструментом только это поле (`docs/components/AnomalyJob.md`). В `Order` не идёт — там инструмент известен из графа сделки |
 | `type` | `Order.type` | тип ордера (источник-нейтральный) |
 | `side` | `Order.side` | `BUY`/`SELL` |
 | `externalStatus` | — | raw статус, режим diagnostic; в FSM не используется (`external-status-resolution.md`) |

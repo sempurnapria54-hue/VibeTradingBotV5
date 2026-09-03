@@ -135,12 +135,12 @@ public class AnomalyJob {
     private void run() {
         AnomalyScan scan = scanReader.read();
         List<Instrument> contour = instrumentDataService.findContourWithin(CONTOUR_WINDOW);
-        Boolean sliceComplete = isTrue(scan.getComplete()) && contour.size() < CONTOUR_WINDOW;
-        if (isFalse(sliceComplete) && contour.size() >= CONTOUR_WINDOW) {
-            log.warn("[anomaly] контур упёрся в окно ({}) — проход считается неполным", CONTOUR_WINDOW);
-        }
+        List<Exchange> exchanges = exchangeDataService.findContourWithin(CONTOUR_WINDOW);
+        Boolean contourComplete = withinWindow("инструменты", contour.size())
+                && withinWindow("биржи", exchanges.size());
+        Boolean sliceComplete = isTrue(scan.getComplete()) && isTrue(contourComplete);
         Set<String> contourNames = contourNames(contour);
-        for (Exchange exchange : exchangeDataService.findContourWithin(CONTOUR_WINDOW)) {
+        for (Exchange exchange : exchanges) {
             Boolean observed = false;
             try {
                 if (isTrue(sliceComplete)) {
@@ -172,6 +172,20 @@ public class AnomalyJob {
                 log.error("Anomaly detection failed instrumentId={}", instrument.getId(), e);
             }
         }
+    }
+
+    /**
+     * Выборка контура уложилась в окно. Упор в окно означает «возможно,
+     * есть ещё», и засчитывается неполнотой прохода — тем же ходом, что и
+     * неполученный срез: обход по усечённому контуру объявил бы чужими
+     * строки среза, которым не хватило места в выборке.
+     */
+    private Boolean withinWindow(String name, int size) {
+        if (size < CONTOUR_WINDOW) {
+            return true;
+        }
+        log.warn("[anomaly] выборка «{}» упёрлась в окно ({}) — проход считается неполным", name, CONTOUR_WINDOW);
+        return false;
     }
 
     /** Биржевые имена инструментов контура — граница «модель против счёта». */

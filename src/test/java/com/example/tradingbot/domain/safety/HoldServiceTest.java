@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.safety;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,19 +67,21 @@ class HoldServiceTest {
         holdService.raise(signal, context());
 
         verify(instrumentDataService).blockEntry(INSTRUMENT_ID);
-        verify(anomalyReportService).journal(any(), eqSignal(signal));
+        verify(anomalyReportService).journalState(any(), eqSignal(signal), isNull());
         verify(instrumentDataService, never()).blockTrade(anyLong());
         verify(safetyHoldCoordinator, never()).react(any(), any());
     }
 
     @Test
-    @DisplayName("Стоящая ступень поглощает повтор: отчёт вторым проходом не множится")
-    void standingRungAbsorbsRepeat() {
+    @DisplayName("Поглощение гасит смену статуса, но НЕ отчёт: строку держит ключ, а не гард")
+    void absorbedSignalStillLeavesReport() {
+        HoldSignal signal = HoldSignal.instrumentSoft(Constants.Hold.INSTRUMENT_PROTECTION_FATE_UNKNOWN);
         when(instrumentDataService.blockEntry(INSTRUMENT_ID)).thenReturn(false);
 
-        holdService.raise(HoldSignal.instrumentSoft(Constants.Hold.INSTRUMENT_PROTECTION_FATE_UNKNOWN), context());
+        holdService.raise(signal, context());
 
-        verify(anomalyReportService, never()).journal(any(), any());
+        verify(anomalyReportService).journalState(any(), eqSignal(signal), isNull());
+        verify(safetyHoldCoordinator, never()).react(any(), any());
     }
 
     @Test
@@ -90,7 +93,7 @@ class HoldServiceTest {
 
         verify(safetyHoldCoordinator).react(eqSignal(signal), any());
         verify(instrumentDataService, never()).blockEntry(anyLong());
-        verify(anomalyReportService, never()).journal(any(), any());
+        verify(anomalyReportService, never()).journalState(any(), any(), any());
     }
 
     @Test
@@ -111,19 +114,20 @@ class HoldServiceTest {
         holdService.raise(signal, context());
 
         verify(exchangeDataService).blockEntry(EXCHANGE_ID);
-        verify(anomalyReportService).journal(any(), eqSignal(signal));
+        verify(anomalyReportService).journalState(any(), eqSignal(signal), isNull());
         verify(instrumentDataService, never()).blockEntry(anyLong());
         verify(safetyHoldCoordinator, never()).react(any(), any());
     }
 
     @Test
-    @DisplayName("Стоящая биржевая ступень поглощает повтор: отчёт вторым проходом не множится")
-    void standingExchangeRungAbsorbsRepeat() {
+    @DisplayName("Поглощение биржевой ступени строку оставляет: дедуп держит ключ, а не гард перехода")
+    void absorbedExchangeSignalStillLeavesReport() {
+        HoldSignal signal = HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE);
         when(exchangeDataService.blockEntry(EXCHANGE_ID)).thenReturn(false);
 
-        holdService.raise(HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE), context());
+        holdService.raise(signal, context());
 
-        verify(anomalyReportService, never()).journal(any(), any());
+        verify(anomalyReportService).journalState(any(), eqSignal(signal), isNull());
     }
 
     @Test

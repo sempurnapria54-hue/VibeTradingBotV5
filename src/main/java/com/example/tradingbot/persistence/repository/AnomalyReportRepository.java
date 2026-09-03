@@ -9,14 +9,6 @@ import org.springframework.data.repository.query.Param;
 public interface AnomalyReportRepository extends JpaRepository<AnomalyReportEntity, Long> {
 
     /**
-     * Дедуп STATE-отчёта по стоящему состоянию: пока по ключу
-     * «биржа + код + severity» отчёт уже заведён, второй не создаётся
-     * (docs/rules/error-handling-policy.md; потребитель —
-     * UNCLASSIFIED_CASH_FLOW у писателя строки разбивки).
-     */
-    Boolean existsByExchangeIdAndCodeAndSeverity(Long exchangeId, String code, String severity);
-
-    /**
      * Носитель подтверждения гистерезиса и дедупа: стои́т ли по этому
      * ключу отчёт, заведённый <b>в окне</b> — не раньше {@code since} и не
      * позже {@code until}. Отдельного счётчика подряд идущих тиков не

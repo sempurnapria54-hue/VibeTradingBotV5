@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.tradingbot.config.AnomalyJobProperties;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
@@ -17,6 +18,7 @@ import com.example.tradingbot.persistence.service.AnomalyReportDataService;
 import com.example.tradingbot.util.ClientIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,7 @@ public class AnomalyReportService {
     private final AnomalyReportDataService dataService;
     private final IntegrationService integrationService;
     private final ObjectMapper objectMapper;
+    private final AnomalyJobProperties properties;
 
     /** Создать отчёт в CREATED с before-слепками (локальный БД + внешний биржевой). */
     public AnomalyReport open(DealContext dealContext, HoldSignal signal) {
@@ -78,6 +81,37 @@ public class AnomalyReportService {
      */
     public AnomalyReport journal(DealContext dealContext, HoldSignal signal, String subjectExternalId) {
         return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId);
+    }
+
+    /**
+     * Журнальный отчёт о факте-СОСТОЯНИИ: пока строка по ключу стои́т,
+     * второй не заводится (docs/rules/error-handling-policy.md
+     * §«Состояние «держится» читается по объекту, а не по статусу
+     * отчёта»). Возвращает {@code null}, если строка уже стои́т.
+     *
+     * <p><b>Природу факта различает ТРОПА, а не колонка.</b> Отчёт о
+     * происшествии заводит своя строка всегда — иначе два разных
+     * происшествия по одному инструменту схлопнулись бы, — и тропа
+     * происшествия зовёт {@link #journal}. Дискриминатором в данных
+     * природа не выражена и не может быть: величина известна писателю на
+     * call-site и ни одному читателю не нужна
+     * (docs/models/domain/other/AnomalyReport.md §«Природа факта — свойство
+     * тропы, а не колонка»).
+     */
+    public AnomalyReport journalState(DealContext dealContext, HoldSignal signal, String subjectExternalId) {
+        if (isTrue(standing(dealContext, signal, subjectExternalId))) {
+            return null;
+        }
+        return journal(dealContext, signal, subjectExternalId);
+    }
+
+    /** Строка по ключу состояния стои́т в окне наблюдения. */
+    private Boolean standing(DealContext dealContext, HoldSignal signal, String subjectExternalId) {
+        return dataService.existsStanding(dealContext.getExchange().getId(),
+                nonNull(dealContext.getInstrument()) ? dealContext.getInstrument().getId() : null,
+                subjectExternalId, signal.getCode(), severityOf(signal),
+                OffsetDateTime.now().minus(properties.getObservationWindow()),
+                OffsetDateTime.now());
     }
 
     private AnomalyReport create(DealContext dealContext, HoldSignal signal, AnomalyReport.Status status) {

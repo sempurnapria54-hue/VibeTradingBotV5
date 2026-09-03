@@ -25,15 +25,6 @@ public class AnomalyReportDataService {
     }
 
     /**
-     * STATE-отчёт по ключу «биржа + код + severity» уже заведён — дедуп
-     * по стоящему состоянию (docs/rules/error-handling-policy.md).
-     */
-    @Transactional(readOnly = true)
-    public Boolean existsByKey(Long exchangeId, String code, AnomalyReport.Severity severity) {
-        return repository.existsByExchangeIdAndCodeAndSeverity(exchangeId, code, severity.name());
-    }
-
-    /**
      * Стои́т ли по ключу отчёт, заведённый <b>в окне</b> {@code [since,
      * until]}, — операнд подтверждения гистерезиса и дедупа журнальной
      * строки (docs/components/AnomalyJob.md §«Такт и гистерезис»).

@@ -149,7 +149,7 @@
 триггер потери покрытия, а не этот.
 
 **Отчёт** — `AnomalyReport`, `code` `RISK_POLICY_BREACH_UNDER_PROTECTION`,
-`kind` `STATE` (состояние держится, пока неравенство ложно), `severity`
+природа — состояние (держится, пока неравенство ложно), `severity`
 `NON_CRITICAL` (kill-switch в составе реакции нет), радиус — инструмент.
 Дедуп по стоящему состоянию объекта
 (`docs/rules/error-handling-policy.md`), поэтому отчёт не множится каждым

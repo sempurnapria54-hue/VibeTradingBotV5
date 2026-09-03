@@ -64,23 +64,27 @@ public class HoldService {
      * Снятия риска в составе нет — принятый риск покрыт, и рвать его
      * нечем, — поэтому отчёт создаётся уже завершённым.
      *
-     * <p><b>Дедуп по стоящему состоянию объекта</b> выражен самим гардом:
-     * не переставился статус — состояние уже держится, и второй строки по
-     * тому же ключу не заводится (docs/lifecycles/AnomalyReport.md
-     * §«Идемпотентность зависит от природы факта»).
+     * <p><b>Поглощение гасит смену статуса и торговую реакцию, но не
+     * отчёт</b> (docs/rules/error-handling-policy.md §«Поглощение
+     * наблюдаемо»). Поэтому запись идёт ДО гарда перехода: гард отвечает
+     * на «переставился ли статус», а отчёт — на «почему контур встал», и
+     * второе основание со своим машинным кодом обязано оставить свою
+     * строку. Дедуп при этом держит не гард, а ключ состояния:
+     * {@link AnomalyReportService#journalState} второй строки по тому же
+     * ключу не заводит. Прежняя редакция полагалась на гард — и оставляла
+     * биржу в холде без единой строки о причине, если первая запись не
+     * прошла.
      *
      * <p>Журнал не гейтит реакцию: сбой записи отчёта логируется и запрет
      * входов не отменяет — ограничение риска приоритетнее журнала.
      */
     private void raiseSoft(HoldSignal signal, DealContext dealContext) {
-        if (isFalse(rungApplied(signal, dealContext))) {
-            return;
-        }
         try {
-            anomalyReportService.journal(dealContext, signal);
+            anomalyReportService.journalState(dealContext, signal, null);
         } catch (RuntimeException e) {
             log.error("Journal anomaly report failed scope={} code={}", signal.getScope(), signal.getCode(), e);
         }
+        rungApplied(signal, dealContext);
     }
 
     /**

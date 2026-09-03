@@ -58,6 +58,7 @@ public class SafetyHoldCoordinator {
 
     private void reactInstrument(HoldSignal signal, DealContext dealContext) {
         if (isFalse(instrumentDataService.blockTrade(dealContext.getInstrument().getId()))) {
+            absorbed(signal, dealContext);
             return;
         }
         runReaction(signal, dealContext, () -> killSwitchService.fireInstrument(dealContext));
@@ -66,9 +67,32 @@ public class SafetyHoldCoordinator {
     private void reactExchange(HoldSignal signal, DealContext dealContext) {
         Long exchangeId = dealContext.getExchange().getId();
         if (isFalse(exchangeDataService.blockTrade(exchangeId))) {
+            absorbed(signal, dealContext);
             return;
         }
         runReaction(signal, dealContext, () -> killSwitchService.fireExchange(exchangeId));
+    }
+
+    /**
+     * Поглощённый сигнал: ступень уже стои́т, смена статуса и снятие риска
+     * не гоняются — <b>но строка остаётся</b>
+     * (docs/rules/error-handling-policy.md §«Поглощение наблюдаемо»).
+     * Второе основание несёт свой машинный код, и без строки различимость
+     * оснований пропадала бы ровно там, где нужна: контур стои́т, а
+     * почему — в данных нет. Дедуп держит ключ состояния, не гард
+     * перехода, поэтому повтор того же основания строки не множит.
+     *
+     * <p>Kill-switch этой тропой не гоняется: права на доведение
+     * недоделанного у автоматического сигнала нет, оно есть только у
+     * явного вызова держателя.
+     */
+    private void absorbed(HoldSignal signal, DealContext dealContext) {
+        try {
+            anomalyReportService.journalState(dealContext, signal, null);
+        } catch (RuntimeException e) {
+            log.error("Journal absorbed safety signal failed scope={} code={}",
+                    signal.getScope(), signal.getCode(), e);
+        }
     }
 
     private void runReaction(HoldSignal signal, DealContext dealContext, Supplier<Boolean> killSwitch) {

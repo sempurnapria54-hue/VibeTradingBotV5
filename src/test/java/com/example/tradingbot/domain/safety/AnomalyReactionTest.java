@@ -77,7 +77,7 @@ class AnomalyReactionTest {
 
         reaction.apply(journalOnly(), exchange());
 
-        verify(reportService).journal(any(), any(), any());
+        verify(reportService).journalState(any(), any(), any());
         verify(holdService, never()).raise(any(), any());
     }
 
@@ -88,7 +88,7 @@ class AnomalyReactionTest {
 
         reaction.apply(journalOnly(), exchange());
 
-        verify(reportService, never()).journal(any(), any(), any());
+        verify(reportService, never()).journalState(any(), any(), any());
         verify(holdService, never()).raise(any(), any());
     }
 
@@ -99,7 +99,7 @@ class AnomalyReactionTest {
 
         reaction.apply(withHysteresis(), exchange());
 
-        verify(reportService).journal(any(), any(), any());
+        verify(reportService).journalState(any(), any(), any());
         verify(holdService, never()).raise(any(), any());
     }
 
@@ -111,7 +111,7 @@ class AnomalyReactionTest {
         reaction.apply(withHysteresis(), exchange());
 
         verify(holdService).raise(any(), any());
-        verify(reportService, never()).journal(any(), any(), any());
+        verify(reportService, never()).journalState(any(), any(), any());
     }
 
     @Test
@@ -158,7 +158,7 @@ class AnomalyReactionTest {
     @DisplayName("Сбой записи журнальной строки реакцию не валит: ограничение риска приоритетнее журнала")
     void journalFailureDoesNotBreakThePass() {
         standingRow(false);
-        when(reportService.journal(any(), any(), any())).thenThrow(new IllegalStateException("БД недоступна"));
+        when(reportService.journalState(any(), any(), any())).thenThrow(new IllegalStateException("БД недоступна"));
 
         assertDoesNotThrow(() -> reaction.apply(journalOnly(), exchange()));
     }

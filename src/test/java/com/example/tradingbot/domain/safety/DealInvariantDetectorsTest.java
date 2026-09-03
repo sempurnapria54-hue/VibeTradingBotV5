@@ -6,7 +6,10 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.tradingbot.domain.command.DealActionState;
+import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult;
 import com.example.tradingbot.domain.command.risk.RiskValidator;
@@ -14,10 +17,12 @@ import com.example.tradingbot.domain.deal.DealContextService;
 import com.example.tradingbot.domain.deal.DealTerminalGate;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.util.Constants;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +56,9 @@ class DealInvariantDetectorsTest {
 
     @Mock
     private DealTerminalGate dealTerminalGate;
+
+    /** Налив входа транша — операнд экспозиции. */
+    private static final BigDecimal EXPOSURE = BigDecimal.valueOf(5);
 
     @Mock
     private RiskValidator riskValidator;
@@ -122,6 +130,30 @@ class DealInvariantDetectorsTest {
         assertEquals(HoldRung.SOFT, finding.getRung());
     }
 
+    @Test
+    @DisplayName("A4 МОЛЧИТ под живым обязательством покрытия: это наш собственный незавершённый ход")
+    void uncoveredTrancheUnderLiveCommitmentIsNotAnomaly() {
+        given(contextWithCommitment(tranche(true, false)));
+        when(dealTerminalGate.exposureReconciled(any(), any())).thenReturn(Boolean.TRUE);
+
+        detectors.detect(exchange());
+
+        verify(reaction, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("Контроль: обязательство ЗАВЕРШЕНО — транш снова нарушает инвариант")
+    void uncoveredTrancheWithFinishedCommitmentIsAnomaly() {
+        DealContext context = contextWithCommitment(tranche(true, false));
+        context.getActionStates().getFirst().setStatus(DealActionStateStatus.COMPLETED);
+        given(context);
+        when(dealTerminalGate.exposureReconciled(any(), any())).thenReturn(Boolean.TRUE);
+
+        detectors.detect(exchange());
+
+        assertEquals(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED, captured().getCode());
+    }
+
     private AnomalyFinding captured() {
         ArgumentCaptor<AnomalyFinding> captor = ArgumentCaptor.forClass(AnomalyFinding.class);
         verify(reaction).apply(captor.capture(), any());
@@ -148,20 +180,36 @@ class DealInvariantDetectorsTest {
                 .build();
     }
 
-    private DealTranche tranche(Boolean riskBearing, Boolean covered) {
-        DealTranche tranche = new DealTranche() {
-            @Override
-            public Boolean isRiskBearing() {
-                return riskBearing;
-            }
+    /** Тот же контекст плюс живая строка исполнения защитного действия на транше. */
+    private DealContext contextWithCommitment(DealTranche tranche) {
+        DealContext context = context(tranche, true);
+        DealActionState commitment = new DealActionState();
+        commitment.setDealTrancheId(tranche.getId());
+        commitment.setStatus(DealActionStateStatus.SUBMITTED);
+        context.register(commitment);
+        return context;
+    }
 
-            @Override
-            public Boolean isCovered() {
-                return covered;
-            }
-        };
+    /**
+     * Транш собирается НАСТОЯЩИМ состоянием, а не подменой предикатов:
+     * предикат, подменённый в тесте, проверял бы детектор против модели,
+     * которой в проде нет. Экспозиция — налив входа; покрытие — живая
+     * отдельная защита с действующим уровнем.
+     */
+    private DealTranche tranche(Boolean riskBearing, Boolean covered) {
+        DealTranche tranche = new DealTranche();
         tranche.setId(3L);
+        tranche.setEntryFilled(isTrue(riskBearing) ? EXPOSURE : BigDecimal.ZERO);
+        tranche.setAlgoOrders(isTrue(covered) ? List.of(liveProtection()) : List.of());
         return tranche;
+    }
+
+    /** Живая отдельная защита, покрывающая экспозицию транша целиком. */
+    private AlgoOrder liveProtection() {
+        AlgoOrder protection = new AlgoOrder();
+        protection.setStatus(AlgoOrder.Status.ACTIVE);
+        protection.setSize(EXPOSURE);
+        return protection;
     }
 
     private Exchange exchange() {

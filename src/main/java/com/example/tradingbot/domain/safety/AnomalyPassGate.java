@@ -63,6 +63,7 @@ public class AnomalyPassGate {
             holdService.raise(HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE), context);
             return;
         }
-        reportService.journal(context, HoldSignal.exchangeJournal(Constants.Hold.ANOMALY_PASS_INCOMPLETE));
+        reportService.journalState(context, HoldSignal.exchangeJournal(Constants.Hold.ANOMALY_PASS_INCOMPLETE),
+                null);
     }
 }

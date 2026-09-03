@@ -141,7 +141,6 @@ class RefreshBillsExecutorTest {
         when(dealCashFlowDataService.findByDeal(DEAL_ID)).thenAnswer(invocation -> savedFlows.stream()
                 .filter(flow -> Objects.equals(DEAL_ID, flow.getDealId()))
                 .collect(Collectors.toList()));
-        when(anomalyReportDataService.existsByKey(any(), anyString(), any())).thenReturn(false);
     }
 
     @Test
@@ -178,9 +177,6 @@ class RefreshBillsExecutorTest {
 
     @Test
     void unmappedTypeFallsToOtherWithSingleJournalReport() {
-        when(anomalyReportDataService.existsByKey(any(), anyString(), any()))
-                .thenReturn(false)
-                .thenReturn(true);
         when(integrationService.getBills(any(), any())).thenReturn(List.of(
                 bill("b1", "1", "11", "USDT", null, IN_WINDOW),
                 bill("b2", "1", "12", "USDT", null, IN_WINDOW)));
