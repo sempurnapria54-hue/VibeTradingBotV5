@@ -16,7 +16,6 @@
 .claude/processes/question-delegation.md	4
 .claude/skills/classify-type.md	Персистентность
 .claude/skills/place-knowledge.md	«Первоисточник правила»
-.claude/skills/stagnation-detection.md	«Реестр прогонов»
 .claude/skills/stagnation-detection.md	Сброс
 .claude/skills/update-roadmap-progress.md	«Закрытие гейтящего узла проходит мини-петлю критики до приземления в корпус»
 .claude/skills/update-roadmap-progress.md	«Закрытие фазы N …»
