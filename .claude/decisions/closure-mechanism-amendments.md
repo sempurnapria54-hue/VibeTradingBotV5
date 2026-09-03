@@ -12,7 +12,7 @@
 глубины и мини-петли (`.claude/decisions/gating-node-closure-depth.md`).
 Семь узлов `GAPS_CLOSE_27` из девяти вернулись гейтящими, но возврат
 неоднороден — четыре класса
-(`.claude/work/progress/phase-1-step-7-docs-check-28.md` §«Четыре класса
+(`.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-28.md` §«Четыре класса
 возврата — и они лечатся по-разному»):
 
 1. **дефект в собственном новом артефакте закрытия** — правки последнего
@@ -83,7 +83,7 @@
 - Гейт-исполнение — `.claude/skills/update-roadmap-progress.md` §«Гейт
   выхода из `GAPS_CLOSE_N`».
 - Измерение —
-  `.claude/work/progress/phase-1-step-7-docs-check-28.md`.
+  `.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-28.md`.
 - Скрипт и батарея проб — `tools/preconditions-check.sh`,
   `.claude/tests/source-api/okx/code-preconditions.md` §«Сверка реестра
   с планом — исполнимой проверкой».

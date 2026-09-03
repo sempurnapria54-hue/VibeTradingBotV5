@@ -62,4 +62,4 @@
 - Подстановка операнда — `docs/components/RefreshBillsExecutor.md`.
 - Правило сверки — `docs/rules/pnl-reconciliation.md`.
 - Исполнение (узел 3 закрытия) —
-  `.claude/work/progress/phase-1-step-7-gaps-close-33.md`.
+  `.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-gaps-close-33.md`.

@@ -133,7 +133,7 @@ P&L (`RefreshBillsExecutor`, `DealCashFlow`, сверка результата),
 
 ## Связи
 
-- Эскалация — `.claude/work/progress/phase-1-step-7-docs-check-34.md`
+- Эскалация — `.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-34.md`
   §«Эскалация: концептуальный дефицит (сигнал С2)».
 - Пересматриваемое решение —
   `.claude/decisions/population-origin-and-code-gate.md`.
@@ -141,4 +141,4 @@ P&L (`RefreshBillsExecutor`, `DealCashFlow`, сверка результата),
   `.claude/decisions/measurement-repair-not-extension.md`.
 - Дом критерия — `.claude/processes/roadmap-step-execution.md` §Гейты.
 - Исполнение перехода —
-  `.claude/work/progress/phase-1-step-7-code-transition.md`.
+  `.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-code-transition.md`.

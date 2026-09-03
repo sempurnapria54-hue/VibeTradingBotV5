@@ -58,11 +58,11 @@
 
 ## Связи
 
-- Эскалация — `.claude/work/progress/phase-1-step-7-docs-check-33.md`
+- Эскалация — `.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-33.md`
   §«Эскалация: концептуальный дефицит».
 - Заморозка усиления измерения —
   `.claude/decisions/population-origin-and-code-gate.md`.
 - Дом фактов среды —
   `.claude/tests/source-api/okx/code-preconditions.md` §«Среда контура —
   проверено прогоном, не выведено».
-- Исполнение — `.claude/work/progress/phase-1-step-7-gaps-close-33.md`.
+- Исполнение — `.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-gaps-close-33.md`.

@@ -180,7 +180,7 @@
 ## Связи
 
 - Эскалация и диагноз — отчёт `DOCS_CHECK_30`
-  (`.claude/work/progress/phase-1-step-7-docs-check-30.md`; после закрытия
+  (`.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-30.md`; после закрытия
   шага — в `history/`).
 - Предыдущий пакет того же класса —
   `.claude/decisions/proof-method-change.md`.

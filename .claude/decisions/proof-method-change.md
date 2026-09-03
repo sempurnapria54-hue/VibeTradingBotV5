@@ -16,7 +16,7 @@
 остановлено целиком до выбора держателя.
 
 Диагноз (отчёт `DOCS_CHECK_29`,
-`.claude/work/progress/phase-1-step-7-docs-check-29.md` §«Диагноз —
+`.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-29.md` §«Диагноз —
 почему латание не сходится»; после закрытия шага — в `history/`)
 назвал две посылки:
 
@@ -136,7 +136,7 @@ fail-fast гейтом полноты графа и его кодом, кото�
 ## Связи
 
 - Эскалация, диагноз, реестр — отчёт `DOCS_CHECK_29`
-  (`.claude/work/progress/phase-1-step-7-docs-check-29.md`; после
+  (`.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-29.md`; после
   закрытия шага — в `history/`) и хроника шага.
 - Детектор и правило сброса — `.claude/skills/stagnation-detection.md`.
 - Дом мутационного стандарта и посерийности —

@@ -213,7 +213,7 @@
 ## Связи
 
 - Эскалация, диагноз и величины — отчёт `DOCS_CHECK_31`
-  (`.claude/work/progress/phase-1-step-7-docs-check-31.md`; после закрытия
+  (`.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-31.md`; после закрытия
   шага — в `history/`).
 - Процедура построения популяции — `.claude/skills/closure-population.md`.
 - Дом норм закрытия — `.claude/processes/roadmap-step-execution.md` §3.
