@@ -142,7 +142,7 @@ RETIRED = [
         'date': '2026-09-04',
         'source': 'SYNC_DOCS_FROM_CODE шага 8, расхождение R1',
         'allowed': ('.claude/work/decision-digest.md',
-                    '.claude/work/progress/phase-1-step-8-closure.md',
+                    '.claude/work/history/2026-09-04-phase-1-step-8-anomaly-job/phase-1-step-8-closure.md',
                     '.claude/knowledge-tree.md',
                     'tools/retired-check.py'),
         'population': (('docs/models/domain/other/AnomalyReport.md',
