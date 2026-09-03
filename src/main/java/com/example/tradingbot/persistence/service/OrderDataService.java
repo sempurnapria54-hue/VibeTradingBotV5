@@ -37,6 +37,17 @@ public class OrderDataService {
         return result;
     }
 
+    /**
+     * Строка по клиентскому идентификатору либо {@code null}. Отличается
+     * от {@code getRequiredByInternalId} назначением: там ненайденность —
+     * авария тропы, здесь она сама по себе ФАКТ, который читает
+     * проактивная детекция.
+     */
+    @Transactional(readOnly = true)
+    public Order findByInternalId(String internalId) {
+        return repository.findByInternalId(internalId).map(mapper::persistenceToDomain).orElse(null);
+    }
+
     @Transactional(readOnly = true)
     public Order getRequiredByInternalId(String internalId) {
         OrderEntity entity = repository.findByInternalId(internalId)

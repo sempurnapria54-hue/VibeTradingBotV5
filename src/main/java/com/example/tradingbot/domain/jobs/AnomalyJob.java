@@ -13,6 +13,7 @@ import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.safety.AccountingDetectors;
 import com.example.tradingbot.domain.safety.AnomalyPassGate;
 import com.example.tradingbot.domain.safety.AnomalyScan;
 import com.example.tradingbot.domain.safety.AnomalyScanReader;
@@ -81,6 +82,7 @@ public class AnomalyJob {
     private final AnomalyScanReader scanReader;
     private final AnomalyPassGate passGate;
     private final ExchangeSideDetectors exchangeSideDetectors;
+    private final AccountingDetectors accountingDetectors;
     private final DealOpeningService dealOpeningService;
 
     @Scheduled(cron = "${anomaly-job.cron}")
@@ -125,6 +127,7 @@ public class AnomalyJob {
         for (Instrument instrument : managed) {
             try {
                 detectUnexplainedPosition(instrument, first(scan.positionsOf(instrument.getExternalId())));
+                accountingDetectors.detect(scan, exchange, instrument);
             } catch (RuntimeException e) {
                 log.error("Anomaly detection failed instrumentId={}", instrument.getId(), e);
             }

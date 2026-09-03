@@ -16,6 +16,7 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.integration.service.IntegrationService;
+import com.example.tradingbot.domain.safety.AccountingDetectors;
 import com.example.tradingbot.domain.safety.AnomalyPassGate;
 import com.example.tradingbot.domain.safety.AnomalyScanReader;
 import com.example.tradingbot.domain.safety.ExchangeSideDetectors;
@@ -67,6 +68,8 @@ class AnomalyJobRecoveryTest {
     @Mock
     private ExchangeSideDetectors exchangeSideDetectors;
     @Mock
+    private AccountingDetectors accountingDetectors;
+    @Mock
     private DealOpeningService dealOpeningService;
 
     private AnomalyJob job;
@@ -75,7 +78,7 @@ class AnomalyJobRecoveryTest {
     void setUp() {
         AnomalyJobProperties properties = new AnomalyJobProperties();
         job = new AnomalyJob(properties, new JobExecutionGuard(), instrumentDataService, exchangeDataService,
-                dealDataService, new AnomalyScanReader(integrationService), passGate, exchangeSideDetectors, dealOpeningService);
+                dealDataService, new AnomalyScanReader(integrationService), passGate, exchangeSideDetectors, accountingDetectors, dealOpeningService);
         when(instrumentDataService.findByStatus(any())).thenReturn(List.of(instrument()));
         when(exchangeDataService.findAllActive()).thenReturn(List.of(exchange()));
         when(passGate.apply(any(), any())).thenReturn(Boolean.TRUE);
@@ -146,7 +149,7 @@ class AnomalyJobRecoveryTest {
         disabled.setEnabled(Boolean.FALSE);
         AnomalyJob offJob = new AnomalyJob(disabled, new JobExecutionGuard(), instrumentDataService,
                 exchangeDataService, dealDataService, new AnomalyScanReader(integrationService), passGate, exchangeSideDetectors,
-                dealOpeningService);
+                accountingDetectors, dealOpeningService);
 
         offJob.tick();
 

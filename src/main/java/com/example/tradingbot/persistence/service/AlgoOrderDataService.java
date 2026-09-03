@@ -25,6 +25,17 @@ public class AlgoOrderDataService {
         return mapper.persistenceToDomain(repository.save(mapper.domainToPersistence(algoOrder)));
     }
 
+    /**
+     * Строка по клиентскому идентификатору либо {@code null}. Отличается
+     * от {@code getRequiredByInternalId} назначением: там ненайденность —
+     * авария тропы, здесь она сама по себе ФАКТ, который читает
+     * проактивная детекция.
+     */
+    @Transactional(readOnly = true)
+    public AlgoOrder findByInternalId(String internalId) {
+        return repository.findByInternalId(internalId).map(mapper::persistenceToDomain).orElse(null);
+    }
+
     @Transactional(readOnly = true)
     public AlgoOrder getRequiredByInternalId(String internalId) {
         return repository.findByInternalId(internalId)
