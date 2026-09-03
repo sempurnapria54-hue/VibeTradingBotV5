@@ -18,11 +18,13 @@ import com.example.tradingbot.domain.command.calc.DealResultCalculator;
 import com.example.tradingbot.domain.command.calc.DealTerminalFeaturesWriter;
 import com.example.tradingbot.domain.deal.DealTerminalGate;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.safety.AnomalyReportService;
 import com.example.tradingbot.domain.safety.HoldSignal;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.util.Constants;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>См. docs/components/MarkDealEmergencyClosedExecutor.md.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
@@ -55,6 +58,7 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
     private final DealTerminalFeaturesWriter featuresWriter;
     private final DealReconciliationCalculator reconciliationCalculator;
     private final DealTerminalGate terminalGate;
+    private final AnomalyReportService anomalyReportService;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -82,6 +86,8 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
             if (isTrue(result.getAvailable())) {
                 deal.setResultProfit(result.getResultProfit());
                 deal.setResultProfitCurrency(result.getResultProfitCurrency());
+            } else {
+                journalResultNotComputable(dealContext, deal);
             }
         }
         featuresWriter.apply(dealContext, resultFinalized);
@@ -91,6 +97,24 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
         deal.setStatus(Deal.Status.EMERGENCY_CLOSED);
         dealDataService.save(deal);
         return complete(actionState, dealContext);
+    }
+
+    /**
+     * Итог аварийно закрытой сделки неисчислим — пустота отличима от нуля
+     * и СЧЁТНА. Природа факта — происшествие: по каждой такой сделке своя
+     * строка. Клейм несущий: невключение неизвестного исхода в расчёт
+     * ожидаемости корректно только при известном ЧИСЛЕ таких случаев, а
+     * без строки оно тождественно нулю, а не неизвестно
+     * (docs/components/MarkDealEmergencyClosedExecutor.md). Терминал этим
+     * не блокируется.
+     */
+    private void journalResultNotComputable(DealContext dealContext, Deal deal) {
+        try {
+            anomalyReportService.journal(dealContext,
+                    HoldSignal.instrumentJournal(Constants.Hold.RESULT_NOT_COMPUTABLE));
+        } catch (RuntimeException e) {
+            log.error("Journal RESULT_NOT_COMPUTABLE failed dealId={}", deal.getId(), e);
+        }
     }
 
     private ServiceCommandExecutionResult complete(DealActionState actionState, DealContext dealContext) {

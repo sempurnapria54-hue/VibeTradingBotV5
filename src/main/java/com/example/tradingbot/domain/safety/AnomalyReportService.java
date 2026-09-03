@@ -77,7 +77,7 @@ public class AnomalyReportService {
      * Журнальный отчёт с названным ПРЕДМЕТОМ — сущностью, о которой он.
      * Предмет входит в ключ дедупа у отчёта без блокировки: его состояние
      * держится на сущности, а не на объекте радиуса
-     * (docs/models/domain/other/AnomalyReport.md §«Ключ дедупа у STATE»).
+     * (docs/models/domain/other/AnomalyReport.md §«Ключ дедупа у состояния»).
      */
     public AnomalyReport journal(DealContext dealContext, HoldSignal signal, String subjectExternalId) {
         return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId);

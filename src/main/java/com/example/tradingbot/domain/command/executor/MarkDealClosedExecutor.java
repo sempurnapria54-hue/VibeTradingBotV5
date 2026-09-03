@@ -16,12 +16,14 @@ import com.example.tradingbot.domain.command.calc.DealReconciliationCalculator;
 import com.example.tradingbot.domain.command.calc.DealTerminalFeaturesWriter;
 import com.example.tradingbot.domain.deal.DealTerminalGate;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.safety.AnomalyReportService;
 import com.example.tradingbot.domain.safety.HoldSignal;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.util.Constants;
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>См. docs/components/MarkDealClosedExecutor.md.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MarkDealClosedExecutor implements CommandExecutor {
@@ -54,6 +57,7 @@ public class MarkDealClosedExecutor implements CommandExecutor {
     private final DealReconciliationCalculator reconciliationCalculator;
     private final DealTerminalFeaturesWriter featuresWriter;
     private final DealTerminalGate terminalGate;
+    private final AnomalyReportService anomalyReportService;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -83,6 +87,7 @@ public class MarkDealClosedExecutor implements CommandExecutor {
             // результат тропы, а не подставленное умолчание.
             deal.setResultProfit(BigDecimal.ZERO);
             deal.setResultProfitCurrency(dealContext.getInstrument().getExternalSettlementCurrency());
+            journalCurrencyUnresolved(dealContext, deal);
             featuresWriter.apply(dealContext, false);
         }
         if (isNull(deal.getCloseReason())) {
@@ -94,6 +99,26 @@ public class MarkDealClosedExecutor implements CommandExecutor {
         deal.setStatus(Deal.Status.CLOSED);
         dealDataService.save(deal);
         return complete(actionState, dealContext);
+    }
+
+    /**
+     * Валюта результата не разрешилась — ноль записан, но в чём он
+     * выражен, неизвестно. Природа факта — ПРОИСШЕСТВИЕ: свой момент у
+     * каждой такой сделки, и счётность обязательна, иначе популяция
+     * сделок с невыраженным нулём не всплывает ни в одном сигнале
+     * (docs/components/MarkDealClosedExecutor.md). Терминал этим не
+     * блокируется.
+     */
+    private void journalCurrencyUnresolved(DealContext dealContext, Deal deal) {
+        if (nonNull(deal.getResultProfitCurrency())) {
+            return;
+        }
+        try {
+            anomalyReportService.journal(dealContext,
+                    HoldSignal.instrumentJournal(Constants.Hold.RESULT_CURRENCY_UNRESOLVED));
+        } catch (RuntimeException e) {
+            log.error("Journal RESULT_CURRENCY_UNRESOLVED failed dealId={}", deal.getId(), e);
+        }
     }
 
     /**

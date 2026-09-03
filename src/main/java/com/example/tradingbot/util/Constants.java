@@ -132,7 +132,7 @@ public final class Constants {
         public static final String INSTRUMENT_PROTECTION_FATE_UNKNOWN = "INSTRUMENT_PROTECTION_FATE_UNKNOWN";
 
         /**
-         * Журнальный STATE-отчёт биржи: движение счёта не покрыто
+         * Журнальный отчёт-СОСТОЯНИЕ биржи: движение счёта не покрыто
          * отображением категорий — принимающая корзина непуста
          * (docs/models/mapping/DealCashFlow.md §«Резолв категории»).
          * Блокировки в составе реакции нет.
@@ -162,6 +162,41 @@ public final class Constants {
          * (docs/models/mapping/PositionCloseResult.md).
          */
         public static final String UNRECOGNIZED_CLOSE_TYPE = "UNRECOGNIZED_CLOSE_TYPE";
+
+        /**
+         * Журнальный отчёт-СОСТОЯНИЕ: снимок средств приземлился, а база
+         * риска осталась пустой. Без строки пустая база не отличала бы
+         * «команда ни разу не отрабатывала» от «отработала, наблюдать
+         * было нечего» — благоприятного умолчания у непроверенного
+         * признака быть не может (П1 §4,
+         * docs/components/RefreshBalanceExecutor.md).
+         */
+        public static final String RISK_BASE_NOT_OBSERVED = "RISK_BASE_NOT_OBSERVED";
+
+        /**
+         * Журнальный отчёт-СОБЫТИЕ: расчётная валюта результата сделки не
+         * разрешилась, и число посчитано быть не может
+         * (docs/components/MarkDealClosedExecutor.md).
+         */
+        public static final String RESULT_CURRENCY_UNRESOLVED = "RESULT_CURRENCY_UNRESOLVED";
+
+        /**
+         * Журнальный отчёт-СОБЫТИЕ: операнда базы риска нет в момент, когда
+         * терминал сделки его требует
+         * (docs/components/MarkDealClosedExecutor.md,
+         * docs/rules/risk-policy.md).
+         */
+        public static final String RISK_BASE_OPERAND_MISSING = "RISK_BASE_OPERAND_MISSING";
+
+        /**
+         * Журнальный отчёт-СОБЫТИЕ: результат аварийно закрытой сделки не
+         * исчислим. Строка несущая: невключение неисчислимого исхода в
+         * расчёт ожидаемости корректно только если ЧИСЛО таких случаев
+         * известно, а без неё оно тождественно нулю
+         * (docs/models/domain/other/AnomalyReport.md,
+         * docs/components/MarkDealEmergencyClosedExecutor.md).
+         */
+        public static final String RESULT_NOT_COMPUTABLE = "RESULT_NOT_COMPUTABLE";
     }
 
     /** Константы интеграции с OKX: коды, флаги, заголовки, пути и имена полей запроса, таймфреймы. */

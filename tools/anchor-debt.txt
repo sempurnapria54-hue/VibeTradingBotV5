@@ -52,5 +52,4 @@
 .claude/work/questions/open-questions.md	epsilon
 .claude/work/questions/open-questions.md	«Ось упущенных возможностей»
 .claude/work/questions/open-questions.md	«Порядок исполнения»
-.claude/work/questions/open-questions.md	Следствия
 .claude/work/roadmap/roadmap.md	IND-Q1.

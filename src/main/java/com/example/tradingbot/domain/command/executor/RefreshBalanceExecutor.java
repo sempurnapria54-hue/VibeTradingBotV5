@@ -17,10 +17,13 @@ import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceExternalSnapshot;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
+import com.example.tradingbot.domain.safety.AnomalyReportService;
+import com.example.tradingbot.domain.safety.HoldSignal;
 import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.persistence.service.BalanceContainerDataService;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
+import com.example.tradingbot.util.Constants;
 import com.example.tradingbot.util.OkxParse;
 import java.math.BigDecimal;
 import java.util.List;
@@ -47,6 +50,7 @@ public class RefreshBalanceExecutor implements CommandExecutor {
     private final DealActionStateDataService dealActionStateDataService;
     private final ExchangeDataService exchangeDataService;
     private final IntegrationService integrationService;
+    private final AnomalyReportService anomalyReportService;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -69,7 +73,7 @@ public class RefreshBalanceExecutor implements CommandExecutor {
         container.setExternalAvailableEquity(OkxParse.decimal(snapshot.getExternalAvailableEquity()));
         container.replaceBalances(buildBalances(snapshot.getBalances()));
         balanceContainerDataService.save(container);
-        observeRiskBase(dealContext.getExchange(), container);
+        observeRiskBase(dealContext, container);
         completeAction(actionState);
         return ServiceCommandExecutionResult.ok();
     }
@@ -92,11 +96,15 @@ public class RefreshBalanceExecutor implements CommandExecutor {
      * </ul>
      *
      * <p>База осталась пустой, хотя снимок приземлился, — это ОМИССИЯ, и
-     * она направлена в разрешающую сторону, поэтому объявляется в лог:
-     * без объявления пустая база не отличала бы «команда ни разу не
-     * отрабатывала» от «отработала, наблюдать было нечего».
+     * она направлена в разрешающую сторону, поэтому объявляется
+     * ПЕРСИСТЕНТНОЙ строкой, а не логом: лог не запрашивается, не
+     * агрегируется и не переживает ротацию, и сослаться на него при
+     * разборе нельзя (docs/concept.md §«Носитель наблюдаемости»). Без
+     * строки пустая база не отличала бы «команда ни разу не отрабатывала»
+     * от «отработала, наблюдать было нечего».
      */
-    private void observeRiskBase(Exchange exchange, BalanceContainer container) {
+    private void observeRiskBase(DealContext dealContext, BalanceContainer container) {
+        Exchange exchange = dealContext.getExchange();
         if (isNull(exchange) || nonNull(exchange.getRiskBase())) {
             return;
         }
@@ -105,11 +113,29 @@ public class RefreshBalanceExecutor implements CommandExecutor {
         if (isNull(candidate) || candidate.signum() <= 0) {
             log.warn("RISK_BASE_NOT_OBSERVED exchangeId={} — snapshot landed, base stays empty",
                     exchange.getId());
+            journalNotObserved(dealContext);
             return;
         }
         exchange.setRiskBase(candidate);
         exchange.setRiskBaseCurrency(settleRow.getExternalCurrency());
         exchangeDataService.save(exchange);
+    }
+
+    /**
+     * Журнальная строка о ненаблюдённой базе. Природа факта — СОСТОЯНИЕ
+     * (пока база пуста, команда тикает каждым проходом), поэтому пишет её
+     * тропа состояния: вторая строка по тому же ключу не заводится, пока
+     * состояние держится (docs/models/domain/other/AnomalyReport.md).
+     * Журнал реакции не гейтит: сбой записи снимок не валит.
+     */
+    private void journalNotObserved(DealContext dealContext) {
+        try {
+            anomalyReportService.journalState(dealContext,
+                    HoldSignal.exchangeJournal(Constants.Hold.RISK_BASE_NOT_OBSERVED), null);
+        } catch (RuntimeException e) {
+            log.error("Journal RISK_BASE_NOT_OBSERVED failed exchangeId={}",
+                    dealContext.getExchange().getId(), e);
+        }
     }
 
     /**

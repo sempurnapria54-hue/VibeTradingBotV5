@@ -14,6 +14,6 @@ create index ix_anomaly_report_standing
     on anomaly_reports (exchange_id, code, severity, instrument_id, subject_external_id, created_at desc);
 
 comment on index ix_anomaly_report_standing is
-    'Ключ дедупа STATE-отчёта и операнд подтверждения гистерезиса: '
+    'Ключ дедупа отчёта-состояния и операнд подтверждения гистерезиса: '
     'объект радиуса + сущность-предмет + code + severity, окно по created_at '
     '(docs/models/domain/other/AnomalyReport.md).';
