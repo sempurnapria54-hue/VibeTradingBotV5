@@ -1224,6 +1224,15 @@ advisory — ратифицированное исключение: замок �
   и отчёт. Дом — `docs/rules/manual-halt.md`, исполнимая форма —
   `docs/spec/manual-halt.json`; состав переходов и предусловий здесь не
   пересказывается.
+  **Половина построена (2026-09-03):** живут операции **снятия** —
+  `trade-unblock` у обоих радиусов и `entry-unblock` у инструмента,
+  с энфорсером предусловия «живого риска не осталось»
+  (`HoldClearanceGate`). **Остаётся постановка** — и вместе с ней имя
+  ступени в вызове: построенный енум двузначен (`HoldRung.SOFT` /
+  `HARD`), проектный `ReactionClass` с третьим значением `FREEZE` в код
+  не вошёл, а `FREEZE` и есть та самая мягкая биржевая ступень из
+  буллета `Exchange.HOLD` выше. Найдено фокусом `divergence` при
+  закрытии шага 7.
 
 #### Хенд-оффы узла Н9 (ручная поверхность safety-остановки)
 
@@ -1243,13 +1252,16 @@ advisory — ратифицированное исключение: замок �
   2026-08-30.** Точечные ручки вне scope фазы 1; значение снято из
   перечней вместе с `Deal.CloseReason.MANUAL_CLOSE` и `MANUAL_CANCEL`
   заявок. Дом решения и условие возврата — `docs/rules/manual-halt.md`
-  §«Точечных ручек в фазе 1 нет». **Остаётся `CODE`-дельта:** снять
-  соответствующие значения енумов в `src/` (`Position.CloseReason`,
-  `Deal.CloseReason`, `Order.CloseReason`, `AlgoOrder.CloseReason`,
-  `AttachedAlgoOrder.CloseReason`) и javadoc payload'ов
-  `ClosePositionCommandPayload` / `CancelOrderCommandPayload` /
-  `CancelAlgoOrderCommandPayload`, где они перечислены. Правка кода идёт
-  `CODE`-фазой шага, а не до неё.
+  §«Точечных ручек в фазе 1 нет». **`CODE`-дельта исполнена 2026-09-03**
+  (фокус `divergence` при закрытии шага 7): из `src/` сняты
+  `Deal.CloseReason.MANUAL_CLOSE`, `Order.CloseReason.MANUAL_CANCEL`,
+  `AlgoOrder.CloseReason.MANUAL_CANCEL` и javadoc-перечисления в
+  `ClosePositionCommandPayload` / `CancelOrderCommandPayload`; у
+  `Position.CloseReason` и `AttachedAlgoOrder.CloseReason` ручных
+  значений не было вовсе. Тем же ходом сняты fallback-значения без
+  производителя — `Deal.EntryReason.MANUAL`/`UNKNOWN`,
+  `Deal.ShutdownReason.MANUAL_STOP`/`UNKNOWN`, `Deal.CloseReason.UNKNOWN`
+  (X1, `docs/rules/writer-named-for-every-value.md`). Пункт закрыт.
 - **X3. Носитель свободного повода держателя** —
   `docs/models/domain/other/AnomalyReport.md`. Поверхность повод не
   сохраняет, требование отличимости закрыто кодом; если носитель

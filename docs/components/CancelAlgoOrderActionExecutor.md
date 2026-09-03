@@ -45,7 +45,7 @@ SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 
 Цель объявляется ключом действия (`targetActionKey`) и резолвится через
 **строку исполнения целевого действия** на текущем эпизоде транша:
-ключ → `DealActionState` → `RuntimeTarget.entityId` → живая отдельная
+ключ → `DealActionState` → `targetEntityId` → живая отдельная
 защита транша. Цели среди живых защит нет — снимать нечего: действие
 неактуально, пакет шага берёт следующее
 (`docs/components/StrategyActionOrchestrator.md` §«Порядок выбора

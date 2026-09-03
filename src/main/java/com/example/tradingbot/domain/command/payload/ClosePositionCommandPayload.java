@@ -16,6 +16,6 @@ public class ClosePositionCommandPayload implements ServiceCommandPayload {
     /** Локальный id закрываемой позиции. */
     Long positionId;
 
-    /** Requested причина закрытия (CLOSED_BY_STRATEGY / KILL_SWITCH / MANUAL_CLOSE). */
+    /** Requested причина закрытия (CLOSED_BY_STRATEGY / KILL_SWITCH). */
     Position.CloseReason requestedCloseReason;
 }

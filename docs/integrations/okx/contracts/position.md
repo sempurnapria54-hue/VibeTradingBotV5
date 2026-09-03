@@ -40,6 +40,12 @@ positions»). При расхождении с офдоком побеждает
   Query (все опц.): `instType`, `instId` (до 10 через запятую),
   `posId` (до 20). В net-режиме на инструмент ожидается одна запись
   с `posSide=net`; в long/short — отдельные `posSide=long`/`short`.
+  **Второе применение того же эндпоинта — срез без сужения по
+  инструменту** (`instType=SWAP`, `instId` не задаётся): его читают
+  обходы, которым нужны живые позиции по МНОЖЕСТВУ инструментов
+  (`docs/components/AnomalyJob.md`). Поштучный запрос там растёт с
+  числом инструментов и выбирает **ту же корзину лимита**, что и
+  торговая петля, — лимит здесь по User ID, а не по инструменту.
 - **Закрыть позицию** (`CLOSE_POSITION_COMMAND`):
   `POST /api/v5/trade/close-position`. Permission `Trade`; rate
   limit 20 req / 2 s по User ID + Instrument ID. Body: `instId`

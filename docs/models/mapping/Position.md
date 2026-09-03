@@ -11,6 +11,7 @@
 | Snapshot field | Domain | Семантика |
 |---|---|---|
 | `externalId` | `Position.externalId` | биржевой id позиции |
+| `externalInstrumentId` | — | биржевое имя инструмента; в домен не переносится (позиция знает инструмент ссылкой), служит адресацией снапшота внутри среза |
 | `externalSize` | `Position.externalSize` | размер по модулю |
 | `direction` | `Position.direction` | `LONG`/`SHORT` (из знака) |
 | `externalAverageEntryPrice` | `Position.externalAverageEntryPrice` | средняя цена входа |
@@ -105,6 +106,7 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 | OKX field | Snapshot field |
 |---|---|
 | `posId` | `externalId` |
+| `instId` | `externalInstrumentId` |
 | `pos` | `abs(pos)` → `externalSize`; знак → `direction` |
 | `avgPx` | `externalAverageEntryPrice` |
 | `markPx` | `externalMarkPrice` |
@@ -114,9 +116,13 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 | `cTime` | `externalCreatedAt` |
 | `uTime` | `externalModifiedAt` |
 
-`instId`, `instType`, `mgnMode`, `posSide`, `lever` — adapter use
+`instType`, `mgnMode`, `posSide`, `lever` — adapter use
 (validation / request constants), в `Position` /
-`PositionExternalSnapshot` не хранятся.
+`PositionExternalSnapshot` не хранятся. **`instId` маппится** — но
+только в снапшот, не в `Position`: у доменной позиции инструмент уже
+известен ссылкой, а снапшот приходит и СРЕЗОМ по множеству инструментов
+(чтение всех живых позиций одним запросом), где адресат каждого не задан
+запросом.
 
 ### OKX response validation (adapter-layer)
 

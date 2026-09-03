@@ -10,7 +10,7 @@
 
 | OKX field | Тип | Семантика |
 |---|---|---|
-| `instId` | string | имя инструмента (для сверки expected) |
+| `instId` | string | имя инструмента: сверка expected **и** адресация снапшота в срезе по множеству инструментов (`externalInstrumentId`) |
 | `instType` | string | тип инструмента (для сверки) |
 | `posId` | string | биржевой id позиции |
 | `pos` | string-decimal | размер со знаком (`+` long, `−` short в net mode) |

@@ -212,9 +212,6 @@ public class Order extends Auditable {
         /** Аварийный safety-flow / kill-switch. */
         KILL_SWITCH,
 
-        /** Ручная отмена пользователем. */
-        MANUAL_CANCEL,
-
         /** Условие создания/ожидания ордера больше неактуально (штатно, не ошибка). */
         CONDITION_EXPIRED,
 

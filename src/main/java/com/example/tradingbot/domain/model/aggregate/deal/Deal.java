@@ -386,14 +386,8 @@ public class Deal extends Auditable {
         /** Создана EntryScannerJob по условиям. */
         STRATEGY,
 
-        /** Создана вручную. */
-        MANUAL,
-
         /** Восстановление существующего runtime risk. */
-        RECOVERY,
-
-        /** Fallback, не для normal flow. */
-        UNKNOWN
+        RECOVERY
     }
 
     /** Причина запуска graceful shutdown / controlled close. Не заменяет closeReason. */
@@ -405,17 +399,11 @@ public class Deal extends Auditable {
         /** Устаревание рыночных данных (только если policy решила завершать сделку). */
         MARKET_DATA_EXPIRED,
 
-        /** Ручная остановка. */
-        MANUAL_STOP,
-
         /** Risk-policy. */
         RISK_POLICY,
 
         /** Exchange hold. */
-        EXCHANGE_HOLD,
-
-        /** Fallback. */
-        UNKNOWN
+        EXCHANGE_HOLD
     }
 
     /**
@@ -513,13 +501,7 @@ public class Deal extends Auditable {
         /** Штатное risk-control завершение (включая risk-block в PRECHECK). */
         RISK_CONTROL,
 
-        /** Ручное закрытие. */
-        MANUAL_CLOSE,
-
         /** Аварийное закрытие (только для EMERGENCY_CLOSED). */
-        EMERGENCY_CLOSE,
-
-        /** Fallback. */
-        UNKNOWN
+        EMERGENCY_CLOSE
     }
 }

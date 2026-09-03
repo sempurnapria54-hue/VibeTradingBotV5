@@ -285,9 +285,6 @@ public class AlgoOrder extends Auditable {
         /** Аварийный safety-flow / kill-switch. */
         KILL_SWITCH,
 
-        /** Ручная отмена. */
-        MANUAL_CANCEL,
-
         /** Не найден после refresh/search/history цикла. */
         MISSING_AFTER_REFRESH,
 
