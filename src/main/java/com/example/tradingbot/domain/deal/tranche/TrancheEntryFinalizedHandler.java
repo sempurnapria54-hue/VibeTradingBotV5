@@ -19,7 +19,9 @@ import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.safety.HoldSignal;
 import com.example.tradingbot.domain.service.market.condition.ConditionEvaluationContext;
+import com.example.tradingbot.util.Constants;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -137,14 +139,26 @@ public class TrancheEntryFinalizedHandler implements TrancheFsmHandler {
         return toManagingIfProtected(dealContext, tranche);
     }
 
-    /** В MANAGING только если live risk покрыт защитой (attached SL входа); иначе ERROR + L3-холд. */
+    /**
+     * В MANAGING только если live risk покрыт защитой (attached SL входа);
+     * иначе ERROR плюс биржевая ступень 2.
+     *
+     * <p>Ступень 2, а не холд инструмента: живой риск без покрытия — не
+     * риск-условие уровня 3, а нарушение инварианта, и его радиус —
+     * биржа (docs/rules/instrument-hold.md §Триггеры,
+     * docs/rules/exchange-hold.md §«Ступень 2 — сворачивание»).
+     * Действующего обязательства покрытия здесь нет по построению: в эту
+     * ветвь приходят, только когда шагов защиты нет вовсе либо ни один не
+     * применим, а незавершённое защитное действие перехватывается
+     * прогрессом выше.
+     */
     private TrancheTransition toManagingIfProtected(DealContext dealContext, DealTranche tranche) {
         Order entry = support.entryOrder(dealContext.getDeal());
         if (nonNull(entry) && isTrue(entry.hasActiveAttachedProtection())) {
             return TrancheTransition.transition(DealTranche.Status.MANAGING);
         }
-        // Live risk без резолвимой защиты = бесстоповая позиция постфактум → L3 (§8.C).
-        return TrancheTransition.escalateToDealError();
+        return TrancheTransition.escalateToDealError(
+                HoldSignal.exchange(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED));
     }
 
     private boolean isActiveStage(DealActionStateStatus status) {

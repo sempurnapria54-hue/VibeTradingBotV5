@@ -244,6 +244,19 @@ public class OkxIntegrationService implements IntegrationService {
     }
 
     @Override
+    public List<PositionExternalSnapshot> getPositions() {
+        OkxApiResponse<PositionOkxResponse> response = execute(
+                () -> okxRestClient.getAllPositions(), "account-positions", "instType=SWAP");
+        verifyCode(response, "account-positions", "instType=SWAP");
+        if (isEmpty(response.getData())) {
+            return List.of();
+        }
+        return response.getData().stream()
+                .map(positionMapper::integrationToSnapshot)
+                .collect(toList());
+    }
+
+    @Override
     public List<PositionCloseResultExternalSnapshot> getPositionCloseRecords(String externalInstrumentId,
                                                                             OffsetDateTime windowBegin) {
         String before = String.valueOf(windowBegin.toInstant().toEpochMilli());

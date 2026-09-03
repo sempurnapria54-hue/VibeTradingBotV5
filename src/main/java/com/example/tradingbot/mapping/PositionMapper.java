@@ -29,6 +29,7 @@ public interface PositionMapper {
     Position persistenceToDomain(PositionEntity entity);
 
     @Mapping(target = "externalId", source = "posId")
+    @Mapping(target = "externalInstrumentId", source = "instId")
     @Mapping(target = "externalSize", source = "pos", qualifiedByName = "okxAbsSize")
     @Mapping(target = "direction", source = "pos", qualifiedByName = "okxDirection")
     @Mapping(target = "externalAverageEntryPrice", source = "avgPx")

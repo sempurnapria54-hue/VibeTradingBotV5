@@ -1,12 +1,12 @@
 package com.example.tradingbot.domain.service.market;
 
+import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketPriceLevel;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import com.example.tradingbot.persistence.service.MarketStructureDataService;
-import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,7 +36,7 @@ public class MarketStructureService {
     /** Требуемый уровень структуры заданного типа (или ошибка, если уровня нет). */
     public MarketPriceLevel getRequiredLevel(MarketStructure structure, MarketPriceLevel.Type levelType) {
         MarketPriceLevel level = structure.findLevel(levelType);
-        if (Objects.isNull(level)) {
+        if (isNull(level)) {
             throw new IllegalStateException("Market price level not found: " + levelType);
         }
         return level;

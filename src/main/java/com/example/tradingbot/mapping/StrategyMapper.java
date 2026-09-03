@@ -230,7 +230,6 @@ public interface StrategyMapper {
     StrategyMarketStructureSettingEntity domainToPersistence(StrategyMarketStructureSetting setting);
 
     @Mapping(target = "steps", source = "stepsByStatus")
-    @Mapping(target = "tranches", source = "tranches")
     StrategyDetailEntity domainToPersistence(StrategyDetail detail);
 
     StrategyStepEntity domainToPersistence(StrategyStep step);
@@ -395,7 +394,6 @@ public interface StrategyMapper {
     StrategyMarketStructureSetting persistenceToDomain(StrategyMarketStructureSettingEntity entity);
 
     @Mapping(target = "stepsByStatus", source = "steps")
-    @Mapping(target = "tranches", source = "tranches")
     StrategyDetail persistenceToDomain(StrategyDetailEntity entity);
 
     StrategyStep persistenceToDomain(StrategyStepEntity entity);

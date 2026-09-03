@@ -9,7 +9,6 @@ import com.example.tradingbot.integration.service.ExternalInvariantViolationExce
 import com.example.tradingbot.util.Constants;
 import com.example.tradingbot.util.OkxParse;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Locale;
@@ -33,11 +32,6 @@ public class OkxResponseConverter {
     /** OKX epoch-ms строка → OffsetDateTime (UTC); empty→null. */
     public OffsetDateTime okxTimeToOffset(String millis) {
         return OkxParse.offsetTime(millis);
-    }
-
-    /** OKX epoch-ms строка → Instant; empty→null. */
-    public Instant okxTimeToInstant(String millis) {
-        return OkxParse.instant(millis);
     }
 
     /** OKX pos → размер по модулю (abs); empty→null. */

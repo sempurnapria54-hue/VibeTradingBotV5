@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.command.risk;
 
+import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
@@ -178,7 +179,7 @@ public class RiskBlockResolver {
     private Boolean liveRiskExists(DealContext dealContext, DealTranche.Status currentStatus) {
         Deal deal = dealContext.getDeal();
         Position position = deal.livePosition();
-        if (Objects.nonNull(position) && isTrue(position.hasLiveRisk())) {
+        if (nonNull(position) && isTrue(position.hasLiveRisk())) {
             return Boolean.TRUE;
         }
         if (LIVE_RISK_STATUSES.contains(currentStatus)) {

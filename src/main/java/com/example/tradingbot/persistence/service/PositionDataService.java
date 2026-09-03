@@ -4,7 +4,6 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.repository.PositionRepository;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,13 +34,6 @@ public class PositionDataService {
         return repository.findByDealIdOrderByExternalCreatedAtAsc(dealId).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(Collectors.toList());
-    }
-
-    /** Живой эпизод сделки либо пусто. */
-    @Transactional(readOnly = true)
-    public Optional<Position> findLiveEpisode(Long dealId) {
-        return repository.findFirstByDealIdAndStatus(dealId, Position.Status.ACTIVE.name())
-                .map(mapper::persistenceToDomain);
     }
 
     @Transactional(readOnly = true)

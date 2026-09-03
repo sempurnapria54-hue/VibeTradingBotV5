@@ -1,5 +1,6 @@
 package com.example.tradingbot.util;
 
+import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import lombok.experimental.UtilityClass;
@@ -40,6 +41,15 @@ public final class Constants {
 
         /** L4-эскалация: kill-switch не подтвердил flat в пределах лимита попыток (остаточный риск, HOLD-Q1). */
         public static final String EXCHANGE_KILL_SWITCH_RESIDUAL = "EXCHANGE_KILL_SWITCH_RESIDUAL";
+
+        /**
+         * Ступень 2: живой риск без покрытия и без действующего
+         * обязательства — сломался наш собственный учёт покрытия, радиус
+         * доверия к нему неизвестен
+         * (docs/rules/live-risk-protection.md §«Реакция на непокрытый
+         * риск», docs/rules/exchange-hold.md §«Ступень 2 — сворачивание»).
+         */
+        public static final String EXCHANGE_LIVE_RISK_UNCOVERED = "EXCHANGE_LIVE_RISK_UNCOVERED";
 
         /** L3: шаг стратегии велел сворачиваться аварийно из-за устаревших рыночных данных. */
         public static final String INSTRUMENT_MARKET_DATA_EXPIRED = "INSTRUMENT_MARKET_DATA_EXPIRED";
@@ -314,6 +324,25 @@ public final class Constants {
 
         /** Контекст округления промежуточных делений BigDecimal в расчётах (precision/HALF_UP). */
         public static final MathContext MATH_CONTEXT = new MathContext(34, RoundingMode.HALF_UP);
+    }
+
+    /** Константы риск-контроля, не назначаемые конфигурацией. */
+    @UtilityClass
+    public class Risk {
+
+        /**
+         * Доля катастрофического потолка, которая обязана остаться
+         * свободной после объявленного нотинала. КОНСТАНТА ПРАВИЛА, а не
+         * число риск-аппетита: выведена из наблюдаемой величины проскока,
+         * поля конфигурации не имеет и отказа при незаданности не даёт
+         * (docs/rules/risk-policy.md §«Нотинал укладывается в потолок с
+         * запасом, а не в границу», docs/spec/strategy-reference.json,
+         * операнд {@code notionalHeadroomShare}).
+         */
+        public static final BigDecimal NOTIONAL_HEADROOM_SHARE = new BigDecimal("0.01");
+
+        /** Полное покрытие защитой в процентах: сумма долей защитного набора шага. */
+        public static final BigDecimal FULL_COVERAGE_PERCENTS = new BigDecimal("100");
     }
 
     /** Константы аудита. */

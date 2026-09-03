@@ -2570,6 +2570,13 @@ Refinements, сознательно отложенные при `CODE` шага 
 - **ClosePosition settle ccy** — `ClosePositionExecutor`/
   `IntegrationService.closePosition`: передавать settle currency в
   close-request (сейчас `null`).
+- **`ExternalStatusReason` — enum вне доменного слоя.** Живёт в
+  `integration.service`, тогда как конвенция объявляет enum'ы только
+  доменными (`.claude/rules/codestyle.md` §«Слои моделей и enum'ы»).
+  Заведён этим шагом (`f2558be`); найдено фокусом `conventions` при
+  закрытии шага 7 (C5), в дельту шага 7 не входит. Перенос затрагивает
+  `ExternalStatusException` и оба резолвера статуса — берётся ближайшим
+  заходом по интеграционному слою.
 - **`ServiceCommandFactory`: REPLACE-оркестрация + CANCEL-резолюция
   цели.** Порядок ног REPLACE по риск-классу (place→факт→cancel для
   protective; cancel→факт→place для entry) и резолюция цели CANCEL по

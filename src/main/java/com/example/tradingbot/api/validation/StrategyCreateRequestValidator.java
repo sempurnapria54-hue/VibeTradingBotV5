@@ -3,6 +3,7 @@ package com.example.tradingbot.api.validation;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.collections4.MapUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
@@ -52,6 +53,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.util.Constants;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
@@ -103,6 +105,18 @@ public class StrategyCreateRequestValidator {
             StrategyConditionRuleType.VOLUME_FILTER_PASSED.name(),
             StrategyConditionRuleType.CANDLE_CLOSED.name(),
             StrategyConditionRuleType.MARKET_STRUCTURE_IS.name());
+
+    /**
+     * Типы условной заявки, образующие ЗАЩИТУ (docs/spec/strategy-reference.json
+     * §{@code isProtectiveAction}). Тейк-профит защитой не является: он не
+     * ограничивает убыток.
+     */
+    private static final Set<String> PROTECTIVE_CONDITION_TYPES = Set.of(
+            AlgoOrder.ConditionType.STOP_LOSS.name(),
+            AlgoOrder.ConditionType.PARTIAL_STOP_LOSS.name(),
+            AlgoOrder.ConditionType.OCO_FULL.name(),
+            AlgoOrder.ConditionType.TRAILING_PERCENTS.name(),
+            AlgoOrder.ConditionType.TRAILING_VALUE.name());
 
     /** Допустимые sourceType операндов в контексте классификации фазы (без MARKET_PHASE и runtime-сделки). */
     private static final Set<String> PHASE_ALLOWED_SOURCE_TYPES = Set.of(
@@ -237,7 +251,283 @@ public class StrategyCreateRequestValidator {
         validatePolicyMatrix(detail, path, violations);
         validateRiskNumbers(detail, path, violations);
         validateTranches(detail, path, violations);
+        validateOverlapRisk(detail, path, violations);
+        validateNotionalHeadroom(detail, path, violations);
+        validateProtectionCoverage(detail, path, violations);
         validateSteps(detail, path, indicatorTypes, structureKeys, violations);
+    }
+
+    /**
+     * Второе статическое неравенство создания: веер детали умещается в её
+     * же потолок одновременного риска —
+     * {@code N_overlap × riskPerActionPercent ≤
+     * strategySimultaneousRiskPerDealPercent}
+     * (docs/rules/strategy-validation.md §«Исключения: неравенства,
+     * проверяемые на создании», исполнимая форма —
+     * docs/spec/strategy-reference.json §{@code overlapRiskSatisfiable}).
+     *
+     * <p>Реджект собственный ({@code ..._UNSATISFIABLE}), а не общий с
+     * первым и третьим: адресует отказ тот конъюнкт, который ложен.
+     * Проверка консервативна — мажорирует сумму произведением, и это
+     * названо домом.
+     *
+     * <p>Незаданные операнды сюда не доезжают решением: их отсутствие уже
+     * отвергнуто своими проверками (риск-числа, {@code levelCount}), и
+     * подстановка умолчания здесь мажорировала бы неравенство в
+     * разрешающую сторону.
+     */
+    private void validateOverlapRisk(StrategyDetailApiModel detail, String path, List<String> violations) {
+        if (isFalse(tradableDetail(detail))) {
+            return;
+        }
+        Integer overlapCount = declaredOverlapCount(detail);
+        BigDecimal perAction = detail.getRiskPerActionPercent();
+        BigDecimal simultaneous = detail.getStrategySimultaneousRiskPerDealPercent();
+        if (isNull(overlapCount) || isNull(perAction) || isNull(simultaneous)) {
+            return;
+        }
+        BigDecimal fan = perAction.multiply(BigDecimal.valueOf(overlapCount));
+        if (fan.compareTo(simultaneous) > 0) {
+            violations.add(path + " STRATEGY_SIMULTANEOUS_RISK_UNSATISFIABLE: веер детали ("
+                    + overlapCount + " × " + perAction + ") выше её максимума одновременного риска "
+                    + simultaneous);
+        }
+    }
+
+    /**
+     * Пятое статическое неравенство создания: объявленный нотинал детали
+     * укладывается в катастрофический потолок С ЗАПАСОМ
+     * (docs/rules/risk-policy.md §«Нотинал укладывается в потолок с
+     * запасом, а не в границу», исполнимая форма —
+     * docs/spec/strategy-reference.json §{@code notionalHeadroomSatisfied}).
+     *
+     * <p>Потолок берётся в долях базы: на создании стратегии база ещё не
+     * наблюдена, а отношение уже вычислимо. Запас — константа правила, не
+     * число конфигурации.
+     */
+    private void validateNotionalHeadroom(StrategyDetailApiModel detail, String path, List<String> violations) {
+        if (isFalse(tradableDetail(detail))) {
+            return;
+        }
+        BigDecimal multiplier = detail.getStrategyCatastrophicRiskPerDealMultiplier();
+        BigDecimal globalSimultaneous = riskAppetite.getGlobalSimultaneousRiskPerDealPercent();
+        BigDecimal declaredShare = declaredNotionalShare(detail);
+        if (isNull(multiplier) || isNull(globalSimultaneous) || isNull(declaredShare)) {
+            return;
+        }
+        BigDecimal ceilingShare = globalSimultaneous
+                .divide(Constants.Risk.FULL_COVERAGE_PERCENTS, Constants.Calc.MATH_CONTEXT)
+                .multiply(multiplier);
+        BigDecimal allowed = ceilingShare.multiply(BigDecimal.ONE.subtract(Constants.Risk.NOTIONAL_HEADROOM_SHARE));
+        if (declaredShare.compareTo(allowed) > 0) {
+            violations.add(path + " STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT: объявленный нотинал детали ("
+                    + declaredShare + " базы) не оставляет запаса под катастрофическим потолком (допустимо "
+                    + allowed + ")");
+        }
+    }
+
+    /**
+     * Четвёртое статическое неравенство создания: покрытие защитой после
+     * шага не опускается ниже ста процентов
+     * (docs/rules/live-risk-protection.md, исполнимые формы —
+     * docs/spec/strategy-reference.json §{@code protectionCoverageComplete}
+     * и §{@code partialStepsReturningLess}).
+     *
+     * <p>Два класса нарушения, реджект один — покрытие после шага ниже
+     * ста: шаг, объявивший ПОЛНЫЙ набор, обязан дать ровно сто (сумма
+     * выше ста — не усиленная защита, а невыполнимое объявление); шаг,
+     * забирающий ЧАСТЬ, обязан вернуть не меньше забранного.
+     */
+    private void validateProtectionCoverage(StrategyDetailApiModel detail, String path, List<String> violations) {
+        if (isFalse(tradableDetail(detail))) {
+            return;
+        }
+        Map<String, StrategyActionApiModel> actionsByKey = actionsByKey(detail);
+        for (StrategyTrancheApiModel tranche : emptyIfNull(detail.getTranches())) {
+            for (Map.Entry<String, List<StrategyStepApiModel>> entry
+                    : emptyIfNull(tranche.getStepsByStatus()).entrySet()) {
+                validateStepCoverage(entry.getValue(), path + ".tranches[" + tranche.getKey() + "]."
+                        + entry.getKey(), actionsByKey, violations);
+            }
+        }
+    }
+
+    private void validateStepCoverage(List<StrategyStepApiModel> steps, String path,
+                                      Map<String, StrategyActionApiModel> actionsByKey, List<String> violations) {
+        List<StrategyStepApiModel> declaredSteps = List.copyOf(emptyIfNull(steps));
+        for (int index = 0; index < declaredSteps.size(); index++) {
+            StrategyStepApiModel step = declaredSteps.get(index);
+            String stepPath = path + "[" + index + "]";
+            BigDecimal declared = protectiveCoverage(step);
+            BigDecimal replaced = replacedCoverage(step, actionsByKey);
+            if (isTrue(declaresFullProtectionSet(step, replaced))) {
+                if (declared.compareTo(Constants.Risk.FULL_COVERAGE_PERCENTS) != 0) {
+                    violations.add(stepPath + " STRATEGY_PROTECTION_COVERAGE_INCOMPLETE: "
+                            + "шаг полного набора защиты объявляет " + declared + " % вместо ста");
+                }
+                continue;
+            }
+            if (declared.compareTo(replaced) < 0) {
+                violations.add(stepPath + " STRATEGY_PROTECTION_COVERAGE_INCOMPLETE: "
+                        + "шаг забирает " + replaced + " % действующего покрытия и возвращает " + declared + " %");
+            }
+        }
+    }
+
+    /**
+     * Полный набор: первичная постановка защиты либо шаг, адресующий ВСЁ
+     * действующее покрытие — снятием, замещением или их смесью.
+     */
+    private Boolean declaresFullProtectionSet(StrategyStepApiModel step, BigDecimal replacedCoverage) {
+        return Objects.equals(step.getStepType(), StrategyStepType.MAIN_PROTECTION.name())
+                || replacedCoverage.compareTo(Constants.Risk.FULL_COVERAGE_PERCENTS) >= 0;
+    }
+
+    /** Сумма долей защитных CREATE и REPLACE шага. */
+    private BigDecimal protectiveCoverage(StrategyStepApiModel step) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (StrategyActionApiModel action : emptyIfNull(step.getActions())) {
+            if (isFalse(protectiveAction(action)) || isFalse(coverageSettingAction(action))) {
+                continue;
+            }
+            BigDecimal fraction = ((StrategyAlgoOrderActionApiModel) action).getCloseFractionPercents();
+            sum = sum.add(nonNull(fraction) ? fraction : BigDecimal.ZERO);
+        }
+        return sum;
+    }
+
+    /**
+     * Сколько действующего покрытия шаг адресует своими REPLACE и CANCEL.
+     * Отбор — по ФОРМЕ действия, а доля читается у ЦЕЛИ: собственный
+     * {@code conditionType} снимающего действия есть денормализованная
+     * копия типа цели, и решение на копии стоять не может. Цель не
+     * разрешена — действие считается адресующим ВСЁ покрытие:
+     * неизвестность не выводит шаг из-под проверки.
+     */
+    private BigDecimal replacedCoverage(StrategyStepApiModel step,
+                                        Map<String, StrategyActionApiModel> actionsByKey) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (StrategyActionApiModel action : emptyIfNull(step.getActions())) {
+            if (isFalse(action instanceof StrategyAlgoOrderActionApiModel)
+                    || isFalse(coverageTakingAction(action))) {
+                continue;
+            }
+            sum = sum.add(targetCoverage(action.getTargetActionKey(), actionsByKey));
+        }
+        return sum;
+    }
+
+    /** Доля покрытия цели: цель не защита — ноль; цель не разрешена — всё. */
+    private BigDecimal targetCoverage(String targetActionKey, Map<String, StrategyActionApiModel> actionsByKey) {
+        StrategyActionApiModel target = isNull(targetActionKey) ? null : actionsByKey.get(targetActionKey);
+        if (isNull(target)) {
+            return Constants.Risk.FULL_COVERAGE_PERCENTS;
+        }
+        if (isFalse(protectiveAction(target))) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal fraction = ((StrategyAlgoOrderActionApiModel) target).getCloseFractionPercents();
+        return nonNull(fraction) ? fraction : Constants.Risk.FULL_COVERAGE_PERCENTS;
+    }
+
+    /** Действие ставит покрытие: создание либо замещение. */
+    private Boolean coverageSettingAction(StrategyActionApiModel action) {
+        return Objects.equals(action.getActionType(), StrategyActionType.CREATE_ACTION.name())
+                || Objects.equals(action.getActionType(), StrategyActionType.REPLACE_ACTION.name());
+    }
+
+    /** Действие забирает покрытие: замещение либо снятие. */
+    private Boolean coverageTakingAction(StrategyActionApiModel action) {
+        return Objects.equals(action.getActionType(), StrategyActionType.REPLACE_ACTION.name())
+                || Objects.equals(action.getActionType(), StrategyActionType.CANCEL_ACTION.name());
+    }
+
+    /** Защитное действие: условная заявка типа из множества защит. */
+    private Boolean protectiveAction(StrategyActionApiModel action) {
+        return action instanceof StrategyAlgoOrderActionApiModel algo
+                && PROTECTIVE_CONDITION_TYPES.contains(algo.getConditionType());
+    }
+
+    /** Действие занимает нотинал: входной ордер обеих форм. */
+    private Boolean entryOrderAction(StrategyOrderActionApiModel action) {
+        return Objects.equals(action.getOrderType(), Order.Type.ENTRY.name())
+                || Objects.equals(action.getOrderType(), Order.Type.ENTRY_ATTACHED_STOP_LOSS.name());
+    }
+
+    /** Все действия детали по ключу — вход резолва цели замещения и снятия. */
+    private Map<String, StrategyActionApiModel> actionsByKey(StrategyDetailApiModel detail) {
+        Map<String, StrategyActionApiModel> byKey = new HashMap<>();
+        for (StrategyTrancheApiModel tranche : emptyIfNull(detail.getTranches())) {
+            emptyIfNull(tranche.getStepsByStatus()).values().forEach(steps -> collectActions(steps, byKey));
+        }
+        emptyIfNull(detail.getStepsByStatus()).values().forEach(steps -> collectActions(steps, byKey));
+        return byKey;
+    }
+
+    private void collectActions(List<StrategyStepApiModel> steps, Map<String, StrategyActionApiModel> byKey) {
+        for (StrategyStepApiModel step : emptyIfNull(steps)) {
+            for (StrategyActionApiModel action : emptyIfNull(step.getActions())) {
+                if (nonNull(action.getKey())) {
+                    byKey.put(action.getKey(), action);
+                }
+            }
+        }
+    }
+
+    /**
+     * {@code N_overlap} детали — сумма {@code levelCount} по её
+     * объявлениям; {@code null}, если хоть одно объявление числа не
+     * назвало (умолчания у него нет, и подстановка мажорировала бы
+     * неравенство в разрешающую сторону).
+     */
+    private Integer declaredOverlapCount(StrategyDetailApiModel detail) {
+        int sum = 0;
+        for (StrategyTrancheApiModel tranche : emptyIfNull(detail.getTranches())) {
+            if (isNull(tranche.getLevelCount())) {
+                return null;
+            }
+            sum += tranche.getLevelCount();
+        }
+        return sum;
+    }
+
+    /**
+     * Нотинал детали в долях базы: сумма по одновременно живым траншам —
+     * доля аллокации входного действия транша, умноженная на его
+     * {@code levelCount}. {@code null} — операнд не объявлен (его
+     * отсутствие отвергается своей проверкой, подстановка нуля читала бы
+     * «уровень не занял ничего»).
+     */
+    private BigDecimal declaredNotionalShare(StrategyDetailApiModel detail) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (StrategyTrancheApiModel tranche : emptyIfNull(detail.getTranches())) {
+            BigDecimal trancheShare = trancheNotionalShare(tranche);
+            if (isNull(trancheShare) || isNull(tranche.getLevelCount())) {
+                return null;
+            }
+            sum = sum.add(trancheShare.multiply(BigDecimal.valueOf(tranche.getLevelCount())));
+        }
+        return sum;
+    }
+
+    private BigDecimal trancheNotionalShare(StrategyTrancheApiModel tranche) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (List<StrategyStepApiModel> steps : emptyIfNull(tranche.getStepsByStatus()).values()) {
+            for (StrategyStepApiModel step : emptyIfNull(steps)) {
+                for (StrategyActionApiModel action : emptyIfNull(step.getActions())) {
+                    if (isFalse(action instanceof StrategyOrderActionApiModel order && entryOrderAction(order))) {
+                        continue;
+                    }
+                    BigDecimal allocation = ((StrategyOrderActionApiModel) action).getAllocationPercents();
+                    if (isNull(allocation)) {
+                        return null;
+                    }
+                    sum = sum.add(allocation.divide(Constants.Risk.FULL_COVERAGE_PERCENTS,
+                            Constants.Calc.MATH_CONTEXT));
+                }
+            }
+        }
+        return sum;
     }
 
     /**
@@ -905,9 +1195,7 @@ public class StrategyCreateRequestValidator {
      */
     private void validateEntryAllocationDeclared(StrategyOrderActionApiModel action, String path,
                                                  List<String> violations) {
-        boolean entry = Objects.equals(action.getOrderType(), Order.Type.ENTRY.name())
-                || Objects.equals(action.getOrderType(), Order.Type.ENTRY_ATTACHED_STOP_LOSS.name());
-        if (entry && isNull(action.getAllocationPercents())) {
+        if (isTrue(entryOrderAction(action)) && isNull(action.getAllocationPercents())) {
             violations.add(path + ".allocationPercents STRATEGY_ACTION_ALLOCATION_NOT_DECLARED: "
                     + "входное действие обязано объявить долю аллокации");
         }

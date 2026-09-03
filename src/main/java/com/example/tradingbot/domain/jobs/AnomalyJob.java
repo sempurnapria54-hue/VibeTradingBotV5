@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.jobs;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -15,6 +16,8 @@ import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -86,9 +89,14 @@ public class AnomalyJob {
      * учёт уже существующего.
      */
     private void run() {
+        // Живые позиции читаются ОДНИМ запросом на тик: поштучное чтение
+        // росло с числом инструментов и упиралось в лимит частоты
+        // источника — общий с торговой петлёй
+        // (docs/integrations/okx/contracts/position.md).
+        Map<String, PositionExternalSnapshot> livePositions = livePositionsByInstrument();
         for (Instrument instrument : instrumentDataService.findByStatus(Instrument.Status.ACTIVE)) {
             try {
-                detectUnexplainedPosition(instrument);
+                detectUnexplainedPosition(instrument, livePositions.get(instrument.getExternalId()));
             } catch (RuntimeException e) {
                 log.error("Anomaly detection failed instrumentId={}", instrument.getId(), e);
             }
@@ -96,15 +104,31 @@ public class AnomalyJob {
     }
 
     /**
+     * Срез живых позиций счёта по внешнему идентификатору инструмента.
+     * Больше одной живой позиции на инструмент модель не допускает
+     * (docs/components/AnomalyJob.md §«Что ищет»); если источник вернул
+     * несколько, берётся первая, а расхождение остаётся предметом своего
+     * детектора — здесь оно не гасится молча.
+     */
+    private Map<String, PositionExternalSnapshot> livePositionsByInstrument() {
+        Map<String, PositionExternalSnapshot> byInstrument = new HashMap<>();
+        for (PositionExternalSnapshot snapshot : emptyIfNull(integrationService.getPositions())) {
+            if (nonNull(snapshot.getExternalInstrumentId())) {
+                byInstrument.putIfAbsent(snapshot.getExternalInstrumentId(), snapshot);
+            }
+        }
+        return byInstrument;
+    }
+
+    /**
      * Активная позиция без сделки, объясняющей её появление. Определение
      * обнаруженного и есть защитная проверка отсутствия активной сделки:
      * позицию, которую сделка объясняет, восстанавливать не надо.
      */
-    private void detectUnexplainedPosition(Instrument instrument) {
+    private void detectUnexplainedPosition(Instrument instrument, PositionExternalSnapshot snapshot) {
         if (isTrue(dealDataService.existsActiveByInstrumentId(instrument.getId()))) {
             return;
         }
-        PositionExternalSnapshot snapshot = integrationService.getPosition(instrument.getExternalId());
         if (isFalse(carriesLiveRisk(snapshot))) {
             return;
         }

@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.model.trade.market_structure;
 
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
 import com.example.tradingbot.domain.model.Auditable;
@@ -65,7 +66,7 @@ public class MarketStructure extends Auditable {
 
     /** Есть подтверждённый пробой в окне расчёта. */
     public Boolean hasConfirmedBreakout() {
-        return Objects.nonNull(breakoutEvent);
+        return nonNull(breakoutEvent);
     }
 
     /** Первый уровень заданного типа или null (резолв уровня для placement/SL). */

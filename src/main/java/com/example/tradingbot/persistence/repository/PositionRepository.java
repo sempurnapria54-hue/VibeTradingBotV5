@@ -2,7 +2,6 @@ package com.example.tradingbot.persistence.repository;
 
 import com.example.tradingbot.persistence.model.position.PositionEntity;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PositionRepository extends JpaRepository<PositionEntity, Long> {
@@ -13,7 +12,4 @@ public interface PositionRepository extends JpaRepository<PositionEntity, Long> 
      * позиция схлопывалась и открывалась заново.
      */
     List<PositionEntity> findByDealIdOrderByExternalCreatedAtAsc(Long dealId);
-
-    /** Живой эпизод сделки — по инварианту он не более одного. */
-    Optional<PositionEntity> findFirstByDealIdAndStatus(Long dealId, String status);
 }

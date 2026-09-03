@@ -71,6 +71,16 @@ public class TrancheTransition {
         return TrancheTransition.builder().escalateDealToError(true).build();
     }
 
+    /**
+     * То же, но с ЗАТРЕБОВАННОЙ ступенью лестницы: увод сделки в ошибку
+     * снимает риск одной сделки, а ступень — реакция на нарушение
+     * инварианта, радиус которой шире сделки. Поднимает ступень сделочный
+     * проход, как и статус (docs/components/DealOrchestratorJob.md).
+     */
+    public static TrancheTransition escalateToDealError(HoldSignal holdSignal) {
+        return TrancheTransition.builder().escalateDealToError(true).holdSignal(holdSignal).build();
+    }
+
     /** Перейти в статус транша (выходная проверка пройдена), без команды. */
     public static TrancheTransition transition(DealTranche.Status nextStatus) {
         return TrancheTransition.builder().nextStatus(nextStatus).build();

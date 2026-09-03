@@ -22,6 +22,7 @@ import com.example.tradingbot.domain.deal.DealStateMachine;
 import com.example.tradingbot.domain.deal.DealTransition;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.safety.HoldService;
+import com.example.tradingbot.domain.safety.HoldSignal;
 import com.example.tradingbot.persistence.service.DealDataService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -129,6 +130,11 @@ public class DealOrchestratorJob {
             executeCommands(transition.getCommands(), dealContext);
             if (isTrue(transition.getEscalateDealToError())) {
                 moveToErrorSafely(dealContext.getDeal());
+                // Ступень, ЗАТРЕБОВАННАЯ траншем, поднимается здесь: увод в
+                // ошибку снимает риск одной сделки, а радиус нарушенного
+                // инварианта шире её (docs/rules/live-risk-protection.md
+                // §«Реакция на непокрытый риск»).
+                raiseHoldSignal(transition.getHoldSignal(), dealContext);
                 return;
             }
             applyTrancheTransition(dealContext, tranche, transition);
@@ -236,8 +242,13 @@ public class DealOrchestratorJob {
      * решает общий исполнитель блокировки, а не этот проход.
      */
     private void reactToHoldSignal(DealTransition transition, DealContext dealContext) {
-        if (nonNull(transition.getHoldSignal())) {
-            holdService.raise(transition.getHoldSignal(), dealContext);
+        raiseHoldSignal(transition.getHoldSignal(), dealContext);
+    }
+
+    /** Общая точка подъёма затребованной ступени — оба уровня прохода. */
+    private void raiseHoldSignal(HoldSignal holdSignal, DealContext dealContext) {
+        if (nonNull(holdSignal)) {
+            holdService.raise(holdSignal, dealContext);
         }
     }
 

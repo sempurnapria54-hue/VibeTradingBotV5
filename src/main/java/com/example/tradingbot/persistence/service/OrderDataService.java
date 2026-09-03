@@ -73,16 +73,6 @@ public class OrderDataService {
                 .orElseThrow(() -> new IllegalArgumentException("AttachedAlgoOrder not found: " + id)));
     }
 
-    /**
-     * Родительская заявка встроенной защиты — источник инструмента для
-     * снятия. Тянем проекцию ссылки, а не строку защиты целиком.
-     */
-    @Transactional(readOnly = true)
-    public Long getRequiredOrderIdByAttachedId(Long id) {
-        return attachedAlgoOrderRepository.findOrderIdById(id)
-                .orElseThrow(() -> new IllegalArgumentException("AttachedAlgoOrder not found: " + id));
-    }
-
     @Transactional
     public AttachedAlgoOrder saveAttached(AttachedAlgoOrder attached) {
         AttachedAlgoOrderEntity entity = mapper.domainToPersistence(attached);

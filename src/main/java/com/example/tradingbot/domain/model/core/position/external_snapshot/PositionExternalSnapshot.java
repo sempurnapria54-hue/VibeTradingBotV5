@@ -20,6 +20,13 @@ public class PositionExternalSnapshot {
     /** Биржевой id позиции (OKX posId). */
     String externalId;
 
+    /**
+     * Биржевое имя инструмента позиции (OKX instId). Нужно там, где
+     * снапшоты приходят СРЕЗОМ по множеству инструментов и адресат
+     * каждого не задан запросом.
+     */
+    String externalInstrumentId;
+
     /** Направление по знаку pos (LONG/SHORT); 0 — не определено. */
     Position.Direction direction;
 

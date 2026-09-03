@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,8 +72,8 @@ class AnomalyJobRecoveryTest {
     @DisplayName("Живая позиция без активной сделки заводит сделку восстановительной тропой")
     void unexplainedPositionTriggersRecovery() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
-        when(integrationService.getPosition(EXTERNAL_ID)).thenReturn(snapshot(Position.Direction.LONG,
-                BigDecimal.valueOf(3)));
+        when(integrationService.getPositions()).thenReturn(List.of(snapshot(Position.Direction.LONG,
+                BigDecimal.valueOf(3))));
 
         job.tick();
 
@@ -83,10 +84,11 @@ class AnomalyJobRecoveryTest {
     @DisplayName("Позицию, которую объясняет активная сделка, восстанавливать не надо")
     void explainedPositionIsNotRecovered() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.TRUE);
+        when(integrationService.getPositions()).thenReturn(List.of(snapshot(Position.Direction.LONG,
+                BigDecimal.valueOf(3))));
 
         job.tick();
 
-        verify(integrationService, never()).getPosition(any());
         verify(dealOpeningService, never()).recoverDeal(any(), any(), any());
     }
 
@@ -94,7 +96,7 @@ class AnomalyJobRecoveryTest {
     @DisplayName("Позиции на бирже нет — восстанавливать нечего")
     void absentPositionIsNotRecovered() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
-        when(integrationService.getPosition(EXTERNAL_ID)).thenReturn(null);
+        when(integrationService.getPositions()).thenReturn(List.of());
 
         job.tick();
 
@@ -105,8 +107,8 @@ class AnomalyJobRecoveryTest {
     @DisplayName("Нулевой размер живым риском не считается")
     void zeroSizedPositionIsNotRecovered() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
-        when(integrationService.getPosition(EXTERNAL_ID)).thenReturn(snapshot(Position.Direction.LONG,
-                BigDecimal.ZERO));
+        when(integrationService.getPositions()).thenReturn(List.of(snapshot(Position.Direction.LONG,
+                BigDecimal.ZERO)));
 
         job.tick();
 
@@ -117,7 +119,7 @@ class AnomalyJobRecoveryTest {
     @DisplayName("Неопределённое направление сделку не заводит: подставлять сторону нечем")
     void undeterminedDirectionIsNotRecovered() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
-        when(integrationService.getPosition(EXTERNAL_ID)).thenReturn(snapshot(null, BigDecimal.valueOf(3)));
+        when(integrationService.getPositions()).thenReturn(List.of(snapshot(null, BigDecimal.valueOf(3))));
 
         job.tick();
 
@@ -134,7 +136,20 @@ class AnomalyJobRecoveryTest {
 
         offJob.tick();
 
-        verify(integrationService, never()).getPosition(any());
+        verify(integrationService, never()).getPositions();
+    }
+
+    @Test
+    @DisplayName("Срез позиций читается ОДНИМ запросом на тик, сколько бы ни было инструментов")
+    void positionsAreReadInOneRequestPerTick() {
+        when(instrumentDataService.findByStatus(any()))
+                .thenReturn(List.of(instrument(), instrument(), instrument()));
+        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
+        when(integrationService.getPositions()).thenReturn(List.of());
+
+        job.tick();
+
+        verify(integrationService, times(1)).getPositions();
     }
 
     private Instrument instrument() {
@@ -148,6 +163,7 @@ class AnomalyJobRecoveryTest {
     private PositionExternalSnapshot snapshot(Position.Direction direction, BigDecimal size) {
         return PositionExternalSnapshot.builder()
                 .externalId("pos-1")
+                .externalInstrumentId(EXTERNAL_ID)
                 .direction(direction)
                 .externalSize(size)
                 .externalCreatedAt(OPENED_AT)

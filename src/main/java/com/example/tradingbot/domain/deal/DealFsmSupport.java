@@ -24,7 +24,6 @@ import com.example.tradingbot.domain.command.payload.RefreshAlgoOrderCommandPayl
 import com.example.tradingbot.domain.command.payload.RefreshBalanceCommandPayload;
 import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.command.risk.RiskBlockAction;
-import com.example.tradingbot.domain.command.risk.RiskCheckResult;
 import com.example.tradingbot.domain.deal.action.StrategyStepEligibility;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
@@ -447,20 +446,6 @@ public class DealFsmSupport {
      */
     public DealTransition markError(DealContext dealContext) {
         return buildMarkError(dealContext, controlledViolationHold(dealContext));
-    }
-
-    /**
-     * Как {@link #markError}, но при отсутствии controlled-violation поднимает
-     * L3-холд инструмента: бесстоповая risk-creating позиция постфактум
-     * (§8.C — уровень 3, docs/rules/instrument-hold.md). Controlled-violation,
-     * если он есть, доминирует (L4).
-     */
-    public DealTransition markErrorStopless(DealContext dealContext) {
-        HoldSignal controlled = controlledViolationHold(dealContext);
-        HoldSignal hold = nonNull(controlled)
-                ? controlled
-                : HoldSignal.instrument(RiskCheckResult.RiskCheckCode.RISK_CREATING_ENTRY_WITHOUT_STOP.name());
-        return buildMarkError(dealContext, hold);
     }
 
     private DealTransition buildMarkError(DealContext dealContext, HoldSignal holdSignal) {

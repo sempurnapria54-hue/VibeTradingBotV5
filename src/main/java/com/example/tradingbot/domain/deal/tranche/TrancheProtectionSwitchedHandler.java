@@ -10,6 +10,8 @@ import com.example.tradingbot.domain.deal.TrancheFsmHandler;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.safety.HoldSignal;
+import com.example.tradingbot.util.Constants;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -42,9 +44,13 @@ public class TrancheProtectionSwitchedHandler implements TrancheFsmHandler {
             return Optional.of(TrancheTransition.transition(DealTranche.Status.EXIT_PENDING));
         }
         if (isEmpty(support.liveAlgoOrders(deal))) {
-            // Позиция с live risk, но main protection не подтверждена live — защита потеряна
-            // → бесстоповая позиция постфактум → L3-холд инструмента (§8.C).
-            return Optional.of(TrancheTransition.escalateToDealError());
+            // Позиция с live risk, но main protection не подтверждена live —
+            // защита потеряна. Живой риск без покрытия и без действующего
+            // обязательства (статус достигается только по SUBMITTED-строке
+            // защитного действия) → биржевая ступень 2
+            // (docs/rules/live-risk-protection.md §«Реакция на непокрытый риск»).
+            return Optional.of(TrancheTransition.escalateToDealError(
+                    HoldSignal.exchange(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED)));
         }
         return Optional.empty();
     }

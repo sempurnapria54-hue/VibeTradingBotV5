@@ -242,6 +242,16 @@ public class OkxRestClient {
     }
 
     /**
+     * Все позиции аккаунта контура одним запросом — сужение только по
+     * типу инструмента. Приватный endpoint (подпись).
+     */
+    public OkxApiResponse<PositionOkxResponse> getAllPositions() {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(Constants.Okx.PARAM_INST_TYPE, Constants.Okx.INST_TYPE_SWAP);
+        return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_POSITIONS_PATH, query, null, true, POSITION_TYPE);
+    }
+
+    /**
      * История закрытых позиций инструмента. Окно снизу — по времени
      * обновления записи ({@code before}); сверху не задаётся. Фильтр по
      * идентификатору позиции не ставится: источник его переиспользует и

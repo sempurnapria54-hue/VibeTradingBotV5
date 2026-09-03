@@ -143,17 +143,6 @@ public class StrategyDetail extends Auditable {
     }
 
     /**
-     * Сколько траншей материализуется по объявлениям детали — сумма
-     * {@code levelCount} всех объявлений. Операнд статического запаса
-     * {@code N_overlap} (docs/rules/risk-policy.md).
-     */
-    public Integer declaredTrancheCount() {
-        return emptyIfNull(tranches).stream()
-                .map(StrategyTranche::materializedCount)
-                .reduce(0, Integer::sum);
-    }
-
-    /**
      * Действие детали по стабильному ключу — резолв цели, объявленной
      * действием {@code REPLACE_ACTION}/{@code CANCEL_ACTION}
      * ({@code targetActionKey}). Ключ уникален в рамках детали, поэтому
