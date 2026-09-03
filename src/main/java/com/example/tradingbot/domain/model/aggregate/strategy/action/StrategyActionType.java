@@ -1,28 +1,41 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.action;
 
 /**
- * Общий тип действия стратегии. Допустимые значения по подтипам:
- * ORDER/ALGO_ORDER — CREATE/REPLACE/CANCEL. Полного закрытия позиции как
- * действия нет: выход из позиции выражается условием-перехода
- * MANAGING → EXIT_PENDING (docs/processes/fsm-execution-layering.md),
- * market-close ведёт ExitPendingHandler; частичное уменьшение — через
- * reduce-only Order/AlgoOrder (инвариант docs/rules/no-partial-close.md).
- * Enforcement семантики действий отложен до шагов 4/7 / activate
- * (docs/decisions/strategy-materialization-and-validation.md). См.
- * docs/models/domain/aggregate/Strategy.md (§Действия).
+ * Общий тип действия стратегии. Допустимые значения по видам:
+ * заявка и условная заявка — {@code CREATE_ACTION} / {@code REPLACE_ACTION}
+ * / {@code CANCEL_ACTION}; позиция — только {@code EXIT_ACTION}.
+ *
+ * <p><b>Маркер уровня — суффикс {@code _ACTION}</b>, а не уникальные
+ * основы: действие стратегии есть уровень абстракции НАД командой
+ * ({@code ServiceCommandType.CREATE_ORDER} и соседние), и уровень
+ * читается по хвосту имени в любом значении
+ * (.claude/rules/naming.md §«Разведение уровней абстракции»).
+ *
+ * <p>Частичное уменьшение позиции действием не выражается — только
+ * reduce-only заявкой (docs/rules/no-partial-close.md); полное закрытие
+ * выражается либо условием-переходом, либо явным {@code EXIT_ACTION}
+ * шага {@code EXIT} (docs/rules/no-partial-close.md §«Формы полного
+ * выхода»). См. docs/models/domain/aggregate/Strategy.md (§Действия).
  */
 public enum StrategyActionType {
 
     /** Создать runtime-сущность. */
-    CREATE,
+    CREATE_ACTION,
 
     /**
      * Ремоделировать runtime-сущность, созданную target-действием:
      * заместить новой сущностью + отменить старую (AMEND из домена
      * убран; docs/rules/replace-not-amend.md).
      */
-    REPLACE,
+    REPLACE_ACTION,
 
     /** Отменить runtime-сущность, созданную target-действием. */
-    CANCEL
+    CANCEL_ACTION,
+
+    /**
+     * Выйти: снять живые входные ноги своей области и закрыть экспозицию.
+     * Область задаёт уровень объявления — транш либо вся сделка
+     * (docs/components/ExitActionExecutor.md).
+     */
+    EXIT_ACTION
 }

@@ -78,7 +78,10 @@ public class MarkDealClosedExecutor implements CommandExecutor {
             deal.setResultProfitCurrency(settleCurrency);
         }
         if (isNull(deal.getCloseReason())) {
-            deal.setCloseReason(Deal.CloseReason.STRATEGY_EXIT);
+            // Причина берётся СТАРШИНСТВОМ причин траншей, а не умолчанием:
+            // подставленный STRATEGY_EXIT объявлял бы штатным выходом и то
+            // закрытие, которого стратегия не запрашивала.
+            deal.setCloseReason(deal.closeReasonBySeniority());
         }
         deal.setStatus(Deal.Status.CLOSED);
         dealDataService.save(deal);

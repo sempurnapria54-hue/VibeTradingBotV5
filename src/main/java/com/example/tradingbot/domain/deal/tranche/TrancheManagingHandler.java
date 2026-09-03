@@ -84,7 +84,7 @@ public class TrancheManagingHandler implements TrancheFsmHandler {
     }
 
     private List<StrategyStep> managingSteps(DealContext dealContext, DealTranche tranche) {
-        return support.stepsOfType(support.stepsFor(dealContext, DealTranche.Status.MANAGING),
+        return support.stepsOfType(support.stepsFor(dealContext, tranche),
                 StrategyStepType.PROTECTION_ADJUSTMENT, StrategyStepType.PARTIAL_EXIT,
                 StrategyStepType.GRID_MANAGEMENT, StrategyStepType.EXIT);
     }

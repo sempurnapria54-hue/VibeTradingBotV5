@@ -131,8 +131,6 @@ public final class Constants {
         /** Путь выставления плеча инструмента (POST). Приватный endpoint. */
         public static final String ACCOUNT_SET_LEVERAGE_PATH = "/api/v5/account/set-leverage";
 
-        /** Путь исполнений (fills, последние 3 дня, GET). Приватный endpoint. */
-        public static final String TRADE_FILLS_PATH = "/api/v5/trade/fills";
 
         /** Путь bill-записей движений счёта (7 дней, GET). Приватный endpoint. */
         public static final String ACCOUNT_BILLS_PATH = "/api/v5/account/bills";
@@ -140,8 +138,6 @@ public final class Constants {
         /** Путь архива bill-записей (3 месяца, GET). Приватный endpoint. */
         public static final String ACCOUNT_BILLS_ARCHIVE_PATH = "/api/v5/account/bills-archive";
 
-        /** Путь истории исполнений (fills, последние 3 месяца, GET). Приватный endpoint. */
-        public static final String TRADE_FILLS_HISTORY_PATH = "/api/v5/trade/fills-history";
 
         /** Путь live/pending ordinary orders (GET). Звено order evidence-cycle. */
         public static final String TRADE_ORDERS_PENDING_PATH = "/api/v5/trade/orders-pending";

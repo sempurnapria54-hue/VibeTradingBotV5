@@ -2,6 +2,7 @@ package com.example.tradingbot.api.controller;
 
 import com.example.tradingbot.domain.jobs.facade.CandleJobFacade;
 import com.example.tradingbot.domain.jobs.facade.DealOrchestratorJobFacade;
+import com.example.tradingbot.domain.jobs.facade.AnomalyJobFacade;
 import com.example.tradingbot.domain.jobs.facade.EntryScannerJobFacade;
 import com.example.tradingbot.domain.jobs.facade.IndicatorJobFacade;
 import com.example.tradingbot.domain.jobs.facade.MarketStructureJobFacade;
@@ -33,6 +34,7 @@ public class JobController {
     private final MarketStructureJobFacade marketStructureJobFacade;
     private final EntryScannerJobFacade entryScannerJobFacade;
     private final DealOrchestratorJobFacade dealOrchestratorJobFacade;
+    private final AnomalyJobFacade anomalyJobFacade;
 
     @PostMapping("/candle-loading/trigger")
     @Operation(summary = "Запустить загрузку свечей вне расписания (асинхронно)")
@@ -66,6 +68,13 @@ public class JobController {
     @Operation(summary = "Запустить проход сопровождения сделок вне расписания (асинхронно)")
     public ResponseEntity<Void> triggerDealOrchestrator() {
         dealOrchestratorJobFacade.trigger();
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/anomaly/trigger")
+    @Operation(summary = "Запустить детектор аномалий вне расписания (асинхронно)")
+    public ResponseEntity<Void> triggerAnomalyDetection() {
+        anomalyJobFacade.trigger();
         return ResponseEntity.accepted().build();
     }
 }

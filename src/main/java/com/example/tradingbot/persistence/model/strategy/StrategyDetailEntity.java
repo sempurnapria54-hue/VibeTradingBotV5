@@ -21,8 +21,11 @@ import lombok.Setter;
 
 /**
  * Persistence-проекция {@link StrategyDetail} (таблица
- * strategy_details) — каркасный реляционный узел. Шаги — дочерние строки
- * strategy_steps (cascade ALL); индикаторы/структуры детали объявлены на
+ * strategy_details) — каркасный реляционный узел. Объявления траншей —
+ * дочерние строки strategy_tranches (cascade ALL), и потраншевые шаги
+ * висят на них; собственные дочерние строки strategy_steps у детали —
+ * только узкая агрегатная поверхность (EXIT / FAIL_SAFE).
+ * Индикаторы/структуры детали объявлены на
  * стратегии (strategy-scope, трек D) и адресуются по key, своих
  * JSONB-настроек деталь не несёт. Реальная схема (UNIQUE(strategy_id,
  * market_phase_type), FK) — во Flyway. Enum'ы хранятся строкой.
@@ -67,9 +70,10 @@ public class StrategyDetailEntity extends AuditableEntity {
             precision = Constants.Price.PRECISION, scale = Constants.Price.SCALE)
     private BigDecimal targetRiskRewardRatio;
 
-    @Column(name = "position_reopen_allowed")
-    private Boolean positionReopenAllowed;
+    @OneToMany(mappedBy = "detail", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<StrategyTrancheEntity> tranches;
 
+    /** Строки шагов УЗКОЙ агрегатной поверхности; потраншевые висят на транше. */
     @OneToMany(mappedBy = "detail", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<StrategyStepEntity> steps;
 }

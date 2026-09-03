@@ -9,7 +9,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.Auditable;
-import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
@@ -23,12 +23,18 @@ import lombok.Setter;
 
 /**
  * Набор торговых правил для конкретной фазы рынка. Каркасный
- * реляционный узел дерева (строка strategy_detail); шаги — плоские строки
- * strategy_step (deal_status + step_index). Индикаторы/структуры, нужные
- * детали, объявлены на уровне стратегии (strategy-scope) и адресуются по
- * {@code key} из условий и листьев действий (трек D — настройки в
- * собственные строки). Ровно одна detail на один MarketPhase.Type
- * (инвариант). См. docs/models/domain/aggregate/Strategy.md (§StrategyDetail).
+ * реляционный узел дерева (строка strategy_detail).
+ *
+ * <p><b>Уровней объявления два.</b> Поведение транша объявляют строки
+ * {@link StrategyTranche}; на самой детали живёт только УЗКАЯ агрегатная
+ * поверхность — шаги уровня сделки ({@code EXIT}, {@code FAIL_SAFE}),
+ * сгруппированные статусом агрегата. Шаги обоих уровней — плоские строки
+ * strategy_step; уровень читается по тому, на кого строка ссылается.
+ *
+ * <p>Индикаторы/структуры, нужные детали, объявлены на уровне стратегии
+ * (strategy-scope) и адресуются по {@code key} из условий и листьев
+ * действий. Ровно одна detail на один MarketPhase.Type (инвариант). См.
+ * docs/models/domain/aggregate/Strategy.md (§StrategyDetail).
  */
 @Getter
 @Setter
@@ -69,58 +75,118 @@ public class StrategyDetail extends Auditable {
      */
     private BigDecimal strategyCatastrophicRiskPerDealMultiplier;
 
-    /**
-     * Допускает ли стратегия ПЕРЕОТКРЫТИЕ эпизода транша: сопровождение
-     * снова отправляет вход тем же траншем. Операнд охраны переоткрытия
-     * (docs/spec/deal-tranche-lifecycle.json §reopenPermitted); пусто
-     * читается как «не допускает» — разрешение объявляется явно, а не
-     * умолчанием.
-     */
-    private Boolean positionReopenAllowed;
-
     /** High-level ориентир risk/reward. */
     private BigDecimal targetRiskRewardRatio;
 
     /**
-     * Шаги, сгруппированные по статусу ТРАНША: шаг принадлежит
-     * траншу, кроме узкой агрегатной поверхности (её несёт тип шага,
-     * не ключ группировки).
+     * Объявленные транши: что заводится и как ведётся каждый вход.
+     * Торгуемая деталь обязана объявить хотя бы один — деталь без
+     * траншей не имеет входа и торговать не может.
      */
-    private Map<DealTranche.Status, List<StrategyStep>> stepsByStatus;
+    private List<StrategyTranche> tranches;
 
     /**
-     * Entry-шаги детали: шаги PRECHECK-группы типов ENTRY/GRID_ENTRY в
-     * порядке объявления; пусто — entry-шагов нет.
+     * Шаги уровня СДЕЛКИ, сгруппированные по статусу агрегата.
+     * Поверхность узкая — только {@code EXIT} и {@code FAIL_SAFE}:
+     * выход из сделки есть утверждение обо всех траншах сразу, и
+     * размноженный по N объявлениям он был бы совпадением N деклараций,
+     * а не обеспеченным фактом. Всё остальное объявляется на транше.
      */
-    public List<StrategyStep> entrySteps() {
+    private Map<Deal.Status, List<StrategyStep>> stepsByStatus;
+
+    /**
+     * Шаги уровня сделки для текущего статуса агрегата (упорядочены =
+     * приоритет); пусто — агрегатных шагов у детали на этом статусе нет.
+     */
+    public List<StrategyStep> dealLevelSteps(Deal.Status status) {
         if (isNull(stepsByStatus)) {
             return List.of();
         }
-        List<StrategyStep> precheckSteps = stepsByStatus.get(DealTranche.Status.PRECHECK);
-        if (isEmpty(precheckSteps)) {
-            return List.of();
+        List<StrategyStep> steps = stepsByStatus.get(status);
+        return isEmpty(steps) ? List.of() : steps;
+    }
+
+    /**
+     * Единственное входное объявление детали — то, чьи PRECHECK-шаги
+     * несут вход. Их у торгуемой детали ровно одно
+     * (docs/rules/strategy-validation.md); пусто — детали входа нет.
+     */
+    public StrategyTranche entryTranche() {
+        return emptyIfNull(tranches).stream()
+                .filter(tranche -> isTrue(tranche.isEntryDeclaration()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Объявление по его идентификатору — резолв «транш сделки → его
+     * объявление». Пусто, если объявления нет: так у восстановленного
+     * транша, и это факт его тропы, а не недогруженное дерево.
+     */
+    public StrategyTranche declarationById(Long strategyTrancheId) {
+        if (isNull(strategyTrancheId)) {
+            return null;
         }
-        return precheckSteps.stream()
-                .filter(step -> isTrue(step.isEntryStep()))
-                .collect(Collectors.toList());
+        return emptyIfNull(tranches).stream()
+                .filter(tranche -> Objects.equals(strategyTrancheId, tranche.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Entry-шаги детали — шаги входного объявления; пусто, если входного
+     * объявления нет.
+     */
+    public List<StrategyStep> entrySteps() {
+        StrategyTranche entry = entryTranche();
+        return isNull(entry) ? List.of() : entry.entrySteps();
+    }
+
+    /**
+     * Сколько траншей материализуется по объявлениям детали — сумма
+     * {@code levelCount} всех объявлений. Операнд статического запаса
+     * {@code N_overlap} (docs/rules/risk-policy.md).
+     */
+    public Integer declaredTrancheCount() {
+        return emptyIfNull(tranches).stream()
+                .map(StrategyTranche::materializedCount)
+                .reduce(0, Integer::sum);
     }
 
     /**
      * Действие детали по стабильному ключу — резолв цели, объявленной
-     * действием {@code REPLACE}/{@code CANCEL} ({@code targetActionKey}).
-     * Ключ уникален в рамках детали, поэтому совпадение одно; ключа нет —
-     * {@code null}.
+     * действием {@code REPLACE_ACTION}/{@code CANCEL_ACTION}
+     * ({@code targetActionKey}). Ключ уникален в рамках детали, поэтому
+     * совпадение одно; ключа нет — {@code null}.
+     *
+     * <p>Область поиска — оба уровня объявления: шаги траншей и шаги
+     * узкой агрегатной поверхности. Сузить её до одного уровня значило
+     * бы сделать цель нерезолвимой ровно там, где она объявлена
+     * соседним уровнем.
      */
     public StrategyAction actionByKey(String key) {
-        if (isBlank(key) || isNull(stepsByStatus)) {
+        if (isBlank(key)) {
             return null;
         }
-        return stepsByStatus.values().stream()
-                .flatMap(steps -> emptyIfNull(steps).stream())
+        return allSteps().stream()
                 .flatMap(step -> emptyIfNull(step.getActions()).stream())
                 .filter(action -> Objects.equals(key, action.getKey()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /** Все шаги детали — траншевые и агрегатные, в порядке объявления. */
+    public List<StrategyStep> allSteps() {
+        List<StrategyStep> steps = emptyIfNull(tranches).stream()
+                .map(StrategyTranche::getStepsByStatus)
+                .filter(Objects::nonNull)
+                .flatMap(byStatus -> byStatus.values().stream())
+                .flatMap(list -> emptyIfNull(list).stream())
+                .collect(Collectors.toList());
+        if (nonNull(stepsByStatus)) {
+            stepsByStatus.values().forEach(list -> steps.addAll(emptyIfNull(list)));
+        }
+        return steps;
     }
 
     /** Разрешён ли вход в фазе: политика задана, не NO_TRADE и допускает фазу. */

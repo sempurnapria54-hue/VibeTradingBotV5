@@ -60,8 +60,60 @@ public class RiskCheckResult {
      */
     public enum RiskCheckCode {
 
-        /** Убыток на стопе как % от свободного депозита превышает лимит сделки. */
-        RISK_PER_TRADE_EXCEEDED(true),
+        /** Риск действия выше ПОАКТНОГО потолка. */
+        RISK_PER_ACTION_EXCEEDED(true),
+
+        /**
+         * Взятое сделкой за жизнь плюс риск акта выше КУМУЛЯТИВНОГО
+         * потолка (docs/spec/risk-limits.json §withinCumulative).
+         */
+        RISK_PER_DEAL_CUMULATIVE_EXCEEDED(true),
+
+        /**
+         * Живой риск плюс риск акта выше максимума ОДНОВРЕМЕННОГО риска,
+         * объявленного стратегией (§withinStrategySimultaneous).
+         */
+        RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED(true),
+
+        /** То же против ГЛОБАЛЬНОГО максимума конфигурации (§withinGlobalSimultaneous). */
+        RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED(true),
+
+        /**
+         * Нотинал неисполненной доли живых ног, живого эпизода и
+         * проверяемого акта выше КАТАСТРОФИЧЕСКОГО потолка сделки
+         * (§withinDealNotional).
+         */
+        DEAL_NOTIONAL_EXCEEDED(true),
+
+        /**
+         * Уровень стопа на убыточной стороне ближе якоря, чем round-trip
+         * комиссия: такой стоп срабатывает в убыток даже без движения цены
+         * (docs/spec/stop-distance.json §stopDistanceAboveFloor).
+         */
+        STOP_DISTANCE_BELOW_FLOOR(true),
+
+        /**
+         * Расчётная валюта инструмента не резолвлена — инструмент к
+         * торговле не допускается: числам риска не в чем меряться
+         * (docs/models/domain/core/Instrument.md).
+         */
+        INSTRUMENT_SETTLE_CURRENCY_MISSING(true),
+
+        /**
+         * Сделка в окне сворачивания, а проверяемый акт создаёт риск
+         * (docs/rules/exit-teardown-order.md). ВРЕМЕННЫЙ по форме кода и
+         * бессрочный по существу окна — но реакция на него КАРВ-АУТ, а не
+         * ребро в ошибку: действие не исполняется, сделка идёт к выходу.
+         */
+        RISK_CREATING_UNDER_COLLAPSE(false),
+
+        /**
+         * Инструмент действия стои́т в safety-ступени, а класс акта входит
+         * в её блок-сет (docs/rules/instrument-hold.md §Enforcement).
+         * ВРЕМЕННЫЙ: возобновление — снятием ступени; реакция — карв-аут,
+         * сделки доживают под своей защитой.
+         */
+        INSTRUMENT_SAFETY_HOLD(false),
 
         /** Плечо превышает биржевой максимум инструмента. */
         EXCHANGE_MAX_LEVERAGE_EXCEEDED(true),

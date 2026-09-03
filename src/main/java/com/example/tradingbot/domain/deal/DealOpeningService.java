@@ -1,10 +1,16 @@
 package com.example.tradingbot.domain.deal;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.persistence.service.DealDataService;
@@ -42,6 +48,9 @@ public class DealOpeningService {
     /** Порядковый номер эпизода у транша, материализованного при создании сделки. */
     private static final int FIRST_EPISODE_SEQ = 1;
 
+    /** Индекс первого экземпляра шаблона: смещение цены входа равно level × levelStep. */
+    private static final int FIRST_LEVEL = 0;
+
     private final DealDataService dealDataService;
     private final DealTrancheDataService dealTrancheDataService;
 
@@ -49,21 +58,23 @@ public class DealOpeningService {
      * Входная тропа — вход по стратегии. Зовёт сканер входа, когда
      * сработало условие; передаёт уже выбранные данные, включая фазу, по
      * которой выбрана деталь, и биржевой момент создания.
+     *
+     * <p>Деталь приходит целиком, а не одним идентификатором: транши
+     * материализуются ПО ЕЁ ОБЪЯВЛЕНИЯМ, и по идентификатору сервису
+     * пришлось бы читать её второй раз тем же проходом.
      */
     @Transactional
-    public Optional<Deal> openDeal(Long instrumentId, Long strategyDetailId, StrategyTradeDirection direction,
-                                   Deal.EntryStepType entryStepType, MarketPhase.Type entryMarketPhase,
-                                   OffsetDateTime externalCreatedAt) {
+    public Optional<Deal> openDeal(Long instrumentId, StrategyDetail detail, StrategyTradeDirection direction,
+                                   MarketPhase.Type entryMarketPhase, OffsetDateTime externalCreatedAt) {
         if (isTrue(dealDataService.existsActiveByInstrumentId(instrumentId))) {
             log.debug("Active deal already exists for instrument {} — entry skipped", instrumentId);
             return Optional.empty();
         }
         Deal deal = newDeal(instrumentId, direction, Deal.EntryReason.STRATEGY, externalCreatedAt);
-        deal.setStrategyDetailId(strategyDetailId);
-        deal.setEntryStepType(entryStepType);
+        deal.setStrategyDetailId(detail.getId());
         deal.setEntryMarketPhase(entryMarketPhase);
         Deal saved = dealDataService.save(deal);
-        materializeTranche(saved, DealTranche.Status.PRECHECK);
+        materializeDeclaredTranches(saved, detail);
         return Optional.of(saved);
     }
 
@@ -89,7 +100,9 @@ public class DealOpeningService {
         }
         Deal deal = newDeal(instrumentId, direction, Deal.EntryReason.RECOVERY, positionOpenedAt);
         Deal saved = dealDataService.save(deal);
-        materializeTranche(saved, DealTranche.Status.MANAGING);
+        // Объявления у восстановленного транша нет: ни ссылки, ни уровня,
+        // ни типа входа — заводил его не выбор входа.
+        materializeTranche(saved, DealTranche.Status.MANAGING, null, null, null);
         return Optional.of(saved);
     }
 
@@ -106,17 +119,53 @@ public class DealOpeningService {
     }
 
     /**
-     * Материализация транша при создании сделки. Эагерна: транш, чей
-     * вход так и не сработает, закроется истёкшим условием, а «уровень
-     * объявлен и ждёт» обязано быть видно в данных. Восстановленный
-     * транш заводится сразу в сопровождении — объявления у него нет, и
-     * штатные рёбра входа ему недостижимы.
+     * Материализация траншей ПО ОБЪЯВЛЕНИЯМ детали: по одному на
+     * объявление, по {@code levelCount} на шаблон. Материализация
+     * эагерна — транш, чей вход так и не сработает, закроется истёкшим
+     * условием, а «уровень объявлен и ждёт» обязано быть видно в данных.
      */
-    private void materializeTranche(Deal deal, DealTranche.Status status) {
+    private void materializeDeclaredTranches(Deal deal, StrategyDetail detail) {
+        for (StrategyTranche declaration : emptyIfNull(detail.getTranches())) {
+            DealTranche.EntryStepType entryStepType = entryStepTypeOf(declaration);
+            int count = declaration.materializedCount();
+            for (int index = 0; index < count; index++) {
+                // Уровень несёт ТОЛЬКО шаблон: у нешаблонного объявления
+                // смещать нечего, и пустота колонки этим и означена.
+                Integer level = count > 1 ? FIRST_LEVEL + index : null;
+                materializeTranche(deal, DealTranche.Status.PRECHECK, declaration.getId(), level, entryStepType);
+            }
+        }
+    }
+
+    /**
+     * Тип входного шага объявления: у сетки входов столько же, сколько
+     * уровней, поэтому поле живёт на транше, а не на сделке. Пусто —
+     * объявление входа не несёт.
+     */
+    private DealTranche.EntryStepType entryStepTypeOf(StrategyTranche declaration) {
+        StrategyStep entryStep = declaration.entrySteps().stream().findFirst().orElse(null);
+        if (isNull(entryStep)) {
+            return null;
+        }
+        return StrategyStepType.GRID_ENTRY.equals(entryStep.getStepType())
+                ? DealTranche.EntryStepType.GRID_ENTRY
+                : DealTranche.EntryStepType.ENTRY;
+    }
+
+    /**
+     * Одна строка транша. Восстановленный транш заводится сразу в
+     * сопровождении — объявления у него нет, и штатные рёбра входа ему
+     * недостижимы.
+     */
+    private void materializeTranche(Deal deal, DealTranche.Status status, Long strategyTrancheId,
+                                    Integer level, DealTranche.EntryStepType entryStepType) {
         DealTranche tranche = new DealTranche();
         tranche.setInternalId(ClientIdGenerator.generate());
         tranche.setDealId(deal.getId());
         tranche.setStatus(status);
+        tranche.setStrategyTrancheId(strategyTrancheId);
+        tranche.setLevel(level);
+        tranche.setEntryStepType(entryStepType);
         tranche.setEpisodeSeq(FIRST_EPISODE_SEQ);
         DealTranche saved = dealTrancheDataService.save(tranche);
         if (nonNull(deal.getTranches())) {

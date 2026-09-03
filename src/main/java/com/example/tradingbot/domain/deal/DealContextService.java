@@ -23,8 +23,11 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.groupingBy;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 /**
  * Собирает {@link DealContext} для одного прохода FSM: Deal с runtime graph
@@ -54,17 +57,55 @@ public class DealContextService {
     public DealContext build(Deal deal) {
         Instrument instrument = instrumentDataService.getRequiredById(deal.getInstrumentId());
         Exchange exchange = exchangeDataService.getRequiredById(instrument.getExchangeId());
-        StrategyDetail strategyDetail = strategyDataService.getRequiredDetailByIdWithTree(deal.getStrategyDetailId());
         reloadRuntimeGraph(deal);
         return DealContext.builder()
                 .deal(deal)
                 .exchange(exchange)
                 .instrument(instrument)
-                .strategyDetail(strategyDetail)
+                .strategyDetail(pinnedDetail(deal))
                 .balanceContainer(balanceContainerDataService.findByExchangeId(exchange.getId()).orElse(null))
                 .actionStates(dealActionStateDataService.findByDealId(deal.getId()))
                 .finalizationStates(dealFinalizationStateDataService.findByDealId(deal.getId()))
+                .graphComplete(graphComplete(deal))
                 .build();
+    }
+
+    /**
+     * Закреплённая деталь; {@code null} у ВОССТАНОВЛЕННОЙ сделки —
+     * заводил её не выбор входа, и выбирать было нечего
+     * (docs/models/domain/aggregate/Deal.md). Пустота здесь — факт
+     * тропы, а не отсутствующая строка: требовать деталь у той сделки, у
+     * которой её не бывает, значило бы ронять проход на штатном
+     * состоянии.
+     */
+    private StrategyDetail pinnedDetail(Deal deal) {
+        return isNull(deal.getStrategyDetailId())
+                ? null
+                : strategyDataService.getRequiredDetailByIdWithTree(deal.getStrategyDetailId());
+    }
+
+    /**
+     * Граф сделки предъявлен целиком
+     * (docs/spec/deal-context-load.json §graphComplete). Загрузка идёт
+     * одним заходом на коллекцию, поэтому «загружено» решается не
+     * пометкой на строке, а НАЛИЧИЕМ коллекции там, где она обязана быть:
+     *
+     * <ul>
+     *   <li>транши обязаны быть у всякой сделки — их материализует
+     *       создание;</li>
+     *   <li>эпизод обязан быть, если позиция по сделке наблюдалась;</li>
+     *   <li>ноги обязаны быть, если входная заявка отправлялась
+     *       (durable-признак — нижняя граница окна линковки).</li>
+     * </ul>
+     *
+     * <p>Встроенные защиты и отдельные условные заявки грузятся вместе
+     * со своими носителями и отдельного конъюнкта не требуют.
+     */
+    private Boolean graphComplete(Deal deal) {
+        boolean tranchesComplete = isNotEmpty(deal.getTranches());
+        boolean episodesComplete = isNotEmpty(deal.getPositions()) || isFalse(deal.positionObserved());
+        boolean legsComplete = isNotEmpty(deal.getOrders()) || isNull(deal.getBillsWindowBegin());
+        return tranchesComplete && episodesComplete && legsComplete;
     }
 
     /**

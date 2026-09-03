@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.command;
 
 /**
- * Тип атомарной операции команды над runtime-сущностью (17 значений).
+ * Тип атомарной операции команды над runtime-сущностью (16 значений).
  * Амендных команд нет: AMEND_* сняты, ремоделирование — REPLACE-
  * оркестрация существующих команд (docs/rules/replace-not-amend.md).
  * Refresh-набор — ровно по одной команде на сущность (bulk-команды
@@ -50,9 +50,6 @@ public enum ServiceCommandType {
 
     /** Обновить algo-order по фактам (evidence-cycle внутри команды). */
     REFRESH_ALGO_ORDER,
-
-    /** Подтянуть fills (evidence-cycle 3d→3m внутри команды). */
-    REFRESH_FILLS,
 
     /** Подтянуть движения средств окна сделки (конвейер 7d→3m внутри команды). */
     REFRESH_BILLS,

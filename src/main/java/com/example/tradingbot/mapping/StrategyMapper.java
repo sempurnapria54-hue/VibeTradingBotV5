@@ -25,14 +25,19 @@ import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseRuleApiModel
 import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyPositionActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyStepApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyTrancheApiModel;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.AtrParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.BollingerBandsParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.EfficiencyRatioParams;
@@ -54,7 +59,9 @@ import com.example.tradingbot.persistence.model.strategy.StrategyIndicatorSettin
 import com.example.tradingbot.persistence.model.strategy.StrategyMarketPhaseSettingEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyMarketStructureSettingEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyOrderActionEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyPositionActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyStepEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyTrancheEntity;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -116,17 +123,40 @@ public interface StrategyMapper {
 
     StrategyStep apiToDomain(StrategyStepApiModel api);
 
+    StrategyTranche apiToDomain(StrategyTrancheApiModel api);
+
     @SubclassMapping(source = StrategyOrderActionApiModel.class, target = StrategyOrderAction.class)
     @SubclassMapping(source = StrategyAlgoOrderActionApiModel.class, target = StrategyAlgoOrderAction.class)
+    @SubclassMapping(source = StrategyPositionActionApiModel.class, target = StrategyPositionAction.class)
     StrategyAction apiToDomain(StrategyActionApiModel api);
 
-    /** stepsByStatus формы ввода → доменная map (порядок запроса сохраняется). */
-    default Map<DealTranche.Status, List<StrategyStep>> stepsApiToDomain(Map<String, List<StrategyStepApiModel>> api) {
+    /**
+     * Шаги ТРАНША формы ввода → доменная map (порядок запроса
+     * сохраняется). Ключ разбирается как статус транша.
+     */
+    default Map<DealTranche.Status, List<StrategyStep>> trancheStepsApiToDomain(
+            Map<String, List<StrategyStepApiModel>> api) {
         if (isNull(api)) {
             return null;
         }
         Map<DealTranche.Status, List<StrategyStep>> result = new LinkedHashMap<>();
         api.forEach((status, steps) -> result.put(DealTranche.Status.valueOf(status),
+                steps.stream().map(this::apiToDomain).collect(toList())));
+        return result;
+    }
+
+    /**
+     * Шаги узкой агрегатной поверхности формы ввода → доменная map. Ключ
+     * разбирается как статус СДЕЛКИ: уровень объявления читается тем,
+     * кто несёт шаг, и разные ключи двух уровней — это он и есть.
+     */
+    default Map<Deal.Status, List<StrategyStep>> dealLevelStepsApiToDomain(
+            Map<String, List<StrategyStepApiModel>> api) {
+        if (isNull(api)) {
+            return null;
+        }
+        Map<Deal.Status, List<StrategyStep>> result = new LinkedHashMap<>();
+        api.forEach((status, steps) -> result.put(Deal.Status.valueOf(status),
                 steps.stream().map(this::apiToDomain).collect(toList())));
         return result;
     }
@@ -157,12 +187,28 @@ public interface StrategyMapper {
 
     StrategyStepApiModel domainToApi(StrategyStep step);
 
+    StrategyTrancheApiModel domainToApi(StrategyTranche tranche);
+
     @SubclassMapping(source = StrategyOrderAction.class, target = StrategyOrderActionApiModel.class)
     @SubclassMapping(source = StrategyAlgoOrderAction.class, target = StrategyAlgoOrderActionApiModel.class)
+    @SubclassMapping(source = StrategyPositionAction.class, target = StrategyPositionActionApiModel.class)
     StrategyActionApiModel domainToApi(StrategyAction action);
 
-    /** Доменная map шагов → форма ответа (порядок ключей сохраняется). */
-    default Map<String, List<StrategyStepApiModel>> stepsDomainToApi(Map<DealTranche.Status, List<StrategyStep>> steps) {
+    /** Доменная map шагов транша → форма ответа (порядок ключей сохраняется). */
+    default Map<String, List<StrategyStepApiModel>> trancheStepsDomainToApi(
+            Map<DealTranche.Status, List<StrategyStep>> steps) {
+        if (isNull(steps)) {
+            return null;
+        }
+        Map<String, List<StrategyStepApiModel>> result = new LinkedHashMap<>();
+        steps.forEach((status, list) -> result.put(status.name(),
+                list.stream().map(this::domainToApi).collect(toList())));
+        return result;
+    }
+
+    /** Доменная map шагов уровня сделки → форма ответа. */
+    default Map<String, List<StrategyStepApiModel>> dealLevelStepsDomainToApi(
+            Map<Deal.Status, List<StrategyStep>> steps) {
         if (isNull(steps)) {
             return null;
         }
@@ -184,20 +230,26 @@ public interface StrategyMapper {
     StrategyMarketStructureSettingEntity domainToPersistence(StrategyMarketStructureSetting setting);
 
     @Mapping(target = "steps", source = "stepsByStatus")
+    @Mapping(target = "tranches", source = "tranches")
     StrategyDetailEntity domainToPersistence(StrategyDetail detail);
 
     StrategyStepEntity domainToPersistence(StrategyStep step);
 
+    @Mapping(target = "steps", source = "stepsByStatus")
+    StrategyTrancheEntity domainToPersistence(StrategyTranche tranche);
+
     @SubclassMapping(source = StrategyOrderAction.class, target = StrategyOrderActionEntity.class)
     @SubclassMapping(source = StrategyAlgoOrderAction.class, target = StrategyAlgoOrderActionEntity.class)
+    @SubclassMapping(source = StrategyPositionAction.class, target = StrategyPositionActionEntity.class)
     StrategyActionEntity domainToPersistence(StrategyAction action);
 
     /**
-     * Доменная map шагов → плоские строки: tranche_status — ключ map,
-     * step_index — позиция в списке. LinkedHashSet сохраняет порядок
+     * Доменная map шагов ТРАНША → плоские строки: tranche_status — ключ
+     * map, step_index — позиция в списке. LinkedHashSet сохраняет порядок
      * вставки (id присваиваются в порядке авторинга).
      */
-    default Set<StrategyStepEntity> stepsDomainToPersistence(Map<DealTranche.Status, List<StrategyStep>> steps) {
+    default Set<StrategyStepEntity> trancheStepsDomainToPersistence(
+            Map<DealTranche.Status, List<StrategyStep>> steps) {
         if (isNull(steps)) {
             return null;
         }
@@ -213,6 +265,29 @@ public interface StrategyMapper {
         return result;
     }
 
+    /**
+     * Доменная map шагов УРОВНЯ СДЕЛКИ → плоские строки: ключ группировки
+     * свой, deal_status. Вторая колонка, а не та же самая: строка с
+     * обоими ключами читалась бы двумя уровнями сразу, и ограничение
+     * схемы такую строку отвергает.
+     */
+    default Set<StrategyStepEntity> dealLevelStepsDomainToPersistence(
+            Map<Deal.Status, List<StrategyStep>> steps) {
+        if (isNull(steps)) {
+            return null;
+        }
+        Set<StrategyStepEntity> result = new LinkedHashSet<>();
+        steps.forEach((status, list) -> {
+            for (int index = 0; index < list.size(); index++) {
+                StrategyStepEntity entity = domainToPersistence(list.get(index));
+                entity.setDealStatus(status.name());
+                entity.setStepIndex(index);
+                result.add(entity);
+            }
+        });
+        return result;
+    }
+
     /** Пакет действий → LinkedHashSet: порядок авторинга = порядок вставки строк. */
     default Set<StrategyActionEntity> actionsDomainToPersistence(List<StrategyAction> actions) {
         if (isNull(actions)) {
@@ -221,7 +296,12 @@ public interface StrategyMapper {
         return actions.stream().map(this::domainToPersistence).collect(toCollection(LinkedHashSet::new));
     }
 
-    /** Back-ссылки дерева: настройка фазы, детали, шаги и действия знают родителей. */
+    /**
+     * Back-ссылки дерева: настройка фазы, детали, объявления траншей,
+     * шаги обоих уровней и действия знают родителей. Действие ссылается
+     * на деталь с обоих уровней — денормализованный FK держит ключ
+     * «деталь + ключ действия», а он один на всю деталь.
+     */
     @AfterMapping
     default void wireTree(@MappingTarget StrategyEntity entity) {
         if (nonNull(entity.getMarketPhaseSetting())) {
@@ -238,19 +318,48 @@ public interface StrategyMapper {
         }
         entity.getDetails().forEach(detail -> {
             detail.setStrategy(entity);
-            if (isNull(detail.getSteps())) {
+            wireDealLevelSteps(detail);
+            wireTranches(detail);
+        });
+    }
+
+    /** Шаги узкой агрегатной поверхности висят на самой детали. */
+    default void wireDealLevelSteps(StrategyDetailEntity detail) {
+        if (isNull(detail.getSteps())) {
+            return;
+        }
+        detail.getSteps().forEach(step -> {
+            step.setDetail(detail);
+            step.setTranche(null);
+            wireActions(step, detail);
+        });
+    }
+
+    /** Шаги объявления висят на транше; деталь они знают только через него. */
+    default void wireTranches(StrategyDetailEntity detail) {
+        if (isNull(detail.getTranches())) {
+            return;
+        }
+        detail.getTranches().forEach(tranche -> {
+            tranche.setDetail(detail);
+            if (isNull(tranche.getSteps())) {
                 return;
             }
-            detail.getSteps().forEach(step -> {
-                step.setDetail(detail);
-                if (isNull(step.getActions())) {
-                    return;
-                }
-                step.getActions().forEach(action -> {
-                    action.setStep(step);
-                    action.setDetail(detail);
-                });
+            tranche.getSteps().forEach(step -> {
+                step.setTranche(tranche);
+                step.setDetail(null);
+                wireActions(step, detail);
             });
+        });
+    }
+
+    private void wireActions(StrategyStepEntity step, StrategyDetailEntity detail) {
+        if (isNull(step.getActions())) {
+            return;
+        }
+        step.getActions().forEach(action -> {
+            action.setStep(step);
+            action.setDetail(detail);
         });
     }
 
@@ -286,12 +395,17 @@ public interface StrategyMapper {
     StrategyMarketStructureSetting persistenceToDomain(StrategyMarketStructureSettingEntity entity);
 
     @Mapping(target = "stepsByStatus", source = "steps")
+    @Mapping(target = "tranches", source = "tranches")
     StrategyDetail persistenceToDomain(StrategyDetailEntity entity);
 
     StrategyStep persistenceToDomain(StrategyStepEntity entity);
 
+    @Mapping(target = "stepsByStatus", source = "steps")
+    StrategyTranche persistenceToDomain(StrategyTrancheEntity entity);
+
     @SubclassMapping(source = StrategyOrderActionEntity.class, target = StrategyOrderAction.class)
     @SubclassMapping(source = StrategyAlgoOrderActionEntity.class, target = StrategyAlgoOrderAction.class)
+    @SubclassMapping(source = StrategyPositionActionEntity.class, target = StrategyPositionAction.class)
     StrategyAction persistenceToDomain(StrategyActionEntity entity);
 
     /** Детали из БД → список, отсортированный по фазе (стабильный порядок ответа). */
@@ -306,8 +420,9 @@ public interface StrategyMapper {
                 .collect(toList());
     }
 
-    /** Плоские строки шагов → доменная map (ключи — порядок DealTranche.Status, списки — по step_index). */
-    default Map<DealTranche.Status, List<StrategyStep>> stepsPersistenceToDomain(Set<StrategyStepEntity> steps) {
+    /** Строки шагов транша → доменная map (ключи — порядок DealTranche.Status, списки — по step_index). */
+    default Map<DealTranche.Status, List<StrategyStep>> trancheStepsPersistenceToDomain(
+            Set<StrategyStepEntity> steps) {
         if (isNull(steps)) {
             return null;
         }
@@ -316,6 +431,24 @@ public interface StrategyMapper {
                 .computeIfAbsent(DealTranche.Status.valueOf(step.getTrancheStatus()), status -> new ArrayList<>())
                 .add(step));
         Map<DealTranche.Status, List<StrategyStep>> result = new EnumMap<>(DealTranche.Status.class);
+        grouped.forEach((status, list) -> result.put(status, list.stream()
+                .sorted(comparing(StrategyStepEntity::getStepIndex))
+                .map(this::persistenceToDomain)
+                .collect(toList())));
+        return result;
+    }
+
+    /** Строки шагов уровня сделки → доменная map (ключи — порядок Deal.Status). */
+    default Map<Deal.Status, List<StrategyStep>> dealLevelStepsPersistenceToDomain(
+            Set<StrategyStepEntity> steps) {
+        if (isNull(steps)) {
+            return null;
+        }
+        Map<Deal.Status, List<StrategyStepEntity>> grouped = new EnumMap<>(Deal.Status.class);
+        steps.forEach(step -> grouped
+                .computeIfAbsent(Deal.Status.valueOf(step.getDealStatus()), status -> new ArrayList<>())
+                .add(step));
+        Map<Deal.Status, List<StrategyStep>> result = new EnumMap<>(Deal.Status.class);
         grouped.forEach((status, list) -> result.put(status, list.stream()
                 .sorted(comparing(StrategyStepEntity::getStepIndex))
                 .map(this::persistenceToDomain)

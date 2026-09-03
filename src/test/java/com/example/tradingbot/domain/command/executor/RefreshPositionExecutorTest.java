@@ -26,6 +26,7 @@ import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.DealDataService;
+import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -67,6 +68,9 @@ class RefreshPositionExecutorTest {
     private PositionDataService positionDataService;
     @Mock
     private DealDataService dealDataService;
+
+    @Mock
+    private OrderDataService orderDataService;
     @Mock
     private DealActionStateDataService dealActionStateDataService;
     @Mock
@@ -81,8 +85,8 @@ class RefreshPositionExecutorTest {
 
     @BeforeEach
     void setUp() {
-        executor = new RefreshPositionExecutor(positionDataService, dealDataService, dealActionStateDataService,
-                integrationService, positionMapper, positionStatusResolver);
+        executor = new RefreshPositionExecutor(positionDataService, dealDataService, orderDataService,
+                dealActionStateDataService, integrationService, positionMapper, positionStatusResolver);
         when(positionDataService.save(any())).thenAnswer(invocation -> {
             Position position = invocation.getArgument(0);
             saved.add(position);

@@ -5,7 +5,6 @@ import com.example.tradingbot.domain.command.resolve.ProtectionHistoryLeg;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
-import com.example.tradingbot.domain.model.core.fill.external_snapshot.FillExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalRulesExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
@@ -269,23 +268,6 @@ public interface IntegrationService {
      * @return нормализованный account-level снапшот баланса.
      */
     BalanceContainerExternalSnapshot getBalance(String settleCurrency);
-
-    /**
-     * Исполнения (fills) по инструменту, пагинация назад по billId.
-     * RefreshFillsExecutor матчит их с Order/AlgoOrder и агрегирует.
-     *
-     * @param afterBillId якорь пагинации (billId); {@code null} — с самых свежих.
-     * @return снапшоты fills (пустой список — нет исполнений в окне).
-     */
-    List<FillExternalSnapshot> getFills(String externalInstrumentId, String afterBillId, Integer limit);
-
-    /**
-     * История исполнений (fills, до 3 месяцев) — эскалация после
-     * getFills (3 дня) в fills evidence-cycle.
-     *
-     * @return снапшоты fills (пустой список — нет исполнений в окне).
-     */
-    List<FillExternalSnapshot> getFillsHistory(String externalInstrumentId, String afterBillId, Integer limit);
 
     /**
      * Bill-записи движений счёта за окно (свежий эндпоинт, 7 дней).

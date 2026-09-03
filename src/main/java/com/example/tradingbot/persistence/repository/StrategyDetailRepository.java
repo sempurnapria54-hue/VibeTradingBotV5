@@ -21,6 +21,9 @@ public interface StrategyDetailRepository extends JpaRepository<StrategyDetailEn
             select distinct d from StrategyDetailEntity d
             left join fetch d.steps st
             left join fetch st.actions
+            left join fetch d.tranches tr
+            left join fetch tr.steps tst
+            left join fetch tst.actions
             where d.id = :id
             """)
     Optional<StrategyDetailEntity> findByIdWithTree(@Param("id") Long id);

@@ -142,6 +142,30 @@ public class AlgoOrder extends Auditable {
     }
 
     /**
+     * ДЕЙСТВУЮЩИЙ уровень остановки убытка этой защиты; {@code null} —
+     * уровня она не несёт (тейк, ненаблюдённый трейлинг, пустая
+     * триггерная цена).
+     *
+     * <p>У трейлинга уровень — НАБЛЮДЁННЫЙ биржей, у стопа — объявленная
+     * триггерная цена. Разведение несущее: у трейлинга объявленного
+     * уровня не бывает вовсе, и подстановка объявленного стопа дала бы
+     * ему чужое число.
+     */
+    public BigDecimal stopLevel() {
+        if (isFalse(carriesActiveStopLevel())) {
+            return null;
+        }
+        if (TRAILING_TYPES.contains(conditionType)) {
+            return condition.getTrailing().getExternalPrice();
+        }
+        if (isNull(condition) || isNull(condition.getTrigger()) || isNull(condition.getTrigger().getStopLoss())) {
+            return null;
+        }
+        TriggerPrice stopLoss = condition.getTrigger().getStopLoss();
+        return nonNull(stopLoss.getExternalValue()) ? stopLoss.getExternalValue() : stopLoss.getValue();
+    }
+
+    /**
      * Сколько эта защита реально закрывает: остаток размера после
      * срабатывания (docs/spec/protection-coverage.json, величина
      * {@code coveredSize} носителя STANDALONE).

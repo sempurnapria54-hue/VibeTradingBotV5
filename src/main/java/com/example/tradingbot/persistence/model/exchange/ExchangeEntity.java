@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -38,4 +39,13 @@ public class ExchangeEntity extends AuditableEntity {
 
     @Column(name = "status", nullable = false)
     private String status;
+
+    @Column(name = "risk_base")
+    private BigDecimal riskBase;
+
+    @Column(name = "risk_base_currency")
+    private String riskBaseCurrency;
+
+    @Column(name = "consecutive_loss_count", nullable = false)
+    private Integer consecutiveLossCount;
 }

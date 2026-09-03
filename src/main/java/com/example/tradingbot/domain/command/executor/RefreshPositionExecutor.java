@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.command.executor;
 
 import static java.util.Objects.isNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
@@ -12,6 +13,7 @@ import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
+import com.example.tradingbot.domain.command.risk.DealRiskNumbers;
 import com.example.tradingbot.domain.command.resolve.PositionStatusResolver;
 import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -23,6 +25,7 @@ import com.example.tradingbot.mapping.PositionMapper;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.PositionDataService;
+import com.example.tradingbot.persistence.service.OrderDataService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayDeque;
@@ -56,6 +59,7 @@ public class RefreshPositionExecutor implements CommandExecutor {
 
     private final PositionDataService positionDataService;
     private final DealDataService dealDataService;
+    private final OrderDataService orderDataService;
     private final DealActionStateDataService dealActionStateDataService;
     private final IntegrationService integrationService;
     private final PositionMapper positionMapper;
@@ -75,10 +79,73 @@ public class RefreshPositionExecutor implements CommandExecutor {
         PositionExternalSnapshot snapshot = integrationService.getPosition(externalInstrumentId);
 
         if (isTrue(liveLegStops(deal, snapshot))) {
+            applyEpisodeAxisAndRiskNumbers(deal, dealContext);
             completeAction(actionState);
             return ServiceCommandExecutionResult.ok();
         }
-        return harvestCloseRecords(deal, externalInstrumentId, actionState);
+        ServiceCommandExecutionResult result = harvestCloseRecords(deal, externalInstrumentId, actionState);
+        applyEpisodeAxisAndRiskNumbers(deal, dealContext);
+        return result;
+    }
+
+    /**
+     * Две работы одного наблюдения — ось эпизода на ногах и пересчёт
+     * четвёрки чисел риска сделки. Обе принадлежат этому исполнителю
+     * потому, что обе меняются ровно тем, что он наблюдает: размером
+     * живого эпизода и сменой эпизода
+     * (docs/models/domain/aggregate/Deal.md §«Писатели четвёрки и их
+     * триггеры»).
+     */
+    private void applyEpisodeAxisAndRiskNumbers(Deal deal, DealContext dealContext) {
+        assignEpisodeAxis(deal);
+        recomputeRiskNumbers(deal, dealContext);
+    }
+
+    /**
+     * <b>Ось эпизода на ногах — write-once.</b> Нога с непустым филлом и
+     * пустой осью приписывается ЖИВОМУ эпизоду: заполнял его именно
+     * он — иначе филла к моменту наблюдения не было бы.
+     *
+     * <p>Без оси ноги закрытых эпизодов неотличимы от ног текущего, и
+     * пара «взятое ↔ снятое защитой» считалась бы по всей истории
+     * сделки — то есть кратно завышенной
+     * (docs/spec/deal-risk-numbers.json §onLiveEpisode).
+     *
+     * <p>Write-once не украшение: переприписывание ноги новому эпизоду
+     * задним числом перенесло бы её риск с закрытого эпизода на живой.
+     */
+    private void assignEpisodeAxis(Deal deal) {
+        Position live = deal.livePosition();
+        if (isNull(live) || isNull(live.getId())) {
+            return;
+        }
+        emptyIfNull(deal.getOrders()).stream()
+                .filter(order -> isNull(order.getPositionId()))
+                .filter(order -> nonNull(order.getAccumulatedFillSize())
+                        && order.getAccumulatedFillSize().signum() > 0)
+                .forEach(order -> {
+                    order.setPositionId(live.getId());
+                    orderDataService.save(order);
+                });
+    }
+
+    /**
+     * Пересчёт запрещён на неполном графе: числа считаются по ногам,
+     * защитам и эпизодам из контекста прохода, и на неполном графе они
+     * вышли бы ЗАНИЖЕННЫМИ — то есть ослабили бы кумулятивный потолок.
+     * Прежние значения тогда остаются нетронутыми.
+     */
+    private void recomputeRiskNumbers(Deal deal, DealContext dealContext) {
+        if (isFalse(DealRiskNumbers.recomputeAllowed(dealContext.getGraphComplete()))) {
+            return;
+        }
+        deal.setPositions(positionDataService.findEpisodes(deal.getId()));
+        DealRiskNumbers.Numbers numbers = DealRiskNumbers.compute(deal);
+        deal.setPlannedRiskAmount(numbers.getPlannedRiskAmount());
+        deal.setIncurredRiskAmount(numbers.getIncurredRiskAmount());
+        deal.setCurrentRiskAmount(numbers.getCurrentRiskAmount());
+        deal.setProtectionRelievedRiskAmount(numbers.getProtectionRelievedRiskAmount());
+        dealDataService.save(deal);
     }
 
     /**

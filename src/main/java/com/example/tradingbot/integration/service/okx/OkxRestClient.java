@@ -17,7 +17,6 @@ import com.example.tradingbot.integration.model.okx.response.AlgoOrderOkxRespons
 import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.AccountBillOkxResponse;
-import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.ServerTimeOkxResponse;
@@ -80,9 +79,6 @@ public class OkxRestClient {
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<BalanceOkxResponse>> BALANCE_TYPE =
-            new ParameterizedTypeReference<>() {
-            };
-    private static final ParameterizedTypeReference<OkxApiResponse<FillOkxResponse>> FILL_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<AccountBillOkxResponse>> ACCOUNT_BILL_TYPE =
@@ -226,15 +222,6 @@ public class OkxRestClient {
         return dispatch(HttpMethod.GET, Constants.Okx.TRADE_ORDERS_ALGO_HISTORY_PATH, query, null, true, ALGO_ORDER_TYPE);
     }
 
-    /** История исполнений (fills, 3 месяца): {@code after} — якорь по billId. Приватный endpoint. */
-    public OkxApiResponse<FillOkxResponse> getFillsHistory(String instId, String after, Integer limit) {
-        Map<String, Object> query = new LinkedHashMap<>();
-        query.put(Constants.Okx.PARAM_INST_ID, instId);
-        query.put(Constants.Okx.PARAM_AFTER, after);
-        query.put(Constants.Okx.PARAM_LIMIT, limit);
-        return dispatch(HttpMethod.GET, Constants.Okx.TRADE_FILLS_HISTORY_PATH, query, null, true, FILL_TYPE);
-    }
-
     /**
      * Ordinary order по {@code ordId} (предпочтительно) или
      * {@code clOrdId}. Приватный endpoint (подпись).
@@ -312,15 +299,6 @@ public class OkxRestClient {
     /** Отмена advance algo-семьи (trailing/move_order_stop). Тело — массив. Приватный endpoint. */
     public OkxApiResponse<AlgoOrderAckOkxResponse> cancelAdvanceAlgos(List<CancelAlgoOrderOkxRequest> requests) {
         return dispatch(HttpMethod.POST, Constants.Okx.TRADE_CANCEL_ADVANCE_ALGOS_PATH, null, requests, true, ALGO_ACK_TYPE);
-    }
-
-    /** Исполнения (fills, последние 3 дня): {@code after} — якорь по billId. Приватный endpoint. */
-    public OkxApiResponse<FillOkxResponse> getFills(String instId, String after, Integer limit) {
-        Map<String, Object> query = new LinkedHashMap<>();
-        query.put(Constants.Okx.PARAM_INST_ID, instId);
-        query.put(Constants.Okx.PARAM_AFTER, after);
-        query.put(Constants.Okx.PARAM_LIMIT, limit);
-        return dispatch(HttpMethod.GET, Constants.Okx.TRADE_FILLS_PATH, query, null, true, FILL_TYPE);
     }
 
     /**

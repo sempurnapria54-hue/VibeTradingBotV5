@@ -46,9 +46,6 @@ public class DealEntity extends AuditableEntity {
     @Column(name = "entry_reason")
     private String entryReason;
 
-    @Column(name = "entry_step_type")
-    private String entryStepType;
-
     @Column(name = "entry_market_phase")
     private String entryMarketPhase;
 
@@ -63,6 +60,24 @@ public class DealEntity extends AuditableEntity {
 
     @Column(name = "result_profit_currency")
     private String resultProfitCurrency;
+
+    @Column(name = "planned_risk_amount")
+    private BigDecimal plannedRiskAmount;
+
+    @Column(name = "incurred_risk_amount")
+    private BigDecimal incurredRiskAmount;
+
+    @Column(name = "current_risk_amount")
+    private BigDecimal currentRiskAmount;
+
+    @Column(name = "protection_relieved_risk_amount")
+    private BigDecimal protectionRelievedRiskAmount;
+
+    @Column(name = "planned_risk_currency")
+    private String plannedRiskCurrency;
+
+    @Column(name = "planned_risk_equity_base")
+    private BigDecimal plannedRiskEquityBase;
 
     @Column(name = "coverage_proven_through")
     private OffsetDateTime coverageProvenThrough;

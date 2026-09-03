@@ -52,4 +52,25 @@ public class CreateOrderCommandPayload implements ServiceCommandPayload {
 
     /** Attached protection при создании со стартовым SL (nullable). */
     AttachedProtectionPayload attachedProtection;
+
+    /** Транш, чью экспозицию нога создаёт или гасит. */
+    Long dealTrancheId;
+
+    /**
+     * Цена входа, по которой считался риск ноги. У рыночного входа —
+     * расчётная референс-цена, на биржу не отправляемая.
+     */
+    BigDecimal plannedEntryPrice;
+
+    /** Уровень стопа, под который считался риск ноги. */
+    BigDecimal plannedStopPrice;
+
+    /** Плановый риск ноги — убыток на её стопе при постановке. */
+    BigDecimal plannedRiskAmount;
+
+    /** Валюта планового риска ноги — расчётная валюта инструмента. */
+    String plannedRiskCurrency;
+
+    /** Размер контракта на момент постановки ноги. */
+    BigDecimal plannedContractValue;
 }

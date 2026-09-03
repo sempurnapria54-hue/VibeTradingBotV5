@@ -21,10 +21,16 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * Persistence-проекция {@link StrategyStep} (таблица strategy_steps).
- * Map stepsByStatus детали хранится плоскими строками: tranche_status —
- * ключ map, step_index — порядок в списке; в домене map пересобирает
- * маппер. Условие шага и политика устаревания — JSONB на этой строке.
- * Действия — дочерние строки strategy_actions (cascade ALL).
+ *
+ * <p><b>Уровень объявления читается по родителю строки, а не по типу
+ * шага.</b> Потраншевый шаг ссылается на strategy_tranches и несёт
+ * tranche_status ключом группировки; шаг узкой агрегатной поверхности
+ * ссылается на strategy_details и несёт deal_status. Ровно одна из двух
+ * ссылок непуста — инвариант держит CHECK во Flyway; в домене обе map
+ * пересобирает маппер.
+ *
+ * <p>Условие шага и политика устаревания — JSONB на этой строке;
+ * действия — дочерние строки strategy_actions (cascade ALL).
  */
 @Getter
 @Setter
@@ -36,12 +42,19 @@ public class StrategyStepEntity extends AuditableEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "strategy_detail_id", nullable = false, updatable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "strategy_tranche_id", updatable = false)
+    private StrategyTrancheEntity tranche;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "strategy_detail_id", updatable = false)
     private StrategyDetailEntity detail;
 
-    @Column(name = "tranche_status", nullable = false)
+    @Column(name = "tranche_status")
     private String trancheStatus;
+
+    @Column(name = "deal_status")
+    private String dealStatus;
 
     @Column(name = "step_index", nullable = false)
     private Integer stepIndex;

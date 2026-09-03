@@ -91,7 +91,7 @@ public class TranchePrecheckHandler implements TrancheFsmHandler {
     }
 
     private List<StrategyStep> entrySteps(DealContext dealContext, DealTranche tranche) {
-        return support.stepsOfType(support.stepsFor(dealContext, DealTranche.Status.PRECHECK),
+        return support.stepsOfType(support.stepsFor(dealContext, tranche),
                 StrategyStepType.ENTRY, StrategyStepType.GRID_ENTRY);
     }
 

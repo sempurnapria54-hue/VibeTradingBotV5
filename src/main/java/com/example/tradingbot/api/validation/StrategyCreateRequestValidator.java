@@ -2,8 +2,11 @@ package com.example.tradingbot.api.validation;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.api.model.request.CreateStrategyApiRequest;
 import com.example.tradingbot.api.model.request.UpdateStrategyStatusApiRequest;
@@ -27,6 +30,8 @@ import com.example.tradingbot.api.model.strategy.StrategyMarketPhaseSettingApiMo
 import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyStepApiModel;
+import com.example.tradingbot.api.model.strategy.StrategyTrancheApiModel;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.MarketDataExpiredAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.PhaseEntryPolicy;
@@ -231,7 +236,112 @@ public class StrategyCreateRequestValidator {
         validateEnum(PhaseEntryPolicy.class, detail.getPhaseEntryPolicy(), path + ".phaseEntryPolicy", violations);
         validatePolicyMatrix(detail, path, violations);
         validateRiskNumbers(detail, path, violations);
+        validateTranches(detail, path, violations);
         validateSteps(detail, path, indicatorTypes, structureKeys, violations);
+    }
+
+    /**
+     * Объявления траншей торгуемой детали
+     * (docs/models/domain/aggregate/Strategy.md §StrategyTranche,
+     * docs/rules/strategy-validation.md):
+     *
+     * <ul>
+     *   <li><b>хотя бы одно</b> — деталь без траншей не имеет входа и
+     *       торговать не может;</li>
+     *   <li><b>ровно одно входное</b> — вход объявляется в одном месте:
+     *       два объявления входа в одной фазе дали бы два независимых
+     *       решения на одну сделку;</li>
+     *   <li><b>ключ уникален</b> в пределах детали — по нему объявление
+     *       адресуется;</li>
+     *   <li><b>согласованность {@code levelCount} и {@code levelStep}</b> —
+     *       смещение уровня осмысленно только у сетки и обязательно у неё.
+     *       Пустой {@code levelCount} умолчания не имеет: единица
+     *       мажорировала бы его в разрешающую сторону неравенства
+     *       статического запаса (docs/rules/risk-policy.md).</li>
+     * </ul>
+     */
+    private void validateTranches(StrategyDetailApiModel detail, String path, List<String> violations) {
+        List<StrategyTrancheApiModel> tranches = detail.getTranches();
+        if (isFalse(tradableDetail(detail))) {
+            if (isNotEmpty(tranches)) {
+                violations.add(path + ".tranches STRATEGY_TRANCHE_ON_NON_TRADING_DETAIL: "
+                        + "неторгуемая деталь объявлений входа не несёт");
+            }
+            return;
+        }
+        if (isEmpty(tranches)) {
+            violations.add(path + ".tranches STRATEGY_TRANCHE_NOT_DECLARED: "
+                    + "торгуемая деталь обязана объявить хотя бы один транш");
+            return;
+        }
+        Set<String> keys = new HashSet<>();
+        int entryDeclarations = 0;
+        for (int index = 0; index < tranches.size(); index++) {
+            StrategyTrancheApiModel tranche = tranches.get(index);
+            String tranchePath = path + ".tranches[" + index + "]";
+            if (nonNull(tranche.getKey()) && isFalse(keys.add(tranche.getKey()))) {
+                violations.add(tranchePath + ": duplicate tranche key " + tranche.getKey());
+            }
+            validateTrancheGrid(tranche, tranchePath, violations);
+            validateTrancheReopen(tranche, tranchePath, violations);
+            int entrySteps = entryStepCount(tranche);
+            if (entrySteps > 1) {
+                violations.add(tranchePath + " STRATEGY_TRANCHE_ENTRY_NOT_UNIQUE: "
+                        + "у транша ровно одно входное объявление, объявлено " + entrySteps);
+            }
+            entryDeclarations += entrySteps > 0 ? 1 : 0;
+        }
+        if (entryDeclarations == 0) {
+            violations.add(path + ".tranches STRATEGY_ENTRY_DECLARATION_MISSING: "
+                    + "у торгуемой детали ни одно объявление не несёт входа — торговать нечем");
+        }
+    }
+
+    /**
+     * Признак переоткрытия объявляется ЯВНО: умолчания у него нет.
+     * Пустое место читалось бы как «не допускает», то есть молчаливо
+     * решало бы за автора стратегии вопрос, который он не поставил.
+     */
+    private void validateTrancheReopen(StrategyTrancheApiModel tranche, String path, List<String> violations) {
+        if (isNull(tranche.getPositionReopenAllowed())) {
+            violations.add(path + ".positionReopenAllowed STRATEGY_TRANCHE_REOPEN_NOT_DECLARED: "
+                    + "признак переоткрытия объявляется явно, умолчания нет");
+        }
+    }
+
+    /** Согласованность шаблона: смещение уровня — только у сетки и обязательно у неё. */
+    private void validateTrancheGrid(StrategyTrancheApiModel tranche, String path, List<String> violations) {
+        Integer levelCount = tranche.getLevelCount();
+        if (isNull(levelCount)) {
+            violations.add(path + ".levelCount STRATEGY_TRANCHE_LEVEL_COUNT_NOT_DECLARED: "
+                    + "умолчания нет — единица мажорировала бы число в разрешающую сторону");
+            return;
+        }
+        boolean isGrid = levelCount > 1;
+        if (isGrid && isNull(tranche.getLevelStep())) {
+            violations.add(path + ".levelStep STRATEGY_TRANCHE_LEVEL_STEP_MISSING: "
+                    + "у шаблона с levelCount > 1 смещение уровня обязательно");
+        }
+        if (isFalse(isGrid) && nonNull(tranche.getLevelStep())) {
+            violations.add(path + ".levelStep STRATEGY_TRANCHE_LEVEL_STEP_UNEXPECTED: "
+                    + "у нешаблонного объявления смещать нечего");
+        }
+    }
+
+    /** Сколько входных шагов несёт объявление: PRECHECK-шаги типа ENTRY либо GRID_ENTRY. */
+    private int entryStepCount(StrategyTrancheApiModel tranche) {
+        Map<String, List<StrategyStepApiModel>> stepsByStatus = tranche.getStepsByStatus();
+        if (isNull(stepsByStatus)) {
+            return 0;
+        }
+        List<StrategyStepApiModel> precheck = stepsByStatus.get(DealTranche.Status.PRECHECK.name());
+        if (isEmpty(precheck)) {
+            return 0;
+        }
+        return (int) precheck.stream()
+                .filter(step -> StrategyStepType.ENTRY.name().equals(step.getStepType())
+                        || StrategyStepType.GRID_ENTRY.name().equals(step.getStepType()))
+                .count();
     }
 
     /**
@@ -415,28 +525,65 @@ public class StrategyCreateRequestValidator {
         }
     }
 
+    /**
+     * Шаги ОБОИХ уровней объявления: потраншевые — на объявлениях,
+     * ключ группировки читается как статус транша; узкая агрегатная
+     * поверхность — на детали, ключ читается как статус СДЕЛКИ.
+     *
+     * <p>Ключ действия уникален в пределах ВСЕЙ детали, поэтому набор
+     * ключей собирается по обоим уровням: цель {@code targetActionKey}
+     * резолвится через них же.
+     */
     private void validateSteps(StrategyDetailApiModel detail, String path,
                                Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
                                List<String> violations) {
-        Map<String, List<StrategyStepApiModel>> stepsByStatus = detail.getStepsByStatus();
-        if (isNull(stepsByStatus)) {
+        Set<String> actionKeys = collectActionKeys(detail, path, violations);
+        emptyIfNull(detail.getTranches()).forEach(tranche -> {
+            String tranchePath = path + ".tranches[" + tranche.getKey() + "]";
+            if (isNull(tranche.getStepsByStatus())) {
+                return;
+            }
+            tranche.getStepsByStatus().forEach((status, steps) -> {
+                validateEnum(DealTranche.Status.class, status, tranchePath + ".stepsByStatus key", violations);
+                for (int index = 0; index < steps.size(); index++) {
+                    validateStep(steps.get(index), tranchePath + ".stepsByStatus[" + status + "][" + index + "]",
+                            indicatorTypes, structureKeys, actionKeys, violations);
+                }
+            });
+        });
+        if (isNull(detail.getStepsByStatus())) {
             return;
         }
-        Set<String> actionKeys = collectActionKeys(stepsByStatus, path, violations);
-        stepsByStatus.forEach((status, steps) -> {
-            validateEnum(DealTranche.Status.class, status, path + ".stepsByStatus key", violations);
+        detail.getStepsByStatus().forEach((status, steps) -> {
+            validateEnum(Deal.Status.class, status, path + ".stepsByStatus key", violations);
             for (int index = 0; index < steps.size(); index++) {
-                validateStep(steps.get(index), path + ".stepsByStatus[" + status + "][" + index + "]",
-                        indicatorTypes, structureKeys, actionKeys, violations);
+                String stepPath = path + ".stepsByStatus[" + status + "][" + index + "]";
+                validateDealLevelStepType(steps.get(index), stepPath, violations);
+                validateStep(steps.get(index), stepPath, indicatorTypes, structureKeys, actionKeys, violations);
             }
         });
     }
 
-    /** Ключ действия уникален в рамках детали (через все её шаги) — правила валидации 1-2. */
-    private Set<String> collectActionKeys(Map<String, List<StrategyStepApiModel>> stepsByStatus,
-                                          String path, List<String> violations) {
+    /**
+     * Агрегатная поверхность УЗКАЯ: на детали законны только шаги
+     * {@code EXIT} и {@code FAIL_SAFE}. Выход из сделки — утверждение обо
+     * всех траншах сразу; всё остальное поведение объявляется на транше,
+     * и шаг иного типа здесь размножился бы по N объявлениям молча
+     * (docs/models/domain/aggregate/Strategy.md).
+     */
+    private void validateDealLevelStepType(StrategyStepApiModel step, String path, List<String> violations) {
+        if (StrategyStepType.EXIT.name().equals(step.getStepType())
+                || StrategyStepType.FAIL_SAFE.name().equals(step.getStepType())) {
+            return;
+        }
+        violations.add(path + ".stepType STRATEGY_DEAL_LEVEL_STEP_OUT_OF_SCOPE: "
+                + "агрегатная поверхность допускает только EXIT и FAIL_SAFE, объявлено " + step.getStepType());
+    }
+
+    /** Ключ действия уникален в рамках детали (через шаги ОБОИХ уровней) — правила валидации 1-2. */
+    private Set<String> collectActionKeys(StrategyDetailApiModel detail, String path, List<String> violations) {
         Set<String> keys = new HashSet<>();
-        stepsByStatus.values().forEach(steps -> steps.forEach(step -> {
+        detailStepStreams(detail).forEach(step -> {
             if (isNull(step.getActions())) {
                 return;
             }
@@ -445,8 +592,21 @@ public class StrategyCreateRequestValidator {
                     violations.add(path + ": duplicate action key " + action.getKey());
                 }
             });
-        }));
+        });
         return keys;
+    }
+
+    /** Все шаги детали — потраншевые и агрегатные, в порядке объявления. */
+    private List<StrategyStepApiModel> detailStepStreams(StrategyDetailApiModel detail) {
+        List<StrategyStepApiModel> steps = new ArrayList<>();
+        emptyIfNull(detail.getTranches()).stream()
+                .map(StrategyTrancheApiModel::getStepsByStatus)
+                .filter(Objects::nonNull)
+                .forEach(byStatus -> byStatus.values().forEach(steps::addAll));
+        if (nonNull(detail.getStepsByStatus())) {
+            detail.getStepsByStatus().values().forEach(steps::addAll);
+        }
+        return steps;
     }
 
     private void validateStep(StrategyStepApiModel step, String path,

@@ -106,7 +106,7 @@ public class StrategyActionOrchestrator {
     /** Действие снимает защиту: CANCEL над отдельной условной заявкой. */
     private boolean isProtectionRemoving(StrategyAction action) {
         return action instanceof StrategyAlgoOrderAction
-                && StrategyActionType.CANCEL.equals(action.getActionType());
+                && StrategyActionType.CANCEL_ACTION.equals(action.getActionType());
     }
 
     /**

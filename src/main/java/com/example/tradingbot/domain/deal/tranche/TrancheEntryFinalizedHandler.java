@@ -93,7 +93,7 @@ public class TrancheEntryFinalizedHandler implements TrancheFsmHandler {
 
     private List<StrategyStep> protectionSteps(DealContext dealContext, DealTranche tranche) {
         return support.stepsOfType(
-                support.stepsFor(dealContext, DealTranche.Status.ENTRY_FINALIZED), StrategyStepType.MAIN_PROTECTION);
+                support.stepsFor(dealContext, tranche), StrategyStepType.MAIN_PROTECTION);
     }
 
     /** Прогресс уже начатого (active) protection-действия; переходы (SUBMITTED/FAILED) отсеяны в checkTransition. */

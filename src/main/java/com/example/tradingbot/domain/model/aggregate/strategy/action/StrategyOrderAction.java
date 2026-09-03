@@ -42,9 +42,6 @@ public class StrategyOrderAction extends Auditable implements StrategyAction {
     /** Намерение reduce-only: ордер только уменьшает позицию. */
     private Boolean positionReducingOnly;
 
-    /** Уровень действия внутри стратегии (например, уровень grid-сетки). */
-    private Integer level;
-
     /** Правило расчёта цены размещения; для market-like входа null. */
     private StrategyPricePlacement placement;
 

@@ -13,6 +13,7 @@ import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
+import com.example.tradingbot.domain.command.risk.DealRiskNumbersWriter;
 import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.command.resolve.AttachedAlgoOrderStateResolver;
 import com.example.tradingbot.domain.command.resolve.AttachedProtectionFacts;
@@ -60,6 +61,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
     private final OrderMapper orderMapper;
     private final OrderExternalStatusResolver orderStatusResolver;
     private final AttachedAlgoOrderStateResolver attachedStateResolver;
+    private final DealRiskNumbersWriter riskNumbersWriter;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -80,6 +82,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
             requestedRung = applyOrUnknown(order, snapshot, dealContext);
         }
         orderDataService.save(order);
+        riskNumbersWriter.recompute(dealContext);
         completeAction(actionState);
         return isNull(requestedRung)
                 ? ServiceCommandExecutionResult.ok()

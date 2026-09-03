@@ -77,6 +77,13 @@ deal-orchestrator:
   cron: ${DEAL_ORCHESTRATOR_CRON:0 * * * * *}
   batch-size: ${DEAL_ORCHESTRATOR_BATCH_SIZE:100}
 
+# Детектор аномалий (docs/components/AnomalyJob.md): ищет активную позицию
+# без сделки, объясняющей её появление, и заводит вокруг неё сделку
+# восстановительной тропой. Частота — провизорное число.
+anomaly-job:
+  enabled: ${ANOMALY_JOB_ENABLED:true}
+  cron: ${ANOMALY_JOB_CRON:30 * * * * *}
+
 # ─── РИСК-АППЕТИТ ────────────────────────────────────────────────────────────
 # Три числа, которыми система ограничивает саму себя. Смысл, единица и роль
 # каждого в формулах — docs/rules/risk-policy.md §«Числа назначает держатель;

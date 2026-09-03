@@ -55,7 +55,7 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
     @Override
     public Boolean supports(StrategyAction action) {
         return action instanceof StrategyAlgoOrderAction
-                && StrategyActionType.CREATE.equals(action.getActionType());
+                && StrategyActionType.CREATE_ACTION.equals(action.getActionType());
     }
 
     @Override

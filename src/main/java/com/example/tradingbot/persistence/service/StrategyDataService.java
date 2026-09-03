@@ -10,11 +10,15 @@ import com.example.tradingbot.mapping.StrategyMapper;
 import com.example.tradingbot.persistence.model.strategy.StrategyActionEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyDetailEntity;
 import com.example.tradingbot.persistence.model.strategy.StrategyEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyStepEntity;
+import com.example.tradingbot.persistence.model.strategy.StrategyTrancheEntity;
 import com.example.tradingbot.persistence.repository.StrategyDetailRepository;
 import com.example.tradingbot.persistence.repository.StrategyRepository;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -132,26 +136,43 @@ public class StrategyDataService {
         saved.getDetails().forEach(this::resolveDetailTargetActions);
     }
 
+    /**
+     * Резолв цели идёт по ВСЕЙ детали — шагам обоих уровней. Ключ
+     * действия уникален в её пределах, и сужение области до одного
+     * уровня сделало бы цель нерезолвимой ровно там, где она объявлена
+     * соседним.
+     */
     private void resolveDetailTargetActions(StrategyDetailEntity detail) {
-        if (isNull(detail.getSteps())) {
-            return;
-        }
+        List<StrategyActionEntity> actions = detailActions(detail);
         Map<String, StrategyActionEntity> actionsByKey = new HashMap<>();
-        detail.getSteps().stream()
+        actions.forEach(action -> actionsByKey.put(action.getKey(), action));
+        actions.stream()
+                .filter(action -> nonNull(action.getTargetActionKey()))
+                .forEach(action -> {
+                    StrategyActionEntity target = actionsByKey.get(action.getTargetActionKey());
+                    if (isNull(target)) {
+                        throw new IllegalStateException(
+                                "Unresolved targetActionKey after validation: " + action.getTargetActionKey());
+                    }
+                    action.setTargetAction(target);
+                });
+    }
+
+    /** Все действия детали: с шагов объявлений траншей и с шагов узкой агрегатной поверхности. */
+    private List<StrategyActionEntity> detailActions(StrategyDetailEntity detail) {
+        List<StrategyStepEntity> steps = new ArrayList<>();
+        if (nonNull(detail.getSteps())) {
+            steps.addAll(detail.getSteps());
+        }
+        if (nonNull(detail.getTranches())) {
+            detail.getTranches().stream()
+                    .map(StrategyTrancheEntity::getSteps)
+                    .filter(Objects::nonNull)
+                    .forEach(steps::addAll);
+        }
+        return steps.stream()
                 .filter(step -> nonNull(step.getActions()))
-                .forEach(step -> step.getActions()
-                        .forEach(action -> actionsByKey.put(action.getKey(), action)));
-        detail.getSteps().stream()
-                .filter(step -> nonNull(step.getActions()))
-                .forEach(step -> step.getActions().forEach(action -> {
-            if (nonNull(action.getTargetActionKey())) {
-                StrategyActionEntity target = actionsByKey.get(action.getTargetActionKey());
-                if (isNull(target)) {
-                    throw new IllegalStateException(
-                            "Unresolved targetActionKey after validation: " + action.getTargetActionKey());
-                }
-                action.setTargetAction(target);
-            }
-        }));
+                .flatMap(step -> step.getActions().stream())
+                .collect(toList());
     }
 }

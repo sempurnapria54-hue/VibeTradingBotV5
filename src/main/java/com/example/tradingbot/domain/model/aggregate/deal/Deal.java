@@ -24,9 +24,8 @@ import lombok.Setter;
  * Сделка — lifecycle root и runtime graph торговой сделки: что система
  * сопровождает сценарий по конкретному Instrument, по pinned
  * StrategyDetail, в ожидаемом направлении, с FSM-статусом, причинами и
- * итоговым PnL. Не биржевая сущность (нет external id/status). Логика
- * финализации PnL (resultProfit через REFRESH_FILLS) — шаг 7; здесь —
- * структура. Связь с DealActionState — не поле Deal (через
+ * итоговым PnL. Не биржевая сущность (нет external id/status). Итоговый результат
+ * считается разбивкой движений средств (docs/rules/pnl-reconciliation.md). Связь с DealActionState — не поле Deal (через
  * Deal.id → DealActionState.dealId). См.
  * docs/models/domain/aggregate/Deal.md, docs/lifecycles/Deal.md.
  */
@@ -56,9 +55,6 @@ public class Deal extends Auditable {
     /** Короткая причина создания (не управляет FSM). */
     private EntryReason entryReason;
 
-    /** Тип entry-step (не управляет FSM). */
-    private EntryStepType entryStepType;
-
     /**
      * Фаза рынка при входе сделки. Write-once, пишет DealOpeningService
      * на тропе входа по объявлению той же транзакцией, что заводит
@@ -73,11 +69,57 @@ public class Deal extends Auditable {
     /** Итоговая бизнес-причина завершения. */
     private CloseReason closeReason;
 
-    /** Итоговый PnL (для terminal CLOSED/EMERGENCY_CLOSED обязателен; считается через REFRESH_FILLS). */
+    /** Итоговый PnL (для terminal CLOSED/EMERGENCY_CLOSED обязателен; считается по движениям средств). */
     private BigDecimal resultProfit;
 
     /** Валюта результата (для ETH-USDT-SWAP обычно USDT). */
     private String resultProfitCurrency;
+
+    /**
+     * <b>Риск, принятый сделкой на входах ({@code R})</b> — заявленный
+     * риск живых и исполнившихся входных ног всех траншей плюс налитая
+     * доля выбывших. Знаменатель R-мультипликатора и операнд
+     * кумулятивного потолка. Производная проекция: пересчитывается
+     * ЦЕЛИКОМ (docs/spec/deal-risk-numbers.json §dealPlannedRisk).
+     */
+    private BigDecimal plannedRiskAmount;
+
+    /**
+     * <b>Взятый на входе риск</b> — сколько из заявленного встало под
+     * удар. Измеритель разрыва «заявлено ↔ взято»; частичным выходом не
+     * уменьшается. Производная проекция.
+     */
+    private BigDecimal incurredRiskAmount;
+
+    /**
+     * <b>Неотработанная доля взятого на входе риска.</b> Уменьшается
+     * частичным выходом, при полном — ноль. Риском «под ударом сейчас»
+     * не является: уровня стопа формула не содержит. Производная
+     * проекция.
+     */
+    private BigDecimal currentRiskAmount;
+
+    /**
+     * <b>Риск, снятый защитой</b> — насколько действующий стоп уменьшил
+     * взятый риск. Наблюдение, не операнд потолков; знак не клэмпится.
+     * Производная проекция.
+     */
+    private BigDecimal protectionRelievedRiskAmount;
+
+    /**
+     * Валюта всех чисел риска сделки. Источник — расчётная валюта
+     * инструмента; у всех траншей она одна.
+     */
+    private String plannedRiskCurrency;
+
+    /**
+     * <b>База риска на момент сайзинга. Write-once</b>: фиксируется
+     * ПЕРВЫМ сайзингом сделки, каким бы траншем он ни делался.
+     * Потребители — знаменатель фактического процента риска в
+     * отчётности и делитель всех четырёх потолков живой сделки. Пусто =
+     * сайзинга не было (позиция создана вне приложения).
+     */
+    private BigDecimal plannedRiskEquityBase;
 
     /**
      * Порог доказанного покрытия — до какого момента наблюдался факт
@@ -224,6 +266,54 @@ public class Deal extends Auditable {
     }
 
     /**
+     * Причина закрытия сделки по СТАРШИНСТВУ причин её траншей: берётся
+     * старшая (наименьший ранг) среди закрывшихся
+     * (docs/spec/deal-lifecycle.json §trancheCloseReasonRank,
+     * §dealCloseReasonBySeniority). Пусто — ни один транш причины не
+     * назвал, и подставлять благоприятную нечем.
+     *
+     * <p>Порядок — не порядок закрытия: транш, закрывшийся первым, не
+     * получает этим старшинства. Ранг у причин один на модель, и здесь он
+     * читается, а не переизобретается.
+     */
+    public CloseReason closeReasonBySeniority() {
+        return emptyIfNull(tranches).stream()
+                .map(DealTranche::getCloseReason)
+                .filter(Objects::nonNull)
+                .min(java.util.Comparator.comparingInt(Deal::trancheReasonRank))
+                .map(Deal::toDealReason)
+                .orElse(null);
+    }
+
+    /** Ранг причины транша: 1 — старшая. Значение вне перечня старшинства рангу не подлежит. */
+    private static int trancheReasonRank(DealTranche.CloseReason reason) {
+        return switch (reason) {
+            case EXTERNAL_CLOSE -> 1;
+            case RISK_CONTROL -> 2;
+            case STOP_LOSS -> 3;
+            case TIME_STOP -> 4;
+            case STRATEGY_EXIT -> 5;
+            case TAKE_PROFIT -> 6;
+            case ENTRY_CONDITION_EXPIRED -> 7;
+            default -> 99;
+        };
+    }
+
+    /** Причина транша в перечне сделки; перечни пересекаются по этим семи значениям. */
+    private static CloseReason toDealReason(DealTranche.CloseReason reason) {
+        return switch (reason) {
+            case EXTERNAL_CLOSE -> CloseReason.EXTERNAL_CLOSE;
+            case RISK_CONTROL -> CloseReason.RISK_CONTROL;
+            case STOP_LOSS -> CloseReason.STOP_LOSS;
+            case TIME_STOP -> CloseReason.TIME_STOP;
+            case STRATEGY_EXIT -> CloseReason.STRATEGY_EXIT;
+            case TAKE_PROFIT -> CloseReason.TAKE_PROFIT;
+            case ENTRY_CONDITION_EXPIRED -> CloseReason.ENTRY_CONDITION_EXPIRED;
+            default -> null;
+        };
+    }
+
+    /**
      * Порог доказанного покрытия двигается ТОЛЬКО вперёд: число
      * наблюдений равно числу закрывшихся эпизодов, и порог обязан
      * накрывать движения всех.
@@ -277,16 +367,6 @@ public class Deal extends Auditable {
         UNKNOWN
     }
 
-    /** Тип entry-step сделки (или null, если создана не через strategy entry-step). */
-    public enum EntryStepType {
-
-        /** Обычный вход. */
-        ENTRY,
-
-        /** Вход уровнем grid-сетки. */
-        GRID_ENTRY
-    }
-
     /** Причина запуска graceful shutdown / controlled close. Не заменяет closeReason. */
     public enum ShutdownReason {
 
@@ -311,6 +391,14 @@ public class Deal extends Auditable {
 
     /** Итоговая бизнес-причина завершения сделки (не технический механизм закрытия). */
     public enum CloseReason {
+
+        /**
+         * Позицию закрыл кто-то извне системы. Клетка ребра
+         * {@code EXIT_PENDING → CLOSED} без инициатора выхода закрывается
+         * им; значение СТАРШЕЕ в порядке старшинства причин траншей
+         * (docs/spec/deal-lifecycle.json §trancheCloseReasonRank).
+         */
+        EXTERNAL_CLOSE,
 
         /** Candidate закрыт в PRECHECK до live risk. */
         ENTRY_CONDITION_EXPIRED,

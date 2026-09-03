@@ -82,6 +82,37 @@ public class Order extends Auditable {
     /** internalId предшественника в цепочке REPLACE (nullable; обратная ссылка выводится запросом). */
     private String replacesInternalId;
 
+    /**
+     * Эпизод сделки, к которому относится заявка. Пусто, пока эпизода
+     * нет либо заявка его не открыла. Write-once — <b>ось отбора</b>
+     * живого эпизода в числах риска: без неё ноги закрытых эпизодов
+     * неотличимы от ног текущего, и пара «взятое ↔ снятое защитой»
+     * считалась бы по всей истории сделки
+     * (docs/spec/deal-risk-numbers.json, {@code onLiveEpisode}).
+     */
+    private Long positionId;
+
+    /**
+     * Цена входа, по которой считался риск ЭТОЙ ноги. У рыночного входа
+     * — расчётная референс-цена, на биржу не отправляемая. Write-once.
+     */
+    private BigDecimal plannedEntryPrice;
+
+    /** Заявленный размер этой ноги в контрактах. Write-once. */
+    private BigDecimal plannedSizeContracts;
+
+    /** Плановый риск этой ноги — убыток на её стопе при постановке. Write-once. */
+    private BigDecimal plannedRiskAmount;
+
+    /** Валюта планового риска ноги. Write-once. */
+    private String plannedRiskCurrency;
+
+    /** Размер контракта на момент постановки ноги. Write-once. */
+    private BigDecimal plannedContractValue;
+
+    /** Уровень стопа, под который считался риск ноги. Write-once. */
+    private BigDecimal plannedStopPrice;
+
     /** Embedded attached protection, созданная вместе с parent order. */
     private List<AttachedAlgoOrder> attachedAlgoOrders;
 

@@ -9,7 +9,12 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
  * (strategyActionId → RuntimeTarget). JSON-дискриминатор actionKind
  * (ORDER/ALGO_ORDER/POSITION) — только для сериализации формы ввода,
  * не поле домена. Каркасный реляционный узел дерева: базовая таблица
- * strategy_action + таблицы по видам (JOINED). См.
+ * strategy_action + таблицы по видам (JOINED).
+ *
+ * <p><b>Уровня у действия нет:</b> уровень — свойство ТРАНША
+ * (docs/models/domain/aggregate/Strategy.md §StrategyTranche), сетку
+ * задаёт шаблон объявления, а порядок исполнения пакета шага определяет
+ * риск-класс (docs/rules/live-risk-protection.md). См.
  * docs/models/domain/aggregate/Strategy.md (§Действия, §Связь с
  * DealActionState).
  */
@@ -30,9 +35,6 @@ public interface StrategyAction {
     /** Тип действия. */
     StrategyActionType getActionType();
 
-    /** Уровень действия внутри стратегии (не переносится в runtime-сущности). */
-    Integer getLevel();
-
     /**
      * Чем задан уровень действия. Резолв — по объявленному блоку настроек
      * (docs/spec/strategy-reference.json, величина
@@ -46,7 +48,7 @@ public interface StrategyAction {
      * (docs/spec/stop-distance.json, операнд {@code placementRole}).
      */
     default StrategyPlacementRole placementRole() {
-        return StrategyActionType.REPLACE.equals(getActionType()) && isNotBlank(getTargetActionKey())
+        return StrategyActionType.REPLACE_ACTION.equals(getActionType()) && isNotBlank(getTargetActionKey())
                 ? StrategyPlacementRole.TRANSFER
                 : StrategyPlacementRole.PRIMARY;
     }

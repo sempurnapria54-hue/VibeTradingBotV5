@@ -74,4 +74,25 @@ public class OrderEntity extends AuditableEntity {
 
     @Column(name = "replaces_internal_id")
     private String replacesInternalId;
+
+    @Column(name = "position_id")
+    private Long positionId;
+
+    @Column(name = "planned_entry_price")
+    private BigDecimal plannedEntryPrice;
+
+    @Column(name = "planned_size_contracts")
+    private BigDecimal plannedSizeContracts;
+
+    @Column(name = "planned_risk_amount")
+    private BigDecimal plannedRiskAmount;
+
+    @Column(name = "planned_risk_currency")
+    private String plannedRiskCurrency;
+
+    @Column(name = "planned_contract_value")
+    private BigDecimal plannedContractValue;
+
+    @Column(name = "planned_stop_price")
+    private BigDecimal plannedStopPrice;
 }

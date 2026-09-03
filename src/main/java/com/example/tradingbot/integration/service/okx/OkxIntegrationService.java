@@ -12,7 +12,6 @@ import com.example.tradingbot.domain.command.resolve.ProtectionHistoryLeg;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;
-import com.example.tradingbot.domain.model.core.fill.external_snapshot.FillExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalRulesExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
@@ -38,7 +37,6 @@ import com.example.tradingbot.integration.model.okx.response.InstrumentOkxRespon
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
-import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.ServerTimeOkxResponse;
@@ -53,7 +51,6 @@ import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.mapping.CandleMapper;
 import com.example.tradingbot.mapping.DealCashFlowMapper;
-import com.example.tradingbot.mapping.FillMapper;
 import com.example.tradingbot.mapping.InstrumentExternalRulesMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.mapping.MarketPriceDataMapper;
@@ -98,7 +95,6 @@ public class OkxIntegrationService implements IntegrationService {
     private final PositionMapper positionMapper;
     private final BalanceContainerMapper balanceContainerMapper;
     private final AlgoOrderMapper algoOrderMapper;
-    private final FillMapper fillMapper;
     private final TradeFeeRateMapper tradeFeeRateMapper;
     private final DealCashFlowMapper dealCashFlowMapper;
 
@@ -410,20 +406,6 @@ public class OkxIntegrationService implements IntegrationService {
     }
 
     @Override
-    public List<FillExternalSnapshot> getFills(String externalInstrumentId, String afterBillId, Integer limit) {
-        OkxApiResponse<FillOkxResponse> response = execute(
-                () -> okxRestClient.getFills(externalInstrumentId, afterBillId, limit),
-                "trade-fills", "instId=" + externalInstrumentId);
-        verifyCode(response, "trade-fills", "instId=" + externalInstrumentId);
-        if (isEmpty(response.getData())) {
-            return List.of();
-        }
-        return response.getData().stream()
-                .map(fillMapper::integrationToSnapshot)
-                .collect(toList());
-    }
-
-    @Override
     public List<OrderExternalSnapshot> getPendingOrders(String externalInstrumentId) {
         OkxApiResponse<OrderOkxResponse> response = execute(() -> okxRestClient.getPendingOrders(externalInstrumentId),
                 "orders-pending", "instId=" + externalInstrumentId);
@@ -518,18 +500,6 @@ public class OkxIntegrationService implements IntegrationService {
             return List.of();
         }
         return response.getData().stream().map(orderMapper::integrationToSnapshot).collect(toList());
-    }
-
-    @Override
-    public List<FillExternalSnapshot> getFillsHistory(String externalInstrumentId, String afterBillId, Integer limit) {
-        OkxApiResponse<FillOkxResponse> response = execute(
-                () -> okxRestClient.getFillsHistory(externalInstrumentId, afterBillId, limit),
-                "fills-history", "instId=" + externalInstrumentId);
-        verifyCode(response, "fills-history", "instId=" + externalInstrumentId);
-        if (isEmpty(response.getData())) {
-            return List.of();
-        }
-        return response.getData().stream().map(fillMapper::integrationToSnapshot).collect(toList());
     }
 
     @Override

@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
+import com.example.tradingbot.domain.command.risk.DealRiskNumbersWriter;
 import com.example.tradingbot.domain.command.payload.RefreshAlgoOrderCommandPayload;
 import com.example.tradingbot.domain.command.resolve.AlgoOrderExternalStatusResolver;
 import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
@@ -48,6 +49,7 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
     private final IntegrationService integrationService;
     private final AlgoOrderMapper algoOrderMapper;
     private final AlgoOrderExternalStatusResolver algoOrderStatusResolver;
+    private final DealRiskNumbersWriter riskNumbersWriter;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -67,6 +69,7 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
             applyOrUnknown(algoOrder, snapshot);
         }
         algoOrderDataService.save(algoOrder);
+        riskNumbersWriter.recompute(dealContext);
         completeAction(actionState);
         return ServiceCommandExecutionResult.ok();
     }

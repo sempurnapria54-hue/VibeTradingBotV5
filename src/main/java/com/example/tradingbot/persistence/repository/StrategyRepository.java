@@ -19,13 +19,16 @@ public interface StrategyRepository extends JpaRepository<StrategyEntity, Long> 
      * (step_index / id ASC).
      */
     @Query("""
-            select s from StrategyEntity s
+            select distinct s from StrategyEntity s
             left join fetch s.marketPhaseSetting
             left join fetch s.indicatorSettings
             left join fetch s.marketStructureSettings
             left join fetch s.details d
             left join fetch d.steps st
             left join fetch st.actions
+            left join fetch d.tranches tr
+            left join fetch tr.steps tst
+            left join fetch tst.actions
             where s.internalId = :internalId
             """)
     Optional<StrategyEntity> findByInternalIdWithTree(@Param("internalId") String internalId);
@@ -77,6 +80,9 @@ public interface StrategyRepository extends JpaRepository<StrategyEntity, Long> 
             left join fetch s.details d
             left join fetch d.steps st
             left join fetch st.actions
+            left join fetch d.tranches tr
+            left join fetch tr.steps tst
+            left join fetch tst.actions
             where s.instrumentId = :instrumentId and s.status = :status
             """)
     Optional<StrategyEntity> findByInstrumentIdAndStatusWithTree(@Param("instrumentId") Long instrumentId,

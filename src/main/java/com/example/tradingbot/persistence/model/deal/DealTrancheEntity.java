@@ -37,6 +37,20 @@ public class DealTrancheEntity extends AuditableEntity {
     @Column(name = "status", nullable = false)
     private String status;
 
+    /** Объявление, по которому транш материализован; пусто у восстановленного. */
+    @Column(name = "strategy_tranche_id")
+    private Long strategyTrancheId;
+
+    /** Уровень экземпляра в сетке объявления; пусто у восстановленного. */
+    @Column(name = "level")
+    private Integer level;
+
+    @Column(name = "entry_step_type")
+    private String entryStepType;
+
+    @Column(name = "close_reason")
+    private String closeReason;
+
     @Column(name = "episode_seq", nullable = false)
     private Integer episodeSeq;
 

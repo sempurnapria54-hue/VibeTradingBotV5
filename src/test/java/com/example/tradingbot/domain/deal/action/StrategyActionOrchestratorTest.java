@@ -37,8 +37,8 @@ class StrategyActionOrchestratorTest {
     @Test
     @DisplayName("Пакет продвигается: действие с готовой строкой пропускается, берётся следующее")
     void packageAdvancesPastStartedAction() {
-        StrategyAction first = algoAction(1L, StrategyActionType.CREATE);
-        StrategyAction second = algoAction(2L, StrategyActionType.CREATE);
+        StrategyAction first = algoAction(1L, StrategyActionType.CREATE_ACTION);
+        StrategyAction second = algoAction(2L, StrategyActionType.CREATE_ACTION);
         DealTranche tranche = tranche();
 
         Optional<StrategyAction> next = orchestrator.nextAction(step(first, second),
@@ -51,8 +51,8 @@ class StrategyActionOrchestratorTest {
     @Test
     @DisplayName("Ключ порядка — риск-класс: снимающее защиту идёт после устанавливающего")
     void protectionRemovingGoesLast() {
-        StrategyAction cancel = algoAction(1L, StrategyActionType.CANCEL);
-        StrategyAction create = algoAction(2L, StrategyActionType.CREATE);
+        StrategyAction cancel = algoAction(1L, StrategyActionType.CANCEL_ACTION);
+        StrategyAction create = algoAction(2L, StrategyActionType.CREATE_ACTION);
         DealTranche tranche = tranche();
 
         // Порядок объявления — снятие первым; ключом порядка он не служит.
@@ -65,8 +65,8 @@ class StrategyActionOrchestratorTest {
     @Test
     @DisplayName("Отложенное действие останавливает пакет: строка не заводится, следующее не обгоняет")
     void deferredActionStopsPackage() {
-        StrategyAction deferred = algoAction(1L, StrategyActionType.CANCEL);
-        StrategyAction create = algoAction(2L, StrategyActionType.CREATE);
+        StrategyAction deferred = algoAction(1L, StrategyActionType.CANCEL_ACTION);
+        StrategyAction create = algoAction(2L, StrategyActionType.CREATE_ACTION);
         DealTranche tranche = tranche();
 
         // Устанавливающее уже исполнено — очередь дошла до снятия, а оно ждёт покрытия.
@@ -79,7 +79,7 @@ class StrategyActionOrchestratorTest {
     @Test
     @DisplayName("Пакет исчерпан — начинать нечего")
     void exhaustedPackageYieldsNothing() {
-        StrategyAction only = algoAction(1L, StrategyActionType.CREATE);
+        StrategyAction only = algoAction(1L, StrategyActionType.CREATE_ACTION);
         DealTranche tranche = tranche();
 
         Optional<StrategyAction> next = orchestrator.nextAction(step(only),
@@ -130,7 +130,7 @@ class StrategyActionOrchestratorTest {
 
         @Override
         public Boolean supports(StrategyAction action) {
-            return StrategyActionType.CREATE.equals(action.getActionType());
+            return StrategyActionType.CREATE_ACTION.equals(action.getActionType());
         }
 
         @Override
@@ -145,7 +145,7 @@ class StrategyActionOrchestratorTest {
 
         @Override
         public Boolean supports(StrategyAction action) {
-            return StrategyActionType.CANCEL.equals(action.getActionType());
+            return StrategyActionType.CANCEL_ACTION.equals(action.getActionType());
         }
 
         @Override

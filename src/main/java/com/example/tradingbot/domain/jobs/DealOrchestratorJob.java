@@ -162,7 +162,9 @@ public class DealOrchestratorJob {
         if (isNull(transition.getNextStatus())) {
             return;
         }
-        Boolean reopenAllowed = dealContext.getStrategyDetail().getPositionReopenAllowed();
+        // Признак переоткрытия живёт на ОБЪЯВЛЕНИИ транша, а не на детали:
+        // сетка и одиночный вход одной фазы вправе решать это по-разному.
+        Boolean reopenAllowed = dealContext.reopenAllowed(tranche);
         if (isFalse(dealTrancheStateMachine.transitionAllowed(tranche, transition.getNextStatus(),
                 dealContext.getDeal(), reopenAllowed, graphComplete(dealContext)))) {
             log.debug("Tranche transition is not allowed trancheId={} to={}",
@@ -170,6 +172,11 @@ public class DealOrchestratorJob {
             return;
         }
         tranche.setStatus(transition.getNextStatus());
+        // Причину закрытия пишет обработчик терминального ребра — той же
+        // транзакцией, которой ребро применяется; write-once.
+        if (nonNull(transition.getCloseReason()) && isNull(tranche.getCloseReason())) {
+            tranche.setCloseReason(transition.getCloseReason());
+        }
         dealTrancheDataService.save(tranche);
     }
 

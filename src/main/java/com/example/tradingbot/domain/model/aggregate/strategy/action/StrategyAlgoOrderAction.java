@@ -37,9 +37,6 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
     /** Тип условия срабатывания algo-order. */
     private AlgoOrder.ConditionType conditionType;
 
-    /** Уровень действия внутри стратегии. */
-    private Integer level;
-
     /** Настройки расчёта stop-loss (для SL/OCO-ноги). */
     private StopLossSettings stopLossSettings;
 

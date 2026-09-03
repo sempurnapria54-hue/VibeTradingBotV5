@@ -2,8 +2,11 @@ package com.example.tradingbot.domain.command.risk;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.config.RiskAppetiteProperties;
 import com.example.tradingbot.domain.command.DealContext;
@@ -16,6 +19,7 @@ import com.example.tradingbot.domain.command.calc.ResolvedTakeProfitPrice;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckStatus;
 import com.example.tradingbot.domain.command.risk.RiskValidationResult.RiskDecision;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -23,15 +27,16 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyLev
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPlacementRole;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
-import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.persistence.service.InstrumentExternalRulesDataService;
 import com.example.tradingbot.util.Constants;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -39,12 +44,20 @@ import org.springframework.stereotype.Component;
  * Проверяет уже рассчитанное risk-creating/increasing/weakening действие
  * по risk-policy и отвечает «разрешено ли действие?», возвращая
  * {@link RiskValidationResult} (docs/components/RiskValidator.md). Сам
- * считает нужные risk-метрики (risk amount, risk percent от свободного
- * депозита). Читает persisted InstrumentExternalRules — в биржу не ходит;
- * статус сделки не меняет и команд не создаёт. Фаза 1 — риск на сделку:
- * главная проверка RISK_PER_TRADE_EXCEEDED (база —
- * externalAvailableEquity); кода контроля экспозиции/нашего кэпа плеча нет
- * (docs/decisions/per-trade-risk-policy.md).
+ * считает нужные risk-метрики. Читает persisted InstrumentExternalRules —
+ * в биржу не ходит; статус сделки не меняет и команд не создаёт.
+ *
+ * <p><b>Делитель ВСЕХ ЧЕТЫРЁХ потолков один</b> — база риска: снимок
+ * сделки, если он есть, иначе живая база счёта. Развилка не
+ * стилистическая: снимок пишет создатель ноги той же транзакцией, что
+ * заводит ногу, а преконтроль идёт ДО неё — на ПЕРВОМ действии сделки
+ * делителя-снимка не существует (docs/spec/risk-limits.json §base).
+ *
+ * <p><b>Входной гейт — полнота графа, и он fail-fast.</b> На неполном
+ * графе операнды потолков занижены, то есть преконтроль разрешал бы
+ * действие, которое потолок обязан отвергнуть; ответ по загруженному
+ * подмножеству был бы ошибкой в разрешающую сторону, а пустота нулём не
+ * подменяется (docs/components/RiskValidator.md).
  */
 @Component
 @RequiredArgsConstructor
@@ -60,6 +73,13 @@ public class RiskValidator {
         CalculatedSize size = calculatedAction.getCalculatedSize();
         CalculatedPrice price = calculatedAction.getCalculatedPrice();
 
+        // Входной гейт полноты графа стои́т ПЕРВЫМ и отказывает fail-fast:
+        // на неполном графе операнды потолков занижены, и любая проверка
+        // после него отвечала бы по загруженному подмножеству.
+        if (isFalse(dealContext.getGraphComplete())) {
+            return blockedResult(checks, RiskCheckCode.DEAL_GRAPH_INCOMPLETE,
+                    "Deal graph is not fully presented by the pass context");
+        }
         if (isNull(size) || isNull(size.getSizeContracts()) || size.getSizeContracts().signum() <= 0) {
             return blockedResult(checks, RiskCheckCode.CALCULATED_ACTION_INVALID,
                     "Calculated size missing or non-positive");
@@ -71,11 +91,16 @@ public class RiskValidator {
             return blockedResult(checks, RiskCheckCode.INSTRUMENT_RULES_MISSING,
                     "Instrument external rules not materialized");
         }
-        BalanceContainer balance = dealContext.getBalanceContainer();
-        if (isNull(balance) || isNull(balance.getExternalAvailableEquity())
-                || balance.getExternalAvailableEquity().signum() <= 0) {
+        // Расчётная валюта — та, в которой меряются все числа риска:
+        // инструмент без неё к торговле не допускается.
+        if (isBlank(dealContext.getInstrument().getExternalSettlementCurrency())) {
+            return blockedResult(checks, RiskCheckCode.INSTRUMENT_SETTLE_CURRENCY_MISSING,
+                    "Instrument settlement currency is not resolved");
+        }
+        BigDecimal base = riskBase(dealContext);
+        if (isNull(base) || base.signum() <= 0) {
             return blockedResult(checks, RiskCheckCode.BALANCE_INVALID,
-                    "Available equity missing or non-positive");
+                    "Risk base is missing or non-positive");
         }
         // Энфорсера остановки по серии убытков не существует, пока порог не
         // задан: провизорное число выглядит контролем, не будучи им
@@ -90,7 +115,6 @@ public class RiskValidator {
         }
 
         BigDecimal sizeContracts = size.getSizeContracts();
-        BigDecimal equity = balance.getExternalAvailableEquity();
         Position position = dealContext.getDeal().livePosition();
         StrategyTradeDirection direction = dealContext.getDeal().getDirection();
         BigDecimal entryReference = entryReference(position, price);
@@ -103,12 +127,275 @@ public class RiskValidator {
         checkRiskCreatingEntryProtection(calculatedAction, checks);
         checkStopLossSide(calculatedAction.getSourceAction(), price.getStopLossPrice(), entryReference,
                 direction, checks);
+        checkStopDistanceFloor(price.getStopLossPrice(), entryReference, direction, rules, checks);
         checkTakeProfitSide(price.getTakeProfitPrice(), entryReference, direction, checks);
         checkLiquidationGuard(price.getStopLossPrice(), position, direction, checks);
-        checkRiskPerTrade(price.getStopLossPrice(), entryReference, sizeContracts, rules, equity,
-                dealContext.getStrategyDetail(), checks);
+        checkCollapseWindow(calculatedAction, dealContext, checks);
+        checkSafetyRung(calculatedAction, dealContext, checks);
+        checkCeilings(calculatedAction, dealContext, rules, base, entryReference, checks);
 
         return aggregate(checks);
+    }
+
+    /**
+     * Делитель всех четырёх потолков: снимок базы, если он есть, иначе
+     * живая база счёта. Снимок пишет создатель ноги ПОСЛЕ преконтроля,
+     * поэтому на первом действии сделки его ещё не существует, и делит
+     * живая база (docs/spec/risk-limits.json §base).
+     */
+    private BigDecimal riskBase(DealContext dealContext) {
+        BigDecimal frozen = dealContext.getDeal().getPlannedRiskEquityBase();
+        if (nonNull(frozen)) {
+            return frozen;
+        }
+        return nonNull(dealContext.getExchange()) ? dealContext.getExchange().getRiskBase() : null;
+    }
+
+    /**
+     * Четыре потолка риска и катастрофический потолок нотинала. Все пять
+     * неравенств считаются от ОДНОЙ базы и от операндов, взятых по графу
+     * в точке проверки (docs/spec/risk-limits.json).
+     *
+     * <p><b>Слагаемое проверяемого акта обязательно</b>: без него первый
+     * вход сравнивал бы с потолком ноль и проходил любым размером —
+     * потолок, заведённый против шокового хода, был бы инертен ровно
+     * там, где решается размер.
+     */
+    private void checkCeilings(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                               InstrumentExternalRules rules, BigDecimal base, BigDecimal entryReference,
+                               List<RiskCheckResult> checks) {
+        StrategyDetail detail = dealContext.getStrategyDetail();
+        if (isNull(detail) || isNull(detail.getRiskPerActionPercent())) {
+            return;
+        }
+        BigDecimal actRisk = actRisk(calculatedAction, dealContext, rules, entryReference);
+        BigDecimal actNotional = actNotional(calculatedAction, rules, entryReference);
+
+        checkAgainst(actRisk, percentOf(detail.getRiskPerActionPercent(), base),
+                RiskCheckCode.RISK_PER_ACTION_EXCEEDED, "per-action risk ceiling", checks);
+        if (nonNull(detail.getCumulativeRiskPerDealMultiplier())) {
+            BigDecimal cumulative = percentOf(detail.getRiskPerActionPercent(), base)
+                    .multiply(detail.getCumulativeRiskPerDealMultiplier());
+            checkAgainst(zeroIfNull(dealContext.getDeal().getPlannedRiskAmount()).add(actRisk), cumulative,
+                    RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_EXCEEDED, "cumulative risk ceiling", checks);
+        }
+        BigDecimal liveRiskNow = liveRiskNow(dealContext, rules, entryReference);
+        if (nonNull(detail.getStrategySimultaneousRiskPerDealPercent())) {
+            checkAgainst(liveRiskNow.add(actRisk),
+                    percentOf(detail.getStrategySimultaneousRiskPerDealPercent(), base),
+                    RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED, "strategy simultaneous ceiling", checks);
+        }
+        checkAgainst(liveRiskNow.add(actRisk),
+                percentOf(riskAppetite.getGlobalSimultaneousRiskPerDealPercent(), base),
+                RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED, "global simultaneous ceiling", checks);
+        checkCatastrophicNotional(dealContext, detail, rules, base, entryReference, actNotional, checks);
+    }
+
+    /**
+     * Катастрофический потолок: максимальный риск на сделку, растянутый
+     * множителем стратегии; он же кэп суммарного нотинала — худший
+     * мыслимый ход принят равным 100 %. Незаданный множитель ОТКАЗЫВАЕТ
+     * вычислением, а не пропускает действие.
+     */
+    private void checkCatastrophicNotional(DealContext dealContext, StrategyDetail detail,
+                                           InstrumentExternalRules rules, BigDecimal base,
+                                           BigDecimal entryReference, BigDecimal actNotional,
+                                           List<RiskCheckResult> checks) {
+        if (isNull(detail.getStrategyCatastrophicRiskPerDealMultiplier())) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+                    "strategyCatastrophicRiskPerDealMultiplier is not declared", null));
+            return;
+        }
+        BigDecimal ceiling = percentOf(riskAppetite.getGlobalSimultaneousRiskPerDealPercent(), base)
+                .multiply(detail.getStrategyCatastrophicRiskPerDealMultiplier());
+        checkAgainst(dealNotional(dealContext, rules, entryReference).add(actNotional), ceiling,
+                RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "catastrophic notional ceiling", checks);
+    }
+
+    /**
+     * Что стои́т под ударом сейчас: неисполненная доля живых входных ног
+     * плюс живой эпизод до действующей защиты. Оба слагаемых считаются
+     * по графу в точке проверки.
+     */
+    private BigDecimal liveRiskNow(DealContext dealContext, InstrumentExternalRules rules,
+                                   BigDecimal entryReference) {
+        BigDecimal unfilled = liveEntryLegs(dealContext).stream()
+                .map(this::legUnfilledRisk)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return unfilled.add(livePositionRiskAtStop(dealContext, rules, entryReference));
+    }
+
+    /** Заявленный риск ноги в её НЕИСПОЛНЕННОЙ доле. */
+    private BigDecimal legUnfilledRisk(Order leg) {
+        BigDecimal planned = zeroIfNull(leg.getPlannedSizeContracts());
+        if (planned.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal unfilled = planned.subtract(zeroIfNull(leg.getAccumulatedFillSize()));
+        return zeroIfNull(leg.getPlannedRiskAmount())
+                .multiply(unfilled)
+                .divide(planned, Constants.Calc.MATH_CONTEXT);
+    }
+
+    /**
+     * Живой эпизод до действующей защиты, с round-trip комиссией. Клэмп
+     * нулём здесь, а не на сумме: стоп за безубытком гасит СВОЁ
+     * слагаемое, а не чужие.
+     */
+    private BigDecimal livePositionRiskAtStop(DealContext dealContext, InstrumentExternalRules rules,
+                                              BigDecimal entryReference) {
+        Position live = dealContext.getDeal().livePosition();
+        if (isNull(live) || isNull(live.getExternalSize()) || isNull(entryReference)
+                || isNull(rules.contractValue())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal stop = dealContext.getDeal().getTranches().stream()
+                .map(tranche -> tranche.worstActiveStopLevel(dealContext.getDeal().getDirection()))
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        BigDecimal risk = DealRiskNumbers.plannedRisk(dealContext.getDeal().getDirection(), entryReference,
+                stop, rules.takerFeeRate(), live.getExternalSize(), rules.contractValue());
+        if (isNull(risk)) {
+            return BigDecimal.ZERO;
+        }
+        return risk.signum() > 0 ? risk : BigDecimal.ZERO;
+    }
+
+    /** Экспозиция сделки ДО акта: неисполненная доля живых ног плюс живой эпизод. */
+    private BigDecimal dealNotional(DealContext dealContext, InstrumentExternalRules rules,
+                                    BigDecimal entryReference) {
+        if (isNull(rules.contractValue())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal legs = liveEntryLegs(dealContext).stream()
+                .map(leg -> zeroIfNull(leg.getPlannedSizeContracts())
+                        .subtract(zeroIfNull(leg.getAccumulatedFillSize()))
+                        .multiply(rules.contractValue())
+                        .multiply(zeroIfNull(leg.getPlannedEntryPrice())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Position live = dealContext.getDeal().livePosition();
+        if (isNull(live) || isNull(live.getExternalSize()) || isNull(entryReference)) {
+            return legs;
+        }
+        return legs.add(live.getExternalSize().multiply(rules.contractValue()).multiply(entryReference));
+    }
+
+    /** Живые ВХОДНЫЕ ноги сделки — по всем траншам: потолки агрегатные. */
+    private List<Order> liveEntryLegs(DealContext dealContext) {
+        return emptyIfNull(dealContext.getDeal().getOrders()).stream()
+                .filter(order -> isTrue(order.isLive()))
+                .filter(order -> isNotTrue(order.getPositionReducingOnly()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Риск проверяемого акта: плановый риск ноги для risk-creating, ноль
+     * для risk-weakening — новых контрактов такое действие не создаёт.
+     */
+    private BigDecimal actRisk(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                               InstrumentExternalRules rules, BigDecimal entryReference) {
+        if (isFalse(isRiskCreatingEntry(calculatedAction.getSourceAction()))) {
+            return BigDecimal.ZERO;
+        }
+        ResolvedStopLossPrice stop = calculatedAction.getCalculatedPrice().getStopLossPrice();
+        BigDecimal risk = DealRiskNumbers.plannedRisk(dealContext.getDeal().getDirection(), entryReference,
+                isNull(stop) ? null : stop.getTriggerPrice(), rules.takerFeeRate(),
+                calculatedAction.getCalculatedSize().getSizeContracts(), rules.contractValue());
+        return isNull(risk) ? BigDecimal.ZERO : risk;
+    }
+
+    /** Нотинал проверяемого акта; risk-weakening контрактов не создаёт. */
+    private BigDecimal actNotional(CalculatedStrategyAction calculatedAction, InstrumentExternalRules rules,
+                                   BigDecimal entryReference) {
+        if (isFalse(isRiskCreatingEntry(calculatedAction.getSourceAction()))
+                || isNull(rules.contractValue()) || isNull(entryReference)) {
+            return BigDecimal.ZERO;
+        }
+        return calculatedAction.getCalculatedSize().getSizeContracts()
+                .multiply(rules.contractValue()).multiply(entryReference);
+    }
+
+    /**
+     * Набор риска в окне сворачивания отвергается ПРЕКОНТРОЛЕМ, а не
+     * только статусным ребром: действие, статус не двигающее — добор
+     * объёма, замещение с увеличением, — до ребра не доходит вовсе
+     * (docs/rules/exit-teardown-order.md). Признак приходит контекстом
+     * прохода; преконтроль его не выводит.
+     */
+    private void checkCollapseWindow(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                                     List<RiskCheckResult> checks) {
+        if (isFalse(isRiskCreatingEntry(calculatedAction.getSourceAction()))) {
+            return;
+        }
+        if (Deal.Status.EXIT_PENDING.equals(dealContext.getDeal().getStatus())) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_CREATING_UNDER_COLLAPSE,
+                    "Risk-creating act while the deal is collapsing", null));
+        }
+    }
+
+    /**
+     * Блок-сет стоящей safety-ступени инструмента: акт блокируемого
+     * класса отвергается, реакция — карв-аут, возобновление — снятием
+     * ступени (docs/rules/instrument-hold.md §Enforcement). Снятие риска
+     * и reduce-only-выход в блок-сет не входят: сделки доживают под
+     * своей защитой.
+     */
+    private void checkSafetyRung(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                                 List<RiskCheckResult> checks) {
+        if (isFalse(dealContext.getInstrument().hasStandingSafetyRung())) {
+            return;
+        }
+        checks.add(RiskCheckResult.blocked(RiskCheckCode.INSTRUMENT_SAFETY_HOLD,
+                "Instrument stands in a safety rung whose block set covers this act class", null));
+    }
+
+    /**
+     * Пол дистанции стопа: уровень на убыточной стороне не ближе якоря,
+     * чем round-trip комиссия — иначе стоп срабатывает в убыток даже без
+     * движения цены (docs/spec/stop-distance.json §stopDistanceAboveFloor).
+     * Проверяется на ЛЮБОЙ постановке и переносе уровня; стоп на
+     * прибыльной стороне под пол не подпадает — там дистанция знаково
+     * отрицательна, и пол к ней неприменим.
+     */
+    private void checkStopDistanceFloor(ResolvedStopLossPrice stopLoss, BigDecimal entryReference,
+                                        StrategyTradeDirection direction, InstrumentExternalRules rules,
+                                        List<RiskCheckResult> checks) {
+        if (isNull(stopLoss) || isNull(stopLoss.getTriggerPrice()) || isNull(entryReference)
+                || isNull(rules.takerFeeRate())) {
+            return;
+        }
+        BigDecimal trigger = stopLoss.getTriggerPrice();
+        BigDecimal signedDistance = StrategyTradeDirection.LONG.equals(direction)
+                ? entryReference.subtract(trigger)
+                : trigger.subtract(entryReference);
+        if (signedDistance.signum() <= 0) {
+            return;
+        }
+        BigDecimal floor = rules.takerFeeRate().multiply(entryReference.add(trigger));
+        if (signedDistance.compareTo(floor) < 0) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_DISTANCE_BELOW_FLOOR,
+                    "Stop distance below round-trip fee floor " + floor, signedDistance));
+        }
+    }
+
+    /** Неравенство потолка: превышение — отказ своим кодом. */
+    private void checkAgainst(BigDecimal actual, BigDecimal ceiling, RiskCheckCode code, String label,
+                              List<RiskCheckResult> checks) {
+        if (isNull(ceiling)) {
+            return;
+        }
+        if (actual.compareTo(ceiling) > 0) {
+            checks.add(RiskCheckResult.blocked(code, label + " exceeded: " + actual + " > " + ceiling, actual));
+        }
+    }
+
+    private BigDecimal percentOf(BigDecimal percent, BigDecimal base) {
+        return isNull(percent) ? null : percent.divide(HUNDRED, Constants.Calc.MATH_CONTEXT).multiply(base);
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return nonNull(value) ? value : BigDecimal.ZERO;
     }
 
     /**
@@ -300,23 +587,6 @@ public class RiskValidator {
         if (tooClose) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
                     "Stop-loss beyond liquidation price " + liquidation, trigger));
-        }
-    }
-
-    private void checkRiskPerTrade(ResolvedStopLossPrice stopLoss, BigDecimal entryReference, BigDecimal sizeContracts,
-                                   InstrumentExternalRules rules, BigDecimal equity, StrategyDetail strategyDetail,
-                                   List<RiskCheckResult> checks) {
-        if (isNull(stopLoss) || isNull(stopLoss.getTriggerPrice()) || isNull(entryReference)
-                || isNull(strategyDetail) || isNull(strategyDetail.getRiskPerActionPercent())
-                || isNull(rules.contractValue())) {
-            return;
-        }
-        BigDecimal stopDistance = entryReference.subtract(stopLoss.getTriggerPrice()).abs();
-        BigDecimal riskAmount = stopDistance.multiply(sizeContracts).multiply(rules.contractValue());
-        BigDecimal riskPercent = riskAmount.divide(equity, Constants.Calc.MATH_CONTEXT).multiply(HUNDRED);
-        if (riskPercent.compareTo(strategyDetail.getRiskPerActionPercent()) > 0) {
-            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_PER_TRADE_EXCEEDED,
-                    "Per-trade risk exceeds limit " + strategyDetail.getRiskPerActionPercent() + "%", riskPercent));
         }
     }
 

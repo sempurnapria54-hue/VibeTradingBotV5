@@ -12,8 +12,10 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Деталь стратегии (API): торговые правила одной фазы рынка. Шаги
- * сгруппированы по статусу сделки (ключ — имя Deal.Status).
+ * Деталь стратегии (API): торговые правила одной фазы рынка. Уровней
+ * объявления два: поведение входа несут транши, на самой детали живёт
+ * только узкая агрегатная поверхность — шаги уровня сделки,
+ * сгруппированные статусом агрегата (ключ — имя Deal.Status).
  */
 @Getter
 @Setter
@@ -55,7 +57,13 @@ public class StrategyDetailApiModel {
     private BigDecimal targetRiskRewardRatio;
 
     @Valid
-    @Schema(description = "Шаги по статусу сделки; ключ — имя Deal.Status (PRECHECK, MANAGING, ...). "
+    @Schema(description = "Объявленные транши: что заводится и как ведётся каждый вход. "
+            + "Торгуемая деталь обязана объявить хотя бы один")
+    private List<@Valid StrategyTrancheApiModel> tranches;
+
+    @Valid
+    @Schema(description = "Шаги уровня СДЕЛКИ по статусу агрегата; ключ — имя Deal.Status (ACTIVE, ...). "
+            + "Поверхность узкая: только EXIT и FAIL_SAFE — всё остальное объявляется на транше. "
             + "Индикаторы/структуры детали объявлены на стратегии (strategy-scope), адресуются по key")
     private Map<String, List<@Valid StrategyStepApiModel>> stepsByStatus;
 }

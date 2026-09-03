@@ -11,14 +11,20 @@ import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.DealTrancheDataService;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,13 +39,14 @@ import org.mockito.quality.Strictness;
  * Связывает две тропы создания сделки с их домом
  * (docs/components/DealOpeningService.md).
  *
- * <p>Несущее для этого теста — ярлык тропы и биржевой момент создания.
- * Ярлык сервис ставит сам: пришедший параметром, он мог бы разойтись с
- * тропой, а на нём стои́т признак «позиция по сделке наблюдалась».
- * Момент создания у восстановленной сделки несёт время ОТКРЫТИЯ
- * наблюдённой позиции — единственный операнд нижней границы окна
- * линковки, потому что своей входной заявки такая сделка не отправит
- * никогда.
+ * <p>Несущее для этого теста — ярлык тропы, биржевой момент создания и
+ * <b>материализация траншей ПО ОБЪЯВЛЕНИЯМ детали</b>: по одному на
+ * объявление, по {@code levelCount} на шаблон. Ярлык сервис ставит сам:
+ * пришедший параметром, он мог бы разойтись с тропой, а на нём стои́т
+ * признак «позиция по сделке наблюдалась». Момент создания у
+ * восстановленной сделки несёт время ОТКРЫТИЯ наблюдённой позиции —
+ * единственный операнд нижней границы окна линковки, потому что своей
+ * входной заявки такая сделка не отправит никогда.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -75,7 +82,7 @@ class DealOpeningServiceTest {
     void strategyPathWritesLabelPhaseAndMoment() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
 
-        Deal deal = service.openDeal(7L, 42L, StrategyTradeDirection.LONG, Deal.EntryStepType.ENTRY,
+        Deal deal = service.openDeal(7L, detail(singleTranche()), StrategyTradeDirection.LONG,
                 MarketPhase.Type.BULL_TREND, MOMENT).orElseThrow();
 
         assertEquals(Deal.EntryReason.STRATEGY, deal.getEntryReason());
@@ -87,7 +94,51 @@ class DealOpeningServiceTest {
     }
 
     @Test
-    @DisplayName("Восстановительная тропа: деталь пуста, ярлык RECOVERY, транш сразу в сопровождении")
+    @DisplayName("Одно объявление — один транш: уровня у нешаблонного нет, тип входа читается объявлением")
+    void singleDeclarationMaterializesOneTranche() {
+        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
+
+        service.openDeal(7L, detail(singleTranche()), StrategyTradeDirection.LONG,
+                MarketPhase.Type.BULL_TREND, MOMENT).orElseThrow();
+
+        assertEquals(1, savedTranches.size());
+        assertEquals(100L, savedTranches.getFirst().getStrategyTrancheId());
+        assertNull(savedTranches.getFirst().getLevel(), "уровень несёт только шаблон");
+        assertEquals(DealTranche.EntryStepType.ENTRY, savedTranches.getFirst().getEntryStepType());
+    }
+
+    @Test
+    @DisplayName("Шаблон с levelCount = 3 материализует три транша с уровнями 0..2")
+    void templateMaterializesLevelCountTranches() {
+        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
+
+        service.openDeal(7L, detail(gridTranche(3)), StrategyTradeDirection.LONG,
+                MarketPhase.Type.BULL_TREND, MOMENT).orElseThrow();
+
+        assertEquals(3, savedTranches.size());
+        assertEquals(List.of(0, 1, 2), savedTranches.stream().map(DealTranche::getLevel).toList());
+        assertTrue(savedTranches.stream().allMatch(tranche -> DealTranche.Status.PRECHECK.equals(tranche.getStatus())));
+        assertTrue(savedTranches.stream()
+                .allMatch(tranche -> DealTranche.EntryStepType.GRID_ENTRY.equals(tranche.getEntryStepType())));
+    }
+
+    @Test
+    @DisplayName("Два объявления материализуются оба: сетка и одиночный вход в одной детали")
+    void everyDeclarationIsMaterialized() {
+        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
+
+        service.openDeal(7L, detail(gridTranche(2), singleTranche()), StrategyTradeDirection.LONG,
+                MarketPhase.Type.BULL_TREND, MOMENT).orElseThrow();
+
+        assertEquals(3, savedTranches.size());
+        assertEquals(2, savedTranches.stream()
+                .filter(tranche -> Long.valueOf(101L).equals(tranche.getStrategyTrancheId())).count());
+        assertEquals(1, savedTranches.stream()
+                .filter(tranche -> Long.valueOf(100L).equals(tranche.getStrategyTrancheId())).count());
+    }
+
+    @Test
+    @DisplayName("Восстановительная тропа: деталь пуста, ярлык RECOVERY, транш сразу в сопровождении без объявления")
     void recoveryPathLeavesDetailEmptyAndManagesTranche() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
 
@@ -99,6 +150,8 @@ class DealOpeningServiceTest {
         assertEquals(MOMENT, deal.getExternalCreatedAt());
         assertTrue(deal.positionObserved());
         assertEquals(DealTranche.Status.MANAGING, savedTranches.getFirst().getStatus());
+        assertNull(savedTranches.getFirst().getStrategyTrancheId(), "объявления у восстановленного нет");
+        assertNull(savedTranches.getFirst().getEntryStepType());
     }
 
     @Test
@@ -106,11 +159,39 @@ class DealOpeningServiceTest {
     void activeDealBlocksBothPaths() {
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.TRUE);
 
-        assertEquals(Optional.empty(), service.openDeal(7L, 42L, StrategyTradeDirection.LONG,
-                Deal.EntryStepType.ENTRY, MarketPhase.Type.BULL_TREND, MOMENT));
+        assertEquals(Optional.empty(), service.openDeal(7L, detail(singleTranche()),
+                StrategyTradeDirection.LONG, MarketPhase.Type.BULL_TREND, MOMENT));
         assertEquals(Optional.empty(), service.recoverDeal(7L, StrategyTradeDirection.LONG, MOMENT));
 
         verify(dealDataService, never()).save(any());
         assertTrue(savedTranches.isEmpty());
+    }
+
+    private StrategyDetail detail(StrategyTranche... declarations) {
+        StrategyDetail detail = new StrategyDetail();
+        detail.setId(42L);
+        detail.setTranches(List.of(declarations));
+        return detail;
+    }
+
+    private StrategyTranche singleTranche() {
+        return declaration(100L, "single", 1, null, StrategyStepType.ENTRY);
+    }
+
+    private StrategyTranche gridTranche(int levelCount) {
+        return declaration(101L, "grid", levelCount, new BigDecimal("10"), StrategyStepType.GRID_ENTRY);
+    }
+
+    private StrategyTranche declaration(Long id, String key, int levelCount, BigDecimal levelStep,
+                                        StrategyStepType entryType) {
+        StrategyStep entryStep = new StrategyStep();
+        entryStep.setStepType(entryType);
+        StrategyTranche declaration = new StrategyTranche();
+        declaration.setId(id);
+        declaration.setKey(key);
+        declaration.setLevelCount(levelCount);
+        declaration.setLevelStep(levelStep);
+        declaration.setStepsByStatus(Map.of(DealTranche.Status.PRECHECK, List.of(entryStep)));
+        return declaration;
     }
 }

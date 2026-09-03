@@ -24,6 +24,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPla
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.TrailingSettings;
 import com.example.tradingbot.domain.model.core.balance.Balance;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
@@ -77,7 +78,7 @@ class PrimaryStopSideAreaTest {
     @DisplayName("Перенос уже стоящего уровня под охрану стороны не подпадает")
     void transferOutsideArea() {
         StrategyAlgoOrderAction action = declaredStopAction();
-        action.setActionType(StrategyActionType.REPLACE);
+        action.setActionType(StrategyActionType.REPLACE_ACTION);
         action.setTargetActionKey("primary-stop");
 
         RiskValidationResult result = validate(action);
@@ -90,7 +91,7 @@ class PrimaryStopSideAreaTest {
     @DisplayName("Замещение без указанной цели переносом не считается — роль остаётся первичной")
     void replaceWithoutTargetStaysPrimary() {
         StrategyAlgoOrderAction action = declaredStopAction();
-        action.setActionType(StrategyActionType.REPLACE);
+        action.setActionType(StrategyActionType.REPLACE_ACTION);
 
         assertEquals(StrategyPlacementRole.PRIMARY, action.placementRole());
     }
@@ -98,7 +99,7 @@ class PrimaryStopSideAreaTest {
     /** Создающее действие с объявленным блоком стопа: PRIMARY + DECLARED. */
     private StrategyAlgoOrderAction declaredStopAction() {
         StrategyAlgoOrderAction action = new StrategyAlgoOrderAction();
-        action.setActionType(StrategyActionType.CREATE);
+        action.setActionType(StrategyActionType.CREATE_ACTION);
         action.setStopLossSettings(new com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossSettings());
         return action;
     }
@@ -112,10 +113,13 @@ class PrimaryStopSideAreaTest {
         Instrument instrument = new Instrument();
         instrument.setId(1L);
         instrument.setMarginMode(Instrument.MarginMode.ISOLATED);
+        instrument.setExternalSettlementCurrency("USDT");
 
         Deal deal = new Deal();
         deal.setId(1L);
         deal.setDirection(StrategyTradeDirection.LONG);
+        deal.setTranches(List.of());
+        deal.setOrders(List.of());
 
         Balance balance = new Balance();
         BalanceContainer balanceContainer = new BalanceContainer();
@@ -136,9 +140,21 @@ class PrimaryStopSideAreaTest {
         return validator.validate(calculated, DealContext.builder()
                 .deal(deal)
                 .instrument(instrument)
+                .exchange(exchangeWithRiskBase())
                 .strategyDetail(new StrategyDetail())
                 .balanceContainer(balanceContainer)
+                // Граф предъявлен целиком: иначе преконтроль отказывает
+                // fail-fast и до охраны стороны уровня не доходит.
+                .graphComplete(Boolean.TRUE)
                 .build());
+    }
+
+    /** База риска наблюдена: без неё преконтроль отказывает до всех своих ветвей. */
+    private static Exchange exchangeWithRiskBase() {
+        Exchange exchange = new Exchange();
+        exchange.setRiskBase(new BigDecimal("1000"));
+        exchange.setRiskBaseCurrency("USDT");
+        return exchange;
     }
 
     /** Числа риск-аппетита заданы: иначе преконтроль отказывает до всех своих ветвей. */

@@ -7,13 +7,16 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -47,6 +50,26 @@ public class DealTranche extends Auditable {
 
     /** FSM-статус транша. */
     private Status status;
+
+    /**
+     * Объявление, по которому транш материализован. Пусто ровно у
+     * восстановленного транша: объявления у него нет, штатные рёбра
+     * входа ему недостижимы, ведётся он safety-тропой.
+     */
+    private Long strategyTrancheId;
+
+    /**
+     * Уровень экземпляра в сетке объявления: цена размещения входа
+     * сдвигается на {@code level × levelStep}. Пусто у восстановленного
+     * транша.
+     */
+    private Integer level;
+
+    /** Тип входного шага ЭТОГО транша; у сетки входов столько же, сколько уровней. */
+    private EntryStepType entryStepType;
+
+    /** Итоговая бизнес-причина завершения транша; пусто, пока транш не терминален. */
+    private CloseReason closeReason;
 
     /**
      * Номер эпизода транша: растёт при переоткрытии. Операнд области
@@ -195,6 +218,32 @@ public class DealTranche extends Auditable {
         return exposure().signum() > 0 && isFalse(hasActiveStopLevel());
     }
 
+    /**
+     * Действующий уровень остановки убытка транша — <b>наименее
+     * благоприятный</b> среди всех его живых защит
+     * (docs/spec/protection-coverage.json, величина
+     * {@code trancheStopCurrent}). {@code null} — живой защиты с уровнем
+     * у транша нет.
+     *
+     * <p>Наименее благоприятный, а не первый попавшийся: несколько защит
+     * на одну экспозицию срабатывают порознь, и риск ограничен тем
+     * уровнем, до которого цена дойдёт ПОСЛЕДНИМ. У длинной позиции это
+     * самый НИЗКИЙ уровень, у короткой — самый высокий.
+     */
+    public BigDecimal worstActiveStopLevel(StrategyTradeDirection direction) {
+        Stream<BigDecimal> attached = emptyIfNull(orders).stream()
+                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                .filter(protection -> isTrue(protection.isActiveLike()))
+                .map(AttachedAlgoOrder::getStopLossTriggerPrice);
+        Stream<BigDecimal> standalone = emptyIfNull(algoOrders).stream()
+                .filter(algo -> isTrue(algo.isExchangeLive()) && isTrue(algo.carriesActiveStopLevel()))
+                .map(AlgoOrder::stopLevel);
+        Stream<BigDecimal> levels = Stream.concat(attached, standalone).filter(Objects::nonNull);
+        return StrategyTradeDirection.SHORT.equals(direction)
+                ? levels.max(BigDecimal::compareTo).orElse(null)
+                : levels.min(BigDecimal::compareTo).orElse(null);
+    }
+
     /** Хоть одна живая защита транша несёт действующий уровень остановки убытка. */
     private Boolean hasActiveStopLevel() {
         boolean attached = emptyIfNull(orders).stream()
@@ -312,6 +361,16 @@ public class DealTranche extends Auditable {
 
         /** Транш завершён: экспозиции нет, риска не несёт. */
         CLOSED
+    }
+
+    /** Тип входного шага транша. */
+    public enum EntryStepType {
+
+        /** Обычный вход. */
+        ENTRY,
+
+        /** Вход уровнем grid-сетки. */
+        GRID_ENTRY
     }
 
     /**

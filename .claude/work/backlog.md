@@ -675,23 +675,6 @@ durable-факт «откуда пришли» (колонка). Первое д
 переписать 49 вхождений; затем — **завести измерение**, иначе класс
 вернётся (кандидат: ось у существующей команды, а не новый инструмент).
 
-## Эталон стратегии не десериализуется api-моделью целиком
-
-**Найдено заходом по читателю чисел риска (2026-09-01).** Шаг эталона
-(`src/main/resources/strategy-examples/trend-following-ema.json`) несёт
-действие `actionKind: POSITION`, а перечень подтипов
-`StrategyActionApiModel` знает только `ORDER` и `ALGO_ORDER`: запрос
-создания с эталоном отвергается разбором **до** валидации, с
-`InvalidTypeIdException`.
-
-**Класс — пробел выходной тропы, не находка захода:** действие над
-позицией (выход, закрытие) в api-модели не заведено вовсе. Пока его нет,
-эталон нельзя ни создать через API, ни прогнать сквозь create-валидацию
-целиком — тесты читают его артефакт деревом.
-
-**Владелец** — заход по выходной тропе (`ExitActionExecutor`,
-`ClosePositionExecutor` уже есть в докax; api-модели действия нет).
-
 ## Живое наблюдение на запуске
 
 **Третий заменитель п. 10** (`.claude/decisions/unorderable-fact-substitutes.md`).
@@ -1041,8 +1024,9 @@ Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
 - **Инвентарь периодических джоб — держать сверенным.** Состояние на
   2026-08-03: **в коде и доках** — `CandleJob`, `IndicatorJob`,
   `MarketStructureJob`, `InstrumentExternalRulesSyncJob`,
-  `EntryScannerJob`, `DealOrchestratorJob`; **док есть, кода нет** —
-  `AnomalyJob` (материализация — этот шаг); **только название** —
+  `EntryScannerJob`, `DealOrchestratorJob`, `AnomalyJob`
+  (материализован 2026-09-03 **одним детектором** — «позиция без
+  сделки»; прочие детекторы перечня — этот шаг); **только название** —
   `ReconciliationJob` (п.7), `TradeGuardJob`; **снят** —
   `MarketPhaseJob` (`docs/models/domain/other/MarketPhase.md`);
   **отвергнута** — `TradeFeeSyncJob`
@@ -1816,15 +1800,16 @@ advisory — ратифицированное исключение: замок �
     «Risk-валидацию не проходит» — привести к действующей редакции
     (валидируется по ветке risk-weakening). Найдено свипом
     `GAPS_CLOSE_24`; линзам `src/`-комментарии в предмет не входили.
-- **CODE стадий 1-2 (доспецифицировано, писать код):** носители
-  `PositionsHistoryOkxResponse` / `PositionCloseResultExternalSnapshot`
-  (`mapping/PositionCloseResult.md`) + `DealCashFlow`
-  (модель+mapping+таблица `deal_cash_flows`, включая компоненту
-  `externalFee` и `applied_rate`); команды/executor'ы `REFRESH_BILLS` /
-  `MARK_DEAL_EMERGENCY_CLOSED`; расчёт+запись `resultProfit` на `Deal`
-  в `FinalizeDealExitExecutor` (N7); сверка bills↔net →
-  `AnomalyReport` (N10; правило — `docs/rules/pnl-reconciliation.md`);
-  снятие `REFRESH_FILLS` (N12, доки закрыты — код-удаление на CODE).
+- **CODE стадий 1-2 — остаток.** Закодированы (2026-09-02/03): носители
+  `PositionsHistoryOkxResponse` / `PositionCloseResultExternalSnapshot`,
+  `DealCashFlow` со схемой и маппингом, `REFRESH_BILLS` вместе с
+  эмиттером выходной тропы; **`REFRESH_FILLS` снят целиком** (N12 —
+  команда, исполнитель, поверхности `IntegrationService`, методы клиента,
+  маппер, снапшот и DTO). **Остаётся:** `MARK_DEAL_EMERGENCY_CLOSED`;
+  расчёт+запись `resultProfit` на `Deal` в `FinalizeDealExitExecutor`
+  (N7); сверка bills↔net → `AnomalyReport` (N10; правило —
+  `docs/rules/pnl-reconciliation.md`). Хвост — позиция Т13
+  (`.claude/work/progress/phase-1-step-7-code-tail.md`).
 - **CODE узла добычи положения закрытия:**
   - `RefreshPositionExecutor` — **вторая нога evidence-cycle**: при
     not-found live-позиции запрос `/account/positions-history`

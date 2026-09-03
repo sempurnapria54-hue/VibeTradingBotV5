@@ -16,6 +16,7 @@ import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.command.resolve.AttachedAlgoOrderStateResolver;
+import com.example.tradingbot.domain.command.risk.DealRiskNumbersWriter;
 import com.example.tradingbot.domain.command.resolve.ProtectionHistoryLeg;
 import com.example.tradingbot.domain.command.resolve.OrderExternalStatusResolver;
 import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
@@ -85,6 +86,9 @@ class RefreshOrderProtectionCycleTest {
 
     @Spy
     private AttachedAlgoOrderStateResolver attachedStateResolver = new AttachedAlgoOrderStateResolver();
+
+    @Mock
+    private DealRiskNumbersWriter riskNumbersWriter;
 
     @InjectMocks
     private RefreshOrderExecutor executor;

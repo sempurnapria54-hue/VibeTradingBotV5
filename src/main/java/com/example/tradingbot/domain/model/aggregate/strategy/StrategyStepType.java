@@ -1,9 +1,14 @@
 package com.example.tradingbot.domain.model.aggregate.strategy;
 
 /**
- * Тип шага стратегии. Связь с Deal.entryStepType: ENTRY/GRID_ENTRY →
- * Deal.entryReason = STRATEGY + соответствующий entryStepType;
- * остальные типы не могут быть entry-step сделки. См.
+ * Тип шага стратегии. Связь с DealTranche.entryStepType: ENTRY/GRID_ENTRY
+ * → Deal.entryReason = STRATEGY + соответствующий тип входа НА ТРАНШЕ;
+ * остальные типы входным шагом быть не могут.
+ *
+ * <p>Уровень объявления типом шага не задаётся: он читается носителем
+ * строки (транш либо деталь). Тип — предмет проверки создания: узкая
+ * агрегатная поверхность допускает только EXIT и FAIL_SAFE
+ * (docs/rules/strategy-validation.md). См.
  * docs/models/domain/aggregate/Strategy.md (§StrategyStep).
  */
 public enum StrategyStepType {

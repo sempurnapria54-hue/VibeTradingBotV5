@@ -22,10 +22,12 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAct
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.persistence.service.InstrumentExternalRulesDataService;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -120,16 +122,23 @@ class RiskAppetiteGateTest {
         Instrument instrument = new Instrument();
         instrument.setId(1L);
         instrument.setMarginMode(Instrument.MarginMode.ISOLATED);
+        instrument.setExternalSettlementCurrency("USDT");
 
         Deal deal = new Deal();
         deal.setId(1L);
         deal.setDirection(StrategyTradeDirection.LONG);
+        deal.setTranches(List.of());
+        deal.setOrders(List.of());
+
+        Exchange exchange = new Exchange();
+        exchange.setRiskBase(new BigDecimal("1000"));
+        exchange.setRiskBaseCurrency("USDT");
 
         BalanceContainer balanceContainer = new BalanceContainer();
         balanceContainer.setExternalAvailableEquity(new BigDecimal("1000"));
 
         StrategyAlgoOrderAction action = new StrategyAlgoOrderAction();
-        action.setActionType(StrategyActionType.REPLACE);
+        action.setActionType(StrategyActionType.REPLACE_ACTION);
         action.setTargetActionKey("primary-stop");
 
         CalculatedStrategyAction calculated = CalculatedStrategyAction.builder()
@@ -146,8 +155,12 @@ class RiskAppetiteGateTest {
         return new RiskValidator(rulesDataService, appetite).validate(calculated, DealContext.builder()
                 .deal(deal)
                 .instrument(instrument)
+                .exchange(exchange)
                 .strategyDetail(new StrategyDetail())
                 .balanceContainer(balanceContainer)
+                // Граф предъявлен целиком: гейт полноты стои́т первым и
+                // fail-fast, и на неполном графе эти ворота не проверялись бы.
+                .graphComplete(Boolean.TRUE)
                 .build());
     }
 

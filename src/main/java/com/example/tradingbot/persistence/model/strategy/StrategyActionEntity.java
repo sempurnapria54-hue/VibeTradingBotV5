@@ -54,9 +54,6 @@ public abstract class StrategyActionEntity extends AuditableEntity {
     @Column(name = "action_type", nullable = false)
     private String actionType;
 
-    @Column(name = "level")
-    private Integer level;
-
     @Column(name = "target_action_key")
     private String targetActionKey;
 

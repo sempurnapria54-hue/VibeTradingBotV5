@@ -123,16 +123,12 @@ public class EntryScannerJob {
             }
             // Фаза уже вычислена к этому моменту, и второй раз её никто не
             // считает; биржевой момент создания добывается ЗДЕСЬ — сервис
-            // создания на биржу за ним не ходит.
-            dealOpeningService.openDeal(instrument.getId(), detail.getId(), entryAction.getDirection(),
-                    entryStepType(step.getStepType()), phaseType, integrationService.getServerTime());
+            // создания на биржу за ним не ходит. Деталь уезжает целиком:
+            // транши материализуются по её объявлениям, и тип входного
+            // шага читается на объявлении, а не приходит параметром.
+            dealOpeningService.openDeal(instrument.getId(), detail, entryAction.getDirection(),
+                    phaseType, integrationService.getServerTime());
             return;
         }
-    }
-
-    private Deal.EntryStepType entryStepType(StrategyStepType stepType) {
-        return StrategyStepType.GRID_ENTRY.equals(stepType)
-                ? Deal.EntryStepType.GRID_ENTRY
-                : Deal.EntryStepType.ENTRY;
     }
 }

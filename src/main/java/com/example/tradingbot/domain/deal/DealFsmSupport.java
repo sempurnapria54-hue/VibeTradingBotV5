@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.deal;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -28,8 +29,10 @@ import com.example.tradingbot.domain.command.risk.RiskCheckResult;
 import com.example.tradingbot.domain.deal.action.StrategyStepEligibility;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.balance.Balance;
@@ -68,10 +71,35 @@ public class DealFsmSupport {
     private final IntegrationService integrationService;
     private final StrategyStepEligibility stepEligibility;
 
-    /** Допустимые шаги стратегии для текущего статуса ТРАНША (упорядочены = приоритет). */
-    public List<StrategyStep> stepsFor(DealContext dealContext, DealTranche.Status status) {
-        List<StrategyStep> steps = dealContext.getStrategyDetail().getStepsByStatus().get(status);
+    /**
+     * Допустимые шаги для текущего статуса ТРАНША (упорядочены =
+     * приоритет). Шаги живут на ОБЪЯВЛЕНИИ транша, а не на детали: два
+     * объявления одной фазы ведут свои входы по-разному, и общий набор
+     * склеил бы их в один.
+     *
+     * <p>Объявления нет — шагов нет: так у восстановленного транша, и
+     * это факт его тропы (ведётся safety-тропой), а не недогруженное
+     * дерево.
+     */
+    public List<StrategyStep> stepsFor(DealContext dealContext, DealTranche tranche) {
+        StrategyTranche declaration = dealContext.declarationOf(tranche);
+        if (isNull(declaration) || isNull(declaration.getStepsByStatus())) {
+            return List.of();
+        }
+        List<StrategyStep> steps = declaration.getStepsByStatus().get(tranche.getStatus());
         return nonNull(steps) ? steps : List.of();
+    }
+
+    /**
+     * Шаги УЗКОЙ АГРЕГАТНОЙ ПОВЕРХНОСТИ для текущего статуса сделки —
+     * `EXIT` и `FAIL_SAFE` уровня сделки. Они живут на детали, а не на
+     * объявлении: выход есть утверждение обо всех траншах сразу.
+     * Закреплённой детали нет (восстановленная сделка) — шагов нет ни
+     * на одном уровне.
+     */
+    public List<StrategyStep> dealLevelSteps(DealContext dealContext) {
+        StrategyDetail detail = dealContext.getStrategyDetail();
+        return isNull(detail) ? List.of() : detail.dealLevelSteps(dealContext.getDeal().getStatus());
     }
 
     /** Шаги указанных типов, в порядке объявления. */
@@ -99,6 +127,27 @@ public class DealFsmSupport {
                                 ConditionEvaluationContext conditionContext) {
         return stepEligibility.eligible(step, tranche, dealContext.getActionStates(),
                 conditionMet(step, conditionContext), standingRungOnActionRadius(dealContext));
+    }
+
+    /**
+     * Шаг СРАБОТАЛ — то есть сделал всё, что объявил. Читается по форме
+     * объявления: у шага без действий (условная форма выхода) срабатывание
+     * есть само истинное условие, у шага с пакетом — исчерпание пакета на
+     * текущем эпизоде объекта.
+     *
+     * <p>Условие шага предикатом не проверяется: его проверяет
+     * вызывающая сторона, и склеивать две проверки значило бы получить
+     * «сработал» истинным у шага, чьё условие ложно, но пакет когда-то
+     * отработал.
+     */
+    public Boolean stepEmpty(StrategyStep step) {
+        return isEmpty(step.getActions());
+    }
+
+    /** Шаг сработал: пустой пакет — сразу, непустой — по исчерпании. */
+    public Boolean stepFired(StrategyStep step, DealContext dealContext, DealTranche tranche) {
+        return isTrue(stepEmpty(step))
+                || isTrue(stepEligibility.appliedOnEpisode(step, tranche, dealContext.getActionStates()));
     }
 
     /**
@@ -141,25 +190,16 @@ public class DealFsmSupport {
     }
 
     /**
-     * Состояние выполнения АГРЕГАТНОГО action (шаг уровня сделки): транша
-     * у него нет ни одного, и отбор идёт без него.
+     * Новая строка исполнения. Транш и номер эпизода пусты у исполнения
+     * УРОВНЯ СДЕЛКИ: выбирать «носителем» один из N траншей было бы
+     * произволом — выход есть утверждение обо всех сразу.
      */
-    public Optional<DealActionState> findDealLevelActionState(DealContext dealContext, StrategyAction action) {
-        if (isEmpty(dealContext.getActionStates())) {
-            return Optional.empty();
-        }
-        return dealContext.getActionStates().stream()
-                .filter(state -> Objects.equals(action.getId(), state.getStrategyActionId()))
-                .filter(state -> isNull(state.getDealTrancheId()))
-                .findFirst();
-    }
-
     private DealActionState createPlanned(DealContext dealContext, DealTranche tranche,
                                           StrategyAction action) {
         DealActionState state = new DealActionState();
         state.setDealId(dealContext.getDeal().getId());
-        state.setDealTrancheId(tranche.getId());
-        state.setTrancheEpisodeSeq(tranche.getEpisodeSeq());
+        state.setDealTrancheId(nonNull(tranche) ? tranche.getId() : null);
+        state.setTrancheEpisodeSeq(nonNull(tranche) ? tranche.getEpisodeSeq() : null);
         state.setStrategyActionId(action.getId());
         state.setStatus(DealActionStateStatus.PLANNED);
         return dealActionStateDataService.save(state);
@@ -192,6 +232,33 @@ public class DealFsmSupport {
     /** Системный REFRESH_POSITION (без action-state): обновить/обнаружить позицию по фактам. */
     public ServiceCommand refreshPositionCommand(DealContext dealContext) {
         return systemCommand(ServiceCommandType.REFRESH_POSITION, dealContext, null);
+    }
+
+    /**
+     * Системный REFRESH_BILLS (без action-state): добыть движения средств
+     * окна сделки. Конвейер 7d→архив и границу разбора ведёт сам
+     * исполнитель — здесь только эмиссия звена.
+     */
+    public ServiceCommand refreshBillsCommand(DealContext dealContext) {
+        return systemCommand(ServiceCommandType.REFRESH_BILLS, dealContext, null);
+    }
+
+    /** Граф сделки предъявлен контекстом целиком — признак читается ГОТОВЫМ. */
+    public Boolean graphComplete(DealContext dealContext) {
+        return isTrue(dealContext.getGraphComplete());
+    }
+
+    /**
+     * У сделки есть живая строка исполнения УРОВНЯ СДЕЛКИ — различитель
+     * форм полного выхода: явная форма (действие шага) строку заводит,
+     * условная нет. Терминальные строки различителем не служат: строка
+     * отработавшего выхода остаётся навсегда, и по ней условная форма
+     * читалась бы явной у всякой сделки, однажды вышедшей действием.
+     */
+    public Boolean hasDealLevelExecution(DealContext dealContext) {
+        return emptyIfNull(dealContext.getActionStates()).stream()
+                .filter(state -> isNull(state.getDealTrancheId()))
+                .anyMatch(state -> !DealActionStateStatus.SKIPPED.equals(state.getStatus()));
     }
 
     /** Системный REFRESH_ORDER по локальному order id (evidence-cycle внутри executor'а). */

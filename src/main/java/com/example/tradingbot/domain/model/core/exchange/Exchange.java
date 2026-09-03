@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.model.core.exchange;
 
 import com.example.tradingbot.domain.model.Auditable;
+import java.math.BigDecimal;
 import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,6 +33,27 @@ public class Exchange extends Auditable {
 
     /** Текущий статус подключения/использования биржи. */
     private Status status;
+
+    /**
+     * <b>Живая база риска счёта</b> — делитель всех четырёх потолков у
+     * сделки, чей снимок ещё не заморожен. Следует за свободным остатком
+     * расчётной валюты В ОБЕ СТОРОНЫ и автоматически: ни пола, ни потолка
+     * на ходу нет — защиту от отыгрыша держат холды, предел серии убытков
+     * и катастрофический потолок (docs/rules/risk-policy.md).
+     *
+     * <p>Пусто — база ни разу не наблюдалась, и преконтроль отказывает:
+     * базы риска не существует, а подставить её нечем.
+     */
+    private BigDecimal riskBase;
+
+    /** Валюта базы риска — расчётная валюта контура. */
+    private String riskBaseCurrency;
+
+    /**
+     * Серия убыточных исходов подряд — операнд остановки по серии
+     * (docs/rules/loss-streak-halt.md).
+     */
+    private Integer consecutiveLossCount;
 
     /** Биржа заморожена реактивным safety-холдом (уровень 4, docs/rules/exchange-hold.md). */
     public Boolean isTradeBlocked() {

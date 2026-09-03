@@ -56,7 +56,7 @@ public class CancelAlgoOrderActionExecutor implements StrategyActionExecutor {
     @Override
     public Boolean supports(StrategyAction action) {
         return action instanceof StrategyAlgoOrderAction
-                && StrategyActionType.CANCEL.equals(action.getActionType());
+                && StrategyActionType.CANCEL_ACTION.equals(action.getActionType());
     }
 
     /**

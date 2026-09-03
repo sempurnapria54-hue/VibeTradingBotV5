@@ -1,5 +1,7 @@
 package com.example.tradingbot.domain.command.executor;
 
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
@@ -7,11 +9,15 @@ import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
+import com.example.tradingbot.domain.command.risk.DealRiskNumbersWriter;
 import com.example.tradingbot.domain.command.TargetEntityType;
 import com.example.tradingbot.domain.command.payload.CreateAlgoOrderCommandPayload;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import com.example.tradingbot.util.ClientIdGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -30,6 +36,7 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
 
     private final AlgoOrderDataService algoOrderDataService;
     private final DealActionStateDataService dealActionStateDataService;
+    private final DealRiskNumbersWriter riskNumbersWriter;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -45,7 +52,34 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
         actionState.setTarget(new RuntimeTarget(TargetEntityType.ALGO_ORDER, saved.getId()));
         actionState.setStatus(DealActionStateStatus.CREATED);
         dealActionStateDataService.save(actionState);
+        appendToGraph(dealContext, saved);
+        riskNumbersWriter.recompute(dealContext);
         return ServiceCommandExecutionResult.ok();
+    }
+
+    /**
+     * Наблюдение меняет операнд четвёрки чисел риска сделки, поэтому
+     * исполнитель ЯВЛЯЕТСЯ её писателем и пересчитывает все четыре
+     * целиком той же транзакцией. Граф предъявлен не целиком — числа не
+     * трогаются: заниженные, они ослабили бы кумулятивный потолок
+     * (docs/models/domain/aggregate/Deal.md §«Писатели четвёрки и их
+     * триггеры»).
+     */
+    private void appendToGraph(DealContext dealContext, AlgoOrder saved) {
+        List<AlgoOrder> algoOrders = new ArrayList<>(emptyIfNull(dealContext.getDeal().getAlgoOrders()));
+        if (algoOrders.stream().noneMatch(algo -> Objects.equals(saved.getId(), algo.getId()))) {
+            algoOrders.add(saved);
+            dealContext.getDeal().setAlgoOrders(algoOrders);
+        }
+        emptyIfNull(dealContext.getDeal().getTranches()).stream()
+                .filter(tranche -> Objects.equals(saved.getDealTrancheId(), tranche.getId()))
+                .forEach(tranche -> {
+                    List<AlgoOrder> own = new ArrayList<>(emptyIfNull(tranche.getAlgoOrders()));
+                    if (own.stream().noneMatch(algo -> Objects.equals(saved.getId(), algo.getId()))) {
+                        own.add(saved);
+                        tranche.setAlgoOrders(own);
+                    }
+                });
     }
 
     private AlgoOrder buildAlgoOrder(CreateAlgoOrderCommandPayload payload, Long dealId) {
