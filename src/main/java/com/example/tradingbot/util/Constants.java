@@ -62,6 +62,59 @@ public final class Constants {
          */
         public static final String ANOMALY_PASS_INCOMPLETE = "ANOMALY_PASS_INCOMPLETE";
 
+        /**
+         * Ступень 2: живая сущность по инструменту ВНЕ контура. Счёт
+         * принадлежит системе единолично, восстановление здесь
+         * недостижимо (строки инструмента нет), и риск не может быть
+         * приписан ничему (docs/rules/exchange-hold.md §«Ступень 2 —
+         * сворачивание» п.3).
+         */
+        public static final String EXCHANGE_FOREIGN_INSTRUMENT_RISK = "EXCHANGE_FOREIGN_INSTRUMENT_RISK";
+
+        /**
+         * Ступень 2: живая заявка либо algo без маркера контура —
+         * сущность, которую мы не создавали (там же, п.3).
+         */
+        public static final String EXCHANGE_FOREIGN_ORDER = "EXCHANGE_FOREIGN_ORDER";
+
+        /**
+         * Ступень 2: позиций по одному инструменту больше одной — режим
+         * позиций счёта не тот, который объявлен adapter-константой
+         * (docs/rules/exchange-hold.md §«Ступень 2 — сворачивание» п.1).
+         */
+        public static final String EXCHANGE_POSITION_MODE_VIOLATION = "EXCHANGE_POSITION_MODE_VIOLATION";
+
+        /**
+         * Журнальный отчёт: стоящая жёсткая ступень радиуса не
+         * проэнфорсена — на бирже живут сущности этого радиуса. Свой
+         * kill-switch эта реакция не гоняет, поглощение держит анкер
+         * (docs/components/SafetyHoldCoordinator.md §«Поглощённый сигнал
+         * наблюдаем»).
+         */
+        public static final String SAFETY_RUNG_NOT_ENFORCED = "SAFETY_RUNG_NOT_ENFORCED";
+
+        /**
+         * Журнальный отчёт: локально ТЕРМИНАЛЬНАЯ сущность жива на бирже.
+         * Блокировки в составе реакции нет; ключ дедупа несёт предмет —
+         * саму сущность (docs/models/domain/other/AnomalyReport.md).
+         */
+        public static final String LOCAL_TERMINAL_ALIVE_ON_EXCHANGE = "LOCAL_TERMINAL_ALIVE_ON_EXCHANGE";
+
+        /**
+         * Мягкая ступень инструмента: хвосты заявок либо algo, не
+         * объяснимые живой сделкой (docs/rules/instrument-hold.md
+         * §Триггеры).
+         */
+        public static final String INSTRUMENT_ORPHAN_ORDERS = "INSTRUMENT_ORPHAN_ORDERS";
+
+        /**
+         * Мягкая ступень инструмента: живая сделка перестала укладываться
+         * в потолки при стоящей защите — те же неравенства при нулевом
+         * акте (docs/rules/instrument-hold.md §«Форма реакции на нарушение
+         * риск-политики при живой защите»).
+         */
+        public static final String RISK_POLICY_BREACH_UNDER_PROTECTION = "RISK_POLICY_BREACH_UNDER_PROTECTION";
+
         /** L3: шаг стратегии велел сворачиваться аварийно из-за устаревших рыночных данных. */
         public static final String INSTRUMENT_MARKET_DATA_EXPIRED = "INSTRUMENT_MARKET_DATA_EXPIRED";
 
@@ -217,6 +270,16 @@ public final class Constants {
          * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
          */
         public static final Integer PENDING_PAGE_LIMIT = 100;
+
+        /**
+         * Маркер контура в клиентском идентификаторе заявки. Единственный
+         * дискриминатор «наше против чужого» на стороне БИРЖИ: по нему
+         * проактивная детекция опознаёт заявку, которую заводили не мы
+         * (docs/components/AnomalyJob.md §«Что ищет»). Короткий — потолок
+         * clOrdId у источника 32 символа, и маркер тратит энтропию
+         * случайной части.
+         */
+        public static final String CLIENT_ID_MARKER = "vtb";
 
         public static final String ALGO_ORD_TYPE_CONDITIONAL = "conditional";
 

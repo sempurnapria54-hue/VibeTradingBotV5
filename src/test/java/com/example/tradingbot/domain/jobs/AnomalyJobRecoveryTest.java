@@ -18,6 +18,7 @@ import com.example.tradingbot.domain.model.core.position.external_snapshot.Posit
 import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.domain.safety.AnomalyPassGate;
 import com.example.tradingbot.domain.safety.AnomalyScanReader;
+import com.example.tradingbot.domain.safety.ExchangeSideDetectors;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
@@ -64,6 +65,8 @@ class AnomalyJobRecoveryTest {
     @Mock
     private AnomalyPassGate passGate;
     @Mock
+    private ExchangeSideDetectors exchangeSideDetectors;
+    @Mock
     private DealOpeningService dealOpeningService;
 
     private AnomalyJob job;
@@ -72,7 +75,7 @@ class AnomalyJobRecoveryTest {
     void setUp() {
         AnomalyJobProperties properties = new AnomalyJobProperties();
         job = new AnomalyJob(properties, new JobExecutionGuard(), instrumentDataService, exchangeDataService,
-                dealDataService, new AnomalyScanReader(integrationService), passGate, dealOpeningService);
+                dealDataService, new AnomalyScanReader(integrationService), passGate, exchangeSideDetectors, dealOpeningService);
         when(instrumentDataService.findByStatus(any())).thenReturn(List.of(instrument()));
         when(exchangeDataService.findAllActive()).thenReturn(List.of(exchange()));
         when(passGate.apply(any(), any())).thenReturn(Boolean.TRUE);
@@ -142,7 +145,7 @@ class AnomalyJobRecoveryTest {
         AnomalyJobProperties disabled = new AnomalyJobProperties();
         disabled.setEnabled(Boolean.FALSE);
         AnomalyJob offJob = new AnomalyJob(disabled, new JobExecutionGuard(), instrumentDataService,
-                exchangeDataService, dealDataService, new AnomalyScanReader(integrationService), passGate,
+                exchangeDataService, dealDataService, new AnomalyScanReader(integrationService), passGate, exchangeSideDetectors,
                 dealOpeningService);
 
         offJob.tick();

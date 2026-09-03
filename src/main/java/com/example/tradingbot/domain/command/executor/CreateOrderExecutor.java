@@ -141,7 +141,7 @@ public class CreateOrderExecutor implements CommandExecutor {
     private Order buildOrder(CreateOrderCommandPayload payload, Long dealId) {
         Order order = new Order();
         order.setDealId(dealId);
-        order.setInternalId(ClientIdGenerator.generate());
+        order.setInternalId(ClientIdGenerator.generateExchangeFacing());
         order.setStatus(Order.Status.CREATED);
         order.setType(payload.getOrderType());
         order.setSide(payload.getSide());
@@ -169,7 +169,7 @@ public class CreateOrderExecutor implements CommandExecutor {
             return null;
         }
         AttachedAlgoOrder attached = new AttachedAlgoOrder();
-        attached.setInternalId(ClientIdGenerator.generate());
+        attached.setInternalId(ClientIdGenerator.generateExchangeFacing());
         attached.setStatus(AttachedAlgoOrder.Status.CREATED);
         attached.setType(protection.getAttachedType());
         attached.setStopLossTriggerPrice(protection.getStopLossTriggerPrice());

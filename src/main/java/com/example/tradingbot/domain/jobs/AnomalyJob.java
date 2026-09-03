@@ -16,11 +16,15 @@ import com.example.tradingbot.domain.model.core.position.external_snapshot.Posit
 import com.example.tradingbot.domain.safety.AnomalyPassGate;
 import com.example.tradingbot.domain.safety.AnomalyScan;
 import com.example.tradingbot.domain.safety.AnomalyScanReader;
+import com.example.tradingbot.domain.safety.ExchangeSideDetectors;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -76,6 +80,7 @@ public class AnomalyJob {
     private final DealDataService dealDataService;
     private final AnomalyScanReader scanReader;
     private final AnomalyPassGate passGate;
+    private final ExchangeSideDetectors exchangeSideDetectors;
     private final DealOpeningService dealOpeningService;
 
     @Scheduled(cron = "${anomaly-job.cron}")
@@ -115,13 +120,23 @@ public class AnomalyJob {
 
     /** Детекторы прохода. Каждый молчит на неполном срезе — гейт выше. */
     private void detect(AnomalyScan scan, Exchange exchange) {
-        for (Instrument instrument : instrumentDataService.findByStatus(Instrument.Status.ACTIVE)) {
+        List<Instrument> managed = instrumentDataService.findByStatus(Instrument.Status.ACTIVE);
+        exchangeSideDetectors.detect(scan, exchange, managedNames(managed));
+        for (Instrument instrument : managed) {
             try {
                 detectUnexplainedPosition(instrument, first(scan.positionsOf(instrument.getExternalId())));
             } catch (RuntimeException e) {
                 log.error("Anomaly detection failed instrumentId={}", instrument.getId(), e);
             }
         }
+    }
+
+    /** Биржевые имена управляемых инструментов — граница «модель против счёта». */
+    private Set<String> managedNames(List<Instrument> managed) {
+        return managed.stream()
+                .map(Instrument::getExternalId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     /**

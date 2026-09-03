@@ -85,7 +85,7 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
         AlgoOrder algoOrder = new AlgoOrder();
         algoOrder.setDealId(dealId);
         algoOrder.setDealTrancheId(payload.getDealTrancheId());
-        algoOrder.setInternalId(ClientIdGenerator.generate());
+        algoOrder.setInternalId(ClientIdGenerator.generateExchangeFacing());
         algoOrder.setStatus(AlgoOrder.Status.CREATED);
         algoOrder.setConditionType(payload.getConditionType());
         algoOrder.setDirection(payload.getDirection());
