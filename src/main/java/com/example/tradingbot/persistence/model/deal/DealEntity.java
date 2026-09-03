@@ -66,4 +66,10 @@ public class DealEntity extends AuditableEntity {
 
     @Column(name = "coverage_proven_through")
     private OffsetDateTime coverageProvenThrough;
+
+    @Column(name = "bills_window_begin")
+    private OffsetDateTime billsWindowBegin;
+
+    @Column(name = "bills_fetched_through")
+    private OffsetDateTime billsFetchedThrough;
 }

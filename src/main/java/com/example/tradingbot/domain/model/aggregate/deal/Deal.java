@@ -14,6 +14,7 @@ import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -88,6 +89,24 @@ public class Deal extends Auditable {
      */
     private OffsetDateTime coverageProvenThrough;
 
+    /**
+     * Нижняя граница окна линковки движений. Единственный писатель —
+     * SubmitOrderExecutor, по биржевому времени создания первой
+     * отправленной входной заявки сделки, каким бы траншем она ни
+     * ставилась; write-once. Пусто — граница не добыта, предикат
+     * линковки берёт суррогат из externalCreatedAt
+     * (docs/spec/cash-flow-linkage.json §lowerBound).
+     */
+    private OffsetDateTime billsWindowBegin;
+
+    /**
+     * До какого момента движения средств добыты. Пишет
+     * RefreshBillsExecutor, монотонно вперёд. Единственный durable-факт
+     * «добыча выполнялась»: пусто = не добывали, а не «добыли, движений
+     * нет» (docs/models/domain/aggregate/Deal.md).
+     */
+    private OffsetDateTime billsFetchedThrough;
+
     /** Ordinary orders сделки (attached protection — внутри Order). */
     private List<Order> orders;
 
@@ -110,6 +129,16 @@ public class Deal extends Auditable {
     public Boolean allTranchesTerminal() {
         return emptyIfNull(tranches).stream()
                 .allMatch(tranche -> isTrue(tranche.isTerminal()));
+    }
+
+    /**
+     * Сделка в терминальном статусе: слот инструмента не держит и
+     * движений счёта больше не принимает (операнд предиката линковки —
+     * docs/spec/cash-flow-linkage.json §linksToDeal). ERROR терминалом
+     * не является — обработка аварийной тропы ещё идёт.
+     */
+    public Boolean isTerminal() {
+        return Objects.equals(Status.CLOSED, status) || Objects.equals(Status.EMERGENCY_CLOSED, status);
     }
 
     /** Хоть один транш сделки несёт живой риск. */

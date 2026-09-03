@@ -68,6 +68,24 @@ public class DealDataService {
         repository.advanceCoverageProvenThrough(dealId, observedAt);
     }
 
+    /**
+     * Write-once нижней границы окна линковки движений: заполненную
+     * границу повторная запись не перетирает — охрану держит сам запрос.
+     */
+    @Transactional
+    public void applyBillsWindowBegin(Long dealId, OffsetDateTime observedAt) {
+        repository.applyBillsWindowBegin(dealId, observedAt);
+    }
+
+    /**
+     * Двигает метку «движения добыты по …» вперёд по времени источника
+     * прохода. Монотонность обеспечивает охрана запроса, не вызывающий.
+     */
+    @Transactional
+    public void advanceBillsFetchedThrough(Long dealId, OffsetDateTime fetchedThrough) {
+        repository.advanceBillsFetchedThrough(dealId, fetchedThrough);
+    }
+
     /** Активные сделки всех инструментов биржи — для каскадного exchange-scoped kill-switch (L4). */
     @Transactional(readOnly = true)
     public List<Deal> findActiveByExchangeId(Long exchangeId) {

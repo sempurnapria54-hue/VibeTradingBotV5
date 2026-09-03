@@ -64,6 +64,9 @@ public class InstrumentEntity extends AuditableEntity {
     @Column(name = "external_leverage")
     private String externalLeverage;
 
+    @Column(name = "external_settlement_currency")
+    private String externalSettlementCurrency;
+
     @Column(name = "planned_candle_start_date")
     private Long plannedCandleStartDate;
 

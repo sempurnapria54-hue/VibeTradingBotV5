@@ -34,6 +34,16 @@ public class InstrumentDataService {
         return repository.findById(id).map(mapper::persistenceToDomain);
     }
 
+    /**
+     * Расчётная валюта инструмента биржи по внешнему id — проекция одного
+     * поля, сущность не тянется. Пусто = инструмента нет в каталоге либо
+     * валюта не резолвилась; для лестницы курса оба исхода — ступень 0.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> findSettlementCurrency(Long exchangeId, String externalInstrumentId) {
+        return repository.findSettlementCurrency(exchangeId, externalInstrumentId);
+    }
+
     @Transactional(readOnly = true)
     public Instrument getRequiredById(Long id) {
         return findById(id).orElseThrow(() -> new IllegalArgumentException("Instrument not found: " + id));

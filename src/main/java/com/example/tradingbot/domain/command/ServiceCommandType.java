@@ -54,6 +54,9 @@ public enum ServiceCommandType {
     /** Подтянуть fills (evidence-cycle 3d→3m внутри команды). */
     REFRESH_FILLS,
 
+    /** Подтянуть движения средств окна сделки (конвейер 7d→3m внутри команды). */
+    REFRESH_BILLS,
+
     /** Финализировать вход сделки (подтверждённая позиция). */
     FINALIZE_DEAL_ENTRY,
 

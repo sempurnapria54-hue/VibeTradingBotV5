@@ -187,23 +187,30 @@ class Ag1FundingHorizonLiveTest extends OkxSourceApiLiveTestBase {
                 .as("AG1.7 → п. 7: запись закрытия эпизода, пережившего расчёт, несёт НЕНУЛЕВОЙ fundingFee")
                 .isNotEqualTo(0);
 
-        // (8) Сверка с движениями счёта: Σ balChg funding-bills == Σ fundingFee записей.
+        // (8) Сверка с движениями счёта: Σ(balChg + posBalChg) funding-bills ==
+        // Σ fundingFee записей. Операнд ДВУСОСТАВНОЙ: на isolated-марже расчёт
+        // финансирования ложится в МАРЖУ ПОЗИЦИИ (posBalChg) при нулевом
+        // balChg — прогон 2026-09-02 наблюдал posBalChg, равный fundingFee
+        // записи закрытия до последнего знака, и сверка по одному balChg
+        // разошлась ровно на весь расчёт.
         List<JsonNode> fundingBills = billsOfType(BILL_TYPE_FUNDING);
         observeValue("AG1.7", "fundingBillsInWindow", fundingBills.size());
         for (JsonNode bill : fundingBills) {
             observeValue("AG1.7", "fundingBill",
                     "ts=" + bill.path("ts").asText() + " subType=" + bill.path("subType").asText()
                             + " ccy=" + bill.path("ccy").asText() + " balChg=" + bill.path("balChg").asText()
+                            + " posBalChg=" + bill.path("posBalChg").asText()
                             + " instId=" + bill.path("instId").asText());
         }
         assertThat(fundingBills)
                 .as("AG1.7 → расчёт фандинга оставил движение счёта типа 8 в окне эпизода").isNotEmpty();
         BigDecimal billsFunding = fundingBills.stream()
-                .map(bill -> decimal(bill, "balChg")).reduce(BigDecimal.ZERO, BigDecimal::add);
-        observeValue("AG1.7", "Σ funding bills balChg", billsFunding);
+                .map(bill -> decimal(bill, "balChg").add(decimal(bill, "posBalChg")))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        observeValue("AG1.7", "Σ funding bills (balChg+posBalChg)", billsFunding);
         observeValue("AG1.7", "Σ record fundingFee", recordFunding);
         assertThat(billsFunding.compareTo(recordFunding))
-                .as("AG1.7 → Σ balChg funding-bills сходится с fundingFee записи закрытия (%s vs %s)",
+                .as("AG1.7 → Σ (balChg+posBalChg) funding-bills сходится с fundingFee записи закрытия (%s vs %s)",
                         billsFunding, recordFunding)
                 .isEqualTo(0);
 
@@ -223,9 +230,10 @@ class Ag1FundingHorizonLiveTest extends OkxSourceApiLiveTestBase {
                 "record.liqPenalty: '" + record.path("liqPenalty").asText("") + "'",
                 "знак fundingFee: " + recordFunding.signum(),
                 "funding-bills в окне: " + fundingBills.size(),
-                "Σ balChg funding-bills: " + billsFunding,
+                "Σ (balChg+posBalChg) funding-bills: " + billsFunding,
                 "Σ fundingFee записи: " + recordFunding,
-                "сходимость Σ balChg == Σ fundingFee: да"));
+                "сходимость Σ (balChg+posBalChg) == Σ fundingFee: да",
+                "isolated-маржа: расчёт ложится в posBalChg, balChg нулевой (наблюдение 2026-09-02)"));
 
             settled[0] = true;
         } finally {

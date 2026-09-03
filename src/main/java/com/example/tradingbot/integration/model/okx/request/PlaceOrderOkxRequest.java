@@ -1,6 +1,7 @@
 package com.example.tradingbot.integration.model.okx.request;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -43,4 +44,8 @@ public class PlaceOrderOkxRequest {
 
     /** Метка запроса. */
     private String tag;
+
+    /** Встроенная защита (attachAlgoOrds[*]); у заявки без защиты отсутствует. */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private List<AttachAlgoOrdOkxRequest> attachAlgoOrds;
 }

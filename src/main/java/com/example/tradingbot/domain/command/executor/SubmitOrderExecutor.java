@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.command.executor;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -15,11 +16,14 @@ import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.domain.command.payload.SubmitOrderCommandPayload;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.integration.service.IntegrationService;
+import java.time.OffsetDateTime;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
+import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -40,6 +44,7 @@ public class SubmitOrderExecutor implements CommandExecutor {
 
     private final OrderDataService orderDataService;
     private final DealActionStateDataService dealActionStateDataService;
+    private final DealDataService dealDataService;
     private final IntegrationService integrationService;
 
     @Override
@@ -54,7 +59,8 @@ public class SubmitOrderExecutor implements CommandExecutor {
         SubmitOrderCommandPayload payload = (SubmitOrderCommandPayload) command.getPayload();
         Order order = orderDataService.getRequiredById(payload.getOrderId());
         String instId = dealContext.getInstrument().getExternalId();
-        if (isBlank(order.getExternalId()) && isFalse(recoverByClientId(order, instId, actionState))) {
+        if (isBlank(order.getExternalId())
+                && isFalse(recoverByClientId(order, instId, actionState, command.getDealId()))) {
             ensureLeverage(order, dealContext);
             ExchangeAck ack = integrationService.placeOrder(order, instId);
             if (isFalse(ack.getSuccess())) {
@@ -62,7 +68,9 @@ public class SubmitOrderExecutor implements CommandExecutor {
             }
             order.setExternalId(ack.getExternalId());
             order.setStatus(Order.Status.PENDING);
+            markProtectionPending(order);
             orderDataService.save(order);
+            applyBillsWindowBegin(order, command.getDealId(), ack.getExternalCreatedAt());
         }
         actionState.setStatus(DealActionStateStatus.SUBMITTED);
         dealActionStateDataService.save(actionState);
@@ -74,7 +82,7 @@ public class SubmitOrderExecutor implements CommandExecutor {
      * предыдущий place мог реально выполниться, даже если ответ не получен.
      * Найден → восстанавливаем externalId, второй раз не отправляем.
      */
-    private Boolean recoverByClientId(Order order, String instId, DealActionState actionState) {
+    private Boolean recoverByClientId(Order order, String instId, DealActionState actionState, Long dealId) {
         if (isFalse(isRetry(actionState))) {
             return false;
         }
@@ -84,8 +92,43 @@ public class SubmitOrderExecutor implements CommandExecutor {
         }
         order.setExternalId(existing.getExternalId());
         order.setStatus(Order.Status.PENDING);
+        markProtectionPending(order);
         orderDataService.save(order);
+        applyBillsWindowBegin(order, dealId, existing.getExternalCreatedAt());
         return true;
+    }
+
+    /**
+     * Нижняя граница окна линковки движений: биржевое время первой
+     * отправленной ВХОДНОЙ заявки сделки, каким бы траншем она ни
+     * ставилась (docs/models/domain/aggregate/Deal.md). Write-once
+     * держит охрана запроса; reduce-only заявки границу не пишут, пустое
+     * биржевое время не фабрикуется — граница остаётся суррогату
+     * (docs/spec/cash-flow-linkage.json §lowerBound).
+     */
+    private void applyBillsWindowBegin(Order order, Long dealId, OffsetDateTime observedAt) {
+        if (isTrue(order.getPositionReducingOnly()) || isNull(dealId) || isNull(observedAt)) {
+            return;
+        }
+        dealDataService.applyBillsWindowBegin(dealId, observedAt);
+    }
+
+    /**
+     * Встроенная защита уходит на биржу вместе с родителем (attachAlgoOrds
+     * place-запроса), поэтому факт «родитель отправлен» пишется и ей:
+     * CREATED → PENDING (docs/lifecycles/Order.md §«Состояния
+     * AttachedAlgoOrder»). Живость этим не утверждается — её подтверждает
+     * REFRESH-контур фактом материализации.
+     */
+    private void markProtectionPending(Order order) {
+        if (isEmpty(order.getAttachedAlgoOrders())) {
+            return;
+        }
+        for (AttachedAlgoOrder attached : order.getAttachedAlgoOrders()) {
+            if (isTrue(attached.canTransitionTo(AttachedAlgoOrder.Status.PENDING))) {
+                attached.toPending();
+            }
+        }
     }
 
     /** Рабочее плечо на бирже перед постановкой открывающего ордера (idempotent); reduce-only не трогаем. */

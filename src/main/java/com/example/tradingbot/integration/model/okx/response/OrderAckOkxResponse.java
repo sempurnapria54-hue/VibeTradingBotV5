@@ -35,4 +35,7 @@ public class OrderAckOkxResponse {
     /** Сообщение результата по ордеру. */
     @JsonProperty("sMsg")
     private String sMsg;
+
+    /** Биржевое время приёма запроса (Unix ms). */
+    private String ts;
 }

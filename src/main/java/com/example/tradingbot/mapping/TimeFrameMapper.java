@@ -24,6 +24,7 @@ public interface TimeFrameMapper {
             return null;
         }
         return switch (timeFrame) {
+            case ONE_SECOND -> Constants.Okx.BAR_ONE_SECOND;
             case ONE_MINUTE -> Constants.Okx.BAR_ONE_MINUTE;
             case THREE_MINUTES -> Constants.Okx.BAR_THREE_MINUTES;
             case FIVE_MINUTES -> Constants.Okx.BAR_FIVE_MINUTES;

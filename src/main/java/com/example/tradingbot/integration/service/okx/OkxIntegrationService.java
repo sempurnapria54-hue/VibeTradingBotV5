@@ -21,6 +21,7 @@ import com.example.tradingbot.domain.model.core.order.external_snapshot.Attached
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.other.external_snapshot.DealCashFlowExternalSnapshot;
 import com.example.tradingbot.domain.model.other.external_snapshot.TradeFeeRateExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
@@ -30,6 +31,7 @@ import com.example.tradingbot.integration.model.okx.request.ClosePositionOkxRequ
 import com.example.tradingbot.integration.model.okx.request.PlaceAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.SetLeverageOkxRequest;
+import com.example.tradingbot.integration.model.okx.response.AccountBillOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.CandleOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.InstrumentOkxResponse;
@@ -50,6 +52,7 @@ import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.mapping.CandleMapper;
+import com.example.tradingbot.mapping.DealCashFlowMapper;
 import com.example.tradingbot.mapping.FillMapper;
 import com.example.tradingbot.mapping.InstrumentExternalRulesMapper;
 import com.example.tradingbot.mapping.InstrumentMapper;
@@ -83,6 +86,9 @@ import org.springframework.web.client.RestClientException;
 @RequiredArgsConstructor
 public class OkxIntegrationService implements IntegrationService {
 
+    /** Размер страницы обхода bill-записей (потолок источника — 100). */
+    private static final Integer BILLS_PAGE_LIMIT = 100;
+
     private final OkxRestClient okxRestClient;
     private final InstrumentMapper instrumentMapper;
     private final InstrumentExternalRulesMapper instrumentExternalRulesMapper;
@@ -94,6 +100,7 @@ public class OkxIntegrationService implements IntegrationService {
     private final AlgoOrderMapper algoOrderMapper;
     private final FillMapper fillMapper;
     private final TradeFeeRateMapper tradeFeeRateMapper;
+    private final DealCashFlowMapper dealCashFlowMapper;
 
     @Override
     public InstrumentExternalSnapshot getInstrument(String externalInstrumentId, String externalInstrumentType) {
@@ -169,6 +176,29 @@ public class OkxIntegrationService implements IntegrationService {
                 "candles", "instId=" + externalInstrumentId + " bar=" + externalBar);
         verifyCode(response, "candles", "instId=" + externalInstrumentId);
         return toCandleSnapshots(response.getData());
+    }
+
+    @Override
+    public CandleExternalSnapshot getIndexCandleAt(String indexInstrumentId, String externalBar, OffsetDateTime at) {
+        Long after = at.toInstant().toEpochMilli() + 1L;
+        OkxApiResponse<List<String>> response = execute(
+                () -> okxRestClient.getHistoryIndexCandles(indexInstrumentId, externalBar, after, 1),
+                "history-index-candles", "instId=" + indexInstrumentId + " bar=" + externalBar + " at=" + at);
+        verifyCode(response, "history-index-candles", "instId=" + indexInstrumentId);
+        if (isEmpty(response.getData())) {
+            return null;
+        }
+        // Строка индекса — [ts,o,h,l,c,confirm]: колонки объёма нет, и общий
+        // маппер девятиколоночной свечи прочёл бы confirm объёмом.
+        List<String> row = response.getData().getFirst();
+        return CandleExternalSnapshot.builder()
+                .openTimestamp(Long.parseLong(row.get(0)))
+                .open(OkxParse.decimal(row.get(1)))
+                .high(OkxParse.decimal(row.get(2)))
+                .low(OkxParse.decimal(row.get(3)))
+                .close(OkxParse.decimal(row.get(4)))
+                .confirm(Objects.equals(Constants.Okx.CONFIRM_CLOSED, row.get(5)))
+                .build();
     }
 
     @Override
@@ -500,6 +530,53 @@ public class OkxIntegrationService implements IntegrationService {
             return List.of();
         }
         return response.getData().stream().map(fillMapper::integrationToSnapshot).collect(toList());
+    }
+
+    @Override
+    public List<DealCashFlowExternalSnapshot> getBills(OffsetDateTime begin, OffsetDateTime end) {
+        return fetchBills("account-bills",
+                (beginMs, endMs, after) -> okxRestClient.getBills(beginMs, endMs, after, BILLS_PAGE_LIMIT),
+                begin, end);
+    }
+
+    @Override
+    public List<DealCashFlowExternalSnapshot> getBillsArchive(OffsetDateTime begin, OffsetDateTime end) {
+        return fetchBills("account-bills-archive",
+                (beginMs, endMs, after) -> okxRestClient.getBillsArchive(beginMs, endMs, after, BILLS_PAGE_LIMIT),
+                begin, end);
+    }
+
+    /**
+     * Обход окна bill-записей с пагинацией назад по billId: следующая
+     * страница — {@code after = min(billId)} предыдущей, стоп — пустая
+     * страница (docs/integrations/okx/contracts/account-bills.md).
+     * Курсор пагинации границу не пересекает — наружу уходит список
+     * снапшотов целиком.
+     */
+    private List<DealCashFlowExternalSnapshot> fetchBills(String operation, BillsPage page,
+                                                          OffsetDateTime begin, OffsetDateTime end) {
+        String beginMs = String.valueOf(begin.toInstant().toEpochMilli());
+        String endMs = String.valueOf(end.toInstant().toEpochMilli());
+        List<DealCashFlowExternalSnapshot> snapshots = new ArrayList<>();
+        String after = null;
+        while (true) {
+            String cursor = after;
+            OkxApiResponse<AccountBillOkxResponse> response = execute(() -> page.fetch(beginMs, endMs, cursor),
+                    operation, "begin=" + beginMs + " end=" + endMs + " after=" + cursor);
+            verifyCode(response, operation, "begin=" + beginMs + " end=" + endMs);
+            if (isEmpty(response.getData())) {
+                return snapshots;
+            }
+            response.getData().stream().map(dealCashFlowMapper::integrationToSnapshot).forEach(snapshots::add);
+            after = response.getData().get(response.getData().size() - 1).getBillId();
+        }
+    }
+
+    /** Страница bill-записей одного эндпоинта (свежего либо архивного). */
+    @FunctionalInterface
+    private interface BillsPage {
+
+        OkxApiResponse<AccountBillOkxResponse> fetch(String beginMs, String endMs, String after);
     }
 
     private List<OrderExternalSnapshot> toOrderSnapshots(OkxApiResponse<OrderOkxResponse> response) {

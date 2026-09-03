@@ -14,6 +14,7 @@ import com.example.tradingbot.domain.model.core.order.external_snapshot.Attached
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.other.external_snapshot.DealCashFlowExternalSnapshot;
 import com.example.tradingbot.domain.model.other.external_snapshot.TradeFeeRateExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.market_price.external_snapshot.MarketPriceDataExternalSnapshot;
@@ -90,6 +91,17 @@ public interface IntegrationService {
      * @return снапшоты свечей (пустой список — данных нет).
      */
     List<CandleExternalSnapshot> getLatestCandles(String externalInstrumentId, String externalBar, Integer limit);
+
+    /**
+     * Свеча ИНДЕКСА пары котировки, открытая не позже момента {@code at},
+     * — носитель курса cross-ccy (история index-candles: свежий эндпоинт
+     * окно в прошлом не обслуживает). Накрывает ли свеча момент —
+     * проверяет вызывающий по своему таймфрейму; объёма у индекса нет.
+     *
+     * @return снапшот ближайшей свечи с открытием {@code <= at};
+     *     {@code null} — данных на этой глубине нет.
+     */
+    CandleExternalSnapshot getIndexCandleAt(String indexInstrumentId, String externalBar, OffsetDateTime at);
 
     /**
      * Ordinary order с биржи по {@code externalId} (предпочтительно) или
@@ -274,4 +286,23 @@ public interface IntegrationService {
      * @return снапшоты fills (пустой список — нет исполнений в окне).
      */
     List<FillExternalSnapshot> getFillsHistory(String externalInstrumentId, String afterBillId, Integer limit);
+
+    /**
+     * Bill-записи движений счёта за окно (свежий эндпоинт, 7 дней).
+     * Ответ аккаунт-широкий по классу инструментов контура; по валюте не
+     * фильтрует (контроль чужой валюты). Пагинация назад по billId идёт
+     * внутри — курсор границу не пересекает
+     * (docs/models/mapping/DealCashFlow.md §«Граничный снапшот»).
+     *
+     * @return снапшоты движений окна (пустой список — движений нет).
+     */
+    List<DealCashFlowExternalSnapshot> getBills(OffsetDateTime begin, OffsetDateTime end);
+
+    /**
+     * Bill-записи движений счёта за окно из архива (3 месяца) —
+     * эскалация конвейера добычи после свежего эндпоинта.
+     *
+     * @return снапшоты движений окна (пустой список — движений нет).
+     */
+    List<DealCashFlowExternalSnapshot> getBillsArchive(OffsetDateTime begin, OffsetDateTime end);
 }

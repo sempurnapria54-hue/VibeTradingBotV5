@@ -53,8 +53,9 @@ Mapping-таблица обязана сказать, что этих колон
   `Order.side → side`; `Order.type/exec settings → ordType`;
   `Order.size → sz`; `Order.price → px` (если нужен типу);
   `Order.internalId → clOrdId`; `Order.positionReducingOnly →
-  reduceOnly`; `Order.attachedAlgoOrders → attachAlgoOrds` (future
-  DTO-поле для entry-with-attached-SL). После successful submit
+  reduceOnly`; `Order.attachedAlgoOrders → attachAlgoOrds`
+  (entry-with-attached-SL; состав элемента — §«Domain Order → OKX
+  request» ниже). После successful submit
   `ordId` (если вернулся) сохраняется как `Order.externalId`; статус
   — `PENDING` до refresh/search/history.
 - **Cancel**: `instId` + одно из `ordId` (предпочтительно) /
@@ -323,8 +324,6 @@ required»). `algoId` материализованной записи нам н�
 
 - `createOrder` не должен принимать `tradeMode`/`positionSide`
   аргументами — `OkxIntegrationService` сам ставит `isolated`/`net`.
-- `CreateOrderRequest` должен принимать `reduceOnly` и
-  `attachAlgoOrds` (для `ENTRY_ATTACHED_STOP_LOSS`).
 - `OrderResponse.state` комментарий: raw статус OKX; pending —
   `live`/`partially_filled`; details/history — `filled`/`canceled`/
   `mmp_canceled` и др. terminal.

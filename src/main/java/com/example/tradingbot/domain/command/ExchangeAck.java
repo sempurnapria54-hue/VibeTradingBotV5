@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.command;
 
+import java.time.OffsetDateTime;
 import lombok.Builder;
 import lombok.Value;
 
@@ -28,4 +29,12 @@ public class ExchangeAck {
 
     /** Сообщение результата биржи (OKX sMsg). */
     String message;
+
+    /**
+     * Биржевое время приёма запроса. Операнд нижней границы окна
+     * линковки движений (docs/models/domain/aggregate/Deal.md,
+     * billsWindowBegin): оба операнда окна биржевые, локальные часы в
+     * сравнение не входят.
+     */
+    OffsetDateTime externalCreatedAt;
 }

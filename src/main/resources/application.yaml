@@ -55,3 +55,34 @@ okx:
 # холд (HOLD-Q1); значение — риск-владельца.
 kill-switch:
   max-teardown-attempts: 3
+
+# Настройки контура биржи (дом перечня — docs/models/domain/core/Exchange.md).
+# Ключ секции — имя биржи (Exchange.name). Отображение категорий движений и
+# список исключений сверки — стартовый набор OKX взят из правила источника
+# (docs/integrations/okx/rules/cash-flow-categories.md) и наблюдением не
+# подтверждён: непокрытый тип садится в OTHER с отчётом UNCLASSIFIED_CASH_FLOW;
+# пополняет держатель по наблюдённому перечню. Типового умолчания у «5» нет
+# намеренно: тип гетерогенен (закрытия + штраф), склейка завысила бы штраф.
+exchange-contour:
+  exchanges:
+    OKX:
+      cash-flow-category-mapping:
+        "2": REALIZED_PNL
+        "8": FUNDING
+        "9": REALIZED_PNL
+        "5/100": REALIZED_PNL
+        "5/101": REALIZED_PNL
+        "5/102": REALIZED_PNL
+        "5/103": REALIZED_PNL
+        "5/104": REALIZED_PNL
+        "5/105": REALIZED_PNL
+        "5/106": REALIZED_PNL
+        "5/107": REALIZED_PNL
+        "5/116": LIQ_PENALTY
+      reconciliation-exclusions:
+        - "2/407"
+        - "2/408"
+        - "2/410"
+        - "2/411"
+        - "2/412"
+        - "2/413"

@@ -46,6 +46,14 @@ public final class Constants {
 
         /** L3, мягкая: разбор истории не предъявил записи защиты — её судьба неизвестна. */
         public static final String INSTRUMENT_PROTECTION_FATE_UNKNOWN = "INSTRUMENT_PROTECTION_FATE_UNKNOWN";
+
+        /**
+         * Журнальный STATE-отчёт биржи: движение счёта не покрыто
+         * отображением категорий — принимающая корзина непуста
+         * (docs/models/mapping/DealCashFlow.md §«Резолв категории»).
+         * Блокировки в составе реакции нет.
+         */
+        public static final String UNCLASSIFIED_CASH_FLOW = "UNCLASSIFIED_CASH_FLOW";
     }
 
     /** Константы интеграции с OKX: коды, флаги, заголовки, пути и имена полей запроса, таймфреймы. */
@@ -82,6 +90,14 @@ public final class Constants {
         /** Путь истории свечей. */
         public static final String HISTORY_CANDLES_PATH = "/api/v5/market/history-candles";
 
+        /**
+         * Путь истории свечей индекса пары котировки — носитель курса
+         * cross-ccy: свежий index-candles окно в прошлом не обслуживает
+         * (docs/integrations/okx/contracts/index-data.md). Публичный
+         * endpoint.
+         */
+        public static final String HISTORY_INDEX_CANDLES_PATH = "/api/v5/market/history-index-candles";
+
         /** Путь тикера (рыночная цена: last/ask/bid). Публичный endpoint. */
         public static final String MARKET_TICKER_PATH = "/api/v5/market/ticker";
 
@@ -117,6 +133,12 @@ public final class Constants {
 
         /** Путь исполнений (fills, последние 3 дня, GET). Приватный endpoint. */
         public static final String TRADE_FILLS_PATH = "/api/v5/trade/fills";
+
+        /** Путь bill-записей движений счёта (7 дней, GET). Приватный endpoint. */
+        public static final String ACCOUNT_BILLS_PATH = "/api/v5/account/bills";
+
+        /** Путь архива bill-записей (3 месяца, GET). Приватный endpoint. */
+        public static final String ACCOUNT_BILLS_ARCHIVE_PATH = "/api/v5/account/bills-archive";
 
         /** Путь истории исполнений (fills, последние 3 месяца, GET). Приватный endpoint. */
         public static final String TRADE_FILLS_HISTORY_PATH = "/api/v5/trade/fills-history";
@@ -214,6 +236,12 @@ public final class Constants {
         /** Имя query-параметра before (нижняя граница окна по времени). */
         public static final String PARAM_BEFORE = "before";
 
+        /** Имя query-параметра begin (нижняя граница фильтра по времени, Unix ms). */
+        public static final String PARAM_BEGIN = "begin";
+
+        /** Имя query-параметра end (верхняя граница фильтра по времени, Unix ms). */
+        public static final String PARAM_END = "end";
+
         /** Класс инструментов контура: бессрочный своп. */
         public static final String INST_TYPE_SWAP = "SWAP";
 
@@ -231,6 +259,9 @@ public final class Constants {
 
         /** Имя query-параметра ccy (валюта). */
         public static final String PARAM_CCY = "ccy";
+
+        /** Таймфрейм OKX: 1 секунда (index-candles, координата курса). */
+        public static final String BAR_ONE_SECOND = "1s";
 
         /** Таймфрейм OKX: 1 минута. */
         public static final String BAR_ONE_MINUTE = "1m";

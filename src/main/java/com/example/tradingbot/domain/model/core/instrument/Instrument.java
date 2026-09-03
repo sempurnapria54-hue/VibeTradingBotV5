@@ -59,6 +59,16 @@ public class Instrument extends Auditable {
     /** Биржевое значение плеча (сырое, OKX lever). */
     private String externalLeverage;
 
+    /**
+     * Расчётная валюта инструмента (OKX settleCcy) — авторитет валюты
+     * риска и валюты результата сделки; операнд ветки чужой валюты на
+     * записи движения (docs/models/domain/core/Instrument.md). Пишет
+     * тропа синка спецификации; пусто = валюта не резолвилась — курс не
+     * ищется вовсе (ступень 0 лестницы огрубления,
+     * docs/components/RefreshBillsExecutor.md).
+     */
+    private String externalSettlementCurrency;
+
     /** Плановая нижняя граница истории свечей (UTC мс), общая для всех таймфреймов. */
     private Long plannedCandleStartDate;
 

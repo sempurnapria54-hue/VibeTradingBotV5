@@ -38,14 +38,17 @@ public interface InstrumentMapper {
 
     /**
      * Частичное обновление инструмента из снапшота: идентичность +
-     * биржевые статус/плечо (шаг 1). {@code externalStatus} /
+     * биржевые статус/плечо + расчётная валюта. {@code externalStatus} /
      * {@code externalLeverage} совпадают по имени; {@code externalId} /
-     * {@code externalType} — из снапшотных external*-полей. Прочие поля
-     * инструмента (id, internalId, exchangeId, leverage, marginMode, ...)
-     * не трогаются.
+     * {@code externalType} — из снапшотных external*-полей; расчётная
+     * валюта — операнд ветки чужой валюты движения
+     * (docs/models/domain/core/Instrument.md). Прочие поля инструмента
+     * (id, internalId, exchangeId, leverage, marginMode, ...) не
+     * трогаются.
      */
     @Mapping(target = "externalId", source = "externalInstrumentId")
     @Mapping(target = "externalType", source = "externalInstrumentType")
+    @Mapping(target = "externalSettlementCurrency", source = "externalSettleCurrency")
     void snapshotToDomain(@MappingTarget Instrument instrument, InstrumentExternalSnapshot snapshot);
 
     @Mapping(target = "candleGroups", ignore = true)

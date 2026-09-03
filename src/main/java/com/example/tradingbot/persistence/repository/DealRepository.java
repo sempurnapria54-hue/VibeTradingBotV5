@@ -46,4 +46,29 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
               and (d.coverageProvenThrough is null or d.coverageProvenThrough < :observedAt)""")
     int advanceCoverageProvenThrough(@Param("dealId") Long dealId,
                                      @Param("observedAt") OffsetDateTime observedAt);
+
+    /**
+     * Write-once нижней границы окна линковки движений: охрана write-once
+     * стои́т в самом запросе — заполненная граница повторной записью не
+     * перетирается (docs/models/domain/aggregate/Deal.md).
+     */
+    @Modifying
+    @Query("""
+            update DealEntity d set d.billsWindowBegin = :observedAt
+            where d.id = :dealId and d.billsWindowBegin is null""")
+    int applyBillsWindowBegin(@Param("dealId") Long dealId,
+                              @Param("observedAt") OffsetDateTime observedAt);
+
+    /**
+     * Монотонное вперёд движение метки «движения добыты по …»: охрана в
+     * самом запросе — откат назад стёр бы факт более глубокой добычи
+     * (docs/models/domain/aggregate/Deal.md, billsFetchedThrough).
+     */
+    @Modifying
+    @Query("""
+            update DealEntity d set d.billsFetchedThrough = :fetchedThrough
+            where d.id = :dealId
+              and (d.billsFetchedThrough is null or d.billsFetchedThrough < :fetchedThrough)""")
+    int advanceBillsFetchedThrough(@Param("dealId") Long dealId,
+                                   @Param("fetchedThrough") OffsetDateTime fetchedThrough);
 }

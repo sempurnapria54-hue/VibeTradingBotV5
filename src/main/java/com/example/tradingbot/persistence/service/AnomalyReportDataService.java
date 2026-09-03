@@ -22,4 +22,13 @@ public class AnomalyReportDataService {
     public AnomalyReport save(AnomalyReport report) {
         return mapper.persistenceToDomain(repository.save(mapper.domainToPersistence(report)));
     }
+
+    /**
+     * STATE-отчёт по ключу «биржа + код + severity» уже заведён — дедуп
+     * по стоящему состоянию (docs/rules/error-handling-policy.md).
+     */
+    @Transactional(readOnly = true)
+    public Boolean existsByKey(Long exchangeId, String code, AnomalyReport.Severity severity) {
+        return repository.existsByExchangeIdAndCodeAndSeverity(exchangeId, code, severity.name());
+    }
 }

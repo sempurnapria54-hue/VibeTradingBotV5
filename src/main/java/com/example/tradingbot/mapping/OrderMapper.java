@@ -7,6 +7,7 @@ import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
+import com.example.tradingbot.integration.model.okx.request.AttachAlgoOrdOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.CancelAlgoOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.CancelOrderOkxRequest;
 import com.example.tradingbot.integration.model.okx.request.PlaceOrderOkxRequest;
@@ -117,7 +118,22 @@ public interface OrderMapper {
     @Mapping(target = "sz", source = "order.size")
     @Mapping(target = "px", source = "order.price")
     @Mapping(target = "reduceOnly", source = "order.positionReducingOnly")
+    @Mapping(target = "attachAlgoOrds", source = "order.attachedAlgoOrders")
     PlaceOrderOkxRequest domainToPlaceRequest(Order order, String instId);
+
+    /**
+     * Элемент attachAlgoOrds[*] place-запроса из встроенной защиты.
+     * slTriggerPxType заполняется всегда — биржевой default не
+     * используется; SL исполняется market после trigger (slOrdPx = -1);
+     * sz не отправляется — источник ведёт защиту на налитый объём
+     * родителя. См. docs/models/mapping/Order.md (§Domain Order → OKX
+     * request).
+     */
+    @Mapping(target = "attachAlgoClOrdId", source = "internalId")
+    @Mapping(target = "slTriggerPx", source = "stopLossTriggerPrice")
+    @Mapping(target = "slTriggerPxType", source = "triggerPriceType", qualifiedByName = "okxTriggerType")
+    @Mapping(target = "slOrdPx", expression = "java(Constants.Okx.MARKET_PRICE_FLAG)")
+    AttachAlgoOrdOkxRequest domainToPlaceRequest(AttachedAlgoOrder attached);
 
     @Mapping(target = "ordId", source = "order.externalId")
     @Mapping(target = "clOrdId", source = "order.internalId")
@@ -144,6 +160,7 @@ public interface OrderMapper {
     @Mapping(target = "code", expression = "java(StringUtils.firstNonBlank(ack.getsCode(), topLevelCode))")
     @Mapping(target = "message", expression = "java(StringUtils.firstNonBlank(ack.getsMsg(), topLevelMessage))")
     @Mapping(target = "success", source = "ack.sCode", qualifiedByName = "okxAckSuccess")
+    @Mapping(target = "externalCreatedAt", source = "ack.ts")
     ExchangeAck integrationToAck(OrderAckOkxResponse ack, String topLevelCode, String topLevelMessage);
 
     /** OKX exec ordType из доменного Order: цена задана → limit, иначе market. */

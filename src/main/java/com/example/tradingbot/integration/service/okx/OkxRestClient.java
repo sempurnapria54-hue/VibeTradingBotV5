@@ -16,6 +16,7 @@ import com.example.tradingbot.integration.model.okx.response.InstrumentOkxRespon
 import com.example.tradingbot.integration.model.okx.response.AlgoOrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OkxApiResponse;
 import com.example.tradingbot.integration.model.okx.response.BalanceOkxResponse;
+import com.example.tradingbot.integration.model.okx.response.AccountBillOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.FillOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.PositionsHistoryOkxResponse;
@@ -84,6 +85,9 @@ public class OkxRestClient {
     private static final ParameterizedTypeReference<OkxApiResponse<FillOkxResponse>> FILL_TYPE =
             new ParameterizedTypeReference<>() {
             };
+    private static final ParameterizedTypeReference<OkxApiResponse<AccountBillOkxResponse>> ACCOUNT_BILL_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
     private static final ParameterizedTypeReference<OkxApiResponse<AlgoOrderOkxResponse>> ALGO_ORDER_TYPE =
             new ParameterizedTypeReference<>() {
             };
@@ -147,6 +151,22 @@ public class OkxRestClient {
         query.put(Constants.Okx.PARAM_AFTER, after);
         query.put(Constants.Okx.PARAM_LIMIT, limit);
         return dispatch(HttpMethod.GET, Constants.Okx.HISTORY_CANDLES_PATH, query, null, false, CANDLE_ARRAY_TYPE);
+    }
+
+    /**
+     * История свечей индекса пары котировки: {@code after} — свечи строго
+     * старше ts (ms). Носитель курса cross-ccy: свежий index-candles окно
+     * в прошлом не обслуживает вовсе (наблюдение MG7.5). Строка —
+     * [ts,o,h,l,c,confirm]. Публичный endpoint.
+     */
+    public OkxApiResponse<List<String>> getHistoryIndexCandles(String instId, String bar, Long after, Integer limit) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(Constants.Okx.PARAM_INST_ID, instId);
+        query.put(Constants.Okx.PARAM_BAR, bar);
+        query.put(Constants.Okx.PARAM_AFTER, after);
+        query.put(Constants.Okx.PARAM_LIMIT, limit);
+        return dispatch(HttpMethod.GET, Constants.Okx.HISTORY_INDEX_CANDLES_PATH, query, null, false,
+                CANDLE_ARRAY_TYPE);
     }
 
     /** Последние свечи (докачка хвоста). */
@@ -301,6 +321,35 @@ public class OkxRestClient {
         query.put(Constants.Okx.PARAM_AFTER, after);
         query.put(Constants.Okx.PARAM_LIMIT, limit);
         return dispatch(HttpMethod.GET, Constants.Okx.TRADE_FILLS_PATH, query, null, true, FILL_TYPE);
+    }
+
+    /**
+     * Bill-записи движений счёта (7 дней): фильтр — тип инструментов и
+     * окно времени; {@code after} — якорь пагинации по billId. Валюта в
+     * запрос не идёт — фильтр по ней убил бы контроль чужой валюты
+     * (docs/integrations/okx/contracts/account-bills.md). Приватный
+     * endpoint.
+     */
+    public OkxApiResponse<AccountBillOkxResponse> getBills(String begin, String end, String after, Integer limit) {
+        return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_BILLS_PATH,
+                billsQuery(begin, end, after, limit), null, true, ACCOUNT_BILL_TYPE);
+    }
+
+    /** Архив bill-записей (3 месяца): те же оси запроса. Приватный endpoint. */
+    public OkxApiResponse<AccountBillOkxResponse> getBillsArchive(String begin, String end, String after,
+                                                                  Integer limit) {
+        return dispatch(HttpMethod.GET, Constants.Okx.ACCOUNT_BILLS_ARCHIVE_PATH,
+                billsQuery(begin, end, after, limit), null, true, ACCOUNT_BILL_TYPE);
+    }
+
+    private Map<String, Object> billsQuery(String begin, String end, String after, Integer limit) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(Constants.Okx.PARAM_INST_TYPE, Constants.Okx.INST_TYPE_SWAP);
+        query.put(Constants.Okx.PARAM_BEGIN, begin);
+        query.put(Constants.Okx.PARAM_END, end);
+        query.put(Constants.Okx.PARAM_AFTER, after);
+        query.put(Constants.Okx.PARAM_LIMIT, limit);
+        return query;
     }
 
     /** Выставление плеча инструмента (POST). Приватный endpoint (подпись). */

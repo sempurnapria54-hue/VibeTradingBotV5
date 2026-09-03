@@ -43,6 +43,15 @@ public class HoldSignal {
         return new HoldSignal(HoldScope.EXCHANGE, HoldRung.HARD, code);
     }
 
+    /**
+     * Журнальный сигнал биржевого радиуса (NON_CRITICAL): блокировки в
+     * составе реакции нет — сигнал описывает scope/severity/code
+     * журнального отчёта и через исполнителя блокировки не идёт.
+     */
+    public static HoldSignal exchangeJournal(String code) {
+        return new HoldSignal(HoldScope.EXCHANGE, HoldRung.SOFT, code);
+    }
+
     /** Реакция снимает принятый риск: kill-switch в её составе есть. */
     public Boolean tearsDownRisk() {
         return Objects.equals(HoldRung.HARD, rung);

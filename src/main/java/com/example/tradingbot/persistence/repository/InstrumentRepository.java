@@ -17,6 +17,17 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
 
     List<InstrumentEntity> findByStatusIn(Collection<String> statuses);
 
+    /**
+     * Проекция расчётной валюты инструмента биржи по внешнему id — резолв
+     * одного поля без выгрузки сущности (лестница курса чужой валюты,
+     * docs/components/RefreshBillsExecutor.md).
+     */
+    @Query("""
+            select i.externalSettlementCurrency from InstrumentEntity i
+            where i.exchangeId = :exchangeId and i.externalId = :externalId""")
+    Optional<String> findSettlementCurrency(@Param("exchangeId") Long exchangeId,
+                                            @Param("externalId") String externalId);
+
     /** Гардированный statusный переход (только из ожидаемого {@code from}); возвращает число затронутых строк. */
     @Modifying
     @Query("update InstrumentEntity i set i.status = :to where i.id = :id and i.status = :from")
