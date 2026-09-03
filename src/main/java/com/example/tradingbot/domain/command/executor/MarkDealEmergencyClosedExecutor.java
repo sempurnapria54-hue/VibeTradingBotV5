@@ -101,7 +101,7 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
         if (isTrue(reconciliationCalculator.rungRequested(dealContext,
                 dealContext.getDeal().getReconciliationStatus()))) {
             return ServiceCommandExecutionResult.okWithHold(
-                    HoldSignal.exchangeJournal(Constants.Hold.PNL_RECONCILIATION_MISMATCH));
+                    HoldSignal.exchangeSoft(Constants.Hold.PNL_RECONCILIATION_MISMATCH));
         }
         return ServiceCommandExecutionResult.ok();
     }

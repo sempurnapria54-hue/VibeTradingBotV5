@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,10 +28,12 @@ import org.springframework.stereotype.Service;
  * Монотонность держит тот же гард: подъём мягкой в жёсткую проходит,
  * понижение — нет (`docs/rules/instrument-hold.md`).
  *
- * <p><b>Мягкая биржевая ступень сюда не приходит:</b> отдельного статуса
- * у неё в модели биржи нет, а её объявленные триггеры (сверка результата,
- * серия убытков, ручной вызов) не закодированы — заводить ветвь без
- * вызывающего значило бы писать мёртвый код. Названное ограничение.
+ * <p><b>Мягкая ступень исполняется на ОБОИХ радиусах.</b> Составы у них
+ * разные, и разводит их не этот сервис, а лестницы: у инструмента — запрет
+ * входов плюс блок-сет преконтроля целиком (включая ослабление защиты живой
+ * сделки), у биржи — только выпадение из выборки входа, командного блок-сета
+ * нет (docs/rules/instrument-hold.md, docs/rules/exchange-hold.md). Общее у
+ * них одно — принятый риск не трогается.
  *
  * <p>См. docs/components/HoldService.md.
  */
@@ -40,6 +43,7 @@ import org.springframework.stereotype.Service;
 public class HoldService {
 
     private final InstrumentDataService instrumentDataService;
+    private final ExchangeDataService exchangeDataService;
     private final AnomalyReportService anomalyReportService;
     private final SafetyHoldCoordinator safetyHoldCoordinator;
 
@@ -69,12 +73,7 @@ public class HoldService {
      * входов не отменяет — ограничение риска приоритетнее журнала.
      */
     private void raiseSoft(HoldSignal signal, DealContext dealContext) {
-        if (isFalse(HoldScope.INSTRUMENT.equals(signal.getScope()))) {
-            log.warn("Soft rung is not modelled for scope={} — signal code={} not raised",
-                    signal.getScope(), signal.getCode());
-            return;
-        }
-        if (isFalse(instrumentDataService.blockEntry(dealContext.getInstrument().getId()))) {
+        if (isFalse(rungApplied(signal, dealContext))) {
             return;
         }
         try {
@@ -82,5 +81,17 @@ public class HoldService {
         } catch (RuntimeException e) {
             log.error("Journal anomaly report failed scope={} code={}", signal.getScope(), signal.getCode(), e);
         }
+    }
+
+    /**
+     * Приводит объект радиуса к мягкой ступени. Возвращает {@code false},
+     * если переход не применился, — то есть состояние уже держится либо
+     * объект стои́т в жёсткой ступени, и мягкий запрос ею поглощается.
+     * Радиус выбирает исполнителя статуса; больше он ни на что не влияет.
+     */
+    private Boolean rungApplied(HoldSignal signal, DealContext dealContext) {
+        return HoldScope.EXCHANGE.equals(signal.getScope())
+                ? exchangeDataService.blockEntry(dealContext.getExchange().getId())
+                : instrumentDataService.blockEntry(dealContext.getInstrument().getId());
     }
 }

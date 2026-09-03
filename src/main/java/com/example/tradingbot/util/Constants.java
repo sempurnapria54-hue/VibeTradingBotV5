@@ -51,6 +51,17 @@ public final class Constants {
          */
         public static final String EXCHANGE_LIVE_RISK_UNCOVERED = "EXCHANGE_LIVE_RISK_UNCOVERED";
 
+        /**
+         * Ступень 1: слепота safety-сети — серия подряд идущих неполных
+         * проходов проактивной детекции. Ступень мягкая: слепота не
+         * нарушает посылку «защита стоит на бирже и исполняется ею
+         * независимо от нашей интеграции», значит принятый риск покрыт и
+         * снимать его нечем; под сомнением право набирать новый вслепую
+         * (docs/components/AnomalyJob.md §«Гейт полноты среза»,
+         * docs/rules/exchange-hold.md §«Ступень 1 — мягкий холд»).
+         */
+        public static final String ANOMALY_PASS_INCOMPLETE = "ANOMALY_PASS_INCOMPLETE";
+
         /** L3: шаг стратегии велел сворачиваться аварийно из-за устаревших рыночных данных. */
         public static final String INSTRUMENT_MARKET_DATA_EXPIRED = "INSTRUMENT_MARKET_DATA_EXPIRED";
 

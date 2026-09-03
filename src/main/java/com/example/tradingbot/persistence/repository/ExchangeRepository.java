@@ -22,6 +22,10 @@ public interface ExchangeRepository extends JpaRepository<ExchangeEntity, Long> 
     @Query("select e.id from ExchangeEntity e where e.status = :status")
     List<Long> findIdsByStatus(@Param("status") String status);
 
+    /** Проекция id бирж в любом из статусов — фильтр входов читает обе ступени лестницы. */
+    @Query("select e.id from ExchangeEntity e where e.status in :statuses")
+    List<Long> findIdsByStatusIn(@Param("statuses") List<String> statuses);
+
     /** Гардированный statusный переход (только из ожидаемого {@code from}); возвращает число затронутых строк. */
     @Modifying
     @Query("update ExchangeEntity e set e.status = :to where e.id = :id and e.status = :from")

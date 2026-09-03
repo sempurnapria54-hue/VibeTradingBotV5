@@ -44,9 +44,27 @@ public class HoldSignal {
     }
 
     /**
+     * Мягкая ступень биржи (L4, ступень 1): биржа выпадает из выборки
+     * входа, живые сделки ведутся полностью. Командного блок-сета у неё
+     * нет — этим она отличается от мягкой ступени инструмента, и разводит
+     * составы лестница, а не сигнал (docs/rules/exchange-hold.md).
+     */
+    public static HoldSignal exchangeSoft(String code) {
+        return new HoldSignal(HoldScope.EXCHANGE, HoldRung.SOFT, code);
+    }
+
+    /**
      * Журнальный сигнал биржевого радиуса (NON_CRITICAL): блокировки в
      * составе реакции нет — сигнал описывает scope/severity/code
      * журнального отчёта и через исполнителя блокировки не идёт.
+     *
+     * <p>Кортеж тот же, что у {@link #exchangeSoft}, а имя другое
+     * НАМЕРЕННО — ровно по той же причине, по какой разведены
+     * {@link #instrumentSoft} и {@link #instrumentJournal}: с тех пор как
+     * мягкая биржевая ступень исполняется, вызов не той фабрики заводит
+     * запрет входов по всей бирже там, где реакции нет вовсе. Прежде обе
+     * ветви были неотличимы по последствиям, потому что не исполнялась ни
+     * одна.
      */
     public static HoldSignal exchangeJournal(String code) {
         return new HoldSignal(HoldScope.EXCHANGE, HoldRung.SOFT, code);

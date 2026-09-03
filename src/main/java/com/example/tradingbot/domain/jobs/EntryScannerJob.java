@@ -73,11 +73,12 @@ public class EntryScannerJob {
     }
 
     private void run() {
-        Set<Long> blockedExchangeIds = new HashSet<>(
-                exchangeDataService.findIdsByStatus(Exchange.Status.TRADE_BLOCKED));
+        Set<Long> blockedExchangeIds = new HashSet<>(exchangeDataService.findIdsBlockingEntry());
         for (Instrument instrument : instrumentDataService.findByStatus(Instrument.Status.ACTIVE)) {
             if (blockedExchangeIds.contains(instrument.getExchangeId())) {
-                // Каскад L4: биржа в TRADE_BLOCKED → входы по всем её инструментам заблокированы.
+                // Ступень биржи гасит новые входы: жёсткая (TRADE_BLOCKED) —
+                // каскадом L4, мягкая (HOLD) — выпадением биржи из выборки.
+                // Живые сделки при этом не трогаются ни той, ни другой.
                 continue;
             }
             try {

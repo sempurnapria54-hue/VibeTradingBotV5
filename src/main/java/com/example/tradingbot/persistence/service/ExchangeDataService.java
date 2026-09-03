@@ -58,16 +58,53 @@ public class ExchangeDataService {
     }
 
     /**
-     * Ручная разморозка торговли: TRADE_BLOCKED → ACTIVE (гардирована статусом,
-     * только из TRADE_BLOCKED — обратная сторона {@link #blockTrade}). Одно действие
-     * отпускает весь L4-каскад: enforcement читает статус биржи живьём, поэтому
-     * возврат биржи в ACTIVE снимает блок входов по всем её инструментам (per-instrument
-     * холды L4 не пишутся). Возвращает {@code true}, если переход применился.
+     * Мягкая ступень: ACTIVE → HOLD (гардирована статусом, только из ACTIVE).
+     * Множество входа мягкой ступени — только рабочее состояние: запрос слабее
+     * стоящей жёсткой ступени поглощается, а понижение делает снятие, не
+     * постановка (docs/rules/exchange-hold.md §«Границы и эскалация»). Гард и
+     * есть анкер: не переставился статус — состояние уже держится.
+     */
+    @Transactional
+    public Boolean blockEntry(Long id) {
+        return repository.updateStatus(id, Exchange.Status.ACTIVE.name(),
+                Exchange.Status.HOLD.name()) > 0;
+    }
+
+    /**
+     * Снятие сворачивания: TRADE_BLOCKED → <b>HOLD</b>, а не в рабочее состояние
+     * (гардирована статусом). Условий снятия два — «риска не осталось» и «причина
+     * понята», — и лестница проверяет их по одному: прыжка сразу в ACTIVE нет
+     * (docs/rules/exchange-hold.md §«Снятие — вручную и только в `HOLD`»).
+     * Возвращает {@code true}, если переход применился.
      */
     @Transactional
     public Boolean unblockTrade(Long id) {
         return repository.updateStatus(id, Exchange.Status.TRADE_BLOCKED.name(),
+                Exchange.Status.HOLD.name()) > 0;
+    }
+
+    /**
+     * Второй ход снятия: HOLD → ACTIVE (гардирована статусом). Машинного
+     * предусловия у него нет — оно есть у первого хода; здесь остаётся
+     * «причина понята», а это суждение держателя, и энфорсера у него нет по
+     * построению (docs/rules/manual-halt.md). Гард отвергает прыжок через
+     * ступень: биржа под сворачиванием этим вызовом не разблокируется.
+     */
+    @Transactional
+    public Boolean clearHold(Long id) {
+        return repository.updateStatus(id, Exchange.Status.HOLD.name(),
                 Exchange.Status.ACTIVE.name()) > 0;
+    }
+
+    /**
+     * Проекция id бирж, чья ступень гасит новые входы, — обе ступени лестницы.
+     * Мягкая и жёсткая одинаково отменяют право набирать новый риск и
+     * различаются судьбой уже принятого, поэтому выборка входа читает обе.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> findIdsBlockingEntry() {
+        return repository.findIdsByStatusIn(List.of(Exchange.Status.HOLD.name(),
+                Exchange.Status.TRADE_BLOCKED.name()));
     }
 
     /** Проекция: только internalId по id — без вытягивания всей сущности. */

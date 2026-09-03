@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import com.example.tradingbot.util.Constants;
 import org.junit.jupiter.api.DisplayName;
@@ -39,8 +40,13 @@ class HoldServiceTest {
 
     private static final Long INSTRUMENT_ID = 7L;
 
+    private static final Long EXCHANGE_ID = 2L;
+
     @Mock
     private InstrumentDataService instrumentDataService;
+
+    @Mock
+    private ExchangeDataService exchangeDataService;
 
     @Mock
     private AnomalyReportService anomalyReportService;
@@ -94,6 +100,30 @@ class HoldServiceTest {
 
         verify(instrumentDataService, never()).blockEntry(anyLong());
         verify(safetyHoldCoordinator, never()).react(any(), any());
+    }
+
+    @Test
+    @DisplayName("Мягкая БИРЖЕВАЯ ступень поднимается и пишет отчёт — инструмент при этом не трогается")
+    void softExchangeRungIsRaised() {
+        when(exchangeDataService.blockEntry(EXCHANGE_ID)).thenReturn(true);
+        HoldSignal signal = HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE);
+
+        holdService.raise(signal, context());
+
+        verify(exchangeDataService).blockEntry(EXCHANGE_ID);
+        verify(anomalyReportService).journal(any(), eqSignal(signal));
+        verify(instrumentDataService, never()).blockEntry(anyLong());
+        verify(safetyHoldCoordinator, never()).react(any(), any());
+    }
+
+    @Test
+    @DisplayName("Стоящая биржевая ступень поглощает повтор: отчёт вторым проходом не множится")
+    void standingExchangeRungAbsorbsRepeat() {
+        when(exchangeDataService.blockEntry(EXCHANGE_ID)).thenReturn(false);
+
+        holdService.raise(HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE), context());
+
+        verify(anomalyReportService, never()).journal(any(), any());
     }
 
     @Test

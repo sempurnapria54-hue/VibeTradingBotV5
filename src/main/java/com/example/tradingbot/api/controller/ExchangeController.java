@@ -50,10 +50,20 @@ public class ExchangeController {
     }
 
     @PostMapping("/{internalId}/trade-unblock")
-    @Operation(summary = "Снять safety-холд биржи (TRADE_BLOCKED → ACTIVE; каскадно отпускает инструменты)")
+    @Operation(summary = "Снять сворачивание биржи — первый из двух ходов (TRADE_BLOCKED → HOLD; "
+            + "требует машинно доказанного отсутствия живого риска)")
     public ExchangeApiResponse unblockTrade(
             @Parameter(description = "Межсервисный идентификатор биржи", required = true)
             @PathVariable @NotBlank String internalId) {
         return mapper.domainToApi(exchangeService.unblockTrade(internalId));
+    }
+
+    @PostMapping("/{internalId}/hold-clear")
+    @Operation(summary = "Снять мягкую ступень биржи — второй ход (HOLD → ACTIVE; "
+            + "каскадно возвращает инструменты в выборку входа)")
+    public ExchangeApiResponse clearHold(
+            @Parameter(description = "Межсервисный идентификатор биржи", required = true)
+            @PathVariable @NotBlank String internalId) {
+        return mapper.domainToApi(exchangeService.clearHold(internalId));
     }
 }
