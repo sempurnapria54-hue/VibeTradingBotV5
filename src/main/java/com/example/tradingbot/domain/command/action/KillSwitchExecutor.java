@@ -158,14 +158,14 @@ public class KillSwitchExecutor {
 
     private ServiceCommand refreshPositionCommand(Deal deal) {
         return ServiceCommand.builder()
-                .type(ServiceCommandType.REFRESH_POSITION)
+                .type(ServiceCommandType.REFRESH_POSITION_COMMAND)
                 .dealId(deal.getId())
                 .build();
     }
 
     private ServiceCommand refreshOrderCommand(Deal deal, Long orderId) {
         return ServiceCommand.builder()
-                .type(ServiceCommandType.REFRESH_ORDER)
+                .type(ServiceCommandType.REFRESH_ORDER_COMMAND)
                 .dealId(deal.getId())
                 .payload(new RefreshOrderCommandPayload(orderId))
                 .build();
@@ -173,7 +173,7 @@ public class KillSwitchExecutor {
 
     private ServiceCommand refreshAlgoOrderCommand(Deal deal, Long algoOrderId) {
         return ServiceCommand.builder()
-                .type(ServiceCommandType.REFRESH_ALGO_ORDER)
+                .type(ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND)
                 .dealId(deal.getId())
                 .payload(new RefreshAlgoOrderCommandPayload(algoOrderId))
                 .build();

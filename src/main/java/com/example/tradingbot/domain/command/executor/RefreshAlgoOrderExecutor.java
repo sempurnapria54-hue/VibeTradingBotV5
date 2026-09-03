@@ -53,7 +53,7 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.REFRESH_ALGO_ORDER;
+        return ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND;
     }
 
     @Override

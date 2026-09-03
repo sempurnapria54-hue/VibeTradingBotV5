@@ -50,7 +50,7 @@ public class RefreshBalanceExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.REFRESH_BALANCE;
+        return ServiceCommandType.REFRESH_BALANCE_COMMAND;
     }
 
     @Override

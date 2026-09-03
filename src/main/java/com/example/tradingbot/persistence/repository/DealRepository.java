@@ -33,6 +33,22 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                                             @Param("statuses") Collection<String> statuses);
 
     /**
+     * Сделки инструмента, ВКЛЮЧАЯ терминальные, свежим окном — вход
+     * предусловия снятия жёсткой ступени. Терминальные нужны потому, что
+     * каскад сворачивания уже увёл активные сделки в ошибочное состояние,
+     * и остаточный риск живёт после терминала: выборка только по
+     * нетерминальным была бы пуста ровно на мотивирующей тропе.
+     */
+    List<DealEntity> findByInstrumentIdOrderByIdDesc(Long instrumentId, Pageable pageable);
+
+    /** То же для биржевого радиуса: сделки всех её инструментов, включая терминальные. */
+    @Query("""
+            select d from DealEntity d, InstrumentEntity i
+            where d.instrumentId = i.id and i.exchangeId = :exchangeId
+            order by d.id desc""")
+    List<DealEntity> findByExchangeId(@Param("exchangeId") Long exchangeId, Pageable pageable);
+
+    /**
      * Монотонное вперёд движение порога доказанного покрытия. Охрана
      * стои́т в самом запросе, а не в вызывающем коде: число наблюдений
      * равно числу закрывшихся эпизодов, и порог обязан накрывать

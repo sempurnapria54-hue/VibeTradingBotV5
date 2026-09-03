@@ -4,6 +4,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.domain.model.other.DealCashFlow;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,6 +58,40 @@ public class ExchangeContourProperties {
         private List<String> reconciliationExclusions = new ArrayList<>();
 
         /**
+         * Допуск сверки P&L: относительный член, омиссионный множитель и
+         * пол. Формула — docs/spec/pnl-reconciliation.json §epsilon;
+         * величины здесь не выводятся, их назначает держатель.
+         */
+        private ReconciliationTolerance reconciliationTolerance = new ReconciliationTolerance();
+
+        /**
+         * <b>Разведочный режим допуска</b>: допуск отгружается
+         * некалиброванным, и до калибровки расхождение неотличимо от
+         * «допуск не тот». В этом режиме расхождение пишет признак и
+         * заводит отчёт, но лестницу не триггерит
+         * (docs/rules/pnl-reconciliation.md §«Разведочный режим
+         * допуска»). Умолчание — включён: выключает его человек
+         * сервисной операцией после калибровки.
+         */
+        private Boolean reconciliationExploratory = true;
+
+        /**
+         * Глубина свежего эндпоинта движений средств, дней. Операнд двух
+         * решений: звать ли архив в конвейере добычи и накрыло ли окно
+         * всю жизнь сделки (признак полноты разбивки). Контрактная
+         * величина источника — docs/integrations/okx/contracts/account-bills.md.
+         */
+        private Integer billsFreshDepthDays = 7;
+
+        /**
+         * Глубина архивного эндпоинта движений средств, дней. Верхняя
+         * граница доступности движений вообще: старше неё разбивка не
+         * добывается ни одним звеном, и сделка получает признак
+         * INCOMPLETE_BY_WINDOW.
+         */
+        private Integer billsArchiveDepthDays = 90;
+
+        /**
          * Тип/пара выведены из области сверки списком исключений:
          * строка типа покрывает все его подтипы, строка пары — точечно
          * (docs/models/mapping/DealCashFlow.md §«Область сверки задаётся
@@ -87,5 +122,26 @@ public class ExchangeContourProperties {
             }
             return Optional.ofNullable(cashFlowCategoryMapping.get(externalType));
         }
+    }
+
+    /**
+     * Величины допуска сверки. Тест двухчастный, срабатывает меньший
+     * член; пол общий и вынесен наружу
+     * (docs/spec/pnl-reconciliation.json §epsilon). Пустая величина
+     * читается нулём только у членов — пустой пол обнулил бы охрану
+     * композиции на популяции сделок без входных ног.
+     */
+    @Getter
+    @Setter
+    public static class ReconciliationTolerance {
+
+        /** Относительный член: доля валового оборота. */
+        private BigDecimal relativeShare = BigDecimal.ZERO;
+
+        /** Омиссионный член: множитель ожидаемой комиссии сделки. */
+        private BigDecimal omissionMultiplier = BigDecimal.ZERO;
+
+        /** Пол допуска в расчётной валюте. */
+        private BigDecimal floor = BigDecimal.ZERO;
     }
 }

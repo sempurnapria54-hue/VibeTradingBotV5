@@ -49,7 +49,7 @@ public class SubmitOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.SUBMIT_ORDER;
+        return ServiceCommandType.SUBMIT_ORDER_COMMAND;
     }
 
     @Override

@@ -5,7 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.DealFinalizationType;
+import com.example.tradingbot.domain.command.SystemActionType;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
 import com.example.tradingbot.domain.deal.TrancheTransition;
 import com.example.tradingbot.domain.deal.TrancheFsmHandler;
@@ -52,7 +52,9 @@ public class TrancheEntrySubmittedHandler implements TrancheFsmHandler {
         Deal deal = dealContext.getDeal();
         Order entry = support.entryOrder(deal);
         if (isTrue(entry.isLive())) {
-            return TrancheTransition.command(support.refreshOrderCommand(dealContext, entry.getId()));
+            return support.refreshOrderCommand(dealContext, entry.getId())
+                    .map(TrancheTransition::command)
+                    .orElseGet(TrancheTransition::stay);
         }
         if (isTrue(support.positionLiveRisk(deal))) {
             return finalizeEntry(dealContext, tranche);
@@ -63,7 +65,9 @@ public class TrancheEntrySubmittedHandler implements TrancheFsmHandler {
         }
         if (isTrue(entryHadFill(entry))) {
             // Entry исполнился, локальной позиции ещё нет — обнаружить её фактами.
-            return TrancheTransition.command(support.refreshPositionCommand(dealContext));
+            return support.refreshPositionCommand(dealContext)
+                    .map(TrancheTransition::command)
+                    .orElseGet(TrancheTransition::stay);
         }
         // Entry терминален без исполнения (canceled до fill): live risk не открыт — чистое закрытие.
         return TrancheTransition.builder()
@@ -72,9 +76,14 @@ public class TrancheEntrySubmittedHandler implements TrancheFsmHandler {
                 .build();
     }
 
-    /** Консолидировать вход (FINALIZE_DEAL_ENTRY), затем выходная проверка → ENTRY_FINALIZED. */
+    /**
+     * Консолидировать вход — системным действием ЭТОГО транша: статус
+     * подтверждённого входа пишется ему, поэтому N траншей сетки,
+     * консолидирующих вход одновременно, ведут N законных исполнений
+     * одного типа (docs/models/domain/other/DealActionState.md).
+     */
     private TrancheTransition finalizeEntry(DealContext dealContext, DealTranche tranche) {
-        return support.finalizationCommand(DealFinalizationType.FINALIZE_ENTRY, dealContext)
+        return support.systemAction(SystemActionType.FINALIZE_DEAL_ENTRY_ACTION, dealContext, tranche)
                 .map(TrancheTransition::command)
                 .orElseGet(() -> TrancheTransition.transition(DealTranche.Status.ENTRY_FINALIZED));
     }

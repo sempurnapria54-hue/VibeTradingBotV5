@@ -1,7 +1,6 @@
 package com.example.tradingbot.config;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,11 +24,11 @@ import org.springframework.core.io.ClassPathResource;
  * отказ»).
  *
  * <p>Проверяется КОНТРАКТ, а не значения: ключи секции действительно
- * биндятся в поля (опечатка в ключе связала бы пустоту молча), профиль
- * test несёт все три числа, профиль prod объявляет их и не заполняет.
- * Сами числа тест не повторяет — второй носитель значения разошёлся бы с
- * конфигом первой же правкой, а читатель не знал бы, которое из двух
- * действует.
+ * биндятся в поля (опечатка в ключе связала бы пустоту молча), и оба
+ * профиля несут все три числа — пустое число в боевом профиле роняет
+ * подъём приложения. Сами числа тест не повторяет — второй носитель
+ * значения разошёлся бы с конфигом первой же правкой, а читатель не знал
+ * бы, которое из двух действует.
  */
 class RiskAppetitePropertiesBindingTest {
 
@@ -52,10 +51,16 @@ class RiskAppetitePropertiesBindingTest {
     }
 
     @Test
-    @DisplayName("Профиль prod объявляет все три ключа и не заполняет ни одного")
-    void prodProfileDeclaresButLeavesEmpty() throws IOException {
-        // Объявленное пустое место отличается от забытого: ключ на месте,
-        // значения нет, и незаданное число отвергает действие, а не пропускает.
+    @DisplayName("Профиль prod объявляет все три ключа и несёт значение у каждого")
+    void prodProfileCarriesAllThree() throws IOException {
+        // Пустое число в боевом профиле роняет подъём приложения
+        // (RiskAppetiteStartupCheck), поэтому проверяется ровно это: ключ
+        // объявлен И значение биндится. КАКОЕ это значение, тест не знает и
+        // знать не должен — до конца фазы 1 там временная копия профиля test
+        // (решение держателя 2026-09-03), после — назначенное держателем
+        // боевое число; носитель этого различия — не тест, а встречный якорь
+        // .claude/work/backlog.md §«Боевые числа риск-аппетита — назначение
+        // держателем перед первым запуском prod».
         ConfigurationPropertySource source = source(PROD_PROFILE);
         for (String key : List.of("global-simultaneous-risk-per-deal-percent",
                 "global-catastrophic-risk-per-deal-multiplier",
@@ -66,9 +71,13 @@ class RiskAppetitePropertiesBindingTest {
         }
 
         RiskAppetiteProperties properties = bind(PROD_PROFILE);
-        assertNull(properties.getGlobalSimultaneousRiskPerDealPercent());
-        assertNull(properties.getGlobalCatastrophicRiskPerDealMultiplier());
-        assertNull(properties.getGlobalConsecutiveLossLimit());
+        assertNotNull(properties.getGlobalSimultaneousRiskPerDealPercent(), "риск на сделку");
+        assertNotNull(properties.getGlobalCatastrophicRiskPerDealMultiplier(), "множитель потолка");
+        assertNotNull(properties.getGlobalConsecutiveLossLimit(), "предел серии убытков");
+
+        assertTrue(properties.getGlobalSimultaneousRiskPerDealPercent().signum() > 0);
+        assertTrue(properties.getGlobalCatastrophicRiskPerDealMultiplier().signum() > 0);
+        assertTrue(properties.getGlobalConsecutiveLossLimit() > 0);
     }
 
     @Test

@@ -3,7 +3,6 @@ package com.example.tradingbot.mapping;
 import static java.util.Objects.isNull;
 
 import com.example.tradingbot.domain.command.RetryError;
-import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.model.core.algo_order.Condition;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -15,8 +14,8 @@ import org.springframework.stereotype.Component;
 /**
  * Конвертация JSONB-навеса runtime-сущностей command-слоя: доменные
  * value-объекты ↔ сериализованный JSON строк persistence-слоя (условие
- * algo-order, связанные ordni ids, runtime-target и last-error
- * DealActionState). Пишутся только непустые значения. Методы
+ * algo-order, связанные ordni ids и last-error строки исполнения).
+ * Пишутся только непустые значения. Методы
  * подхватывают мапперы (MapStruct uses) по парам типов. Параллель —
  * {@link StrategyJsonConverter}.
  */
@@ -36,14 +35,6 @@ public class RuntimeJsonConverter {
 
     public Condition jsonToCondition(String json) {
         return readJson(json, Condition.class);
-    }
-
-    public String runtimeTargetToJson(RuntimeTarget target) {
-        return writeJson(target);
-    }
-
-    public RuntimeTarget jsonToRuntimeTarget(String json) {
-        return readJson(json, RuntimeTarget.class);
     }
 
     public String retryErrorToJson(RetryError error) {

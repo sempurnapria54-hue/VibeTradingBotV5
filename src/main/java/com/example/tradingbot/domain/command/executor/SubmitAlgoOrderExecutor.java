@@ -42,7 +42,7 @@ public class SubmitAlgoOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.SUBMIT_ALGO_ORDER;
+        return ServiceCommandType.SUBMIT_ALGO_ORDER_COMMAND;
     }
 
     @Override

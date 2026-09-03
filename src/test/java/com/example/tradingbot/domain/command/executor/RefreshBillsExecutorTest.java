@@ -334,7 +334,7 @@ class RefreshBillsExecutorTest {
 
     private ServiceCommand command() {
         return ServiceCommand.builder()
-                .type(ServiceCommandType.REFRESH_BILLS)
+                .type(ServiceCommandType.REFRESH_BILLS_COMMAND)
                 .dealId(DEAL_ID)
                 .build();
     }

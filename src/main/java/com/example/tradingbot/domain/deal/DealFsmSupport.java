@@ -6,17 +6,16 @@ import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.tradingbot.domain.command.ActionKind;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.DealFinalizationCommandFactory;
-import com.example.tradingbot.domain.command.DealFinalizationStateStatus;
-import com.example.tradingbot.domain.command.DealFinalizationType;
-import com.example.tradingbot.domain.command.Retryable;
 import com.example.tradingbot.domain.command.RuntimeErrorCode;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandPayload;
 import com.example.tradingbot.domain.command.ServiceCommandType;
+import com.example.tradingbot.domain.command.SystemActionType;
+import com.example.tradingbot.domain.command.action.SystemActionExecutor;
 import com.example.tradingbot.domain.command.calc.CalculationError;
 import com.example.tradingbot.domain.command.payload.CancelAlgoOrderCommandPayload;
 import com.example.tradingbot.domain.command.payload.CancelOrderCommandPayload;
@@ -55,10 +54,16 @@ import org.springframework.stereotype.Component;
 
 /**
  * Общие операции FSM handler'ов: выбор допустимых StrategyStep по статусу
- * сделки, оценка StrategyCondition, find-or-create DealActionState под
- * action (идемпотентность по UNIQUE(deal_id, strategy_action_id)), сборка
- * технических команд (REFRESH_BALANCE) и эмиссия финализационных команд
- * через фабрику. Оркестрацию последовательности держит сам handler.
+ * транша и сделки, оценка StrategyCondition, find-or-create строки
+ * исполнения под стратегийное действие, эмиссия звеньев СИСТЕМНЫХ
+ * действий через {@link SystemActionExecutor} и сборка команд дочистки.
+ * Оркестрацию последовательности держит сам handler.
+ *
+ * <p><b>Дочистка идёт напрямую, добыча и финализация — звеньями</b>:
+ * отмены и закрытие позиции риск-снижающие и иерархии создания торгового
+ * намерения не подчинены, поэтому анкера у них нет вовсе
+ * (docs/components/SystemActionExecutor.md §«Дочистка звеном не
+ * является»).
  */
 @Component
 @RequiredArgsConstructor
@@ -67,7 +72,7 @@ public class DealFsmSupport {
     private final DealActionStateDataService dealActionStateDataService;
     private final StrategyConditionEvaluator conditionEvaluator;
     private final MarketConditionContextFactory conditionContextFactory;
-    private final DealFinalizationCommandFactory finalizationFactory;
+    private final SystemActionExecutor systemActionExecutor;
     private final IntegrationService integrationService;
     private final StrategyStepEligibility stepEligibility;
 
@@ -198,49 +203,61 @@ public class DealFsmSupport {
                                           StrategyAction action) {
         DealActionState state = new DealActionState();
         state.setDealId(dealContext.getDeal().getId());
+        state.setActionKind(ActionKind.STRATEGY);
         state.setDealTrancheId(nonNull(tranche) ? tranche.getId() : null);
         state.setTrancheEpisodeSeq(nonNull(tranche) ? tranche.getEpisodeSeq() : null);
         state.setStrategyActionId(action.getId());
         state.setStatus(DealActionStateStatus.PLANNED);
-        return dealActionStateDataService.save(state);
+        DealActionState saved = dealActionStateDataService.save(state);
+        // Контекст собран до этой строки, а анкер команды обязан резолвиться сразу.
+        dealContext.register(saved);
+        return saved;
     }
 
-    /** REFRESH_BALANCE по settle currency последнего снапшота (null — аккаунт целиком). */
-    public ServiceCommand refreshBalanceCommand(DealContext dealContext) {
-        return ServiceCommand.builder()
-                .type(ServiceCommandType.REFRESH_BALANCE)
-                .dealId(dealContext.getDeal().getId())
-                .payload(new RefreshBalanceCommandPayload(settleCurrency(dealContext.getBalanceContainer())))
-                .build();
-    }
-
-    /** Эмиссия финализационной команды (FINALIZE_* / MARK_*) через фабрику. */
-    public Optional<ServiceCommand> finalizationCommand(DealFinalizationType type, DealContext dealContext) {
-        return finalizationFactory.finalizationCommand(type, dealContext);
-    }
-
-    /** Финализация type исчерпала повторы (FAILED) — сделку на ошибочную тропу (DEAL-Q2). */
-    public Boolean finalizationFailed(DealContext dealContext, DealFinalizationType type) {
-        if (isEmpty(dealContext.getFinalizationStates())) {
-            return false;
-        }
-        return dealContext.getFinalizationStates().stream()
-                .anyMatch(state -> Objects.equals(type, state.getType())
-                        && Objects.equals(DealFinalizationStateStatus.FAILED, state.getStatus()));
-    }
-
-    /** Системный REFRESH_POSITION (без action-state): обновить/обнаружить позицию по фактам. */
-    public ServiceCommand refreshPositionCommand(DealContext dealContext) {
-        return systemCommand(ServiceCommandType.REFRESH_POSITION, dealContext, null);
+    /** Звено добычи баланса по settle currency последнего снапшота (null — аккаунт целиком). */
+    public Optional<ServiceCommand> refreshBalanceCommand(DealContext dealContext) {
+        return fetchLink(dealContext, ServiceCommandType.REFRESH_BALANCE_COMMAND,
+                new RefreshBalanceCommandPayload(settleCurrency(dealContext.getBalanceContainer())));
     }
 
     /**
-     * Системный REFRESH_BILLS (без action-state): добыть движения средств
-     * окна сделки. Конвейер 7d→архив и границу разбора ведёт сам
-     * исполнитель — здесь только эмиссия звена.
+     * Очередное звено системного действия, выводимое из подтверждённых
+     * фактов сделки (финализация, терминалы, цикл добычи). Пусто —
+     * исполнять нечего: звено ждёт времени следующей попытки либо
+     * надобности больше нет.
      */
-    public ServiceCommand refreshBillsCommand(DealContext dealContext) {
-        return systemCommand(ServiceCommandType.REFRESH_BILLS, dealContext, null);
+    public Optional<ServiceCommand> systemAction(SystemActionType type, DealContext dealContext,
+                                                 DealTranche tranche) {
+        return systemActionExecutor.next(type, dealContext, tranche);
+    }
+
+    /**
+     * Системное действие названного типа исчерпало бюджет попыток —
+     * сделку на ошибочную тропу. Читается по строкам исполнения самой
+     * сделки: отказавшая строка терминальна и живой уже не станет.
+     */
+    public Boolean systemActionFailed(DealContext dealContext, SystemActionType type) {
+        return dealContext.systemActionStates(type).stream()
+                .anyMatch(state -> DealActionStateStatus.FAILED.equals(state.getStatus()));
+    }
+
+    /**
+     * Звено добычи позиции: обновить либо обнаружить эпизод по фактам.
+     * Идёт анкером цикла добычи — у звена есть бюджет попыток и ревизия,
+     * в отличие от прежней безанкерной эмиссии.
+     */
+    public Optional<ServiceCommand> refreshPositionCommand(DealContext dealContext) {
+        return fetchLink(dealContext, ServiceCommandType.REFRESH_POSITION_COMMAND, null);
+    }
+
+    /**
+     * Звено добычи движений средств окна сделки. Конвейер «свежий
+     * эндпоинт → архив» и границу разбора ведёт сам исполнитель — здесь
+     * только эмиссия звена. Звено ВЫХОДНОЙ тропы: на аварийной оно не
+     * эмитится вовсе.
+     */
+    public Optional<ServiceCommand> refreshBillsCommand(DealContext dealContext) {
+        return fetchLink(dealContext, ServiceCommandType.REFRESH_BILLS_COMMAND, null);
     }
 
     /** Граф сделки предъявлен контекстом целиком — признак читается ГОТОВЫМ. */
@@ -261,34 +278,51 @@ public class DealFsmSupport {
                 .anyMatch(state -> !DealActionStateStatus.SKIPPED.equals(state.getStatus()));
     }
 
-    /** Системный REFRESH_ORDER по локальному order id (evidence-cycle внутри executor'а). */
-    public ServiceCommand refreshOrderCommand(DealContext dealContext, Long orderId) {
-        return systemCommand(ServiceCommandType.REFRESH_ORDER, dealContext, new RefreshOrderCommandPayload(orderId));
+    /** Звено добычи заявки по локальному идентификатору (evidence-cycle внутри исполнителя). */
+    public Optional<ServiceCommand> refreshOrderCommand(DealContext dealContext, Long orderId) {
+        return fetchLink(dealContext, ServiceCommandType.REFRESH_ORDER_COMMAND,
+                new RefreshOrderCommandPayload(orderId));
     }
 
-    /** Системный REFRESH_ALGO_ORDER по локальному algo id (evidence-cycle внутри executor'а). */
-    public ServiceCommand refreshAlgoOrderCommand(DealContext dealContext, Long algoOrderId) {
-        return systemCommand(ServiceCommandType.REFRESH_ALGO_ORDER, dealContext,
+    /** Звено добычи условной заявки по локальному идентификатору. */
+    public Optional<ServiceCommand> refreshAlgoOrderCommand(DealContext dealContext, Long algoOrderId) {
+        return fetchLink(dealContext, ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND,
                 new RefreshAlgoOrderCommandPayload(algoOrderId));
+    }
+
+    /**
+     * Звено цикла добычи с ЯВНО названной сущностью: durable-факт
+     * надобности прочитал вызывающий обработчик, и повторять его разбор
+     * в исполнителе значило бы завести второго носителя одного решения.
+     *
+     * <p>Действие добычи — <b>агрегатное</b>: транша у него нет ни
+     * одного, потому что добываются факты сделки целиком, а потраншевым
+     * бывает единственное системное действие — консолидация входа транша
+     * (docs/models/domain/other/DealActionState.md §Енумы).
+     */
+    private Optional<ServiceCommand> fetchLink(DealContext dealContext, ServiceCommandType link,
+                                               ServiceCommandPayload payload) {
+        return systemActionExecutor.next(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION, dealContext, null,
+                link, payload);
     }
 
     /** Cleanup CLOSE_POSITION (full close, reduce-only) без action-state. */
     public ServiceCommand closePositionCommand(DealContext dealContext, Long positionId,
                                                Position.CloseReason reason) {
-        return systemCommand(ServiceCommandType.CLOSE_POSITION, dealContext,
+        return systemCommand(ServiceCommandType.CLOSE_POSITION_COMMAND, dealContext,
                 new ClosePositionCommandPayload(positionId, reason));
     }
 
     /** Cleanup CANCEL_ORDER без action-state. */
     public ServiceCommand cancelOrderCommand(DealContext dealContext, Long orderId, Order.CloseReason reason) {
-        return systemCommand(ServiceCommandType.CANCEL_ORDER, dealContext,
+        return systemCommand(ServiceCommandType.CANCEL_ORDER_COMMAND, dealContext,
                 new CancelOrderCommandPayload(orderId, reason));
     }
 
     /** Cleanup CANCEL_ALGO_ORDER без action-state. */
     public ServiceCommand cancelAlgoOrderCommand(DealContext dealContext, Long algoOrderId,
                                                  AlgoOrder.CloseReason reason) {
-        return systemCommand(ServiceCommandType.CANCEL_ALGO_ORDER, dealContext,
+        return systemCommand(ServiceCommandType.CANCEL_ALGO_ORDER_COMMAND, dealContext,
                 new CancelAlgoOrderCommandPayload(algoOrderId, reason));
     }
 
@@ -430,27 +464,26 @@ public class DealFsmSupport {
     }
 
     private DealTransition buildMarkError(DealContext dealContext, HoldSignal holdSignal) {
-        return finalizationCommand(DealFinalizationType.MARK_ERROR, dealContext)
+        return systemAction(SystemActionType.FINALIZE_DEAL_ERROR_ACTION, dealContext, null)
                 .map(command -> DealTransition.builder().command(command).holdSignal(holdSignal).build())
                 .orElseGet(() -> nonNull(holdSignal)
                         ? DealTransition.builder().holdSignal(holdSignal).build()
                         : DealTransition.stay());
     }
 
-    /** L4-холд биржи, если среди retry-anchor'ов сделки есть controlled-violation; иначе null. */
+    /**
+     * L4-холд биржи, если среди анкеров сделки есть controlled-violation;
+     * иначе null. Анкер один на оба вида действий, поэтому и перечень
+     * один — строки исполнения сделки.
+     */
     private HoldSignal controlledViolationHold(DealContext dealContext) {
-        boolean controlled = isTrue(hasControlledViolation(dealContext.getActionStates()))
-                || isTrue(hasControlledViolation(dealContext.getFinalizationStates()));
-        return controlled ? HoldSignal.exchange(Constants.Hold.EXCHANGE_CONTROLLED_VIOLATION) : null;
-    }
-
-    /** Есть ли среди retry-anchor'ов ошибка класса VALIDATION_ERROR (= ControlledExchangeException). */
-    private Boolean hasControlledViolation(List<? extends Retryable> retryables) {
-        if (isEmpty(retryables)) {
-            return false;
+        List<DealActionState> states = dealContext.getActionStates();
+        if (isEmpty(states)) {
+            return null;
         }
-        return retryables.stream().anyMatch(retryable -> nonNull(retryable.getLastError())
-                && Objects.equals(RuntimeErrorCode.VALIDATION_ERROR, retryable.getLastError().getType()));
+        boolean controlled = states.stream().anyMatch(state -> nonNull(state.getLastError())
+                && Objects.equals(RuntimeErrorCode.VALIDATION_ERROR, state.getLastError().getType()));
+        return controlled ? HoldSignal.exchange(Constants.Hold.EXCHANGE_CONTROLLED_VIOLATION) : null;
     }
 
     private DealTransition reactToBlock(RiskBlockAction block, DealContext dealContext) {
@@ -460,7 +493,9 @@ public class DealFsmSupport {
                     .closeReason(block.getCloseReason())
                     .build();
             case MOVE_DEAL_TO_ERROR -> markError(dealContext);
-            case REQUEST_REFRESH -> DealTransition.command(refreshBalanceCommand(dealContext));
+            case REQUEST_REFRESH -> refreshBalanceCommand(dealContext)
+                    .map(DealTransition::command)
+                    .orElseGet(DealTransition::stay);
             default -> DealTransition.stay();
         };
     }

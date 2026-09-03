@@ -67,7 +67,7 @@ public class RefreshPositionExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.REFRESH_POSITION;
+        return ServiceCommandType.REFRESH_POSITION_COMMAND;
     }
 
     @Override

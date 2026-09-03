@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.command.SystemActionType;
 import com.example.tradingbot.domain.deal.DealFsmHandler;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
 import com.example.tradingbot.domain.deal.DealTransition;
@@ -74,7 +75,7 @@ public class DealActiveHandler implements DealFsmHandler {
             return Optional.of(DealTransition.transition(Deal.Status.EXIT_PENDING));
         }
         if (isTrue(deal.allTranchesTerminal())) {
-            return Optional.of(terminalOrCoordinatedExit(deal));
+            return Optional.of(terminalOrCoordinatedExit(dealContext));
         }
         return exitDecision(dealContext);
     }
@@ -102,11 +103,21 @@ public class DealActiveHandler implements DealFsmHandler {
      * <p>Были операции — сделка идёт в координированный выход, и её
      * терминал затребует уже его обработчик: там число считает звено
      * расчёта, а штатный терминал его требует.
+     *
+     * <p><b>Терминал без входа ставится звеном, а не прямым ребром.</b>
+     * Число на этой тропе равно нулю как РЕЗУЛЬТАТ расчёта, и пишет его
+     * терминальное ребро вместе с признаками отбора
+     * (docs/models/domain/aggregate/Deal.md §«Расчёт и запись — писателей
+     * три»); прямой переход закрыл бы сделку без числа, а контракт
+     * штатного терминала его требует.
      */
-    private DealTransition terminalOrCoordinatedExit(Deal deal) {
-        return isTrue(deal.positionObserved())
-                ? DealTransition.transition(Deal.Status.EXIT_PENDING)
-                : DealTransition.transition(Deal.Status.CLOSED);
+    private DealTransition terminalOrCoordinatedExit(DealContext dealContext) {
+        if (isTrue(dealContext.getDeal().positionObserved())) {
+            return DealTransition.transition(Deal.Status.EXIT_PENDING);
+        }
+        return support.systemAction(SystemActionType.FINALIZE_DEAL_EXIT_ACTION, dealContext, null)
+                .map(DealTransition::command)
+                .orElseGet(DealTransition::stay);
     }
 
     /**

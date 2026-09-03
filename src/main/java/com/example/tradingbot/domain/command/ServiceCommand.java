@@ -10,8 +10,16 @@ import lombok.Value;
  * пересобирается по фактам (docs/rules/command-lifecycle.md).
  * Происхождение восстанавливается через DealActionState — strategyId/
  * strategyDetailId не хранит. Отвечает «какую простую операцию
- * выполнить»; executor — «как технически», FSM — «зачем сейчас». См.
- * docs/components/models/ServiceCommand.md.
+ * выполнить»; executor — «как технически», FSM — «зачем сейчас».
+ *
+ * <p><b>Анкер учёта один</b> — строка исполнения. Отдельного анкера под
+ * финализацию нет: системное действие несёт свою строку наравне со
+ * стратегийным (docs/models/domain/other/DealActionState.md). Пусто
+ * ровно у дочистки: отмены и закрытие позиции эмитируются напрямую, без
+ * анкера (docs/components/SystemActionExecutor.md §«Дочистка звеном не
+ * является»).
+ *
+ * <p>См. docs/components/models/ServiceCommand.md.
  */
 @Value
 @Builder
@@ -23,11 +31,8 @@ public class ServiceCommand {
     /** Сделка, в рамках которой выполняется команда. */
     Long dealId;
 
-    /** Runtime-состояние action стратегии (связь со StrategyAction); null для финализационных/не-action команд. */
+    /** Строка исполнения — анкер идемпотентности, повторов и цели; null у дочистки. */
     Long dealActionStateId;
-
-    /** Runtime-состояние финализационной команды (lifecycle/system action без StrategyAction); null для action-команд. */
-    Long dealFinalizationStateId;
 
     /** Параметры выполнения. */
     ServiceCommandPayload payload;

@@ -148,7 +148,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v108.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v109.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -208,6 +208,7 @@
 │       │   ├── phase-1-step-7-code-pass-precontrol.md — Что сделано заходом по преконтролю и что он оставил названным?
 │       │   ├── phase-1-step-7-code-pass-levels.md — Что сделано заходом по уровням и что он оставил названным?
 │       │   ├── phase-1-step-7-code-pass-aggregate-surface.md — Что сделано заходом по агрегатной поверхности, объявлениям траншей и числам риска?
+│       │   ├── phase-1-step-7-code-pass-execution-rows.md — Что сделано заходом по строкам исполнения, финализации выхода и хвосту конвейера?
 │       │   ├── phase-1-step-7-code-tail.md — Что осталось дописать в компонентах, переведённых в «в работе»?
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили? (общие вопросы пайплайна и продукта)
@@ -227,7 +228,6 @@
 │   │   │   ├── CalculationError.md — Что это за контролируемая ошибка расчёта?
 │   │   │   ├── DealContext.md — Что это за контекст одного прохода FSM?
 │   │   │   ├── HoldSignal.md — Чем описывается требуемая блокировка?
-│   │   │   ├── MarketDataExpirationResult.md — Что это за `MarketDataExpirationResult`?
 │   │   │   ├── MarketPriceData.md — Что это за runtime-цены инструмента?
 │   │   │   ├── PositionStatusResolveResult.md — Что это за `PositionStatusResolveResult`?
 │   │   │   ├── RiskBlockAction.md — Что это за `RiskBlockAction`?

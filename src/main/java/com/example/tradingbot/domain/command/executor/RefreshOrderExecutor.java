@@ -65,7 +65,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.REFRESH_ORDER;
+        return ServiceCommandType.REFRESH_ORDER_COMMAND;
     }
 
     @Override

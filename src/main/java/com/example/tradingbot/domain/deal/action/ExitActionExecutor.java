@@ -99,7 +99,7 @@ public class ExitActionExecutor implements StrategyActionExecutor {
         }
         List<Order> entryLegs = liveEntryLegs(dealContext, tranche);
         if (isNotEmpty(entryLegs)) {
-            return ActionPlan.command(command(ServiceCommandType.CANCEL_ORDER, dealContext, state,
+            return ActionPlan.command(command(ServiceCommandType.CANCEL_ORDER_COMMAND, dealContext, state,
                     new CancelOrderCommandPayload(entryLegs.getFirst().getId(),
                             Order.CloseReason.CANCELED_BY_STRATEGY)));
         }
@@ -108,7 +108,7 @@ public class ExitActionExecutor implements StrategyActionExecutor {
             // экспозиция ушла сама — дальше ведёт статус выхода.
             return ActionPlan.empty();
         }
-        return ActionPlan.command(command(ServiceCommandType.CLOSE_POSITION, dealContext, state,
+        return ActionPlan.command(command(ServiceCommandType.CLOSE_POSITION_COMMAND, dealContext, state,
                 new ClosePositionCommandPayload(dealContext.getDeal().livePosition().getId(),
                         Position.CloseReason.CLOSED_BY_STRATEGY)));
     }

@@ -61,7 +61,9 @@ public class TrancheProtectionSwitchedHandler implements TrancheFsmHandler {
     public TrancheTransition handle(DealContext dealContext, DealTranche tranche) {
         for (AlgoOrder algoOrder : support.liveAlgoOrders(dealContext.getDeal())) {
             if (isFalse(AlgoOrder.Status.ACTIVE.equals(algoOrder.getStatus()))) {
-                return TrancheTransition.command(support.refreshAlgoOrderCommand(dealContext, algoOrder.getId()));
+                return support.refreshAlgoOrderCommand(dealContext, algoOrder.getId())
+                        .map(TrancheTransition::command)
+                        .orElseGet(TrancheTransition::stay);
             }
         }
         return TrancheTransition.stay();

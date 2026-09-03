@@ -2,80 +2,88 @@ package com.example.tradingbot.domain.command.executor;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static org.apache.commons.collections4.CollectionUtils.isEmpty;
-import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealActionState;
+import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.DealFinalizationState;
-import com.example.tradingbot.domain.command.DealFinalizationStateStatus;
-import com.example.tradingbot.domain.command.DealFinalizationType;
 import com.example.tradingbot.domain.command.RuntimeErrorCode;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
+import com.example.tradingbot.domain.command.calc.DealReconciliationCalculator;
+import com.example.tradingbot.domain.command.calc.DealTerminalFeaturesWriter;
+import com.example.tradingbot.domain.deal.DealTerminalGate;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
-import com.example.tradingbot.domain.model.core.balance.Balance;
-import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
-import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.safety.HoldSignal;
+import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import com.example.tradingbot.persistence.service.DealDataService;
-import com.example.tradingbot.persistence.service.DealFinalizationStateDataService;
+import com.example.tradingbot.util.Constants;
 import java.math.BigDecimal;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Исполняет MARK_DEAL_CLOSED — терминальное ребро штатного закрытия
- * (EXIT_PENDING → CLOSED). Ставит терминал только после подтверждённого
- * отсутствия live risk; иначе не терминализирует (failure → retry/error
- * path). Обязательные resultProfit/resultProfitCurrency: сам PnL-расчёт —
- * шаг 7 (граница 6 ↔ 7), здесь — механический placeholder (ZERO + settle
- * currency), чтобы удовлетворить инвариант наличия числа на чистом
- * терминале; шаг 7 заменит расчётом. Если число неисчислимо (нет settle
- * currency) — failure → DEAL-Q2 ошибочная тропа. RiskValidator не
- * вызывается. Retry-anchor — DealFinalizationState(deal, MARK_CLOSED). См.
- * docs/components/MarkDealClosedExecutor.md.
+ * Исполняет MARK_DEAL_CLOSED_COMMAND — терминальное ребро штатного
+ * закрытия (EXIT_PENDING → CLOSED). Ставит терминал только после
+ * подтверждённого отсутствия живого риска.
+ *
+ * <p><b>Числа этот исполнитель не пишет — он его АССЕРТИТ</b>
+ * (docs/models/domain/aggregate/Deal.md §«Расчёт и запись — писателей
+ * три»): на штатной тропе число уже записала финализация выхода, и
+ * подстановка нуля объявляла бы посчитанным то, что не посчитано.
+ * Исключение — тропа закрытия БЕЗ входа: там ноль есть результат
+ * расчёта, и пишет его сам терминал.
+ *
+ * <p><b>Расхождение сверки поднимает ступень 1 после коммита терминала</b>
+ * и только в боевом режиме допуска: до калибровки расхождение неотличимо
+ * от «допуск не тот» (docs/rules/pnl-reconciliation.md §«Реакция на
+ * расхождение»). Ступень ЗАТРЕБОВАНА результатом, а поднимает её проход:
+ * иначе отказ реакции откатил бы применение терминала.
+ *
+ * <p>См. docs/components/MarkDealClosedExecutor.md.
  */
 @Component
 @RequiredArgsConstructor
 public class MarkDealClosedExecutor implements CommandExecutor {
 
-    private final DealFinalizationStateDataService finalizationStateDataService;
     private final DealDataService dealDataService;
+    private final DealActionStateDataService dealActionStateDataService;
+    private final DealReconciliationCalculator reconciliationCalculator;
+    private final DealTerminalFeaturesWriter featuresWriter;
+    private final DealTerminalGate terminalGate;
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.MARK_DEAL_CLOSED;
+        return ServiceCommandType.MARK_DEAL_CLOSED_COMMAND;
     }
 
     @Override
     @Transactional
     public ServiceCommandExecutionResult execute(ServiceCommand command, DealActionState actionState,
                                                  DealContext dealContext) {
-        DealFinalizationState state = finalizationStateDataService
-                .findByDealIdAndType(command.getDealId(), DealFinalizationType.MARK_CLOSED)
-                .orElseThrow(() -> new IllegalStateException(
-                        "DealFinalizationState(MARK_CLOSED) not found dealId=" + command.getDealId()));
         Deal deal = dealContext.getDeal();
         if (Deal.Status.CLOSED.equals(deal.getStatus())) {
-            return complete(state);
+            return complete(actionState, dealContext);
         }
-        if (hasLiveRisk(deal.livePosition()) || hasLiveEntities(deal)) {
+        if (isFalse(terminalAllowed(deal, dealContext.getGraphComplete()))) {
             return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR,
-                    "Cannot mark deal CLOSED while live risk (position / orders / algo) remains");
+                    "терминал не ставится: не все транши терминальны либо живой риск не доказанно отсутствует"
+                            + " (docs/spec/deal-lifecycle.json §riskProvenAbsent)");
         }
         if (isNull(deal.getResultProfit())) {
-            String settleCurrency = settleCurrency(dealContext.getBalanceContainer());
-            if (isNull(settleCurrency)) {
+            if (isTrue(deal.positionObserved())) {
                 return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR,
-                        "Cannot resolve resultProfitCurrency for clean close");
+                        "штатный терминал требует посчитанного числа: финализация выхода его не записала"
+                                + " (docs/spec/deal-lifecycle.json §cleanTerminalContract)");
             }
-            // PnL-расчёт — шаг 7; здесь механический placeholder под инвариант чистого терминала.
+            // Тропа закрытия БЕЗ входа: считать не по чему, и ноль здесь —
+            // результат тропы, а не подставленное умолчание.
             deal.setResultProfit(BigDecimal.ZERO);
-            deal.setResultProfitCurrency(settleCurrency);
+            deal.setResultProfitCurrency(dealContext.getInstrument().getExternalSettlementCurrency());
+            featuresWriter.apply(dealContext, false);
         }
         if (isNull(deal.getCloseReason())) {
             // Причина берётся СТАРШИНСТВОМ причин траншей, а не умолчанием:
@@ -85,39 +93,38 @@ public class MarkDealClosedExecutor implements CommandExecutor {
         }
         deal.setStatus(Deal.Status.CLOSED);
         dealDataService.save(deal);
-        return complete(state);
+        return complete(actionState, dealContext);
     }
 
-    private ServiceCommandExecutionResult complete(DealFinalizationState state) {
-        if (DealFinalizationStateStatus.COMPLETED.equals(state.getStatus())) {
-            return ServiceCommandExecutionResult.ok();
+    /**
+     * Завершение звена плюс затребование ступени по уже записанному
+     * признаку сверки. Признак читается со сделки, а не пересчитывается:
+     * писатель у него один — финализация выхода.
+     */
+    private ServiceCommandExecutionResult complete(DealActionState actionState, DealContext dealContext) {
+        if (nonNull(actionState)) {
+            actionState.setStatus(DealActionStateStatus.COMPLETED);
+            dealActionStateDataService.save(actionState);
         }
-        state.setStatus(DealFinalizationStateStatus.COMPLETED);
-        finalizationStateDataService.save(state);
+        if (isTrue(reconciliationCalculator.rungRequested(dealContext,
+                dealContext.getDeal().getReconciliationStatus()))) {
+            return ServiceCommandExecutionResult.okWithHold(
+                    HoldSignal.exchangeJournal(Constants.Hold.PNL_RECONCILIATION_MISMATCH));
+        }
         return ServiceCommandExecutionResult.ok();
     }
 
-    private Boolean hasLiveRisk(Position position) {
-        return nonNull(position) && isTrue(position.hasLiveRisk());
-    }
-
-    /** Терминал не ставится, пока на сделке остаются live ordinary/algo orders (live risk шире позиции). */
-    private Boolean hasLiveEntities(Deal deal) {
-        boolean liveOrder = isNotEmpty(deal.getOrders())
-                && deal.getOrders().stream().anyMatch(order -> isTrue(order.isLive()));
-        boolean liveAlgo = isNotEmpty(deal.getAlgoOrders())
-                && deal.getAlgoOrders().stream().anyMatch(algo -> isTrue(algo.isLive()));
-        return liveOrder || liveAlgo;
-    }
-
-    private String settleCurrency(BalanceContainer balanceContainer) {
-        if (isNull(balanceContainer) || isEmpty(balanceContainer.getBalances())) {
-            return null;
-        }
-        return balanceContainer.getBalances().stream()
-                .map(Balance::getExternalCurrency)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
+    /**
+     * Право на терминал — <b>тот же гейт, что у машины сделки</b>: все
+     * транши терминальны и живой риск доказанно отсутствует
+     * (docs/spec/deal-lifecycle.json §transitionAllowed). Ребро ставит
+     * это звено, а не машина, поэтому и гейт читается здесь: свой,
+     * упрощённый предикат живого риска был бы вторым носителем инварианта
+     * и разошёлся бы с первым — в разрешающую сторону, потому что не
+     * видит ни сверки экспозиции, ни полноты графа.
+     */
+    private Boolean terminalAllowed(Deal deal, Boolean graphComplete) {
+        return isTrue(deal.allTranchesTerminal())
+                && isTrue(terminalGate.riskProvenAbsent(deal, deal.getTranches(), graphComplete));
     }
 }

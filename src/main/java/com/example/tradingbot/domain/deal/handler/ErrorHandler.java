@@ -7,6 +7,7 @@ import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
+import com.example.tradingbot.domain.command.SystemActionType;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
 import com.example.tradingbot.domain.deal.DealTransition;
 import com.example.tradingbot.domain.deal.DealFsmHandler;
@@ -40,16 +41,17 @@ public class ErrorHandler implements DealFsmHandler {
         return Deal.Status.ERROR;
     }
 
+    /**
+     * Прямого ребра в аварийный терминал здесь нет, и это не пропуск:
+     * терминал ставит звено аварийного действия — оно пишет число
+     * best-effort, признаки отбора и причину закрытия той же
+     * транзакцией, что и ребро
+     * (docs/components/MarkDealEmergencyClosedExecutor.md). Прямой
+     * переход опережал бы их и закрывал сделку без числа.
+     */
     @Override
     public Optional<DealTransition> checkTransition(DealContext dealContext) {
-        Deal deal = dealContext.getDeal();
-        if (isTrue(support.positionLiveRisk(deal))
-                || isNotEmpty(support.liveOrders(deal))
-                || isNotEmpty(support.liveAlgoOrders(deal))) {
-            return Optional.empty();
-        }
-        // Live risk снят и подтверждён фактами — аварийный терминал.
-        return Optional.of(DealTransition.transition(Deal.Status.EMERGENCY_CLOSED));
+        return Optional.empty();
     }
 
     @Override
@@ -66,7 +68,19 @@ public class ErrorHandler implements DealFsmHandler {
         if (nonNull(algoSafety)) {
             return algoSafety;
         }
-        return DealTransition.stay();
+        return emergencyTerminal(dealContext);
+    }
+
+    /**
+     * Живой риск снят и подтверждён фактами — аварийный терминал звеном
+     * аварийного действия. Исчерпание его бюджета терминал не отменяет и
+     * второй тропы не открывает: из ошибочного состояния другого ребра
+     * нет (docs/lifecycles/Deal.md).
+     */
+    private DealTransition emergencyTerminal(DealContext dealContext) {
+        return support.systemAction(SystemActionType.FINALIZE_DEAL_ERROR_ACTION, dealContext, null)
+                .map(DealTransition::command)
+                .orElseGet(DealTransition::stay);
     }
 
     private DealTransition reduceOrConfirmPosition(DealContext dealContext, Position position) {
@@ -75,7 +89,9 @@ public class ErrorHandler implements DealFsmHandler {
                     Position.CloseReason.KILL_SWITCH));
         }
         // Закрытие уже запрошено — подтвердить flat фактами (ACK не truth).
-        return DealTransition.command(support.refreshPositionCommand(dealContext));
+        return support.refreshPositionCommand(dealContext)
+                .map(DealTransition::command)
+                .orElseGet(DealTransition::stay);
     }
 
     private DealTransition reduceOrConfirmOrders(DealContext dealContext, List<Order> liveOrders) {
@@ -87,7 +103,9 @@ public class ErrorHandler implements DealFsmHandler {
             return DealTransition.command(support.cancelOrderCommand(dealContext, order.getId(),
                     Order.CloseReason.KILL_SWITCH));
         }
-        return DealTransition.command(support.refreshOrderCommand(dealContext, order.getId()));
+        return support.refreshOrderCommand(dealContext, order.getId())
+                .map(DealTransition::command)
+                .orElseGet(DealTransition::stay);
     }
 
     private DealTransition reduceOrConfirmAlgoOrders(DealContext dealContext, List<AlgoOrder> liveAlgoOrders) {
@@ -99,6 +117,8 @@ public class ErrorHandler implements DealFsmHandler {
             return DealTransition.command(support.cancelAlgoOrderCommand(dealContext, algoOrder.getId(),
                     AlgoOrder.CloseReason.KILL_SWITCH));
         }
-        return DealTransition.command(support.refreshAlgoOrderCommand(dealContext, algoOrder.getId()));
+        return support.refreshAlgoOrderCommand(dealContext, algoOrder.getId())
+                .map(DealTransition::command)
+                .orElseGet(DealTransition::stay);
     }
 }

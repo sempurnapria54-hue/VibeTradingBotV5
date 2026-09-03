@@ -140,7 +140,7 @@ class SubmitOrderExecutorProtectionTest {
 
     private ServiceCommand command() {
         return ServiceCommand.builder()
-                .type(ServiceCommandType.SUBMIT_ORDER)
+                .type(ServiceCommandType.SUBMIT_ORDER_COMMAND)
                 .dealId(DEAL_ID)
                 .payload(new SubmitOrderCommandPayload(ORDER_ID))
                 .build();

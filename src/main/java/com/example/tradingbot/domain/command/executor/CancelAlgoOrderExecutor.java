@@ -39,7 +39,7 @@ public class CancelAlgoOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.CANCEL_ALGO_ORDER;
+        return ServiceCommandType.CANCEL_ALGO_ORDER_COMMAND;
     }
 
     @Override

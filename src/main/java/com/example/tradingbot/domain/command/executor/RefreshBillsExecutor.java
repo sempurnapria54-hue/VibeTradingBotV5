@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.command.executor;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -71,9 +72,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RefreshBillsExecutor implements CommandExecutor {
 
-    /** Глубина свежего эндпоинта bills у источника, дней (контракт account-bills). */
-    private static final long FRESH_ENDPOINT_DEPTH_DAYS = 7L;
-
     /** Статусы курса, при которых строка ещё ждёт лестницу (операнд rateBlocking и догона). */
     private static final Set<DealCashFlow.RateStatus> PENDING_RATE_STATUSES =
             EnumSet.of(DealCashFlow.RateStatus.RATE_UNAVAILABLE,
@@ -92,7 +90,7 @@ public class RefreshBillsExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.REFRESH_BILLS;
+        return ServiceCommandType.REFRESH_BILLS_COMMAND;
     }
 
     @Override
@@ -108,18 +106,33 @@ public class RefreshBillsExecutor implements CommandExecutor {
                     "окно линковки не адресуемо: ни границы, ни суррогата — писатель externalCreatedAt не отработал"
                             + " (docs/spec/cash-flow-linkage.json §boundResolved)");
         }
+        ExchangeContourProperties.Contour contour =
+                exchangeContourProperties.forExchange(dealContext.getExchange().getName());
         OffsetDateTime sourceTime = integrationService.getServerTime();
-        List<DealCashFlowExternalSnapshot> snapshots = fetchWindow(lowerBound, sourceTime);
+        List<DealCashFlowExternalSnapshot> snapshots = fetchWindow(lowerBound, sourceTime, contour);
         Optional<String> invalid = firstInvalid(snapshots);
         if (invalid.isPresent()) {
             return ServiceCommandExecutionResult.failure(RuntimeErrorCode.EXCHANGE_ERROR, invalid.get());
         }
 
-        ExchangeContourProperties.Contour contour =
-                exchangeContourProperties.forExchange(dealContext.getExchange().getName());
+        // Перерезолв корзины по ТЕКУЩЕМУ отображению идёт первым: держатель
+        // пополняет отображение по наблюдённому перечню, и строка, севшая в
+        // корзину прежним проходом, обязана из неё выйти — иначе она навсегда
+        // остаётся вне области сверки. Он же и есть тропа СНЯТИЯ состояния.
+        reclassifyUnclassified(deal.getId(), contour);
+        Boolean basketStood = dealCashFlowDataService.unclassifiedBasketStands(dealContext.getExchange().getId());
+
         List<Long> persistedNow = new ArrayList<>();
+        List<DealCashFlow> unclassifiedNow = new ArrayList<>();
         for (DealCashFlowExternalSnapshot snapshot : snapshots) {
-            persistRow(snapshot, dealContext, contour, lowerBound, sourceTime, persistedNow);
+            persistRow(snapshot, dealContext, contour, lowerBound, sourceTime, persistedNow, unclassifiedNow);
+        }
+        // Отчёт заводится ровно на ВОЗНИКНОВЕНИЕ состояния: корзина стояла
+        // непустой — состояние держится, второй строки по тому же ключу нет;
+        // была пуста и наполнилась — состояние возникло заново, и отчёт
+        // заводится, даже если по ключу уже стои́т прежний.
+        if (isFalse(basketStood) && isNotEmpty(unclassifiedNow)) {
+            reportUnclassified(dealContext, unclassifiedNow.getFirst());
         }
         dealDataService.advanceBillsFetchedThrough(deal.getId(), sourceTime);
 
@@ -141,11 +154,17 @@ public class RefreshBillsExecutor implements CommandExecutor {
      * Свежий эндпоинт всегда; архив — когда нижняя граница окна старше
      * его глубины. Слияние по идентификатору записи: страницы двух
      * эндпоинтов могут перекрываться.
+     *
+     * <p><b>Глубина — величина контура, а не константа кода</b>: её же
+     * читает признак полноты разбивки, и второй носитель одного числа
+     * разошёлся бы с первым (docs/models/domain/core/Exchange.md
+     * §«Настройки контура биржи»).
      */
-    private List<DealCashFlowExternalSnapshot> fetchWindow(OffsetDateTime lowerBound, OffsetDateTime sourceTime) {
+    private List<DealCashFlowExternalSnapshot> fetchWindow(OffsetDateTime lowerBound, OffsetDateTime sourceTime,
+                                                           ExchangeContourProperties.Contour contour) {
         Map<String, DealCashFlowExternalSnapshot> unique = new LinkedHashMap<>();
         addUnique(unique, integrationService.getBills(lowerBound, sourceTime));
-        if (lowerBound.isBefore(sourceTime.minus(Duration.ofDays(FRESH_ENDPOINT_DEPTH_DAYS)))) {
+        if (lowerBound.isBefore(sourceTime.minus(Duration.ofDays(contour.getBillsFreshDepthDays())))) {
             addUnique(unique, integrationService.getBillsArchive(lowerBound, sourceTime));
         }
         return new ArrayList<>(unique.values());
@@ -179,14 +198,18 @@ public class RefreshBillsExecutor implements CommandExecutor {
 
     private void persistRow(DealCashFlowExternalSnapshot snapshot, DealContext dealContext,
                             ExchangeContourProperties.Contour contour, OffsetDateTime lowerBound,
-                            OffsetDateTime sourceTime, List<Long> persistedNow) {
+                            OffsetDateTime sourceTime, List<Long> persistedNow,
+                            List<DealCashFlow> unclassifiedNow) {
         Long exchangeId = dealContext.getExchange().getId();
         if (isTrue(dealCashFlowDataService.exists(exchangeId, snapshot.getExternalBillId()))) {
             return;
         }
         DealCashFlow flow = dealCashFlowMapper.snapshotToDomain(snapshot);
         flow.setExchangeId(exchangeId);
-        resolveCategory(flow, contour, dealContext);
+        resolveCategory(flow, contour);
+        if (DealCashFlow.CashFlowCategory.OTHER.equals(flow.getCategory())) {
+            unclassifiedNow.add(flow);
+        }
         if (isTrue(linksToDeal(flow, dealContext, lowerBound, sourceTime))) {
             flow.setDealId(dealContext.getDeal().getId());
         }
@@ -196,29 +219,42 @@ public class RefreshBillsExecutor implements CommandExecutor {
 
     /**
      * Резолв категории — по типу операции, от частного к общему; тип вне
-     * отображения садится в принимающую корзину OTHER и поднимает
-     * журнальный STATE-отчёт нераспознанного движения с дедупом по
-     * стоящему состоянию (docs/models/mapping/DealCashFlow.md
-     * §«Резолв категории»).
+     * отображения садится в принимающую корзину OTHER
+     * (docs/models/mapping/DealCashFlow.md §«Резолв категории»). Отчёт
+     * отсюда не заводится: он про СОСТОЯНИЕ корзины, а не про строку.
      */
-    private void resolveCategory(DealCashFlow flow, ExchangeContourProperties.Contour contour,
-                                 DealContext dealContext) {
-        Optional<DealCashFlow.CashFlowCategory> resolved =
-                contour.resolveCategory(flow.getExternalType(), flow.getExternalSubType());
-        if (resolved.isPresent()) {
-            flow.setCategory(resolved.get());
-            return;
-        }
-        flow.setCategory(DealCashFlow.CashFlowCategory.OTHER);
-        reportUnclassified(dealContext, flow);
+    private void resolveCategory(DealCashFlow flow, ExchangeContourProperties.Contour contour) {
+        flow.setCategory(contour.resolveCategory(flow.getExternalType(), flow.getExternalSubType())
+                .orElse(DealCashFlow.CashFlowCategory.OTHER));
     }
 
-    private void reportUnclassified(DealContext dealContext, DealCashFlow flow) {
-        Long exchangeId = dealContext.getExchange().getId();
-        if (isTrue(anomalyReportDataService.existsByKey(exchangeId, Constants.Hold.UNCLASSIFIED_CASH_FLOW,
-                AnomalyReport.Severity.NON_CRITICAL))) {
-            return;
+    /**
+     * Перерезолв строк, сидящих в принимающей корзине, по ТЕКУЩЕМУ
+     * отображению контура. Отображение пополняет держатель по
+     * наблюдённому перечню, и без перерезолва строка, севшая в корзину до
+     * пополнения, оставалась бы вне области сверки навсегда — то есть
+     * искажала бы её молча.
+     *
+     * <p>Это же и тропа СНЯТИЯ состояния: опустевшая корзина — операнд,
+     * которого дедупу журнального отчёта прежде не давал никто.
+     */
+    private void reclassifyUnclassified(Long dealId, ExchangeContourProperties.Contour contour) {
+        for (DealCashFlow flow : dealCashFlowDataService.findUnclassifiedByDeal(dealId)) {
+            contour.resolveCategory(flow.getExternalType(), flow.getExternalSubType())
+                    .ifPresent(category -> {
+                        flow.setCategory(category);
+                        dealCashFlowDataService.save(flow);
+                    });
         }
+    }
+
+    /**
+     * Журнальный отчёт о непустой корзине. Дедуп — по СТОЯЩЕМУ состоянию
+     * объекта радиуса, а не по статусу отчёта: наличие прежней строки по
+     * тому же ключу возникновение состояния заново не гасит
+     * (docs/rules/error-handling-policy.md).
+     */
+    private void reportUnclassified(DealContext dealContext, DealCashFlow flow) {
         log.warn("[bills] нераспознанное движение: type={} subType={} billId={} — корзина OTHER непуста",
                 flow.getExternalType(), flow.getExternalSubType(), flow.getExternalBillId());
         anomalyReportService.journal(dealContext,

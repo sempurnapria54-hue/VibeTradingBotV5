@@ -110,7 +110,7 @@ public final class DealRiskNumbers {
     }
 
     /** Вырожденный знаменатель даёт ноль, а не деление. */
-    private static BigDecimal filledShare(Order leg) {
+    public static BigDecimal filledShare(Order leg) {
         BigDecimal planned = zeroIfNull(leg.getPlannedSizeContracts());
         if (planned.signum() == 0) {
             return ZERO;
@@ -175,7 +175,7 @@ public final class DealRiskNumbers {
      * коллекцию ног эта граница недостижима — читатель отбирает только
      * ноги с филлом, а филл не бывает больше планового размера.
      */
-    private static BigDecimal feeRate(Order leg) {
+    public static BigDecimal feeRate(Order leg) {
         if (isNull(leg.getPlannedStopPrice()) || isNull(leg.getPlannedRiskAmount())) {
             return ZERO;
         }
@@ -206,7 +206,7 @@ public final class DealRiskNumbers {
     }
 
     /** Входные ноги сделки — по всем траншам: числа риска агрегатные. */
-    private static List<Order> entryLegs(Deal deal) {
+    public static List<Order> entryLegs(Deal deal) {
         return emptyIfNull(deal.getOrders()).stream()
                 .filter(order -> Order.Type.ENTRY.equals(order.getType())
                         || Order.Type.ENTRY_ATTACHED_STOP_LOSS.equals(order.getType()))

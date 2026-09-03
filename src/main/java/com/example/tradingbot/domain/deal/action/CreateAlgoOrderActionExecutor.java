@@ -6,7 +6,6 @@ import static java.util.Objects.nonNull;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
-import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandPayload;
 import com.example.tradingbot.domain.command.ServiceCommandType;
@@ -94,7 +93,7 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
                 .sizeContracts(calculated.getCalculatedSize().getSizeContracts())
                 .condition(buildCondition(action, calculated.getCalculatedPrice()))
                 .build();
-        return command(ServiceCommandType.CREATE_ALGO_ORDER, dealContext, state, payload);
+        return command(ServiceCommandType.CREATE_ALGO_ORDER_COMMAND, dealContext, state, payload);
     }
 
     /**
@@ -155,21 +154,21 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
     }
 
     private ActionPlan submitCommand(DealActionState state, DealContext dealContext) {
-        RuntimeTarget target = state.getTarget();
-        if (isNull(target)) {
+        Long targetEntityId = state.getTargetEntityId();
+        if (isNull(targetEntityId)) {
             return ActionPlan.empty();
         }
-        return ActionPlan.command(command(ServiceCommandType.SUBMIT_ALGO_ORDER, dealContext, state,
-                new SubmitAlgoOrderCommandPayload(target.getEntityId())));
+        return ActionPlan.command(command(ServiceCommandType.SUBMIT_ALGO_ORDER_COMMAND, dealContext, state,
+                new SubmitAlgoOrderCommandPayload(targetEntityId)));
     }
 
     private ActionPlan refreshCommand(DealActionState state, DealContext dealContext) {
-        RuntimeTarget target = state.getTarget();
-        if (isNull(target)) {
+        Long targetEntityId = state.getTargetEntityId();
+        if (isNull(targetEntityId)) {
             return ActionPlan.empty();
         }
-        return ActionPlan.command(command(ServiceCommandType.REFRESH_ALGO_ORDER, dealContext, state,
-                new RefreshAlgoOrderCommandPayload(target.getEntityId())));
+        return ActionPlan.command(command(ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND, dealContext, state,
+                new RefreshAlgoOrderCommandPayload(targetEntityId)));
     }
 
     private ServiceCommand command(ServiceCommandType type, DealContext dealContext, DealActionState state,

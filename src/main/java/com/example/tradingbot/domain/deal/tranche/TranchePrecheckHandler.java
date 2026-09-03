@@ -49,7 +49,9 @@ public class TranchePrecheckHandler implements TrancheFsmHandler {
     @Override
     public Optional<TrancheTransition> checkEntry(DealContext dealContext, DealTranche tranche) {
         if (isFalse(support.balanceUsable(dealContext))) {
-            return Optional.of(TrancheTransition.command(support.refreshBalanceCommand(dealContext)));
+            return Optional.of(support.refreshBalanceCommand(dealContext)
+                    .map(TrancheTransition::command)
+                    .orElseGet(TrancheTransition::stay));
         }
         if (isTrue(support.foreignLiveRisk(dealContext))) {
             return Optional.of(TrancheTransition.escalateToDealError());

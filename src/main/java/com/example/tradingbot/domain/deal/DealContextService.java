@@ -10,8 +10,10 @@ import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
 import com.example.tradingbot.persistence.service.BalanceContainerDataService;
+import com.example.tradingbot.config.DealOrchestratorProperties;
+import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
-import com.example.tradingbot.persistence.service.DealFinalizationStateDataService;
+import com.example.tradingbot.persistence.service.DealCashFlowDataService;
 import com.example.tradingbot.persistence.service.DealTrancheDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
@@ -51,13 +53,16 @@ public class DealContextService {
     private final PositionDataService positionDataService;
     private final BalanceContainerDataService balanceContainerDataService;
     private final DealActionStateDataService dealActionStateDataService;
-    private final DealFinalizationStateDataService dealFinalizationStateDataService;
+    private final DealCashFlowDataService dealCashFlowDataService;
     private final DealTrancheDataService dealTrancheDataService;
+    private final DealOrchestratorProperties orchestratorProperties;
 
     public DealContext build(Deal deal) {
         Instrument instrument = instrumentDataService.getRequiredById(deal.getInstrumentId());
         Exchange exchange = exchangeDataService.getRequiredById(instrument.getExchangeId());
         reloadRuntimeGraph(deal);
+        Integer cashFlowLimit = orchestratorProperties.getCashFlowWindowLimit();
+        List<DealCashFlow> cashFlows = dealCashFlowDataService.findByDealWindow(deal.getId(), cashFlowLimit);
         return DealContext.builder()
                 .deal(deal)
                 .exchange(exchange)
@@ -65,9 +70,21 @@ public class DealContextService {
                 .strategyDetail(pinnedDetail(deal))
                 .balanceContainer(balanceContainerDataService.findByExchangeId(exchange.getId()).orElse(null))
                 .actionStates(dealActionStateDataService.findByDealId(deal.getId()))
-                .finalizationStates(dealFinalizationStateDataService.findByDealId(deal.getId()))
+                .cashFlows(cashFlows)
                 .graphComplete(graphComplete(deal))
+                .flowsComplete(flowsComplete(deal, cashFlows, cashFlowLimit))
                 .build();
+    }
+
+    /**
+     * Разбивка движений добыта И предъявлена целиком
+     * (docs/spec/deal-context-load.json §flowsComplete). Конъюнкта два, и
+     * они разные по природе: первый — что добыча вообще выполнялась
+     * (durable-факт сделки; на аварийной тропе звено добычи не эмитится
+     * вовсе), второй — что предъявленное не усечено потолком выборки.
+     */
+    private Boolean flowsComplete(Deal deal, List<DealCashFlow> cashFlows, Integer limit) {
+        return nonNull(deal.getBillsFetchedThrough()) && cashFlows.size() <= limit;
     }
 
     /**

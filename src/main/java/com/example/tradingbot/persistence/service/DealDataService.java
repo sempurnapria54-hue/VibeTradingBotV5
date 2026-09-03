@@ -93,4 +93,25 @@ public class DealDataService {
                 .map(mapper::persistenceToDomain)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Сделки инструмента свежим окном, ВКЛЮЧАЯ терминальные — вход
+     * предусловия снятия жёсткой ступени: остаточный риск живёт после
+     * терминала (docs/rules/manual-halt.md §«Предусловие «риска не
+     * осталось» — машинное, а не заявляемое»).
+     */
+    @Transactional(readOnly = true)
+    public List<Deal> findRecentByInstrumentId(Long instrumentId, Integer limit) {
+        return repository.findByInstrumentIdOrderByIdDesc(instrumentId, PageRequest.of(0, limit)).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
+
+    /** То же для биржевого радиуса: сделки всех её инструментов свежим окном. */
+    @Transactional(readOnly = true)
+    public List<Deal> findRecentByExchangeId(Long exchangeId, Integer limit) {
+        return repository.findByExchangeId(exchangeId, PageRequest.of(0, limit)).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
 }

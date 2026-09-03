@@ -8,6 +8,7 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.external_snapshot.InstrumentExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
+import com.example.tradingbot.domain.safety.HoldClearanceGate;
 import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.mapping.InstrumentMapper;
 import com.example.tradingbot.mapping.TimeFrameMapper;
@@ -42,6 +43,7 @@ public class InstrumentService {
     private final InstrumentMapper instrumentMapper;
     private final TimeFrameMapper timeFrameMapper;
     private final CandleLoadingProperties properties;
+    private final HoldClearanceGate holdClearanceGate;
 
     /** Заводит инструмент в статусе CREATED; биржа резолвится по exchangeInternalId. */
     public Instrument create(Instrument instrument, String exchangeInternalId) {
@@ -62,9 +64,20 @@ public class InstrumentService {
      * Гардирована статусом; если инструмент не в TRADE_BLOCKED — переход не
      * применяется (IllegalStateException → 409). Снимает только этот инструмент;
      * L4-холд его биржи (если есть) снимается отдельно разморозкой биржи.
+     *
+     * <p><b>Предусловие «живого риска не осталось» проверяется машинно, до
+     * записи статуса</b> (docs/rules/manual-halt.md): реакция сворачивания
+     * best-effort по составу — kill-switch мог не подтвердиться, и тогда
+     * снятие вернуло бы вход в торговлю поверх непогашенного риска. Выход
+     * из этого состояния есть, и он не здесь: повторный полный вызов
+     * лестницы гоняет снятие риска заново.
      */
     public Instrument unblockTrade(String internalId) {
         Instrument instrument = instrumentDataService.getRequiredByInternalId(internalId);
+        if (isFalse(holdClearanceGate.riskClearedOnInstrument(instrument.getId()))) {
+            throw new IllegalStateException(
+                    "Live risk is not proven absent on instrument: " + internalId);
+        }
         if (isFalse(instrumentDataService.unblockTrade(instrument.getId()))) {
             throw new IllegalStateException("Instrument is not trade-blocked: " + internalId);
         }

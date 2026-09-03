@@ -6,6 +6,7 @@ import com.example.tradingbot.persistence.repository.DealCashFlowRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,10 +34,42 @@ public class DealCashFlowDataService {
         return repository.existsByExchangeIdAndExternalBillId(exchangeId, externalBillId);
     }
 
+    /**
+     * Принимающая корзина нераспознанного у биржи непуста — операнд
+     * дедупа журнального отчёта по СТОЯЩЕМУ состоянию, а не по факту
+     * существования прежнего отчёта.
+     */
+    @Transactional(readOnly = true)
+    public Boolean unclassifiedBasketStands(Long exchangeId) {
+        return repository.existsByExchangeIdAndCategory(exchangeId,
+                DealCashFlow.CashFlowCategory.OTHER.name());
+    }
+
+    /** Строки сделки в принимающей корзине — вход перерезолва по текущему отображению. */
+    @Transactional(readOnly = true)
+    public List<DealCashFlow> findUnclassifiedByDeal(Long dealId) {
+        return repository.findByDealIdAndCategory(dealId, DealCashFlow.CashFlowCategory.OTHER.name()).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
+
     /** Строки разбивки сделки — операнды предиката остановки звена и догона курса. */
     @Transactional(readOnly = true)
     public List<DealCashFlow> findByDeal(Long dealId) {
         return repository.findByDealId(dealId).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Строки разбивки сделки ограниченным окном: берётся на одну больше
+     * потолка, чтобы вызывающий отличил полную выборку от упёршейся в
+     * него. Упёршаяся — неполнота, а не усечение
+     * (docs/spec/deal-context-load.json §cashFlowsComplete).
+     */
+    @Transactional(readOnly = true)
+    public List<DealCashFlow> findByDealWindow(Long dealId, Integer limit) {
+        return repository.findByDealIdOrderByExternalCreatedAtDesc(dealId, PageRequest.of(0, limit + 1)).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(Collectors.toList());
     }

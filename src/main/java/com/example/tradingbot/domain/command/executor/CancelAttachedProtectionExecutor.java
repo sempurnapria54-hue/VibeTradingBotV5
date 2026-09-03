@@ -40,7 +40,7 @@ public class CancelAttachedProtectionExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.CANCEL_ATTACHED_PROTECTION;
+        return ServiceCommandType.CANCEL_ATTACHED_PROTECTION_COMMAND;
     }
 
     @Override

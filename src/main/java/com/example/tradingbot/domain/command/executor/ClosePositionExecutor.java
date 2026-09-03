@@ -39,7 +39,7 @@ public class ClosePositionExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.CLOSE_POSITION;
+        return ServiceCommandType.CLOSE_POSITION_COMMAND;
     }
 
     @Override

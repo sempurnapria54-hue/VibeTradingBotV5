@@ -87,4 +87,16 @@ public class DealEntity extends AuditableEntity {
 
     @Column(name = "bills_fetched_through")
     private OffsetDateTime billsFetchedThrough;
+
+    @Column(name = "close_outcome")
+    private String closeOutcome;
+
+    @Column(name = "reconciliation_status")
+    private String reconciliationStatus;
+
+    @Column(name = "breakdown_incomplete")
+    private String breakdownIncomplete;
+
+    @Column(name = "risk_benchmark_availability")
+    private String riskBenchmarkAvailability;
 }

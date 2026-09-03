@@ -54,6 +54,30 @@ public final class Constants {
          * Блокировки в составе реакции нет.
          */
         public static final String UNCLASSIFIED_CASH_FLOW = "UNCLASSIFIED_CASH_FLOW";
+
+        /**
+         * Расхождение сверки P&L сверх допуска. В боевом режиме допуска
+         * стои́т и на отчёте, и на сигнале ступени 1; в разведочном —
+         * только на отчёте, ступень не запрашивается
+         * (docs/rules/pnl-reconciliation.md §«Реакция на расхождение»).
+         */
+        public static final String PNL_RECONCILIATION_MISMATCH = "PNL_RECONCILIATION_MISMATCH";
+
+        /**
+         * Журнальный отчёт-СОБЫТИЕ: вход состоялся, а знаменателя R нет.
+         * Без него популяция сделок с потерянным знаменателем не всплывает
+         * ни в одном сигнале (docs/models/domain/aggregate/Deal.md
+         * §Енумы).
+         */
+        public static final String RISK_BENCHMARK_MISSING = "RISK_BENCHMARK_MISSING";
+
+        /**
+         * Журнальный отчёт-СОБЫТИЕ: запись закрытия эпизода добыта, а
+         * торговый исход из её типа не выводится — поле пусто либо
+         * значение перечню не принадлежит
+         * (docs/models/mapping/PositionCloseResult.md).
+         */
+        public static final String UNRECOGNIZED_CLOSE_TYPE = "UNRECOGNIZED_CLOSE_TYPE";
     }
 
     /** Константы интеграции с OKX: коды, флаги, заголовки, пути и имена полей запроса, таймфреймы. */

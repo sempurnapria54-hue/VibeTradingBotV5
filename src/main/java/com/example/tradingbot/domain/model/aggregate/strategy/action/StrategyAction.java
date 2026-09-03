@@ -6,7 +6,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
  * Ожидаемое действие стратегии. Это не ServiceCommand: действие
  * описывает, что должно быть создано/изменено/отменено; runtime-
  * сущность связывается через DealActionState
- * (strategyActionId → RuntimeTarget). JSON-дискриминатор actionKind
+ * (strategyActionId → targetEntityType/targetEntityId).
+ * JSON-дискриминатор вида объявления
  * (ORDER/ALGO_ORDER/POSITION) — только для сериализации формы ввода,
  * не поле домена. Каркасный реляционный узел дерева: базовая таблица
  * strategy_action + таблицы по видам (JOINED).

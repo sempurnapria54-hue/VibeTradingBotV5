@@ -149,6 +149,35 @@ public class Deal extends Auditable {
      */
     private OffsetDateTime billsFetchedThrough;
 
+    /**
+     * <b>Торговый исход закрытия</b> — признак отбора для отчёта.
+     * Отличается от {@link #closeReason} намеренно: та — бизнес-причина
+     * завершения сделки, этот — рыночный факт того, кто и почему закрыл
+     * позицию (docs/spec/position-close-outcome.json).
+     */
+    private CloseOutcome closeOutcome;
+
+    /**
+     * <b>Исход сверки разбивки</b> — признак отбора. Свойство числа, а
+     * не членства: сделка остаётся в популяции при любом значении
+     * (docs/spec/pnl-reconciliation.json).
+     */
+    private ReconciliationStatus reconciliationStatus;
+
+    /**
+     * <b>Полнота разбивки</b> — признак отбора: накрыло ли окно добычи
+     * движений всю жизнь сделки (docs/components/RefreshBillsExecutor.md).
+     */
+    private BreakdownCompleteness breakdownIncomplete;
+
+    /**
+     * <b>Почему знаменатель {@code R} пуст или непуст</b> — признак
+     * отбора. {@code MISSING} есть аномалия с отчётом: вход был, а
+     * знаменателя нет (docs/spec/deal-lifecycle.json
+     * §benchmarkAvailabilityOnTerminal).
+     */
+    private RiskBenchmarkAvailability riskBenchmarkAvailability;
+
     /** Ordinary orders сделки (attached protection — внутри Order). */
     private List<Order> orders;
 
@@ -387,6 +416,72 @@ public class Deal extends Auditable {
 
         /** Fallback. */
         UNKNOWN
+    }
+
+    /**
+     * Торговый исход закрытия позиции сделки — рыночный факт, а не
+     * бизнес-причина. Резолв и старшинство по эпизодам —
+     * docs/models/mapping/PositionCloseResult.md.
+     */
+    public enum CloseOutcome {
+
+        /** Позицию закрыли мы либо биржевое событие вне ликвидационного контура. */
+        NORMAL_EXIT,
+
+        /** Принудительное закрытие по марже. */
+        LIQUIDATION,
+
+        /** Принудительное сокращение. */
+        FORCED_REDUCTION,
+
+        /**
+         * Торговый исход <b>не установлен</b> — значение, а не пустота:
+         * сделка остаётся в популяции и счётна отдельной корзиной.
+         */
+        UNDETERMINED
+    }
+
+    /**
+     * Исход сверки разбивки движений с записями закрытия эпизодов.
+     * Третьего значения нет: различение «были обязаны и не посчитали»
+     * несёт терминальный статус, а не признак.
+     */
+    public enum ReconciliationStatus {
+
+        /** Сверка не была обязана: хотя бы один конъюнкт обязанности не выполнен. */
+        NOT_RUN,
+
+        /** Общее расхождение по четырём парам в пределах допуска. */
+        MATCHED,
+
+        /** Общее расхождение сверх допуска. */
+        MISMATCHED
+    }
+
+    /** Полнота разбивки движений: накрыло ли окно добычи всю жизнь сделки. */
+    public enum BreakdownCompleteness {
+
+        /** Возраст нижней границы окна на момент добычи не превышает глубины доступности движений. */
+        COMPLETE,
+
+        /** Превышает: часть движений старше доступной глубины и в разбивку не попала. */
+        INCOMPLETE_BY_WINDOW,
+
+        /** Сравнение не выполнялось — добыча движений не выполнялась (единственный триггер). */
+        NOT_ASSESSED
+    }
+
+    /** Почему знаменатель {@code R} пуст или непуст. */
+    public enum RiskBenchmarkAvailability {
+
+        /** Знаменатель определён. */
+        AVAILABLE,
+
+        /** Входа не было, поэтому знаменателя нет ПО ПОСТРОЕНИЮ — нормальная популяция. */
+        NOT_APPLICABLE,
+
+        /** Вход был, а знаменателя нет — аномалия с отчётом. */
+        MISSING
     }
 
     /** Итоговая бизнес-причина завершения сделки (не технический механизм закрытия). */

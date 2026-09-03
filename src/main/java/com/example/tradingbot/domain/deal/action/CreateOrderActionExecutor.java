@@ -7,7 +7,6 @@ import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
-import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandPayload;
 import com.example.tradingbot.domain.command.ServiceCommandType;
@@ -107,7 +106,7 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
                 .plannedRiskCurrency(dealContext.getInstrument().getExternalSettlementCurrency())
                 .plannedContractValue(contractValueOf(dealContext))
                 .build();
-        return command(ServiceCommandType.CREATE_ORDER, dealContext, state, payload);
+        return command(ServiceCommandType.CREATE_ORDER_COMMAND, dealContext, state, payload);
     }
 
     /**
@@ -144,21 +143,21 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     }
 
     private ActionPlan submitCommand(DealActionState state, DealContext dealContext) {
-        RuntimeTarget target = state.getTarget();
-        if (isNull(target)) {
+        Long targetEntityId = state.getTargetEntityId();
+        if (isNull(targetEntityId)) {
             return ActionPlan.empty();
         }
-        return ActionPlan.command(command(ServiceCommandType.SUBMIT_ORDER, dealContext, state,
-                new SubmitOrderCommandPayload(target.getEntityId())));
+        return ActionPlan.command(command(ServiceCommandType.SUBMIT_ORDER_COMMAND, dealContext, state,
+                new SubmitOrderCommandPayload(targetEntityId)));
     }
 
     private ActionPlan refreshCommand(DealActionState state, DealContext dealContext) {
-        RuntimeTarget target = state.getTarget();
-        if (isNull(target)) {
+        Long targetEntityId = state.getTargetEntityId();
+        if (isNull(targetEntityId)) {
             return ActionPlan.empty();
         }
-        return ActionPlan.command(command(ServiceCommandType.REFRESH_ORDER, dealContext, state,
-                new RefreshOrderCommandPayload(target.getEntityId())));
+        return ActionPlan.command(command(ServiceCommandType.REFRESH_ORDER_COMMAND, dealContext, state,
+                new RefreshOrderCommandPayload(targetEntityId)));
     }
 
     private ServiceCommand command(ServiceCommandType type, DealContext dealContext, DealActionState state,

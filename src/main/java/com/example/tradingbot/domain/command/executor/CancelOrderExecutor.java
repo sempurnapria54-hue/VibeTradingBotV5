@@ -38,7 +38,7 @@ public class CancelOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.CANCEL_ORDER;
+        return ServiceCommandType.CANCEL_ORDER_COMMAND;
     }
 
     @Override

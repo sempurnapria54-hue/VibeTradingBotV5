@@ -5,7 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.DealFinalizationType;
+import com.example.tradingbot.domain.command.SystemActionType;
 import com.example.tradingbot.domain.deal.DealFsmHandler;
 import com.example.tradingbot.domain.deal.DealFsmSupport;
 import com.example.tradingbot.domain.deal.DealTransition;
@@ -78,10 +78,14 @@ public class DealExitPendingHandler implements DealFsmHandler {
             return netClose.get();
         }
         if (isTrue(cashFlowFetchDue(dealContext))) {
-            return DealTransition.command(support.refreshBillsCommand(dealContext));
+            return support.refreshBillsCommand(dealContext)
+                    .map(DealTransition::command)
+                    .orElseGet(DealTransition::stay);
         }
         if (isFalse(support.balanceUsable(dealContext))) {
-            return DealTransition.command(support.refreshBalanceCommand(dealContext));
+            return support.refreshBalanceCommand(dealContext)
+                    .map(DealTransition::command)
+                    .orElseGet(DealTransition::stay);
         }
         return finalize(dealContext);
     }
@@ -141,20 +145,21 @@ public class DealExitPendingHandler implements DealFsmHandler {
     }
 
     /**
-     * Завершение — через действие финализации выхода: подтвердить причину
-     * закрытия, посчитать и записать число, затем поставить терминал.
-     * Исчерпание бюджета любого из двух звеньев — ошибочная тропа: числа
-     * после него не будет, а штатный терминал его требует.
+     * Завершение — через ОДНО действие финализации выхода с двумя
+     * звеньями: расчёт числа, затем терминальное ребро. Звено выбирает
+     * исполнитель системного действия по durable-факту «число уже
+     * посчитано», а не handler: стадия выводится из подтверждённого
+     * факта (docs/components/SystemActionExecutor.md).
+     *
+     * <p>Исчерпание бюджета действия — ошибочная тропа: числа после него
+     * не будет, а штатный терминал его требует.
      */
     private DealTransition finalize(DealContext dealContext) {
-        if (isTrue(support.finalizationFailed(dealContext, DealFinalizationType.FINALIZE_EXIT))
-                || isTrue(support.finalizationFailed(dealContext, DealFinalizationType.MARK_CLOSED))) {
+        if (isTrue(support.systemActionFailed(dealContext, SystemActionType.FINALIZE_DEAL_EXIT_ACTION))) {
             return support.markError(dealContext);
         }
-        return support.finalizationCommand(DealFinalizationType.FINALIZE_EXIT, dealContext)
+        return support.systemAction(SystemActionType.FINALIZE_DEAL_EXIT_ACTION, dealContext, null)
                 .map(DealTransition::command)
-                .orElseGet(() -> support.finalizationCommand(DealFinalizationType.MARK_CLOSED, dealContext)
-                        .map(DealTransition::command)
-                        .orElseGet(DealTransition::stay));
+                .orElseGet(DealTransition::stay);
     }
 }

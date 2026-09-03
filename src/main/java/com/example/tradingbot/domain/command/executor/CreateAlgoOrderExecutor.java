@@ -5,7 +5,6 @@ import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
@@ -40,7 +39,7 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.CREATE_ALGO_ORDER;
+        return ServiceCommandType.CREATE_ALGO_ORDER_COMMAND;
     }
 
     @Override
@@ -49,7 +48,7 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
                                                  DealContext dealContext) {
         CreateAlgoOrderCommandPayload payload = (CreateAlgoOrderCommandPayload) command.getPayload();
         AlgoOrder saved = algoOrderDataService.save(buildAlgoOrder(payload, dealContext.getDeal().getId()));
-        actionState.setTarget(new RuntimeTarget(TargetEntityType.ALGO_ORDER, saved.getId()));
+        actionState.targetAt(TargetEntityType.ALGO_ORDER, saved.getId());
         actionState.setStatus(DealActionStateStatus.CREATED);
         dealActionStateDataService.save(actionState);
         appendToGraph(dealContext, saved);

@@ -207,7 +207,7 @@ class RefreshOrderProtectionCycleTest {
 
     private ServiceCommand command() {
         return ServiceCommand.builder()
-                .type(ServiceCommandType.REFRESH_ORDER)
+                .type(ServiceCommandType.REFRESH_ORDER_COMMAND)
                 .dealId(1L)
                 .payload(new RefreshOrderCommandPayload(ORDER_ID))
                 .build();

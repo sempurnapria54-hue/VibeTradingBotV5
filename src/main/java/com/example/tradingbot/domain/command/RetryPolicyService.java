@@ -23,9 +23,18 @@ public class RetryPolicyService {
 
     private final ServiceCommandRetryProperties properties;
 
-    /** Политика для типа команды (fallback на default). */
+    /**
+     * Политика для типа команды: своя, иначе умолчание конфигурации,
+     * иначе <b>пустая</b>. Третья ветвь несущая: без неё отсутствующая
+     * секция конфигурации давала бы {@code null}, и проверка бюджета
+     * падала бы NPE в catch-ветке учёта отказа — подменяя исходную
+     * ошибку. Пустая политика означает «повторов нет» и ведёт строку в
+     * отказ, то есть ошибается в запрещающую сторону.
+     */
     public ServiceCommandRetryPolicy getPolicy(ServiceCommandType commandType) {
-        return properties.getPolicies().getOrDefault(commandType, properties.getDefaultPolicy());
+        ServiceCommandRetryPolicy policy = properties.getPolicies()
+                .getOrDefault(commandType, properties.getDefaultPolicy());
+        return nonNull(policy) ? policy : new ServiceCommandRetryPolicy();
     }
 
     /** Можно ли ещё повторять (attemptCount < maxAttempts). */

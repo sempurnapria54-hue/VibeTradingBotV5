@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.command;
 
 /**
- * Тип runtime-сущности, на которую нацелено действие сделки
- * (RuntimeTarget.entityType). См.
- * docs/models/domain/other/DealActionState.md.
+ * Тип runtime-сущности, на которую нацелено исполнение действия
+ * (DealActionState.targetEntityType). См.
+ * docs/models/domain/other/DealActionState.md §Енумы.
  */
 public enum TargetEntityType {
 
@@ -13,18 +13,15 @@ public enum TargetEntityType {
     /** Standalone algo-order. */
     ALGO_ORDER,
 
-    /** Встроенная защита — раздел модели Order, не отдельная сущность. */
-    ATTACHED_PROTECTION,
-
     /** Позиция. */
     POSITION,
 
-    /** Сама сделка (lifecycle/finalization-action). */
+    /** Сама сделка — цель системных действий. */
     DEAL,
 
-    /** Баланс (REFRESH_BALANCE). */
+    /** Баланс. */
     BALANCE,
 
-    /** Действие без runtime-target-сущности (entityId == null). */
+    /** Исполнение без runtime-цели (targetEntityId пуст). */
     NONE
 }

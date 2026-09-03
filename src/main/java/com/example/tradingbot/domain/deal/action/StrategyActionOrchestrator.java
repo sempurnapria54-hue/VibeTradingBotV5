@@ -4,7 +4,6 @@ import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
-import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.deal.ActionPlan;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -146,8 +145,7 @@ public class StrategyActionOrchestrator {
      * CREATED → SUBMIT (recovery находит сущность) → SUBMITTED → REFRESH.
      */
     private void rearmForRetry(DealActionState state) {
-        RuntimeTarget target = state.getTarget();
-        state.setStatus(isNull(target)
+        state.setStatus(isNull(state.getTargetEntityId())
                                 ? DealActionStateStatus.PLANNED
                                 : DealActionStateStatus.CREATED);
         dealActionStateDataService.save(state);

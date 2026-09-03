@@ -9,7 +9,6 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
@@ -48,7 +47,7 @@ public class CreateOrderExecutor implements CommandExecutor {
 
     @Override
     public ServiceCommandType supportedType() {
-        return ServiceCommandType.CREATE_ORDER;
+        return ServiceCommandType.CREATE_ORDER_COMMAND;
     }
 
     @Override
@@ -57,7 +56,7 @@ public class CreateOrderExecutor implements CommandExecutor {
                                                  DealContext dealContext) {
         CreateOrderCommandPayload payload = (CreateOrderCommandPayload) command.getPayload();
         Order saved = orderDataService.save(buildOrder(payload, dealContext.getDeal().getId()));
-        actionState.setTarget(new RuntimeTarget(TargetEntityType.ORDER, saved.getId()));
+        actionState.targetAt(TargetEntityType.ORDER, saved.getId());
         actionState.setStatus(DealActionStateStatus.CREATED);
         dealActionStateDataService.save(actionState);
         applyRiskNumbers(payload, saved, dealContext);

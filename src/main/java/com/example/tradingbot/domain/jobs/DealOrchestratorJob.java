@@ -9,6 +9,7 @@ import com.example.tradingbot.config.DealOrchestratorProperties;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
+import com.example.tradingbot.domain.command.action.SystemActionExecutor;
 import com.example.tradingbot.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingbot.domain.command.RetryBudgetExhaustedException;
 import com.example.tradingbot.domain.deal.DealContextService;
@@ -57,6 +58,7 @@ public class DealOrchestratorJob {
     private final DealTrancheStateMachine dealTrancheStateMachine;
     private final DealTrancheDataService dealTrancheDataService;
     private final ServiceCommandExecutor serviceCommandExecutor;
+    private final SystemActionExecutor systemActionExecutor;
     private final HoldService holdService;
 
     @Scheduled(cron = "${deal-orchestrator.cron}")
@@ -80,6 +82,11 @@ public class DealOrchestratorJob {
             if (enforceHold(dealContext)) {
                 return;
             }
+            // Ревизия живых системных исполнений идёт ДО прохода: строка,
+            // чья надобность снята фактами, иначе держала бы частичный ключ
+            // и тратила бюджет на надобность, которой больше нет
+            // (docs/components/SystemActionExecutor.md).
+            systemActionExecutor.reviseLiveExecutions(dealContext);
             advanceTranches(dealContext);
             advanceDeal(dealContext);
         } catch (ControlledExchangeException e) {
@@ -181,13 +188,13 @@ public class DealOrchestratorJob {
     }
 
     /**
-     * Полнота графа исполнения прохода. Пока признак не считается
-     * отдельным носителем, проход опирается на то, что контекст собран
-     * целиком: это НАЗВАННОЕ ограничение — доводится вместе с добычей
-     * положений закрытия (заход движений счёта и P&L).
+     * Полнота графа исполнения прохода — признак читается ГОТОВЫМ с
+     * контекста: его кладёт фабрика контекста, и пересобирать его здесь
+     * значило бы обязать проход знать объём загрузки
+     * (docs/spec/deal-context-load.json §graphComplete).
      */
     private Boolean graphComplete(DealContext dealContext) {
-        return nonNull(dealContext.getDeal().getTranches());
+        return isTrue(dealContext.getGraphComplete());
     }
 
     /**

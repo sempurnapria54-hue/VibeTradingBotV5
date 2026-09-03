@@ -52,6 +52,17 @@ public class HoldSignal {
         return new HoldSignal(HoldScope.EXCHANGE, HoldRung.SOFT, code);
     }
 
+    /**
+     * Журнальный сигнал радиуса инструмента (NON_CRITICAL). Кортеж тот же,
+     * что у {@link #instrumentSoft}, а имя другое НАМЕРЕННО: журнальный
+     * сигнал идёт прямо в отчёт, минуя исполнителя блокировки, и вызов
+     * фабрики «мягкой ступени» на такой тропе приглашал бы завести
+     * блокировку входов там, где реакции нет вовсе.
+     */
+    public static HoldSignal instrumentJournal(String code) {
+        return new HoldSignal(HoldScope.INSTRUMENT, HoldRung.SOFT, code);
+    }
+
     /** Реакция снимает принятый риск: kill-switch в её составе есть. */
     public Boolean tearsDownRisk() {
         return Objects.equals(HoldRung.HARD, rung);

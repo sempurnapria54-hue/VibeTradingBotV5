@@ -5,7 +5,6 @@ import static java.util.Objects.nonNull;
 
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.RuntimeTarget;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandPayload;
 import com.example.tradingbot.domain.command.ServiceCommandType;
@@ -100,7 +99,7 @@ public class CancelAlgoOrderActionExecutor implements StrategyActionExecutor {
         if (nonNull(blocked)) {
             return blocked;
         }
-        return ActionPlan.command(command(ServiceCommandType.CANCEL_ALGO_ORDER, dealContext, state,
+        return ActionPlan.command(command(ServiceCommandType.CANCEL_ALGO_ORDER_COMMAND, dealContext, state,
                 new CancelAlgoOrderCommandPayload(target.getId(), AlgoOrder.CloseReason.CANCELED_BY_STRATEGY)));
     }
 
@@ -111,7 +110,7 @@ public class CancelAlgoOrderActionExecutor implements StrategyActionExecutor {
         if (isNull(target)) {
             return ActionPlan.empty();
         }
-        return ActionPlan.command(command(ServiceCommandType.REFRESH_ALGO_ORDER, dealContext, state,
+        return ActionPlan.command(command(ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND, dealContext, state,
                 new RefreshAlgoOrderCommandPayload(target.getId())));
     }
 
@@ -125,8 +124,7 @@ public class CancelAlgoOrderActionExecutor implements StrategyActionExecutor {
             return null;
         }
         Long targetEntityId = dealContext.actionState(targetAction.getId(), tranche)
-                .map(DealActionState::getTarget)
-                .map(RuntimeTarget::getEntityId)
+                .map(DealActionState::getTargetEntityId)
                 .orElse(null);
         if (isNull(targetEntityId)) {
             return null;

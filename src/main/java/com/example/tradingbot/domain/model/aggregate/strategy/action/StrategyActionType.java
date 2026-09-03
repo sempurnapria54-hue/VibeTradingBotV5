@@ -7,7 +7,7 @@ package com.example.tradingbot.domain.model.aggregate.strategy.action;
  *
  * <p><b>Маркер уровня — суффикс {@code _ACTION}</b>, а не уникальные
  * основы: действие стратегии есть уровень абстракции НАД командой
- * ({@code ServiceCommandType.CREATE_ORDER} и соседние), и уровень
+ * ({@code ServiceCommandType.CREATE_ORDER_COMMAND} и соседние), и уровень
  * читается по хвосту имени в любом значении
  * (.claude/rules/naming.md §«Разведение уровней абстракции»).
  *
