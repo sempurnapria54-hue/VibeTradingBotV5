@@ -112,7 +112,7 @@ public class DealInvariantDetectors {
         reaction.apply(AnomalyFinding.builder()
                 .scope(HoldScope.EXCHANGE)
                 .rung(HoldRung.HARD)
-                .code(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED)
+                .code(Constants.Hold.EXCHANGE_EXPOSURE_MISMATCH)
                 .instrument(context.getInstrument())
                 .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(false)

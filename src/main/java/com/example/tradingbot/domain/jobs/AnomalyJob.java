@@ -53,15 +53,21 @@ import org.springframework.stereotype.Component;
  * (docs/models/domain/aggregate/Deal.md). Собственной тропы реакции
  * восстановление не заводит.
  *
- * <p><b>Названное ограничение — неполнота КОДОВАЯ, не концептуальная.</b>
- * Перечень детекторов объявлен целиком (docs/components/AnomalyJob.md
- * §«Что ищет»), <b>ступень и радиус у каждого выводятся</b> тремя
- * ратифицированными осями, а такт и гистерезис объявлены там же. Здесь
- * построен один детектор из тринадцати; остальные — CODE-дельта шага 8
- * (`.claude/work/backlog.md` §«Шаг 8 (safety / AnomalyJob)»). У A7 в
- * дельту входит и обязательство слоя команд: ни одна наша заявка не
- * уходит на биржу без распознаваемого clOrdId — по нему и только по нему
- * опознаётся чужая.
+ * <p><b>Перечень построен: одиннадцать детекторов</b> из двенадцати
+ * живых (docs/components/AnomalyJob.md §«Что ищет»). Кода нет только у
+ * A13 — переоценки инварианта ликвидации: её такт, гистерезис и выбор
+ * между ремоделом и выходом остаются предметом шага сопровождения.
+ * Ступень и радиус у каждого детектора ВЫВОДЯТСЯ тремя ратифицированными
+ * осями; реакции проход не заводит — зовёт лестницу.
+ *
+ * <p>Детекторы разложены по источнику операнда: биржевые признаки —
+ * {@link com.example.tradingbot.domain.safety.ExchangeSideDetectors},
+ * сверка наших строк с биржей —
+ * {@link com.example.tradingbot.domain.safety.AccountingDetectors},
+ * инварианты живой сделки —
+ * {@link com.example.tradingbot.domain.safety.DealInvariantDetectors},
+ * полнота прохода —
+ * {@link com.example.tradingbot.domain.safety.AnomalyPassGate}.
  *
  * <p>Concurrency — in-memory {@link JobExecutionGuard}; создание дубля
  * предотвращает тот же gatekeeper, что и на входной тропе. CRON/enabled

@@ -122,6 +122,24 @@ ROOTS = ('CLAUDE.md', 'README.md',
 #                снималась.
 RETIRED = [
     {
+        'name': 'перечень детекторов построен на один из тринадцати',
+        # Снято кодовой фазой шага 8: построены одиннадцать детекторов из
+        # двенадцати живых, кода нет только у A13 — она форвард шага
+        # сопровождения, и это объявлено в её собственном разборе.
+        'pattern': r'кода\s+ниже\s+—\s+один\s+детектор'
+                   r'|построен\s+один\s+детектор\s+из\s+тринадцати',
+        'arrived': r'[Пп]еречень\s+построен'
+                   r'|одиннадцать\s+детекторов',
+        'date': '2026-09-03',
+        'source': 'кодовая фаза шага 8, заходы CODE_1..CODE_5',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/knowledge-tree.md',
+                    'tools/retired-check.py'),
+        'population': (('docs/components/AnomalyJob.md', None),
+                       ('src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
+                        r'одиннадцать\s+детекторов')),
+    },
+    {
         'name': 'мягкая биржевая ступень не построена',
         # Снято постройкой Т11: пара (EXCHANGE, SOFT) поднимает Exchange.HOLD,
         # фабрика exchangeSoft заведена, снятие сворачивания стало двухходовым.
@@ -171,7 +189,7 @@ RETIRED = [
                        ('.claude/work/backlog.md',
                         r'ступень\s+и\s+радиус\s+выводятся'),
                        ('src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
-                        r'неполнота\s+КОДОВАЯ')),
+                        r'ВЫВОДЯТСЯ\s+тремя\s+ратифицированными')),
     },
     {
         'name': 'ReactionClass как построенный енум ступени сигнала',

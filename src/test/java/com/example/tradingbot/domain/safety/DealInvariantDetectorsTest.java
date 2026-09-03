@@ -102,7 +102,7 @@ class DealInvariantDetectorsTest {
 
         detectors.detect(exchange());
 
-        assertEquals(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED, captured().getCode());
+        assertEquals(Constants.Hold.EXCHANGE_EXPOSURE_MISMATCH, captured().getCode());
     }
 
     @Test

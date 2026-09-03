@@ -115,6 +115,16 @@ public final class Constants {
          */
         public static final String RISK_POLICY_BREACH_UNDER_PROTECTION = "RISK_POLICY_BREACH_UNDER_PROTECTION";
 
+        /**
+         * Ступень 2: сумма gross-экспозиций траншей разошлась с
+         * нетто-размером живого эпизода. Код СВОЙ, а не общий с потерей
+         * покрытия: коды — единственное, чем в данных различаются
+         * основания одной ступени, и схлопывание двух разных расхождений
+         * в одну строку отняло бы у разбора именно то, ради чего коды
+         * заведены (docs/models/domain/aggregate/Deal.md).
+         */
+        public static final String EXCHANGE_EXPOSURE_MISMATCH = "EXCHANGE_EXPOSURE_MISMATCH";
+
         /** L3: шаг стратегии велел сворачиваться аварийно из-за устаревших рыночных данных. */
         public static final String INSTRUMENT_MARKET_DATA_EXPIRED = "INSTRUMENT_MARKET_DATA_EXPIRED";
 
