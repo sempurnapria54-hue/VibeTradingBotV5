@@ -412,6 +412,53 @@ public class RiskValidator {
      * сравнение с нулём разрешило бы снятие последней защиты над живой
      * экспозицией.
      */
+    /**
+     * Те же неравенства потолков при НУЛЕВОМ акте: «уложилась бы живая
+     * сделка в потолки, не делая ничего». Операнд детектора нарушения
+     * риск-политики при живой защите (docs/components/AnomalyJob.md
+     * §«Что ищет», строка A12); собственных величин детектор не заводит —
+     * формула у потолков одна, и дом у неё здесь.
+     *
+     * <p><b>Это не расширение scope преконтроля.</b> Scope отвечает на
+     * «можно ли СОЗДАВАТЬ риск», и переоценка инвариантов ведомой позиции
+     * — задача детектора, а не преконтроля
+     * (docs/rules/risk-validator-scope.md §«Переоценка вне создания
+     * риска»). Здесь переиспользуется ФОРМУЛА, а не точка вызова: второй
+     * дом у неё был бы копией, расходящейся первой же правкой.
+     *
+     * <p><b>Гейт полноты графа.</b> На неполном графе операнды потолков
+     * занижены, и детектор обязан МОЛЧАТЬ, а не рапортовать: ложный
+     * триггер остановил бы входы по инструменту без основания. Неполный
+     * граф здесь выражается пустым результатом.
+     */
+    public List<RiskCheckResult> ceilingsBreachedWithoutAct(DealContext dealContext) {
+        List<RiskCheckResult> checks = new ArrayList<>();
+        if (isFalse(dealContext.getGraphComplete())) {
+            return checks;
+        }
+        InstrumentExternalRules rules = rulesDataService
+                .findByInstrumentId(dealContext.getInstrument().getId())
+                .orElse(null);
+        BigDecimal base = riskBase(dealContext);
+        if (isNull(rules) || isNull(base) || base.signum() <= 0) {
+            return checks;
+        }
+        StrategyDetail detail = dealContext.getStrategyDetail();
+        if (isNull(detail) || isNull(riskAppetite.getGlobalSimultaneousRiskPerDealPercent())) {
+            return checks;
+        }
+        BigDecimal entryReference = entryReference(dealContext.getDeal().livePosition(), null);
+        BigDecimal liveRiskNow = liveRiskNow(dealContext, rules, entryReference);
+        if (nonNull(detail.getStrategySimultaneousRiskPerDealPercent())) {
+            checkAgainst(liveRiskNow, percentOf(detail.getStrategySimultaneousRiskPerDealPercent(), base),
+                    RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED, "strategy simultaneous ceiling", checks);
+        }
+        checkAgainst(liveRiskNow, percentOf(riskAppetite.getGlobalSimultaneousRiskPerDealPercent(), base),
+                RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED, "global simultaneous ceiling", checks);
+        checkCatastrophicNotional(dealContext, detail, rules, base, entryReference, BigDecimal.ZERO, checks);
+        return checks;
+    }
+
     public RiskValidationResult validateProtectionRemoval(DealTranche tranche, Long algoOrderId) {
         Boolean allowed = tranche.removalAllowed(algoOrderId);
         if (isNull(allowed)) {
