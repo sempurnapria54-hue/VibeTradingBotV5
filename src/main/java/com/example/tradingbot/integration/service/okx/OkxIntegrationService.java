@@ -438,9 +438,10 @@ public class OkxIntegrationService implements IntegrationService {
 
     @Override
     public List<OrderExternalSnapshot> getAllPendingOrders() {
-        OkxApiResponse<OrderOkxResponse> response = execute(() -> okxRestClient.getAllPendingOrders(),
+        OkxApiResponse<OrderOkxResponse> response = execute(okxRestClient::getAllPendingOrders,
                 "orders-pending", "instType=SWAP");
         verifyCode(response, "orders-pending", "instType=SWAP");
+        verifyPageNotTruncated(response.getData(), "orders-pending", "instType=SWAP");
         return toOrderSnapshots(response);
     }
 
@@ -450,6 +451,12 @@ public class OkxIntegrationService implements IntegrationService {
      * семьи, которые контур умеет ставить; семья, которую он не ставит,
      * в срезе была бы чужой заявкой, и её ловит свой детектор по маркеру,
      * а не по отсутствию в этом перечне.
+     *
+     * <p><b>Усечение проверяется у КАЖДОЙ выданной страницы, а не у
+     * склейки.</b> Потолок задан на вызов, поэтому суммарный размер трёх
+     * семей его превышает штатно: мера по склейке объявляла бы проход
+     * неполным при полностью добытом срезе — и трижды подряд поднимала бы
+     * мягкую биржевую ступень со снятием вручную.
      */
     @Override
     public List<AlgoOrderExternalSnapshot> getAllPendingAlgoOrders() {
@@ -459,9 +466,30 @@ public class OkxIntegrationService implements IntegrationService {
                     () -> okxRestClient.getAllPendingAlgoOrders(ordType),
                     "orders-algo-pending", "instType=SWAP ordType=" + ordType);
             verifyCode(response, "orders-algo-pending", "instType=SWAP ordType=" + ordType);
+            verifyPageNotTruncated(response.getData(), "orders-algo-pending", "ordType=" + ordType);
             all.addAll(toAlgoOrderSnapshots(response));
         }
         return all;
+    }
+
+    /**
+     * Полная страница означает «возможно, есть ещё», и принять её за
+     * полный срез нельзя: детекторы молчали бы о том, что не поместилось,
+     * то есть пропуск выглядел бы чистым проходом
+     * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
+     *
+     * <p>Проверка живёт ЗДЕСЬ, а не у читателя среза: потолок — величина
+     * источника, он задаётся этому вызову и меряется на его же выдаче.
+     * У читателя нет операнда «сколько страниц было выдано», и там же
+     * доменный слой читал бы константу источника напрямую.
+     */
+    private void verifyPageNotTruncated(List<?> page, String endpoint, String params) {
+        if (isEmpty(page) || page.size() < Constants.Okx.PENDING_PAGE_LIMIT) {
+            return;
+        }
+        throw new ExchangeIntegrationException(String.format(
+                "Счёт-широкий срез усечён потолком страницы: endpoint=%s %s limit=%d",
+                endpoint, params, Constants.Okx.PENDING_PAGE_LIMIT));
     }
 
     @Override

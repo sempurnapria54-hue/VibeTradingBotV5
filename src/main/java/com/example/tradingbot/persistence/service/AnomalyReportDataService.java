@@ -34,14 +34,16 @@ public class AnomalyReportDataService {
     }
 
     /**
-     * Стои́т ли по ключу отчёт, заведённый не раньше порога, — операнд
-     * подтверждения гистерезиса (docs/components/AnomalyJob.md §«Такт и
-     * гистерезис»). Отдельного счётчика подряд идущих тиков в модели нет.
+     * Стои́т ли по ключу отчёт, заведённый <b>в окне</b> {@code [since,
+     * until]}, — операнд подтверждения гистерезиса и дедупа журнальной
+     * строки (docs/components/AnomalyJob.md §«Такт и гистерезис»).
+     * Отдельного счётчика подряд идущих тиков в модели нет.
      */
     @Transactional(readOnly = true)
     public Boolean existsStanding(Long exchangeId, Long instrumentId, String subjectExternalId,
-                                  String code, AnomalyReport.Severity severity, OffsetDateTime since) {
+                                  String code, AnomalyReport.Severity severity,
+                                  OffsetDateTime since, OffsetDateTime until) {
         return repository.existsStanding(exchangeId, instrumentId, subjectExternalId, code,
-                severity.name(), since);
+                severity.name(), since, until);
     }
 }

@@ -45,20 +45,24 @@ public class AnomalyPassGate {
 
     /**
      * Отметить проход и, если слепота держится дольше предела, поднять
-     * мягкую биржевую ступень. Возвращает {@code true}, если проход полон.
+     * мягкую биржевую ступень.
+     *
+     * <p>Операнд — <b>исход наблюдения</b>, а не полнота среза: проход,
+     * чей срез добыт целиком, но детекция по нему не отработала, есть
+     * такая же слепота. Различать их значило бы засчитывать чистым
+     * проход, на котором никто не смотрел.
      */
-    public Boolean apply(AnomalyScan scan, Exchange exchange) {
-        Integer blindPasses = exchangeDataService.markPass(exchange.getId(), scan.getComplete());
-        if (isTrue(scan.getComplete())) {
-            return true;
+    public void apply(Boolean observed, Exchange exchange) {
+        Integer blindPasses = exchangeDataService.markPass(exchange.getId(), observed);
+        if (isTrue(observed)) {
+            return;
         }
         DealContext context = DealContext.builder().exchange(exchange).build();
         log.warn("[anomaly] проход неполон exchangeId={} подряд={}", exchange.getId(), blindPasses);
         if (blindPasses >= properties.getBlindPassLimit()) {
             holdService.raise(HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE), context);
-            return false;
+            return;
         }
         reportService.journal(context, HoldSignal.exchangeJournal(Constants.Hold.ANOMALY_PASS_INCOMPLETE));
-        return false;
     }
 }

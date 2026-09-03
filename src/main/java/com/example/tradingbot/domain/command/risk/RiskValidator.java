@@ -399,20 +399,6 @@ public class RiskValidator {
     }
 
     /**
-     * Ветка ослабления защиты для СНЯТИЯ отдельной защиты при живой
-     * экспозиции (docs/rules/risk-validator-scope.md): снятие риск не
-     * снимает, а увеличивает. Операнд — покрытие транша после того, как
-     * снимаемая защита исчезнет (docs/spec/protection-coverage.json,
-     * величина {@code removalAllowed}); ниже экспозиции этого транша —
-     * отказ {@code PROTECTION_COVERAGE_REDUCED}. Защиты соседних траншей
-     * в операнд не входят.
-     *
-     * <p>Предикат, отказавший вычислением, даёт
-     * {@code DEAL_GRAPH_INCOMPLETE}: пустота нулём не подменяется, иначе
-     * сравнение с нулём разрешило бы снятие последней защиты над живой
-     * экспозицией.
-     */
-    /**
      * Те же неравенства потолков при НУЛЕВОМ акте: «уложилась бы живая
      * сделка в потолки, не делая ничего». Операнд детектора нарушения
      * риск-политики при живой защите (docs/components/AnomalyJob.md
@@ -459,6 +445,20 @@ public class RiskValidator {
         return checks;
     }
 
+    /**
+     * Ветка ослабления защиты для СНЯТИЯ отдельной защиты при живой
+     * экспозиции (docs/rules/risk-validator-scope.md): снятие риск не
+     * снимает, а увеличивает. Операнд — покрытие транша после того, как
+     * снимаемая защита исчезнет (docs/spec/protection-coverage.json,
+     * величина {@code removalAllowed}); ниже экспозиции этого транша —
+     * отказ {@code PROTECTION_COVERAGE_REDUCED}. Защиты соседних траншей
+     * в операнд не входят.
+     *
+     * <p>Предикат, отказавший вычислением, даёт
+     * {@code DEAL_GRAPH_INCOMPLETE}: пустота нулём не подменяется, иначе
+     * сравнение с нулём разрешило бы снятие последней защиты над живой
+     * экспозицией.
+     */
     public RiskValidationResult validateProtectionRemoval(DealTranche tranche, Long algoOrderId) {
         Boolean allowed = tranche.removalAllowed(algoOrderId);
         if (isNull(allowed)) {

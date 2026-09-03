@@ -11,6 +11,7 @@ import lombok.Value;
 @Value
 public class AnomalyScanSlice<T> {
 
+    /** Строки выборки; при неполученной выборке — пустой список, не {@code null}. */
     List<T> rows;
 
     /** Выборка добыта целиком: вызов прошёл и страница не упёрлась в потолок. */

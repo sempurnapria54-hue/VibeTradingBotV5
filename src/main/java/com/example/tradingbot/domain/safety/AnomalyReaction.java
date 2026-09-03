@@ -46,40 +46,65 @@ public class AnomalyReaction {
     private final AnomalyJobProperties properties;
 
     /**
-     * Применить реакцию по находке. Возвращает {@code true}, если ступень
-     * запрошена, — {@code false} означает «признак записан, подтверждения
-     * ждём следующим тиком».
+     * Применить реакцию по находке: поднять ступень либо записать
+     * наблюдение и ждать подтверждения следующим тиком.
      */
-    public Boolean apply(AnomalyFinding finding, Exchange exchange) {
+    public void apply(AnomalyFinding finding, Exchange exchange) {
         DealContext context = DealContext.builder()
                 .exchange(exchange)
                 .instrument(finding.getInstrument())
                 .build();
-        if (isTrue(finding.getJournalOnly())) {
-            journal(finding, context);
-            return false;
+        if (isTrue(reactsOnFirstSight(finding))) {
+            holdService.raise(signalOf(finding), context);
+            return;
         }
         if (isFalse(confirmed(finding, exchange))) {
             journal(finding, context);
-            return false;
+            return;
+        }
+        if (isTrue(finding.getJournalOnly())) {
+            return;
         }
         holdService.raise(signalOf(finding), context);
-        return true;
+    }
+
+    /**
+     * Ступень поднимается с первого наблюдения: гистерезиса у находки
+     * нет, и реакция у неё есть. Журнальная находка сюда не попадает —
+     * подтверждать ей нечего, а стоящая строка у неё служит дедупом, а не
+     * операндом ступени.
+     */
+    private Boolean reactsOnFirstSight(AnomalyFinding finding) {
+        return WITHOUT_HYSTERESIS.equals(finding.getHysteresisTicks())
+                && isFalse(finding.getJournalOnly());
     }
 
     /**
      * Признак подтверждён: гистерезиса нет вовсе либо наблюдательная
-     * строка по этому ключу уже стои́т и заведена не раньше предыдущего
-     * тика. Порог берётся из такта джобы с запасом на дрейф расписания.
+     * строка по этому ключу уже стои́т — заведена не раньше предыдущего
+     * тика и не этим же проходом.
+     *
+     * <p><b>Границ у окна две, и верхняя обязательна.</b> Без неё два
+     * прохода, идущие подряд в секундах (ручной триггер сразу после
+     * планового тика, рестарт с немедленным тиком, дрейф расписания),
+     * подтверждают друг друга: гистерезис заведён против гонки чтения
+     * длиной в такт, а такая пара проходов её не переживает и «подтвердит»
+     * транзиторное расхождение жёсткой ступенью.
+     *
+     * <p><b>Гейт стои́т и перед журнальной находкой.</b> Строка, пока
+     * состояние держится, одна: журнальная тропа без него заводила бы её
+     * каждым тиком бессрочно — ровно то размножение отчётов, против
+     * которого дедуп по стоящему состоянию и записан
+     * (docs/rules/error-handling-policy.md §«Состояние «держится» читается
+     * по объекту, а не по статусу отчёта»).
      */
     private Boolean confirmed(AnomalyFinding finding, Exchange exchange) {
-        if (WITHOUT_HYSTERESIS.equals(finding.getHysteresisTicks())) {
-            return true;
-        }
-        OffsetDateTime since = OffsetDateTime.now().minus(properties.getObservationWindow());
+        OffsetDateTime now = OffsetDateTime.now();
         return reportDataService.existsStanding(exchange.getId(), instrumentId(finding),
                 finding.getSubjectExternalId(), finding.getCode(),
-                AnomalyReport.Severity.NON_CRITICAL, since);
+                AnomalyReport.Severity.NON_CRITICAL,
+                now.minus(properties.getObservationWindow()),
+                now.minus(properties.getConfirmationMinAge()));
     }
 
     /**

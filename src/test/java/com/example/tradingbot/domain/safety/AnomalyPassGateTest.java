@@ -11,12 +11,10 @@ import com.example.tradingbot.config.AnomalyJobProperties;
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.util.Constants;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -48,7 +46,6 @@ class AnomalyPassGateTest {
 
     private final AnomalyJobProperties properties = new AnomalyJobProperties();
 
-    @InjectMocks
     private AnomalyPassGate passGate;
 
     @BeforeEach
@@ -57,11 +54,11 @@ class AnomalyPassGateTest {
     }
 
     @Test
-    @DisplayName("Полный проход сбрасывает счёт слепоты и ступени не поднимает")
-    void completePassResetsCounter() {
+    @DisplayName("Наблюдённый проход сбрасывает счёт слепоты и ступени не поднимает")
+    void observedPassResetsCounter() {
         when(exchangeDataService.markPass(EXCHANGE_ID, true)).thenReturn(0);
 
-        assertEquals(Boolean.TRUE, passGate.apply(scan(true), exchange()));
+        passGate.apply(true, exchange());
 
         verify(exchangeDataService).markPass(EXCHANGE_ID, true);
         verify(holdService, never()).raise(any(), any());
@@ -69,11 +66,11 @@ class AnomalyPassGateTest {
     }
 
     @Test
-    @DisplayName("Первый неполный проход оставляет строку и ступени НЕ поднимает")
+    @DisplayName("Первый ненаблюдённый проход оставляет строку и ступени НЕ поднимает")
     void firstBlindPassOnlyReports() {
         when(exchangeDataService.markPass(EXCHANGE_ID, false)).thenReturn(1);
 
-        assertEquals(Boolean.FALSE, passGate.apply(scan(false), exchange()));
+        passGate.apply(false, exchange());
 
         verify(reportService).journal(any(), any());
         verify(holdService, never()).raise(any(), any());
@@ -84,7 +81,7 @@ class AnomalyPassGateTest {
     void blindLimitRaisesSoftExchangeRung() {
         when(exchangeDataService.markPass(EXCHANGE_ID, false)).thenReturn(properties.getBlindPassLimit());
 
-        assertEquals(Boolean.FALSE, passGate.apply(scan(false), exchange()));
+        passGate.apply(false, exchange());
 
         HoldSignal expected = HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE);
         verify(holdService).raise(eq(expected), any());
@@ -95,15 +92,6 @@ class AnomalyPassGateTest {
     void blindnessRungDoesNotTearDownRisk() {
         assertEquals(Boolean.FALSE,
                 HoldSignal.exchangeSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE).tearsDownRisk());
-    }
-
-    private AnomalyScan scan(Boolean complete) {
-        return AnomalyScan.builder()
-                .positions(Map.of())
-                .orders(Map.of())
-                .algoOrders(Map.of())
-                .complete(complete)
-                .build();
     }
 
     private Exchange exchange() {

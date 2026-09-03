@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.jobs;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -26,7 +27,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -81,6 +81,14 @@ public class AnomalyJob {
 
     private static final String JOB_NAME = "anomalyJob";
 
+    /**
+     * Окно чтения контура: инструменты и биржи читаются ограниченной
+     * выборкой, а упор в окно засчитывается неполнотой прохода — тем же
+     * ходом, что и неполученный срез. Число — потолок реестра контура, не
+     * калибровка наблюдения: онбординг заводит инструменты десятками.
+     */
+    private static final int CONTOUR_WINDOW = 500;
+
     private final AnomalyJobProperties properties;
     private final JobExecutionGuard executionGuard;
     private final InstrumentDataService instrumentDataService;
@@ -102,53 +110,76 @@ public class AnomalyJob {
     }
 
     /**
-     * Проход: срез счёта → гейт полноты → обход управляемых инструментов.
+     * Проход: срез счёта + контур → детекция → отметка прохода.
      *
-     * <p>Статусные ворота входной тропы здесь НЕ стоят: риск уже живой, и
-     * пропуск заблокированного инструмента оставил бы его вне модели —
-     * ровно тем зависшим живым риском, которого не бывает. Блокировка
-     * гасит новые входы, а не учёт уже существующего.
+     * <p><b>Статусные ворота входной тропы здесь НЕ стоят:</b> риск уже
+     * живой, и пропуск заблокированного инструмента оставил бы его вне
+     * модели — ровно тем зависшим живым риском, которого не бывает.
+     * Блокировка гасит новые входы, а не учёт уже существующего. Поэтому
+     * контур читается ЦЕЛИКОМ: обход по одному статусу делал бы `A6`
+     * недостижимым (его популяция — как раз заблокированный инструмент),
+     * а `A2` — ложно срабатывающим на нашем собственном инструменте под
+     * мягкой ступенью, то есть замыкал бы петлю «мягкий холд → через тик
+     * жёсткая биржевая ступень со сносом по рынку».
      *
      * <p><b>На неполном проходе прочие детекторы МОЛЧАТ.</b> Признак
      * всякого из них — расхождение БД с биржей, и на неполном срезе
      * расхождение производит сама неполнота; ложный триггер снял бы риск,
      * которого нет (docs/components/AnomalyJob.md §«Гейт полноты среза»).
+     *
+     * <p><b>Проход отмечается ПОСЛЕ детекции, а не до неё.</b> Отметка
+     * «полон» до обхода сбрасывала бы счёт слепоты и на том проходе, где
+     * детекция упала: «не смотрели» стало бы неотличимо от «ничего не
+     * нашли» — ровно то различение, ради которого `A10` и заведён (П3).
      */
     private void run() {
         AnomalyScan scan = scanReader.read();
-        for (Exchange exchange : exchangeDataService.findAllActive()) {
+        List<Instrument> contour = instrumentDataService.findContourWithin(CONTOUR_WINDOW);
+        Boolean sliceComplete = isTrue(scan.getComplete()) && contour.size() < CONTOUR_WINDOW;
+        if (isFalse(sliceComplete) && contour.size() >= CONTOUR_WINDOW) {
+            log.warn("[anomaly] контур упёрся в окно ({}) — проход считается неполным", CONTOUR_WINDOW);
+        }
+        Set<String> contourNames = contourNames(contour);
+        for (Exchange exchange : exchangeDataService.findContourWithin(CONTOUR_WINDOW)) {
+            Boolean observed = false;
             try {
-                passGate.apply(scan, exchange);
-                if (isTrue(scan.getComplete())) {
-                    detect(scan, exchange);
+                if (isTrue(sliceComplete)) {
+                    detect(scan, exchange, contour, contourNames);
+                    observed = true;
                 }
             } catch (RuntimeException e) {
-                log.error("Anomaly pass failed exchangeId={}", exchange.getId(), e);
+                log.error("Anomaly detection failed exchangeId={}", exchange.getId(), e);
+            }
+            try {
+                passGate.apply(observed, exchange);
+            } catch (RuntimeException e) {
+                log.error("Anomaly pass gate failed exchangeId={}", exchange.getId(), e);
             }
         }
     }
 
     /** Детекторы прохода. Каждый молчит на неполном срезе — гейт выше. */
-    private void detect(AnomalyScan scan, Exchange exchange) {
-        List<Instrument> managed = instrumentDataService.findByStatus(Instrument.Status.ACTIVE);
-        exchangeSideDetectors.detect(scan, exchange, managedNames(managed));
+    private void detect(AnomalyScan scan, Exchange exchange, List<Instrument> contour, Set<String> contourNames) {
+        exchangeSideDetectors.detect(scan, exchange, contourNames);
         dealInvariantDetectors.detect(exchange);
-        for (Instrument instrument : managed) {
+        for (Instrument instrument : contour) {
             try {
-                detectUnexplainedPosition(instrument, first(scan.positionsOf(instrument.getExternalId())));
-                accountingDetectors.detect(scan, exchange, instrument);
+                Boolean dealExplains = dealDataService.existsActiveByInstrumentId(instrument.getId());
+                detectUnexplainedPosition(instrument, first(scan.positionsOf(instrument.getExternalId())),
+                        dealExplains);
+                accountingDetectors.detect(scan, exchange, instrument, dealExplains);
             } catch (RuntimeException e) {
                 log.error("Anomaly detection failed instrumentId={}", instrument.getId(), e);
             }
         }
     }
 
-    /** Биржевые имена управляемых инструментов — граница «модель против счёта». */
-    private Set<String> managedNames(List<Instrument> managed) {
-        return managed.stream()
+    /** Биржевые имена инструментов контура — граница «модель против счёта». */
+    private Set<String> contourNames(List<Instrument> contour) {
+        return contour.stream()
                 .map(Instrument::getExternalId)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     /**
@@ -164,12 +195,16 @@ public class AnomalyJob {
      * Активная позиция без сделки, объясняющей её появление. Определение
      * обнаруженного и есть защитная проверка отсутствия активной сделки:
      * позицию, которую сделка объясняет, восстанавливать не надо.
+     *
+     * <p>Дешёвый гард идёт первым: в штатном режиме позиции по
+     * инструменту нет, и признак снимается без обращения к БД.
      */
-    private void detectUnexplainedPosition(Instrument instrument, PositionExternalSnapshot snapshot) {
-        if (isTrue(dealDataService.existsActiveByInstrumentId(instrument.getId()))) {
+    private void detectUnexplainedPosition(Instrument instrument, PositionExternalSnapshot snapshot,
+                                           Boolean dealExplains) {
+        if (isFalse(carriesLiveRisk(snapshot))) {
             return;
         }
-        if (isFalse(carriesLiveRisk(snapshot))) {
+        if (isTrue(dealExplains)) {
             return;
         }
         StrategyTradeDirection direction = directionOf(snapshot);

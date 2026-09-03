@@ -2,7 +2,6 @@ package com.example.tradingbot.domain.safety;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,7 +13,6 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
-import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.util.ClientIdGenerator;
 import com.example.tradingbot.util.Constants;
@@ -48,8 +46,11 @@ class AccountingDetectorsTest {
     private static final String INST = "BTC-USDT-SWAP";
     private static final Long INSTRUMENT_ID = 7L;
 
-    @Mock
-    private DealDataService dealDataService;
+    /** Живая сделка по инструменту есть — заявки объяснены. */
+    private static final Boolean DEAL_EXPLAINS = Boolean.TRUE;
+
+    /** Живой сделки нет — заявки объяснить нечем. */
+    private static final Boolean DEAL_ABSENT = Boolean.FALSE;
 
     @Mock
     private OrderDataService orderDataService;
@@ -66,9 +67,7 @@ class AccountingDetectorsTest {
     @Test
     @DisplayName("A9: заявки без позиции и без живой сделки — мягкая ступень инструмента")
     void orphanOrdersRaiseInstrumentSoftRung() {
-        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
-
-        detectors.detect(scanWithOrders(), exchange(Exchange.Status.ACTIVE), instrument());
+        detectors.detect(scanWithOrders(), exchange(Exchange.Status.ACTIVE), instrument(), DEAL_ABSENT);
 
         AnomalyFinding finding = captured();
         assertEquals(Constants.Hold.INSTRUMENT_ORPHAN_ORDERS, finding.getCode());
@@ -80,9 +79,7 @@ class AccountingDetectorsTest {
     @Test
     @DisplayName("A9 МОЛЧИТ, когда заявку объясняет живая сделка: это штатный отдыхающий вход")
     void restingEntryOrderOfLiveDealIsNotOrphan() {
-        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.TRUE);
-
-        detectors.detect(scanWithOrders(), exchange(Exchange.Status.ACTIVE), instrument());
+        detectors.detect(scanWithOrders(), exchange(Exchange.Status.ACTIVE), instrument(), DEAL_EXPLAINS);
 
         verify(reaction, never()).apply(any(), any());
     }
@@ -90,9 +87,8 @@ class AccountingDetectorsTest {
     @Test
     @DisplayName("A6: жёсткая ступень биржи стоит, а на бирже живут сущности — журнальная строка")
     void standingHardRungWithLiveEntitiesIsReported() {
-        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.TRUE);
-
-        detectors.detect(scanWithOrders(), exchange(Exchange.Status.TRADE_BLOCKED), instrument());
+        detectors.detect(scanWithOrders(), exchange(Exchange.Status.TRADE_BLOCKED), instrument(),
+                DEAL_EXPLAINS);
 
         AnomalyFinding finding = captured();
         assertEquals(Constants.Hold.SAFETY_RUNG_NOT_ENFORCED, finding.getCode());
@@ -102,11 +98,11 @@ class AccountingDetectorsTest {
     @Test
     @DisplayName("A8: наша строка терминальна, а сущность на бирже жива — журнальная строка с предметом")
     void terminalLocallyButAliveOnExchange() {
-        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.TRUE);
         String clientId = ClientIdGenerator.generateExchangeFacing();
         when(orderDataService.findByInternalId(clientId)).thenReturn(terminalOrder());
 
-        detectors.detect(scanWithOwnOrder(clientId), exchange(Exchange.Status.ACTIVE), instrument());
+        detectors.detect(scanWithOwnOrder(clientId), exchange(Exchange.Status.ACTIVE), instrument(),
+                DEAL_EXPLAINS);
 
         AnomalyFinding finding = captured();
         assertEquals(Constants.Hold.LOCAL_TERMINAL_ALIVE_ON_EXCHANGE, finding.getCode());
@@ -117,11 +113,11 @@ class AccountingDetectorsTest {
     @Test
     @DisplayName("A8 МОЛЧИТ на живой нашей заявке: расхождения нет")
     void liveOrderIsNotAnomaly() {
-        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.TRUE);
         String clientId = ClientIdGenerator.generateExchangeFacing();
         when(orderDataService.findByInternalId(clientId)).thenReturn(liveOrder());
 
-        detectors.detect(scanWithOwnOrder(clientId), exchange(Exchange.Status.ACTIVE), instrument());
+        detectors.detect(scanWithOwnOrder(clientId), exchange(Exchange.Status.ACTIVE), instrument(),
+                DEAL_EXPLAINS);
 
         verify(reaction, never()).apply(any(), any());
     }
@@ -129,12 +125,34 @@ class AccountingDetectorsTest {
     @Test
     @DisplayName("A8 не путает «мы закрыли» с «мы не заводили»: строки нет — не его предмет")
     void unknownClientIdIsNotTerminalLocally() {
-        when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.TRUE);
         String clientId = ClientIdGenerator.generateExchangeFacing();
         when(orderDataService.findByInternalId(clientId)).thenReturn(null);
         when(algoOrderDataService.findByInternalId(clientId)).thenReturn(null);
 
-        detectors.detect(scanWithOwnOrder(clientId), exchange(Exchange.Status.ACTIVE), instrument());
+        detectors.detect(scanWithOwnOrder(clientId), exchange(Exchange.Status.ACTIVE), instrument(),
+                DEAL_EXPLAINS);
+
+        verify(reaction, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("A6 видит ЖЁСТКУЮ СТУПЕНЬ ИНСТРУМЕНТА, а не только биржи — иначе его популяция недостижима")
+    void standingInstrumentRungWithLiveEntitiesIsReported() {
+        Instrument blocked = instrument();
+        blocked.setStatus(Instrument.Status.TRADE_BLOCKED);
+
+        detectors.detect(scanWithOrders(), exchange(Exchange.Status.ACTIVE), blocked, DEAL_EXPLAINS);
+
+        AnomalyFinding finding = captured();
+        assertEquals(Constants.Hold.SAFETY_RUNG_NOT_ENFORCED, finding.getCode());
+        assertEquals(HoldScope.INSTRUMENT, finding.getScope());
+        assertEquals(Boolean.TRUE, finding.getJournalOnly());
+    }
+
+    @Test
+    @DisplayName("Контроль: ни одна ступень не стои́т — A6 молчит, сколько бы сущностей ни жило")
+    void liveEntitiesWithoutStandingRungAreNotReported() {
+        detectors.detect(scanWithOrders(), exchange(Exchange.Status.ACTIVE), instrument(), DEAL_EXPLAINS);
 
         verify(reaction, never()).apply(any(), any());
     }

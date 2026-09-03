@@ -4,6 +4,7 @@ import com.example.tradingbot.persistence.model.instrument.InstrumentEntity;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +17,16 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     List<InstrumentEntity> findByStatus(String status);
 
     List<InstrumentEntity> findByStatusIn(Collection<String> statuses);
+
+    /**
+     * Контур целиком, ограниченным окном: статус инструмента выборку
+     * <b>не сужает</b>. Проактивная детекция обходит контур по факту
+     * живого риска, а не по готовности к торговле — заблокированный
+     * инструмент из обхода не выпадает (docs/components/AnomalyJob.md).
+     * Окно вместо {@code findAll()} — {@code codestyle} §«Выборка
+     * данных»; упор в окно читатель засчитывает неполнотой прохода.
+     */
+    List<InstrumentEntity> findAllBy(Pageable pageable);
 
     /**
      * Проекция расчётной валюты инструмента биржи по внешнему id — резолв

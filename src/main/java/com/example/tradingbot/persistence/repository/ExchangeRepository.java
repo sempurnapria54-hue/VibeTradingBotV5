@@ -3,6 +3,7 @@ package com.example.tradingbot.persistence.repository;
 import com.example.tradingbot.persistence.model.exchange.ExchangeEntity;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -35,7 +36,7 @@ public interface ExchangeRepository extends JpaRepository<ExchangeEntity, Long> 
     @Modifying
     @Query("update ExchangeEntity e set e.blindPassCount = case when :complete = true then 0 "
             + "else e.blindPassCount + 1 end where e.id = :id")
-    int updateBlindPassCount(@Param("id") Long id, @Param("complete") Boolean complete);
+    void updateBlindPassCount(@Param("id") Long id, @Param("complete") Boolean complete);
 
     @Query("select e.blindPassCount from ExchangeEntity e where e.id = :id")
     Optional<Integer> findBlindPassCountById(@Param("id") Long id);
@@ -44,4 +45,23 @@ public interface ExchangeRepository extends JpaRepository<ExchangeEntity, Long> 
     @Modifying
     @Query("update ExchangeEntity e set e.status = :to where e.id = :id and e.status = :from")
     int updateStatus(@Param("id") Long id, @Param("from") String from, @Param("to") String to);
+
+    /**
+     * Переход из <b>любого</b> статуса, кроме целевого. Форма нужна
+     * жёсткой ступени: «`TRADE_BLOCKED` — из любого: авария застаёт биржу
+     * в любом состоянии» (docs/rules/exchange-hold.md §«Границы и
+     * эскалация»). Ноль затронутых строк означает «ступень уже стои́т» —
+     * анкер идемпотентности сохраняется.
+     */
+    @Modifying
+    @Query("update ExchangeEntity e set e.status = :to where e.id = :id and e.status <> :to")
+    int updateStatusUnlessAlready(@Param("id") Long id, @Param("to") String to);
+
+    /**
+     * Биржи контура ограниченным окном. Ступень биржи выборку <b>не
+     * сужает</b>: проактивная детекция обходит контур по факту живого
+     * риска. Окно вместо {@code findAll()} — {@code codestyle} §«Выборка
+     * данных».
+     */
+    List<ExchangeEntity> findAllBy(Pageable pageable);
 }

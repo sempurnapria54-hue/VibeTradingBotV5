@@ -31,9 +31,10 @@ public class ClientIdGenerator {
 
     /**
      * Длина случайной части у биржевого идентификатора: маркер плюс она
-     * обязаны уложиться в потолок источника (32 символа).
+     * обязаны уложиться в потолок источника.
      */
-    private static final int EXCHANGE_RANDOM_LENGTH = 32 - Constants.Okx.CLIENT_ID_MARKER.length();
+    private static final int EXCHANGE_RANDOM_LENGTH =
+            Constants.Okx.CLIENT_ID_MAX_LENGTH - Constants.Okx.CLIENT_ID_MARKER.length();
 
     public static String generate() {
         return UUID.randomUUID().toString().replace(DASH, EMPTY);

@@ -271,13 +271,13 @@ public final class Constants {
         /** Путь отмены advance algo-семьи (trailing/move_order_stop). Приватный endpoint. */
         public static final String TRADE_CANCEL_ADVANCE_ALGOS_PATH = "/api/v5/trade/cancel-advance-algos";
 
-        /** Тип algo-order OKX: conditional (SL/TP/partial). */
         /**
          * Потолок страницы pending-срезов. Задаётся явно, чтобы усечение
          * было НАБЛЮДАЕМЫМ: полная страница означает «возможно, есть
          * ещё», и проход детекции объявляет себя неполным вместо того,
          * чтобы принять усечённый срез за полный
          * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
+         * Меряется у КАЖДОГО вызова, а не у склейки семей.
          */
         public static final Integer PENDING_PAGE_LIMIT = 100;
 
@@ -286,11 +286,18 @@ public final class Constants {
          * дискриминатор «наше против чужого» на стороне БИРЖИ: по нему
          * проактивная детекция опознаёт заявку, которую заводили не мы
          * (docs/components/AnomalyJob.md §«Что ищет»). Короткий — потолок
-         * clOrdId у источника 32 символа, и маркер тратит энтропию
-         * случайной части.
+         * clOrdId у источника, и маркер тратит энтропию случайной части.
          */
         public static final String CLIENT_ID_MARKER = "vtb";
 
+        /**
+         * Потолок длины клиентского идентификатора заявки у источника
+         * (docs/integrations/okx/contracts/order.md). Ограничение биржи,
+         * а не алгоритма генератора, поэтому дом у него здесь.
+         */
+        public static final int CLIENT_ID_MAX_LENGTH = 32;
+
+        /** Тип algo-order OKX: conditional (SL/TP/partial). */
         public static final String ALGO_ORD_TYPE_CONDITIONAL = "conditional";
 
         /** Тип algo-order OKX: OCO. */

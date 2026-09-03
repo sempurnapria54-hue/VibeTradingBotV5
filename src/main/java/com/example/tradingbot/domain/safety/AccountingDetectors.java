@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.safety;
 
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -12,7 +13,6 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.OrderExternalSnapshot;
 import com.example.tradingbot.persistence.service.AlgoOrderDataService;
-import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.OrderDataService;
 import com.example.tradingbot.util.ClientIdGenerator;
 import com.example.tradingbot.util.Constants;
@@ -40,15 +40,19 @@ public class AccountingDetectors {
     /** Признак сравнивает БД с биржей: подтверждается следующим тиком. */
     private static final Integer CONFIRMED_NEXT_TICK = 2;
 
-    private final DealDataService dealDataService;
     private final OrderDataService orderDataService;
     private final AlgoOrderDataService algoOrderDataService;
     private final AnomalyReaction reaction;
 
-    public void detect(AnomalyScan scan, Exchange exchange, Instrument instrument) {
+    /**
+     * {@code dealExplains} резолвится проходом один раз на инструмент и
+     * передаётся сюда: тот же признак нужен восстановительной тропе, и
+     * второй запрос за ним был бы дублем в пределах одного тика.
+     */
+    public void detect(AnomalyScan scan, Exchange exchange, Instrument instrument, Boolean dealExplains) {
         rungNotEnforced(scan, exchange, instrument);
         terminalAliveOnExchange(scan, exchange, instrument);
-        orphanOrders(scan, exchange, instrument);
+        orphanOrders(scan, exchange, instrument, dealExplains);
     }
 
     /**
@@ -112,15 +116,15 @@ public class AccountingDetectors {
      * входная заявка позиции ещё не имеет по построению, и без него
      * детектор срабатывал бы на каждом нормальном входе.
      */
-    private void orphanOrders(AnomalyScan scan, Exchange exchange, Instrument instrument) {
+    private void orphanOrders(AnomalyScan scan, Exchange exchange, Instrument instrument, Boolean dealExplains) {
         String externalId = instrument.getExternalId();
-        if (isFalse(scan.positionsOf(externalId).isEmpty())) {
+        if (isNotEmpty(scan.positionsOf(externalId))) {
             return;
         }
         if (isEmpty(scan.ordersOf(externalId)) && isEmpty(scan.algoOrdersOf(externalId))) {
             return;
         }
-        if (isTrue(dealDataService.existsActiveByInstrumentId(instrument.getId()))) {
+        if (isTrue(dealExplains)) {
             return;
         }
         log.warn("[anomaly] хвосты заявок без живой сделки instrumentId={}", instrument.getId());
@@ -137,9 +141,9 @@ public class AccountingDetectors {
     /** По инструменту на бирже живёт хоть что-то. */
     private Boolean hasLiveEntities(AnomalyScan scan, Instrument instrument) {
         String externalId = instrument.getExternalId();
-        return isFalse(scan.positionsOf(externalId).isEmpty())
-                || isFalse(scan.ordersOf(externalId).isEmpty())
-                || isFalse(scan.algoOrdersOf(externalId).isEmpty());
+        return isNotEmpty(scan.positionsOf(externalId))
+                || isNotEmpty(scan.ordersOf(externalId))
+                || isNotEmpty(scan.algoOrdersOf(externalId));
     }
 
     /**

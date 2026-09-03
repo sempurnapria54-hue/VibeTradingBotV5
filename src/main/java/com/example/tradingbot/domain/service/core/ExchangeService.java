@@ -20,8 +20,19 @@ public class ExchangeService {
     private final ExchangeDataService exchangeDataService;
     private final HoldClearanceGate holdClearanceGate;
 
+    /**
+     * Заведение биржи. Счётчики серии убытков и слепоты стартуют нулём
+     * здесь: обе колонки объявлены {@code NOT NULL}, а api-запрос их не
+     * несёт — без явного писателя вставка уходила бы в источник с
+     * {@code null}. Правило «таблицы пусты» снимает бэкфилл, но не
+     * назначение писателя у объектов, заводимых ПОСЛЕ ввода колонки
+     * (.claude/rules/pre-launch-schema-changes.md §«Чего правило НЕ
+     * снимает»).
+     */
     public Exchange create(Exchange exchange) {
         exchange.setStatus(Exchange.Status.CREATED);
+        exchange.setConsecutiveLossCount(0);
+        exchange.setBlindPassCount(0);
         return exchangeDataService.save(exchange);
     }
 

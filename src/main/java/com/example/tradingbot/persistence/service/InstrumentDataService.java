@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +71,20 @@ public class InstrumentDataService {
     @Transactional(readOnly = true)
     public List<Instrument> findByStatus(Instrument.Status status) {
         return repository.findByStatus(status.name()).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(toList());
+    }
+
+    /**
+     * Контур целиком, ограниченным окном: статус выборку не сужает.
+     * Потребитель — проактивная детекция, у которой популяция задана
+     * живым риском на бирже, а не готовностью инструмента к торговле;
+     * упор в окно она засчитывает неполнотой прохода
+     * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
+     */
+    @Transactional(readOnly = true)
+    public List<Instrument> findContourWithin(Integer limit) {
+        return repository.findAllBy(PageRequest.of(0, limit)).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());
     }

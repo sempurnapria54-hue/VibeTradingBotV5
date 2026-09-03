@@ -55,6 +55,19 @@ class ExchangeServiceTest {
     private ExchangeService exchangeService;
 
     @Test
+    @DisplayName("Заведение биржи ставит счётчики нулём: у обязательных колонок назван писатель")
+    void createNamesWriterForMandatoryCounters() {
+        Exchange created = new Exchange();
+        when(exchangeDataService.save(created)).thenReturn(created);
+
+        exchangeService.create(created);
+
+        assertEquals(Exchange.Status.CREATED, created.getStatus());
+        assertEquals(Integer.valueOf(0), created.getConsecutiveLossCount());
+        assertEquals(Integer.valueOf(0), created.getBlindPassCount());
+    }
+
+    @Test
     @DisplayName("Снятие сворачивания ведёт в МЯГКУЮ ступень, а не в рабочее состояние")
     void unblockTradeLandsOnSoftRung() {
         given(Exchange.Status.TRADE_BLOCKED);

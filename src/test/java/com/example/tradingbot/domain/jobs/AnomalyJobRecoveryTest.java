@@ -1,8 +1,10 @@
 package com.example.tradingbot.domain.jobs;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -15,12 +17,12 @@ import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
-import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.domain.safety.AccountingDetectors;
 import com.example.tradingbot.domain.safety.AnomalyPassGate;
 import com.example.tradingbot.domain.safety.AnomalyScanReader;
 import com.example.tradingbot.domain.safety.DealInvariantDetectors;
 import com.example.tradingbot.domain.safety.ExchangeSideDetectors;
+import com.example.tradingbot.integration.service.IntegrationService;
 import com.example.tradingbot.persistence.service.DealDataService;
 import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
@@ -80,11 +82,11 @@ class AnomalyJobRecoveryTest {
     @BeforeEach
     void setUp() {
         AnomalyJobProperties properties = new AnomalyJobProperties();
-        job = new AnomalyJob(properties, new JobExecutionGuard(), instrumentDataService, exchangeDataService,
-                dealDataService, new AnomalyScanReader(integrationService), passGate, exchangeSideDetectors, accountingDetectors, dealInvariantDetectors, dealOpeningService);
-        when(instrumentDataService.findByStatus(any())).thenReturn(List.of(instrument()));
-        when(exchangeDataService.findAllActive()).thenReturn(List.of(exchange()));
-        when(passGate.apply(any(), any())).thenReturn(Boolean.TRUE);
+        job = new AnomalyJob(properties, new JobExecutionGuard(), instrumentDataService,
+                exchangeDataService, dealDataService, new AnomalyScanReader(integrationService), passGate,
+                exchangeSideDetectors, accountingDetectors, dealInvariantDetectors, dealOpeningService);
+        when(instrumentDataService.findContourWithin(anyInt())).thenReturn(List.of(instrument()));
+        when(exchangeDataService.findContourWithin(anyInt())).thenReturn(List.of(exchange()));
     }
 
     @Test
@@ -151,8 +153,8 @@ class AnomalyJobRecoveryTest {
         AnomalyJobProperties disabled = new AnomalyJobProperties();
         disabled.setEnabled(Boolean.FALSE);
         AnomalyJob offJob = new AnomalyJob(disabled, new JobExecutionGuard(), instrumentDataService,
-                exchangeDataService, dealDataService, new AnomalyScanReader(integrationService), passGate, exchangeSideDetectors,
-                accountingDetectors, dealInvariantDetectors, dealOpeningService);
+                exchangeDataService, dealDataService, new AnomalyScanReader(integrationService), passGate,
+                exchangeSideDetectors, accountingDetectors, dealInvariantDetectors, dealOpeningService);
 
         offJob.tick();
 
@@ -162,7 +164,7 @@ class AnomalyJobRecoveryTest {
     @Test
     @DisplayName("Срез позиций читается ОДНИМ запросом на тик, сколько бы ни было инструментов")
     void positionsAreReadInOneRequestPerTick() {
-        when(instrumentDataService.findByStatus(any()))
+        when(instrumentDataService.findContourWithin(anyInt()))
                 .thenReturn(List.of(instrument(), instrument(), instrument()));
         when(dealDataService.existsActiveByInstrumentId(anyLong())).thenReturn(Boolean.FALSE);
         when(integrationService.getPositions()).thenReturn(List.of());
@@ -170,6 +172,42 @@ class AnomalyJobRecoveryTest {
         job.tick();
 
         verify(integrationService, times(1)).getPositions();
+    }
+
+    @Test
+    @DisplayName("Обход берёт контур ЦЕЛИКОМ: заблокированный инструмент из наблюдения не выпадает")
+    void blockedInstrumentStaysUnderObservation() {
+        Instrument blocked = instrument();
+        blocked.setStatus(Instrument.Status.TRADE_BLOCKED);
+        when(instrumentDataService.findContourWithin(anyInt())).thenReturn(List.of(blocked));
+        when(integrationService.getPositions()).thenReturn(List.of());
+
+        job.tick();
+
+        verify(accountingDetectors).detect(any(), any(), eq(blocked), any());
+        verify(instrumentDataService, never()).findByStatus(any());
+    }
+
+    @Test
+    @DisplayName("Отметка прохода идёт ПОСЛЕ детекции: упавшая детекция чистым проходом не считается")
+    void failedDetectionIsNotCountedAsObservedPass() {
+        when(integrationService.getPositions()).thenReturn(List.of());
+        doThrow(new IllegalStateException("детекция упала"))
+                .when(dealInvariantDetectors).detect(any());
+
+        job.tick();
+
+        verify(passGate).apply(eq(Boolean.FALSE), any());
+    }
+
+    @Test
+    @DisplayName("Контроль: отработавшая детекция отмечает проход наблюдённым")
+    void successfulDetectionMarksPassObserved() {
+        when(integrationService.getPositions()).thenReturn(List.of());
+
+        job.tick();
+
+        verify(passGate).apply(eq(Boolean.TRUE), any());
     }
 
     private Exchange exchange() {

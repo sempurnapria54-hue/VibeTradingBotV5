@@ -7,6 +7,7 @@ import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.persistence.repository.ExchangeRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,16 +48,25 @@ public class ExchangeDataService {
     }
 
     /**
-     * Заморозка торговли по аварии: ACTIVE → TRADE_BLOCKED (гардирована статусом,
-     * только из ACTIVE — decision B). Возвращает {@code true}, если переход
-     * применился (биржа была ACTIVE) — анкер идемпотентности реакции холда.
-     * Обратный переход (ручная разморозка TRADE_BLOCKED → ACTIVE) — с операцией
-     * un-hold (step 9 / backlog п.9), здесь не вводится превентивно.
+     * Заморозка торговли по аварии: <b>любой статус</b> → TRADE_BLOCKED.
+     * Возвращает {@code true}, если переход применился, — анкер
+     * идемпотентности реакции холда.
+     *
+     * <p><b>Гард только из ACTIVE не годится:</b> «`HOLD →
+     * TRADE_BLOCKED` разрешён и реакцию не пропускает: мягкий холд
+     * анкером идемпотентности не является»
+     * (docs/rules/exchange-hold.md §«Границы и эскалация», там же —
+     * «`TRADE_BLOCKED` — из любого»). С прежним гардом жёсткая находка
+     * на бирже под мягкой ступенью проглатывалась молча: kill-switch не
+     * гонялся, отчёт не заводился. Инструментная лестница разведена так
+     * же ({@link InstrumentDataService#blockTrade}).
+     *
+     * <p>Обратный переход (ручная разморозка TRADE_BLOCKED → HOLD) —
+     * операция снятия, здесь не вводится.
      */
     @Transactional
     public Boolean blockTrade(Long id) {
-        return repository.updateStatus(id, Exchange.Status.ACTIVE.name(),
-                Exchange.Status.TRADE_BLOCKED.name()) > 0;
+        return repository.updateStatusUnlessAlready(id, Exchange.Status.TRADE_BLOCKED.name()) > 0;
     }
 
     /**
@@ -110,13 +120,14 @@ public class ExchangeDataService {
     }
 
     /**
-     * Биржи, которые контур ведёт, — вход прохода проактивной детекции.
-     * Ступень биржи выборку НЕ сужает: под холдом учёт уже существующего
-     * риска продолжается, гасятся только новые входы.
+     * Биржи, которые контур ведёт, — вход прохода проактивной детекции,
+     * ограниченным окном. Ступень биржи выборку НЕ сужает: под холдом
+     * учёт уже существующего риска продолжается, гасятся только новые
+     * входы. Имя не обещает фильтра по статусу — его здесь нет.
      */
     @Transactional(readOnly = true)
-    public List<Exchange> findAllActive() {
-        return repository.findAll().stream()
+    public List<Exchange> findContourWithin(Integer limit) {
+        return repository.findAllBy(PageRequest.of(0, limit)).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());
     }

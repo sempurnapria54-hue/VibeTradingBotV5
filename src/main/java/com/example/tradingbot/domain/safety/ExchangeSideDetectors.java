@@ -15,11 +15,22 @@ import org.springframework.stereotype.Service;
  * (живой риск по инструменту вне контура), `A3` (больше одной позиции на
  * инструмент), `A7` (живая заявка без нашего маркера).
  *
- * <p><b>Гистерезис им не нужен, и это не послабление.</b> Гонка чтения —
- * срез, прочитанный между отправкой нашей команды и её появлением на
- * бирже — их признака не производит: вторая позиция по одному инструменту
- * нашей командой не создаётся никогда, а маркер заявки наш рестарт
- * изменить не может (docs/components/AnomalyJob.md §«Такт и гистерезис»).
+ * <p><b>`A2` и `A3` гистерезиса не требуют, и это не послабление.</b>
+ * Гонка чтения — срез, прочитанный между отправкой нашей команды и её
+ * появлением на бирже — их признака не производит: вторая позиция по
+ * одному инструменту нашей командой не создаётся никогда, а строка
+ * инструмента нашим ходом не исчезает (docs/components/AnomalyJob.md
+ * §«Такт и гистерезис»).
+ *
+ * <p><b>`A7` гистерезис требует, и посылка обратного опровергнута.</b>
+ * Наш собственный ход его признак производит: закрытие позиции идёт
+ * эндпоинтом {@code close-position}, у которого клиентского
+ * идентификатора нет в контракте вовсе
+ * (docs/integrations/okx/contracts/position.md), поэтому наша рыночная
+ * закрывающая заявка висит в срезе БЕЗ маркера. По прежнему признаку
+ * детектор сносил бы биржу по рынку за наш штатный выход — тот самый
+ * класс, ради исключения которого маркер и введён, только входом в него
+ * служит не рестарт, а эндпоинт без поля.
  *
  * <p><b>Радиус у всех трёх биржевой.</b> У `A2` строки инструмента нет
  * вовсе — инструментной реакции нечем адресоваться; у `A3` под сомнением
@@ -36,21 +47,33 @@ public class ExchangeSideDetectors {
     /** Признак читается из одного среза: подтверждения следующим тиком не требует. */
     private static final Integer WITHOUT_HYSTERESIS = 1;
 
+    /** Признак производит наш собственный незавершённый ход: подтверждается следующим тиком. */
+    private static final Integer CONFIRMED_NEXT_TICK = 2;
+
     private final AnomalyReaction reaction;
 
     /**
-     * Проход по трём биржевым признакам. {@code managed} — биржевые имена
-     * инструментов, которые контур ведёт; всё, что вне этого множества,
-     * модели не принадлежит.
+     * Проход по трём биржевым признакам. {@code contour} — биржевые имена
+     * <b>всех</b> инструментов модели, независимо от их статуса: операнд
+     * `A2` — «строки инструмента нет вовсе», и сужение его статусом
+     * объявляло бы чужим наш собственный заблокированный инструмент.
+     *
+     * <p>Отказ на одном имени обход не обрывает: остальные живые сущности
+     * этого тика обязаны быть просмотрены, иначе частичная детекция
+     * выглядела бы чистым проходом.
      */
-    public void detect(AnomalyScan scan, Exchange exchange, Set<String> managed) {
+    public void detect(AnomalyScan scan, Exchange exchange, Set<String> contour) {
         for (String externalInstrumentId : scan.instrumentsWithLiveEntities()) {
-            if (isFalse(managed.contains(externalInstrumentId))) {
-                outsideContour(externalInstrumentId, exchange);
-                continue;
+            try {
+                if (isFalse(contour.contains(externalInstrumentId))) {
+                    outsideContour(externalInstrumentId, exchange);
+                    continue;
+                }
+                duplicatePosition(scan, externalInstrumentId, exchange);
+                foreignOrders(scan, externalInstrumentId, exchange);
+            } catch (RuntimeException e) {
+                log.error("Anomaly exchange-side detection failed instId={}", externalInstrumentId, e);
             }
-            duplicatePosition(scan, externalInstrumentId, exchange);
-            foreignOrders(scan, externalInstrumentId, exchange);
         }
     }
 
@@ -78,11 +101,12 @@ public class ExchangeSideDetectors {
      * {@code posSide=net}.
      */
     private void duplicatePosition(AnomalyScan scan, String externalInstrumentId, Exchange exchange) {
-        if (scan.positionsOf(externalInstrumentId).size() <= 1) {
+        int positions = scan.positionsOf(externalInstrumentId).size();
+        if (positions <= 1) {
             return;
         }
         log.warn("[anomaly] больше одной позиции на инструменте instId={} позиций={}",
-                externalInstrumentId, scan.positionsOf(externalInstrumentId).size());
+                externalInstrumentId, positions);
         reaction.apply(AnomalyFinding.builder()
                 .scope(HoldScope.EXCHANGE)
                 .rung(HoldRung.HARD)
@@ -100,6 +124,9 @@ public class ExchangeSideDetectors {
      * перечень живых ОТДЕЛЬНЫХ заявок она не входит, и собственного
      * клиентского идентификатора не несёт. Отсюда две стороны: своей
      * встроенной защиты детектор чужой не объявит, и чужую не заметит.
+     *
+     * <p><b>Гистерезис — два тика</b>, потому что наша собственная
+     * закрывающая заявка маркера не несёт (разбор в шапке класса).
      */
     private void foreignOrders(AnomalyScan scan, String externalInstrumentId, Exchange exchange) {
         boolean foreign = scan.ordersOf(externalInstrumentId).stream()
@@ -114,7 +141,7 @@ public class ExchangeSideDetectors {
                 .scope(HoldScope.EXCHANGE)
                 .rung(HoldRung.HARD)
                 .code(Constants.Hold.EXCHANGE_FOREIGN_ORDER)
-                .hysteresisTicks(WITHOUT_HYSTERESIS)
+                .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(false)
                 .build(), exchange);
     }
