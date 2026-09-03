@@ -1,5 +1,7 @@
 package com.example.tradingbot.persistence.service;
 
+import static java.util.stream.Collectors.toList;
+
 import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.mapping.ExchangeMapper;
 import com.example.tradingbot.persistence.repository.ExchangeRepository;
@@ -105,6 +107,30 @@ public class ExchangeDataService {
     public List<Long> findIdsBlockingEntry() {
         return repository.findIdsByStatusIn(List.of(Exchange.Status.HOLD.name(),
                 Exchange.Status.TRADE_BLOCKED.name()));
+    }
+
+    /**
+     * Биржи, которые контур ведёт, — вход прохода проактивной детекции.
+     * Ступень биржи выборку НЕ сужает: под холдом учёт уже существующего
+     * риска продолжается, гасятся только новые входы.
+     */
+    @Transactional(readOnly = true)
+    public List<Exchange> findAllActive() {
+        return repository.findAll().stream()
+                .map(mapper::persistenceToDomain)
+                .collect(toList());
+    }
+
+    /**
+     * Отметить проход детекции: полный сбрасывает счёт слепоты в ноль,
+     * неполный увеличивает его на единицу. Возвращает счёт ПОСЛЕ отметки
+     * — операнд предела слепоты (docs/components/AnomalyJob.md §«Гейт
+     * полноты среза»).
+     */
+    @Transactional
+    public Integer markPass(Long id, Boolean complete) {
+        repository.updateBlindPassCount(id, complete);
+        return repository.findBlindPassCountById(id).orElse(0);
     }
 
     /** Проекция: только internalId по id — без вытягивания всей сущности. */

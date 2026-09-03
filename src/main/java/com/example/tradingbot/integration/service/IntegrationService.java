@@ -117,6 +117,21 @@ public interface IntegrationService {
     List<OrderExternalSnapshot> getPendingOrders(String externalInstrumentId);
 
     /**
+     * Счёт-широкий срез live/pending ordinary orders — один запрос на
+     * весь счёт. Потребитель — проактивная детекция
+     * (docs/components/AnomalyJob.md): поштучный обход рос бы с числом
+     * инструментов и выбирал лимит частоты у торговой петли.
+     */
+    List<OrderExternalSnapshot> getAllPendingOrders();
+
+    /**
+     * Счёт-широкий срез live/pending algo — по всем семьям, которые
+     * контур умеет ставить. Складывается из вызова на семью: {@code
+     * ordType} у эндпоинта обязателен.
+     */
+    List<AlgoOrderExternalSnapshot> getAllPendingAlgoOrders();
+
+    /**
      * История ordinary orders по инструменту (звено order evidence-cycle).
      */
     List<OrderExternalSnapshot> getOrderHistory(String externalInstrumentId);

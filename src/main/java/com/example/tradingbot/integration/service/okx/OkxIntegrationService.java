@@ -86,6 +86,16 @@ public class OkxIntegrationService implements IntegrationService {
     /** Размер страницы обхода bill-записей (потолок источника — 100). */
     private static final Integer BILLS_PAGE_LIMIT = 100;
 
+    /**
+     * Семьи algo, которые контур умеет ставить: обычные условные (SL/TP),
+     * OCO и трейлинг. Счёт-широкий срез algo складывается из вызова на
+     * семью — {@code ordType} у эндпоинта обязателен.
+     */
+    private static final List<String> ALGO_PENDING_FAMILIES = List.of(
+            Constants.Okx.ALGO_ORD_TYPE_CONDITIONAL,
+            Constants.Okx.ALGO_ORD_TYPE_OCO,
+            Constants.Okx.ALGO_ORD_TYPE_MOVE_STOP);
+
     private final OkxRestClient okxRestClient;
     private final InstrumentMapper instrumentMapper;
     private final InstrumentExternalRulesMapper instrumentExternalRulesMapper;
@@ -424,6 +434,34 @@ public class OkxIntegrationService implements IntegrationService {
                 "orders-pending", "instId=" + externalInstrumentId);
         verifyCode(response, "orders-pending", "instId=" + externalInstrumentId);
         return toOrderSnapshots(response);
+    }
+
+    @Override
+    public List<OrderExternalSnapshot> getAllPendingOrders() {
+        OkxApiResponse<OrderOkxResponse> response = execute(() -> okxRestClient.getAllPendingOrders(),
+                "orders-pending", "instType=SWAP");
+        verifyCode(response, "orders-pending", "instType=SWAP");
+        return toOrderSnapshots(response);
+    }
+
+    /**
+     * Семьи перечислены явно: {@code ordType} у эндпоинта обязателен, и
+     * счёт-широкий срез складывается из вызова на семью. Перечень — те
+     * семьи, которые контур умеет ставить; семья, которую он не ставит,
+     * в срезе была бы чужой заявкой, и её ловит свой детектор по маркеру,
+     * а не по отсутствию в этом перечне.
+     */
+    @Override
+    public List<AlgoOrderExternalSnapshot> getAllPendingAlgoOrders() {
+        List<AlgoOrderExternalSnapshot> all = new ArrayList<>();
+        for (String ordType : ALGO_PENDING_FAMILIES) {
+            OkxApiResponse<AlgoOrderOkxResponse> response = execute(
+                    () -> okxRestClient.getAllPendingAlgoOrders(ordType),
+                    "orders-algo-pending", "instType=SWAP ordType=" + ordType);
+            verifyCode(response, "orders-algo-pending", "instType=SWAP ordType=" + ordType);
+            all.addAll(toAlgoOrderSnapshots(response));
+        }
+        return all;
     }
 
     @Override

@@ -20,6 +20,13 @@ import lombok.Setter;
 @Setter
 public class AlgoOrderOkxResponse {
 
+    /**
+     * Биржевое имя инструмента. Нужно СЧЁТ-ШИРОКОМУ срезу: в
+     * per-instrument запросах инструмент задан самим запросом, а в срезе
+     * по счёту он есть только в записи (docs/components/AnomalyJob.md).
+     */
+    private String instId;
+
     /** stable client id. */
     private String algoClOrdId;
 

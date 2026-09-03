@@ -61,6 +61,7 @@ public interface OrderMapper {
     @Mapping(target = "takeProfitTriggerPrice", source = "tpTriggerPx")
     @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx")
     @Mapping(target = "attachedAlgoOrders", source = "attachAlgoOrds")
+    @Mapping(target = "externalInstrumentId", source = "instId")
     OrderExternalSnapshot integrationToSnapshot(OrderOkxResponse response);
 
     /**

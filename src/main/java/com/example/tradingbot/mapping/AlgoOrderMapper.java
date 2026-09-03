@@ -59,6 +59,7 @@ public interface AlgoOrderMapper {
             return null;
         }
         return AlgoOrderExternalSnapshot.builder()
+                .externalInstrumentId(response.getInstId())
                 .internalId(response.getAlgoClOrdId())
                 .externalId(response.getAlgoId())
                 .externalStatus(response.getState())

@@ -18,6 +18,9 @@ import lombok.Value;
 @Builder
 public class AlgoOrderExternalSnapshot {
 
+    /** Биржевое имя инструмента (OKX instId) — адрес записи в счёт-широком срезе. */
+    String externalInstrumentId;
+
     /** stable client id (OKX algoClOrdId). */
     String internalId;
 

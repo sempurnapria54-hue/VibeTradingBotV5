@@ -188,6 +188,35 @@ public class OkxRestClient {
         return dispatch(HttpMethod.GET, Constants.Okx.TRADE_ORDERS_PENDING_PATH, query, null, true, ORDER_TYPE);
     }
 
+    /**
+     * Счёт-широкий срез live/pending ordinary orders: лимит частоты у
+     * эндпоинта по User ID, не по инструменту, поэтому один запрос
+     * дешевле поштучного обхода (docs/components/AnomalyJob.md
+     * §«Состояние носителя»). {@code limit} задан явно потолком страницы:
+     * усечение обязано быть наблюдаемым, а не выглядеть полным срезом.
+     */
+    public OkxApiResponse<OrderOkxResponse> getAllPendingOrders() {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(Constants.Okx.PARAM_INST_TYPE, Constants.Okx.INST_TYPE_SWAP);
+        query.put(Constants.Okx.PARAM_LIMIT, Constants.Okx.PENDING_PAGE_LIMIT);
+        return dispatch(HttpMethod.GET, Constants.Okx.TRADE_ORDERS_PENDING_PATH, query, null, true, ORDER_TYPE);
+    }
+
+    /**
+     * Счёт-широкий срез live/pending algo одной семьи. {@code ordType} у
+     * этого эндпоинта обязателен, поэтому счёт-широкий срез algo
+     * складывается из вызова на семью — в отличие от позиций и ordinary
+     * orders, где хватает одного.
+     */
+    public OkxApiResponse<AlgoOrderOkxResponse> getAllPendingAlgoOrders(String ordType) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(Constants.Okx.PARAM_INST_TYPE, Constants.Okx.INST_TYPE_SWAP);
+        query.put(Constants.Okx.PARAM_ORD_TYPE, ordType);
+        query.put(Constants.Okx.PARAM_LIMIT, Constants.Okx.PENDING_PAGE_LIMIT);
+        return dispatch(HttpMethod.GET, Constants.Okx.TRADE_ORDERS_ALGO_PENDING_PATH, query, null, true,
+                ALGO_ORDER_TYPE);
+    }
+
     /** История ordinary orders по инструменту (7 дней; звено evidence-cycle). */
     public OkxApiResponse<OrderOkxResponse> getOrderHistory(String instId) {
         Map<String, Object> query = new LinkedHashMap<>();

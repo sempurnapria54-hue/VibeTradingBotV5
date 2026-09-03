@@ -11,11 +11,15 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.config.AnomalyJobProperties;
 import com.example.tradingbot.domain.deal.DealOpeningService;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.integration.service.IntegrationService;
+import com.example.tradingbot.domain.safety.AnomalyPassGate;
+import com.example.tradingbot.domain.safety.AnomalyScanReader;
 import com.example.tradingbot.persistence.service.DealDataService;
+import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -56,6 +60,10 @@ class AnomalyJobRecoveryTest {
     @Mock
     private IntegrationService integrationService;
     @Mock
+    private ExchangeDataService exchangeDataService;
+    @Mock
+    private AnomalyPassGate passGate;
+    @Mock
     private DealOpeningService dealOpeningService;
 
     private AnomalyJob job;
@@ -63,9 +71,11 @@ class AnomalyJobRecoveryTest {
     @BeforeEach
     void setUp() {
         AnomalyJobProperties properties = new AnomalyJobProperties();
-        job = new AnomalyJob(properties, new JobExecutionGuard(), instrumentDataService, dealDataService,
-                integrationService, dealOpeningService);
+        job = new AnomalyJob(properties, new JobExecutionGuard(), instrumentDataService, exchangeDataService,
+                dealDataService, new AnomalyScanReader(integrationService), passGate, dealOpeningService);
         when(instrumentDataService.findByStatus(any())).thenReturn(List.of(instrument()));
+        when(exchangeDataService.findAllActive()).thenReturn(List.of(exchange()));
+        when(passGate.apply(any(), any())).thenReturn(Boolean.TRUE);
     }
 
     @Test
@@ -132,7 +142,8 @@ class AnomalyJobRecoveryTest {
         AnomalyJobProperties disabled = new AnomalyJobProperties();
         disabled.setEnabled(Boolean.FALSE);
         AnomalyJob offJob = new AnomalyJob(disabled, new JobExecutionGuard(), instrumentDataService,
-                dealDataService, integrationService, dealOpeningService);
+                exchangeDataService, dealDataService, new AnomalyScanReader(integrationService), passGate,
+                dealOpeningService);
 
         offJob.tick();
 
@@ -150,6 +161,12 @@ class AnomalyJobRecoveryTest {
         job.tick();
 
         verify(integrationService, times(1)).getPositions();
+    }
+
+    private Exchange exchange() {
+        Exchange exchange = new Exchange();
+        exchange.setId(1L);
+        return exchange;
     }
 
     private Instrument instrument() {

@@ -31,6 +31,13 @@ public class AnomalyReport extends Auditable {
     /** Инструмент аномалии; {@code null}, если однозначно не определён. */
     private Long instrumentId;
 
+    /**
+     * Сущность, о которой отчёт, — четвёртая величина ключа дедупа у
+     * отчёта БЕЗ блокировки: его состояние держится на сущности, а не на
+     * объекте радиуса (docs/models/domain/other/AnomalyReport.md).
+     */
+    private String subjectExternalId;
+
     /** Скоуп реакции: инструмент (L3) или биржа (L4). Снимает неоднозначность instrumentId=null. */
     private HoldScope scope;
 

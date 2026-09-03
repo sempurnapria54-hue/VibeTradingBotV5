@@ -58,7 +58,7 @@ class OkxReadDtoDeserializationTest {
     @Test
     void orderResponseBindsAllFields() {
         String json = """
-                {"clOrdId":"cli-1","ordId":"ord-1","ordType":"limit","side":"buy","state":"live",\
+                {"instId":"BTC-USDT-SWAP","clOrdId":"cli-1","ordId":"ord-1","ordType":"limit","side":"buy","state":"live",\
                 "px":"837","sz":"0.01","accFillSz":"0","avgPx":"0","fee":"0",\
                 "cTime":"1700000000000","uTime":"1700000000001","attachAlgoClOrdId":"a-1",\
                 "tpTriggerPx":"1800","slTriggerPx":"1500","attachAlgoOrds":[{}]}""";
@@ -68,7 +68,7 @@ class OkxReadDtoDeserializationTest {
     @Test
     void algoOrderResponseBindsAllFields() {
         String json = """
-                {"algoClOrdId":"algo-1","algoId":"aid-1","state":"live","failCode":"0",\
+                {"instId":"BTC-USDT-SWAP","algoClOrdId":"algo-1","algoId":"aid-1","state":"live","failCode":"0",\
                 "failReason":"","sz":"0.01",\
                 "actualSz":"0.01","actualPx":"0","triggerTime":"1700000000000","ordIdList":["o1"],\
                 "slTriggerPx":"1500","slTriggerPxType":"last","tpTriggerPx":"1800",\

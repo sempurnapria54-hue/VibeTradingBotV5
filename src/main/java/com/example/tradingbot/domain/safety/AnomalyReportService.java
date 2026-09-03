@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.safety;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -66,14 +67,32 @@ public class AnomalyReportService {
      * между «до» и «после» ничего не происходило.
      */
     public AnomalyReport journal(DealContext dealContext, HoldSignal signal) {
-        return create(dealContext, signal, AnomalyReport.Status.COMPLETED);
+        return journal(dealContext, signal, null);
+    }
+
+    /**
+     * Журнальный отчёт с названным ПРЕДМЕТОМ — сущностью, о которой он.
+     * Предмет входит в ключ дедупа у отчёта без блокировки: его состояние
+     * держится на сущности, а не на объекте радиуса
+     * (docs/models/domain/other/AnomalyReport.md §«Ключ дедупа у STATE»).
+     */
+    public AnomalyReport journal(DealContext dealContext, HoldSignal signal, String subjectExternalId) {
+        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId);
     }
 
     private AnomalyReport create(DealContext dealContext, HoldSignal signal, AnomalyReport.Status status) {
+        return create(dealContext, signal, status, null);
+    }
+
+    private AnomalyReport create(DealContext dealContext, HoldSignal signal, AnomalyReport.Status status,
+                                 String subjectExternalId) {
         AnomalyReport report = new AnomalyReport();
         report.setInternalId(ClientIdGenerator.generate());
         report.setExchangeId(dealContext.getExchange().getId());
-        report.setInstrumentId(dealContext.getInstrument().getId());
+        report.setInstrumentId(nonNull(dealContext.getInstrument())
+                ? dealContext.getInstrument().getId()
+                : null);
+        report.setSubjectExternalId(subjectExternalId);
         report.setScope(signal.getScope());
         report.setSeverity(severityOf(signal));
         report.setStatus(status);
@@ -116,23 +135,35 @@ public class AnomalyReportService {
     }
 
     /** Компактный слепок локального состояния (БД-граф сделки + статусы scope) в JSON. */
+    /**
+     * Слепок описывает то, что известно. Сделки и инструмента у
+     * счёт-широкого детектора нет по построению (его радиус — биржа), и
+     * разыменование их здесь роняло бы отчёт ровно на той тропе, ради
+     * наблюдаемости которой отчёт и заводится.
+     */
     private String internalSnapshot(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         Instrument instrument = dealContext.getInstrument();
         Exchange exchange = dealContext.getExchange();
-        Position position = deal.livePosition();
         Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("dealId", deal.getId());
-        snapshot.put("dealInternalId", deal.getInternalId());
-        snapshot.put("dealStatus", deal.getStatus());
-        snapshot.put("instrumentId", instrument.getId());
-        snapshot.put("instrumentExternalId", instrument.getExternalId());
-        snapshot.put("instrumentStatus", instrument.getStatus());
-        snapshot.put("exchangeId", exchange.getId());
-        snapshot.put("exchangeStatus", exchange.getStatus());
-        snapshot.put("positionLiveRisk", nonNull(position) && isTrue(position.hasLiveRisk()));
-        snapshot.put("orderIds", orderIds(deal.getOrders()));
-        snapshot.put("algoOrderIds", algoOrderIds(deal.getAlgoOrders()));
+        if (nonNull(deal)) {
+            Position position = deal.livePosition();
+            snapshot.put("dealId", deal.getId());
+            snapshot.put("dealInternalId", deal.getInternalId());
+            snapshot.put("dealStatus", deal.getStatus());
+            snapshot.put("positionLiveRisk", nonNull(position) && isTrue(position.hasLiveRisk()));
+            snapshot.put("orderIds", orderIds(deal.getOrders()));
+            snapshot.put("algoOrderIds", algoOrderIds(deal.getAlgoOrders()));
+        }
+        if (nonNull(instrument)) {
+            snapshot.put("instrumentId", instrument.getId());
+            snapshot.put("instrumentExternalId", instrument.getExternalId());
+            snapshot.put("instrumentStatus", instrument.getStatus());
+        }
+        if (nonNull(exchange)) {
+            snapshot.put("exchangeId", exchange.getId());
+            snapshot.put("exchangeStatus", exchange.getStatus());
+        }
         return writeJson(snapshot);
     }
 
@@ -156,7 +187,17 @@ public class AnomalyReportService {
      * orphan/algo-сущности и биржа-широкая реконсиляция (L4) — проактивный контур
      * шага 8.
      */
+    /**
+     * Внешний слепок адресуется инструментом; у счёт-широкого детектора
+     * его нет, и добывать нечего — слепок остаётся пустым, а не роняет
+     * отчёт. Собственного среза счёта отчёт не читает: срез уже добыт
+     * проходом детекции, и второе чтение выбирало бы лимит частоты у
+     * торговой петли.
+     */
     private String externalSnapshot(DealContext dealContext) {
+        if (isNull(dealContext.getInstrument())) {
+            return null;
+        }
         String externalInstrumentId = dealContext.getInstrument().getExternalId();
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("instrumentExternalId", externalInstrumentId);

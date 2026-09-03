@@ -2,22 +2,25 @@ package com.example.tradingbot.domain.jobs;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.config.AnomalyJobProperties;
 import com.example.tradingbot.domain.deal.DealOpeningService;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
+import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
-import com.example.tradingbot.integration.service.IntegrationService;
+import com.example.tradingbot.domain.safety.AnomalyPassGate;
+import com.example.tradingbot.domain.safety.AnomalyScan;
+import com.example.tradingbot.domain.safety.AnomalyScanReader;
 import com.example.tradingbot.persistence.service.DealDataService;
+import com.example.tradingbot.persistence.service.ExchangeDataService;
 import com.example.tradingbot.persistence.service.InstrumentDataService;
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -69,8 +72,10 @@ public class AnomalyJob {
     private final AnomalyJobProperties properties;
     private final JobExecutionGuard executionGuard;
     private final InstrumentDataService instrumentDataService;
+    private final ExchangeDataService exchangeDataService;
     private final DealDataService dealDataService;
-    private final IntegrationService integrationService;
+    private final AnomalyScanReader scanReader;
+    private final AnomalyPassGate passGate;
     private final DealOpeningService dealOpeningService;
 
     @Scheduled(cron = "${anomaly-job.cron}")
@@ -82,27 +87,37 @@ public class AnomalyJob {
     }
 
     /**
-     * Область обхода — активные инструменты. Статусные ворота входной
-     * тропы здесь НЕ стоят: риск уже живой, и пропуск заблокированного
-     * инструмента оставил бы его вне модели — ровно тем зависшим живым
-     * риском, которого не бывает. Блокировка гасит новые входы, а не
-     * учёт уже существующего.
+     * Проход: срез счёта → гейт полноты → обход управляемых инструментов.
      *
-     * <p>Срез читается по СЧЁТУ, а обход идёт по управляемым
-     * инструментам: строка среза, которой не соответствует ни один
-     * инструмент модели, здесь выпадает молча. Это популяция детектора
-     * A2 — живой риск по инструменту вне контура, биржевая ступень 2
-     * (docs/components/AnomalyJob.md §«Что ищет»).
+     * <p>Статусные ворота входной тропы здесь НЕ стоят: риск уже живой, и
+     * пропуск заблокированного инструмента оставил бы его вне модели —
+     * ровно тем зависшим живым риском, которого не бывает. Блокировка
+     * гасит новые входы, а не учёт уже существующего.
+     *
+     * <p><b>На неполном проходе прочие детекторы МОЛЧАТ.</b> Признак
+     * всякого из них — расхождение БД с биржей, и на неполном срезе
+     * расхождение производит сама неполнота; ложный триггер снял бы риск,
+     * которого нет (docs/components/AnomalyJob.md §«Гейт полноты среза»).
      */
     private void run() {
-        // Живые позиции читаются ОДНИМ запросом на тик: поштучное чтение
-        // росло с числом инструментов и упиралось в лимит частоты
-        // источника — общий с торговой петлёй
-        // (docs/integrations/okx/contracts/position.md).
-        Map<String, PositionExternalSnapshot> livePositions = livePositionsByInstrument();
+        AnomalyScan scan = scanReader.read();
+        for (Exchange exchange : exchangeDataService.findAllActive()) {
+            try {
+                passGate.apply(scan, exchange);
+                if (isTrue(scan.getComplete())) {
+                    detect(scan, exchange);
+                }
+            } catch (RuntimeException e) {
+                log.error("Anomaly pass failed exchangeId={}", exchange.getId(), e);
+            }
+        }
+    }
+
+    /** Детекторы прохода. Каждый молчит на неполном срезе — гейт выше. */
+    private void detect(AnomalyScan scan, Exchange exchange) {
         for (Instrument instrument : instrumentDataService.findByStatus(Instrument.Status.ACTIVE)) {
             try {
-                detectUnexplainedPosition(instrument, livePositions.get(instrument.getExternalId()));
+                detectUnexplainedPosition(instrument, first(scan.positionsOf(instrument.getExternalId())));
             } catch (RuntimeException e) {
                 log.error("Anomaly detection failed instrumentId={}", instrument.getId(), e);
             }
@@ -110,20 +125,12 @@ public class AnomalyJob {
     }
 
     /**
-     * Срез живых позиций счёта по внешнему идентификатору инструмента.
-     * Больше одной живой позиции на инструмент модель не допускает
-     * (docs/components/AnomalyJob.md §«Что ищет»); если источник вернул
-     * несколько, берётся первая, а расхождение остаётся предметом своего
-     * детектора — здесь оно не гасится молча.
+     * Первая запись среза по инструменту. Больше одной живой позиции
+     * модель не допускает; расхождение — предмет своего детектора, и
+     * здесь оно не гасится молча.
      */
-    private Map<String, PositionExternalSnapshot> livePositionsByInstrument() {
-        Map<String, PositionExternalSnapshot> byInstrument = new HashMap<>();
-        for (PositionExternalSnapshot snapshot : emptyIfNull(integrationService.getPositions())) {
-            if (nonNull(snapshot.getExternalInstrumentId())) {
-                byInstrument.putIfAbsent(snapshot.getExternalInstrumentId(), snapshot);
-            }
-        }
-        return byInstrument;
+    private PositionExternalSnapshot first(List<PositionExternalSnapshot> rows) {
+        return isEmpty(rows) ? null : rows.getFirst();
     }
 
     /**

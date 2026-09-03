@@ -55,6 +55,14 @@ public class Exchange extends Auditable {
      */
     private Integer consecutiveLossCount;
 
+    /**
+     * Подряд идущие НЕПОЛНЫЕ проходы проактивной детекции — операнд
+     * предела слепоты. Носитель durable по той же причине, что у
+     * гистерезиса: память инстанса обнуляется ровно в аварии
+     * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
+     */
+    private Integer blindPassCount;
+
     /** Биржа заморожена реактивным safety-холдом (уровень 4, docs/rules/exchange-hold.md). */
     public Boolean isTradeBlocked() {
         return Objects.equals(status, Status.TRADE_BLOCKED);

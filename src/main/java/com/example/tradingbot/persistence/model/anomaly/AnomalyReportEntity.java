@@ -37,6 +37,14 @@ public class AnomalyReportEntity extends AuditableEntity {
     @Column(name = "instrument_id")
     private Long instrumentId;
 
+    /**
+     * Сущность-предмет журнального отчёта (внешний идентификатор). У
+     * отчёта с блокировкой пуст: его состояние — стоящая ступень объекта
+     * радиуса.
+     */
+    @Column(name = "subject_external_id")
+    private String subjectExternalId;
+
     @Column(name = "scope", nullable = false)
     private String scope;
 

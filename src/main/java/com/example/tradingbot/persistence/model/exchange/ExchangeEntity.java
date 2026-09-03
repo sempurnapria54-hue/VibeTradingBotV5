@@ -48,4 +48,8 @@ public class ExchangeEntity extends AuditableEntity {
 
     @Column(name = "consecutive_loss_count", nullable = false)
     private Integer consecutiveLossCount;
+
+    /** Подряд идущие НЕПОЛНЫЕ проходы проактивной детекции. */
+    @Column(name = "blind_pass_count", nullable = false)
+    private Integer blindPassCount;
 }

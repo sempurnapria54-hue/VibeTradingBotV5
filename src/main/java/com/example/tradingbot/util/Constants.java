@@ -209,6 +209,15 @@ public final class Constants {
         public static final String TRADE_CANCEL_ADVANCE_ALGOS_PATH = "/api/v5/trade/cancel-advance-algos";
 
         /** Тип algo-order OKX: conditional (SL/TP/partial). */
+        /**
+         * Потолок страницы pending-срезов. Задаётся явно, чтобы усечение
+         * было НАБЛЮДАЕМЫМ: полная страница означает «возможно, есть
+         * ещё», и проход детекции объявляет себя неполным вместо того,
+         * чтобы принять усечённый срез за полный
+         * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
+         */
+        public static final Integer PENDING_PAGE_LIMIT = 100;
+
         public static final String ALGO_ORD_TYPE_CONDITIONAL = "conditional";
 
         /** Тип algo-order OKX: OCO. */

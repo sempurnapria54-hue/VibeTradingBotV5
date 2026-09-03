@@ -1,6 +1,7 @@
 package com.example.tradingbot.persistence.service;
 
 import com.example.tradingbot.domain.safety.AnomalyReport;
+import java.time.OffsetDateTime;
 import com.example.tradingbot.mapping.AnomalyReportMapper;
 import com.example.tradingbot.persistence.repository.AnomalyReportRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,5 +31,17 @@ public class AnomalyReportDataService {
     @Transactional(readOnly = true)
     public Boolean existsByKey(Long exchangeId, String code, AnomalyReport.Severity severity) {
         return repository.existsByExchangeIdAndCodeAndSeverity(exchangeId, code, severity.name());
+    }
+
+    /**
+     * Стои́т ли по ключу отчёт, заведённый не раньше порога, — операнд
+     * подтверждения гистерезиса (docs/components/AnomalyJob.md §«Такт и
+     * гистерезис»). Отдельного счётчика подряд идущих тиков в модели нет.
+     */
+    @Transactional(readOnly = true)
+    public Boolean existsStanding(Long exchangeId, Long instrumentId, String subjectExternalId,
+                                  String code, AnomalyReport.Severity severity, OffsetDateTime since) {
+        return repository.existsStanding(exchangeId, instrumentId, subjectExternalId, code,
+                severity.name(), since);
     }
 }
