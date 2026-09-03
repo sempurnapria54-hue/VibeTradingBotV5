@@ -17,8 +17,12 @@ import com.example.tradingbot.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingbot.domain.deal.DealContextService;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.integration.service.IntegrationService;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -83,6 +87,7 @@ public class KillSwitchExecutor {
         closePositionIfLive(deal, instId);
         cancelLiveOrders(deal, instId);
         cancelLiveAlgoOrders(deal, instId);
+        cancelLiveAttachedProtections(deal, instId);
         closeBestEffort(instId);
     }
 
@@ -126,6 +131,28 @@ public class KillSwitchExecutor {
     }
 
     /**
+     * Снятие ВСТРОЕННЫХ защит — тем же риск-минимизирующим порядком, что
+     * и отдельные условные заявки. Обход нужен потому, что при непустом
+     * наливе родителя встроенная защита материализуется самостоятельной
+     * заявкой и переживает терминал родителя
+     * (docs/models/domain/core/Order.md §«Встроенная защита»): перечень
+     * живых algo-заявок её не содержит, и без этого шага она оставалась
+     * бы на бирже после подтверждённого flat.
+     */
+    private void cancelLiveAttachedProtections(Deal deal, String instId) {
+        deal.liveAttachedProtections().forEach(protection -> cancelAttachedBestEffort(protection, instId));
+    }
+
+    private void cancelAttachedBestEffort(AttachedAlgoOrder protection, String instId) {
+        try {
+            integrationService.cancelAttachedProtection(protection, instId);
+        } catch (RuntimeException e) {
+            log.warn("Kill-switch cancel-attached best-effort failure attachedId={}: {}",
+                    protection.getId(), e.getMessage());
+        }
+    }
+
+    /**
      * Сверка: обновляем FSM-известные сущности сделки REFRESH-командами
      * (evidence-cycle + резолвер статуса внутри executor'ов), перечитываем граф
      * из БД, проверяем flat по доменным моделям. Транзиентная ошибка чтения — не
@@ -148,12 +175,26 @@ public class KillSwitchExecutor {
                 serviceCommandExecutor.execute(refreshOrderCommand(deal, order.getId()), dealContext));
         deal.liveAlgoOrders().forEach(algoOrder ->
                 serviceCommandExecutor.execute(refreshAlgoOrderCommand(deal, algoOrder.getId()), dealContext));
+        // Судьбу встроенной защиты резолвит добыча РОДИТЕЛЬСКОЙ заявки, а
+        // родитель к этому моменту чаще всего терминален и в liveOrders не
+        // попадает: перечень собирается по несущим живую защиту.
+        parentsOfLiveProtections(deal).forEach(orderId ->
+                serviceCommandExecutor.execute(refreshOrderCommand(deal, orderId), dealContext));
+    }
+
+    /** Идентификаторы заявок, несущих живую встроенную защиту, без дублей. */
+    private Set<Long> parentsOfLiveProtections(Deal deal) {
+        return deal.liveAttachedProtections().stream()
+                .map(AttachedAlgoOrder::getOrderId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     private boolean isFlat(Deal deal) {
         return isFalse(deal.hasLivePositionRisk())
                 && isEmpty(deal.liveOrders())
-                && isEmpty(deal.liveAlgoOrders());
+                && isEmpty(deal.liveAlgoOrders())
+                && isEmpty(deal.liveAttachedProtections());
     }
 
     private ServiceCommand refreshPositionCommand(Deal deal) {

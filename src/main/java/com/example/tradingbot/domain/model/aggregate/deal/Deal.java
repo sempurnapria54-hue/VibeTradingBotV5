@@ -8,6 +8,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
@@ -258,6 +259,24 @@ public class Deal extends Auditable {
     public List<AlgoOrder> liveAlgoOrders() {
         return emptyIfNull(algoOrders).stream()
                 .filter(algoOrder -> isTrue(algoOrder.isLive()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Живые ВСТРОЕННЫЕ защиты сделки — остаточный live-risk для teardown
+     * наравне с отдельными условными заявками.
+     *
+     * <p>Перечень идёт по <b>всем</b> заявкам, а не по живым: встроенная
+     * защита материализуется самостоятельной заявкой на бирже при
+     * непустом наливе родителя (`docs/models/domain/core/Order.md`
+     * §«Встроенная защита»), то есть переживает терминал родителя. Обход
+     * по живым родителям пропустил бы ровно тот случай, ради которого
+     * перечень заведён.
+     */
+    public List<AttachedAlgoOrder> liveAttachedProtections() {
+        return emptyIfNull(orders).stream()
+                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                .filter(protection -> isTrue(protection.isActiveLike()))
                 .collect(Collectors.toList());
     }
 
