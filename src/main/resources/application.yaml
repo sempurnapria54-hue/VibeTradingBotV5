@@ -50,6 +50,20 @@ okx:
   secret: ${OKX_SECRET_KEY}
   passphrase: ${OKX_PASSPHRASE}
 
+# Доступ к поверхности нашего API (docs/rules/api-access-policy.md): умолчание
+# закрыто, открыта только проба живости. Принципал один — посылка фазы 1, её
+# параметр снятия — появление второго субъекта поверхности.
+#
+# Имя и секрет читаются из Vault per-profile, как datasource и OKX-креды:
+# prod → secret/tradingbot/api-access, test → secret/tradingbot/api-access-test
+# (импорт пути — в application-{prod,test}.yaml). Умолчаний НЕТ: пустой секрет
+# поднял бы контур с поверхностью, закрытой ничем, — ошибка в разрешающую
+# сторону, а такие запрещены.
+api-access:
+  # Ключи секрета Vault: API_ACCESS_PRINCIPAL / API_ACCESS_SECRET.
+  principal: ${API_ACCESS_PRINCIPAL}
+  secret: ${API_ACCESS_SECRET}
+
 # Аварийный kill-switch (KillSwitchExecutor). max-teardown-attempts — лимит
 # попыток teardown «снять риск → сверить flat рефрешем» до эскалации на биржевой
 # холд (HOLD-Q1); значение — риск-владельца.

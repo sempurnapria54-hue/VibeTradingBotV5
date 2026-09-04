@@ -25,7 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
  * запуск загрузки свечей). Наружу адресуется по internalId; в ответе —
  * internalId инструмента и exchangeInternalId биржи (резолвится из
  * доменного exchangeId). Автономного драйвера онбординга нет —
- * последовательность триггерится явно (ORCH-Q1). Авторизация — шаг 9.
+ * последовательность триггерится явно (ORCH-Q1). Поверхность закрыта контуром доступа
+ * (docs/rules/api-access-policy.md): умолчание закрыто, принципал один.
  */
 @Validated
 @RestController

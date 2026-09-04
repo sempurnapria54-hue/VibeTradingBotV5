@@ -20,7 +20,7 @@
   `.claude/rules/codestyle.md`, нейминг по слоям).
 - `<model>` — та же модель в camelCase (имя бина/переменной).
 - `<models>` / `<Models>` — множественное число для пути и тега.
-- `<authority>`, `<summary>`, `<описание>` — по месту.
+- `<summary>`, `<описание>` — по месту.
 
 ## Шаблон
 
@@ -36,7 +36,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,7 +53,6 @@ public class <Model>Controller {
     private final <Model>Mapper mapper;
 
     @GetMapping("/{<model>Id}")
-    @PreAuthorize("hasAuthority('<authority>')") // политика — docs/rules/api-access-policy.md
     @Operation(summary = "<summary>")
     // @ApiResponses(...) — коды по error-конвенции (TBD)
     public <Model>ApiResponse getById(
@@ -72,12 +70,14 @@ public class <Model>Controller {
   persistence-слоем).
 - **Без хардкода кодов** (HTTP-статусы / коды ошибок в шаблон не
   вшиты).
-- `@PreAuthorize` — **placeholder**: дом политики доступа —
-  `docs/rules/api-access-policy.md`, и он же называет форму закрытия
-  каждой точки. Указатель ведёт в **носитель**, а не в шаг роадмапа:
-  момент прошёл, политика заведена, и адресация моментом устарела бы
-  первой. Плейсхолдер снимается кодовым заходом шага 9, который закрывает
-  поверхность принципалом.
+- **`@PreAuthorize` на методе НЕ ставится**, и это не пропуск. Поверхность
+  закрыта **целиком одним правилом** — контуром доступа
+  (`docs/rules/api-access-policy.md`, исполнение —
+  `config/ApiAccessSecurityConfig`): умолчание закрыто, открыта только
+  проба живости. Пер-операционная аннотация выражала бы **модель прав**,
+  которой при одном принципале различать некого: «что ему можно»
+  тождественно «всё». Она появится вместе со вторым субъектом поверхности,
+  и тогда — не плейсхолдером, а по модели прав.
 - `@ApiResponses` — **закомментирован**: error-конвенция (коды,
   `@ControllerAdvice` vs per-endpoint, документирование ошибок) пока
   TBD в `.claude/rules/codestyle.md`. Раскомментируется, когда

@@ -7,6 +7,7 @@ spring:
     import:
       - vault://secret/tradingbot/postgres
       - vault://secret/tradingbot/okx
+      - vault://secret/tradingbot/api-access
   datasource:
     url: ${DATASOURCE_URL}
     username: ${DATASOURCE_USERNAME}

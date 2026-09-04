@@ -30,7 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
  * GET — получить; PUT — activate/inactivate/delete (смена статуса,
  * 422 — семантика готовности к запуску). Наружу адресуется по
  * internalId; в ответе — internalId стратегии и instrumentInternalId
- * инструмента. Авторизация — шаг 9.
+ * инструмента. Поверхность закрыта контуром доступа
+ * (docs/rules/api-access-policy.md): умолчание закрыто, принципал один.
  */
 @Validated
 @RestController

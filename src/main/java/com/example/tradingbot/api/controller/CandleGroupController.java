@@ -20,7 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * API групп свечей инструмента (чтение статуса загрузки/покрытия).
  * Инструмент адресуется по internalId; в ответе — internalId группы и
- * instrumentInternalId. Авторизация — шаг 9 «Безопасность».
+ * instrumentInternalId. Поверхность закрыта контуром доступа
+ * (docs/rules/api-access-policy.md): умолчание закрыто, принципал один.
  */
 @Validated
 @RestController

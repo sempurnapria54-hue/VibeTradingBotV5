@@ -7,8 +7,7 @@ import com.example.tradingbot.integration.service.ControlledExchangeException;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +26,10 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final ErrorApiResponseFactory responseFactory;
 
     /** Не найдено (getRequiredBy* кидает IllegalArgumentException). */
     @ExceptionHandler(IllegalArgumentException.class)
@@ -89,14 +91,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", request);
     }
 
+    /**
+     * Сборка делегируется общему {@link ErrorApiResponseFactory}: тот же
+     * сборщик зовут точки входа отказа доступа, которые до этого обработчика
+     * не доходят (docs/rules/error-handling-policy.md).
+     */
     private ResponseEntity<ErrorApiResponse> build(HttpStatus status, String message, HttpServletRequest request) {
-        ErrorApiResponse body = ErrorApiResponse.builder()
-                .timestamp(OffsetDateTime.now(ZoneOffset.UTC))
-                .status(status.value())
-                .error(status.getReasonPhrase())
-                .message(message)
-                .path(request.getRequestURI())
-                .build();
-        return ResponseEntity.status(status).body(body);
+        return ResponseEntity.status(status)
+                .body(responseFactory.build(status, message, request.getRequestURI()));
     }
 }

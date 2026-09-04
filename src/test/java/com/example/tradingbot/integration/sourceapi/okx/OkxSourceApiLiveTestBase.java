@@ -16,11 +16,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import com.example.tradingbot.config.ApiAccessProperties;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -159,6 +162,16 @@ abstract class OkxSourceApiLiveTestBase {
     @Autowired
     private Environment environment;
 
+    /**
+     * Принципал контура. Поверхность закрыта принципалом
+     * (docs/rules/api-access-policy.md), и коллекция кейсов обращается к
+     * {@code /raw} напрямую — значит предъявлять себя обязана и она. Креды те
+     * же, что у поднятого app: читаются из его конфигурации, вторым носителем
+     * в тесте не заводятся.
+     */
+    @Autowired
+    private ApiAccessProperties apiAccess;
+
     @BeforeEach
     void resetPerCase(TestInfo testInfo) {
         throttle = DEFAULT_THROTTLE;
@@ -244,11 +257,18 @@ abstract class OkxSourceApiLiveTestBase {
         }
     }
 
+    /** Заголовок предъявления принципала контура — Basic по кредам из конфигурации app. */
+    private String basicAuthorization() {
+        String pair = apiAccess.getPrincipal() + ":" + apiAccess.getSecret();
+        return "Basic " + Base64.getEncoder().encodeToString(pair.getBytes(StandardCharsets.UTF_8));
+    }
+
     private RawResponse send(RawRequest req, String payload) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + RAW_ENDPOINT))
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/json")
+                .header("Authorization", basicAuthorization())
                 .POST(HttpRequest.BodyPublishers.ofString(payload))
                 .build();
         try {
