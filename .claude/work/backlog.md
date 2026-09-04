@@ -960,10 +960,10 @@ root/dev-token, ротация секретов, unseal/инициализаци
 
 ### S2. Auth-инфраструктура
 
-Spring Security, `@PreAuthorize`, `SecurityFilterChain`. На этом
-шаге **реактивируется** фокус `security-review`
-(`.claude/skills/security-review.md`), деактивированный на текущих
-шагах.
+Spring Security, `@PreAuthorize`, `SecurityFilterChain`. Фокус
+`security-review` **реактивирован** открытием шага 9 (2026-09-04) —
+`.claude/skills/security-review.md`; он входит в аппрув `CODE` наравне с
+тремя прочими.
 
 ## Форвард-материал шагов 7 / 8 и фазы 3 (скан интегратора + ревью)
 
