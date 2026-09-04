@@ -23,6 +23,8 @@ import com.example.tradingbot.domain.deal.DealTransition;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.safety.HoldService;
 import com.example.tradingbot.domain.safety.HoldSignal;
+import com.example.tradingbot.integration.service.CredentialsRejectedException;
+import com.example.tradingbot.util.Constants;
 import com.example.tradingbot.persistence.service.DealDataService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -78,8 +80,13 @@ public class DealOrchestratorJob {
     }
 
     private void processDeal(Deal deal) {
+        // Контекст объявлен ВНЕ try: биржа резолвится через него, и она нужна
+        // обработчику отказа кредов. Сборка контекста к бирже не ходит (граф
+        // сделки читается локально), поэтому к моменту любого биржевого вызова
+        // контекст уже построен — обработчик застаёт его непустым.
+        DealContext dealContext = null;
         try {
-            DealContext dealContext = dealContextService.build(deal);
+            dealContext = dealContextService.build(deal);
             if (enforceHold(dealContext)) {
                 return;
             }
@@ -97,6 +104,25 @@ public class DealOrchestratorJob {
             // (docs/rules/controlled-exchange-exceptions.md).
             log.warn("Controlled exchange violation dealId={}", deal.getId(), e);
             moveToErrorSafely(deal);
+        } catch (CredentialsRejectedException e) {
+            // Выделенный обработчик: источник отверг наши креды. Ступень
+            // выводится ТОЙ ЖЕ осью, что и остальные триггеры, — судьба
+            // принятого риска: сопровождать его нечем, значит он подлежит
+            // снятию (docs/rules/exchange-hold.md §«Ступень 2 —
+            // сворачивание», п.5). Реакция исполняется best-effort: снятие
+            // риска идёт теми же отвергнутыми кредами, и подтверждения не
+            // получит — ограничение названо в доме, а не обходится здесь.
+            log.error("Source rejected our credentials dealId={} — raising exchange rung 2", deal.getId(), e);
+            moveToErrorSafely(deal);
+            if (isNull(dealContext)) {
+                // Недостижимо по построению (сборка контекста к бирже не
+                // ходит), но молчать нельзя: без объекта радиуса ступень
+                // адресовать нечем, и отказ обязан быть громким.
+                log.error("Credentials rejected before deal context was built dealId={} — rung not addressed",
+                        deal.getId());
+                return;
+            }
+            raiseHoldSignal(HoldSignal.exchange(Constants.Hold.EXCHANGE_CREDENTIALS_REJECTED), dealContext);
         } catch (RetryBudgetExhaustedException e) {
             // Выделенный обработчик, класс броска 2: бюджет попыток
             // исчерпан. Ошибочной тропой уводится только СИСТЕМНАЯ

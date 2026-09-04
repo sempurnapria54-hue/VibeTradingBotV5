@@ -19,6 +19,7 @@ import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.integration.service.ControlledExchangeException;
+import com.example.tradingbot.integration.service.CredentialsRejectedException;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import java.util.List;
@@ -76,6 +77,16 @@ public class ServiceCommandExecutor {
             // Учёт уже применён (строка переведена в отказ) — бросок идёт
             // выделенному обработчику оркестратора нетронутым.
             throw e;
+        } catch (CredentialsRejectedException e) {
+            // Класс ИЗЪЯТ из ретраибельного: повтор помогает там, где отказ
+            // транзиторен, а отвергнутый ключ от повторения принятым не
+            // станет — бюджет истратится и кончится тем же исходом, только
+            // позже и при живых позициях (docs/rules/runtime-error-classification.md).
+            // Ступень запрашивает граница исполнения прохода, поэтому бросок
+            // идёт наружу нетронутым, а строка закрывается отказом здесь.
+            log.error("Credentials rejected by source [{}] dealId={}", command.getType(), command.getDealId(), e);
+            failWithoutRetry(actionState, e.getMessage());
+            throw e;
         } catch (RuntimeException e) {
             log.error("Command execution failed [{}] dealId={}", command.getType(), command.getDealId(), e);
             RuntimeErrorCode errorCode = classify(e);
@@ -122,6 +133,23 @@ public class ServiceCommandExecutor {
                     "Retry budget exhausted for command " + command.getType() + ": " + message,
                     actionState, isFalse(actionState.isSystem()));
         }
+    }
+
+    /**
+     * Закрыть строку исполнения отказом <b>без</b> повтора. Отдельный ход, а
+     * не ветка общего учёта: тот выводит повторяемость из кода ошибки, а здесь
+     * она снята <b>природой отказа</b>, а не исчерпанным бюджетом — и потому
+     * эскалации «бюджет кончился» тоже не порождает.
+     */
+    private void failWithoutRetry(DealActionState actionState, String message) {
+        if (isNull(actionState)) {
+            return;
+        }
+        Integer attemptCount = isNull(actionState.getAttemptCount()) ? 0 : actionState.getAttemptCount();
+        actionState.setAttemptCount(attemptCount + 1);
+        actionState.setLastError(new RetryError(null, message, RuntimeErrorCode.EXCHANGE_ERROR));
+        actionState.setStatus(DealActionStateStatus.FAILED);
+        dealActionStateDataService.save(actionState);
     }
 
     private RuntimeErrorCode classify(RuntimeException e) {

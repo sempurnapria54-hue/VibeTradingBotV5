@@ -43,6 +43,16 @@ public final class Constants {
         public static final String EXCHANGE_KILL_SWITCH_RESIDUAL = "EXCHANGE_KILL_SWITCH_RESIDUAL";
 
         /**
+         * Ступень 2: источник отверг наши креды. Ось та же, что у остальных
+         * триггеров — судьба принятого риска: сопровождать его нечем, значит
+         * он подлежит снятию. Реакция при этом исполняется best-effort, и
+         * ограничение названо в доме (docs/rules/exchange-hold.md §«Ступень 2
+         * — сворачивание», п.5); перечень кодов источника —
+         * docs/integrations/okx/rules/auth-rejection-codes.md.
+         */
+        public static final String EXCHANGE_CREDENTIALS_REJECTED = "EXCHANGE_CREDENTIALS_REJECTED";
+
+        /**
          * Ступень 2: живой риск без покрытия и без действующего
          * обязательства — сломался наш собственный учёт покрытия, радиус
          * доверия к нему неизвестен

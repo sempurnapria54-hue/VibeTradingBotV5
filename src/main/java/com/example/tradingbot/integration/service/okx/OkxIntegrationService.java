@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.domain.command.ExchangeAck;
@@ -45,8 +46,10 @@ import com.example.tradingbot.integration.model.okx.response.TradeFeeOkxResponse
 import com.example.tradingbot.integration.model.okx.response.OrderAckOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.OrderOkxResponse;
 import com.example.tradingbot.integration.model.okx.response.SetLeverageOkxResponse;
+import com.example.tradingbot.integration.service.CredentialsRejectedException;
 import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.integration.service.IntegrationService;
+import com.example.tradingbot.integration.service.okx.resolve.OkxCredentialsRejectionResolver;
 import com.example.tradingbot.mapping.AlgoOrderMapper;
 import com.example.tradingbot.mapping.BalanceContainerMapper;
 import com.example.tradingbot.mapping.CandleMapper;
@@ -97,6 +100,7 @@ public class OkxIntegrationService implements IntegrationService {
             Constants.Okx.ALGO_ORD_TYPE_MOVE_STOP);
 
     private final OkxRestClient okxRestClient;
+    private final OkxCredentialsRejectionResolver credentialsRejectionResolver;
     private final InstrumentMapper instrumentMapper;
     private final InstrumentExternalRulesMapper instrumentExternalRulesMapper;
     private final MarketPriceDataMapper marketPriceDataMapper;
@@ -669,6 +673,14 @@ public class OkxIntegrationService implements IntegrationService {
         boolean success = Objects.equals(Constants.Okx.SUCCESS_CODE, response.getCode());
         if (isFalse(success)) {
             log.error("OKX error [{}] {} code={} msg={}", endpoint, context, response.getCode(), response.getMsg());
+            // Отказ в кредах опознаётся ЗДЕСЬ: граница — единственный слой,
+            // который видит ответ источника, и момент — любой приватный вызов
+            // (docs/components/IntegrationService.md). Дальше он едет своим
+            // исключением: повтором не лечится и поднимает биржевую ступень 2.
+            if (isTrue(credentialsRejectionResolver.isCredentialsRejected(response.getCode()))) {
+                throw new CredentialsRejectedException("OKX rejected our credentials [" + endpoint
+                        + "] code=" + response.getCode() + " msg=" + response.getMsg());
+            }
             throw new ExchangeIntegrationException("OKX error [" + endpoint + "] code=" + response.getCode()
                     + " msg=" + response.getMsg());
         }
