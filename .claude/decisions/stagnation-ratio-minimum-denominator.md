@@ -97,6 +97,6 @@
 - Встречный якорь исполнения — `.claude/skills/update-roadmap-progress.md`
   §«Гейт входа в `GAPS_CLOSE_N`».
 - Кейс, на котором поправка записана —
-  `.claude/work/progress/phase-1-step-9-docs-check-5.md`.
+  `.claude/work/history/2026-09-04-phase-1-step-9-security/phase-1-step-9-docs-check-5.md`.
 - Прошлая эскалация того же шага —
   `.claude/decisions/security-perimeter-design-pass.md`.

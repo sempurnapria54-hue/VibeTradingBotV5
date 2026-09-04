@@ -10,7 +10,7 @@
 Детектор стагнации на `DOCS_CHECK_3` поднял сигнал **С2** («бумеранг
 закрытия»): доля гейтящих находок, производных от предыдущего закрытия, —
 `DOCS_CHECK_2` **5/5**, `DOCS_CHECK_3` **6/7**, два прогона подряд, оба
-≥ ½. Реестр прогонов — `.claude/work/progress/phase-1-step-9-chronicle.md`.
+≥ ½. Реестр прогонов — `.claude/work/history/2026-09-04-phase-1-step-9-security/phase-1-step-9-chronicle.md`.
 
 ## Диагноз
 
@@ -44,7 +44,7 @@
 
 **Отменяется способ, а не результат.** Содержание `GAPS_CLOSE_1` и
 `GAPS_CLOSE_2` переиспользовано; отменены только те его места, которые
-проход назвал поимённо (`.claude/work/progress/phase-1-step-9-design-pass.md`).
+проход назвал поимённо (`.claude/work/history/2026-09-04-phase-1-step-9-security/phase-1-step-9-design-pass.md`).
 
 ## Что проход вскрыл сверх находок
 
@@ -91,9 +91,9 @@
 
 ## Связи
 
-- Эскалация и величины — `.claude/work/progress/phase-1-step-9-docs-check-3.md`.
+- Эскалация и величины — `.claude/work/history/2026-09-04-phase-1-step-9-security/phase-1-step-9-docs-check-3.md`.
 - Исполнение прохода и популяции —
-  `.claude/work/progress/phase-1-step-9-design-pass.md`.
+  `.claude/work/history/2026-09-04-phase-1-step-9-security/phase-1-step-9-design-pass.md`.
 - Детектор и правило реакции — `.claude/skills/stagnation-detection.md`.
 - Третий исход эскалации — `.claude/decisions/code-contact-as-gate.md`.
 - Полнота закрытия по популяции —
