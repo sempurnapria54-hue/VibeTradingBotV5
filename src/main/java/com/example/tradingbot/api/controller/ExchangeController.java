@@ -22,7 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * API бирж. Контроллер принимает api, делает apiToDomain, дальше
  * работает только с domain (codestyle: слои). Наружу адресуется по
- * internalId. Авторизация (@PreAuthorize) — на шаге 9 «Безопасность».
+ * internalId. Поверхность закрыта контуром доступа
+ * (docs/rules/api-access-policy.md): умолчание закрыто, принципал один.
  */
 @Validated
 @RestController

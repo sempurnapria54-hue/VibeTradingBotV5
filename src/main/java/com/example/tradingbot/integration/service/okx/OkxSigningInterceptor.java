@@ -25,8 +25,8 @@ import org.springframework.stereotype.Component;
  * Подпись приватных запросов OKX (HMAC-SHA256): добавляет заголовки
  * OK-ACCESS-KEY/SIGN/TIMESTAMP/PASSPHRASE на приватном RestClient.
  * prehash = timestamp + method + requestPath(+query) + body; подпись =
- * base64(HMAC-SHA256(secret, prehash)). Секреты не логируются. Интерим
- * до Vault-конфигурации шага 9 «Безопасность».
+ * base64(HMAC-SHA256(secret, prehash)). Секреты не логируются и берутся из
+ * Vault per-profile.
  *
  * <p>При отсутствии кредов (apiKey/secret/passphrase не заданы) — fail-fast
  * {@link IllegalStateException} «OKX credentials not configured» до подписи и

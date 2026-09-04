@@ -494,7 +494,12 @@ public final class Constants {
     @UtilityClass
     public class Audit {
 
-        /** Системный принципал createdBy/modifiedBy до ввода аутентификации (шаг 9). */
+        /**
+         * Значение актора для хода БЕЗ внешнего инициатора — класс контура
+         * (расписание, реакция обработчика, восстановление). Не заглушка:
+         * область значений актора несёт ровно два класса, и это второй
+         * (docs/models/domain/other/Auditable.md).
+         */
         public static final String SYSTEM_PRINCIPAL = "system";
     }
 }

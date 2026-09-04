@@ -7,8 +7,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Конфигурация интеграции с OKX. Приватные креды (apiKey/secret/passphrase)
  * читаются из Vault per-profile (secret/tradingbot/okx[-test]), как
- * datasource; шаг 9 «Безопасность» — остаточный хардненинг, не ввод
- * секретов. URL выбирается по региону и конфигурируется извне
+ * datasource и принципал поверхности. Остаточный хардненинг Vault
+ * (политики/approle, ротация, unseal) — операции над самим хранилищем, а не
+ * над этой конфигурацией. URL выбирается по региону и конфигурируется извне
  * (docs/integrations/okx/contracts/service-urls.md).
  */
 @Getter
