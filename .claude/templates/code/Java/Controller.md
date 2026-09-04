@@ -54,7 +54,7 @@ public class <Model>Controller {
     private final <Model>Mapper mapper;
 
     @GetMapping("/{<model>Id}")
-    @PreAuthorize("hasAuthority('<authority>')") // TODO: политика — шаг «Безопасность»
+    @PreAuthorize("hasAuthority('<authority>')") // политика — docs/rules/api-access-policy.md
     @Operation(summary = "<summary>")
     // @ApiResponses(...) — коды по error-конвенции (TBD)
     public <Model>ApiResponse getById(
@@ -72,9 +72,12 @@ public class <Model>Controller {
   persistence-слоем).
 - **Без хардкода кодов** (HTTP-статусы / коды ошибок в шаблон не
   вшиты).
-- `@PreAuthorize` — **placeholder с TODO**: конкретная политика
-  определяется на шаге «Безопасность» Фазы 1
-  (`.claude/work/roadmap/phase-1.md`).
+- `@PreAuthorize` — **placeholder**: дом политики доступа —
+  `docs/rules/api-access-policy.md`, и он же называет форму закрытия
+  каждой точки. Указатель ведёт в **носитель**, а не в шаг роадмапа:
+  момент прошёл, политика заведена, и адресация моментом устарела бы
+  первой. Плейсхолдер снимается кодовым заходом шага 9, который закрывает
+  поверхность принципалом.
 - `@ApiResponses` — **закомментирован**: error-конвенция (коды,
   `@ControllerAdvice` vs per-endpoint, документирование ошибок) пока
   TBD в `.claude/rules/codestyle.md`. Раскомментируется, когда
