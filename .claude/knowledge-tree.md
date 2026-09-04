@@ -77,6 +77,7 @@
 │   │   ├── risk-base-follows-balance.md — Почему база риска следует за балансом в обе стороны, а не держится невозрастающей?
 │   │   ├── rule-source-of-truth.md — Где первоисточник правила, когда оно ложится в несколько мест?
 │   │   ├── security-perimeter-design-pass.md — Почему по эскалации `DOCS_CHECK_3` шага 9 сменена рамка узла на цельный дизайн-проход?
+│   │   ├── stagnation-ratio-minimum-denominator.md — Почему у доли сигнала С2 объявлена нижняя граница знаменателя?
 │   │   ├── runtime-value-object.md — Где живут runtime-объекты компонентного слоя?
 │   │   ├── source-api-target-rebase.md — Почему контур тестов API источника бьёт в сырьё, а не в нашу границу?
 │   │   ├── test-knowledge-type.md — Почему per-source тест-планы живут в .claude/tests/?
