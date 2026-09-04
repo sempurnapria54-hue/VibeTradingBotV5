@@ -307,6 +307,7 @@
 │   │       └── rules/ — Какое правило источника OKX?
 │   │           ├── adapter-constants.md — Какие константы OKX adapter выставляет сам, не из доменных моделей?
 │   │           ├── cash-flow-categories.md — Как тип движения счёта OKX относится к экономике сделки?
+│   │           ├── auth-rejection-codes.md — По каким кодам источника опознаётся отказ в наших кредах?
 │   │           ├── client-id-marker.md — Какое правило источника делает нашу заявку опознаваемой на стороне биржи?
 │   │           ├── reduce-only-invariant.md — Какой invariant OKX adapter проверяет по `reduceOnly` факту?
 │   │           ├── timeframe-constants.md — Какое у нас правило обращения со строками таймфреймов OKX?
