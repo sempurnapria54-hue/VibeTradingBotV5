@@ -162,7 +162,7 @@ public class DealReconciliationCalculator {
     private BigDecimal leftByCategory(List<DealCashFlow> scope, DealCashFlow.CashFlowCategory category,
                                       boolean separateFeeGranularity) {
         return scope.stream()
-                .filter(flow -> category.equals(flow.getCategory()))
+                .filter(flow -> Objects.equals(category, flow.getCategory()))
                 .map(flow -> flowAmountNetOfFee(flow, separateFeeGranularity))
                 .reduce(ZERO, BigDecimal::add);
     }
