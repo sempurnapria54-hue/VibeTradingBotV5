@@ -38,7 +38,7 @@ production-flow одной стратегии.
 | 6 | FSM + живая оркестрация (состояния и переходы сущностей + handler'ы; живая оркестрационная петля `DealOrchestratorJob` (driving), REPLACE-оркестрация, per-deal concurrency-guard, механика финализации — финализационные executor'ы / терминальные рёбра / retry-state финализации) | DONE |
 | 7 | Сделки и P&L (`DealOrchestratorJob` — агрегирование в `Deal`, расчёт `resultProfit` / P&L) | DONE |
 | 8 | AnomalyJob (полноценный, операционная детекция аномалий состояния/исполнения) | DONE |
-| 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | DOCS_CHECK_1 |
+| 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | DOCS_CHECK_3 · эскалация |
 | 10 | Тесты | HOLD |
 | 11 | Фронт | HOLD |
 
@@ -52,6 +52,13 @@ production-flow одной стратегии.
   docs-first на самом шаге; на нём реактивируется фокус
   `security-review`. Форвард-материал — `.claude/work/backlog.md`
   §S1 / §S2.
+  **Шаг остановлен на эскалации:** после `DOCS_CHECK_3` сработал
+  машинный сигнал С2 детектора стагнации, и по
+  `.claude/skills/update-roadmap-progress.md` §«Гейт входа в
+  `GAPS_CLOSE_N`» закрытие остановлено целиком до выбора рамки
+  держателем. Выбор и его цена —
+  `.claude/work/progress/phase-1-step-9-docs-check-3.md`
+  §«Эскалация: концептуальный дефицит».
 - **Тесты (шаг 10)** и **Фронт (шаг 11)** — отдельные шаги фазы,
   исполняются по тому же процессу docs-first. Фронт — простой, для
   прогонов; полноценный появится после архитектурного рубежа.
