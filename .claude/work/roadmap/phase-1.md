@@ -38,7 +38,7 @@ production-flow одной стратегии.
 | 6 | FSM + живая оркестрация (состояния и переходы сущностей + handler'ы; живая оркестрационная петля `DealOrchestratorJob` (driving), REPLACE-оркестрация, per-deal concurrency-guard, механика финализации — финализационные executor'ы / терминальные рёбра / retry-state финализации) | DONE |
 | 7 | Сделки и P&L (`DealOrchestratorJob` — агрегирование в `Deal`, расчёт `resultProfit` / P&L) | DONE |
 | 8 | AnomalyJob (полноценный, операционная детекция аномалий состояния/исполнения) | DONE |
-| 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | GAPS_CLOSE_4 |
+| 9 | Безопасность (auth-инфраструктура: Spring Security, `@PreAuthorize`, `SecurityFilterChain`; остаточный хардненинг секретов Vault — политики/approle/ротация/unseal, сама привязка уже введена на инфра-шаге; реактивирует фокус `security-review`) | DOCS_CHECK_5 · эскалация |
 | 10 | Тесты | HOLD |
 | 11 | Фронт | HOLD |
 
@@ -58,8 +58,14 @@ production-flow одной стратегии.
   клеймов построена обходом смежных домов до правки, периметр написан
   одной согласованной правкой —
   `.claude/work/progress/phase-1-step-9-design-pass.md`; решение —
-  `.claude/decisions/security-perimeter-design-pass.md`. Дальше — один
-  проверочный `DOCS_CHECK_4`.
+  `.claude/decisions/security-perimeter-design-pass.md`.
+  **Проход сошёлся по своему предмету:** `DOCS_CHECK_4` — 4 гейтящих,
+  `DOCS_CHECK_5` — 2, ряд упал на 71 %, класс «дома решения не существует»
+  исчерпан. **Но на `_5` сработали С1 и С2** по новой посылке — охват
+  правки, не снимающей редакции, не измеряется ничем. `GAPS_CLOSE_5` не
+  проводится; держателю вынесен `PROC-Q5` (три варианта, крен CC — вход в
+  `CODE`). Разбор —
+  `.claude/work/progress/phase-1-step-9-docs-check-5.md`.
 - **Тесты (шаг 10)** и **Фронт (шаг 11)** — отдельные шаги фазы,
   исполняются по тому же процессу docs-first. Фронт — простой, для
   прогонов; полноценный появится после архитектурного рубежа.

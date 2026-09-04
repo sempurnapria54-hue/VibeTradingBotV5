@@ -442,12 +442,18 @@ grep -rn "controlled-exchange-exceptions" docs/ --include=*.md
 
 | Ось | Команда | Итог |
 |---|---|---|
-| §-адреса `.claude/**` | `py -3 tools/anchor-check.py` | заполняется по прогону |
-| снятые редакции | `py -3 tools/retired-check.py` | заполняется по прогону |
-| исполнимые спеки | `bash tools/spec-run.sh` | заполняется по прогону |
-| мутационная проба | `bash tools/spec-mutation-check.sh` | заполняется по прогону |
-| область величин спек | `py -3 tools/spec-scope-check.py` | заполняется по прогону |
-| указатели на величины | `py -3 tools/spec-pointer-check.py` | заполняется по прогону |
-| происхождение популяций | `py -3 tools/population-derive-check.py` | заполняется по прогону |
-| критерий выхода в `CODE` | `py -3 tools/code-gate-check.py` | заполняется по прогону |
-| сборка и тесты | `mvn -o test -DexcludedGroups=source-api-live` | заполняется по прогону |
+| §-адреса `.claude/**` | `py -3 tools/anchor-check.py` | 621 адрес, новых неразрешимых **0** |
+| снятые редакции | `py -3 tools/retired-check.py` | 40 записей (7 заведены проходом), 147 строк популяции, дефектов **0** |
+| исполнимые спеки | `bash tools/spec-run.sh` | 22 спеки, 574 примера — сошлись все |
+| мутационная проба | `bash tools/spec-mutation-check.sh` | 388 величин, переживают нейтрализацию **0** |
+| область величин спек | `py -3 tools/spec-scope-check.py` | классы A/B/C/D — **0** |
+| указатели на величины | `py -3 tools/spec-pointer-check.py` | 248 указателей, ведут не в дом **0** |
+| происхождение популяций | `py -3 tools/population-derive-check.py` | 7 осей, перечни сошлись |
+| предусловия контура | `bash tools/preconditions-check.sh` | слоты реестра == гейт-пометки плана |
+| критерий выхода в `CODE` | `py -3 tools/code-gate-check.py` | **пройден**, 42/42 |
+| сборка и тесты | `mvn -o test -DexcludedGroups=source-api-live` | **297 тестов, 0 падений** |
+
+**Средовая заметка:** `JAVA_HOME` в среде указывает на JDK 11, и Maven без
+переопределения падает на `UnsupportedClassVersionError` ещё до тестов.
+Рабочая форма — `JAVA_HOME=C:/Users/RomanKrd/.jdks/corretto-25.0.3` перед
+вызовом `mvn`.
