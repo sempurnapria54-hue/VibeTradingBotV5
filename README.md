@@ -27,5 +27,6 @@ Vault UI — <http://localhost:8200>. Инициализация, unseal и за
 
 ## Проверка
 
-- `GET http://localhost:8080/actuator/health`
-- `GET http://localhost:8080/api/health`
+- `GET http://localhost:8080/actuator/health` — проба живости; она же
+  единственная поверхность, остающаяся открытой после ввода контура
+  доступа (`docs/rules/api-access-policy.md`).
