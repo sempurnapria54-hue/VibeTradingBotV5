@@ -164,7 +164,9 @@
 Канонический набор статусов **фазы** (ролляп):
 - `HOLD` — все шаги в `HOLD`;
 - `DONE` — все шаги в `DONE`;
-- `IN_PROGRESS` — иначе.
+- `IN_PROGRESS` — иначе;
+- `FOLDED` — вручную, фаза растворена пересборкой роадмапа
+  (`.claude/decisions/roadmap-rebuild-for-service-platform.md`).
 
 ## Следствия
 

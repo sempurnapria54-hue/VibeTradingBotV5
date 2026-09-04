@@ -92,7 +92,7 @@ source ответ → `InstrumentExternalRulesExternalSnapshot` (сырые
 `listTime`/`expTime`/`openType`/`ruleType` (lifecycle биржи; для
 SWAP `expTime` обычно пусто), `category`/`alias`/`stk`/
 `optType`, `posLmtAmt`/`posLmtPct`/`maxPlatOILmt` (позиционные лимиты —
-форвард к риску на биржу/портфель, фаза 3,
+форвард к риску на биржу/портфель — потолок одновременного риска тенанта (`docs/architecture/signal-strategy-allocator.md`),
 `docs/rules/risk-policy.md`).
 
 **`groupId` из этого списка снят**. Он не «прочее

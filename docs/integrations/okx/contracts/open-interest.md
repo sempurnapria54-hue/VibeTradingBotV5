@@ -21,7 +21,7 @@
 
 Не используется (в периметре как рыночный контекст; потенциальная
 связь — позиционный лимит как доля открытого интереса, форвард к риску на
-биржу/портфель, фаза 3, `docs/rules/risk-policy.md`).
+биржу/портфель — потолок одновременного риска тенанта, `docs/architecture/signal-strategy-allocator.md`, `docs/rules/risk-policy.md`).
 
 ## GET /api/v5/public/open-interest
 
