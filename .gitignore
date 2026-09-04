@@ -4,7 +4,7 @@
 .env.test.local
 # Shell-sourced Vault token for CC's test-profile boot (.example is committed)
 .env.vault.test.local
-/target/
+target/
 .idea/
 .docs/planing
 .m2/

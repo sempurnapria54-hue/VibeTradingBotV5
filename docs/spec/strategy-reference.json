@@ -9,7 +9,7 @@
     "order-lifecycle"
   ],
   "operands": {
-    "strategy": "src/main/resources/strategy-examples/trend-following-ema.json — исполнимый эталон",
+    "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json — исполнимый эталон",
     "details[].phaseEntryPolicy": "политика входа в фазе; NO_TRADE — неторгуемая деталь",
     "details[].stepsByStatus{}": "шаги, сгруппированные по статусу сделки",
     "steps[].actions[]": "пакет действий шага",
@@ -395,7 +395,7 @@
     {
       "case": "эталонная стратегия объявляет деталь на каждый тип фазы",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "detailsCount": 4,
@@ -405,7 +405,7 @@
     {
       "case": "у торгуемых деталей эталона заполнены все риск-поля действующей модели",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "tradableDetailsWithRiskFields": 2,
@@ -416,7 +416,7 @@
     {
       "case": "каждая торгуемая деталь эталона объявляет транш, и транш объявляет признак переоткрытия",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "tradableDetailsWithTranches": 2,
@@ -426,7 +426,7 @@
     {
       "case": "у каждого транша эталона ровно одно входное объявление",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "tranchesWithSingleEntry": 2
@@ -435,7 +435,7 @@
     {
       "case": "агрегатная поверхность эталона несёт только выход",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "dealLevelStepsOutOfScope": 0
@@ -444,7 +444,7 @@
     {
       "case": "маркера уровня на действиях эталона не осталось: уровень уехал на транш",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "usesLegacyActionLevel": 0
@@ -453,7 +453,7 @@
     {
       "case": "типы действий эталона — из действующего словаря",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "actionsWithUnknownType": 0
@@ -462,7 +462,7 @@
     {
       "case": "каждый шаг эталона, объявляющий полный набор защиты, покрывает позицию целиком; под проверку попадают все шесть — по три на торгуемую деталь: первичная постановка, безубыток замещением и перевод на трейлинг снятием",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "fullSetStepsCount": 6,
@@ -889,7 +889,7 @@
     {
       "case": "ни один шаг эталона не возвращает покрытия меньше, чем забирает",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "partialStepsReturningLess": 0
@@ -898,7 +898,7 @@
     {
       "case": "снятие защиты в эталоне всегда идёт вместе с заменой в том же пакете",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "cancelStepsWithoutReplacement": 0
@@ -907,7 +907,7 @@
     {
       "case": "вход эталона несёт встроенную защиту",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "entryActionsWithoutAttachedProtection": 0
@@ -916,7 +916,7 @@
     {
       "case": "доли аллокации эталона структурно допустимы",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "allocationOutOfRange": 0,
@@ -931,7 +931,7 @@
         "globalCatastrophicRiskPerDealMultiplier": 150.0
       },
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "detailsBreakingRiskChain": 0
@@ -1018,7 +1018,7 @@
     {
       "case": "объявления уровня стопа в эталоне — из закрытого перечня, и доля согласована со способом: шаг безубытка объявлен BREAKEVEN без доли",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "stopSettingsMisdeclared": 0,
@@ -1106,7 +1106,7 @@
     {
       "case": "веер эталона умещается в потолок одновременного риска: каждая торгуемая деталь объявляет один одновременно живой транш",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "detailsBreakingOverlap": 0
@@ -1349,7 +1349,7 @@
     {
       "case": "нотинал эталона укладывается в катастрофический потолок с запасом, а не в равенство: доля аллокации 95 % против потолка в одну базу",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "state": {
         "globalSimultaneousRiskPerDealPercent": 1.0,
@@ -1658,7 +1658,7 @@
     {
       "case": "эталон источников, которых источник не отдаёт, не объявляет",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "priceSourceUnavailable": 0,
@@ -1964,7 +1964,7 @@
     {
       "case": "эталонная стратегия укладывается в матрицу допустимости целиком",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "allDetailsWithinPhaseMatrix": true
@@ -2021,7 +2021,7 @@
     {
       "case": "эталонная стратегия: каждое ставящее уровень действие объявляет его источник, а снимающие из области выведены",
       "stateFrom": {
-        "strategy": "src/main/resources/strategy-examples/trend-following-ema.json"
+        "strategy": "donor/src/main/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "actionsSettingLevelWithoutSource": 0

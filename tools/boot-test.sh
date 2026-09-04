@@ -31,5 +31,5 @@ if [[ -z "${VAULT_TOKEN:-}" || "${VAULT_TOKEN}" == "${PLACEHOLDER}" ]]; then
   exit 1
 fi
 
-cd "${REPO_ROOT}"
+cd "${REPO_ROOT}/donor"
 exec mvn spring-boot:run -Dspring-boot.run.profiles=test

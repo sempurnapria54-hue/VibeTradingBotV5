@@ -18,7 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SpecRunnerTest {
 
-    private static final Path SPEC_DIRECTORY = Path.of("docs", "spec");
+    /**
+     * Каталог спецификаций — от корня репозитория, а не от рабочего каталога:
+     * Maven запускает тест из каталога сборки ({@code donor/}), где
+     * {@code docs/spec} не лежит. Якорь и его довод —
+     * {@link Spec#repositoryRoot()}.
+     */
+    private static final Path SPEC_DIRECTORY = Spec.repositoryRoot().resolve(Path.of("docs", "spec"));
 
     @TestFactory
     List<DynamicTest> specificationsMatchTheirExamples() throws IOException {

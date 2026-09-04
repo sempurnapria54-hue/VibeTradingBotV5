@@ -54,11 +54,11 @@ command -v cygpath >/dev/null && SPEC_CLASSES="$(cygpath -m "$SPEC_CLASSES")"
 trap 'rm -rf "$SPEC_CLASSES"' EXIT
 
 "$SPEC_JDK_HOME/bin/javac" -encoding UTF-8 -nowarn -cp "$CP" -d "$SPEC_CLASSES" \
-    "$SPEC_ROOT/src/test/java/com/example/tradingbot/spec/Spec.java" \
-    "$SPEC_ROOT/src/test/java/com/example/tradingbot/spec/SpecExpression.java" \
-    "$SPEC_ROOT/src/test/java/com/example/tradingbot/spec/SpecException.java" \
-    "$SPEC_ROOT/src/test/java/com/example/tradingbot/spec/SpecScope.java" \
-    "$SPEC_ROOT/src/test/java/com/example/tradingbot/spec/SpecMutation.java" \
+    "$SPEC_ROOT/donor/src/test/java/com/example/tradingbot/spec/Spec.java" \
+    "$SPEC_ROOT/donor/src/test/java/com/example/tradingbot/spec/SpecExpression.java" \
+    "$SPEC_ROOT/donor/src/test/java/com/example/tradingbot/spec/SpecException.java" \
+    "$SPEC_ROOT/donor/src/test/java/com/example/tradingbot/spec/SpecScope.java" \
+    "$SPEC_ROOT/donor/src/test/java/com/example/tradingbot/spec/SpecMutation.java" \
   || { echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: раннер не собрался" >&2; exit 2; }
 
 JAVA=("$SPEC_JDK_HOME/bin/java" -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8

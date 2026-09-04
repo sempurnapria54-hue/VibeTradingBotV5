@@ -32,7 +32,7 @@ per-source тест-планы и библиотека кейсов.
 - **`{testType}`** — уровень на вырост под будущие типы тестов;
   текущий контур — **`source-api`** (проверка API источника на уровне
   сырья — `.claude/decisions/source-api-target-rebase.md`). Доменные
-  автотесты кода (`src/test`, шаг 10) — другой `{testType}`, когда
+  автотесты кода (`donor/src/test`, шаг 10) — другой `{testType}`, когда
   дойдут, не смешиваются с `source-api` в одном уровне.
 - **`{source}`** — источник (`okx` и далее), как в
   `docs/integrations/{name}/`.

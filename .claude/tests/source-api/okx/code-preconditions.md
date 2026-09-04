@@ -276,7 +276,7 @@ bash tools/preconditions-check.sh "$P" "$t/reg.md"    # → два «ДЕФЕК�
 # фикстура ось не изолировала: на ней отсутствовали носители всех девяти
 # кейсов, rc=1 был гарантирован независимо от проверяемой оси, и падение
 # не атрибутировалось ей (F-1 `DOCS_CHECK_33`).
-TESTS=src/test/java/com/example/tradingbot/integration/sourceapi/okx/
+TESTS=donor/src/test/java/com/example/tradingbot/integration/sourceapi/okx/
 mkdir -p "$t/iso"; cp -r "$TESTS"* "$t/iso/"
 find "$t/iso" -name '*.java' -exec sed -i 's/AG6\.1\b/AG6_RET/g' {} +
 
@@ -501,11 +501,11 @@ export CANDLE_JOB_ENABLED=false INDICATOR_JOB_ENABLED=false \
        MARKET_STRUCTURE_JOB_ENABLED=false INSTRUMENT_RULES_SYNC_ENABLED=false \
        ENTRY_SCANNER_ENABLED=false DEAL_ORCHESTRATOR_ENABLED=false
 
-mvn -o test -Dgroups=source-api-live -Dtest=Ag1DealFixtureLiveTest    # пп. 1, 6, 9, 14, 15; п. 2 — перепрогоном (перечень пишется персистентно)
-mvn -o test -Dgroups=source-api-live -Dtest=Ag6BillSubtypesLiveTest   # пп. 2, 16
-mvn -o test -Dgroups=source-api-live -Dtest=Mg7IndexCandlesLiveTest   # п. 5
-mvn -o test -Dgroups=source-api-live -Dtest=M17CancelOrderLiveTest    # п. 17 (все три цепочки наблюдены — §«Что добыто»)
-mvn -o test -Dgroups=source-api-live -Dtest=Ag1FundingHorizonLiveTest # п. 7 — сам выбирает инструмент по интервалу; вне окна пишет исход пропуска
+mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Ag1DealFixtureLiveTest    # пп. 1, 6, 9, 14, 15; п. 2 — перепрогоном (перечень пишется персистентно)
+mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Ag6BillSubtypesLiveTest   # пп. 2, 16
+mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Mg7IndexCandlesLiveTest   # п. 5
+mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=M17CancelOrderLiveTest    # п. 17 (все три цепочки наблюдены — §«Что добыто»)
+mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Ag1FundingHorizonLiveTest # п. 7 — сам выбирает инструмент по интервалу; вне окна пишет исход пропуска
 
 bash tools/preconditions-check.sh            # сверка реестра с планом и с фактикой носителей
 ```
@@ -628,7 +628,7 @@ cross-ccy-издержке) этой фикстурой **не разрешен�
 уровня книги, и частичный налив был недостижим **по счёту**. Действующее
 значение — 2500 USDT (≈10 контрактов), дом константы —
 `M17CancelOrderLiveTest.FIXTURE_RISK_CEILING_USDT`; величина помечена
-фикстурной, живёт только в `src/test` и продуктовыми путями не читается.
+фикстурной, живёт только в `donor/src/test` и продуктовыми путями не читается.
 
 ### Что осталось открытым
 
@@ -785,6 +785,10 @@ isolated-марже расчёт финансирования ложится в 
 
 ### Что среда всё ещё не даёт
 
+- **`pom.xml` живёт в `donor/`, не в корне** (реструктуризация в
+  монорепозиторий, шаг 1 фазы 2). Команды прогона идут из корня с
+  `-f donor/pom.xml`; записи прогонов **ниже по этому файлу сохраняют
+  форму, которой прогонялись** — их предмет числа, а не команда.
 - **`mvnw` в репозитории нет.** Прогон опирается на maven3, встроенный в
   IDEA (кэш wrapper'а `~/.m2/wrapper/dists` прежней записи исчез), и на
   ручной `PATH`. Состав работ

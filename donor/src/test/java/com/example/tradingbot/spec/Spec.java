@@ -14,6 +14,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -44,6 +45,9 @@ public final class Spec {
 
     /** Спецификация проверяет алгебру, а не десятичный шум округления. */
     private static final BigDecimal TOLERANCE = new BigDecimal("1e-9");
+
+    /** Корень репозитория; вычисляется один раз при первом обращении. */
+    private static Path repositoryRoot;
 
     /**
      * Префикс расхождения, вызванного отказом корпуса, а не содержанием
@@ -127,6 +131,39 @@ public final class Spec {
             }
             values.put(name, definition);
         }
+    }
+
+    /**
+     * Корень репозитория — якорь, от которого разрешаются пути артефактов
+     * ({@code stateFrom}).
+     *
+     * <p>Ищется вверх от рабочего каталога прогона по маркеру {@code docs/spec}.
+     * Якорь нужен потому, что троп прогона две и рабочий каталог у них разный:
+     * {@code tools/spec-run.sh} идёт из корня репозитория, а Maven-прогон
+     * {@code SpecRunnerTest} — из каталога сборки ({@code donor/} после
+     * реструктуризации в монорепозиторий, шаг 1 фазы 2). Пути артефактов
+     * записаны в спеках от корня, поэтому без общего якоря одна из двух троп
+     * читала бы их мимо — и падала бы системным отказом на здоровом корпусе.
+     *
+     * <p>Маркер не найден — отказ, а не молчаливый откат на рабочий каталог:
+     * прочитанный мимо артефакт даёт расхождение примера, неотличимое от
+     * настоящего.
+     */
+    public static Path repositoryRoot() {
+        if (Objects.isNull(repositoryRoot)) {
+            Path candidate = Path.of("").toAbsolutePath();
+            while (Objects.nonNull(candidate) && Objects.isNull(repositoryRoot)) {
+                if (Files.isDirectory(candidate.resolve("docs").resolve("spec"))) {
+                    repositoryRoot = candidate;
+                }
+                candidate = candidate.getParent();
+            }
+        }
+        if (Objects.isNull(repositoryRoot)) {
+            throw new SpecException("Корень репозитория не найден вверх от "
+                    + Path.of("").toAbsolutePath() + ": нет каталога docs/spec");
+        }
+        return repositoryRoot;
     }
 
     /** Загружает спецификацию из файла. */
@@ -449,7 +486,7 @@ public final class Spec {
     private static Map<String, Object> stateOf(Map<String, Object> example) {
         Map<String, Object> state = new LinkedHashMap<>(asMap(example.get("state")));
         for (Map.Entry<String, Object> entry : asMap(example.get("stateFrom")).entrySet()) {
-            Path file = Path.of(String.valueOf(entry.getValue()));
+            Path file = repositoryRoot().resolve(String.valueOf(entry.getValue()));
             try {
                 state.put(entry.getKey(), MAPPER.readValue(file.toFile(), Map.class));
             } catch (IOException failure) {

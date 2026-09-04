@@ -20,7 +20,7 @@ A2-passthrough. Структура **эндпоинт → кейсы → таб�
 **DESIGN аппрувнут** (2026-06-19): план прошёл два независимых
 адверсариальных ревью (оба APPROVE), §Принятые решения §Нерешённое 1-4
 закрыты. CODE-тесты написаны
-(`src/test/java/com/example/tradingbot/integration/sourceapi/okx/`) — на
+(`donor/src/test/java/com/example/tradingbot/integration/sourceapi/okx/`) — на
 состав плана той даты **и дописаны 2026-08-30 на гейтящую дельту шага 7**;
 кейсы без носителя перечислены поимённо разделом «Структурный изоморфизм (план ↔ код-тесты)».
 
@@ -183,7 +183,7 @@ POST {{base_url}}/api/proxy/okx/raw
 Код-тесты 1:1 с планом **на дату аппрува**; кейсы, заведённые
 после, в коде не представлены — проверено грепом
 идентификаторов по
-`src/test/java/com/example/tradingbot/integration/sourceapi/okx/`:
+`donor/src/test/java/com/example/tradingbot/integration/sourceapi/okx/`:
 
 - **из шестнадцати содержательных кейсов шага 7** код-тесты имеют
   **десять** (`M17.5`, `AG1.5`, `AG1.6`, `AG1.7`, `AG1.8`, `AG1.9`,
@@ -1062,7 +1062,7 @@ conditional-заявкой** на налитый объём. Четыре сле
   конструкции: остаток после налива верхнего уровня заведомо не меньше
   половины потолка, поэтому вырождение в `filled` требует, чтобы книга
   поглотила **его**, а не лот. Величина — фикстурная конфигурация контура
-  тестов, живёт только в `src/test`
+  тестов, живёт только в `donor/src/test`
   (`M17CancelOrderLiveTest.FIXTURE_RISK_CEILING_USDT`) и продуктовыми
   путями не читается: продуктовые потолки задаёт
   `docs/rules/risk-policy.md` и считает от базы риска.
@@ -3276,5 +3276,5 @@ REPLACE-ремодел этим не предрешается — контур �
 - Контракты OKX — `docs/integrations/okx/contracts/`; правила —
   `docs/integrations/okx/rules/`.
 - Generic-эндпоинт `/raw` и сырой клиент —
-  `src/main/java/com/example/tradingbot/api/controller/OkxProxyController.java`,
+  `donor/src/main/java/com/example/tradingbot/api/controller/OkxProxyController.java`,
   `integration/service/okx/OkxRestClient.java`.

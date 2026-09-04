@@ -128,7 +128,7 @@ awk -F'|' '/^\| / && NF>=7 { v=$5; gsub(/^[ \t]+|[ \t]+$/,"",v)
 
 ```bash
 P=.claude/tests/source-api/okx/plan.md
-T=src/test/java/com/example/tradingbot/integration/sourceapi/okx/
+T=donor/src/test/java/com/example/tradingbot/integration/sourceapi/okx/
 for c in $(grep '^### ' "$P" | grep -oE '[A-Za-z]+[0-9]+[.][0-9]+' | sort -u); do
   re="(^|[^0-9A-Za-z.])${c//./\\.}([^0-9A-Za-z.]|\\.[^0-9A-Za-z]|\\.$|$)"
   # носитель — ИСПОЛНИМАЯ строка: комментарии вычищаются ИЗ строк до грепа

@@ -70,7 +70,7 @@
 set -u
 PLAN="${1:-.claude/tests/source-api/okx/plan.md}"
 REG="${2:-.claude/tests/source-api/okx/code-preconditions.md}"
-TESTS="${3:-src/test/java/com/example/tradingbot/integration/sourceapi/okx/}"
+TESTS="${3:-donor/src/test/java/com/example/tradingbot/integration/sourceapi/okx/}"
 
 for f in "$PLAN" "$REG"; do
   [ -f "$f" ] || { echo "ОШИБКА: нет файла $f" >&2; exit 2; }

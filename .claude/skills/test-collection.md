@@ -128,5 +128,5 @@
 - Роль-автор — `.claude/agents/tester.md`.
 - Решение о ре-базе на сырьё / A2 — `.claude/decisions/source-api-target-rebase.md`.
 - Сырой клиент и DTO —
-  `src/main/java/com/example/tradingbot/integration/service/okx/OkxRestClient.java`,
+  `donor/src/main/java/com/example/tradingbot/integration/service/okx/OkxRestClient.java`,
   `integration/model/okx/{request,response}`.

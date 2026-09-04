@@ -64,7 +64,8 @@
 пришедшую редакцию, и это ось 4.
 
 ОБЛАСТЬ СВИПА. Живые носители: `CLAUDE.md`, `README.md`, `docs/**` (md, json),
-`src/**` (java, json, sql, yml, yaml, properties), `tools/**` (py, sh, txt) и
+деревья кода (java, json, sql, yml, yaml, properties) — `donor/`, `services/*`,
+`libs/*`, — `tools/**` (py, sh, txt) и
 `.claude/**` (md) за вычетом архива, истории, библиотеки и отчётов
 прогонов (`progress/` цитирует снятые редакции как находки — это их предмет,
 а не рецидив). Число просмотренных носителей печатает сам прогон: область,
@@ -98,12 +99,20 @@ SKIP = ('/.claude-archive/', '/.claude/work/history/', '/.claude/work/progress/'
 # (json коллекции) — то есть шапка обещала «src/**, tools/**», а свип шёл
 # по трём расширениям из семи. Носитель, не попавший в область, зелёного
 # прогона не портит и потому невидим.
-ROOTS = ('CLAUDE.md', 'README.md',
-         'docs/**/*.md', 'docs/**/*.json',
-         'src/**/*.java', 'src/**/*.json', 'src/**/*.sql',
-         'src/**/*.yml', 'src/**/*.yaml', 'src/**/*.properties',
-         '.claude/**/*.md',
-         'tools/*.py', 'tools/*.sh', 'tools/*.txt')
+#
+# Деревья кода перечислены ПРЕФИКСАМИ, а не одним `src/**`: после
+# реструктуризации в монорепозиторий (шаг 1 фазы 2) код донора лежит в
+# `donor/src`, а сервисы и общие артефакты появятся в `services/<имя>/src` и
+# `libs/<имя>/src`. Перечень, привязанный к одному корню, молча терял бы
+# каждое новое дерево — тот самый невидимый зелёный, о котором абзац выше.
+CODE_TREES = ('donor', 'services/*', 'libs/*')
+CODE_SUFFIXES = ('java', 'json', 'sql', 'yml', 'yaml', 'properties')
+ROOTS = (('CLAUDE.md', 'README.md',
+          'docs/**/*.md', 'docs/**/*.json',
+          '.claude/**/*.md',
+          'tools/*.py', 'tools/*.sh', 'tools/*.txt')
+         + tuple('%s/src/**/*.%s' % (tree, suf)
+                 for tree in CODE_TREES for suf in CODE_SUFFIXES))
 
 # --- РЕЕСТР СНЯТЫХ РЕДАКЦИЙ ---------------------------------------------------
 # Ключи записи:
@@ -179,7 +188,7 @@ RETIRED = [
                     '.claude/knowledge-tree.md',
                     'tools/retired-check.py'),
         'population': (('docs/components/AnomalyJob.md', None),
-                       ('src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
+                       ('donor/src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
                         r'одиннадцать\s+детекторов')),
     },
     {
@@ -231,7 +240,7 @@ RETIRED = [
         'population': (('docs/components/AnomalyJob.md', None),
                        ('.claude/work/backlog.md',
                         r'ступень\s+и\s+радиус\s+выводятся'),
-                       ('src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
+                       ('donor/src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
                         r'ВЫВОДЯТСЯ\s+тремя\s+ратифицированными')),
     },
     {
@@ -330,8 +339,8 @@ RETIRED = [
         'allowed': ('.claude/decisions/acceptance-by-measurement.md',
                     '.claude/work/decision-digest.md',
                     '.claude/processes/roadmap-step-execution.md',
-                    'src/test/java/com/example/tradingbot/spec/Spec.java',
-                    'src/test/java/com/example/tradingbot/spec/SpecMutation.java',
+                    'donor/src/test/java/com/example/tradingbot/spec/Spec.java',
+                    'donor/src/test/java/com/example/tradingbot/spec/SpecMutation.java',
                     'tools/retired-check.py'),
         # Популяция добыта по состоянию корпуса ДО снятия (git show HEAD:<файл>
         # | grep -c provenBy): пять спек и одно правило. На месте снятого встало

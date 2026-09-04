@@ -22,7 +22,7 @@
 ## Ключевые правила
 
 - **Фреймворк — JUnit 5 + AssertJ** (существующий стек, прецедент —
-  `src/test/.../integration/model/okx/response/*DeserializationTest`).
+  `donor/src/test/.../integration/model/okx/response/*DeserializationTest`).
   `@SpringBootTest` с профилем `test` (demo-креды из Vault test).
 
 - **Механика — A2-passthrough.** Код-тест бьёт
@@ -32,7 +32,7 @@
   AssertJ.
 
 - **Расположение и изоляция.** Живые тесты — отдельным пакетом
-  `src/test/java/.../integration/sourceapi/{source}/`, **не** смешивать с
+  `donor/src/test/java/.../integration/sourceapi/{source}/`, **не** смешивать с
   офлайн unit-тестами биндинга DTO. Метка `@Tag("source-api-live")`.
   Структура зеркалит план **метод → кейсы**: **класс на метод сырого
   клиента, тест-метод на кейс** (прямой / каждый негатив / каждый
@@ -93,7 +93,7 @@
 - **Порядок прогона — детерминированный по структуре плана.** Классы и
   методы упорядочены `@Order`: класс на эндпоинт (M1–M21 → TG → AG → MG →
   PG, 1..60), метод на кейс (по порядку плана внутри эндпоинта); orderers
-  включены в `src/test/resources/junit-platform.properties`
+  включены в `donor/src/test/resources/junit-platform.properties`
   (`ClassOrderer`/`MethodOrderer` = `OrderAnnotation`). Порядок
   воспроизводим (один и тот же каждый раз), что делает **halt** осмысленным:
   «дальше не идём» = всё, что после в этом порядке. Дешёвые no-state
@@ -118,7 +118,7 @@
 
 - **Вход:** утверждённый тест-план
   (`.claude/tests/{testType}/{source}/`); A2-passthrough; сырые DTO.
-- **Выход:** код-тесты в `src/test/java/.../integration/sourceapi/{source}/`
+- **Выход:** код-тесты в `donor/src/test/java/.../integration/sourceapi/{source}/`
   (`@Tag("source-api-live")`, профиль-гейт, teardown в каждом кейсе),
   покрывающие весь план.
 
@@ -133,4 +133,4 @@
 - Роль-автор — `.claude/agents/tester.md`.
 - Решение о ре-базе / B1+passthrough — `.claude/decisions/source-api-target-rebase.md`.
 - Прецедент офлайн-тестов DTO —
-  `src/test/java/com/example/tradingbot/integration/model/okx/response/`.
+  `donor/src/test/java/com/example/tradingbot/integration/model/okx/response/`.
