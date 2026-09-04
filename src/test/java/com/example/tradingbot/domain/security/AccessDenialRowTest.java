@@ -85,6 +85,28 @@ class AccessDenialRowTest {
                 .doesNotThrowAnyException();
     }
 
+    /**
+     * Поверхность приходит от вызывающего, <b>который себя не предъявил</b>:
+     * длина под его контролем. Без усечения такой вызов ронял бы запись на
+     * ограничении колонки — то есть отказ доступа стирал бы собственный след,
+     * и чем длиннее путь, тем надёжнее.
+     */
+    @Test
+    @DisplayName("Поверхность усекается по потолку колонки — след не теряется на длинном пути")
+    void oversizedSurfaceIsTruncatedInsteadOfLosingTheRow() {
+        when(dataService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        String oversized = "GET /api/" + "x".repeat(1000);
+
+        service.record(oversized, AccessDenial.Outcome.PRINCIPAL_ABSENT, null);
+
+        ArgumentCaptor<AccessDenial> captor = ArgumentCaptor.forClass(AccessDenial.class);
+        verify(dataService).save(captor.capture());
+        assertThat(captor.getValue().getSurface())
+                .as("значение обязано влезать в колонку, иначе строка не заведётся вовсе")
+                .hasSizeLessThanOrEqualTo(256)
+                .startsWith("GET /api/");
+    }
+
     private AccessDenial denial(AccessDenial.Outcome outcome, String principal) {
         AccessDenial denial = new AccessDenial();
         denial.setSurface(SURFACE);

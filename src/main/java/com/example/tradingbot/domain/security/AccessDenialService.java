@@ -1,6 +1,8 @@
 package com.example.tradingbot.domain.security;
 
+import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.StringUtils.abbreviate;
 
 import com.example.tradingbot.persistence.service.AccessDenialDataService;
 import com.example.tradingbot.util.ClientIdGenerator;
@@ -29,6 +31,14 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AccessDenialService {
 
+    /**
+     * Потолок ширины колонки поверхности. Значение <b>контролируется
+     * вызывающим, который себя не предъявил</b>: длинный путь — это его выбор,
+     * а не наш факт. Без усечения такой вызов ронял бы запись строки на
+     * ограничении колонки, то есть отказ доступа стирал бы собственный след.
+     */
+    private static final int SURFACE_MAX_LENGTH = 256;
+
     private final AccessDenialDataService dataService;
 
     /**
@@ -38,7 +48,7 @@ public class AccessDenialService {
     public void record(String surface, AccessDenial.Outcome outcome, String principal) {
         AccessDenial denial = new AccessDenial();
         denial.setInternalId(ClientIdGenerator.generate());
-        denial.setSurface(surface);
+        denial.setSurface(truncateSurface(surface));
         denial.setOutcome(outcome);
         denial.setPrincipal(principal);
 
@@ -46,7 +56,7 @@ public class AccessDenialService {
             // Дефект писателя, а не вызывающего: класс отказа и принципал
             // выражают одно состояние дважды и разойтись не вправе.
             log.error("Access denial row is inconsistent: outcome={} principal present={}",
-                    outcome, principal != null);
+                    outcome, nonNull(principal));
         }
         try {
             dataService.save(denial);
@@ -54,5 +64,10 @@ public class AccessDenialService {
             log.error("Access denial row not persisted for surface {} ({}): {}",
                     surface, outcome, failure.getMessage(), failure);
         }
+    }
+
+    /** Усечение по потолку колонки — см. {@link #SURFACE_MAX_LENGTH}. */
+    private String truncateSurface(String surface) {
+        return abbreviate(surface, SURFACE_MAX_LENGTH);
     }
 }

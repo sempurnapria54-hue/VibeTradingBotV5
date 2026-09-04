@@ -20,6 +20,7 @@ import com.example.tradingbot.integration.service.ExchangeIntegrationException;
 import com.example.tradingbot.domain.command.RetryPolicyService;
 import com.example.tradingbot.persistence.service.DealActionStateDataService;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -123,7 +124,7 @@ class CredentialsRejectionRetryExclusionTest {
                 throw failure;
             }
         };
-        when(dealActionStateDataService.findById(ACTION_STATE_ID)).thenReturn(java.util.Optional.of(actionState));
+        when(dealActionStateDataService.findById(ACTION_STATE_ID)).thenReturn(Optional.of(actionState));
         return new ServiceCommandExecutor(List.of(failing), retryPolicyService, dealActionStateDataService);
     }
 

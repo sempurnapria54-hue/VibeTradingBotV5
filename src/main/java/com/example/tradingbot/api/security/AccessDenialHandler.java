@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -48,6 +49,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AccessDenialHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
+    /** Область предъявления для Basic — имя контура, не секрет. */
+    private static final String BASIC_REALM = "Basic realm=\"tradingbot\"";
+
     private final AccessDenialService denialService;
     private final ErrorApiResponseFactory responseFactory;
     private final ObjectMapper objectMapper;
@@ -57,7 +61,7 @@ public class AccessDenialHandler implements AuthenticationEntryPoint, AccessDeni
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authenticationException) throws IOException {
         denialService.record(surfaceOf(request), AccessDenial.Outcome.PRINCIPAL_ABSENT, null);
-        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"tradingbot\"");
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, BASIC_REALM);
         respond(request, response, HttpStatus.UNAUTHORIZED);
     }
 
@@ -87,7 +91,7 @@ public class AccessDenialHandler implements AuthenticationEntryPoint, AccessDeni
             throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         objectMapper.writeValue(response.getOutputStream(),
                 responseFactory.build(status, status.getReasonPhrase(), request.getRequestURI()));
     }
