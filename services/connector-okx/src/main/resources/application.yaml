@@ -1,0 +1,54 @@
+# Конфигурация сервиса connector-okx.
+#
+# Значения осей окружения приезжают из манифеста окружения
+# (deploy/<окружение>/env.yaml); здесь — только форма и умолчания,
+# выбранные так, чтобы незаданное означало ОТКАЗ, а не разрешение.
+spring:
+  application:
+    name: connector-okx
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Точка провайдера идентичности: подпись токена проверяется
+          # локально по его ключам. Пустое означает, что контур доступа
+          # не настроен, и поверхность не поднимется — это отказ.
+          issuer-uri: ${OIDC_ISSUER_URI:}
+  cloud:
+    vault:
+      # Адрес хранилища секретов: по нему читаются ключи биржевых счетов
+      # (docs/architecture/tenant-and-exchange.md §Ключи).
+      uri: ${VAULT_URI:}
+      authentication: ${VAULT_AUTHENTICATION:KUBERNETES}
+      kubernetes:
+        role: ${VAULT_ROLE:}
+      kv:
+        # Config-import выключен намеренно: коннектор не читает из Vault
+        # свойств процесса. Ключи — операнд вызова, и берутся VaultTemplate
+        # по адресу счёта, а не биндингом в конфигурацию.
+        enabled: false
+
+platform:
+  environment:
+    # Первый сегмент адреса ключей счёта. Пусто = адрес невычислим, и
+    # приватный вызов отказывает: лучше отказ, чем поход за ключами в
+    # чужое окружение.
+    name: ${PLATFORM_ENVIRONMENT:}
+
+okx:
+  # Базовый URL площадки: выбирается по региону
+  # (docs/integrations/okx/contracts/service-urls.md).
+  base-url: ${OKX_BASE_URL:}
+
+credentials:
+  # Короткий срок кэша ключей. Требование дома
+  # (docs/architecture/tenant-and-exchange.md §Ключи): без кэша каждая
+  # команда площадке ходила бы в хранилище, и его недоступность
+  # останавливала бы торговлю мгновенно. Ноль выключает кэш.
+  cache-ttl: ${CREDENTIALS_CACHE_TTL:60s}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

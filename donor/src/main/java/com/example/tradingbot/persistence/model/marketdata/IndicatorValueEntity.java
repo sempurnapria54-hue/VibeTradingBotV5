@@ -21,7 +21,7 @@ import lombok.Setter;
  * дискриминатор indicator_type) — значения ключуются настройкой-владельцем
  * (strategy_indicator_setting_id), ряд строк (строка на свечу), не upsert.
  * Идемпотентность — UNIQUE(instrument_id, strategy_indicator_setting_id,
- * candle_timestamp) во Flyway (owner-ключевание, трек D). См.
+ * candle_timestamp) во Flyway (ключевание идентичностью вычисления, трек D). См.
  * docs/models/domain/other/IndicatorValue.md, docs/rules/market-data-retention.md.
  */
 @Getter
@@ -40,7 +40,7 @@ public abstract class IndicatorValueEntity extends AuditableEntity {
     private Long instrumentId;
 
     @Column(name = "strategy_indicator_setting_id", nullable = false, updatable = false)
-    private Long strategyIndicatorSettingId;
+    private Long indicatorConfigId;
 
     @Column(name = "candle_timestamp", nullable = false, updatable = false)
     private OffsetDateTime candleTimestamp;

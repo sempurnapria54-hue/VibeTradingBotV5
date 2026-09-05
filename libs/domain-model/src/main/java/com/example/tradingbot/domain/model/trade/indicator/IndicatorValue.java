@@ -7,15 +7,24 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Готовое значение технического индикатора, рассчитанное
- * {@code IndicatorJob} по закрытым свечам для конкретной
- * настройки-владельца {@code StrategyIndicatorSetting}. Ключуется
- * настройкой-владельцем ({@code strategyIndicatorSettingId}), не шарится и
- * не ключуется по идентичности конфигурации — реестр убран (трек D).
- * Конкретное значение лежит в наследнике по типу индикатора.
- * Persisted-модель рыночных данных, не про бизнес-цикл сделки. См.
- * docs/models/domain/other/IndicatorValue.md,
- * docs/decisions/market-data-result-identity-keying.md.
+ * Готовое значение технического индикатора, рассчитанное по закрытым
+ * свечам.
+ *
+ * <p><b>Ключуется идентичностью вычисления</b> — типом, таймфреймом и
+ * каноническими параметрами ({@code indicatorConfigId}), а не настройкой
+ * стратегии: настройка живёт в базе другого сервиса, а у фич по всему
+ * листингу для детекторов советника владельца нет вовсе. Дом решения —
+ * {@code docs/models/domain/other/IndicatorValue.md} §«Ключевание —
+ * идентичностью вычисления».
+ *
+ * <p><b>Срока свежести строка не несёт.</b> Толерантность приносит
+ * читатель и применяет к {@code candleTimestamp}: одно значение для
+ * одной настройки свежее, для другой уже нет
+ * ({@code docs/rules/market-data-freshness.md}).
+ *
+ * <p><b>В доноре та же идентичность материализована строкой настройки</b>
+ * — одна настройка есть одно вычисление, — и колонка там названа по
+ * настройке. Это деталь его схемы, а не второй смысл поля.
  */
 @Getter
 @Setter
@@ -28,8 +37,8 @@ public abstract class IndicatorValue extends Auditable {
     /** Внутренний ID инструмента. */
     private Long instrumentId;
 
-    /** FK на настройку-владельца StrategyIndicatorSetting (owner-ключевание). */
-    private Long strategyIndicatorSettingId;
+    /** Идентичность вычисления: тип индикатора, таймфрейм, канонические параметры. */
+    private Long indicatorConfigId;
 
     /** Время свечи, на которой рассчитан индикатор. */
     private OffsetDateTime candleTimestamp;

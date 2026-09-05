@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 /**
  * Раздаёт готовую структуру рынка и нужные ценовые уровни потребителям.
  * Сама уровни по свечам не ищет — их заранее считает MarketStructureJob.
- * Структура резолвится по настройке-владельцу (её id — owner-ключевание,
+ * Структура резолвится по настройке-владельцу (её id — ключевание идентичностью вычисления,
  * трек D) и отдаётся, только если свежа по её expirationDuration
  * (referencePoint = windowEndAt). См.
  * docs/components/MarketStructureService.md, docs/rules/market-data-freshness.md.

@@ -17,6 +17,19 @@ spring:
           # означает, что контур доступа не настроен, и контекст не
           # поднимется — это отказ, а не открытая поверхность.
           issuer-uri: ${OIDC_ISSUER_URI:}
+  cloud:
+    vault:
+      # Хранилище секретов: сюда `auth` ПИШЕТ ключи биржевого счёта при
+      # регистрации — единственное место платформы, где ключи пишутся
+      # (docs/architecture/tenant-and-exchange.md §Ключи).
+      uri: ${VAULT_URI:}
+      authentication: ${VAULT_AUTHENTICATION:KUBERNETES}
+      kubernetes:
+        role: ${VAULT_ROLE:}
+      kv:
+        # Config-import выключен: свойств процесса `auth` из Vault не
+        # читает, а пишет секреты счетов через VaultTemplate.
+        enabled: false
   jpa:
     open-in-view: false
     hibernate:

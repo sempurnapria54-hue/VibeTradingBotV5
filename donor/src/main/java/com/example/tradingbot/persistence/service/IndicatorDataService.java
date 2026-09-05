@@ -23,9 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
  * значения с уже присутствующим candle_timestamp в (instrument, setting)
  * повторно не вставляются (UNIQUE(instrument_id,
  * strategy_indicator_setting_id, candle_timestamp)). Чтение — производный
- * checkpoint и последнее значение. instrumentId/strategyIndicatorSettingId
+ * checkpoint и последнее значение. instrumentId/indicatorConfigId
  * уже проставлены на доменном значении (их выставляет job/калькулятор) —
- * owner-ключевание (трек D).
+ * ключевание идентичностью вычисления (трек D).
  */
 @Service
 @RequiredArgsConstructor
@@ -41,7 +41,7 @@ public class IndicatorDataService {
      * @return число фактически вставленных значений.
      */
     @Transactional
-    public Integer saveValues(Long instrumentId, Long strategyIndicatorSettingId, List<IndicatorValue> values) {
+    public Integer saveValues(Long instrumentId, Long indicatorConfigId, List<IndicatorValue> values) {
         if (isEmpty(values)) {
             return 0;
         }
@@ -50,7 +50,7 @@ public class IndicatorDataService {
         OffsetDateTime to = values.stream().map(IndicatorValue::getCandleTimestamp)
                 .max(Comparator.naturalOrder()).orElseThrow();
         Set<OffsetDateTime> existing = new HashSet<>(
-                repository.findCandleTimestampsInRange(instrumentId, strategyIndicatorSettingId, from, to));
+                repository.findCandleTimestampsInRange(instrumentId, indicatorConfigId, from, to));
         List<IndicatorValueEntity> toInsert = values.stream()
                 .filter(value -> isFalse(existing.contains(value.getCandleTimestamp())))
                 .map(mapper::domainToPersistence)
@@ -61,19 +61,19 @@ public class IndicatorDataService {
 
     /** Последнее по candle_timestamp значение настройки (для раздачи потребителям). */
     @Transactional(readOnly = true)
-    public Optional<IndicatorValue> findLatest(Long instrumentId, Long strategyIndicatorSettingId) {
+    public Optional<IndicatorValue> findLatest(Long instrumentId, Long indicatorConfigId) {
         return repository
-                .findFirstByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
-                        instrumentId, strategyIndicatorSettingId)
+                .findFirstByInstrumentIdAndIndicatorConfigIdOrderByCandleTimestampDesc(
+                        instrumentId, indicatorConfigId)
                 .map(mapper::persistenceToDomain);
     }
 
     /** Два последних значения настройки (latest, previous) — для slope/crossover. */
     @Transactional(readOnly = true)
-    public List<IndicatorValue> findLatestTwo(Long instrumentId, Long strategyIndicatorSettingId) {
+    public List<IndicatorValue> findLatestTwo(Long instrumentId, Long indicatorConfigId) {
         return repository
-                .findFirst2ByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
-                        instrumentId, strategyIndicatorSettingId)
+                .findFirst2ByInstrumentIdAndIndicatorConfigIdOrderByCandleTimestampDesc(
+                        instrumentId, indicatorConfigId)
                 .stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());

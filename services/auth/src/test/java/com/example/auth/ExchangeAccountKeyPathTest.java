@@ -2,7 +2,7 @@ package com.example.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.auth.domain.service.ExchangeAccountKeyPath;
+import com.example.tradingbot.domain.util.ExchangeAccountKeyPath;
 import org.junit.jupiter.api.Test;
 
 /**

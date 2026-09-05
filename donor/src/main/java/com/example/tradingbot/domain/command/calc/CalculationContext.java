@@ -130,7 +130,7 @@ public class CalculationContext {
             return null;
         }
         return indicatorValues.stream()
-                              .filter(value -> Objects.equals(value.getStrategyIndicatorSettingId(), settingId))
+                              .filter(value -> Objects.equals(value.getIndicatorConfigId(), settingId))
                               .findFirst()
                               .orElse(null);
     }
@@ -151,7 +151,7 @@ public class CalculationContext {
             return null;
         }
         return marketStructures.stream()
-                               .filter(structure -> Objects.equals(structure.getStrategyMarketStructureSettingId(),
+                               .filter(structure -> Objects.equals(structure.getMarketStructureConfigId(),
                                                                    settingId))
                                .findFirst()
                                .orElse(null);

@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.model.aggregate.deal;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -117,7 +118,7 @@ public class DealTranche extends Auditable {
 
     /** Транш активен: занимает место в проходе и может нести риск. */
     public Boolean isActive() {
-        return nonNull(status) && !isTrue(isTerminal());
+        return nonNull(status) && isFalse(isTerminal());
     }
 
     /**
@@ -326,8 +327,8 @@ public class DealTranche extends Auditable {
      */
     public Boolean isRiskBearing() {
         return exposure().signum() > 0
-                || !liveOrders().isEmpty()
-                || !liveAlgoOrders().isEmpty();
+                || isNotEmpty(liveOrders())
+                || isNotEmpty(liveAlgoOrders());
     }
 
     private BigDecimal zeroIfNull(BigDecimal value) {

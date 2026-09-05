@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.model.aggregate.strategy;
 
 import static java.util.Objects.isNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
@@ -99,6 +100,6 @@ public class StrategyTranche extends Auditable {
      * (docs/rules/strategy-validation.md).
      */
     public Boolean isEntryDeclaration() {
-        return !entrySteps().isEmpty();
+        return isNotEmpty(entrySteps());
     }
 }

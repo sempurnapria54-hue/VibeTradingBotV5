@@ -19,7 +19,7 @@ import org.hibernate.type.SqlTypes;
  * Persistence-проекция {@link StrategyIndicatorSetting} (таблица
  * strategy_indicator_settings) — strategy-scope-строка, объявляется раз
  * (UNIQUE(strategy_id, key)); цель FK результата расчёта IndicatorValue
- * (owner-ключевание, трек D). {@code indicator_type} — дискриминатор
+ * (ключевание идентичностью вычисления, трек D). {@code indicator_type} — дискриминатор
  * подтипа params (колонка-владелец строки); {@code params} — JSONB на
  * строке без дублирования тега (десериализуется в подтип по indicator_type,
  * docs/rules/persistence-representation.md). Не Auditable (доменная

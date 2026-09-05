@@ -12,8 +12,9 @@ import lombok.Setter;
  * реляционная строка strategy-scope (таблица strategy_indicator_settings,
  * UNIQUE(strategy_id, key)); адресуется по {@code key} (операнд условия
  * {@code indicatorKey}, «мягкие» ссылки JSON-листьев, ER/ATR-входы
- * структуры). Результат расчёта IndicatorValue ссылается на её {@code id}
- * (owner-ключевание, трек D). Дискриминатор подтипа params —
+ * структуры). Результат расчёта {@code IndicatorValue} на неё НЕ
+ * ссылается: он ключуется идентичностью вычисления
+ * (docs/models/domain/other/IndicatorValue.md). Дискриминатор строки —
  * {@code indicatorType} (колонка-владелец строки); сам params — JSONB на
  * строке без дублирования тега. Доменный таймфрейм и warmup живут внутри
  * params. См. docs/models/domain/aggregate/Strategy.md

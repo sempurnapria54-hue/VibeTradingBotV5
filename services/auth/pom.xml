@@ -30,7 +30,21 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <springdoc.version>3.0.0</springdoc.version>
+        <!-- Release train под Spring Boot 4: 2025.1.x. -->
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Формы доменных сущностей — из общего артефакта, не свои. -->
@@ -89,6 +103,17 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
+        </dependency>
+
+        <!--
+          Хранилище секретов: ключи биржевых счетов. Config-import сюда не
+          заводится намеренно — ключи не свойства процесса, а операнд
+          вызова, и читаются VaultTemplate по адресу счёта
+          (docs/architecture/tenant-and-exchange.md §Ключи).
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-vault-config</artifactId>
         </dependency>
 
         <dependency>

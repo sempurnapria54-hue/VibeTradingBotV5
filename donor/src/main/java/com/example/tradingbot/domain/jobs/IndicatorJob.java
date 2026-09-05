@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
  * Производитель технических индикаторов (docs/components/IndicatorJob.md):
  * для стратегий всех статусов кроме DELETED заранее считает объявленные
  * IndicatorValue по закрытым свечам и сохраняет их под настройкой-владельцем
- * (owner-ключевание, трек D — реестр конфигураций и дедуп убраны). Тонкий
+ * (ключевание идентичностью вычисления, трек D — реестр конфигураций и дедуп убраны). Тонкий
  * оркестратор — математику держат IndicatorCalculator'ы, идемпотентность/
  * checkpoint — IndicatorDataService (UNIQUE(instrument,
  * strategy_indicator_setting_id, candle_timestamp)). Вне расписания —

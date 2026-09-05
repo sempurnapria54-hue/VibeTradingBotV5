@@ -29,7 +29,7 @@ public class EfficiencyRatioCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         EfficiencyRatioParams erParams = (EfficiencyRatioParams) params;
         int period = erParams.getPeriod();
@@ -50,7 +50,7 @@ public class EfficiencyRatioCalculator implements IndicatorCalculator {
                     : netMove.divide(totalMove, DomainMath.CONTEXT);
             EfficiencyRatioValue value = new EfficiencyRatioValue();
             value.setInstrumentId(instrumentId);
-            value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
+            value.setIndicatorConfigId(indicatorConfigId);
             value.setCandleTimestamp(candleTimestamp(closedCandles.get(index)));
             value.setEfficiencyRatio(efficiencyRatio);
             result.add(value);

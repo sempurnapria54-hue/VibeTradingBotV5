@@ -13,14 +13,17 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Готовый результат расчёта структуры рынка (уровни, диапазоны, тренд),
- * рассчитанный MarketStructureJob (вычисление делегируется
- * MarketStructureResolver) по закрытым свечам для конкретной
- * настройки-владельца StrategyMarketStructureSetting. Ключуется
- * настройкой-владельцем (strategyMarketStructureSettingId), не шарится и не
- * ключуется по идентичности конфигурации — реестр убран (трек D). Тип
- * структуры — выход расчёта, не вход настройки. Persisted-модель
- * рыночных данных. См. docs/models/domain/other/MarketStructure.md.
+ * Результат расчёта структуры рынка по закрытым свечам.
+ *
+ * <p><b>Ключуется идентичностью вычисления</b>
+ * ({@code marketStructureConfigId}): таймфрейм, канонические параметры и
+ * ключи входов резолвера. Довод общий с индикатором —
+ * {@code docs/models/domain/other/IndicatorValue.md} §«Ключевание —
+ * идентичностью вычисления».
+ *
+ * <p><b>Ключи входов входят в идентичность:</b> два вычисления с разными
+ * входами дают разные строки, иначе последнее записанное затирало бы
+ * чужое.
  */
 @Getter
 @Setter
@@ -33,8 +36,8 @@ public class MarketStructure extends Auditable {
     /** Внутренний ID инструмента. */
     private Long instrumentId;
 
-    /** FK на настройку-владельца StrategyMarketStructureSetting (owner-ключевание). */
-    private Long strategyMarketStructureSettingId;
+    /** Идентичность вычисления: таймфрейм, параметры окна, ключи входов резолвера. */
+    private Long marketStructureConfigId;
 
     /** Тип структуры рынка (выход расчёта). */
     private Type type;

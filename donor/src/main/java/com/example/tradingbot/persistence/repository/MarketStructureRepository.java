@@ -7,9 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MarketStructureRepository extends JpaRepository<MarketStructureEntity, Long> {
 
-    Boolean existsByInstrumentIdAndStrategyMarketStructureSettingIdAndWindowEndAt(
-            Long instrumentId, Long strategyMarketStructureSettingId, OffsetDateTime windowEndAt);
+    Boolean existsByInstrumentIdAndMarketStructureConfigIdAndWindowEndAt(
+            Long instrumentId, Long marketStructureConfigId, OffsetDateTime windowEndAt);
 
-    Optional<MarketStructureEntity> findFirstByInstrumentIdAndStrategyMarketStructureSettingIdOrderByWindowEndAtDesc(
-            Long instrumentId, Long strategyMarketStructureSettingId);
+    Optional<MarketStructureEntity> findFirstByInstrumentIdAndMarketStructureConfigIdOrderByWindowEndAtDesc(
+            Long instrumentId, Long marketStructureConfigId);
 }

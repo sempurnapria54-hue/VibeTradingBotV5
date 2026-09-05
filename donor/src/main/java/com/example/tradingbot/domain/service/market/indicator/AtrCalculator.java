@@ -22,7 +22,7 @@ public class AtrCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         AtrParams atrParams = (AtrParams) params;
         int period = atrParams.getPeriod();
@@ -39,12 +39,12 @@ public class AtrCalculator implements IndicatorCalculator {
             seedSum = seedSum.add(trueRange[index]);
         }
         BigDecimal atr = seedSum.divide(periodValue, DomainMath.CONTEXT);
-        emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, period - 1, warmup, atr);
+        emit(result, instrumentId, indicatorConfigId, closedCandles, period - 1, warmup, atr);
 
         for (int index = period; index < closedCandles.size(); index++) {
             atr = atr.multiply(periodValue.subtract(BigDecimal.ONE)).add(trueRange[index])
                     .divide(periodValue, DomainMath.CONTEXT);
-            emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, index, warmup, atr);
+            emit(result, instrumentId, indicatorConfigId, closedCandles, index, warmup, atr);
         }
         return result;
     }
@@ -63,14 +63,14 @@ public class AtrCalculator implements IndicatorCalculator {
         return trueRange;
     }
 
-    private void emit(List<IndicatorValue> result, Long instrumentId, Long strategyIndicatorSettingId, List<Candle> candles,
+    private void emit(List<IndicatorValue> result, Long instrumentId, Long indicatorConfigId, List<Candle> candles,
                       int index, int warmup, BigDecimal atr) {
         if (index < warmup) {
             return;
         }
         AtrValue value = new AtrValue();
         value.setInstrumentId(instrumentId);
-        value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
+        value.setIndicatorConfigId(indicatorConfigId);
         value.setCandleTimestamp(candleTimestamp(candles.get(index)));
         value.setAtr(atr);
         result.add(value);

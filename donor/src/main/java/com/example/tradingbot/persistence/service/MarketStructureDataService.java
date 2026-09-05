@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  * результат с уже присутствующим window_end_at в (instrument, setting)
  * повторно не вставляется. При сломанной/изменившейся структуре job
  * сохраняет новый результат (новый window_end_at), а не правит старый.
- * Ключ — настройка-владелец (owner-ключевание, трек D).
+ * Ключ — настройка-владелец (ключевание идентичностью вычисления, трек D).
  */
 @Service
 @RequiredArgsConstructor
@@ -27,8 +27,8 @@ public class MarketStructureDataService {
     /** Сохраняет результат, если для (instrument, setting, window_end_at) его ещё нет. */
     @Transactional
     public void saveIfNew(MarketStructure structure) {
-        Boolean exists = repository.existsByInstrumentIdAndStrategyMarketStructureSettingIdAndWindowEndAt(
-                structure.getInstrumentId(), structure.getStrategyMarketStructureSettingId(),
+        Boolean exists = repository.existsByInstrumentIdAndMarketStructureConfigIdAndWindowEndAt(
+                structure.getInstrumentId(), structure.getMarketStructureConfigId(),
                 structure.getWindowEndAt());
         if (isTrue(exists)) {
             return;
@@ -38,10 +38,10 @@ public class MarketStructureDataService {
 
     /** Последняя по window_end_at структура настройки (для раздачи потребителям). */
     @Transactional(readOnly = true)
-    public Optional<MarketStructure> findLatest(Long instrumentId, Long strategyMarketStructureSettingId) {
+    public Optional<MarketStructure> findLatest(Long instrumentId, Long marketStructureConfigId) {
         return repository
-                .findFirstByInstrumentIdAndStrategyMarketStructureSettingIdOrderByWindowEndAtDesc(
-                        instrumentId, strategyMarketStructureSettingId)
+                .findFirstByInstrumentIdAndMarketStructureConfigIdOrderByWindowEndAtDesc(
+                        instrumentId, marketStructureConfigId)
                 .map(mapper::persistenceToDomain);
     }
 }

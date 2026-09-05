@@ -32,7 +32,7 @@ public class BollingerBandsCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         BollingerBandsParams bbParams = (BollingerBandsParams) params;
         int period = bbParams.getPeriod();
@@ -52,7 +52,7 @@ public class BollingerBandsCalculator implements IndicatorCalculator {
             BigDecimal lower = middle.subtract(deviation);
             BollingerBandsValue value = new BollingerBandsValue();
             value.setInstrumentId(instrumentId);
-            value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
+            value.setIndicatorConfigId(indicatorConfigId);
             value.setCandleTimestamp(candleTimestamp(closedCandles.get(index)));
             value.setUpperBand(upper);
             value.setMiddleBand(middle);

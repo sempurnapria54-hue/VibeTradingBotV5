@@ -18,6 +18,18 @@
 ## Endpoint
 
 `GET /api/v5/market/ticker`. Permission: Public (auth не нужен).
+
+**Агрегатная форма — `GET /api/v5/market/tickers`** (плюрал): один запрос
+отдаёт тикеры всего листинга по `instType`. Rate limit 20 req / 2 s по
+IP. Элемент — тот же объект, что у единичного чтения
+(`docs/models/integrations/okx/TickerOkxResponse.md`), плюс суточные
+объёмы (`vol24h`, `volCcy24h`). Форма подтверждена контуром проверки
+источника (`.claude/tests/source-api/okx/plan.md` §«MG1. Tickers
+(плюрал) — GET /api/v5/market/tickers (Market Data)»).
+
+**Зачем агрегатная:** срез цен по всему листингу поинструментным обходом
+стоил бы сотни запросов из общего бюджета лимитов
+(`docs/processes/snapshot-collection.md`).
 Rate limit: 20 req / 2 s по IP + Instrument ID. Query: `instId`
 обязателен (`ETH-USDT-SWAP`).
 

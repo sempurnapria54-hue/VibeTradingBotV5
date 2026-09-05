@@ -66,16 +66,19 @@ IndicatorValue + MarketStructure
 ## Условия запуска и инварианты
 
 - Все расчёты — только по закрытым свечам, без look-ahead.
-- Jobs идемпотентны (уникальность по `instrument` +
-  **настройка-владелец** (`strategy_indicator_setting_id` /
-  `strategy_market_structure_setting_id`) + candle/window timestamp —
-  owner-ключевание, `docs/rules/market-data-freshness.md`;
-  checkpoint **производный** — `max(timestamp)` по таблице результатов на
-  (инструмент + настройка-владелец), отдельного состояния не храним). Фаза
-  job'ом не считается (вычисляется на чтение), идемпотентность к ней
-  неприменима.
-- Jobs **не** меняют `Strategy.Status`; для `DELETED`-стратегий новые
-  данные не считаются (правило — `docs/rules/market-data-freshness.md`).
+- Jobs идемпотентны (уникальность по `instrument` + **идентичность
+  вычисления** (`indicator_config_id` / `market_structure_config_id`) +
+  candle/window timestamp — `docs/models/domain/other/IndicatorValue.md`
+  §«Ключевание — идентичностью вычисления»; checkpoint **производный** —
+  `max(timestamp)` по таблице результатов на (инструмент + идентичность),
+  отдельного состояния не храним). Фаза job'ом не считается (вычисляется
+  на чтение), идемпотентность к ней неприменима.
+- **Что считать, определяет требование потребителя, а не стратегия
+  напрямую.** Расчёт идёт по идентичностям, которые кто-то заказал
+  (`docs/architecture/market-data-collection.md` §«Как потребность
+  доходит до сбора»); статуса стратегий сервис рыночных данных не видит —
+  снятие стратегии убирает её требование, а не строки результата, на
+  которых стои́т чужой бэктест.
 - При отсутствии свежих входных данных job не создаёт новый result;
   старый постепенно становится expired (свежесть проверяет
   `docs/components/MarketDataExpirationChecker.md`).

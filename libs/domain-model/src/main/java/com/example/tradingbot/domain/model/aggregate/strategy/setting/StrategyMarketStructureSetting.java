@@ -13,7 +13,8 @@ import lombok.Setter;
  * UNIQUE(strategy_id, key)); адресуется по {@code key} (операнд условия
  * {@code structureKey}, «мягкие» ссылки JSON-листьев placement/stopLossSettings).
  * Результат расчёта MarketStructure ссылается на её {@code id}
- * (owner-ключевание, трек D). ER/ATR-входы резолвера — «мягкие» ссылки по
+ * (результат считается по идентичности вычисления, а не по этой
+ * настройке — docs/models/domain/other/IndicatorValue.md).
  * {@code key} на индикаторные настройки стратегии. См.
  * docs/models/domain/aggregate/Strategy.md (§StrategyMarketStructureSetting).
  */

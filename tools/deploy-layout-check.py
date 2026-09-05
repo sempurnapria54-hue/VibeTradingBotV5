@@ -90,12 +90,32 @@ def inventory(root):
             continue
         first = line.split("|")[1].strip()
         for name in re.findall(r"`([a-z][a-z0-9-]*(?:-<[^>]+>)?)`", first):
-            # `connector-<биржа>` — семейство: каталогом станет конкретное имя.
-            units.add(name.split("-<")[0] if "-<" in name else name)
+            # `connector-<биржа>` — СЕМЕЙСТВО, а не единица: каталогом
+            # станет конкретное имя (`connector-okx`). Семейство метится
+            # хвостом «-», и принадлежность проверяет unit_known ниже —
+            # сравнением по префиксу, а не равенством. До первого
+            # коннектора в services/ эта ветка не исполнялась ни разу, и
+            # разница между «семейство» и «единица» была неотличима:
+            # ось на семейной строке не срабатывала.
+            units.add(name.split("-<")[0] + "-" if "-<" in name else name)
     if not units:
         raise Refusal("в %s не разобрана ни одна единица развёртывания"
                       % SERVICES_DOC)
     return units
+
+
+def unit_known(name, units):
+    """Каталог назван инвентарём: единицей поимённо либо членом семейства.
+
+    Член семейства — имя с непустым хвостом после «-» (`connector-okx`
+    при семействе `connector-`). Пустой хвост членом не считается:
+    каталог `connector` — это семейство, объявившее себя единицей, а
+    площадки у него нет.
+    """
+    if name in units:
+        return True
+    return any(unit.endswith("-") and name.startswith(unit) and len(name) > len(unit)
+               for unit in units)
 
 
 def shared_artifacts(root):
@@ -209,7 +229,7 @@ def check(root):
         for name in sorted(os.listdir(services)):
             if not os.path.isdir(os.path.join(services, name)):
                 continue
-            if name not in units:
+            if not unit_known(name, units):
                 defects.append("services/%s — единицы нет в инвентаре %s"
                                % (name, SERVICES_DOC))
 
@@ -284,6 +304,7 @@ MIN_SERVICES = """## Единицы развёртывания
 |---|---|---|
 | `alpha` | — | нет |
 | `beta` | — | да |
+| `connector-<биржа>` (по одной на площадку) | — | нет |
 
 ## Общие артефакты монорепозитория
 
@@ -385,6 +406,20 @@ def battery():
     defects, refusal = run(stray_service)
     axis("1. единица в services/ вне инвентаря — расхождение",
          bool(defects) and any("инвентаре" in d for d in defects or []),
+         refusal or "; ".join(defects or []))
+
+    def family_member(files):
+        files["services/connector-okx/.keep"] = ""
+    defects, refusal = run(family_member)
+    axis("1b. КОНТРОЛЬ: член семейства `connector-<биржа>` принимается",
+         refusal is None and not defects,
+         refusal or "; ".join(defects or []) or "дефектов: 0")
+
+    def bare_family(files):
+        files["services/connector/.keep"] = ""
+    defects, refusal = run(bare_family)
+    axis("1c. голое имя семейства без площадки — расхождение",
+         bool(defects) and any("connector" in d for d in defects or []),
          refusal or "; ".join(defects or []))
 
     def stray_lib(files):

@@ -19,7 +19,7 @@ import org.hibernate.type.SqlTypes;
  * Persistence-проекция {@link StrategyMarketStructureSetting} (таблица
  * strategy_market_structure_settings) — strategy-scope-строка,
  * объявляется раз (UNIQUE(strategy_id, key)); цель FK результата расчёта
- * MarketStructure (owner-ключевание, трек D). {@code params} — JSONB на
+ * MarketStructure (ключевание идентичностью вычисления, трек D). {@code params} — JSONB на
  * строке (MarketStructureParams не полиморфен — тег не нужен). ER/ATR-входы
  * — «мягкие» ключи на индикаторные настройки стратегии. Не Auditable
  * (доменная настройка — value, не Auditable).

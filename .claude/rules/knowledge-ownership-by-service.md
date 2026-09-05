@@ -56,7 +56,7 @@
 | `docs/models/domain/core/Instrument.md`, `other/InstrumentExternalRules.md`, `other/TradeFeeRate.md` | `market-data`; проекция у `trading-core` |
 | `docs/models/domain/aggregate/`: `Deal`, `DealTranche`; `other/`: `DealActionState`, `DealCashFlow`, `AnomalyReport` | `trading-core` |
 | `docs/models/domain/aggregate/Strategy.md` | определение — `strategies`; исполняемая форма — `strategy-engine` |
-| `docs/models/domain/other/`: `Candle`, `CandleGroup`, `IndicatorValue`, `MarketStructure`, `MarketPhase` | `market-data` |
+| `docs/models/domain/other/`: `Candle`, `CandleGroup`, `IndicatorValue`, `MarketStructure`, `MarketPhase`, `MarketOrderBook`, `MarketTicker` | `market-data` |
 | `docs/models/domain/other/AccessDenial.md` | `auth` + `bff` |
 | `docs/models/domain/other/Auditable.md` | `domain-model` |
 | `docs/models/integrations/okx/`, `docs/models/mapping/`, `docs/integrations/okx/` | `connector-okx` |
@@ -68,7 +68,7 @@
 | `docs/components/`: `IntegrationService`, `*ExternalStatusResolver`, `AttachedAlgoOrderStateResolver` | `connector-okx` |
 | `docs/components/`: `StrategyConditionEvaluator`, `StrategyActionCalculator`, `PriceCalculator`, `SizeCalculator`, `CalculationContextFactory` и их runtime-модели | `strategy-engine` |
 | `docs/components/`: всё остальное (оркестратор, обработчики, исполнители, риск, холды, kill-switch, аномалии, сканер входа, ошибки, ретраи) и их runtime-модели | `trading-core` |
-| `docs/processes/`: `candle-loading`, `market-data-calculation` | `market-data` |
+| `docs/processes/`: `candle-loading`, `market-data-calculation`, `snapshot-collection` | `market-data` |
 | `docs/processes/`: `deal-management`, `fsm-execution-layering`, `risk-evaluation` | `trading-core` |
 | `docs/processes/strategy-action-calculation.md` | `strategy-engine` |
 | `docs/spec/` | по владельцу величины: сайзинг, риск, сделки, транши, холды — `trading-core`; свежесть, фаза — `market-data`; стратегия — `strategies` / `strategy-engine`; статусы площадки — коннектор |

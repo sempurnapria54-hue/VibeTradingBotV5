@@ -12,17 +12,17 @@ public interface IndicatorValueRepository extends JpaRepository<IndicatorValueEn
 
     /** Уже сохранённые candle_timestamp в окне (дедуп при идемпотентном пересчёте). */
     @Query("select v.candleTimestamp from IndicatorValueEntity v "
-            + "where v.instrumentId = :instrumentId and v.strategyIndicatorSettingId = :settingId "
+            + "where v.instrumentId = :instrumentId and v.indicatorConfigId = :settingId "
             + "and v.candleTimestamp between :from and :to")
     List<OffsetDateTime> findCandleTimestampsInRange(@Param("instrumentId") Long instrumentId,
                                                      @Param("settingId") Long settingId,
                                                      @Param("from") OffsetDateTime from,
                                                      @Param("to") OffsetDateTime to);
 
-    Optional<IndicatorValueEntity> findFirstByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
-            Long instrumentId, Long strategyIndicatorSettingId);
+    Optional<IndicatorValueEntity> findFirstByInstrumentIdAndIndicatorConfigIdOrderByCandleTimestampDesc(
+            Long instrumentId, Long indicatorConfigId);
 
     /** Два последних значения (по убыванию candle_timestamp) — для slope/crossover. */
-    List<IndicatorValueEntity> findFirst2ByInstrumentIdAndStrategyIndicatorSettingIdOrderByCandleTimestampDesc(
-            Long instrumentId, Long strategyIndicatorSettingId);
+    List<IndicatorValueEntity> findFirst2ByInstrumentIdAndIndicatorConfigIdOrderByCandleTimestampDesc(
+            Long instrumentId, Long indicatorConfigId);
 }

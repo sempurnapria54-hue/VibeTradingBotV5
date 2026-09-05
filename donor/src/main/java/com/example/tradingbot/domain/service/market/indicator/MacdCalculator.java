@@ -28,7 +28,7 @@ public class MacdCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         MacdParams macdParams = (MacdParams) params;
         int fast = macdParams.getFastPeriod();
@@ -59,7 +59,7 @@ public class MacdCalculator implements IndicatorCalculator {
             BigDecimal macd = macdLine.get(compact);
             MacdValue value = new MacdValue();
             value.setInstrumentId(instrumentId);
-            value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
+            value.setIndicatorConfigId(indicatorConfigId);
             value.setCandleTimestamp(candleTimestamp(closedCandles.get(index)));
             value.setMacdLine(macd);
             value.setSignalLine(signalLine);

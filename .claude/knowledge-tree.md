@@ -159,7 +159,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v128.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v130.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -374,8 +374,10 @@
 │   │   │       ├── DealCashFlow.md — Что это за модель `DealCashFlow`?
 │   │   │       ├── IndicatorValue.md — Что это за модель `IndicatorValue`?
 │   │   │       ├── InstrumentExternalRules.md — Что это за модель `InstrumentExternalRules` — справочные правила инструмента?
+│   │   │       ├── MarketOrderBook.md — Что это за модель `MarketOrderBook` — срез книги заявок?
 │   │   │       ├── MarketPhase.md — Что это за `MarketPhase`?
 │   │   │       ├── MarketStructure.md — Что это за модель `MarketStructure`?
+│   │   │       ├── MarketTicker.md — Что это за модель `MarketTicker` — срез цен?
 │   │   │       └── TradeFeeRate.md — Что это за модель `TradeFeeRate` — ставка торговой комиссии?
 │   │   ├── integrations/ — Какие поля у нативной модели источника?
 │   │   │   └── okx/ — Какие поля у нативной модели источника OKX?
@@ -411,6 +413,7 @@
 │   │   ├── fsm-execution-layering.md — Как разложены слои исполнения сделки от петли до биржевого вызова?
 │   │   ├── market-data-calculation.md — Как устроен процесс вычисления производных рыночных данных (индикаторы / структура / фаза) поверх загруженных свечей?
 │   │   ├── risk-evaluation.md — Как устроен процесс оценки риска?
+│   │   ├── snapshot-collection.md — Как устроен процесс снятия невосполнимых срезов?
 │   │   └── strategy-action-calculation.md — Как устроен процесс расчёта параметров одного `StrategyAction`?
 │   ├── rules/ — Какое правило действует в системе?
 │   │   ├── absent-value-semantics.md — Как выражается отсутствие значения у признака?

@@ -52,7 +52,10 @@ public class ExchangeAccountController {
                 request.getTenantInternalId(),
                 request.getExchangeCode(),
                 request.getLabel(),
-                ExchangeAccount.Contour.valueOf(request.getContour()));
+                ExchangeAccount.Contour.valueOf(request.getContour()),
+                request.getApiKey(),
+                request.getSecret(),
+                request.getPassphrase());
         return ResponseEntity.status(HttpStatus.CREATED).body(accountMapper.persistenceToApi(account));
     }
 

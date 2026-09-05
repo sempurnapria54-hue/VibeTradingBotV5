@@ -1,0 +1,51 @@
+package com.example.connector.okx.mapping;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
+import com.example.tradingbot.domain.model.trade.candle.Candle;
+import com.example.connector.okx.snapshot.CandleExternalSnapshot;
+import com.example.connector.okx.integration.model.okx.response.CandleOkxResponse;
+import com.example.connector.okx.util.OkxConstants;
+import java.math.BigDecimal;
+import java.util.Objects;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Named;
+import org.mapstruct.ReportingPolicy;
+
+/**
+ * Маппинг свечи между слоями (docs/models/mapping/Candle.md):
+ * integration DTO OKX (позиционный массив, уже разобранный в
+ * {@link CandleOkxResponse}) → граничный {@link CandleExternalSnapshot},
+ * затем → доменная {@link Candle}. Сырые строки OKX → BigDecimal/Long;
+ * confirm — фильтр закрытых свечей, в домен не пишется.
+ */
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface CandleMapper {
+
+    @Mapping(target = "openTimestamp", source = "ts", qualifiedByName = "toLong")
+    @Mapping(target = "open", source = "open", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "high", source = "high", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "low", source = "low", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "close", source = "close", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "volume", source = "volume", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "confirm", source = "confirm", qualifiedByName = "toConfirm")
+    CandleExternalSnapshot integrationToSnapshot(CandleOkxResponse response);
+
+    Candle snapshotToDomain(CandleExternalSnapshot snapshot);
+
+    @Named("toBigDecimal")
+    default BigDecimal toBigDecimal(String value) {
+        return isBlank(value) ? null : new BigDecimal(value);
+    }
+
+    @Named("toLong")
+    default Long toLong(String value) {
+        return isBlank(value) ? null : Long.valueOf(value);
+    }
+
+    @Named("toConfirm")
+    default Boolean toConfirm(String value) {
+        return Objects.equals(OkxConstants.CONFIRM_CLOSED, value);
+    }
+}

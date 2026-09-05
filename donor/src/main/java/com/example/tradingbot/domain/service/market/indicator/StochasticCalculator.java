@@ -31,7 +31,7 @@ public class StochasticCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         StochasticParams stochasticParams = (StochasticParams) params;
         int kPeriod = stochasticParams.getkPeriod();
@@ -50,7 +50,7 @@ public class StochasticCalculator implements IndicatorCalculator {
             if (nonNull(kLine[index]) && nonNull(dLine[index])) {
                 StochasticValue value = new StochasticValue();
                 value.setInstrumentId(instrumentId);
-                value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
+                value.setIndicatorConfigId(indicatorConfigId);
                 value.setCandleTimestamp(candleTimestamp(closedCandles.get(index)));
                 value.setK(kLine[index]);
                 value.setD(dLine[index]);

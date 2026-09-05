@@ -21,10 +21,11 @@ import lombok.Setter;
  * Persistence-проекция MarketStructure (таблица market_structures).
  * Уровни — отдельные строки market_price_levels (контейнмент cascade).
  * Событие пробоя — плоские breakout_*-колонки (null — пробоя нет).
- * Ключуется настройкой-владельцем (strategy_market_structure_setting_id);
+ * Строка адресуется идентичностью вычисления; в схеме донора эта
+ * идентичность материализована строкой настройки, и колонка названа по ней.
  * ряд строк (строка на окно), не upsert. Идемпотентность —
  * UNIQUE(instrument_id, strategy_market_structure_setting_id, window_end_at)
- * во Flyway (owner-ключевание, трек D). См.
+ * во Flyway (ключевание идентичностью вычисления, трек D). См.
  * docs/models/domain/other/MarketStructure.md.
  */
 @Getter
@@ -41,7 +42,7 @@ public class MarketStructureEntity extends AuditableEntity {
     private Long instrumentId;
 
     @Column(name = "strategy_market_structure_setting_id", nullable = false, updatable = false)
-    private Long strategyMarketStructureSettingId;
+    private Long marketStructureConfigId;
 
     @Column(name = "type", nullable = false)
     private String type;

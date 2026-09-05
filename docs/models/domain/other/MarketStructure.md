@@ -10,12 +10,13 @@
 (уровни, диапазоны, тренд), рассчитанный `MarketStructureJob` (вычисление
 делегируется компоненту `MarketStructureResolver` —
 `docs/components/MarketStructureResolver.md`) по закрытым свечам для
-конкретной **настройки-владельца** `StrategyMarketStructureSetting`.
-Результат ключуется настройкой-владельцем (одна типизированная FK
-`strategyMarketStructureSettingId`), **не шарится** и не ключуется по
-идентичности конфигурации — реестр `market_structure_configs` убран
-ревизией трек D (см.
-`docs/rules/market-data-freshness.md`). Persisted-модель
+заданных параметров окна. **Результат ключуется идентичностью
+вычисления** — таймфрейм плюс канонические параметры; довод и снятая
+редакция — общие с индикатором
+(`docs/models/domain/other/IndicatorValue.md`
+§«Ключевание — идентичностью вычисления»): настройка стратегии живёт в
+базе другого сервиса, а у структуры по всему листингу владельца нет
+вовсе. Persisted-модель
 рыночных данных, не про бизнес-цикл сделки → `other` (см.
 `.claude/decisions/models-core-vs-other.md`).
 
@@ -37,7 +38,7 @@ Java-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID результата расчёта. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `strategyMarketStructureSettingId` | `Long` | FK на настройку-владельца `StrategyMarketStructureSetting` (`strategy_market_structure_settings.id`) — owner-ключевание (см. `docs/rules/market-data-freshness.md`). |
+| `marketStructureConfigId` | `Long` | FK на идентичность вычисления (`market_structure_configs.id`): таймфрейм, канонические параметры, ключи входов. |
 | `type` | `Type` | Тип структуры рынка. |
 | `windowStartAt` | `OffsetDateTime` | Начало окна свечей расчёта. |
 | `windowEndAt` | `OffsetDateTime` | Конец окна свечей расчёта. |
@@ -173,26 +174,21 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 ## Правила хранения
 
 - Считается только по закрытым свечам (без look-ahead).
-- Уникальность: `UNIQUE(instrument_id, strategy_market_structure_setting_id,
-  window_end_at)` (ключ по настройке-владельцу — owner-ключевание, см.
-  `docs/rules/market-data-freshness.md`).
+- Уникальность: `UNIQUE(instrument_id, market_structure_config_id,
+  window_end_at)` — ключ по идентичности вычисления.
 - **Per-настроечный `structureType` отсутствует** (`StrategyMarketStructureSetting`
   его не несёт): `MarketStructure.Type` — **выход** расчёта
-  (`MarketStructureResolver` его выводит), не вход настройки. Реестра
-  конфигураций и «идентичности конфигурации» больше нет — результат
-  ключуется настройкой-владельцем; канонизация `params` не нужна.
-  - **Краевой случай разногласия конфигураций снят по построению.** Soft-ключи
-    входов резолвера `efficiencyRatioKey` / `atrKey` живут на настройке;
-    при owner-ключевании каждая настройка структуры (со своими ER/ATR-
-    ключами) пишет в **свою** строку под своим
-    `strategy_market_structure_setting_id` — разделяемого ряда, на котором
-    возникала коллизия, нет (см.
-    `docs/models/domain/other/MarketStructure.md` случай
-    идентичности).
+  (`MarketStructureResolver` его выводит), не вход настройки.
+  - **Soft-ключи входов резолвера входят в идентичность.**
+    `efficiencyRatioKey` / `atrKey` называют, на каких входах посчитана
+    структура; две настройки с разными входами дают **разные**
+    идентичности и разные строки. Канонизация параметров поэтому
+    обязана включать их: без этого два разных вычисления делили бы одну
+    строку, и последнее записанное затирало бы чужое.
 - **Свежесть на чтение:** точка отсчёта — `windowEndAt`; устаревание
-  считается в runtime, колонкой не хранится; у строки результата один
-  владелец, под него и оценивается свежесть. Правило —
+  считается в runtime, колонкой не хранится; толерантность приносит
+  **потребитель**. Правило —
   `docs/rules/market-data-freshness.md`, форма —
   `docs/spec/market-data-freshness.json`.
-- **Retention:** результаты не чистятся (нет потребителя истории) —
-  `docs/rules/market-data-retention.md`.
+- **Retention:** производные следуют за глубиной свечей, на которых
+  посчитаны, — `docs/rules/market-data-retention.md` (дом).

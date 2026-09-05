@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
  * Раздаёт готовые значения индикаторов потребителям (evaluator,
  * калькуляторы, MarketPhaseResolver). Сам индикаторы не считает — их
  * заранее считает IndicatorJob. Значение резолвится по
- * настройке-владельцу (её id — owner-ключевание, трек D) и отдаётся,
+ * настройке-владельцу (её id — ключевание идентичностью вычисления, трек D) и отдаётся,
  * только если свежо по её expirationDuration (referencePoint =
  * candleTimestamp). См. docs/components/IndicatorService.md,
  * docs/rules/market-data-freshness.md.

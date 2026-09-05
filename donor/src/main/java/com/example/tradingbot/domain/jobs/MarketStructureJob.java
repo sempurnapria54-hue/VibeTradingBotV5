@@ -39,7 +39,7 @@ import org.springframework.stereotype.Component;
  * Производитель структуры рынка (docs/components/MarketStructureJob.md):
  * для стратегий всех статусов кроме DELETED заранее готовит MarketStructure
  * по закрытым свечам окна и сохраняет под настройкой-владельцем
- * (owner-ключевание, трек D — реестр конфигураций и дедуп убраны). Тонкий —
+ * (ключевание идентичностью вычисления, трек D — реестр конфигураций и дедуп убраны). Тонкий —
  * классификацию держит MarketStructureResolver; идемпотентность —
  * MarketStructureDataService (UNIQUE(instrument,
  * strategy_market_structure_setting_id, window_end_at)). Готовые каталожные
@@ -126,7 +126,7 @@ public class MarketStructureJob {
         }
         MarketStructure structure = resolver.resolve(window, efficiencyRatio, atr, setting.getParams());
         structure.setInstrumentId(instrumentId);
-        structure.setStrategyMarketStructureSettingId(settingId);
+        structure.setMarketStructureConfigId(settingId);
         structureDataService.saveIfNew(structure);
     }
 
@@ -156,7 +156,7 @@ public class MarketStructureJob {
     private MarketStructure unknownStructure(Long instrumentId, Long settingId, List<Candle> window) {
         MarketStructure structure = new MarketStructure();
         structure.setInstrumentId(instrumentId);
-        structure.setStrategyMarketStructureSettingId(settingId);
+        structure.setMarketStructureConfigId(settingId);
         structure.setType(MarketStructure.Type.UNKNOWN);
         structure.setLevels(new ArrayList<>());
         OffsetDateTime windowEndAt = timestampOf(window.get(window.size() - 1));

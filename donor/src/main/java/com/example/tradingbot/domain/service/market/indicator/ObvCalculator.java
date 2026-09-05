@@ -28,7 +28,7 @@ public class ObvCalculator implements IndicatorCalculator {
     }
 
     @Override
-    public List<IndicatorValue> calculate(Long instrumentId, Long strategyIndicatorSettingId, List<Candle> closedCandles,
+    public List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
                                           IndicatorParams params) {
         ObvParams obvParams = (ObvParams) params;
         int warmup = effectiveWarmup(obvParams.getWarmup(), 1);
@@ -50,7 +50,7 @@ public class ObvCalculator implements IndicatorCalculator {
             if (index >= warmup) {
                 ObvValue value = new ObvValue();
                 value.setInstrumentId(instrumentId);
-                value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);
+                value.setIndicatorConfigId(indicatorConfigId);
                 value.setCandleTimestamp(candleTimestamp(closedCandles.get(index)));
                 value.setObv(obv);
                 result.add(value);
