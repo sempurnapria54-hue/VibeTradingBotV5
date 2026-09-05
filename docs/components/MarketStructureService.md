@@ -6,21 +6,25 @@
 
 ## Назначение
 
-`MarketStructureService` отдаёт готовую `MarketStructure` и нужные
-`MarketPriceLevel` (см. `docs/models/domain/other/MarketStructure.md`). Сам
+`MarketStructureService` отдаёт готовую `MarketStructure` вместе с её
+`MarketPriceLevel` (`docs/models/domain/other/MarketStructure.md`). Сам
 уровни по свечам не ищет — их заранее считает
 `docs/components/MarketStructureJob.md`.
 
-## Контракт (примеры методов)
+## Контракт
 
-- `MarketStructure getLatestStructure(Long instrumentId,
-  StrategyMarketStructureSetting setting)`;
-- `MarketPriceLevel getRequiredLevel(MarketStructure structure,
-  MarketPriceLevel.Type levelType)`.
+- `Optional<MarketStructure> getLatestStructure(Long instrumentId,
+  Long marketStructureConfigId, Duration tolerance)` — последняя
+  структура идентичности, свежая под срок **запрашивающего**; точка
+  отсчёта — `windowEndAt`.
+
+Срок приезжает операндом по тому же доводу, что у значений индикатора
+(`docs/components/IndicatorService.md`). Выбора уровня контракт не несёт:
+уровень из уже отданной структуры достаёт её читатель предикатом самой
+модели, а не чужой сервис.
 
 ## Поведение при отсутствии / устаревании
 
-Если нужная структура отсутствует или устарела по
-`StrategyMarketStructureSetting.expirationDuration` (правило —
-`docs/rules/market-data-freshness.md`) — это блокирующее условие для
-активации стратегии, входа и выполнения action, зависящего от структуры.
+Структуры нет либо она старше названного срока — отдаётся пустота; обе
+пустоты неразличимы и ведут к одной реакции читателя
+(`docs/rules/market-data-freshness.md`).

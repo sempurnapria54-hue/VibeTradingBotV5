@@ -2,10 +2,12 @@ package com.example.marketdata.domain.jobs;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.marketdata.config.ConnectorProperties;
 import com.example.marketdata.config.InstrumentSyncProperties;
 import com.example.marketdata.domain.service.InstrumentCatalogService;
+import com.example.marketdata.integration.ExchangeAccessException;
 import com.example.marketdata.persistence.service.InstrumentDataService;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import java.util.List;
@@ -68,18 +70,34 @@ public class InstrumentSyncJob {
     }
 
     private void run() {
-        syncListing();
-        syncRules();
+        if (isTrue(syncListing())) {
+            syncRules();
+        }
     }
 
-    private void syncListing() {
+    /**
+     * Сводит каталог с листингом по каждому типу инструмента.
+     *
+     * <p>Отказ доступа или лимита ПРЕКРАЩАЕТ тик: под исчерпанным лимитом
+     * следующие чтения тратят бюджет, которым пользуется и сбор
+     * невосполнимых срезов (docs/processes/snapshot-collection.md §«Отказ
+     * на проходе»).
+     *
+     * @return прошёл ли листинг без отказа доступа; под отказом второй
+     *         половине тика идти незачем.
+     */
+    private Boolean syncListing() {
         for (String instrumentType : connectorProperties.getInstrumentTypes()) {
             try {
                 catalogService.synchronizeListing(instrumentType);
+            } catch (ExchangeAccessException e) {
+                log.error("Instrument sync tick stopped on listing: exchange refused access or limit", e);
+                return false;
             } catch (RuntimeException e) {
                 log.error("Instrument listing sync failed for instType={}", instrumentType, e);
             }
         }
+        return true;
     }
 
     /**
@@ -105,6 +123,9 @@ public class InstrumentSyncJob {
         for (Instrument instrument : instruments) {
             try {
                 catalogService.synchronizeRules(instrument);
+            } catch (ExchangeAccessException e) {
+                log.error("Instrument rules sync stopped: exchange refused access or limit", e);
+                return;
             } catch (RuntimeException e) {
                 log.error("Instrument rules sync failed for {}", instrument.getId(), e);
             }

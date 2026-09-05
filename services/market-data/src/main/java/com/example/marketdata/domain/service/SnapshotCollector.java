@@ -116,7 +116,8 @@ public class SnapshotCollector {
         for (Instrument instrument : listed) {
             MarketTicker ticker = tickers.get(instrument.getExternalId());
             if (nonNull(ticker)) {
-                persistTicker(ticker, instrument, observedAt, markPrices, indexPrices);
+                persistSafely(instrument, () -> persistTicker(ticker, instrument, observedAt,
+                        markPrices, indexPrices));
             }
         }
     }
@@ -166,7 +167,30 @@ public class SnapshotCollector {
                 return;
             } catch (ExchangeReadException e) {
                 log.warn("Order book snapshot skipped for {}", instrument.getExternalId(), e);
+            } catch (RuntimeException e) {
+                log.warn("Order book snapshot not written for {}", instrument.getExternalId(), e);
             }
+        }
+    }
+
+    /**
+     * Пишет строку среза так, чтобы её отказ стоил одну строку, а не
+     * проход.
+     *
+     * <p><b>Отказ письма разведён с отказом чтения намеренно.</b>
+     * Отказ по одному инструменту проход не роняет — это объявленная
+     * политика класса, — но до сих пор она держалась только на отказах
+     * ЧТЕНИЯ: строка, которую площадка отдала неполной (нет метки
+     * времени — а это половина естественного ключа), валила бы письмо
+     * необъявленным исключением, и вместе с ним весь проход, включая ещё
+     * не снятые книги. Момент при этом невосполним
+     * (docs/processes/snapshot-collection.md).
+     */
+    private void persistSafely(Instrument instrument, Runnable write) {
+        try {
+            write.run();
+        } catch (RuntimeException e) {
+            log.warn("Ticker snapshot not written for {}", instrument.getExternalId(), e);
         }
     }
 }

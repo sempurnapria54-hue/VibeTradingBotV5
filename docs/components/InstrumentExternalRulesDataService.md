@@ -39,4 +39,4 @@
 
 - Навес правил — `docs/models/domain/other/InstrumentExternalRules.md`.
 - Ставка — `docs/models/domain/other/TradeFeeRate.md`.
-- Синк — `docs/components/InstrumentExternalRulesSyncJob.md`.
+- Синк — `docs/components/InstrumentSyncJob.md`.

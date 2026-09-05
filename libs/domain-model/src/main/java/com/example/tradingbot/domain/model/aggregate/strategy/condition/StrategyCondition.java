@@ -14,7 +14,7 @@ import lombok.Setter;
  * истинности — деталь evaluator'а (downstream,
  * StrategyConditionEvaluator). См.
  * docs/models/domain/aggregate/Strategy.md (§Условия),
- * docs/decisions/strategy-condition-authoring-contract.md.
+ * docs/rules/strategy-condition-contract.md.
  */
 @Getter
 @Setter

@@ -16,6 +16,8 @@ import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -90,6 +92,55 @@ class CandleDemandTest {
         verify(candleGroupDataService).save(saved.capture());
         assertThat(saved.getValue().getPlannedFirstUtcMillis()).isLessThan(System.currentTimeMillis());
         assertThat(saved.getValue().getStatus()).isEqualTo(CandleGroup.Status.BACKFILL);
+    }
+
+    /**
+     * Группа, застигнутая посреди цикла, тоже возвращается к бэкфиллу.
+     *
+     * <p>Это НЕ повтор предыдущего случая: там группа была {@code ACTIVE},
+     * и возврат держался на проверке готовности. Докачка хвоста уводит
+     * группу из {@code ACTIVE} на каждом новом закрытом баре, и требование,
+     * пришедшее в это окно, дошло бы по циклу до {@code ACTIVE} с
+     * непокрытым горизонтом — то есть потерялось бы молча.
+     */
+    @ParameterizedTest
+    @EnumSource(value = CandleGroup.Status.class,
+            names = {"CREATED", "SYNC", "CHECK", "REPAIR", "ACTIVE"})
+    void deeperRequirementReopensBackfillFromAnyLiveStatus(CandleGroup.Status status) {
+        givenInstrument();
+        CandleGroup standing = groupWithHorizon(System.currentTimeMillis());
+        standing.setStatus(status);
+        when(candleGroupDataService.findByInstrumentIdAndTimeframe(INSTRUMENT_ID, TimeFrame.ONE_HOUR))
+                .thenReturn(Optional.of(standing));
+        when(candleGroupDataService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        demandService.requireCandles(INSTRUMENT_INTERNAL_ID, TimeFrame.ONE_HOUR, 1000L);
+
+        ArgumentCaptor<CandleGroup> saved = ArgumentCaptor.forClass(CandleGroup.class);
+        verify(candleGroupDataService).save(saved.capture());
+        assertThat(saved.getValue().getStatus()).isEqualTo(CandleGroup.Status.BACKFILL);
+    }
+
+    /**
+     * Терминальная группа требованием не оживляется: исчерпанные попытки
+     * докачки не начинаются заново от чужой команды.
+     */
+    @ParameterizedTest
+    @EnumSource(value = CandleGroup.Status.class, names = {"ERROR", "DELETED"})
+    void deeperRequirementDoesNotResurrectTerminalGroup(CandleGroup.Status status) {
+        givenInstrument();
+        CandleGroup standing = groupWithHorizon(System.currentTimeMillis());
+        standing.setStatus(status);
+        when(candleGroupDataService.findByInstrumentIdAndTimeframe(INSTRUMENT_ID, TimeFrame.ONE_HOUR))
+                .thenReturn(Optional.of(standing));
+        when(candleGroupDataService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        demandService.requireCandles(INSTRUMENT_INTERNAL_ID, TimeFrame.ONE_HOUR, 1000L);
+
+        ArgumentCaptor<CandleGroup> saved = ArgumentCaptor.forClass(CandleGroup.class);
+        verify(candleGroupDataService).save(saved.capture());
+        assertThat(saved.getValue().getStatus()).isEqualTo(status);
+        assertThat(saved.getValue().getPlannedFirstUtcMillis()).isLessThan(System.currentTimeMillis());
     }
 
     /**

@@ -2,6 +2,7 @@ package com.example.marketdata.domain.service;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.marketdata.domain.model.IndicatorConfig;
 import com.example.marketdata.domain.model.MarketStructureConfig;
@@ -74,6 +75,17 @@ public class MarketDataDemandService {
      *
      * <p>Мельче стоящего — не сужение: собранное не выбрасывается, потому
      * что его заказал кто-то другой.
+     *
+     * <p><b>Углублённый горизонт возвращает к бэкфиллу группу в ЛЮБОМ
+     * живом статусе, а не только готовую.</b> Дотягивание нижней границы
+     * до планового горизонта — забота одного лишь {@code BACKFILL}
+     * (docs/models/domain/other/CandleGroup.md §«Целостность по count»),
+     * и остальные статусы цикла к нему сами не возвращаются: группа,
+     * которую застали в {@code SYNC}/{@code CHECK}/{@code REPAIR}, дошла бы до
+     * {@code ACTIVE} с непокрытым горизонтом, и требование потерялось бы
+     * молча. Окно это не редкое: докачка хвоста уводит группу из
+     * {@code ACTIVE} на каждом новом закрытом баре. Терминальные статусы
+     * требованием не оживляются ({@code CandleGroup.isTerminal()}).
      */
     private CandleGroup deepenHorizon(CandleGroup group, Long horizon) {
         if (isNull(horizon)) {
@@ -84,7 +96,7 @@ public class MarketDataDemandService {
             return group;
         }
         group.setPlannedFirstUtcMillis(horizon);
-        if (group.isActive()) {
+        if (isFalse(group.isTerminal())) {
             group.setStatus(CandleGroup.Status.BACKFILL);
         }
         return candleGroupDataService.save(group);

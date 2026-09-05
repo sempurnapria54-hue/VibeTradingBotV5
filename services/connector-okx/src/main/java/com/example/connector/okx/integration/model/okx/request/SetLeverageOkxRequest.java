@@ -8,7 +8,7 @@ import lombok.Setter;
  * Тело запроса OKX set-leverage (POST /api/v5/account/set-leverage):
  * выставить рабочее плечо инструмента перед постановкой entry-ордера.
  * Сериализуется по именам полей (NON_NULL). См.
- * docs/components/PrecheckHandler.md (set-leverage перед постановкой).
+ * docs/components/TranchePrecheckHandler.md (set-leverage перед постановкой).
  */
 @Getter
 @Setter

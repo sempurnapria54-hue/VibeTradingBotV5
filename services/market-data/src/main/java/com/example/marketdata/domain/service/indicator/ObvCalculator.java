@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * объёма — +volume при росте close, −volume при падении, 0 при
  * равенстве. Кумулятивен от старта истории; warmup = 1 (нужна
  * предыдущая свеча). Абсолютный уровень нестабилен — операнд ограничен
- * относительными формами (docs/decisions/volume-condition-semantics.md).
+ * относительными формами (docs/models/domain/other/IndicatorValue.md).
  */
 @Component
 public class ObvCalculator implements IndicatorCalculator {

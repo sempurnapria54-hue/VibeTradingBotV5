@@ -4,7 +4,7 @@ package com.example.tradingbot.domain.model.aggregate.strategy.condition;
  * Тип правила условия стратегии. Per-ruleType контракт полей (какие
  * поля заполняются под каждый тип, включая валидность комбинаций
  * операндов) дозаполняется инкрементально при реализации каждого
- * ruleType (docs/decisions/strategy-condition-authoring-contract.md).
+ * ruleType (docs/rules/strategy-condition-contract.md).
  */
 public enum StrategyConditionRuleType {
 

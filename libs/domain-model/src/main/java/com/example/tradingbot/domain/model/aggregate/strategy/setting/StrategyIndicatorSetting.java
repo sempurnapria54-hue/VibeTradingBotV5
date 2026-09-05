@@ -18,7 +18,7 @@ import lombok.Setter;
  * {@code indicatorType} (колонка-владелец строки); сам params — JSONB на
  * строке без дублирования тега. Доменный таймфрейм и warmup живут внутри
  * params. См. docs/models/domain/aggregate/Strategy.md
- * (§StrategyIndicatorSetting), docs/decisions/strategy-tree-persistence.md.
+ * (§StrategyIndicatorSetting), docs/rules/persistence-representation.md.
  */
 @Getter
 @Setter

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -122,6 +123,33 @@ class SnapshotCollectionTest {
 
         verify(readClient, times(1)).getOrderBook(anyString(), anyInt());
         verify(snapshotDataService, times(0)).saveIfNew(any(MarketOrderBook.class));
+    }
+
+    /**
+     * Отказ ПИСЬМА одной строки проход тоже не роняет — и не уносит с
+     * собой ещё не снятые книги.
+     *
+     * <p>Отказ по одному инструменту стоит одну строку — это объявленная
+     * политика прохода, но держалась она только на отказах ЧТЕНИЯ.
+     * Неполная строка от площадки (нет метки времени — половины
+     * естественного ключа) валит письмо, а вместе с ним валила и весь
+     * проход: момент невосполним, догонять нечего.
+     */
+    @Test
+    void tickerWriteFailureDoesNotStopThePass() {
+        givenListing(instrument(1L, FIRST), instrument(2L, SECOND));
+        when(readClient.getTickers("SWAP")).thenReturn(Map.of(FIRST, ticker(), SECOND, ticker()));
+        when(readClient.getMarkPrices("SWAP")).thenReturn(Map.of());
+        when(readClient.getIndexPrices("USDT")).thenReturn(Map.of());
+        when(readClient.getOrderBook(anyString(), anyInt())).thenReturn(orderBook());
+        doThrow(new IllegalArgumentException("no external timestamp"))
+                .doNothing()
+                .when(snapshotDataService).saveIfNew(any(MarketTicker.class));
+
+        collector.collectPass();
+
+        verify(snapshotDataService, times(2)).saveIfNew(any(MarketTicker.class));
+        verify(snapshotDataService, times(2)).saveIfNew(any(MarketOrderBook.class));
     }
 
     private void givenListing(Instrument... instruments) {

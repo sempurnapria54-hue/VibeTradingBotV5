@@ -27,7 +27,7 @@
 история защит по ноге, закрытые эпизоды позиции, исторические свечи,
 правила инструмента) остались без выхода, хотя их зовут `RefreshAlgoOrderExecutor`,
 `RefreshOrderExecutor`, `RefreshPositionExecutor`, `CandleLoader` и
-`InstrumentExternalRulesSyncJob` — то есть будущие `trading-core` и
+`InstrumentSyncJob` — то есть `trading-core` и
 `market-data`. Сужение обнаружено контактом с кодом: методы читателя
 остались без вызывающего.
 

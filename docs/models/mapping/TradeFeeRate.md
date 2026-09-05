@@ -11,7 +11,7 @@
 ```text
 trade-fee REST -> raw TradeFeeOkxResponse -> IntegrationService validation
   -> TradeFeeRateMapper -> TradeFeeRateExternalSnapshot (по одному на группу)
-  -> InstrumentExternalRulesSyncJob -> TradeFeeRate (persist)
+  -> синк владельца счёта -> TradeFeeRate (persist)
 ```
 
 Raw DTO не выходит за `IntegrationService` / adapter-layer. **Один ответ

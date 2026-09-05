@@ -9,7 +9,7 @@ import lombok.Setter;
  * Параметры Kaufman efficiency ratio (EFFICIENCY_RATIO). ER — оконный
  * индикатор: warmup по умолчанию = period. Каталожный измеритель
  * тренд/шум (fork A). См.
- * docs/decisions/efficiency-ratio-as-catalog-indicator.md,
+ * docs/models/domain/other/IndicatorValue.md,
  * docs/models/domain/aggregate/Strategy.md (§IndicatorParams).
  */
 @Getter

@@ -53,7 +53,8 @@
 | `docs/rules/`: `controlled-exchange-exceptions`, `external-status-resolution` | делится: словарь статусов площадки — коннектор; доменный резолв — `trading-core` |
 | `docs/models/domain/core/`: `Order`, `Position`, `AlgoOrder`, `BalanceContainer` | формы — `domain-model`; зеркало и писатели — `trading-core` |
 | `docs/models/domain/core/Exchange.md` | делится: площадка и счёт-реестр — `auth`; торговое состояние счёта — `trading-core` (`docs/architecture/tenant-and-exchange.md`) |
-| `docs/models/domain/core/Instrument.md`, `other/InstrumentExternalRules.md`, `other/TradeFeeRate.md` | `market-data`; проекция у `trading-core` |
+| `docs/models/domain/core/Instrument.md`, `other/InstrumentExternalRules.md` | `market-data`; проекция у `trading-core` |
+| `docs/models/domain/other/TradeFeeRate.md` | `trading-core`: ставка — атрибут комиссионного уровня биржевого счёта и читается с его ключами, а чтения `market-data` публичные по контракту (`.claude/work/backlog.md` §«Ставка комиссии — реестр переезжает к владельцу счёта»). У `market-data` остаётся только **ключ** группы на навесе правил |
 | `docs/models/domain/aggregate/`: `Deal`, `DealTranche`; `other/`: `DealActionState`, `DealCashFlow`, `AnomalyReport` | `trading-core` |
 | `docs/models/domain/aggregate/Strategy.md` | определение — `strategies`; исполняемая форма — `strategy-engine` |
 | `docs/models/domain/other/`: `Candle`, `CandleGroup`, `IndicatorValue`, `MarketStructure`, `MarketPhase`, `MarketOrderBook`, `MarketTicker` | `market-data` |

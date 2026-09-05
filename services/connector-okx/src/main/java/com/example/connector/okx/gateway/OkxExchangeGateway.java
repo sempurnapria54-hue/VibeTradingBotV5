@@ -278,9 +278,14 @@ public class OkxExchangeGateway implements ExchangeGateway {
         if (isNull(snapshots)) {
             return Map.of();
         }
+        // Повтор инструмента в ответе площадки схлопывается в первую строку,
+        // а не роняет чтение: без функции слияния toMap бросает на дубле
+        // ключа, и одна лишняя строка стоила бы читателю всего среза цен по
+        // листингу — на каждом проходе, пока площадка её отдаёт.
         return snapshots.stream().collect(Collectors.toMap(
                 MarketTickerExternalSnapshot::getExternalInstrumentId,
-                marketSnapshotMapper::snapshotToDomain));
+                marketSnapshotMapper::snapshotToDomain,
+                (first, duplicate) -> first));
     }
 
     @Override

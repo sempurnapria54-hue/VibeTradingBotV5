@@ -15,7 +15,7 @@ import lombok.Setter;
  * несут только математические параметры по типу индикатора. Хранение —
  * JSONB внутри JSON настройки-владельца. См.
  * docs/models/domain/aggregate/Strategy.md (§IndicatorParams),
- * docs/decisions/strategy-condition-authoring-contract.md.
+ * docs/rules/strategy-condition-contract.md.
  */
 @Getter
 @Setter

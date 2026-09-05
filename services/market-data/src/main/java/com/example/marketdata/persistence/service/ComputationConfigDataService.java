@@ -13,7 +13,6 @@ import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.util.InternalIdFactory;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,11 +43,6 @@ public class ComputationConfigDataService {
                         config.getIndicatorType().name(), config.getTimeframe().name(), canonical)
                 .map(this::toDomain)
                 .orElseGet(() -> toDomain(indicatorConfigRepository.save(toEntity(config, canonical))));
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<IndicatorConfig> findIndicatorConfig(Long id) {
-        return indicatorConfigRepository.findById(id).map(this::toDomain);
     }
 
     @Transactional(readOnly = true)

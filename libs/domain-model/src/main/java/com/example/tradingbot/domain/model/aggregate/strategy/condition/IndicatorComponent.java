@@ -7,7 +7,7 @@ package com.example.tradingbot.domain.model.aggregate.strategy.condition;
  * единицах нестабильна межинструментно — автор берёт осмысленный
  * компонент). У одно-компонентных индикаторов (EMA/RSI/ATR/OBV/
  * EFFICIENCY_RATIO) не задаётся (единственное значение подразумевается).
- * См. docs/decisions/strategy-condition-authoring-contract.md.
+ * См. docs/rules/strategy-condition-contract.md.
  */
 public enum IndicatorComponent {
 

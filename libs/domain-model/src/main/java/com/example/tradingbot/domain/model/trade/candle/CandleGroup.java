@@ -101,6 +101,16 @@ public class CandleGroup extends Auditable {
     }
 
     /**
+     * Группа выведена из живого цикла загрузки: разбор ошибки или
+     * логическое удаление. Такую группу циклы не ведут и требование
+     * потребителя её не оживляет — иначе исчерпанные попытки докачки
+     * начинались бы заново от чужой команды.
+     */
+    public Boolean isTerminal() {
+        return Objects.equals(status, Status.ERROR) || Objects.equals(status, Status.DELETED);
+    }
+
+    /**
      * Появился ли новый закрытый бар к моменту {@code nowMillis}: после
      * открытия последней загруженной свечи прошло ≥ {@code CLOSED_BAR_FACTOR}
      * длительностей бара. Пустая группа (нет actualLast) — нет.

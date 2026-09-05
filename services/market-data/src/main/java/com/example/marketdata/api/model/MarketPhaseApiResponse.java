@@ -9,7 +9,7 @@ import lombok.Setter;
  *
  * <p>Своей метки времени у фазы нет: она не персистируется и вычисляется
  * на момент запроса, а свежесть наследует от входов
- * (docs/decisions/market-phase-stateless.md).
+ * (docs/components/MarketPhaseService.md).
  */
 @Getter
 @Setter

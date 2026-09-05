@@ -11,7 +11,7 @@ import lombok.Setter;
  * Клауза «условие → фаза» в наборе правил классификации
  * StrategyMarketPhaseSetting.phaseRules. Набор — упорядоченный
  * first-match-список: клаузы проверяются по позиции в списке (поле
- * {@code level} снято — трек D, docs/decisions/market-phase-stateless.md),
+ * {@code level} снято — трек D, docs/components/MarketPhaseService.md),
  * первая с истинным {@code condition} задаёт MarketPhase.Type; не сработала
  * ни одна → UNKNOWN. Condition — тот же StrategyCondition, но в контексте
  * классификации фазы (до выбора детали, без сделки): операнды
@@ -19,7 +19,7 @@ import lombok.Setter;
  * runtime-источников сделки (контекстный whitelist — create-валидация).
  * Хранится JSONB (колонка phase_rules на строке настройки фазы). См.
  * docs/models/domain/aggregate/Strategy.md (§StrategyMarketPhaseRule),
- * docs/decisions/market-phase-conditional-classification.md.
+ * docs/components/MarketPhaseResolver.md.
  */
 @Getter
 @Setter

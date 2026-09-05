@@ -1,7 +1,6 @@
 package com.example.marketdata.persistence.repository;
 
 import com.example.marketdata.persistence.model.MarketStructureConfigEntity;
-import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -26,6 +25,4 @@ public interface MarketStructureConfigRepository extends JpaRepository<MarketStr
                                                          @Param("paramsCanonical") String paramsCanonical,
                                                          @Param("efficiencyRatioConfigId") Long efficiencyRatioConfigId,
                                                          @Param("atrConfigId") Long atrConfigId);
-
-    List<MarketStructureConfigEntity> findByTimeframe(String timeframe);
 }

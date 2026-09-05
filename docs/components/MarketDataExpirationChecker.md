@@ -12,13 +12,17 @@
 
 ## Контракт
 
-- `Boolean isFresh(referencePoint, expirationDuration)` — свежесть одного
-  значения под срок его настройки-владельца; на нём стои́т раздача готовых
-  результатов (`docs/components/IndicatorService.md`,
-  `docs/components/MarketStructureService.md`);
-- `Boolean stepDataFresh(StrategyStep step, ConditionEvaluationContext
-  context)` — свежи ли данные, нужные **именно этому шагу**: каждая
-  настройка, на которую ссылается его условие, отдала значение.
+- `Boolean isFresh(referencePoint, tolerance)` — свежесть одного значения
+  под срок **запрашивающего**; на нём стои́т раздача готовых результатов
+  (`docs/components/IndicatorService.md`,
+  `docs/components/MarketStructureService.md`).
+
+**Второй точки входа у сервиса market-data нет.** Предикат «свежи ли
+данные, нужные именно этому шагу» (`stepDataFresh`) спрашивает про
+`StrategyStep` — модель, которой market-data не владеет и которую не
+читает; он принадлежит **торговому ядру** и живёт там же, где реакция на
+несвежесть. Здесь остаётся один бит на одну пару «строка + срок
+читателя».
 
 **Отсутствие и устаревание на поверхности шага неразличимы, и различать их
 незачем:** обе пустоты означают «данным доверять нельзя» и ведут к одной
@@ -36,11 +40,13 @@
 
 ## Источник сроков
 
-`expirationDuration` из `StrategyIndicatorSetting`,
-`StrategyMarketStructureSetting`. У `StrategyMarketPhaseSetting`
-`expirationDuration` **нет** — `MarketPhase` не персистируется, свежесть
-фазы наследуется от свежести её входов (индикаторов/структур; см.
-`docs/models/domain/other/MarketPhase.md`).
+**Срок приносит читатель операндом вызова.** Он объявлен в его настройке
+(`StrategyIndicatorSetting.expirationDuration`,
+`StrategyMarketStructureSetting.expirationDuration`), но самой этой
+настройки market-data не видит: она в базе другого сервиса, и через
+границу едет одно число. У фазы своего срока нет вовсе — `MarketPhase` не
+персистируется, и свежесть наследуется от входов
+(`docs/models/domain/other/MarketPhase.md`).
 
 ## Вычисление свежести (на чтение)
 

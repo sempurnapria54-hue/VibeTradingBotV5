@@ -18,7 +18,7 @@ import lombok.Setter;
  * — **не** ссылки на настройку, ограничение их не касается; у вычисляемых
  * источников значение приходит в рантайме. См.
  * docs/models/domain/aggregate/Strategy.md (§StrategyConditionOperand),
- * docs/decisions/strategy-condition-authoring-contract.md.
+ * docs/rules/strategy-condition-contract.md.
  */
 @Getter
 @Setter

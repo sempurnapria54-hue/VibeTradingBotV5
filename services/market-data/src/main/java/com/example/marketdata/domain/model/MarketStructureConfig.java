@@ -1,7 +1,5 @@
 package com.example.marketdata.domain.model;
 
-import static java.util.Objects.nonNull;
-
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.MarketStructureParams;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import lombok.Getter;
@@ -39,9 +37,4 @@ public class MarketStructureConfig {
 
     /** Идентичность входного ATR; пусто — вход не объявлен. */
     private Long atrConfigId;
-
-    /** Объявлен ли хотя бы один вход резолвера. */
-    public Boolean hasDeclaredInputs() {
-        return nonNull(efficiencyRatioConfigId) || nonNull(atrConfigId);
-    }
 }

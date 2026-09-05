@@ -9,7 +9,7 @@ import lombok.Setter;
  * Значение индикатора OBV (On-Balance Volume) — кумулятивная бегущая
  * сумма знакового объёма от старта расчёта. Абсолютный уровень
  * нестабилен (зависит от глубины истории и масштаба объёма): операнд OBV
- * ограничен относительными формами (docs/decisions/volume-condition-semantics.md).
+ * ограничен относительными формами (docs/models/domain/other/IndicatorValue.md).
  * См. docs/models/domain/other/IndicatorValue.md (§Наследники).
  */
 @Getter

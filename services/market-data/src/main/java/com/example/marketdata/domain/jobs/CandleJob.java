@@ -6,6 +6,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.marketdata.config.CandleLoadingProperties;
 import com.example.marketdata.domain.service.CandleLoader;
 import com.example.marketdata.domain.service.InstrumentCatalogService;
+import com.example.marketdata.integration.ExchangeAccessException;
 import com.example.marketdata.persistence.service.CandleGroupDataService;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import java.time.Instant;
@@ -60,11 +61,25 @@ public class CandleJob {
         instrumentCatalogService.refreshReadiness();
     }
 
+    /**
+     * Ведёт рабочие группы, ПРЕКРАЩАЯ тик на отказе доступа или лимита.
+     *
+     * <p><b>Отказ по одной группе тик не роняет, отказ площадки —
+     * роняет.</b> Проход тянет по вызову на группу, и продолжать его под
+     * исчерпанным лимитом значит потратить остаток бюджета на заведомо
+     * отказные вызовы — тем же лимитом пользуется сбор невосполнимых
+     * срезов, который догнать нельзя
+     * (docs/processes/snapshot-collection.md §«Отказ на проходе»). Тип
+     * отказа для этого и разведён ({@link ExchangeAccessException}).
+     */
     private void advanceWorkingGroups() {
         List<CandleGroup> groups = candleGroupDataService.findByStatusIn(WORKING_STATUSES);
         for (CandleGroup group : groups) {
             try {
                 candleLoader.advance(group);
+            } catch (ExchangeAccessException e) {
+                log.error("Candle loading tick stopped: exchange refused access or limit", e);
+                return;
             } catch (RuntimeException e) {
                 log.error("Candle loading failed for group {}", group.getId(), e);
             }

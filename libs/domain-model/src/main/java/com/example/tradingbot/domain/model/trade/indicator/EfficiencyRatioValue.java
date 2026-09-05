@@ -10,7 +10,7 @@ import lombok.Setter;
  * (|чистый ход| / Σ|побарных ходов| по окну). ER→1 — тренд, ER→0 —
  * шум/боковик; нормирован по определению. Единый каталожный источник ER,
  * потребляемый условиями (фаза/вход) и MarketStructureResolver. См.
- * docs/decisions/efficiency-ratio-as-catalog-indicator.md,
+ * docs/models/domain/other/IndicatorValue.md,
  * docs/models/domain/other/IndicatorValue.md (§Наследники).
  */
 @Getter

@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
  * Свежесть наследуется от входов: устаревший индикатор/структура не попадает
  * в контекст → операнд недоступен → клауза ложна → UNKNOWN. См.
  * docs/components/MarketPhaseResolver.md,
- * docs/decisions/market-phase-stateless.md.
+ * docs/components/MarketPhaseService.md.
  */
 @Service
 @RequiredArgsConstructor

@@ -6,17 +6,25 @@
 
 ## Назначение
 
-`MarketPriceDataService` отдаёт `MarketPriceData` (см.
-`docs/components/models/MarketPriceData.md`) — runtime-данные текущих цен
-инструмента (last/bid/ask + время тикера). Не persisted, историю тикеров
-не ведёт, кэш на первом этапе не использует.
+Отдаёт `MarketPriceData` (`docs/components/models/MarketPriceData.md`) —
+цены инструмента на момент (last, mark, index). Не персистируется,
+истории не ведёт, кэша не держит.
+
+**Это не ряд тикер-срезов.** Тот — история состояния рынка со своими
+метками времени и своим правилом хранения
+(`docs/models/domain/other/MarketTicker.md`); этот — вход расчёта «прямо
+сейчас».
 
 ## Поведение
 
-`MarketPriceData` не считается заранее: нужен прямо перед расчётом
-параметров действия. Flow: client-модель OKX ticker →
-`MarketPriceDataExternalSnapshot` → `MarketPriceData` (OKX-маппинг —
-`docs/models/mapping/MarketPriceData.md`).
+Цена нужна прямо перед расчётом и берётся чтением у площадки **через
+коннектор**: `market-data` собственного клиента площадки не имеет и
+иметь не должен — одна площадка, один коннектор
+(`docs/architecture/services.md`). Чтение публичное, ключей не требует
+(`docs/architecture/contracts.md` — дом перечня синхронных вызовов).
 
-В рамках одного `CalculationContext` `MarketPriceData` получается один
-раз и переиспользуется, чтобы не плодить REST-запросы.
+Граничный снапшот и маппинг живут у коннектора; market-data получает
+уже доменную модель и сырых DTO площадки не видит
+(`docs/rules/raw-exchange-dto-boundary.md`).
+
+Тикера на площадке нет — отдаётся пустота, а не выдуманная цена.

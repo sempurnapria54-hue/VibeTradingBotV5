@@ -18,7 +18,7 @@ import lombok.Setter;
  * контракт полей дозаполняется инкрементально при реализации каждого
  * ruleType. См. docs/models/domain/aggregate/Strategy.md
  * (§StrategyConditionRule),
- * docs/decisions/strategy-condition-authoring-contract.md.
+ * docs/rules/strategy-condition-contract.md.
  */
 @Getter
 @Setter

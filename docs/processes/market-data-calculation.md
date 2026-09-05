@@ -11,8 +11,8 @@
 жизненного цикла сделки. FSM и калькуляторы не считают эти данные
 сами — jobs готовят их заранее, потребители читают готовые
 результаты. (Подготовка спеков инструмента — `InstrumentExternalRules`
-через `InstrumentExternalRulesSyncJob` — материализуется на шаге 5, в
-оркестрацию рыночных данных не входит, см. ниже.)
+через `InstrumentSyncJob` — в оркестрацию рыночных данных не входит,
+см. ниже.)
 
 Свечи этот процесс **не добывает** — он вычисляет поверх уже
 загруженных свечей; их добыча и целостность — отдельный процесс
@@ -35,11 +35,10 @@ EntryScannerJob / DealOrchestratorJob (FSM)
      фазу получают через MarketPhaseService (вычисляется на лету)
 ```
 
-`InstrumentExternalRulesSyncJob` (подготовка спеков инструмента) в
-активную оркестрацию рыночных данных **не входит**: он готовит
-`InstrumentExternalRules` — модель, материализуемую на шаге 5
-(риск-преконтроль), отдельным от расчёта рыночных данных контуром
-(`docs/components/InstrumentExternalRulesSyncJob.md`,
+`InstrumentSyncJob` (каталог и спеки инструмента) в активную
+оркестрацию рыночных данных **не входит**: он ведёт каталог и
+`InstrumentExternalRules` отдельным контуром
+(`docs/components/InstrumentSyncJob.md`,
 `docs/models/domain/other/InstrumentExternalRules.md`).
 
 ## Свечи как вход

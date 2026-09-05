@@ -12,7 +12,7 @@ import lombok.Setter;
  * настройка описывает классификацию рынка во все MarketPhase.Type.
  * Фаза вычисляется на лету и не персистируется — своих часов (timeframe)
  * и срока свежести (expirationDuration) у неё нет; свежесть наследуется от
- * входов (трек D, docs/decisions/market-phase-stateless.md). Каркасный
+ * входов (трек D, docs/components/MarketPhaseService.md). Каркасный
  * реляционный узел дерева (своя строка/таблица); phaseRules и листовые
  * настройки — JSONB на его строке. См.
  * docs/models/domain/aggregate/Strategy.md (§StrategyMarketPhaseSetting).
@@ -29,7 +29,7 @@ public class StrategyMarketPhaseSetting extends Auditable {
      * Авторские правила классификации фазы (упорядоченный first-match-
      * список клауз «условие → фаза»; порядок = позиция в списке). Заменяют
      * распущенный скоринговый MarketPhaseParams
-     * (docs/decisions/market-phase-conditional-classification.md).
+     * (docs/components/MarketPhaseResolver.md).
      * Операнды клауз адресуют индикаторы/структуры стратегии по
      * {@code key} (strategy-scope, трек D).
      */

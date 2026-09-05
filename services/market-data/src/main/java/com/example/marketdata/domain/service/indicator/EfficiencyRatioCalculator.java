@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * Вычислитель Kaufman efficiency ratio: ER = |close[i] − close[i−period]|
  * / Σ|побарных изменений| по окну period. ER→1 — тренд, ER→0 — шум/боковик
  * (нормирован по определению). warmup ≈ period. См.
- * docs/decisions/efficiency-ratio-as-catalog-indicator.md.
+ * docs/models/domain/other/IndicatorValue.md.
  */
 @Component
 public class EfficiencyRatioCalculator implements IndicatorCalculator {

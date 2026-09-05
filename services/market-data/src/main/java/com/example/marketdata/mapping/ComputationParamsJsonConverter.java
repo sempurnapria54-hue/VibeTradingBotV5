@@ -47,10 +47,26 @@ public class ComputationParamsJsonConverter {
     public ComputationParamsJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
                 .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
-        this.canonicalMapper = objectMapper.copy()
+        this.canonicalMapper = buildCanonicalMapper(objectMapper);
+    }
+
+    /**
+     * Маппер канонической формы: пустые поля не пишутся, ключи карт и
+     * свойства объектов идут в алфавитном порядке.
+     *
+     * <p>Сортировка свойств ставится <b>конфигурацией сериализации</b>, а
+     * не {@code configure(MapperFeature, …)} на самом маппере: последний
+     * помечен deprecated (.claude/rules/codestyle.md §«Строгие правила»),
+     * и компиляция с {@code -Dmaven.compiler.showDeprecation=true} на нём
+     * предупреждает.
+     */
+    private ObjectMapper buildCanonicalMapper(ObjectMapper source) {
+        ObjectMapper canonical = source.copy()
                 .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
-                .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-                .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true);
+                .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+        canonical.setConfig(canonical.getSerializationConfig()
+                .with(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
+        return canonical;
     }
 
     /** Параметры в JSON строки реестра. */

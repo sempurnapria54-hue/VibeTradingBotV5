@@ -2,6 +2,7 @@ package com.example.marketdata.api.controller;
 
 import com.example.marketdata.api.model.CandleApiResponse;
 import com.example.marketdata.api.model.CandleGroupApiResponse;
+import com.example.marketdata.api.model.CandleHistoryApiQuery;
 import com.example.marketdata.api.model.InstrumentApiResponse;
 import com.example.marketdata.mapping.MarketDataApiMapper;
 import com.example.marketdata.persistence.service.CandleDataService;
@@ -11,18 +12,18 @@ import com.example.marketdata.persistence.service.InstrumentExternalRulesDataSer
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
-import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -112,14 +113,13 @@ public class InstrumentController {
     })
     @GetMapping("/{internalId}/candles")
     public List<CandleApiResponse> getCandles(@PathVariable String internalId,
-                                              @RequestParam TimeFrame timeframe,
-                                              @RequestParam Long fromMillis,
-                                              @RequestParam Integer limit) {
+                                              @Valid @ParameterObject CandleHistoryApiQuery window) {
         Long instrumentId = instrumentDataService.getRequiredIdByInternalId(internalId);
-        CandleGroup group = candleGroupDataService.findByInstrumentIdAndTimeframe(instrumentId, timeframe)
+        CandleGroup group = candleGroupDataService
+                .findByInstrumentIdAndTimeframe(instrumentId, window.getTimeframe())
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "Candle group not found: " + internalId + " " + timeframe));
-        return apiMapper.domainToApiCandles(
-                candleDataService.findHistoryFrom(group.getId(), fromMillis, limit));
+                        "Candle group not found: " + internalId + " " + window.getTimeframe()));
+        return apiMapper.domainToApiCandles(candleDataService.findHistoryFrom(
+                group.getId(), window.getFromMillis(), window.getLimit()));
     }
 }

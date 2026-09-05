@@ -10,7 +10,7 @@ import lombok.Setter;
  * MarketPhaseResolver (first-match по авторским phaseRules). Своих часов и
  * срока свежести у фазы нет — свежесть наследуется от входов (устаревший
  * вход → недоступен → UNKNOWN). EntryScannerJob по type выбирает
- * StrategyDetail. См. docs/decisions/market-phase-stateless.md,
+ * StrategyDetail. См. docs/components/MarketPhaseService.md,
  * docs/models/domain/other/MarketPhase.md.
  */
 @Getter

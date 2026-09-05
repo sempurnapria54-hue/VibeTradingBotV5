@@ -111,13 +111,6 @@ public class InstrumentDataService {
                 .collect(toList());
     }
 
-    /** Проекция: только internalId по идентификатору — сущность не тянется. */
-    @Transactional(readOnly = true)
-    public String getRequiredInternalIdById(Long id) {
-        return repository.findInternalIdById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Instrument not found: " + id));
-    }
-
     /** Проекция: только идентификатор по internalId — сущность не тянется. */
     @Transactional(readOnly = true)
     public Long getRequiredIdByInternalId(String internalId) {
