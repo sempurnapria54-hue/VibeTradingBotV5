@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.tradingbot.domain.model.other.TradeFeeRate;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
+import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketOrderBook;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketTicker;
@@ -199,7 +200,7 @@ public interface ExchangeGateway {
     InstrumentExternalRules getInstrumentRules(String externalInstrumentId, String externalInstrumentType);
 
     /** Последние свечи инструмента. */
-    List<Candle> getLatestCandles(String externalInstrumentId, String externalBar, Integer limit);
+    List<Candle> getLatestCandles(String externalInstrumentId, TimeFrame timeframe, Integer limit);
 
     /**
      * Исторические свечи инструмента окном назад от момента.
@@ -208,11 +209,11 @@ public interface ExchangeGateway {
      * за годы кладут и площадку, и базу читателя
      * ({@code .claude/rules/codestyle.md} §«Выборка данных»).
      */
-    List<Candle> getHistoryCandles(String externalInstrumentId, String externalBar, Long afterMillis,
+    List<Candle> getHistoryCandles(String externalInstrumentId, TimeFrame timeframe, Long afterMillis,
                                    Integer limit);
 
     /** Свеча индекса на момент. */
-    Candle getIndexCandleAt(String indexInstrumentId, String externalBar, OffsetDateTime at);
+    Candle getIndexCandleAt(String indexInstrumentId, TimeFrame timeframe, OffsetDateTime at);
 
     /** Цены момента: last, mark, index. */
     MarketPriceData getMarketPriceData(String externalInstrumentId);
@@ -223,8 +224,15 @@ public interface ExchangeGateway {
      * <p>Марк-цены и индекса в тикере НЕТ: площадка их не отдаёт
      * ({@code docs/models/domain/other/MarketTicker.md}). Их берут
      * соседние операции, а срез собирает вызывающий.
+     *
+     * <p><b>Картой по имени инструмента на площадке, а не списком:</b>
+     * читателю нужно знать, к какому инструменту относится строка, а
+     * числового ключа базы коннектор не знает. Положить имя площадки на
+     * саму доменную модель значило бы завести на ней второй
+     * идентификатор ради одного чтения — тот же выбор, что у марк-цен и
+     * индексов.
      */
-    List<MarketTicker> getTickers(String externalInstrumentType);
+    Map<String, MarketTicker> getTickers(String externalInstrumentType);
 
     /** Книга заявок инструмента на заданную глубину каждой стороны. */
     MarketOrderBook getOrderBook(String externalInstrumentId, Integer depth);

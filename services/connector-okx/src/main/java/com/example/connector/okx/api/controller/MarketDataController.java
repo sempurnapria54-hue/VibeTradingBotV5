@@ -66,27 +66,27 @@ public class MarketDataController {
     @Operation(summary = "Последние свечи инструмента")
     @GetMapping("/candles")
     public List<Candle> getLatestCandles(@ParameterObject CandleWindowApiQuery window) {
-        return gateway.getLatestCandles(window.getExternalInstrumentId(), window.getExternalBar(),
+        return gateway.getLatestCandles(window.getExternalInstrumentId(), window.getTimeframe(),
                 window.getLimit());
     }
 
     @Operation(summary = "Исторические свечи инструмента окном")
     @GetMapping("/candles/history")
     public List<Candle> getHistoryCandles(@ParameterObject HistoryCandleApiQuery window) {
-        return gateway.getHistoryCandles(window.getExternalInstrumentId(), window.getExternalBar(),
+        return gateway.getHistoryCandles(window.getExternalInstrumentId(), window.getTimeframe(),
                 window.getAfterMillis(), window.getLimit());
     }
 
     @Operation(summary = "Свеча индекса на момент")
     @GetMapping("/candles/index")
     public Candle getIndexCandleAt(@ParameterObject IndexCandleApiQuery query) {
-        return gateway.getIndexCandleAt(query.getIndexInstrumentId(), query.getExternalBar(),
+        return gateway.getIndexCandleAt(query.getIndexInstrumentId(), query.getTimeframe(),
                 query.getAt());
     }
 
     @Operation(summary = "Тикеры всего листинга одним чтением")
     @GetMapping("/tickers")
-    public List<MarketTicker> getTickers(@RequestParam String externalInstrumentType) {
+    public Map<String, MarketTicker> getTickers(@RequestParam String externalInstrumentType) {
         return gateway.getTickers(externalInstrumentType);
     }
 

@@ -21,6 +21,7 @@ import com.example.connector.okx.mapping.MarketPriceDataMapper;
 import com.example.connector.okx.mapping.MarketSnapshotMapper;
 import com.example.connector.okx.mapping.OrderMapper;
 import com.example.connector.okx.mapping.PositionMapper;
+import com.example.connector.okx.mapping.TimeFrameMapper;
 import com.example.connector.okx.mapping.TradeFeeRateMapper;
 import com.example.connector.okx.source.OkxSourceReader;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
@@ -48,9 +49,9 @@ class OkxExchangeGatewayTest {
             reader, resolver,
             mock(OrderMapper.class), mock(AlgoOrderMapper.class), mock(PositionMapper.class),
             mock(InstrumentMapper.class), mock(InstrumentExternalRulesMapper.class),
-            mock(BalanceContainerMapper.class), mock(CandleMapper.class), mock(DealCashFlowMapper.class),
-            mock(TradeFeeRateMapper.class), mock(MarketPriceDataMapper.class),
-            mock(MarketSnapshotMapper.class));
+            mock(BalanceContainerMapper.class), mock(CandleMapper.class), mock(TimeFrameMapper.class),
+            mock(DealCashFlowMapper.class), mock(TradeFeeRateMapper.class),
+            mock(MarketPriceDataMapper.class), mock(MarketSnapshotMapper.class));
 
     /**
      * Ключи резолвятся на каждом вызове и по тому счёту, который в вызове

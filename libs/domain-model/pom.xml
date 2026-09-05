@@ -31,7 +31,6 @@
         <lombok.version>1.18.42</lombok.version>
         <commons-lang3.version>3.19.0</commons-lang3.version>
         <commons-collections4.version>4.5.0</commons-collections4.version>
-        <jackson-annotations.version>2.20</jackson-annotations.version>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
     </properties>
 
@@ -61,23 +60,6 @@
             <version>${commons-collections4.version}</version>
         </dependency>
 
-        <!--
-          ТОЛЬКО аннотации Jackson, без databind: маркерный jar без
-          собственных зависимостей. Нужен потому, что доменная модель
-          InstrumentExternalRules несёт @JsonIgnore — след того, что она
-          сериализуется в JSONB-навес.
-          НАЗВАННЫЙ ДОЛГ: сериализация — забота персистентности, а не
-          формы, и аннотация на доменной модели означает, что форма знает
-          о своём хранении. Условие возврата — шаг 6 фазы 2
-          (market-data), который владеет InstrumentExternalRules; якорь —
-          .claude/work/backlog.md §«Сериализационная аннотация на доменной
-          модели».
-        -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-            <version>${jackson-annotations.version}</version>
-        </dependency>
     </dependencies>
 
     <build>

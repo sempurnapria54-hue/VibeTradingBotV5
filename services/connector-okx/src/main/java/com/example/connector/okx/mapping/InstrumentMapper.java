@@ -34,7 +34,7 @@ public interface InstrumentMapper {
 
     /**
      * Частичное обновление инструмента из снапшота: идентичность +
-     * биржевые статус/плечо + расчётная валюта. {@code externalStatus} /
+     * биржевые статус/плечо + валюты инструмента. {@code externalStatus} /
      * {@code externalLeverage} совпадают по имени; {@code externalId} /
      * {@code externalType} — из снапшотных external*-полей; расчётная
      * валюта — операнд ветки чужой валюты движения
@@ -45,6 +45,8 @@ public interface InstrumentMapper {
     @Mapping(target = "externalId", source = "externalInstrumentId")
     @Mapping(target = "externalType", source = "externalInstrumentType")
     @Mapping(target = "externalSettlementCurrency", source = "externalSettleCurrency")
+    @Mapping(target = "externalBaseCurrency", source = "externalBaseCurrency")
+    @Mapping(target = "externalQuoteCurrency", source = "externalQuoteCurrency")
     void snapshotToDomain(@MappingTarget Instrument instrument, InstrumentExternalSnapshot snapshot);
 
 }

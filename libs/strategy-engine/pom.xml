@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  strategy-engine — общий артефакт: интерпретатор определения стратегии
+  (docs/architecture/services.md §«Общие артефакты монорепозитория»).
+  Собирается в сервисы, сам не разворачивается.
+
+  ЗАВОДИТСЯ ВМЕСТЕ С ПЕРВЫМ СВОИМ ПОТРЕБИТЕЛЕМ, а не «фазой 4», как
+  говорила плановая заметка libs/README.md. Потребность предъявлена
+  шагом 6 фазы 2: market-data резолвит фазу рынка по авторским клаузам
+  потребителя (docs/components/MarketPhaseService.md), а грамматику
+  условий держит интерпретатор. Копия грамматики внутри market-data была
+  бы вторым носителем одной истины (.claude/rules/policy-home.md), и
+  разошлась бы с оригиналом при первом же расширении каталога условий.
+
+  НЕСЁТ ПОКА ТОЛЬКО ИНТЕРПРЕТАТОР. Детекторы и симулированный коннектор —
+  другие модули той же библиотеки; они приезжают со своими шагами, как и
+  здесь: носитель без потребителя не заводится.
+
+  ЗАВИСИМОСТЕЙ МИНИМУМ — тот же довод, что у domain-model: библиотеку
+  тянут в себя сервисы, и всякая зависимость здесь становится их
+  обязательной. Spring тут только ради стереотипа бина: интерпретатор —
+  коллаборатор сервисных бинов.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>strategy-engine</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>strategy-engine</name>
+    <description>Интерпретатор определения стратегии</description>
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <lombok.version>1.18.42</lombok.version>
+        <commons-lang3.version>3.19.0</commons-lang3.version>
+        <commons-collections4.version>4.5.0</commons-collections4.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <spring.version>7.0.0</spring.version>
+        <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>domain-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+          Commons Lang3 и Collections4 — требование конвенции
+          (.claude/rules/codestyle.md §«Строгие правила»): проверки
+          коллекций и отрицания пишутся ими, а не руками.
+        -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>${commons-collections4.version}</version>
+        </dependency>
+
+        <!--
+          Логирование — только API: интерпретатор пишет предупреждение о
+          неоцениваемом в этом контексте типе правила. Реализацию выбирает
+          сервис, который библиотеку в себя собирает.
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
+        <!--
+          spring-context — ради @Service на интерпретаторе: он коллаборатор
+          сервисных бинов и должен подниматься сканированием, а не
+          собираться руками у каждого потребителя.
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <!-- Версия закреплена явно: родителя у модуля нет (см. domain-model). -->
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

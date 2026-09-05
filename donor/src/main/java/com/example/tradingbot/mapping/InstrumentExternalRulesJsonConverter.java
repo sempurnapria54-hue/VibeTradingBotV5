@@ -3,6 +3,7 @@ package com.example.tradingbot.mapping;
 import static java.util.Objects.isNull;
 
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +23,8 @@ public class InstrumentExternalRulesJsonConverter {
 
     public InstrumentExternalRulesJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
-                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
+                .addMixIn(InstrumentExternalRules.class, InstrumentExternalRulesNavelMixin.class);
     }
 
     /** Доменные правила → JSON для навеса; {@code null} → {@code null}. */
@@ -47,5 +49,12 @@ public class InstrumentExternalRulesJsonConverter {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("InstrumentExternalRules JSONB deserialization failed", e);
         }
+    }
+
+    /** Примесь хранилищного слоя: поля, которые в навес не едут. */
+    private abstract static class InstrumentExternalRulesNavelMixin {
+
+        @JsonIgnore
+        abstract String getExternalTakerFeeRate();
     }
 }

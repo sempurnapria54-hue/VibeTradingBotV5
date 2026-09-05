@@ -31,8 +31,10 @@
 
     <modules>
         <module>libs/domain-model</module>
+        <module>libs/strategy-engine</module>
         <module>services/auth</module>
         <module>services/connector-okx</module>
+        <module>services/market-data</module>
         <module>donor</module>
     </modules>
 </project>

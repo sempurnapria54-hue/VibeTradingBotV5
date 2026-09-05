@@ -3,7 +3,6 @@ package com.example.tradingbot.domain.model.core.instrument;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.util.Objects;
 import lombok.AllArgsConstructor;
@@ -100,9 +99,9 @@ public class InstrumentExternalRules {
      *
      * <p>В JSONB-навес поле не попадает: значение принадлежит группе, а
      * не справочнику инструмента, и копия на инструменте разошлась бы со
-     * сменой тира счёта.
+     * сменой тира счёта. Исключение выражает ХРАНИЛИЩНЫЙ слой
+     * своими средствами: форма о своём хранении не знает.
      */
-    @JsonIgnore
     private String externalTakerFeeRate;
 
     /**

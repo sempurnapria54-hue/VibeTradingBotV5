@@ -1,0 +1,105 @@
+# Конфигурация сервиса market-data.
+#
+# Значения осей окружения приезжают из манифеста окружения
+# (deploy/<окружение>/env.yaml); здесь — только форма и умолчания,
+# выбранные так, чтобы незаданное означало ОТКАЗ, а не разрешение.
+spring:
+  application:
+    name: market-data
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Точка провайдера идентичности: подпись входящего токена
+          # проверяется локально по его ключам. Пустое означает, что контур
+          # доступа не настроен, и поверхность не поднимется — это отказ.
+          issuer-uri: ${OIDC_ISSUER_URI:}
+      client:
+        # Исходящая идентичность: под ней market-data ходит к коннектору
+        # (docs/architecture/contracts.md §«Контекст тенанта в вызове»).
+        # Грант — client credentials: пользователя в этом вызове нет.
+        registration:
+          connector:
+            client-id: ${CONNECTOR_CLIENT_ID:}
+            client-secret: ${CONNECTOR_CLIENT_SECRET:}
+            authorization-grant-type: client_credentials
+            provider: platform
+        provider:
+          platform:
+            token-uri: ${OIDC_TOKEN_URI:}
+  datasource:
+    # База сервиса: он единственный писатель рядов рыночных данных
+    # (docs/architecture/data-ownership.md §Раскладка).
+    url: ${MARKET_DATA_DB_URL:}
+    username: ${MARKET_DATA_DB_USERNAME:}
+    password: ${MARKET_DATA_DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Источник истины схемы — миграции Flyway; Hibernate схему не правит.
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# Привязка к коннектору площадки. Один коннектор — одна площадка
+# (docs/architecture/services.md); вторая приезжает вторым блоком, а не
+# правкой кода.
+connector:
+  exchange-code: ${CONNECTOR_EXCHANGE_CODE:}
+  base-url: ${CONNECTOR_BASE_URL:}
+  client-registration-id: connector
+  # Типы инструментов, чей листинг собирается. Полнота листинга нужна
+  # советнику по построению и требованием потребителя не выражается — это
+  # конфигурация сервиса (docs/architecture/market-data-collection.md).
+  instrument-types: ${CONNECTOR_INSTRUMENT_TYPES:SWAP}
+  # Котировочные валюты, по которым читаются цены индексов: чтение
+  # индексов у площадки идёт по валюте, а не по инструменту.
+  index-quote-currencies: ${CONNECTOR_INDEX_QUOTE_CURRENCIES:USDT,USD}
+
+# Загрузка свечей (docs/processes/candle-loading.md). Списка таймфреймов
+# здесь нет намеренно: группу заводит требование потребителя, а не
+# конфигурация — иначе клейм «собираем то, что кому-то нужно» ложен.
+candle-loading:
+  enabled: true
+  cron: ${CANDLE_LOADING_CRON:0 * * * * *}
+  page-size: 100
+  max-repair-attempts: 5
+
+# Расчёт производных (docs/processes/market-data-calculation.md).
+market-data:
+  candle-window-bars: 1500
+  indicator:
+    enabled: true
+    cron: ${INDICATOR_CRON:15 * * * * *}
+  structure:
+    enabled: true
+    cron: ${MARKET_STRUCTURE_CRON:30 * * * * *}
+
+# Синк листинга и справочных правил. Правила площадка отдаёт
+# поинструментно, поэтому обход идёт окном за курсором, а не целиком.
+instrument-sync:
+  enabled: true
+  cron: ${INSTRUMENT_SYNC_CRON:0 */5 * * * *}
+  rules-batch-size: 50
+
+# Сбор невосполнимых срезов (docs/processes/snapshot-collection.md).
+# Интервал среза и глубина стакана — величины провизорные и выведены из
+# лимитов площадки; направление ошибки названо: реже и мельче, чем чаще и
+# глубже (docs/architecture/market-data-collection.md §«Невосполнимые
+# срезы»).
+snapshot-collection:
+  enabled: true
+  cron: ${SNAPSHOT_COLLECTION_CRON:0 * * * * *}
+  order-book-depth: 20
+  pass-limit: 500
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

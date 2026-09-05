@@ -32,7 +32,28 @@ public class Instrument extends Auditable {
     /** Межсервисный идентификатор инструмента. */
     private String internalId;
 
-    /** Внутренний ID биржи (Exchange.id). */
+    /**
+     * Код площадки, которой принадлежит инструмент ({@code OKX},
+     * {@code BYBIT}).
+     *
+     * <p><b>Код, а не числовой идентификатор</b>, потому что справочник
+     * площадок принадлежит {@code auth}, а внешнего ключа через границу
+     * сервиса не бывает (docs/architecture/tenant-and-exchange.md
+     * §«Три сущности вместо одной»). Той же осью площадку называет реестр
+     * биржевых счетов.
+     */
+    private String exchangeCode;
+
+    /**
+     * Внутренний ID биржи (Exchange.id) — <b>носитель монолита</b>.
+     *
+     * <p><b>Названный долг.</b> Числовой ключ площадки существует только
+     * в схеме донора; сервисы адресуют площадку кодом. Поле живёт, пока
+     * жив донор, и market-data его НЕ пишет: у него таблицы площадок нет.
+     * Условие снятия — полная модель площадки
+     * (.claude/work/backlog.md §«Exchange модель/lifecycle»), вместе с
+     * которой поле уходит из этой формы.
+     */
     private Long exchangeId;
 
     /** Имя инструмента на бирже (OKX instId), например ETH-USDT-SWAP. */
@@ -68,6 +89,18 @@ public class Instrument extends Auditable {
      * docs/components/RefreshBillsExecutor.md).
      */
     private String externalSettlementCurrency;
+
+    /**
+     * Базовая валюта инструмента (OKX baseCcy).
+     *
+     * <p>Вместе с котировочной образует имя индекса у площадки, по
+     * которому резолвится индексная цена среза
+     * (docs/models/domain/other/MarketTicker.md).
+     */
+    private String externalBaseCurrency;
+
+    /** Котировочная валюта инструмента (OKX quoteCcy); вторая половина имени индекса. */
+    private String externalQuoteCurrency;
 
     /** Плановая нижняя граница истории свечей (UTC мс), общая для всех таймфреймов. */
     private Long plannedCandleStartDate;

@@ -1,6 +1,7 @@
 package com.example.connector.okx.gateway;
 
 import static java.util.Objects.isNull;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.connector.okx.credentials.ExchangeCredentials;
 import com.example.connector.okx.credentials.ExchangeCredentialsResolver;
@@ -14,7 +15,10 @@ import com.example.connector.okx.mapping.MarketPriceDataMapper;
 import com.example.connector.okx.mapping.MarketSnapshotMapper;
 import com.example.connector.okx.mapping.OrderMapper;
 import com.example.connector.okx.mapping.PositionMapper;
+import com.example.connector.okx.mapping.TimeFrameMapper;
 import com.example.connector.okx.mapping.TradeFeeRateMapper;
+import com.example.connector.okx.snapshot.CandleExternalSnapshot;
+import com.example.connector.okx.snapshot.MarketTickerExternalSnapshot;
 import com.example.connector.okx.snapshot.InstrumentExternalSnapshot;
 import com.example.connector.okx.snapshot.PositionCloseResultExternalSnapshot;
 import com.example.connector.okx.source.OkxSourceReader;
@@ -29,6 +33,7 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.tradingbot.domain.model.other.TradeFeeRate;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
+import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketOrderBook;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketTicker;
@@ -72,6 +77,7 @@ public class OkxExchangeGateway implements ExchangeGateway {
     private final InstrumentExternalRulesMapper instrumentExternalRulesMapper;
     private final BalanceContainerMapper balanceContainerMapper;
     private final CandleMapper candleMapper;
+    private final TimeFrameMapper timeFrameMapper;
     private final DealCashFlowMapper dealCashFlowMapper;
     private final TradeFeeRateMapper tradeFeeRateMapper;
     private final MarketPriceDataMapper marketPriceDataMapper;
@@ -236,16 +242,16 @@ public class OkxExchangeGateway implements ExchangeGateway {
     }
 
     @Override
-    public List<Candle> getLatestCandles(String externalInstrumentId, String externalBar, Integer limit) {
-        return many(reader.getLatestCandles(externalInstrumentId, externalBar, limit),
-                candleMapper::snapshotToDomain);
+    public List<Candle> getLatestCandles(String externalInstrumentId, TimeFrame timeframe, Integer limit) {
+        return closedOnly(reader.getLatestCandles(externalInstrumentId,
+                timeFrameMapper.domainToOkx(timeframe), limit));
     }
 
     @Override
-    public List<Candle> getHistoryCandles(String externalInstrumentId, String externalBar, Long afterMillis,
+    public List<Candle> getHistoryCandles(String externalInstrumentId, TimeFrame timeframe, Long afterMillis,
                                           Integer limit) {
-        return many(reader.getHistoryCandles(externalInstrumentId, externalBar, afterMillis, limit),
-                candleMapper::snapshotToDomain);
+        return closedOnly(reader.getHistoryCandles(externalInstrumentId,
+                timeFrameMapper.domainToOkx(timeframe), afterMillis, limit));
     }
 
     @Override
@@ -256,8 +262,9 @@ public class OkxExchangeGateway implements ExchangeGateway {
     }
 
     @Override
-    public Candle getIndexCandleAt(String indexInstrumentId, String externalBar, OffsetDateTime at) {
-        return one(reader.getIndexCandleAt(indexInstrumentId, externalBar, at), candleMapper::snapshotToDomain);
+    public Candle getIndexCandleAt(String indexInstrumentId, TimeFrame timeframe, OffsetDateTime at) {
+        return one(reader.getIndexCandleAt(indexInstrumentId, timeFrameMapper.domainToOkx(timeframe), at),
+                candleMapper::snapshotToDomain);
     }
 
     @Override
@@ -266,8 +273,14 @@ public class OkxExchangeGateway implements ExchangeGateway {
     }
 
     @Override
-    public List<MarketTicker> getTickers(String externalInstrumentType) {
-        return many(reader.getTickers(externalInstrumentType), marketSnapshotMapper::snapshotToDomain);
+    public Map<String, MarketTicker> getTickers(String externalInstrumentType) {
+        List<MarketTickerExternalSnapshot> snapshots = reader.getTickers(externalInstrumentType);
+        if (isNull(snapshots)) {
+            return Map.of();
+        }
+        return snapshots.stream().collect(Collectors.toMap(
+                MarketTickerExternalSnapshot::getExternalInstrumentId,
+                marketSnapshotMapper::snapshotToDomain));
     }
 
     @Override
@@ -345,5 +358,29 @@ public class OkxExchangeGateway implements ExchangeGateway {
         return isNull(snapshots)
                 ? List.of()
                 : snapshots.stream().map(toDomain).collect(Collectors.toList());
+    }
+
+    /**
+     * Наружу уходят только ЗАКРЫТЫЕ бары: признак закрытия виден на
+     * границе и дальше не едет — доменная свеча его не несёт
+     * ({@code docs/models/domain/other/Candle.md}).
+     *
+     * <p><b>Фильтр стои́т здесь, потому что больше ему стоять негде.</b>
+     * Читатель, получив незакрытый бар неотличимым от закрытого, записал
+     * бы его в историю — и всякий расчёт по этой истории получил бы
+     * look-ahead. Ошибка была бы в разрешающую сторону, а такие
+     * запрещены ({@code docs/concept.md}, П1).
+     *
+     * <p>Незакрытый бар — законный факт площадки, и когда он кому-то
+     * понадобится, он приедет СВОЕЙ операцией («текущий бар»), а не
+     * ослаблением этой: две разные истины одной операцией не отдаются.
+     */
+    private List<Candle> closedOnly(List<CandleExternalSnapshot> snapshots) {
+        return isNull(snapshots)
+                ? List.of()
+                : snapshots.stream()
+                        .filter(snapshot -> isTrue(snapshot.getConfirm()))
+                        .map(candleMapper::snapshotToDomain)
+                        .collect(Collectors.toList());
     }
 }
