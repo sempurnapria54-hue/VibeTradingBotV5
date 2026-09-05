@@ -1,0 +1,62 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Кластерный слой: то, что ставится РАЗ НА КЛАСТЕР, а не на окружение.
+#
+# ПОЧЕМУ ОТДЕЛЬНО ОТ ОВЕРЛЕЯ ОКРУЖЕНИЯ. Оператор — ресурс кластера: его
+# CRD и контроллер одни на все окружения, и три оверлея, каждый со своей
+# копией Application, ставили бы один и тот же чарт трижды. Плюс
+# Application и AppProject живут в пространстве имён argocd, а оверлей
+# окружения переписывает namespace всем своим ресурсам — попав в него,
+# Application уехал бы в namespace окружения, где Argo CD его не видит.
+# Обе половины обнаружены первым развёртыванием (локальный стенд).
+#
+# Инстансы данных (../data) — наоборот, свои у каждого окружения: они и
+# лежат в ../kustomization.yaml.
+
+namespace: argocd
+
+resources:
+  - argocd-project.yaml
+  - rbac-log-shipper.yaml
+  - operator-cert-manager.yaml
+  - operator-cloudnative-pg.yaml
+  - operator-strimzi.yaml
+  - operator-vault.yaml
+  - operator-eck.yaml
+  - operator-kube-prometheus-stack.yaml
+  - operator-keycloak.yaml
+
+# Синхронизация кластерного слоя — автоматическая, и это не ослабление
+# правила «тропа к деньгам содержит человека». Версия чарта закреплена
+# полем targetRevision, поэтому Argo применяет ровно то, что записано в
+# манифесте: измениться оно может только правкой репозитория, то есть
+# человеком. Ручная синхронизация здесь добавила бы второй шаг к тому же
+# исходу. Оверлей окружения свою политику задаёт сам
+# (docs/architecture/platform.md §«Чем различаются окружения»).
+#
+# prune: false — снятие Application не удаляет CRD и данные операторов
+# молча; удаление оператора делается явным ходом.
+#
+# ServerSideApply — не оптимизация, а условие работоспособности. Клиентская
+# форма применения кладёт весь объект в аннотацию
+# last-applied-configuration, а предел аннотации — 262144 байта; CRD
+# операторов данных крупнее (`clusters.postgresql.cnpg.io`,
+# `prometheuses.monitoring.coreos.com`, `alertmanagers...`). Клиентская
+# форма теряет их МОЛЧА: оператор поднимается здоровым, а ресурса, ради
+# которого он ставится, в кластере нет. Обнаружено первым развёртыванием
+# (локальный стенд): у CNPG отсутствовал `clusters`, у стека метрик —
+# `prometheuses` и `alertmanagers`.
+patches:
+  - target:
+      group: argoproj.io
+      kind: Application
+    patch: |-
+      - op: add
+        path: /spec/syncPolicy/automated
+        value:
+          selfHeal: true
+          prune: false
+      - op: add
+        path: /spec/syncPolicy/syncOptions/-
+        value: ServerSideApply=true

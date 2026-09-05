@@ -77,4 +77,24 @@ public class ExchangeAccountService {
     public List<ExchangeAccountEntity> byTenant(String tenantInternalId) {
         return accountRepository.findAllByTenantId(tenantInternalId);
     }
+
+    /**
+     * Реестр счетов целиком — чтение торгового ядра.
+     *
+     * <p><b>Не по тенанту, и это следствие контракта, а не удобства.</b>
+     * Ядро обязано знать, какие счета существуют, иначе не начнёт ни
+     * одного прохода (docs/architecture/contracts.md §«Синхронные
+     * вызовы»); перечня тенантов у него нет и быть не должно — тенантами
+     * владеет этот сервис.
+     *
+     * <p><b>Пагинации нет, и это названное ограничение.</b> Счёт заводит
+     * человек, и их десятки, а не тысячи: окно за курсором стоило бы
+     * больше, чем даёт (.claude/rules/design-simplicity.md). Условие
+     * пересмотра — второй субъект (фаза 4): с ним число счетов растёт с
+     * числом тенантов, и чтение переводится на окно.
+     */
+    @Transactional(readOnly = true)
+    public List<ExchangeAccountEntity> all() {
+        return accountRepository.findAll();
+    }
 }

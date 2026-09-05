@@ -52,25 +52,3 @@ patches:
       - op: replace
         path: /spec/instances
         value: 2
-  - target:
-      kind: Kafka
-      name: platform-kafka
-    patch: |-
-      - op: replace
-        path: /spec/kafka/replicas
-        value: 3
-      - op: replace
-        path: /spec/kafka/config/default.replication.factor
-        value: 3
-      - op: replace
-        path: /spec/kafka/config/offsets.topic.replication.factor
-        value: 3
-      - op: replace
-        path: /spec/kafka/config/transaction.state.log.replication.factor
-        value: 3
-      - op: replace
-        path: /spec/kafka/config/transaction.state.log.min.isr
-        value: 2
-      - op: replace
-        path: /spec/kafka/config/min.insync.replicas
-        value: 2

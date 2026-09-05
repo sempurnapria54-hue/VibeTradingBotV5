@@ -4,16 +4,41 @@
 #
 # Репликация — не меньше трёх с подтверждением большинством: это свойство
 # брокер даёт, и потеря при отказе узла закрывается им
-# (docs/architecture/data-ownership.md §«Outbox и доставка»). Число брокеров
+# (docs/architecture/data-ownership.md §«Outbox и доставка»). Число узлов
 # — ось различия окружений: в непроизводственных оно равно единице, и там
 # фактор репликации понижается оверлеем вместе с ним.
-apiVersion: kafka.strimzi.io/v1beta2
+#
+# ФОРМА CR ЗАКРЕПЛЕНА ПЕРВЫМ РАЗВЁРТЫВАНИЕМ (локальный стенд, 2026-09-05).
+# Число узлов и их хранилище объявляет KafkaNodePool, а не Kafka: начиная
+# с 1.0 оператор работает только в режиме KRaft и только с пулами узлов —
+# полей `spec.kafka.replicas` и `spec.kafka.storage` в схеме CRD больше
+# нет, как нет и версии API `v1beta2`.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: platform-kafka-nodes
+  labels:
+    # Метка связывает пул с кластером; без неё оператор пул не подхватит.
+    strimzi.io/cluster: platform-kafka
+spec:
+  replicas: 3
+  # Совмещённая роль: контроллер кворума и брокер в одном узле. Разводить
+  # их на два пула имеет смысл там, где у ролей разный профиль нагрузки;
+  # здесь это был бы второй набор узлов ради того же исхода.
+  roles:
+    - controller
+    - broker
+  storage:
+    type: persistent-claim
+    size: 20Gi
+    deleteClaim: false
+---
+apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
   name: platform-kafka
 spec:
   kafka:
-    replicas: 3
     listeners:
     # Слушатель открытый — НАЗВАННЫЙ выбор, не умолчание:
     # docs/architecture/platform.md §Безопасность, «Транспорт внутри
@@ -28,10 +53,6 @@ spec:
       transaction.state.log.min.isr: 2
       default.replication.factor: 3
       min.insync.replicas: 2
-    storage:
-      type: persistent-claim
-      size: 20Gi
-      deleteClaim: false
   entityOperator:
     topicOperator: {}
     userOperator: {}

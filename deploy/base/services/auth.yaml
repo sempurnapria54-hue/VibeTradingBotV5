@@ -1,0 +1,180 @@
+# Развёртывание сервиса auth (шаг 4 фазы 2). Манифест приезжает первым
+# развёртыванием, а не шагом сервиса: Deployment обязан назвать образ,
+# адрес провайдера идентичности и ресурсные числа, а до кластера ни
+# одного из трёх не существовало (.claude/work/backlog.md §«Манифесты
+# развёртывания сервисов»).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: auth
+---
+# База сервиса. Роль-владелец объявлена кластером (../data/postgres-cluster.yaml):
+# оператор ведёт роли только полем кластера, а базу — отдельным ресурсом,
+# и она живёт рядом со своим писателем (docs/architecture/data-ownership.md
+# §Раскладка).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: auth
+spec:
+  cluster:
+    name: platform-postgres
+  name: auth
+  owner: auth
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+spec:
+  selector:
+    app.kubernetes.io/name: auth
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: auth
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: auth
+    spec:
+      serviceAccountName: auth
+      containers:
+        - name: auth
+          image: registry.invalid/vibetrading/auth
+          # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
+          # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
+          # в реестр незачем. Умолчание здесь опасно ещё и тем, что при
+          # безтеговом образе оно равно `Always`, и под не поднимется на
+          # стенде, где реестра нет вовсе.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: environment
+            - name: PLATFORM_ADMITTED_CONTOURS
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: admittedContours
+            # Провайдер идентичности — сервис того же пространства имён:
+            # окружение и есть пространство имён, поэтому адрес не несёт
+            # его имени и одинаков во всех трёх.
+            - name: OIDC_ISSUER_URI
+              value: http://platform-identity-service:8080/realms/vibetrading
+            - name: VAULT_URI
+              value: http://vault.vault-system.svc:8200
+            - name: VAULT_ROLE
+              value: auth
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://platform-postgres-rw:5432/auth
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-auth
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-auth
+                  key: password
+          # Числа назначает разворачивающий по наблюдаемому потреблению
+          # (docs/architecture/platform.md §«Чем различаются окружения»).
+          # Это ПЕРВОЕ назначение — до наблюдения; пересматривается по
+          # снятому потреблению стенда.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+---
+# Сетевая политика сервиса. Разрешение даёт строка
+# docs/architecture/contracts.md §«Синхронные вызовы»; входящих вызовов у
+# auth сегодня два — от bff и от trading-core, и оба приедут со своими
+# сервисами. Здесь — исходящее, без которого процесс не поднимется вовсе:
+# база, хранилище секретов, провайдер идентичности.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: auth
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: platform-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault-system
+      ports:
+        - protocol: TCP
+          port: 8200
+---
+# Встречное разрешение на стороне базы. Запрет по умолчанию действует в
+# ОБЕ стороны: одного исходящего правила у сервиса мало, входящее у
+# инстанса базы обязано быть названо тем же ходом. Обнаружено первым
+# развёртыванием: сервис висел на попытке соединения, пока правило было
+# только исходящим.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress-from-auth
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: auth
+      ports:
+        - protocol: TCP
+          port: 5432

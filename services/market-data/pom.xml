@@ -68,6 +68,21 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <!--
+          ПРОБА ЖИВОСТИ — ОБЪЯВЛЕННАЯ ПОВЕРХНОСТЬ, а не удобство: она
+          единственная открытая точка контура доступа
+          (docs/rules/api-access-policy.md), и на неё же смотрят пробы
+          готовности и живости в манифесте развёртывания. Без стартера
+          актуатора эндпойнта не существует вовсе: конфигурация
+          management.endpoints.* и правило permitAll в SecurityConfig
+          оставались объявлениями без предмета, а всякий запрос к
+          /actuator/health отвечал 401. Обнаружено первым развёртыванием
+          (локальный стенд): под не становился готовым никогда.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!--
           RestClient.Builder переехал в отдельный модуль в Boot 4:
           starter-web несёт серверную часть, клиентский автоконфиг — здесь.
           Клиент нужен для чтений у коннектора.
@@ -92,9 +107,19 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!--
+          СТАРТЕР, А НЕ flyway-core. Boot 4 разнёс автоконфиги по модулям:
+          flyway-core на classpath даёт биндинг spring.flyway.* и сам
+          Flyway, но автоконфиг, ЗАПУСКАЮЩИЙ миграции на старте, живёт в
+          модуле spring-boot-flyway и сам не подтягивается. С одним
+          flyway-core миграции молча не применяются, и сервис падает уже на
+          валидации схемы. Обнаружено первым развёртыванием (локальный
+          стенд); донор ту же ловушку прошёл раньше и записал её у себя.
+          flyway-database-postgresql стартер не тянет — держим явно.
+        -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -169,6 +194,19 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <!--
+              Исполняемый артефакт сервиса. Без repackage сборка даёт
+              обычный jar без зависимостей и без манифеста запуска — то
+              есть образ сервиса собрать не из чего. Обнаружено первым
+              развёртыванием (локальный стенд): донор плагин несёт, а
+              сервисы, заведённые шагами 4-6, его не унаследовали —
+              родитель объявляет только УПРАВЛЕНИЕ версией плагина, а не
+              его подключение.
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

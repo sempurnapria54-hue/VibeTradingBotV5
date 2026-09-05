@@ -18,7 +18,15 @@ resources:
 # (docs/architecture/platform.md §Развёртывание). Правит его CI хостинга
 # репозитория командой tools/deploy-set-image-tag.sh.
 # Список пуст, пока нет ни одного сервиса: сервисы приезжают шагами 3-10.
-images: []
+images:
+  - name: registry.invalid/vibetrading/trading-core
+    newTag: 0.0.1-585a998-20260905192646
+  - name: registry.invalid/vibetrading/market-data
+    newTag: 0.0.1-585a998-20260905175310
+  - name: registry.invalid/vibetrading/connector-okx
+    newTag: 0.0.1-585a998
+  - name: registry.invalid/vibetrading/auth
+    newTag: 0.0.1-585a998-20260905191945
 patches:
   - target:
       kind: Namespace
@@ -30,13 +38,19 @@ patches:
       - op: replace
         path: /metadata/labels/platform.vibetrading~1environment
         value: dev
+  # Число узлов Kafka объявляет пул, а не сам кластер: с версии оператора
+  # 1.0 полей replicas/storage в Kafka нет (см. шапку базового манифеста).
+  - target:
+      kind: KafkaNodePool
+      name: platform-kafka-nodes
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
   - target:
       kind: Kafka
       name: platform-kafka
     patch: |-
-      - op: replace
-        path: /spec/kafka/replicas
-        value: 1
       - op: replace
         path: /spec/kafka/config/default.replication.factor
         value: 1

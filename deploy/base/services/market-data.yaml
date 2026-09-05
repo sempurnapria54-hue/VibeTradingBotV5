@@ -1,0 +1,176 @@
+# Развёртывание сервиса market-data (шаг 6 фазы 2). О причине, по которой
+# манифест приезжает первым развёртыванием, — см. шапку auth.yaml.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: market-data
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: market-data
+spec:
+  cluster:
+    name: platform-postgres
+  name: market_data
+  owner: market_data
+  # Ряды лежат гипертаблицами; расширение объявляет тот, кто заводит базу,
+  # а не миграция сервиса: `create extension` требует прав суперпользователя,
+  # которых у роли-владельца базы нет и быть не должно.
+  extensions:
+    - name: timescaledb
+      ensure: present
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-data
+spec:
+  selector:
+    app.kubernetes.io/name: market-data
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: market-data
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: market-data
+    spec:
+      serviceAccountName: market-data
+      containers:
+        - name: market-data
+          image: registry.invalid/vibetrading/market-data
+          # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
+          # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
+          # в реестр незачем. Умолчание здесь опасно ещё и тем, что при
+          # безтеговом образе оно равно `Always`, и под не поднимется на
+          # стенде, где реестра нет вовсе.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: environment
+            - name: OIDC_ISSUER_URI
+              value: http://platform-identity-service:8080/realms/vibetrading
+            - name: OIDC_TOKEN_URI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/token
+            - name: CONNECTOR_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-market-data
+                  key: client-id
+            - name: CONNECTOR_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-market-data
+                  key: client-secret
+            - name: CONNECTOR_EXCHANGE_CODE
+              value: OKX
+            - name: CONNECTOR_BASE_URL
+              value: http://connector-okx:8080
+            - name: MARKET_DATA_DB_URL
+              value: jdbc:postgresql://platform-postgres-rw:5432/market_data
+            - name: MARKET_DATA_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-market-data
+                  key: username
+            - name: MARKET_DATA_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-market-data
+                  key: password
+          resources:
+            requests:
+              cpu: 200m
+              memory: 768Mi
+            limits:
+              memory: 1536Mi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 20
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: market-data-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: market-data
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: platform-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Публичные чтения площадки идут ЧЕРЕЗ коннектор: наружу market-data
+    # не ходит вовсе (docs/architecture/platform.md §Безопасность).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: connector-okx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Встречное разрешение на стороне базы. Запрет по умолчанию действует в
+# ОБЕ стороны: одного исходящего правила у сервиса мало, входящее у
+# инстанса базы обязано быть названо тем же ходом. Обнаружено первым
+# развёртыванием: сервис висел на попытке соединения, пока правило было
+# только исходящим.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress-from-market-data
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: market-data
+      ports:
+        - protocol: TCP
+          port: 5432

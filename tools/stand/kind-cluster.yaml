@@ -1,0 +1,23 @@
+# Форма кластера локального стенда.
+#
+# ПРЕДМЕТ: один узел, на котором живут все пространства имён — окружения
+# (`dev`/`stage`/`prod`) и системные (операторы, Argo CD). Ровно та же
+# раскладка, что описана в docs/architecture/platform.md §Развёртывание
+# для случая «до выбора облака»; отличие стенда только в том, ЧЕМ поднят
+# сам кластер.
+#
+# Проброс портов заведён под будущий ингресс: пока ни одного Ingress-ресурса
+# нет (они приезжают с bff и web), доступ к интерфейсам идёт через
+# `kubectl port-forward` — см. .claude/skills/local-stand.md.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: vibetrading
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 8081
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 8443
+        protocol: TCP

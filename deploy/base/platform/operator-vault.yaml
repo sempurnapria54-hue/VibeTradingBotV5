@@ -1,10 +1,8 @@
 # Vault. Схема путей — docs/architecture/platform.md §Безопасность; роли привязаны к ServiceAccount сервиса в его пространстве имён.
 #
-# ВЕРСИЯ ЧАРТА НЕ ЗАКРЕПЛЕНА ПРОГОНОМ: кластера в объявленной среде нет,
-# и проверить, что именно эта версия ставится, было нечем. Поле
-# targetRevision несёт заведомо-заметный плейсхолдер, а не правдоподобное
-# число: правдоподобное выглядело бы проверенным. Закрепляется первым
-# развёртыванием (deploy/README.md §«Что не проверено прогоном»).
+# ВЕРСИЯ ЗАКРЕПЛЕНА ПЕРВЫМ РАЗВЁРТЫВАНИЕМ (локальный стенд, 2026-09-05):
+# именно эта версия поднялась в кластере, а не выбрана по индексу чарта
+# (.claude/skills/local-stand.md).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,7 +13,7 @@ spec:
   source:
     repoURL: https://helm.releases.hashicorp.com
     chart: vault
-    targetRevision: PIN-ON-FIRST-DEPLOY
+    targetRevision: 0.34.1
   destination:
     server: https://kubernetes.default.svc
     namespace: vault-system

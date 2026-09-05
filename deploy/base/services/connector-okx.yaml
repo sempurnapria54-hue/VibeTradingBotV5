@@ -1,0 +1,149 @@
+# Развёртывание сервиса connector-okx (шаг 5 фазы 2). О причине, по
+# которой манифест приезжает первым развёртыванием, — см. шапку auth.yaml.
+#
+# БАЗЫ У КОННЕКТОРА НЕТ (docs/architecture/data-ownership.md §Раскладка):
+# он стейтлесс, поэтому ни Database, ни секрета роли здесь не заводится.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: connector-okx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: connector-okx
+spec:
+  selector:
+    app.kubernetes.io/name: connector-okx
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connector-okx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: connector-okx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: connector-okx
+    spec:
+      serviceAccountName: connector-okx
+      containers:
+        - name: connector-okx
+          image: registry.invalid/vibetrading/connector-okx
+          # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
+          # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
+          # в реестр незачем. Умолчание здесь опасно ещё и тем, что при
+          # безтеговом образе оно равно `Always`, и под не поднимется на
+          # стенде, где реестра нет вовсе.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: environment
+            - name: OIDC_ISSUER_URI
+              value: http://platform-identity-service:8080/realms/vibetrading
+            - name: VAULT_URI
+              value: http://vault.vault-system.svc:8200
+            - name: VAULT_ROLE
+              value: connector-okx
+            # Базовый URL площадки — docs/integrations/okx/contracts/service-urls.md.
+            # Демо-контур отличается заголовком запроса, а не адресом.
+            - name: OKX_BASE_URL
+              value: https://www.okx.com
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+---
+# Входящее: коннектор зовут market-data (публичные чтения) и trading-core
+# (команды площадке) — строки docs/architecture/contracts.md §«Синхронные
+# вызовы». Пара с trading-core приедет с его сервисом.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: connector-okx-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: connector-okx
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: market-data
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Исходящее: коннектор — один из двух прикладных сервисов, которым
+# периметр открыт наружу (docs/architecture/platform.md §Безопасность):
+# площадка живёт в интернете. Плюс хранилище ключей и проверка подписи
+# токена у провайдера идентичности.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: connector-okx-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: connector-okx
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault-system
+      ports:
+        - protocol: TCP
+          port: 8200
+    # Наружу — только к площадке. Диапазон адресов площадки неизвестен и
+    # меняется, поэтому разрешается выход в интернет с вычетом
+    # внутрикластерных и приватных сетей: узкое правило здесь было бы
+    # заявлением, а не ограничением.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

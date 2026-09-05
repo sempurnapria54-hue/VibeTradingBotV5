@@ -1,0 +1,178 @@
+# Разрешения, без которых пространство имён с запретом по умолчанию не
+# поднимается вовсе.
+#
+# ПОЧЕМУ ЭТОТ ФАЙЛ ЕСТЬ. Запрет по умолчанию (network-default-deny.yaml)
+# адресует ВСЕ поды пространства, а не только прикладные сервисы. Инстансы
+# данных, которыми управляют операторы, ведут не прикладной, а
+# УПРАВЛЯЮЩИЙ трафик: агент экземпляра Postgres читает свой ресурс у
+# API-сервера, оператор ходит к поду за состоянием, Prometheus снимает
+# метрики. Таблица docs/architecture/contracts.md §«Синхронные вызовы»
+# описывает вызовы СЕРВИСОВ друг к другу и об этом классе не
+# высказывается — поэтому разрешения живут здесь, а не выводятся из неё.
+#
+# Обнаружено первым развёртыванием (локальный стенд): CNI kind политику
+# ИСПОЛНЯЕТ, и кластер Postgres не поднялся — агент экземпляра не смог
+# дойти до API-сервера («dial tcp 10.96.0.1:443: i/o timeout»), то есть
+# запрет сработал ровно так, как написан.
+#
+# Область: только поды, которыми управляют операторы данных. Прикладные
+# сервисы под эти правила не попадают — их тропы объявляются поимённо в
+# их собственных манифестах.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-operand-apiserver-egress
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes:
+    - Egress
+  egress:
+    # Точного селектора API-сервера у NetworkPolicy не существует: он не
+    # под и адрес его — свойство кластера, а не окружения. Поэтому правило
+    # ограничено ПОРТОМ и НАБОРОМ ПОДОВ, а не адресом; цена названа: под
+    # экземпляра базы может открыть исходящее соединение на 443/6443 к
+    # чужому адресу. Сужение до адреса кластера — на прод-рубеже, где
+    # адрес известен и неизменен (.claude/work/backlog.md §«Транспорт
+    # внутри кластера — пересмотр перед первым `prod`»).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-strimzi-operand-apiserver-egress
+spec:
+  podSelector:
+    matchExpressions:
+      - key: strimzi.io/cluster
+        operator: Exists
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+---
+# Экземпляры одного кластера данных говорят друг с другом: репликация
+# Postgres, кворум и репликация Kafka, обмен узлов Elasticsearch. Это
+# внутреннее устройство инстанса, а не вызов между сервисами.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-data-instances-intra
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: Exists
+        - podSelector:
+            matchExpressions:
+              - key: strimzi.io/cluster
+                operator: Exists
+        - podSelector:
+            matchExpressions:
+              - key: elasticsearch.k8s.elastic.co/cluster-name
+                operator: Exists
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: Exists
+        - podSelector:
+            matchExpressions:
+              - key: strimzi.io/cluster
+                operator: Exists
+        - podSelector:
+            matchExpressions:
+              - key: elasticsearch.k8s.elastic.co/cluster-name
+                operator: Exists
+---
+# Операторы ходят к своим подам: CloudNativePG — к агенту экземпляра,
+# Strimzi — к брокерам, ECK — к узлам Elasticsearch, оператор провайдера
+# идентичности — к своему поду, Prometheus — за метриками ко всем.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-operators-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kafka-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elastic-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+---
+# Провайдер идентичности — своя база, как у любого писателя
+# (docs/architecture/data-ownership.md §Раскладка). Правило отдельное, а
+# не в общем наборе инстансов: это вызов К базе, а не обмен внутри одного
+# инстанса.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-identity-egress
+spec:
+  # Селектор по ВЛАДЕЛЬЦУ, а не по имени: оператор провайдера поднимает не
+  # только сервер (`app: keycloak`), но и разовые поды импорта реалма
+  # (`app: keycloak-realm-import`), и они ходят в ту же базу. Обнаружено
+  # первым развёртыванием: импорт реалма падал по таймауту соединения,
+  # пока правило называло только сервер.
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: keycloak-operator
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: Exists
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443

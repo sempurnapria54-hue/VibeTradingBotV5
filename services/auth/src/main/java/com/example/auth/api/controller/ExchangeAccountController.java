@@ -59,6 +59,19 @@ public class ExchangeAccountController {
         return ResponseEntity.status(HttpStatus.CREATED).body(accountMapper.persistenceToApi(account));
     }
 
+    /**
+     * Реестр счетов целиком: чтение торгового ядра, которому нужно
+     * знать, какие счета существуют
+     * (docs/architecture/contracts.md §«Синхронные вызовы»).
+     */
+    @Operation(summary = "Реестр биржевых счетов")
+    @GetMapping
+    public List<ExchangeAccountApiResponse> list() {
+        return accountService.all().stream()
+                .map(accountMapper::persistenceToApi)
+                .collect(Collectors.toList());
+    }
+
     @Operation(summary = "Счета тенанта")
     @GetMapping("/tenant/{tenantInternalId}")
     public List<ExchangeAccountApiResponse> byTenant(@PathVariable String tenantInternalId) {

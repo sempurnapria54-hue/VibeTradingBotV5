@@ -1,0 +1,42 @@
+# Права сборщика логов — кластерные, поэтому живут в кластерном слое.
+#
+# ПОЧЕМУ НЕ В СЛОЕ ОКРУЖЕНИЯ. Сборщик работает в каждом окружении своим
+# DaemonSet'ом (../data/elastic-ui-and-shipper.yaml), но читает
+# метаданные подов у API-сервера — а это право кластерное, и имя у
+# кластерного ресурса одно на кластер: три окружения, положив тот же
+# ClusterRole в свой оверлей, перезаписывали бы друг друга.
+#
+# Отсюда форма: роль одна, а привязка перечисляет служебные учётные записи
+# ВСЕХ окружений поимённо. Окружение, которого в перечне нет, сборщик
+# поднимет, но метаданные пода читать не сможет — и это будет видно в его
+# логах, а не молча.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-log-shipper
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "pods", "nodes"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-log-shipper
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-log-shipper
+subjects:
+  - kind: ServiceAccount
+    name: platform-log-shipper
+    namespace: dev
+  - kind: ServiceAccount
+    name: platform-log-shipper
+    namespace: stage
+  - kind: ServiceAccount
+    name: platform-log-shipper
+    namespace: prod

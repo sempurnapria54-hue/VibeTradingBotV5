@@ -27,6 +27,7 @@
           <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct-processor/1.6.3/mapstruct-processor-1.6.3.jar" />
         </processorPath>
         <module name="market-data" />
+        <module name="trading-core" />
         <module name="tradingbot (1)" />
         <module name="auth" />
         <module name="connector-okx" />
@@ -47,6 +48,7 @@
       <module name="auth" options="-parameters" />
       <module name="connector-okx" options="-parameters" />
       <module name="market-data" options="-parameters" />
+      <module name="trading-core" options="-parameters" />
       <module name="tradingbot" options="" />
       <module name="tradingbot (1)" options="-parameters" />
     </option>

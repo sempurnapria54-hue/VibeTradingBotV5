@@ -1,0 +1,42 @@
+# Реалм окружения у провайдера идентичности. Владелец — шаг 4 фазы 2
+# (`auth`): тенанты, членства и роли ведёт он, а учётные данные, сессии и
+# токены — провайдер (docs/architecture/services.md).
+#
+# ЧТО ЗДЕСЬ ЕСТЬ: структура — сам реалм и клиенты сервисов, ходящих друг к
+# другу без пользователя (docs/architecture/contracts.md §«Контекст
+# тенанта в вызове»).
+#
+# ЧЕГО ЗДЕСЬ НЕТ И НЕ БУДЕТ: секретов клиентов. Секрет генерирует сам
+# провайдер, а в кластер его переносит команда постановки стенда
+# (`.claude/skills/local-stand.md`); в целевой конструкции — Vault
+# (docs/architecture/platform.md §Безопасность). Секрет, записанный в
+# манифест, лежал бы в git открытым текстом.
+apiVersion: k8s.keycloak.org/v2beta1
+kind: KeycloakRealmImport
+metadata:
+  name: vibetrading
+spec:
+  keycloakCRName: platform-identity
+  realm:
+    realm: vibetrading
+    enabled: true
+    clients:
+      # Исходящая идентичность market-data: под ней он ходит к коннектору
+      # за публичными чтениями площадки. Грант — client credentials:
+      # пользователя в этом вызове нет.
+      - clientId: market-data
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        serviceAccountsEnabled: true
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+      # Исходящая идентичность торгового ядра: под ней оно ходит к
+      # коннектору, к auth за реестром счетов и к market-data за фичами.
+      - clientId: trading-core
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        serviceAccountsEnabled: true
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false

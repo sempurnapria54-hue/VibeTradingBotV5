@@ -1,0 +1,232 @@
+# Развёртывание сервиса trading-core (шаг 7 фазы 2). О причине, по
+# которой манифесты сервисов приезжают развёртыванием, — см. шапку
+# auth.yaml.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trading-core
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: trading-core
+spec:
+  cluster:
+    name: platform-postgres
+  name: trading_core
+  owner: trading_core
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trading-core
+spec:
+  selector:
+    app.kubernetes.io/name: trading-core
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-core
+spec:
+  # ОДНА РЕПЛИКА, И ЭТО НЕ ПРОФИЛЬ ОКРУЖЕНИЯ. Распределённого замка нет;
+  # две реплики дали бы два одновременных прохода оркестратора, то есть
+  # двух писателей решения об ордере (docs/architecture/platform.md
+  # §Реплики). Условие снятия названо там же: одна реплика перестала
+  # успевать.
+  replicas: 1
+  strategy:
+    # Пересоздание, а не перекрытие: на время выкатки два процесса ядра
+    # не должны существовать одновременно по тому же доводу.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trading-core
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trading-core
+    spec:
+      serviceAccountName: trading-core
+      containers:
+        - name: trading-core
+          image: registry.invalid/vibetrading/trading-core
+          # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
+          # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
+          # в реестр незачем. Умолчание здесь опасно ещё и тем, что при
+          # безтеговом образе оно равно `Always`, и под не поднимется на
+          # стенде, где реестра нет вовсе.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: environment
+            - name: OIDC_ISSUER_URI
+              value: http://platform-identity-service:8080/realms/vibetrading
+            - name: OIDC_TOKEN_URI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/token
+            - name: SERVICE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-trading-core
+                  key: client-id
+            - name: SERVICE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-trading-core
+                  key: client-secret
+            - name: CONNECTOR_EXCHANGE_CODE
+              value: OKX
+            - name: CONNECTOR_BASE_URL
+              value: http://connector-okx:8080
+            - name: AUTH_BASE_URL
+              value: http://auth:8080
+            - name: MARKET_DATA_BASE_URL
+              value: http://market-data:8080
+            - name: TRADING_CORE_DB_URL
+              value: jdbc:postgresql://platform-postgres-rw:5432/trading_core
+            - name: TRADING_CORE_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-trading-core
+                  key: username
+            - name: TRADING_CORE_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-trading-core
+                  key: password
+          resources:
+            requests:
+              cpu: 200m
+              memory: 768Mi
+            limits:
+              memory: 1536Mi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 20
+---
+# Исходящее: три строки таблицы docs/architecture/contracts.md
+# §«Синхронные вызовы» — к коннектору, к auth за реестром счетов, к
+# market-data за фичами и каталогом. Плюс провайдер идентичности за
+# ключами подписи и токеном исходящего вызова.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trading-core-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: trading-core
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: platform-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: connector-okx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: auth
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: market-data
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Встречные разрешения на стороне соседей: запрет по умолчанию
+# двусторонний, поэтому исходящего правила у ядра мало.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress-from-trading-core
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trading-core
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: neighbours-ingress-from-trading-core
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - connector-okx
+          - auth
+          - market-data
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trading-core
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: identity-ingress-from-trading-core
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trading-core
+      ports:
+        - protocol: TCP
+          port: 8080

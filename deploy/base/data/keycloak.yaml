@@ -4,7 +4,22 @@
 #
 # Реалмы, клиенты и мапперы заводит шаг 4 фазы 2 вместе с сервисом auth:
 # они бессмысленны без тенантов, которых ещё нет.
-apiVersion: k8s.keycloak.org/v2alpha1
+#
+# База провайдера — своя, как у любого писателя
+# (docs/architecture/data-ownership.md §Раскладка, строка «провайдер
+# идентичности»): её объявляет ресурс Database ниже, роль-владелец —
+# кластер (postgres-cluster.yaml), пароль — секрет вне репозитория.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: keycloak
+spec:
+  cluster:
+    name: platform-postgres
+  name: keycloak
+  owner: keycloak
+---
+apiVersion: k8s.keycloak.org/v2beta1
 kind: Keycloak
 metadata:
   name: platform-identity
@@ -13,6 +28,13 @@ spec:
   db:
     vendor: postgres
     host: platform-postgres-rw
+    database: keycloak
+    usernameSecret:
+      name: postgres-role-keycloak
+      key: username
+    passwordSecret:
+      name: postgres-role-keycloak
+      key: password
   # HTTP внутри кластера — НАЗВАННЫЙ выбор, не умолчание:
   # docs/architecture/platform.md §Безопасность, «Транспорт внутри
   # кластера». Условие пересмотра — перед первым развёртыванием prod.
@@ -20,3 +42,54 @@ spec:
     httpEnabled: true
   hostname:
     strict: false
+---
+# Встречное разрешение на стороне провайдера: подпись входящего токена
+# каждый сервис проверяет ЛОКАЛЬНО, но ключи подписи забирает у него, а
+# market-data ещё и берёт токен для исходящего вызова. Запрет по умолчанию
+# действует в обе стороны, поэтому исходящего правила у сервисов мало.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: identity-ingress-from-services
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: auth
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: connector-okx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: market-data
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Встречное разрешение на стороне базы: провайдер идентичности — такой же
+# писатель своей базы, как любой сервис (см. довод у auth.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress-from-identity
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/managed-by: keycloak-operator
+      ports:
+        - protocol: TCP
+          port: 5432

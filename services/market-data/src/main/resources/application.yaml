@@ -53,9 +53,12 @@ connector:
   exchange-code: ${CONNECTOR_EXCHANGE_CODE:}
   base-url: ${CONNECTOR_BASE_URL:}
   client-registration-id: connector
-  # Типы инструментов, чей листинг собирается. Полнота листинга нужна
-  # советнику по построению и требованием потребителя не выражается — это
-  # конфигурация сервиса (docs/architecture/market-data-collection.md).
+  # Типы инструментов, чей листинг ЗЕРКАЛИТСЯ В КАТАЛОГ. Каталог полон
+  # всегда: заказать сбор по инструменту, которого в нём нет, невозможно
+  # (docs/components/InstrumentSyncJob.md). Что по этим инструментам
+  # собирается — решает требование потребителя, а не эта настройка
+  # (docs/architecture/market-data-collection.md §«Как потребность доходит
+  # до сбора»).
   instrument-types: ${CONNECTOR_INSTRUMENT_TYPES:SWAP}
   # Котировочные валюты, по которым читаются цены индексов: чтение
   # индексов у площадки идёт по валюте, а не по инструменту.

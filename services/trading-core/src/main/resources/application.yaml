@@ -1,0 +1,82 @@
+# Конфигурация сервиса trading-core.
+#
+# Значения осей окружения приезжают из манифеста окружения
+# (deploy/<окружение>/env.yaml); здесь — только форма и умолчания,
+# выбранные так, чтобы незаданное означало ОТКАЗ, а не разрешение.
+spring:
+  application:
+    name: trading-core
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Точка провайдера идентичности: подпись входящего токена
+          # проверяется локально по его ключам. Пустое означает, что контур
+          # доступа не настроен, и поверхность не поднимется — это отказ.
+          issuer-uri: ${OIDC_ISSUER_URI:}
+      client:
+        # Исходящая идентичность: под ней ядро ходит к коннектору, к auth
+        # и к market-data (docs/architecture/contracts.md §«Контекст
+        # тенанта в вызове»). Грант — client credentials: пользователя в
+        # межсервисном вызове нет.
+        registration:
+          platform-services:
+            client-id: ${SERVICE_CLIENT_ID:}
+            client-secret: ${SERVICE_CLIENT_SECRET:}
+            authorization-grant-type: client_credentials
+            provider: platform
+        provider:
+          platform:
+            token-uri: ${OIDC_TOKEN_URI:}
+  datasource:
+    # База сервиса: ядро — единственный писатель торговых строк
+    # (docs/architecture/data-ownership.md §Раскладка).
+    url: ${TRADING_CORE_DB_URL:}
+    username: ${TRADING_CORE_DB_USERNAME:}
+    password: ${TRADING_CORE_DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Источник истины схемы — миграции Flyway; Hibernate схему не правит.
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+platform:
+  environment:
+    name: ${PLATFORM_ENVIRONMENT:}
+
+# Соседи по контракту. Адреса приезжают из манифеста окружения; пустое
+# означает, что тропа не настроена, и вызов отказывает — лучше отказ, чем
+# поход в чужое окружение.
+neighbours:
+  connector:
+    exchange-code: ${CONNECTOR_EXCHANGE_CODE:}
+    base-url: ${CONNECTOR_BASE_URL:}
+    client-registration-id: platform-services
+  auth:
+    base-url: ${AUTH_BASE_URL:}
+    client-registration-id: platform-services
+  market-data:
+    base-url: ${MARKET_DATA_BASE_URL:}
+    client-registration-id: platform-services
+
+# Тик синка проекций чужих реестров
+# (docs/models/domain/core/Instrument.md §«Проекция у торгового ядра»).
+# Период — калибровочная величина сервиса с названным направлением: ЧАЩЕ,
+# чем реже. Чтение внутрикластерное и лимита площадки не тратит, поэтому
+# ограничение сверху — не бюджет владельца, а нагрузка на его поверхность.
+projection-sync:
+  enabled: true
+  cron: ${PROJECTION_SYNC_CRON:0 */5 * * * *}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

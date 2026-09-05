@@ -6,7 +6,9 @@ kind: Elasticsearch
 metadata:
   name: platform-logs
 spec:
-  version: PIN-ON-FIRST-DEPLOY
+  # Версия закреплена первым развёртыванием (локальный стенд, 2026-09-05):
+  # именно она поднялась под оператором ECK 3.5.0.
+  version: 9.5.3
   nodeSets:
     - name: default
       count: 1

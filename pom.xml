@@ -35,6 +35,7 @@
         <module>services/auth</module>
         <module>services/connector-okx</module>
         <module>services/market-data</module>
+        <module>services/trading-core</module>
         <module>donor</module>
     </modules>
 </project>

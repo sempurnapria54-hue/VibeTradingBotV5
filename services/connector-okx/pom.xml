@@ -67,6 +67,21 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <!--
+          ПРОБА ЖИВОСТИ — ОБЪЯВЛЕННАЯ ПОВЕРХНОСТЬ, а не удобство: она
+          единственная открытая точка контура доступа
+          (docs/rules/api-access-policy.md), и на неё же смотрят пробы
+          готовности и живости в манифесте развёртывания. Без стартера
+          актуатора эндпойнта не существует вовсе: конфигурация
+          management.endpoints.* и правило permitAll в SecurityConfig
+          оставались объявлениями без предмета, а всякий запрос к
+          /actuator/health отвечал 401. Обнаружено первым развёртыванием
+          (локальный стенд): под не становился готовым никогда.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!--
           RestClient.Builder переехал в отдельный модуль в Boot 4:
           starter-web несёт серверную часть, клиентский автоконфиг — здесь.
         -->
@@ -157,6 +172,19 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <!--
+              Исполняемый артефакт сервиса. Без repackage сборка даёт
+              обычный jar без зависимостей и без манифеста запуска — то
+              есть образ сервиса собрать не из чего. Обнаружено первым
+              развёртыванием (локальный стенд): донор плагин несёт, а
+              сервисы, заведённые шагами 4-6, его не унаследовали —
+              родитель объявляет только УПРАВЛЕНИЕ версией плагина, а не
+              его подключение.
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

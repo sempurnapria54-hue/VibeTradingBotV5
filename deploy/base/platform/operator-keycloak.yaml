@@ -1,10 +1,22 @@
 # Провайдер идентичности. Учётные данные, сессии, токены, MFA — у него; тенанты и роли — у сервиса auth (docs/architecture/services.md).
 #
-# ВЕРСИЯ ЧАРТА НЕ ЗАКРЕПЛЕНА ПРОГОНОМ: кластера в объявленной среде нет,
-# и проверить, что именно эта версия ставится, было нечем. Поле
-# targetRevision несёт заведомо-заметный плейсхолдер, а не правдоподобное
-# число: правдоподобное выглядело бы проверенным. Закрепляется первым
-# развёртыванием (deploy/README.md §«Что не проверено прогоном»).
+# ИСТОЧНИК — МАНИФЕСТЫ ОФИЦИАЛЬНОГО ОПЕРАТОРА, А НЕ ЧАРТ. Инстанс
+# окружения объявлен ресурсом `k8s.keycloak.org` (../data/keycloak.yaml),
+# а этот CRD ставит только официальный оператор Keycloak; публикуется он
+# манифестами в keycloak-k8s-resources, чарта у него нет. Прежняя пара
+# «чарт codecentric/keycloakx + ресурс оператора» не работала по
+# построению: чарт разворачивает сам Keycloak и CRD не несёт, поэтому
+# инстанс окружения было бы некому подхватить.
+#
+# ВАРИАНТ — CLUSTER-WIDE. По умолчанию оператор смотрит ТОЛЬКО своё
+# пространство имён, а инстансы провайдера живут в пространствах
+# окружений: обычная поставка оставила бы ресурс Keycloak без статуса —
+# его никто не берёт. Обнаружено первым развёртыванием (локальный стенд).
+# Источник несёт кластерный вариант отдельным каталогом, и своё
+# пространство имён он называет сам (`keycloak-operator`).
+#
+# ВЕРСИЯ ЗАКРЕПЛЕНА ПЕРВЫМ РАЗВЁРТЫВАНИЕМ (локальный стенд, 2026-09-05):
+# именно эта версия поднялась в кластере (.claude/skills/local-stand.md).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -13,12 +25,15 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://codecentric.github.io/helm-charts
-    chart: keycloakx
-    targetRevision: PIN-ON-FIRST-DEPLOY
+    repoURL: https://github.com/keycloak/keycloak-k8s-resources
+    path: kubernetes/cluster-wide
+    targetRevision: 26.7.3
   destination:
     server: https://kubernetes.default.svc
-    namespace: identity
+    # Пространство имён названо тем же, что стои́т в манифестах оператора:
+    # они несут его в своей kustomization, и указать здесь другое значит
+    # получить ресурсы, которые Argo считает несинхронизированными вечно.
+    namespace: keycloak-operator
   syncPolicy:
     syncOptions:
       - CreateNamespace=true

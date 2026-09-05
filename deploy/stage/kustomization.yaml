@@ -31,13 +31,19 @@ patches:
       - op: replace
         path: /metadata/labels/platform.vibetrading~1environment
         value: stage
+  # Число узлов Kafka объявляет пул, а не сам кластер: с версии оператора
+  # 1.0 полей replicas/storage в Kafka нет (см. шапку базового манифеста).
+  - target:
+      kind: KafkaNodePool
+      name: platform-kafka-nodes
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
   - target:
       kind: Kafka
       name: platform-kafka
     patch: |-
-      - op: replace
-        path: /spec/kafka/replicas
-        value: 1
       - op: replace
         path: /spec/kafka/config/default.replication.factor
         value: 1

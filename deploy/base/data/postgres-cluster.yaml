@@ -5,7 +5,17 @@
 # ОБРАЗ С TIMESCALEDB, а не стоковый: расширение в стоковом образе
 # CloudNativePG отсутствует, и `create extension timescaledb` упал бы на
 # первой миграции market-data (.claude/rules/tech-radar.md, строка
-# TimescaleDB). Тег образа не закреплён по той же причине, что у чартов.
+# TimescaleDB). Тег закреплён первым развёртыванием (локальный стенд,
+# 2026-09-05): PostgreSQL 17.10 + TimescaleDB 2.29.2.
+#
+# ВАРИАНТ ОБРАЗА — Community, а не `-oss`: сжатие гипертаблиц в OSS-сборке
+# TimescaleDB отсутствует, а политика сжатия объявлена формой хранения
+# рядов (.claude/work/backlog.md §«Политики сжатия и хранения гипертаблиц»).
+#
+# UID/GID 1000 — не украшение: CloudNativePG по умолчанию запускает
+# операнд под uid 26 (своя сборка образа), а в образе TimescaleDB
+# пользователь postgres имеет uid 1000. Без этих двух полей контейнер не
+# получает прав на свой же том данных.
 #
 # Число инстансов — свойство сервиса-носителя, не калибровка: одиночный
 # Postgres в prod означал бы, что отказ узла останавливает торговлю и
@@ -18,13 +28,34 @@
 # ресурсов). Число здесь — непроизводственное; условие пересмотра —
 # .claude/work/backlog.md §«Размеры томов данных — назначение по
 # наблюдаемому потреблению».
+# Каталог образов, а не прямое имя: оператор требует, чтобы из тега
+# читалась мажорная версия Postgres, а тег образа TimescaleDB несёт две
+# версии сразу (`pg17.10-ts2.29.2`) и такой проверки не проходит. Каталог —
+# штатная форма ответа: он называет мажор явно. Обнаружено первым
+# развёртыванием (локальный стенд): прямое имя отвергается вебхуком
+# оператора с «invalid version tag».
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: timescaledb
+spec:
+  images:
+    - major: 17
+      image: timescale/timescaledb-ha:pg17.10-ts2.29.2
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: platform-postgres
 spec:
   instances: 1
-  imageName: PIN-ON-FIRST-DEPLOY-timescaledb-image
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: timescaledb
+    major: 17
+  postgresUID: 1000
+  postgresGID: 1000
   postgresql:
     shared_preload_libraries:
       - timescaledb
@@ -34,3 +65,34 @@ spec:
     initdb:
       database: bootstrap
       owner: bootstrap
+  # Роли-владельцы баз. База на сервис — раскладка
+  # docs/architecture/data-ownership.md §Раскладка; саму базу объявляет
+  # ресурс Database рядом со своим потребителем, а роль обязана жить
+  # здесь: оператор ведёт роли только полем кластера.
+  #
+  # ПАРОЛЕЙ ЗДЕСЬ НЕТ И НЕ БУДЕТ. Каждая роль берёт пароль из секрета,
+  # который в репозиторий не попадает: на стенде его создаёт разовая
+  # команда постановки (`.claude/skills/local-stand.md`), в целевой
+  # конструкции — Vault (docs/architecture/platform.md §Безопасность).
+  managed:
+    roles:
+      - name: keycloak
+        ensure: present
+        login: true
+        passwordSecret:
+          name: postgres-role-keycloak
+      - name: auth
+        ensure: present
+        login: true
+        passwordSecret:
+          name: postgres-role-auth
+      - name: market_data
+        ensure: present
+        login: true
+        passwordSecret:
+          name: postgres-role-market-data
+      - name: trading_core
+        ensure: present
+        login: true
+        passwordSecret:
+          name: postgres-role-trading-core

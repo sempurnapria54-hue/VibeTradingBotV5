@@ -1,0 +1,41 @@
+# Выдача сертификатов внутри кластера.
+#
+# ЗАЧЕМ ОН ЕСТЬ. Два потребителя, и оба названы. Первый — сегодня:
+# оператор Jaeger монтирует секрет с сертификатом своего вебхука
+# БЕЗУСЛОВНО, и без выдающего его механизма под оператора не стартует
+# (обнаружено первым развёртыванием: `MountVolume.SetUp failed for volume
+# "cert": secret "jaeger-operator-service-cert" not found`). Второй — по
+# появлении поверхности: сертификат ингресса выдаётся автоматически по
+# имени хоста окружения (docs/architecture/platform.md §Безопасность), и
+# выдаёт его тот же механизм.
+#
+# ПОЧЕМУ НЕ ОБОЙТИСЬ БЕЗ НЕГО. Альтернативы перебраны: выключить вебхуки
+# оператора Jaeger — секрет всё равно монтируется (условия у тома в чарте
+# нет); подложить самоподписанный секрет руками — механизм без ротации,
+# то есть отложенный отказ; отказаться от оператора Jaeger в пользу
+# ручного развёртывания all-in-one — потеря управляемости ради экономии
+# на одном контроллере, притом что второй потребитель сертификатов уже
+# назван.
+#
+# ВЕРСИЯ ЗАКРЕПЛЕНА ПЕРВЫМ РАЗВЁРТЫВАНИЕМ (локальный стенд, 2026-09-05).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: 1.21.1
+    helm:
+      valuesObject:
+        crds:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

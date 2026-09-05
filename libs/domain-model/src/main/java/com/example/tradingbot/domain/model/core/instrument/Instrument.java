@@ -123,7 +123,16 @@ public class Instrument extends Auditable {
         return isNotEmpty(candleGroups) && candleGroups.stream().allMatch(CandleGroup::isActive);
     }
 
-    /** Инструмент заморожен реактивным safety-холдом (уровень 3, docs/rules/instrument-hold.md). */
+    /**
+     * Инструмент заморожен реактивным safety-холдом (уровень 3,
+     * docs/rules/instrument-hold.md).
+     *
+     * <p><b>Предикат формы монолита:</b> он читает ступень из
+     * {@link Status}, а в целевой конструкции ступень стои́т на паре
+     * «счёт, инструмент» ({@link SafetyRung}). Читает его только донор;
+     * сервисы спрашивают ступень у её носителя. Уходит вместе с донором —
+     * тот же остаток, что назван у {@link Status}.
+     */
     public Boolean isTradeBlocked() {
         return Objects.equals(status, Status.TRADE_BLOCKED);
     }
@@ -140,13 +149,36 @@ public class Instrument extends Auditable {
      * ступенью живые сделки сопровождаются полностью
      * (docs/rules/exchange-hold.md), и морозить повтор там значило бы
      * отменять то, что ступень обязана сохранять.
+     *
+     * <p><b>Предикат формы монолита</b> — по тому же доводу, что у
+     * {@link #isTradeBlocked()}: ступень он читает из {@link Status}, а её
+     * целевой носитель — пара «счёт, инструмент».
      */
     public Boolean hasStandingSafetyRung() {
         return Objects.equals(status, Status.ENTRY_BLOCKED)
                 || Objects.equals(status, Status.TRADE_BLOCKED);
     }
 
-    /** Онбординг-статус инструмента в системе (готовность к торговле). */
+    /**
+     * Онбординг-статус инструмента в системе (писатель {@code market-data}).
+     *
+     * <p><b>Перечень раскололся надвое по писателю</b> (`GAPS_CLOSE_1`
+     * шага 7 фазы 2): ступень пишет ядро, каталог — {@code market-data}, и
+     * одна колонка получала бы двух писателей в двух базах. Целевой
+     * перечень онбординга — {@code CREATED}, {@code HOLD}, {@code SYNC},
+     * {@code CANDLES_LOADING}, {@code ACTIVE}, {@code CLOSED},
+     * {@code ERROR}; ступени переехали в {@link SafetyRung}
+     * (docs/models/domain/core/Instrument.md §Енумы).
+     *
+     * <p><b>Названный остаток: {@code ENTRY_BLOCKED} и
+     * {@code TRADE_BLOCKED} из перечня НЕ сняты, пока жив донор.</b> Он
+     * читает их в восьми файлах, а условие его жизни — «собирается и
+     * зелёный» (donor/README.md): снятие значений сломало бы оригинал, с
+     * которым сверяется порт. Сервисы этих значений не пишут и не читают —
+     * ступень они берут из {@link SafetyRung}. Условие снятия — удаление
+     * донора; якорь — .claude/work/backlog.md §«Донорские значения в
+     * расколотых перечнях общей библиотеки».
+     */
     public enum Status {
 
         /** Инструмент заведён, онбординг не начинался. */
@@ -187,6 +219,39 @@ public class Instrument extends Auditable {
 
         /** Ошибка онбординга. */
         ERROR
+    }
+
+    /**
+     * Ступень лестницы инструмента (писатель {@code trading-core}).
+     *
+     * <p><b>Стои́т она на ПАРЕ «счёт, инструмент», а не на инструменте:</b>
+     * инструмент принадлежит площадке, и ступень, поднятая отказами
+     * одного счёта, не описывает состояние другого. Носитель —
+     * {@code account_instrument_states} базы ядра
+     * (docs/models/domain/core/Instrument.md §«Ступень и настройки счёта
+     * на инструменте»).
+     *
+     * <p>Семантика ступеней и условия входа живут в
+     * docs/rules/instrument-hold.md и здесь не пересказываются.
+     */
+    public enum SafetyRung {
+
+        /** Ступени нет: рабочее состояние. */
+        ACTIVE,
+
+        /**
+         * Мягкий запрет новых входов: инструмент выпадает из выборки
+         * сканера входа, живые сделки не сворачиваются и доживают под
+         * своей защитой.
+         */
+        ENTRY_BLOCKED,
+
+        /**
+         * Холд с kill-switch: инструмент выпадает из сканера, активные
+         * сделки уводятся в ошибку с последующим снятием живого риска —
+         * непрерывно, пока ступень стои́т.
+         */
+        TRADE_BLOCKED
     }
 
     /** Нормализованный режим маржи; сырой биржевой — в externalMarginMode. */

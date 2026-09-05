@@ -9,6 +9,7 @@
     <file url="file://$PROJECT_DIR$/services/auth/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/connector-okx/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/market-data/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/trading-core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
   </component>
