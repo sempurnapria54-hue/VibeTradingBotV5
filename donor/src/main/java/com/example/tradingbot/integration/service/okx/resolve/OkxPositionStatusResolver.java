@@ -3,7 +3,7 @@ package com.example.tradingbot.integration.service.okx.resolve;
 import static java.util.Objects.isNull;
 
 import com.example.tradingbot.domain.command.resolve.PositionStatusResolver;
-import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
+import com.example.tradingbot.domain.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 import org.springframework.stereotype.Component;

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.resolve.ProtectionHistoryLeg;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

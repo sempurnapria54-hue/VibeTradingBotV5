@@ -6,6 +6,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.order.Order;
@@ -83,7 +84,7 @@ public final class DealRiskNumbers {
             return ZERO;
         }
         return episodeIncurred.multiply(live.getExternalSize())
-                .divide(episodeFilled, Constants.Calc.MATH_CONTEXT);
+                .divide(episodeFilled, DomainMath.CONTEXT);
     }
 
     /**
@@ -115,7 +116,7 @@ public final class DealRiskNumbers {
         if (planned.signum() == 0) {
             return ZERO;
         }
-        return zeroIfNull(leg.getAccumulatedFillSize()).divide(planned, Constants.Calc.MATH_CONTEXT);
+        return zeroIfNull(leg.getAccumulatedFillSize()).divide(planned, DomainMath.CONTEXT);
     }
 
     /**
@@ -187,7 +188,7 @@ public final class DealRiskNumbers {
         }
         BigDecimal bareDistance = leg.getPlannedEntryPrice().subtract(leg.getPlannedStopPrice()).abs();
         return leg.getPlannedRiskAmount().subtract(bareDistance.multiply(notional))
-                .divide(base, Constants.Calc.MATH_CONTEXT);
+                .divide(base, DomainMath.CONTEXT);
     }
 
     /**

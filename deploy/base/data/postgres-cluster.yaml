@@ -1,0 +1,36 @@
+# Кластер Postgres окружения. По базе на сервис — раскладка
+# docs/architecture/data-ownership.md §Раскладка; базы заводятся шагами
+# своих сервисов, здесь только кластер, который их несёт.
+#
+# ОБРАЗ С TIMESCALEDB, а не стоковый: расширение в стоковом образе
+# CloudNativePG отсутствует, и `create extension timescaledb` упал бы на
+# первой миграции market-data (.claude/rules/tech-radar.md, строка
+# TimescaleDB). Тег образа не закреплён по той же причине, что у чартов.
+#
+# Число инстансов — свойство сервиса-носителя, не калибровка: одиночный
+# Postgres в prod означал бы, что отказ узла останавливает торговлю и
+# теряет незаписанное. Здесь стои́т непроизводственное значение, prod
+# поднимает его своим оверлеем.
+#
+# Размер тома — калибровочное значение, и писатель у него назван: тот, кто
+# разворачивает окружение, по наблюдаемому потреблению
+# (docs/architecture/platform.md §«Чем различаются окружения», профиль
+# ресурсов). Число здесь — непроизводственное; условие пересмотра —
+# .claude/work/backlog.md §«Размеры томов данных — назначение по
+# наблюдаемому потреблению».
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: platform-postgres
+spec:
+  instances: 1
+  imageName: PIN-ON-FIRST-DEPLOY-timescaledb-image
+  postgresql:
+    shared_preload_libraries:
+      - timescaledb
+  storage:
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: bootstrap
+      owner: bootstrap

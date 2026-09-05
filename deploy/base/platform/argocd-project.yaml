@@ -1,0 +1,23 @@
+# Проект Argo CD окружения. Argo приводит кластер к состоянию манифестов
+# этого репозитория; ручных `kubectl apply` в поставке нет
+# (docs/architecture/platform.md §Развёртывание).
+#
+# Политика синхронизации задаётся ОВЕРЛЕЕМ, а не здесь: `dev`
+# синхронизируется автоматически, `stage` и `prod` — по явной правке
+# манифеста (там же, §«Чем различаются окружения»). Довод — П1: тропа к
+# деньгам содержит человека по построению.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Платформа тенантной торговой системы
+  sourceRepos:
+    - '*'
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'

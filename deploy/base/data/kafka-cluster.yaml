@@ -1,0 +1,37 @@
+# Кластер Kafka окружения. Темы здесь не заводятся: тема на производителя
+# и род, и заводит её шаг сервиса-производителя
+# (docs/architecture/contracts.md §События, «Событие → тема»).
+#
+# Репликация — не меньше трёх с подтверждением большинством: это свойство
+# брокер даёт, и потеря при отказе узла закрывается им
+# (docs/architecture/data-ownership.md §«Outbox и доставка»). Число брокеров
+# — ось различия окружений: в непроизводственных оно равно единице, и там
+# фактор репликации понижается оверлеем вместе с ним.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: platform-kafka
+spec:
+  kafka:
+    replicas: 3
+    listeners:
+    # Слушатель открытый — НАЗВАННЫЙ выбор, не умолчание:
+    # docs/architecture/platform.md §Безопасность, «Транспорт внутри
+    # кластера». Условие пересмотра — перед первым развёртыванием prod.
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 3
+      min.insync.replicas: 2
+    storage:
+      type: persistent-claim
+      size: 20Gi
+      deleteClaim: false
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

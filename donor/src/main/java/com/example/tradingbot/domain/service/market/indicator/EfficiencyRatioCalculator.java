@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.service.market.indicator;
 
 import static java.util.stream.Collectors.toList;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.EfficiencyRatioParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
@@ -46,7 +47,7 @@ public class EfficiencyRatioCalculator implements IndicatorCalculator {
                 totalMove = totalMove.add(closes.get(offset).subtract(closes.get(offset - 1)).abs());
             }
             BigDecimal efficiencyRatio = totalMove.signum() == 0 ? BigDecimal.ZERO
-                    : netMove.divide(totalMove, Constants.Calc.MATH_CONTEXT);
+                    : netMove.divide(totalMove, DomainMath.CONTEXT);
             EfficiencyRatioValue value = new EfficiencyRatioValue();
             value.setInstrumentId(instrumentId);
             value.setStrategyIndicatorSettingId(strategyIndicatorSettingId);

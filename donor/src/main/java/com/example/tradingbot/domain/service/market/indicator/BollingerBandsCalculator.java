@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.service.market.indicator;
 
 import static java.util.stream.Collectors.toList;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.BollingerBandsParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
@@ -67,7 +68,7 @@ public class BollingerBandsCalculator implements IndicatorCalculator {
         if (middle.signum() == 0) {
             return BigDecimal.ZERO;
         }
-        return upper.subtract(lower).divide(middle, Constants.Calc.MATH_CONTEXT);
+        return upper.subtract(lower).divide(middle, DomainMath.CONTEXT);
     }
 
     private BigDecimal percentB(BigDecimal close, BigDecimal upper, BigDecimal lower) {
@@ -75,6 +76,6 @@ public class BollingerBandsCalculator implements IndicatorCalculator {
         if (range.signum() == 0) {
             return HALF;
         }
-        return close.subtract(lower).divide(range, Constants.Calc.MATH_CONTEXT);
+        return close.subtract(lower).divide(range, DomainMath.CONTEXT);
     }
 }

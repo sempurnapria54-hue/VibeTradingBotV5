@@ -3,6 +3,7 @@ package com.example.tradingbot.util;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.experimental.UtilityClass;
+import com.example.tradingbot.domain.util.DomainMath;
 
 /**
  * Числовые помощники расчёта индикаторов (переиспользуемые между
@@ -25,12 +26,12 @@ public class IndicatorMath {
         if (values.size() < period) {
             return result;
         }
-        BigDecimal multiplier = TWO.divide(BigDecimal.valueOf(period + 1L), Constants.Calc.MATH_CONTEXT);
+        BigDecimal multiplier = TWO.divide(BigDecimal.valueOf(period + 1L), DomainMath.CONTEXT);
         BigDecimal sum = BigDecimal.ZERO;
         for (int index = 0; index < period; index++) {
             sum = sum.add(values.get(index));
         }
-        BigDecimal ema = sum.divide(BigDecimal.valueOf(period), Constants.Calc.MATH_CONTEXT);
+        BigDecimal ema = sum.divide(BigDecimal.valueOf(period), DomainMath.CONTEXT);
         result[period - 1] = ema;
         for (int index = period; index < values.size(); index++) {
             ema = ema.add(values.get(index).subtract(ema).multiply(multiplier));
@@ -45,7 +46,7 @@ public class IndicatorMath {
         for (int index = from; index < from + period; index++) {
             sum = sum.add(values.get(index));
         }
-        return sum.divide(BigDecimal.valueOf(period), Constants.Calc.MATH_CONTEXT);
+        return sum.divide(BigDecimal.valueOf(period), DomainMath.CONTEXT);
     }
 
     /** Популяционное СКО окна [from, from+period) с заранее посчитанным средним. */
@@ -55,7 +56,7 @@ public class IndicatorMath {
             BigDecimal diff = values.get(index).subtract(mean);
             sumSquares = sumSquares.add(diff.multiply(diff));
         }
-        BigDecimal variance = sumSquares.divide(BigDecimal.valueOf(period), Constants.Calc.MATH_CONTEXT);
-        return variance.sqrt(Constants.Calc.MATH_CONTEXT);
+        BigDecimal variance = sumSquares.divide(BigDecimal.valueOf(period), DomainMath.CONTEXT);
+        return variance.sqrt(DomainMath.CONTEXT);
     }
 }

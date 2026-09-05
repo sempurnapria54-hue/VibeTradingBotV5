@@ -1,0 +1,24 @@
+# Метрики и алерты: Prometheus, Grafana, Alertmanager. Бизнес-алерты идут от событий, но носитель факта — запись, не алерт (docs/concept.md, П3).
+#
+# ВЕРСИЯ ЧАРТА НЕ ЗАКРЕПЛЕНА ПРОГОНОМ: кластера в объявленной среде нет,
+# и проверить, что именно эта версия ставится, было нечем. Поле
+# targetRevision несёт заведомо-заметный плейсхолдер, а не правдоподобное
+# число: правдоподобное выглядело бы проверенным. Закрепляется первым
+# развёртыванием (deploy/README.md §«Что не проверено прогоном»).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: PIN-ON-FIRST-DEPLOY
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

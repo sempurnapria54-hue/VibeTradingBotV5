@@ -4,6 +4,9 @@ import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.integration.service.ExternalStatusException;
+import com.example.tradingbot.integration.service.ExternalStatusReason;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.integration.service.ExternalInvariantViolationException;
 import com.example.tradingbot.util.Constants;
@@ -108,6 +111,43 @@ public class OkxResponseConverter {
     @Named("okxAckSuccess")
     public Boolean ackSuccess(String code) {
         return Objects.equals(Constants.Okx.SUCCESS_CODE, code);
+    }
+
+    /**
+     * Доменная сторона заявки → словарь площадки (buy/sell).
+     *
+     * <p>Здесь и проходит граница: доменный перечень внутрь площадки не
+     * уезжает, литерал площадки в домен не попадает
+     * (.claude/rules/codestyle.md §«Слои»).
+     */
+    @Named("okxOrderSide")
+    public String orderSide(Order.Side side) {
+        return isNull(side) ? null : side.name().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Словарь площадки → доменная сторона заявки.
+     *
+     * <p><b>Отсутствие и неразрешимость — разные вещи.</b> Поля нет в
+     * ответе — пусто, обновление стороны не происходит. Поле есть, а
+     * значение неизвестно — контролируемое исключение, как у резолверов
+     * внешнего статуса: молча записанное {@code null} в обязательное поле
+     * денежной тропы означало бы заявку без стороны, а это состояние, из
+     * которого не выводится ни направление, ни экспозиция
+     * (docs/rules/controlled-exchange-exceptions.md).
+     */
+    @Named("okxOrderSideToDomain")
+    public Order.Side orderSideToDomain(String raw) {
+        if (isNull(raw)) {
+            return null;
+        }
+        if (Constants.Okx.SIDE_BUY.equals(raw)) {
+            return Order.Side.BUY;
+        }
+        if (Constants.Okx.SIDE_SELL.equals(raw)) {
+            return Order.Side.SELL;
+        }
+        throw new ExternalStatusException(ExternalStatusReason.UNKNOWN_EXTERNAL_STATUS, raw);
     }
 
     /** Доменное направление algo → OKX side (buy/sell). */

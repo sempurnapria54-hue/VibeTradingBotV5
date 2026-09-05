@@ -1,0 +1,38 @@
+# Конфигурация сервиса auth.
+#
+# Значения осей окружения приезжают из манифеста окружения
+# (deploy/<окружение>/env.yaml); здесь — только форма и умолчания,
+# выбранные так, чтобы незаданное означало ОТКАЗ, а не разрешение.
+spring:
+  application:
+    name: auth
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Точка провайдера идентичности: по ней сервис забирает ключи и
+          # проверяет подпись токена ЛОКАЛЬНО, без вызова auth на каждом
+          # запросе (docs/architecture/contracts.md §«Контекст тенанта в
+          # вызове»). Значение приезжает из манифеста окружения; пустое
+          # означает, что контур доступа не настроен, и контекст не
+          # поднимется — это отказ, а не открытая поверхность.
+          issuer-uri: ${OIDC_ISSUER_URI:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+platform:
+  environment:
+    name: ${PLATFORM_ENVIRONMENT:}
+    # Пусто = ни один контур не допущен. Окружение без конфигурации
+    # счетов не заводит — это отказ, а не «допустимы все».
+    admitted-contours: ${PLATFORM_ADMITTED_CONTOURS:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

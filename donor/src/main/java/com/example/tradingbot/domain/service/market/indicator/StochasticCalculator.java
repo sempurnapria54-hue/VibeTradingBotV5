@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.service.market.indicator;
 
 import static java.util.Objects.nonNull;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StochasticParams;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
@@ -71,7 +72,7 @@ public class StochasticCalculator implements IndicatorCalculator {
             BigDecimal range = highest.subtract(lowest);
             rawK[index] = range.signum() == 0 ? FLAT_WINDOW_VALUE
                     : candles.get(index).getClose().subtract(lowest)
-                    .multiply(HUNDRED).divide(range, Constants.Calc.MATH_CONTEXT);
+                    .multiply(HUNDRED).divide(range, DomainMath.CONTEXT);
         }
         return rawK;
     }
@@ -91,7 +92,7 @@ public class StochasticCalculator implements IndicatorCalculator {
                 }
             }
             if (complete) {
-                result[index] = sum.divide(BigDecimal.valueOf(period), Constants.Calc.MATH_CONTEXT);
+                result[index] = sum.divide(BigDecimal.valueOf(period), DomainMath.CONTEXT);
             }
         }
         return result;

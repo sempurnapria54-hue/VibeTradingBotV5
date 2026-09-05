@@ -1,0 +1,76 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Оверлей окружения `prod`. Держит ТОЛЬКО оси различия, объявленные в
+# docs/architecture/platform.md §«Чем различаются окружения». Всё
+# остальное — в ../base и здесь не повторяется: вторая копия одинакового
+# расходится первой.
+
+namespace: prod
+
+resources:
+  - ../base
+  - env.yaml
+
+# Место тега образа — единственное на сервис в наборе окружения.
+# Тег НЕИЗМЕНЯЕМ и продвигается: собирается один раз на коммит и дальше
+# только переезжает из окружения в окружение правкой этого списка
+# (docs/architecture/platform.md §Развёртывание). Правит его CI хостинга
+# репозитория командой tools/deploy-set-image-tag.sh.
+# Список пуст, пока нет ни одного сервиса: сервисы приезжают шагами 3-10.
+images: []
+
+patches:
+  - target:
+      kind: Namespace
+      name: placeholder
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: prod
+      - op: replace
+        path: /metadata/labels/platform.vibetrading~1environment
+        value: prod
+  - target:
+      kind: Cluster
+      name: platform-postgres
+    patch: |-
+      - op: replace
+        path: /spec/instances
+        value: 3
+  - target:
+      kind: Elasticsearch
+      name: platform-logs
+    patch: |-
+      - op: replace
+        path: /spec/nodeSets/0/count
+        value: 3
+  - target:
+      kind: Keycloak
+      name: platform-identity
+    patch: |-
+      - op: replace
+        path: /spec/instances
+        value: 2
+  - target:
+      kind: Kafka
+      name: platform-kafka
+    patch: |-
+      - op: replace
+        path: /spec/kafka/replicas
+        value: 3
+      - op: replace
+        path: /spec/kafka/config/default.replication.factor
+        value: 3
+      - op: replace
+        path: /spec/kafka/config/offsets.topic.replication.factor
+        value: 3
+      - op: replace
+        path: /spec/kafka/config/transaction.state.log.replication.factor
+        value: 3
+      - op: replace
+        path: /spec/kafka/config/transaction.state.log.min.isr
+        value: 2
+      - op: replace
+        path: /spec/kafka/config/min.insync.replicas
+        value: 2

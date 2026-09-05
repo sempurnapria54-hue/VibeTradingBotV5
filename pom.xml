@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Агрегирующий pom монорепозитория.
+
+  ЗАЧЕМ ОН ПОЯВИЛСЯ ЗДЕСЬ И НЕ РАНЬШЕ. Шаг 1 фазы 2 сознательно его не
+  заводил: агрегировать было нечего — дерево кода было одно. Шаг 3 заводит
+  первый общий артефакт (libs/domain-model), от которого зависит донор, и
+  без реактора эта зависимость разрешалась бы только через установку в
+  локальный репозиторий — то есть сборка зависела бы от предыдущей сборки.
+
+  АГРЕГАЦИЯ, А НЕ НАСЛЕДОВАНИЕ. Модули перечислены здесь, но родителя не
+  наследуют: у донора свой родитель (spring-boot-starter-parent), у общих
+  артефактов — свой минимум. Общий артефакт не тянет в себя веб-стек
+  сервиса, а сервис не ограничен минимумом библиотеки.
+
+  Состав модулей растёт шагами 4-10 фазы 2 по мере появления сервисов;
+  каталог services/ равен инвентарю docs/architecture/services.md, и
+  равенство проверяется прогоном tools/deploy-layout-check.py.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vibetradingbot</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>vibetradingbot</name>
+    <description>Монорепозиторий тенантной торговой платформы</description>
+
+    <modules>
+        <module>libs/domain-model</module>
+        <module>services/auth</module>
+        <module>donor</module>
+    </modules>
+</project>

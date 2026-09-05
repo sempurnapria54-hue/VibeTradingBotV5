@@ -19,6 +19,7 @@ import com.example.tradingbot.domain.command.calc.ResolvedTakeProfitPrice;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingbot.domain.command.risk.RiskCheckResult.RiskCheckStatus;
 import com.example.tradingbot.domain.command.risk.RiskValidationResult.RiskDecision;
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
@@ -234,7 +235,7 @@ public class RiskValidator {
         BigDecimal unfilled = planned.subtract(zeroIfNull(leg.getAccumulatedFillSize()));
         return zeroIfNull(leg.getPlannedRiskAmount())
                 .multiply(unfilled)
-                .divide(planned, Constants.Calc.MATH_CONTEXT);
+                .divide(planned, DomainMath.CONTEXT);
     }
 
     /**
@@ -391,7 +392,7 @@ public class RiskValidator {
     }
 
     private BigDecimal percentOf(BigDecimal percent, BigDecimal base) {
-        return isNull(percent) ? null : percent.divide(HUNDRED, Constants.Calc.MATH_CONTEXT).multiply(base);
+        return isNull(percent) ? null : percent.divide(HUNDRED, DomainMath.CONTEXT).multiply(base);
     }
 
     private BigDecimal zeroIfNull(BigDecimal value) {

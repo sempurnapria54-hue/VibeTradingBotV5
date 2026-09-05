@@ -15,7 +15,7 @@ import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
 import com.example.tradingbot.domain.command.resolve.PositionStatusResolver;
-import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
+import com.example.tradingbot.domain.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;

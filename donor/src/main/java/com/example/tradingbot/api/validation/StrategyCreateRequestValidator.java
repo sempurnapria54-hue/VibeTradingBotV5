@@ -32,6 +32,7 @@ import com.example.tradingbot.api.model.strategy.StrategyMarketStructureSettingA
 import com.example.tradingbot.api.model.strategy.StrategyOrderActionApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyStepApiModel;
 import com.example.tradingbot.api.model.strategy.StrategyTrancheApiModel;
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.MarketDataExpiredAction;
@@ -316,7 +317,7 @@ public class StrategyCreateRequestValidator {
             return;
         }
         BigDecimal ceilingShare = globalSimultaneous
-                .divide(Constants.Risk.FULL_COVERAGE_PERCENTS, Constants.Calc.MATH_CONTEXT)
+                .divide(Constants.Risk.FULL_COVERAGE_PERCENTS, DomainMath.CONTEXT)
                 .multiply(multiplier);
         BigDecimal allowed = ceilingShare.multiply(BigDecimal.ONE.subtract(Constants.Risk.NOTIONAL_HEADROOM_SHARE));
         if (declaredShare.compareTo(allowed) > 0) {
@@ -523,7 +524,7 @@ public class StrategyCreateRequestValidator {
                         return null;
                     }
                     sum = sum.add(allocation.divide(Constants.Risk.FULL_COVERAGE_PERCENTS,
-                            Constants.Calc.MATH_CONTEXT));
+                            DomainMath.CONTEXT));
                 }
             }
         }

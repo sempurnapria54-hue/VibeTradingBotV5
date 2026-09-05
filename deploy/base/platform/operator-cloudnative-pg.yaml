@@ -1,0 +1,24 @@
+# Оператор Postgres. Кластеры баз — data/postgres-cluster.yaml; TimescaleDB идёт расширением того же кластера (docs/architecture/data-ownership.md §«Временные ряды»).
+#
+# ВЕРСИЯ ЧАРТА НЕ ЗАКРЕПЛЕНА ПРОГОНОМ: кластера в объявленной среде нет,
+# и проверить, что именно эта версия ставится, было нечем. Поле
+# targetRevision несёт заведомо-заметный плейсхолдер, а не правдоподобное
+# число: правдоподобное выглядело бы проверенным. Закрепляется первым
+# развёртыванием (deploy/README.md §«Что не проверено прогоном»).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudnative-pg
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: cloudnative-pg
+    targetRevision: PIN-ON-FIRST-DEPLOY
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

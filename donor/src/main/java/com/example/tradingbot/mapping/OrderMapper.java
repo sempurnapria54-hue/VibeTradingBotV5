@@ -2,7 +2,7 @@ package com.example.tradingbot.mapping;
 
 import static java.util.Objects.nonNull;
 
-import com.example.tradingbot.domain.command.ExchangeAck;
+import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
@@ -108,6 +108,7 @@ public interface OrderMapper {
     @Mapping(target = "internalId", ignore = true)
     @Mapping(target = "type", ignore = true)
     @Mapping(target = "attachedAlgoOrders", ignore = true)
+    @Mapping(target = "side", source = "side", qualifiedByName = "okxOrderSideToDomain")
     void updateFromSnapshot(OrderExternalSnapshot snapshot, @MappingTarget Order order);
 
     @Mapping(target = "tdMode", expression = "java(Constants.Okx.TD_MODE_ISOLATED)")
@@ -115,7 +116,7 @@ public interface OrderMapper {
     @Mapping(target = "tag", expression = "java(Constants.Okx.ORDER_TAG)")
     @Mapping(target = "ordType", expression = "java(resolveOrdType(order))")
     @Mapping(target = "clOrdId", source = "order.internalId")
-    @Mapping(target = "side", source = "order.side")
+    @Mapping(target = "side", source = "order.side", qualifiedByName = "okxOrderSide")
     @Mapping(target = "sz", source = "order.size")
     @Mapping(target = "px", source = "order.price")
     @Mapping(target = "reduceOnly", source = "order.positionReducingOnly")

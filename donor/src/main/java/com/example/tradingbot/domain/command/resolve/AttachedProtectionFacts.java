@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.command.resolve;
 
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.order.external_snapshot.AttachedAlgoOrderExternalSnapshot;
+import com.example.tradingbot.domain.resolve.ProtectionHistoryLeg;
 import java.math.BigDecimal;
 import lombok.Builder;
 import lombok.Value;

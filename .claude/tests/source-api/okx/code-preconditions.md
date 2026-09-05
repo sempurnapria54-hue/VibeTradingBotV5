@@ -501,11 +501,11 @@ export CANDLE_JOB_ENABLED=false INDICATOR_JOB_ENABLED=false \
        MARKET_STRUCTURE_JOB_ENABLED=false INSTRUMENT_RULES_SYNC_ENABLED=false \
        ENTRY_SCANNER_ENABLED=false DEAL_ORCHESTRATOR_ENABLED=false
 
-mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Ag1DealFixtureLiveTest    # пп. 1, 6, 9, 14, 15; п. 2 — перепрогоном (перечень пишется персистентно)
-mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Ag6BillSubtypesLiveTest   # пп. 2, 16
-mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Mg7IndexCandlesLiveTest   # п. 5
-mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=M17CancelOrderLiveTest    # п. 17 (все три цепочки наблюдены — §«Что добыто»)
-mvn -o -f donor/pom.xml test -Dgroups=source-api-live -Dtest=Ag1FundingHorizonLiveTest # п. 7 — сам выбирает инструмент по интервалу; вне окна пишет исход пропуска
+mvn -o -am -pl donor test -Dgroups=source-api-live -Dtest=Ag1DealFixtureLiveTest    # пп. 1, 6, 9, 14, 15; п. 2 — перепрогоном (перечень пишется персистентно)
+mvn -o -am -pl donor test -Dgroups=source-api-live -Dtest=Ag6BillSubtypesLiveTest   # пп. 2, 16
+mvn -o -am -pl donor test -Dgroups=source-api-live -Dtest=Mg7IndexCandlesLiveTest   # п. 5
+mvn -o -am -pl donor test -Dgroups=source-api-live -Dtest=M17CancelOrderLiveTest    # п. 17 (все три цепочки наблюдены — §«Что добыто»)
+mvn -o -am -pl donor test -Dgroups=source-api-live -Dtest=Ag1FundingHorizonLiveTest # п. 7 — сам выбирает инструмент по интервалу; вне окна пишет исход пропуска
 
 bash tools/preconditions-check.sh            # сверка реестра с планом и с фактикой носителей
 ```
@@ -785,10 +785,14 @@ isolated-марже расчёт финансирования ложится в 
 
 ### Что среда всё ещё не даёт
 
-- **`pom.xml` живёт в `donor/`, не в корне** (реструктуризация в
-  монорепозиторий, шаг 1 фазы 2). Команды прогона идут из корня с
-  `-f donor/pom.xml`; записи прогонов **ниже по этому файлу сохраняют
-  форму, которой прогонялись** — их предмет числа, а не команда.
+- **Сборка стала реакторной** (шаг 3 фазы 2: агрегирующий `pom.xml` в
+  корне, донор зависит от `libs/domain-model`). Команды прогона идут из
+  корня, и точечная форма — `mvn -o -am -pl donor test -Dtest=<Класс>`:
+  `-am` собирает то, от чего донор зависит. Прежняя форма
+  `-f donor/pom.xml` падает `Could not find artifact
+  com.example:domain-model` — донор один больше не собирается. Записи
+  прогонов **ниже по этому файлу сохраняют форму, которой прогонялись** —
+  их предмет числа, а не команда.
 - **`mvnw` в репозитории нет.** Прогон опирается на maven3, встроенный в
   IDEA (кэш wrapper'а `~/.m2/wrapper/dists` прежней записи исчез), и на
   ручной `PATH`. Состав работ

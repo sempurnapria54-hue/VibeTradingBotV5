@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.MarketStructureParams;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketBreakoutEvent;
@@ -130,12 +131,12 @@ public class MarketStructureResolver {
 
     private boolean isRange(List<MarketPriceLevel> swingHighs, List<MarketPriceLevel> swingLows,
                             BigDecimal resistance, BigDecimal support, BigDecimal atr, MarketStructureParams params) {
-        BigDecimal mid = resistance.add(support).divide(BigDecimal.valueOf(2L), Constants.Calc.MATH_CONTEXT);
+        BigDecimal mid = resistance.add(support).divide(BigDecimal.valueOf(2L), DomainMath.CONTEXT);
         if (mid.signum() == 0) {
             return false;
         }
         BigDecimal widthPercent = resistance.subtract(support)
-                .multiply(HUNDRED).divide(mid, Constants.Calc.MATH_CONTEXT);
+                .multiply(HUNDRED).divide(mid, DomainMath.CONTEXT);
         boolean withinWidth = widthPercent.compareTo(params.getMinRangeWidthPercents()) >= 0
                 && widthPercent.compareTo(params.getMaxRangeWidthPercents()) <= 0;
         int touchesHigh = touchesNear(swingHighs, resistance, atr, params);
@@ -162,7 +163,7 @@ public class MarketStructureResolver {
         if (isNull(resistance) || isNull(support) || candles.size() < confirmationBars || confirmationBars < 1) {
             return null;
         }
-        BigDecimal buffer = params.getBreakoutBufferPercents().divide(HUNDRED, Constants.Calc.MATH_CONTEXT);
+        BigDecimal buffer = params.getBreakoutBufferPercents().divide(HUNDRED, DomainMath.CONTEXT);
         BigDecimal upThreshold = resistance.add(resistance.multiply(buffer));
         BigDecimal downThreshold = support.subtract(support.multiply(buffer));
         List<Candle> tail = candles.subList(candles.size() - confirmationBars, candles.size());
@@ -258,7 +259,7 @@ public class MarketStructureResolver {
                     .subtract(candles.get(index - 1).getClose()).abs());
         }
         return totalMove.signum() == 0 ? BigDecimal.ZERO
-                : netMove.divide(totalMove, Constants.Calc.MATH_CONTEXT);
+                : netMove.divide(totalMove, DomainMath.CONTEXT);
     }
 
     private MarketPriceLevel boundaryLevel(MarketPriceLevel.Type type, BigDecimal price, OffsetDateTime confirmedAt) {

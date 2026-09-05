@@ -1,0 +1,24 @@
+# Оператор Elastic. Логи: структурированный JSON из сервиса → сборщик на узле → Elasticsearch → Kibana.
+#
+# ВЕРСИЯ ЧАРТА НЕ ЗАКРЕПЛЕНА ПРОГОНОМ: кластера в объявленной среде нет,
+# и проверить, что именно эта версия ставится, было нечем. Поле
+# targetRevision несёт заведомо-заметный плейсхолдер, а не правдоподобное
+# число: правдоподобное выглядело бы проверенным. Закрепляется первым
+# развёртыванием (deploy/README.md §«Что не проверено прогоном»).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eck-operator
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://helm.elastic.co
+    chart: eck-operator
+    targetRevision: PIN-ON-FIRST-DEPLOY
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: elastic-system
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

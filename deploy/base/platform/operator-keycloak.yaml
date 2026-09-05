@@ -1,0 +1,24 @@
+# Провайдер идентичности. Учётные данные, сессии, токены, MFA — у него; тенанты и роли — у сервиса auth (docs/architecture/services.md).
+#
+# ВЕРСИЯ ЧАРТА НЕ ЗАКРЕПЛЕНА ПРОГОНОМ: кластера в объявленной среде нет,
+# и проверить, что именно эта версия ставится, было нечем. Поле
+# targetRevision несёт заведомо-заметный плейсхолдер, а не правдоподобное
+# число: правдоподобное выглядело бы проверенным. Закрепляется первым
+# развёртыванием (deploy/README.md §«Что не проверено прогоном»).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak-operator
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://codecentric.github.io/helm-charts
+    chart: keycloakx
+    targetRevision: PIN-ON-FIRST-DEPLOY
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: identity
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

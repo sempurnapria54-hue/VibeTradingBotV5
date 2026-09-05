@@ -1,7 +1,7 @@
 package com.example.tradingbot.integration.service;
 
-import com.example.tradingbot.domain.command.ExchangeAck;
-import com.example.tradingbot.domain.command.resolve.ProtectionHistoryLeg;
+import com.example.tradingbot.domain.exchange.ExchangeAck;
+import com.example.tradingbot.domain.resolve.ProtectionHistoryLeg;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.balance.external_snapshot.BalanceContainerExternalSnapshot;

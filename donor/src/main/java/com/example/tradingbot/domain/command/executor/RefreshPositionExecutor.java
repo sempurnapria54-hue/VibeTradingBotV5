@@ -15,7 +15,7 @@ import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;
 import com.example.tradingbot.domain.command.risk.DealRiskNumbers;
 import com.example.tradingbot.domain.command.resolve.PositionStatusResolver;
-import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
+import com.example.tradingbot.domain.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionCloseResultExternalSnapshot;

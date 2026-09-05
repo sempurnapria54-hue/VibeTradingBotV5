@@ -37,6 +37,11 @@ changelog `log_en/`, напр. вывод AWS-доменов 2025-04-28). При
 - **REST:** `https://eea.okx.com` (тот же, demo flag через header).
 - **WS public/private/business:** `wss://wseeapap.okx.com:8443/ws/v5/...`.
 
+**Чей это выбор.** Заголовок ниже — форма, которой контур выражается в
+запросе к OKX; **какой контур у счёта** и какие контуры допускает
+окружение — не предмет этого дока
+(`docs/architecture/platform.md` §«Чем различаются окружения»).
+
 **Header для demo (REST и WS login):** `x-simulated-trading: 1`. Без
 него запросы будут уходить в production-окружение даже при demo-ключах
 — возможна ошибка несоответствия окружения/ключа.

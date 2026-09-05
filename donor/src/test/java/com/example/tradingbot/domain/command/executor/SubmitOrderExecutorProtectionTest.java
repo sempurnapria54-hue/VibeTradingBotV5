@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.ExchangeAck;
+import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingbot.domain.command.ServiceCommandType;

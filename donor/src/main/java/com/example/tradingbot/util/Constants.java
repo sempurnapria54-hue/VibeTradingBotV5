@@ -464,12 +464,6 @@ public final class Constants {
     }
 
     /** Константы расчёта производных рыночных данных (индикаторы/структура/фаза). */
-    @UtilityClass
-    public class Calc {
-
-        /** Контекст округления промежуточных делений BigDecimal в расчётах (precision/HALF_UP). */
-        public static final MathContext MATH_CONTEXT = new MathContext(34, RoundingMode.HALF_UP);
-    }
 
     /** Константы риск-контроля, не назначаемые конфигурацией. */
     @UtilityClass

@@ -1,0 +1,44 @@
+# Запрет по умолчанию — форма правила яруса.
+#
+# Ярус запрещает восходящее и НЕ РАЗРЕШАЕТ ничего: разрешение даёт
+# поимённая строка таблицы docs/architecture/contracts.md §«Синхронные
+# вызовы», и каждая такая строка приезжает своей NetworkPolicy вместе с
+# сервисом, который её вызывает (docs/architecture/platform.md
+# §Безопасность). Поэтому здесь только запрет, а разрешающих политик в
+# base/ нет ни одной — их нечему разрешать, пока сервисов нет.
+#
+# Исходящее закрыто тем же манифестом: прикладной сервис наружу не ходит,
+# кроме коннекторов (площадка) и bff (провайдер идентичности). DNS открыт
+# отдельным правилом — без него не резолвится ни один внутренний адрес, и
+# запрет выродился бы в неработающее пространство имён.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

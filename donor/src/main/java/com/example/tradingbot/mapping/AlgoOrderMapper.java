@@ -4,7 +4,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-import com.example.tradingbot.domain.command.ExchangeAck;
+import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.AlgoOrderExternalSnapshot;
 import com.example.tradingbot.domain.model.core.algo_order.external_snapshot.ConditionExternalSnapshot;

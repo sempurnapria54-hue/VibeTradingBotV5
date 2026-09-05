@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossSettings;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
@@ -163,7 +164,7 @@ public class PriceCalculator {
         if (denominator.signum() == 0) {
             throw error(BREAKEVEN_LEVEL_UNAVAILABLE, "Fee rate degenerates the breakeven denominator");
         }
-        return anchor.multiply(numerator).divide(denominator, Constants.Calc.MATH_CONTEXT);
+        return anchor.multiply(numerator).divide(denominator, DomainMath.CONTEXT);
     }
 
     /** Прогнозная ставка комиссии как издержка; нет ставки — считать безубыток не из чего. */
@@ -375,7 +376,7 @@ public class PriceCalculator {
         if (isNull(percents)) {
             return BigDecimal.ZERO;
         }
-        return base.multiply(percents).divide(HUNDRED, Constants.Calc.MATH_CONTEXT);
+        return base.multiply(percents).divide(HUNDRED, DomainMath.CONTEXT);
     }
 
     private BigDecimal requireDistance(BigDecimal distancePercents) {

@@ -1,0 +1,72 @@
+{
+  "subject": "environment-contour",
+  "question": "Допускает ли окружение платформы биржевой счёт этого контура",
+  "home": "docs/architecture/platform.md",
+
+  "operands": {
+    "environment": "окружение платформы — dev, stage либо prod (docs/architecture/platform.md, §«Чем различаются окружения»)",
+    "contour": "контур площадки биржевого счёта — LIVE (боевая площадка) либо DEMO (демо-контур). Атрибут СЧЁТА, лежащий рядом с его ключами (docs/architecture/tenant-and-exchange.md, §Ключи), а не атрибут развёртывания"
+  },
+
+  "values": [
+    {
+      "name": "contourAdmitted",
+      "note": "ДОМ ПРАВИЛА ДОПУСКА. Окружение допускает счёт этого контура. Непроизводственное окружение (dev, stage) допускает только DEMO: за потерю в нём никто не отвечает, поэтому капитала оно не двигает. Производственное допускает оба — запрет DEMO в prod не защищал бы ничего (демо-счёт капитала не двигает) и стоил бы запретом заведомо безопасной конфигурации. Ограничение асимметрично по построению. Проверяется в момент РЕГИСТРАЦИИ счёта, а не в момент сделки: отказ на регистрации дёшев, отказ на сделке приходит отказом доступа площадки и поздно.",
+      "expr": "if(environment == 'prod', true, contour == 'DEMO')"
+    }
+  ],
+
+  "populations": [
+    {
+      "axis": "пара «окружение × контур» — у каждой назван исход допуска",
+      "note": "Перечень выводится полным произведением ДВУХ перечней дока-дома (окружения из шапки таблицы, контуры из её строки допустимых контуров), а не из списка допущенных пар: список допущенных молчит о паре, которую он запрещает, — то есть ровно о тех состояниях, ради которых правило и заведено. Все шесть достижимы: попытка завести боевой счёт в dev — это состояние, которое правило обязано отвергнуть, а не состояние, которого не бывает.",
+      "rule": ["contourAdmitted"],
+      "derive": {
+        "command": "bash tools/derive/environment-contour-matrix.sh",
+        "from": ["docs/architecture/platform.md"]
+      },
+      "keys": ["environment", "contour"],
+      "members": [
+        { "member": ["dev", "DEMO"] },
+        { "member": ["dev", "LIVE"] },
+        { "member": ["stage", "DEMO"] },
+        { "member": ["stage", "LIVE"] },
+        { "member": ["prod", "DEMO"] },
+        { "member": ["prod", "LIVE"] }
+      ]
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "dev × DEMO: непроизводственное окружение допускает демо-счёт — это его штатная конфигурация",
+      "state": { "environment": "dev", "contour": "DEMO" },
+      "expect": { "contourAdmitted": true }
+    },
+    {
+      "case": "dev × LIVE: боевой счёт в разработке отвергается на регистрации — окружение, не отвечающее за потерю, капитала не двигает",
+      "state": { "environment": "dev", "contour": "LIVE" },
+      "expect": { "contourAdmitted": false }
+    },
+    {
+      "case": "stage × DEMO: репетиционное окружение допускает демо-счёт",
+      "state": { "environment": "stage", "contour": "DEMO" },
+      "expect": { "contourAdmitted": true }
+    },
+    {
+      "case": "stage × LIVE: репетиция боевыми деньгами отвергается — репетиция тем и отличается от прогона, что потери в ней не бывает",
+      "state": { "environment": "stage", "contour": "LIVE" },
+      "expect": { "contourAdmitted": false }
+    },
+    {
+      "case": "prod × DEMO: демо-счёт в производстве допустим — он капитала не двигает, и запрет защищал бы от безопасного",
+      "state": { "environment": "prod", "contour": "DEMO" },
+      "expect": { "contourAdmitted": true }
+    },
+    {
+      "case": "prod × LIVE: боевой счёт в производстве — целевая конфигурация",
+      "state": { "environment": "prod", "contour": "LIVE" },
+      "expect": { "contourAdmitted": true }
+    }
+  ]
+}

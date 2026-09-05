@@ -22,6 +22,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyActionType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.persistence.service.InstrumentExternalRulesDataService;
@@ -175,7 +176,12 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
         return isNotTrue(action.getPositionReducingOnly());
     }
 
-    private String toSide(StrategyTradeDirection direction) {
-        return StrategyTradeDirection.LONG.equals(direction) ? Constants.Okx.SIDE_BUY : Constants.Okx.SIDE_SELL;
+    /**
+     * Направление стратегии → сторона заявки. Оба перечня доменные:
+     * литерала площадки на этой тропе больше нет, перевод в её словарь
+     * делает маппер на границе (docs/models/mapping/Order.md).
+     */
+    private Order.Side toSide(StrategyTradeDirection direction) {
+        return StrategyTradeDirection.LONG.equals(direction) ? Order.Side.BUY : Order.Side.SELL;
     }
 }

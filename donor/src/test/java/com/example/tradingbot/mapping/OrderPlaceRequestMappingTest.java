@@ -69,7 +69,7 @@ class OrderPlaceRequestMappingTest {
     private Order order() {
         Order order = new Order();
         order.setInternalId("ord-1");
-        order.setSide("buy");
+        order.setSide(Order.Side.BUY);
         order.setSize(new BigDecimal("0.05"));
         return order;
     }

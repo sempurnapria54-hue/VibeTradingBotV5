@@ -1,0 +1,24 @@
+# Оператор Kafka. Темы заводит шаг сервиса-производителя, не этот шаг (docs/architecture/contracts.md §События, «Событие → тема»).
+#
+# ВЕРСИЯ ЧАРТА НЕ ЗАКРЕПЛЕНА ПРОГОНОМ: кластера в объявленной среде нет,
+# и проверить, что именно эта версия ставится, было нечем. Поле
+# targetRevision несёт заведомо-заметный плейсхолдер, а не правдоподобное
+# число: правдоподобное выглядело бы проверенным. Закрепляется первым
+# развёртыванием (deploy/README.md §«Что не проверено прогоном»).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: strimzi-kafka-operator
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://strimzi.io/charts
+    chart: strimzi-kafka-operator
+    targetRevision: PIN-ON-FIRST-DEPLOY
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka-system
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

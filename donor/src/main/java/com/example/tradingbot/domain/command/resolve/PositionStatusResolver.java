@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.command.resolve;
 
 import com.example.tradingbot.domain.model.core.position.Position;
+import com.example.tradingbot.domain.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.model.core.position.external_snapshot.PositionExternalSnapshot;
 
 /**

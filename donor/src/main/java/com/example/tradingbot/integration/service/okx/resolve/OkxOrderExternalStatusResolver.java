@@ -1,7 +1,7 @@
 package com.example.tradingbot.integration.service.okx.resolve;
 
-import com.example.tradingbot.domain.command.resolve.OrderExternalStatusResolver;
-import com.example.tradingbot.domain.command.resolve.StatusResolveResult;
+import com.example.tradingbot.domain.resolve.OrderExternalStatusResolver;
+import com.example.tradingbot.domain.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.integration.service.ExternalStatusException;
 import com.example.tradingbot.integration.service.ExternalStatusReason;

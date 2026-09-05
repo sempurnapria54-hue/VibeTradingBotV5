@@ -1,0 +1,10 @@
+# Jaeger окружения: приёмник трейсов OpenTelemetry. Контекст трейса
+# проходит через REST и через конверт события; tenantId и strategyId —
+# атрибуты каждого спана с первого дня
+# (docs/architecture/platform.md §Наблюдаемость).
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: platform-tracing
+spec:
+  strategy: allInOne

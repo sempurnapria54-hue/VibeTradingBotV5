@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.service.market.indicator;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.AtrParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
@@ -37,12 +38,12 @@ public class AtrCalculator implements IndicatorCalculator {
         for (int index = 0; index < period; index++) {
             seedSum = seedSum.add(trueRange[index]);
         }
-        BigDecimal atr = seedSum.divide(periodValue, Constants.Calc.MATH_CONTEXT);
+        BigDecimal atr = seedSum.divide(periodValue, DomainMath.CONTEXT);
         emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, period - 1, warmup, atr);
 
         for (int index = period; index < closedCandles.size(); index++) {
             atr = atr.multiply(periodValue.subtract(BigDecimal.ONE)).add(trueRange[index])
-                    .divide(periodValue, Constants.Calc.MATH_CONTEXT);
+                    .divide(periodValue, DomainMath.CONTEXT);
             emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, index, warmup, atr);
         }
         return result;

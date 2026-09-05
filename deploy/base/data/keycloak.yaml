@@ -1,0 +1,22 @@
+# Провайдер идентичности окружения. Платформа хранит только идентификатор
+# пользователя; учётные данные, сессии и токены — здесь
+# (docs/architecture/tenant-and-exchange.md §«Пользователи и роли»).
+#
+# Реалмы, клиенты и мапперы заводит шаг 4 фазы 2 вместе с сервисом auth:
+# они бессмысленны без тенантов, которых ещё нет.
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: platform-identity
+spec:
+  instances: 1
+  db:
+    vendor: postgres
+    host: platform-postgres-rw
+  # HTTP внутри кластера — НАЗВАННЫЙ выбор, не умолчание:
+  # docs/architecture/platform.md §Безопасность, «Транспорт внутри
+  # кластера». Условие пересмотра — перед первым развёртыванием prod.
+  http:
+    httpEnabled: true
+  hostname:
+    strict: false

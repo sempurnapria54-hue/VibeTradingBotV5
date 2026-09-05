@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Общий корень манифестов: всё, что одинаково во всех трёх окружениях.
+# Различия накладываются оверлеем окружения и ТОЛЬКО по осям
+# docs/architecture/platform.md §«Чем различаются окружения».
+#
+# Пространство имён здесь не задано намеренно: имя пространства — свойство
+# окружения, и подставляет его оверлей (namespace: в его kustomization).
+
+resources:
+  - namespace.yaml
+  - network-default-deny.yaml
+  - platform/argocd-project.yaml
+  - platform/operator-cloudnative-pg.yaml
+  - platform/operator-strimzi.yaml
+  - platform/operator-vault.yaml
+  - platform/operator-eck.yaml
+  - platform/operator-kube-prometheus-stack.yaml
+  - platform/operator-jaeger.yaml
+  - platform/operator-keycloak.yaml
+  - data/postgres-cluster.yaml
+  - data/kafka-cluster.yaml
+  - data/vault.yaml
+  - data/elastic.yaml
+  - data/jaeger.yaml
+  - data/keycloak.yaml

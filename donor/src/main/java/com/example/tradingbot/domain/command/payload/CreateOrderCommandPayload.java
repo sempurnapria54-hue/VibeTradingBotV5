@@ -23,8 +23,8 @@ public class CreateOrderCommandPayload implements ServiceCommandPayload {
     /** Нормализованное торговое направление стратегии. */
     StrategyTradeDirection strategyDirection;
 
-    /** Сторона (buy/sell). */
-    String side;
+    /** Сторона заявки — доменный перечень, не литерал площадки. */
+    Order.Side side;
 
     /** Сторона позиции (generic intent). */
     String positionSide;

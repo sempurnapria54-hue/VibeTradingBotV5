@@ -7,7 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import com.example.tradingbot.domain.command.DealActionState;
 import com.example.tradingbot.domain.command.DealActionStateStatus;
 import com.example.tradingbot.domain.command.DealContext;
-import com.example.tradingbot.domain.command.ExchangeAck;
+import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.command.RuntimeErrorCode;
 import com.example.tradingbot.domain.command.ServiceCommand;
 import com.example.tradingbot.domain.command.ServiceCommandExecutionResult;

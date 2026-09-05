@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.service.market.indicator;
 
 import static java.util.stream.Collectors.toList;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.RsiParams;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
@@ -44,8 +45,8 @@ public class RsiCalculator implements IndicatorCalculator {
             gainSum = gainSum.add(change.max(BigDecimal.ZERO));
             lossSum = lossSum.add(change.negate().max(BigDecimal.ZERO));
         }
-        BigDecimal avgGain = gainSum.divide(periodValue, Constants.Calc.MATH_CONTEXT);
-        BigDecimal avgLoss = lossSum.divide(periodValue, Constants.Calc.MATH_CONTEXT);
+        BigDecimal avgGain = gainSum.divide(periodValue, DomainMath.CONTEXT);
+        BigDecimal avgLoss = lossSum.divide(periodValue, DomainMath.CONTEXT);
         emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, period, warmup, rsi(avgGain, avgLoss));
 
         for (int index = period + 1; index < closedCandles.size(); index++) {
@@ -53,9 +54,9 @@ public class RsiCalculator implements IndicatorCalculator {
             BigDecimal gain = change.max(BigDecimal.ZERO);
             BigDecimal loss = change.negate().max(BigDecimal.ZERO);
             avgGain = avgGain.multiply(periodValue.subtract(BigDecimal.ONE)).add(gain)
-                    .divide(periodValue, Constants.Calc.MATH_CONTEXT);
+                    .divide(periodValue, DomainMath.CONTEXT);
             avgLoss = avgLoss.multiply(periodValue.subtract(BigDecimal.ONE)).add(loss)
-                    .divide(periodValue, Constants.Calc.MATH_CONTEXT);
+                    .divide(periodValue, DomainMath.CONTEXT);
             emit(result, instrumentId, strategyIndicatorSettingId, closedCandles, index, warmup, rsi(avgGain, avgLoss));
         }
         return result;
@@ -65,8 +66,8 @@ public class RsiCalculator implements IndicatorCalculator {
         if (avgLoss.signum() == 0) {
             return HUNDRED;
         }
-        BigDecimal rs = avgGain.divide(avgLoss, Constants.Calc.MATH_CONTEXT);
-        return HUNDRED.subtract(HUNDRED.divide(BigDecimal.ONE.add(rs), Constants.Calc.MATH_CONTEXT));
+        BigDecimal rs = avgGain.divide(avgLoss, DomainMath.CONTEXT);
+        return HUNDRED.subtract(HUNDRED.divide(BigDecimal.ONE.add(rs), DomainMath.CONTEXT));
     }
 
     private void emit(List<IndicatorValue> result, Long instrumentId, Long strategyIndicatorSettingId, List<Candle> candles,

@@ -1,0 +1,14 @@
+# Elasticsearch окружения: приёмник структурированных логов сервисов.
+# Секреты в логах не появляются — это обязанность автора кода
+# (.claude/rules/codestyle.md §Логирование), а не фильтра на приёмнике.
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: platform-logs
+spec:
+  version: PIN-ON-FIRST-DEPLOY
+  nodeSets:
+    - name: default
+      count: 1
+      config:
+        node.store.allow_mmap: false

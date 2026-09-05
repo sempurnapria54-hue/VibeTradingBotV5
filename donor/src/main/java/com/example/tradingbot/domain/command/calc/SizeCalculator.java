@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
@@ -67,7 +68,7 @@ public class SizeCalculator {
         BigDecimal allocationFraction = requireFraction(action.getAllocationPercents(), MISSING_ALLOCATION);
 
         BigDecimal desiredNotional = equity.multiply(allocationFraction);
-        BigDecimal contracts = desiredNotional.divide(entryPrice.multiply(ctVal), Constants.Calc.MATH_CONTEXT);
+        BigDecimal contracts = desiredNotional.divide(entryPrice.multiply(ctVal), DomainMath.CONTEXT);
         contracts = capByRiskLimit(contracts, entryPrice, ctVal, equity, context, calculatedPrice);
 
         BigDecimal rounded = floorAtMin(roundDownToLot(contracts, rules.lotSize()), rules.minSize());
@@ -96,7 +97,7 @@ public class SizeCalculator {
             return contracts;
         }
         BigDecimal riskBudget = equity.multiply(fraction(detail.getRiskPerActionPercent()));
-        BigDecimal maxByRisk = riskBudget.divide(stopDistance.multiply(ctVal), Constants.Calc.MATH_CONTEXT);
+        BigDecimal maxByRisk = riskBudget.divide(stopDistance.multiply(ctVal), DomainMath.CONTEXT);
         return contracts.min(maxByRisk);
     }
 
@@ -179,7 +180,7 @@ public class SizeCalculator {
     }
 
     private BigDecimal fraction(BigDecimal percents) {
-        return percents.divide(HUNDRED, Constants.Calc.MATH_CONTEXT);
+        return percents.divide(HUNDRED, DomainMath.CONTEXT);
     }
 
     private BigDecimal roundDownToLot(BigDecimal contracts, BigDecimal lotSize) {

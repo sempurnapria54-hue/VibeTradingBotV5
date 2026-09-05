@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  domain-model — общий артефакт: доменные сущности, перечни и конверт
+  события (docs/architecture/services.md §«Общие артефакты
+  монорепозитория»). Собирается в сервисы, сам не разворачивается.
+
+  ЗАВИСИМОСТЕЙ МИНИМУМ, И ЭТО НЕСУЩЕЕ СВОЙСТВО. Библиотеку тянут в себя
+  ВСЕ сервисы; всякая зависимость здесь становится обязательной для
+  каждого. Поэтому здесь нет ни веб-стека, ни персистентности, ни
+  MapStruct: маппинг принадлежит границам сервиса, а не форме.
+
+  Родителя нет намеренно (агрегирующий pom модули не наследуются, см.
+  корневой pom.xml): наследование spring-boot-starter-parent втянуло бы
+  в библиотеку управление версиями всего бут-стека.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>domain-model</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>domain-model</name>
+    <description>Доменные сущности, перечни и конверт события</description>
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <lombok.version>1.18.42</lombok.version>
+        <commons-lang3.version>3.19.0</commons-lang3.version>
+        <commons-collections4.version>4.5.0</commons-collections4.version>
+        <jackson-annotations.version>2.20</jackson-annotations.version>
+        <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+          Commons Lang3 и Collections4 — не удобство, а требование
+          конвенции: .claude/rules/codestyle.md §«Строгие правила»
+          предписывает BooleanUtils/StringUtils/CollectionUtils вместо
+          ручных проверок. Доменные предикаты написаны по этой конвенции,
+          значит библиотека их и несёт.
+        -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>${commons-collections4.version}</version>
+        </dependency>
+
+        <!--
+          ТОЛЬКО аннотации Jackson, без databind: маркерный jar без
+          собственных зависимостей. Нужен потому, что доменная модель
+          InstrumentExternalRules несёт @JsonIgnore — след того, что она
+          сериализуется в JSONB-навес.
+          НАЗВАННЫЙ ДОЛГ: сериализация — забота персистентности, а не
+          формы, и аннотация на доменной модели означает, что форма знает
+          о своём хранении. Условие возврата — шаг 6 фазы 2
+          (market-data), который владеет InstrumentExternalRules; якорь —
+          .claude/work/backlog.md §«Сериализационная аннотация на доменной
+          модели».
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${jackson-annotations.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <!--
+                  Версия закреплена явно: родителя у модуля нет, и без
+                  закрепления Maven предупреждает о нестабильности сборки,
+                  а версия плагина зависела бы от версии самого Maven.
+                -->
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
