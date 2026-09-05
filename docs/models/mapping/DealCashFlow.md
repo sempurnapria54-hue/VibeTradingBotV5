@@ -199,7 +199,7 @@
 
 | Поле | Кто и когда |
 |---|---|
-| `exchangeId` | писатель при сохранении — биржу знает он |
+| `exchangeAccountId` | писатель при сохранении — счёт знает он |
 | `category` | резолвер категории |
 | `dealId` | предикат линковки при сохранении (`docs/spec/cash-flow-linkage.json`) |
 | `appliedRate`, `rateStatus`, три координаты свечи | `RefreshBillsExecutor` — той же транзакцией, что и сама строка (`docs/components/RefreshBillsExecutor.md`) |

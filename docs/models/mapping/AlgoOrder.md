@@ -90,7 +90,7 @@ AlgoOrder.size → sz`). База доли — экспозиция **транш
 
 Сверка expected vs actual (mismatch → `ExternalInvariantViolationException`
 → `AlgoOrder.ERROR` + `closeReason = EXCHANGE_INVARIANT_VIOLATION` →
-`Deal.ERROR` → `Exchange.TRADE_BLOCKED`):
+`Deal.ERROR` → `ExchangeAccount.safetyRung = TRADE_BLOCKED`):
 
 ```text
 tdMode    == isolated

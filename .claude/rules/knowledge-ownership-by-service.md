@@ -68,7 +68,7 @@
 | `docs/components/`: джобы и сервисы свечей, индикаторов, структуры, фазы, правил инструмента, `MarketDataExpirationChecker`, `MarketPriceDataService` | `market-data` |
 | `docs/components/`: `IntegrationService`, `*ExternalStatusResolver`, `AttachedAlgoOrderStateResolver` | `connector-okx` |
 | `docs/components/`: `StrategyConditionEvaluator`, `StrategyActionCalculator`, `PriceCalculator`, `SizeCalculator`, `CalculationContextFactory` и их runtime-модели | `strategy-engine` |
-| `docs/components/`: всё остальное (оркестратор, обработчики, исполнители, риск, холды, kill-switch, аномалии, сканер входа, ошибки, ретраи) и их runtime-модели | `trading-core` |
+| `docs/components/`: всё остальное (оркестратор, обработчики, исполнители, риск, холды, kill-switch, аномалии, сканер входа, ошибки, ретраи, реле outbox) и их runtime-модели | `trading-core` |
 | `docs/processes/`: `candle-loading`, `market-data-calculation`, `snapshot-collection` | `market-data` |
 | `docs/processes/`: `deal-management`, `fsm-execution-layering`, `risk-evaluation` | `trading-core` |
 | `docs/processes/strategy-action-calculation.md` | `strategy-engine` |

@@ -51,9 +51,11 @@ PROFIT/LOSS_PERCENTS_REACHED -> Position.avgPrice + MarketPriceData
 
 ## Границы
 
-Freshness нужных данных проверяется до evaluator'а
-(`MarketDataExpirationChecker.stepDataFresh`, правило —
-`docs/rules/market-data-freshness.md`). Evaluator только отвечает
+Freshness нужных данных проверяется до evaluator'а — предикатом
+`stepDataFresh` **торгового ядра**, а не сервиса рыночных данных: он
+спрашивает про `StrategyStep` и контекст оценки, которых `market-data` не
+владеет и не читает (`docs/components/MarketDataExpirationChecker.md`
+§Контракт; правило — `docs/rules/market-data-freshness.md`). Evaluator только отвечает
 true/false по правилам condition (структура `StrategyCondition` /
 `StrategyConditionRule` — `docs/models/domain/aggregate/Strategy.md`); решение о
 применении step и выборе action принимает FSM handler.

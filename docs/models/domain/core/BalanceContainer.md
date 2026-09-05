@@ -11,7 +11,7 @@
 проверка расчётной валюты, диагностика замороженных средств и
 **терминальное ребро сделки**: `MarkDealClosedExecutor` и
 `MarkDealEmergencyClosedExecutor` читают `externalAvailableBalance` строки
-расчётной валюты, чтобы привести `Exchange.riskBase` к остатку — в обе
+расчётной валюты, чтобы привести `ExchangeAccount.riskBase` к остатку — в обе
 стороны
 (`docs/rules/risk-policy.md`). Годность
 снимка для этого хода — отдельное условие: строка расчётной валюты есть и
@@ -20,7 +20,7 @@
 
 **Второй читатель остатка — первое наблюдение базы риска.**
 `RefreshBalanceExecutor` читает `externalAvailableBalance` строки
-расчётной валюты, чтобы заполнить пустую `Exchange.riskBase` той же
+расчётной валюты, чтобы заполнить пустую `ExchangeAccount.riskBase` той же
 транзакцией, что приземляет снимок; наблюдением считается только строго
 положительный остаток (`docs/components/RefreshBalanceExecutor.md`).
 
@@ -32,7 +32,7 @@
 | Поле | Тип | Назначение |
 |---|---|---|
 | `id` | `Long` | Внутренний идентификатор снимка. |
-| `exchangeId` | `Long` | Биржевой счёт, которому принадлежит снимок. |
+| `exchangeAccountId` | `Long` | **Биржевой счёт**, которому принадлежит снимок (`docs/models/domain/core/ExchangeAccount.md`). |
 | `externalUpdatedAt` | `OffsetDateTime` | Время обновления снимка на стороне биржи. База проверки свежести. |
 | `externalTotalEquity` | `BigDecimal` | Общий капитал счёта. |
 | `externalAdjustedEquity` | `BigDecimal` | Скорректированный капитал. |

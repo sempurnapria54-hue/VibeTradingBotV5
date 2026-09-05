@@ -36,7 +36,7 @@
 ```text
 сущность → ERROR, closeReason = соответствующий код
 Deal     → ERROR
-Exchange → TRADE_BLOCKED (kill-switch flatten всей биржи)
+ExchangeAccount.safetyRung = TRADE_BLOCKED (kill-switch flatten всего счёта)
 ```
 
 Квалификатора «по тяжести» нет, и реакция доминирует над инструментным

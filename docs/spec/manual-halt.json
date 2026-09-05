@@ -8,14 +8,14 @@
     "standingManualReportSeverity": "severity СТОЯЩЕЙ ручной строки отчёта на объекте радиуса; пусто — ручной строки на объекте нет вовсе. Операнд ключа дедупа, а не происхождения ступени: ключ отчёта-состояния — «объект радиуса + code + severity» (docs/rules/error-handling-policy.md), и по разным severity строки РАЗНЫЕ. Прежняя редакция разводила поглощённые классы парой операндов, о severity умалчивавшей, и гасила строку там, где по ключу дома её нет: мягкий ручной вызов поверх СВОЕЙ ЖЕ жёсткой ступени.",
     "fullReactionRunningOnObject": "полная реакция по этому объекту радиуса уже идёт (исключающий ключ занят)",
     "operation": "операция ручной поверхности: RAISE — постановка ступени, CLEAR — снятие названной ступени",
-    "requestedScope": "радиус вызова: EXCHANGE либо INSTRUMENT; групповых значений нет",
+    "requestedScope": "радиус вызова: EXCHANGE_ACCOUNT либо INSTRUMENT; групповых значений нет",
     "requestedClass": "ступень, названная вызовом, выраженная классом реакции сигнала: SOFT — мягкая на инструменте, FREEZE — мягкая на бирже, FULL — сворачивание с закрытием открытых сделок по рынку",
     "objectStatusBefore": "статус объекта блокировки до вызова; какие значения являются ступенью — зависит от радиуса (см. hardStanding / softStanding / onboardingStanding)",
     "objectInWorkingState": "объект в рабочем состоянии, то есть множество входа мягкой ступени выполнено; под стоящей ступенью — false",
     "nonTerminalDealWithLiveRiskOnScope": "на радиусе есть НЕтерминальная сделка с живым риском по предикату сделки (docs/lifecycles/Deal.md, §«Живой риск»; гейт riskProvenAbsent в docs/spec/deal-lifecycle.json)",
     "terminalDealWithUnprovenRiskOnScope": "на радиусе есть ТЕРМИНАЛЬНАЯ сделка, у которой снятие риска не доказано тем же предикатом: каскад сворачивания увёл сделки в ERROR, а живая сущность на бирже могла остаться — ровно тропа неподтверждённого kill-switch",
     "onboardingIncomplete": "инструмент не завершил онбординг к моменту подъёма ступени (спецификация не синхронизирована либо свечи не догружены); на биржевом радиусе значения не имеет и всегда false",
-    "consecutiveLossCountBefore": "Exchange.consecutiveLossCount до вызова; дом величины — docs/rules/loss-streak-halt.md"
+    "consecutiveLossCountBefore": "ExchangeAccount.consecutiveLossCount до вызова; дом величины — docs/rules/loss-streak-halt.md"
   },
   "values": [
     {
@@ -31,12 +31,12 @@
     {
       "name": "validPair",
       "note": "Допустимых пар четыре, и перечень задан не поверхностью, а лестницами: мягкий класс инструментного радиуса биржевым статусом не выражается, и наоборот (docs/models/domain/core/Exchange.md). Перечень общий для обеих операций — поверхность своего не заводит.",
-      "expr": "(requestedScope == 'EXCHANGE' && in(requestedClass, 'FREEZE', 'FULL')) || (requestedScope == 'INSTRUMENT' && in(requestedClass, 'SOFT', 'FULL'))"
+      "expr": "(requestedScope == 'EXCHANGE_ACCOUNT' && in(requestedClass, 'FREEZE', 'FULL')) || (requestedScope == 'INSTRUMENT' && in(requestedClass, 'SOFT', 'FULL'))"
     },
     {
       "name": "requestedRung",
       "note": "Ступень, названная парой: при постановке — поднимаемая, при снятии — снимаемая. Снятие называет ступень явно, иначе повторный вызов шагал бы по лестнице дальше. Недопустимая пара ступени не резолвит — пустота здесь однозначна и сама значение.",
-      "expr": "if(validPair, if(requestedClass == 'FULL', 'TRADE_BLOCKED', if(requestedScope == 'EXCHANGE', 'HOLD', 'ENTRY_BLOCKED')), null)"
+      "expr": "if(validPair, if(requestedClass == 'FULL', 'TRADE_BLOCKED', if(requestedScope == 'EXCHANGE_ACCOUNT', 'HOLD', 'ENTRY_BLOCKED')), null)"
     },
     {
       "name": "hardStanding",
@@ -46,7 +46,7 @@
     {
       "name": "softStanding",
       "note": "На объекте уже стоит мягкая ступень СВОЕГО радиуса, и операнд обязан ветвиться радиусом: HOLD — мягкая ступень только на бирже, ENTRY_BLOCKED — только на инструменте. Радиус-независимая редакция зачисляла онбординговый Instrument.HOLD в стоящую мягкую ступень, из-за чего мягкая ручная постановка не отвергалась и затирала онбординговый статус (docs/rules/instrument-hold.md, §Правило: онбординговый HOLD к safety-холду отношения не имеет).",
-      "expr": "(requestedScope == 'EXCHANGE' && objectStatusBefore == 'HOLD') || (requestedScope == 'INSTRUMENT' && objectStatusBefore == 'ENTRY_BLOCKED')"
+      "expr": "(requestedScope == 'EXCHANGE_ACCOUNT' && objectStatusBefore == 'HOLD') || (requestedScope == 'INSTRUMENT' && objectStatusBefore == 'ENTRY_BLOCKED')"
     },
     {
       "name": "onboardingStanding",
@@ -121,7 +121,7 @@
     {
       "name": "clearanceTarget",
       "note": "Куда ведёт снятие. Биржевое сворачивание снимается ТОЛЬКО в мягкую ступень: два условия снятия лестница проверяет по одному, прыжка сразу в рабочее состояние нет. Инструмент, у которого ступень затёрла незавершённый онбординг, возвращается в ОНБОРДИНГОВЫЙ HOLD, а не в ACTIVE: снятие safety-ступени не выдаёт права торговать, которого у объекта не было до её подъёма, — иначе инструмент с несинхронизированной спецификацией попадал бы в выборку входа (docs/lifecycles/Instrument.md, §Охват). Остальные снятия ведут в рабочее состояние ACTIVE. Отсюда клейм: снятие биржевого сворачивания сразу в рабочее состояние не ведёт — носитель клейма пример «снятие: биржевое сворачивание при погашенном риске даёт мягкую ступень». Инструментное сворачивание сегодня одноходовое — поверхность наследует редакцию лестницы, своей не вводит; асимметрия названа в доме.",
-      "expr": "if(clearanceApplied, if(requestedClass == 'FULL' && requestedScope == 'EXCHANGE', 'HOLD', if(requestedScope == 'INSTRUMENT' && onboardingIncomplete, 'HOLD', 'ACTIVE')), null)"
+      "expr": "if(clearanceApplied, if(requestedClass == 'FULL' && requestedScope == 'EXCHANGE_ACCOUNT', 'HOLD', if(requestedScope == 'INSTRUMENT' && onboardingIncomplete, 'HOLD', 'ACTIVE')), null)"
     },
     {
       "name": "statusAfter",
@@ -161,7 +161,7 @@
     {
       "name": "rungRankAfter",
       "note": "Ранг ступени после вызова — по той же шкале и тому же радиусу. Постановка холд не снимает и ступень не понижает: ни срока действия, ни обратного хода у неё нет. Клейм выражен РАНГОМ, а не членством в перечне ступеней: редакция «statusAfter не входит в перечень ступеней» тождественно ложна (при постановке statusAfter всегда одна из ступеней) и понижения не ловила вовсе. Носители клейма — примеры поглощения, где rungRankBefore = rungRankAfter = 2.",
-      "expr": "if(statusAfter == 'TRADE_BLOCKED', 2, if((requestedScope == 'EXCHANGE' && statusAfter == 'HOLD') || (requestedScope == 'INSTRUMENT' && statusAfter == 'ENTRY_BLOCKED'), 1, 0))"
+      "expr": "if(statusAfter == 'TRADE_BLOCKED', 2, if((requestedScope == 'EXCHANGE_ACCOUNT' && statusAfter == 'HOLD') || (requestedScope == 'INSTRUMENT' && statusAfter == 'ENTRY_BLOCKED'), 1, 0))"
     }
   ],
   "examples": [
@@ -172,7 +172,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
@@ -202,7 +202,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
@@ -251,7 +251,7 @@
       }
     },
     {
-      "case": "постановка: полный режим на инструменте — жёсткий статус и снятие риска по инструменту",
+      "case": "постановка: полный режим на инструменте — жёсткий статус и снятие риска по паре «счёт, инструмент»",
       "state": {
         "callOrigin": "HOLDER",
         "standingRungRaisedManually": false,
@@ -337,7 +337,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
@@ -391,7 +391,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
@@ -418,7 +418,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -447,7 +447,7 @@
         "standingRungRaisedManually": true,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -499,7 +499,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
@@ -526,7 +526,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -579,7 +579,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "CLOSED",
         "objectInWorkingState": false,
@@ -604,7 +604,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "ERROR",
         "objectInWorkingState": false,
@@ -655,7 +655,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -686,7 +686,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -714,7 +714,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -740,7 +740,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
@@ -767,7 +767,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
@@ -789,7 +789,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -813,7 +813,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
@@ -934,7 +934,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
@@ -982,7 +982,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -1032,7 +1032,7 @@
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -1058,7 +1058,7 @@
         "standingRungRaisedManually": true,
         "fullReactionRunningOnObject": true,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -1080,7 +1080,7 @@
       "state": {
         "callOrigin": "HOLDER",
         "operation": "CLEAR",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
@@ -1103,7 +1103,7 @@
       "state": {
         "callOrigin": "HOLDER",
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -1133,7 +1133,7 @@
         "standingManualReportSeverity": "CRITICAL",
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
@@ -1160,7 +1160,7 @@
         "standingManualReportSeverity": "NON_CRITICAL",
         "fullReactionRunningOnObject": false,
         "operation": "RAISE",
-        "requestedScope": "EXCHANGE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,

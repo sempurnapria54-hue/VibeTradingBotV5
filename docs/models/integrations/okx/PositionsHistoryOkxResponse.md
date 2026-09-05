@@ -63,7 +63,7 @@ bill-записей (`docs/models/mapping/DealCashFlow.md`), а не из эти
 или без ликвидационного штрафа: контракт требует, чтобы эти четыре поля
 были заполнены и парсились, а нарушение выражается
 `ExternalInvariantViolationException` ⇒ биржевая ступень 2
-(`Exchange.TRADE_BLOCKED` + flatten) с ручным
+(`ExchangeAccount.safetyRung = TRADE_BLOCKED` + flatten) с ручным
 снятием (`docs/models/mapping/PositionCloseResult.md`).
 
 **Какую форму источник отдаёт фактически — открытый факт**, добываемый

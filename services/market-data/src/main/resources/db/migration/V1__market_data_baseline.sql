@@ -68,7 +68,7 @@ create table instruments (
 );
 
 comment on table instruments is 'Каталог инструментов подключённых площадок; наполняется синком листинга';
-comment on column instruments.status is 'CREATED | SYNC | CANDLES_LOADING | ACTIVE | CLOSED | ERROR; safety-ступени инструмента пишет trading-core, market-data их не ставит';
+comment on column instruments.status is 'Онбординг: CREATED | HOLD | SYNC | CANDLES_LOADING | ACTIVE | CLOSED | ERROR. Safety-ступени инструмента этой колонкой не выражаются вовсе: их носитель — таблица account_instrument_states базы trading_core, ключ «счёт, инструмент» (docs/models/domain/core/Instrument.md)';
 comment on column instruments.external_rules is 'Справочный навес InstrumentExternalRules: волатильная часть спецификации площадки';
 
 -- ---------------------------------------------------------------------

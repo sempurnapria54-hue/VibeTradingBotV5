@@ -39,7 +39,7 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 `externalInstrumentType` → доменная проекция `instrumentType`
 (`InstrumentType`, неизвестное → `UNKNOWN`) — резолв **при материализации**,
 как у `InstrumentExternalRules`. Остальные `external*` переносятся 1:1;
-`exchangeId` проставляет вызывающий (синк знает биржу), не маппер.
+`exchangeAccountId` проставляет вызывающий (синк знает счёт), не маппер.
 
 **Проекция `instrumentType` — не ось резолва.** Ключ группы —
 пара **сырых** (`externalInstrumentType`, `externalFeeGroupId`)
@@ -108,7 +108,7 @@ Raw DTO не выходит за `IntegrationService` / adapter-layer. **Оди�
 
 **Ось резолва — пара (`instType`, `groupId`)**, не голый `groupId`: одно и то
 же число значит разное при разном `instType`. **Полный ключ строки —
-тройка** с `exchangeId` (`docs/models/domain/other/TradeFeeRate.md`): биржу подставляет вызывающий, в источнике её нет, поэтому
+тройка** с `exchangeAccountId` (`docs/models/domain/other/TradeFeeRate.md`): счёт подставляет вызывающий, в источнике его нет, поэтому
 на оси маппинга речь о паре. Ключ группы инструмента приходит
 `GET /api/v5/public/instruments` (`groupId` →
 `InstrumentExternalRules.externalFeeGroupId`,

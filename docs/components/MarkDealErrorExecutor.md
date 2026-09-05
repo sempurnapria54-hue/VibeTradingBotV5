@@ -34,7 +34,7 @@
 ## Энфорсеров счёта это звено не двигает
 
 Ошибочный статус терминалом не является, поэтому звено **не** трогает ни
-`Exchange.consecutiveLossCount`, ни `Exchange.riskBase`: сделка идёт
+`ExchangeAccount.consecutiveLossCount`, ни `ExchangeAccount.riskBase`: сделка идёт
 дальше аварийной тропой и будет учтена аварийным терминалом — ровно один
 раз. Двойного счёта серии тем самым не возникает
 (`docs/rules/loss-streak-halt.md`).

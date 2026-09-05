@@ -163,6 +163,97 @@ OUT_OF_AREA = {
 #                снималась.
 RETIRED = [
     {
+        'name': 'состав strategy-engine — детекторы и интерпретатор, расчёт в ядре',
+        # Снято GAPS_CLOSE_2 шага 7 фазы 2 (узел C3). Дом состава артефакта
+        # перечислял детекторы, интерпретатор и симулированный коннектор, тогда
+        # как карта владельцев отдавала библиотеке ещё пять расчётных
+        # компонентов. Пришедшая редакция: расчётный слой — в библиотеке, и это
+        # следствие довода, ради которого движок вынесен (бэктест и живая
+        # торговля исполняют один расчёт).
+        'pattern': r'детекторы,\s*интерпретатор\s+определения\s+стратегии,\s*симулированный',
+        'arrived': r'расчётн\w+\s+слой'
+                   r'|контекст\s+расчёта,\s*цена\s+размещения,\s*размер',
+        'date': '2026-09-05',
+        'source': 'GAPS_CLOSE_2 шага 7 фазы 2, узел C3',
+        'allowed': ('.claude/work/decision-digest.md',),
+        'population': (
+            ('docs/architecture/services.md', r'расчётн\w+\s+слой'),
+        ),
+    },
+    {
+        'name': 'радиус торговой строки — инструмент и биржа, а не счёт',
+        # Снято GAPS_CLOSE_1 шага 7 фазы 2 (узел 1). Монолит имел ровно одну
+        # строку биржи, и она молча служила площадкой, счётом и тенантом:
+        # радиусы «биржа» и «инструмент» были одним радиусом. Пришедшая
+        # редакция: корневая торговая строка называет БИРЖЕВОЙ СЧЁТ, а
+        # инвариант радиуса «инструмент» читается на паре «счёт × инструмент»
+        # (docs/architecture/tenant-and-exchange.md §«Торговая строка называет
+        # счёт, и радиусы читаются от него»).
+        # Разрешённые места — ЗАМОРОЖЕННЫЕ файлы донора: он остаётся рабочим
+        # монолитом до удаления (donor/README.md §«Портированная область
+        # замораживается»), и форма монолита в нём законна. Файла docs/** в
+        # перечне нет ни одного.
+        'pattern': r'Exchange\.(riskBase|riskBaseCurrency|consecutiveLossCount|blindPassCount)'
+                   r'|uk_deal_active_instrument'
+                   r'|одн[аоу]\s+(активн|незакрыт)\w*\s+сделк\w*\s+на\s+инструмент'
+                   r'|одн[аоу]\s+активн\w*\s+стратеги\w*\s+на\s+инструмент'
+                   r'|HoldScope\.EXCHANGE\b'
+                   r'|\(EXCHANGE,\s*(SOFT|HARD|FREEZE|FULL)\)',
+        'arrived': r'ExchangeAccount\.(riskBase|consecutiveLossCount|blindPassCount|HOLD|status)'
+                   r'|uk_deal_active_account_instrument'
+                   r'|exchangeAccountId'
+                   r'|EXCHANGE_ACCOUNT'
+                   r'|сделк\w*\s+на\s+паре\s+счёт'
+                   r'|стратеги\w*\s+на\s+пару\s+«биржевой\s+счёт'
+                   r'|Торговая\s+строка\s+называет\s+счёт',
+        'date': '2026-09-05',
+        'source': 'GAPS_CLOSE_1 шага 7 фазы 2, узел 1 (A1 + B2)',
+        'allowed': (
+            '.claude/work/decision-digest.md',
+            '.claude/notes/2026-08-23-разрывы-спека-кода-на-тропе-живой-сделки.md',
+            'donor/src/main/resources/db/migration/V9__create_deal_finalization_states.sql',
+            'donor/src/main/java/com/example/tradingbot/domain/command/executor/RefreshBalanceExecutor.java',
+            'donor/src/main/java/com/example/tradingbot/domain/safety/AnomalyReaction.java',
+            'donor/src/main/java/com/example/tradingbot/domain/safety/DealInvariantDetectors.java',
+            'donor/src/main/java/com/example/tradingbot/domain/safety/ExchangeSideDetectors.java',
+            'donor/src/main/java/com/example/tradingbot/domain/safety/HoldService.java',
+            'donor/src/main/java/com/example/tradingbot/domain/safety/HoldSignal.java',
+            'donor/src/main/java/com/example/tradingbot/domain/safety/SafetyHoldCoordinator.java',
+            'donor/src/test/java/com/example/tradingbot/domain/safety/ExchangeSideDetectorsTest.java',
+        ),
+        'population': (
+            ('docs/architecture/tenant-and-exchange.md',
+             r'Торговая\s+строка\s+называет\s+счёт'),
+            ('docs/models/domain/aggregate/Deal.md',
+             r'uk_deal_active_account_instrument'),
+            ('docs/models/domain/aggregate/Strategy.md', r'exchangeAccountId'),
+            ('docs/rules/strategy-validation.md',
+             r'стратеги\w*\s+на\s+пару\s+«биржевой\s+счёт'),
+            ('docs/components/EntryScannerJob.md',
+             r'uk_deal_active_account_instrument'),
+            ('docs/components/RefreshPositionExecutor.md',
+             r'uk_deal_active_account_instrument'),
+            ('docs/rules/loss-streak-halt.md',
+             r'ExchangeAccount\.consecutiveLossCount'),
+            ('docs/rules/risk-policy.md', r'ExchangeAccount\.riskBase'),
+            ('docs/rules/exchange-hold.md', r'ExchangeAccount\.safetyRung'),
+            ('docs/rules/manual-halt.md', r'EXCHANGE_ACCOUNT'),
+            ('docs/rules/error-handling-policy.md', r'EXCHANGE_ACCOUNT'),
+            ('docs/components/AnomalyJob.md', r'EXCHANGE_ACCOUNT'),
+            ('docs/components/HoldService.md', r'ступень\s+счёта'),
+            ('docs/components/models/HoldSignal.md', r'EXCHANGE_ACCOUNT'),
+            ('docs/components/models/DealContext.md', r'биржевой\s+счёт'),
+            ('docs/models/domain/other/AnomalyReport.md', r'exchangeAccountId'),
+            ('docs/models/domain/other/DealCashFlow.md', r'exchangeAccountId'),
+            ('docs/models/domain/other/TradeFeeRate.md', r'exchangeAccountId'),
+            ('docs/models/domain/core/BalanceContainer.md', r'exchangeAccountId'),
+            ('docs/spec/cash-flow-linkage.json', r'exchangeAccountId'),
+            ('docs/spec/manual-halt.json', r'EXCHANGE_ACCOUNT'),
+            ('docs/spec/loss-streak-halt.json', r'ExchangeAccount\.'),
+            ('docs/spec/risk-limits.json', r'ExchangeAccount\.'),
+        ),
+    },
+    {
         'name': 'owner-ключевание производных рыночных данных настройкой стратегии',
         # Снято GAPS_CLOSE_5 шага 6 фазы 2 (находка D1): результат
         # индикатора и структуры ключевался настройкой стратегии и держал
@@ -384,8 +475,8 @@ RETIRED = [
                    r'|фабрику\s+имеет,\s+а\s+исполнения\s+—\s+нет',
         'arrived': r'[Мм]ягк\w+\s+ступень\s+исполняется\s+на\s+обоих\s+радиусах'
                    r'|[Ии]сполнитель\s+у\s+этой\s+пары\s+есть'
-                   r'|пару\s+`?\(EXCHANGE,\s*SOFT\)`?\s+поднимает'
-                   r'|[Пп]ара\s+`?\(EXCHANGE,\s*SOFT\)`?\s+исполняется',
+                   r'|пару\s+`?\(EXCHANGE(?:_ACCOUNT)?,\s*SOFT\)`?\s+поднимает'
+                   r'|[Пп]ара\s+`?\(EXCHANGE(?:_ACCOUNT)?,\s*SOFT\)`?\s+исполняется',
         'date': '2026-09-03',
         'source': 'закрытие Т11 при выводе шага 8 в CODE',
         'allowed': ('.claude/work/decision-digest.md',
@@ -393,9 +484,9 @@ RETIRED = [
                     'tools/retired-check.py'),
         'population': (('docs/components/HoldService.md', None),
                        ('docs/components/models/HoldSignal.md',
-                        r'[Пп]ара\s+`?\(EXCHANGE,\s*SOFT\)`?\s+исполняется'),
+                        r'[Пп]ара\s+`?\(EXCHANGE(?:_ACCOUNT)?,\s*SOFT\)`?\s+исполняется'),
                        ('docs/rules/manual-halt.md',
-                        r'пару\s+`?\(EXCHANGE,\s*SOFT\)`?\s+поднимает'),
+                        r'пару\s+`?\(EXCHANGE(?:_ACCOUNT)?,\s*SOFT\)`?\s+поднимает'),
                        ('docs/components/AnomalyJob.md',
                         r'[Ии]сполнитель\s+у\s+этой\s+пары\s+есть')),
     },
@@ -779,7 +870,7 @@ RETIRED = [
         'pattern': r'радиус\w*\s+шире\s+инструмента\s+выража\w+\s+набором'
                    r'|шире\s+инструмента\s+—\s+набор\w*\s+(строк|вызовов)',
         'arrived': r'групповой\s+радиус[^.]{0,120}набор\w*\s+(строк|вызовов)'
-                   r'|биржев\w+\s+радиус\s+сюда\s+не\s+относится',
+                   r'|(?:биржев\w+|счётн\w+)\s+радиус\s+сюда\s+не\s+относится',
         'date': '2026-09-01',
         'source': 'B1 DOCS_CHECK_33: встречная форма снятой редакции, '
                   'узел 5 GAPS_CLOSE_33',

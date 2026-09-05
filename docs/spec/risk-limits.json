@@ -9,7 +9,7 @@
   "operands": {
     "graphComplete": "граф сделки предъявлен контекстом прохода целиком: транши, эпизоды, ноги, встроенные защиты, отдельные условные заявки. Значение берётся из дома-спеки: graphComplete в docs/spec/deal-context-load.json; здесь форма не переписывается, признак читается готовым и преконтролем не пересобирается (docs/components/models/DealContext.md). Ложен — операнды, которые преконтроль считает по этому же графу (dealRiskTaken, liveRiskNow, dealNotional), пусты, и стоящие на них потолки отказывают вычислением: преконтроль отвечает fail-fast отказом DEAL_GRAPH_INCOMPLETE (docs/components/RiskValidator.md). Ответ по загруженному подмножеству был бы ЗАНИЖЕННЫМ, то есть разрешающим; пустота нулём не подменяется. Поактное неравенство на графе не стои́т и остаётся вычислимым — но преконтроль до него не доходит: отказ у него fail-fast, а не накопительный (docs/components/RiskValidator.md)",
     "deal.plannedRiskAmount": "Deal.plannedRiskAmount — риск, принятый сделкой: заявленный живыми и исполнившимися входными ногами плюс налитая доля выбывших; резолв — docs/spec/deal-risk-numbers.json, значение dealPlannedRisk",
-    "deal.plannedRiskEquityBase": "Deal.plannedRiskEquityBase — снимок Exchange.riskBase, замороженный ПЕРВЫМ сайзингом сделки. ПУСТО достижимо и значаще: снимок пишет CreateOrderExecutor той же транзакцией, что создаёт ногу, то есть ПОСЛЕ преконтроля — на первом действии сделки снимка ещё нет",
+    "deal.plannedRiskEquityBase": "Deal.plannedRiskEquityBase — снимок ExchangeAccount.riskBase, замороженный ПЕРВЫМ сайзингом сделки. ПУСТО достижимо и значаще: снимок пишет CreateOrderExecutor той же транзакцией, что создаёт ногу, то есть ПОСЛЕ преконтроля — на первом действии сделки снимка ещё нет",
     "direction": "Deal.direction — LONG или SHORT; имя операнда совпадает с именем дома закрытой формы (docs/spec/risk-at-stop.json), поэтому форма подключается без переименований на границе",
     "entryAnchor": "Position.externalAverageEntryPrice живого эпизода — ФАКТИЧЕСКАЯ себестоимость, от которой меряется живой риск (docs/rules/risk-policy.md); операнд дома закрытой формы docs/spec/risk-at-stop.json",
     "stopPrice": "уровень остановки убытка, на котором считается риск живого эпизода. Резолвится величиной stopPriceAfterAct — call-site преконтроля подставляет её значение; контракт держит предикат stopPriceIsAfterAct",
@@ -29,12 +29,12 @@
     "actRiskCreating": "проверяемый акт создаёт риск: отправка входной заявки, добор объёма, замещение с увеличением. Определение — docs/rules/risk-policy.md",
     "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening; резолв — docs/spec/order-sizing.json, значение entryRiskAtStop",
     "actNotional": "нотинал акта: плановый размер ноги × стоимость контракта × плановая цена входа для risk-creating, 0 для risk-weakening — новых контрактов такое действие не создаёт; резолв — CalculatedSize и CalculatedPrice проверяемого действия",
-    "riskBaseBefore": "Exchange.riskBase до применения исхода сделки",
+    "riskBaseBefore": "ExchangeAccount.riskBase до применения исхода сделки",
     "freeBalanceAtFinalization": "свободный остаток расчётной валюты на момент финализации сделки; пусто — строки расчётной валюты в снимке нет",
     "balanceSnapshotAfterTerminal": "снимок BalanceContainer сделан не раньше терминала сделки; false — снимок устарел относительно исхода",
     "riskBaseObservationCandidate": "доступный остаток строки расчётной валюты в приземляемом снимке средств — операнд первого наблюдения базы; пусто — строки расчётной валюты в снимке нет",
-    "exchangeRiskBase": "Exchange.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)",
-    "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.ENTRY_BLOCKED либо TRADE_BLOCKED (docs/rules/instrument-hold.md §Enforcement). Рабочее состояние и онбординговые статусы значения не дают",
+    "exchangeRiskBase": "ExchangeAccount.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)",
+    "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.safetyRung = ENTRY_BLOCKED либо TRADE_BLOCKED (docs/rules/instrument-hold.md §Enforcement). Рабочее состояние и онбординговые статусы значения не дают",
     "actInSafetyBlockSet": "класс проверяемого акта входит в блок-сет safety-ступени: risk-creating, risk-increasing либо risk-weakening (ослабление защиты). Снятие риска и reduce-only-выход в блок-сет не входят — сделки доживают под своей защитой (docs/rules/instrument-hold.md)"
   },
   "values": [
@@ -121,7 +121,7 @@
     },
     {
       "name": "riskBaseObserved",
-      "note": "Первое наблюдение базы: пустую Exchange.riskBase заполняет RefreshBalanceExecutor транзакцией приземления снимка. Условие тройное, и каждый конъюнкт несёт своё: база пуста (запись однократная и только из пустоты), операнд резолвился (строка расчётной валюты в снимке есть), остаток СТРОГО положителен. Ноль и отрицательный наблюдением не считаются: записанный ноль автоматически уже не поднимется, и счёт остался бы в отказе до явного действия держателя. Момент — другое ребро и другой актор, нежели ход базы вниз, поэтому величина своя, а не ветвь riskBaseAfter.",
+      "note": "Первое наблюдение базы: пустую ExchangeAccount.riskBase заполняет RefreshBalanceExecutor транзакцией приземления снимка. Условие тройное, и каждый конъюнкт несёт своё: база пуста (запись однократная и только из пустоты), операнд резолвился (строка расчётной валюты в снимке есть), остаток СТРОГО положителен. Ноль и отрицательный наблюдением не считаются: записанный ноль автоматически уже не поднимется, и счёт остался бы в отказе до явного действия держателя. Момент — другое ребро и другой актор, нежели ход базы вниз, поэтому величина своя, а не ветвь riskBaseAfter.",
       "expr": "isNull(riskBaseBefore) && notNull(riskBaseObservationCandidate) && riskBaseObservationCandidate > 0"
     },
     {

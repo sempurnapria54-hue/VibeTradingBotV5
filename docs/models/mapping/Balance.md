@@ -22,7 +22,7 @@ Raw DTO не выходит за пределы `IntegrationService` / adapter-l
 
 | Snapshot field | Семантика |
 |---|---|
-| `exchangeId` | внутренний идентификатор источника |
+| `exchangeAccountId` | внутренний ключ строки биржевого счёта у ядра |
 | `externalUpdatedAt` | время обновления account snapshot |
 | `externalTotalEquity` | total equity аккаунта |
 | `externalAdjustedEquity` | adjusted / effective equity |
@@ -86,7 +86,7 @@ snapshot полностью заменяет старый список currency 
   risk-creating action не выполняется; `RiskValidator` при
   absent/stale/invalid возвращает `BLOCKED`; для active Deal возможен
   переход `Deal → ERROR` по FSM policy; для account-level safety
-  problem возможен `Exchange.TRADE_BLOCKED` (ступень 2).
+  problem возможен `ExchangeAccount.safetyRung = TRADE_BLOCKED` (ступень 2).
 - **Normal null contract не используется:** успешный refresh обязан
   вернуть валидный snapshot с settleCurrency; empty/missing/invalid
   → exception / controlled error.
