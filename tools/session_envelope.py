@@ -42,6 +42,18 @@ def probe(path):
     return 0
 
 
+def step_title(value):
+    """Имя шага для строки-заголовка коммита: одна строка, не длиннее 80.
+
+    Обрезка живёт ЗДЕСЬ, а не в оболочке: `cut -c` в Git Bash режет байтами
+    и разваливает букву кириллицы пополам. Длинное имя не отказ — название
+    шага в роадмапе бывает абзацем с разметкой, и заголовок коммита из него
+    нечитаем; короткое имя просит стоячий промпт, а здесь стои́т предохранитель.
+    """
+    text = " ".join((value or "").split())
+    return text if len(text) <= 80 else text[:79].rstrip() + "…"
+
+
 def fields(path):
     """Поля конверта одной сессии присваиваниями оболочки."""
     try:
@@ -63,6 +75,9 @@ def fields(path):
     print("ST_STATUS=%s" % quote(structured.get("status")))
     print("ST_GATES=%s" % quote(str(structured.get("gates_green")).lower()))
     print("ST_SUMMARY=%s" % quote(structured.get("summary")))
+    print("ST_PHASE=%s" % quote(structured.get("phase")))
+    print("ST_STEP=%s" % quote(structured.get("step")))
+    print("ST_TITLE=%s" % quote(step_title(structured.get("step_title"))))
     return 0
 
 

@@ -9,12 +9,19 @@
 #
 # ЧТО ОНА НЕ ДЕЛАЕТ. Не поднимает стенд (tools/stand/up.sh) и не
 # выкладывает сборку (tools/stand/deploy-services.sh) — это делает сама
-# сессия, когда ей нужно. Не коммитит: правило проекта оставляет дельту
-# в рабочем дереве под ревью держателя.
+# сессия, когда ей нужно.
 #
-# ЦИКЛ ИДЁТ ТОЛЬКО ПРИ `continue` + `gates_green`. Всякий иной исход —
-# остановка с названной причиной и без повторов: повтор сессии, которая
-# уже уперлась, стои́т денег и приводит туда же.
+# КОММИТ — НА ГРАНИЦЕ ШАГА, И ДЕЛАЕТ ЕГО СЦЕНАРИЙ. У каждого закрытого шага
+# роадмапа своя точка отката: на `step_done` и на `phase_done` при зелёных
+# гейтах цикл делает `git add -A && git commit`, а сообщение собирает из
+# КОНВЕРТА (фаза, шаг, название шага) — не из журнала, который живёт вне
+# репозитория. На всех прочих остановках коммита нет: дельта остаётся
+# staged держателю на ревью. Правило «CC не коммитит» (CLAUDE.md) этим не
+# меняется — коммитит сценарий держателя, а не сессия.
+#
+# ЦИКЛ ИДЁТ ТОЛЬКО ПРИ `continue`/`step_done` + `gates_green`. Всякий иной
+# исход — остановка с названной причиной и без повторов: повтор сессии,
+# которая уже уперлась, стои́т денег и приводит туда же.
 #
 # Запуск (из корня репозитория):
 #   bash tools/session-loop.sh 5             # не больше пяти сессий за запуск
@@ -24,7 +31,7 @@
 # Код возврата: 0 — лимит исчерпан штатно либо фаза закрыта; 2 — отказ
 # предполётной проверки; 3 — нужен держатель (`holder_decision`);
 # 4 — `blocked`; 5 — гейты красные; 6 — отказ CLI или негодный ответ;
-# 7 — предохранитель по диску.
+# 7 — предохранитель по диску; 8 — отказ коммита на границе шага.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,20 +46,32 @@ MIN_FREE_GIB="${SESSION_MIN_FREE_GIB:-10}"
 # подтверждение, отклоняется, а не висит.
 PERMISSION_MODE="${SESSION_PERMISSION_MODE:-bypassPermissions}"
 
+# ФОНОВЫЕ ЗАДАЧИ ЖДУТСЯ ДО КОНЦА. У Claude Code есть потолок ожидания фоновых
+# задач, по которому сессия завершается принудительно («Background tasks still
+# running after 600s; terminating»). Обрывается при этом не пауза, а идущая
+# работа — так оборвалась фоновая критика, и конверт о ней уже не отчитался.
+# Ноль снимает потолок; время сессии ограничивает SESSION_TIMEOUT, для того он
+# и есть. Значение из среды не перебивается: держатель вправе вернуть потолок.
+export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS="${CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS:-0}"
+
 MAX=1
 DRY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --max) MAX="${2:?--max требует число}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
-    -h|--help) sed -n '2,28p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) awk 'NR > 1 { if (/^#/) print; else exit }' "${BASH_SOURCE[0]}"; exit 0 ;;
     ""|*[!0-9]*) echo "ОТКАЗ: неизвестный аргумент «$1»" >&2; exit 2 ;;
     *) MAX="$1"; shift ;;
   esac
 done
 [ "$MAX" -ge 1 ] 2>/dev/null || { echo "ОТКАЗ: максимум сессий — целое от 1" >&2; exit 2; }
 
-SCHEMA='{"type":"object","properties":{"status":{"type":"string","enum":["continue","holder_decision","phase_done","blocked"]},"gates_green":{"type":"boolean"},"summary":{"type":"string"}},"required":["status","gates_green","summary"],"additionalProperties":false}'
+# КОНТРАКТ СТАТУСА. `phase`/`step`/`step_title` названы в КАЖДОМ конверте, а не
+# только на границе шага: условно обязательное поле модель заполняет по своему
+# прочтению условия, и на `step_done` — там, где оно и нужно, — его могло бы не
+# оказаться. Из них собирается сообщение коммита (tools/session-prompt.md).
+SCHEMA='{"type":"object","properties":{"status":{"type":"string","enum":["continue","step_done","holder_decision","phase_done","blocked"]},"gates_green":{"type":"boolean"},"phase":{"type":"integer"},"step":{"type":"integer"},"step_title":{"type":"string"},"summary":{"type":"string"}},"required":["status","gates_green","phase","step","step_title","summary"],"additionalProperties":false}'
 
 JOURNAL="$LOOP_DIR/journal.md"
 RAW_DIR="$LOOP_DIR/raw"
@@ -139,6 +158,59 @@ stop_with() { # $1 — код возврата, $2 — причина
   exit "$1"
 }
 
+# ------------------------------------------------------- граница шага
+# ТОЧКА ОТКАТА У КАЖДОГО ЗАКРЫТОГО ШАГА. Коммит ставится только на границе
+# `step_done`/`phase_done` и только при зелёных гейтах — проверку делает
+# вызывающий, сюда управление доходит уже зелёным. Сообщение собирается из
+# конверта: журнал живёт вне репозитория, и вывести из него подпись коммита
+# значило бы поставить историю репозитория в зависимость от машинного
+# вывода, который никто не хранит.
+#
+# ОТКАЗ КОММИТА — ОСТАНОВКА, А НЕ ПРОДОЛЖЕНИЕ БЕЗ ТОЧКИ ОТКАТА. Всякая
+# причина отказа (нет идентичности git, пустой индекс, конфликт, хук)
+# означает, что граница не зафиксирована; следующая сессия наложила бы
+# свою дельту на незафиксированную, и разделить их было бы уже нечем.
+COMMIT_ERR=""
+COMMIT_INFO=""
+commit_boundary() { # $1 — статус конверта; печатает причину в COMMIT_ERR
+  local status="$1" subject body failure
+  COMMIT_ERR=""
+  COMMIT_INFO=""
+
+  case "${ST_PHASE:-}" in ""|*[!0-9]*) COMMIT_ERR="конверт не назвал фазу числом (получено «${ST_PHASE:-}»)"; return 1 ;; esac
+  case "${ST_STEP:-}" in ""|*[!0-9]*) COMMIT_ERR="конверт не назвал шаг числом (получено «${ST_STEP:-}»)"; return 1 ;; esac
+  [ -n "${ST_TITLE:-}" ] || { COMMIT_ERR="конверт не назвал название шага"; return 1; }
+
+  [ -n "$(git -C "$ROOT" config user.name 2>/dev/null || true)" ] || { COMMIT_ERR="нет идентичности git: не задан user.name"; return 1; }
+  [ -n "$(git -C "$ROOT" config user.email 2>/dev/null || true)" ] || { COMMIT_ERR="нет идентичности git: не задан user.email"; return 1; }
+
+  git -C "$ROOT" add -A || { COMMIT_ERR="git add -A отказал"; return 1; }
+  if git -C "$ROOT" diff --cached --quiet; then
+    COMMIT_ERR="индекс пуст, а сессия объявила «$status» — фиксировать нечего"
+    return 1
+  fi
+
+  subject="ROADMAP ${ST_PHASE}-${ST_STEP} DONE — ${ST_TITLE}"
+  body="${ST_SUMMARY:-(итог не назван)}"
+  if [ "$status" = "phase_done" ]; then
+    body="$body
+
+Фаза ${ST_PHASE} закрыта."
+  fi
+  body="$body
+
+Сессия: ${SESSION_ID:-?} (цикл $LAUNCH)"
+
+  # Отказ пересказывается СЛОВАМИ git, а не догадкой о причине: конфликт,
+  # хук и состояние репозитория пишут разное, и держателю нужно именно оно.
+  if ! failure="$(git -C "$ROOT" commit -m "$subject" -m "$body" 2>&1)"; then
+    COMMIT_ERR="git commit отказал: $(printf '%s' "$failure" | tail -n 3 | paste -sd ' ' -)"
+    return 1
+  fi
+  COMMIT_INFO="$(git -C "$ROOT" log -1 --format='%h %s')"
+  return 0
+}
+
 TOTAL_COST=0
 for (( n = 1; n <= MAX; n++ )); do
   # ПРЕДОХРАНИТЕЛЬ ПО ДИСКУ — до запуска, а не после: сессия, начатая на
@@ -198,7 +270,7 @@ for (( n = 1; n <= MAX; n++ )); do
 
   jrn "- сессия: \`$SESSION_ID\`, ходов: ${NUM_TURNS:-?}, отказов прав: ${DENIALS:-?}"
   jrn "- стоимость: \$${COST} (за запуск: \$${TOTAL_COST})"
-  jrn "- статус: **${ST_STATUS:-нет}**, гейты: **${ST_GATES:-нет}**"
+  jrn "- статус: **${ST_STATUS:-нет}**, гейты: **${ST_GATES:-нет}**, шаг: ${ST_PHASE:-?}-${ST_STEP:-?} «${ST_TITLE:-?}»"
   jrn "- \`result\`: \`${RESULT}\`"
   jrn ""
   jrn "> ${ST_SUMMARY:-(итог не назван)}"
@@ -211,19 +283,35 @@ for (( n = 1; n <= MAX; n++ )); do
   fi
 
   case "$ST_STATUS" in
-    continue) : ;;
+    continue|step_done|phase_done) : ;;
     holder_decision) stop_with 3 "сессии $n нужен держатель: $ST_SUMMARY" ;;
-    phase_done)      stop_with 0 "фаза закрыта на сессии $n: $ST_SUMMARY" ;;
     blocked)         stop_with 4 "сессия $n заблокирована: $ST_SUMMARY" ;;
     *)               stop_with 6 "сессия $n не назвала статус из контракта (получено «${ST_STATUS}»)" ;;
   esac
 
+  # ГЕЙТЫ РАНЬШЕ КОММИТА: точка отката ставится на состоянии, которое сессия
+  # объявила зелёным, — иначе она фиксировала бы красное как рубеж.
   if [ "$ST_GATES" != "true" ]; then
     stop_with 5 "гейты красные после сессии $n: $ST_SUMMARY"
+  fi
+
+  if [ "$ST_STATUS" = "step_done" ] || [ "$ST_STATUS" = "phase_done" ]; then
+    if commit_boundary "$ST_STATUS"; then
+      jrn ""
+      jrn "- коммит границы: \`$COMMIT_INFO\`"
+      echo "коммит: $COMMIT_INFO"
+    else
+      jrn "- **коммит не сделан:** $COMMIT_ERR"
+      stop_with 8 "коммит границы шага после сессии $n не сделан: $COMMIT_ERR"
+    fi
+  fi
+
+  if [ "$ST_STATUS" = "phase_done" ]; then
+    stop_with 0 "фаза закрыта на сессии $n: $ST_SUMMARY"
   fi
 done
 
 jrn ""
-jrn "**ЛИМИТ ($LAUNCH):** $MAX сессий отработано, все — \`continue\` с зелёными гейтами. Стоимость запуска: \$${TOTAL_COST}."
+jrn "**ЛИМИТ ($LAUNCH):** $MAX сессий отработано, все — \`continue\`/\`step_done\` с зелёными гейтами. Стоимость запуска: \$${TOTAL_COST}."
 say "Лимит $MAX сессий исчерпан штатно. Стоимость запуска: \$${TOTAL_COST}"
 echo "журнал: $JOURNAL"
