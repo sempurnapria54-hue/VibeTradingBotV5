@@ -17,7 +17,9 @@ import com.example.connector.okx.mapping.OrderMapper;
 import com.example.connector.okx.mapping.PositionMapper;
 import com.example.connector.okx.mapping.TimeFrameMapper;
 import com.example.connector.okx.mapping.TradeFeeRateMapper;
+import com.example.connector.okx.snapshot.AlgoOrderExternalSnapshot;
 import com.example.connector.okx.snapshot.CandleExternalSnapshot;
+import com.example.connector.okx.snapshot.OrderExternalSnapshot;
 import com.example.connector.okx.snapshot.MarketTickerExternalSnapshot;
 import com.example.connector.okx.snapshot.InstrumentExternalSnapshot;
 import com.example.connector.okx.snapshot.PositionCloseResultExternalSnapshot;
@@ -37,6 +39,8 @@ import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketOrderBook;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketTicker;
+import com.example.tradingbot.domain.resolve.AlgoOrderExternalStatusResolver;
+import com.example.tradingbot.domain.resolve.OrderExternalStatusResolver;
 import com.example.tradingbot.domain.resolve.ProtectionHistoryLeg;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -59,10 +63,19 @@ import org.springframework.stereotype.Service;
  * ({@code docs/rules/raw-exchange-dto-boundary.md} — там же о том, что
  * границ две).
  *
- * <p><b>Доменных решений здесь не принимается.</b> Резолв внешнего
- * статуса в доменный — интерпретация факта, и её дом у вызывающего
- * ({@code docs/rules/external-status-resolution.md}); коннектор отдаёт
- * модель с тем, что видно из ответа, и не назначает ей исхода.
+ * <p><b>Доменный статус заявки и условной заявки резолвится здесь</b> —
+ * последним шагом чтения, тем же, что переводит снапшот в модель. Словарь
+ * статусов принадлежит площадке, и знает его только эта сторона
+ * ({@code docs/rules/external-status-resolution.md} §«Где резолвится —
+ * сторона выбирается по словарю источника»). Резолв идёт в вызывающем
+ * коде, а не в маппере: маппер переносит данные и доменных решений не
+ * принимает ({@code .claude/rules/codestyle.md} §Маппинг).
+ *
+ * <p><b>Исхода сущности коннектор не назначает.</b> Причина закрытия
+ * write-once, а её операнды — намерение отмены, уже стоящая причина,
+ * исчерпание цикла добычи — живут у исполнителя ядра; наружу уезжает
+ * статус, не пара. Позиция здесь не резолвится вовсе: сырого статуса у
+ * неё нет ({@code docs/components/PositionStatusResolver.md}).
  */
 @Service
 @RequiredArgsConstructor
@@ -72,6 +85,8 @@ public class OkxExchangeGateway implements ExchangeGateway {
     private final ExchangeCredentialsResolver credentialsResolver;
     private final OrderMapper orderMapper;
     private final AlgoOrderMapper algoOrderMapper;
+    private final OrderExternalStatusResolver orderStatusResolver;
+    private final AlgoOrderExternalStatusResolver algoOrderStatusResolver;
     private final PositionMapper positionMapper;
     private final InstrumentMapper instrumentMapper;
     private final InstrumentExternalRulesMapper instrumentExternalRulesMapper;
@@ -127,50 +142,50 @@ public class OkxExchangeGateway implements ExchangeGateway {
     public Order getOrder(String accountInternalId, String externalInstrumentId, String externalId,
                           String internalId) {
         return one(reader.getOrder(keys(accountInternalId), externalInstrumentId, externalId, internalId),
-                orderMapper::snapshotToDomain);
+                this::toOrder);
     }
 
     @Override
     public List<Order> getPendingOrders(String accountInternalId, String externalInstrumentId) {
         return many(reader.getPendingOrders(keys(accountInternalId), externalInstrumentId),
-                orderMapper::snapshotToDomain);
+                this::toOrder);
     }
 
     @Override
     public List<Order> getAllPendingOrders(String accountInternalId) {
-        return many(reader.getAllPendingOrders(keys(accountInternalId)), orderMapper::snapshotToDomain);
+        return many(reader.getAllPendingOrders(keys(accountInternalId)), this::toOrder);
     }
 
     @Override
     public List<Order> getOrderHistory(String accountInternalId, String externalInstrumentId) {
         return many(reader.getOrderHistory(keys(accountInternalId), externalInstrumentId),
-                orderMapper::snapshotToDomain);
+                this::toOrder);
     }
 
     @Override
     public AlgoOrder getAlgoOrder(String accountInternalId, String externalInstrumentId, String externalId,
                                   String internalId) {
         return one(reader.getAlgoOrder(keys(accountInternalId), externalInstrumentId, externalId, internalId),
-                algoOrderMapper::snapshotToDomain);
+                this::toAlgoOrder);
     }
 
     @Override
     public List<AlgoOrder> getAllPendingAlgoOrders(String accountInternalId) {
-        return many(reader.getAllPendingAlgoOrders(keys(accountInternalId)), algoOrderMapper::snapshotToDomain);
+        return many(reader.getAllPendingAlgoOrders(keys(accountInternalId)), this::toAlgoOrder);
     }
 
     @Override
     public List<AlgoOrder> getPendingAlgoOrders(String accountInternalId, String externalInstrumentId,
                                                 AlgoOrder.ConditionType conditionType) {
         return many(reader.getPendingAlgoOrders(keys(accountInternalId), externalInstrumentId, conditionType),
-                algoOrderMapper::snapshotToDomain);
+                this::toAlgoOrder);
     }
 
     @Override
     public List<AlgoOrder> getAlgoOrderHistory(String accountInternalId, String externalInstrumentId,
                                                AlgoOrder.ConditionType conditionType, String externalId) {
         return many(reader.getAlgoOrderHistory(keys(accountInternalId), externalInstrumentId, conditionType,
-                externalId), algoOrderMapper::snapshotToDomain);
+                externalId), this::toAlgoOrder);
     }
 
     @Override
@@ -339,17 +354,60 @@ public class OkxExchangeGateway implements ExchangeGateway {
     }
 
     /**
+     * Заявка площадки с проставленным доменным статусом.
+     *
+     * <p><b>Резолв идёт здесь, а не в маппере.</b> Сырой статус — слово
+     * площадки, и словарь его знает только эта сторона; маппер же
+     * переносит данные и доменных решений не принимает
+     * ({@code .claude/rules/codestyle.md} §Маппинг). Дом решения —
+     * {@code docs/rules/external-status-resolution.md} §«Где резолвится —
+     * сторона выбирается по словарю источника».
+     *
+     * <p><b>Причина закрытия не проставляется, хотя резолвер её и
+     * предлагает.</b> Поле write-once, и второй писатель сделал бы
+     * кандидата неотличимым от применённого значения; операнды выбора —
+     * намерение отмены, уже стоящая причина, исчерпание цикла — живут у
+     * исполнителя ядра.
+     *
+     * <p><b>Неизвестный либо проблемный статус роняет ВЕСЬ ответ</b>, в
+     * том числе списочный: резолвер бросает контролируемое исключение.
+     * Гранулярность здесь и не нужна — реакция на такой отказ биржевая, на
+     * всю площадку ({@code docs/rules/external-status-resolution.md}
+     * §Реакция).
+     */
+    private Order toOrder(OrderExternalSnapshot snapshot) {
+        Order order = orderMapper.snapshotToDomain(snapshot);
+        order.setStatus(orderStatusResolver.resolve(snapshot.getExternalStatus()).getStatus());
+        return order;
+    }
+
+    /** Условная заявка площадки с проставленным доменным статусом; довод — {@link #toOrder}. */
+    private AlgoOrder toAlgoOrder(AlgoOrderExternalSnapshot snapshot) {
+        AlgoOrder algoOrder = algoOrderMapper.snapshotToDomain(snapshot);
+        algoOrder.setStatus(algoOrderStatusResolver.resolve(snapshot.getExternalStatus()).getStatus());
+        return algoOrder;
+    }
+
+    /**
      * Закрытый эпизод позиции.
      *
      * <p>Живого размера у него нет: это позиция в прошлом, и модель несёт
      * ровно то, что сообщает запись закрытия.
+     *
+     * <p><b>Тропа МАТЕРИАЛИЗАЦИИ, а не обновления, и подмена здесь
+     * счётна.</b> Тропа обновления идентичность эпизода не переносит — она
+     * рассчитана на строку, у которой пара «биржевой идентификатор,
+     * биржевое время создания» уже стои́т. Собери мы ею модель с нуля —
+     * наружу уехала бы запись без пары, то есть ровно без того ключа,
+     * которым читатель сопоставляет её со своим эпизодом
+     * ({@code docs/models/domain/core/Position.md}).
      */
     private Position toClosedPosition(PositionCloseResultExternalSnapshot snapshot) {
         if (isNull(snapshot)) {
             return null;
         }
         Position position = new Position();
-        positionMapper.updateFromCloseSnapshot(snapshot, position);
+        positionMapper.materializeFromCloseSnapshot(snapshot, position);
         return position;
     }
 

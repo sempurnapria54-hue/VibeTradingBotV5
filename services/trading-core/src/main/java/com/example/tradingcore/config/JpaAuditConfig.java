@@ -1,5 +1,6 @@
 package com.example.tradingcore.config;
 
+import com.example.tradingcore.util.Constants;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -27,12 +28,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 @EnableJpaAuditing(dateTimeProviderRef = "auditingDateTimeProvider")
 public class JpaAuditConfig {
 
-    /** Имя писателя торговых строк. */
-    private static final String WRITER = "trading-core";
-
     @Bean
     public AuditorAware<String> auditorAware() {
-        return () -> Optional.of(WRITER);
+        return () -> Optional.of(Constants.Audit.WRITER);
     }
 
     /** Момент записи — всегда в UTC, как требует шкала времени системы. */

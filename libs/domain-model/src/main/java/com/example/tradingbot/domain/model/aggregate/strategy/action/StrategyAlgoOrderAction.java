@@ -53,6 +53,26 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
     private AlgoOrder.TriggerPriceType triggerPriceType;
 
     /**
+     * Защитное ли действие — условная заявка типа из закрытого множества
+     * защит (docs/spec/strategy-reference.json, величина
+     * {@code isProtectiveAction}).
+     *
+     * <p><b>Селектор годится у СОЗДАЮЩЕГО и ЗАМЕЩАЮЩЕГО</b>: они
+     * объявляют, какую заявку ставят, и тип условия у них — собственное
+     * свойство. У снимающего тип условия есть денормализованная копия типа
+     * цели, совпадение с оригиналом не проверяется, и решение на копии
+     * стоять не может: что действие забирает, читается у цели
+     * (docs/rules/live-risk-protection.md).
+     */
+    public Boolean isProtective() {
+        return AlgoOrder.ConditionType.STOP_LOSS.equals(conditionType)
+                || AlgoOrder.ConditionType.PARTIAL_STOP_LOSS.equals(conditionType)
+                || AlgoOrder.ConditionType.OCO_FULL.equals(conditionType)
+                || AlgoOrder.ConditionType.TRAILING_PERCENTS.equals(conditionType)
+                || AlgoOrder.ConditionType.TRAILING_VALUE.equals(conditionType);
+    }
+
+    /**
      * Источник уровня читается по ОБЪЯВЛЕННОМУ БЛОКУ настроек: блок
      * трейлинга означает уровень, наблюдаемый после активации, блок стопа
      * — уровень, объявленный способом расчёта. Конфигурация с обоими

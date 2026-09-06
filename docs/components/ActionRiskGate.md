@@ -10,7 +10,7 @@
 `RiskBlockResolver` для per-type исполнителей действий: прогоняет
 вердикт и, если реакция блокирующая, отдаёт её планом действия
 (`ActionPlan.blocked`). Разрешающие реакции (`CONTINUE`,
-`CONTINUE_WITH_WARNING`) плана не порождают — действие продолжает свой
+`CONTINUE_WITH_WARNING`) плана не порождают (форма — пустой `Optional`) — действие продолжает свой
 ход.
 
 Две ветви входа, обе из `docs/rules/risk-validator-scope.md`:

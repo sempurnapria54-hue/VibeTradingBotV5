@@ -1,0 +1,208 @@
+{
+  "subject": "deal-condition",
+  "question": "Истинен ли предикат условия шага, читающий факты сделки",
+  "home": "docs/components/StrategyConditionEvaluator.md",
+  "operands": {
+    "positionRiskBearing": "живой эпизод позиции сделки несёт риск: строка активна и наблюдённый размер положителен (docs/models/domain/core/Position.md). Пусто и ложь здесь одно и то же: эпизода нет — риска нет",
+    "entryAnchor": "наблюдённая средняя цена входа живого эпизода. Пусто — эпизода нет либо средняя ещё не наблюдена; плановой ценой не подменяется, иначе порог считался бы от числа, по которому не входили",
+    "marketPrice": "цена момента — последняя цена сделки инструмента. Пусто — операнд недоступен: площадка отказала либо цену никто не спрашивал",
+    "dealDirection": "направление сделки: 'LONG' либо 'SHORT'",
+    "declaredPercents": "порог в процентах, объявленный правилом шага. Знак положительный у обоих предикатов: убыточный порог объявляется величиной убытка, а не отрицательным числом",
+    "entryLegFilled": "входная нога транша исполнена целиком — статус завершён с причиной налива (docs/models/domain/core/Order.md)",
+    "trancheHasAttachedProtection": "у транша есть живая ВСТРОЕННАЯ защита — защита внутри его входной заявки",
+    "trancheHasStandaloneProtection": "у транша есть живая ОТДЕЛЬНАЯ защита, несущая действующий уровень остановки убытка (docs/spec/protection-coverage.json)"
+  },
+  "values": [
+    {
+      "name": "positionOpened",
+      "note": "Предикат POSITION_OPENED: у сделки есть живой эпизод, несущий риск. Строка эпизода без положительного размера открытой позицией не считается — она факт наблюдения, а не экспозиция.",
+      "expr": "positionRiskBearing"
+    },
+    {
+      "name": "noOpenPosition",
+      "note": "Предикат NO_OPEN_POSITION — строгое отрицание предыдущего. Отдельное значение заведено потому, что оба типа правил объявлены каталогом и оба читаются автором как самостоятельные пороги.",
+      "expr": "!positionRiskBearing"
+    },
+    {
+      "name": "entryOrderFinalized",
+      "note": "Предикат ENTRY_ORDER_FINALIZED: входная нога транша исполнена целиком. Частичный налив финализацией не является — экспозиция ещё меняется, и шаг, объявленный от завершённого входа, сработал бы на неокончательном размере.",
+      "expr": "entryLegFilled"
+    },
+    {
+      "name": "attachedStopLossExists",
+      "note": "Предикат ATTACHED_STOP_LOSS_EXISTS: у транша живёт встроенная защита. Отдельная защита сюда не входит по построению: предикат отвечает на вопрос о защите ВНУТРИ входной заявки.",
+      "expr": "trancheHasAttachedProtection"
+    },
+    {
+      "name": "mainProtectionExists",
+      "note": "Предикат MAIN_PROTECTION_EXISTS: у транша живёт отдельная защита с действующим уровнем остановки убытка. Встроенная сюда не входит — вопрос ровно в том, встала ли основная.",
+      "expr": "trancheHasStandaloneProtection"
+    },
+    {
+      "name": "moveOperandsAvailable",
+      "note": "Обе половины хода доступны и якорь ненулевой. Деление на нулевой якорь дало бы бесконечность, а пустой операнд — исключение вычисления; и то и другое обязано читаться как «порог не проверен».",
+      "expr": "notNull(entryAnchor) && notNull(marketPrice) && entryAnchor != 0"
+    },
+    {
+      "name": "signedMovePercents",
+      "note": "Ход цены от ЦЕНЫ ВХОДА в процентах, со знаком направления: положителен в прибыли, отрицателен в убытке. Единица объявлена домом настроек трейлинга — «проценты прибыли от цены входа» (docs/models/domain/aggregate/Strategy.md); плечо в неё не входит, иначе один и тот же порог означал бы разное на разных счетах. Пусто — операнды недоступны.",
+      "expr": "if(moveOperandsAvailable, if(dealDirection == 'LONG', (marketPrice - entryAnchor) / entryAnchor * 100, (entryAnchor - marketPrice) / entryAnchor * 100), null)"
+    },
+    {
+      "name": "profitPercentsReached",
+      "note": "Предикат PROFIT_PERCENTS_REACHED: ход достиг объявленного порога прибыли. Недоступный операнд даёт ЛОЖЬ, а не срабатывание: шаг, объявленный от прибыли, снял бы защиту или зафиксировал бы часть позиции по прибыли, которой никто не наблюдал (docs/concept.md П1).",
+      "expr": "notNull(signedMovePercents) && notNull(declaredPercents) && signedMovePercents >= declaredPercents"
+    },
+    {
+      "name": "lossPercentsReached",
+      "note": "Предикат LOSS_PERCENTS_REACHED: ход достиг объявленного порога убытка. Порог объявляется ПОЛОЖИТЕЛЬНОЙ величиной убытка, поэтому сравнение идёт с его отрицанием: иначе автор обязан был бы писать знак, а забытый знак дал бы срабатывание в прибыли.",
+      "expr": "notNull(signedMovePercents) && notNull(declaredPercents) && signedMovePercents <= 0 - declaredPercents"
+    }
+  ],
+  "examples": [
+    {
+      "case": "живой эпизод несёт риск — позиция открыта",
+      "state": {"positionRiskBearing": true},
+      "expect": {"positionOpened": true, "noOpenPosition": false}
+    },
+    {
+      "case": "живого эпизода нет — позиции нет",
+      "state": {"positionRiskBearing": false},
+      "expect": {"positionOpened": false, "noOpenPosition": true}
+    },
+    {
+      "case": "входная нога налита целиком — вход финализирован",
+      "state": {"entryLegFilled": true},
+      "expect": {"entryOrderFinalized": true}
+    },
+    {
+      "case": "входная нога налита не целиком — вход не финализирован",
+      "state": {"entryLegFilled": false},
+      "expect": {"entryOrderFinalized": false}
+    },
+    {
+      "case": "встроенная защита жива, отдельной нет — различаются оба предиката",
+      "state": {"trancheHasAttachedProtection": true, "trancheHasStandaloneProtection": false},
+      "expect": {"attachedStopLossExists": true, "mainProtectionExists": false}
+    },
+    {
+      "case": "отдельная защита встала, встроенной уже нет — то же различение с другой стороны",
+      "state": {"trancheHasAttachedProtection": false, "trancheHasStandaloneProtection": true},
+      "expect": {"attachedStopLossExists": false, "mainProtectionExists": true}
+    },
+    {
+      "case": "длинная сделка в прибыли: порог прибыли взят, порог убытка нет",
+      "state": {
+        "entryAnchor": 100,
+        "marketPrice": 103,
+        "dealDirection": "LONG",
+        "declaredPercents": 2
+      },
+      "expect": {
+        "moveOperandsAvailable": true,
+        "signedMovePercents": 3,
+        "profitPercentsReached": true,
+        "lossPercentsReached": false
+      }
+    },
+    {
+      "case": "длинная сделка в убытке: порог убытка взят, порог прибыли нет",
+      "note": "Фальсифицирует отрицание порога в lossPercentsReached: сравнение с самим порогом дало бы здесь ложь.",
+      "state": {
+        "entryAnchor": 100,
+        "marketPrice": 97,
+        "dealDirection": "LONG",
+        "declaredPercents": 2
+      },
+      "expect": {
+        "signedMovePercents": -3,
+        "profitPercentsReached": false,
+        "lossPercentsReached": true
+      }
+    },
+    {
+      "case": "короткая сделка: тот же ход цены вниз — это ПРИБЫЛЬ",
+      "note": "Фальсифицирует ветвь направления в signedMovePercents: без неё короткая сделка читала бы свою прибыль как убыток и закрывалась бы шагом стоп-порога.",
+      "state": {
+        "entryAnchor": 100,
+        "marketPrice": 97,
+        "dealDirection": "SHORT",
+        "declaredPercents": 2
+      },
+      "expect": {
+        "signedMovePercents": 3,
+        "profitPercentsReached": true,
+        "lossPercentsReached": false
+      }
+    },
+    {
+      "case": "ход ровно на пороге — порог ВЗЯТ",
+      "note": "Граница включающая: порог объявлен как достигаемый, и строгое сравнение сдвинуло бы срабатывание на один тик.",
+      "state": {
+        "entryAnchor": 100,
+        "marketPrice": 102,
+        "dealDirection": "LONG",
+        "declaredPercents": 2
+      },
+      "expect": {"profitPercentsReached": true}
+    },
+    {
+      "case": "цена момента недоступна — оба порога ложны, а не сработали",
+      "note": "Фальсифицирует конъюнкт доступности: без него вычисление хода упало бы на пустом операнде либо прочло бы его нулём — то есть объявило бы полный убыток.",
+      "state": {
+        "entryAnchor": 100,
+        "marketPrice": null,
+        "dealDirection": "LONG",
+        "declaredPercents": 2
+      },
+      "expect": {
+        "moveOperandsAvailable": false,
+        "signedMovePercents": null,
+        "profitPercentsReached": false,
+        "lossPercentsReached": false
+      }
+    },
+    {
+      "case": "средней цены входа ещё нет — то же самое со стороны якоря",
+      "state": {
+        "entryAnchor": null,
+        "marketPrice": 103,
+        "dealDirection": "LONG",
+        "declaredPercents": 2
+      },
+      "expect": {
+        "moveOperandsAvailable": false,
+        "profitPercentsReached": false,
+        "lossPercentsReached": false
+      }
+    },
+    {
+      "case": "порог правилом не объявлен — предикат ложен, а не берёт ноль",
+      "note": "Фальсифицирует конъюнкт notNull(declaredPercents): прочитанный нулём, порог срабатывал бы на любом положительном ходе.",
+      "state": {
+        "entryAnchor": 100,
+        "marketPrice": 103,
+        "dealDirection": "LONG",
+        "declaredPercents": null
+      },
+      "expect": {
+        "profitPercentsReached": false,
+        "lossPercentsReached": false
+      }
+    },
+    {
+      "case": "нулевой якорь — деления не происходит",
+      "state": {
+        "entryAnchor": 0,
+        "marketPrice": 103,
+        "dealDirection": "LONG",
+        "declaredPercents": 2
+      },
+      "expect": {
+        "moveOperandsAvailable": false,
+        "signedMovePercents": null,
+        "profitPercentsReached": false
+      }
+    }
+  ]
+}

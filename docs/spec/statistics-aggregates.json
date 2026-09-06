@@ -1,0 +1,636 @@
+{
+  "subject": "statistics-aggregates",
+  "question": "Что считает строка агрегата статистики и на какой популяции сделок",
+  "home": "docs/rules/statistics-aggregates.md",
+  "operands": {
+    "tookRisk": "сделка приняла риск: у неё была живая позиция. Ложь — тропа закрытия без входа (docs/rules/deal-without-operations.md): кандидат дошёл до терминала, не торгуя",
+    "priceResult": "ценовой результат закрытой сделки — значение величины priceResult дома docs/spec/loss-streak-halt.json; форма здесь не переписывается. Пусто — результат недоступен: не добыта запись закрытия эпизода, не предъявлена разбивка движений либо движение вне расчётной валюты ждёт курса",
+    "grossResult": "итог сделки — Deal.resultProfit, дом формы docs/spec/deal-result.json; накопленное финансирование в него ВХОДИТ. Пусто ровно тогда же, когда пуст ценовой результат: оба приходят одной записью закрытия эпизода",
+    "fee": "комиссии обеих ног сделки, издержкой положительные",
+    "funding": "накопленное финансирование сделки; знак нормализован издержкой, поэтому carry-доход отрицателен",
+    "plannedRisk": "плановый риск сделки — Deal.plannedRiskAmount, знаменатель R-мультипликатора. Пусто у сделки, не принявшей риск: сайзинга на её тропе не было",
+    "currency": "расчётная валюта сделки — Instrument.externalSettlementCurrency",
+    "rowCurrency": "расчётная валюта строки агрегата; она в зерне строки, а не в поле",
+    "deals": "закрытые сделки суток одной строки агрегата",
+    "records": "строки журнала суток одной строки агрегата; элемент несёт eventType",
+    "eventType": "класс события строки журнала — AuditRecord.eventType"
+  },
+  "values": [
+    {
+      "name": "resultClass",
+      "note": "Класс результата закрытой сделки. Недоступность — самостоятельный класс, а не ноль: подмена недобытого значением стирает причину (docs/concept.md, П3). Ноль — исход расчёта, и он достижим у сделки, которая торговала, и у сделки, которая не торговала.",
+      "expr": "if(isNull(priceResult), 'UNAVAILABLE', if(priceResult > 0, 'POSITIVE', if(priceResult < 0, 'NEGATIVE', 'ZERO')))"
+    },
+    {
+      "name": "countsInShares",
+      "note": "Сделка входит в популяцию долей, только если приняла риск. Сделка, закрытая без входа, не торговала, и её включение размывает долю выигрышных тем сильнее, чем чаще срабатывает истечение условия входа, — то есть искажает метрику ровно в те периоды, когда рынок не давал входов.",
+      "expr": "tookRisk"
+    },
+    {
+      "name": "countsAsWinning",
+      "note": "Выигрышность меряется ЦЕНОВЫМ результатом — тем же числом, каким двигается счётчик серии (docs/rules/loss-streak-halt.md). По итогу она расходилась бы с поднятой ступенью систематически: carry-доход поверх ценового убытка показал бы выигрыш там, где энфорсер насчитал убыток.",
+      "expr": "countsInShares && resultClass == 'POSITIVE'"
+    },
+    {
+      "name": "countsAsLosing",
+      "note": "Строго отрицательный ценовой результат на принявшей риск сделке.",
+      "expr": "countsInShares && resultClass == 'NEGATIVE'"
+    },
+    {
+      "name": "countsAsNeutral",
+      "note": "Ноль ценового результата — исход расчёта, а не отсутствие исхода; в выигрышные он не идёт.",
+      "expr": "countsInShares && resultClass == 'ZERO'"
+    },
+    {
+      "name": "countsAsUnavailable",
+      "note": "Недоступный результат выпадает из сумм и потому обязан иметь свой счётчик: без него он выпал бы МОЛЧА, и доля считалась бы по неизвестному знаменателю.",
+      "expr": "countsInShares && resultClass == 'UNAVAILABLE'"
+    },
+    {
+      "name": "entersMoneySums",
+      "note": "В денежные суммы сделка входит только с доступным результатом. Ноль вместо недоступного был бы благоприятным умолчанием (docs/concept.md, П1).",
+      "expr": "countsInShares && resultClass != 'UNAVAILABLE'"
+    },
+    {
+      "name": "closedDeals",
+      "note": "Все закрытые сделки суток — оба терминала. Сколько кандидатов дошло до терминала, самостоятельный факт, и терять его нельзя: он не совпадает с числом торговавших.",
+      "over": "deals",
+      "op": "count"
+    },
+    {
+      "name": "riskBearingDeals",
+      "note": "Знаменатель всего, что считается по торговавшим сделкам.",
+      "over": "deals",
+      "op": "count",
+      "where": "countsInShares"
+    },
+    {
+      "name": "winningDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsWinning",
+      "note": "Числитель доли выигрышных."
+    },
+    {
+      "name": "losingDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsLosing",
+      "note": "Убыточные по ценовому результату — та же популяция, что двигает счётчик серии."
+    },
+    {
+      "name": "neutralDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsNeutral",
+      "note": "Нулевые по расчёту; в выигрышные не идут и долю не поднимают."
+    },
+    {
+      "name": "resultUnavailableDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsUnavailable",
+      "note": "Часть популяции, не покрытая числом. Показывается рядом с долей — иначе читатель не знает, какой части знаменателя не хватает."
+    },
+    {
+      "name": "priceResultSum",
+      "over": "deals",
+      "op": "sum",
+      "of": "priceResult",
+      "where": "entersMoneySums",
+      "note": "Сумма ценовых результатов доступных."
+    },
+    {
+      "name": "grossResultSum",
+      "over": "deals",
+      "op": "sum",
+      "of": "grossResult",
+      "where": "entersMoneySums",
+      "note": "Сумма итогов доступных. Разница ЦЕНОВОЙ суммы и этой есть ровно fundingSum — все три считаются по одной популяции, и владелец, взявший три опубликованных числа строки, получает равенство, а не приближение."
+    },
+    {
+      "name": "feeSum",
+      "over": "deals",
+      "op": "sum",
+      "of": "fee",
+      "where": "entersMoneySums",
+      "note": "Комиссии сделок с доступным результатом. Своей ветви доступности у них нет: строки TRADE_FEE разбивки движений входят в предикат доступности итога (docs/spec/deal-result.json), то есть пусты ровно тогда, когда пуст итог."
+    },
+    {
+      "name": "fundingSum",
+      "over": "deals",
+      "op": "sum",
+      "of": "funding",
+      "where": "entersMoneySums",
+      "note": "Накопленное финансирование сделок с доступным результатом; отрицательное значение — carry-доход. Доступность общая с итогом: слагаемое приходит той же записью закрытия эпизода (docs/spec/loss-streak-halt.json, операнд fundingCost)."
+    },
+    {
+      "name": "plannedRiskSum",
+      "over": "deals",
+      "op": "sum",
+      "of": "plannedRisk",
+      "where": "countsInShares && notNull(plannedRisk)",
+      "note": "Знаменатель среднего R по суткам — сумма плановых рисков тех сделок, у которых он есть. Сам R не хранится: он частное уже хранимых величин. Исключённые считает riskUnsizedDeals — без него знаменатель расходился бы с числителем молча."
+    },
+    {
+      "name": "winRateDenominator",
+      "note": "Честный знаменатель доли выигрышных: торговавшие сделки с ИЗВЕСТНЫМ результатом. Недоступные из него вычтены, а не подменены нулём.",
+      "expr": "riskBearingDeals - resultUnavailableDeals"
+    },
+    {
+      "name": "winRateReportable",
+      "note": "На пустом знаменателе доля не показывается вовсе. Ноль в знаменателе — не ноль доли: сутки без торговавших сделок означают «не торговали», а не «не выигрывали».",
+      "expr": "winRateDenominator > 0"
+    },
+    {
+      "name": "rowCurrencyUniform",
+      "note": "Охранный инвариант зерна: строка агрегата собрана из сделок одной расчётной валюты. Суммировать результаты разных валют нельзя, а сумма без ключа валюты выглядит осмысленной и таковой не является.",
+      "over": "deals",
+      "op": "all",
+      "of": "currency == rowCurrency"
+    },
+    {
+      "name": "raisedHolds",
+      "note": "Счётчик происшествий суток по классу события — форма, общая для всех счётчиков этого семейства: отбор строк журнала по eventType. Живёт в строке ВТОРОГО зерна (тенант × счёт × сутки): события подъёма ступени не несут ни определения стратегии, ни расчётной валюты, и в сделочную строку не укладываются (docs/rules/statistics-aggregates.md §«Счётчики происшествий — своё зерно, а не строка сделочного агрегата»).",
+      "over": "records",
+      "op": "count",
+      "where": "eventType == 'HOLD_RAISED'"
+    },
+    {
+      "name": "countsAsUnsized",
+      "note": "Сделка приняла риск, а планового риска у неё нет: сайзинга на её тропе не было. Достижимо восстановительной тропой входа — сделка заводится вокруг ЖИВОГО риска, созданного вне приложения (docs/models/domain/aggregate/Deal.md).",
+      "expr": "countsInShares && isNull(plannedRisk)"
+    },
+    {
+      "name": "riskUnsizedDeals",
+      "note": "Часть популяции, не покрытая знаменателем среднего R. Показывается рядом с ним по тому же доводу, что и resultUnavailableDeals: выпавшее из суммы без своего счётчика выпадает МОЛЧА.",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsUnsized"
+    }
+  ],
+  "populations": [
+    {
+      "axis": "классы закрытой сделки для агрегата — приняла ли риск × класс результата",
+      "note": "Перечень выводится полным произведением ДВУХ осей дока-дома (§«Классы закрытой сделки для агрегата»), а не из множества классов, встреченных в примерах: множество встреченного молчит ровно о том классе, которого в нём нет. Три класса из восьми недостижимы и предъявляют контрпример с названной причиной: сделка без входа результат имеет всегда, и он ноль по расчёту.",
+      "rule": [
+        "countsInShares",
+        "countsAsWinning",
+        "countsAsLosing",
+        "countsAsNeutral",
+        "countsAsUnavailable",
+        "entersMoneySums"
+      ],
+      "derive": {
+        "command": "bash tools/derive/statistics-deal-classes.sh",
+        "from": [
+          "docs/rules/statistics-aggregates.md"
+        ]
+      },
+      "keys": [
+        "tookRisk",
+        "resultClass"
+      ],
+      "members": [
+        {
+          "member": [
+            "true",
+            "POSITIVE"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "NEGATIVE"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "ZERO"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "UNAVAILABLE"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "ZERO"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "POSITIVE"
+          ],
+          "unreachable": "сделка, не принявшая риск, не торговала: результат её — ноль по расчёту, а не по исходу (docs/models/domain/aggregate/Deal.md §«Итоговый результат сделки»); положительным он стать не может, потому что складывать нечего"
+        },
+        {
+          "member": [
+            "false",
+            "NEGATIVE"
+          ],
+          "unreachable": "та же тропа: без входа нет ни ценового движения, ни комиссии второй ноги — отрицательным результат стать не может"
+        },
+        {
+          "member": [
+            "false",
+            "UNAVAILABLE"
+          ],
+          "unreachable": "недоступность результата приходит от НЕДОБЫТОЙ записи закрытия эпизода, а у сделки без входа эпизода не было вовсе: добывать нечего, и ноль пишется расчётом"
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "case": "торговавшая сделка с положительным ценовым результатом",
+      "state": {
+        "tookRisk": true,
+        "priceResult": 12.5,
+        "plannedRisk": 50
+      },
+      "expect": {
+        "resultClass": "POSITIVE",
+        "countsInShares": true,
+        "countsAsWinning": true,
+        "countsAsLosing": false,
+        "countsAsNeutral": false,
+        "countsAsUnavailable": false,
+        "entersMoneySums": true,
+        "countsAsUnsized": false
+      }
+    },
+    {
+      "case": "торговавшая сделка с отрицательным ценовым результатом",
+      "state": {
+        "tookRisk": true,
+        "priceResult": -8
+      },
+      "expect": {
+        "resultClass": "NEGATIVE",
+        "countsInShares": true,
+        "countsAsWinning": false,
+        "countsAsLosing": true,
+        "countsAsNeutral": false,
+        "countsAsUnavailable": false,
+        "entersMoneySums": true
+      }
+    },
+    {
+      "case": "торговавшая сделка с нулевым ценовым результатом",
+      "state": {
+        "tookRisk": true,
+        "priceResult": 0
+      },
+      "expect": {
+        "resultClass": "ZERO",
+        "countsInShares": true,
+        "countsAsWinning": false,
+        "countsAsLosing": false,
+        "countsAsNeutral": true,
+        "countsAsUnavailable": false,
+        "entersMoneySums": true
+      }
+    },
+    {
+      "case": "торговавшая сделка с недоступным результатом",
+      "state": {
+        "tookRisk": true,
+        "priceResult": null,
+        "plannedRisk": null
+      },
+      "expect": {
+        "resultClass": "UNAVAILABLE",
+        "countsInShares": true,
+        "countsAsWinning": false,
+        "countsAsLosing": false,
+        "countsAsNeutral": false,
+        "countsAsUnavailable": true,
+        "entersMoneySums": false,
+        "countsAsUnsized": true
+      }
+    },
+    {
+      "case": "сделка, закрытая без входа: ноль по расчёту, в доли не входит",
+      "state": {
+        "tookRisk": false,
+        "priceResult": 0
+      },
+      "expect": {
+        "resultClass": "ZERO",
+        "countsInShares": false,
+        "countsAsWinning": false,
+        "countsAsLosing": false,
+        "countsAsNeutral": false,
+        "countsAsUnavailable": false,
+        "entersMoneySums": false
+      }
+    },
+    {
+      "case": "контрпример: не торговавшая сделка с положительным результатом",
+      "unreachable": "складывать нечего — эпизода не было",
+      "state": {
+        "tookRisk": false,
+        "priceResult": 5
+      },
+      "expect": {
+        "resultClass": "POSITIVE",
+        "countsInShares": false,
+        "countsAsWinning": false,
+        "countsAsLosing": false,
+        "countsAsNeutral": false,
+        "countsAsUnavailable": false,
+        "entersMoneySums": false
+      }
+    },
+    {
+      "case": "контрпример: не торговавшая сделка с отрицательным результатом",
+      "unreachable": "без входа нет ни ценового движения, ни комиссии второй ноги",
+      "state": {
+        "tookRisk": false,
+        "priceResult": -5
+      },
+      "expect": {
+        "resultClass": "NEGATIVE",
+        "countsInShares": false,
+        "countsAsWinning": false,
+        "countsAsLosing": false,
+        "countsAsNeutral": false,
+        "countsAsUnavailable": false,
+        "entersMoneySums": false
+      }
+    },
+    {
+      "case": "контрпример: не торговавшая сделка с недоступным результатом",
+      "unreachable": "добывать нечего — записи закрытия эпизода не существует",
+      "state": {
+        "tookRisk": false,
+        "priceResult": null
+      },
+      "expect": {
+        "resultClass": "UNAVAILABLE",
+        "countsInShares": false,
+        "countsAsWinning": false,
+        "countsAsLosing": false,
+        "countsAsNeutral": false,
+        "countsAsUnavailable": false,
+        "entersMoneySums": false
+      }
+    },
+    {
+      "case": "сутки: пять закрытых сделок, четыре торговали, у одной результат недоступен",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          {
+            "tookRisk": true,
+            "priceResult": 12.5,
+            "grossResult": 10.0,
+            "fee": 1.2,
+            "funding": 2.5,
+            "plannedRisk": 50,
+            "currency": "USDT"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": -8,
+            "grossResult": -9,
+            "fee": 0.8,
+            "funding": 1.0,
+            "plannedRisk": 40,
+            "currency": "USDT"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": null,
+            "grossResult": null,
+            "fee": null,
+            "funding": null,
+            "plannedRisk": 30,
+            "currency": "USDT"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": 0,
+            "grossResult": -1,
+            "fee": 0.2,
+            "funding": 1.0,
+            "plannedRisk": 10,
+            "currency": "USDT"
+          },
+          {
+            "tookRisk": false,
+            "priceResult": 0,
+            "grossResult": 0,
+            "fee": 0,
+            "funding": 0,
+            "plannedRisk": null,
+            "currency": "USDT"
+          }
+        ]
+      },
+      "expect": {
+        "closedDeals": 5,
+        "riskBearingDeals": 4,
+        "winningDeals": 1,
+        "losingDeals": 1,
+        "neutralDeals": 1,
+        "resultUnavailableDeals": 1,
+        "priceResultSum": 4.5,
+        "grossResultSum": 0.0,
+        "feeSum": 2.2,
+        "fundingSum": 4.5,
+        "plannedRiskSum": 130,
+        "winRateDenominator": 3,
+        "winRateReportable": true,
+        "rowCurrencyUniform": true,
+        "riskUnsizedDeals": 0
+      }
+    },
+    {
+      "case": "carry-доход перекрыл ценовой убыток: итог положителен, сделка убыточна",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          {
+            "tookRisk": true,
+            "priceResult": -3,
+            "grossResult": 2,
+            "fee": 0.4,
+            "funding": -5,
+            "plannedRisk": 20,
+            "currency": "USDT"
+          }
+        ]
+      },
+      "expect": {
+        "closedDeals": 1,
+        "riskBearingDeals": 1,
+        "winningDeals": 0,
+        "losingDeals": 1,
+        "neutralDeals": 0,
+        "resultUnavailableDeals": 0,
+        "priceResultSum": -3,
+        "grossResultSum": 2,
+        "feeSum": 0.4,
+        "fundingSum": -5,
+        "plannedRiskSum": 20,
+        "winRateDenominator": 1,
+        "winRateReportable": true,
+        "rowCurrencyUniform": true,
+        "riskUnsizedDeals": 0
+      }
+    },
+    {
+      "case": "сутки без торговавших сделок: доля не показывается",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          {
+            "tookRisk": false,
+            "priceResult": 0,
+            "grossResult": 0,
+            "fee": 0,
+            "funding": 0,
+            "plannedRisk": null,
+            "currency": "USDT"
+          },
+          {
+            "tookRisk": false,
+            "priceResult": 0,
+            "grossResult": 0,
+            "fee": 0,
+            "funding": 0,
+            "plannedRisk": null,
+            "currency": "USDT"
+          }
+        ]
+      },
+      "expect": {
+        "closedDeals": 2,
+        "riskBearingDeals": 0,
+        "winningDeals": 0,
+        "losingDeals": 0,
+        "neutralDeals": 0,
+        "resultUnavailableDeals": 0,
+        "priceResultSum": 0,
+        "grossResultSum": 0,
+        "feeSum": 0,
+        "fundingSum": 0,
+        "plannedRiskSum": 0,
+        "winRateDenominator": 0,
+        "winRateReportable": false,
+        "rowCurrencyUniform": true,
+        "riskUnsizedDeals": 0
+      }
+    },
+    {
+      "case": "контрпример: строка агрегата собрана из сделок двух валют",
+      "unreachable": "проекция группирует ПО расчётной валюте — она в зерне строки, поэтому чужая валюта в строку не попадает",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          {
+            "tookRisk": true,
+            "priceResult": 1,
+            "grossResult": 1,
+            "fee": 0,
+            "funding": 0,
+            "plannedRisk": 10,
+            "currency": "USDT"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": 2,
+            "grossResult": 2,
+            "fee": 0,
+            "funding": 0,
+            "plannedRisk": 10,
+            "currency": "BTC"
+          }
+        ]
+      },
+      "expect": {
+        "rowCurrencyUniform": false
+      }
+    },
+    {
+      "case": "счётчик происшествий: два подъёма ступени за сутки",
+      "state": {
+        "records": [
+          {
+            "eventType": "HOLD_RAISED"
+          },
+          {
+            "eventType": "DEAL_CLOSED"
+          },
+          {
+            "eventType": "HOLD_RAISED"
+          }
+        ]
+      },
+      "expect": {
+        "raisedHolds": 2
+      }
+    },
+    {
+      "case": "счётчик происшествий: подъёмов ступени за сутки не было",
+      "state": {
+        "records": [
+          {
+            "eventType": "DEAL_OPENED"
+          },
+          {
+            "eventType": "DEAL_CLOSED"
+          }
+        ]
+      },
+      "expect": {
+        "raisedHolds": 0
+      }
+    },
+    {
+      "case": "восстановительная сделка приняла риск, а планового риска у неё нет",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          {
+            "tookRisk": true,
+            "priceResult": 7,
+            "grossResult": 7,
+            "fee": 0.3,
+            "funding": 0,
+            "plannedRisk": null,
+            "currency": "USDT"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": -2,
+            "grossResult": -2,
+            "fee": 0.1,
+            "funding": 0,
+            "plannedRisk": 25,
+            "currency": "USDT"
+          }
+        ]
+      },
+      "expect": {
+        "riskBearingDeals": 2,
+        "riskUnsizedDeals": 1,
+        "plannedRiskSum": 25,
+        "priceResultSum": 5,
+        "grossResultSum": 5,
+        "feeSum": 0.4,
+        "fundingSum": 0,
+        "winningDeals": 1,
+        "losingDeals": 1,
+        "winRateDenominator": 2
+      }
+    }
+  ]
+}

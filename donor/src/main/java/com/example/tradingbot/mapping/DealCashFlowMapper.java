@@ -21,8 +21,16 @@ import org.mapstruct.ReportingPolicy;
         uses = OkxResponseConverter.class)
 public interface DealCashFlowMapper {
 
+    /**
+     * Имя доменного поля разошлось с колонкой донора: общий артефакт
+     * называет радиус СЧЁТОМ (docs/models/domain/other/DealCashFlow.md), а
+     * схема монолита — биржей. Отображение объявлено явно; без него
+     * политика IGNORE уронила бы колонку молча.
+     */
+    @Mapping(target = "exchangeId", source = "exchangeAccountId")
     DealCashFlowEntity domainToPersistence(DealCashFlow flow);
 
+    @Mapping(target = "exchangeAccountId", source = "exchangeId")
     DealCashFlow persistenceToDomain(DealCashFlowEntity entity);
 
     /** Сырая bill-запись → граничный снапшот; пустые строки числовых полей → null. */

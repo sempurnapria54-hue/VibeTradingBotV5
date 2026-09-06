@@ -2,6 +2,9 @@ package com.example.tradingcore.integration;
 
 import com.example.tradingcore.config.NeighbourProperties;
 import com.example.tradingcore.integration.model.InstrumentMarketDataResponse;
+import com.example.tradingcore.integration.model.MarketFeatureBundleResponse;
+import com.example.tradingcore.integration.model.MarketFeatureReadRequest;
+import com.example.tradingcore.util.Constants;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import java.util.List;
 import org.springframework.core.ParameterizedTypeReference;
@@ -23,6 +26,12 @@ import org.springframework.web.client.RestClient;
  * нет.</b> Навес может быть ещё не материализован, и владелец отвечает
  * тогда пустым телом: {@code null} здесь означает «правил ещё нет», а не
  * «правила пусты» — разница видна писателю проекции.
+ *
+ * <p><b>Фичи момента читаются ОДНИМ вызовом, а не по операнду.</b> Оценке
+ * условий и расчёту параметров нужны сразу все входы; россыпь чтений
+ * собрала бы контекст из значений РАЗНЫХ моментов — пока идёт обход имён,
+ * тик расчёта у владельца успевает записать новое значение, и условие
+ * сравнило бы величины, не существовавшие одновременно.
  */
 @Component
 public class MarketDataReadClient {
@@ -62,7 +71,27 @@ public class MarketDataReadClient {
                 .body(InstrumentExternalRules.class));
     }
 
+    /**
+     * Фичи на момент решения: значения по привязкам, их предыдущие
+     * значения, структуры, цены и — если переданы клаузы — фаза.
+     *
+     * <p><b>Предыдущее значение — операнд, а не удобство.</b> На нём стои́т
+     * весь класс правил пересечения и объёмный фильтр; читатель, у
+     * которого его нет, вычислил бы такое правило на пустом операнде и
+     * получил бы ЛОЖЬ — то есть шаг стратегии не исполнился бы молча
+     * (docs/components/StrategyConditionEvaluator.md).
+     */
+    public MarketFeatureBundleResponse readFeatures(String instrumentInternalId,
+                                                    MarketFeatureReadRequest request) {
+        return PeerCall.execute(PEER, "features", () -> restClient.post()
+                .uri("/api/v1/market-data/instruments/{internalId}/features", instrumentInternalId)
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .body(request)
+                .retrieve()
+                .body(MarketFeatureBundleResponse.class));
+    }
+
     private String bearer() {
-        return "Bearer " + tokenProvider.getTokenValue(clientRegistrationId);
+        return Constants.Header.BEARER_PREFIX + tokenProvider.getTokenValue(clientRegistrationId);
     }
 }

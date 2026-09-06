@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  strategies — владелец определений стратегий и их жизненного цикла
+  (docs/architecture/services.md). Определение — данные, а не код: их
+  исполняет движок из общего артефакта, и потому бэктест и живая торговля
+  проверяют одно и то же.
+
+  Отдельный процесс потому, что владелец определений один, а читателей
+  много; бэктест — тяжёлая, но не торговая нагрузка (фаза 4).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>strategies</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>strategies</name>
+    <description>Определения стратегий, их валидация и жизненный цикл</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <springdoc.version>3.0.0</springdoc.version>
+    </properties>
+
+    <dependencies>
+        <!-- Формы доменных сущностей и событий — из общего артефакта. -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>domain-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!--
+          Проба живости — единственная открытая точка контура доступа
+          (docs/rules/api-access-policy.md); без стартера актуатора её не
+          существует вовсе, и под не становится готовым никогда.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!--
+          Исходящая сервисная идентичность: чтение чисел риск-аппетита и
+          проверка ссылок определения у ядра идут под клиентом
+          client-credentials, а не под пользователем
+          (docs/architecture/contracts.md §«Контекст тенанта в вызове»).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+        <!--
+          СТАРТЕР, А НЕ flyway-core: в Boot 4 автоконфиг, ЗАПУСКАЮЩИЙ
+          миграции на старте, живёт в отдельном модуле и сам не
+          подтягивается. С одним flyway-core миграции молча не
+          применяются, и сервис падает на валидации схемы.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        <!--
+          Бин ObjectMapper совместимостным автоконфигом Jackson 2: навес
+          JSONB дерева стратегии сериализуется им же, что и у ядра
+          (.claude/rules/tech-radar.md, записи Jackson).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
+        <!--
+          Публикация событий владельца: активация, деактивация, удаление.
+          Реле читает свою outbox и кладёт в тему strategies.facts
+          (docs/architecture/data-ownership.md §«Outbox и доставка»).
+        -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Контур доступа доказывается тестом поверхности, а не строкой
+          правила (docs/rules/api-access-policy.md §«Перечень точек: что
+          закрыто и что осталось»); поднять фильтры Security под MockMvc
+          без этого модуля нечем.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>${lombok-mapstruct-binding.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!-- Исполняемый артефакт: без repackage образ сервиса собрать не из чего. -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

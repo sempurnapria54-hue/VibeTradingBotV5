@@ -77,6 +77,12 @@ spec:
             # его имени и одинаков во всех трёх.
             - name: OIDC_ISSUER_URI
               value: http://platform-identity-service:8080/realms/vibetrading
+            # Публичный клиент браузера: по нему резолв членств отличает
+            # токен ЧЕЛОВЕКА от служебной идентичности кластера — тропу
+            # заведения тенанта проходит первый
+            # (docs/architecture/contracts.md §«Контекст тенанта в вызове»).
+            - name: OIDC_BROWSER_CLIENT_ID
+              value: web
             - name: VAULT_URI
               value: http://vault.vault-system.svc:8200
             - name: VAULT_ROLE

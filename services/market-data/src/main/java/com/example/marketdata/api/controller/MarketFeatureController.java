@@ -4,16 +4,16 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 
 import com.example.marketdata.api.model.FeatureBindingApiRequest;
+import com.example.marketdata.api.model.FeatureReadApiRequest;
 import com.example.marketdata.api.model.IndicatorValueApiResponse;
+import com.example.marketdata.api.model.MarketFeatureBundleApiResponse;
 import com.example.marketdata.api.model.MarketOrderBookApiResponse;
-import com.example.marketdata.api.model.MarketPhaseApiRequest;
-import com.example.marketdata.api.model.MarketPhaseApiResponse;
 import com.example.marketdata.api.model.MarketStructureApiResponse;
 import com.example.marketdata.api.model.MarketTickerApiResponse;
 import com.example.marketdata.domain.model.FeatureBinding;
-import com.example.marketdata.domain.model.MarketPhaseRequest;
+import com.example.marketdata.domain.model.FeatureReadRequest;
 import com.example.marketdata.domain.service.IndicatorService;
-import com.example.marketdata.domain.service.MarketPhaseService;
+import com.example.marketdata.domain.service.MarketFeatureService;
 import com.example.marketdata.domain.service.MarketPriceDataService;
 import com.example.marketdata.domain.service.MarketStructureService;
 import com.example.marketdata.mapping.MarketDataApiMapper;
@@ -61,7 +61,7 @@ public class MarketFeatureController {
     private final ComputationConfigDataService configDataService;
     private final IndicatorService indicatorService;
     private final MarketStructureService marketStructureService;
-    private final MarketPhaseService marketPhaseService;
+    private final MarketFeatureService marketFeatureService;
     private final MarketPriceDataService marketPriceDataService;
     private final MarketSnapshotDataService snapshotDataService;
     private final MarketDataApiMapper apiMapper;
@@ -113,34 +113,37 @@ public class MarketFeatureController {
     }
 
     /**
-     * Классификация фазы по клаузам потребителя.
+     * Фичи на момент решения одним чтением.
      *
-     * <p>{@code POST} у чтения — не оговорка: клаузы и привязки не
+     * <p>{@code POST} у чтения — не оговорка: привязки и клаузы не
      * помещаются в строку запроса, а тело у {@code GET} контракту не
-     * принадлежит. Состояния вызов не меняет: фаза не персистируется.
+     * принадлежит. Состояния вызов не меняет.
+     *
+     * <p><b>Чтение одно, а не по операнду.</b> Потребителю нужны сразу все
+     * входы его условий и калькуляторов; россыпь вызовов собрала бы
+     * контекст из значений РАЗНЫХ моментов — пока идёт обход имён, тик
+     * расчёта успевает записать новое значение.
      */
-    @Operation(summary = "Фаза рынка по авторским клаузам потребителя")
+    @Operation(summary = "Фичи на момент решения: значения, предыдущие значения, структуры, цены, фаза")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Фаза классифицирована; UNKNOWN — вход недоступен"),
-            @ApiResponse(responseCode = "204", description = "Клауз классификации не передано"),
+            @ApiResponse(responseCode = "200", description = "Связка снята; пустое место в раскладке — вход недоступен"),
             @ApiResponse(responseCode = "400", description = "Инструмента либо идентичности с таким идентификатором нет")
     })
-    @PostMapping("/phase")
-    public ResponseEntity<MarketPhaseApiResponse> resolvePhase(@PathVariable String internalId,
-                                                               @Valid @RequestBody MarketPhaseApiRequest request) {
+    @PostMapping("/features")
+    public ResponseEntity<MarketFeatureBundleApiResponse> readFeatures(
+            @PathVariable String internalId,
+            @Valid @RequestBody FeatureReadApiRequest request) {
         Instrument instrument = instrumentDataService.getRequiredByInternalId(internalId);
-        MarketPhaseRequest phaseRequest = MarketPhaseRequest.builder()
-                .phaseRules(request.getPhaseRules())
+        FeatureReadRequest readRequest = FeatureReadRequest.builder()
                 .indicatorBindings(indicatorBindings(request.getIndicatorBindings()))
                 .structureBindings(structureBindings(request.getStructureBindings()))
+                .phaseRules(request.getPhaseRules())
+                .priceRequired(request.getPriceRequired())
                 .build();
-        return marketPhaseService.getCurrentPhase(instrument, phaseRequest)
-                .map(apiMapper::domainToApi)
-                .map(response -> {
-                    response.setInstrumentInternalId(internalId);
-                    return ResponseEntity.ok(response);
-                })
-                .orElseGet(() -> ResponseEntity.noContent().build());
+        MarketFeatureBundleApiResponse response = apiMapper.domainToApi(
+                marketFeatureService.readFeatures(instrument, readRequest));
+        response.setInstrumentInternalId(internalId);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Цены момента инструмента: last, mark, index")

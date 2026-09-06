@@ -154,7 +154,7 @@ class RefreshBillsExecutorTest {
         assertThat(savedFlows).hasSize(1);
         DealCashFlow flow = savedFlows.get(0);
         assertThat(flow.getDealId()).isEqualTo(DEAL_ID);
-        assertThat(flow.getExchangeId()).isEqualTo(EXCHANGE_ID);
+        assertThat(flow.getExchangeAccountId()).isEqualTo(EXCHANGE_ID);
         assertThat(flow.getCategory()).isEqualTo(DealCashFlow.CashFlowCategory.REALIZED_PNL);
         assertThat(flow.getRateStatus()).isEqualTo(DealCashFlow.RateStatus.NOT_REQUIRED);
         verify(dealDataService).advanceBillsFetchedThrough(DEAL_ID, SOURCE_TIME);
@@ -261,7 +261,7 @@ class RefreshBillsExecutorTest {
         DealCashFlow stale = new DealCashFlow();
         stale.setId(100L);
         stale.setDealId(DEAL_ID);
-        stale.setExchangeId(EXCHANGE_ID);
+        stale.setExchangeAccountId(EXCHANGE_ID);
         stale.setCcy("BTC");
         stale.setExternalInstrumentId(INST_ID);
         stale.setExternalType("2");

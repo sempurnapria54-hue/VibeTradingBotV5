@@ -161,7 +161,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v133.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v149.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -178,10 +178,10 @@
 │   │       └── environment.postman_environment.json — (артефакт: Postman-окружение)
 │   └── work/ — В каком состоянии исполнительная работа?
 │       ├── backlog.md — Что мы планируем сделать?
-│       ├── code-gate-ledger.json — Какой класс и какую диспозицию несёт каждая гейтящая находка последнего прогона?
+│       ├── code-gate-ledger.json — Что гейтит каждая незакрытая находка?
 │       ├── decision-digest.md — Какие проектные решения CC принял автономно в текущей итерации?
 │       ├── 2026-08-26-step-7-question-flow-analysis.md — Какие источники дали поток ~400 вопросов на шаге 7?
-│       ├── progress/ — На каком шаге мы в этой активной операции? (шаг 7 фазы 2: хроника, gap-отчёт и отчёт закрытия)
+│       ├── progress/ — На каком шаге мы в этой активной операции? (идёт шаг 10 фазы 2)
 │       ├── questions/ — Что мы ещё не решили?
 │       │   ├── open-questions.md — Что мы ещё не решили? (общие вопросы пайплайна и продукта)
 │       │   └── tasks/ — Что неясно по этой конкретной активной задаче?
@@ -208,12 +208,16 @@
 │   │   └── tenant-and-exchange.md — Как устроены тенант, его биржевые счета и площадка?
 │   ├── components/ — Кто выполняет?
 │   │   ├── models/ — Что это за runtime-объект?
+│   │   │   ├── ActionPlan.md — Что это за исход прохода по одному действию стратегии?
+│   │   │   ├── ActionReadiness.md — Что это за исход гейта предусловия действия?
+│   │   │   ├── AttachedProtectionFacts.md — Что это за набор фактов встроенной защиты?
 │   │   │   ├── CalculatedPrice.md — Что это за рассчитанная цена действия?
 │   │   │   ├── CalculatedSize.md — Что это за `CalculatedSize`?
 │   │   │   ├── CalculatedStrategyAction.md — Что это за `CalculatedStrategyAction`?
 │   │   │   ├── CalculationContext.md — Что это за контекст расчёта одного действия?
 │   │   │   ├── CalculationError.md — Что это за контролируемая ошибка расчёта?
 │   │   │   ├── DealContext.md — Что это за контекст одного прохода FSM?
+│   │   │   ├── DealTransition.md — Что это за исход прохода FSM сделки?
 │   │   │   ├── HoldSignal.md — Чем описывается требуемая блокировка?
 │   │   │   ├── MarketPriceData.md — Что это за runtime-цены инструмента?
 │   │   │   ├── PositionStatusResolveResult.md — Что это за `PositionStatusResolveResult`?
@@ -222,7 +226,11 @@
 │   │   │   ├── RiskValidationResult.md — Что это за `RiskValidationResult`?
 │   │   │   ├── ServiceCommand.md — Что это за атомарная команда над runtime-сущностью?
 │   │   │   ├── ServiceCommandPayload.md — Что это за параметры команды?
-│   │   │   └── StrategyActionCalculationResult.md — Что это за `StrategyActionCalculationResult`?
+│   │   │   ├── StepSelection.md — Что это за исход отбора шага на проходе?
+│   │   │   ├── StrategyActionCalculationResult.md — Что это за `StrategyActionCalculationResult`?
+│   │   │   ├── TrancheCascadeResult.md — Что это за сведённый исход каскада траншей?
+│   │   │   ├── TrancheEdge.md — Что это за одобренное ребро транша, ждущее применения?
+│   │   │   └── TrancheTransition.md — Что это за исход прохода FSM транша?
 │   │   ├── ActionRiskGate.md — Кто связывает преконтроль риска с планом действия за проход?
 │   │   ├── AlgoOrderExternalStatusResolver.md — Кто переводит внешний статус standalone algo-order в доменный?
 │   │   ├── AnomalyJob.md — Кто ищет нарушения базовых инвариантов системы?
@@ -277,6 +285,7 @@
 │   │   ├── RefreshBillsExecutor.md — Кто исполняет команду добычи движений средств?
 │   │   ├── RefreshOrderExecutor.md — Кто исполняет добычу состояния обычной заявки?
 │   │   ├── RefreshPositionExecutor.md — Кто исполняет добычу состояния позиции?
+│   │   ├── RegistryProjectionJob.md — Кто сводит проекции чужих реестров с их владельцами?
 │   │   ├── RetryPolicyService.md — Кто управляет политикой повтора команд?
 │   │   ├── RiskBlockResolver.md — Кто превращает результат risk-проверки в действие handler'а?
 │   │   ├── RiskValidator.md — Кто проверяет рассчитанное действие по риск-политике?
@@ -287,9 +296,11 @@
 │   │   ├── StrategyActionExecutor.md — Кто выдаёт следующую команду одного типа действия стратегии за проход?
 │   │   ├── StrategyActionOrchestrator.md — Кто выбирает следующее действие стратегии за проход?
 │   │   ├── StrategyConditionEvaluator.md — Кто проверяет применимость `StrategyCondition`?
+│   │   ├── StrategyDemandJob.md — Кто объявляет владельцу рыночных данных потребность копий определения?
 │   │   ├── SubmitAlgoOrderExecutor.md — Кто исполняет `SUBMIT_ALGO_ORDER_COMMAND`?
 │   │   ├── SubmitOrderExecutor.md — Кто исполняет отправку обычной заявки на биржу?
 │   │   ├── SystemActionExecutor.md — Кто выдаёт следующую команду системного действия за проход?
+│   │   ├── TradeFeeRateSyncJob.md — Кто наблюдает ставки комиссии биржевых счетов?
 │   │   ├── TrancheEntryFinalizedHandler.md — Что делает обработчик статуса подтверждённого входа транша?
 │   │   ├── TrancheEntrySubmittedHandler.md — Что делает обработчик статуса отправленного входа транша?
 │   │   ├── TrancheExitPendingHandler.md — Что делает обработчик статуса выхода транша?
@@ -297,6 +308,7 @@
 │   │   ├── TranchePrecheckHandler.md — Что делает обработчик предвходовой проверки транша?
 │   │   └── TrancheProtectionSwitchedHandler.md — Что делает обработчик статуса переключения защиты транша?
 │   ├── dictionary/ — Что означает этот термин?
+│   │   ├── audit.md — Что означает слово «аудит» в корпусе?
 │   │   └── leg-term.md — Что означает термин «нога»?
 │   ├── integrations/ — Что известно про источник?
 │   │   └── okx/ — Что известно про источник OKX?
@@ -370,6 +382,7 @@
 │   │   │       ├── AccessDenial.md — Что это за модель `AccessDenial`?
 │   │   │       ├── AnomalyReport.md — Что это за модель `AnomalyReport`?
 │   │   │       ├── Auditable.md — Какие общие поля аудита несут доменные сущности?
+│   │   │       ├── AuditRecord.md — Что это за модель `AuditRecord`?
 │   │   │       ├── Candle.md — Что это за доменная модель `Candle`?
 │   │   │       ├── CandleGroup.md — Что это за доменная модель `CandleGroup`?
 │   │   │       ├── DealActionState.md — Что это за модель `DealActionState` — строка исполнения действия?
@@ -445,6 +458,7 @@
 │   │   ├── raw-exchange-dto-boundary.md — Какое правило ограничивает распространение сырых DTO источника по слоям?
 │   │   ├── replace-not-amend.md — Как система ремоделирует уже стоящие на бирже сущности?
 │   │   ├── risk-policy.md — Какой риск система допускает на сделку?
+│   │   ├── statistics-aggregates.md — Какое правило задаёт состав и способ счёта агрегатов статистики?
 │   │   ├── risk-validator-scope.md — Для каких действий вызывается `RiskValidator`?
 │   │   ├── runtime-error-classification.md — Как классифицируются неожиданные runtime-ошибки?
 │   │   ├── strategy-condition-contract.md — Как автор стратегии записывает условие?
@@ -475,6 +489,7 @@
 │   │   ├── protection-coverage.json — Каково покрытие защиты транша?
 │   │   ├── risk-at-stop.json — Чему равен убыток на уровне остановки убытка в расчёте на единицу экспозиции?
 │   │   ├── risk-limits.json — Выполняются ли потолки риска?
+│   │   ├── statistics-aggregates.json — Что считает строка агрегата статистики и на какой популяции сделок?
 │   │   ├── stop-distance.json — Допустим ли объявленный уровень остановки убытка?
 │   │   ├── strategy-reference.json — Проходит ли эталонная стратегия репозитория действующие требования к дереву стратегии?
 │   │   └── strategy-walkthrough.json — Держится ли инвариант покрытия на каждом шаге прохода эталонного транша?

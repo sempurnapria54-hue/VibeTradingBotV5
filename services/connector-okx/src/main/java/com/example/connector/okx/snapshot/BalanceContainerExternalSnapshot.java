@@ -9,15 +9,16 @@ import lombok.Value;
  * Account-level нормализованный снапшот баланса — validated boundary
  * object для REFRESH_BALANCE (raw OKX DTO за adapter не выходит).
  * Числовые поля остаются строками (провалидированы как parseable).
- * exchangeId проставляет executor из DealContext (не из OKX). См.
- * docs/models/domain/core/BalanceContainer.md, docs/models/mapping/Balance.md.
+ *
+ * <p><b>Счёта снимок не несёт:</b> коннектор стейтлесс и внутренних
+ * идентификаторов наших строк не знает — {@code exchangeAccountId}
+ * проставляет ядро, приземляя снимок
+ * (docs/models/domain/core/BalanceContainer.md,
+ * docs/models/mapping/Balance.md).
  */
 @Value
 @Builder
 public class BalanceContainerExternalSnapshot {
-
-    /** Внутренний идентификатор биржи/аккаунта (проставляется executor'ом). */
-    Long exchangeId;
 
     /** Время обновления account snapshot (OKX uTime). */
     OffsetDateTime externalUpdatedAt;

@@ -29,6 +29,18 @@ public interface InstrumentMapper {
     Instrument integrationToDomain(InstrumentMarketDataResponse response);
 
     /**
+     * Строка проекции → доменный инструмент. Читатель — контекст прохода:
+     * ему нужна сама модель, а не поле, поэтому здесь тянется строка
+     * целиком.
+     *
+     * <p><b>Навес правил сюда не едет:</b> в колонке он лежит
+     * сериализованным, а его читатели ходят своей границей
+     * ({@code InstrumentExternalRulesDataService}) — там же наливается
+     * ставка комиссии счёта, которой на навесе нет.
+     */
+    Instrument persistenceToDomain(InstrumentEntity entity);
+
+    /**
      * Обновление строки проекции спецификацией из каталога.
      *
      * <p>Идентичности не переписываются — по ним строка и найдена; навес

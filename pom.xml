@@ -33,8 +33,10 @@
         <module>libs/domain-model</module>
         <module>libs/strategy-engine</module>
         <module>services/auth</module>
+        <module>services/bff</module>
         <module>services/connector-okx</module>
         <module>services/market-data</module>
+        <module>services/strategies</module>
         <module>services/trading-core</module>
         <module>donor</module>
     </modules>

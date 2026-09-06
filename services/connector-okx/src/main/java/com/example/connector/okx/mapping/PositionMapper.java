@@ -37,13 +37,6 @@ public interface PositionMapper {
     PositionExternalSnapshot integrationToSnapshot(PositionOkxResponse response);
 
     /**
-     * Обновление полей Position из снапшота (REFRESH-контур). Доменный
-     * status / closeReason применяет исполнитель через резолвер.
-     */
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    void updateFromSnapshot(PositionExternalSnapshot snapshot, @MappingTarget Position position);
-
-    /**
      * Снапшот → доменная позиция, СОЗДАНИЕМ: коннектор отдаёт модель, а
      * не доливает чужую. Доменный статус резолвит вызывающий.
      */
@@ -69,20 +62,6 @@ public interface PositionMapper {
     @Mapping(target = "externalCreatedAt", source = "cTime")
     @Mapping(target = "externalModifiedAt", source = "uTime")
     PositionCloseResultExternalSnapshot integrationToCloseSnapshot(PositionsHistoryOkxResponse response);
-
-    /**
-     * Наполнение строки эпизода положением закрытия — тропа ОБНОВЛЕНИЯ:
-     * строку закрыла нога 1, здесь появляются реализованные факты.
-     * Идентичность эпизода (пара) и направление уже стоят — снапшот их
-     * не перезаписывает.
-     */
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "externalRealizedProfit", source = "externalRealizedPnl")
-    @Mapping(target = "externalRealizedProfitGross", source = "externalRealizedPnlGross")
-    @Mapping(target = "externalId", ignore = true)
-    @Mapping(target = "direction", ignore = true)
-    @Mapping(target = "externalCreatedAt", ignore = true)
-    void updateFromCloseSnapshot(PositionCloseResultExternalSnapshot snapshot, @MappingTarget Position position);
 
     /**
      * Наполнение строки эпизода положением закрытия — тропа

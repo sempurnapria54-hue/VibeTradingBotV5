@@ -36,7 +36,7 @@ class DealCashFlowMappingTest {
         flow.setAppliedRateCandleInstrument("ETH-USDT");
         flow.setAppliedRateCandleTimeframe(TimeFrame.ONE_MINUTE);
         flow.setAppliedRateCandleOpenTime(OffsetDateTime.of(2026, 9, 2, 16, 0, 0, 0, ZoneOffset.UTC));
-        flow.setExchangeId(1L);
+        flow.setExchangeAccountId(1L);
         flow.setExternalInstrumentId("ETH-USDT-SWAP");
         flow.setExternalBillId("bill-1");
         flow.setExternalType("8");
@@ -60,7 +60,7 @@ class DealCashFlowMappingTest {
         flow.setAmount(BigDecimal.ONE);
         flow.setCcy("USDT");
         flow.setRateStatus(DealCashFlow.RateStatus.NOT_REQUIRED);
-        flow.setExchangeId(1L);
+        flow.setExchangeAccountId(1L);
         flow.setExternalBillId("bill-2");
         flow.setExternalType("290");
 
@@ -103,7 +103,7 @@ class DealCashFlowMappingTest {
         DealCashFlow domain = mapper.snapshotToDomain(snapshot);
         assertThat(domain.getPositionBalanceChange()).isEqualByComparingTo(new BigDecimal("0.0103373078764316"));
         assertThat(domain.getCategory()).as("категорию маппер не резолвит — её пишет вызывающий").isNull();
-        assertThat(domain.getExchangeId()).isNull();
+        assertThat(domain.getExchangeAccountId()).isNull();
         assertThat(domain.getRateStatus()).isNull();
     }
 

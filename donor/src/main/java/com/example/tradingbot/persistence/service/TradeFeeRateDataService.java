@@ -49,7 +49,7 @@ public class TradeFeeRateDataService {
      */
     @Transactional
     public TradeFeeRate record(TradeFeeRate observed) {
-        Optional<TradeFeeRateEntity> current = latestEntity(observed.getExchangeId(),
+        Optional<TradeFeeRateEntity> current = latestEntity(observed.getExchangeAccountId(),
                 observed.getExternalInstrumentType(), observed.getExternalFeeGroupId());
         if (current.isPresent()) {
             TradeFeeRate stored = mapper.persistenceToDomain(current.get());

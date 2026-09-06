@@ -18,11 +18,8 @@ import com.example.connector.okx.integration.model.okx.response.AlgoOrderOkxResp
 import com.example.connector.okx.util.OkxConstants;
 import com.example.connector.okx.util.OkxParse;
 import org.apache.commons.lang3.StringUtils;
-import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
 /**
@@ -39,18 +36,10 @@ import org.mapstruct.ReportingPolicy;
 public interface AlgoOrderMapper {
 
     /**
-     * Обновление полей AlgoOrder из снапшота (REFRESH-контур). internalId
-     * и condition (дерево обновляется отдельно) не перетираются;
-     * доменный status / closeReason применяет исполнитель через резолвер.
-     */
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "internalId", ignore = true)
-    @Mapping(target = "condition", ignore = true)
-    void updateFromSnapshot(AlgoOrderExternalSnapshot snapshot, @MappingTarget AlgoOrder algoOrder);
-
-    /**
      * Снапшот → доменная условная заявка, СОЗДАНИЕМ: коннектор отдаёт
-     * модель, а не доливает чужую. Доменный статус резолвит вызывающий.
+     * модель, а не доливает чужую. Доменный статус здесь не
+     * проставляется — его ставит шлюз резолвером, последним шагом чтения
+     * (docs/rules/external-status-resolution.md).
      */
     AlgoOrder snapshotToDomain(AlgoOrderExternalSnapshot snapshot);
 

@@ -36,8 +36,11 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      # Источник истины схемы — миграции Flyway; Hibernate схему не правит.
-      ddl-auto: none
+      # Источник истины схемы — миграции Flyway; Hibernate схему не правит,
+      # но СВЕРЯЕТ с ней свои сущности на старте — как у `auth`. Прежнее
+      # `none` не сверяло ничего: имя колонки, разошедшееся с миграцией,
+      # доживало до первого запроса.
+      ddl-auto: validate
     properties:
       hibernate:
         jdbc:

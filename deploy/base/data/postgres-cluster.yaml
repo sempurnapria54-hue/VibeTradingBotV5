@@ -91,6 +91,11 @@ spec:
         login: true
         passwordSecret:
           name: postgres-role-market-data
+      - name: strategies
+        ensure: present
+        login: true
+        passwordSecret:
+          name: postgres-role-strategies
       - name: trading_core
         ensure: present
         login: true

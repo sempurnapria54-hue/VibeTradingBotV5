@@ -2,6 +2,7 @@ package com.example.tradingcore.integration;
 
 import com.example.tradingcore.config.NeighbourProperties;
 import com.example.tradingcore.integration.model.ExchangeAccountAuthResponse;
+import com.example.tradingcore.util.Constants;
 import java.util.List;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -45,13 +46,13 @@ public class AuthReadClient {
     /** Реестр биржевых счетов целиком: тик синка сводит с ним проекцию. */
     public List<ExchangeAccountAuthResponse> getExchangeAccounts() {
         return PeerCall.execute(PEER, "exchange-accounts", () -> restClient.get()
-                .uri("/api/v1/exchange-accounts")
+                .uri("/api/v1/auth/exchange-accounts")
                 .header(HttpHeaders.AUTHORIZATION, bearer())
                 .retrieve()
                 .body(ACCOUNT_LIST));
     }
 
     private String bearer() {
-        return "Bearer " + tokenProvider.getTokenValue(clientRegistrationId);
+        return Constants.Header.BEARER_PREFIX + tokenProvider.getTokenValue(clientRegistrationId);
     }
 }

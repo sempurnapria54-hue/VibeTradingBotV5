@@ -66,7 +66,7 @@ public class RefreshBalanceExecutor implements CommandExecutor {
         Long exchangeId = dealContext.getExchange().getId();
         BalanceContainer container = balanceContainerDataService.findByExchangeId(exchangeId)
                 .orElseGet(BalanceContainer::new);
-        container.setExchangeId(exchangeId);
+        container.setExchangeAccountId(exchangeId);
         container.setExternalUpdatedAt(snapshot.getExternalUpdatedAt());
         container.setExternalTotalEquity(OkxParse.decimal(snapshot.getExternalTotalEquity()));
         container.setExternalAdjustedEquity(OkxParse.decimal(snapshot.getExternalAdjustedEquity()));

@@ -30,6 +30,8 @@ public interface MarketPriceDataMapper {
     @Mapping(target = "externalLastPrice", source = "last", qualifiedByName = "toBigDecimal")
     @Mapping(target = "externalAskPrice", source = "askPx", qualifiedByName = "toBigDecimal")
     @Mapping(target = "externalBidPrice", source = "bidPx", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "externalAskSize", source = "askSz", qualifiedByName = "toBigDecimal")
+    @Mapping(target = "externalBidSize", source = "bidSz", qualifiedByName = "toBigDecimal")
     @Mapping(target = "externalTimestamp", source = "ts", qualifiedByName = "toTimestamp")
     MarketPriceDataExternalSnapshot integrationToSnapshot(TickerOkxResponse response);
 

@@ -61,7 +61,8 @@
 | `RISK_PER_ACTION_EXCEEDED` | бессрочный — расчёт разошёлся, повтор даст то же |
 | `SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET` | бессрочный — лот неделим, база от прохода к проходу его не поделит |
 | `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`, `DEAL_NOTIONAL_EXCEEDED` | **временный** — бюджет освободится выходом соседнего транша |
-| `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`, `FEE_RATE_UNAVAILABLE`, `DEAL_GRAPH_INCOMPLETE`, `LOSS_LIMIT_NOT_CONFIGURED`, `RISK_APPETITE_NOT_CONFIGURED` | **временный** — операнд добудется следующим проходом либо придёт правкой конфигурации |
+| `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`, `FEE_RATE_UNAVAILABLE`, `DEAL_GRAPH_INCOMPLETE` | **временный** — операнд добудется следующим проходом |
+| `LOSS_LIMIT_NOT_CONFIGURED`, `RISK_APPETITE_NOT_CONFIGURED` | **временный** — число приходит **назначением держателя** на строку риск-аппетита тенанта (`docs/rules/risk-policy.md`), то есть снаружи прохода, но без правки определения стратегии. Носитель — строка тенанта, не конфигурация профиля: та снята вместе с переездом чисел |
 | `INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `INSTRUMENT_SETTLE_CURRENCY_MISSING`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `MARGIN_MODE_NOT_ISOLATED`, `BORROW_OR_DEBT_DETECTED` | бессрочные — состояние контура сменится не проходом, а внешним действием |
 | прочие (конфигурация, стороны уровней, инварианты частичного выхода) | бессрочные — меняются только правкой стратегии |
 
@@ -70,7 +71,16 @@
 **конъюнкцию**: вердикт бессрочен, только если бессрочны все его коды.
 
 **Защита:** `RISK_CREATING_ENTRY_WITHOUT_STOP`,
-`PROTECTION_COVERAGE_REDUCED`, `PROTECTION_LADDER_STEP_BELOW_MIN_SIZE`.
+`PROTECTION_COVERAGE_REDUCED`.
+
+**`PROTECTION_LADDER_STEP_BELOW_MIN_SIZE` значением этого перечня НЕ
+является** — и это не пропуск. Реджект производит **расчётный слой**
+контролируемой ошибкой (`docs/components/SizeCalculator.md`), а не
+преконтроль: один реджект под двумя носителями означал бы, что
+переименование у производителя молча рассогласует потребителя. Дом кода —
+общий артефакт расчёта (`CalculationErrorCodes`), карв-аут аварийной
+тропы читает его оттуда (`docs/processes/risk-evaluation.md` §«Карв-аут
+исчерпанного бюджета сделки»).
 
 **Контур и инструмент:** `EXCHANGE_MAX_LEVERAGE_EXCEEDED`,
 `MARGIN_MODE_NOT_ISOLATED`, `BORROW_OR_DEBT_DETECTED`,

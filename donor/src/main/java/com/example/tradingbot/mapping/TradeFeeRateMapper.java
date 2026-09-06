@@ -46,16 +46,25 @@ public interface TradeFeeRateMapper {
     /**
      * Материализация ставки из снапшота: {@code external*} переносятся по
      * имени, доменная проекция типа резолвится из сырого значения,
-     * {@code exchangeId} проставляет вызывающий — синк знает биржу.
+     * владельца проставляет вызывающий.
+     *
+     * <p><b>Донор кладёт в поле владельца биржу, а не счёт.</b> Общая
+     * модель называет владельцем ставки биржевой СЧЁТ
+     * (docs/models/domain/other/TradeFeeRate.md §Структура); у монолита
+     * счёта как сущности нет, и его радиус — площадка. Отображение
+     * поэтому явное: без него политика IGNORE уронила бы поле молча.
      */
+    @Mapping(target = "exchangeAccountId", source = "exchangeId")
     @Mapping(target = "instrumentType", source = "snapshot.externalInstrumentType",
             qualifiedByName = "resolveFeeInstrumentType")
     TradeFeeRate snapshotToDomain(TradeFeeRateExternalSnapshot snapshot, Long exchangeId);
 
     /** Доменная ставка → строка хранения (enum типа уходит строкой). */
+    @Mapping(target = "exchangeId", source = "exchangeAccountId")
     TradeFeeRateEntity domainToPersistence(TradeFeeRate rate);
 
     /** Строка хранения → доменная ставка. */
+    @Mapping(target = "exchangeAccountId", source = "exchangeId")
     TradeFeeRate persistenceToDomain(TradeFeeRateEntity entity);
 
     /** Ставка источника со снятым знаком: комиссия положительна, ребейт отрицателен. */

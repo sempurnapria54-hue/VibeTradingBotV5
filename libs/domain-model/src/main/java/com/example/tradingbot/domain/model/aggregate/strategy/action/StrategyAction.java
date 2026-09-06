@@ -2,14 +2,24 @@ package com.example.tradingbot.domain.model.aggregate.strategy.action;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 /**
  * Ожидаемое действие стратегии. Это не ServiceCommand: действие
  * описывает, что должно быть создано/изменено/отменено; runtime-
  * сущность связывается через DealActionState
  * (strategyActionId → targetEntityType/targetEntityId).
- * JSON-дискриминатор вида объявления
- * (ORDER/ALGO_ORDER/POSITION) — только для сериализации формы ввода,
- * не поле домена. Каркасный реляционный узел дерева: базовая таблица
+ * <b>JSON-дискриминатор вида объявления {@code actionKind}
+ * (ORDER/ALGO_ORDER/POSITION) — только для сериализации формы ввода, не
+ * поле домена.</b> Он обязателен, а не декоративен: форма определения
+ * пересекает сериализацию — телом команды приёма и снимком в событии
+ * активации, — и без дискриминатора разбор падает у ЧИТАТЕЛЯ, в файле,
+ * которого писатель не открывал
+ * (.claude/rules/codestyle.md §«Неизменяемое значение, пересекающее
+ * сериализацию»). Имена значений те же, что у дискриминатора
+ * персистентности: две записи одного различения, разошедшись, дали бы
+ * копию, читаемую из базы и не читаемую с провода. Каркасный реляционный узел дерева: базовая таблица
  * strategy_action + таблицы по видам (JOINED).
  *
  * <p><b>Уровня у действия нет:</b> уровень — свойство ТРАНША
@@ -19,6 +29,11 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
  * docs/models/domain/aggregate/Strategy.md (§Действия, §Связь с
  * DealActionState).
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "actionKind")
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = StrategyOrderAction.class, name = "ORDER"),
+        @JsonSubTypes.Type(value = StrategyAlgoOrderAction.class, name = "ALGO_ORDER"),
+        @JsonSubTypes.Type(value = StrategyPositionAction.class, name = "POSITION")})
 public interface StrategyAction {
 
     /** Технический ID действия (runtime-связь через DealActionState). */

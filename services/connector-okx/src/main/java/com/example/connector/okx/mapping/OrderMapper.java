@@ -17,11 +17,8 @@ import com.example.connector.okx.integration.model.okx.response.OrderAckOkxRespo
 import com.example.connector.okx.integration.model.okx.response.OrderOkxResponse;
 import com.example.connector.okx.util.OkxConstants;
 import org.apache.commons.lang3.StringUtils;
-import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
 /**
@@ -90,35 +87,26 @@ public interface OrderMapper {
     AttachedAlgoOrderExternalSnapshot integrationToSnapshot(AlgoOrderOkxResponse response);
 
     /**
-     * Обновление полей Order из снапшота (REFRESH-контур). internalId
-     * (stable client id), бизнес-type и attached не перетираются;
-     * доменный status / closeReason применяет исполнитель через резолвер.
-     */
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "internalId", ignore = true)
-    @Mapping(target = "type", ignore = true)
-    @Mapping(target = "attachedAlgoOrders", ignore = true)
-    @Mapping(target = "side", source = "side", qualifiedByName = "okxOrderSideToDomain")
-    void updateFromSnapshot(OrderExternalSnapshot snapshot, @MappingTarget Order order);
-
-    /**
      * Снапшот → доменная заявка, СОЗДАНИЕМ.
      *
      * <p>В доноре хватало обновления: сущность держало ядро, и граница
      * лишь доливала поля. В целевой конструкции коннектор ОТДАЁТ модель
      * (docs/components/IntegrationService.md §«Входной контракт»), значит
-     * обязан её собрать. Доменный статус здесь не резолвится — это
-     * интерпретация факта, и её дом у вызывающего
-     * (docs/rules/external-status-resolution.md).
+     * обязан её собрать. Доменный статус здесь не проставляется: маппер
+     * переносит данные и доменных решений не принимает
+     * (.claude/rules/codestyle.md §Маппинг) — резолвер зовёт шлюз,
+     * последним шагом чтения
+     * (docs/rules/external-status-resolution.md §«Где резолвится —
+     * сторона выбирается по словарю источника»).
      */
-    @Mapping(target = "attachedAlgoOrders", ignore = true)
     @Mapping(target = "side", source = "side", qualifiedByName = "okxOrderSideToDomain")
     Order snapshotToDomain(OrderExternalSnapshot snapshot);
 
     /**
      * Снапшот встроенной защиты → доменная модель, СОЗДАНИЕМ.
-     * Доменный статус защиты резолвит вызывающий: это интерпретация
-     * факта, и её дом у него.
+     * Статус защиты выводится не из статусной колонки, а по набору
+     * фактов, и делает это отдельный резолвер состояния
+     * (docs/components/AttachedAlgoOrderStateResolver.md), не маппер.
      */
     AttachedAlgoOrder snapshotToDomain(AttachedAlgoOrderExternalSnapshot snapshot);
 

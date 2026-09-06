@@ -92,6 +92,11 @@ spec:
               value: http://auth:8080
             - name: MARKET_DATA_BASE_URL
               value: http://market-data:8080
+            # Брокер: реле outbox публикует накопленное в свою тему
+            # (docs/components/OutboxRelayJob.md). Слушатель открытый —
+            # названный выбор платформы, не умолчание.
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: platform-kafka-kafka-bootstrap:9092
             - name: TRADING_CORE_DB_URL
               value: jdbc:postgresql://platform-postgres-rw:5432/trading_core
             - name: TRADING_CORE_DB_USERNAME
@@ -230,3 +235,27 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+
+---
+# Тема торгового ядра — «производитель и род»
+# (docs/architecture/contracts.md §«Событие → тема»). Род один, потому что
+# все классы событий ядра — ПРОИСШЕСТВИЯ; события-состояния, чья истина
+# есть последнее значение по ключу, ядро не производит. Смешивать роды в
+# одной теме нельзя: компакция темы фактов теряет факты.
+#
+# Тему заводит шаг сервиса-производителя, а не шаг платформы: темы без
+# производителя не бывает.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: trading-core.facts
+  labels:
+    strimzi.io/cluster: platform-kafka
+spec:
+  partitions: 3
+  replicas: 3
+  config:
+    # Хранение по времени, а не компакция: факт не заменяется последним
+    # значением по ключу — он произошёл.
+    cleanup.policy: delete
+    retention.ms: 604800000

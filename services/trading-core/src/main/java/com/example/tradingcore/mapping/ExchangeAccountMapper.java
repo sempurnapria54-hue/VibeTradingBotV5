@@ -48,4 +48,11 @@ public interface ExchangeAccountMapper {
     @Mapping(target = "safetyRung", ignore = true)
     @Mapping(target = "tenantInternalId", source = "tenantId")
     void updateProjection(ExchangeAccount account, @MappingTarget ExchangeAccountEntity entity);
+
+    /**
+     * Строка проекции → доменный счёт. Нужен читателям, которым счёт
+     * приходит операндом: синку ставок комиссии, контексту прохода.
+     */
+    @Mapping(target = "tenantId", source = "tenantInternalId")
+    ExchangeAccount persistenceToDomain(ExchangeAccountEntity entity);
 }

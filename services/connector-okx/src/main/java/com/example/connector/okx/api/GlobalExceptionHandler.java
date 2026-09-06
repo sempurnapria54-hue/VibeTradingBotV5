@@ -5,6 +5,7 @@ import com.example.connector.okx.integration.CredentialsRejectedException;
 import com.example.connector.okx.integration.ExchangeIntegrationException;
 import com.example.connector.okx.integration.ExternalInvariantViolationException;
 import com.example.connector.okx.integration.ExternalStatusException;
+import com.example.tradingbot.domain.exchange.ExchangeFailureClass;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,18 @@ import org.springframework.web.client.RestClientException;
  * общим «ошибка интеграции» значило бы решить за ядро
  * ({@code docs/rules/controlled-exchange-exceptions.md}).
  *
+ * <p><b>Значение класса берётся из общего перечня</b>
+ * ({@link ExchangeFailureClass}), а не из литерала: производит класс
+ * коннектор, потребляет ядро, и разойдись копии — ядро молча не узнало бы
+ * класс и выбрало бы не ту реакцию. Форма ответа при этом остаётся своей
+ * у каждой стороны: api-модель принадлежит тому, кто её отдаёт.
+ *
+ * <p><b>Негодный вход из перечня выпадает намеренно.</b> {@code 400} тут
+ * означает наш собственный дефект сборки запроса, а не отказ ПЛОЩАДКИ; в
+ * таблице классов границы его нет, и значения в общем перечне ему тоже не
+ * заводится — нераспознанный класс вызывающий и так обязан трактовать как
+ * свой дефект.
+ *
  * <p><b>Конкретные HTTP-коды провизорны</b> — этот набор объявлен
  * хвостом пользователя ({@code .claude/rules/codestyle.md} §«Обработка
  * ошибок»): выравнивание кодов по всей платформе идёт одним ходом, а не
@@ -47,13 +60,13 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(CredentialsUnavailableException.class)
     public ResponseEntity<ErrorApiResponse> onCredentialsUnavailable(CredentialsUnavailableException failure) {
-        return response(HttpStatus.UNPROCESSABLE_CONTENT, "CREDENTIALS_UNAVAILABLE", failure.getMessage());
+        return response(HttpStatus.UNPROCESSABLE_CONTENT, ExchangeFailureClass.CREDENTIALS_UNAVAILABLE.name(), failure.getMessage());
     }
 
     /** Площадка отвергла наши ключи: исходящий отказ доступа, реакция — у ядра. */
     @ExceptionHandler(CredentialsRejectedException.class)
     public ResponseEntity<ErrorApiResponse> onCredentialsRejected(CredentialsRejectedException failure) {
-        return response(HttpStatus.BAD_GATEWAY, "EXCHANGE_CREDENTIALS_REJECTED", failure.getMessage());
+        return response(HttpStatus.BAD_GATEWAY, ExchangeFailureClass.EXCHANGE_CREDENTIALS_REJECTED.name(), failure.getMessage());
     }
 
     /**
@@ -69,7 +82,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ExternalStatusException.class)
     public ResponseEntity<ErrorApiResponse> onExternalStatus(ExternalStatusException failure) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ErrorApiResponse.builder()
-                .code("EXTERNAL_STATUS")
+                .code(ExchangeFailureClass.EXTERNAL_STATUS.name())
                 .reason(failure.getReasonCode().name())
                 .message(failure.getMessage())
                 .occurredAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -79,13 +92,13 @@ public class GlobalExceptionHandler {
     /** Ответ получен, но нарушает инвариант, на котором стои́т наша торговля. */
     @ExceptionHandler(ExternalInvariantViolationException.class)
     public ResponseEntity<ErrorApiResponse> onInvariantViolation(ExternalInvariantViolationException failure) {
-        return response(HttpStatus.BAD_GATEWAY, "EXTERNAL_INVARIANT_VIOLATION", failure.getMessage());
+        return response(HttpStatus.BAD_GATEWAY, ExchangeFailureClass.EXTERNAL_INVARIANT_VIOLATION.name(), failure.getMessage());
     }
 
     /** Ошибка API площадки, разбора ответа либо транспорта: ретраится ядром. */
     @ExceptionHandler(ExchangeIntegrationException.class)
     public ResponseEntity<ErrorApiResponse> onIntegrationFailure(ExchangeIntegrationException failure) {
-        return response(HttpStatus.BAD_GATEWAY, "EXCHANGE_ERROR", failure.getMessage());
+        return response(HttpStatus.BAD_GATEWAY, ExchangeFailureClass.EXCHANGE_ERROR.name(), failure.getMessage());
     }
 
     /**
@@ -101,7 +114,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<ErrorApiResponse> onTransportFailure(RestClientException failure) {
-        return response(HttpStatus.BAD_GATEWAY, "EXCHANGE_UNREACHABLE", failure.getMessage());
+        return response(HttpStatus.BAD_GATEWAY, ExchangeFailureClass.EXCHANGE_UNREACHABLE.name(), failure.getMessage());
     }
 
     /**
@@ -118,7 +131,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(VaultException.class)
     public ResponseEntity<ErrorApiResponse> onSecretStoreUnavailable(VaultException failure) {
-        return response(HttpStatus.SERVICE_UNAVAILABLE, "SECRET_STORE_UNAVAILABLE", failure.getMessage());
+        return response(HttpStatus.SERVICE_UNAVAILABLE, ExchangeFailureClass.SECRET_STORE_UNAVAILABLE.name(), failure.getMessage());
     }
 
     /** Негодный вход: неразобранное значение перечня, отсутствующий обязательный операнд. */

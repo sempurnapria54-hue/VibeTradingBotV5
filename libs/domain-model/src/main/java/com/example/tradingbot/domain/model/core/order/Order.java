@@ -46,6 +46,24 @@ public class Order extends Auditable {
     /** Биржевой id ordinary order (OKX ordId). */
     private String externalId;
 
+    /**
+     * Биржевое имя инструмента, к которому строка относится <b>по словам
+     * источника</b>; непусто только у строки, приехавшей чтением границы.
+     *
+     * <p><b>Атрибут ГРАНИЦЫ, а не хранения:</b> у нашей строки инструмент
+     * известен через сделку, и колонки под это поле нет. Заводится оно
+     * ради <b>счёт-широких</b> чтений: они возвращают строки всего счёта
+     * сразу, и адресовать их нечем — локального идентификатора у чужой
+     * строки не бывает по построению, а именно она и есть предмет
+     * проактивной детекции (docs/components/AnomalyJob.md §«Что ищет»,
+     * `A2`).
+     *
+     * <p>Резолв «биржевое имя → наш инструмент» здесь не делается
+     * намеренно: его отсутствие — сам признак детектора, и подставленный
+     * идентификатор погасил бы находку.
+     */
+    private String externalInstrumentId;
+
     /** Доменный статус. */
     private Status status;
 
@@ -117,6 +135,24 @@ public class Order extends Auditable {
     /** Уровень стопа, под который считался риск ноги. Write-once. */
     private BigDecimal plannedStopPrice;
 
+    /**
+     * <b>Наблюдаемый запас до ликвидации на момент постановки</b> —
+     * измеритель, не операнд: в инвариант «шесть или ни одного» не входит
+     * (docs/models/domain/core/Order.md §«Шесть чисел планового риска
+     * ноги»). Write-once; <b>пуст, когда цена ликвидации не
+     * наблюдалась</b> — у открывающего входа позиции ещё нет, и мерить
+     * не от чего.
+     */
+    private BigDecimal liquidationDistanceRatio;
+
+    /**
+     * <b>Наблюдаемая ёмкость стакана на момент постановки</b> —
+     * измеритель, не операнд. Write-once; пуст, когда свежих рыночных
+     * данных в контексте не было. Пустота здесь — самостоятельное
+     * значение «не измеряли», а не нарушение инварианта.
+     */
+    private BigDecimal bookDepthAtPlacement;
+
     /** Embedded attached protection, созданная вместе с parent order. */
     private List<AttachedAlgoOrder> attachedAlgoOrders;
 
@@ -126,6 +162,18 @@ public class Order extends Auditable {
     /** Live: ещё существует на бирже / влияет на risk (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED). */
     public Boolean isLive() {
         return LIVE_STATUSES.contains(status);
+    }
+
+    /**
+     * Нога налита целиком: завершена с причиной налива.
+     *
+     * <p><b>Частичный налив финализацией не является.</b> Экспозиция такой
+     * ноги ещё меняется, и шаг, объявленный от завершённого входа, сработал
+     * бы на неокончательном размере (docs/spec/deal-condition.json,
+     * величина {@code entryOrderFinalized}).
+     */
+    public Boolean isFilled() {
+        return Status.COMPLETED.equals(status) && CloseReason.FILLED.equals(closeReason);
     }
 
     /** Есть хотя бы одна active-like (PENDING/ACTIVE) attached-защита. */

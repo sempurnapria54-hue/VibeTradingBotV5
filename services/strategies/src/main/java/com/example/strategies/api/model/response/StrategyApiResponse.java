@@ -1,0 +1,47 @@
+package com.example.strategies.api.model.response;
+
+import com.example.strategies.api.model.strategy.StrategyDetailApiModel;
+import com.example.strategies.api.model.strategy.StrategyIndicatorSettingApiModel;
+import com.example.strategies.api.model.strategy.StrategyMarketPhaseSettingApiModel;
+import com.example.strategies.api.model.strategy.StrategyMarketStructureSettingApiModel;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * Представление стратегии в API нашего сервиса (полное дерево).
+ * Наружу — internalId стратегии и instrumentInternalId инструмента,
+ * не id из БД.
+ */
+@Getter
+@Setter
+public class StrategyApiResponse extends AuditableApiResponse {
+
+    @Schema(description = "Межсервисный идентификатор стратегии")
+    private String internalId;
+
+    @Schema(description = "Межсервисный идентификатор биржевого счёта стратегии")
+    private String exchangeAccountInternalId;
+
+    @Schema(description = "Межсервисный идентификатор инструмента стратегии")
+    private String instrumentInternalId;
+
+    @Schema(description = "Человекочитаемое имя стратегии")
+    private String name;
+
+    @Schema(description = "Административный статус: CREATED/ACTIVE/INACTIVE/DELETED")
+    private String status;
+
+    @Schema(description = "Настройка расчёта фазы рынка")
+    private StrategyMarketPhaseSettingApiModel marketPhaseSetting;
+
+    @Schema(description = "Детали по фазам рынка")
+    private List<StrategyDetailApiModel> details;
+
+    @Schema(description = "Настройки индикаторов стратегии (strategy-scope)")
+    private List<StrategyIndicatorSettingApiModel> indicatorSettings;
+
+    @Schema(description = "Настройки структуры рынка стратегии (strategy-scope)")
+    private List<StrategyMarketStructureSettingApiModel> marketStructureSettings;
+}

@@ -38,8 +38,13 @@ public class TradeFeeRate extends Auditable {
     /** Внутренний идентификатор в БД. */
     private Long id;
 
-    /** Биржа-владелец ставки. */
-    private Long exchangeId;
+    /**
+     * <b>Биржевой счёт-владелец ставки.</b> Ставка есть атрибут
+     * комиссионного уровня СЧЁТА, а не свойство площадки, и читается его
+     * ключами (docs/architecture/tenant-and-exchange.md,
+     * docs/models/domain/other/TradeFeeRate.md §Структура).
+     */
+    private Long exchangeAccountId;
 
     /** Ось группы: сырой тип инструмента источника. */
     private String externalInstrumentType;

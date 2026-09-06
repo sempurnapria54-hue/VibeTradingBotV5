@@ -38,8 +38,16 @@ public interface BalanceContainerMapper {
     @Mapping(target = "externalFrozenBalance", source = "frozenBal")
     BalanceExternalSnapshot integrationToSnapshot(BalanceDetailOkxResponse detail);
 
+    /**
+     * Имя доменного поля разошлось с колонкой донора: общий артефакт
+     * называет радиус СЧЁТОМ (docs/models/domain/core/BalanceContainer.md),
+     * а схема монолита — биржей. Отображение объявлено явно; без него
+     * политика IGNORE уронила бы колонку молча.
+     */
+    @Mapping(target = "exchangeId", source = "exchangeAccountId")
     BalanceContainerEntity domainToPersistence(BalanceContainer container);
 
+    @Mapping(target = "exchangeAccountId", source = "exchangeId")
     BalanceContainer persistenceToDomain(BalanceContainerEntity entity);
 
     BalanceEntity domainToPersistence(Balance balance);

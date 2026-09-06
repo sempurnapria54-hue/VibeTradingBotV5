@@ -8,6 +8,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.example.connector.okx.credentials.ExchangeCredentialsResolver;
+import com.example.tradingbot.domain.resolve.AlgoOrderExternalStatusResolver;
+import com.example.tradingbot.domain.resolve.OrderExternalStatusResolver;
 import com.example.connector.okx.gateway.OkxExchangeGateway;
 import com.example.connector.okx.mapping.AlgoOrderMapper;
 import com.example.connector.okx.mapping.BalanceContainerMapper;
@@ -54,7 +56,9 @@ class ClosedCandleBoundaryTest {
 
     private final OkxExchangeGateway gateway = new OkxExchangeGateway(
             reader, mock(ExchangeCredentialsResolver.class),
-            mock(OrderMapper.class), mock(AlgoOrderMapper.class), mock(PositionMapper.class),
+            mock(OrderMapper.class), mock(AlgoOrderMapper.class),
+            mock(OrderExternalStatusResolver.class), mock(AlgoOrderExternalStatusResolver.class),
+            mock(PositionMapper.class),
             mock(InstrumentMapper.class), mock(InstrumentExternalRulesMapper.class),
             mock(BalanceContainerMapper.class), candleMapper, timeFrameMapper,
             mock(DealCashFlowMapper.class), mock(TradeFeeRateMapper.class),

@@ -1,5 +1,6 @@
 package com.example.tradingbot.domain.model.aggregate.deal;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
@@ -13,6 +14,7 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -155,6 +157,25 @@ public class DealTranche extends Auditable {
     }
 
     /**
+     * Живые ВСТРОЕННЫЕ защиты транша — остаточный живой риск для
+     * аварийного снятия наравне с отдельными условными заявками
+     * (docs/components/KillSwitchExecutor.md §Порядок).
+     *
+     * <p>Обход идёт по <b>всем</b> заявкам транша, а не по живым:
+     * встроенная защита при непустом наливе родителя материализуется на
+     * бирже самостоятельной заявкой и переживает терминал родителя
+     * (docs/models/domain/core/Order.md §«Встроенная защита»). Обход по
+     * живым родителям пропустил бы ровно тот случай, ради которого
+     * перечень заведён.
+     */
+    public List<AttachedAlgoOrder> liveAttachedProtections() {
+        return emptyIfNull(orders).stream()
+                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                .filter(protection -> isTrue(protection.isActiveLike()))
+                .collect(Collectors.toList());
+    }
+
+    /**
      * У транша есть живая входная нога — живая заявка, которая НЕ только
      * уменьшает позицию. Признак входа берётся у доменного намерения
      * заявки ({@code positionReducingOnly}), а не у её типа: reduce-only
@@ -164,6 +185,105 @@ public class DealTranche extends Auditable {
         return emptyIfNull(orders).stream()
                 .anyMatch(order -> isTrue(order.isLive())
                         && isFalse(order.getPositionReducingOnly()));
+    }
+
+    /**
+     * Входная нога транша — <b>последняя</b> заявка, которая не только
+     * уменьшает позицию; пусто — входа не было.
+     *
+     * <p><b>Селектор — максимальный {@code id}, и это не вкус.</b>
+     * Замещение входа заводит НОВУЮ заявку
+     * (docs/rules/replace-not-amend.md), а переоткрытие эпизода ведётся
+     * тем же траншем — ноги прошлого эпизода остаются на нём. Первая по
+     * порядку отвечала бы плановой ценой снятой либо чужой ноги, то есть
+     * якорем, которого больше нет.
+     *
+     * <p>Живость здесь не спрашивается: у наливившейся ноги читают
+     * плановую и среднюю цену, и заявка, переставшая быть живой,
+     * якорем быть не перестаёт
+     * (docs/components/PriceCalculator.md).
+     */
+    public Order entryOrder() {
+        return emptyIfNull(orders).stream()
+                .filter(order -> isFalse(order.getPositionReducingOnly()))
+                .filter(order -> nonNull(order.getId()))
+                .max(Comparator.comparing(Order::getId))
+                .orElse(null);
+    }
+
+    /**
+     * Инициатор выхода транша, прочитанный по его собственным фактам;
+     * пусто — инициатора нет вовсе, экспозиция обнулилась вне нашего
+     * ведения.
+     *
+     * <p>Порядок чтения: сработавшая защита называет себя типом условия,
+     * затем — налитая собственная reduce-only нога («закрыли мы»). Пустой
+     * ответ читателем переводится в {@code EXTERNAL_CLOSE}
+     * (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша —
+     * обработчик терминального ребра»).
+     *
+     * <p><b>Названное ограничение: сработавший OCO читается как штатный
+     * выход по стратегии.</b> Какая из двух его ног исполнилась, тип
+     * условия не говорит — на бирже это одна заявка, а исполнившаяся нога
+     * есть факт налива, не объявления. Различитель появится вместе с
+     * разбором налива OCO; до тех пор ответ не выдумывается в сторону
+     * стопа либо тейка, а даётся родовым значением. Ошибка тут журнальная:
+     * причина закрытия читается разбором, а числа сделки считаются по
+     * движениям средств, не по ней.
+     */
+    public CloseReason exitInitiatedReason() {
+        CloseReason triggered = triggeredProtectionReason();
+        if (nonNull(triggered)) {
+            return triggered;
+        }
+        boolean ownExitFilled = emptyIfNull(orders).stream()
+                .filter(order -> isTrue(order.getPositionReducingOnly()))
+                .anyMatch(order -> isTrue(order.isFilled()));
+        return ownExitFilled ? CloseReason.STRATEGY_EXIT : null;
+    }
+
+    /** Причина по сработавшей защите транша — отдельной либо встроенной. */
+    private CloseReason triggeredProtectionReason() {
+        CloseReason standalone = emptyIfNull(algoOrders).stream()
+                .filter(algo -> AlgoOrder.CloseReason.TRIGGERED.equals(algo.getCloseReason()))
+                .map(algo -> reasonOf(algo.getConditionType()))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        if (nonNull(standalone)) {
+            return standalone;
+        }
+        boolean attachedTriggered = emptyIfNull(orders).stream()
+                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                .anyMatch(protection ->
+                        AttachedAlgoOrder.CloseReason.TRIGGERED.equals(protection.getCloseReason()));
+        return attachedTriggered ? CloseReason.STOP_LOSS : null;
+    }
+
+    private static CloseReason reasonOf(AlgoOrder.ConditionType conditionType) {
+        if (isNull(conditionType)) {
+            return null;
+        }
+        return switch (conditionType) {
+            case STOP_LOSS, PARTIAL_STOP_LOSS, TRAILING_PERCENTS, TRAILING_VALUE -> CloseReason.STOP_LOSS;
+            case TAKE_PROFIT, PARTIAL_TAKE_PROFIT -> CloseReason.TAKE_PROFIT;
+            case OCO_FULL -> CloseReason.STRATEGY_EXIT;
+        };
+    }
+
+    /**
+     * Вход транша <b>отправлен</b>: входная нога есть и она вышла за
+     * пределы локального заведения.
+     *
+     * <p>Признак читается у самой ноги, а не у строки исполнения: статус
+     * {@code CREATED} означает «сущность заведена локально», и всё, что
+     * дальше, есть факт, дошедший до площадки
+     * (docs/lifecycles/Order.md). Строка исполнения ответила бы о СВОЁМ
+     * продвижении, которое ребро транша не описывает.
+     */
+    public Boolean entrySubmitted() {
+        Order entry = entryOrder();
+        return nonNull(entry) && isFalse(Order.Status.CREATED.equals(entry.getStatus()));
     }
 
     /**
@@ -322,13 +442,27 @@ public class DealTranche extends Auditable {
     }
 
     /**
-     * Транш несёт живой риск: положительная экспозиция либо живая заявка
-     * любого рода. Предикат читает только собственные данные транша.
+     * Транш несёт живой риск: положительная экспозиция, живая ВХОДНАЯ
+     * заявка либо живая условная заявка — встроенная или отдельная
+     * (docs/spec/protection-coverage.json, величина
+     * {@code trancheRiskBearing}). Предикат читает только собственные
+     * данные транша.
+     *
+     * <p><b>Третий дизъюнкт читается носителем защиты, а не одними лишь
+     * отдельными условными заявками.</b> Прежняя редакция спрашивала
+     * {@code liveAlgoOrders()}, то есть встроенную защиту не видела вовсе,
+     * — а она при непустом наливе родителя материализуется на бирже
+     * самостоятельной заявкой и ПЕРЕЖИВАЕТ его терминал
+     * (docs/models/domain/core/Order.md §«Встроенная защита»). Транш с
+     * нулевой экспозицией и живым встроенным стопом читался бы как не
+     * несущий риска, уходил бы в {@code CLOSED} — а обработчика у него
+     * больше нет, — и стоп оставался бы на бирже. Ровно этот случай
+     * третий дизъюнкт и заведён закрывать.
      */
     public Boolean isRiskBearing() {
         return exposure().signum() > 0
-                || isNotEmpty(liveOrders())
-                || isNotEmpty(liveAlgoOrders());
+                || isTrue(hasLiveEntryOrder())
+                || isTrue(hasLiveProtection());
     }
 
     private BigDecimal zeroIfNull(BigDecimal value) {

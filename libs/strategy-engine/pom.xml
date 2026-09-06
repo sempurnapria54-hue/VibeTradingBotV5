@@ -42,6 +42,9 @@
         <slf4j.version>2.0.17</slf4j.version>
         <spring.version>7.0.0</spring.version>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
+        <junit-jupiter.version>6.0.1</junit-jupiter.version>
+        <assertj.version>3.27.6</assertj.version>
     </properties>
 
     <dependencies>
@@ -95,6 +98,36 @@
             <artifactId>spring-context</artifactId>
             <version>${spring.version}</version>
         </dependency>
+
+        <!--
+          ТЕСТОВЫЕ ЗАВИСИМОСТИ ЖИВУТ ЗДЕСЬ, а не у сервиса-потребителя:
+          расчётный слой есть исполнимая форма спек (order-sizing,
+          risk-at-stop, stop-distance), и его проверка не должна зависеть
+          ни от одного сервиса — тот же довод, по которому сам слой уехал
+          в библиотеку (docs/architecture/services.md §«Общие артефакты
+          монорепозитория»).
+
+          Правило «зависимость общего артефакта становится обязательной
+          для всех сервисов» (.claude/rules/codestyle.md §«Новый модуль
+          монорепозитория») на область test не распространяется: она не
+          транзитивна и в сборку сервиса не попадает.
+
+          Версии закреплены явно — родителя у модуля нет; совпадают с
+          теми, что даёт spring-boot-starter-parent 4.0.0 сервисам, чтобы
+          два дерева тестов не разъезжались по API.
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit-jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -113,6 +146,12 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <!-- Версия закреплена явно по той же причине: родителя у модуля нет. -->
+                <version>${maven-surefire-plugin.version}</version>
             </plugin>
         </plugins>
     </build>

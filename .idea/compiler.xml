@@ -28,8 +28,10 @@
         </processorPath>
         <module name="market-data" />
         <module name="trading-core" />
-        <module name="tradingbot (1)" />
+        <module name="bff" />
         <module name="auth" />
+        <module name="strategies" />
+        <module name="tradingbot (1)" />
         <module name="connector-okx" />
       </profile>
       <profile name="Annotation profile for strategy-engine" enabled="true">
@@ -46,8 +48,10 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="auth" options="-parameters" />
+      <module name="bff" options="-parameters" />
       <module name="connector-okx" options="-parameters" />
       <module name="market-data" options="-parameters" />
+      <module name="strategies" options="-parameters" />
       <module name="trading-core" options="-parameters" />
       <module name="tradingbot" options="" />
       <module name="tradingbot (1)" options="-parameters" />

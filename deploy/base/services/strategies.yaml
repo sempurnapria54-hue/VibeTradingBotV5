@@ -1,0 +1,233 @@
+# Развёртывание сервиса strategies (шаг 8 фазы 2) — владельца
+# определений стратегий и их жизненного цикла
+# (docs/architecture/services.md).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: strategies
+---
+# База сервиса. Роль-владелец объявлена кластером (../data/postgres-cluster.yaml):
+# оператор ведёт роли только полем кластера, а базу — отдельным ресурсом,
+# и она живёт рядом со своим писателем (docs/architecture/data-ownership.md
+# §Раскладка).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: strategies
+spec:
+  cluster:
+    name: platform-postgres
+  name: strategies
+  owner: strategies
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: strategies
+spec:
+  selector:
+    app.kubernetes.io/name: strategies
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: strategies
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: strategies
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: strategies
+    spec:
+      serviceAccountName: strategies
+      containers:
+        - name: strategies
+          image: registry.invalid/vibetrading/strategies
+          # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
+          # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
+          # в реестр незачем.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: environment
+            # Провайдер идентичности — сервис того же пространства имён:
+            # окружение и есть пространство имён, поэтому адрес не несёт
+            # его имени и одинаков во всех трёх.
+            - name: OIDC_ISSUER_URI
+              value: http://platform-identity-service:8080/realms/vibetrading
+            - name: OIDC_TOKEN_URI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/token
+            # Исходящая сервисная идентичность: под ней владелец
+            # определений читает у ядра числа риск-аппетита и разрешимость
+            # ссылок (docs/architecture/contracts.md §«Синхронные вызовы»).
+            - name: SERVICE_CLIENT_ID
+              value: platform-services
+            - name: SERVICE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: platform-service-client
+                  key: secret
+            - name: TRADING_CORE_BASE_URL
+              value: http://trading-core:8080
+            # Брокер: реле outbox публикует активации в свою тему
+            # (docs/components/OutboxRelayJob.md).
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: platform-kafka-kafka-bootstrap:9092
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://platform-postgres-rw:5432/strategies
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-strategies
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-strategies
+                  key: password
+          # Числа назначает разворачивающий по наблюдаемому потреблению
+          # (docs/architecture/platform.md §«Чем различаются окружения»).
+          # Это ПЕРВОЕ назначение — до наблюдения; пересматривается по
+          # снятому потреблению стенда.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+---
+# Исходящее сервиса. Разрешение даёт строка
+# docs/architecture/contracts.md §«Синхронные вызовы»: `strategies` →
+# `trading-core` (числа риск-аппетита и разрешимость ссылок). Пара
+# `strategies` → `market-data` (история для бэктеста) приедет со своим
+# предметом — фазой 4, и раньше него в политике не объявляется.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: strategies-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: strategies
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: platform-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trading-core
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: platform-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+---
+# Встречное разрешение на стороне базы. Запрет по умолчанию действует в
+# ОБЕ стороны: одного исходящего правила у сервиса мало, входящее у
+# инстанса базы обязано быть названо тем же ходом.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress-from-strategies
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: strategies
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Встречное разрешение на стороне ядра: владелец определений читает его
+# поверхность.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trading-core-ingress-from-strategies
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: trading-core
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: strategies
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Тема владельца определений — «производитель и род»
+# (docs/architecture/contracts.md §«Событие → тема»). Род один: активация,
+# деактивация и удаление — ПРОИСШЕСТВИЯ, а не состояния. Смешивать роды в
+# одной теме нельзя: компакция темы фактов теряет факты.
+#
+# Тему заводит шаг сервиса-производителя, а не шаг платформы: темы без
+# производителя не бывает.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: strategies.facts
+  labels:
+    strimzi.io/cluster: platform-kafka
+spec:
+  partitions: 3
+  replicas: 3
+  config:
+    # Хранение по времени, а не компакция: факт не заменяется последним
+    # значением по ключу — он произошёл.
+    cleanup.policy: delete
+    retention.ms: 604800000

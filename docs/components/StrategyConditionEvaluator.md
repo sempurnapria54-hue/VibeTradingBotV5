@@ -42,6 +42,19 @@ PROFIT/LOSS_PERCENTS_REACHED -> Position.avgPrice + MarketPriceData
 сам `TREND_CHANGED` (темпоральное несовместимо со stateless-классификатором
 — см. `docs/models/domain/aggregate/Strategy.md`).
 
+**Предикаты правил, читающих факты сделки, определены не здесь.** Форма —
+`docs/spec/deal-condition.json`: открытая позиция, финализированный вход,
+наличие встроенной и основной защиты, пороги прибыли и убытка. Единица
+порогов — **проценты хода от цены входа**, и объявлена она домом настроек
+трейлинга (`docs/models/domain/aggregate/Strategy.md`); плечо в неё не
+входит.
+
+**Whitelist контекста выражен пустотой операндов, а не перечнем типов.**
+Классификация фазы собирает контекст без эпизода, транша и фазы входа —
+правила, читающие их, оказываются на пустом операнде и консервативно
+ложны. Второй перечень разрешённых типов разошёлся бы с этим различением
+при добавлении первого же типа.
+
 **Оба предиката фазы определены, и определены не здесь.** Форма —
 `docs/spec/market-phase-condition.json`, дом смысла —
 `docs/models/domain/other/MarketPhase.md`. Темпоральный операнд `TREND_CHANGED` берётся у
@@ -51,11 +64,17 @@ PROFIT/LOSS_PERCENTS_REACHED -> Position.avgPrice + MarketPriceData
 
 ## Границы
 
-Freshness нужных данных проверяется до evaluator'а — предикатом
-`stepDataFresh` **торгового ядра**, а не сервиса рыночных данных: он
-спрашивает про `StrategyStep` и контекст оценки, которых `market-data` не
-владеет и не читает (`docs/components/MarketDataExpirationChecker.md`
-§Контракт; правило — `docs/rules/market-data-freshness.md`). Evaluator только отвечает
+Свежесть нужных данных проверяется до evaluator'а, и **своего предиката
+свежести у ядра нет** — он был бы вторым ответом на вопрос, на который уже
+ответил владелец данных. Владелец отдаёт **пустое место** там, где
+значение устарело либо не собрано, и оба состояния ведут к одной реакции
+(`docs/spec/market-data-freshness.json`, величина `freshnessState`).
+
+**Носитель гейта у ядра — «операнды шага покрыты снятой раскладкой»**
+(`MarketFeatures.covers(condition)`): условие, чей операнд в раскладке
+отсутствует, до оценки не доходит. Форма ровно та, какая нужна: «устарело»
+и «нет» неотличимы по построению, и различать их ядру нечем и незачем
+(`docs/rules/market-data-freshness.md`). Evaluator только отвечает
 true/false по правилам condition (структура `StrategyCondition` /
 `StrategyConditionRule` — `docs/models/domain/aggregate/Strategy.md`); решение о
 применении step и выборе action принимает FSM handler.

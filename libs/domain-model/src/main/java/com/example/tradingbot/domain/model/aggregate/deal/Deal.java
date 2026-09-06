@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.model.aggregate.deal;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
@@ -16,7 +17,9 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -40,6 +43,16 @@ public class Deal extends Auditable {
 
     /** Безопасный внешний/межсервисный id (API, логи, timeline). */
     private String internalId;
+
+    /**
+     * <b>Биржевой счёт тенанта, на котором идёт сделка</b> — ключ строки
+     * торгового состояния счёта в базе ядра. Операнд базы риска, серии
+     * убытков, ступени счёта и всех выборок радиуса счёта. Тенанта сделка
+     * отдельным полем не несёт: он резолвится по счёту
+     * (docs/architecture/tenant-and-exchange.md §«Торговая строка называет
+     * счёт, и радиусы читаются от него»).
+     */
+    private Long exchangeAccountId;
 
     /** Инструмент (полный Instrument — в DealContext). */
     private Long instrumentId;
@@ -179,10 +192,21 @@ public class Deal extends Auditable {
      */
     private RiskBenchmarkAvailability riskBenchmarkAvailability;
 
-    /** Ordinary orders сделки (attached protection — внутри Order). */
+    /**
+     * Ordinary orders сделки (attached protection — внутри Order).
+     *
+     * <p><b>Целевой модели агрегата поле не принадлежит:</b> ноги висят на
+     * траншах и собираются их обходом
+     * (docs/models/domain/aggregate/Deal.md §Структура). Поле держится ради
+     * донора, который читает его в двенадцати файлах, а условие его жизни —
+     * «собирается и зелёный»; сервисы монорепозитория ни его, ни
+     * {@link #algoOrders} не пишут и не читают. Снятие —
+     * `.claude/work/backlog.md` §«Донорские поля агрегата сделки в общей
+     * библиотеке».
+     */
     private List<Order> orders;
 
-    /** Standalone algo-orders сделки. */
+    /** Standalone algo-orders сделки. Донорское поле — см. {@link #orders}. */
     private List<AlgoOrder> algoOrders;
 
     /**
@@ -213,6 +237,26 @@ public class Deal extends Auditable {
         return Objects.equals(Status.CLOSED, status) || Objects.equals(Status.EMERGENCY_CLOSED, status);
     }
 
+    /**
+     * Сделка в ОКНЕ СВОРАЧИВАНИЯ: нового риска не берёт ни один её транш
+     * (docs/rules/exit-teardown-order.md).
+     *
+     * <p><b>Окно — один статус, а не два.</b> Дом называет окном пару
+     * {@code EXIT_PENDING} и {@code ERROR}, но вторая половина закрыта
+     * НЕДОСТИЖИМОСТЬЮ акта, а не этим предикатом: в ошибочном состоянии
+     * FSM траншей не прогоняется, а преконтроль на аварийных и
+     * восстановительных тропах не вызывается вовсе
+     * (docs/rules/risk-validator-scope.md). Операнд объявлен именно так и
+     * в исполнимой форме (docs/spec/risk-limits.json, {@code dealCollapsing}).
+     *
+     * <p>Предикат живёт на модели, потому что преконтроль признак НЕ
+     * ВЫВОДИТ — он получает его готовым (docs/components/RiskValidator.md);
+     * второе его чтение — энфорсер ребра транша.
+     */
+    public Boolean isCollapsing() {
+        return Objects.equals(Status.EXIT_PENDING, status);
+    }
+
     /** Хоть один транш сделки несёт живой риск. */
     public Boolean anyTrancheRiskBearing() {
         return emptyIfNull(tranches).stream()
@@ -241,6 +285,31 @@ public class Deal extends Auditable {
                 .anyMatch(tranche -> isTrue(tranche.stopUnresolved()));
     }
 
+    /**
+     * Действующий уровень защиты НА ВСЮ ПОЗИЦИЮ — наименее благоприятный
+     * среди действующих защит всех траншей: у LONG нижний, у SHORT верхний
+     * (docs/spec/protection-coverage.json, величина {@code stopCurrentLive}).
+     *
+     * <p><b>ОТКАЗЫВАЕТ ВЫЧИСЛЕНИЕМ, а не отдаёт уровень соседа</b>, если
+     * хотя бы один транш с экспозицией своего уровня не несёт: агрегат по
+     * непустым такой транш ПРОПУСТИЛ БЫ, и уровень на всю позицию брался
+     * бы у соседа — занижение живого риска, ничем не ограниченное сверху.
+     *
+     * <p>Под лестницей разноуровневых защит оценка завышается, и это
+     * направление консервативное.
+     */
+    public BigDecimal currentStopLevel() {
+        if (isTrue(stopUnresolved())) {
+            return null;
+        }
+        Stream<BigDecimal> levels = emptyIfNull(tranches).stream()
+                .map(tranche -> tranche.worstActiveStopLevel(direction))
+                .filter(Objects::nonNull);
+        return StrategyTradeDirection.LONG.equals(direction)
+                ? levels.min(BigDecimal::compareTo).orElse(null)
+                : levels.max(BigDecimal::compareTo).orElse(null);
+    }
+
     /** Живые транши сделки: те, что ещё занимают место в проходе. */
     public List<DealTranche> liveTranches() {
         return emptyIfNull(tranches).stream()
@@ -248,14 +317,20 @@ public class Deal extends Auditable {
                 .collect(Collectors.toList());
     }
 
-    /** Live ordinary orders сделки (остаточный live-risk для teardown); пусто — нет. */
+    /**
+     * Live ordinary orders сделки (остаточный live-risk для teardown); пусто
+     * — нет. Читает донорское {@link #orders} — см. его javadoc.
+     */
     public List<Order> liveOrders() {
         return emptyIfNull(orders).stream()
                 .filter(order -> isTrue(order.isLive()))
                 .collect(Collectors.toList());
     }
 
-    /** Live standalone algo-orders сделки (остаточный live-risk для teardown); пусто — нет. */
+    /**
+     * Live standalone algo-orders сделки (остаточный live-risk для teardown);
+     * пусто — нет. Читает донорское {@link #algoOrders}.
+     */
     public List<AlgoOrder> liveAlgoOrders() {
         return emptyIfNull(algoOrders).stream()
                 .filter(algoOrder -> isTrue(algoOrder.isLive()))
@@ -264,7 +339,8 @@ public class Deal extends Auditable {
 
     /**
      * Живые ВСТРОЕННЫЕ защиты сделки — остаточный live-risk для teardown
-     * наравне с отдельными условными заявками.
+     * наравне с отдельными условными заявками. Читает донорское
+     * {@link #orders}.
      *
      * <p>Перечень идёт по <b>всем</b> заявкам, а не по живым: встроенная
      * защита материализуется самостоятельной заявкой на бирже при
@@ -278,6 +354,32 @@ public class Deal extends Auditable {
                 .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
                 .filter(protection -> isTrue(protection.isActiveLike()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Живая сущность сделки, не приписанная ни одному её траншу.
+     *
+     * <p><b>Инвариант, а не находка сканера.</b> Всё живое по сделке
+     * атрибутируется её траншам: экспозицию считают транши, покрытие
+     * считают транши, терминал требует терминальности всех траншей. Нога,
+     * висящая мимо них, не входит ни в один из этих счётов — то есть
+     * несёт живой риск, который модель не приписывает никому
+     * (docs/components/TranchePrecheckHandler.md §«Входные проверки»).
+     *
+     * <p>Предикат живёт на агрегате, а не в обработчике: тот же вопрос
+     * задают предвходовая проверка, сопровождение и поиск нарушений
+     * инвариантов, и ответ у них один.
+     */
+    public Boolean unattributedLiveRisk() {
+        Set<Long> attributed = emptyIfNull(tranches).stream()
+                .flatMap(tranche -> Stream.concat(
+                        tranche.liveOrders().stream().map(Order::getId),
+                        tranche.liveAlgoOrders().stream().map(AlgoOrder::getId)))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return Stream.concat(liveOrders().stream().map(Order::getId),
+                        liveAlgoOrders().stream().map(AlgoOrder::getId))
+                .anyMatch(id -> isFalse(attributed.contains(id)));
     }
 
     /** Живой эпизод позиции сделки либо пусто. */
@@ -294,11 +396,38 @@ public class Deal extends Auditable {
         return nonNull(live) && isTrue(live.hasLiveRisk());
     }
 
+    /**
+     * Живых эпизодов у сделки больше одного — состояние, которого модель
+     * не производит: эпизоды сделки последовательны, и второй заводится
+     * только после закрытия первого. Наблюдение означает рассогласование
+     * учёта, и входные проверки обработчиков читают его как небезопасное
+     * состояние (docs/components/TranchePrecheckHandler.md).
+     */
+    public Boolean moreThanOneLiveEpisode() {
+        return emptyIfNull(positions).stream()
+                .filter(episode -> isTrue(episode.hasLiveRisk()))
+                .count() > 1;
+    }
+
     /** Эпизоды, ждущие положения закрытия: строка закрыта и записи закрытия не несёт. */
     public List<Position> episodesAwaitingCloseRecord() {
         return emptyIfNull(positions).stream()
                 .filter(episode -> isTrue(episode.awaitsCloseRecord()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Нижняя граница окна линковки движений средств: durable-колонка, а
+     * при её пустоте — суррогат из биржевого момента заведения сделки
+     * (docs/spec/cash-flow-linkage.json, {@code lowerBound}).
+     *
+     * <p><b>Подстановка идёт в чтении, колонку не трогая:</b> различитель
+     * провенанса стои́т на её пустоте. Предикат живёт на модели, потому
+     * что читателей у него два — конвейер добычи движений и признак
+     * полноты разбивки, — и вторая копия разошлась бы с первой.
+     */
+    public OffsetDateTime billsWindowLowerBound() {
+        return nonNull(billsWindowBegin) ? billsWindowBegin : getExternalCreatedAt();
     }
 
     /**
@@ -348,6 +477,36 @@ public class Deal extends Auditable {
     }
 
     /** Причина транша в перечне сделки; перечни пересекаются по этим семи значениям. */
+    /**
+     * Причина, которую НАСЛЕДУЕТ транш, закрытый каскадом сворачивания
+     * сделки; пусто — наследовать нечего.
+     *
+     * <p><b>Наследование, а не своё значение.</b> Транш, закрытый
+     * каскадом, закрылся не по своей причине: инициатор у выхода
+     * сделочный. Значение {@code DEAL_EXIT} удвоило бы перечень тем, что
+     * уже выражено (docs/lifecycles/DealTranche.md §«Писатель причины
+     * закрытия транша — обработчик терминального ребра»).
+     *
+     * <p><b>Аварийная причина не наследуется.</b> {@code EMERGENCY_CLOSE}
+     * у транша не пишется вовсе: аварийная тропа сделочная, и FSM траншей
+     * на ней не прогоняется.
+     */
+    public DealTranche.CloseReason inheritedTrancheCloseReason() {
+        if (isNull(closeReason)) {
+            return null;
+        }
+        return switch (closeReason) {
+            case EXTERNAL_CLOSE -> DealTranche.CloseReason.EXTERNAL_CLOSE;
+            case ENTRY_CONDITION_EXPIRED -> DealTranche.CloseReason.ENTRY_CONDITION_EXPIRED;
+            case STRATEGY_EXIT -> DealTranche.CloseReason.STRATEGY_EXIT;
+            case TAKE_PROFIT -> DealTranche.CloseReason.TAKE_PROFIT;
+            case STOP_LOSS -> DealTranche.CloseReason.STOP_LOSS;
+            case TIME_STOP -> DealTranche.CloseReason.TIME_STOP;
+            case RISK_CONTROL -> DealTranche.CloseReason.RISK_CONTROL;
+            case EMERGENCY_CLOSE -> null;
+        };
+    }
+
     private static CloseReason toDealReason(DealTranche.CloseReason reason) {
         return switch (reason) {
             case EXTERNAL_CLOSE -> CloseReason.EXTERNAL_CLOSE;

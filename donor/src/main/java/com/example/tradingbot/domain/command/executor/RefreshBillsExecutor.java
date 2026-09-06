@@ -22,7 +22,6 @@ import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.tradingbot.domain.model.other.external_snapshot.DealCashFlowExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.candle.external_snapshot.CandleExternalSnapshot;
-import com.example.tradingbot.domain.safety.AnomalyReport;
 import com.example.tradingbot.domain.safety.AnomalyReportService;
 import com.example.tradingbot.domain.safety.HoldSignal;
 import com.example.tradingbot.integration.service.IntegrationService;
@@ -205,7 +204,7 @@ public class RefreshBillsExecutor implements CommandExecutor {
             return;
         }
         DealCashFlow flow = dealCashFlowMapper.snapshotToDomain(snapshot);
-        flow.setExchangeId(exchangeId);
+        flow.setExchangeAccountId(exchangeId);
         resolveCategory(flow, contour);
         if (DealCashFlow.CashFlowCategory.OTHER.equals(flow.getCategory())) {
             unclassifiedNow.add(flow);
@@ -327,7 +326,7 @@ public class RefreshBillsExecutor implements CommandExecutor {
             return null;
         }
         return instrumentDataService
-                .findSettlementCurrency(flow.getExchangeId(), flow.getExternalInstrumentId())
+                .findSettlementCurrency(flow.getExchangeAccountId(), flow.getExternalInstrumentId())
                 .orElse(null);
     }
 

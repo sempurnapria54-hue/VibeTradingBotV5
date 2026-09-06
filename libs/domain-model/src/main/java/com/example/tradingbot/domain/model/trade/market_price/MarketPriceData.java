@@ -42,6 +42,18 @@ public class MarketPriceData {
     /** Лучшая цена покупки. */
     private BigDecimal externalBidPrice;
 
+    /**
+     * Объём на лучшем ask на момент среза — <b>операнд измерителя
+     * ёмкости</b> {@code Order.bookDepthAtPlacement}, не операнд решения.
+     * Он ничего не блокирует: по его распределению после первого периода
+     * живой торговли назначается либо отклоняется ёмкостный потолок
+     * (docs/rules/risk-policy.md).
+     */
+    private BigDecimal externalAskSize;
+
+    /** Объём на лучшем bid — та же роль. */
+    private BigDecimal externalBidSize;
+
     /** Время тикера на бирже. */
     private OffsetDateTime externalTimestamp;
 

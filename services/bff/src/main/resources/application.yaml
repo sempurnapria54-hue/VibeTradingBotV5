@@ -1,0 +1,82 @@
+# Конфигурация периметра.
+#
+# Значения осей окружения приезжают из манифеста окружения
+# (deploy/<окружение>/env.yaml); здесь — только форма и умолчания,
+# выбранные так, чтобы незаданное означало ОТКАЗ, а не разрешение.
+spring:
+  application:
+    name: bff
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Точка провайдера идентичности: по ней периметр забирает ключи
+          # и проверяет подпись токена ЛОКАЛЬНО, без вызова auth на каждом
+          # запросе (docs/architecture/contracts.md §«Контекст тенанта в
+          # вызове»). Пустое означает, что контур не настроен, и контекст
+          # не поднимется — это отказ, а не открытая поверхность.
+          issuer-uri: ${OIDC_ISSUER_URI:}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
+    consumer:
+      # У КАЖДОЙ РЕПЛИКИ СВОЯ ГРУППА: событие обязано дойти до всех
+      # открытых сессий, а общая группа отдала бы его одной реплике
+      # (docs/architecture/contracts.md §«Дедуплицирует клиент…»).
+      # Отсюда же случайный суффикс: группа живёт ровно столько, сколько
+      # под, и брокер убирает её по своему сроку хранения смещений.
+      group-id: bff-${random.uuid}
+      # Новая группа начинается с ТЕКУЩЕГО МОМЕНТА: `earliest` переиграл бы
+      # браузеру всю историю темы при каждом рестарте пода.
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+perimeter:
+  # Адрес владельца выводится из ПЕРВОГО СЕГМЕНТА пути, таблицы маршрутов
+  # периметр не держит (docs/architecture/contracts.md §«Владельца
+  # называет путь, а не таблица маршрутов»). Шаблон — ось окружения:
+  # внутри кластера имя сервиса и есть имя единицы.
+  owner-url-template: ${PERIMETER_OWNER_URL_TEMPLATE:http://{owner}:8080}
+  # Бюджет повторов ЧТЕНИЯ. Мутирующий запрос не повторяется никогда, и
+  # это не настройка (docs/architecture/contracts.md §«Периметр повторяет
+  # только чтения»).
+  read-retries: ${PERIMETER_READ_RETRIES:1}
+  membership:
+    # Срок годности записи кэша членств. Ошибается в РАЗРЕШАЮЩУЮ сторону,
+    # поэтому короткий; пока у MembershipChanged нет производителя, это
+    # единственная тропа сброса на REST-тропе.
+    cache-ttl: ${PERIMETER_MEMBERSHIP_CACHE_TTL:60s}
+  stream:
+    # Темы, у которых ЕСТЬ производитель. Тем auth здесь нет намеренно:
+    # производителя у его четырёх классов не построено
+    # (.claude/work/backlog.md §«События auth — производителя и темы нет»).
+    topics: ${PERIMETER_STREAM_TOPICS:trading-core.facts,strategies.facts}
+    # Окно переигрывания на реплику: сколько последних событий тенанта
+    # держится в памяти для продолжения потока по Last-Event-ID.
+    replay-window: ${PERIMETER_STREAM_REPLAY_WINDOW:200}
+    # Период пульса. Молчание без пульса — наблюдаемый отказ; порог
+    # отсутствия показывает фронт (шаг 12 фазы 2).
+    pulse-interval: ${PERIMETER_STREAM_PULSE_INTERVAL:15s}
+    # Выключатель тика пульса — как у всякой джобы.
+    pulse-enabled: ${PERIMETER_STREAM_PULSE_ENABLED:true}
+    # Срок жизни соединения подписки: сверх него SSE закрывается штатно и
+    # браузер переподключается сам.
+    connection-timeout: ${PERIMETER_STREAM_CONNECTION_TIMEOUT:30m}
+    # Потолок одновременных подписок на тенанта: подписки живут в памяти
+    # реплики, и число их задаёт открывающий, а не мы.
+    max-subscriptions-per-tenant: ${PERIMETER_STREAM_MAX_SUBSCRIPTIONS:32}
+  ticket:
+    # Секрет подписи билета подписки — ОБЩИЙ У РЕПЛИК: подписка может
+    # прийти не на ту реплику, что выдала билет. Пустое означает, что
+    # выдача билетов не настроена, и подписка не открывается вовсе.
+    secret: ${PERIMETER_TICKET_SECRET:}
+    # Срок билета: проверяется при ОТКРЫТИИ подписки, установленный поток
+    # по его истечении не рвётся. Больше типичного разрыва, чтобы штатное
+    # переподключение EventSource работало тем же адресом.
+    ttl: ${PERIMETER_TICKET_TTL:10m}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

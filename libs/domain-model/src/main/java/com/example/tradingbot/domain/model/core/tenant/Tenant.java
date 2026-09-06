@@ -1,7 +1,7 @@
 package com.example.tradingbot.domain.model.core.tenant;
 
 import com.example.tradingbot.domain.model.Auditable;
-import java.util.Objects;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,10 +13,19 @@ import lombok.Setter;
  * принадлежит тенанту; пользователь тенантом не является — он в нём
  * состоит членством с ролью.
  *
- * <p>Форму несёт эта библиотека, владеет данными и пишет их сервис
- * {@code auth}. Чисел риск-аппетита здесь нет намеренно: они принадлежат
- * тенанту, но хранит и энфорсит их {@code trading-core} — единственный,
- * кто принимает риск.
+ * <p><b>Модель двухписательная по двум разным наборам полей</b> — как и
+ * биржевой счёт: реестровую часть пишет {@code auth}, числа риск-аппетита
+ * — {@code trading-core}, единственный, кто принимает риск. Физически это
+ * две таблицы в двух базах с общим {@link #internalId}, и правило «у
+ * таблицы один писатель» соблюдено; в каждом сервисе материализуется тот
+ * набор полей, которым он владеет.
+ *
+ * <p><b>Прежняя редакция объявляла чисел риск-аппетита здесь нет
+ * намеренно</b> — она написана до переезда чисел из секции профиля на
+ * строку тенанта (docs/rules/risk-policy.md §«Числа назначает держатель;
+ * пустое место — отказ»). После переезда числа стали частью формы
+ * тенанта, и отсутствие полей означало бы, что у объявленной домом
+ * структуры нет носителя.
  */
 @Getter
 @Setter
@@ -44,15 +53,29 @@ public class Tenant extends Auditable {
     private Status status;
 
     /**
-     * Тенант набирает риск.
-     *
-     * <p>Предикат на модели, а не сравнение статуса в сервисе: вопрос
-     * «можно ли набирать риск» задаёт не только ядро, и ответ обязан быть
-     * один (.claude/rules/codestyle.md §«Вложенность и rich-модели»).
+     * Максимальный риск на сделку в процентах базы риска: потолок
+     * одновременного риска и первый сомножитель катастрофического
+     * потолка. Пусто ⇒ risk-creating действие отвергается кодом
+     * {@code RISK_APPETITE_NOT_CONFIGURED} — пустое место означает отказ,
+     * а не ноль.
      */
-    public Boolean isRiskTaking() {
-        return Status.ACTIVE.equals(status);
-    }
+    private BigDecimal globalSimultaneousRiskPerDealPercent;
+
+    /**
+     * Предел множителя, которым стратегия вправе растянуть
+     * катастрофический потолок. Читает его валидация создания стратегии;
+     * горячий путь сверяется с множителем, объявленным деталью.
+     */
+    private BigDecimal globalCatastrophicRiskPerDealMultiplier;
+
+    /**
+     * Сколько подряд ценово-убыточных закрытых сделок останавливают
+     * торговлю счёта (docs/rules/loss-streak-halt.md). Пусто ⇒
+     * risk-creating действие отвергается кодом
+     * {@code LOSS_LIMIT_NOT_CONFIGURED}: энфорсера остановки не
+     * существует, пока порог не задан.
+     */
+    private Integer globalConsecutiveLossLimit;
 
     /** Состояние тенанта. */
     public enum Status {

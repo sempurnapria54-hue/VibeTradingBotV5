@@ -11,6 +11,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.util.List;
@@ -162,6 +163,58 @@ public class StrategyDetail extends Auditable {
                 .filter(action -> Objects.equals(key, action.getKey()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Действие детали по идентификатору строки — резолв «строка исполнения
+     * → её действие». Строка несёт {@code strategyActionId}, а не ключ:
+     * ключ уникален в пределах детали, но живёт на объявлении, а строка
+     * ссылается на конкретную строку действия.
+     */
+    public StrategyAction actionById(Long actionId) {
+        if (isNull(actionId)) {
+            return null;
+        }
+        return allSteps().stream()
+                .flatMap(step -> emptyIfNull(step.getActions()).stream())
+                .filter(action -> Objects.equals(actionId, action.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Шаг, объявивший это действие; пусто — действия в дереве детали нет.
+     * Отбор идёт по <b>тождеству объекта</b>, а не по ключу: у ключа
+     * уникальность объявлена в пределах детали
+     * (docs/rules/strategy-validation.md), но вопрос здесь именно о том, в
+     * каком пакете лежит поданный экземпляр, — а на подменённом дереве
+     * ключ ответил бы за другой.
+     */
+    public StrategyStep stepOf(StrategyAction action) {
+        if (isNull(action)) {
+            return null;
+        }
+        return allSteps().stream()
+                .filter(step -> emptyIfNull(step.getActions()).stream().anyMatch(declared -> declared == action))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Спрашивает ли цену момента хоть одно условие детали.
+     *
+     * <p><b>Вопрос задаётся до сбора данных.</b> Цена, в отличие от
+     * индикаторов и структуры, не лежит в хранилище рыночных данных: её
+     * читают у площадки. Снимать её для детали, чьи условия её не
+     * называют, значит вешать на каждый проход round-trip наружу и
+     * доступность площадки. Разбор самого правила живёт у грамматики
+     * ({@link StrategyCondition#readsPrice()}) — здесь только обход шагов.
+     */
+    public Boolean readsPrice() {
+        return allSteps().stream()
+                .map(StrategyStep::getCondition)
+                .filter(Objects::nonNull)
+                .anyMatch(condition -> isTrue(condition.readsPrice()));
     }
 
     /** Все шаги детали — траншевые и агрегатные, в порядке объявления. */

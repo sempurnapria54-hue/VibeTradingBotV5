@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Ведёт каталог инструментов и их справочный навес
- * (docs/components/InstrumentExternalRulesSyncJob.md): тик сводит каталог
+ * (docs/components/InstrumentSyncJob.md): тик сводит каталог
  * с листингом площадки и обновляет правила окном инструментов.
  *
  * <p><b>Листинг и правила читаются разной ценой, и поэтому идут разным

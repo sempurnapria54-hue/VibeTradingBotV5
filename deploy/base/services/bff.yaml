@@ -1,0 +1,290 @@
+# Развёртывание периметра (шаг 9 фазы 2) — единственной точки входа
+# браузера (docs/architecture/services.md, ярус периметра).
+#
+# СВОЕЙ БАЗЫ У НЕГО НЕТ, и ресурса Database здесь нет ни одного:
+# персистентного состояния периметр не держит, а кэш членств эфемерен
+# (docs/architecture/contracts.md §«Состояния периметр не держит —
+# persistentного»).
+#
+# ИНГРЕСС И СЕРТИФИКАТ ПРИЕЗЖАЮТ ЗДЕСЬ, а не шагом платформы: маршрут в
+# никуда и сертификат ни на что заводить незачем
+# (docs/architecture/platform.md §Безопасность).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bff
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bff
+spec:
+  selector:
+    app.kubernetes.io/name: bff
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bff
+spec:
+  # Реплика одна, но конструкция от их числа не зависит: у каждой своя
+  # группа потребителя, и событие доходит до всех открытых сессий
+  # (docs/architecture/contracts.md §«Дедуплицирует клиент…»).
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bff
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bff
+    spec:
+      serviceAccountName: bff
+      containers:
+        - name: bff
+          image: registry.invalid/vibetrading/bff
+          # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
+          # поэтому образ, уже лежащий на узле, — тот самый.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: environment
+            # Провайдер идентичности — сервис того же пространства имён.
+            - name: OIDC_ISSUER_URI
+              value: http://platform-identity-service:8080/realms/vibetrading
+            # Брокер: периметр — потребитель тем, у которых есть
+            # производитель. Тем `auth` здесь нет намеренно
+            # (.claude/work/backlog.md §«События `auth` — производителя и
+            # темы нет»).
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: platform-kafka-kafka-bootstrap:9092
+            - name: PERIMETER_STREAM_TOPICS
+              value: trading-core.facts,strategies.facts
+            # Секрет подписи билета подписки — ОБЩИЙ У РЕПЛИК: подписка
+            # может прийти не на ту реплику, что выдала билет
+            # (docs/architecture/contracts.md §«Подписку открывает билет,
+            # а не сам токен»). Значение вне репозитория; в целевой
+            # конструкции — Vault.
+            - name: PERIMETER_TICKET_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bff-ticket-secret
+                  key: secret
+          # Числа назначает разворачивающий по наблюдаемому потреблению;
+          # это ПЕРВОЕ назначение — до наблюдения.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+---
+# Исходящее периметра. Разрешение даёт таблица
+# docs/architecture/contracts.md §«Синхронные вызовы»: строки `bff → auth`
+# и `bff → strategies, trading-core, market-data, audit-statistics`. Пары
+# с `audit-statistics` здесь нет — сервиса ещё не существует, и раньше
+# него в политике она не объявляется.
+#
+# ЭТА ПОЛИТИКА И ЕСТЬ ЭНФОРСЕР НАБОРА ВЛАДЕЛЬЦЕВ: адрес периметр выводит
+# из первого сегмента пути и перечня не держит, а пара, которой нет в
+# таблице контрактов, в кластере запрещена
+# (docs/architecture/platform.md §Безопасность).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bff-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: bff
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: auth
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trading-core
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: strategies
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: market-data
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: platform-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+---
+# Встречные разрешения на стороне владельцев. Запрет по умолчанию
+# действует в ОБЕ стороны: одного исходящего правила у периметра мало.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-ingress-from-bff
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: auth
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bff
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trading-core-ingress-from-bff
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: trading-core
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bff
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: strategies-ingress-from-bff
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: strategies
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bff
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: market-data-ingress-from-bff
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: market-data
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bff
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Ингресс окружения: снаружи трафик приходит по TLS, его терминирует он,
+# а сертификат выдаётся автоматически по имени хоста окружения
+# (docs/architecture/platform.md §Безопасность). Имя хоста — ось
+# различия окружений, и здесь стои́т значение `dev`: наложение окружения
+# подменяет его своим.
+#
+# ФРОНТ ОТДАЁТСЯ ИНГРЕССОМ, А НЕ ПЕРИМЕТРОМ (docs/architecture/services.md,
+# строка `web`), поэтому маршрут статики приедет вместе с ним — шагом 12.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: perimeter-issuer
+spec:
+  # САМОПОДПИСАННЫЙ, и это названный выбор, а не умолчание. Публичного
+  # имени у окружения нет (хосты — *.invalid), значит ACME-проверку
+  # владения проходить нечем, а корпоративного центра сертификации в
+  # контуре не существует. Условие пересмотра то же, что у транспорта
+  # внутри кластера: перед первым развёртыванием `prod`
+  # (docs/architecture/platform.md §Безопасность,
+  # .claude/work/backlog.md §«Транспорт внутри кластера — пересмотр перед
+  # первым `prod`»).
+  selfSigned: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: perimeter
+  annotations:
+    cert-manager.io/issuer: perimeter-issuer
+spec:
+  tls:
+    - hosts:
+        - dev.vibetrading.invalid
+      secretName: perimeter-tls
+  rules:
+    - host: dev.vibetrading.invalid
+      http:
+        paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: bff
+                port:
+                  name: http

@@ -49,6 +49,20 @@ public class StrategyOrderAction extends Auditable implements StrategyAction {
     private StrategyAttachedProtectionSettings attachedProtection;
 
     /**
+     * Сторона заявки — направление действия плюс намерение reduce-only.
+     *
+     * <p><b>Сторона не совпадает с направлением сделки</b>, и это не
+     * оговорка: закрывающая заявка на длинной ноге имеет сторону
+     * {@code SELL} (docs/models/domain/core/Order.md). Вывод живёт здесь,
+     * у объявления, потому что оба операнда объявлены им же.
+     */
+    public Order.Side side() {
+        boolean longSide = StrategyTradeDirection.LONG.equals(direction);
+        boolean reducing = Boolean.TRUE.equals(positionReducingOnly);
+        return longSide == reducing ? Order.Side.SELL : Order.Side.BUY;
+    }
+
+    /**
      * У заявки уровень задаёт только встроенная защита, а она объявляется
      * блоком настроек стопа — наблюдаемого уровня у неё не бывает.
      */

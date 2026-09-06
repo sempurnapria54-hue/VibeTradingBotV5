@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.example.connector.okx.credentials.ExchangeCredentials;
 import com.example.connector.okx.credentials.ExchangeCredentialsResolver;
+import com.example.tradingbot.domain.resolve.AlgoOrderExternalStatusResolver;
+import com.example.tradingbot.domain.resolve.OrderExternalStatusResolver;
 import com.example.connector.okx.gateway.OkxExchangeGateway;
 import com.example.connector.okx.mapping.AlgoOrderMapper;
 import com.example.connector.okx.mapping.BalanceContainerMapper;
@@ -47,7 +49,9 @@ class OkxExchangeGatewayTest {
     private final ExchangeCredentialsResolver resolver = mock(ExchangeCredentialsResolver.class);
     private final OkxExchangeGateway gateway = new OkxExchangeGateway(
             reader, resolver,
-            mock(OrderMapper.class), mock(AlgoOrderMapper.class), mock(PositionMapper.class),
+            mock(OrderMapper.class), mock(AlgoOrderMapper.class),
+            mock(OrderExternalStatusResolver.class), mock(AlgoOrderExternalStatusResolver.class),
+            mock(PositionMapper.class),
             mock(InstrumentMapper.class), mock(InstrumentExternalRulesMapper.class),
             mock(BalanceContainerMapper.class), mock(CandleMapper.class), mock(TimeFrameMapper.class),
             mock(DealCashFlowMapper.class), mock(TradeFeeRateMapper.class),

@@ -151,6 +151,16 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
+        <!--
+          Kafka — публикация накопленного в outbox
+          (docs/components/OutboxRelayJob.md). Введена по предъявленной
+          потребности: реле публикует в тему производителя, и без клиента
+          брокера компонент не собирается.
+        -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>

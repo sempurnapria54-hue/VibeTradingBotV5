@@ -14,7 +14,8 @@ import org.mapstruct.ReportingPolicy;
  * Маппинг OKX balance response → нормализованные снапшоты
  * (account-level + currency-level). Числовые поля переносятся строками
  * (валидированы как parseable), uTime → OffsetDateTime через
- * {@link OkxResponseConverter}. exchangeId не из OKX (executor). См.
+ * {@link OkxResponseConverter}. Счёта коннектор не знает — его
+ * проставляет ядро, приземляя снимок. См.
  * docs/models/domain/core/BalanceContainer.md, docs/models/mapping/Balance.md.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,

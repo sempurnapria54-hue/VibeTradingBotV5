@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Конфигурация синка листинга и справочных правил инструментов
- * (docs/components/InstrumentExternalRulesSyncJob.md): выключатель и
+ * (docs/components/InstrumentSyncJob.md): выключатель и
  * потолок числа инструментов, чьи правила обновляются за один тик.
  *
  * <p><b>Правила читаются ПОИНСТРУМЕНТНО</b> — агрегатного чтения правил

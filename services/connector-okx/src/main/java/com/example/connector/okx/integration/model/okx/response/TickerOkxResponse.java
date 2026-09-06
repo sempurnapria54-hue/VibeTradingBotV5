@@ -29,6 +29,12 @@ public class TickerOkxResponse {
     /** Лучшая цена покупки (bidPx, decimal-строка). */
     private String bidPx;
 
+    /** Объём на лучшем ask — операнд измерителя ёмкости Order.bookDepthAtPlacement. */
+    private String askSz;
+
+    /** Объём на лучшем bid — та же роль. */
+    private String bidSz;
+
     /** Время тикера, epoch millis-строка (ts). */
     private String ts;
 

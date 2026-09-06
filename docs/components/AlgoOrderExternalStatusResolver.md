@@ -12,6 +12,13 @@ standalone algo-order биржи в доменный `AlgoOrder.Status` + option
 `OkxAlgoOrderExternalStatusResolver`. FSM/handlers с сырыми строками
 биржи не работают (см. `docs/rules/external-status-resolution.md`).
 
+## Где живёт
+
+**У коннектора** — по тому же критерию, что и резолвер обычной заявки:
+вход есть слово площадки. Статус проставляет граница чтения; причину
+закрытия назначает ядро (`docs/rules/external-status-resolution.md`
+§«Где резолвится — сторона выбирается по словарю источника»).
+
 ## Контракт и границы
 
 Возвращает result-object (`status + closeReason candidate`); применяет

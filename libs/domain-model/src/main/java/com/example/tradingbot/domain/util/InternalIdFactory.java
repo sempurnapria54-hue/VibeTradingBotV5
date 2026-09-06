@@ -1,5 +1,7 @@
 package com.example.tradingbot.domain.util;
 
+import static java.util.Objects.nonNull;
+
 import java.security.SecureRandom;
 import java.util.UUID;
 import lombok.experimental.UtilityClass;
@@ -63,5 +65,23 @@ public class InternalIdFactory {
             id.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
         }
         return id.toString();
+    }
+
+    /**
+     * Клиентский идентификатор поставлен НАШИМ контуром.
+     *
+     * <p><b>Признак читается со стороны площадки, и БД в нём не
+     * участвует.</b> «Строки в БД нет» безопасным дискриминатором не
+     * является: заявка, ушедшая на биржу до коммита своей строки,
+     * переживает рестарт — а рестарт штатен, — и по такому признаку
+     * детектор объявил бы чужой нашу собственную заявку
+     * (docs/integrations/okx/rules/client-id-marker.md). Маркер же наш
+     * рестарт изменить не может.
+     *
+     * <p>Проверка живёт рядом с производством формы: разъехавшись, они
+     * дали бы контур, который не узнаёт собственных заявок.
+     */
+    public static Boolean isOurs(String clientId) {
+        return nonNull(clientId) && clientId.startsWith(CONTOUR_MARKER);
     }
 }

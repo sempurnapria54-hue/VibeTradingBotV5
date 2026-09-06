@@ -62,11 +62,6 @@ public class MarketStructure extends Auditable {
      */
     private MarketBreakoutEvent breakoutEvent;
 
-    /** Структура — трендовая (восходящая или нисходящая). */
-    public Boolean isTrend() {
-        return Objects.equals(type, Type.UPTREND) || Objects.equals(type, Type.DOWNTREND);
-    }
-
     /** Есть подтверждённый пробой в окне расчёта. */
     public Boolean hasConfirmedBreakout() {
         return nonNull(breakoutEvent);

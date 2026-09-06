@@ -1,6 +1,8 @@
 package com.example.tradingbot.domain.model.aggregate.strategy;
 
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
@@ -36,7 +38,57 @@ public class Strategy extends Auditable {
     /** Безопасный внешний/межсервисный идентификатор. */
     private String internalId;
 
-    /** Внутренний ID инструмента стратегии. */
+    /**
+     * <b>Тенант-владелец определения</b> — его {@code internalId}.
+     *
+     * <p><b>Несётся строкой у ВЛАДЕЛЬЦА определений и пуст у копии
+     * ядра.</b> Признак применимости механический: держит ли сервис
+     * локальную строку счёта. У {@code strategies} её нет вовсе, поэтому
+     * тенант обязан лежать на строке; у ядра есть проекция реестра, и
+     * там тенант резолвится по счёту, как у сделки
+     * (docs/architecture/tenant-and-exchange.md §«Торговая строка
+     * называет счёт, и радиусы читаются от него»).
+     *
+     * <p><b>Пустота у объекта, собранного из копии, читается как «не
+     * хранится этой стороной», а не «тенанта нет»</b>
+     * (docs/rules/absent-value-semantics.md).
+     *
+     * <p>Писатель — приёмник команды создания у владельца, значение
+     * берётся <b>из контекста вызова</b>, а не из тела: тело приходит от
+     * вызывающего, и принятый из него тенант был бы его собственным
+     * объявлением о себе.
+     */
+    private String tenantId;
+
+    /**
+     * <b>Биржевой счёт тенанта, на котором стратегия торгует</b> — его
+     * {@code internalId}, а не ключ чьей-либо базы: числовые ключи баз
+     * границу сервиса не пересекают
+     * (docs/architecture/data-ownership.md §Идентификаторы). Радиусы
+     * читаются от счёта (docs/architecture/tenant-and-exchange.md
+     * §«Торговая строка называет счёт, и радиусы читаются от него»).
+     */
+    private String exchangeAccountInternalId;
+
+    /** Инструмент стратегии — его {@code internalId}. */
+    private String instrumentInternalId;
+
+    /**
+     * Числовой ключ инструмента в базе донора.
+     *
+     * <p><b>Целевой модели поле не принадлежит:</b> определение адресует
+     * контекст идентичностями, а числовые ключи баз границу сервиса не
+     * пересекают (docs/architecture/data-ownership.md §Идентификаторы);
+     * у сервисов монорепозитория этот ключ живёт на строке
+     * персистентности и резолвится из {@link #instrumentInternalId} на
+     * границе domain → persistence (docs/models/mapping/Strategy.md).
+     *
+     * <p>Поле держится ради донора, который читает его в пяти файлах, а
+     * условие его жизни — «собирается и зелёный» (donor/README.md):
+     * порт сверяется с работающим оригиналом. Сервисы его не пишут и не
+     * читают. Снятие — `.claude/work/backlog.md` §«Донорский числовой
+     * ключ инструмента у определения в общей библиотеке».
+     */
     private Long instrumentId;
 
     /** Человекочитаемое имя стратегии. */
@@ -107,6 +159,22 @@ public class Strategy extends Auditable {
         return details.stream()
                 .filter(detail -> Objects.equals(phaseType, detail.getMarketPhaseType()))
                 .findFirst();
+    }
+
+    /**
+     * Хоть одна деталь стратегии читает цену.
+     *
+     * <p><b>Вопрос агрегатный, потому что задаётся ДО выбора детали.</b>
+     * Деталь выбирается фазой, а фаза приезжает тем же чтением рыночных
+     * операндов, что и цена: спросить «читает ли цену выбранная деталь»
+     * на отборе входа не у кого. Ответ по всей стратегии — надмножество
+     * ответа по детали, и цена этого надмножества — round-trip наружу у
+     * стратегии, чья цену читает не всякая деталь
+     * ({@link StrategyDetail#readsPrice()}).
+     */
+    public Boolean readsPrice() {
+        return emptyIfNull(details).stream()
+                .anyMatch(detail -> isTrue(detail.readsPrice()));
     }
 
     /**

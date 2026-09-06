@@ -21,10 +21,20 @@
 Конфликт дока с концепцией читается в пользу концепции, поэтому клейм
 снят. Предикат каждого типа правила имеет **дом** — исполнимую форму;
 детальностью вычислителя остаётся только то, как он до операндов
-добирается, а не что предикат означает. Первые заведённые дома —
-`docs/spec/market-phase-condition.json` (`MARKET_PHASE_IS`,
-`TREND_CHANGED`); прочие типы получают свои по мере того, как их
-достигают шаги.
+добирается, а не что предикат означает.
+
+**Заведённые дома:** `docs/spec/market-phase-condition.json`
+(`MARKET_PHASE_IS`, `TREND_CHANGED`) и `docs/spec/deal-condition.json`
+(девять величин: `positionOpened`, `noOpenPosition`,
+`entryOrderFinalized`, `attachedStopLossExists`, `mainProtectionExists`,
+`moveOperandsAvailable`, `signedMovePercents`, `profitPercentsReached`,
+`lossPercentsReached`).
+
+**Без дома остались восемь типов:** `NO_ACTIVE_DEAL`,
+`RANGE_BREAKOUT_CONFIRMED`, `MARKET_STRUCTURE_IS`, `INDICATOR_COMPARE`,
+`PRICE_COMPARE`, `CROSSOVER`, `VOLUME_FILTER_PASSED`, `CANDLE_CLOSED`.
+Каждый получает дом на шаге, который его достигает; перечень здесь —
+чтобы «дома ещё нет» отличалось от «дом не нужен».
 
 ## Настройка индикатора
 

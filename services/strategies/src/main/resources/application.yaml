@@ -1,0 +1,72 @@
+# Конфигурация сервиса strategies.
+#
+# Значения осей окружения приезжают из манифеста окружения
+# (deploy/<окружение>/env.yaml); здесь — только форма и умолчания,
+# выбранные так, чтобы незаданное означало ОТКАЗ, а не разрешение.
+spring:
+  application:
+    name: strategies
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Точка провайдера идентичности: по ней сервис забирает ключи и
+          # проверяет подпись токена ЛОКАЛЬНО, без вызова auth на каждом
+          # запросе (docs/architecture/contracts.md §«Контекст тенанта в
+          # вызове»). Пустое означает, что контур доступа не настроен, и
+          # контекст не поднимется — это отказ, а не открытая поверхность.
+          issuer-uri: ${OIDC_ISSUER_URI:}
+      client:
+        # Исходящая идентичность: под ней владелец определений читает у
+        # ядра числа риск-аппетита и разрешимость ссылок. Грант —
+        # client credentials: пользователя в межсервисном вызове нет.
+        registration:
+          platform-services:
+            client-id: ${SERVICE_CLIENT_ID:}
+            client-secret: ${SERVICE_CLIENT_SECRET:}
+            authorization-grant-type: client_credentials
+            provider: platform
+        provider:
+          platform:
+            token-uri: ${OIDC_TOKEN_URI:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
+    producer:
+      # Подтверждение всеми синхронными репликами: событие активации —
+      # факт, который обязан дойти (docs/architecture/data-ownership.md
+      # §«Outbox и доставка»).
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Соседи, которых читает валидация и активация. Пустой адрес означает,
+# что операнд не добыть — и тогда отвергается создание, а не проходит
+# непроверенным (docs/rules/strategy-validation.md).
+neighbours:
+  trading-core:
+    base-url: ${TRADING_CORE_BASE_URL:}
+    client-registration-id: platform-services
+
+# Внешняя поверхность: окно перечня определений тенанта. Безлимитного
+# чтения у растущей таблицы не бывает (.claude/rules/codestyle.md
+# §«Выборка данных»).
+surface:
+  strategy-list-window: ${SURFACE_STRATEGY_LIST_WINDOW:200}
+
+jobs:
+  outbox-relay:
+    enabled: ${JOB_OUTBOX_RELAY_ENABLED:true}
+    cron: ${JOB_OUTBOX_RELAY_CRON:0/5 * * * * *}
+    batch-size: ${JOB_OUTBOX_RELAY_BATCH_SIZE:200}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

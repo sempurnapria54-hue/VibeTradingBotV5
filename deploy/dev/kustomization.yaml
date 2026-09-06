@@ -20,14 +20,41 @@ resources:
 # Список пуст, пока нет ни одного сервиса: сервисы приезжают шагами 3-10.
 images:
   - name: registry.invalid/vibetrading/trading-core
-    newTag: 0.0.1-585a998-20260905192646
+    newTag: 0.0.1-ba475bd-20260905211905
   - name: registry.invalid/vibetrading/market-data
-    newTag: 0.0.1-585a998-20260905175310
+    newTag: 0.0.1-ba475bd-20260905212043
   - name: registry.invalid/vibetrading/connector-okx
     newTag: 0.0.1-585a998
   - name: registry.invalid/vibetrading/auth
     newTag: 0.0.1-585a998-20260905191945
 patches:
+  # Имя хоста ингресса — ось различия окружений
+  # (docs/architecture/platform.md §«Чем различаются окружения»).
+  # Базовый манифест несёт форму, значение подставляет окружение:
+  # без этой правки три окружения одного кластера снаружи неразличимы.
+  - target:
+      kind: Ingress
+      name: perimeter
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev.vibetrading.invalid
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: dev.vibetrading.invalid
+  # Тот же хост — в браузерном клиенте провайдера: адрес возврата и
+  # источник запросов обязаны совпасть с ингрессом, иначе тропа токена
+  # не замкнётся.
+  - target:
+      kind: KeycloakRealmImport
+      name: vibetrading
+    patch: |-
+      - op: replace
+        path: /spec/realm/clients/0/redirectUris/0
+        value: https://dev.vibetrading.invalid/*
+      - op: replace
+        path: /spec/realm/clients/0/webOrigins/0
+        value: https://dev.vibetrading.invalid
   - target:
       kind: Namespace
       name: placeholder

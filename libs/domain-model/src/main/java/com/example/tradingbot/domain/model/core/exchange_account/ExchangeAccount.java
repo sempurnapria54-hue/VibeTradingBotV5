@@ -2,7 +2,6 @@ package com.example.tradingbot.domain.model.core.exchange_account;
 
 import com.example.tradingbot.domain.model.Auditable;
 import java.math.BigDecimal;
-import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -84,21 +83,6 @@ public class ExchangeAccount extends Auditable {
      */
     private SafetyRung safetyRung;
 
-    /**
-     * Счёт двигает капитал владельца.
-     *
-     * <p>Предикат на модели: вопрос задают и окружение при регистрации, и
-     * ядро перед набором риска, и ответ обязан быть один.
-     */
-    public Boolean isCapitalMoving() {
-        return Contour.LIVE.equals(contour);
-    }
-
-    /** База риска назначена, значит risk-creating действие имеет делитель. */
-    public Boolean hasRiskBase() {
-        return Objects.nonNull(riskBase);
-    }
-
     /** Контур площадки, к которому принадлежат ключи счёта. */
     public enum Contour {
 
@@ -157,6 +141,21 @@ public class ExchangeAccount extends Auditable {
          * Сворачивание: снятие живого риска по счёту, каскад активных
          * сделок в ошибку, блок торговых команд.
          */
-        TRADE_BLOCKED
+        TRADE_BLOCKED;
+
+        /**
+         * Ранг ступени: 2 — сворачивание, 1 — мягкий холд, 0 — ступени нет
+         * (docs/spec/manual-halt.json, величина {@code rungRankBefore}).
+         * Механизм монотонности — тот же, что у лестницы инструмента
+         * (docs/rules/exchange-hold.md §«Границы и эскалация»): подъём
+         * применяется только СТРОГО выше стоящей ступени.
+         */
+        public Integer rank() {
+            return switch (this) {
+                case ACTIVE -> 0;
+                case HOLD -> 1;
+                case TRADE_BLOCKED -> 2;
+            };
+        }
     }
 }

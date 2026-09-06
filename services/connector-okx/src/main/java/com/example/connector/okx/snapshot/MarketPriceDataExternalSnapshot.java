@@ -33,6 +33,12 @@ public class MarketPriceDataExternalSnapshot {
     /** Лучшая цена покупки. */
     BigDecimal externalBidPrice;
 
+    /** Объём на лучшем ask — операнд измерителя ёмкости стакана. */
+    BigDecimal externalAskSize;
+
+    /** Объём на лучшем bid — та же роль. */
+    BigDecimal externalBidSize;
+
     /** Время тикера на бирже. */
     OffsetDateTime externalTimestamp;
 }

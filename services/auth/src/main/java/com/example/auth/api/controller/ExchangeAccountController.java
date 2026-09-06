@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * `internalId` (.claude/rules/codestyle.md §«Идентичность наружу»).
  */
 @RestController
-@RequestMapping("/api/v1/exchange-accounts")
+@RequestMapping("/api/v1/auth/exchange-accounts")
 public class ExchangeAccountController {
 
     private final ExchangeAccountService accountService;

@@ -19,8 +19,8 @@
 ```text
 FSM / StateHandler
   -> выбрал StrategyAction
-  -> StrategyActionCalculator
-     -> CalculationContextFactory.build(action, dealContext)   # свежий context
+  -> ЯДРО: CalculationContextFactory.build(action, dealContext)  # свежий context
+  -> StrategyActionCalculator(context)                           # общий артефакт
      -> PriceCalculator.calculate(context)        -> CalculatedPrice
      -> SizeCalculator.calculate(context, price)  -> CalculatedSize
      -> StrategyActionCalculationResult (SUCCESS: CalculatedStrategyAction)
@@ -28,6 +28,12 @@ FSM / StateHandler
   -> RiskValidator, если action создаёт / увеличивает риск или ослабляет контроль
   -> StrategyActionOrchestrator (per-type StrategyActionExecutor) -> ServiceCommand
 ```
+
+**Сборка контекста ВНЕ калькулятора, и граница здесь не косметическая.**
+Фабрика живёт в ядре: её входы — персистентность ядра плюс вызов к соседу,
+а расчёт лежит в общей библиотеке и к базе не ходит вовсе
+(`docs/architecture/services.md` §«Что в библиотеку НЕ уезжает»). Бэктест
+соберёт тот же контекст из своего состояния и позовёт **тот же** расчёт.
 
 Компоненты: `docs/components/StrategyActionCalculator.md`,
 `CalculationContextFactory.md`, `PriceCalculator.md`, `SizeCalculator.md`.

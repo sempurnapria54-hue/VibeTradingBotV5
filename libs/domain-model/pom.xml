@@ -31,6 +31,7 @@
         <lombok.version>1.18.42</lombok.version>
         <commons-lang3.version>3.19.0</commons-lang3.version>
         <commons-collections4.version>4.5.0</commons-collections4.version>
+        <jackson-annotations.version>2.20</jackson-annotations.version>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
     </properties>
 
@@ -58,6 +59,20 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-collections4</artifactId>
             <version>${commons-collections4.version}</version>
+        </dependency>
+        <!--
+          Аннотации Jackson — ПО ПРЕДЪЯВЛЕННОЙ ПОТРЕБНОСТИ: форма
+          определения стратегии пересекает сериализацию (тело команды
+          приёма, снимок в событии активации), а её действие полиморфно —
+          без дискриминатора вида объявления разбор падает у ЧИТАТЕЛЯ.
+          Артефакт общий у Jackson 2 и Jackson 3: третий мажор оставил
+          аннотации на групповом идентификаторе второго
+          (.claude/rules/tech-radar.md, записи Jackson).
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${jackson-annotations.version}</version>
         </dependency>
 
     </dependencies>

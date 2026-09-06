@@ -43,25 +43,20 @@ public interface TradeFeeRateMapper {
                                                        TradeFeeOkxResponse.FeeGroupOkxResponse group);
 
     /**
-     * Материализация ставки из снапшота: {@code external*} переносятся по
-     * имени, доменная проекция типа резолвится из сырого значения,
-     * {@code exchangeId} проставляет вызывающий — синк знает биржу.
-     */
-    @Mapping(target = "instrumentType", source = "snapshot.externalInstrumentType",
-            qualifiedByName = "resolveFeeInstrumentType")
-    TradeFeeRate snapshotToDomain(TradeFeeRateExternalSnapshot snapshot, Long exchangeId);
-
-    /**
-     * Снапшот → доменная модель БЕЗ числового ключа связанной
-     * сущности.
+     * Снапшот → доменная модель БЕЗ числового ключа владельца.
      *
      * <p><b>Коннектор его и не может заполнить:</b> числовые ключи баз
      * границу сервиса не пересекают
      * ({@code docs/architecture/data-ownership.md} §Идентификаторы), а
-     * у коннектора базы нет вовсе. Связь проставляет владелец
-     * сущности, получив модель. Соседний метод с ключом остаётся для
-     * внутреннего употребления донора, пока тот жив.
+     * у коннектора базы нет вовсе. Счёт-владелец проставляет ядро,
+     * получив модель: у него счёт и есть ключ чтения.
+     *
+     * <p>Перегрузки с числовым ключом здесь больше нет: её не звал никто
+     * — у донора свой маппер, и метод был копией, оставленной портом
+     * (.claude/rules/codestyle.md §«Неиспользуемый код»).
      */
+    @Mapping(target = "instrumentType", source = "externalInstrumentType",
+            qualifiedByName = "resolveFeeInstrumentType")
     TradeFeeRate snapshotToDomain(TradeFeeRateExternalSnapshot snapshot);
 
     /** Ставка источника со снятым знаком: комиссия положительна, ребейт отрицателен. */
