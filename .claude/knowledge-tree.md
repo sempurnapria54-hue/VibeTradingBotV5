@@ -74,6 +74,7 @@
 │   │   ├── models-core-vs-other.md — Как разделены persisted-модели на core и other?
 │   │   ├── negative-statements-not-fixated.md — Почему не фиксируем утверждения «X не хранит Y»?
 │   │   ├── process-materialization-criterion.md — По какому критерию кандидат в процесс материализуется файлом?
+│   │   ├── per-node-closure-frame.md — Почему по эскалации `DOCS_CHECK_2` шага 10 фазы 2 закрытие переведено на поузловую рамку с обязательной чистотой узла?
 │   │   ├── product-roadmap-type.md — Почему тип «роадмап» устроен так, а не иначе?
 │   │   ├── population-origin-and-code-gate.md — Почему по эскалации `DOCS_CHECK_32` сменены происхождение перечня популяции, гейт `CODE` и режим усиления измерения?
 │   │   ├── recovered-deal-linkage-window-bound.md — Почему нижней границей окна линковки восстановленной сделки выбрано биржевое время открытия наблюдённой позиции?
@@ -161,7 +162,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v151.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v152.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
