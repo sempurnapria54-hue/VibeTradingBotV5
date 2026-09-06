@@ -1,0 +1,399 @@
+{
+  "subject": "event-actor-presence",
+  "question": "У каких классов событий актор едет содержимым",
+  "home": "docs/architecture/contracts.md",
+  "operands": {
+    "eventClass": "класс события из таблицы производителей (docs/architecture/contracts.md, §События)",
+    "hasManualPath": "класс порождается КОМАНДОЙ ПОЛЬЗОВАТЕЛЯ, а не собственным проходом контура. Ложь — событие производит расписание, обработчик либо исполнитель, и у актора одно значение по построению",
+    "producerBuilt": "производитель класса построен: у сервиса есть outbox, реле и тема. Ложь — класс объявлен таблицей, а порождать его пока некому"
+  },
+  "values": [
+    {
+      "name": "actorTravelsInContent",
+      "note": "ДОМ ПРАВИЛА. Актор едет полем СОДЕРЖИМОГО у классов с ручной тропой и только у них. Конверт актора не несёт: у классов собственного прохода значение одно — «собственный проход», и поле конверта с одним значением расширяло бы объявленный полный состав и версионировало бы все события сразу. Область значений поля — домовая (docs/models/domain/other/Auditable.md: имя принципала либо собственный проход), второй области не заводится; идентификатором актор не выражается — internalId пользователя корпус не объявляет ничем. Второй конъюнкт несущий: у класса без производителя содержимого не существует вовсе, и поле приезжает ВМЕСТЕ С КЛАССОМ, не раньше.",
+      "expr": "hasManualPath && producerBuilt"
+    }
+  ],
+  "populations": [
+    {
+      "axis": "класс события — у каждого назван исход правила об акторе",
+      "note": "Перечень выводится из таблицы производителей дока-дома, а не из классов, встреченных в примерах: множество встреченного молчит ровно о том классе, которого в нём нет. Двенадцать классов недостижимы — производителя у них нет, и содержимого тоже, — каждый предъявляет контрпример с названной причиной исключения.",
+      "rule": [
+        "actorTravelsInContent"
+      ],
+      "derive": {
+        "command": "bash tools/derive/event-class-manual-path.sh",
+        "from": [
+          "docs/architecture/contracts.md"
+        ]
+      },
+      "keys": [
+        "eventClass"
+      ],
+      "members": [
+        {
+          "member": [
+            "OrderDecided"
+          ]
+        },
+        {
+          "member": [
+            "DealOpened"
+          ]
+        },
+        {
+          "member": [
+            "DealShutdownInitiated"
+          ]
+        },
+        {
+          "member": [
+            "DealClosed"
+          ]
+        },
+        {
+          "member": [
+            "HoldRaised"
+          ]
+        },
+        {
+          "member": [
+            "HoldReleased"
+          ],
+          "unreachable": "ручная тропа объявлена, класса в перечне производителя нет: снятие ступени приезжает поверхностью ручных операций ядра, а её не построено — содержимого у класса не существует"
+        },
+        {
+          "member": [
+            "AnomalyReported"
+          ]
+        },
+        {
+          "member": [
+            "StrategyActivated"
+          ]
+        },
+        {
+          "member": [
+            "StrategyDeactivated"
+          ]
+        },
+        {
+          "member": [
+            "StrategyDeleted"
+          ]
+        },
+        {
+          "member": [
+            "BacktestCompleted"
+          ],
+          "unreachable": "предмета не существует: бэктест приезжает фазой 4"
+        },
+        {
+          "member": [
+            "SignalDetected"
+          ],
+          "unreachable": "предмета не существует: сигнал приезжает фазой 4 вместе со своим производителем"
+        },
+        {
+          "member": [
+            "SignalOutcomeRecorded"
+          ],
+          "unreachable": "предмета не существует: исход сигнала приезжает фазой 4"
+        },
+        {
+          "member": [
+            "ExecutionObserved"
+          ],
+          "unreachable": "единственный механизм публикации — WS-слушатель коннектора, и он ждёт добытого контракта каналов"
+        },
+        {
+          "member": [
+            "MembershipChanged"
+          ],
+          "unreachable": "у auth нет ни outbox, ни реле, ни темы; класс объявлен таблицей, порождать его некому"
+        },
+        {
+          "member": [
+            "ExchangeAccountRegistered"
+          ],
+          "unreachable": "у auth нет ни outbox, ни реле, ни темы"
+        },
+        {
+          "member": [
+            "ExchangeKeysRotated"
+          ],
+          "unreachable": "у auth нет ни outbox, ни реле, ни темы"
+        },
+        {
+          "member": [
+            "TenantSuspended"
+          ],
+          "unreachable": "у auth нет ни outbox, ни реле, ни темы"
+        },
+        {
+          "member": [
+            "InstrumentListed"
+          ],
+          "unreachable": "у market-data нет ни outbox, ни реле, ни темы; его данные читаются синхронно"
+        },
+        {
+          "member": [
+            "InstrumentRulesChanged"
+          ],
+          "unreachable": "у market-data нет ни outbox, ни реле, ни темы"
+        },
+        {
+          "member": [
+            "FeaturesUpdated"
+          ],
+          "unreachable": "у market-data нет ни outbox, ни реле, ни темы"
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "case": "OrderDecided — решение о заявке принимает проход оркестратора: актор константен, поля не заводится",
+      "state": {
+        "eventClass": "OrderDecided",
+        "hasManualPath": false,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "DealOpened — сделку заводит сканер входа либо восстановительная тропа; человека на обеих нет",
+      "state": {
+        "eventClass": "DealOpened",
+        "hasManualPath": false,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "DealShutdownInitiated — причину остановки пишут обработчик активной сделки и шаг энфорсмента ступени: оба — собственный проход",
+      "state": {
+        "eventClass": "DealShutdownInitiated",
+        "hasManualPath": false,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "DealClosed — терминал пишет исполнитель терминального ребра",
+      "state": {
+        "eventClass": "DealClosed",
+        "hasManualPath": false,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "HoldRaised — ступень поднимает детектор, а не человек: подъём автоматический по построению",
+      "state": {
+        "eventClass": "HoldRaised",
+        "hasManualPath": false,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "AnomalyReported — отчёт заводит проход детекции",
+      "state": {
+        "eventClass": "AnomalyReported",
+        "hasManualPath": false,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "StrategyActivated — активацию запускает команда пользователя через периметр, и субъект вызова писателю известен из предъявленного токена: актор едет содержимым",
+      "state": {
+        "eventClass": "StrategyActivated",
+        "hasManualPath": true,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": true
+      }
+    },
+    {
+      "case": "StrategyDeactivated — та же ручная тропа: остановку определения инициирует человек",
+      "state": {
+        "eventClass": "StrategyDeactivated",
+        "hasManualPath": true,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": true
+      }
+    },
+    {
+      "case": "StrategyDeleted — та же ручная тропа",
+      "state": {
+        "eventClass": "StrategyDeleted",
+        "hasManualPath": true,
+        "producerBuilt": true
+      },
+      "expect": {
+        "actorTravelsInContent": true
+      }
+    },
+    {
+      "case": "контрпример: HoldReleased — ручная тропа ОБЪЯВЛЕНА, класса в перечне производителя нет",
+      "unreachable": "снятие ступени приезжает поверхностью ручных операций ядра, а её не построено: содержимого у класса не существует, и поле приезжает вместе с классом",
+      "state": {
+        "eventClass": "HoldReleased",
+        "hasManualPath": true,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: MembershipChanged — ручная тропа есть, производителя нет",
+      "unreachable": "у auth нет ни outbox, ни реле, ни темы; актор приезжает вместе с производителем",
+      "state": {
+        "eventClass": "MembershipChanged",
+        "hasManualPath": true,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: ExchangeAccountRegistered — регистрацию счёта делает владелец руками, производителя нет",
+      "unreachable": "у auth нет ни outbox, ни реле, ни темы",
+      "state": {
+        "eventClass": "ExchangeAccountRegistered",
+        "hasManualPath": true,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: ExchangeKeysRotated — ротацию ключей делает владелец руками, производителя нет",
+      "unreachable": "у auth нет ни outbox, ни реле, ни темы",
+      "state": {
+        "eventClass": "ExchangeKeysRotated",
+        "hasManualPath": true,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: TenantSuspended — приостановку тенанта делает админ платформы, производителя нет",
+      "unreachable": "у auth нет ни outbox, ни реле, ни темы",
+      "state": {
+        "eventClass": "TenantSuspended",
+        "hasManualPath": true,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: ExecutionObserved — факт площадки, ручной тропы нет и производителя нет",
+      "unreachable": "единственный механизм публикации — WS-слушатель коннектора, и он ждёт добытого контракта каналов",
+      "state": {
+        "eventClass": "ExecutionObserved",
+        "hasManualPath": false,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: InstrumentListed — каталог инструментов, производителя нет",
+      "unreachable": "у market-data нет ни outbox, ни реле, ни темы; его данные читаются синхронно",
+      "state": {
+        "eventClass": "InstrumentListed",
+        "hasManualPath": false,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: InstrumentRulesChanged — то же",
+      "unreachable": "у market-data нет ни outbox, ни реле, ни темы",
+      "state": {
+        "eventClass": "InstrumentRulesChanged",
+        "hasManualPath": false,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: FeaturesUpdated — то же",
+      "unreachable": "у market-data нет ни outbox, ни реле, ни темы",
+      "state": {
+        "eventClass": "FeaturesUpdated",
+        "hasManualPath": false,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: SignalDetected — предмета не существует",
+      "unreachable": "сигнал приезжает фазой 4 вместе со своим производителем",
+      "state": {
+        "eventClass": "SignalDetected",
+        "hasManualPath": false,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: SignalOutcomeRecorded — предмета не существует",
+      "unreachable": "исход сигнала приезжает фазой 4",
+      "state": {
+        "eventClass": "SignalOutcomeRecorded",
+        "hasManualPath": false,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    },
+    {
+      "case": "контрпример: BacktestCompleted — предмета не существует",
+      "unreachable": "бэктест приезжает фазой 4",
+      "state": {
+        "eventClass": "BacktestCompleted",
+        "hasManualPath": false,
+        "producerBuilt": false
+      },
+      "expect": {
+        "actorTravelsInContent": false
+      }
+    }
+  ]
+}

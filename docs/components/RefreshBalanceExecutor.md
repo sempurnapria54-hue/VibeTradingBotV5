@@ -24,8 +24,17 @@ settleCurrency / invalid fields → controlled external/account error (см.
 Не знает про raw OKX response и не валидирует OKX-specific поля: цепочка
 `IntegrationService → raw DTO → validation → BalanceContainerMapper →
 BalanceContainerExternalSnapshot → upsert BalanceContainer → replace
-balances`. Команда попадает в историю исполнения (см.
+balances`. Исполнение команды объясняется историей (см.
 `docs/rules/audit-not-runtime-source.md`).
+
+**Чем именно объясняется и когда — названо, потому что сегодня не
+объясняется ничем.** Durable-носитель у исполнения есть: команда идёт
+звеном системного действия `REFRESH_DEAL_CONTEXT_ACTION`, у которого полная
+тропа статусов (`docs/lifecycles/DealActionState.md`). В журнал исполнение
+уедет вместе с появлением **класса события на переход строки исполнения**;
+сегодня такого класса нет ни одного, и клейм правила **верен и не
+обеспечен**. Дом ограничения — `.claude/work/backlog.md`, секция о классе
+события на переход строки исполнения.
 
 ## Первое наблюдение базы риска
 

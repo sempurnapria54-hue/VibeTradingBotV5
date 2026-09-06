@@ -60,7 +60,7 @@
 | `docs/models/domain/other/`: `Candle`, `CandleGroup`, `IndicatorValue`, `MarketStructure`, `MarketPhase`, `MarketOrderBook`, `MarketTicker` | `market-data` |
 | `docs/models/domain/other/AccessDenial.md` | `auth`: строку заводит сервис, у которого отказ произошёл **и** есть своя база; у периметра базы нет, и там след — лог и метрика (`docs/rules/api-access-policy.md` §«След отказа пишет тот, у кого есть база») |
 | `docs/models/domain/other/Auditable.md` | `domain-model` |
-| `docs/models/domain/other/AuditRecord.md`, `docs/rules/statistics-aggregates.md`, `docs/spec/statistics-aggregates.json` | `audit-statistics` |
+| `docs/models/domain/other/AuditRecord.md`, `docs/rules/statistics-aggregates.md`, `docs/spec/statistics-aggregates.json`, `docs/spec/audit-journal.json` | `audit-statistics` |
 | `docs/rules/audit-not-runtime-source.md` | сквозное: правило **запрещает** управляющей логике читать историю, то есть адресовано её читателям — ядру и всякому, кто принимает runtime-решение, — а не владельцу журнала. У аудита оно не предмет, а следствие |
 | `docs/components/` — файлов владельца `audit-statistics` пока нет, и **строку catch-all ниже он не наследует** | его исполнители (потребитель событий, джоба пересчёта проекции, поверхность чтения) получают компонент-доки на своём шаге; без этой строки они достались бы `trading-core` умолчанием — тот же класс, что закрыт у `bff` и у `strategies` |
 | `docs/models/integrations/okx/`, `docs/models/mapping/`, `docs/integrations/okx/` | `connector-okx` |
@@ -79,7 +79,7 @@
 | `docs/processes/`: `candle-loading`, `market-data-calculation`, `snapshot-collection` | `market-data` |
 | `docs/processes/`: `deal-management`, `fsm-execution-layering`, `risk-evaluation` | `trading-core` |
 | `docs/processes/strategy-action-calculation.md` | `strategy-engine` |
-| `docs/spec/` | по владельцу величины: сайзинг, риск, сделки, транши, холды — `trading-core`; свежесть, фаза — `market-data`; стратегия — `strategies` / `strategy-engine`; статусы площадки — коннектор |
+| `docs/spec/` | по владельцу величины: сайзинг, риск, сделки, транши, холды — `trading-core`; свежесть, фаза — `market-data`; стратегия — `strategies` / `strategy-engine`; статусы площадки — коннектор; полнота журнала — `audit-statistics`; **присутствие актора в содержимом — сквозное**: его дом `docs/architecture/contracts.md`, а предмет — правило, обязанное иметь исход на классе каждого из пяти производителей |
 | `.claude/` целиком, `tools/`, `README.md`, `CLAUDE.md` | пайплайн монорепозитория — вне оси |
 | `.claude/tests/source-api/okx/` | пайплайн; **предмет** — `connector-okx` (контур проверки источника принадлежит проверочной деятельности, не сервису) |
 
