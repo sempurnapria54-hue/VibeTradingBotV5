@@ -14,8 +14,10 @@
   сервиса, а сервис не ограничен минимумом библиотеки.
 
   Состав модулей растёт шагами 4-10 фазы 2 по мере появления сервисов;
-  каталог services/ равен инвентарю docs/architecture/services.md, и
-  равенство проверяется прогоном tools/deploy-layout-check.py.
+  в каталоге services/ нет единицы, которой нет в инвентаре
+  docs/architecture/services.md, и это вложение проверяется прогоном
+  tools/deploy-layout-check.py. Обратного вложения замер не покрывает:
+  пока построена не последняя единица инвентаря, инвентарь шире каталога.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

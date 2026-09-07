@@ -5,10 +5,10 @@
   "operands": {
     "tookRisk": "сделка приняла риск: у неё была живая позиция. Ложь — тропа закрытия без входа (docs/rules/deal-without-operations.md): кандидат дошёл до терминала, не торгуя",
     "priceResult": "результат сделки ДО накопленного финансирования — значение величины priceResult дома docs/spec/loss-streak-halt.json; форма здесь не переписывается. Комиссии обеих ног и штраф ликвидации в него УЖЕ ВХОДЯТ вычтенными: слагаемое приходит биржевым net эпизода (docs/spec/deal-result.json, операнд externalRealizedProfit). Пусто — результат недоступен: не добыта запись закрытия эпизода, не предъявлена разбивка движений либо движение вне расчётной валюты ждёт курса",
-    "grossResult": "итог сделки — Deal.resultProfit, дом формы docs/spec/deal-result.json; накопленное финансирование в него ВХОДИТ, как и комиссии со штрафом ликвидации. Пусто ровно тогда же, когда пуст результат до финансирования: оба приходят одной записью закрытия эпизода",
+    "resultProfit": "итог сделки — Deal.resultProfit, дом формы docs/spec/deal-result.json; накопленное финансирование в него ВХОДИТ, как и комиссии со штрафом ликвидации. Пусто ровно тогда же, когда пуст результат до финансирования: оба приходят одной записью закрытия эпизода",
     "fee": "комиссии обеих ног сделки, издержкой ПОЛОЖИТЕЛЬНЫЕ: величина rightTradeFee дома docs/spec/pnl-reconciliation.json с обратным знаком — там конвенция сырая. Сторона выбрана правая (сумма Position.externalFee по эпизодам), а не левая (сумма по строкам разбивки), потому что из ЭТОГО же носителя посчитан публикуемый результат: разложение сходится тождеством, а не обещанием. При несошедшейся сверке показанная комиссия расходится с разбивкой — это состояние видно счётчиком reconciliationMismatchedDeals",
     "funding": "накопленное финансирование сделки — значение величины fundingCost дома docs/spec/loss-streak-halt.json; знак нормализован издержкой, поэтому carry-доход отрицателен",
-    "liqPenalty": "штраф ликвидации сделки, издержкой ПОЛОЖИТЕЛЬНЫЙ: величина rightLiquidationPenalty дома docs/spec/pnl-reconciliation.json с обратным знаком. Ноль у сделки, закрытой не ликвидацией",
+    "liqPenalty": "штраф ликвидации сделки, издержкой ПОЛОЖИТЕЛЬНЫЙ: величина rightLiquidationPenalty дома docs/spec/pnl-reconciliation.json с обратным знаком. Ноль у сделки, которую биржа не закрывала принудительно. У принудительного сокращения штраф НЕ ИСКЛЮЧЁН: наблюдения нет, и обе развязки держат фикстуры дома (docs/spec/pnl-reconciliation.json)",
     "plannedRisk": "плановый риск сделки — Deal.plannedRiskAmount, знаменатель R-мультипликатора; форма — docs/spec/deal-risk-numbers.json, величина dealPlannedRisk. Величина НИКОГДА не пуста: её дом — сумма по входным ногам, и на пустом множестве сумма даёт НОЛЬ. Ноль означает «сайзинга на тропе сделки не было» — так закрывается восстановительная сделка, заведённая вокруг живого риска",
     "currency": "расчётная валюта результата сделки — Deal.resultProfitCurrency, дом формы docs/spec/deal-result.json. Пусто достижимо: расчётная валюта инструмента не резолвилась, и у числа нет единицы измерения",
     "closeOutcome": "торговый исход закрытия — Deal.closeOutcome, тип CloseOutcome: NORMAL_EXIT, LIQUIDATION, FORCED_REDUCTION, UNDETERMINED. Пусто у сделки, закрытой без входа: признак неприменим",
@@ -17,10 +17,11 @@
     "riskBenchmarkAvailability": "доступность базы риска сделки — Deal.riskBenchmarkAvailability, тип RiskBenchmarkAvailability: AVAILABLE, NOT_APPLICABLE, MISSING. MISSING означает потерянный знаменатель при состоявшемся входе и заводит отчёт о происшествии",
     "rowCurrency": "расчётная валюта строки агрегата; она в зерне строки, а не в поле. Пусто — строка нерезолвленной валюты",
     "deals": "закрытые сделки суток одной строки агрегата",
-    "records": "строки журнала суток одной строки агрегата второго зерна; элемент несёт eventType и, у подъёма ступени, ступень с признаком ручной тропы",
+    "records": "строки журнала суток одной строки агрегата второго зерна; элемент несёт eventType и, у подъёма ступени и у отчёта о происшествии, операнды их разрезов",
     "eventType": "класс события строки журнала — AuditRecord.eventType",
     "holdRung": "ступень поднятого холда — поле содержимого HoldRaised; пусто у строк прочих классов",
-    "actorIsPrincipal": "актор строки журнала — ИМЯ ПРИНЦИПАЛА, а не собственный проход контура. Область значений актора домовая (docs/models/domain/other/Auditable.md), и здесь она не переписывается: операнд несёт различение двух её классов, а не литерал. Пусто у классов без ручной тропы"
+    "severity": "критичность отчёта о происшествии — поле содержимого AnomalyReported; область значений домовая (docs/models/domain/other/AnomalyReport.md), и здесь она не переписывается. Пусто у строк прочих классов",
+    "codeIsManualOperation": "код строки журнала принадлежит множеству кодов, которыми ручная поверхность метит СВОИ операции. Область значений домовая (docs/rules/manual-halt.md), и здесь она не переписывается: операнд несёт различение двух классов кода, а не литерал. Пусто у классов, чьё содержимое кода не несёт"
   },
   "values": [
     {
@@ -80,8 +81,18 @@
     },
     {
       "name": "countsAsLiquidated",
-      "note": "Сделку закрыла биржа принудительно. Признак едет в терминальном событии как признак ОТБОРА (docs/architecture/contracts.md), и отчёт обязан по нему отбирать: день с ликвидацией — ровно тот, после которого меняют риск-аппетит, и без счётчика он читается как обычный убыток.",
+      "note": "Сделку закрыла биржа принудительно ПО МАРЖЕ — принудительное сокращение это значение не накрывает, у него свой счётчик. Признак едет в терминальном событии как признак ОТБОРА (docs/architecture/contracts.md), и отчёт обязан по нему отбирать: день с ликвидацией — ровно тот, после которого меняют риск-аппетит, и без счётчика он читается как обычный убыток.",
       "expr": "countsInShares && closeOutcome == 'LIQUIDATION'"
+    },
+    {
+      "name": "countsAsForcedReduction",
+      "note": "Позицию принудительно сократила биржа — делеверидж, а не наш выход. Признак едет тем же признаком ОТБОРА, что и ликвидация, и отбирать по нему обязательно по тому же доводу: и то и другое говорит о марже и меняет риск-аппетит. Счётчик свой, а не общий с ликвидацией: маржинальный вынос и делеверидж соседа — разные поводы, и одно число на оба давало бы одинаковый ответ на разных состояниях.",
+      "expr": "countsInShares && closeOutcome == 'FORCED_REDUCTION'"
+    },
+    {
+      "name": "countsAsOutcomeUndetermined",
+      "note": "Кто закрыл позицию, не установлено — значение, а не пустота (docs/models/domain/aggregate/Deal.md). Состояние достижимо у сделки с ДОСТУПНЫМ результатом: вошедшая сделка без единого эпизода даёт его, а свёртка «записи закрытия добыты у всех эпизодов» на пустой коллекции истинна (docs/spec/position-close-outcome.json, docs/spec/deal-result.json). Без счётчика такая сделка входит в суммы и читается как штатный выход — благоприятное умолчание, запрещённое docs/concept.md, П1.",
+      "expr": "countsInShares && closeOutcome == 'UNDETERMINED'"
     },
     {
       "name": "countsAsMismatched",
@@ -89,9 +100,19 @@
       "expr": "countsInShares && reconciliationStatus == 'MISMATCHED'"
     },
     {
+      "name": "countsAsReconciliationNotRun",
+      "note": "Сверка не была обязана: хотя бы один конъюнкт обязанности не выполнен (docs/spec/pnl-reconciliation.json). Счётчик доводит до конца тот же довод, каким обоснован countsAsMismatched: без него «не проверяли» складывается с «проверили, всё в порядке» — ровно то различение, которого требует docs/concept.md, П1. Состояние достижимо у сделки с доступным результатом: порог доказанного покрытия пуст, когда эпизода не было ни одного.",
+      "expr": "countsInShares && reconciliationStatus == 'NOT_RUN'"
+    },
+    {
       "name": "countsAsBreakdownIncomplete",
       "note": "Разбивка движений неполна: часть строк не добыта в пределах окна. Комиссия и финансирование такой сделки занижены на недобытое, и без счётчика занижение входит в суммы молча.",
       "expr": "countsInShares && breakdownIncomplete == 'INCOMPLETE_BY_WINDOW'"
+    },
+    {
+      "name": "countsAsBreakdownNotAssessed",
+      "note": "Полнота разбивки не оценивалась: добыча движений не выполнялась — единственный триггер значения (docs/models/domain/aggregate/Deal.md). Счётчик свой, как у каждого нездорового значения признака отбора: без него число здорового значения перестаёт быть остатком, а состояние «не проверяли» складывается с «проверили, полна».",
+      "expr": "countsInShares && breakdownIncomplete == 'NOT_ASSESSED'"
     },
     {
       "name": "countsAsRiskBenchmarkMissing",
@@ -158,28 +179,56 @@
       "over": "deals",
       "op": "count",
       "where": "countsAsLiquidated",
-      "note": "Сколько сделок суток закрыла биржа принудительно."
+      "note": "Сколько принявших риск сделок суток закрыла биржа по марже. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
+    },
+    {
+      "name": "forcedReductionDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsForcedReduction",
+      "note": "Сколько принявших риск сделок суток биржа сократила принудительно. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
+    },
+    {
+      "name": "outcomeUndeterminedDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsOutcomeUndetermined",
+      "note": "Сколько принявших риск сделок суток закрылось с неустановленным торговым исходом — та самая отдельная корзина, которую объявляет владелец перечня. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
     },
     {
       "name": "reconciliationMismatchedDeals",
       "over": "deals",
       "op": "count",
       "where": "countsAsMismatched",
-      "note": "Сколько чисел суток вошло в суммы с несошедшейся сверкой."
+      "note": "Сколько принявших риск сделок суток закрылось с несошедшейся сверкой. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
+    },
+    {
+      "name": "reconciliationNotRunDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsReconciliationNotRun",
+      "note": "Сколько принявших риск сделок суток закрылось непроверенными. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
     },
     {
       "name": "breakdownIncompleteDeals",
       "over": "deals",
       "op": "count",
       "where": "countsAsBreakdownIncomplete",
-      "note": "Сколько сделок суток вошло в суммы с неполной разбивкой движений."
+      "note": "Сколько принявших риск сделок суток закрылось с неполной разбивкой движений. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
+    },
+    {
+      "name": "breakdownNotAssessedDeals",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsBreakdownNotAssessed",
+      "note": "Сколько принявших риск сделок суток закрылось с неоценённой полнотой разбивки. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
     },
     {
       "name": "riskBenchmarkMissingDeals",
       "over": "deals",
       "op": "count",
       "where": "countsAsRiskBenchmarkMissing",
-      "note": "Сколько сделок суток потеряли базу риска."
+      "note": "Сколько принявших риск сделок суток потеряло базу риска. Популяция — принявшие риск, а не вошедшие в денежные суммы: признак достижим и у сделки с недоступным результатом, а такая в суммы не входит."
     },
     {
       "name": "resultBeforeFundingSum",
@@ -193,7 +242,7 @@
       "name": "netResultSum",
       "over": "deals",
       "op": "sum",
-      "of": "grossResult",
+      "of": "resultProfit",
       "where": "entersRowSums",
       "note": "Сумма итогов — net по всем издержкам, включая финансирование. Имя то же, каким тот же носитель зовётся выше по цепочке (docs/models/domain/core/Position.md): назвать это число gross значило бы звать gross ровно то, что корпус зовёт net."
     },
@@ -250,8 +299,8 @@
       "over": "deals",
       "op": "sum",
       "of": "plannedRisk",
-      "where": "countsInShares && plannedRisk > 0 && !entersRowSums",
-      "note": "Плановый риск, выведенный из знаменателя. Счётчика мало: читателю нужна ВЕЛИЧИНА непокрытого риска, чтобы судить, насколько отношение опирается на полную картину."
+      "where": "countsInShares && plannedRisk > 0 && !entersRowSums && currencyResolved",
+      "note": "Плановый риск, выведенный из знаменателя. Счётчика мало: читателю нужна ВЕЛИЧИНА непокрытого риска, чтобы судить, насколько отношение опирается на полную картину. Конъюнкт currencyResolved несущий, и довод его — не тождество двух валют, а ключ зерна: единицу строке даёт он, несёт он валюту РЕЗУЛЬТАТА, и второй валютной колонки у строки нет. На строке с пустым ключом сумма планового риска единицы не имеет ни при каком исходе резолва валюты риска — и складывала бы величины разных инструментов, то есть ровно ту операцию, ради запрета которой валюта вынесена в ключ. Мощность той популяции показывает currencyUnresolvedDeals, а величины у неё нет по той же причине, по которой её нет у результата."
     },
     {
       "name": "rSum",
@@ -297,22 +346,27 @@
       "of": "(isNull(currency) && isNull(rowCurrency)) || currency == rowCurrency"
     },
     {
+      "name": "unassessedBreakdownHasNoResult",
+      "note": "ОХРАННЫЙ ИНВАРИАНТ признака полноты разбивки: у сделки, чья полнота не оценивалась, итога нет. Единственный триггер значения NOT_ASSESSED — добыча движений не выполнялась (docs/models/domain/aggregate/Deal.md); тогда ложен первый конъюнкт полноты разбивки (docs/spec/deal-context-load.json), а с ним и доступность итога (docs/spec/deal-result.json). Инвариант связывает признак отбора с доступностью итога: нарушенный, он молча испортил бы обе величины — сам по себе счётчиком он не выражается.",
+      "expr": "!(countsInShares && breakdownIncomplete == 'NOT_ASSESSED') || countsAsUnavailable"
+    },
+    {
       "name": "openedDeals",
-      "note": "Счётчик происшествий суток: заведённых сделок. Живёт в строке ВТОРОГО зерна (тенант × счёт × сутки): события происшествий не несут ни определения стратегии, ни расчётной валюты, и в сделочную строку не укладываются (docs/rules/statistics-aggregates.md — дом обоих зёрен).",
+      "note": "Счётчик происшествий суток: заведённых сделок. Живёт в строке ВТОРОГО зерна: события происшествий не несут ни определения стратегии, ни расчётной валюты, и в сделочную строку не укладываются. Ключи обоих зёрен здесь не переписываются — их дом docs/rules/statistics-aggregates.md.",
       "over": "records",
       "op": "count",
       "where": "eventType == 'DEAL_OPENED'"
     },
     {
       "name": "orderDecisions",
-      "note": "Счётчик происшествий суток: решений о заявке.",
+      "note": "Счётчик происшествий суток: решений о создании ОБЫЧНОЙ заявки. Популяция названа, потому что она у́же имени: ремодел выражается новой сущностью плюс отменой старой (docs/rules/replace-not-amend.md) и даёт своё решение, а решение об отдельной условной заявке не выражено классом события вовсе — производителя у него нет, и в разность объявленных и построенных классов оно не попадает (docs/models/domain/other/AuditRecord.md).",
       "over": "records",
       "op": "count",
       "where": "eventType == 'ORDER_DECIDED'"
     },
     {
       "name": "raisedHolds",
-      "note": "Счётчик происшествий суток: поднятых ступеней, обе природы вместе. Само по себе это число ни на какой вопрос не отвечает и потому идёт в паре с разрезами ниже.",
+      "note": "Счётчик происшествий суток: поднятых ступеней, обе тропы вместе. Само по себе это число ни на какой вопрос не отвечает и потому идёт в паре с разрезами ниже.",
       "over": "records",
       "op": "count",
       "where": "eventType == 'HOLD_RAISED'"
@@ -326,17 +380,31 @@
     },
     {
       "name": "manuallyRaisedHolds",
-      "note": "Разрез по природе. «Система остановила себя» — сигнал, что гипотеза не работает; «я её остановил» — собственное действие держателя. Одно число на оба состояния есть ложный операнд по определению: собственные остановки держателя считались бы признаком отказа гипотезы.",
+      "note": "Разрез по тропе. «Система остановила себя» — сигнал, что гипотеза не работает; «остановили её снаружи» — вмешательство в контур. Одно число на оба состояния есть ложный операнд по определению: вмешательства считались бы признаком отказа гипотезы. Различитель — КОД тропы, а не актор строки: актор отвечает на вопрос «кем порождён ход», и у джобы, запущенной ручным триггером, он равен принципалу (docs/models/domain/other/Auditable.md), то есть автоматическая остановка, найденная в ручном прогоне детекции, попала бы в это число. Отсюда и популяция: счётчик мерит ТРОПУ, а не человека — код одинаков у человека и у скрипта, до поверхности дошедшего.",
       "over": "records",
       "op": "count",
-      "where": "eventType == 'HOLD_RAISED' && actorIsPrincipal"
+      "where": "eventType == 'HOLD_RAISED' && codeIsManualOperation"
     },
     {
       "name": "anomalyReports",
-      "note": "Счётчик происшествий суток: отчётов о происшествиях.",
+      "note": "Счётчик происшествий суток: отчётов о происшествиях, обе тропы вместе. Само по себе это число ни на какой вопрос не отвечает и потому идёт в паре с разрезами ниже — как и raisedHolds.",
       "over": "records",
       "op": "count",
       "where": "eventType == 'ANOMALY_REPORTED'"
+    },
+    {
+      "name": "criticalAnomalyReports",
+      "note": "Разрез по критичности. «Kill-switch гонялся» и «не гонялся» — разные сутки, а без разреза они дают одно число; довод тот же, каким обоснован разрез по ступени у подъёма холда.",
+      "over": "records",
+      "op": "count",
+      "where": "eventType == 'ANOMALY_REPORTED' && severity == 'CRITICAL'"
+    },
+    {
+      "name": "manualOperationReports",
+      "note": "Разрез по тропе. Отчёт заводит не только детекция: ручная поверхность заводит его и на постановке ступени, и на СНЯТИИ (docs/rules/manual-halt.md). Снятие — действие, обратное постановке, и сложенное с происшествиями автоматики оно выдаёт ручную операцию за находку детектора. Довод и операнд те же, что у manuallyRaisedHolds, включая выбор кода вместо актора: ручной прогон джобы детекции даёт актором принципала, и по актору находки автоматики считались бы ручными. Популяция счётчика — строки отчёта, заведённые ручной тропой, обе операции вместе; направление третьим разрезом не разводится, потому что «какая именно операция» есть вопрос к журналу, где коды двух операций различны.",
+      "over": "records",
+      "op": "count",
+      "where": "eventType == 'ANOMALY_REPORTED' && codeIsManualOperation"
     }
   ],
   "populations": [
@@ -412,6 +480,157 @@
             "UNAVAILABLE"
           ],
           "unreachable": "недоступность результата приходит от НЕДОБЫТОЙ записи закрытия эпизода, а у сделки без входа эпизода не было вовсе: добывать нечего, и ноль пишется расчётом"
+        }
+      ]
+    },
+    {
+      "axis": "исход закрытия торговавшей сделки — у каждого значения назван исход отнесения",
+      "note": "Перечень выводится из объявления перечня общей доменной модели, а не из значений, встреченных в примерах: множество встреченного молчит ровно о том значении, которого в нём нет. Здоровое значение своего счётчика не получает — его число есть остаток популяции счёта за вычетом прочих, а выводимое вторым носителем не заводится (docs/concept.md, П4).",
+      "rule": [
+        "countsAsLiquidated",
+        "countsAsForcedReduction",
+        "countsAsOutcomeUndetermined"
+      ],
+      "derive": {
+        "command": "bash tools/derive/deal-selection-feature-values.sh CloseOutcome",
+        "from": [
+          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+        ]
+      },
+      "where": "tookRisk",
+      "excludes": "сделка, закрытая без входа: признак у неё пуст и неприменим, а вся популяция счётчиков отбора — принявшие риск",
+      "keys": [
+        "closeOutcome"
+      ],
+      "members": [
+        {
+          "member": [
+            "NORMAL_EXIT"
+          ]
+        },
+        {
+          "member": [
+            "LIQUIDATION"
+          ]
+        },
+        {
+          "member": [
+            "FORCED_REDUCTION"
+          ]
+        },
+        {
+          "member": [
+            "UNDETERMINED"
+          ]
+        }
+      ]
+    },
+    {
+      "axis": "исход сверки у торговавшей сделки — у каждого значения назван исход отнесения",
+      "note": "Перечень выводится из объявления перечня общей доменной модели, а не из значений, встреченных в примерах: множество встреченного молчит ровно о том значении, которого в нём нет. Здоровое значение своего счётчика не получает — его число есть остаток популяции счёта за вычетом прочих, а выводимое вторым носителем не заводится (docs/concept.md, П4).",
+      "rule": [
+        "countsAsMismatched",
+        "countsAsReconciliationNotRun"
+      ],
+      "derive": {
+        "command": "bash tools/derive/deal-selection-feature-values.sh ReconciliationStatus",
+        "from": [
+          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+        ]
+      },
+      "where": "tookRisk",
+      "excludes": "сделка, закрытая без входа: признак у неё пуст и неприменим, а вся популяция счётчиков отбора — принявшие риск",
+      "keys": [
+        "reconciliationStatus"
+      ],
+      "members": [
+        {
+          "member": [
+            "NOT_RUN"
+          ]
+        },
+        {
+          "member": [
+            "MATCHED"
+          ]
+        },
+        {
+          "member": [
+            "MISMATCHED"
+          ]
+        }
+      ]
+    },
+    {
+      "axis": "полнота разбивки у торговавшей сделки — у каждого значения назван исход отнесения",
+      "note": "Перечень выводится из объявления перечня общей доменной модели, а не из значений, встреченных в примерах: множество встреченного молчит ровно о том значении, которого в нём нет. Здоровое значение своего счётчика не получает — его число есть остаток популяции счёта за вычетом прочих, а выводимое вторым носителем не заводится (docs/concept.md, П4).",
+      "rule": [
+        "countsAsBreakdownIncomplete",
+        "countsAsBreakdownNotAssessed",
+        "unassessedBreakdownHasNoResult"
+      ],
+      "derive": {
+        "command": "bash tools/derive/deal-selection-feature-values.sh BreakdownCompleteness",
+        "from": [
+          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+        ]
+      },
+      "where": "tookRisk",
+      "excludes": "сделка, закрытая без входа: признак у неё пуст и неприменим, а вся популяция счётчиков отбора — принявшие риск",
+      "keys": [
+        "breakdownIncomplete"
+      ],
+      "members": [
+        {
+          "member": [
+            "COMPLETE"
+          ]
+        },
+        {
+          "member": [
+            "INCOMPLETE_BY_WINDOW"
+          ]
+        },
+        {
+          "member": [
+            "NOT_ASSESSED"
+          ]
+        }
+      ]
+    },
+    {
+      "axis": "доступность базы риска у торговавшей сделки — у каждого значения назван исход отнесения",
+      "note": "Перечень выводится из объявления перечня общей доменной модели, а не из значений, встреченных в примерах: множество встреченного молчит ровно о том значении, которого в нём нет. Здоровое значение своего счётчика не получает — его число есть остаток популяции счёта за вычетом прочих, а выводимое вторым носителем не заводится (docs/concept.md, П4).",
+      "rule": [
+        "countsAsRiskBenchmarkMissing"
+      ],
+      "derive": {
+        "command": "bash tools/derive/deal-selection-feature-values.sh RiskBenchmarkAvailability",
+        "from": [
+          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+        ]
+      },
+      "where": "tookRisk",
+      "excludes": "сделка, закрытая без входа: признак у неё принимает NOT_APPLICABLE, а вся популяция счётчиков отбора — принявшие риск",
+      "keys": [
+        "riskBenchmarkAvailability"
+      ],
+      "members": [
+        {
+          "member": [
+            "AVAILABLE"
+          ]
+        },
+        {
+          "member": [
+            "NOT_APPLICABLE"
+          ],
+          "unreachable": "значение означает «входа не было, знаменателя нет по построению» (docs/models/domain/aggregate/Deal.md); у сделки, принявшей риск, вход состоялся, а вся популяция счётчиков отбора — принявшие риск"
+        },
+        {
+          "member": [
+            "MISSING"
+          ]
         }
       ]
     }
@@ -513,7 +732,9 @@
         "countsAsNeutral": false,
         "countsAsUnavailable": true,
         "entersMoneySums": false,
-        "entersRowSums": false
+        "entersRowSums": false,
+        "countsAsReconciliationNotRun": true,
+        "unassessedBreakdownHasNoResult": true
       }
     },
     {
@@ -682,7 +903,6 @@
           {
             "tookRisk": true,
             "priceResult": 12.5,
-            "grossResult": 10.0,
             "fee": 1.2,
             "funding": 2.5,
             "liqPenalty": 0,
@@ -691,12 +911,12 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": 10.0
           },
           {
             "tookRisk": true,
             "priceResult": -8,
-            "grossResult": -9,
             "fee": 0.8,
             "funding": 1.0,
             "liqPenalty": 0,
@@ -705,12 +925,12 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": -9
           },
           {
             "tookRisk": true,
             "priceResult": null,
-            "grossResult": null,
             "fee": null,
             "funding": null,
             "liqPenalty": null,
@@ -719,12 +939,12 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "NOT_RUN",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": null
           },
           {
             "tookRisk": true,
             "priceResult": 0,
-            "grossResult": -1,
             "fee": 0.2,
             "funding": 1.0,
             "liqPenalty": 0,
@@ -733,12 +953,12 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": -1
           },
           {
             "tookRisk": false,
             "priceResult": 0,
-            "grossResult": 0,
             "fee": 0,
             "funding": 0,
             "liqPenalty": 0,
@@ -747,7 +967,8 @@
             "closeOutcome": null,
             "reconciliationStatus": null,
             "breakdownIncomplete": null,
-            "riskBenchmarkAvailability": "NOT_APPLICABLE"
+            "riskBenchmarkAvailability": "NOT_APPLICABLE",
+            "resultProfit": 0
           }
         ]
       },
@@ -790,7 +1011,6 @@
           {
             "tookRisk": true,
             "priceResult": -3,
-            "grossResult": 2,
             "fee": 0.4,
             "funding": -5,
             "liqPenalty": 0,
@@ -799,7 +1019,8 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": 2
           }
         ]
       },
@@ -838,7 +1059,6 @@
           {
             "tookRisk": true,
             "priceResult": -50,
-            "grossResult": -52,
             "fee": 1.5,
             "funding": 2,
             "liqPenalty": 12,
@@ -847,12 +1067,12 @@
             "closeOutcome": "LIQUIDATION",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": -52
           },
           {
             "tookRisk": true,
             "priceResult": 5,
-            "grossResult": 5,
             "fee": 0.2,
             "funding": 0,
             "liqPenalty": 0,
@@ -861,7 +1081,8 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MISMATCHED",
             "breakdownIncomplete": "INCOMPLETE_BY_WINDOW",
-            "riskBenchmarkAvailability": "MISSING"
+            "riskBenchmarkAvailability": "MISSING",
+            "resultProfit": 5
           }
         ]
       },
@@ -890,7 +1111,11 @@
         "rReportable": true,
         "fundingDecompositionHolds": true,
         "rowCurrencyUniform": true,
-        "rDenominatorDeals": 2
+        "rDenominatorDeals": 2,
+        "forcedReductionDeals": 0,
+        "outcomeUndeterminedDeals": 0,
+        "reconciliationNotRunDeals": 0,
+        "breakdownNotAssessedDeals": 0
       }
     },
     {
@@ -901,7 +1126,6 @@
           {
             "tookRisk": false,
             "priceResult": 0,
-            "grossResult": 0,
             "fee": 0,
             "funding": 0,
             "liqPenalty": 0,
@@ -910,12 +1134,12 @@
             "closeOutcome": null,
             "reconciliationStatus": null,
             "breakdownIncomplete": null,
-            "riskBenchmarkAvailability": "NOT_APPLICABLE"
+            "riskBenchmarkAvailability": "NOT_APPLICABLE",
+            "resultProfit": 0
           },
           {
             "tookRisk": false,
             "priceResult": 0,
-            "grossResult": 0,
             "fee": 0,
             "funding": 0,
             "liqPenalty": 0,
@@ -924,7 +1148,8 @@
             "closeOutcome": null,
             "reconciliationStatus": null,
             "breakdownIncomplete": null,
-            "riskBenchmarkAvailability": "NOT_APPLICABLE"
+            "riskBenchmarkAvailability": "NOT_APPLICABLE",
+            "resultProfit": 0
           }
         ]
       },
@@ -963,7 +1188,6 @@
           {
             "tookRisk": true,
             "priceResult": 7,
-            "grossResult": 7,
             "fee": 0.3,
             "funding": 0,
             "liqPenalty": 0,
@@ -972,12 +1196,12 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": 7
           },
           {
             "tookRisk": true,
             "priceResult": -2,
-            "grossResult": -2,
             "fee": 0.1,
             "funding": 0,
             "liqPenalty": 0,
@@ -986,7 +1210,8 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": -2
           }
         ]
       },
@@ -1020,7 +1245,6 @@
           {
             "tookRisk": true,
             "priceResult": 3,
-            "grossResult": 3,
             "fee": 0.1,
             "funding": 0,
             "liqPenalty": 0,
@@ -1029,7 +1253,8 @@
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE"
+            "riskBenchmarkAvailability": "AVAILABLE",
+            "resultProfit": 3
           }
         ]
       },
@@ -1046,7 +1271,7 @@
         "winResultSum": 0,
         "lossResultSum": 0,
         "plannedRiskSum": 0,
-        "plannedRiskExcludedSum": 15,
+        "plannedRiskExcludedSum": 0,
         "rSum": 0,
         "rReportable": false,
         "fundingDecompositionHolds": true,
@@ -1063,12 +1288,12 @@
           {
             "tookRisk": true,
             "priceResult": 5,
-            "grossResult": 5,
             "fee": 0,
             "funding": 3,
             "liqPenalty": 0,
             "plannedRisk": 10,
-            "currency": "USDT"
+            "currency": "USDT",
+            "resultProfit": 5
           }
         ]
       },
@@ -1088,22 +1313,22 @@
           {
             "tookRisk": true,
             "priceResult": 1,
-            "grossResult": 1,
             "fee": 0,
             "funding": 0,
             "liqPenalty": 0,
             "plannedRisk": 10,
-            "currency": "USDT"
+            "currency": "USDT",
+            "resultProfit": 1
           },
           {
             "tookRisk": true,
             "priceResult": 2,
-            "grossResult": 2,
             "fee": 0,
             "funding": 0,
             "liqPenalty": 0,
             "plannedRisk": 10,
-            "currency": "BTC"
+            "currency": "BTC",
+            "resultProfit": 2
           }
         ]
       },
@@ -1112,18 +1337,18 @@
       }
     },
     {
-      "case": "счётчики происшествий суток: обе природы подъёма ступени и обе ступени",
+      "case": "счётчики происшествий суток: обе тропы подъёма ступени, обе ступени и обе тропы отчёта о происшествии",
       "state": {
         "records": [
           {
             "eventType": "HOLD_RAISED",
             "holdRung": "SOFT",
-            "actorIsPrincipal": false
+            "codeIsManualOperation": false
           },
           {
             "eventType": "HOLD_RAISED",
             "holdRung": "HARD",
-            "actorIsPrincipal": true
+            "codeIsManualOperation": true
           },
           {
             "eventType": "DEAL_OPENED"
@@ -1135,10 +1360,22 @@
             "eventType": "ORDER_DECIDED"
           },
           {
-            "eventType": "ANOMALY_REPORTED"
+            "eventType": "ANOMALY_REPORTED",
+            "severity": "CRITICAL",
+            "codeIsManualOperation": false
           },
           {
             "eventType": "DEAL_CLOSED"
+          },
+          {
+            "eventType": "ANOMALY_REPORTED",
+            "severity": "NON_CRITICAL",
+            "codeIsManualOperation": false
+          },
+          {
+            "eventType": "ANOMALY_REPORTED",
+            "severity": "NON_CRITICAL",
+            "codeIsManualOperation": true
           }
         ]
       },
@@ -1148,7 +1385,9 @@
         "raisedHolds": 2,
         "hardRaisedHolds": 1,
         "manuallyRaisedHolds": 1,
-        "anomalyReports": 1
+        "anomalyReports": 3,
+        "criticalAnomalyReports": 1,
+        "manualOperationReports": 1
       }
     },
     {
@@ -1169,7 +1408,187 @@
         "raisedHolds": 0,
         "hardRaisedHolds": 0,
         "manuallyRaisedHolds": 0,
-        "anomalyReports": 0
+        "anomalyReports": 0,
+        "criticalAnomalyReports": 0,
+        "manualOperationReports": 0
+      }
+    },
+    {
+      "case": "принудительное сокращение биржей: сделка в суммах, счётчик свой",
+      "state": {
+        "tookRisk": true,
+        "plannedRisk": 20,
+        "currency": "USDT",
+        "priceResult": -30,
+        "closeOutcome": "FORCED_REDUCTION",
+        "reconciliationStatus": "MATCHED",
+        "breakdownIncomplete": "COMPLETE",
+        "riskBenchmarkAvailability": "AVAILABLE"
+      },
+      "expect": {
+        "countsInShares": true,
+        "entersRowSums": true,
+        "countsAsLiquidated": false,
+        "countsAsForcedReduction": true,
+        "countsAsOutcomeUndetermined": false,
+        "countsAsReconciliationNotRun": false,
+        "countsAsBreakdownIncomplete": false,
+        "countsAsRiskBenchmarkMissing": false,
+        "unassessedBreakdownHasNoResult": true
+      }
+    },
+    {
+      "case": "вошедшая сделка без единого эпизода: исход не установлен, сверка не была обязана, а результат доступен",
+      "state": {
+        "tookRisk": true,
+        "plannedRisk": 20,
+        "currency": "USDT",
+        "priceResult": 0,
+        "closeOutcome": "UNDETERMINED",
+        "reconciliationStatus": "NOT_RUN",
+        "breakdownIncomplete": "COMPLETE",
+        "riskBenchmarkAvailability": "AVAILABLE"
+      },
+      "expect": {
+        "countsInShares": true,
+        "resultClass": "ZERO",
+        "entersRowSums": true,
+        "countsAsLiquidated": false,
+        "countsAsForcedReduction": false,
+        "countsAsOutcomeUndetermined": true,
+        "countsAsReconciliationNotRun": true,
+        "unassessedBreakdownHasNoResult": true
+      }
+    },
+    {
+      "case": "добыча движений не выполнялась: полнота не оценивалась, и результата нет",
+      "state": {
+        "tookRisk": true,
+        "plannedRisk": 20,
+        "currency": "USDT",
+        "priceResult": null,
+        "breakdownIncomplete": "NOT_ASSESSED"
+      },
+      "expect": {
+        "countsInShares": true,
+        "countsAsUnavailable": true,
+        "countsAsBreakdownIncomplete": false,
+        "unassessedBreakdownHasNoResult": true,
+        "countsAsBreakdownNotAssessed": true
+      }
+    },
+    {
+      "case": "контрпример: полнота разбивки не оценивалась, а результат доступен",
+      "unreachable": "единственный триггер значения NOT_ASSESSED — добыча движений не выполнялась (docs/models/domain/aggregate/Deal.md); тогда ложен первый конъюнкт полноты разбивки (docs/spec/deal-context-load.json), а с ним и доступность итога (docs/spec/deal-result.json)",
+      "state": {
+        "tookRisk": true,
+        "plannedRisk": 20,
+        "currency": "USDT",
+        "priceResult": 4,
+        "breakdownIncomplete": "NOT_ASSESSED"
+      },
+      "expect": {
+        "countsInShares": true,
+        "countsAsUnavailable": false,
+        "countsAsBreakdownIncomplete": false,
+        "unassessedBreakdownHasNoResult": false,
+        "countsAsBreakdownNotAssessed": true
+      }
+    },
+    {
+      "case": "контрпример: сделка приняла риск, а база риска неприменима",
+      "unreachable": "значение NOT_APPLICABLE означает «входа не было, знаменателя нет по построению» (docs/models/domain/aggregate/Deal.md); у сделки, принявшей риск, вход состоялся",
+      "state": {
+        "tookRisk": true,
+        "plannedRisk": 20,
+        "currency": "USDT",
+        "priceResult": 2,
+        "riskBenchmarkAvailability": "NOT_APPLICABLE"
+      },
+      "expect": {
+        "countsInShares": true,
+        "countsAsRiskBenchmarkMissing": false
+      }
+    },
+    {
+      "case": "сутки: принудительное сокращение, неустановленный исход и непроверенная сверка — каждое своим счётчиком",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          {
+            "tookRisk": true,
+            "priceResult": -30,
+            "resultProfit": -31,
+            "fee": 1,
+            "funding": 1,
+            "liqPenalty": 0,
+            "plannedRisk": 20,
+            "currency": "USDT",
+            "closeOutcome": "FORCED_REDUCTION",
+            "reconciliationStatus": "MATCHED",
+            "breakdownIncomplete": "COMPLETE",
+            "riskBenchmarkAvailability": "AVAILABLE"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": 0,
+            "resultProfit": 0,
+            "fee": 0,
+            "funding": 0,
+            "liqPenalty": 0,
+            "plannedRisk": 10,
+            "currency": "USDT",
+            "closeOutcome": "UNDETERMINED",
+            "reconciliationStatus": "NOT_RUN",
+            "breakdownIncomplete": "COMPLETE",
+            "riskBenchmarkAvailability": "AVAILABLE"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": 6,
+            "resultProfit": 6,
+            "fee": 0.5,
+            "funding": 0,
+            "liqPenalty": 0,
+            "plannedRisk": 10,
+            "currency": "USDT",
+            "closeOutcome": "NORMAL_EXIT",
+            "reconciliationStatus": "MATCHED",
+            "breakdownIncomplete": "COMPLETE",
+            "riskBenchmarkAvailability": "AVAILABLE"
+          },
+          {
+            "tookRisk": true,
+            "priceResult": null,
+            "resultProfit": null,
+            "fee": 0,
+            "funding": 0,
+            "liqPenalty": 0,
+            "plannedRisk": 10,
+            "currency": "USDT",
+            "closeOutcome": "NORMAL_EXIT",
+            "reconciliationStatus": "NOT_RUN",
+            "breakdownIncomplete": "NOT_ASSESSED",
+            "riskBenchmarkAvailability": "AVAILABLE"
+          }
+        ]
+      },
+      "expect": {
+        "closedDeals": 4,
+        "riskBearingDeals": 4,
+        "liquidatedDeals": 0,
+        "forcedReductionDeals": 1,
+        "outcomeUndeterminedDeals": 1,
+        "reconciliationMismatchedDeals": 0,
+        "reconciliationNotRunDeals": 2,
+        "resultBeforeFundingSum": -24,
+        "netResultSum": -25,
+        "fundingSum": 1,
+        "plannedRiskExcludedSum": 10,
+        "fundingDecompositionHolds": true,
+        "rowCurrencyUniform": true,
+        "resultUnavailableDeals": 1,
+        "breakdownNotAssessedDeals": 1
       }
     }
   ]
