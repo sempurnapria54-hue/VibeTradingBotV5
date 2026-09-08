@@ -59,6 +59,7 @@
 │   │   ├── component-vs-process.md — Как различать «компонент» и «процесс» при классификации?
 │   │   ├── context-cost-diet.md — Почему контекстная стоимость знаниевых файлов сокращена именно так?
 │   │   ├── cross-cutting-parking.md — Как мигрируем сущность, чьё знание частично относится к другим кластерам?
+│   │   ├── edit-self-description-pass.md — Почему по эскалации С5 узла 1 `GAPS_CLOSE_4` шага 10 фазы 2 закрытие переведено на цельный проход по механической проверке самоописания правки?
 │   │   ├── env-wait-deadline.md — Почему ожидание восстановления demo-контура получило срок и что происходит по его наступлении?
 │   │   ├── executor-payload-file-granularity.md — Почему документация command-layer гранулируется file-per-executor?
 │   │   ├── forward-notes-after-task-closure.md — Где живут форвард-заметки после закрытия задачи-источника?
@@ -133,6 +134,7 @@
 │   │   ├── pre-launch-schema-changes.md — Какое правило схемных изменений, пока проект не запущен?
 │   │   ├── session-work-unit.md — Какое правило единицы работы сессии?
 │   │   ├── snapshot-format.md — Какое правило формата снапшота?
+│   │   ├── stopped-node-disposition.md — Какое правило разбора узла, остановленного сигналом С5?
 │   │   ├── structure.md — Какое правило размещения знания?
 │   │   └── tech-radar.md — Что мы используем при написании кода (стэк со статусами)?
 │   ├── skills/ — Как именно делать X?
@@ -165,7 +167,7 @@
 │   │   ├── trading-review.md — Как сделать адверсариальный проход по торговой корректности?
 │   │   └── update-roadmap-progress.md — Как обновить статус шага и пересчитать статус фазы?
 │   ├── snapshots/ — Где мы сейчас?
-│   │   └── snapshot-v159.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
+│   │   └── snapshot-v161.md — Где мы сейчас? (актуальный; старые — в work/history/snapshots/)
 │   ├── templates/
 │   │   ├── code/ — Каков абстрактный паттерн/шаблон кода для X?
 │   │   │   └── Java/Controller.md — Каков паттерн контроллера нашего API?
@@ -239,6 +241,7 @@
 │   │   ├── AlgoOrderExternalStatusResolver.md — Кто переводит внешний статус standalone algo-order в доменный?
 │   │   ├── AnomalyJob.md — Кто ищет нарушения базовых инвариантов системы?
 │   │   ├── AttachedAlgoOrderStateResolver.md — Кто определяет доменный статус встроенной защиты?
+│   │   ├── AuditEventListener.md — Кто принимает событие в журнал аудита?
 │   │   ├── CalculationContextFactory.md — Кто собирает контекст расчёта?
 │   │   ├── CancelAlgoOrderActionExecutor.md — Кто планирует CANCEL-действие над standalone algo-order за проход?
 │   │   ├── CancelAlgoOrderExecutor.md — Кто исполняет `CANCEL_ALGO_ORDER_COMMAND`?
@@ -268,6 +271,7 @@
 │   │   ├── InstrumentExternalRulesDataService.md — Кто отдаёт справочные правила инструмента?
 │   │   ├── InstrumentSyncJob.md — Кто ведёт каталог инструментов и их справочный навес?
 │   │   ├── IntegrationService.md — Кто является границей с биржей?
+│   │   ├── JournalCleanupJob.md — Кто чистит журнал аудита в непроизводственном окружении?
 │   │   ├── KillSwitchExecutor.md — Кто исполняет аварийное снятие живого риска?
 │   │   ├── KillSwitchService.md — Кто триггерит аварийное снятие риска для реактивной реакции?
 │   │   ├── MarkDealClosedExecutor.md — Кто применяет терминал штатного закрытия сделки?
@@ -284,6 +288,7 @@
 │   │   ├── OutboxRelayJob.md — Кто публикует накопленное в outbox?
 │   │   ├── PositionStatusResolver.md — Кто определяет доменный статус позиции по факту её наличия?
 │   │   ├── PriceCalculator.md — Кто рассчитывает цены действия?
+│   │   ├── ReceptionStateJob.md — Кто ведёт строку состояния приёма журнала?
 │   │   ├── RefreshAlgoOrderExecutor.md — Кто исполняет добычу состояния условной заявки?
 │   │   ├── RefreshBalanceExecutor.md — Кто исполняет `REFRESH_BALANCE_COMMAND`?
 │   │   ├── RefreshBillsExecutor.md — Кто исполняет команду добычи движений средств?

@@ -65,7 +65,7 @@ CONTOUR_SPEC = "docs/spec/environment-contour.json"
 # осью 4: расхождение перечня здесь и там — тот же дубль носителя.
 REQUIRED_AXES = ("environment", "admittedContours", "ingressHost",
                  "argocdSync", "vaultPrefix", "resourceProfile",
-                 "retentionProfile")
+                 "retentionProfile", "journalRetentionProfile")
 
 
 class Refusal(Exception):
@@ -351,6 +351,7 @@ data:
   vaultPrefix: "%s"
   resourceProfile: "target"
   retentionProfile: "reduced"
+  journalRetentionProfile: "reduced"
 """
 
 KUSTOMIZATION = """apiVersion: kustomize.config.k8s.io/v1beta1
