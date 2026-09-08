@@ -1,0 +1,48 @@
+# Объявленный долг клеток-носителей команд — команды, стоящие в клетке
+# markdown-таблицы с экранированной альтернацией и потому дословно не
+# воспроизводимые (механизм — шапка tools/command-carrier-check.py; дом правила —
+# .claude/processes/roadmap-step-execution.md, пассаж «Команда, объявленная
+# воспроизводимой, стоит блоком кода, а не клеткой таблицы»).
+#
+# Перечисленные клетки написаны ДО ввода правила и лежат в отчётах уже закрытых
+# заходов: ретро-правка закрытого их не касается (.claude/rules/curation.md).
+# Прогон падает на НОВОЙ такой клетке и на строке долга, которой в корпусе
+# больше нет. Долг не растёт.
+#
+# Три гейтящие единицы GAPS_CLOSE_4 шага 10 фазы 2 в долг НЕ внесены: их клетки
+# переведены в блоки кода закрытием Г1 — на них правило и записано.
+#
+# С вводом оси 9 (2026-09-08) долг адресует ДВА класса одной гранулярностью
+# «носитель + начало команды»: клетку таблицы (ось 1) и строку ограждённого блока
+# (оси 7, 9). Восемь строк ниже — строки блоков двух отчётов верификации узла 1,
+# читающие $PY, который в блоке не связан: имя жило в прозе над блоком, а отчёты
+# принадлежат уже ЗАКРЫТЫМ заходам, и ретро-правка их не касается
+# (.claude/rules/curation.md). Маркер исключения им не подходит: он объявляет
+# ПРЕДЪЯВЛЕНИЕ дефекта, а эти блоки — запись настоящего прогона.
+#
+# Погашение — .claude/work/backlog.md, секция «Команды в клетках таблиц у живых
+# отчётов».
+#
+# Формат: <путь от .claude/work/progress/><TAB><начало команды, как его печатает
+# прогон>. Номеров строк нет намеренно: номер дрейфует от любой правки.
+phase-2-step-10-docs-check-1-lens-c.md	grep -rn "HOLD_RELEASED" libs/ services/ --include=*.java \| wc -l
+phase-2-step-10-docs-check-1-lens-c.md	grep -rn "funding\|Funding" libs/domain-model/src/main/java/com/exampl
+phase-2-step-10-docs-check-1-lens-c.md	grep -rn "shutdownReason" libs/.../domain/event/ \| wc -l
+phase-2-step-10-docs-check-1-lens-c.md	grep -rni "tranche" libs/.../domain/event/ \| wc -l
+phase-2-step-10-docs-check-3.md	grep -n 'journal_reception_state\|access_denials' docs/architecture/da
+phase-2-step-10-gaps-close-1-part-2-critique.md	LC_ALL=C.UTF-8 grep -rn 'шаг 10\|шага 10' docs/
+phase-2-step-10-gaps-close-1-part-2-critique.md	grep -rln "DealClosedContent\|DealOpenedContent\|OrderDecidedContent\|
+phase-2-step-10-gaps-close-1-part-2-critique.md	grep -rn "kafkaExporter\|consumer_lag\|PrometheusRule" deploy/
+phase-2-step-10-gaps-close-1-part-2-verification.md	sed §«Что аудит фиксирует» \| grep -c '^- '
+phase-2-step-10-gaps-close-3-node-1-verification-6.md	git ls-files \| grep tmp
+phase-2-step-10-gaps-close-3-node-2.md	LC_ALL=C.UTF-8 grep -rlUzP '(?s)нижн[а-яё]+\s+границ' docs/ .claude/ C
+phase-2-step-10-gaps-close-4-node-1-verification-2.md	git diff -- docs/ \| grep '^+'
+phase-2-step-10-gaps-close-4-node-1-verification-2.md	git diff -U0 \| grep -c '^@@'
+phase-2-step-10-gaps-close-3-node-1-verification-6.md	doc-pointer-check.py; do "$PY" tools/$t; echo "exit=$?"; done
+phase-2-step-10-gaps-close-3-node-1-verification-7.md	$PY tools/spec-scope-check.py docs/spec
+phase-2-step-10-gaps-close-3-node-1-verification-7.md	$PY tools/spec-pointer-check.py
+phase-2-step-10-gaps-close-3-node-1-verification-7.md	$PY tools/anchor-check.py
+phase-2-step-10-gaps-close-3-node-1-verification-7.md	$PY tools/retired-check.py
+phase-2-step-10-gaps-close-3-node-1-verification-7.md	$PY tools/population-derive-check.py
+phase-2-step-10-gaps-close-3-node-1-verification-7.md	$PY tools/deploy-layout-check.py
+phase-2-step-10-gaps-close-3-node-1-verification-7.md	$PY tools/doc-pointer-check.py

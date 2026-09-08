@@ -4,7 +4,15 @@
 
 ПРЕДМЕТ. `.claude/rules/structure.md` объявляет: «в каталоге нет единицы,
 которой нет в инвентаре — это и мерит прогон», а
-`docs/architecture/platform.md` объявляет закрытый перечень окружений.
+`docs/architecture/platform.md` объявляет закрытый перечень окружений и
+закрытый перечень осей их различия.
+
+Перечни берутся ИЗ ДОМА разбором, а не копией рядом с кодом. Прежняя
+редакция держала оси кортежем `REQUIRED_AXES` и объявляла его «выведенным
+из дома и сверяемым с ним осью 4», тогда как ось 4 сверяла манифест с этим
+же кортежем: копия делала измеряемой себя, а не дом. Проба, на которой это
+записано: строка оси, удалённая из таблицы дома, оставляла замер зелёным —
+расхождений 0 (A12 `DOCS_CHECK_4`).
 Обратного вложения (инвентарь ⊆ каталог) дом не обещает и этот замер его не
 мерит: единицы приезжают со своими шагами.
 Механической проверки ни у одного из двух клеймов не было: клейм полноты
@@ -24,8 +32,16 @@
   2. каталог `deploy/` содержит ровно окружения перечня
      `docs/architecture/platform.md` плюс `base/` — ни больше, ни меньше;
   3. у каждого окружения есть `kustomization.yaml` и `env.yaml`;
-  4. `env.yaml` окружения объявляет ВСЕ оси различия, названные домом
-     (по одной строке `data:` на ось), и ни одной сверх перечня;
+  4. `env.yaml` окружения объявляет РОВНО те ключи, которые дом называет в
+     колонке «Ключ манифеста», — ни меньше (4a), ни больше (4b); перечень
+     ВЫВОДИТСЯ из таблицы дома, своей копии у детектора нет (4c);
+  4d. строка дома с прочерком вместо ключа обязательного ключа не заводит
+     (КОНТРОЛЬ: ось различает окружения, но живёт не в `env.yaml`);
+  4e. клетка ключа, не разобранная ни как ключ, ни как прочерк, —
+     расхождение: молчаливо пропущенная строка ушла бы из перечня;
+  4f. голый прочерк — расхождение: дом обещает называть носитель значения в
+     той же клетке. Мерится НЕПУСТОТА хвоста, а не его содержательность:
+     «— TBD» замер проходит, и клейма о смысле хвоста команда не даёт;
   5. допустимые контуры окружения в `env.yaml` совпадают с матрицей
      `docs/spec/environment-contour.json` — двум носителям одной истины
      разойтись не даётся;
@@ -33,7 +49,12 @@
      в `services/` существует: тег несуществующего сервиса — мусор,
      который Argo применит молча;
   7. отказ: инвентарь не разобран, дом окружений не разобран, каталога
-     `deploy/` нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2).
+     `deploy/` нет — ЗАМЕР НЕ ПРОВОДИЛСЯ (код 2);
+  7d. таблица дома перечня осей НЕ ДАЁТ — раздела нет, таблицы в разделе
+     нет, колонки ключей нет, ни одного ключа не разобрано: замер
+     отказывает по любой из четырёх причин. Проб две, по краям диапазона
+     (колонки нет; ключей ни одного) — ветвь у всех четырёх одна, и
+     доказывается предикат, а не каждая причина порознь.
 
 Форма, которой в этом перечне нет, замером НЕ измерена — на неё он клейма
 не даёт.
@@ -60,12 +81,18 @@ SERVICES_DOC = "docs/architecture/services.md"
 PLATFORM_DOC = "docs/architecture/platform.md"
 CONTOUR_SPEC = "docs/spec/environment-contour.json"
 
-# Оси различия окружений, которые обязан объявить env.yaml. Перечень выведен
-# из дома (PLATFORM_DOC, шапка и первый столбец таблицы) и сверяется с ним
-# осью 4: расхождение перечня здесь и там — тот же дубль носителя.
-REQUIRED_AXES = ("environment", "admittedContours", "ingressHost",
-                 "argocdSync", "vaultPrefix", "resourceProfile",
-                 "retentionProfile", "journalRetentionProfile")
+# Заголовок колонки дома, в которой стои́т машиночитаемое имя оси, и две
+# формы её клетки. Перечня осей здесь НЕТ намеренно: он выводится из дома
+# функцией required_axes ниже.
+AXES_SECTION = "## Чем различаются окружения"
+KEY_COLUMN = "Ключ манифеста"
+AXIS_KEY_RE = re.compile(r"^`([A-Za-z][A-Za-z0-9]*)`$")
+# Прочерк: ось различает окружения, но живёт не в env.yaml. Дом обещает
+# называть носитель значения в той же клетке, поэтому голый прочерк —
+# расхождение: он неотличим от забытой клетки, ради чего колонка и заведена.
+NO_KEY_RE = re.compile(r"^—\s*\S")
+BARE_DASH_RE = re.compile(r"^—\s*$")
+SEPARATOR_RE = re.compile(r"^:?-{2,}:?$")
 
 
 class Refusal(Exception):
@@ -157,6 +184,56 @@ def environments(root):
     return names
 
 
+def required_axes(root):
+    """Обязательные ключи `env.yaml` — из колонки ключей таблицы дома.
+
+    Возвращает тройку: множество ключей, перечень строк с неразобранной
+    клеткой и перечень строк с голым прочерком. Второе и третье —
+    расхождения, а не отказ: остальной перечень выводится, а неразобранная
+    строка молча ушла бы из него, и её отсутствие проявилось бы у соседа —
+    ключом «вне перечня».
+    """
+    text = read(root, PLATFORM_DOC)
+    section = text.split(AXES_SECTION, 1)
+    if len(section) < 2:
+        raise Refusal("в %s нет раздела «%s»"
+                      % (PLATFORM_DOC, AXES_SECTION.lstrip("# ")))
+    body = section[1].split("\n## ", 1)[0]
+    column = None
+    keys = set()
+    malformed = []
+    bare = []
+    for line in body.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if all(SEPARATOR_RE.match(cell) for cell in cells):
+            continue
+        if column is None:
+            if KEY_COLUMN not in cells:
+                raise Refusal(
+                    "в таблице %s нет колонки «%s» — перечень осей выводить "
+                    "не из чего" % (PLATFORM_DOC, KEY_COLUMN))
+            column = cells.index(KEY_COLUMN)
+            continue
+        if len(cells) <= column:
+            malformed.append(cells[0] if cells else "?")
+            continue
+        cell = cells[column]
+        match = AXIS_KEY_RE.match(cell)
+        if match:
+            keys.add(match.group(1))
+        elif BARE_DASH_RE.match(cell):
+            bare.append(cells[0])
+        elif not NO_KEY_RE.match(cell):
+            malformed.append(cells[0])
+    if column is None:
+        raise Refusal("в %s не разобрана шапка таблицы осей" % PLATFORM_DOC)
+    if not keys:
+        raise Refusal("в %s не разобрано ни одного ключа оси" % PLATFORM_DOC)
+    return keys, malformed, bare
+
+
 def admitted_from_spec(root):
     """Матрица допуска контуров — из исполнимой спеки, а не из прозы."""
     text = read(root, CONTOUR_SPEC)
@@ -219,12 +296,23 @@ def check(root):
     """Сверка раскладки. Возвращает список расхождений."""
     units = inventory(root)
     envs = environments(root)
+    required_keys, malformed, bare = required_axes(root)
     matrix = admitted_from_spec(root)
     deploy = os.path.join(root, "deploy")
     if not os.path.isdir(deploy):
         raise Refusal("каталога deploy/ нет — раскладку мерить не на чем")
 
     defects = []
+
+    # --- ось 4e: клетка ключа в доме не разобрана
+    for name in malformed:
+        defects.append("%s — у оси «%s» клетка ключа не разобрана: ни ключа "
+                       "в обратных кавычках, ни прочерка" % (PLATFORM_DOC, name))
+
+    # --- ось 4f: прочерк не назвал носителя значения
+    for name in bare:
+        defects.append("%s — у оси «%s» стои́т голый прочерк: носитель "
+                       "значения не назван" % (PLATFORM_DOC, name))
 
     # --- ось 1: services/ ⊆ инвентарь
     services = os.path.join(root, "services")
@@ -272,11 +360,11 @@ def check(root):
             continue
         with io.open(env_file, encoding="utf-8") as handle:
             axes = axes_of(handle.read())
-        # --- ось 4: перечень осей совпадает с объявленным
-        for axis in REQUIRED_AXES:
-            if axis not in axes:
-                defects.append("deploy/%s/env.yaml — нет оси «%s»" % (env, axis))
-        for axis in sorted(set(axes) - set(REQUIRED_AXES)):
+        # --- ось 4: ключи манифеста совпадают с выведенными из дома
+        for axis in sorted(required_keys - set(axes)):
+            defects.append("deploy/%s/env.yaml — нет оси «%s», названной в %s"
+                           % (env, axis, PLATFORM_DOC))
+        for axis in sorted(set(axes) - required_keys):
             defects.append("deploy/%s/env.yaml — ось «%s» вне перечня %s"
                            % (env, axis, PLATFORM_DOC))
         # --- ось 5: контуры совпадают со спекой
@@ -318,11 +406,23 @@ MIN_SERVICES = """## Единицы развёртывания
 ## Дальше
 """
 
+# Фикстура дома объявляет ТЕ ЖЕ ключи, что несёт фикстура манифеста ниже:
+# иначе контрольная ось батареи молчала бы на расхождении дома и манифеста —
+# ровно на том дефекте, против которого заведён вывод перечня из дома.
 MIN_PLATFORM = """## Чем различаются окружения
 
-| Ось | `dev` | `prod` |
-|---|---|---|
-| допустимые контуры площадки | `DEMO` | `LIVE`, `DEMO` |
+| Ось | Ключ манифеста | `dev` | `prod` |
+|---|---|---|---|
+| имя окружения | `environment` | `dev` | `prod` |
+| допустимые контуры площадки | `admittedContours` | `DEMO` | `LIVE`, `DEMO` |
+| имя хоста ингресса | `ingressHost` | своё | своё |
+| синхронизация Argo CD | `argocdSync` | ручная | ручная |
+| префикс путей Vault | `vaultPrefix` | `dev` | `prod` |
+| реплики сервиса | — манифест сервиса | 1 | сколько назначил сервис |
+| тег образа сервиса | — блок images: оверлея | свой | свой |
+| ресурсные лимиты | `resourceProfile` | целевые | целевые |
+| глубина хранения рядов | `retentionProfile` | сокращённая | по виду ряда |
+| глубина хранения журнала | `journalRetentionProfile` | сокращённая | бессрочно |
 """
 
 MIN_SPEC = json.dumps({
@@ -363,8 +463,10 @@ images: %s
 """
 
 
-def _sandbox(work, mutate=None):
-    """Минимальный корпус, на котором оси доказываются поимённо."""
+def _files(mutate=None):
+    """Файлы минимального корпуса. Отдельно от записи: пробе бывает нужен их
+    состав — например, чтобы вывести окружения фикстуры, а не написать их
+    число рядом с проверкой."""
     files = {
         SERVICES_DOC: MIN_SERVICES,
         PLATFORM_DOC: MIN_PLATFORM,
@@ -379,6 +481,18 @@ def _sandbox(work, mutate=None):
     }
     if mutate:
         mutate(files)
+    return files
+
+
+def _fixture_envs(mutate=None):
+    """Окружения фикстуры — из её же состава."""
+    return sorted({name.split("/")[1] for name in _files(mutate)
+                   if name.startswith("deploy/") and name.endswith("env.yaml")})
+
+
+def _sandbox(work, mutate=None):
+    """Минимальный корпус, на котором оси доказываются поимённо."""
+    files = _files(mutate)
     for relative, body in files.items():
         path = os.path.join(work, relative.replace("/", os.sep))
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -470,6 +584,41 @@ def battery():
          bool(defects) and any("вне перечня" in d for d in defects or []),
          refusal or "; ".join(defects or []))
 
+    def axis_dropped_at_home(files):
+        files[PLATFORM_DOC] = files[PLATFORM_DOC].replace(
+            "| префикс путей Vault | `vaultPrefix` | `dev` | `prod` |\n", "")
+    defects, refusal = run(axis_dropped_at_home)
+    hit = {env for env in _fixture_envs(axis_dropped_at_home)
+           if any("vaultPrefix" in d and "deploy/%s/" % env in d
+                  for d in defects or [])}
+    axis("4c. ось убрана ИЗ ДОМА, манифесты не тронуты — расхождение у КАЖДОГО "
+         "окружения (перечень выведен из дома, а не скопирован)",
+         bool(defects) and hit == set(_fixture_envs(axis_dropped_at_home)),
+         refusal or "; ".join(defects or []))
+
+    def axis_without_key(files):
+        files[PLATFORM_DOC] = files[PLATFORM_DOC].replace(
+            "| ресурсные лимиты | `resourceProfile` |",
+            "| ресурсные лимиты | — манифест сервиса |")
+        for env in ("dev", "prod"):
+            files["deploy/%s/env.yaml" % env] = files[
+                "deploy/%s/env.yaml" % env].replace(
+                '  resourceProfile: "target"\n', "")
+    defects, refusal = run(axis_without_key)
+    axis("4d. КОНТРОЛЬ: строка дома с прочерком обязательного ключа не заводит",
+         refusal is None and not defects,
+         refusal or "; ".join(defects or []) or "дефектов: 0")
+
+    def axis_key_unparsed(files):
+        files[PLATFORM_DOC] = files[PLATFORM_DOC].replace(
+            "| ресурсные лимиты | `resourceProfile` |",
+            "| ресурсные лимиты | resourceProfile |")
+    defects, refusal = run(axis_key_unparsed)
+    axis("4e. клетка ключа не разобрана — расхождение (строка не исчезает молча)",
+         bool(defects) and any("клетка ключа не разобрана" in d
+                               for d in defects or []),
+         refusal or "; ".join(defects or []))
+
     def contour_drift(files):
         files["deploy/dev/env.yaml"] = files["deploy/dev/env.yaml"].replace(
             'admittedContours: "DEMO"', 'admittedContours: "LIVE,DEMO"')
@@ -496,6 +645,29 @@ def battery():
         files[PLATFORM_DOC] = "## Другое\n"
     defects, refusal = run(no_platform)
     axis("7b. дом окружений не разобран — проверка отказывает",
+         refusal is not None, refusal or "проверка отчиталась")
+
+    def bare_dash(files):
+        files[PLATFORM_DOC] = files[PLATFORM_DOC].replace(
+            "| — манифест сервиса |", "| — |")
+    defects, refusal = run(bare_dash)
+    axis("4f. голый прочерк без названного носителя — расхождение",
+         bool(defects) and any("голый прочерк" in d for d in defects or []),
+         refusal or "; ".join(defects or []))
+
+    def no_keys_at_all(files):
+        text = files[PLATFORM_DOC]
+        files[PLATFORM_DOC] = re.sub(r"\| `[A-Za-z][A-Za-z0-9]*` \|",
+                                     "| — носитель назван |", text)
+    defects, refusal = run(no_keys_at_all)
+    axis("7d-2. в таблице дома ни одного ключа — проверка отказывает",
+         refusal is not None, refusal or "проверка отчиталась")
+
+    def no_key_column(files):
+        files[PLATFORM_DOC] = files[PLATFORM_DOC].replace(
+            "| Ось | Ключ манифеста |", "| Ось |")
+    defects, refusal = run(no_key_column)
+    axis("7d-1. в таблице дома нет колонки ключей — проверка отказывает",
          refusal is not None, refusal or "проверка отчиталась")
 
     def no_deploy(files):

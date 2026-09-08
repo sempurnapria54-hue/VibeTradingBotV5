@@ -26,7 +26,24 @@
 #
 # Кортеж одноключевой, поэтому разделителя не требуется; сверщик режет
 # строку по табуляции (tools/population-derive-check.py, функция derive).
+#
+# КЛЮЧ --built ПЕЧАТАЕТ ВТОРУЮ СТОРОНУ, И ЭТО НЕ ВТОРОЙ ПРЕДМЕТ. Обе стороны
+# команда и так читает — сверка выше на них и стои́т; ключ лишь ПОКАЗЫВАЕТ
+# сверенное. Печатается оно в той же нотации, что и первая сторона
+# (PascalCase, нормализация ниже), потому что разность двух множеств,
+# напечатанных разными нотациями, машиной не берётся, и обещание «обе стороны
+# разности читатель получает прогоном» на них не держится: считать пришлось бы
+# руками (A11 DOCS_CHECK_4 шага 10 фазы 2). Разность непостроенных классов:
+#   comm -23 <(bash tools/derive/event-class-manual-path.sh) \
+#            <(bash tools/derive/event-class-manual-path.sh --built)
+# Без ключа поведение прежнее — его зовёт tools/population-derive-check.py.
 set -euo pipefail
+
+BUILT_SIDE=0
+if [ "${1:-}" = "--built" ]; then
+  BUILT_SIDE=1
+  shift
+fi
 
 DOC="${1:-docs/architecture/contracts.md}"
 ENUM_DIR="${2:-libs/domain-model/src/main/java/com/example/tradingbot/domain/event}"
@@ -75,10 +92,13 @@ if [ -z "$enum_values" ]; then
 fi
 
 # Имя значения перечня — SCREAMING_SNAKE, имя класса — PascalCase; сверка
-# идёт по нормализованной форме.
+# идёт по нормализованной форме. Она же — форма второй стороны при --built:
+# нормализация одна на сверку и на печать, второй её копии не заводится.
 missing=""
+built_norm=""
 for v in $enum_values; do
   norm=$(printf '%s' "$v" | LC_ALL=C.UTF-8 awk -F_ '{s="";for(i=1;i<=NF;i++){s=s toupper(substr($i,1,1)) tolower(substr($i,2))};print s}')
+  built_norm="$built_norm$norm"$'\n'
   if ! printf '%s\n' "$classes" | grep -qx "$norm"; then
     missing="$missing $v"
   fi
@@ -87,6 +107,11 @@ done
 if [ -n "$missing" ]; then
   echo "ВЫВОД НЕ СОСТОЯЛСЯ: значение перечня есть, строки таблицы нет:$missing" >&2
   exit 2
+fi
+
+if [ "$BUILT_SIDE" -eq 1 ]; then
+  printf '%s' "$built_norm" | sort -u
+  exit 0
 fi
 
 printf '%s\n' "$classes"
