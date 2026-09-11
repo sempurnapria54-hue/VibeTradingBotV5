@@ -32,6 +32,25 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
     Optional<String> findTenantInternalIdByInternalId(@Param("internalId") String internalId);
 
     /**
+     * Идентичность счёта по его числовому ключу — проекция одного поля.
+     *
+     * <p>Читатель — писатель события сделки: наружу едет
+     * {@code internalId}, а на руках у него только числовая ссылка строки
+     * сделки (.claude/rules/codestyle.md §«Выборка данных: не тянем
+     * сущность ради одного поля»).
+     */
+    @Query("select a.internalId from ExchangeAccountEntity a where a.id = :id")
+    Optional<String> findInternalIdById(@Param("id") Long id);
+
+    /**
+     * Тенант-владелец счёта по числовому ключу — проекция одного поля.
+     * Читатель тот же: тенант едет конвертом события и служит ключом
+     * партиции.
+     */
+    @Query("select a.tenantInternalId from ExchangeAccountEntity a where a.id = :id")
+    Optional<String> findTenantInternalIdById(@Param("id") Long id);
+
+    /**
      * Идентичности тенантов, у которых есть счёт.
      *
      * <p>Проекция поля, а не выборка строк: тик заводит место под числа

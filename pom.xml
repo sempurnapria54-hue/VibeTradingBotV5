@@ -34,6 +34,8 @@
     <modules>
         <module>libs/domain-model</module>
         <module>libs/strategy-engine</module>
+        <module>libs/test-support</module>
+        <module>services/audit-statistics</module>
         <module>services/auth</module>
         <module>services/bff</module>
         <module>services/connector-okx</module>

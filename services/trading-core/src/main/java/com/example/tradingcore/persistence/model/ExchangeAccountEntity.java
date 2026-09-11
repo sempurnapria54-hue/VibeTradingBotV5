@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * Проекция реестра счетов ПЛЮС торговое состояние счёта (таблица
@@ -26,12 +27,23 @@ import lombok.Setter;
  * <p><b>Тенант назван внешней идентичностью:</b> числовой ключ базы
  * {@code auth} границу сервиса не пересекает.
  *
+ * <p><b>Разведение по колонкам держится {@code @DynamicUpdate}, а не
+ * договорённостью.</b> Проекционные колонки пишет тик синка ЧТЕНИЕМ СТРОКИ И
+ * СОХРАНЕНИЕМ ЕЁ ЦЕЛИКОМ, а торговые — точечными запросами; при пуле
+ * планировщика больше единицы оба хода идут одновременно, и полнострочный
+ * UPDATE вернул бы торговые колонки к значениям, прочитанным в начале
+ * транзакции синка. Признак оставляет в SET только изменённые колонки, то
+ * есть делает объявленное выше разведение свойством ИСПУСКАЕМОГО SQL.
+ * Обратное направление той же потери закрыто иначе — тем, что торговые ходы
+ * строку целиком не пишут вовсе ({@code ExchangeAccountDataService}).
+ *
  * <p>Ключей счёта здесь нет ни в каком виде: они в Vault по пути,
  * выводимому из {@code internalId}.
  */
 @Getter
 @Setter
 @Entity
+@DynamicUpdate
 @Table(name = "exchange_accounts")
 public class ExchangeAccountEntity extends AuditableEntity {
 

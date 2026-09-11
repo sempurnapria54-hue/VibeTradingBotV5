@@ -167,6 +167,25 @@ public class ExchangeAccountDataService {
     }
 
     /**
+     * Идентичность счёта по его числовому ключу — <b>проекцией поля</b>, а
+     * не строкой целиком (.claude/rules/codestyle.md §«Выборка данных: не
+     * тянем сущность ради одного поля»). Ненайденность — авария тропы:
+     * сделка ссылается на счёт, которого в проекции реестра нет.
+     */
+    @Transactional(readOnly = true)
+    public String getRequiredInternalIdById(Long id) {
+        return repository.findInternalIdById(id)
+                .orElseThrow(() -> new IllegalStateException("ExchangeAccount not found: " + id));
+    }
+
+    /** Тенант-владелец счёта по числовому ключу — той же проекцией поля. */
+    @Transactional(readOnly = true)
+    public String getRequiredTenantInternalIdById(Long id) {
+        return repository.findTenantInternalIdById(id)
+                .orElseThrow(() -> new IllegalStateException("ExchangeAccount not found: " + id));
+    }
+
+    /**
      * Тенант-владелец счёта по его идентичности; пусто — счёта в проекции
      * нет вовсе. Пустота здесь <b>ответ, а не авария</b>: вызывающий и
      * спрашивает «существует ли».

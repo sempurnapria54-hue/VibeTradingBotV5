@@ -17,13 +17,18 @@ import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
+import com.example.tradingbot.domain.event.CoreEventType;
+import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldRung;
+import com.example.tradingcore.domain.safety.HoldRungEdgeService;
+import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.ManualHaltClass;
 import com.example.tradingcore.domain.safety.ManualHaltService;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
+import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
@@ -66,8 +71,13 @@ class ManualHaltSurfaceTest {
     private final ExchangeAccount account = account(ExchangeAccount.SafetyRung.ACTIVE);
     private final Instrument instrument = instrument(Instrument.Status.ACTIVE);
 
+    private final OutboxWriter outboxWriter = mock(OutboxWriter.class);
+    private final HoldService holdService = new HoldService(reports, coordinator,
+            new HoldRungEdgeService(pairStates, accounts, new ActorProvider(), outboxWriter));
+
     private final ManualHaltService service = new ManualHaltService(accounts, instruments, pairStates,
-            deals, contexts, new DealTerminalGate(), coordinator, reports, new ManualHaltProperties());
+            deals, contexts, new DealTerminalGate(), coordinator, holdService, reports,
+            new ManualHaltProperties());
 
     @BeforeEach
     void givenWorkingObjects() {
@@ -99,12 +109,44 @@ class ManualHaltSurfaceTest {
     /** Мягкая постановка счёта: статус плюс строка журнала, координатор не зовётся. */
     @Test
     void theAccountSoftRaiseGoesWithoutTheCoordinator() {
+        when(accounts.raiseRung(ACCOUNT_ID, ExchangeAccount.SafetyRung.HOLD)).thenReturn(true);
+
         service.raise(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
 
         verify(accounts).raiseRung(ACCOUNT_ID, ExchangeAccount.SafetyRung.HOLD);
         verify(reports).journalState(any(), eq(new HoldSignal(HoldScope.EXCHANGE_ACCOUNT, HoldRung.SOFT,
                 Constants.Hold.MANUAL_HALT_REQUESTED)), eq(null));
         verify(coordinator, never()).react(any(), any(), any());
+    }
+
+    /**
+     * Ручная постановка порождает факт подъёма ступени: событие пишет тот
+     * код, который переставляет ступень, — иначе поднятая держателем
+     * ступень не оставила бы в журнале класса, по которому её считают
+     * (docs/rules/statistics-aggregates.md §«Счётчики происшествий — своё
+     * зерно, а не строка сделочного агрегата»).
+     */
+    @Test
+    void theManualRaisePublishesTheRaisedFact() {
+        when(accounts.raiseRung(ACCOUNT_ID, ExchangeAccount.SafetyRung.HOLD)).thenReturn(true);
+
+        service.raise(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
+
+        verify(outboxWriter).write(eq("tn-0001"), eq(CoreEventType.HOLD_RAISED), any());
+    }
+
+    /**
+     * Поглощённая ручная постановка события не производит: ступень уже
+     * стои́т, статус не двигался, и объявлять фактом ход, которого не было,
+     * нельзя.
+     */
+    @Test
+    void anAbsorbedManualRaisePublishesNothing() {
+        when(accounts.raiseRung(ACCOUNT_ID, ExchangeAccount.SafetyRung.HOLD)).thenReturn(false);
+
+        service.raise(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
+
+        verify(outboxWriter, never()).write(any(), any(), any());
     }
 
     /**
@@ -130,7 +172,7 @@ class ManualHaltSurfaceTest {
         service.raise(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
 
         verify(coordinator).react(eq(new HoldSignal(HoldScope.INSTRUMENT, HoldRung.HARD,
-                Constants.Hold.MANUAL_HALT_REQUESTED)), any(DealContext.class), eq(false));
+                Constants.Hold.MANUAL_HALT_REQUESTED)), any(DealContext.class));
     }
 
     /**
@@ -148,14 +190,18 @@ class ManualHaltSurfaceTest {
         verify(coordinator).react(any(), any(DealContext.class), eq(true));
     }
 
-    /** Тот же вызов при погашенном риске доведения не запрашивает. */
+    /**
+     * Тот же вызов при погашенном риске доведения не запрашивает: он идёт
+     * общим исполнителем блокировки, а тот права на обход анкера не имеет.
+     */
     @Test
     void aHolderFullCallOverClearedRiskDoesNotRetry() {
         givenAccountRung(ExchangeAccount.SafetyRung.TRADE_BLOCKED);
 
         service.raise(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
 
-        verify(coordinator).react(any(), any(DealContext.class), eq(false));
+        verify(coordinator, never()).react(any(), any(DealContext.class), eq(true));
+        verify(coordinator).react(any(), any(DealContext.class));
     }
 
     // --- снятие ------------------------------------------------------------

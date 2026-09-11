@@ -39,6 +39,14 @@ import org.springframework.transaction.annotation.Transactional;
  * признаков аварийным терминалом, приходящим на усечённом графе
  * (docs/spec/deal-lifecycle.json §benchmarkAvailabilityOnTerminal).
  *
+ * <p><b>Число и признаки пишутся ТОЧЕЧНЫМ запросом с гардом
+ * незаполненного числа</b>, а не строкой целиком: запись строки целиком
+ * вернула бы к снимку начала прохода и статус, и колонки, записанные
+ * охраняемыми запросами соседних звеньев
+ * (docs/models/domain/aggregate/Deal.md §Персистентность). Тот же гард
+ * делает однократность числа структурной — прежде её держала проверка
+ * непустоты на модели, то есть вызывающий.
+ *
  * <p><b>Терминальное ребро пишет следующее звено действия</b>, а не этот
  * исполнитель: здесь считается и пишется число, там ставится терминал с
  * проверкой его непустоты.
@@ -80,7 +88,7 @@ public class FinalizeDealExitExecutor implements CommandExecutor {
         deal.setResultProfit(result.getResultProfit());
         deal.setResultProfitCurrency(result.getResultProfitCurrency());
         featuresWriter.apply(dealContext, false);
-        dealDataService.save(deal);
+        dealDataService.applyResultAndFeatures(deal);
         return complete(actionState);
     }
 

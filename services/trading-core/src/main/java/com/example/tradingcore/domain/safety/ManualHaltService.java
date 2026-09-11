@@ -1,6 +1,5 @@
 package com.example.tradingcore.domain.safety;
 
-import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -29,11 +28,22 @@ import org.springframework.stereotype.Service;
  * docs/spec/manual-halt.json.
  *
  * <p><b>Собственного механизма остановки здесь нет.</b> Постановка
- * собирает сигнал и зовёт общего исполнителя блокировки. Снятие через
- * него не идёт — «снятие холда — ручная сервисная операция, не этот
- * путь», — и потому несёт идемпотентность само: её даёт <b>явно названная
- * ступень</b>, из-за которой повтор попадает в холостой ход, а не в
- * следующий шаг лестницы.
+ * собирает сигнал и зовёт общего исполнителя блокировки — <b>обе ступени,
+ * а не одну жёсткую</b>: событие подъёма обязан писать тот код, который
+ * переставляет ступень, и своя мягкая ветвь оставила бы ручную постановку
+ * без факта в журнале. Снятие через него не идёт — «снятие холда — ручная
+ * сервисная операция, не этот путь», — и потому несёт идемпотентность
+ * само: её даёт <b>явно названная ступень</b>, из-за которой повтор
+ * попадает в холостой ход, а не в следующий шаг лестницы.
+ *
+ * <p><b>Доведение недоделанного — единственная ветвь, идущая мимо общего
+ * исполнителя</b>, и события она не производит: ступень на объекте уже
+ * стои́т, а право обойти анкер есть только у явного вызова держателя
+ * (§«Право на доведение недоделанного есть только здесь» ниже). Факт
+ * подъёма пишет ребро самого перехода, а перехода на этой тропе нет —
+ * объявлять фактом ход, которого не было, нельзя. Исхода реакция при этом
+ * не отдаёт вовсе: её единственным читателем был писатель, стоявший НАД
+ * переходом (docs/rules/manual-halt.md).
  *
  * <p><b>Отказ при запуске синхронен и виден вызывающему сразу.</b>
  * Асинхронный отказ невидим: держатель получил бы {@code 202}, ступень не
@@ -60,6 +70,7 @@ public class ManualHaltService {
     private final DealContextService dealContextService;
     private final DealTerminalGate dealTerminalGate;
     private final SafetyHoldCoordinator safetyHoldCoordinator;
+    private final HoldService holdService;
     private final AnomalyReportService anomalyReportService;
     private final ManualHaltProperties properties;
 
@@ -84,11 +95,7 @@ public class ManualHaltService {
             safetyHoldCoordinator.react(signal, context, true);
             return;
         }
-        if (HoldRung.HARD.equals(signal.getRung())) {
-            safetyHoldCoordinator.react(signal, context, false);
-            return;
-        }
-        raiseSoft(signal, context);
+        holdService.raise(signal, context);
     }
 
     /**
@@ -204,24 +211,6 @@ public class ManualHaltService {
         return ManualHaltClass.FULL.equals(haltClass)
                 && isTrue(hardStanding(scope, context))
                 && isFalse(riskProvenAbsentOnScope(scope, context));
-    }
-
-    /**
-     * Мягкая постановка: статус плюс строка журнала. Через координатора
-     * мягкие формы не идут — снятия риска и каскада у них нет.
-     *
-     * <p>Строка заводится <b>по ключу отчёта</b>, а не по гарду перехода:
-     * поглощение гасит смену статуса, но не отчёт.
-     */
-    private void raiseSoft(HoldSignal signal, DealContext context) {
-        journal(signal, signal.getScope(), context);
-        if (HoldScope.EXCHANGE_ACCOUNT.equals(signal.getScope())) {
-            exchangeAccountDataService.raiseRung(context.getExchangeAccount().getId(),
-                    ExchangeAccount.SafetyRung.HOLD);
-            return;
-        }
-        accountInstrumentStateDataService.raiseRung(context.getExchangeAccount().getId(),
-                context.getInstrument().getId(), Instrument.SafetyRung.ENTRY_BLOCKED);
     }
 
     /**

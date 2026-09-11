@@ -56,7 +56,10 @@ kubectl apply -k "$ROOT/deploy/base/platform"
 
 say "4. Секреты ролей базы (вне репозитория, генерируются один раз)"
 kubectl create namespace "$ENVIRONMENT" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-for role in keycloak auth market_data trading_core; do
+# Перечень идёт по РОЛЯМ, а не по сервисам: у процесса с двумя владельцами
+# данных ролей две (audit, statistics — docs/architecture/data-ownership.md
+# §Раскладка). Роль, чьего секрета нет, оператор не сводит вовсе.
+for role in keycloak auth market_data trading_core audit statistics; do
   secret="postgres-role-$(echo "$role" | tr '_' '-')"
   if kubectl -n "$ENVIRONMENT" get secret "$secret" >/dev/null 2>&1; then
     echo "секрет $secret уже есть"

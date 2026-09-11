@@ -55,6 +55,14 @@ import org.springframework.transaction.annotation.Transactional;
  * и коды у них разные — расхождение сверки и достигнутый предел серии
  * убытков; оба могут сработать одним ходом.
  *
+ * <p><b>Ребро пишется ТОЧЕЧНЫМ гардированным запросом, а не строкой
+ * целиком</b> (docs/components/MarkDealClosedExecutor.md §«Побочные
+ * эффекты терминала»). Гард — исходный статус: проактивная детекция
+ * уводит активные сделки радиуса в {@code ERROR} своим потоком, и
+ * терминал, выведенный из снимка начала прохода, снял бы этот каскад
+ * молча. Ребро не применилось — звено не завершается, и следующий проход
+ * ведёт сделку уже ошибочной тропой.
+ *
  * <p><b>Названное ограничение: базу риска терминал не двигает.</b> Ход
  * «следовать за свободным остатком в обе стороны» не построен ни одним
  * писателем, поэтому нет и омиссии, о которой отчитываться: код
@@ -67,6 +75,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class MarkDealClosedExecutor implements CommandExecutor {
+
+    /** Статусы, из которых штатный терминал законен. */
+    private static final List<Deal.Status> ACTIVE_STATUSES =
+            List.of(Deal.Status.ACTIVE, Deal.Status.EXIT_PENDING);
 
     private final DealDataService dealDataService;
     private final DealActionStateDataService dealActionStateDataService;
@@ -106,8 +118,14 @@ public class MarkDealClosedExecutor implements CommandExecutor {
         if (isNull(deal.getCloseReason())) {
             deal.setCloseReason(deal.closeReasonBySeniority());
         }
+        Deal.Status fromStatus = deal.getStatus();
         deal.setStatus(Deal.Status.CLOSED);
-        dealDataService.save(deal);
+        if (isFalse(dealDataService.applyTerminalEdge(deal, ACTIVE_STATUSES))) {
+            deal.setStatus(fromStatus);
+            return ServiceCommandExecutionResult.notCompleted(
+                    "терминал не применён: сделка ушла из-под прохода — статус в базе больше не активен"
+                            + " (docs/components/DealOrchestratorJob.md §«Цикл прохода»)");
+        }
         publishClosed(dealContext, deal);
         dealActionStateDataService.skipLiveSystemExecutions(dealContext.getActionStates(), anchorId(actionState));
         Boolean haltTriggered = lossStreakCounter.applyTerminal(dealContext);
@@ -128,6 +146,7 @@ public class MarkDealClosedExecutor implements CommandExecutor {
         deal.setResultProfitCurrency(dealContext.getInstrument().getExternalSettlementCurrency());
         journalCurrencyUnresolved(dealContext, deal);
         featuresWriter.apply(dealContext, false);
+        dealDataService.applyResultAndFeatures(deal);
     }
 
     /**
@@ -196,11 +215,10 @@ public class MarkDealClosedExecutor implements CommandExecutor {
      */
     private void publishClosed(DealContext dealContext, Deal deal) {
         outboxWriter.write(dealContext.getExchangeAccount().getTenantId(), CoreEventType.DEAL_CLOSED,
-                new DealClosedContent(deal.getInternalId(),
+                DealClosedContent.of(deal,
                         dealContext.getExchangeAccount().getInternalId(),
                         dealContext.getInstrument().getInternalId(),
-                        String.valueOf(deal.getStatus()), String.valueOf(deal.getCloseReason()),
-                        String.valueOf(deal.getResultProfit()),
-                        deal.getResultProfitCurrency()));
+                        dealContext.strategyInternalId(),
+                        dealContext.getGraphComplete()));
     }
 }

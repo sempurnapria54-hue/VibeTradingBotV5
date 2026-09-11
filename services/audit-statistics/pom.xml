@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  audit-statistics — владелец журнала событий по тенанту и агрегатов над
+  ним (docs/architecture/services.md).
+
+  ПОВЕРХНОСТЬ ТОЛЬКО ЧИТАЮЩАЯ: команд у сервиса нет по инвентарю, и
+  входящего REST на запись он не имеет (docs/architecture/contracts.md
+  §«Синхронные вызовы», строка `bff` → `audit-statistics`). Отсюда же
+  следует отсутствие ручных фасадов у его джоб
+  (docs/components/JournalCleanupJob.md).
+
+  СВОЕЙ КОНФИГУРАЦИИ LOMBOK МОДУЛЬ НЕ ЗАВОДИТ — наследует корневую
+  (.claude/rules/codestyle.md §«Новый модуль монорепозитория»): вне её
+  области действия у полей вида `kPeriod` молча меняются имена
+  аксессоров, и ломается не модуль, а его потребитель.
+
+  ЗАВИСИМОСТИ — ПО ПРЕДЪЯВЛЕННОЙ ПОТРЕБНОСТИ, а не по образцу соседа.
+  Брокер и отображение схемы на классы приехали со слушателем приёма;
+  МАППЕР — С ПЕРВЫМ ЧИТАТЕЛЕМ СТРОК, журнальной выборкой чтения, ровно по
+  условию, которым его отсутствие и было объявлено. Записи он не
+  обслуживает: единственная тропа записи журнала — нативная вставка,
+  поглощающая конфликт по ключу, и переносить между слоями там нечего.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>audit-statistics</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>audit-statistics</name>
+    <description>Журнал событий по тенанту и агрегаты над ним</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <springdoc.version>3.0.0</springdoc.version>
+        <commons-collections4.version>4.5.0</commons-collections4.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!--
+          Проба живости — единственная открытая точка контура
+          (docs/rules/api-access-policy.md); без стартера актуатора её не
+          существует вовсе, и под не становится готовым никогда.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!--
+          РЕЕСТР МЕТРИК — ЕДИНСТВЕННОЕ, ЧЕГО НЕДОСТАВАЛО ДЛЯ ЭКСПОРТА.
+          Автоконфигурация экспорта в Prometheus уже лежит в дереве:
+          spring-boot-starter-actuator тянет spring-boot-starter-micrometer-metrics,
+          а тот — spring-boot-micrometer-metrics, где и живёт
+          PrometheusMetricsExportAutoConfiguration. Она условна по КЛАССУ
+          io.micrometer.prometheusmetrics.PrometheusMeterRegistry, который
+          приезжает только этим артефактом, — без него ни реестра, ни
+          эндпоинта `prometheus` не существует, и отказа при этом нет:
+          экспозиция просто пуста.
+
+          Потребность предъявлена алертом на лаг группы журнала, без
+          которого гарантия «потеря недопустима» держится обещанием, а не
+          наблюдением (docs/architecture/data-ownership.md §«Outbox и
+          доставка»). Версией управляет BOM Boot.
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!--
+          Ресурс-сервер: поверхность целевых сервисов ходит на
+          bearer-токене провайдера идентичности, подпись проверяется
+          локально по его ключам (docs/rules/api-access-policy.md
+          §«Два контура доступа сосуществуют, пока жив донор»).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!--
+          Бин ObjectMapper совместимостным автоконфигом Jackson 2 — как у
+          соседних сервисов (.claude/rules/tech-radar.md, записи Jackson):
+          им собирает тело отказа точка входа фильтр-цепочки. Переход на
+          Jackson 3 — общий ход всех сервисов, а не решение одного
+          (.claude/work/backlog.md §«I2. Миграция кода на Jackson 3»).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
+        <!--
+          Описание поверхности: каждое поле api-модели несёт аннотацию с
+          назначением (.claude/rules/codestyle.md §«Контроллеры / API»), и
+          без этого стартера аннотации нет на classpath вовсе. Потребность
+          предъявлена единым error-DTO — первой api-моделью сервиса.
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        <!--
+          ПОДКЛЮЧЕНИЙ К БАЗАМ ТРИ, А НЕ ОДНО, и это правит форму настройки,
+          а не выбор стартера: автоконфигурация JPA держится на
+          @ConditionalOnSingleCandidate(DataSource.class) и при трёх
+          источниках отступает целиком — фабрика сущностей и менеджер
+          транзакций объявляются явно (JournalPersistenceConfig).
+          Стартер приехал с первым, кто сущность завёл, — слушателем
+          приёма; до него в дереве стоял starter-jdbc, потому что миграциям
+          хватало пула и источника данных.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!--
+          Потребление тем производителей: группа журнала подписана на тему
+          КАЖДОГО производителя несомых классов
+          (docs/components/AuditEventListener.md). Введена по предъявленной
+          потребности — без клиента брокера слушатель не собирается.
+        -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <!--
+          ОБЩИЙ АРТЕФАКТ — ПО ПРЕДЪЯВЛЕННОЙ ПОТРЕБНОСТИ, и потребностей
+          две, обе от писателя строки отказа доступа: базовый тип полей
+          аудита доменного слоя (Auditable) и фабрика internalId
+          (InternalIdFactory). У обеих форм дом — библиотека, и он назван
+          в ней самой: заведи модуль свои копии, одинаковость формы
+          держалась бы на дисциплине восьми сервисов, а расхождение не
+          ловилось бы ничем (.claude/rules/policy-home.md,
+          .claude/rules/carrier-levels.md).
+
+          ЧЕГО ВВОД НЕ МЕНЯЕТ: приём событий по-прежнему разбирает конверт
+          заголовками своими константами, а не формами библиотеки. Перевод
+          на них — предмет компонента общих форм содержимого и его
+          потребителей (.claude/work/code-gate-ledger.json), а не этого
+          хода: зависимость введена ради двух названных форм, а не ради
+          образца соседа.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>domain-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!--
+          Проверки коллекций — CollectionUtils, а не ручное сравнение
+          (.claude/rules/codestyle.md §«Строгие правила»). Потребность
+          предъявлена тиком состояния приёма: живость меряется пустотой
+          назначенных партиций, состав пар — пустотой подписки. Артефакт
+          приезжает и транзитивно — с общим артефактом выше, — но объявлен
+          явно: модуль зовёт его напрямую, а транзитивная тропа исчезнет
+          вместе с чужим объявлением, о котором модуль не знает.
+        -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>${commons-collections4.version}</version>
+        </dependency>
+        <!--
+          FLYWAY-CORE, А НЕ spring-boot-starter-flyway, и это не отступление
+          от соседей, а следствие числа источников данных. Автоконфиг,
+          запускающий миграции, отказывает при собственном бине Flyway
+          (@ConditionalOnMissingBean(Flyway.class)) — а он здесь обязателен:
+          цепочек две, у каждой своя база и своя роль, и одной настройкой
+          spring.flyway.* они не выражаются. Стартер добавил бы автоконфиг,
+          который не может сработать; запуск идёт явным initMethod
+          (SchemaMigrationConfig). flyway-database-postgresql стартер не
+          тянет и здесь тоже держится явно.
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!--
+          Маппинг между слоями — только MapStruct, ручного маппинга у
+          проекта нет (.claude/rules/codestyle.md §Маппинг). Потребность
+          предъявлена журнальной выборкой чтения: строка идёт
+          persistence -> domain -> api, и цепочка не срезается даже при
+          близких формах.
+        -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+        <!--
+          Проверка операндов поверхности (@NotBlank на заголовке
+          контекста): без стартера валидации аннотация на classpath есть
+          лишь транзитивно, а обработчика её у контейнера нет вовсе, и
+          требование молча не исполнялось бы.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Контур доступа доказывается ТЕСТОМ ПОВЕРХНОСТИ, а не строкой
+          правила (docs/rules/api-access-policy.md §«Вся поверхность
+          закрыта; открытое — перечислено»); поднять фильтры Security под
+          MockMvc без этого модуля нечем.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    
+        <!--
+          Общая форма пробы вместимости планировщика: у сервиса есть
+          ИЗМЕРИТЕЛЬ среди джоб, и вывод размера пула обязан иметь охрану
+          (.claude/rules/codestyle.md §Джобы). Scope test — дальше тестового
+          пути артефакт не уезжает.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>test-support</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>${lombok-mapstruct-binding.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!-- Исполняемый артефакт: без repackage образ сервиса собрать не из чего. -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

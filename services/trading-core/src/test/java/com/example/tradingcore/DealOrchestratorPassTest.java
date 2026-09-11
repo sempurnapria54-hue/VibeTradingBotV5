@@ -25,12 +25,15 @@ import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
 import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingcore.domain.deal.DealContextService;
+import com.example.tradingcore.domain.deal.DealShutdownEdgeException;
+import com.example.tradingcore.domain.deal.DealStatusEdgeService;
 import com.example.tradingcore.domain.fsm.DealStateMachine;
 import com.example.tradingcore.domain.fsm.DealTransition;
 import com.example.tradingcore.domain.fsm.TrancheEdge;
 import com.example.tradingcore.domain.jobs.DealOrchestratorJob;
 import com.example.tradingcore.domain.jobs.JobExecutionGuard;
 import com.example.tradingcore.domain.safety.HoldRung;
+import com.example.tradingcore.domain.safety.HardRungShutdownReasonResolver;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
@@ -75,6 +78,7 @@ class DealOrchestratorPassTest {
     private final DealDataService dealDataService = mock(DealDataService.class);
     private final DealTrancheDataService dealTrancheDataService = mock(DealTrancheDataService.class);
     private final DealContextService dealContextService = mock(DealContextService.class);
+    private final DealStatusEdgeService dealStatusEdgeService = mock(DealStatusEdgeService.class);
     private final SystemActionExecutor systemActionExecutor = mock(SystemActionExecutor.class);
     private final DealStateMachine dealStateMachine = mock(DealStateMachine.class);
     private final ServiceCommandExecutor serviceCommandExecutor = mock(ServiceCommandExecutor.class);
@@ -93,22 +97,23 @@ class DealOrchestratorPassTest {
         DealContext context = context(Deal.Status.ACTIVE, coveredTranche());
         stubPass(context, DealTransition.stay());
         when(dealDataService.findIdsUnderAccountRung(List.of(DEAL_ID))).thenReturn(List.of(DEAL_ID));
-        when(dealDataService.enforceHardRung(eq(DEAL_ID), any())).thenReturn(Boolean.TRUE);
+        when(dealStatusEdgeService.enforceHardRung(any(), any())).thenReturn(Boolean.TRUE);
 
         job().tick();
 
-        InOrder order = inOrder(dealDataService, dealContextService);
-        order.verify(dealDataService).enforceHardRung(DEAL_ID, Deal.ShutdownReason.EXCHANGE_HOLD);
+        InOrder order = inOrder(dealStatusEdgeService, dealContextService);
+        order.verify(dealStatusEdgeService).enforceHardRung(context.getDeal(),
+                Deal.ShutdownReason.EXCHANGE_HOLD);
         order.verify(dealContextService).build(context.getDeal());
-        assertThat(context.getDeal().getStatus()).isEqualTo(Deal.Status.ERROR);
-        assertThat(context.getDeal().getShutdownReason()).isEqualTo(Deal.ShutdownReason.EXCHANGE_HOLD);
     }
 
     /**
      * При обоих стоящих радиусах пишется биржевая причина: биржевой радиус
-     * старше, и шаг читает счёт первым. Клетка достижима —
-     * восстановительная тропа заводит сделку при уже стоящей ступени
-     * любого радиуса.
+     * старше (docs/lifecycles/Deal.md §«Причина выхода из штатного
+     * ведения»). Порядок чтения свойством этого шага не является — правило
+     * исполняет читатель, общий у обоих затребователей ребра. Клетка
+     * достижима: восстановительная тропа заводит сделку при уже стоящей
+     * ступени любого радиуса.
      */
     @Test
     void theExchangeReasonWinsWhenBothRadiiStand() {
@@ -119,7 +124,8 @@ class DealOrchestratorPassTest {
 
         job().tick();
 
-        verify(dealDataService).enforceHardRung(DEAL_ID, Deal.ShutdownReason.EXCHANGE_HOLD);
+        verify(dealStatusEdgeService).enforceHardRung(context.getDeal(),
+                Deal.ShutdownReason.EXCHANGE_HOLD);
     }
 
     /** Жёсткая ступень одного лишь инструмента пишет риск-политику. */
@@ -131,7 +137,8 @@ class DealOrchestratorPassTest {
 
         job().tick();
 
-        verify(dealDataService).enforceHardRung(DEAL_ID, Deal.ShutdownReason.RISK_POLICY);
+        verify(dealStatusEdgeService).enforceHardRung(context.getDeal(),
+                Deal.ShutdownReason.RISK_POLICY);
     }
 
     /** Ступени нет ни на одном радиусе — ребра тоже нет. */
@@ -142,7 +149,7 @@ class DealOrchestratorPassTest {
 
         job().tick();
 
-        verify(dealDataService, never()).enforceHardRung(any(), any());
+        verify(dealStatusEdgeService, never()).enforceHardRung(any(), any());
     }
 
     // --- выделенные перехватчики ------------------------------------------
@@ -165,8 +172,8 @@ class DealOrchestratorPassTest {
         InOrder order = inOrder(holdService, dealDataService);
         order.verify(holdService).raise(signal(HoldScope.EXCHANGE_ACCOUNT, HoldRung.HARD,
                 Constants.Hold.EXCHANGE_CONTROLLED_FAILURE), context);
-        order.verify(dealDataService).interceptToError(DEAL_ID);
-        verify(dealDataService, never()).applyStatusEdge(any(), any());
+        order.verify(dealDataService).applyErrorEdge(DEAL_ID);
+        verify(dealStatusEdgeService, never()).applyPassEdge(any(), any(), any());
     }
 
     /**
@@ -185,7 +192,7 @@ class DealOrchestratorPassTest {
         job().tick();
 
         InOrder order = inOrder(dealDataService, holdService);
-        order.verify(dealDataService).interceptToError(DEAL_ID);
+        order.verify(dealDataService).applyErrorEdge(DEAL_ID);
         order.verify(holdService).raise(signal(HoldScope.EXCHANGE_ACCOUNT, HoldRung.HARD,
                 Constants.Hold.EXCHANGE_CREDENTIALS_REJECTED), context);
     }
@@ -207,7 +214,7 @@ class DealOrchestratorPassTest {
 
         verify(holdService).raise(signal(HoldScope.INSTRUMENT, HoldRung.SOFT,
                 Constants.Hold.INSTRUMENT_RETRY_BUDGET_EXHAUSTED), context);
-        verify(dealDataService, never()).interceptToError(any());
+        verify(dealDataService, never()).applyErrorEdge(any());
         assertThat(context.getDeal().getStatus()).isEqualTo(Deal.Status.ACTIVE);
     }
 
@@ -247,7 +254,7 @@ class DealOrchestratorPassTest {
 
         verify(holdService).raise(signal(HoldScope.INSTRUMENT, HoldRung.SOFT,
                 Constants.Hold.INSTRUMENT_RETRY_BUDGET_EXHAUSTED), context);
-        verify(dealDataService).interceptToError(DEAL_ID);
+        verify(dealDataService).applyErrorEdge(DEAL_ID);
     }
 
     /**
@@ -263,8 +270,39 @@ class DealOrchestratorPassTest {
 
         job().tick();
 
-        verify(dealDataService).interceptToError(DEAL_ID);
+        verify(dealDataService).applyErrorEdge(DEAL_ID);
         verify(holdService, never()).raise(any(), any());
+    }
+
+    /**
+     * <b>Отказ ребра, присваивавшего причину остановки, в ошибку НЕ
+     * перехватывается.</b> Ребро и его факт идут одной транзакцией, и её
+     * откат вернул сделку в состояние, из которого ход повторим;
+     * перехваченная же сделка стои́т в {@code ERROR}, а рёбра присвоения
+     * причины применяются только из {@code ACTIVE} и {@code EXIT_PENDING} —
+     * причина, уже вычисленная, не записалась бы НИКОГДА.
+     *
+     * <p><b>Проба нужна потому, что потеря молчалива:</b> сделка выглядела
+     * бы ошибочной штатно, а вопрос «почему она перестала вестись» остался
+     * бы без единственного своего носителя.
+     *
+     * <p><b>Локус здесь ПЕРВЫЙ</b> — ребро энфорсмента ступени, стоящее
+     * первым шагом прохода. На нём откат возвращает состояние целиком,
+     * потому что до него проход ничего не коммитил; у второго локуса довод
+     * другой, и его мерит соседняя проба.
+     */
+    @Test
+    void aFailedShutdownEdgeLeavesTheDealToTheNextPass() {
+        DealContext context = context(Deal.Status.ACTIVE, coveredTranche());
+        when(dealDataService.findActive(any())).thenReturn(new ArrayList<>(List.of(context.getDeal())));
+        when(dealDataService.findIdsUnderAccountRung(any())).thenReturn(List.of(DEAL_ID));
+        when(dealStatusEdgeService.enforceHardRung(any(), any()))
+                .thenThrow(new DealShutdownEdgeException(DEAL_ID, new IllegalStateException("outbox")));
+
+        job().tick();
+
+        verify(dealDataService, never()).applyErrorEdge(any());
+        verify(dealContextService, never()).build(any());
     }
 
     // --- применение перехода ----------------------------------------------
@@ -330,11 +368,45 @@ class DealOrchestratorPassTest {
         job().tick();
 
         ArgumentCaptor<Deal.Status> from = ArgumentCaptor.forClass(Deal.Status.class);
-        verify(dealDataService).applyStatusEdge(eq(context.getDeal()), from.capture());
+        verify(dealStatusEdgeService).applyPassEdge(eq(context), from.capture(),
+                eq(Deal.ShutdownReason.MARKET_DATA_EXPIRED));
         assertThat(from.getValue()).isEqualTo(Deal.Status.ACTIVE);
         assertThat(context.getDeal().getStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
         assertThat(context.getDeal().getShutdownReason()).isEqualTo(Deal.ShutdownReason.MARKET_DATA_EXPIRED);
         assertThat(context.getDeal().getCloseReason()).isEqualTo(Deal.CloseReason.RISK_CONTROL);
+    }
+
+    /**
+     * <b>Отказ статусного ребра — ВТОРОЙ локус, и он оставляет рёбра
+     * траншей применёнными.</b> Сделка так же не уводится в {@code ERROR},
+     * но откат возвращает только её строку: рёбра траншей закоммичены
+     * раньше и своей транзакцией, а команды перехода уже исполнены.
+     *
+     * <p><b>Проба закрепляет ЧАСТИЧНОЕ ПРИМЕНЕНИЕ как названную цену, а не
+     * как незамеченный исход</b> (docs/components/DealOrchestratorJob.md
+     * §«Цикл прохода», шаг «применение перехода»). Без неё клейм
+     * повторимости читался бы безусловным — тем же, что у первого локуса,
+     * — а он там держится на другом доводе: на природе причин, доезжающих
+     * до этого ребра.
+     */
+    @Test
+    void aFailedPassEdgeLeavesTheTrancheEdgesApplied() {
+        DealTranche tranche = coveredTranche();
+        DealContext context = context(Deal.Status.ACTIVE, tranche);
+        stubPass(context, DealTransition.collapse(Deal.ShutdownReason.MARKET_DATA_EXPIRED,
+                        Deal.CloseReason.RISK_CONTROL)
+                .withTrancheEdges(List.of(new TrancheEdge(tranche, DealTranche.Status.CLOSED,
+                        DealTranche.CloseReason.STRATEGY_EXIT))));
+        when(dealStatusEdgeService.applyPassEdge(any(), any(), any()))
+                .thenThrow(new DealShutdownEdgeException(DEAL_ID, new IllegalStateException("outbox")));
+
+        job().tick();
+
+        verify(dealDataService, never()).applyErrorEdge(any());
+        verify(dealTrancheDataService).save(tranche);
+        assertThat(tranche.getStatus())
+                .as("ребро транша закоммичено раньше и откатом статусного ребра не снимается")
+                .isEqualTo(DealTranche.Status.CLOSED);
     }
 
     /**
@@ -374,8 +446,9 @@ class DealOrchestratorPassTest {
 
     private DealOrchestratorJob job(DealOrchestratorProperties properties) {
         return new DealOrchestratorJob(properties, new JobExecutionGuard(), dealDataService,
-                dealTrancheDataService, dealContextService, systemActionExecutor, dealStateMachine,
-                serviceCommandExecutor, holdService);
+                dealTrancheDataService, dealContextService, dealStatusEdgeService, systemActionExecutor,
+                dealStateMachine, serviceCommandExecutor, holdService,
+                new HardRungShutdownReasonResolver(dealDataService));
     }
 
     /** Выборка из одной сделки, её контекст и заданный исход машины. */

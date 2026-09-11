@@ -1,20 +1,16 @@
 package com.example.tradingcore.domain.safety;
 
-import static java.math.BigDecimal.ZERO;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
-import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.math.BigDecimal;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -77,25 +73,16 @@ public class LossStreakCounter {
      * финансирования в домене нормализован издержкой, поэтому возврат
      * издержки в число есть сложение. Пусто — числа нет либо граф
      * предъявлен не целиком.
+     *
+     * <p>Сумма по эпизодам живёт на модели: её читает и терминальное
+     * событие, и вторая копия разошлась бы с первой.
      */
     private BigDecimal priceResult(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         if (isFalse(dealContext.getGraphComplete()) || isNull(deal.getResultProfit())) {
             return null;
         }
-        return deal.getResultProfit().add(fundingCost(deal));
-    }
-
-    /**
-     * Накопленное финансирование сделки — сумма по эпизодам. Берётся из
-     * записи закрытия эпизода, а не из строк разбивки движений: те сверяют
-     * то же число и в ценовой результат не входят.
-     */
-    private BigDecimal fundingCost(Deal deal) {
-        return emptyIfNull(deal.getPositions()).stream()
-                .map(Position::getExternalFundingCost)
-                .filter(Objects::nonNull)
-                .reduce(ZERO, BigDecimal::add);
+        return deal.getResultProfit().add(deal.accumulatedFundingCost());
     }
 
     /**

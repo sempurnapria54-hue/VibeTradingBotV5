@@ -121,6 +121,19 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+    
+        <!--
+          Общая форма пробы вместимости планировщика: у сервиса есть
+          ИЗМЕРИТЕЛЬ среди джоб, и вывод размера пула обязан иметь охрану
+          (.claude/rules/codestyle.md §Джобы). Scope test — дальше тестового
+          пути артефакт не уезжает.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>test-support</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

@@ -231,7 +231,8 @@ public class RefreshBillsExecutor implements CommandExecutor {
      *
      * <p><b>Журнал реакции не гейтит:</b> сбой записи приземлившиеся строки
      * не валит — иначе отказ носителя наблюдаемости отнимал бы добытый
-     * факт.
+     * факт. Дом клаузы — docs/rules/error-handling-policy.md §«Отказ
+     * журнального носителя реакцию не гейтит».
      */
     private void reportUnclassified(DealContext dealContext, DealCashFlow flow) {
         log.warn("UNCLASSIFIED_CASH_FLOW type={} subType={} billId={} — basket is not empty",

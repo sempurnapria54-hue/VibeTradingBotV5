@@ -16,6 +16,7 @@ import com.example.tradingbot.domain.util.InternalIdFactory;
 import com.example.tradingcore.config.AnomalyReportProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -70,6 +71,7 @@ public class AnomalyReportService {
     private final ExchangeOperationsClient exchangeOperationsClient;
     private final ObjectMapper objectMapper;
     private final AnomalyReportProperties properties;
+    private final ActorProvider actorProvider;
     private final OutboxWriter outboxWriter;
 
     /**
@@ -128,12 +130,19 @@ public class AnomalyReportService {
      *
      * <p><b>При поглощении дедупом строки нет — и события тоже:</b> ход
      * идёт отсюда, а поглощённая тропа сюда не доходит вовсе.
+     *
+     * <p><b>Актор едет содержимым, потому что тропа у класса не одна:</b>
+     * отчёт заводит и детекция, и ручная операция — на постановке ступени и
+     * на снятии (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от
+     * автоматики, и друг от друга»), — и различает их
+     * в данных именно он (docs/models/domain/other/Auditable.md §«Область
+     * значений актора»).
      */
     private void publishReported(DealContext dealContext, AnomalyReport report) {
         outboxWriter.write(tenantId(dealContext), CoreEventType.ANOMALY_REPORTED,
                 new AnomalyReportedContent(report.getInternalId(), accountInternalId(dealContext),
-                        instrumentInternalId(dealContext), String.valueOf(report.getScope()),
-                        String.valueOf(report.getSeverity()), report.getCode()));
+                        instrumentInternalId(dealContext), report.getScope().name(),
+                        report.getSeverity().name(), report.getCode(), actorProvider.currentActor()));
     }
 
     private String tenantId(DealContext dealContext) {

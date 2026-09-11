@@ -16,9 +16,12 @@ import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
 import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingcore.domain.deal.DealContextService;
+import com.example.tradingcore.domain.deal.DealShutdownEdgeException;
+import com.example.tradingcore.domain.deal.DealStatusEdgeService;
 import com.example.tradingcore.domain.fsm.DealStateMachine;
 import com.example.tradingcore.domain.fsm.DealTransition;
 import com.example.tradingcore.domain.fsm.TrancheEdge;
+import com.example.tradingcore.domain.safety.HardRungShutdownReasonResolver;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.integration.exchange.ControlledExchangeException;
@@ -26,9 +29,8 @@ import com.example.tradingcore.integration.exchange.CredentialsRejectedException
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
 import com.example.tradingcore.util.Constants;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +61,14 @@ import org.springframework.stereotype.Component;
  * <p><b>Все четыре пишут статус ошибки прямой записью, звена не
  * эмитируя</b>, и причины выхода из штатного ведения не пишут: писателя
  * у этой тропы нет по построению (docs/lifecycles/Deal.md §«Причина
- * выхода из штатного ведения»).
+ * выхода из штатного ведения»). Факта остановки они поэтому не производят
+ * тоже: событие публикуется на ребре, которым причина ПРИСВОЕНА.
+ *
+ * <p><b>Оба ребра присвоения причины проход применяет через
+ * {@link DealStatusEdgeService}</b>: событие обязано лечь той же
+ * транзакцией, что и строка, а сам проход транзакции не открывает
+ * (docs/architecture/contracts.md §«У каждого класса события назван
+ * писатель, и он же писатель решения»).
  *
  * <p><b>Затребованная ступень поднимается даже после неуспешной
  * команды.</b> Отказ команды отменяет применение перехода — статус,
@@ -86,10 +95,12 @@ public class DealOrchestratorJob {
     private final DealDataService dealDataService;
     private final DealTrancheDataService dealTrancheDataService;
     private final DealContextService dealContextService;
+    private final DealStatusEdgeService dealStatusEdgeService;
     private final SystemActionExecutor systemActionExecutor;
     private final DealStateMachine dealStateMachine;
     private final ServiceCommandExecutor serviceCommandExecutor;
     private final HoldService holdService;
+    private final HardRungShutdownReasonResolver hardRungShutdownReasonResolver;
 
     @Scheduled(cron = "${deal-orchestrator.cron}")
     public void tick() {
@@ -100,8 +111,8 @@ public class DealOrchestratorJob {
     }
 
     /**
-     * Тик: выборка нетерминальных сделок окна, операнды энфорсмента одним
-     * чтением на радиус, затем проход по каждой сделке.
+     * Тик: выборка нетерминальных сделок окна, раскладка причин остановки
+     * одним запросом читателя, затем проход по каждой сделке.
      */
     private void run() {
         List<Deal> deals = dealDataService.findActive(properties.getBatchSize());
@@ -109,10 +120,10 @@ public class DealOrchestratorJob {
             return;
         }
         List<Long> dealIds = deals.stream().map(Deal::getId).collect(Collectors.toList());
-        Set<Long> underAccountRung = new HashSet<>(dealDataService.findIdsUnderAccountRung(dealIds));
-        Set<Long> underInstrumentRung = new HashSet<>(dealDataService.findIdsUnderInstrumentRung(dealIds));
+        Map<Long, Deal.ShutdownReason> shutdownReasons =
+                hardRungShutdownReasonResolver.resolveByStandingRung(dealIds);
         for (Deal deal : deals) {
-            passSafely(deal, underAccountRung, underInstrumentRung);
+            passSafely(deal, shutdownReasons);
         }
     }
 
@@ -125,10 +136,31 @@ public class DealOrchestratorJob {
      *
      * <p>Отказ одной сделки прохода по остальным не отменяет: они
      * независимы, и общая ветка — не выход из тика.
+     *
+     * <p><b>Отказ ребра, присваивавшего причину остановки, в ошибку НЕ
+     * перехватывается, и это несущее исключение.</b> Ребро и его факт
+     * идут одной транзакцией, и её откат возвращает сделку в состояние, из
+     * которого ребро применимо снова; перехват же увёл бы её в
+     * {@code ERROR} <b>без</b> причины — а рёбра присвоения причины
+     * применяются только из {@code ACTIVE} и {@code EXIT_PENDING}, то есть
+     * причина, уже вычисленная, не записалась бы НИКОГДА
+     * ({@code DealShutdownEdgeException}).
+     *
+     * <p><b>Ход повторим, но довод у двух локусов разный.</b> На ребре
+     * энфорсмента ступени проход до отказа ничего не коммитил, и откат
+     * возвращает состояние целиком; на статусном ребре рёбра траншей уже
+     * применены своей транзакцией, и повторимость держится на том, что
+     * причины, доезжающие туда, суть условия <b>среды</b> — следующий
+     * проход выводит их заново. Безусловной формы у клейма нет; цена
+     * частичного применения названа у дома порядка прохода
+     * (docs/components/DealOrchestratorJob.md §«Цикл прохода»).
      */
-    private void passSafely(Deal deal, Set<Long> underAccountRung, Set<Long> underInstrumentRung) {
+    private void passSafely(Deal deal, Map<Long, Deal.ShutdownReason> shutdownReasons) {
         try {
-            pass(deal, underAccountRung, underInstrumentRung);
+            pass(deal, shutdownReasons);
+        } catch (DealShutdownEdgeException e) {
+            log.error("Deal shutdown edge failed, the deal is left to the next pass dealId={}",
+                    deal.getId(), e);
         } catch (RuntimeException e) {
             log.error("Deal pass failed dealId={}", deal.getId(), e);
             interceptToError(deal);
@@ -136,8 +168,8 @@ public class DealOrchestratorJob {
     }
 
     /** Цикл прохода одной сделки в объявленном порядке шагов. */
-    private void pass(Deal deal, Set<Long> underAccountRung, Set<Long> underInstrumentRung) {
-        enforceHardRung(deal, underAccountRung, underInstrumentRung);
+    private void pass(Deal deal, Map<Long, Deal.ShutdownReason> shutdownReasons) {
+        enforceHardRung(deal, shutdownReasons);
         DealContext dealContext = dealContextService.build(deal);
         systemActionExecutor.reviseLiveExecutions(dealContext);
         DealTransition transition = dealStateMachine.run(dealContext);
@@ -157,43 +189,28 @@ public class DealOrchestratorJob {
      * в момент постановки ступени: каскад ступени — первый ход
      * энфорсмента, а не весь (docs/rules/error-handling-policy.md).
      *
-     * <p>Он же — писатель причины выхода из штатного ведения, той же
-     * транзакцией, которой пишется статус: без неё у сделки, поднятой в
-     * ошибку каскадом, durable-ответа «почему» не остаётся.
+     * <p>Ребро он применяет то же, что и первый ход
+     * (docs/components/SafetyHoldCoordinator.md): статус, причина выхода
+     * из штатного ведения и факт остановки — одной транзакцией. Сделку,
+     * уведённую первым ходом, гард ребра отсекает — она уже стои́т в
+     * ошибке, и ребра у неё больше нет; этот шаг подбирает ставшие
+     * активными ПОСЛЕ него.
+     *
+     * <p><b>Причину шаг не резолвит:</b> раскладку «сделка → причина»
+     * отдаёт единственный читатель соответствия
+     * ({@link HardRungShutdownReasonResolver}), общий у обоих
+     * затребователей ребра. Сделки без стоящей ступени в раскладке нет, и
+     * шаг её пропускает.
      */
-    private void enforceHardRung(Deal deal, Set<Long> underAccountRung, Set<Long> underInstrumentRung) {
-        Deal.ShutdownReason reason = shutdownReasonOf(deal, underAccountRung, underInstrumentRung);
+    private void enforceHardRung(Deal deal, Map<Long, Deal.ShutdownReason> shutdownReasons) {
+        Deal.ShutdownReason reason = shutdownReasons.get(deal.getId());
         if (isNull(reason)) {
             return;
         }
-        if (isTrue(dealDataService.enforceHardRung(deal.getId(), reason))) {
+        if (isTrue(dealStatusEdgeService.enforceHardRung(deal, reason))) {
             log.warn("Deal is moved to error by the hard rung enforcement dealId={} reason={}",
                     deal.getId(), reason);
-            deal.setStatus(Deal.Status.ERROR);
-            deal.setShutdownReason(reason);
         }
-    }
-
-    /**
-     * Причина по радиусу стоящей ступени; пусто — жёсткой ступени нет ни
-     * на одном.
-     *
-     * <p><b>Счёт читается первым, и при обоих стоящих радиусах пишется
-     * биржевая причина:</b> биржевой радиус старше, и старшинство
-     * согласовано с доминированием биржевых ступеней
-     * (docs/lifecycles/Deal.md §«Причина выхода из штатного ведения»).
-     * Цена названа там же: причина одновременно стоявшего инструментного
-     * холда в поле не видна — её несёт строка статуса инструмента.
-     */
-    private Deal.ShutdownReason shutdownReasonOf(Deal deal, Set<Long> underAccountRung,
-                                                 Set<Long> underInstrumentRung) {
-        if (underAccountRung.contains(deal.getId())) {
-            return Deal.ShutdownReason.EXCHANGE_HOLD;
-        }
-        if (underInstrumentRung.contains(deal.getId())) {
-            return Deal.ShutdownReason.RISK_POLICY;
-        }
-        return null;
     }
 
     // ------------------------------------------------------------------
@@ -331,6 +348,17 @@ public class DealOrchestratorJob {
      * до диспетчера, статус транша пережил бы отказ собственной команды и
      * разошёлся бы с фактами площадки, поэтому применение идёт ПОСЛЕ
      * диспетчеризации (docs/processes/fsm-execution-layering.md §«Ребро в `ERROR`: два механизма по природе тропы»).
+     *
+     * <p><b>Записей здесь ДВЕ, и транзакции у них разные.</b> Рёбра
+     * траншей коммитятся раньше статусного ребра и в его транзакцию не
+     * входят: отказ статусного ребра откатывает его и его факт, а рёбра
+     * траншей остаются применёнными — <b>частичное применение</b>, и
+     * следующий проход считает уже другое состояние графа. Цена принята и
+     * названа у дома порядка (docs/components/DealOrchestratorJob.md
+     * §«Цикл прохода», шаг «применение перехода»); свести записи в одну
+     * транзакцию значило бы завести второй бин — самовызов транзакции
+     * Spring не открывает — и снять свойство «проход транзакции не
+     * открывает», на котором стои́т отсоединённость сущностей прохода.
      */
     private void applyTransition(DealContext dealContext, DealTransition transition) {
         applyTrancheEdges(transition);
@@ -346,7 +374,8 @@ public class DealOrchestratorJob {
             deal.setCloseReason(transition.getCloseReason());
         }
         deal.setStatus(transition.getNextStatus());
-        if (isFalse(dealDataService.applyStatusEdge(deal, fromStatus))) {
+        if (isFalse(dealStatusEdgeService.applyPassEdge(dealContext, fromStatus,
+                transition.getShutdownReason()))) {
             log.warn("Deal status edge is not applied: the row has moved dealId={} from={} to={}",
                     deal.getId(), fromStatus, transition.getNextStatus());
         }
@@ -389,7 +418,7 @@ public class DealOrchestratorJob {
      */
     private void interceptToError(Deal deal) {
         try {
-            if (isTrue(dealDataService.interceptToError(deal.getId()))) {
+            if (isTrue(dealDataService.applyErrorEdge(deal.getId()))) {
                 deal.setStatus(Deal.Status.ERROR);
             }
         } catch (RuntimeException e) {

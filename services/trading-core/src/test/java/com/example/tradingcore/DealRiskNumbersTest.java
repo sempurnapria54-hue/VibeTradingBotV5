@@ -218,7 +218,7 @@ class DealRiskNumbersTest {
         assertThat(service.recompute(context)).isFalse();
 
         assertThat(deal.getPlannedRiskAmount()).isEqualByComparingTo("777");
-        verify(dealDataService, never()).save(any());
+        verify(dealDataService, never()).applyRiskNumbers(any());
     }
 
     /** Полный граф: четвёрка переписывается целиком и уезжает в базу одной записью. */
@@ -235,7 +235,7 @@ class DealRiskNumbersTest {
         assertThat(deal.getIncurredRiskAmount()).isEqualByComparingTo("929.55");
         assertThat(deal.getCurrentRiskAmount()).isEqualByComparingTo("929.55");
         assertThat(deal.getProtectionRelievedRiskAmount()).isEqualByComparingTo("999.5");
-        verify(dealDataService).save(deal);
+        verify(dealDataService).applyRiskNumbers(deal);
     }
 
     private static Deal deal(StrategyTradeDirection direction, Position live, DealTranche tranche) {

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.strategies.domain.event.OutboxWriter;
+import com.example.strategies.domain.service.ActorProvider;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.service.StrategyStatusWriter;
 import com.example.strategies.domain.service.TenantRiskAppetiteReader;
@@ -68,7 +69,8 @@ class StrategyLifecycleTest {
     private final TenantRiskAppetiteReader appetiteReader = new TenantRiskAppetiteReader(coreClient);
 
     private final StrategyLifecycleService service = new StrategyLifecycleService(
-            dataService, validator, coreClient, mapper, appetiteReader, statusWriter);
+            dataService, validator, coreClient, mapper, appetiteReader, statusWriter,
+            new ActorProvider());
 
     /** Активация состоявшаяся: статус переставлен, событие со снимком записано. */
     @Test

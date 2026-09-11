@@ -28,6 +28,12 @@ import org.springframework.web.server.ResponseStatusException;
  * Чего режим не даёт — бэктеста вне выборки, теневого периода и порога
  * выживаемости; смягчение названо там же.
  *
+ * <p><b>Актор перехода едет содержимым события</b>: у всех трёх классов
+ * определения есть ручная тропа, и без актора журнал отвечает на «что
+ * произошло» и не отвечает на «кто это сделал»
+ * (docs/spec/event-actor-presence.json). Значение даёт единственный
+ * поставщик ({@link ActorProvider}), а не место исполнения.
+ *
  * <p><b>Порядок несущий: чужие операнды добываются ДО транзакции.</b>
  * Сама запись — переход плюс строка outbox — лежит в отдельном
  * компоненте, потому что транзакцию открывает прокси на входе в бин
@@ -43,6 +49,7 @@ public class StrategyLifecycleService {
     private final StrategyApiMapper mapper;
     private final TenantRiskAppetiteReader riskAppetiteReader;
     private final StrategyStatusWriter statusWriter;
+    private final ActorProvider actorProvider;
 
     /**
      * Перевести определение в целевой статус.
@@ -62,7 +69,8 @@ public class StrategyLifecycleService {
         }
         return statusWriter.commit(definition, target,
                 new StrategyLifecycleContent(definition.getInternalId(),
-                        definition.getExchangeAccountInternalId(), definition.getInstrumentInternalId()));
+                        definition.getExchangeAccountInternalId(), definition.getInstrumentInternalId(),
+                        actorProvider.currentActor()));
     }
 
     /**
@@ -72,6 +80,13 @@ public class StrategyLifecycleService {
      * <p>Снимок дерева читается <b>до</b> перехода: он же поедет
      * содержимым события, и читать его повторно внутри транзакции значило
      * бы держать её на время загрузки дерева.
+     *
+     * <p><b>Три идентичности радиуса едут рядом со снимком, а не только
+     * внутри него:</b> читатель журнала достаёт из содержимого только
+     * одноимённые компоненты верхнего уровня, а внутри снимка определение
+     * зовётся {@code internalId} и по имени колонки не находится вовсе
+     * (docs/architecture/contracts.md §«Производность меряется у ЧИТАТЕЛЯ,
+     * а не у формы»).
      */
     private Strategy activate(Strategy definition, String tenantInternalId) {
         requireNoOtherActiveOnPair(definition);
@@ -82,7 +97,9 @@ public class StrategyLifecycleService {
         validator.validateRiskInequalities(mapper.domainToApi(snapshot).getDetails(),
                 riskAppetiteReader.read(tenantInternalId));
         return statusWriter.commit(snapshot, Strategy.Status.ACTIVE,
-                new StrategyActivatedContent(snapshot));
+                new StrategyActivatedContent(snapshot.getInternalId(),
+                        snapshot.getExchangeAccountInternalId(), snapshot.getInstrumentInternalId(),
+                        actorProvider.currentActor(), snapshot));
     }
 
     /**

@@ -1,0 +1,175 @@
+{
+  "subject": "hard-rung-shutdown-reason",
+  "question": "Какую причину выхода из штатного ведения присваивает ребро энфорсмента жёсткой ступени",
+  "home": "docs/lifecycles/Deal.md",
+  "operands": {
+    "underAccountRung": "жёсткая ступень стои́т на биржевом счёте сделки. Читается по СТОЯЩЕЙ строке торгового состояния счёта, а не по радиусу поднимаемого сигнала: поле сделки отвечает, под какой ступенью она встала",
+    "underInstrumentRung": "жёсткая ступень стои́т на паре «счёт, инструмент» сделки — тот же операнд второго радиуса",
+    "reactionScope": "радиус реакции, снявшей риск сделок, — операнд ПЕРВОГО ХОДА энфорсмента; у шага прохода его нет по построению: он реакции не исполнял и риска не снимал. Область значений домовая (docs/components/models/HoldSignal.md, енум HoldScope), и здесь она не переписывается"
+  },
+  "values": [
+    {
+      "name": "hardRungShutdownReason",
+      "note": "Причина, которую ребро энфорсмента жёсткой ступени присваивает уводимой сделке. Область значений домовая (docs/models/domain/aggregate/Deal.md, тип ShutdownReason), и здесь она не переписывается. Счёт читается первым: биржевой радиус старше (docs/rules/exchange-hold.md). Пусто — жёсткой ступени нет ни на одном радиусе. Шаг прохода такую сделку пропускает; у первого хода есть последний резерв — радиус собственной реакции (величина firstMoveShutdownReason). Читатель у правила ОДИН на обоих затребователей ребра — первый ход энфорсмента и шаг прохода оркестратора.",
+      "expr": "if(underAccountRung, 'EXCHANGE_HOLD', if(underInstrumentRung, 'RISK_POLICY', null))"
+    },
+    {
+      "name": "reactionScopeReason",
+      "note": "Причина по радиусу СОБСТВЕННОЙ реакции — последний резерв первого хода. Соответствие «радиус → причина» здесь исполнимо, а его дом — таблица docs/lifecycles/Deal.md §«Причина выхода из штатного ведения» (в дереве кода тем же домом служит енум HoldScope, несущий причину атрибутом радиуса).",
+      "expr": "if(reactionScope == 'EXCHANGE_ACCOUNT', 'EXCHANGE_HOLD', if(reactionScope == 'INSTRUMENT', 'RISK_POLICY', null))"
+    },
+    {
+      "name": "firstMoveShutdownReason",
+      "note": "Причина, которую присваивает ребро у ПЕРВОГО ХОДА энфорсмента. Стоящая ступень старше резерва: резерв доходит только до сделки, под которой не стои́т ни одной ступени. Ветвь достижима — снятие живого риска идёт шагом 3 реакции, а каскад шагом 5 (docs/components/SafetyHoldCoordinator.md), и ступень, снятую в этом окне, каскад уже не видит; пропустить такую сделку нельзя — её риск погашен, а шаг прохода её не подберёт.",
+      "expr": "coalesce(hardRungShutdownReason, reactionScopeReason)"
+    }
+  ],
+  "populations": [
+    {
+      "axis": "стоящие ступени радиусов сделки — у каждой пары назван исход резолва причины",
+      "note": "Перечень выводится из ПЕРЕЧНЯ РАДИУСОВ полным произведением «стои́т / не стои́т», а не из списка встреченных случаев. Член «обе стоя́т» — предмет находки B1 прогона DOCS_CHECK_6: первый ход энфорсмента писал на нём инструментную причину, потому что читал радиус сигнала. Член «ни одна не стои́т» достижим у первого хода (ступень снята между подъёмом и каскадом) и штатен у шага прохода (сделка вне радиуса ступени).",
+      "rule": [
+        "hardRungShutdownReason"
+      ],
+      "derive": {
+        "command": "bash tools/derive/hard-rung-standing-pairs.sh",
+        "from": [
+          "services/trading-core/src/main/java/com/example/tradingcore/domain/safety/HoldScope.java"
+        ]
+      },
+      "keys": [
+        "underAccountRung",
+        "underInstrumentRung"
+      ],
+      "members": [
+        {
+          "member": [
+            "false",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "member": [
+            "true",
+            "true"
+          ]
+        }
+      ]
+    },
+    {
+      "axis": "радиус собственной реакции у первого хода — резерв, когда ни одна ступень не стои́т",
+      "note": "Перечень выводится из объявления enum HoldScope тем же ключом команды, что и произведение ступеней. Радиус, добавленный в перечень, обязан получить свой исход резерва: без члена перечень разойдётся с выведенным.",
+      "rule": [
+        "firstMoveShutdownReason"
+      ],
+      "derive": {
+        "command": "bash tools/derive/hard-rung-standing-pairs.sh --scopes",
+        "from": [
+          "services/trading-core/src/main/java/com/example/tradingcore/domain/safety/HoldScope.java"
+        ]
+      },
+      "keys": [
+        "reactionScope"
+      ],
+      "members": [
+        {
+          "member": [
+            "EXCHANGE_ACCOUNT"
+          ]
+        },
+        {
+          "member": [
+            "INSTRUMENT"
+          ]
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "case": "ступени нет ни на одном радиусе — ребро не применяется",
+      "state": {
+        "underAccountRung": false,
+        "underInstrumentRung": false
+      },
+      "expect": {
+        "hardRungShutdownReason": null
+      }
+    },
+    {
+      "case": "стои́т только инструментная ступень — причина инструментного холда",
+      "state": {
+        "underAccountRung": false,
+        "underInstrumentRung": true
+      },
+      "expect": {
+        "hardRungShutdownReason": "RISK_POLICY"
+      }
+    },
+    {
+      "case": "стои́т только счётная ступень — причина биржевого сворачивания",
+      "state": {
+        "underAccountRung": true,
+        "underInstrumentRung": false
+      },
+      "expect": {
+        "hardRungShutdownReason": "EXCHANGE_HOLD"
+      }
+    },
+    {
+      "case": "стоя́т обе ступени — биржевой радиус старше, и это не зависит от того, каким сигналом сделка уводится",
+      "state": {
+        "underAccountRung": true,
+        "underInstrumentRung": true
+      },
+      "expect": {
+        "hardRungShutdownReason": "EXCHANGE_HOLD"
+      }
+    },
+    {
+      "case": "ступень снята за время реакции счётного радиуса — резерв даёт биржевую причину",
+      "state": {
+        "underAccountRung": false,
+        "underInstrumentRung": false,
+        "reactionScope": "EXCHANGE_ACCOUNT"
+      },
+      "expect": {
+        "firstMoveShutdownReason": "EXCHANGE_HOLD"
+      }
+    },
+    {
+      "case": "то же на инструментном радиусе — резерв даёт причину риск-политики",
+      "state": {
+        "underAccountRung": false,
+        "underInstrumentRung": false,
+        "reactionScope": "INSTRUMENT"
+      },
+      "expect": {
+        "firstMoveShutdownReason": "RISK_POLICY"
+      }
+    },
+    {
+      "case": "стоящая счётная ступень старше резерва инструментной реакции",
+      "state": {
+        "underAccountRung": true,
+        "underInstrumentRung": false,
+        "reactionScope": "INSTRUMENT"
+      },
+      "expect": {
+        "firstMoveShutdownReason": "EXCHANGE_HOLD"
+      }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  test-support — общий артефакт ФОРМЫ ПРОБ, а не продуктового кода
+  (docs/architecture/services.md §«Общие артефакты монорепозитория»).
+  Собирается в сервисы только на ТЕСТОВЫЙ путь: потребители объявляют его
+  со scope test, и в поставляемый образ он не попадает ни у одного.
+
+  ЗАЧЕМ ОН ПОЯВИЛСЯ ЗДЕСЬ И НЕ РАНЬШЕ. Условие названо было заранее и
+  сработало: у пробы вместимости планировщика появился ТРЕТИЙ сервис-носитель
+  (audit-statistics, bff, trading-core), и до третьего копия была дешевле
+  общего носителя, а с третьим — дороже. Заводить модуль превентивно
+  запрещал тот же довод в обратную сторону (.claude/rules/design-simplicity.md).
+
+  РОДИТЕЛЬ — spring-boot-starter-parent, в отличие от domain-model. Причина
+  обратная тамошней: содержимое этого артефакта — тестовая оснастка Boot, и
+  версии junit, assertj и spring-boot-test обязаны совпадать с теми, что
+  каркас приносит потребителям. Своя закрепка версий разошлась бы с ними
+  молча.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>test-support</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>test-support</name>
+    <description>Общие формы проб: вместимость планировщика</description>
+
+    <properties>
+        <java.version>25</java.version>
+    </properties>
+
+    <dependencies>
+        <!--
+          Стартер тестов идёт БЕЗ scope test, и это не оплошность: сами
+          формы проб лежат в src/main этого модуля — иначе потребитель не
+          увидел бы их, а test-jar завёл бы второй артефакт там, где хватает
+          одного. У потребителей зависимость объявлена со scope test, и
+          дальше него стартер не уезжает.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+        </dependency>
+        <!--
+          Автоконфигурация планировщика — предмет пробы доезда величины:
+          проба обязана собирать планировщик ТЕМ ЖЕ автоконфигом, каким его
+          собирает Boot у сервиса, иначе она мерила бы свою сборку.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              Перепаковки нет: артефакт не приложение, а библиотека. Плагин
+              Boot, унаследованный от родителя, обычную банку заменил бы
+              исполняемой, и потребитель не увидел бы её классов.
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

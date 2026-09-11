@@ -102,10 +102,9 @@ spec:
             periodSeconds: 20
 ---
 # Исходящее периметра. Разрешение даёт таблица
-# docs/architecture/contracts.md §«Синхронные вызовы»: строки `bff → auth`
-# и `bff → strategies, trading-core, market-data, audit-statistics`. Пары
-# с `audit-statistics` здесь нет — сервиса ещё не существует, и раньше
-# него в политике она не объявляется.
+# docs/architecture/contracts.md §«Синхронные вызовы»: строки `bff → auth`,
+# `bff → strategies, trading-core, market-data` и `bff → audit-statistics`
+# (только чтение журнала и агрегатов).
 #
 # ЭТА ПОЛИТИКА И ЕСТЬ ЭНФОРСЕР НАБОРА ВЛАДЕЛЬЦЕВ: адрес периметр выводит
 # из первого сегмента пути и перечня не держит, а пара, которой нет в
@@ -154,6 +153,13 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: market-data
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: audit-statistics
       ports:
         - protocol: TCP
           port: 8080
@@ -232,6 +238,25 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: market-data
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bff
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-statistics-ingress-from-bff
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: audit-statistics
   policyTypes:
     - Ingress
   ingress:

@@ -1,0 +1,361 @@
+# Развёртывание сервиса audit-statistics (шаг 10 фазы 2) — владельца
+# журнала событий по тенанту и агрегатов над ним
+# (docs/architecture/services.md).
+#
+# ПОВЕРХНОСТЬ ТОЛЬКО ЧИТАЮЩАЯ: команд у сервиса нет по инвентарю, и
+# входящий вызов у него один — от периметра
+# (docs/architecture/contracts.md §«Синхронные вызовы»). Его встречная
+# пара объявлена рядом с исходящим правилом вызывающего — в bff.yaml,
+# как у остальных владельцев.
+#
+# БАЗ У СЕРВИСА ДВЕ — по одной на владельца данных, а не на процесс
+# (docs/architecture/data-ownership.md §Раскладка). Роли объявлены полем
+# кластера: оператор ведёт роли только там (deploy/base/data/postgres-cluster.yaml).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: audit-statistics
+---
+# База журнала: её владелец — модуль аудита, и он единственный писатель
+# строк журнала, состояния приёма и следа отказа доступа.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: audit
+spec:
+  cluster:
+    name: platform-postgres
+  name: audit
+  owner: audit
+---
+# База агрегатов: производная проекция журнала. Расширений ей не нужно —
+# гипертаблиц здесь нет, суточные строки зерна не ряд.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: statistics
+spec:
+  cluster:
+    name: platform-postgres
+  name: statistics
+  owner: statistics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-statistics
+  # МЕТКА У САМОЙ СЛУЖБЫ, А НЕ ТОЛЬКО У ПОДА: наблюдатель выбирает
+  # ServiceMonitor'ом именно СЛУЖБУ, а не под, и без метки на ней он не
+  # нашёл бы цели вовсе — молча, потому что «нет целей» неотличимо от
+  # «цели здоровы» (docs/architecture/platform.md §Наблюдаемость).
+  labels:
+    app.kubernetes.io/name: audit-statistics
+spec:
+  selector:
+    app.kubernetes.io/name: audit-statistics
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-statistics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audit-statistics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audit-statistics
+    spec:
+      serviceAccountName: audit-statistics
+      containers:
+        - name: audit-statistics
+          image: registry.invalid/vibetrading/audit-statistics
+          # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
+          # поэтому образ, уже лежащий на узле, — тот самый.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: environment
+            # Ось глубины хранения журнала доезжает до исполнителя чистки
+            # ключом конфигурации — иначе предикат применимости не
+            # вычисляется ничем (docs/models/domain/other/AuditRecord.md
+            # §«Глубина хранения»). Число суток здесь не стои́т: ось несёт
+            # ПРОФИЛЬ, а глубина — величина конфигурации сервиса.
+            - name: PLATFORM_JOURNAL_RETENTION_PROFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: journalRetentionProfile
+            # Провайдер идентичности — сервис того же пространства имён:
+            # окружение и есть пространство имён, поэтому адрес не несёт
+            # его имени и одинаков во всех трёх.
+            - name: OIDC_ISSUER_URI
+              value: http://platform-identity-service:8080/realms/vibetrading
+            # Брокер: группа журнала подписана на тему КАЖДОГО производителя
+            # несомых классов (docs/components/AuditEventListener.md).
+            # Слушатель открытый — названный выбор платформы, не умолчание.
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: platform-kafka-kafka-bootstrap:9092
+            # ДВА КОМПЛЕКТА УЧЁТНЫХ ДАННЫХ, А ПОДКЛЮЧЕНИЙ ТРИ. Третье —
+            # журнал под ролью агрегатов — своей настройки не имеет: его
+            # собирает сервис из адреса журнала и учётных данных агрегатов
+            # (services/audit-statistics ... PersistenceConfig). Отдельный
+            # адрес одной и той же базы разошёлся бы с первым молча.
+            - name: AUDIT_DB_URL
+              value: jdbc:postgresql://platform-postgres-rw:5432/audit
+            - name: AUDIT_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-audit
+                  key: username
+            - name: AUDIT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-audit
+                  key: password
+            - name: STATISTICS_DB_URL
+              value: jdbc:postgresql://platform-postgres-rw:5432/statistics
+            - name: STATISTICS_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-statistics
+                  key: username
+            - name: STATISTICS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-role-statistics
+                  key: password
+          # Числа назначает разворачивающий по наблюдаемому потреблению
+          # (docs/architecture/platform.md §«Чем различаются окружения»).
+          # Это ПЕРВОЕ назначение — до наблюдения.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+---
+# Исходящее сервиса. Запрет по умолчанию адресует и его: без правила
+# процесс не дойдёт до провайдера идентичности за ключами подписи и не
+# поднимет контур доступа вовсе.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-statistics-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: audit-statistics
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Правило одно на все три подключения: политика адресует ПОД и порт, а
+    # не роль подключения. Разделять их здесь нечем — и незачем: чужую
+    # базу от чужой записи отделяет грант, а не сеть.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: platform-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Брокер: durable-группа журнала читает темы производителей. Порт —
+    # открытого слушателя кластера Kafka, того же, что называет адрес в
+    # переменной окружения выше.
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: platform-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+---
+# Встречное разрешение на стороне брокера — тот же довод, что у базы:
+# запрет по умолчанию двусторонний.
+#
+# НАЗВАННОЕ ОГРАНИЧЕНИЕ ОБЛАСТИ: правило заведено только для этого сервиса.
+# У построенных соседей, ходящих к брокеру (реле ядра, реле strategies,
+# поток периметра), встречного правила нет ни одного — это их находка, а не
+# доработка здесь (.claude/work/backlog.md §«Тропа к брокеру у построенных
+# соседей не объявлена ни правилом, ни автоконфигурацией»).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-ingress-from-audit-statistics
+spec:
+  podSelector:
+    matchExpressions:
+      - key: strimzi.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: audit-statistics
+      ports:
+        - protocol: TCP
+          port: 9092
+---
+# Встречное разрешение на стороне базы. Запрет по умолчанию действует в ОБЕ
+# стороны: одного исходящего правила у сервиса мало — без входящего у
+# инстанса базы процесс висел бы на попытке соединения (обнаружено первым
+# развёртыванием, см. postgres-ingress-from-market-data).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress-from-audit-statistics
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: audit-statistics
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# СЪЁМ МЕТРИК: наблюдатель окружения приходит к службе за экспозицией
+# сервиса (docs/architecture/platform.md §Наблюдаемость). Первая уплата
+# общего долга экспорта — оживителем названа предъявленная потребность
+# этого сервиса, алерт на лаг группы журнала
+# (.claude/work/backlog.md §«Экспорт метрик из сервисов»).
+#
+# МЕТКА `release` — НЕ УКРАШЕНИЕ: оператор из чарта kube-prometheus-stack
+# отбирает ServiceMonitor и PrometheusRule по метке имени своего релиза
+# (умолчание чарта serviceMonitorSelectorNilUsesHelmValues). Имя релиза —
+# имя Application ArgoCD, тем же именем названы его службы на стенде
+# (.claude/skills/local-stand.md). Без метки ресурс существует, а
+# наблюдатель его не берёт — то есть отказ приходит МОЛЧАНИЕМ.
+#
+# ТРОПЫ В СЕТИ ЗАВОДИТЬ НЕ НАДО: вход из пространства `monitoring`
+# разрешён всем подам общим правилом яруса
+# (deploy/base/network-platform-allowances.yaml, allow-operators-ingress —
+# «Prometheus — за метриками ко всем»).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: audit-statistics
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audit-statistics
+  endpoints:
+    # Порт назван ИМЕНЕМ порта службы, а не числом: число здесь стало бы
+    # второй копией того, что уже объявлено выше.
+    - port: http
+      path: /actuator/prometheus
+      interval: 30s
+---
+# ПРАВИЛ ДВА, И ВМЕСТЕ ОНИ И ЕСТЬ ПРЕДИКАТ ИСПОЛНИМОЙ ФОРМЫ
+# (docs/spec/audit-journal.json, pairLagAlertFires):
+#
+#   if(isNull(порог) || isNull(остаток), true, возраст >= порог && остаток > 0)
+#
+# Первое правило несёт ветвь СРАВНЕНИЯ, второе — ветвь «измеритель не
+# мерит». Разнести их пришлось потому, что у наблюдателя пустая величина
+# выражается ОТСУТСТВИЕМ РЯДА, а не значением: ряд, поданный числом,
+# молча решил бы исход, а поданный NaN — сделал бы ложным всякое
+# сравнение, то есть погасил бы алерт тише всех (docs/concept.md, П1).
+#
+# ЕДИНИЦА ОБОИХ — ПАРА «группа × тема»: метка темы стоит на каждом ряду, и
+# свёртка «любая» получается сама — каждая сработавшая пара даёт свой
+# экземпляр алерта (docs/architecture/data-ownership.md §«Outbox и
+# доставка»). Правило под одну пару оставило бы невыполненным обещание
+# алерта, данное у темы активаций (docs/lifecycles/Strategy.md).
+#
+# КАЛИБРОВАННОГО ЧИСЛА В ТЕКСТЕ НЕТ НИ ОДНОГО: порог приезжает РЯДОМ, а
+# срок хранения остаётся в манифесте темы своего владельца. Литералы,
+# которые здесь есть, величин не несут: `> 0` — граница предиката
+# «остаток непустой», чей дом исполнимая форма; `== 1` — значение ряда
+# живости цели; `for` — окно, которое дом второго правила требует прямо
+# («на пропажу ряда ЗА ОКНО») и которое покрывает перекатывание пода.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: audit-statistics
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: audit-statistics.reception
+      rules:
+        - alert: AuditJournalReceptionLagging
+          # Возраст последнего принятого события достиг порога СВОЕЙ темы,
+          # и непринятое по ней есть. Второй конъюнкт несущий: возраст
+          # растёт одинаково у вставшего потребителя и у молчащего
+          # производителя, а второе штатно — события ядра суть
+          # происшествия, и неделя без входов законна.
+          expr: |
+            audit_journal_reception_last_event_age_ms
+              >= audit_journal_reception_lag_alert_threshold_ms
+            and audit_journal_reception_unconsumed_records > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "Приём журнала отстаёт на теме {{ $labels.topic }}"
+            description: >-
+              Возраст последнего принятого события достиг доли срока хранения темы,
+              и непринятое в ней есть. Разбирать по строке состояния приёма пары —
+              носитель факта запись, а не алерт.
+        - alert: AuditJournalReceptionUnmeasured
+          # Три дизъюнкта, и все три означают «измеритель не мерит»:
+          # процесс жив, а рядов приёма не даёт вовсе; у пары нет ряда
+          # порога (срок темы не добыт); у пары нет ряда остатка (клиент
+          # лага не отдал). Молчание на любом из них равнялось бы снятому
+          # алерту, и снял бы его отказ измерения, а не решение.
+          expr: |
+            up{job="audit-statistics"} == 1
+              unless on (namespace, pod) audit_journal_reception_last_event_age_ms
+            or (audit_journal_reception_last_event_age_ms
+              unless audit_journal_reception_lag_alert_threshold_ms)
+            or (audit_journal_reception_last_event_age_ms
+              unless audit_journal_reception_unconsumed_records)
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Измеритель приёма журнала не мерит{{ if $labels.topic }} на теме {{ $labels.topic }}{{ end }}"
+            description: >-
+              Ряд операнда алерта на лаг пропал или не выводится. Пока он не выводится,
+              гарантия «потеря недопустима» не наблюдается ничем.

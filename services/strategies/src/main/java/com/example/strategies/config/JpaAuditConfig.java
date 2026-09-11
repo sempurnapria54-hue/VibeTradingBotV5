@@ -1,11 +1,13 @@
 package com.example.strategies.config;
 
+import com.example.strategies.domain.service.ActorProvider;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.auditing.DateTimeProvider;
+import org.springframework.data.domain.AuditorAware;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 /**
@@ -17,29 +19,32 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  * (шкала одна — UTC, docs/rules/time-utc.md): без своего поставщика КАЖДАЯ
  * запись падает на «Cannot convert unsupported date type».
  *
- * <p><b>Автора записи здесь не производит НИКТО, и это названо, а не
- * умолчано.</b> Поставщика ({@code AuditorAware}) в этой конфигурации нет,
- * поэтому {@code createdBy}/{@code modifiedBy} остаются пустыми у обоих
- * классов — и у черновика, пришедшего поверхностью, и у порождённого
- * модулем сервиса. Объявленное различение двух классов
- * (docs/models/domain/other/Auditable.md §«Область значений актора») этим
- * НЕ исполняется: контур доступа принципала удостоверяет, но до записи
- * его никто не доносит.
- *
- * <p><b>Чем закрывается.</b> Поставщиком актора, читающим контекст хода
+ * <p><b>Автора записи производит {@link ActorProvider}</b>, и он же
+ * поставляет актора в содержимое трёх классов событий определения: у
+ * величины один носитель на обоих читателей
  * (docs/models/domain/other/Auditable.md §«Носитель дискриминатора —
- * контекст хода, а не поле модели»); он же поставляет значение в
- * содержимое трёх классов определения стратегии, у которых ручная тропа
- * есть. Носитель приезжает дельтой CODE шага 10 фазы 2
- * (.claude/work/progress/phase-2-step-10-design-pass.md, позиция 8).
+ * контекст хода, а не поле модели»). Объявленное различение двух классов —
+ * имя принципала против класса контура — исполняется им, а не умолчанием
+ * каркаса: прежде поставщика не было вовсе, и {@code createdBy} оставался
+ * пустым у обоих классов записей.
  */
 @Configuration
-@EnableJpaAuditing(dateTimeProviderRef = "auditingDateTimeProvider")
+@EnableJpaAuditing(auditorAwareRef = "auditorAware", dateTimeProviderRef = "auditingDateTimeProvider")
 public class JpaAuditConfig {
 
     /** Момент записи — всегда в UTC, как требует шкала времени системы. */
     @Bean
     public DateTimeProvider auditingDateTimeProvider() {
         return () -> Optional.of(OffsetDateTime.now(ZoneOffset.UTC));
+    }
+
+    /**
+     * Резолвер актора записи. Собственного правила не держит — зовёт
+     * единственного поставщика, чтобы у ответа «кто инициировал ход» не
+     * появилось второй редакции.
+     */
+    @Bean
+    public AuditorAware<String> auditorAware(ActorProvider actorProvider) {
+        return () -> Optional.of(actorProvider.currentActor());
     }
 }

@@ -132,7 +132,9 @@ public class DealTerminalFeaturesWriter {
      * Журнальные отчёты-события по признакам: потерянный знаменатель и
      * нераспознанный тип закрытия. Оба — происшествие, своя строка на
      * каждую такую сделку, дедупа нет. Журнал реакцию не гейтит: сбой
-     * записи логируется и терминала не отменяет.
+     * записи логируется и терминала не отменяет (дом клаузы —
+     * docs/rules/error-handling-policy.md §«Отказ журнального носителя
+     * реакцию не гейтит»).
      */
     private void report(DealContext dealContext, DealTerminalFeatures features) {
         if (Deal.RiskBenchmarkAvailability.MISSING.equals(features.getRiskBenchmarkAvailability())) {

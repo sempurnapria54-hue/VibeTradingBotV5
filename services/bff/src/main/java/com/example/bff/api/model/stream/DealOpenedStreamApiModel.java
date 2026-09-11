@@ -8,8 +8,17 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param dealInternalId            идентичность сделки
  * @param exchangeAccountInternalId биржевой счёт сделки
  * @param instrumentInternalId      инструмент сделки
- * @param entryReason               причина заведения
- * @param direction                 направление сделки
+ * @param entryReason               причина заведения — имя значения
+ *                                  перечня {@code Deal.EntryReason};
+ *                                  область значений домовая
+ *                                  (docs/models/domain/aggregate/Deal.md),
+ *                                  и здесь она не переписывается
+ * @param direction                 направление сделки — имя значения
+ *                                  перечня
+ *                                  {@code StrategyTradeDirection};
+ *                                  область значений домовая
+ *                                  (docs/models/domain/aggregate/Strategy.md),
+ *                                  и здесь она не переписывается
  */
 public record DealOpenedStreamApiModel(
         @Schema(description = "Идентичность сделки") String dealInternalId,

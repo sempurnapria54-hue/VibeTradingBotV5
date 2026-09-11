@@ -38,8 +38,15 @@ public class OutboxWriter {
     /**
      * Версия формы содержимого. Растёт, когда меняется состав полей;
      * потребитель старой версии обязан оставаться рабочим.
+     *
+     * <p><b>Версия одна на весь состав, а не на класс</b>
+     * (docs/architecture/contracts.md §События): состав приезжает одним
+     * ходом, и обе формы производителя — снимок активации и идентичности
+     * прочих переходов — этим ходом изменились обе. Вторая редакция: к
+     * идентичностям добавлен актор, а к содержимому активации — три
+     * идентичности радиуса верхнего уровня.
      */
-    private static final Integer FORM_VERSION = 1;
+    private static final Integer FORM_VERSION = 2;
 
     private final OutboxDataService outboxDataService;
     private final ObjectMapper objectMapper;
@@ -58,13 +65,14 @@ public class OutboxWriter {
         EventEnvelope envelope = EventEnvelope.builder()
                 .eventId(InternalIdFactory.forInternalEntity())
                 .tenantId(tenantId)
+                .eventType(type.name())
                 .occurredAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .version(FORM_VERSION)
                 .build();
         OutboxEntity entity = new OutboxEntity();
         entity.setEventId(envelope.getEventId());
         entity.setTenantId(envelope.getTenantId());
-        entity.setEventType(type.name());
+        entity.setEventType(envelope.getEventType());
         entity.setVersion(envelope.getVersion());
         entity.setOccurredAt(envelope.getOccurredAt());
         entity.setTraceContext(envelope.getTraceContext());

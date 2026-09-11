@@ -53,13 +53,13 @@ class OutboxRelayTest {
     @Test
     void theWrittenRowCarriesTheEnvelopeAndTheFactsTopic() {
         writer().write(TENANT, CoreEventType.DEAL_OPENED,
-                new DealOpenedContent("dl-1", "ea-1", "in-1", "STRATEGY", "LONG"));
+                new DealOpenedContent("dl-1", "ea-1", "in-1", "st-1", "STRATEGY", "LONG", "TREND"));
 
         OutboxEntity row = savedRow();
         assertThat(row.getTenantId()).isEqualTo(TENANT);
         assertThat(row.getEventType()).isEqualTo(CoreEventType.DEAL_OPENED.name());
         assertThat(row.getTopic()).isEqualTo("trading-core.facts");
-        assertThat(row.getVersion()).isEqualTo(1);
+        assertThat(row.getVersion()).isEqualTo(2);
         assertThat(row.getEventId()).isNotBlank();
         assertThat(row.getOccurredAt()).isNotNull();
         assertThat(row.getPublishedAt()).isNull();
@@ -75,7 +75,7 @@ class OutboxRelayTest {
     @Test
     void anAbsentTraceContextIsLegal() {
         writer().write(TENANT, CoreEventType.DEAL_OPENED,
-                new DealOpenedContent("dl-1", "ea-1", "in-1", "STRATEGY", "LONG"));
+                new DealOpenedContent("dl-1", "ea-1", "in-1", "st-1", "STRATEGY", "LONG", "TREND"));
 
         assertThat(savedRow().getTraceContext()).isNull();
     }

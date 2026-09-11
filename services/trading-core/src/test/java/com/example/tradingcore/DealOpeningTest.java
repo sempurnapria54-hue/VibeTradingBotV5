@@ -22,6 +22,7 @@ import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
+import com.example.tradingcore.persistence.service.StrategyDataService;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -56,10 +57,11 @@ class DealOpeningTest {
     private final DealDataService dealDataService = mock(DealDataService.class);
     private final DealTrancheDataService dealTrancheDataService = mock(DealTrancheDataService.class);
 
+    private final StrategyDataService strategyDataService = mock(StrategyDataService.class);
     private final OutboxWriter outboxWriter = mock(OutboxWriter.class);
 
     private final DealOpeningService service = new DealOpeningService(dealDataService,
-            dealTrancheDataService, outboxWriter);
+            dealTrancheDataService, strategyDataService, outboxWriter);
 
     // --- входная тропа -----------------------------------------------------
 
@@ -131,7 +133,7 @@ class DealOpeningTest {
                 MarketPhase.Type.BULL_TREND, MOMENT);
 
         assertThat(opened).isEmpty();
-        verify(dealDataService, never()).save(any());
+        verify(dealDataService, never()).create(any());
         verify(dealTrancheDataService, never()).save(any());
     }
 
@@ -176,7 +178,7 @@ class DealOpeningTest {
                 StrategyTradeDirection.SHORT, MOMENT);
 
         assertThat(recovered).isEmpty();
-        verify(dealDataService, never()).save(any());
+        verify(dealDataService, never()).create(any());
     }
 
     /**
@@ -196,7 +198,7 @@ class DealOpeningTest {
     // --- сборка ------------------------------------------------------------
 
     private void stubSave() {
-        when(dealDataService.save(any())).thenAnswer(invocation -> {
+        when(dealDataService.create(any())).thenAnswer(invocation -> {
             Deal deal = invocation.getArgument(0);
             deal.setId(DEAL_ID);
             return deal;
@@ -206,7 +208,7 @@ class DealOpeningTest {
 
     private Deal savedDeal() {
         ArgumentCaptor<Deal> captor = ArgumentCaptor.forClass(Deal.class);
-        verify(dealDataService).save(captor.capture());
+        verify(dealDataService).create(captor.capture());
         return captor.getValue();
     }
 

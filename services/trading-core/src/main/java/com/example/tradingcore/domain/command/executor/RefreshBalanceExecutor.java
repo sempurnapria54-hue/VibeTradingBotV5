@@ -140,6 +140,8 @@ public class RefreshBalanceExecutor implements CommandExecutor {
      *
      * <p><b>Журнал реакции не гейтит:</b> сбой записи снимок не валит —
      * иначе отказ носителя наблюдаемости отнимал бы приземлившийся факт.
+     * Дом клаузы — docs/rules/error-handling-policy.md §«Отказ журнального
+     * носителя реакцию не гейтит».
      */
     private void journalNotObserved(DealContext dealContext) {
         log.warn("RISK_BASE_NOT_OBSERVED accountId={} — snapshot landed, base stays empty",

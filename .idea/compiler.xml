@@ -7,6 +7,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="test-support" />
       </profile>
       <profile name="Annotation profile for domain-model" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -16,6 +17,15 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
         </processorPath>
         <module name="domain-model" />
+      </profile>
+      <profile name="Annotation profile for strategy-engine" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="strategy-engine" />
       </profile>
       <profile name="Annotation profile for vibetradingbot" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -31,27 +41,21 @@
         <module name="bff" />
         <module name="auth" />
         <module name="strategies" />
+        <module name="audit-statistics" />
         <module name="tradingbot (1)" />
         <module name="connector-okx" />
-      </profile>
-      <profile name="Annotation profile for strategy-engine" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-        </processorPath>
-        <module name="strategy-engine" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="audit-statistics" options="-parameters" />
       <module name="auth" options="-parameters" />
       <module name="bff" options="-parameters" />
       <module name="connector-okx" options="-parameters" />
       <module name="market-data" options="-parameters" />
       <module name="strategies" options="-parameters" />
+      <module name="test-support" options="-parameters" />
       <module name="trading-core" options="-parameters" />
       <module name="tradingbot" options="" />
       <module name="tradingbot (1)" options="-parameters" />

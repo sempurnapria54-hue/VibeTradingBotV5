@@ -6,6 +6,8 @@
     <file url="file://$PROJECT_DIR$/libs/domain-model/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/libs/strategy-engine/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/libs/strategy-engine/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/libs/test-support/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/audit-statistics/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/auth/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/bff/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/connector-okx/src/main/java" charset="UTF-8" />

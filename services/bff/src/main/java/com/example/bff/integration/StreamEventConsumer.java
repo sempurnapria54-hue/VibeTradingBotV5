@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.event.AnomalyReportedContent;
 import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.event.DealClosedContent;
 import com.example.tradingbot.domain.event.DealOpenedContent;
+import com.example.tradingbot.domain.event.DealShutdownInitiatedContent;
 import com.example.tradingbot.domain.event.HoldRaisedContent;
 import com.example.tradingbot.domain.event.OrderDecidedContent;
 import com.example.tradingbot.domain.event.StrategyActivatedContent;
@@ -100,6 +101,8 @@ public class StreamEventConsumer {
         return switch (type) {
             case ORDER_DECIDED -> streamEventMapper.toApi(read(payload, OrderDecidedContent.class));
             case DEAL_OPENED -> streamEventMapper.toApi(read(payload, DealOpenedContent.class));
+            case DEAL_SHUTDOWN_INITIATED ->
+                    streamEventMapper.toApi(read(payload, DealShutdownInitiatedContent.class));
             case DEAL_CLOSED -> streamEventMapper.toApi(read(payload, DealClosedContent.class));
             case HOLD_RAISED -> streamEventMapper.toApi(read(payload, HoldRaisedContent.class));
             case ANOMALY_REPORTED -> streamEventMapper.toApi(read(payload, AnomalyReportedContent.class));

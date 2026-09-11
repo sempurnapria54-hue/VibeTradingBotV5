@@ -142,6 +142,27 @@ public class StrategyDataService {
     }
 
     /**
+     * Идентичность определения, которому принадлежит закреплённая деталь —
+     * поверх ПРОЕКЦИИ одного поля, а не загрузки детали с деревом
+     * (.claude/rules/codestyle.md §«Выборка данных»).
+     *
+     * <p>Читатель — писатель события сделки, у которого контекста прохода
+     * нет: у него на руках только ключ закреплённой детали, а событию нужна
+     * идентичность её владельца.
+     *
+     * <p><b>Отсутствие строки — нарушенный инвариант, а не пустое
+     * значение:</b> деталь принадлежит копии по построению, и «детали нет»
+     * от «определения у сделки нет» отличает вызывающий — он и не зовёт
+     * резолв, когда деталь не закреплена.
+     */
+    @Transactional(readOnly = true)
+    public String getRequiredStrategyInternalIdByDetailId(Long detailId) {
+        return repository.findStrategyInternalIdByDetailId(detailId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Strategy copy of the pinned detail not found: detail " + detailId));
+    }
+
+    /**
      * Переставляет статус копии по идентичности её определения.
      *
      * <p><b>Транзакцию открывает вызывающий.</b> Статус копии и отметка

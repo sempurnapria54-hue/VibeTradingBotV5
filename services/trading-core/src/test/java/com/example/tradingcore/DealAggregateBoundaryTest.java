@@ -1,9 +1,11 @@
 package com.example.tradingcore;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +21,7 @@ import com.example.tradingcore.persistence.repository.DealRepository;
 import com.example.tradingcore.persistence.repository.DealTrancheRepository;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -28,10 +31,12 @@ import org.springframework.data.domain.Pageable;
  * Границы выборки агрегата сделки: чем меряется занятость слота, что
  * входит в проход и в каком объёме читаются транши.
  *
- * <p>Проверяется не маппинг полей, а <b>три решения, которые молча
- * ломаются оптимизацией</b>: радиус слота (пара, а не инструмент), состав
- * терминальных статусов (аварийная сделка проходом ведётся) и объём
- * траншей (целиком, включая закрытые).
+ * <p>Проверяется не маппинг полей, а <b>решения, которые молча ломаются
+ * оптимизацией</b>: радиус слота (пара, а не инструмент), состав
+ * терминальных статусов (аварийная сделка проходом ведётся), объём
+ * траншей (целиком, включая закрытые) и <b>форма записи существующей
+ * строки</b> — точечный гардированный запрос против записи строки
+ * целиком.
  */
 class DealAggregateBoundaryTest {
 
@@ -46,6 +51,89 @@ class DealAggregateBoundaryTest {
     private final DealDataService dealDataService = new DealDataService(dealRepository, dealMapper);
     private final DealTrancheDataService trancheDataService =
             new DealTrancheDataService(trancheRepository, trancheMapper);
+
+    /**
+     * <b>Строка целиком пишется только на ЗАВЕДЕНИИ.</b> Модель с уже
+     * присвоенной идентичностью отвергается: запись существующей строки
+     * целиком есть {@code merge} отсоединённой сущности, откатывающий и
+     * колонки соседних охраняемых запросов, и статус, переставленный
+     * каскадом жёсткой ступени из соседнего потока
+     * (docs/models/domain/aggregate/Deal.md §Персистентность).
+     *
+     * <p>Охрана нужна ровно потому, что конвенция уже действовала и
+     * нарушалась: правило без отказа держится до следующего вызывающего.
+     */
+    @Test
+    void anExistingRowIsNotWrittenWholesale() {
+        Deal existing = new Deal();
+        existing.setId(DEAL_ID);
+
+        assertThatThrownBy(() -> dealDataService.create(existing))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(String.valueOf(DEAL_ID));
+
+        verify(dealRepository, never()).save(any());
+    }
+
+    /**
+     * Терминальное ребро уезжает в запрос <b>вместе с набором законных
+     * исходных статусов</b>: гард и есть то, чем терминал разведён с
+     * каскадом жёсткой ступени, и потерять его — значит вернуть молчаливую
+     * перезапись каскада.
+     */
+    @Test
+    void theTerminalEdgeCarriesItsFromStatusesIntoTheQuery() {
+        Deal deal = new Deal();
+        deal.setId(DEAL_ID);
+        deal.setStatus(Deal.Status.CLOSED);
+        deal.setCloseReason(Deal.CloseReason.STRATEGY_EXIT);
+        when(dealRepository.applyTerminalEdge(anyLong(), any(), any(), any())).thenReturn(1);
+
+        assertThat(dealDataService.applyTerminalEdge(deal,
+                List.of(Deal.Status.ACTIVE, Deal.Status.EXIT_PENDING))).isTrue();
+
+        verify(dealRepository).applyTerminalEdge(DEAL_ID, Deal.Status.CLOSED.name(),
+                Deal.CloseReason.STRATEGY_EXIT.name(),
+                List.of(Deal.Status.ACTIVE.name(), Deal.Status.EXIT_PENDING.name()));
+    }
+
+    /**
+     * Ноль применённых строк — <b>не успех</b>: сделка ушла из-под
+     * прохода, и звену это обязано быть видно.
+     */
+    @Test
+    void anEdgeThatTouchedNoRowIsReportedAsNotApplied() {
+        Deal deal = new Deal();
+        deal.setId(DEAL_ID);
+        deal.setStatus(Deal.Status.CLOSED);
+        when(dealRepository.applyTerminalEdge(anyLong(), any(), any(), any())).thenReturn(0);
+
+        assertThat(dealDataService.applyTerminalEdge(deal, List.of(Deal.Status.ACTIVE))).isFalse();
+    }
+
+    /**
+     * Число и четвёрка признаков уезжают ОДНИМ запросом: признак,
+     * отставший от числа, снял бы охрану от пересчёта на усечённом графе
+     * (docs/spec/deal-lifecycle.json §benchmarkAvailabilityOnTerminal).
+     * Перечни едут именами значений — колонка хранит {@code name()}.
+     */
+    @Test
+    void theNumberAndItsFeaturesTravelInOneQuery() {
+        Deal deal = new Deal();
+        deal.setId(DEAL_ID);
+        deal.setResultProfit(new BigDecimal("-12.5"));
+        deal.setResultProfitCurrency("USDT");
+        deal.setCloseOutcome(Deal.CloseOutcome.LIQUIDATION);
+        deal.setRiskBenchmarkAvailability(Deal.RiskBenchmarkAvailability.MISSING);
+        when(dealRepository.applyResultAndFeatures(anyLong(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+
+        assertThat(dealDataService.applyResultAndFeatures(deal)).isTrue();
+
+        verify(dealRepository).applyResultAndFeatures(DEAL_ID, new BigDecimal("-12.5"), "USDT",
+                Deal.CloseOutcome.LIQUIDATION.name(), null, null,
+                Deal.RiskBenchmarkAvailability.MISSING.name());
+    }
 
     /**
      * Слот меряется ПАРОЙ «счёт, инструмент». Инструмент принадлежит

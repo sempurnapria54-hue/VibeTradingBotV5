@@ -2,9 +2,9 @@ package com.example.tradingcore.persistence.service;
 
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
+import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.mapping.AccountInstrumentStateMapper;
 import com.example.tradingcore.persistence.repository.AccountInstrumentStateRepository;
-import com.example.tradingcore.util.Constants;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,6 +30,18 @@ import org.springframework.transaction.annotation.Transactional;
  * не догадка о настройке. Плечо остаётся ПУСТЫМ: оно объявлено ручной
  * статичной настройкой держателя, и подставленное число выглядело бы
  * назначенным, не будучи им.
+ *
+ * <p><b>Автора строки эта граница спрашивает сама, и это названное
+ * исключение.</b> Безопасная вставка по ключу идёт нативным запросом и
+ * слушателей аудита не проходит вовсе, поэтому {@code createdBy} она обязана
+ * положить своей рукой — а спросить обязана ТОГО ЖЕ поставщика, которого
+ * спрашивает слушатель: вторая копия правила «принципал либо контур»
+ * разошлась бы с первой (.claude/rules/policy-home.md). Материализовать
+ * строку может и ручная тропа — ручная остановка читает состояние пары, — и
+ * подставленный класс контура был бы тогда ложной записью
+ * (docs/models/domain/other/Auditable.md §«Область значений актора»).
+ * Параметр в сигнатуре сделал бы писателем значения каждого вызывающего, а
+ * о происхождении хода не знает ни один из них.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +49,7 @@ public class AccountInstrumentStateDataService {
 
     private final AccountInstrumentStateRepository repository;
     private final AccountInstrumentStateMapper mapper;
+    private final ActorProvider actorProvider;
 
     /**
      * Поднять ступень пары до запрошенной; {@code true} — переход
@@ -53,7 +66,7 @@ public class AccountInstrumentStateDataService {
     public Boolean raiseRung(Long exchangeAccountId, Long instrumentId, Instrument.SafetyRung requested) {
         repository.insertIfAbsent(exchangeAccountId, instrumentId,
                 Instrument.SafetyRung.ACTIVE.name(), Instrument.MarginMode.ISOLATED.name(),
-                Constants.Audit.WRITER);
+                actorProvider.currentActor());
         return repository.raiseRung(exchangeAccountId, instrumentId, requested.name(),
                 lowerRungs(requested)) > 0;
     }
@@ -128,7 +141,7 @@ public class AccountInstrumentStateDataService {
     public AccountInstrumentState getRequiredByPair(Long exchangeAccountId, Long instrumentId) {
         repository.insertIfAbsent(exchangeAccountId, instrumentId,
                 Instrument.SafetyRung.ACTIVE.name(), Instrument.MarginMode.ISOLATED.name(),
-                Constants.Audit.WRITER);
+                actorProvider.currentActor());
         return repository.findByExchangeAccountIdAndInstrumentId(exchangeAccountId, instrumentId)
                 .map(mapper::persistenceToDomain)
                 .orElseThrow(() -> new IllegalStateException(

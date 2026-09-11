@@ -2,6 +2,7 @@ package com.example.tradingcore.domain.command.executor;
 
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingcore.domain.command.DealActionState;
@@ -34,6 +35,13 @@ import org.springframework.transaction.annotation.Transactional;
  * терминалом не является, итоговая причина ещё не определена
  * (docs/lifecycles/Deal.md).
  *
+ * <p><b>Ребро пишется ТОЧЕЧНЫМ гардированным запросом</b> — тем же, что
+ * и у перехвата петли: троп две, а запись одна, и обе причины не пишут
+ * ({@code DealRepository.applyErrorEdge}). Гард — активные статусы:
+ * сделка, уже уведённая каскадом ступени либо терминализованная, ребра не
+ * получает, и модель тогда не сдвигается тоже — иначе граф прохода
+ * объявлял бы ошибочным то, что в базе закрыто.
+ *
  * <p><b>Энфорсеров счёта звено не двигает:</b> ни серии убытков, ни базы
  * риска — сделка идёт дальше аварийной тропой и будет учтена аварийным
  * терминалом ровно один раз (docs/rules/loss-streak-halt.md).
@@ -58,9 +66,9 @@ public class MarkDealErrorExecutor implements CommandExecutor {
     public ServiceCommandExecutionResult execute(ServiceCommand command, DealActionState actionState,
                                                  DealContext dealContext) {
         Deal deal = dealContext.getDeal();
-        if (isFalse(Deal.Status.ERROR.equals(deal.getStatus()))) {
+        if (isFalse(Deal.Status.ERROR.equals(deal.getStatus()))
+                && isTrue(dealDataService.applyErrorEdge(deal.getId()))) {
             deal.setStatus(Deal.Status.ERROR);
-            dealDataService.save(deal);
         }
         if (nonNull(actionState)) {
             actionState.setStatus(DealActionStateStatus.COMPLETED);

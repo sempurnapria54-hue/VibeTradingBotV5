@@ -103,14 +103,21 @@ public class CreateOrderExecutor implements CommandExecutor {
      * <p><b>Повтор звена события не производит:</b> строка уже заведена, и
      * решение принято однажды. Иначе один и тот же ордер приезжал бы
      * потребителю столько раз, сколько было попыток отправки.
+     *
+     * <p><b>Идентичность транша читается из графа прохода</b>: транши в нём
+     * уже загружены, и чтение строки транша ради одного поля было бы
+     * запросом по прочитанному. Без неё заявки при нескольких уровнях входа
+     * к траншам неатрибутируемы
+     * (docs/architecture/contracts.md §«Решение о заявке несёт идентичность
+     * транша»).
      */
     private void publishDecided(DealContext dealContext, Order order) {
+        Deal deal = dealContext.getDeal();
         outboxWriter.write(dealContext.getExchangeAccount().getTenantId(), CoreEventType.ORDER_DECIDED,
-                new OrderDecidedContent(order.getInternalId(), dealContext.getDeal().getInternalId(),
+                OrderDecidedContent.of(order, deal.getInternalId(),
+                        deal.trancheInternalId(order.getDealTrancheId()),
                         dealContext.getExchangeAccount().getInternalId(),
-                        dealContext.getInstrument().getInternalId(),
-                        String.valueOf(order.getType()), String.valueOf(order.getSide()),
-                        String.valueOf(order.getSize()), String.valueOf(order.getPrice())));
+                        dealContext.getInstrument().getInternalId()));
     }
 
     /**

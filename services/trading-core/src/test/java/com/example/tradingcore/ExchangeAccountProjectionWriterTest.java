@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import org.hibernate.annotations.DynamicUpdate;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -32,6 +33,15 @@ import org.mockito.ArgumentCaptor;
  * строки</b>, а не {@code DEFAULT} колонки: вставляет приложение, и база
  * риска у новой строки остаётся ПУСТОЙ, потому что пустота есть отказ, а
  * не ноль.
+ *
+ * <p><b>Третье условие — о SQL, а не об объекте.</b> Две пробы выше мерят
+ * СОХРАНЯЕМУЮ СУЩНОСТЬ: торговые значения в ней целы. Этого мало с тех пор,
+ * как проходы сервиса идут одновременно: полнострочный UPDATE вернул бы
+ * торговые колонки к значениям, прочитанным в НАЧАЛЕ транзакции синка, — и
+ * обе пробы выше остались бы зелёными, потому что объект в них верен.
+ * Мерить исход на живой базе здесь нечем ({@code @SpringBootTest} у модуля
+ * нет намеренно), поэтому проверяется механизм, которым разведение
+ * держится.
  */
 class ExchangeAccountProjectionWriterTest {
 
@@ -77,6 +87,19 @@ class ExchangeAccountProjectionWriterTest {
         assertThat(saved.getBlindPassCount()).isZero();
         assertThat(saved.getRiskBase()).isNull();
         assertThat(saved.getRiskBaseCurrency()).isNull();
+    }
+
+    /**
+     * Признак, оставляющий в SET только изменённые колонки. Снятый, он не
+     * ломает ни одной пробы поведения и возвращает потерю записи МОЛЧА —
+     * ровно тот класс, ради которого проба и стои́т.
+     */
+    @Test
+    void theRowIsUpdatedByChangedColumnsOnly() {
+        assertThat(ExchangeAccountEntity.class.isAnnotationPresent(DynamicUpdate.class))
+                .as("проекционный ход пишет строку целиком: без признака его UPDATE несёт и "
+                        + "торговые колонки, затирая параллельный ход торгового кода")
+                .isTrue();
     }
 
     private ExchangeAccountEntity captureSaved() {

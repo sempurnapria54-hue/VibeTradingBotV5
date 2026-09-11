@@ -106,6 +106,11 @@ class DealTerminalEdgeTest {
                 terminalGate, lossStreakCounter, reports, outboxWriter);
         errorExecutor = new MarkDealErrorExecutor(dealDataService, actionStates);
         when(tenants.findByTenantInternalId(anyString())).thenReturn(Optional.empty());
+        // Ребро применилось — умолчание МОКА обратное, и это несущее:
+        // непрослушанный гард даёт «сделка ушла из-под прохода», то есть
+        // тест, забывший о нём, падает, а не проходит молча.
+        when(dealDataService.applyTerminalEdge(any(), any())).thenReturn(true);
+        when(dealDataService.applyErrorEdge(anyLong())).thenReturn(true);
     }
 
     // --- штатный терминал ----------------------------------------------
@@ -291,6 +296,81 @@ class DealTerminalEdgeTest {
         verify(accounts, never()).applyLossStreak(anyLong(), any());
     }
 
+    // --- гард ребра: сделка ушла из-под прохода --------------------------
+
+    /**
+     * <b>Каскад жёсткой ступени терминалом не снимается.</b> Проактивная
+     * детекция уводит активные сделки счёта в {@code ERROR} своим потоком;
+     * гард исходного статуса не пускает терминал, выведенный из снимка
+     * начала прохода, и звено не завершается.
+     */
+    @Test
+    void theCleanTerminalStopsWhenTheRowLeftTheActiveStatuses() {
+        when(dealDataService.applyTerminalEdge(any(), any())).thenReturn(false);
+        Deal deal = closableDeal(false);
+        DealContext dealContext = context(deal, true);
+
+        ServiceCommandExecutionResult result = closedExecutor.execute(command(), anchor(), dealContext);
+
+        assertThat(result.getSuccess()).isFalse();
+        assertThat(result.getErrorCode())
+                .as("ошибки нет: звено не завершено, повтор идёт по бюджету строки")
+                .isNull();
+        assertThat(deal.getStatus())
+                .as("модель не объявляет закрытым то, что в базе не закрыто")
+                .isEqualTo(Deal.Status.EXIT_PENDING);
+        verify(outboxWriter, never()).write(anyString(), any(), any());
+    }
+
+    /** Тот же гард у аварийного терминала: он законен ровно из ошибочного. */
+    @Test
+    void theEmergencyTerminalStopsWhenTheRowIsNoLongerInError() {
+        when(dealDataService.applyTerminalEdge(any(), any())).thenReturn(false);
+        Deal deal = closableDeal(true);
+        deal.setStatus(Deal.Status.ERROR);
+        DealContext dealContext = context(deal, true, SETTLE, false);
+
+        ServiceCommandExecutionResult result =
+                emergencyExecutor.execute(command(), anchor(), dealContext);
+
+        assertThat(result.getSuccess()).isFalse();
+        assertThat(deal.getStatus()).isEqualTo(Deal.Status.ERROR);
+        verify(outboxWriter, never()).write(anyString(), any(), any());
+    }
+
+    /**
+     * Ребро в ошибку не применилось — модель за ним не идёт: иначе граф
+     * прохода объявил бы ошибочной сделку, которую база уже закрыла.
+     */
+    @Test
+    void theErrorEdgeLeavesTheModelAloneWhenItDidNotApply() {
+        when(dealDataService.applyErrorEdge(anyLong())).thenReturn(false);
+        Deal deal = closableDeal(false);
+        DealActionState anchor = anchor();
+
+        errorExecutor.execute(command(), anchor, context(deal, true));
+
+        assertThat(deal.getStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(anchor.getStatus()).isEqualTo(DealActionStateStatus.COMPLETED);
+    }
+
+    /**
+     * <b>Строка целиком не пишется ни одним терминалом.</b> Проба
+     * структурная: {@code create} есть единственный писатель строки
+     * целиком, и он заводит новую — существующую правят точечные
+     * гардированные запросы
+     * (docs/models/domain/aggregate/Deal.md §Персистентность).
+     */
+    @Test
+    void noTerminalWritesTheRowWholesale() {
+        Deal closable = closableDeal(false);
+        closedExecutor.execute(command(), anchor(), context(closable, true));
+        emergencyExecutor.execute(command(), anchor(), context(inError(), true, SETTLE, false));
+        errorExecutor.execute(command(), anchor(), context(closableDeal(false), true));
+
+        verify(dealDataService, never()).create(any());
+    }
+
     // --- сборка состояния -------------------------------------------------
 
     private static HoldSignal signalWithCode(String code) {
@@ -313,6 +393,13 @@ class DealTerminalEdgeTest {
         state.setSystemActionType(SystemActionType.FINALIZE_DEAL_EXIT_ACTION);
         state.setStatus(DealActionStateStatus.PLANNED);
         return state;
+    }
+
+    /** Та же сделка, уже уведённая в ошибочное состояние. */
+    private static Deal inError() {
+        Deal deal = closableDeal(true);
+        deal.setStatus(Deal.Status.ERROR);
+        return deal;
     }
 
     /** Сделка, готовая к терминалу: транши терминальны, живого риска нет. */

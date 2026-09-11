@@ -174,7 +174,7 @@ class FinalizationLinkTest {
 
         assertThat(deal.getResultProfit()).isEqualByComparingTo(new BigDecimal("7"));
         assertThat(anchor.getStatus()).isEqualTo(DealActionStateStatus.COMPLETED);
-        verify(dealDataService, never()).save(any());
+        verify(dealDataService, never()).applyResultAndFeatures(any());
     }
 
     // --- сборка состояния ---------------------------------------------------

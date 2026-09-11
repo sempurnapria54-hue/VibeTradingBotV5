@@ -13,10 +13,14 @@ import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.mapping.AccountInstrumentStateMapper;
 import com.example.tradingcore.persistence.model.AccountInstrumentStateEntity;
 import com.example.tradingcore.persistence.repository.AccountInstrumentStateRepository;
+import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.util.Constants;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * Ленивая материализация строки пары «счёт, инструмент» и предикаты её
@@ -32,7 +36,7 @@ class AccountInstrumentStateTest {
     private final AccountInstrumentStateMapper mapper = mock(AccountInstrumentStateMapper.class);
 
     private final AccountInstrumentStateDataService dataService =
-            new AccountInstrumentStateDataService(repository, mapper);
+            new AccountInstrumentStateDataService(repository, mapper, new ActorProvider());
 
     /**
      * Строка заводится СТАРТОВЫМИ значениями, и каждое названо: ступени нет
@@ -47,10 +51,56 @@ class AccountInstrumentStateTest {
 
         verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT),
                 eq(Instrument.SafetyRung.ACTIVE.name()), eq(Instrument.MarginMode.ISOLATED.name()),
-                eq(Constants.Audit.WRITER));
+                eq(Constants.Audit.SYSTEM_PRINCIPAL));
         assertThat(state.getLeverage()).isNull();
         assertThat(state.isMarginIsolated()).isTrue();
         assertThat(state.hasStandingSafetyRung()).isFalse();
+    }
+
+    /**
+     * Автор строки — АКТОР ХОДА, а не литерал контура.
+     *
+     * <p>Проба о ПРОИСХОЖДЕНИИ значения: вставка идёт нативным запросом и
+     * слушателей аудита не проходит, поэтому автора она кладёт своей рукой.
+     * На ходе без предъявленного принципала поставщик и константа дают одно
+     * и то же — подмену видно только там, где принципал предъявлен: строку
+     * пары материализует и ручная тропа (docs/models/domain/other/Auditable.md
+     * §«Область значений актора»).
+     */
+    @Test
+    void theMaterializedRowCarriesTheActorOfTheMove() {
+        givenStoredRow(Instrument.SafetyRung.ACTIVE, Instrument.MarginMode.ISOLATED, null);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "holder", "n/a", AuthorityUtils.createAuthorityList("ROLE_USER")));
+        try {
+            dataService.getRequiredByPair(ACCOUNT, INSTRUMENT);
+
+            verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT), any(), any(), eq("holder"));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    /**
+     * Тот же автор — на ВТОРОЙ точке материализации.
+     *
+     * <p>Точек у безопасной вставки две — подъём ступени и чтение состояния
+     * пары, — и покрытие одной из них ничего не говорит о второй: мутация,
+     * подменившая поставщика литералом на непокрытой точке, осталась бы
+     * зелёной. Подъём ступени приходит и с ручной тропы
+     * (docs/rules/manual-halt.md), поэтому автор у него тот же вопрос.
+     */
+    @Test
+    void theRungRaiseMaterializesTheRowWithTheActorOfTheMove() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "holder", "n/a", AuthorityUtils.createAuthorityList("ROLE_USER")));
+        try {
+            dataService.raiseRung(ACCOUNT, INSTRUMENT, Instrument.SafetyRung.ENTRY_BLOCKED);
+
+            verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT), any(), any(), eq("holder"));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     /**

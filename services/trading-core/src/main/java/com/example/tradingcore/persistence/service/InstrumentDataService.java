@@ -82,6 +82,18 @@ public class InstrumentDataService {
     }
 
     /**
+     * Идентичность инструмента по его числовому ключу — <b>проекцией
+     * поля</b>: писателю события нужна ровно она, а не строка каталога
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»). Ненайденность — авария тропы.
+     */
+    @Transactional(readOnly = true)
+    public String getRequiredInternalIdById(Long id) {
+        return repository.findInternalIdById(id)
+                .orElseThrow(() -> new IllegalStateException("Instrument not found: " + id));
+    }
+
+    /**
      * Инструмент сделки строкой проекции; нет — авария тропы: сделка
      * ссылается на инструмент, которого в проекции каталога нет, и вести
      * её не по чему.

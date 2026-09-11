@@ -133,38 +133,27 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                                               Pageable pageable);
 
     /**
-     * Каскад активных сделок радиуса в ошибочное состояние — <b>первый ход
-     * энфорсмента жёсткой ступени</b>
+     * Сделки счёта, которые уводит жёсткая ступень биржевого радиуса, —
+     * популяция <b>первого хода энфорсмента</b>
      * (docs/rules/error-handling-policy.md §«Жёсткая ступень энфорсится
      * непрерывно, а не одним ходом»).
      *
-     * <p>Одним запросом, а не выборкой с обходом: ребро на тропе
-     * ПЕРЕХВАТА пишется прямой записью статуса, без действия и без анкера
-     * (docs/processes/fsm-execution-layering.md §«Ребро в `ERROR`: два
-     * механизма по природе тропы»), и разложение на чтение с записью
-     * добавило бы окно, в котором сделка успевает уйти терминалом.
+     * <p><b>Отбор по исходным статусам, а не по нетерминальности:</b>
+     * сделке, уже стоящей в {@code ERROR}, ребра больше нет, и читать её
+     * ради ноля применённых строк незачем.
      *
-     * <p>Причина закрытия на этом ребре не пишется: {@code ERROR} — не
-     * терминал (docs/lifecycles/Deal.md).
+     * <p><b>Окна у выборки нет намеренно</b>, и довод тот же, что у
+     * популяции снятия риска: мощность ограничена построением — слот пары
+     * «счёт, инструмент» держит не больше одной незакрытой сделки. Окно
+     * резало бы каскад молча.
      */
-    @Modifying
-    @Query("""
-            update DealEntity d set d.status = :errorStatus
-            where d.exchangeAccountId = :exchangeAccountId and d.status in :activeStatuses""")
-    int cascadeAccountToError(@Param("exchangeAccountId") Long exchangeAccountId,
-                              @Param("activeStatuses") Collection<String> activeStatuses,
-                              @Param("errorStatus") String errorStatus);
+    List<DealEntity> findByExchangeAccountIdAndStatusIn(Long exchangeAccountId,
+                                                        Collection<String> statuses);
 
-    /** Тот же каскад радиусом пары «счёт, инструмент». */
-    @Modifying
-    @Query("""
-            update DealEntity d set d.status = :errorStatus
-            where d.exchangeAccountId = :exchangeAccountId and d.instrumentId = :instrumentId
-              and d.status in :activeStatuses""")
-    int cascadeInstrumentToError(@Param("exchangeAccountId") Long exchangeAccountId,
-                                 @Param("instrumentId") Long instrumentId,
-                                 @Param("activeStatuses") Collection<String> activeStatuses,
-                                 @Param("errorStatus") String errorStatus);
+    /** Та же популяция радиусом пары «счёт, инструмент». */
+    List<DealEntity> findByExchangeAccountIdAndInstrumentIdAndStatusIn(Long exchangeAccountId,
+                                                                       Long instrumentId,
+                                                                       Collection<String> statuses);
 
     /**
      * Какие из названных сделок стоя́т на счёте с запрошенной ступенью —
@@ -221,23 +210,31 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                         @Param("activeStatuses") Collection<String> activeStatuses);
 
     /**
-     * Ребро в {@code ERROR} <b>перехватом петли</b>: статус прямой
-     * записью, без действия и без анкера
-     * (docs/processes/fsm-execution-layering.md).
+     * Ребро в {@code ERROR} <b>без причины</b> — общий запрос обеих троп,
+     * у которых писателя причины нет: перехвата петли (прямая запись, без
+     * действия и без анкера — docs/processes/fsm-execution-layering.md) и
+     * звена аварийного действия
+     * (docs/components/MarkDealErrorExecutor.md).
      *
-     * <p><b>Причины выхода из штатного ведения тропа не пишет</b> —
-     * писателя у неё нет по построению (docs/lifecycles/Deal.md
-     * §«Причина выхода из штатного ведения», третья клетка перебора).
-     * Отдельный запрос, а не ветка предыдущего: там причина обязательна,
-     * здесь запрещена.
+     * <p><b>Механизмы у этих троп разные, а запись одна и та же.</b>
+     * Различает их эмиссия — есть ли действие и анкер, — а не SQL: обе
+     * ставят статус и обе причины не пишут, писателя у неё нет по
+     * построению (docs/lifecycles/Deal.md §«Причина выхода из штатного
+     * ведения», третья клетка перебора). Отдельный запрос от энфорсмента
+     * ступени — там причина обязательна, здесь запрещена.
+     *
+     * <p><b>Гард исходного статуса держит сделку, ушедшую из-под
+     * писателя:</b> строка, уже уведённая каскадом ступени либо
+     * терминализованная, ребра не получает, и ноль применённых строк
+     * означает «писать нечего», а не ошибку.
      */
     @Modifying
     @Query("""
             update DealEntity d set d.status = :errorStatus
             where d.id = :dealId and d.status in :activeStatuses""")
-    int interceptToError(@Param("dealId") Long dealId,
-                         @Param("errorStatus") String errorStatus,
-                         @Param("activeStatuses") Collection<String> activeStatuses);
+    int applyErrorEdge(@Param("dealId") Long dealId,
+                       @Param("errorStatus") String errorStatus,
+                       @Param("activeStatuses") Collection<String> activeStatuses);
 
     /**
      * Применение статусного ребра прохода: статус и обе причины.
@@ -262,6 +259,104 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                         @Param("shutdownReason") String shutdownReason,
                         @Param("closeReason") String closeReason,
                         @Param("fromStatus") String fromStatus);
+
+    /**
+     * <b>Терминальное ребро сделки: статус и причина закрытия одним
+     * точечным запросом.</b> Оба терминала пишут им — штатный
+     * ({@code ACTIVE}/{@code EXIT_PENDING} → {@code CLOSED}) и аварийный
+     * ({@code ERROR} → {@code EMERGENCY_CLOSED}); различает их набор
+     * разрешённых исходных статусов, а не запрос.
+     *
+     * <p><b>Записью строки целиком терминал не ставится, и довод тот же,
+     * что у {@link #applyStatusEdge}:</b> колонки сделки правятся
+     * охраняемыми запросами звеньев того же прохода, а модель в памяти
+     * собрана ДО них.
+     *
+     * <p><b>Гард исходного статуса разводит терминал с каскадом жёсткой
+     * ступени.</b> Проактивная детекция уводит активные сделки радиуса в
+     * {@code ERROR} своим тиком и своим потоком
+     * (docs/rules/error-handling-policy.md §«Жёсткая ступень энфорсится
+     * непрерывно, а не одним ходом»); без гарда терминал, выведенный из
+     * снимка начала прохода, перезаписал бы этот каскад — то есть довёл бы
+     * сделку до терминала на счёте, стоящем под биржевой ступенью, и не
+     * оставил бы следа. Ноль применённых строк здесь означает «сделка
+     * ушла из-под прохода», и звено обязано на нём остановиться.
+     *
+     * <p>Причина закрытия сводится вызывающим (write-once по старшинству
+     * либо значением затребователя аварийного ребра) и пишется как
+     * сведена — та же раскладка, что у {@link #applyStatusEdge}
+     * (docs/lifecycles/Deal.md).
+     */
+    @Modifying
+    @Query("""
+            update DealEntity d set d.status = :status, d.closeReason = :closeReason
+            where d.id = :dealId and d.status in :fromStatuses""")
+    int applyTerminalEdge(@Param("dealId") Long dealId,
+                          @Param("status") String status,
+                          @Param("closeReason") String closeReason,
+                          @Param("fromStatuses") Collection<String> fromStatuses);
+
+    /**
+     * <b>Итоговое число сделки вместе с четвёркой признаков отбора — одним
+     * точечным запросом.</b> Атомарность пары несущая: durable-факт «число
+     * финализировано» служит охраной от перезаписи признаков аварийным
+     * терминалом, приходящим на усечённом графе
+     * (docs/spec/deal-lifecycle.json §benchmarkAvailabilityOnTerminal), и
+     * признак, отставший от числа, эту охрану снял бы.
+     *
+     * <p><b>Гард — незаполненное число, и он же делает write-once
+     * структурным.</b> Прежде однократность держал вызывающий: и
+     * финализация выхода, и оба терминала проверяли непустоту числа на
+     * модели, собранной в начале прохода. Охрана, оставленная
+     * вызывающему, держится ровно до второго вызывающего
+     * (docs/models/domain/aggregate/Deal.md §Персистентность), а
+     * вызывающих здесь три.
+     *
+     * <p><b>Пустое число законно и оставляет строку под тем же гардом:</b>
+     * аварийный терминал на недоступном итоге пишет одни признаки, число
+     * остаётся пустым со смыслом «неисчислимо»
+     * (docs/components/MarkDealEmergencyClosedExecutor.md).
+     */
+    @Modifying
+    @Query("""
+            update DealEntity d
+               set d.resultProfit = :resultProfit, d.resultProfitCurrency = :resultProfitCurrency,
+                   d.closeOutcome = :closeOutcome, d.reconciliationStatus = :reconciliationStatus,
+                   d.breakdownIncomplete = :breakdownIncomplete,
+                   d.riskBenchmarkAvailability = :riskBenchmarkAvailability
+             where d.id = :dealId and d.resultProfit is null""")
+    int applyResultAndFeatures(@Param("dealId") Long dealId,
+                               @Param("resultProfit") BigDecimal resultProfit,
+                               @Param("resultProfitCurrency") String resultProfitCurrency,
+                               @Param("closeOutcome") String closeOutcome,
+                               @Param("reconciliationStatus") String reconciliationStatus,
+                               @Param("breakdownIncomplete") String breakdownIncomplete,
+                               @Param("riskBenchmarkAvailability") String riskBenchmarkAvailability);
+
+    /**
+     * <b>Четвёрка чисел риска — точечным запросом.</b> Пересчёт идёт
+     * каждой правкой операнда и по построению переписывает ровно эти
+     * четыре колонки; записью строки целиком он вернул бы к снимку начала
+     * прохода и всё остальное — статус, границы окон, метки добытости.
+     *
+     * <p><b>Гарда исходного статуса у него нет намеренно:</b> числа
+     * описательны, и их свежесть на сделке, уведённой каскадом ступени в
+     * {@code ERROR}, не вредна — вредна была бы запись статуса, которой
+     * здесь нет.
+     */
+    @Modifying
+    @Query("""
+            update DealEntity d
+               set d.plannedRiskAmount = :plannedRiskAmount,
+                   d.incurredRiskAmount = :incurredRiskAmount,
+                   d.currentRiskAmount = :currentRiskAmount,
+                   d.protectionRelievedRiskAmount = :protectionRelievedRiskAmount
+             where d.id = :dealId""")
+    int applyRiskNumbers(@Param("dealId") Long dealId,
+                         @Param("plannedRiskAmount") BigDecimal plannedRiskAmount,
+                         @Param("incurredRiskAmount") BigDecimal incurredRiskAmount,
+                         @Param("currentRiskAmount") BigDecimal currentRiskAmount,
+                         @Param("protectionRelievedRiskAmount") BigDecimal protectionRelievedRiskAmount);
 
     /**
      * Порог доказанного покрытия двигается только вперёд: число

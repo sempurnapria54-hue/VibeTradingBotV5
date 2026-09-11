@@ -7,8 +7,17 @@ import io.swagger.v3.oas.annotations.media.Schema;
  *
  * @param exchangeAccountInternalId биржевой счёт радиуса
  * @param instrumentInternalId      инструмент радиуса, если он назван
- * @param scope                     радиус блокировки
- * @param rung                      поднятая ступень
+ * @param scope                     радиус блокировки — имя значения
+ *                                  перечня {@code HoldScope}; область
+ *                                  значений домовая
+ *                                  (docs/components/models/HoldSignal.md),
+ *                                  и здесь она не переписывается
+ * @param rung                      поднятая ступень — имя значения перечня
+ *                                  ступеней реакции; область значений
+ *                                  домовая
+ *                                  (docs/components/models/HoldSignal.md
+ *                                  §«Енум HoldRung»), и здесь она не
+ *                                  переписывается
  * @param code                      машинный код причины
  */
 public record HoldRaisedStreamApiModel(

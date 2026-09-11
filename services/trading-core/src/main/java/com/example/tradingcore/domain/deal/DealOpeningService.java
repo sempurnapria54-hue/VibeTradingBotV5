@@ -21,6 +21,7 @@ import com.example.tradingbot.domain.util.InternalIdFactory;
 import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
+import com.example.tradingcore.persistence.service.StrategyDataService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -72,6 +73,7 @@ public class DealOpeningService {
 
     private final DealDataService dealDataService;
     private final DealTrancheDataService dealTrancheDataService;
+    private final StrategyDataService strategyDataService;
     private final OutboxWriter outboxWriter;
 
     /**
@@ -100,7 +102,7 @@ public class DealOpeningService {
                 externalCreatedAt);
         deal.setStrategyDetailId(detail.getId());
         deal.setEntryMarketPhase(entryMarketPhase);
-        Deal saved = dealDataService.save(deal);
+        Deal saved = dealDataService.create(deal);
         saved.setTranches(new ArrayList<>());
         materializeDeclaredTranches(saved, detail);
         publishOpened(account, instrument, saved);
@@ -146,7 +148,7 @@ public class DealOpeningService {
         }
         Deal deal = newDeal(account.getId(), instrument.getId(), direction, Deal.EntryReason.RECOVERY,
                 positionOpenedAt);
-        Deal saved = dealDataService.save(deal);
+        Deal saved = dealDataService.create(deal);
         saved.setTranches(new ArrayList<>());
         // Объявления у восстановленного транша нет: ни ссылки, ни уровня,
         // ни типа входа — заводил его не выбор входа. Ведётся он
@@ -164,12 +166,34 @@ public class DealOpeningService {
      * <p>Счёт и инструмент приходят моделями, а не идентификаторами,
      * именно поэтому: наружу едет {@code internalId} — числовой ключ
      * границу сервиса не пересекает.
+     *
+     * <p><b>Контекст входа едет обеими тропами</b> — фаза, по которой
+     * выбрана деталь, и идентичность определения
+     * (docs/architecture/contracts.md §«Событие создания сделки несёт
+     * контекст входа — фазу рынка и идентичность определения»); у
+     * восстановленной сделки обе половины пусты по построению тропы.
      */
     private void publishOpened(ExchangeAccount account, Instrument instrument, Deal deal) {
         outboxWriter.write(account.getTenantId(), CoreEventType.DEAL_OPENED,
-                new DealOpenedContent(deal.getInternalId(), account.getInternalId(),
-                        instrument.getInternalId(), deal.getEntryReason().name(),
-                        String.valueOf(deal.getDirection())));
+                DealOpenedContent.of(deal, account.getInternalId(), instrument.getInternalId(),
+                        strategyInternalId(deal)));
+    }
+
+    /**
+     * Идентичность определения — ПРОЕКЦИЕЙ по ключу закреплённой детали, а
+     * не загрузкой детали с деревом: событию нужно одно поле, а дерево
+     * несёт шаги, действия и транши (.claude/rules/codestyle.md §«Выборка
+     * данных»).
+     *
+     * <p><b>Пусто у восстановительной тропы, и это значение:</b> деталь она
+     * не закрепляет — выбора входа не было, — а пустота означает «сделка
+     * заведена вокруг живого риска»
+     * (docs/rules/absent-value-semantics.md).
+     */
+    private String strategyInternalId(Deal deal) {
+        return isNull(deal.getStrategyDetailId())
+                ? null
+                : strategyDataService.getRequiredStrategyInternalIdByDetailId(deal.getStrategyDetailId());
     }
 
     private Deal newDeal(Long exchangeAccountId, Long instrumentId, StrategyTradeDirection direction,

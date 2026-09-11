@@ -18,6 +18,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Getter;
@@ -440,6 +441,69 @@ public class Deal extends Auditable {
     public Boolean positionObserved() {
         return EntryReason.RECOVERY == entryReason
                 || emptyIfNull(tranches).stream().anyMatch(tranche -> isTrue(tranche.hasEntryFill()));
+    }
+
+    /**
+     * Накопленное финансирование сделки — сумма по эпизодам, <b>издержкой
+     * положительная</b>: знак этого поля в домене уже нормализован
+     * (docs/models/domain/core/Position.md).
+     *
+     * <p>Величина живёт на модели, потому что читателей у неё два —
+     * ценовой результат счётчика серии убытков
+     * (docs/rules/loss-streak-halt.md) и операнд терминального события
+     * (docs/architecture/contracts.md), — и вторая копия суммы разошлась бы
+     * с первой.
+     *
+     * <p><b>На усечённом графе сумма занижена, и охраняет её не эта
+     * модель</b>, а признак полноты графа у читателя: коллекция эпизодов
+     * загружается проходом, и предикат «граф предъявлен целиком» стои́т
+     * рядом с числом там, где число используется.
+     */
+    public BigDecimal accumulatedFundingCost() {
+        return sumEpisodes(Position::getExternalFundingCost);
+    }
+
+    /**
+     * Комиссии обеих ног сделки — сумма по эпизодам, приведённая к
+     * <b>издержке положительной</b>: в домене у поля СЫРОЙ знак источника
+     * (docs/models/domain/core/Position.md), а суммы отчёта объявлены
+     * издержкой положительными (docs/rules/statistics-aggregates.md).
+     */
+    public BigDecimal accumulatedFeeCost() {
+        return BigDecimal.ZERO.subtract(sumEpisodes(Position::getExternalFee));
+    }
+
+    /**
+     * Штраф принудительного закрытия — сумма по эпизодам, приведённая к
+     * издержке положительной по тому же доводу, что и комиссия.
+     */
+    public BigDecimal accumulatedLiquidationPenaltyCost() {
+        return BigDecimal.ZERO.subtract(sumEpisodes(Position::getExternalLiquidationPenalty));
+    }
+
+    /**
+     * Идентичность транша по его ключу; пусто — транша с таким ключом в
+     * загруженном графе нет.
+     *
+     * <p>Числовой ключ границу сервиса не пересекает
+     * (.claude/rules/codestyle.md §«Идентичность наружу»), а транши у
+     * прохода уже загружены: чтение строки транша ради одного поля было бы
+     * запросом по уже прочитанному.
+     */
+    public String trancheInternalId(Long trancheId) {
+        return emptyIfNull(tranches).stream()
+                .filter(tranche -> Objects.equals(trancheId, tranche.getId()))
+                .findFirst()
+                .map(DealTranche::getInternalId)
+                .orElse(null);
+    }
+
+    /** Сумма поля по эпизодам сделки; пустое слагаемое считается нулём. */
+    private BigDecimal sumEpisodes(Function<Position, BigDecimal> field) {
+        return emptyIfNull(positions).stream()
+                .map(field)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**

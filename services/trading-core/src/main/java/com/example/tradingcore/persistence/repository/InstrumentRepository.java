@@ -25,6 +25,15 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     Optional<Long> findIdByInternalId(@Param("internalId") String internalId);
 
     /**
+     * Обратный резолв той же пары — идентичность по числовому ключу,
+     * проекцией одного поля. Читатель — писатель события сделки: наружу
+     * едет {@code internalId}, а на руках у него числовая ссылка строки
+     * сделки.
+     */
+    @Query("select i.internalId from InstrumentEntity i where i.id = :id")
+    Optional<String> findInternalIdById(@Param("id") Long id);
+
+    /**
      * Расчётная валюта инструмента площадки — ПРОЕКЦИЕЙ одного поля.
      * Строку целиком ради валюты не тянем
      * (.claude/rules/codestyle.md §«Выборка данных»).

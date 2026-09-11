@@ -102,3 +102,21 @@ spec:
         login: true
         passwordSecret:
           name: postgres-role-trading-core
+      # У audit-statistics владельцев данных ДВА — журнал и агрегаты, — и
+      # ролей поэтому две. Это не два сервиса: роль есть то, чем инвариант
+      # «один пишущий» ОБЕСПЕЧЕН, а не только объявлен. У процесса с одним
+      # владельцем писателя отделяет от чужих таблиц отсутствие чужих
+      # учётных данных; здесь оба комплекта живут в одном процессе, и
+      # отделение восстанавливает грант: роль агрегатов журнал только
+      # читает, а выдаёт ей это право первая миграция журнала
+      # (docs/architecture/data-ownership.md §Раскладка).
+      - name: audit
+        ensure: present
+        login: true
+        passwordSecret:
+          name: postgres-role-audit
+      - name: statistics
+        ensure: present
+        login: true
+        passwordSecret:
+          name: postgres-role-statistics

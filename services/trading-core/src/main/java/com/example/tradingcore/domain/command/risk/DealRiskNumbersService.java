@@ -82,7 +82,7 @@ public class DealRiskNumbersService {
         deal.setIncurredRiskAmount(numbers.getIncurredRiskAmount());
         deal.setCurrentRiskAmount(numbers.getCurrentRiskAmount());
         deal.setProtectionRelievedRiskAmount(numbers.getProtectionRelievedRiskAmount());
-        dealDataService.save(deal);
+        dealDataService.applyRiskNumbers(deal);
         return true;
     }
 

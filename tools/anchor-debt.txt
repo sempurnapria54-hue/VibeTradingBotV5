@@ -17,7 +17,6 @@
 .claude/skills/classify-type.md	Персистентность
 .claude/skills/place-knowledge.md	«Первоисточник правила»
 .claude/skills/stagnation-detection.md	Сброс
-.claude/skills/update-roadmap-progress.md	«Закрытие гейтящего узла проходит мини-петлю критики до приземления в корпус»
 .claude/skills/update-roadmap-progress.md	«Закрытие фазы N …»
 .claude/tests/source-api/okx/code-preconditions.md	AG1.9
 .claude/tests/source-api/okx/code-preconditions.md	«Гейт грунта»

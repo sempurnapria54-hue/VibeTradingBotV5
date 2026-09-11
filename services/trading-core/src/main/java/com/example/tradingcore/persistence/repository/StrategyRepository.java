@@ -74,4 +74,17 @@ public interface StrategyRepository extends JpaRepository<StrategyEntity, Long> 
             where s.id = :id
             """)
     Optional<StrategyEntity> findByIdWithSettings(@Param("id") Long id);
+
+    /**
+     * Идентичность копии-владельца закреплённой детали — ПРОЕКЦИЕЙ одного
+     * поля.
+     *
+     * <p>Читатель — писатель события сделки: наружу едет идентичность, а
+     * числовой ключ границу сервиса не пересекает. Загрузка детали с
+     * деревом ради одного поля читала бы шаги, действия и транши, которых
+     * писателю не нужно ни одного (.claude/rules/codestyle.md §«Выборка
+     * данных: не тянем сущность ради одного поля»).
+     */
+    @Query("select s.internalId from StrategyEntity s join s.details d where d.id = :detailId")
+    Optional<String> findStrategyInternalIdByDetailId(@Param("detailId") Long detailId);
 }

@@ -1,6 +1,8 @@
 package com.example.tradingcore.persistence.service;
 
+import static com.example.tradingbot.domain.util.EnumNames.name;
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -50,8 +52,34 @@ public class DealDataService {
     private final DealRepository repository;
     private final DealMapper mapper;
 
+    /**
+     * Завести строку сделки; возвращается сведённая модель с
+     * присвоенной идентичностью.
+     *
+     * <p><b>Метод заводит строку и только заводит — правки существующей
+     * идут точечными запросами.</b> Запись строки целиком есть
+     * {@code merge} отсоединённой сущности, то есть
+     * {@code update deals set <все колонки> where id = ?} значениями
+     * снимка, взятого в начале прохода: она откатывает и колонки,
+     * записанные охраняемыми запросами звеньев того же прохода, и статус,
+     * переставленный каскадом жёсткой ступени из соседнего потока.
+     *
+     * <p><b>Охрана здесь, а не в конвенции.</b> Правило «рёбра пишутся
+     * точечными запросами» уже действовало, и четыре терминальных звена
+     * его всё-таки нарушали: правило, за которым не стои́т отказа,
+     * держится ровно до следующего вызывающего
+     * (docs/models/domain/aggregate/Deal.md §Персистентность).
+     *
+     * @throws IllegalArgumentException у модели уже есть идентичность
+     */
     @Transactional
-    public Deal save(Deal deal) {
+    public Deal create(Deal deal) {
+        if (nonNull(deal.getId())) {
+            throw new IllegalArgumentException(
+                    "Deal row is written wholesale: dealId=" + deal.getId()
+                            + " — an existing row is updated by a targeted guarded query"
+                            + " (docs/models/domain/aggregate/Deal.md §Персистентность)");
+        }
         return mapper.persistenceToDomain(repository.save(mapper.domainToPersistence(deal)));
     }
 
@@ -128,22 +156,34 @@ public class DealDataService {
     }
 
     /**
-     * Каскад активных сделок счёта в ошибочное состояние; возвращает число
-     * уведённых. Радиус — весь счёт
-     * (docs/rules/error-handling-policy.md §«Жёсткая ступень энфорсится
-     * непрерывно, а не одним ходом»).
+     * Сделки счёта, которые уводит первый ход энфорсмента жёсткой ступени
+     * биржевого радиуса (docs/rules/error-handling-policy.md §«Жёсткая
+     * ступень энфорсится непрерывно, а не одним ходом»).
+     *
+     * <p><b>Читается популяция, а не пишется bulk-запрос.</b> Ребро
+     * каскада — то же ребро энфорсмента, что применяет проход: статус,
+     * резолвленная причина и факт остановки одной транзакцией на сделку
+     * (docs/lifecycles/Deal.md §«Причина выхода из штатного ведения»).
+     * Один bulk-{@code update} писал бы статус без причины и без факта, и
+     * тропы к ним у уведённой сделки не оставалось бы уже никогда.
      */
-    @Transactional
-    public Integer cascadeAccountToError(Long exchangeAccountId) {
-        return repository.cascadeAccountToError(exchangeAccountId, CASCADE_SOURCE_STATUSES,
-                Deal.Status.ERROR.name());
+    @Transactional(readOnly = true)
+    public List<Deal> findCascadeSourceOnAccount(Long exchangeAccountId) {
+        return repository.findByExchangeAccountIdAndStatusIn(exchangeAccountId, CASCADE_SOURCE_STATUSES)
+                .stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
     }
 
-    /** Тот же каскад радиусом пары «счёт, инструмент». */
-    @Transactional
-    public Integer cascadeInstrumentToError(Long exchangeAccountId, Long instrumentId) {
-        return repository.cascadeInstrumentToError(exchangeAccountId, instrumentId, CASCADE_SOURCE_STATUSES,
-                Deal.Status.ERROR.name());
+    /** Та же популяция радиусом пары «счёт, инструмент». */
+    @Transactional(readOnly = true)
+    public List<Deal> findCascadeSourceOnPair(Long exchangeAccountId, Long instrumentId) {
+        return repository
+                .findByExchangeAccountIdAndInstrumentIdAndStatusIn(exchangeAccountId, instrumentId,
+                        CASCADE_SOURCE_STATUSES)
+                .stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -181,12 +221,17 @@ public class DealDataService {
     }
 
     /**
-     * Увести сделку в ошибочное состояние перехватом петли — без причины
-     * выхода из штатного ведения; {@code true} — ребро применилось.
+     * Увести сделку в ошибочное состояние <b>без причины</b> выхода из
+     * штатного ведения; {@code true} — ребро применилось.
+     *
+     * <p>Писателей у ребра два — перехват петли и звено аварийного
+     * действия, — и обе тропы причины не пишут: писателя у неё нет по
+     * построению (docs/lifecycles/Deal.md §«Причина выхода из штатного
+     * ведения»).
      */
     @Transactional
-    public Boolean interceptToError(Long dealId) {
-        return repository.interceptToError(dealId, Deal.Status.ERROR.name(), CASCADE_SOURCE_STATUSES) > 0;
+    public Boolean applyErrorEdge(Long dealId) {
+        return repository.applyErrorEdge(dealId, Deal.Status.ERROR.name(), CASCADE_SOURCE_STATUSES) > 0;
     }
 
     /**
@@ -203,9 +248,44 @@ public class DealDataService {
                 name(deal.getShutdownReason()), name(deal.getCloseReason()), fromStatus.name()) > 0;
     }
 
-    /** Имя значения перечня либо пусто — колонка допускает отсутствие. */
-    private static String name(Enum<?> value) {
-        return isNull(value) ? null : value.name();
+    /**
+     * Применить <b>терминальное</b> ребро сделки: статус и причину
+     * закрытия, сведённые вызывающим; {@code true} — ребро применилось.
+     *
+     * <p>Набор разрешённых исходных статусов приходит от звена: у
+     * штатного терминала это активные статусы, у аварийного —
+     * {@code ERROR}. {@code false} означает, что сделка ушла из-под
+     * прохода — каскадом жёсткой ступени либо чужим терминалом, — и звено
+     * обязано остановиться, а не дописывать поверх.
+     *
+     * @param fromStatuses статусы, из которых это ребро законно
+     */
+    @Transactional
+    public Boolean applyTerminalEdge(Deal deal, List<Deal.Status> fromStatuses) {
+        return repository.applyTerminalEdge(deal.getId(), deal.getStatus().name(),
+                name(deal.getCloseReason()),
+                fromStatuses.stream().map(Enum::name).collect(Collectors.toList())) > 0;
+    }
+
+    /**
+     * Записать итоговое число сделки вместе с четвёркой признаков отбора;
+     * {@code true} — записано. {@code false} означает, что число уже
+     * стои́т: гард write-once живёт в самом запросе.
+     */
+    @Transactional
+    public Boolean applyResultAndFeatures(Deal deal) {
+        return repository.applyResultAndFeatures(deal.getId(), deal.getResultProfit(),
+                deal.getResultProfitCurrency(), name(deal.getCloseOutcome()),
+                name(deal.getReconciliationStatus()), name(deal.getBreakdownIncomplete()),
+                name(deal.getRiskBenchmarkAvailability())) > 0;
+    }
+
+    /** Записать четвёрку чисел риска, сведённых пересчётом. */
+    @Transactional
+    public void applyRiskNumbers(Deal deal) {
+        repository.applyRiskNumbers(deal.getId(), deal.getPlannedRiskAmount(),
+                deal.getIncurredRiskAmount(), deal.getCurrentRiskAmount(),
+                deal.getProtectionRelievedRiskAmount());
     }
 
     /**

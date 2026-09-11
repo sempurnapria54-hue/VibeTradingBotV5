@@ -54,7 +54,14 @@ import org.springframework.transaction.annotation.Transactional;
  * усечённой загрузке ложна при законном числе. Тот же durable-факт
  * свидетельствует и о признаках отбора: они записаны на полном графе.
  *
- * <p><b>Причину закрытия звено не пишет:</b> её пишет затребователь ребра
+ * <p><b>Ребро пишется ТОЧЕЧНЫМ гардированным запросом, а не строкой
+ * целиком</b>, тем же доводом, что у штатного терминала
+ * (docs/components/MarkDealClosedExecutor.md §«Побочные эффекты
+ * терминала»). Гард здесь — {@code ERROR}: аварийный терминал законен
+ * ровно из ошибочного состояния, и ноль применённых строк означает, что
+ * сделку увёл кто-то другой.
+ *
+ * <p><b>Причину закрытия звено не пишет своим решением:</b> её пишет затребователь ребра
  * — аварийный обработчик, той же транзакцией, которой ребро гейтит
  * (docs/lifecycles/Deal.md).
  */
@@ -62,6 +69,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
+
+    /** Единственный статус, из которого аварийный терминал законен. */
+    private static final List<Deal.Status> ERROR_STATUS = List.of(Deal.Status.ERROR);
 
     private final DealDataService dealDataService;
     private final DealActionStateDataService dealActionStateDataService;
@@ -97,9 +107,15 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
         if (isNull(deal.getResultProfit())) {
             writeBestEffortResult(dealContext, deal);
             featuresWriter.apply(dealContext, false);
+            dealDataService.applyResultAndFeatures(deal);
         }
         deal.setStatus(Deal.Status.EMERGENCY_CLOSED);
-        dealDataService.save(deal);
+        if (isFalse(dealDataService.applyTerminalEdge(deal, ERROR_STATUS))) {
+            deal.setStatus(Deal.Status.ERROR);
+            return ServiceCommandExecutionResult.notCompleted(
+                    "аварийный терминал не применён: сделка ушла из-под прохода — статус в базе больше"
+                            + " не ошибочный (docs/components/DealOrchestratorJob.md §«Цикл прохода»)");
+        }
         publishClosed(dealContext, deal);
         dealActionStateDataService.skipLiveSystemExecutions(dealContext.getActionStates(), anchorId(actionState));
         Boolean haltTriggered = lossStreakCounter.applyTerminal(dealContext);
@@ -167,11 +183,10 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
      */
     private void publishClosed(DealContext dealContext, Deal deal) {
         outboxWriter.write(dealContext.getExchangeAccount().getTenantId(), CoreEventType.DEAL_CLOSED,
-                new DealClosedContent(deal.getInternalId(),
+                DealClosedContent.of(deal,
                         dealContext.getExchangeAccount().getInternalId(),
                         dealContext.getInstrument().getInternalId(),
-                        String.valueOf(deal.getStatus()), String.valueOf(deal.getCloseReason()),
-                        String.valueOf(deal.getResultProfit()),
-                        deal.getResultProfitCurrency()));
+                        dealContext.strategyInternalId(),
+                        dealContext.getGraphComplete()));
     }
 }

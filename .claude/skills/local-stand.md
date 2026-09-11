@@ -143,6 +143,52 @@ bash tools/stand/vault-setup.sh            # Vault после каждого п�
 **Vault после рестарта запечатан всегда** — это свойство не-dev режима, а
 не поломка.
 
+## Место под хранилищем Docker
+
+**Хранилище Docker не отдаёт место само.** Диск данных
+(`%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx`) смонтирован **без
+`discard`**: освобождённое внутри Docker — снятый образ, убранный кэш
+сборки, уборка в узле — хосту не возвращается вообще, файл только растёт.
+Поэтому `docker system df` показывает освобождённое там, где на диске его
+не прибавилось.
+
+**Рост держит ограниченным выкладка:** `deploy-services.sh` снимает
+хостовую копию образа после `kind load` и убирает кэш сборки в конце
+(дом — шапка самой команды). Уже занятого файла она не сжимает.
+
+**Сжимает только компактизация, и она — ручной ход держателя:** `diskpart`
+требует прав администратора, поэтому в цепочку сессий не встраивается.
+Признак, по которому пора: цикл отказывается стартовать при свободном ниже
+`SESSION_MIN_FREE_GIB` (умолчание — 10 ГиБ, `tools/session-loop.sh`).
+
+```bash
+docker stop vibetrading-control-plane                      # стенд — как выше
+"$LOCALAPPDATA/Programs/DockerDesktop/DockerCli.exe" -Shutdown
+wsl.exe --shutdown
+```
+
+Дальше — в PowerShell **от администратора**:
+
+```powershell
+$v = "$env:LOCALAPPDATA\Docker\wsl\disk\docker_data.vhdx"
+@"
+select vdisk file="$v"
+attach vdisk readonly
+compact vdisk
+detach vdisk
+exit
+"@ | Set-Content "$env:TEMP\compact.txt" -Encoding ascii
+diskpart /s "$env:TEMP\compact.txt"
+```
+
+Замер 2026-09-09: 33.69 → 24.83 ГиБ, свободного на диске 9 → 18 ГиБ; все
+132 ссылки образов узла и тома целы. Docker поднимается обратно обычным
+запуском, стенд — `docker start` по разделу выше.
+
+**`wsl --manage … --set-sparse true` не применять:** WSL отключил
+разреженный режим из-за риска повреждения данных, а `--allow-unsafe`
+обходит именно эту защиту.
+
 ## Снятие
 
 ```bash

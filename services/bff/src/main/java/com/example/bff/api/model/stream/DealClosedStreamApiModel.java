@@ -8,8 +8,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param dealInternalId            идентичность сделки
  * @param exchangeAccountInternalId биржевой счёт сделки
  * @param instrumentInternalId      инструмент сделки
- * @param status                    терминальное состояние сделки
- * @param closeReason               причина закрытия
+ * @param status                    терминальное состояние сделки — имя
+ *                                  значения перечня {@code Deal.Status};
+ *                                  область значений домовая
+ *                                  (docs/models/domain/aggregate/Deal.md),
+ *                                  и здесь она не переписывается
+ * @param closeReason               причина закрытия — имя значения
+ *                                  перечня {@code Deal.CloseReason};
+ *                                  область значений домовая (там же), и
+ *                                  здесь она не переписывается
  * @param result                    финансовый исход сделки
  * @param resultCurrency            валюта исхода
  */
