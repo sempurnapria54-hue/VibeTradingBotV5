@@ -152,7 +152,7 @@ markdown-таблицы рвёт разметку. Поэтому она ост�
   `tools/retired-check.py`, `tools/retired-prose-debt.txt`.
 - Происхождение (эскалация С5 и ответ держателя) —
   `.claude/decisions/edit-self-description-pass.md`; отчёт прохода —
-  `.claude/work/progress/phase-2-step-10-self-description-pass.md`.
+  `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-self-description-pass.md`.
 - Единственность дома у пришедшей редакции — `.claude/rules/policy-home.md`.
 - Момент записи исхода захода — `.claude/rules/session-work-unit.md`
   §«Приземляемая точка».

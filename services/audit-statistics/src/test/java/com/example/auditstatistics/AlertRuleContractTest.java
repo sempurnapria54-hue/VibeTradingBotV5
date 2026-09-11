@@ -41,7 +41,7 @@ import org.springframework.core.io.ClassPathResource;
  * <p><b>Предмет пробы — имена и тропа, а не семантика правил.</b>
  * Семантику (границу порога, второй конъюнкт, три исхода «измеритель не
  * мерит») мерит прогон {@code promtool} по выражениям того же манифеста —
- * .claude/work/progress/phase-2-step-10-code-pass-k9.md.
+ * .claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k9.md.
  */
 class AlertRuleContractTest {
 

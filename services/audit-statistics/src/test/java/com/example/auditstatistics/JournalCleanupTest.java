@@ -43,7 +43,7 @@ import org.mockito.InOrder;
  * <p>Семантику самих записей (что удаляется по моменту ПРИЁМА, что момент
  * разрыва внутри границы не гаснет, что чужая группа не тронута) держит
  * SQL, и проверена она живым прогоном —
- * .claude/work/progress/phase-2-step-10-code-pass-k5.md.
+ * .claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k5.md.
  */
 class JournalCleanupTest {
 

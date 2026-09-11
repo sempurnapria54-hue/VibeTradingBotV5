@@ -349,10 +349,10 @@ tools/spec-mutation-check.sh` (25-32), сверка перечня с вывед
 - Энфорсер носительской оси — `tools/retired-check.py`.
 - Происхождение — `.claude/decisions/closure-completeness-by-population.md`;
   окрестностной оси —
-  `.claude/work/progress/phase-2-step-10-insertion-neighborhood-pass.md`;
+  `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-insertion-neighborhood-pass.md`;
   источника перечня точек —
-  `.claude/work/progress/phase-2-step-10-obligation-subject-pass.md`;
+  `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-obligation-subject-pass.md`;
   соразмерности клетки выдаче —
-  `.claude/work/progress/phase-2-step-10-output-disposition-pass.md`.
+  `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-output-disposition-pass.md`.
 - Дом нормы «предмет обязанностей — своя дельта» и нормы «обязанность полноты
   кончается разбором выдачи» — `.claude/rules/edit-kind-obligations.md`.

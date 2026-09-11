@@ -163,5 +163,5 @@
 - Прецедент третьей оси (снятие рамки) —
   `.claude/decisions/code-contact-as-gate.md`.
 - Прогон, поднявший эскалацию —
-  `.claude/work/progress/phase-2-step-10-docs-check-2.md` §«Эскалация:
+  `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-docs-check-2.md` §«Эскалация:
   концептуальный дефицит».

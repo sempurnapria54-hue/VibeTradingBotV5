@@ -21,7 +21,7 @@ CC задачей. После чтения пользователем разоб
 ## Приземление узла 2 `GAPS_CLOSE_6` (2026-09-11)
 
 Закрытие Ф2 и Ф3, оставленных второй верификацией узла. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-2.md`
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-2.md`
 §«Приземление узла».
 
 | # | Решение | Альтернативы | Почему так |
@@ -36,7 +36,7 @@ CC задачей. После чтения пользователем разоб
 Реакция на сигнал С5 узла 2 `GAPS_CLOSE_6` шага 10 фазы 2 по признаку
 `.claude/rules/stopped-node-disposition.md`: диагноз назвал посылку — значит
 концепт-проход по ней. Отчёт —
-`.claude/work/progress/phase-2-step-10-output-disposition-pass.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-output-disposition-pass.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -3763,7 +3763,7 @@ place-ноге она тождественно истинна (старая за
 
 ## Итерация 63 — шаг 10 фазы 2, `GAPS_CLOSE_1` (аудит и статистика)
 
-Отчёты — `.claude/work/progress/phase-2-step-10-*`.
+Отчёты — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -3806,7 +3806,7 @@ place-ноге она тождественно истинна (старая за
 ## Итерация 2026-09-06 (65) — шаг 10 фазы 2, `GAPS_CLOSE_1` часть 2 (серии 8-11)
 
 Решения машины при закрытии оставшихся 18 находок прогона
-`DOCS_CHECK_1`. Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-1-part-2.md`;
+`DOCS_CHECK_1`. Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-1-part-2.md`;
 мини-петля прошла **два раунда** (23 дефекта в первом, 9 новых во втором)
 плюс верификацию финальной правки.
 
@@ -3849,7 +3849,7 @@ place-ноге она тождественно истинна (старая за
 ## Итерация 2026-09-07 (66) — шаг 10 фазы 2, `GAPS_CLOSE_3` узел 1 (ключ группировки пересчёта)
 
 Решения машины при закрытии узла 1 прогона `DOCS_CHECK_3` (находки A2, B4).
-Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-3-node-1.md`;
+Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-3-node-1.md`;
 мини-петля прошла два раунда критики и семь верификаций, узел приземлён по
 поправке держателя `PROC-Q5` (чистота меряется по носителю).
 
@@ -3861,7 +3861,7 @@ place-ноге она тождественно истинна (старая за
 ## Итерация 2026-09-07 (67) — шаг 10 фазы 2, `GAPS_CLOSE_3` узел 2 (полнота журнала по паре)
 
 Решения машины при закрытии узла 2 прогона `DOCS_CHECK_3` (находки A1, A5,
-B3). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-3-node-2.md`.
+B3). Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-3-node-2.md`.
 Общее правило узла: **полнота журнала меряется по паре «группа × тема», а
 наружу едет консервативная свёртка по парам.**
 
@@ -3879,7 +3879,7 @@ B3). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-3-node-2.m
 ## Итерация 2026-09-07 (68) — шаг 10 фазы 2, `GAPS_CLOSE_3` узел 3 (состав и семантика счётчиков)
 
 Решения машины при закрытии узла 3 прогона `DOCS_CHECK_3` (находки B1, B2,
-B5, B6, C5). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-3-node-3.md`.
+B5, B6, C5). Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-3-node-3.md`.
 Общее правило узла: **число агрегата не говорит о себе неправды — имя и нота
 называют ту популяцию, которую оно считает, а перечислимый операнд отбора
 покрыт целиком и отнесение проверяется прогоном.**
@@ -3898,7 +3898,7 @@ B5, B6, C5). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-3-
 ## Итерация 2026-09-07 (69) — шаг 10 фазы 2, `GAPS_CLOSE_3` узел 4 (радиус чтения и его энфорсер)
 
 Решения машины при закрытии узла 4 прогона `DOCS_CHECK_3` (находки A3, A7).
-Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-3-node-4.md`.
+Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-3-node-4.md`.
 Общее правило узла: **охрана, которую корпус объявляет действующей, называет
 своего энфорсера поимённо; где энфорсера нет — стои́т названное ограничение с
 ценой и оживителем, и ни один носитель не пишет, что охрана уже работает.**
@@ -3914,7 +3914,7 @@ B5, B6, C5). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-3-
 
 Решения машины при закрытии узла 5 прогона `DOCS_CHECK_3` (находки A4, A6,
 A8, A12, C1, C2, C8, C9 плюс две позиции, переданные узлом 1). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-3-node-5.md`. Общее
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-3-node-5.md`. Общее
 правило узла: **носитель не утверждает о чужом предмете больше, чем стои́т
 в его доме; клейм полноты, равенства или счёта стои́т ровно на том, что
 измеримо.**
@@ -3931,7 +3931,7 @@ A8, A12, C1, C2, C8, C9 плюс две позиции, переданные у�
 
 Решения машины при закрытии узла 6 прогона `DOCS_CHECK_3` (находки A9, A10,
 A11, C3, C4, C6, C7). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-3-node-6.md`. Общее
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-3-node-6.md`. Общее
 правило узла: **всё, что шаг о себе объявляет — границу предмета, обещанный
 носитель, замер сквозного класса, — обязано иметь исход, проверяемый не
 памятью исполнителя.**
@@ -3974,7 +3974,7 @@ A11, C3, C4, C6, C7). Отчёт —
 Решения машины внутри прохода, выбранного держателем (`PROC-Q6` = (а),
 дом — `.claude/decisions/reception-executor-design-pass.md`). Сама форма
 исполнителя — факт держателя, не решение машины; отчёт прохода —
-`.claude/work/progress/phase-2-step-10-design-pass.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-design-pass.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -3990,7 +3990,7 @@ A11, C3, C4, C6, C7). Отчёт —
 ## `GAPS_CLOSE_4`, узел 1 — провод: конверт, содержимое, потребители (2026-09-08)
 
 Решения машины при закрытии находок A1, A6, B4, B5 прогона `DOCS_CHECK_4`.
-Рационал узла — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-1.md`.
+Рационал узла — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4-node-1.md`.
 
 **Узел ОСТАНОВЛЕН сигналом С5, и правки его в корпус не приземлены.**
 Решения ниже приняты и записаны, но **в силу входят вместе с приземлением**,
@@ -4031,7 +4031,7 @@ A11, C3, C4, C6, C7). Отчёт —
 
 Ответ держателя `PROC-Q8` = (а) назвал предмет и три позиции; ось «измеритель
 против снятия» он оставил проходу дословно. Отчёт —
-`.claude/work/progress/phase-2-step-10-self-description-pass.md`, дом правила —
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-self-description-pass.md`, дом правила —
 `.claude/rules/self-description-form.md`.
 
 | # | Решение | Альтернативы | Почему так |
@@ -4049,7 +4049,7 @@ A11, C3, C4, C6, C7). Отчёт —
 
 Четвёртая единица закрытия: разбор двух объявленных остатков остановки —
 дефектов **предмета**, не самоописания. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4-node-1.md` §«Состояние
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4-node-1.md` §«Состояние
 узла: ПРИЗЕМЛЁН».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4065,7 +4065,7 @@ A11, C3, C4, C6, C7). Отчёт —
 ## Приземление узла 3 `GAPS_CLOSE_4` (2026-09-08)
 
 Шестая единица закрытия: пороги, границы и моменты замера (A9, A10, B12).
-Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-3.md`
+Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4-node-3.md`
 §«Приземление».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4080,7 +4080,7 @@ A11, C3, C4, C6, C7). Отчёт —
 ## Приземление узла 4 `GAPS_CLOSE_4` (2026-09-08)
 
 Седьмая единица закрытия: оси окружений — перечень выводится из дома (A12,
-B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.md`
+B10). Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4-node-4.md`
 §«Приземление».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4095,7 +4095,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Приземление узла 5 `GAPS_CLOSE_4` (2026-09-08)
 
 Восьмая единица закрытия: предъявитель клейма (A11, B9, B11, C3). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4-node-5.md`
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4-node-5.md`
 §«Приземление».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4109,7 +4109,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Гейт выхода из `GAPS_CLOSE_4` (2026-09-08)
 
 Девятая единица закрытия: прогон гейта, исход красный. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4.md` §«Гейт выхода из
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md` §«Гейт выхода из
 `GAPS_CLOSE_4` — прогнан 2026-09-08, исход КРАСНЫЙ».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4123,8 +4123,8 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Десятая единица закрытия: верификация 2 узла 2, исход — узел остановлен
 сигналом С5. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4-node-2-verification-2.md`;
-эскалация и реакция — `.claude/work/progress/phase-2-step-10-gaps-close-4.md`
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4-node-2-verification-2.md`;
+эскалация и реакция — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md`
 §«Эскалация: концептуальный дефицит (сигнал С5, узел 2)».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4137,7 +4137,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Одиннадцатая единица закрытия: концепт-проход по посылке С5 узла 2 — реакция,
 выбранная Д1136. Отчёт —
-`.claude/work/progress/phase-2-step-10-edit-kind-pass.md`; дом правила —
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-edit-kind-pass.md`; дом правила —
 `.claude/rules/edit-kind-obligations.md`.
 
 | # | Решение | Альтернативы | Почему так |
@@ -4152,7 +4152,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Двенадцатая единица закрытия: приземление узла 2 после концепт-прохода —
 разбор восьми объявленных остатков (W1-W5, Н2-Н4). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4-node-2.md`
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4-node-2.md`
 §«Приземление после концепт-прохода».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4165,7 +4165,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Четырнадцатая единица закрытия: правка отчётов узлов 1 и 2 по четырём находкам
 второго прогона гейта выхода плюс диспозиция «части дома» находки Г1. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4.md` §«Четырнадцатая единица
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md` §«Четырнадцатая единица
 закрытия — закрытие Г1-Г4 второго прогона гейта».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4178,7 +4178,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Шестнадцатая единица закрытия: правка отчёта узла 1 и таблицы свипов хвоста по
 находкам третьего прогона гейта выхода плюс диспозиция названной им гигиены.
-Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4.md`
+Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md`
 §«Шестнадцатая единица закрытия — закрытие Т1-Т4 третьего прогона гейта».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4190,7 +4190,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Восемнадцатая единица закрытия: правка популяций дизайн-прохода и узла 1,
 правка живых зелёных клеймов о популяциях и уточнение признака в доме формы
-самоописания. Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4.md`
+самоописания. Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md`
 §«Восемнадцатая единица закрытия — закрытие Ч1-Ч2 четвёртого прогона гейта».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4206,7 +4206,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 Девятнадцатая единица закрытия: правка команды свипа, не исполнявшейся вовсе,
 разбор выдачи свипов по классам носителей, сведение строк популяции к выдаче и
 расширение предмета энфорсера клаузы о носителе команды. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4.md` §«Девятнадцатая единица
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md` §«Девятнадцатая единица
 закрытия — закрытие П1-П3 пятого прогона гейта».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4222,7 +4222,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 строки популяции о снапшоте к классу, внесение собственного отчёта в разбор
 выдачи, снятие прозаического счёта носителей и ввод оси 9 энфорсера клаузы о
 носителе команды. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-4.md` §«Двадцатая единица
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md` §«Двадцатая единица
 закрытия — закрытие Ш1-Ш3 шестого прогона гейта».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4244,7 +4244,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 потребителя» (B1-B4). Мини-петля — раунд критики и две верификации; ряд
 блокирующих корпусную правку **6 → 6 → 4**, потолок исчерпан, правки в корпус
 не приземлены. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-5-node-1.md` §«Эскалация:
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-5-node-1.md` §«Эскалация:
 концептуальный дефицит (сигнал С5, узел 1)».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4263,7 +4263,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 посылку — значит концепт-проход по ней. Проход вводит третью ось полноты
 правки — окрестность точки вставки — в существующий дом
 `.claude/skills/closure-population.md`. Отчёт —
-`.claude/work/progress/phase-2-step-10-insertion-neighborhood-pass.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-insertion-neighborhood-pass.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4278,7 +4278,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при приземлении узла 1 (находки B1-B4 прогона `DOCS_CHECK_5`)
 после концепт-прохода, снявшего посылку остановки. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-5-node-1.md`
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-5-node-1.md`
 §«Приземление узла (корпусный заход)».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4293,7 +4293,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии узла 2 (находки A1, A5, A8, C1 прогона
 `DOCS_CHECK_5`). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-5-node-2.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-5-node-2.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4308,7 +4308,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии узла 3 (находки A2, A3, C2 прогона
 `DOCS_CHECK_5`). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-5-node-3.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-5-node-3.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4322,7 +4322,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии узла 4 (находки A4, A7, A9, B7, B8, C3 прогона
 `DOCS_CHECK_5`). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-5-node-4.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-5-node-4.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4338,7 +4338,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии узла 5 (находки A6, B5, B6, B9, B10, C4 прогона
 `DOCS_CHECK_5`). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-5-node-5.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-5-node-5.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4354,17 +4354,17 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Итерация 2026-09-10 (83) — шаг 10 фазы 2, простановка `CODE`
 
 Решения машины при переходе шага в `CODE`. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-transition.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-transition.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
 | Д1213 | **Противоречие внутри дельты `CODE` (позиция 11 «строит экспорт метрик» против позиции 37 «не строит») разрешено В ПОЛЬЗУ позиции 11; клауза позиции 37 снята** | (б) снять позицию 11 и оставить экспорт метрик общему долгу; (в) не править ничего, назвав противоречие в отчёте перехода и припарковав ремонт | (б) противоречит дому долга: `.claude/work/backlog.md` §«Экспорт метрик из сервисов» называет **оживителем** доли `audit-statistics` кодовый заход именно этого шага и мотивирует это предъявленной потребностью — алертом на лаг группы журнала, без которого гарантия «потеря недопустима» держится обещанием. (в) оставляет вход следующей единицы двусмысленным ровно там, где он решает, существует компонент или нет. Дом (`docs/architecture/data-ownership.md` §«Outbox и доставка») говорит, где долг **живёт**, а не что шаг его не платит; позиция 37 читала дом до слов «общим долгом» |
-| Д1214 | **Записи в реестре снятых редакций (`tools/retired-check.py`) на эту снятую клаузу НЕ заводится** | завести запись с популяцией из одного носителя | снятая формулировка жила ровно в одном файле — `.claude/work/progress/phase-2-step-10-chronicle.md`, — а `.claude/work/progress/` объявлен в `SKIP` области свипа детектора: запись мерила бы пустое множество и притом требовала бы снятия при закрытии шага. Свип по потребителям при этом проведён и предъявлен командой: единственный носитель вне дельты правки не требует. Цена названа — механической охраны у этого снятия нет, держится оно разобранным свипом |
+| Д1214 | **Записи в реестре снятых редакций (`tools/retired-check.py`) на эту снятую клаузу НЕ заводится** | завести запись с популяцией из одного носителя | снятая формулировка жила ровно в одном файле — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-chronicle.md`, — а `.claude/work/progress/` объявлен в `SKIP` области свипа детектора: запись мерила бы пустое множество и притом требовала бы снятия при закрытии шага. Свип по потребителям при этом проведён и предъявлен командой: единственный носитель вне дельты правки не требует. Цена названа — механической охраны у этого снятия нет, держится оно разобранным свипом |
 
 ## Первый кодовый заход шага 10 фазы 2 (компонент K1)
 
 Решения машины при кодировании скелета `audit-statistics`. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k1.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k1.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4377,7 +4377,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Второй кодовый заход шага 10 фазы 2 (компонент K2)
 
 Решения машины при заведении схем обеих баз, ролей и грантов. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k2.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k2.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4394,7 +4394,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Третий кодовый заход шага 10 фазы 2 (компонент K3)
 
 Решения машины при построении слушателя приёма и обработчика ошибок. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k3.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k3.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4413,7 +4413,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Четвёртый кодовый заход шага 10 фазы 2 (компонент K4)
 
 Решения машины при построении тика состояния приёма. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k4.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k4.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4456,7 +4456,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Седьмой кодовый заход шага 10 фазы 2 (компонент K7)
 
 Решения машины при постановке журнальной выборки чтения. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k7.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k7.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4478,7 +4478,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Восьмой кодовый заход шага 10 фазы 2 (компонент K8)
 
 Решения машины при постановке агрегатной выборки чтения. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k8.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k8.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4499,7 +4499,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Девятый кодовый заход шага 10 фазы 2 (компонент K9)
 
 Решения машины при постановке реестра метрик и правил алертов. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k9.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k9.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4515,7 +4515,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Десятый кодовый заход шага 10 фазы 2 (писатель строки отказа доступа)
 
 Решения машины при построении писателя строки отвергнутого вызова. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k10.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k10.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4532,7 +4532,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при построении поставщика актора у владельца определений и
 состава его форм. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k11.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k11.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4552,7 +4552,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при построении составов форм ядра, класса `DealShutdownInitiated`
 и поставщика актора у ядра. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k12.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k12.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4571,7 +4571,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Тринадцатый кодовый заход шага 10 фазы 2 (закрытие находок аппрува)
 
 Решения машины при закрытии одиннадцати находок фокусов. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k13.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k13.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4584,7 +4584,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Четырнадцатый кодовый заход шага 10 фазы 2 (закрытие находок второго прогона фокусов)
 
 Решения машины при закрытии R1 и R2. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k14.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k14.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4595,7 +4595,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Пятнадцатый кодовый заход шага 10 фазы 2 (закрытие находок третьего прогона фокусов)
 
 Решения машины при закрытии Ф1-Ф4. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k15.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k15.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4607,7 +4607,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Шестнадцатый кодовый заход шага 10 фазы 2 (закрытие находки Ф5 четвёртого прогона фокусов)
 
 Решения машины при закрытии Ф5. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k16.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k16.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4620,7 +4620,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Семнадцатый кодовый заход шага 10 фазы 2 (закрытие находки Ф6 пятого прогона фокусов)
 
 Решения машины при закрытии Ф6. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k17.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k17.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4632,7 +4632,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Восемнадцатый кодовый заход шага 10 фазы 2 (закрытие находок Ф7 и Ф8 шестого прогона фокусов)
 
 Решения машины при закрытии Ф7 и Ф8. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k18.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k18.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4644,7 +4644,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Девятнадцатый кодовый заход шага 10 фазы 2 (закрытие находок Ф9 и Ф10 седьмого прогона фокусов)
 
 Решения машины при закрытии Ф9 и Ф10. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k19.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k19.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4656,7 +4656,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Двадцатый кодовый заход шага 10 фазы 2 (закрытие находок Ф12 и Ф13 восьмого прогона фокусов)
 
 Решения машины при закрытии Ф12 и Ф13. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-pass-k20.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k20.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4669,7 +4669,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Девятый прогон фокусов шага 10 фазы 2 (аппрув `CODE`)
 
 Решения машины при выпуске аппрува. Отчёт —
-`.claude/work/progress/phase-2-step-10-code-focuses-9.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-focuses-9.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4681,7 +4681,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Узел 1 `GAPS_CLOSE_6` шага 10 фазы 2 (закрытие гейтящей находки B1, узел остановлен по С5)
 
 Решения машины при закрытии B1 — расхождения двух затребователей ребра
-энфорсмента. Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-6-node-1.md`.
+энфорсмента. Отчёт — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-1.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4698,7 +4698,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии узла 2 (находки A1, A2, A3, A8, A9, B3, C2, C4;
 гейтящих ноль). Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-2.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-2.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4711,7 +4711,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Остановка узла 2 `GAPS_CLOSE_6` по С5 и выбор реакции
 
 Решения машины при разборе остановленного узла. Раздел отчёта —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-2.md`
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-2.md`
 §«Остановка узла: сигнал С5 и выбор реакции».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4723,7 +4723,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Доработка узла 2 `GAPS_CLOSE_6` по итогам критики
 
 Решения машины при закрытии находок К1-К16 раунда критики. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-2.md`
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-2.md`
 §«Доработка по итогам критики».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4737,7 +4737,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 ## Приземление узла 1 `GAPS_CLOSE_6` шага 10 фазы 2
 
 Решения машины при приземлении узла — заходе корпусном и у узла последнем.
-Раздел отчёта — `.claude/work/progress/phase-2-step-10-gaps-close-6-node-1.md`
+Раздел отчёта — `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-1.md`
 §«Приземление: свипы и обход потребителей».
 
 | # | Решение | Альтернативы | Почему так |
@@ -4750,7 +4750,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии находок A4, A5, A12, A13, C1 и трёх носителей,
 найденных собственными пробами узла. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-3.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-3.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4762,7 +4762,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии находок A11, B4, C3 и трёх носителей, найденных
 собственными пробами узла. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-4.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-4.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4780,7 +4780,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии находок A10 и B2 и двух носителей, найденных
 собственными пробами узла. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-5.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-5.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4795,7 +4795,7 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 
 Решения машины при закрытии находок A6 и A7 и трёх носителей, найденных
 собственными пробами и свипами узла. Отчёт —
-`.claude/work/progress/phase-2-step-10-gaps-close-6-node-6.md`.
+`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-6-node-6.md`.
 
 | # | Решение | Альтернативы | Почему так |
 |---|---|---|---|
@@ -4856,3 +4856,15 @@ B10). Отчёт — `.claude/work/progress/phase-2-step-10-gaps-close-4-node-4.
 | Д1443 | **Гейт прогоняет команду с подменой статуса (`--статус`) до записи статуса** | (б) прогонять после записи; (в) считать срабатывание «шаг DONE» находкой следующей сессии | условие срабатывает самой простановкой; без подмены статус проходил бы гейт зелёным, а красный прогон встречала бы чужая сессия на чужой правке |
 | Д1444 | **Энфорсер введён под заморозкой усиления измерения как решение держателя о машине петли** | (б) припарковать до входа шага 10 в `CODE` | заморозка адресует находки прогонов и их закрытия; указание держателя о процессе — не находка (`.claude/rules/docs-loop-limits.md` §«Чего правило НЕ означает») |
 | Д1445 | **Накопленное снято одним ходом, без файла долга** | (б) `tools/backlog-debt.txt` по образцу `anchor-debt.txt` | накопленное и есть предмет указания держателя; долг заводится там, где снять сразу нельзя, а здесь — 143 секции разобраны с доказательствами (`.claude/work/history/2026-09-11-backlog-diet.md`) |
+
+## Переход шага 10 фазы 2 в `DONE` (2026-09-11)
+
+Развилки, встреченные закрытием шага. Дом каждой названной нормы — в клетке
+«Почему»; здесь фиксируется выбор с правом вето постфактум.
+
+| # | Решение | Альтернативы | Почему |
+|---|---|---|---|
+| Д1446 | **Долг клеток-носителей снят переездом своих носителей в `history/`, а не правкой клеток** | (б) перенести 21 команду из клеток в блоки кода, прогнать каждую и сверить исход, как предписывала задача секции бэклога; (в) оставить строки долга и принять красный прогон после переноса | (б) — ровно та ретро-правка, которую **уже отвергло** решение Д1148 («клетки лежат в отчётах закрытых заходов, и правка закрытого сделала бы их описанием того, чего не было»): формулировка задачи расходилась с решением, на котором стои́т сам долг. Сверх того прогон команды **сегодня** мерил бы нынешний корпус и записывал бы его исход в отчёт о прошлом заходе. (в) консервирует долг без предмета — то, что ось 3 энфорсера и объявляет дефектом |
+| Д1447 | **Отчёт перехода остаётся в `.claude/work/progress/`, когда прочие артефакты шага уезжают** | (б) увезти его вместе со всеми и принять код 2 у двух энфорсеров; (в) ослабить у энфорсеров ось отказа на пустой области | (б) уносит из измеряемой области **собственную** классификацию корпусного захода — класс, против которого заведено правило родов; сверх того `edit-kind-check.py` и `command-carrier-check.py` на пустой области отказывают кодом 2 (**предъявлено прогоном**, а не выведено), то есть граница шага была бы неизмерима по построению. (в) ослабляет базовый гейт, записанный решением держателя 2026-08-30 («вход разобран и непуст ⇒ код 2»), и требует своей падающей пробы — это своя единица, а не попутная правка |
+| Д1448 | **Шесть секций-энфорсеров взяты в работу (`сейчас`), а не перевооружены на вход шага 11 в `CODE`** | (б) перевооружить на `шаг:2-11:CODE`; (в) закрыть как неактуальные | (б) объявила бы задачи заблокированными ровно в то окно, в которое они и открыты: заморозка усиления измерения вооружается доковой петлёй **шага**, а между шагами ни одной петли не идёт — две из шести это окно прямо и называли своим условием. (в) — потеря: предмет каждой жив, измерения нет ни у одной |
+| Д1449 | **Секция прозы реестра снятых редакций перевооружена на `наблюдение:`, а не взята в работу** | (б) `сейчас`; (в) оставить `шаг:2-10:DONE` | условие сработало **по букве** и не исполнилось **по существу**: закрытие шага 10 не сняло ни одной записи реестра, а задача ждёт именно снимаемой записи. Машинной формы у события «запись реестра снята» нет, и `наблюдение:` печатается каждым прогоном поимённо — то есть спрятаться не может |

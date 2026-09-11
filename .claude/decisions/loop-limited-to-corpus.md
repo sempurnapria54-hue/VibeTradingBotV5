@@ -117,5 +117,5 @@
 - Потолок-сосед — `.claude/decisions/mini-loop-verification-ceiling.md`.
 - Реакция на остановку — `.claude/rules/stopped-node-disposition.md`.
 - Замер, на котором решение стои́т —
-  `.claude/work/progress/phase-2-step-10-gaps-close-4.md` §«Красное — находки
+  `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-gaps-close-4.md` §«Красное — находки
   шестого прогона» и разделы прогонов выше него.

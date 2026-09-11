@@ -494,7 +494,7 @@ RETIRED = [
         'source': 'приземление узла 5 `GAPS_CLOSE_5`, шаг 10 фазы 2',
         'allowed': (),
         'population': (
-            ('.claude/work/roadmap/phase-2.md',
+            ('.claude/processes/roadmap-step-execution.md',
              r'Стойка\s+меряется\s+конструкцией,\s+а\s+не\s+её\s+элементом'),
         ),
     },
@@ -565,7 +565,7 @@ RETIRED = [
         'source': 'проход по окрестности точки вставки, шаг 10 фазы 2',
         'allowed': (
             '.claude/work/decision-digest.md',
-            '.claude/work/progress/phase-2-step-10-insertion-neighborhood-pass.md',
+            '.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-insertion-neighborhood-pass.md',
         ),
         'population': (
             ('.claude/skills/closure-population.md',
@@ -590,7 +590,7 @@ RETIRED = [
         'source': 'проход по предмету обязанностей полноты, шаг 10 фазы 2',
         'allowed': (
             '.claude/work/decision-digest.md',
-            '.claude/work/progress/phase-2-step-10-obligation-subject-pass.md',
+            '.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-obligation-subject-pass.md',
         ),
         'population': (
             ('.claude/skills/closure-population.md',
@@ -706,7 +706,7 @@ RETIRED = [
         'allowed': (
             '.claude/work/decision-digest.md',
             '.claude/skills/closure-population.md',
-            '.claude/work/progress/phase-2-step-10-edit-kind-pass.md',
+            '.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-edit-kind-pass.md',
         ),
         'population': (
             ('.claude/processes/roadmap-step-execution.md',
@@ -772,7 +772,7 @@ RETIRED = [
         'population': (
             ('docs/architecture/contracts.md', r'Результата\s+до\s+финансирования\s+в\s+перечне\s+нет'),
             ('docs/spec/statistics-aggregates.json', r'СОДЕРЖИМЫМ\s+СОБЫТИЯ\s+не\s+приезжает'),
-            ('.claude/work/progress/phase-2-step-10-chronicle.md', r'Ценовой\s+результат\s+полем\s+не\s+заводится'),
+            ('.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-chronicle.md', r'Ценовой\s+результат\s+полем\s+не\s+заводится'),
         ),
     },
     {
@@ -2258,7 +2258,6 @@ RETIRED = [
             ('docs/architecture/contracts.md', None),
             ('docs/architecture/reserved-extension-points.md', None),
             ('docs/architecture/data-ownership.md', None),
-            ('.claude/work/roadmap/phase-2.md', None),
         ),
     },
     {
@@ -2770,7 +2769,7 @@ RETIRED = [
         'allowed': ('.claude/work/decision-digest.md',),
         'population': (
             ('deploy/base/services/bff.yaml', None),
-            ('.claude/work/progress/phase-2-step-10-chronicle.md',
+            ('.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-chronicle.md',
              r'встречная\s+ПАРА\s+сетевой\s+политики'),
         ),
     },
@@ -2791,8 +2790,6 @@ RETIRED = [
         'allowed': ('.claude/work/decision-digest.md',),
         'population': (
             ('docs/models/domain/other/AuditRecord.md', None),
-            ('.claude/work/roadmap/phase-2.md',
-             r'живёт\s+в\s+доме\s+и\s+здесь\s+не\s+пересказывается'),
         ),
     },
     {
@@ -2849,7 +2846,7 @@ RETIRED = [
                   '(.claude/decisions/reception-executor-design-pass.md)',
         'allowed': ('.claude/work/decision-digest.md',
                     '.claude/decisions/reception-executor-design-pass.md',
-                    '.claude/work/progress/phase-2-step-10-design-pass.md'),
+                    '.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-design-pass.md'),
         'population': (('docs/models/domain/other/AuditRecord.md',
                         r'ReceptionStateJob'),
                        ('docs/spec/audit-journal.json', r'ReceptionStateJob'),
@@ -2869,7 +2866,7 @@ RETIRED = [
         'source': 'дизайн-проход шага 10 фазы 2, позиция 1 '
                   '(.claude/decisions/reception-executor-design-pass.md)',
         'allowed': ('.claude/work/decision-digest.md',
-                    '.claude/work/progress/phase-2-step-10-design-pass.md'),
+                    '.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-design-pass.md'),
         'population': (('docs/rules/error-handling-policy.md',
                         r'не\s+блокирующая\s+реакция'),),
     },
@@ -2891,7 +2888,7 @@ RETIRED = [
         'source': 'дизайн-проход шага 10 фазы 2, позиция 3 '
                   '(.claude/decisions/reception-executor-design-pass.md)',
         'allowed': ('.claude/work/decision-digest.md',
-                    '.claude/work/progress/phase-2-step-10-design-pass.md'),
+                    '.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-design-pass.md'),
         'population': (('docs/models/domain/other/AuditRecord.md', r'lag_gap_at'),
                        ('docs/spec/audit-journal.json', r'lag_gap_at'),
                        ('docs/components/AuditEventListener.md', None),
@@ -2910,7 +2907,7 @@ RETIRED = [
         'date': '2026-09-08',
         'source': 'дизайн-проход шага 10 фазы 2, позиция 1 '
                   '(.claude/decisions/reception-executor-design-pass.md)',
-        'allowed': ('.claude/work/progress/phase-2-step-10-design-pass.md',),
+        'allowed': ('.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-design-pass.md',),
         'population': (('docs/models/domain/other/AuditRecord.md',
                         r'обработчик\w*\s+ошибок\s+контейнера'),
                        ('docs/components/AuditEventListener.md', None)),
@@ -2937,7 +2934,6 @@ RETIRED = [
              r'ограничения\s+отбора\s+агрегатной\s+вместе\s+с'),
             ('.claude/work/backlog.md', None),
             ('.claude/rules/knowledge-ownership-by-service.md', None),
-            ('.claude/work/roadmap/phase-2.md', None),
         ),
     },
     {
@@ -2973,7 +2969,6 @@ RETIRED = [
         'source': 'узел 2 GAPS_CLOSE_4 шага 10 фазы 2, правки 1-2 (A7, V1)',
         'allowed': ('.claude/work/roadmap/phase-2.md',),
         'population': (
-            ('.claude/work/roadmap/phase-2.md', None),
             ('docs/models/domain/other/AuditRecord.md', None),
             ('.claude/work/backlog.md', None),
         ),
@@ -3085,7 +3080,6 @@ RETIRED = [
         'population': (
             ('docs/models/domain/other/AuditRecord.md', None),
             ('.claude/work/backlog.md', None),
-            ('.claude/work/roadmap/phase-2.md', None),
         ),
     },
     {

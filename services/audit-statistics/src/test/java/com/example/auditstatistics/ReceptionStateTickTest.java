@@ -54,7 +54,7 @@ import org.springframework.kafka.listener.MessageListenerContainer;
  * <p>Семантику самих записей (что заведение не трогает величин приёма, что
  * момент наблюдения вторым тактом не переписывается, что строка ушедшей
  * темы не удаляется) держит SQL, и проверена она живым прогоном —
- * .claude/work/progress/phase-2-step-10-code-pass-k4.md.
+ * .claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k4.md.
  */
 class ReceptionStateTickTest {
 
