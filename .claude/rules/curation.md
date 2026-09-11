@@ -30,7 +30,11 @@
    `open-questions.md`, `phase-N.md`, `questions/tasks/*` — без
    закрытых пунктов, «Мигрировано/Построено/Сделано»-блоков и
    хроники завершённого; итоги — в `history/` с указателями
-   (`closed-work-transfer.md`).
+   (`closed-work-transfer.md`). У `backlog.md` это мерит
+   `python3 tools/backlog-check.py`: секция без маркера, сработавшее
+   условие, объём и провенанс — красный прогон
+   (`.claude/rules/backlog-section-form.md`); перечень `сейчас` из его
+   выдачи — действующий список работы свипа.
 2. **`phase-N.md` — только таблица статусов и живые примечания к
    будущим шагам.** Хроника текущего шага — в
    `work/progress/phase-<N>-step-<M>-chronicle.md`.

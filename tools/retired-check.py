@@ -181,6 +181,25 @@ OUT_OF_AREA = {
 #                снималась.
 RETIRED = [
     {
+        'name': 'следующий шаг берёт следующая сессия',
+        # Снято решением держателя 2026-09-11 (остановка цикла на границе
+        # шага). Прежняя редакция вела цикл через границу закрытого шага
+        # дальше: момент, когда держателю показывают закрытое, зависел от
+        # того, на какой сессии кончится предел запуска, а не от того, что
+        # шаг закрыт. Что действует теперь — объявляет ключ `arrived`.
+        'pattern': r'следующий\s+шаг\s+бер[её]т\s+следующая\s+сессия',
+        'arrived': r'границ[а-яё]*\s+закрытого\s+шага\s+останавливает\s+цикл',
+        'date': '2026-09-11',
+        'source': 'решение держателя 2026-09-11 (цикл сессий: остановка на границе шага)',
+        'allowed': ('.claude/skills/session-chain.md',
+                    '.claude/work/decision-digest.md'),
+        'population': (
+            ('.claude/skills/session-chain.md', None),
+            ('tools/session-prompt.md', None),
+            ('tools/session-loop.sh', None),
+        ),
+    },
+    {
         'name': 'связку имён компонентов не мерит ни одна проба ни на одном конце',
         # Снято первой верификацией узла 5 GAPS_CLOSE_6 шага 10 фазы 2
         # (2026-09-11, находка В2). Прежняя редакция выводила клейм о покрытии
@@ -1186,8 +1205,7 @@ RETIRED = [
                         r'природа\s+—\s+происшествие'),
                        ('docs/components/MarkDealEmergencyClosedExecutor.md',
                         r'природа\s+—\s+происшествие'),
-                       ('.claude/work/backlog.md',
-                        r'снята\s+как\s+редакция')),
+),
     },
     {
         'name': 'перечень детекторов построен на один из тринадцати',
@@ -1254,8 +1272,6 @@ RETIRED = [
                     '.claude/knowledge-tree.md',
                     'tools/retired-check.py'),
         'population': (('docs/components/AnomalyJob.md', None),
-                       ('.claude/work/backlog.md',
-                        r'ступень\s+и\s+радиус\s+выводятся'),
                        ('donor/src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
                         r'ВЫВОДЯТСЯ\s+тремя\s+ратифицированными')),
     },
@@ -1400,7 +1416,6 @@ RETIRED = [
                        ('docs/rules/loss-streak-halt.md', r'дедуп\w*\s+по\s+стоящему\s+состоянию'),
                        ('docs/rules/manual-halt.md', None),
                        ('docs/spec/manual-halt.json', None),
-                       ('.claude/work/backlog.md', None),
                        ('.claude/work/questions/open-questions.md', None)),
     },
     {
@@ -1605,8 +1620,7 @@ RETIRED = [
                        ('docs/lifecycles/Position.md', None),
                        ('docs/models/mapping/PositionCloseResult.md', None),
                        ('docs/rules/pnl-reconciliation.md', None),
-                       ('docs/spec/pnl-reconciliation.json', None),
-                       ('.claude/work/backlog.md', None)),
+                       ('docs/spec/pnl-reconciliation.json', None),),
     },
     {
         'name': 'радиус шире инструмента — набором строк',
@@ -1879,8 +1893,7 @@ RETIRED = [
         'population': (('docs/rules/replace-not-amend.md', None),
                        ('docs/components/CancelAlgoOrderExecutor.md',
                         r'судьбу\s+её\s+встроенной\s+защиты\s+решает\s+налив'),
-                       ('.claude/work/backlog.md',
-                        r'по\s+филлу\s+НЕ\s+ветвится')),
+),
     },
     {
         'name': 'в биржевом эхе тип триггера не наблюдается',
@@ -2748,12 +2761,15 @@ RETIRED = [
         # при запрете по умолчанию — обнаружилось бы первым живым прогоном.
         'pattern': r'пара\s+сетевой\s+политики\s+у\s+поверхности\s+уже\s+есть'
                    r'|строка\s+вызова\s+и\s+пара\s+политики\s+существуют',
-        'arrived': r'\*\*пары\s+сетевой\s+политики\s+нет\*\*',
+        # Редакция сменилась ещё раз ходом `CODE` шага 10 (2026-09-11, чистка
+        # бэклога): носитель пришедшего — манифест периметра, не рабочий файл.
+        # Что действует теперь — объявляет ключ `arrived`.
+        'arrived': r'audit-statistics-ingress-from-bff',
         'date': '2026-09-07',
         'source': 'GAPS_CLOSE_3 шага 10 фазы 2, узел 5',
         'allowed': ('.claude/work/decision-digest.md',),
         'population': (
-            ('.claude/work/backlog.md', None),
+            ('deploy/base/services/bff.yaml', None),
             ('.claude/work/progress/phase-2-step-10-chronicle.md',
              r'встречная\s+ПАРА\s+сетевой\s+политики'),
         ),
@@ -2995,7 +3011,6 @@ RETIRED = [
             ('.claude/processes/roadmap-step-execution.md',
              r'Форм\s+невоспроизводимости\s+у\s+энфорсера\s+три'),
             ('.claude/skills/update-roadmap-progress.md', None),
-            ('.claude/work/backlog.md', None),
         ),
     },
     {

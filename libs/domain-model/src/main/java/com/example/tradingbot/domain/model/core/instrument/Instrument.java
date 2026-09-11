@@ -51,7 +51,8 @@ public class Instrument extends Auditable {
      * в схеме донора; сервисы адресуют площадку кодом. Поле живёт, пока
      * жив донор, и market-data его НЕ пишет: у него таблицы площадок нет.
      * Условие снятия — полная модель площадки
-     * (.claude/work/backlog.md §«Exchange модель/lifecycle»), вместе с
+     * (.claude/work/backlog.md §«Донорские значения в расколотых перечнях
+     * общей библиотеки»), вместе с
      * которой поле уходит из этой формы.
      */
     private Long exchangeId;

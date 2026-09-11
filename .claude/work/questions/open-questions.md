@@ -52,8 +52,11 @@ per-status handler'ы по образцу FSM сделки; (2) оркестра
 переходов — в lifecycle-доках, оркестрация описана процессом
 `candle-loading` без привязки к компоненту-владельцу.
 
-Горизонт — конец фазы 1 / когда осядет ось владения
-`Instrument.Status` (backlog п.9). Связано:
+Горизонт — когда осядет ось владения `Instrument.Status`
+(`.claude/work/backlog.md` §«Периферийные статусы `Instrument` —
+онбординговый `HOLD`, `ERROR`-recovery, повторный онбординг, `CLOSED`»);
+прежний горизонт «конец фазы 1» сработал (фаза 1 `FOLDED`), новый — по
+той же секции. Связано:
 `docs/processes/candle-loading.md`, `docs/lifecycles/Instrument.md`,
 `docs/lifecycles/CandleGroup.md`, `docs/components/CandleJob.md`.
 
@@ -226,7 +229,8 @@ mapping-доков. До решения WS описаны короткими п�
 `docs/models/mapping/PositionCloseResult.md`,
 `docs/components/EntryScannerJob.md`,
 `docs/rules/instrument-hold.md`, `.claude/work/backlog.md`
-§«Искажение измеряемой ожидаемости: две оси × две стороны (торговый форвард-фокус; владелец — фаза ожидаемости).».
+§«Крены измеряемой ожидаемости — учесть при сравнении бэктест ↔ live»
+(тело матрицы — `.claude/work/history/2026-09-11-backlog-diet.md`).
 
 ### ORCH-Q2. Порядок teardown у kill-switch против инварианта дочистки (владелец — `solution-designer`)
 

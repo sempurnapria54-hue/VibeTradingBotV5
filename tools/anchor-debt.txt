@@ -29,13 +29,6 @@
 .claude/tests/source-api/okx/plan.md	«Внешний источник правды»
 .claude/tests/source-api/okx/plan.md	«Идентификация записи»
 .claude/tests/source-api/okx/plan.md	Нерешённое
-.claude/work/backlog.md	5/§8
-.claude/work/backlog.md	I3
-.claude/work/backlog.md	Runtime
-.claude/work/backlog.md	«Остаточный `грунт` — величина базиса»
-.claude/work/backlog.md	«Переоценка инварианта»
-.claude/work/backlog.md	«Прочие ремарки»
-.claude/work/backlog.md	Чего
 .claude/work/decision-digest.md	2
 .claude/work/decision-digest.md	3
 .claude/work/decision-digest.md	4
