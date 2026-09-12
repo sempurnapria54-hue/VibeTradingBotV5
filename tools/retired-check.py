@@ -142,16 +142,36 @@ SKIP = ('/.claude-archive/', '/.claude/work/history/', '/.claude/work/progress/'
 CODE_TREES = ('donor', 'services/*', 'libs/*')
 CODE_SUFFIXES = ('java', 'json', 'sql', 'yml', 'yaml', 'properties')
 DEPLOY_SUFFIXES = ('yml', 'yaml', 'json')
+# СБОРОЧНЫЕ ФАЙЛЫ В ОБЛАСТИ, и это решение, а не расширение по инерции.
+# Комментарий `pom.xml` — носитель предписания наравне с доком: им объясняют,
+# почему модуль объявлен так, а не иначе, и снятая редакция живёт там ровно так
+# же незаметно. Три уровня — корень реактора, дерево донора и модули
+# `services/<имя>`, `libs/<имя>`; глубже модулей у реактора ничего нет.
+BUILD_FILES = ('pom.xml', '*/pom.xml', '*/*/pom.xml')
+
+# ДЕРЕВО ИНСТРУМЕНТОВ — ШЕСТЬ РАСШИРЕНИЙ, И ТРИ ИЗ НИХ ДОБАВЛЕНЫ ЭТИМ ХОДОМ.
+# Шаблоны выписаны литералами, а не собраны из перечня суффиксов: их читает не
+# только эта строка, но и условие возврата задачи, которая их потребовала, —
+# собранный в цикле шаблон в тексте файла не встречается вовсе.
+# `tools/**/*.md` — стоячий промпт цикла (`tools/session-prompt.md`) есть живой
+# носитель ПРЕДПИСАНИЙ, а не оформление: снятая редакция в нём действует на
+# каждую сессию. `tools/**/*.ps1` — оболочечный близнец `session-loop.sh`,
+# несущий ту же прозу. `tools/**/*.yaml` — манифест стенда
+# (`tools/stand/kind-cluster.yaml`) с комментариями о выборе формы кластера.
+TOOL_PATTERNS = ('tools/**/*.py', 'tools/**/*.sh', 'tools/**/*.txt',
+                 'tools/**/*.md', 'tools/**/*.ps1', 'tools/**/*.yaml')
+
 ROOTS = (('CLAUDE.md', 'README.md', '*/README.md',
           'docs/**/*.md', 'docs/**/*.json',
-          '.claude/**/*.md', '.claude/work/*.json',
-          'tools/**/*.py', 'tools/**/*.sh', 'tools/**/*.txt')
+          '.claude/**/*.md', '.claude/work/*.json')
+         + BUILD_FILES
+         + TOOL_PATTERNS
          + tuple('%s/src/**/*.%s' % (tree, suf)
                  for tree in CODE_TREES for suf in CODE_SUFFIXES)
          + tuple('deploy/**/*.%s' % suf for suf in DEPLOY_SUFFIXES))
 
 # Каталоги верхнего уровня, сознательно оставленные ВНЕ области, с причиной.
-# Ось 20 требует, чтобы каждый каталог корня был либо покрыт шаблоном с
+# Ось 20a требует, чтобы каждый каталог корня был либо покрыт шаблоном с
 # литеральным первым сегментом, либо назван здесь: молчаливо потерянного
 # дерева не бывает — бывает названное.
 OUT_OF_AREA = {
@@ -162,6 +182,35 @@ OUT_OF_AREA = {
     '.codebase-archive': 'архив: материал, не источник истины',
     'web': ('SPA: исходников ещё нет, суффиксы фронта заводит шаг 12 фазы 2; '
             'указатель web/README.md свипается как файл знания'),
+}
+
+# Файлы верхнего уровня вне области, с причиной (ось 20b). Общее у всех —
+# машинная настройка без прозы о политике: их читает инструмент, а не человек,
+# ищущий обоснование.
+OUT_OF_AREA_FILES = {
+    '.gitignore': 'перечень шаблонов игнорирования — прозы о политике не несёт',
+    '.env.prod.local': 'локальный секрет машины держателя, вне репозитория',
+    '.env.test.local': 'локальный секрет машины держателя, вне репозитория',
+    '.env.vault.test.local': 'локальный секрет машины держателя, вне репозитория',
+    '.env.vault.test.local.example': 'образец файла секретов — пары «ключ = значение»',
+    'code-style.xml': 'выгрузка настроек форматтера IDE — машинная, не прозаическая',
+    'docker-compose.yml': 'локальный подъём зависимостей разработчика, вне контура развёртывания',
+    'lombok.config': 'настройка процессора аннотаций — пары «ключ = значение»',
+    'vault.hcl': 'конфигурация локального Vault стенда — пары «ключ = значение»',
+}
+
+# Расширения внутри покрытых деревьев вне области, с причиной (ось 20c). Ключ —
+# «дерево.расширение».
+OUT_OF_AREA_SUFFIXES = {
+    'docs.gitkeep': 'пустышка git для пустого каталога — содержимого не несёт',
+    '.claude.gitkeep': 'пустышка git для пустого каталога — содержимого не несёт',
+    '.claude.json': ('локальные настройки харнесса и выгрузки плана запросов: '
+                     'формат без синтаксиса комментария, прозу нести не может'),
+    '.claude.svg': 'иллюстрация дерева знания — растр, а не текст',
+    'donor.iml': 'дескриптор модуля IDE — машинный, локальный для машины',
+    'tools.json': 'выгрузки коллекций Postman — формат без синтаксиса комментария',
+    'tools.pyc': 'байт-код кэша Python — производное, не носитель',
+    'deploy.gitkeep': 'пустышка git для пустого каталога — содержимого не несёт',
 }
 
 # --- РЕЕСТР СНЯТЫХ РЕДАКЦИЙ ---------------------------------------------------
@@ -3264,9 +3313,31 @@ RETIRED = [
 ]
 
 
+# ПРОДОЛЖЕНИЕ КОММЕНТАРИЯ в java: звёздочка javadoc, её закрывающая пара и две
+# косые черты строчного комментария. Сведение носителя к плоскому тексту меняет
+# перенос с пробелами на пробел — в markdown этого довольно, а в java между
+# словами остаётся маркер продолжения, и шаблон записи реестра не совпадает,
+# хотя деревья кода объявлены областью свипа. Термин, разорванный переносом
+# внутри javadoc, был детектору невидим.
+#
+# ОБЛАСТЬ НОРМАЛИЗАЦИИ — ТОЛЬКО `.java`, и это не осторожность, а признак:
+# маркер продолжения существует там, где его вводит синтаксис комментария. В
+# markdown `*` начинает пункт списка, и снятие его склеивало бы соседние пункты
+# в одну строку — то есть заводило бы ЛОЖНЫЕ срабатывания там, где сегодня их
+# нет. Ось контроля на это в батарее стои́т.
+JAVA_CONTINUATION = re.compile(r'\n[ \t]*(?:\*/|\*|//)[ \t]?')
+
+
+def flatten(text, suffix):
+    """Плоский текст носителя: перенос с продолжением комментария — в пробел."""
+    if suffix == '.java':
+        text = JAVA_CONTINUATION.sub('\n', text)
+    return re.sub(r'\s*\n\s*', ' ', text)
+
+
 def flat_text(path):
     with io.open(path, encoding='utf-8', errors='replace') as handle:
-        return re.sub(r'\s*\n\s*', ' ', handle.read())
+        return flatten(handle.read(), os.path.splitext(path)[1])
 
 
 def carriers(roots):
@@ -3279,24 +3350,55 @@ def carriers(roots):
     return sorted(set(found))
 
 
-def area_incomplete(roots, out_of_area, root='.'):
+def area_incomplete(roots, out_of_area, root='.',
+                    out_of_area_files=None, out_of_area_suffixes=None):
     """Ось 20: область объявлена исчерпывающе против фактического корня.
 
-    Каталог верхнего уровня обязан быть либо покрыт шаблоном с ЛИТЕРАЛЬНЫМ
-    первым сегментом, либо назван в `out_of_area` с причиной. Шаблон с
-    подстановкой в первом сегменте покрытием не считается: иначе `*/README.md`
-    покрывал бы всякое новое дерево молча, и ось не срабатывала бы никогда —
-    то есть детектор объявлял бы полноту области, которой не мерил.
+    ТРИ ПОДОСИ, И ВСЕ ТРИ НУЖНЫ. Прежняя редакция мерила только первую, и
+    молчаливый пропуск возвращался через две другие — класс предъявлен дважды,
+    на носителях разного типа: файл ВНЕ покрытых деревьев (комментарий корневого
+    `pom.xml`) и расширение ВНЕ покрытых ВНУТРИ дерева (`tools/session-prompt.md`).
+    Оба были закрыты поимённой строкой популяции конкретной записи — то есть
+    средством, работающим лишь там, где закрытие о носителе уже знает.
+
+      20a. КАТАЛОГ верхнего уровня обязан быть либо покрыт шаблоном с
+           ЛИТЕРАЛЬНЫМ первым сегментом, либо назван в `out_of_area` с
+           причиной. Шаблон с подстановкой в первом сегменте покрытием не
+           считается: иначе `*/README.md` покрывал бы всякое новое дерево
+           молча, и ось не срабатывала бы никогда.
+      20b. ФАЙЛ верхнего уровня обязан быть либо покрыт шаблоном без
+           разделителя пути, либо назван в `out_of_area_files` с причиной.
+           Корень — не только каталоги: `pom.xml` и `vault.hcl` лежат рядом с
+           `CLAUDE.md` и в область прежде не попадали ни одним шаблоном.
+      20c. РАСШИРЕНИЕ, встреченное внутри покрытого дерева, обязано быть либо
+           достижимо шаблоном этого дерева, либо названо в
+           `out_of_area_suffixes` парой «дерево.расширение» с причиной.
+
+    Гранулярность 20c — дерево, а не путь: `.claude/work/*.json` делает
+    расширение `json` достижимым во всём `.claude/**`, хотя шаблон покрывает
+    один каталог. Это названное огрубление — подось отвечает на вопрос «есть ли
+    у расширения хоть один читатель в дереве», а не «покрыт ли каждый файл».
+    Пути, снятые `SKIP` (архивы, история, библиотека, `target/`), в обходе
+    20c не участвуют: они вне свипа по построению, и требовать объявления их
+    расширений значило бы объявлять область того, что не свипается.
     """
+    out_of_area_files = out_of_area_files or {}
+    out_of_area_suffixes = out_of_area_suffixes or {}
     covered = set()
+    covered_files = set()
     for pattern in roots:
-        head = pattern.replace(os.sep, '/').split('/')[0]
+        flat = pattern.replace(os.sep, '/')
+        head = flat.split('/')[0]
+        if '/' not in flat and not glob.has_magic(flat):
+            covered_files.add(flat)
+            continue
         if head and not glob.has_magic(head):
             covered.add(head)
     try:
         entries = sorted(os.listdir(root))
     except OSError as failure:
         return 'корень репозитория не прочитан (%s) — область не сверить' % failure
+
     undeclared = [name for name in entries
                   if os.path.isdir(os.path.join(root, name))
                   and name not in covered and name not in out_of_area]
@@ -3304,6 +3406,43 @@ def area_incomplete(roots, out_of_area, root='.'):
         return ('каталоги верхнего уровня вне объявленной области и не названные '
                 'причиной: %s — свип по неполной области ничего не удостоверяет'
                 % ', '.join(undeclared))
+
+    stray = [name for name in entries
+             if os.path.isfile(os.path.join(root, name))
+             and name not in covered_files and name not in out_of_area_files]
+    if stray:
+        return ('файлы корня вне объявленной области и не названные причиной: %s '
+                '— свип по неполной области ничего не удостоверяет'
+                % ', '.join(stray))
+
+    reachable = set()
+    for pattern in roots:
+        for path in glob.glob(os.path.join(root, pattern), recursive=True):
+            reachable.add(os.path.relpath(path, root).replace(os.sep, '/'))
+    for tree in sorted(covered):
+        tree_path = os.path.join(root, tree)
+        if not os.path.isdir(tree_path):
+            continue
+        for directory, _, names in os.walk(tree_path):
+            relative = os.path.relpath(directory, root).replace(os.sep, '/')
+            flat_dir = '/' + ('' if relative == '.' else relative + '/')
+            if any(skipped in flat_dir for skipped in SKIP):
+                continue
+            for name in names:
+                if '.' not in name:
+                    continue
+                suffix = name.rsplit('.', 1)[-1]
+                relative_file = (relative + '/' + name) if relative != '.' else name
+                if relative_file in reachable:
+                    continue
+                if '%s.%s' % (tree, suffix) in out_of_area_suffixes:
+                    continue
+                return ('расширение `.%s` внутри покрытого дерева `%s` не достижимо '
+                        'ни одним шаблоном области и не названо причиной (пример: '
+                        '%s) — свип по неполной области ничего не удостоверяет'
+                        % (suffix, tree,
+                           os.path.relpath(os.path.join(directory, name),
+                                           root).replace(os.sep, '/')))
     return None
 
 
@@ -3535,23 +3674,65 @@ def battery():
         axes.append(('19. запись без шаблона пришедшей редакции — проверка отказывает',
                      bool(refusal), refusal or 'проверка отчиталась'))
 
-        # --- ось 20: полнота ОБЛАСТИ против фактического корня
-        os.makedirs(os.path.join(work, 'новое-дерево'), exist_ok=True)
-        refusal = area_incomplete(('дом/**/*.md',), {}, work)
+        # --- ось 20: полнота ОБЛАСТИ против фактического корня.
+        # Корень проб — СВОЙ каталог, а не общая рабочая папка батареи:
+        # подось 20b мерит файлы корня, а в общей папке лежат фикстуры
+        # прочих осей, и проба ловила бы их вместо своего предмета.
+        area = os.path.join(work, 'корень-области')
+        os.makedirs(os.path.join(area, 'новое-дерево'), exist_ok=True)
+        refusal = area_incomplete(('дом/**/*.md',), {}, area)
         axes.append(('20. дерево корня вне области и не названное причиной — '
                      'проверка отказывает', bool(refusal),
                      refusal or 'проверка отчиталась'))
-        refusal = area_incomplete(('*/README.md',), {}, work)
+        refusal = area_incomplete(('*/README.md',), {}, area)
         axes.append(('21. подстановка в первом сегменте покрытием не считается',
                      bool(refusal), refusal or 'проверка отчиталась'))
-        refusal = area_incomplete(('новое-дерево/**/*.md',), {}, work)
+        refusal = area_incomplete(('новое-дерево/**/*.md',), {}, area)
         axes.append(('22. контроль: дерево покрыто литеральным шаблоном — '
                      'отказа нет', not refusal, refusal or 'проверка отчиталась'))
         refusal = area_incomplete(('дом/**/*.md',),
-                                  {'новое-дерево': 'проба: названо причиной'}, work)
+                                  {'новое-дерево': 'проба: названо причиной'}, area)
         axes.append(('23. контроль: дерево названо в OUT_OF_AREA — отказа нет',
                      not refusal, refusal or 'проверка отчиталась'))
-        os.rmdir(os.path.join(work, 'новое-дерево'))
+
+        # --- ось 20b: ФАЙЛ корня вне области. Класс предъявлен комментарием
+        # корневого `pom.xml`: он лежал рядом с `CLAUDE.md` и не попадал в
+        # область ни одним шаблоном, а ось 20a мерила только каталоги.
+        with open(os.path.join(area, 'сборка.xml'), 'w', encoding='utf-8') as handle:
+            handle.write('<!-- проба -->\n')
+        refusal = area_incomplete(('новое-дерево/**/*.md',), {}, area)
+        axes.append(('20b. файл корня вне области и не названный причиной — '
+                     'проверка отказывает', bool(refusal),
+                     refusal or 'проверка отчиталась'))
+        refusal = area_incomplete(('новое-дерево/**/*.md', 'сборка.xml'), {}, area)
+        axes.append(('20b-контроль: файл корня покрыт шаблоном — отказа нет',
+                     not refusal, refusal or 'проверка отчиталась'))
+        refusal = area_incomplete(('новое-дерево/**/*.md',), {}, area,
+                                  {'сборка.xml': 'проба: названо причиной'})
+        axes.append(('20b-контроль: файл корня назван причиной — отказа нет',
+                     not refusal, refusal or 'проверка отчиталась'))
+        os.remove(os.path.join(area, 'сборка.xml'))
+
+        # --- ось 20c: РАСШИРЕНИЕ внутри покрытого дерева. Класс предъявлен
+        # `tools/session-prompt.md`: дерево объявлено областью, а расширение в
+        # неё не входило — пропуск был молчаливым ровно так же.
+        with open(os.path.join(area, 'новое-дерево', 'промпт.md'), 'w',
+                  encoding='utf-8') as handle:
+            handle.write('проба\n')
+        refusal = area_incomplete(('новое-дерево/**/*.py',), {}, area)
+        axes.append(('20c. расширение внутри покрытого дерева вне области — '
+                     'проверка отказывает', bool(refusal),
+                     refusal or 'проверка отчиталась'))
+        refusal = area_incomplete(('новое-дерево/**/*.py', 'новое-дерево/**/*.md'),
+                                  {}, area)
+        axes.append(('20c-контроль: расширение достижимо шаблоном дерева — '
+                     'отказа нет', not refusal, refusal or 'проверка отчиталась'))
+        refusal = area_incomplete(('новое-дерево/**/*.py',), {}, area, {},
+                                  {'новое-дерево.md': 'проба: названо причиной'})
+        axes.append(('20c-контроль: расширение названо причиной — отказа нет',
+                     not refusal, refusal or 'проверка отчиталась'))
+        os.remove(os.path.join(area, 'новое-дерево', 'промпт.md'))
+        os.rmdir(os.path.join(area, 'новое-дерево'))
         # Ось 8 — проза записи, пересказывающая пришедшую редакцию. Мерится
         # на СИНТЕТИЧЕСКОМ исходнике: детектор читает текст реестра, а не
         # только разобранный список, и проба обязана это доказать.
@@ -3569,6 +3750,29 @@ def battery():
                      prose_hits(source_without, entry) == [],
                      'запись без прозы молчит'))
 
+    # --- ось 26: ПРОДОЛЖЕНИЕ КОММЕНТАРИЯ в java. Термин, разорванный переносом
+    # внутри javadoc, прежде был невидим: между словами оставалась звёздочка, и
+    # шаблон записи не совпадал, хотя дерево кода объявлено областью свипа.
+    javadoc = ('/**\n'
+               ' * Текст про одну ACTIVE\n'
+               ' * на инструмент — разорван переносом.\n'
+               ' */\n')
+    pattern = r'одну\s+ACTIVE\s+на\s+инструмент'
+    axes.append(('26. термин, разорванный переносом внутри javadoc, опознан',
+                 bool(re.search(pattern, flatten(javadoc, '.java'), re.I)),
+                 'плоский текст: %r' % (flatten(javadoc, '.java').strip(),)))
+    axes.append(('26-контроль: без нормализации тот же термин невиден',
+                 not re.search(pattern, flatten(javadoc, '.md'), re.I),
+                 'плоский текст: %r' % (flatten(javadoc, '.md').strip(),)))
+
+    # --- ось 27: контроль на ЛОЖНОЕ срабатывание. В markdown `*` начинает пункт
+    # списка, а не продолжает комментарий; снятие его склеило бы соседние пункты
+    # и завело бы находку там, где терминов нет.
+    bullet = '* одну ACTIVE\n* на инструмент\n'
+    axes.append(('27. контроль: пункты markdown-списка не склеиваются',
+                 not re.search(pattern, flatten(bullet, '.md'), re.I),
+                 'плоский текст: %r' % (flatten(bullet, '.md').strip(),)))
+
     return axes
 
 
@@ -3583,7 +3787,8 @@ def main():
               'ничего не удостоверял бы' % len(broken))
         return 2
 
-    refusal = area_incomplete(ROOTS, OUT_OF_AREA)
+    refusal = area_incomplete(ROOTS, OUT_OF_AREA, '.',
+                              OUT_OF_AREA_FILES, OUT_OF_AREA_SUFFIXES)
     if refusal:
         print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: ' + refusal)
         return 2

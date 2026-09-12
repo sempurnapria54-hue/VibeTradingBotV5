@@ -28,12 +28,31 @@
 глаз, и расхождение «док описывает монолит» остаётся незамеченным ровно у
 тех доков, которые никто не отнёс к строящемуся сервису.
 
-**Ось — разметка, не раскладка.** Она не проверяется прогоном и потому
-стареет молча; цена принята сознательно, якорь погашения —
-`.claude/work/backlog.md` §«Энфорсер оси владельца-сервиса». До энфорсера
-дисциплина держится на переносящем: **завёл или переименовал носитель —
+**Ось — разметка, не раскладка**, и разметка каталогами не выражается. Отсюда
+обязанность переносящего остаётся прежней: **завёл или переименовал носитель —
 строка карты тем же ходом**, как и `.claude/knowledge-tree.md`
 (`.claude/rules/curation.md`).
+
+**Четыре оси разметки мерит прогон** — `python3 tools/ownership-map-check.py`:
+указатель строки разрешается в существующий путь; имя владельца принадлежит
+словарю инвентаря `docs/architecture/services.md` (единицы развёртывания, общие
+артефакты, экземпляры шаблонной единицы) либо признаку «сквозное»/«вне оси»;
+всякий живой носитель `docs/**` накрыт хотя бы одной строкой; ни один не назван
+поимённо дважды — два имени есть два дома у одной истины
+(`.claude/rules/policy-home.md`).
+
+**Чего прогон не мерит — названо им самим и печатается каждым прогоном.**
+**Верность** владельца из файловой системы не выводится: что носитель
+принадлежит именно этому сервису, читает критик, а не машина. **Прозаический
+кластер** («джобы и сервисы свечей, индикаторов…») машине не разрешается — имён
+файлов в нём нет; такие строки прогон называет поимённо, а их носители уходят в
+строку-катч-олл своего каталога. Молчаливого пропуска нет ни у одной из двух
+границ.
+
+**Первый прогон нашёл два двойных именования, и оба сняты им же:**
+`docs/rules/audit-not-runtime-source.md` стоял и в кластере сквозных правил, и
+своей строкой с доводом; `docs/rules/market-data-freshness.md` — в двух
+кластерах-владельцах сразу, вместо одного объявления формы «делится: … — …».
 
 **Карта — гранулярностью кластера.** Носитель, не попавший в карту
 поимённо, наследует владельца своего кластера; носитель, чей владелец
@@ -44,11 +63,12 @@
 | Носитель | Владелец |
 |---|---|
 | `docs/concept.md`, `docs/architecture/`, `docs/dictionary/` | сквозное |
-| `docs/rules/`: `time-utc`, `absent-value-semantics`, `writer-named-for-every-value`, `persistence-representation`, `idempotency-via-unique`, `error-handling-policy`, `audit-not-runtime-source`, `ack-not-runtime-truth`, `raw-exchange-dto-boundary`, `decimal-arithmetic` | сквозное |
-| `docs/rules/`: `risk-policy`, `live-risk-protection`, `loss-streak-halt`, `manual-halt`, `exchange-hold`, `instrument-hold`, `command-lifecycle`, `execution-hierarchy`, `exit-teardown-order`, `no-partial-close`, `replace-not-amend`, `pnl-reconciliation`, `deal-without-operations`, `risk-validator-scope`, `trading-constraints`, `runtime-error-classification`, `market-data-freshness` (как операнд гейта) | `trading-core` |
+| `docs/rules/`: `time-utc`, `absent-value-semantics`, `writer-named-for-every-value`, `persistence-representation`, `idempotency-via-unique`, `error-handling-policy`, `ack-not-runtime-truth`, `raw-exchange-dto-boundary`, `decimal-arithmetic` | сквозное |
+| `docs/rules/`: `risk-policy`, `live-risk-protection`, `loss-streak-halt`, `manual-halt`, `exchange-hold`, `instrument-hold`, `command-lifecycle`, `execution-hierarchy`, `exit-teardown-order`, `no-partial-close`, `replace-not-amend`, `pnl-reconciliation`, `deal-without-operations`, `risk-validator-scope`, `trading-constraints`, `runtime-error-classification` | `trading-core` |
 | `docs/rules/`: `strategy-validation`, `trading-configuration-ownership` | `strategies` |
 | `docs/rules/`: `strategy-condition-contract`, `strategy-step-once-per-episode`, `condition-ruletype-granularity` | `strategy-engine` |
-| `docs/rules/`: `market-data-retention` (и `market-data-freshness` как вычисление) | `market-data` |
+| `docs/rules/`: `market-data-retention` | `market-data` |
+| `docs/rules/market-data-freshness.md` | делится: **вычисление** свежести — `market-data`; **операнд гейта** входа — `trading-core`. Прежде носитель стоял в двух строках-кластерах сразу — у ядра «как операнд гейта», у рыночных данных «как вычисление», — то есть имел два дома вместо одного объявления с двумя сторонами; форму «делится: … — …» это правило и предписывает |
 | `docs/rules/`: `api-access-policy` | `auth` + `bff` (входящий доступ); исходящий отказ — у коннектора |
 | `docs/rules/`: `controlled-exchange-exceptions`, `external-status-resolution` | делится: резолв сырого статуса и класс отказа границы — коннектор; назначение исхода (причина закрытия, терминал ненайденности) и резолв позиции — `trading-core`. Критерий — `docs/rules/external-status-resolution.md` §«Где резолвится — сторона выбирается по словарю источника» |
 | `docs/models/domain/core/`: `Order`, `Position`, `AlgoOrder`, `BalanceContainer` | формы — `domain-model`; зеркало и писатели — `trading-core` |
