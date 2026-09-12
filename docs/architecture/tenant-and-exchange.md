@@ -135,7 +135,7 @@
   разойдись имена — секрет лежал бы на месте, а читатель получал бы
   «ключей нет», и отказ был бы неотличим от незаведённого счёта. Поэтому
   исполнимая форма имён одна на оба сервиса —
-  `libs/domain-model` `domain/util/ExchangeAccountSecretFields`, как и
+  `services/common/model/domain` `domain/util/ExchangeAccountSecretFields`, как и
   форма самого пути.
 
   | Поле | Что несёт |

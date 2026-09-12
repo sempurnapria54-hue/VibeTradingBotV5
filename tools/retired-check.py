@@ -139,20 +139,24 @@ SKIP = ('/.claude-archive/', '/.claude/work/history/', '/.claude/work/progress/'
 # `donor/src`, а сервисы и общие артефакты появятся в `services/<имя>/src` и
 # `libs/<имя>/src`. Перечень, привязанный к одному корню, молча терял бы
 # каждое новое дерево — тот самый невидимый зелёный, о котором абзац выше.
-# `services/common/*` — общие артефакты, чей дом в `services/` по решению
-# держателя: они не единицы развёртывания, и глубина у них на сегмент
-# больше, чем у сервиса.
-CODE_TREES = ('donor', 'services/*', 'services/common/*', 'libs/*')
+# `services/common/*` — общие артефакты: их дом в `services/` по решению
+# держателя (2026-09-12, каталог `libs/` снят), они не единицы развёртывания,
+# и глубина у них на сегмент больше, чем у сервиса. Модели вдобавок
+# сгруппированы каталогом и разведены по слою (`common/model/<слой>`) —
+# отсюда третий шаблон: без него их дерево выпало бы из свипа молча.
+CODE_TREES = ('donor', 'services/*', 'services/common/*', 'services/common/model/*')
 CODE_SUFFIXES = ('java', 'json', 'sql', 'yml', 'yaml', 'properties')
 DEPLOY_SUFFIXES = ('yml', 'yaml', 'json')
 # СБОРОЧНЫЕ ФАЙЛЫ В ОБЛАСТИ, и это решение, а не расширение по инерции.
 # Комментарий `pom.xml` — носитель предписания наравне с доком: им объясняют,
 # почему модуль объявлен так, а не иначе, и снятая редакция живёт там ровно так
 # же незаметно. Три уровня — корень реактора, дерево донора и модули
-# `services/<имя>`, `libs/<имя>`. Четвёртый уровень добавлен вместе с общим
-# артефактом `services/common/model`: его модуль лежит на сегмент глубже
-# сервиса, и без шаблона его `pom.xml` выпал бы из свипа молча.
-BUILD_FILES = ('pom.xml', '*/pom.xml', '*/*/pom.xml', '*/*/*/pom.xml')
+# `services/<имя>`, `services/common/<имя>` и `services/common/model/<слой>`.
+# Уровни ниже третьего добавлены вместе с общими артефактами под
+# `services/common/`: их модули лежат глубже сервиса, а модели — ещё на
+# сегмент глубже, и без шаблонов их `pom.xml` выпали бы из свипа молча.
+BUILD_FILES = ('pom.xml', '*/pom.xml', '*/*/pom.xml', '*/*/*/pom.xml',
+               '*/*/*/*/pom.xml')
 
 # ДЕРЕВО ИНСТРУМЕНТОВ — ШЕСТЬ РАСШИРЕНИЙ, И ТРИ ИЗ НИХ ДОБАВЛЕНЫ ЭТИМ ХОДОМ.
 # Шаблоны выписаны литералами, а не собраны из перечня суффиксов: их читает не
@@ -448,7 +452,7 @@ RETIRED = [
         'source': 'кодовый заход K18, шаг 10 фазы 2 (закрытие Ф8)',
         'allowed': ('.claude/work/decision-digest.md',),
         'population': (
-            ('services/common/model/src/main/java/com/example/tradingbot/message/'
+            ('services/common/model/message/src/main/java/com/example/tradingbot/message/'
              'DealShutdownInitiatedMessage.java',
              r'Актор\s+едет\s+содержимым,\s+потому\s+что\s+у\s+класса\s+есть\s+ручная\s+тропа'),
             ('docs/spec/event-actor-presence.json',
@@ -2185,7 +2189,7 @@ RETIRED = [
             ('docs/architecture/data-ownership.md', None),
             ('docs/architecture/contracts.md', None),
             ('docs/components/OutboxRelayJob.md', None),
-            ('services/common/model/src/main/java/com/example/tradingbot/message/'
+            ('services/common/model/message/src/main/java/com/example/tradingbot/message/'
              'EventEnvelopeMessage.java', None),
             ('services/strategies/src/main/java/com/example/strategies/domain/jobs/JobExecutionGuard.java', None),
         ),

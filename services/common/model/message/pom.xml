@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  common-model — общий артефакт слоя СООБЩЕНИЯ: формы, которыми сервисы
+  message-model — общий артефакт слоя СООБЩЕНИЯ: формы, которыми сервисы
   говорят друг с другом через брокер (docs/architecture/services.md
   §«Общие артефакты монорепозитория»). Собирается в сервисы, сам не
   разворачивается.
 
-  ПОЧЕМУ ОТДЕЛЬНЫЙ АРТЕФАКТ, А НЕ ПАКЕТ В domain-model. Форма сообщения —
+  ПОЧЕМУ ОТДЕЛЬНЫЙ АРТЕФАКТ, А НЕ ПАКЕТ В model/domain. Форма сообщения —
   не доменная модель: у неё читатель на другой стороне провода, и правит
   её совместимость, а не доменный инвариант
   (.claude/rules/codestyle.md §«Слой сообщения: внутренняя шина»).
@@ -19,7 +19,7 @@
   (.claude/rules/carrier-levels.md) и разошлось бы с первым при первом же
   расширении каталога условий.
 
-  Родителя нет намеренно — по тому же доводу, что у libs/domain-model.
+  Родителя нет намеренно — по тому же доводу, что у model/domain.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -27,10 +27,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.example</groupId>
-    <artifactId>common-model</artifactId>
+    <artifactId>message-model</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>common-model</name>
+    <name>message-model</name>
     <description>Формы сообщений внутренней шины: конверт события и содержимое его классов</description>
 
     <properties>

@@ -2,16 +2,16 @@
 <project version="4">
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/donor/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/libs/domain-model/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/libs/domain-model/src/main/resources" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/libs/strategy-engine/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/libs/strategy-engine/src/main/resources" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/libs/test-support/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/common/model/domain/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/common/model/domain/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/common/strategy-engine/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/common/strategy-engine/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/common/test-support/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/audit-statistics/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/auth/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/bff/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/services/common/model/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/services/common/model/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/common/model/message/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/services/common/model/message/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/connector-okx/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/market-data/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/services/strategies/src/main/java" charset="UTF-8" />

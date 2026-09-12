@@ -18,16 +18,16 @@
 
 **Дельта staged, не закоммичена.** Ветка `claude-audit`. **Дерево кода эта
 единица не трогала вовсе** — правились инструменты и корпус; реактор поэтому не
-прогонялся, и это не пропуск (`git status --porcelain services/ libs/ donor/`
+прогонялся, и это не пропуск (`git status --porcelain services/ donor/`
 пуст).
 
 **Режим — автономия до прод-рубежа.** Решения — Д250-Д1457.
 
 ## Что сделано после v241
 
-**Единица — межшаговое окно 2-10 → 2-11 целиком.** Отчёт —
-`.claude/work/progress/phase-2-interstep-enforcers.md`; итог —
-`.claude/work/history/2026-09-11-interstep-enforcers.md`.
+**Единица — межшаговое окно 2-10 → 2-11 целиком.** Итог —
+`.claude/work/history/2026-09-11-interstep-enforcers.md`; отчёт захода — в
+одноимённой папке рядом с ним.
 
 - **Шесть секций-энфорсеров закрыты.** Четыре получили свою команду
   (`surface-path-check.py`, `ownership-map-check.py`,

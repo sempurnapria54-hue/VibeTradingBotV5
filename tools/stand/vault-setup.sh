@@ -12,7 +12,7 @@
 # ПУТЬ СЕКРЕТОВ. KV монтируется ПО ИМЕНИ ОКРУЖЕНИЯ (`dev/`), потому что
 # сервисы адресуют ключи счёта путём `<окружение>/exchange-accounts/<id>`
 # (docs/architecture/platform.md §Безопасность; исполнимая форма —
-# libs/domain-model ExchangeAccountKeyPath) и пишут его через VaultTemplate
+# services/common/model/domain ExchangeAccountKeyPath) и пишут его через VaultTemplate
 # без префикса движка. Версия KV — первая: у второй адрес несёт вставку
 # `data/`, которой в форме пути нет.
 #

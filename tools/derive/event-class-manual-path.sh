@@ -46,7 +46,7 @@ if [ "${1:-}" = "--built" ]; then
 fi
 
 DOC="${1:-docs/architecture/contracts.md}"
-ENUM_DIR="${2:-libs/domain-model/src/main/java/com/example/tradingbot/domain/event}"
+ENUM_DIR="${2:-services/common/model/domain/src/main/java/com/example/tradingbot/domain/event}"
 
 if [ ! -f "$DOC" ]; then
   echo "ВЫВОД НЕ СОСТОЯЛСЯ: нет файла $DOC" >&2

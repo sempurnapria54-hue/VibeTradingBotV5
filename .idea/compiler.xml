@@ -45,16 +45,19 @@
         <module name="tradingbot (1)" />
         <module name="connector-okx" />
       </profile>
-      <profile name="Annotation profile for common-model" enabled="true">
+      <profile name="Annotation profile for message-model" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
         </processorPath>
-        <module name="common-model" />
+        <module name="message-model" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="common-model" target="25" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">

@@ -349,8 +349,9 @@ JSONB» — форму выбирает, версии формы не задаё
 нет (`docs/decisions/…`, снятые компоненты). Число не хранится — печатает
 `grep -rhoE 'docs/[^ )`]+\.md' donor/src` с проверкой существования.
 
-**Дом измерения.** `tools/doc-pointer-check.py` — область `services/**`,
-`libs/**`, `web/**`, входит в гейт инструментов корпуса; `donor/**`
+**Дом измерения.** `tools/doc-pointer-check.py` — область `services/**`
+(общие артефакты лежат под ней) и `web/**`, входит в гейт инструментов
+корпуса; `donor/**`
 выведен намеренно: донор заморожен и уходит с фазой 2, красный прогон на
 том, что не правится, обесценил бы команду.
 
@@ -363,9 +364,9 @@ JSONB» — форму выбирает, версии формы не задаё
 
 **Задача.** Завести ось у существующей команды: `doc-pointer-check.py`
 мерит существование файла, `anchor-check.py` — адреса только `.claude/**`;
-адрес пассажа, написанный в javadoc `libs/**`, `services/**`, `web/**`,
+адрес пассажа, написанный в javadoc `services/**`, `web/**`,
 не мерит ни один. Экземпляры — `StrategyEventType`
-(`libs/domain-model/.../domain/event/`; пассаж «Формы событий и запросов» в
+(`services/common/model/domain/.../domain/event/`; пассаж «Формы событий и запросов» в
 `docs/architecture/contracts.md` — не заголовок и не лид-жирный) и
 `OrderDecidedMessage` (`services/common/model/.../message/`; сокращённое имя
 пассажа «Содержимое несёт идентичности…»). Знак параграфа здесь не
@@ -525,36 +526,25 @@ LC_ALL=C.UTF-8 grep -rnoP 'DOCS_CHECK_\d+|GAPS_CLOSE_\d+' docs/
 
 **Владелец** — `knowledge-curator`.
 
-## Отчёт перехода шага 10 фазы 2 — перенос в папку истории
+## Отчёт единицы слоя сообщения — перенос в папку истории
 
-<!-- backlog: владелец=knowledge-curator; оживит=шаг:2-11:открыт; закрыто-когда=нет-файла:.claude/work/progress/phase-2-step-10-done-transition.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=шаг:2-11:открыт; закрыто-когда=нет-файла:.claude/work/progress/message-layer-and-common-artifacts.md -->
 
-**Задача.** Перенести `.claude/work/progress/phase-2-step-10-done-transition.md`
-в `.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/` и
-починить входящие указатели из живых носителей тем же ходом
+**Задача.** Перенести
+`.claude/work/progress/message-layer-and-common-artifacts.md` в папку истории
+своей единицы и починить входящие указатели из живых носителей тем же ходом
 (`.claude/rules/closed-work-transfer.md` §«Ссылочная целостность»).
 
-**Почему отчёт остался в `progress/`, когда прочие артефакты шага уехали.**
-Причины две, и обе механические.
-
-- **Классификацию корпусного захода мерит `py tools/edit-kind-check.py`, и
-  область его свипа — `.claude/work/progress/**`.** Заход перехода корпус
-  меняет (бэклог, роадмап, реестр долга, указатели правил, реестр снятых
-  редакций, javadoc тестов), значит несёт классификацию по словарю родов
-  (`.claude/rules/edit-kind-obligations.md`). Уехав тем же ходом, он унёс бы
-  собственную классификацию из измеряемой области — ровно тот класс, против
-  которого правило родов и заведено: инструмент отстаёт от предмета.
-- **Пустая `progress/` делает два энфорсера отказывающими.**
-  `edit-kind-check.py` и `tools/command-carrier-check.py` при области без
-  носителей возвращают код 2 («не измерялось»), и гейт инструментов корпуса
-  такой исход не пропускает наравне с кодом 1
-  (`.claude/skills/update-roadmap-progress.md` §«Гейт инструментов корпуса»).
-  Пустая `progress/` — состояние, которое корпус производит **своими же**
-  правилами на каждой границе шага.
+**Почему отчёт остался в `progress/`.** Пустая область роняет три энфорсера
+(`edit-kind-check.py`, `command-carrier-check.py`,
+`insertion-neighborhood-check.py`) кодом 2 («не измерялось»), и гейт такой
+исход не пропускает наравне с кодом 1. Пустая `progress/` — состояние, которое
+корпус производит своими же правилами на каждой границе единицы; ровно по
+этой причине здесь до 2026-09-12 стоял отчёт перехода шага 10.
 
 **Что оживит.** Открытие шага 11 фазы 2: его первая единица заводит свою
 хронику, область перестаёт быть одночленной, и отчёт уезжает к остальным
-артефактам шага 10.
+артефактам.
 
 **Владелец** — `knowledge-curator`.
 
@@ -605,13 +595,13 @@ line` в том же блоке, получил `ДЕФЕКТ: имя не св�
 
 ## Марк- и индексная цена как источник размещения — возврат по поддержке источником
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=нет-грепа:"PRICE_SOURCE_UNAVAILABLE"@libs/strategy-engine/src/main/**/*.java -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=нет-грепа:"PRICE_SOURCE_UNAVAILABLE"@services/common/strategy-engine/src/main/**/*.java -->
 
 **Задача.** Снять отказ создания стратегии для `MARK_PRICE` /
 `INDEX_PRICE` (`STRATEGY_PRICE_SOURCE_UNAVAILABLE`), довести обе цены до
-`MarketPriceData` (`libs/domain-model`, снапшот коннектора
+`MarketPriceData` (`services/common/model/domain`, снапшот коннектора
 `MarketPriceDataExternalSnapshot`) и `PriceCalculator`
-(`libs/strategy-engine`), пересмотреть
+(`services/common/strategy-engine`), пересмотреть
 `docs/components/models/MarketPriceData.md` §«Правила использования» и
 `docs/models/domain/aggregate/Strategy.md` §«StrategyPricePlacement —
 правило расчёта цены размещения».
@@ -788,7 +778,7 @@ run-config уходит вместе с донором. Указатели сю�
 `docs/models/domain/aggregate/Strategy.md` («выход условием-переходом либо
 явным действием `EXIT`»), `docs/rules/no-partial-close.md`; процесс —
 `docs/processes/fsm-execution-layering.md`. Классов условий-переходов в
-`libs/strategy-engine` и `services/trading-core` нет. **Причина парковки:**
+`services/common/strategy-engine` и `services/trading-core` нет. **Причина парковки:**
 форма условий определения — предмет движка стратегий как библиотеки.
 
 ## Переоценка инварианта «ликвидация за стопом» — проектирование A13
@@ -1141,7 +1131,7 @@ run-config уходит вместе с донором. Указатели сю�
 исходов), `docs/components/models/CalculatedSize.md` §«Читает — per-type
 `StrategyActionExecutor` действия выхода», форма —
 `docs/spec/order-sizing.json` (`exitOutcome`). Производитель построен
-(`libs/strategy-engine`, `SizeCalculator` + `ExitOutcome`); в
+(`services/common/strategy-engine`, `SizeCalculator` + `ExitOutcome`); в
 `services/trading-core` ни одного чтения `exitOutcome` и ни одного из двух
 кодов нет.
 
@@ -1364,7 +1354,7 @@ positions-history, на каком такте, что с просроченны�
   не переживает рестарт. Носитель счётчика — поле `CandleGroup`
   (`docs/models/domain/other/CandleGroup.md`).
 - **`strategies`: `MarketStructureParams.lookbackBars` без нижней границы.**
-  Поле объявлено голым `Integer` (`libs/domain-model`), валидатор
+  Поле объявлено голым `Integer` (`services/common/model/domain`), валидатор
   определения границу не проверяет; нулевое или отрицательное окно доходит до
   потребителя. Дом — `docs/rules/strategy-validation.md`.
 - **`strategies`: указатель javadoc в несуществующий док.**
@@ -1388,11 +1378,11 @@ positions-history, на каком такте, что с просроченны�
 
 ## M2. `BalanceContainer.externalUpdatedAt` → конвенционное имя
 
-<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=нет-грепа:"externalUpdatedAt"@libs/domain-model/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=нет-грепа:"externalUpdatedAt"@services/common/model/domain/src/main/java/**/*.java -->
 
 **Задача.** Привести `externalUpdatedAt` (контейнер и валюта) и снапшоты к
 `externalModifiedAt` конвенции `docs/models/domain/other/Auditable.md` либо
-зафиксировать исключение решением. Носители: `libs/domain-model`
+зафиксировать исключение решением. Носители: `services/common/model/domain`
 (`BalanceContainer`, `Balance`), сущности `services/trading-core`,
 снапшоты и маппер `services/connector-okx`,
 `docs/models/domain/core/BalanceContainer.md`, `docs/models/mapping/Balance.md`.
@@ -1524,12 +1514,12 @@ Vault, кодом не решаются (`.claude/rules/tech-radar.md`, стро
 
 ## Спек-раннер в доноре: границы, невыразимые на нём
 
-<!-- backlog: владелец=code-writer; оживит=греп:"class\s+Spec\b"@libs/**/*.java|нет-файла:donor/src/test/java/com/example/tradingbot/spec/Spec.java -->
+<!-- backlog: владелец=code-writer; оживит=греп:"class\s+Spec\b"@services/common/**/*.java|нет-файла:donor/src/test/java/com/example/tradingbot/spec/Spec.java -->
 
 Раннер спек (`donor/src/test/java/com/example/tradingbot/spec/Spec.java`;
 `tools/spec-runner-env.sh` компилирует именно его) заморожен вместе с
 донором; позиции берутся ходом, переносящим раннер в общий артефакт
-(`libs/test-support`).
+(`services/common/test-support`).
 
 - **Пустая вложенная коллекция подменяется одноимённой коллекцией
   состояния.** Коллекцию брать из состояния только когда ключа в строке нет,
@@ -1601,8 +1591,7 @@ guard непустоты у каждой покрыт примером (свои
 **Что мерить.** Указатели `` `path/to/file.md` `` / `` `.json` `` в живых
 `.claude/**` и `docs/**`; исключения — `history/`, `.claude-archive/`,
 шаблоны пути с плейсхолдерами. Детектор объявляет письменные формы в шапке и
-доказывает каждую осью батареи. Код-указатели (`services/**`, `libs/**`,
-`web/**`) уже мерит `tools/doc-pointer-check.py`; md-область — расширение
+доказывает каждую осью батареи. Код-указатели (`services/**`, `web/**`) уже мерит `tools/doc-pointer-check.py`; md-область — расширение
 того же детектора, класс `ИЗМЕРЕНИЕ` (условие — вход в код шага «Тесты»).
 Гейтом `CODE` не является.
 
@@ -1735,7 +1724,7 @@ guard непустоты у каждой покрыт примером (свои
 
 <!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=греп:"triggerProfitPercents"@docs/**/*.md -->
 
-Уровень фиксации прибыли объявлен эталоном и заведён в `libs/domain-model`
+Уровень фиксации прибыли объявлен эталоном и заведён в `services/common/model/domain`
 (`StrategyAlgoOrderAction`), сущностях `strategies` и `trading-core` и
 api-модели, а в `docs/**` не упомянут — величина без дома и писателя. Дом —
 `docs/models/domain/aggregate/Strategy.md`
@@ -2239,9 +2228,9 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Донорские значения в расколотых перечнях общей библиотеки
 
-<!-- backlog: владелец=code-writer; оживит=нет-файла:donor/pom.xml; закрыто-когда=нет-грепа:"ENTRY_BLOCKED"@libs/domain-model/src/main/java/**/Instrument.java -->
+<!-- backlog: владелец=code-writer; оживит=нет-файла:donor/pom.xml; закрыто-когда=нет-грепа:"ENTRY_BLOCKED"@services/common/model/domain/src/main/java/**/Instrument.java -->
 
-**Что сделать.** Снять из `Instrument.Status` (`libs/domain-model`)
+**Что сделать.** Снять из `Instrument.Status` (`services/common/model/domain`)
 значения `ENTRY_BLOCKED` и `TRADE_BLOCKED` с предикатами
 `isTradeBlocked()` и `hasStandingSafetyRung()`; тем же ходом — донорские
 поля торгового состояния `Exchange` (переехало на счёт:
@@ -2260,9 +2249,9 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Донорские поля агрегата сделки в общей библиотеке
 
-<!-- backlog: владелец=code-writer; оживит=нет-файла:donor/pom.xml; закрыто-когда=нет-грепа:"List<AlgoOrder>\s+algoOrders"@libs/domain-model/src/main/java/**/Deal.java -->
+<!-- backlog: владелец=code-writer; оживит=нет-файла:donor/pom.xml; закрыто-когда=нет-грепа:"List<AlgoOrder>\s+algoOrders"@services/common/model/domain/src/main/java/**/Deal.java -->
 
-**Что сделать.** Снять с `Deal` (`libs/domain-model`) поля `orders` и
+**Что сделать.** Снять с `Deal` (`services/common/model/domain`) поля `orders` и
 `algoOrders` с предикатами `liveOrders()`, `liveAlgoOrders()`,
 `liveAttachedProtections()`; предикаты пересобрать обходом траншей.
 
@@ -2280,9 +2269,9 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Донорский числовой ключ инструмента у определения в общей библиотеке
 
-<!-- backlog: владелец=code-writer; оживит=нет-файла:donor/pom.xml; закрыто-когда=нет-грепа:"Long\s+instrumentId"@libs/domain-model/src/main/java/**/Strategy.java -->
+<!-- backlog: владелец=code-writer; оживит=нет-файла:donor/pom.xml; закрыто-когда=нет-грепа:"Long\s+instrumentId"@services/common/model/domain/src/main/java/**/Strategy.java -->
 
-**Что сделать.** Снять с `Strategy` (`libs/domain-model`) поле
+**Что сделать.** Снять с `Strategy` (`services/common/model/domain`) поле
 `instrumentId` — числовой ключ инструмента в базе донора.
 
 **Дом** — `docs/architecture/data-ownership.md` §Идентификаторы (числовые
@@ -2368,7 +2357,7 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 **Причина парковки.** Тропа достижима только при расхождении форм
 производителя и потребителя, а обе лежат в одном артефакте
-(`libs/domain-model`, `domain/event`) — окно одно: перекатывание версий.
+(`services/common/model/domain`, `domain/event`) — окно одно: перекатывание версий.
 Калибровать развилку не на чем: живого прогона реле не было.
 
 **Оживит** — первый живой прогон реле и потребителя на стенде; тот же
@@ -2410,7 +2399,7 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Конверт события не разбирается читателем — та же форма, что была у ack
 
-<!-- backlog: владелец=code-writer; оживит=греп:"EventEnvelopeMessage\.class"@services/*/src/main/java/**/*.java; закрыто-когда=нет-грепа:"@Value"@services/common/model/src/main/java/**/EventEnvelopeMessage.java -->
+<!-- backlog: владелец=code-writer; оживит=греп:"EventEnvelopeMessage\.class"@services/*/src/main/java/**/*.java; закрыто-когда=нет-грепа:"@Value"@services/common/model/message/src/main/java/**/EventEnvelopeMessage.java -->
 
 **Что сделать.** Свести `EventEnvelopeMessage` (`services/common/model`,
 пакет `message`) к форме, которую сериализатор собирает без скрытых
@@ -2550,7 +2539,7 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 ```bash
 export LC_ALL=C.UTF-8
 ls services/
-grep -rln 'micrometer-registry-prometheus' services/*/pom.xml libs/*/pom.xml
+grep -rln 'micrometer-registry-prometheus' services/*/pom.xml services/common/*/pom.xml
 grep -rln 'kind: ServiceMonitor' deploy/
 ```
 
@@ -2618,7 +2607,7 @@ grep -rln "AnonymousAuthenticationToken" services/*/src/main/java
 которому Spring Security и так обязателен.
 
 **Причина парковки.** Реализация читает контекст Spring Security, и вынос
-её в `libs/domain-model` сделал бы зависимость обязательной для всякого
+её в `services/common/model/domain` сделал бы зависимость обязательной для всякого
 потребителя артефакта (`.claude/rules/codestyle.md` §«Новый модуль
 монорепозитория»), а артефакт объявлен чисто доменным.
 
@@ -2626,7 +2615,7 @@ grep -rln "AnonymousAuthenticationToken" services/*/src/main/java
 
 ## Автора строки у `auth` не проставляет никто
 
-<!-- backlog: владелец=code-writer; оживит=шаг:5-1:открыт|греп:"ActorProvider"@libs/**/*.java; закрыто-когда=греп:"AuditorAware"@services/auth/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=шаг:5-1:открыт|греп:"ActorProvider"@services/common/**/*.java; закрыто-когда=греп:"AuditorAware"@services/auth/src/main/java/**/*.java -->
 
 **Что сделать.** Завести у `auth` резолвер актора — тот же предикат, что у
 трёх соседей (§«Предикат актора — три реализации при одном доме
@@ -2686,7 +2675,7 @@ grep -rl 'AccessDenialService' services/*/src/main/java | cut -d/ -f2 | sort -u
 
 ## Класс события `HoldReleased` и его ручная тропа
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ход по ручной поверхности ядра, доводящий снятие ступени до писателя класса; закрыто-когда=греп:"HOLD_RELEASED"@libs/domain-model/src/main/java/**/*.java -->
+<!-- backlog: владелец=solution-designer; оживит=наблюдение:ход по ручной поверхности ядра, доводящий снятие ступени до писателя класса; закрыто-когда=греп:"HOLD_RELEASED"@services/common/model/domain/src/main/java/**/*.java -->
 
 **Что сделать.** Завести класс события `HoldReleased`, его содержимое и
 поле актора и довести до писателя класса **уже построенную** поверхность

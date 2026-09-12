@@ -26,7 +26,12 @@
 # Каталоги `target/classes` и `target/test-classes` всех модулей реактора
 # СНОСЯТСЯ перед прогоном: плагин `clean` в офлайне не резолвится, а без
 # сноса ось 1 срабатывала бы на каждом втором запуске и мерить было бы
-# нечего.
+# нечего. Перечень путей идёт по ДВУМ уровням `services/`: общие артефакты
+# лежат в `services/common/<артефакт>`, то есть на сегмент глубже сервиса, а
+# модели — ещё на сегмент (`services/common/model/<слой>`; каталог `libs/`
+# снят 2026-09-12). Пропущенный уровень — не лишняя
+# работа, а ровно вакуумный прогон: несносенные классы дают «Nothing to
+# compile», и прогон отказывает кодом 2.
 #
 # Запуск (из корня репозитория):  bash tools/reactor-test.sh
 # Код возврата: 0 — дерево скомпилировано целиком и тесты зелёные;
@@ -138,8 +143,11 @@ fi
 
 # Снос классов: плагин clean в офлайне не резолвится, а без сноса ось 1
 # срабатывала бы на здоровом дереве.
-rm -rf "$REPO_ROOT"/libs/*/target/classes "$REPO_ROOT"/libs/*/target/test-classes \
-       "$REPO_ROOT"/services/*/target/classes "$REPO_ROOT"/services/*/target/test-classes \
+rm -rf "$REPO_ROOT"/services/*/target/classes "$REPO_ROOT"/services/*/target/test-classes \
+       "$REPO_ROOT"/services/common/*/target/classes \
+       "$REPO_ROOT"/services/common/*/target/test-classes \
+       "$REPO_ROOT"/services/common/model/*/target/classes \
+       "$REPO_ROOT"/services/common/model/*/target/test-classes \
        "$REPO_ROOT"/donor/target/classes "$REPO_ROOT"/donor/target/test-classes
 
 LOG="$(mktemp)"

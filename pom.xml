@@ -4,7 +4,7 @@
 
   ЗАЧЕМ ОН ПОЯВИЛСЯ ЗДЕСЬ И НЕ РАНЬШЕ. Шаг 1 фазы 2 сознательно его не
   заводил: агрегировать было нечего — дерево кода было одно. Шаг 3 заводит
-  первый общий артефакт (libs/domain-model), от которого зависит донор, и
+  первый общий артефакт (services/common/model/domain), от которого зависит донор, и
   без реактора эта зависимость разрешалась бы только через установку в
   локальный репозиторий — то есть сборка зависела бы от предыдущей сборки.
 
@@ -32,10 +32,10 @@
     <description>Монорепозиторий тенантной торговой платформы</description>
 
     <modules>
-        <module>libs/domain-model</module>
-        <module>libs/strategy-engine</module>
-        <module>libs/test-support</module>
-        <module>services/common/model</module>
+        <module>services/common/model/domain</module>
+        <module>services/common/model/message</module>
+        <module>services/common/strategy-engine</module>
+        <module>services/common/test-support</module>
         <module>services/audit-statistics</module>
         <module>services/auth</module>
         <module>services/bff</module>

@@ -30,7 +30,7 @@
 set -euo pipefail
 
 ENUM="${1:-}"
-SRC="${2:-libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java}"
+SRC="${2:-services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java}"
 SPEC="${3:-docs/spec/statistics-aggregates.json}"
 
 if [ -z "$ENUM" ]; then

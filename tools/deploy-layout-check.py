@@ -25,16 +25,26 @@
 прогоном, до замера):
   1. каталог `services/` не содержит единицы, которой нет в инвентаре
      `docs/architecture/services.md`;
-  1a. каталог `libs/` не содержит артефакта, которого нет в таблице
+  1b. каталог `services/common/` не содержит артефакта, которого нет в таблице
      «Общие артефакты монорепозитория» того же дока: клейм тот же
-     («в каталоге нет артефакта, которого нет в таблице»), и мерить его
-     надо тем же;
-  1b. каталог `services/common/` не содержит артефакта, которого нет в той же
-     таблице: дом общих артефактов не один, и второе его дерево лежит внутри
-     `services/`. Оттуда же следствие для оси 1 — сам каталог `common`
-     единицей развёртывания НЕ является и из неё изъят поимённо: без изъятия
-     общий артефакт читался бы как незарегистрированный сервис, а с молчаливым
-     пропуском всего дерева его артефакты не мерились бы ничем;
+     («в каталоге нет артефакта, которого нет в таблице»), и мерить его надо
+     тем же. Оттуда же следствие для оси 1 — сам каталог `common` единицей
+     развёртывания НЕ является и из неё изъят поимённо: без изъятия общий
+     артефакт читался бы как незарегистрированный сервис, а с молчаливым
+     пропуском всего дерева его артефакты не мерились бы ничем.
+     АРТЕФАКТ ОПОЗНАЁТСЯ ПО `pom.xml`, А НЕ ПО ГЛУБИНЕ. Модели сгруппированы
+     каталогом и разведены по слою (`common/model/domain`,
+     `common/model/message`), поэтому артефакты лежат на разной глубине, и
+     сам `model` артефактом НЕ является — он каталог-группа. Обход по
+     фиксированной глубине пропустил бы либо сгруппированные модели, либо
+     объявил бы группу артефактом; признак «есть `pom.xml`» механический и
+     от раскладки не зависит. Каталог без `pom.xml`, внутри которого ни у
+     одного потомка его тоже нет, — расхождение: он не артефакт и не
+     группа;
+     ПРЕЖДЕ ОСЕЙ БЫЛО ДВЕ: домов у общих артефактов было два (`libs/` и
+     `services/common/`), и один клейм мерился порознь на каждом. Каталог
+     `libs/` снят решением держателя 2026-09-12 — его содержимое переехало
+     под `services/common/`, и ось `1a` вместе с ним;
   2. каталог `deploy/` содержит ровно окружения перечня
      `docs/architecture/platform.md` плюс `base/` — ни больше, ни меньше;
   3. у каждого окружения есть `kustomization.yaml` и `env.yaml`;
@@ -157,6 +167,28 @@ def unit_known(name, units):
                for unit in units)
 
 
+def common_modules(common, prefix=""):
+    """Артефакты дерева общих: каталоги с `pom.xml`, на любой глубине.
+
+    Каталог без `pom.xml` считается ГРУППОЙ и обходится дальше (так лежат
+    модели: `model/domain`, `model/message`). Каталог, у которого ни своего
+    `pom.xml`, ни единого потомка с ним, артефактом не является и группой
+    тоже — он возвращается своим именем и попадает в расхождения.
+    """
+    found = []
+    for name in sorted(os.listdir(common)):
+        path = os.path.join(common, name)
+        if not os.path.isdir(path):
+            continue
+        relative = prefix + name
+        if os.path.isfile(os.path.join(path, "pom.xml")):
+            found.append(relative)
+            continue
+        nested = common_modules(path, relative + "/")
+        found.extend(nested or [relative])
+    return found
+
+
 def shared_artifacts(root):
     """Общие артефакты — из таблицы §«Общие артефакты монорепозитория»."""
     text = read(root, SERVICES_DOC)
@@ -170,7 +202,7 @@ def shared_artifacts(root):
         if not line.startswith("|"):
             continue
         first = line.split("|")[1].strip()
-        # Имя артефакта бывает с сегментом дома (`common/model`): дом общих
+        # Имя артефакта бывает с сегментом дома (`common/model/message`): дом общих
         # артефактов не один, и таблица называет второй прямо в имени.
         artifacts.update(re.findall(r"`([a-z][a-z0-9/-]*)`", first))
     if not artifacts:
@@ -337,29 +369,15 @@ def check(root):
                 defects.append("services/%s — единицы нет в инвентаре %s"
                                % (name, SERVICES_DOC))
 
-    # --- ось 1a: libs/ ⊆ общие артефакты
-    libs = os.path.join(root, "libs")
-    if os.path.isdir(libs):
-        artifacts = shared_artifacts(root)
-        for name in sorted(os.listdir(libs)):
-            if not os.path.isdir(os.path.join(libs, name)):
-                continue
-            if name not in artifacts:
-                defects.append("libs/%s — артефакта нет в таблице «Общие "
-                               "артефакты монорепозитория» %s"
-                               % (name, SERVICES_DOC))
-
     # --- ось 1b: services/common/ ⊆ общие артефакты
     common = os.path.join(services, COMMON_DIR)
     if os.path.isdir(common):
         artifacts = shared_artifacts(root)
-        for name in sorted(os.listdir(common)):
-            if not os.path.isdir(os.path.join(common, name)):
-                continue
-            if "%s/%s" % (COMMON_DIR, name) not in artifacts:
+        for relative in common_modules(common):
+            if "%s/%s" % (COMMON_DIR, relative) not in artifacts:
                 defects.append("services/%s/%s — артефакта нет в таблице «Общие "
                                "артефакты монорепозитория» %s"
-                               % (COMMON_DIR, name, SERVICES_DOC))
+                               % (COMMON_DIR, relative, SERVICES_DOC))
 
     # --- ось 2: deploy/ == окружения + base
     present = {name for name in os.listdir(deploy)
@@ -426,8 +444,8 @@ MIN_SERVICES = """## Единицы развёртывания
 
 | Артефакт | Что несёт | Кто зависит |
 |---|---|---|
-| `shared-one` | — | все |
 | `common/shared-two` | — | все |
+| `common/group/shared-three` | — | все |
 
 ## Дальше
 """
@@ -503,8 +521,8 @@ def _files(mutate=None):
         "deploy/prod/env.yaml": ENV_YAML % ("prod", "LIVE,DEMO", "prod", "prod"),
         "deploy/prod/kustomization.yaml": KUSTOMIZATION % ("prod", "[]"),
         "services/.keep": "",
-        "libs/shared-one/.keep": "",
-        "services/common/shared-two/.keep": "",
+        "services/common/shared-two/pom.xml": "<project/>\n",
+        "services/common/group/shared-three/pom.xml": "<project/>\n",
     }
     if mutate:
         mutate(files)
@@ -567,18 +585,32 @@ def battery():
          bool(defects) and any("connector" in d for d in defects or []),
          refusal or "; ".join(defects or []))
 
-    def stray_lib(files):
-        files["libs/unknown-lib/.keep"] = ""
-    defects, refusal = run(stray_lib)
-    axis("1a. артефакт в libs/ вне таблицы общих артефактов — расхождение",
-         bool(defects) and any("Общие" in d for d in defects or []),
-         refusal or "; ".join(defects or []))
-
     def stray_common(files):
-        files["services/common/unknown-two/.keep"] = ""
+        files["services/common/unknown-two/pom.xml"] = "<project/>\n"
     defects, refusal = run(stray_common)
     axis("1b-common. артефакт в services/common/ вне таблицы — расхождение",
          bool(defects) and any("common/unknown-two" in d for d in defects or []),
+         refusal or "; ".join(defects or []))
+
+    def stray_grouped(files):
+        files["services/common/group/unknown-three/pom.xml"] = "<project/>\n"
+    defects, refusal = run(stray_grouped)
+    axis("1b-глубина. СГРУППИРОВАННЫЙ артефакт вне таблицы — расхождение",
+         bool(defects) and any("common/group/unknown-three" in d for d in defects or []),
+         refusal or "; ".join(defects or []))
+
+    def group_is_not_artifact(files):
+        files["services/common/group/shared-three/src/.keep"] = ""
+    defects, refusal = run(group_is_not_artifact)
+    axis("1b-группа. КОНТРОЛЬ: каталог-группа артефактом не считается",
+         refusal is None and not defects,
+         refusal or "; ".join(defects or []) or "дефектов: 0")
+
+    def hollow_dir(files):
+        files["services/common/hollow/src/.keep"] = ""
+    defects, refusal = run(hollow_dir)
+    axis("1b-пустой. каталог без `pom.xml` у себя и у потомков — расхождение",
+         bool(defects) and any("common/hollow" in d for d in defects or []),
          refusal or "; ".join(defects or []))
 
     axis("1b-common-контроль. `common` единицей развёртывания не считается",

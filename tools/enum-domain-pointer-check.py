@@ -56,7 +56,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-FORMS_DIR = os.path.join('services', 'common', 'model', 'src', 'main', 'java')
+FORMS_DIR = os.path.join('services', 'common', 'model', 'message', 'src', 'main', 'java')
 FORMS_SUFFIX = 'Message.java'
 WRITER_TREES = ('services', 'libs')
 GENERATED_TREE = os.path.join('target', 'generated-sources')

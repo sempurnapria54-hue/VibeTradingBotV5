@@ -494,7 +494,7 @@
       "derive": {
         "command": "bash tools/derive/deal-selection-feature-values.sh CloseOutcome",
         "from": [
-          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+          "services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
         ]
       },
       "where": "tookRisk",
@@ -535,7 +535,7 @@
       "derive": {
         "command": "bash tools/derive/deal-selection-feature-values.sh ReconciliationStatus",
         "from": [
-          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+          "services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
         ]
       },
       "where": "tookRisk",
@@ -572,7 +572,7 @@
       "derive": {
         "command": "bash tools/derive/deal-selection-feature-values.sh BreakdownCompleteness",
         "from": [
-          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+          "services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
         ]
       },
       "where": "tookRisk",
@@ -607,7 +607,7 @@
       "derive": {
         "command": "bash tools/derive/deal-selection-feature-values.sh RiskBenchmarkAvailability",
         "from": [
-          "libs/domain-model/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
+          "services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/deal/Deal.java"
         ]
       },
       "where": "tookRisk",
