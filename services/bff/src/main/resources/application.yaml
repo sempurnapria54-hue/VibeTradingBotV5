@@ -70,7 +70,7 @@ perimeter:
     # держится в памяти для продолжения потока по Last-Event-ID.
     replay-window: ${PERIMETER_STREAM_REPLAY_WINDOW:200}
     # Период пульса. Молчание без пульса — наблюдаемый отказ; порог
-    # отсутствия показывает фронт (шаг 12 фазы 2).
+    # отсутствия показывает фронт (шаг 13 фазы 2).
     pulse-interval: ${PERIMETER_STREAM_PULSE_INTERVAL:15s}
     # Выключатель тика пульса — как у всякой джобы.
     pulse-enabled: ${PERIMETER_STREAM_PULSE_ENABLED:true}

@@ -48,6 +48,7 @@
 │   ├── decisions/ — Почему мы решили так, а не иначе? (пайплайн)
 │   │   ├── acceptance-by-measurement.md — Почему по эскалации `DOCS_CHECK_30` сменена концепция приёмки правил и инструментов?
 │   │   ├── architecture-docs-type.md — Почему сервисная конструкция получила свой тип знания `docs/architecture/`?
+│   │   ├── audit-statistics-split.md — Почему `audit-statistics` разводится на два сервиса, а не остаётся одним процессом?
 │   │   ├── backlog-machine-form.md — Почему бэклог получил машинно-читаемое условие возврата и энфорсер, а не очередную чистку?
 │   │   ├── chat-vs-cc-knowledge-split.md — Как разделено знание по адресатам — чат vs Claude Code?
 │   │   ├── client-layer-docs.md — Где живут exchange-specific факты?
