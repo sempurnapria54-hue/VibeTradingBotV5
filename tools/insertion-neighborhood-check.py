@@ -44,6 +44,21 @@
 дерева. Признак механический (`git status --porcelain` на самом отчёте), и без
 него отчёт приземлённого захода мерился бы дельтой СЛЕДУЮЩЕГО.
 
+ДЕЛЬТА ЗАХОДА ОГРАНИЧЕНА МЕТКОЙ ПОСЛЕДОВАТЕЛЯ, и это починка верности оси, а не
+новая ось. Коммитов внутри шага нет (`.claude/rules/session-work-unit.md`),
+поэтому по признаку выше «идут» ВСЕ отчёты шага разом, и дельта предшественника
+оказывалась надмножеством дельт всех последователей: заход краснел на носителе,
+которого не трогал, а предъявить его окрестность не мог — правки в нём ещё не
+существовало, когда отчёт писался. Последователь опознаётся механически: его
+метка — дерево, в котором ФАЙЛ ЭТОГО ОТЧЁТА уже лежит, потому что метка
+отбивается до первой правки своего захода, а отчёт предшественника к тому
+времени написан. Из таких меток берётся БЛИЖАЙШАЯ — та, чья дельта от своей
+метки наименьшая, — и дельта захода считается до неё.
+
+ОГРАНИЧЕНИЕ НАЗВАНО: у захода, объявившего две метки, прогон читает первую, и
+дельта такого захода ШИРЕ его последней правки — ошибка в строгую сторону, ту
+же, что у запасного вывода метки (`.claude/rules/edit-kind-obligations.md`).
+
 ОСИ ДОКАЗАНЫ БАТАРЕЕЙ, исполняемой ЭТОЙ ЖЕ командой. Код возврата 2 — «не
 измерялось».
 """
@@ -151,7 +166,33 @@ def is_pointer_rewrite(lines):
     return all(blank(before) == blank(after) for before, after in zip(removed, added))
 
 
-def changed_lines(mark, report, base_dir):
+def later_marks(report_path, declared, base_dir):
+    """Метки заходов-последователей: в их дереве файл ЭТОГО отчёта уже лежит."""
+    result = []
+    for other, mark, _ in declared:
+        if other == report_path:
+            continue
+        if git(['cat-file', '-e', '%s:%s' % (mark, report_path)], base_dir) is not None:
+            result.append(mark)
+    return result
+
+
+def nearest_mark(mark, candidates, base_dir):
+    """Ближайшая метка-последователь — та, чья дельта от своей наименьшая."""
+    best = None
+    best_size = None
+    for candidate in candidates:
+        output = git(['diff', '--name-only', mark, candidate], base_dir)
+        if output is None:
+            continue
+        size = len([line for line in output.splitlines() if line.strip()])
+        if best_size is None or size < best_size:
+            best = candidate
+            best_size = size
+    return best
+
+
+def changed_lines(mark, report, base_dir, end=None):
     """Точки вставки захода: {файл корпуса: множество номеров новых строк}.
 
     Из перечня выведены два класса, и оба объявлены корпусом, а не придуманы
@@ -162,6 +203,8 @@ def changed_lines(mark, report, base_dir):
     arguments = ['diff', '-U0', mark]
     if landed(report, base_dir):
         arguments = ['diff', '-U0', mark, 'HEAD']
+    if end is not None:
+        arguments = ['diff', '-U0', mark, end]
     output = git(arguments, base_dir)
     if output is None:
         return None, None
@@ -322,6 +365,22 @@ def battery(base_dir):
                  not is_pointer_rewrite(added_only),
                  'исход: %r' % (is_pointer_rewrite(added_only),)))
 
+    # Ось 11e: ближайшая метка-последователь выбирается по НАИМЕНЬШЕЙ дельте —
+    # иначе дельта захода тянулась бы до самого дальнего последователя, то есть
+    # ровно до рабочего дерева, против чего починка и сделана. Проба подменяет
+    # выдачу git, а не репозиторий: исход оси не должен зависеть от состояния
+    # дерева, на котором прогон идёт.
+    saved = globals()['git']
+    try:
+        stub = {'дальняя': 'a' + chr(10) + 'b' + chr(10) + 'c' + chr(10),
+                'ближняя': 'a' + chr(10)}
+        globals()['git'] = lambda args, base: stub.get(args[-1], '')
+        picked = nearest_mark('метка', ['дальняя', 'ближняя'], base_dir)
+    finally:
+        globals()['git'] = saved
+    axes.append(('ближайшая метка-последователь — с наименьшей дельтой',
+                 picked == 'ближняя', 'выбрана: %r' % (picked,)))
+
     # Ось 12: git доступен — иначе мерить нечем.
     axes.append(('git отвечает на rev-parse',
                  git(['rev-parse', 'HEAD'], base_dir) is not None,
@@ -358,7 +417,8 @@ def main():
             print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: метка отчёта %s недостижима (%s) — '
                   'дельта захода не выводится' % (report, mark))
             return 2
-        points, excluded = changed_lines(mark, report, base_dir)
+        end = nearest_mark(mark, later_marks(report, declared, base_dir), base_dir)
+        points, excluded = changed_lines(mark, report, base_dir, end)
         if points is None:
             print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: дельта по метке %s не получена' % mark)
             return 2

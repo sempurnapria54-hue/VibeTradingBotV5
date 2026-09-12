@@ -34,4 +34,6 @@
 
 - Запрет управляющей логике читать историю —
   `docs/rules/audit-not-runtime-source.md`.
-- Агрегаты, считаемые по журналу — `docs/rules/statistics-aggregates.md`.
+- Агрегаты статистики, считаемые по её собственным фактам —
+  `docs/rules/statistics-aggregates.md`,
+  `docs/models/domain/other/StatisticsFact.md`.
