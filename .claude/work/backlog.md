@@ -3089,7 +3089,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ## Ориентиры к дизайн-проходу по `statistics`
 
-<!-- backlog: владелец=solution-designer; оживит=шаг:2-11:открыт -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас -->
 
 **Что сделать.** Провести дизайн-проход по форме сервиса `statistics` шага 11
 фазы 2 и дать каждому ориентиру ниже исход — принят либо отклонён по критерию

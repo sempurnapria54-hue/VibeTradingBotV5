@@ -27,6 +27,16 @@
 # строка. Стоячий промпт лентой не трогается. Дом формата —
 # .claude/skills/session-chain.md §«Лента хода сессии в консоли».
 #
+# МОДЕЛЬ И EFFORT ЦИКЛ НАЗЫВАЕТ ВСЛУХ, А EFFORT ЕЩЁ И НАЗНАЧАЕТ САМ. Модель
+# сессия сообщает сама — она стои́т в `init`-событии потока, и лента печатает её
+# первой строкой сессии. Effort в потоке не сообщается вовсе: CLI его только
+# ЭКСПОРТИРУЕТ ВНУТРЬ сессии (`$CLAUDE_EFFORT` для хуков и команд), наружу не
+# отдавая. Поэтому цикл передаёт `--effort` явно и печатает переданное:
+# напечатанное равно действующему по построению, а не по догадке о том, как
+# настройки разрешились. Цена названа: значение живёт вторым домом — правка
+# `effortLevel` в настройках сессии цикла больше не двигает, её двигает
+# SESSION_EFFORT.
+#
 # СЛЕДУЮЩУЮ СЕССИЮ ЦИКЛ БЕРЁТ ТОЛЬКО ПРИ `continue` + `gates_green`. Всякий
 # иной исход — остановка с названной причиной и без повторов: повтор сессии,
 # которая уже уперлась, стои́т денег и приводит туда же.
@@ -61,6 +71,13 @@ MIN_FREE_GIB="${SESSION_MIN_FREE_GIB:-10}"
 # none` держит обещание «ничто не ждёт ответа»: то, что запросило бы
 # подтверждение, отклоняется, а не висит.
 PERMISSION_MODE="${SESSION_PERMISSION_MODE:-bypassPermissions}"
+# Умолчание равно тому, что настройки держателя дают опусу сегодня: ход вводит
+# печать величины, а не новую политику расходов.
+EFFORT="${SESSION_EFFORT:-high}"
+case "$EFFORT" in
+  low|medium|high|xhigh|max) : ;;
+  *) echo "ОТКАЗ: SESSION_EFFORT=«$EFFORT» — не уровень CLI (low, medium, high, xhigh, max)" >&2; exit 2 ;;
+esac
 
 # ФОНОВЫЕ ЗАДАЧИ ЖДУТСЯ ДО КОНЦА. У Claude Code есть потолок ожидания фоновых
 # задач, по которому сессия завершается принудительно («Background tasks still
@@ -154,11 +171,12 @@ DOCKER_DIR="$(docker_data_dir)"
 echo "хранилище Docker: $DOCKER_DIR"
 echo "журнал: $JOURNAL"
 echo "режим прав: $PERMISSION_MODE, максимум сессий: $MAX"
+echo "модель: ${SESSION_MODEL:-умолчание настроек (сессия назовёт её сама)}, effort: $EFFORT"
 
 if [ "$DRY" -eq 1 ]; then
   say "Команда сессии (--dry-run, ничего не запущено)"
-  printf 'claude -p "$(cat %s)" \\\n  --output-format stream-json --verbose --json-schema <контракт статуса> \\\n  --permission-mode %s --permission-prompts none \\\n  | py -3 tools/session_feed.py follow --raw <ответ.ndjson>\n' \
-    "$PROMPT_FILE" "$PERMISSION_MODE"
+  printf 'claude -p "$(cat %s)" \\\n  --output-format stream-json --verbose --json-schema <контракт статуса> \\\n  --permission-mode %s --permission-prompts none --effort %s \\\n  | py -3 tools/session_feed.py follow --raw <ответ.ndjson> --effort %s\n' \
+    "$PROMPT_FILE" "$PERMISSION_MODE" "$EFFORT" "$EFFORT"
   exit 0
 fi
 
@@ -168,6 +186,7 @@ jrn ""
 jrn "# Запуск $LAUNCH"
 jrn ""
 jrn "Максимум сессий: $MAX. Режим прав: \`$PERMISSION_MODE\`. Порог диска: ${MIN_FREE_GIB} ГиБ."
+jrn "Модель: \`${SESSION_MODEL:-умолчание настроек}\`. Effort: \`$EFFORT\`."
 
 stop_with() { # $1 — код возврата, $2 — причина
   jrn ""
@@ -258,16 +277,18 @@ for (( n = 1; n <= MAX; n++ )); do
     timeout "$SESSION_TIMEOUT" claude -p "$PROMPT" \
       --output-format stream-json --verbose --json-schema "$SCHEMA" \
       --permission-mode "$PERMISSION_MODE" --permission-prompts none \
+      --effort "$EFFORT" \
       ${SESSION_MODEL:+--model "$SESSION_MODEL"} \
       ${SESSION_MAX_USD:+--max-budget-usd "$SESSION_MAX_USD"} \
-      </dev/null | py -3 "$FEED" follow --raw "$RAW"
+      </dev/null | py -3 "$FEED" follow --raw "$RAW" --effort "$EFFORT"
   else
     claude -p "$PROMPT" \
       --output-format stream-json --verbose --json-schema "$SCHEMA" \
       --permission-mode "$PERMISSION_MODE" --permission-prompts none \
+      --effort "$EFFORT" \
       ${SESSION_MODEL:+--model "$SESSION_MODEL"} \
       ${SESSION_MAX_USD:+--max-budget-usd "$SESSION_MAX_USD"} \
-      </dev/null | py -3 "$FEED" follow --raw "$RAW"
+      </dev/null | py -3 "$FEED" follow --raw "$RAW" --effort "$EFFORT"
   fi
   CLI_CODE=${PIPESTATUS[0]}
   set -e

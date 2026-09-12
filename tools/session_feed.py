@@ -35,12 +35,18 @@
   * пульс `…` — при тишине дольше пяти минут: сколько идёт сессия и что
     последнее (для незавершённого прогона — что идёт).
 
+Первой строкой сессии печатается `модель: … · effort: …`. МОДЕЛЬ — ФАКТ
+ПОТОКА (поле `model` события `system/init`), EFFORT — ОБЪЯВЛЕНИЕ ЦИКЛА
+(`--effort`, им же переданное сессии): в потоке его нет вовсе, CLI отдаёт
+уровень только ВНУТРЬ сессии (`$CLAUDE_EFFORT`). Без `--effort` строка
+несёт одну модель — выдумывать уровень лента не станет.
+
 Границы сессии (`▶`/`■`) печатает сам цикл: они зависят от роадмапа и
 конверта, а не от потока. Подкоманда `step` печатает ему текущий шаг и его
 статус присваиваниями оболочки.
 
 Вызывается своей оболочкой:
-    claude -p … --output-format stream-json --verbose | py -3 tools/session_feed.py follow --raw <ответ.ndjson>
+    claude -p … --output-format stream-json --verbose | py -3 tools/session_feed.py follow --raw <ответ.ndjson> [--effort <уровень>]
     py -3 tools/session_feed.py step            # текущий шаг: STEP_ID=… STEP_STATUS=…
     py -3 tools/session_feed.py step 2-11       # статус названного шага
 """
@@ -143,9 +149,10 @@ def shorten(text, width=COMMAND_WIDTH):
 
 
 class Feed:
-    def __init__(self, raw_path, out=sys.stdout):
+    def __init__(self, raw_path, out=sys.stdout, effort=None):
         self.raw = open(raw_path, "w", encoding="utf-8", newline="")
         self.out = out
+        self.effort = effort
         self.cwd = os.getcwd()
         self.started = time.time()
         self.last_action_at = self.started
@@ -166,6 +173,15 @@ class Feed:
         self.last_action = prefix + text
         self.last_action_at = time.time()
         self.last_pulse_at = self.last_action_at
+
+    def identity(self, model):
+        """Модель и effort первой строкой сессии: модель — из потока, effort —
+        из объявления цикла (в потоке его нет)."""
+        text = "модель: %s" % (model or "не названа")
+        if self.effort:
+            text += " · effort: %s" % self.effort
+        self.line("  " + text)
+        self.last_pulse_at = time.time()
 
     # --- пути
 
@@ -351,8 +367,10 @@ class Feed:
 
     def event(self, record):
         kind = record.get("type")
-        if kind == "system" and record.get("subtype") == "init" and record.get("cwd"):
-            self.cwd = record["cwd"]
+        if kind == "system" and record.get("subtype") == "init":
+            if record.get("cwd"):
+                self.cwd = record["cwd"]
+            self.identity(record.get("model"))
             return
         if kind not in ("assistant", "user"):
             return
@@ -428,10 +446,10 @@ class Feed:
 
 
 def follow(argv):
-    if len(argv) != 2 or argv[0] != "--raw":
-        print("вызов: session_feed.py follow --raw <ответ.ndjson>", file=sys.stderr)
+    if len(argv) not in (2, 4) or argv[0] != "--raw" or (len(argv) == 4 and argv[2] != "--effort"):
+        print("вызов: session_feed.py follow --raw <ответ.ndjson> [--effort <уровень>]", file=sys.stderr)
         return 2
-    feed = Feed(argv[1])
+    feed = Feed(argv[1], effort=argv[3] if len(argv) == 4 else None)
     return feed.follow(sys.stdin.buffer)
 
 
@@ -439,6 +457,6 @@ COMMANDS = {"follow": follow, "step": step}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
-        print("вызов: session_feed.py {follow --raw <файл> | step [Ф-Ш]}", file=sys.stderr)
+        print("вызов: session_feed.py {follow --raw <файл> [--effort <уровень>] | step [Ф-Ш]}", file=sys.stderr)
         raise SystemExit(2)
     raise SystemExit(COMMANDS[sys.argv[1]](sys.argv[2:]))
