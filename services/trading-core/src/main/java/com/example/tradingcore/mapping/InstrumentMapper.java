@@ -1,7 +1,7 @@
 package com.example.tradingcore.mapping;
 
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingcore.integration.model.InstrumentMarketDataResponse;
+import com.example.tradingcore.integration.internal.api.model.InstrumentMarketDataResponse;
 import com.example.tradingcore.persistence.model.InstrumentEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

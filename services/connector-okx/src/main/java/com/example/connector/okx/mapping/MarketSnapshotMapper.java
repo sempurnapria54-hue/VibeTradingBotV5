@@ -3,10 +3,10 @@ package com.example.connector.okx.mapping;
 import static java.util.Objects.isNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
-import com.example.connector.okx.integration.model.okx.response.MarkPriceOkxResponse;
-import com.example.connector.okx.integration.model.okx.response.IndexTickerOkxResponse;
-import com.example.connector.okx.integration.model.okx.response.OrderBookOkxResponse;
-import com.example.connector.okx.integration.model.okx.response.TickerOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.MarkPriceOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.IndexTickerOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.OrderBookOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.TickerOkxResponse;
 import com.example.connector.okx.snapshot.MarketOrderBookExternalSnapshot;
 import com.example.connector.okx.snapshot.MarketTickerExternalSnapshot;
 import com.example.connector.okx.snapshot.OrderBookLevelExternalSnapshot;

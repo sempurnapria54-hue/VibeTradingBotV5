@@ -5,7 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
 import com.example.marketdata.config.CandleLoadingProperties;
-import com.example.marketdata.integration.ExchangeReadClient;
+import com.example.marketdata.integration.internal.api.ExchangeReadClient;
 import com.example.marketdata.persistence.service.CandleDataService;
 import com.example.marketdata.persistence.service.CandleGroupDataService;
 import com.example.marketdata.persistence.service.InstrumentDataService;

@@ -364,11 +364,12 @@ JSONB» — форму выбирает, версии формы не задаё
 **Задача.** Завести ось у существующей команды: `doc-pointer-check.py`
 мерит существование файла, `anchor-check.py` — адреса только `.claude/**`;
 адрес пассажа, написанный в javadoc `libs/**`, `services/**`, `web/**`,
-не мерит ни один. Экземпляры — `libs/domain-model/.../domain/event/`:
-`StrategyEventType` (пассаж «Формы событий и запросов» в
-`docs/architecture/contracts.md` — не заголовок и не лид-жирный),
-`OrderDecidedContent` (сокращённое имя пассажа «Содержимое несёт
-идентичности…»). Знак параграфа здесь не воспроизведён намеренно.
+не мерит ни один. Экземпляры — `StrategyEventType`
+(`libs/domain-model/.../domain/event/`; пассаж «Формы событий и запросов» в
+`docs/architecture/contracts.md` — не заголовок и не лид-жирный) и
+`OrderDecidedMessage` (`services/common/model/.../message/`; сокращённое имя
+пассажа «Содержимое несёт идентичности…»). Знак параграфа здесь не
+воспроизведён намеренно.
 
 **Причина парковки была** — заморозка усиления измерения
 (`.claude/rules/docs-loop-limits.md`); она снята входом шага 10 фазы 2 в
@@ -2409,10 +2410,10 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Конверт события не разбирается читателем — та же форма, что была у ack
 
-<!-- backlog: владелец=code-writer; оживит=греп:"EventEnvelope\.class"@services/*/src/main/java/**/*.java; закрыто-когда=нет-грепа:"@Value"@libs/domain-model/src/main/java/**/EventEnvelope.java -->
+<!-- backlog: владелец=code-writer; оживит=греп:"EventEnvelopeMessage\.class"@services/*/src/main/java/**/*.java; закрыто-когда=нет-грепа:"@Value"@services/common/model/src/main/java/**/EventEnvelopeMessage.java -->
 
-**Что сделать.** Свести `EventEnvelope` (`libs/domain-model`,
-`domain/event`) к форме, которую сериализатор собирает без скрытых
+**Что сделать.** Свести `EventEnvelopeMessage` (`services/common/model`,
+пакет `message`) к форме, которую сериализатор собирает без скрытых
 механизмов: сегодня у него `@Value` + `@Builder`. Форма — по
 `.claude/rules/codestyle.md` §«Неизменяемое значение, пересекающее
 сериализацию».
@@ -3081,7 +3082,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 `StreamEventFormTest` сверяет три идентичности у классов жизненного цикла
 определения; непокрытыми остаются прочие классы — у них имя не связывает
 ни одна проба ни на одном конце. Мутация имени компонента
-`HoldRaisedContent` оставила зелёными
+`HoldRaisedMessage` оставила зелёными
 наборы проб ядра, периметра и журнала
 (`.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-focuses-9.md`, находка Ф16).
 

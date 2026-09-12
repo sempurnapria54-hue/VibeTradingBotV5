@@ -3,13 +3,11 @@ package com.example.tradingcore.domain.safety;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
-import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingbot.domain.event.HoldRaisedContent;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.command.DealContext;
-import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.domain.service.ActorProvider;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +55,7 @@ public class HoldRungEdgeService {
     private final AccountInstrumentStateDataService accountInstrumentStateDataService;
     private final ExchangeAccountDataService exchangeAccountDataService;
     private final ActorProvider actorProvider;
-    private final OutboxWriter outboxWriter;
+    private final CoreEventWriter coreEventWriter;
 
     /**
      * Поднять ступень объекта радиуса и, если переход применился,
@@ -121,10 +119,9 @@ public class HoldRungEdgeService {
 
     /** Факт подъёма — той же транзакцией, что и сама перестановка. */
     private void publishRaised(HoldSignal signal, DealContext dealContext) {
-        outboxWriter.write(dealContext.getExchangeAccount().getTenantId(), CoreEventType.HOLD_RAISED,
-                new HoldRaisedContent(dealContext.getExchangeAccount().getInternalId(),
-                        instrumentInternalId(signal, dealContext), signal.getScope().name(),
-                        signal.getRung().name(), signal.getCode(), actorProvider.currentActor()));
+        coreEventWriter.holdRaised(dealContext.getExchangeAccount().getTenantId(), signal,
+                dealContext.getExchangeAccount().getInternalId(),
+                instrumentInternalId(signal, dealContext), actorProvider.currentActor());
     }
 
     /** Инструмент радиуса; у счётного сигнала его нет по построению радиуса. */

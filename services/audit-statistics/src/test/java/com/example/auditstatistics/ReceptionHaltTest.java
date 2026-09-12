@@ -8,9 +8,9 @@ import static org.mockito.Mockito.verify;
 
 import com.example.auditstatistics.config.ReceptionProperties;
 import com.example.auditstatistics.domain.service.AuditReceptionService;
-import com.example.auditstatistics.integration.IncompleteEventException;
-import com.example.auditstatistics.integration.JournalReceptionErrorHandler;
-import com.example.auditstatistics.integration.ReceptionHaltMarker;
+import com.example.auditstatistics.integration.internal.event.IncompleteEventException;
+import com.example.auditstatistics.integration.internal.event.JournalReceptionErrorHandler;
+import com.example.auditstatistics.integration.internal.event.ReceptionHaltMarker;
 import java.time.Duration;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

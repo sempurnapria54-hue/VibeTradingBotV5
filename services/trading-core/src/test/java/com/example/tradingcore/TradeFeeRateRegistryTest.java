@@ -13,7 +13,7 @@ import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.other.TradeFeeRate;
 import com.example.tradingcore.domain.service.TradeFeeRateSyncService;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.mapping.InstrumentExternalRulesJsonConverter;
 import com.example.tradingcore.mapping.TradeFeeRateMapper;
 import com.example.tradingcore.mapping.TradeFeeRateMapperImpl;

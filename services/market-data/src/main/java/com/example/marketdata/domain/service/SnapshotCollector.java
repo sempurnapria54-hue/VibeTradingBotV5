@@ -7,9 +7,9 @@ import static org.apache.commons.collections4.MapUtils.emptyIfNull;
 
 import com.example.marketdata.config.ConnectorProperties;
 import com.example.marketdata.config.SnapshotCollectionProperties;
-import com.example.marketdata.integration.ExchangeAccessException;
-import com.example.marketdata.integration.ExchangeReadClient;
-import com.example.marketdata.integration.ExchangeReadException;
+import com.example.marketdata.integration.internal.api.ExchangeAccessException;
+import com.example.marketdata.integration.internal.api.ExchangeReadClient;
+import com.example.marketdata.integration.internal.api.ExchangeReadException;
 import com.example.marketdata.persistence.service.InstrumentDataService;
 import com.example.marketdata.persistence.service.MarketSnapshotDataService;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;

@@ -20,7 +20,7 @@ import com.example.tradingcore.config.PnlReconciliationProperties;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingcore.domain.command.ServiceCommandType;
@@ -77,7 +77,7 @@ class DealTerminalEdgeTest {
     private final DealDataService dealDataService = mock(DealDataService.class);
     private final DealActionStateDataService actionStates = mock(DealActionStateDataService.class);
     private final AnomalyReportService reports = mock(AnomalyReportService.class);
-    private final OutboxWriter outboxWriter = mock(OutboxWriter.class);
+    private final CoreEventWriter coreEventWriter = mock(CoreEventWriter.class);
     private final ExchangeAccountDataService accounts = mock(ExchangeAccountDataService.class);
     private final TenantRiskAppetiteDataService tenants = mock(TenantRiskAppetiteDataService.class);
     private final ExchangeContourProperties contourProperties = new ExchangeContourProperties();
@@ -100,10 +100,10 @@ class DealTerminalEdgeTest {
         DealTerminalGate terminalGate = new DealTerminalGate();
         lossStreakCounter = new LossStreakCounter(accounts, tenants);
         closedExecutor = new MarkDealClosedExecutor(dealDataService, actionStates, reconciliationCalculator,
-                featuresWriter, terminalGate, lossStreakCounter, reports, outboxWriter);
+                featuresWriter, terminalGate, lossStreakCounter, reports, coreEventWriter);
         emergencyExecutor = new MarkDealEmergencyClosedExecutor(dealDataService, actionStates,
                 new DealResultCalculator(contourProperties), reconciliationCalculator, featuresWriter,
-                terminalGate, lossStreakCounter, reports, outboxWriter);
+                terminalGate, lossStreakCounter, reports, coreEventWriter);
         errorExecutor = new MarkDealErrorExecutor(dealDataService, actionStates);
         when(tenants.findByTenantInternalId(anyString())).thenReturn(Optional.empty());
         // Ребро применилось — умолчание МОКА обратное, и это несущее:
@@ -319,7 +319,7 @@ class DealTerminalEdgeTest {
         assertThat(deal.getStatus())
                 .as("модель не объявляет закрытым то, что в базе не закрыто")
                 .isEqualTo(Deal.Status.EXIT_PENDING);
-        verify(outboxWriter, never()).write(anyString(), any(), any());
+        verify(coreEventWriter, never()).dealClosed(anyString(), any(), any(), any(), any(), any());
     }
 
     /** Тот же гард у аварийного терминала: он законен ровно из ошибочного. */
@@ -335,7 +335,7 @@ class DealTerminalEdgeTest {
 
         assertThat(result.getSuccess()).isFalse();
         assertThat(deal.getStatus()).isEqualTo(Deal.Status.ERROR);
-        verify(outboxWriter, never()).write(anyString(), any(), any());
+        verify(coreEventWriter, never()).dealClosed(anyString(), any(), any(), any(), any(), any());
     }
 
     /**

@@ -13,9 +13,9 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMa
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingcore.integration.MarketDataReadClient;
-import com.example.tradingcore.integration.model.MarketFeatureBinding;
-import com.example.tradingcore.integration.model.MarketFeatureReadRequest;
+import com.example.tradingcore.integration.internal.api.MarketDataReadClient;
+import com.example.tradingcore.integration.internal.api.model.MarketFeatureBinding;
+import com.example.tradingcore.integration.internal.api.model.MarketFeatureReadRequest;
 import com.example.tradingcore.mapping.MarketFeatureMapper;
 import java.time.Duration;
 import java.util.ArrayList;

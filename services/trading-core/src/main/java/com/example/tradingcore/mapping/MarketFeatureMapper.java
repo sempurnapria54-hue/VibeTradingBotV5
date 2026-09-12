@@ -17,11 +17,11 @@ import com.example.tradingbot.domain.model.trade.market_structure.MarketBreakout
 import com.example.tradingbot.domain.model.trade.market_structure.MarketPriceLevel;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import com.example.tradingcore.domain.market.MarketFeatures;
-import com.example.tradingcore.integration.model.IndicatorValueResponse;
-import com.example.tradingcore.integration.model.MarketFeatureBundleResponse;
-import com.example.tradingcore.integration.model.MarketPhaseResponse;
-import com.example.tradingcore.integration.model.MarketPriceLevelResponse;
-import com.example.tradingcore.integration.model.MarketStructureResponse;
+import com.example.tradingcore.integration.internal.api.model.IndicatorValueResponse;
+import com.example.tradingcore.integration.internal.api.model.MarketFeatureBundleResponse;
+import com.example.tradingcore.integration.internal.api.model.MarketPhaseResponse;
+import com.example.tradingcore.integration.internal.api.model.MarketPriceLevelResponse;
+import com.example.tradingcore.integration.internal.api.model.MarketStructureResponse;
 import java.util.List;
 import java.util.Map;
 import org.mapstruct.Mapper;

@@ -40,7 +40,7 @@ import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.deal.DealStatusEdgeService;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.domain.safety.AnomalyReport;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldRung;
@@ -51,7 +51,9 @@ import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.LossStreakCounter;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
 import com.example.tradingcore.domain.service.ActorProvider;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.mapping.CoreEventMessageMapper;
+import com.example.tradingcore.mapping.CoreEventMessageMapperImpl;
 import com.example.tradingcore.persistence.model.OutboxEntity;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;
@@ -108,6 +110,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
  */
 class CoreEventFormTest {
 
+    /** Маппер domain → message: формы событий строит граница, а не домен. */
+    private static final CoreEventMessageMapper EVENT_MESSAGES = new CoreEventMessageMapperImpl();
+
     private static final String EXCHANGE = "OKX";
     private static final String SETTLE = "USDT";
     private static final String TENANT = "tn-0001";
@@ -142,7 +147,7 @@ class CoreEventFormTest {
 
     private final OutboxDataService outboxDataService = mock(OutboxDataService.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-    private final OutboxWriter outboxWriter = new OutboxWriter(outboxDataService, objectMapper);
+    private final CoreEventWriter coreEventWriter = new CoreEventWriter(outboxDataService, objectMapper, EVENT_MESSAGES);
     private final ActorProvider actorProvider = new ActorProvider();
 
     private final DealDataService dealDataService = mock(DealDataService.class);
@@ -321,7 +326,7 @@ class CoreEventFormTest {
             return saved;
         });
         CreateOrderExecutor executor = new CreateOrderExecutor(orders, actionStates, dealDataService,
-                riskNumbers, outboxWriter);
+                riskNumbers, coreEventWriter);
 
         executor.execute(createOrderCommand(), createAnchor(), context);
 
@@ -347,7 +352,7 @@ class CoreEventFormTest {
         AccountInstrumentStateDataService pairStates = mock(AccountInstrumentStateDataService.class);
         when(pairStates.raiseRung(anyLong(), anyLong(), any())).thenReturn(true);
         HoldService holdService = new HoldService(reports, mock(SafetyHoldCoordinator.class),
-                new HoldRungEdgeService(pairStates, accounts, actorProvider, outboxWriter));
+                new HoldRungEdgeService(pairStates, accounts, actorProvider, coreEventWriter));
 
         holdService.raise(HoldSignal.instrumentSoft(Constants.Hold.MANUAL_HALT_REQUESTED),
                 context(enteredDeal(), true, definition()));
@@ -376,7 +381,7 @@ class CoreEventFormTest {
         AccountInstrumentStateDataService pairStates = mock(AccountInstrumentStateDataService.class);
         when(pairStates.raiseRung(anyLong(), anyLong(), any())).thenReturn(true);
         HoldRungEdgeService rungEdges = new HoldRungEdgeService(pairStates, accounts, actorProvider,
-                outboxWriter);
+                coreEventWriter);
 
         rungEdges.raise(HoldSignal.instrument(Constants.Hold.INSTRUMENT_RETRY_BUDGET_EXHAUSTED),
                 context(enteredDeal(), true, definition()));
@@ -392,7 +397,7 @@ class CoreEventFormTest {
         AccountInstrumentStateDataService pairStates = mock(AccountInstrumentStateDataService.class);
         when(pairStates.raiseRung(anyLong(), anyLong(), any())).thenReturn(true);
         HoldService holdService = new HoldService(reports, mock(SafetyHoldCoordinator.class),
-                new HoldRungEdgeService(pairStates, accounts, actorProvider, outboxWriter));
+                new HoldRungEdgeService(pairStates, accounts, actorProvider, coreEventWriter));
 
         holdService.raise(HoldSignal.instrumentSoft(Constants.Hold.INSTRUMENT_RETRY_BUDGET_EXHAUSTED),
                 context(enteredDeal(), true, definition()));
@@ -421,7 +426,7 @@ class CoreEventFormTest {
         deal.setExchangeAccountId(ACCOUNT_ID);
         deal.setInstrumentId(INSTRUMENT_ID);
         DealStatusEdgeService statusEdges = new DealStatusEdgeService(dealDataService, accounts,
-                instruments, strategies, actorProvider, outboxWriter);
+                instruments, strategies, actorProvider, coreEventWriter);
 
         statusEdges.enforceHardRung(deal, Deal.ShutdownReason.EXCHANGE_HOLD);
 
@@ -442,7 +447,7 @@ class CoreEventFormTest {
         when(reportData.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         AnomalyReportService service = new AnomalyReportService(reportData,
                 mock(ExchangeOperationsClient.class), objectMapper, new AnomalyReportProperties(),
-                actorProvider, outboxWriter);
+                actorProvider, coreEventWriter);
 
         service.journalState(context(enteredDeal(), true, definition()),
                 HoldSignal.instrumentJournal(Constants.Hold.MANUAL_HALT_CLEARED), null);
@@ -469,7 +474,7 @@ class CoreEventFormTest {
         when(reportData.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         AnomalyReportService service = new AnomalyReportService(reportData,
                 mock(ExchangeOperationsClient.class), objectMapper, new AnomalyReportProperties(),
-                actorProvider, outboxWriter);
+                actorProvider, coreEventWriter);
 
         service.journalState(context(enteredDeal(), true, definition()),
                 HoldSignal.instrument(Constants.Hold.INSTRUMENT_RETRY_BUDGET_EXHAUSTED), null);
@@ -494,12 +499,12 @@ class CoreEventFormTest {
         when(dealDataService.applyTerminalEdge(any(), any())).thenReturn(true);
         return new MarkDealClosedExecutor(dealDataService, actionStates, reconciliationCalculator,
                 featuresWriter, new DealTerminalGate(), new LossStreakCounter(accounts, tenants),
-                reports, outboxWriter);
+                reports, coreEventWriter);
     }
 
     private DealOpeningService openingService() {
         return new DealOpeningService(dealDataService, mock(DealTrancheDataService.class),
-                strategies, outboxWriter);
+                strategies, coreEventWriter);
     }
 
     /** Строка, которую писатель отдал границе персистентности. */

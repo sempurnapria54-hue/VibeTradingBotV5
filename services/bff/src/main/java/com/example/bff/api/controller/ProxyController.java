@@ -6,7 +6,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.bff.domain.TenantContext;
 import com.example.bff.domain.TenantContextResolver;
-import com.example.bff.integration.OwnerProxyClient;
+import com.example.bff.integration.internal.api.OwnerProxyClient;
 import com.example.bff.util.Constants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

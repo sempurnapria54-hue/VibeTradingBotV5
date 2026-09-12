@@ -15,7 +15,7 @@ import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.payload.SubmitAlgoOrderCommandPayload;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.AlgoOrderDataService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import lombok.RequiredArgsConstructor;

@@ -2,7 +2,7 @@ package com.example.connector.okx.mapping;
 
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.connector.okx.snapshot.InstrumentExternalSnapshot;
-import com.example.connector.okx.integration.model.okx.response.InstrumentOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.InstrumentOkxResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;

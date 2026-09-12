@@ -1,6 +1,6 @@
 package com.example.strategies.domain.service;
 
-import com.example.strategies.domain.event.OutboxWriter;
+import com.example.strategies.integration.internal.event.StrategyEventWriter;
 import com.example.strategies.persistence.model.StrategyEntity;
 import com.example.strategies.persistence.service.StrategyDataService;
 import com.example.tradingbot.domain.event.StrategyEventType;
@@ -32,22 +32,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class StrategyStatusWriter {
 
     private final StrategyDataService strategyDataService;
-    private final OutboxWriter outboxWriter;
+    private final StrategyEventWriter eventWriter;
 
     /**
      * Переставить статус и записать событие.
      *
-     * @param definition определение, чей статус переставляется
+     * <p><b>Содержимое события здесь не собирается.</b> Какую форму несёт
+     * класс события, знает шина; сюда приходят определение и актор
+     * (.claude/rules/codestyle.md §«Слой сообщения: внутренняя шина»).
+     *
+     * @param definition определение, чей статус переставляется; у активации
+     *                   это снимок с деревом — он же поедет содержимым
      * @param target     целевой статус
-     * @param content    содержимое события: снимок дерева у активации,
-     *                   идентичности у прочих переходов
+     * @param actor      кто инициировал переход
      */
     @Transactional
-    public Strategy commit(Strategy definition, Strategy.Status target, Object content) {
+    public Strategy commit(Strategy definition, Strategy.Status target, String actor) {
         StrategyEntity entity =
                 strategyDataService.getRequiredEntityByInternalId(definition.getInternalId());
         strategyDataService.applyStatus(entity, target);
-        outboxWriter.write(definition.getTenantId(), eventType(target), content);
+        eventWriter.record(definition, eventType(target), actor);
         definition.setStatus(target);
         log.info("Strategy definition moved internalId={} status={}", definition.getInternalId(), target);
         return definition;

@@ -35,6 +35,7 @@
         <module>libs/domain-model</module>
         <module>libs/strategy-engine</module>
         <module>libs/test-support</module>
+        <module>services/common/model</module>
         <module>services/audit-statistics</module>
         <module>services/auth</module>
         <module>services/bff</module>

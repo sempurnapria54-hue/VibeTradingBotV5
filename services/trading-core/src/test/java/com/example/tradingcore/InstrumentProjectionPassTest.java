@@ -11,11 +11,11 @@ import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingcore.domain.service.RegistryProjectionService;
-import com.example.tradingcore.integration.AuthReadClient;
-import com.example.tradingcore.integration.MarketDataReadClient;
-import com.example.tradingcore.integration.PeerReadException;
-import com.example.tradingcore.integration.PeerServiceUnavailableException;
-import com.example.tradingcore.integration.model.InstrumentMarketDataResponse;
+import com.example.tradingcore.integration.internal.api.AuthReadClient;
+import com.example.tradingcore.integration.internal.api.MarketDataReadClient;
+import com.example.tradingcore.integration.internal.api.PeerReadException;
+import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
+import com.example.tradingcore.integration.internal.api.model.InstrumentMarketDataResponse;
 import com.example.tradingcore.mapping.ExchangeAccountMapper;
 import com.example.tradingcore.mapping.ExchangeAccountMapperImpl;
 import com.example.tradingcore.mapping.InstrumentMapper;

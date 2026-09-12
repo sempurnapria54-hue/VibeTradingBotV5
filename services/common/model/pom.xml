@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  common-model — общий артефакт слоя СООБЩЕНИЯ: формы, которыми сервисы
+  говорят друг с другом через брокер (docs/architecture/services.md
+  §«Общие артефакты монорепозитория»). Собирается в сервисы, сам не
+  разворачивается.
+
+  ПОЧЕМУ ОТДЕЛЬНЫЙ АРТЕФАКТ, А НЕ ПАКЕТ В domain-model. Форма сообщения —
+  не доменная модель: у неё читатель на другой стороне провода, и правит
+  её совместимость, а не доменный инвариант
+  (.claude/rules/codestyle.md §«Слой сообщения: внутренняя шина»).
+  Домен и провод в одном артефакте разъезжались бы молча: правка доменного
+  поля выглядела бы правкой формы, которую уже кто-то читает.
+
+  ЗАВИСИМОСТЬ НА domain-model ОДНА И ПРЕДЪЯВЛЕНА. Снимок определения
+  стратегии едет содержимым события ТЕМ ЖЕ доменным деревом, каким живёт
+  у владельца (docs/architecture/contracts.md §События): зеркало этого
+  дерева в слое сообщения было бы вторым носителем одной формы
+  (.claude/rules/carrier-levels.md) и разошлось бы с первым при первом же
+  расширении каталога условий.
+
+  Родителя нет намеренно — по тому же доводу, что у libs/domain-model.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>common-model</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>common-model</name>
+    <description>Формы сообщений внутренней шины: конверт события и содержимое его классов</description>
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <lombok.version>1.18.42</lombok.version>
+        <domain-model.version>0.0.1-SNAPSHOT</domain-model.version>
+        <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>domain-model</artifactId>
+            <version>${domain-model.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <!--
+                  Версия закреплена явно: родителя у модуля нет, и без
+                  закрепления версия плагина зависела бы от версии Maven.
+                -->
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

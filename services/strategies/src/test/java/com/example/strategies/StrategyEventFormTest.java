@@ -7,28 +7,30 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.strategies.domain.event.OutboxWriter;
 import com.example.strategies.domain.service.ActorProvider;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.service.StrategyStatusWriter;
 import com.example.strategies.domain.service.TenantRiskAppetiteReader;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
-import com.example.strategies.integration.TradingCoreReadClient;
-import com.example.strategies.integration.model.PairCheckCoreResponse;
-import com.example.strategies.integration.model.RiskAppetiteCoreResponse;
+import com.example.strategies.integration.internal.api.TradingCoreReadClient;
+import com.example.strategies.integration.internal.api.model.PairCheckCoreResponse;
+import com.example.strategies.integration.internal.api.model.RiskAppetiteCoreResponse;
+import com.example.strategies.integration.internal.event.StrategyEventWriter;
 import com.example.strategies.mapping.StrategyApiMapper;
 import com.example.strategies.mapping.StrategyApiMapperImpl;
+import com.example.strategies.mapping.StrategyEventMessageMapper;
+import com.example.strategies.mapping.StrategyEventMessageMapperImpl;
 import com.example.strategies.persistence.model.OutboxEntity;
 import com.example.strategies.persistence.model.StrategyEntity;
 import com.example.strategies.persistence.service.OutboxDataService;
 import com.example.strategies.persistence.service.StrategyDataService;
 import com.example.strategies.util.Constants;
-import com.example.tradingbot.domain.event.EventEnvelope;
 import com.example.tradingbot.domain.event.StrategyEventType;
 import com.example.tradingbot.domain.model.aggregate.strategy.PhaseEntryPolicy;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.example.tradingbot.message.EventEnvelopeMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Field;
@@ -70,6 +72,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
  */
 class StrategyEventFormTest {
 
+    /** Маппер domain → message: формы событий строит граница, а не домен. */
+    private static final StrategyEventMessageMapper EVENT_MESSAGES =
+            new StrategyEventMessageMapperImpl();
+
     private static final String TENANT = "tn-0001";
     private static final String ACCOUNT = "ea-0001";
     private static final String INSTRUMENT = "in-0001";
@@ -93,8 +99,9 @@ class StrategyEventFormTest {
     private final StrategyApiMapper mapper = new StrategyApiMapperImpl();
     private final StrategyDefinitionValidator validator = new StrategyDefinitionValidator();
     private final ActorProvider actorProvider = new ActorProvider();
-    private final OutboxWriter outboxWriter = new OutboxWriter(outboxDataService, objectMapper);
-    private final StrategyStatusWriter statusWriter = new StrategyStatusWriter(dataService, outboxWriter);
+    private final StrategyEventWriter eventWriter =
+            new StrategyEventWriter(outboxDataService, objectMapper, EVENT_MESSAGES);
+    private final StrategyStatusWriter statusWriter = new StrategyStatusWriter(dataService, eventWriter);
     private final TenantRiskAppetiteReader appetiteReader = new TenantRiskAppetiteReader(coreClient);
 
     private final StrategyLifecycleService service = new StrategyLifecycleService(
@@ -205,7 +212,7 @@ class StrategyEventFormTest {
     @Test
     @DisplayName("Класс конверта несёт весь объявленный состав и ничего сверх")
     void theEnvelopeClassCarriesItsDeclaredCompositionWhole() {
-        List<String> declared = Arrays.stream(EventEnvelope.class.getDeclaredFields())
+        List<String> declared = Arrays.stream(EventEnvelopeMessage.class.getDeclaredFields())
                 .filter(field -> isFalse(Modifier.isStatic(field.getModifiers())))
                 .map(Field::getName)
                 .toList();

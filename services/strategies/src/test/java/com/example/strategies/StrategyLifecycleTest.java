@@ -9,22 +9,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.strategies.domain.event.OutboxWriter;
 import com.example.strategies.domain.service.ActorProvider;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.service.StrategyStatusWriter;
 import com.example.strategies.domain.service.TenantRiskAppetiteReader;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
-import com.example.strategies.integration.TradingCoreReadClient;
-import com.example.strategies.integration.model.PairCheckCoreResponse;
-import com.example.strategies.integration.model.RiskAppetiteCoreResponse;
+import com.example.strategies.integration.internal.api.TradingCoreReadClient;
+import com.example.strategies.integration.internal.api.model.PairCheckCoreResponse;
+import com.example.strategies.integration.internal.api.model.RiskAppetiteCoreResponse;
+import com.example.strategies.integration.internal.event.StrategyEventWriter;
 import com.example.strategies.mapping.StrategyApiMapper;
 import com.example.strategies.mapping.StrategyApiMapperImpl;
 import com.example.strategies.persistence.model.StrategyEntity;
 import com.example.strategies.persistence.service.StrategyDataService;
-import com.example.tradingbot.domain.event.StrategyActivatedContent;
 import com.example.tradingbot.domain.event.StrategyEventType;
-import com.example.tradingbot.domain.event.StrategyLifecycleContent;
 import com.example.tradingbot.domain.model.aggregate.strategy.PhaseEntryPolicy;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
@@ -61,10 +59,10 @@ class StrategyLifecycleTest {
 
     private final StrategyDataService dataService = mock(StrategyDataService.class);
     private final TradingCoreReadClient coreClient = mock(TradingCoreReadClient.class);
-    private final OutboxWriter outboxWriter = mock(OutboxWriter.class);
+    private final StrategyEventWriter eventWriter = mock(StrategyEventWriter.class);
     private final StrategyApiMapper mapper = new StrategyApiMapperImpl();
     private final StrategyDefinitionValidator validator = new StrategyDefinitionValidator();
-    private final StrategyStatusWriter statusWriter = new StrategyStatusWriter(dataService, outboxWriter);
+    private final StrategyStatusWriter statusWriter = new StrategyStatusWriter(dataService, eventWriter);
 
     private final TenantRiskAppetiteReader appetiteReader = new TenantRiskAppetiteReader(coreClient);
 
@@ -83,8 +81,8 @@ class StrategyLifecycleTest {
         Strategy moved = service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE);
 
         assertThat(moved.getStatus()).isEqualTo(Strategy.Status.ACTIVE);
-        verify(outboxWriter).write(eq(TENANT), eq(StrategyEventType.STRATEGY_ACTIVATED),
-                any(StrategyActivatedContent.class));
+        verify(eventWriter).record(any(Strategy.class), eq(StrategyEventType.STRATEGY_ACTIVATED),
+                any());
     }
 
     /**
@@ -102,7 +100,7 @@ class StrategyLifecycleTest {
         assertThatThrownBy(() -> service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("RISK_APPETITE_NOT_CONFIGURED");
-        verify(outboxWriter, never()).write(any(), any(), any());
+        verify(eventWriter, never()).record(any(), any(), any());
     }
 
     /** Чужая активная на паре останавливает активацию: инвариант радиуса пары. */
@@ -115,7 +113,7 @@ class StrategyLifecycleTest {
         assertThatThrownBy(() -> service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("STRATEGY_ACTIVE_ALREADY_EXISTS");
-        verify(outboxWriter, never()).write(any(), any(), any());
+        verify(eventWriter, never()).record(any(), any(), any());
     }
 
     /**
@@ -134,7 +132,7 @@ class StrategyLifecycleTest {
         assertThatThrownBy(() -> service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("STRATEGY_ACCOUNT_NOT_FOUND");
-        verify(outboxWriter, never()).write(any(), any(), any());
+        verify(eventWriter, never()).record(any(), any(), any());
     }
 
     /**
@@ -151,7 +149,7 @@ class StrategyLifecycleTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("STRATEGY_TRANSITION_NOT_ALLOWED");
         verify(coreClient, never()).checkPair(any(), any(), any());
-        verify(outboxWriter, never()).write(any(), any(), any());
+        verify(eventWriter, never()).record(any(), any(), any());
     }
 
     /** Деактивация: событие идентичностей, дерева в нём нет — оно у читателя уже лежит. */
@@ -162,8 +160,8 @@ class StrategyLifecycleTest {
         Strategy moved = service.applyStatus(STRATEGY, TENANT, Strategy.Status.INACTIVE);
 
         assertThat(moved.getStatus()).isEqualTo(Strategy.Status.INACTIVE);
-        verify(outboxWriter).write(eq(TENANT), eq(StrategyEventType.STRATEGY_DEACTIVATED),
-                any(StrategyLifecycleContent.class));
+        verify(eventWriter).record(any(Strategy.class), eq(StrategyEventType.STRATEGY_DEACTIVATED),
+                any());
     }
 
     /** Определение чужого тенанта читается как ненайденное, а не как отказ права. */

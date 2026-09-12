@@ -33,7 +33,7 @@ import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.safety.KillSwitchExecutor;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;

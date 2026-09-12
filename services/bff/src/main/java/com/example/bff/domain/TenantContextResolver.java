@@ -2,8 +2,8 @@ package com.example.bff.domain;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
-import com.example.bff.integration.AuthMembershipClient;
-import com.example.bff.integration.MembershipApiModel;
+import com.example.bff.integration.internal.api.AuthMembershipClient;
+import com.example.bff.integration.internal.api.model.MembershipApiModel;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

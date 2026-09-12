@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 import com.example.auditstatistics.domain.model.AuditRecord;
-import com.example.auditstatistics.integration.JournalEnvelopeReader;
+import com.example.auditstatistics.integration.internal.event.JournalEnvelopeReader;
+import com.example.auditstatistics.mapping.AuditRecordMapper;
+import com.example.auditstatistics.mapping.AuditRecordMapperImpl;
 import com.example.auditstatistics.util.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -49,12 +51,15 @@ import org.junit.jupiter.api.Test;
  */
 class WireFormContractTest {
 
+    /** Перевод прочитанного сообщения в доменную строку — маппер границы. */
+    private static final AuditRecordMapper MESSAGES = new AuditRecordMapperImpl();
+
     /** Построенные публикаторы: у каждого своя приватная копия имён. */
     private static final List<Path> PUBLISHERS = List.of(
             Path.of("..", "..", "services", "trading-core", "src", "main", "java", "com", "example",
-                    "tradingcore", "integration", "EventPublisher.java"),
+                    "tradingcore", "integration", "internal", "event", "EventPublisher.java"),
             Path.of("..", "..", "services", "strategies", "src", "main", "java", "com", "example",
-                    "strategies", "integration", "EventPublisher.java"));
+                    "strategies", "integration", "internal", "event", "EventPublisher.java"));
 
     /** Объявление литерала имени заголовка у публикатора. */
     private static final Pattern HEADER_CONSTANT =
@@ -121,7 +126,7 @@ class WireFormContractTest {
     void aMessageBuiltByThePublisherIsReadByTheConsumer() throws IOException {
         ConsumerRecord<String, String> message = messageBuiltAs(wireForm(PUBLISHERS.get(0)));
 
-        AuditRecord record = reader.read(message);
+        AuditRecord record = MESSAGES.messageToDomain(reader.read(message));
 
         assertThat(record.hasCompleteInput())
                 .as("вход, собранный построенным публикатором, обязан быть полным")

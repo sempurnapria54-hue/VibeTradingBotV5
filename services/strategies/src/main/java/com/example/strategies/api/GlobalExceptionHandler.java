@@ -2,8 +2,8 @@ package com.example.strategies.api;
 
 import static java.util.Objects.isNull;
 
-import com.example.strategies.integration.PeerReadException;
-import com.example.strategies.integration.PeerServiceUnavailableException;
+import com.example.strategies.integration.internal.api.PeerReadException;
+import com.example.strategies.integration.internal.api.PeerServiceUnavailableException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.extern.slf4j.Slf4j;

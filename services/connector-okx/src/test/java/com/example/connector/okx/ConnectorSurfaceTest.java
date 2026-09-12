@@ -17,8 +17,8 @@ import com.example.connector.okx.api.controller.ExchangeAccountOperationsControl
 import com.example.connector.okx.api.controller.MarketDataController;
 import com.example.connector.okx.credentials.CredentialsUnavailableException;
 import com.example.connector.okx.gateway.ExchangeGateway;
-import com.example.connector.okx.integration.CredentialsRejectedException;
-import com.example.connector.okx.integration.ExternalStatusException;
+import com.example.connector.okx.integration.external.api.CredentialsRejectedException;
+import com.example.connector.okx.integration.external.api.ExternalStatusException;
 import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;

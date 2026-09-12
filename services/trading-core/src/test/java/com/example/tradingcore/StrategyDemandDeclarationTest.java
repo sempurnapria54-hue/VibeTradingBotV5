@@ -23,9 +23,9 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMa
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
-import com.example.tradingcore.integration.MarketDataDemandClient;
-import com.example.tradingcore.integration.PeerServiceUnavailableException;
-import com.example.tradingcore.integration.model.ComputationConfigResponse;
+import com.example.tradingcore.integration.internal.api.MarketDataDemandClient;
+import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
+import com.example.tradingcore.integration.internal.api.model.ComputationConfigResponse;
 import com.example.tradingcore.domain.service.StrategyDemandService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;

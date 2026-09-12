@@ -4,7 +4,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.connector.okx.snapshot.CandleExternalSnapshot;
-import com.example.connector.okx.integration.model.okx.response.CandleOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.CandleOkxResponse;
 import com.example.connector.okx.util.OkxConstants;
 import java.math.BigDecimal;
 import java.util.Objects;

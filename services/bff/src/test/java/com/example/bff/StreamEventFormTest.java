@@ -6,9 +6,9 @@ import com.example.bff.api.model.stream.StrategyActivatedStreamApiModel;
 import com.example.bff.api.model.stream.StrategyLifecycleStreamApiModel;
 import com.example.bff.mapping.StreamEventMapper;
 import com.example.bff.mapping.StreamEventMapperImpl;
-import com.example.tradingbot.domain.event.StrategyActivatedContent;
-import com.example.tradingbot.domain.event.StrategyLifecycleContent;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
+import com.example.tradingbot.message.StrategyActivatedMessage;
+import com.example.tradingbot.message.StrategyLifecycleMessage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,8 +38,8 @@ class StreamEventFormTest {
     @Test
     @DisplayName("Активация: идентичности берутся с верхнего уровня, имя — из снимка")
     void theActivationTakesItsIdentitiesFromTheTopLevelAndItsNameFromTheSnapshot() {
-        StrategyActivatedStreamApiModel model = mapper.toApi(
-                new StrategyActivatedContent(STRATEGY, ACCOUNT, INSTRUMENT, "holder", definition()));
+        StrategyActivatedStreamApiModel model = mapper.messageToApi(
+                new StrategyActivatedMessage(STRATEGY, ACCOUNT, INSTRUMENT, "holder", definition()));
 
         assertThat(model.strategyInternalId()).isEqualTo(STRATEGY);
         assertThat(model.exchangeAccountInternalId()).isEqualTo(ACCOUNT);
@@ -52,8 +52,8 @@ class StreamEventFormTest {
     @Test
     @DisplayName("Деактивация и удаление: перевод 1:1, актор наружу не уходит")
     void theLifecycleFormTravelsOneToOne() {
-        StrategyLifecycleStreamApiModel model = mapper.toApi(
-                new StrategyLifecycleContent(STRATEGY, ACCOUNT, INSTRUMENT, "holder"));
+        StrategyLifecycleStreamApiModel model = mapper.messageToApi(
+                new StrategyLifecycleMessage(STRATEGY, ACCOUNT, INSTRUMENT, "holder"));
 
         assertThat(model.strategyInternalId()).isEqualTo(STRATEGY);
         assertThat(model.exchangeAccountInternalId()).isEqualTo(ACCOUNT);

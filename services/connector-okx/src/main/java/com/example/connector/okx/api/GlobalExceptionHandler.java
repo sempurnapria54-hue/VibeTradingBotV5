@@ -1,10 +1,10 @@
 package com.example.connector.okx.api;
 
 import com.example.connector.okx.credentials.CredentialsUnavailableException;
-import com.example.connector.okx.integration.CredentialsRejectedException;
-import com.example.connector.okx.integration.ExchangeIntegrationException;
-import com.example.connector.okx.integration.ExternalInvariantViolationException;
-import com.example.connector.okx.integration.ExternalStatusException;
+import com.example.connector.okx.integration.external.api.CredentialsRejectedException;
+import com.example.connector.okx.integration.external.api.ExchangeIntegrationException;
+import com.example.connector.okx.integration.external.api.ExternalInvariantViolationException;
+import com.example.connector.okx.integration.external.api.ExternalStatusException;
 import com.example.tradingbot.domain.exchange.ExchangeFailureClass;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

@@ -5,7 +5,7 @@ import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.marketdata.config.ConnectorProperties;
-import com.example.marketdata.integration.ExchangeReadClient;
+import com.example.marketdata.integration.internal.api.ExchangeReadClient;
 import com.example.marketdata.mapping.InstrumentMapper;
 import com.example.marketdata.persistence.service.CandleGroupDataService;
 import com.example.marketdata.persistence.service.InstrumentDataService;

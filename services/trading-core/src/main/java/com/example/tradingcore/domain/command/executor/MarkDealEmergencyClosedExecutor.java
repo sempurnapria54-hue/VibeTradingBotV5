@@ -5,8 +5,6 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
-import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingbot.domain.event.DealClosedContent;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
@@ -20,10 +18,10 @@ import com.example.tradingcore.domain.command.calc.DealResult;
 import com.example.tradingcore.domain.command.calc.DealResultCalculator;
 import com.example.tradingcore.domain.command.calc.DealTerminalFeaturesWriter;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
-import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.LossStreakCounter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.util.Constants;
@@ -81,7 +79,7 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
     private final DealTerminalGate terminalGate;
     private final LossStreakCounter lossStreakCounter;
     private final AnomalyReportService anomalyReportService;
-    private final OutboxWriter outboxWriter;
+    private final CoreEventWriter coreEventWriter;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -182,11 +180,10 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
      * Писателей у класса два, потому что терминалов два.
      */
     private void publishClosed(DealContext dealContext, Deal deal) {
-        outboxWriter.write(dealContext.getExchangeAccount().getTenantId(), CoreEventType.DEAL_CLOSED,
-                DealClosedContent.of(deal,
-                        dealContext.getExchangeAccount().getInternalId(),
-                        dealContext.getInstrument().getInternalId(),
-                        dealContext.strategyInternalId(),
-                        dealContext.getGraphComplete()));
+        coreEventWriter.dealClosed(dealContext.getExchangeAccount().getTenantId(), deal,
+                dealContext.getExchangeAccount().getInternalId(),
+                dealContext.getInstrument().getInternalId(),
+                dealContext.strategyInternalId(),
+                dealContext.getGraphComplete());
     }
 }

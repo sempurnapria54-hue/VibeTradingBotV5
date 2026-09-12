@@ -2,7 +2,7 @@ package com.example.tradingcore.domain.service;
 
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.other.TradeFeeRate;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.TradeFeeRateDataService;

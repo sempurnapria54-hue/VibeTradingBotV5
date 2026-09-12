@@ -4,7 +4,7 @@ import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.strategies.config.OutboxRelayProperties;
-import com.example.strategies.integration.EventPublisher;
+import com.example.strategies.integration.internal.event.EventPublisher;
 import com.example.strategies.persistence.model.OutboxEntity;
 import com.example.strategies.persistence.service.OutboxDataService;
 import java.time.OffsetDateTime;

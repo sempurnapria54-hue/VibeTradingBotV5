@@ -18,7 +18,7 @@ import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
 import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldRung;
 import com.example.tradingcore.domain.safety.HoldRungEdgeService;
@@ -71,9 +71,9 @@ class ManualHaltSurfaceTest {
     private final ExchangeAccount account = account(ExchangeAccount.SafetyRung.ACTIVE);
     private final Instrument instrument = instrument(Instrument.Status.ACTIVE);
 
-    private final OutboxWriter outboxWriter = mock(OutboxWriter.class);
+    private final CoreEventWriter coreEventWriter = mock(CoreEventWriter.class);
     private final HoldService holdService = new HoldService(reports, coordinator,
-            new HoldRungEdgeService(pairStates, accounts, new ActorProvider(), outboxWriter));
+            new HoldRungEdgeService(pairStates, accounts, new ActorProvider(), coreEventWriter));
 
     private final ManualHaltService service = new ManualHaltService(accounts, instruments, pairStates,
             deals, contexts, new DealTerminalGate(), coordinator, holdService, reports,
@@ -132,7 +132,7 @@ class ManualHaltSurfaceTest {
 
         service.raise(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
 
-        verify(outboxWriter).write(eq("tn-0001"), eq(CoreEventType.HOLD_RAISED), any());
+        verify(coreEventWriter).holdRaised(eq("tn-0001"), any(), any(), any(), any());
     }
 
     /**
@@ -146,7 +146,7 @@ class ManualHaltSurfaceTest {
 
         service.raise(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
 
-        verify(outboxWriter, never()).write(any(), any(), any());
+        verify(coreEventWriter, never()).holdRaised(any(), any(), any(), any(), any());
     }
 
     /**

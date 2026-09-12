@@ -24,7 +24,7 @@ import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.executor.RefreshPositionExecutor;
 import com.example.tradingcore.domain.command.resolve.PositionStatusResolver;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.mapping.PositionMapper;
 import com.example.tradingcore.mapping.PositionMapperImpl;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;

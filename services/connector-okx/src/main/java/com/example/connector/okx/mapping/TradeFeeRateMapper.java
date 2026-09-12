@@ -5,7 +5,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.other.TradeFeeRate;
 import com.example.connector.okx.snapshot.TradeFeeRateExternalSnapshot;
-import com.example.connector.okx.integration.model.okx.response.TradeFeeOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.TradeFeeOkxResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;

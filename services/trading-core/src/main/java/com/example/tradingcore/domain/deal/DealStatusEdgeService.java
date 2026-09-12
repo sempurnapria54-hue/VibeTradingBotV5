@@ -4,12 +4,10 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
-import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingbot.domain.event.DealShutdownInitiatedContent;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingcore.domain.command.DealContext;
-import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.domain.service.ActorProvider;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
@@ -54,7 +52,7 @@ public class DealStatusEdgeService {
     private final InstrumentDataService instrumentDataService;
     private final StrategyDataService strategyDataService;
     private final ActorProvider actorProvider;
-    private final OutboxWriter outboxWriter;
+    private final CoreEventWriter coreEventWriter;
 
     /**
      * Статусное ребро прохода: применить его к строке сделки и, если этим
@@ -183,9 +181,8 @@ public class DealStatusEdgeService {
     /** Факт остановки — той же транзакцией, что и ребро. */
     private void publishInitiated(Deal deal, String tenantId, String exchangeAccountInternalId,
                                   String instrumentInternalId, String strategyInternalId) {
-        outboxWriter.write(tenantId, CoreEventType.DEAL_SHUTDOWN_INITIATED,
-                DealShutdownInitiatedContent.of(deal, exchangeAccountInternalId, instrumentInternalId,
-                        strategyInternalId, actorProvider.currentActor()));
+        coreEventWriter.dealShutdownInitiated(tenantId, deal, exchangeAccountInternalId,
+                instrumentInternalId, strategyInternalId, actorProvider.currentActor());
     }
 
     /**

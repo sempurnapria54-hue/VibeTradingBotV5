@@ -8,10 +8,23 @@
 перечня, а состав не переписывается»; здесь они не пересказываются.
 
 ПЕРЕЧЕНЬ КОМПОНЕНТОВ ВЫВОДИТСЯ У ПИСАТЕЛЯ, А НЕ ПО ИМЕНИ КОМПОНЕНТА. Признак
-применимости — что кладёт писатель: `name(...)` у фабрики формы либо
-`<перечень>.name()` у внешнего конструктора. Читать признак по имени нельзя:
-`direction` у решения о заявке несёт `Order.Side`, а у создания сделки —
+применимости — что кладёт писатель: `name(...)` либо `<перечень>.name()` в
+аргументе конструктора формы. Читать признак по имени нельзя: `direction` у
+решения о заявке несёт `Order.Side`, а у создания сделки —
 `StrategyTradeDirection`, и дома у них разные.
+
+ПИСАТЕЛЬ БЫВАЕТ ПОРОЖДЁННЫМ, И ЭТО НЕСУЩЕЕ. С тех пор как форму сообщения
+строит маппер, а не фабрика на самой форме (.claude/rules/codestyle.md §«Слой
+сообщения: внутренняя шина»), конструктор формы стои́т в ПОРОЖДЁННОМ классе
+`*MapperImpl`, а `.name()` в нём вынесен в локальную переменную строкой выше.
+Поэтому писательские деревья включают `services/*/target/generated-sources`, а
+признак резолвится через локаль: аргумент-идентификатор, которому в том же
+носителе присвоено значение с `.name()`, помечает компонент наравне с
+`.name()` прямо в аргументе.
+
+ОТСЮДА ЗАВИСИМОСТЬ ОТ СБОРКИ, И ОНА НАЗВАНА. Порождённых носителей нет, пока
+не прогнана сборка; прогон тогда ОТКАЗЫВАЕТ кодом 2 («не измерялось»), а не
+считает популяцию пустой.
 
 ПОЧЕМУ ГРЕП ФОРМЫ НЕ ГОДИТСЯ. Греп указателя находит места, где правило
 ИСПОЛНЕНО, и молчит о неисполненных — то есть мерит наоборот. Отсюда порядок
@@ -43,9 +56,12 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-FORMS_DIR = os.path.join('libs', 'domain-model', 'src', 'main', 'java')
-FORMS_SUFFIX = 'Content.java'
+FORMS_DIR = os.path.join('services', 'common', 'model', 'src', 'main', 'java')
+FORMS_SUFFIX = 'Message.java'
 WRITER_TREES = ('services', 'libs')
+GENERATED_TREE = os.path.join('target', 'generated-sources')
+ASSIGNED_NAME = re.compile(r'^\s*(\w+)\s*=\s*[^;]*?'
+                           r'(?:(?:^|[^\w.])name\(|\.name\(\))[^;]*;\s*$')
 RECORD = re.compile(r'public record (\w+)\((.*?)\)\s*\{', re.S)
 PARAM = re.compile(r'@param\s+(\w+)\s+(.*?)(?=\n\s*\*\s*@param|\n\s*\*/)', re.S)
 POINTER = re.compile(r'(имя|имени|именем|имён)\s+(значени\w+|перечн\w+)')
@@ -119,15 +135,45 @@ def java_files(base_dir):
     return found
 
 
+def generated_files(base_dir):
+    """Порождённые java-носители: там стои́т конструктор формы у маппера."""
+    found = []
+    services = os.path.join(base_dir, 'services')
+    if not os.path.isdir(services):
+        return found
+    for unit in sorted(os.listdir(services)):
+        root = os.path.join(services, unit, GENERATED_TREE)
+        if not os.path.isdir(root):
+            continue
+        for directory, _, names in os.walk(root):
+            for name in names:
+                if name.endswith('.java'):
+                    found.append(os.path.join(directory, name))
+    return found
+
+
+def name_locals(text):
+    """Локали носителя, которым присвоено значение с `name`.
+
+    Порождённый маппер не кладёт `.name()` в аргумент конструктора: он
+    пишет `orderType = order.getType().name();` строкой выше и передаёт
+    локаль. Без резолва через локаль признак у такого писателя невидим.
+    """
+    return {match.group(1) for line in text.split('\n')
+            for match in [ASSIGNED_NAME.match(line)] if match}
+
+
 def enumerated_components(record, components, texts):
     """Компоненты, чьё значение писатель кладёт именем значения перечня."""
     marked = set()
     for text in texts:
+        locals_with_name = name_locals(text)
         for arguments in arguments_at(text, record):
             for index, argument in enumerate(arguments):
                 if index >= len(components):
                     continue
-                if NAME_CALL.search(argument.replace('\n', ' ')):
+                flat = argument.replace('\n', ' ')
+                if NAME_CALL.search(flat) or flat.strip() in locals_with_name:
                     marked.add(components[index])
     return marked
 
@@ -164,30 +210,47 @@ def composition_copied(body):
 def battery():
     """Оси детектора, доказанные падающей пробой на каждой."""
     axes = []
-    record_text = ('public record ПробаContent(String left, String right) {\n}\n')
+    record_text = ('public record ПробаMessage(String left, String right) {\n}\n')
 
     # Ось 1: компоненты записи читаются по порядку объявления.
     name, components = components_of(record_text)
     axes.append(('компоненты записи читаются по порядку',
-                 name == 'ПробаContent' and components == ['left', 'right'],
+                 name == 'ПробаMessage' and components == ['left', 'right'],
                  'запись: %r; компоненты: %r' % (name, components)))
 
     # Ось 2: писатель с `.name()` помечает компонент своей ПОЗИЦИИ, а не имени.
-    writer = 'new ПробаContent(deal.getInternalId(), signal.getRung().name())'
-    marked = enumerated_components('ПробаContent', ['left', 'right'], [writer])
+    writer = 'new ПробаMessage(deal.getInternalId(), signal.getRung().name())'
+    marked = enumerated_components('ПробаMessage', ['left', 'right'], [writer])
     axes.append(('писатель помечает компонент по позиции аргумента',
                  marked == {'right'}, 'помечено: %r' % (sorted(marked),)))
 
     # Ось 3: фабричный помощник `name(...)` опознаётся наравне с `.name()`.
-    writer = 'new ПробаContent(name(deal.getStatus()), deal.getCode())'
-    marked = enumerated_components('ПробаContent', ['left', 'right'], [writer])
+    writer = 'new ПробаMessage(name(deal.getStatus()), deal.getCode())'
+    marked = enumerated_components('ПробаMessage', ['left', 'right'], [writer])
     axes.append(('фабричный `name(...)` опознаётся наравне с `.name()`',
                  marked == {'left'}, 'помечено: %r' % (sorted(marked),)))
 
     # Ось 4: контроль — аргумент без `name` компонент не помечает.
-    writer = 'new ПробаContent(deal.getInternalId(), deal.getCode())'
-    marked = enumerated_components('ПробаContent', ['left', 'right'], [writer])
+    writer = 'new ПробаMessage(deal.getInternalId(), deal.getCode())'
+    marked = enumerated_components('ПробаMessage', ['left', 'right'], [writer])
     axes.append(('контроль: аргумент без `name` компонента не помечает',
+                 marked == set(), 'помечено: %r' % (sorted(marked),)))
+
+    # Ось 4a: писатель через локаль, которой присвоено `.name()`, помечает
+    # компонент — так пишет порождённый маппер.
+    writer = ('String rung = null;\n'
+              '        rung = signal.getRung().name();\n'
+              '        ПробаMessage m = new ПробаMessage( deal.getInternalId(), rung );\n')
+    marked = enumerated_components('ПробаMessage', ['left', 'right'], [writer])
+    axes.append(('писатель через локаль с `.name()` помечает компонент',
+                 marked == {'right'}, 'помечено: %r' % (sorted(marked),)))
+
+    # Ось 4b: контроль — локаль без `.name()` компонента не помечает.
+    writer = ('String code = null;\n'
+              '        code = signal.getCode();\n'
+              '        ПробаMessage m = new ПробаMessage( deal.getInternalId(), code );\n')
+    marked = enumerated_components('ПробаMessage', ['left', 'right'], [writer])
+    axes.append(('контроль: локаль без `.name()` компонента не помечает',
                  marked == set(), 'помечено: %r' % (sorted(marked),)))
 
     # Ось 5: компонент без указателя — дефект.
@@ -263,7 +326,13 @@ def main():
         print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: форм содержимого нет вовсе — мерить нечего')
         return 2
 
-    texts = [read(path) for path in java_files(base_dir)]
+    generated = generated_files(base_dir)
+    if not generated:
+        print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: порождённых носителей нет — сборка не '
+              'прогонялась, и писатель формы не выведен ни у одной формы')
+        return 2
+
+    texts = [read(path) for path in java_files(base_dir) + generated]
     total = 0
     defects = []
     for path in sorted(forms):

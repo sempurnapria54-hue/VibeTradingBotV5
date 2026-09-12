@@ -3,8 +3,8 @@ package com.example.strategies.domain.service;
 import static java.util.Objects.isNull;
 
 import com.example.strategies.domain.model.TenantRiskAppetite;
-import com.example.strategies.integration.TradingCoreReadClient;
-import com.example.strategies.integration.model.RiskAppetiteCoreResponse;
+import com.example.strategies.integration.internal.api.TradingCoreReadClient;
+import com.example.strategies.integration.internal.api.model.RiskAppetiteCoreResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

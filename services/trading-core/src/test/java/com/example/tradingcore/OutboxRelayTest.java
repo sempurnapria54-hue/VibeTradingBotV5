@@ -12,12 +12,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingbot.domain.event.DealOpenedContent;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingcore.config.OutboxRelayProperties;
-import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.domain.jobs.JobExecutionGuard;
 import com.example.tradingcore.domain.jobs.OutboxRelayJob;
-import com.example.tradingcore.integration.EventPublisher;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
+import com.example.tradingcore.integration.internal.event.EventPublisher;
+import com.example.tradingcore.mapping.CoreEventMessageMapper;
+import com.example.tradingcore.mapping.CoreEventMessageMapperImpl;
 import com.example.tradingcore.persistence.model.OutboxEntity;
 import com.example.tradingcore.persistence.service.OutboxDataService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +41,9 @@ import org.mockito.InOrder;
  */
 class OutboxRelayTest {
 
+    /** Маппер domain → message: формы событий строит граница, а не домен. */
+    private static final CoreEventMessageMapper EVENT_MESSAGES = new CoreEventMessageMapperImpl();
+
     private static final String TENANT = "tn-0001";
 
     private final OutboxDataService outboxDataService = mock(OutboxDataService.class);
@@ -52,8 +57,7 @@ class OutboxRelayTest {
      */
     @Test
     void theWrittenRowCarriesTheEnvelopeAndTheFactsTopic() {
-        writer().write(TENANT, CoreEventType.DEAL_OPENED,
-                new DealOpenedContent("dl-1", "ea-1", "in-1", "st-1", "STRATEGY", "LONG", "TREND"));
+        writer().dealOpened(TENANT, openedDeal(), "ea-1", "in-1", "st-1");
 
         OutboxEntity row = savedRow();
         assertThat(row.getTenantId()).isEqualTo(TENANT);
@@ -74,8 +78,7 @@ class OutboxRelayTest {
      */
     @Test
     void anAbsentTraceContextIsLegal() {
-        writer().write(TENANT, CoreEventType.DEAL_OPENED,
-                new DealOpenedContent("dl-1", "ea-1", "in-1", "st-1", "STRATEGY", "LONG", "TREND"));
+        writer().dealOpened(TENANT, openedDeal(), "ea-1", "in-1", "st-1");
 
         assertThat(savedRow().getTraceContext()).isNull();
     }
@@ -144,8 +147,20 @@ class OutboxRelayTest {
 
     // --- сборка ------------------------------------------------------------
 
-    private OutboxWriter writer() {
-        return new OutboxWriter(outboxDataService, new ObjectMapper());
+    /**
+     * Сделка ровно с тем, что читают утверждения о содержимом: форму строит
+     * маппер за границей, и подставлять её руками здесь нечем
+     * (.claude/rules/codestyle.md §«Слой сообщения: внутренняя шина»).
+     */
+    private Deal openedDeal() {
+        Deal deal = new Deal();
+        deal.setInternalId("dl-1");
+        deal.setEntryReason(Deal.EntryReason.STRATEGY);
+        return deal;
+    }
+
+    private CoreEventWriter writer() {
+        return new CoreEventWriter(outboxDataService, new ObjectMapper(), EVENT_MESSAGES);
     }
 
     private OutboxRelayJob job() {

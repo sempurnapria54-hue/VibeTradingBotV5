@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.example.auditstatistics.integration.TopicRetentionProvider;
+import com.example.auditstatistics.integration.internal.event.TopicRetentionProvider;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;

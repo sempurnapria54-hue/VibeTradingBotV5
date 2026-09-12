@@ -12,8 +12,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.config.NeighbourProperties;
-import com.example.tradingcore.integration.ServiceTokenProvider;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.ServiceTokenProvider;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;

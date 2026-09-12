@@ -41,6 +41,18 @@
             <artifactId>domain-model</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!--
+          Формы сообщений внутренней шины — общий артефакт: конверт события
+          и содержимое его классов (docs/architecture/services.md §«Общие
+          артефакты монорепозитория»). Слой сообщения отделён от домена и
+          от интеграции с внешним (.claude/rules/codestyle.md §«Слой
+          сообщения: внутренняя шина»).
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>common-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

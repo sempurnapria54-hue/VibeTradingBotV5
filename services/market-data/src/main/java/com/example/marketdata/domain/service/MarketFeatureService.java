@@ -7,7 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import com.example.marketdata.domain.model.FeatureBinding;
 import com.example.marketdata.domain.model.FeatureReadRequest;
 import com.example.marketdata.domain.model.MarketFeatureBundle;
-import com.example.marketdata.integration.ExchangeReadException;
+import com.example.marketdata.integration.internal.api.ExchangeReadException;
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;

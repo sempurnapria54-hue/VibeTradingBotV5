@@ -22,7 +22,7 @@ import com.example.tradingcore.domain.command.payload.RefreshBalanceCommandPaylo
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldSignal;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.BalanceContainerDataService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;

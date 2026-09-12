@@ -1,7 +1,7 @@
 package com.example.auditstatistics.config;
 
-import com.example.auditstatistics.integration.JournalRebalanceListener;
-import com.example.auditstatistics.integration.JournalReceptionErrorHandler;
+import com.example.auditstatistics.integration.internal.event.JournalRebalanceListener;
+import com.example.auditstatistics.integration.internal.event.JournalReceptionErrorHandler;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.admin.Admin;

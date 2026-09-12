@@ -26,7 +26,7 @@ import com.example.tradingcore.domain.command.ActionKind;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingcore.domain.command.ServiceCommandPayload;
@@ -50,8 +50,8 @@ import com.example.tradingcore.domain.command.payload.CreateOrderCommandPayload;
 import com.example.tradingcore.domain.command.payload.SubmitAlgoOrderCommandPayload;
 import com.example.tradingcore.domain.command.payload.SubmitOrderCommandPayload;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
-import com.example.tradingcore.integration.exchange.ExchangeIntegrationException;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeIntegrationException;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.AlgoOrderDataService;
@@ -525,7 +525,7 @@ class PlacementExecutorTest {
 
     private CreateOrderExecutor createOrderExecutor() {
         return new CreateOrderExecutor(orderDataService, actionStateDataService, dealDataService,
-                riskNumbersService, mock(OutboxWriter.class));
+                riskNumbersService, mock(CoreEventWriter.class));
     }
 
     /**

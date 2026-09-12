@@ -4,7 +4,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.connector.okx.snapshot.MarketPriceDataExternalSnapshot;
-import com.example.connector.okx.integration.model.okx.response.TickerOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.TickerOkxResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;

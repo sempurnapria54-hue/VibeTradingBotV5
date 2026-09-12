@@ -3,9 +3,7 @@ package com.example.tradingcore.domain.service;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
-import com.example.tradingbot.domain.event.StrategyActivatedContent;
 import com.example.tradingbot.domain.event.StrategyEventType;
-import com.example.tradingbot.domain.event.StrategyLifecycleContent;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingcore.persistence.service.InboxDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
@@ -42,6 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
  * заняв партию, и остановил бы применение СЛЕДУЮЩИХ событий — то есть
  * ошибался бы в разрешающую сторону по отношению к копиям, которые
  * подвинуть было нужно.
+ *
+ * <p><b>Формы сообщения этот сервис не видит.</b> Он доменный, и входы у
+ * него доменные: снимок определения и его идентичность. Разбор конверта и
+ * содержимого остаётся на границе шины
+ * (.claude/rules/codestyle.md §«Слой сообщения: внутренняя шина»).
  */
 @Slf4j
 @Service
@@ -56,11 +59,10 @@ public class StrategyDefinitionApplier {
      * существующую в {@code ACTIVE}.
      */
     @Transactional
-    public void applyActivated(String eventId, StrategyActivatedContent content) {
+    public void applyActivated(String eventId, Strategy definition) {
         if (isTrue(inboxDataService.isConsumed(eventId))) {
             return;
         }
-        Strategy definition = content.definition();
         if (isNull(definition) || isNull(definition.getInternalId())) {
             throw new IllegalArgumentException("Activation event carries no definition identity: " + eventId);
         }
@@ -79,11 +81,10 @@ public class StrategyDefinitionApplier {
      * статус — дерево у читателя уже лежит и неизменяемо.
      */
     @Transactional
-    public void applyLifecycle(String eventId, StrategyEventType type, StrategyLifecycleContent content) {
+    public void applyLifecycle(String eventId, StrategyEventType type, String internalId) {
         if (isTrue(inboxDataService.isConsumed(eventId))) {
             return;
         }
-        String internalId = content.strategyInternalId();
         if (strategyDataService.findByInternalId(internalId).isEmpty()) {
             inboxDataService.markConsumed(eventId, type.name());
             log.info("Strategy fact concerns a definition that was never activated: no copy to move "

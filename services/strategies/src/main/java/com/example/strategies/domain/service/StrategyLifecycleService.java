@@ -4,12 +4,10 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
-import com.example.strategies.integration.TradingCoreReadClient;
-import com.example.strategies.integration.model.PairCheckCoreResponse;
+import com.example.strategies.integration.internal.api.TradingCoreReadClient;
+import com.example.strategies.integration.internal.api.model.PairCheckCoreResponse;
 import com.example.strategies.mapping.StrategyApiMapper;
 import com.example.strategies.persistence.service.StrategyDataService;
-import com.example.tradingbot.domain.event.StrategyActivatedContent;
-import com.example.tradingbot.domain.event.StrategyLifecycleContent;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,10 +65,7 @@ public class StrategyLifecycleService {
         if (Objects.equals(Strategy.Status.ACTIVE, target)) {
             return activate(definition, tenantInternalId);
         }
-        return statusWriter.commit(definition, target,
-                new StrategyLifecycleContent(definition.getInternalId(),
-                        definition.getExchangeAccountInternalId(), definition.getInstrumentInternalId(),
-                        actorProvider.currentActor()));
+        return statusWriter.commit(definition, target, actorProvider.currentActor());
     }
 
     /**
@@ -96,10 +91,7 @@ public class StrategyLifecycleService {
                         "Strategy tree disappeared before activation: " + definition.getInternalId()));
         validator.validateRiskInequalities(mapper.domainToApi(snapshot).getDetails(),
                 riskAppetiteReader.read(tenantInternalId));
-        return statusWriter.commit(snapshot, Strategy.Status.ACTIVE,
-                new StrategyActivatedContent(snapshot.getInternalId(),
-                        snapshot.getExchangeAccountInternalId(), snapshot.getInstrumentInternalId(),
-                        actorProvider.currentActor(), snapshot));
+        return statusWriter.commit(snapshot, Strategy.Status.ACTIVE, actorProvider.currentActor());
     }
 
     /**

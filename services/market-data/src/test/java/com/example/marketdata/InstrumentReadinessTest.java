@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.marketdata.config.ConnectorProperties;
 import com.example.marketdata.domain.service.InstrumentCatalogService;
-import com.example.marketdata.integration.ExchangeReadClient;
+import com.example.marketdata.integration.internal.api.ExchangeReadClient;
 import com.example.marketdata.mapping.InstrumentMapper;
 import com.example.marketdata.persistence.service.CandleGroupDataService;
 import com.example.marketdata.persistence.service.InstrumentDataService;

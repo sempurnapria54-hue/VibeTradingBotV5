@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.connector.okx.credentials.ExchangeCredentials;
-import com.example.connector.okx.integration.client.OkxSigningInterceptor;
+import com.example.connector.okx.integration.external.api.client.OkxSigningInterceptor;
 import com.example.connector.okx.util.OkxConstants;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import java.net.URI;

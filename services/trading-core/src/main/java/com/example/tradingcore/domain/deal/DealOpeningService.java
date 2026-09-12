@@ -5,8 +5,6 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
-import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingbot.domain.event.DealOpenedContent;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
@@ -18,7 +16,7 @@ import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.domain.util.InternalIdFactory;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
@@ -74,7 +72,7 @@ public class DealOpeningService {
     private final DealDataService dealDataService;
     private final DealTrancheDataService dealTrancheDataService;
     private final StrategyDataService strategyDataService;
-    private final OutboxWriter outboxWriter;
+    private final CoreEventWriter coreEventWriter;
 
     /**
      * Входная тропа — вход по стратегии. Зовёт сканер входа, когда
@@ -174,9 +172,8 @@ public class DealOpeningService {
      * восстановленной сделки обе половины пусты по построению тропы.
      */
     private void publishOpened(ExchangeAccount account, Instrument instrument, Deal deal) {
-        outboxWriter.write(account.getTenantId(), CoreEventType.DEAL_OPENED,
-                DealOpenedContent.of(deal, account.getInternalId(), instrument.getInternalId(),
-                        strategyInternalId(deal)));
+        coreEventWriter.dealOpened(account.getTenantId(), deal, account.getInternalId(),
+                instrument.getInternalId(), strategyInternalId(deal));
     }
 
     /**

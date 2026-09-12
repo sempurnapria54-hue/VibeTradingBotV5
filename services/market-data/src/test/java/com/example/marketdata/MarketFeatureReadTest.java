@@ -18,7 +18,7 @@ import com.example.marketdata.domain.service.MarketPhaseService;
 import com.example.marketdata.domain.service.MarketPriceDataService;
 import com.example.marketdata.domain.service.MarketStructureService;
 import com.example.marketdata.domain.service.phase.MarketPhaseResolver;
-import com.example.marketdata.integration.ExchangeReadException;
+import com.example.marketdata.integration.internal.api.ExchangeReadException;
 import com.example.marketdata.persistence.service.IndicatorDataService;
 import com.example.marketdata.persistence.service.MarketStructureDataService;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;

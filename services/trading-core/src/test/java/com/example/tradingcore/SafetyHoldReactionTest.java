@@ -14,14 +14,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingbot.domain.event.HoldRaisedContent;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealStatusEdgeService;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.domain.safety.AnomalyReport;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
@@ -38,7 +36,6 @@ import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.util.Constants;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -68,7 +65,7 @@ class SafetyHoldReactionTest {
     private final KillSwitchService killSwitchService = mock(KillSwitchService.class);
     private final DealDataService deals = mock(DealDataService.class);
     private final DealStatusEdgeService statusEdges = mock(DealStatusEdgeService.class);
-    private final OutboxWriter outboxWriter = mock(OutboxWriter.class);
+    private final CoreEventWriter coreEventWriter = mock(CoreEventWriter.class);
 
     private SafetyHoldCoordinator coordinator;
     private HoldService holdService;
@@ -76,7 +73,7 @@ class SafetyHoldReactionTest {
     @BeforeEach
     void setUp() {
         HoldRungEdgeService rungEdges = new HoldRungEdgeService(pairStates, accounts,
-                new ActorProvider(), outboxWriter);
+                new ActorProvider(), coreEventWriter);
         coordinator = new SafetyHoldCoordinator(reports, killSwitchService, deals, statusEdges, rungEdges,
                 new HardRungShutdownReasonResolver(deals));
         holdService = new HoldService(reports, coordinator, rungEdges);
@@ -183,9 +180,9 @@ class SafetyHoldReactionTest {
     void theRaisedFactIsWrittenAtTheTransitionBeforeAnyExternalCall() {
         holdService.raise(HoldSignal.instrument(CODE), context());
 
-        InOrder order = inOrder(pairStates, outboxWriter, killSwitchService, statusEdges);
+        InOrder order = inOrder(pairStates, coreEventWriter, killSwitchService, statusEdges);
         order.verify(pairStates).raiseRung(ACCOUNT_ID, INSTRUMENT_ID, Instrument.SafetyRung.TRADE_BLOCKED);
-        order.verify(outboxWriter).write(any(), eq(CoreEventType.HOLD_RAISED), any());
+        order.verify(coreEventWriter).holdRaised(any(), any(), any(), any(), any());
         order.verify(killSwitchService).fireInstrument(any());
         order.verify(statusEdges).enforceHardRung(any(), any());
     }
@@ -200,7 +197,7 @@ class SafetyHoldReactionTest {
 
         holdService.raise(HoldSignal.instrument(CODE), context());
 
-        verify(outboxWriter, never()).write(any(), eq(CoreEventType.HOLD_RAISED), any());
+        verify(coreEventWriter, never()).holdRaised(any(), any(), any(), any(), any());
     }
 
     /**
@@ -215,7 +212,7 @@ class SafetyHoldReactionTest {
 
         holdService.raise(HoldSignal.exchangeAccount(CODE), context());
 
-        assertThat(raisedContents().getFirst().instrumentInternalId())
+        assertThat(raisedInstruments().getFirst())
                 .as("радиус — весь счёт: инструмент здесь не операнд")
                 .isNull();
     }
@@ -234,10 +231,10 @@ class SafetyHoldReactionTest {
 
         holdService.raise(HoldSignal.instrument(CODE), context());
 
-        HoldRaisedContent escalated = raisedContents().get(1);
-        assertThat(escalated.scope()).isEqualTo(HoldScope.EXCHANGE_ACCOUNT.name());
-        assertThat(escalated.code()).isEqualTo(Constants.Hold.EXCHANGE_KILL_SWITCH_RESIDUAL);
-        assertThat(escalated.instrumentInternalId()).isNull();
+        HoldSignal escalated = raisedSignals().get(1);
+        assertThat(escalated.getScope()).isEqualTo(HoldScope.EXCHANGE_ACCOUNT);
+        assertThat(escalated.getCode()).isEqualTo(Constants.Hold.EXCHANGE_KILL_SWITCH_RESIDUAL);
+        assertThat(raisedInstruments().get(1)).isNull();
     }
 
     @Test
@@ -396,14 +393,28 @@ class SafetyHoldReactionTest {
         return deal;
     }
 
-    /** Содержимое всех написанных фактов подъёма, по порядку записи. */
-    private List<HoldRaisedContent> raisedContents() {
-        ArgumentCaptor<Object> contents = ArgumentCaptor.forClass(Object.class);
-        verify(outboxWriter, atLeastOnce()).write(any(), eq(CoreEventType.HOLD_RAISED),
-                contents.capture());
-        return contents.getAllValues().stream()
-                .map(HoldRaisedContent.class::cast)
-                .collect(Collectors.toList());
+    /**
+     * Сигналы всех написанных фактов подъёма, по порядку записи.
+     *
+     * <p><b>Читается аргумент границы, а не содержимое.</b> Форму сообщения
+     * собирает шина (.claude/rules/codestyle.md §«Слой сообщения: внутренняя
+     * шина»), и через мок писателя она не проходит; что перечень и код
+     * доезжают до содержимого именами, мерит проба формы у писателя
+     * ({@code CoreEventFormTest}).
+     */
+    private List<HoldSignal> raisedSignals() {
+        ArgumentCaptor<HoldSignal> signals = ArgumentCaptor.forClass(HoldSignal.class);
+        verify(coreEventWriter, atLeastOnce()).holdRaised(any(), signals.capture(), any(),
+                any(), any());
+        return signals.getAllValues();
+    }
+
+    /** Инструмент радиуса у всех написанных фактов подъёма, по порядку записи. */
+    private List<String> raisedInstruments() {
+        ArgumentCaptor<String> instruments = ArgumentCaptor.forClass(String.class);
+        verify(coreEventWriter, atLeastOnce()).holdRaised(any(), any(), any(),
+                instruments.capture(), any());
+        return instruments.getAllValues();
     }
 
     /** Сигнал с названным машинным кодом причины. */

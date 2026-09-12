@@ -5,10 +5,10 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
-import com.example.connector.okx.integration.ExternalStatusException;
+import com.example.connector.okx.integration.external.api.ExternalStatusException;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.connector.okx.integration.ExternalInvariantViolationException;
+import com.example.connector.okx.integration.external.api.ExternalInvariantViolationException;
 import com.example.connector.okx.util.OkxConstants;
 import com.example.connector.okx.util.OkxParse;
 import java.math.BigDecimal;

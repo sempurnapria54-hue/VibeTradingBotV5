@@ -6,8 +6,6 @@ import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
-import com.example.tradingbot.domain.event.CoreEventType;
-import com.example.tradingbot.domain.event.OrderDecidedContent;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
@@ -22,7 +20,7 @@ import com.example.tradingcore.domain.command.TargetEntityType;
 import com.example.tradingcore.domain.command.payload.AttachedProtectionPayload;
 import com.example.tradingcore.domain.command.payload.CreateOrderCommandPayload;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.OrderDataService;
@@ -54,7 +52,7 @@ public class CreateOrderExecutor implements CommandExecutor {
     private final DealActionStateDataService dealActionStateDataService;
     private final DealDataService dealDataService;
     private final DealRiskNumbersService dealRiskNumbersService;
-    private final OutboxWriter outboxWriter;
+    private final CoreEventWriter coreEventWriter;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -113,11 +111,10 @@ public class CreateOrderExecutor implements CommandExecutor {
      */
     private void publishDecided(DealContext dealContext, Order order) {
         Deal deal = dealContext.getDeal();
-        outboxWriter.write(dealContext.getExchangeAccount().getTenantId(), CoreEventType.ORDER_DECIDED,
-                OrderDecidedContent.of(order, deal.getInternalId(),
-                        deal.trancheInternalId(order.getDealTrancheId()),
-                        dealContext.getExchangeAccount().getInternalId(),
-                        dealContext.getInstrument().getInternalId()));
+        coreEventWriter.orderDecided(dealContext.getExchangeAccount().getTenantId(), order,
+                deal.getInternalId(), deal.trancheInternalId(order.getDealTrancheId()),
+                dealContext.getExchangeAccount().getInternalId(),
+                dealContext.getInstrument().getInternalId());
     }
 
     /**

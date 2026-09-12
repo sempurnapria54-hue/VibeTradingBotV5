@@ -5,8 +5,6 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
-import com.example.tradingbot.domain.event.AnomalyReportedContent;
-import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
@@ -15,9 +13,9 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.util.InternalIdFactory;
 import com.example.tradingcore.config.AnomalyReportProperties;
 import com.example.tradingcore.domain.command.DealContext;
-import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.domain.service.ActorProvider;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -72,7 +70,7 @@ public class AnomalyReportService {
     private final ObjectMapper objectMapper;
     private final AnomalyReportProperties properties;
     private final ActorProvider actorProvider;
-    private final OutboxWriter outboxWriter;
+    private final CoreEventWriter coreEventWriter;
 
     /**
      * Журнальный отчёт о факте-СОСТОЯНИИ: пока строка по ключу стои́т в
@@ -139,10 +137,9 @@ public class AnomalyReportService {
      * значений актора»).
      */
     private void publishReported(DealContext dealContext, AnomalyReport report) {
-        outboxWriter.write(tenantId(dealContext), CoreEventType.ANOMALY_REPORTED,
-                new AnomalyReportedContent(report.getInternalId(), accountInternalId(dealContext),
-                        instrumentInternalId(dealContext), report.getScope().name(),
-                        report.getSeverity().name(), report.getCode(), actorProvider.currentActor()));
+        coreEventWriter.anomalyReported(tenantId(dealContext), report,
+                accountInternalId(dealContext), instrumentInternalId(dealContext),
+                actorProvider.currentActor());
     }
 
     private String tenantId(DealContext dealContext) {

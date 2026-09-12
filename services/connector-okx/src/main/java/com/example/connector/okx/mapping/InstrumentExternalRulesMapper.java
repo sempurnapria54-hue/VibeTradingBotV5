@@ -4,7 +4,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.connector.okx.snapshot.InstrumentExternalRulesExternalSnapshot;
-import com.example.connector.okx.integration.model.okx.response.InstrumentOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.InstrumentOkxResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;

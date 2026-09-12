@@ -4,7 +4,7 @@ import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingcore.config.OutboxRelayProperties;
-import com.example.tradingcore.integration.EventPublisher;
+import com.example.tradingcore.integration.internal.event.EventPublisher;
 import com.example.tradingcore.persistence.model.OutboxEntity;
 import com.example.tradingcore.persistence.service.OutboxDataService;
 import java.time.OffsetDateTime;

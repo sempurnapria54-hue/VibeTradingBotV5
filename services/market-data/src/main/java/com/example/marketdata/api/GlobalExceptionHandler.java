@@ -1,7 +1,7 @@
 package com.example.marketdata.api;
 
-import com.example.marketdata.integration.ExchangeAccessException;
-import com.example.marketdata.integration.ExchangeReadException;
+import com.example.marketdata.integration.internal.api.ExchangeAccessException;
+import com.example.marketdata.integration.internal.api.ExchangeReadException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.http.HttpStatus;

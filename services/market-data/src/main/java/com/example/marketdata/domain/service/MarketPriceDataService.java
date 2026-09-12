@@ -2,7 +2,7 @@ package com.example.marketdata.domain.service;
 
 import static java.util.Objects.isNull;
 
-import com.example.marketdata.integration.ExchangeReadClient;
+import com.example.marketdata.integration.internal.api.ExchangeReadClient;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

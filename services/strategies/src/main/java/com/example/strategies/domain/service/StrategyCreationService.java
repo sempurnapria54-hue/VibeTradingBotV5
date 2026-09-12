@@ -4,8 +4,8 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
-import com.example.strategies.integration.TradingCoreReadClient;
-import com.example.strategies.integration.model.PairCheckCoreResponse;
+import com.example.strategies.integration.internal.api.TradingCoreReadClient;
+import com.example.strategies.integration.internal.api.model.PairCheckCoreResponse;
 import com.example.strategies.mapping.StrategyApiMapper;
 import com.example.strategies.persistence.service.StrategyDataService;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;

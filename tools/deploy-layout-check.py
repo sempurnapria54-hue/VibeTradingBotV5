@@ -29,6 +29,12 @@
      «Общие артефакты монорепозитория» того же дока: клейм тот же
      («в каталоге нет артефакта, которого нет в таблице»), и мерить его
      надо тем же;
+  1b. каталог `services/common/` не содержит артефакта, которого нет в той же
+     таблице: дом общих артефактов не один, и второе его дерево лежит внутри
+     `services/`. Оттуда же следствие для оси 1 — сам каталог `common`
+     единицей развёртывания НЕ является и из неё изъят поимённо: без изъятия
+     общий артефакт читался бы как незарегистрированный сервис, а с молчаливым
+     пропуском всего дерева его артефакты не мерились бы ничем;
   2. каталог `deploy/` содержит ровно окружения перечня
      `docs/architecture/platform.md` плюс `base/` — ни больше, ни меньше;
   3. у каждого окружения есть `kustomization.yaml` и `env.yaml`;
@@ -78,6 +84,9 @@ if hasattr(sys.stderr, "reconfigure"):
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SERVICES_DOC = "docs/architecture/services.md"
+# Каталог общих артефактов внутри `services/`: единицей развёртывания не
+# является и мерится осью 1b, а не осью 1.
+COMMON_DIR = "common"
 PLATFORM_DOC = "docs/architecture/platform.md"
 CONTOUR_SPEC = "docs/spec/environment-contour.json"
 
@@ -161,7 +170,9 @@ def shared_artifacts(root):
         if not line.startswith("|"):
             continue
         first = line.split("|")[1].strip()
-        artifacts.update(re.findall(r"`([a-z][a-z0-9-]*)`", first))
+        # Имя артефакта бывает с сегментом дома (`common/model`): дом общих
+        # артефактов не один, и таблица называет второй прямо в имени.
+        artifacts.update(re.findall(r"`([a-z][a-z0-9/-]*)`", first))
     if not artifacts:
         raise Refusal("в %s не разобран ни один общий артефакт" % SERVICES_DOC)
     return artifacts
@@ -320,6 +331,8 @@ def check(root):
         for name in sorted(os.listdir(services)):
             if not os.path.isdir(os.path.join(services, name)):
                 continue
+            if name == COMMON_DIR:
+                continue
             if not unit_known(name, units):
                 defects.append("services/%s — единицы нет в инвентаре %s"
                                % (name, SERVICES_DOC))
@@ -335,6 +348,18 @@ def check(root):
                 defects.append("libs/%s — артефакта нет в таблице «Общие "
                                "артефакты монорепозитория» %s"
                                % (name, SERVICES_DOC))
+
+    # --- ось 1b: services/common/ ⊆ общие артефакты
+    common = os.path.join(services, COMMON_DIR)
+    if os.path.isdir(common):
+        artifacts = shared_artifacts(root)
+        for name in sorted(os.listdir(common)):
+            if not os.path.isdir(os.path.join(common, name)):
+                continue
+            if "%s/%s" % (COMMON_DIR, name) not in artifacts:
+                defects.append("services/%s/%s — артефакта нет в таблице «Общие "
+                               "артефакты монорепозитория» %s"
+                               % (COMMON_DIR, name, SERVICES_DOC))
 
     # --- ось 2: deploy/ == окружения + base
     present = {name for name in os.listdir(deploy)
@@ -402,6 +427,7 @@ MIN_SERVICES = """## Единицы развёртывания
 | Артефакт | Что несёт | Кто зависит |
 |---|---|---|
 | `shared-one` | — | все |
+| `common/shared-two` | — | все |
 
 ## Дальше
 """
@@ -478,6 +504,7 @@ def _files(mutate=None):
         "deploy/prod/kustomization.yaml": KUSTOMIZATION % ("prod", "[]"),
         "services/.keep": "",
         "libs/shared-one/.keep": "",
+        "services/common/shared-two/.keep": "",
     }
     if mutate:
         mutate(files)
@@ -546,6 +573,18 @@ def battery():
     axis("1a. артефакт в libs/ вне таблицы общих артефактов — расхождение",
          bool(defects) and any("Общие" in d for d in defects or []),
          refusal or "; ".join(defects or []))
+
+    def stray_common(files):
+        files["services/common/unknown-two/.keep"] = ""
+    defects, refusal = run(stray_common)
+    axis("1b-common. артефакт в services/common/ вне таблицы — расхождение",
+         bool(defects) and any("common/unknown-two" in d for d in defects or []),
+         refusal or "; ".join(defects or []))
+
+    axis("1b-common-контроль. `common` единицей развёртывания не считается",
+         refusal is not None or all("services/common — единицы" not in d
+                                    for d in defects or []),
+         refusal or "; ".join(defects or []) or "дефектов: 0")
 
     def stray_env(files):
         files["deploy/qa/env.yaml"] = ENV_YAML % ("qa", "DEMO", "qa", "qa")

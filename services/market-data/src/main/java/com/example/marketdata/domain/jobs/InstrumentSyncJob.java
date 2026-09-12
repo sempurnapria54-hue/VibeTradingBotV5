@@ -7,7 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.marketdata.config.ConnectorProperties;
 import com.example.marketdata.config.InstrumentSyncProperties;
 import com.example.marketdata.domain.service.InstrumentCatalogService;
-import com.example.marketdata.integration.ExchangeAccessException;
+import com.example.marketdata.integration.internal.api.ExchangeAccessException;
 import com.example.marketdata.persistence.service.InstrumentDataService;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import java.util.List;

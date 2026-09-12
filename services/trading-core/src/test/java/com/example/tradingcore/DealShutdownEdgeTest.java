@@ -16,8 +16,10 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealShutdownEdgeException;
 import com.example.tradingcore.domain.deal.DealStatusEdgeService;
-import com.example.tradingcore.domain.event.OutboxWriter;
 import com.example.tradingcore.domain.service.ActorProvider;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
+import com.example.tradingcore.mapping.CoreEventMessageMapper;
+import com.example.tradingcore.mapping.CoreEventMessageMapperImpl;
 import com.example.tradingcore.persistence.model.OutboxEntity;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
@@ -49,6 +51,9 @@ import org.mockito.ArgumentCaptor;
  */
 class DealShutdownEdgeTest {
 
+    /** Маппер domain → message: формы событий строит граница, а не домен. */
+    private static final CoreEventMessageMapper EVENT_MESSAGES = new CoreEventMessageMapperImpl();
+
     private static final String TENANT = "tn-0001";
     private static final String ACCOUNT_INTERNAL_ID = "ea-0001";
     private static final String INSTRUMENT_INTERNAL_ID = "in-0001";
@@ -61,7 +66,7 @@ class DealShutdownEdgeTest {
 
     private final OutboxDataService outboxDataService = mock(OutboxDataService.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-    private final OutboxWriter outboxWriter = new OutboxWriter(outboxDataService, objectMapper);
+    private final CoreEventWriter coreEventWriter = new CoreEventWriter(outboxDataService, objectMapper, EVENT_MESSAGES);
 
     private final DealDataService dealDataService = mock(DealDataService.class);
     private final ExchangeAccountDataService accounts = mock(ExchangeAccountDataService.class);
@@ -69,7 +74,7 @@ class DealShutdownEdgeTest {
     private final StrategyDataService strategies = mock(StrategyDataService.class);
 
     private final DealStatusEdgeService service = new DealStatusEdgeService(dealDataService, accounts,
-            instruments, strategies, new ActorProvider(), outboxWriter);
+            instruments, strategies, new ActorProvider(), coreEventWriter);
 
     /**
      * Ребро прохода, которым присвоена причина остановки, публикует факт;

@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.example.auditstatistics.integration.ConsumerLagProvider;
+import com.example.auditstatistics.integration.internal.event.ConsumerLagProvider;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

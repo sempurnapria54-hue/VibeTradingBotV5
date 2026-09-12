@@ -11,10 +11,12 @@ import static org.mockito.Mockito.verify;
 
 import com.example.auditstatistics.domain.model.AuditRecord;
 import com.example.auditstatistics.domain.service.AuditReceptionService;
-import com.example.auditstatistics.integration.AuditEventListener;
-import com.example.auditstatistics.integration.IncompleteEventException;
-import com.example.auditstatistics.integration.JournalEnvelopeReader;
-import com.example.auditstatistics.integration.ReceptionOffsetTracker;
+import com.example.auditstatistics.integration.internal.event.AuditEventListener;
+import com.example.auditstatistics.integration.internal.event.IncompleteEventException;
+import com.example.auditstatistics.integration.internal.event.JournalEnvelopeReader;
+import com.example.auditstatistics.integration.internal.event.ReceptionOffsetTracker;
+import com.example.auditstatistics.mapping.AuditRecordMapper;
+import com.example.auditstatistics.mapping.AuditRecordMapperImpl;
 import com.example.auditstatistics.util.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +43,9 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class ReceptionEnvelopeTest {
 
+    /** Перевод прочитанного сообщения в доменную строку — маппер границы. */
+    private static final AuditRecordMapper MESSAGES = new AuditRecordMapperImpl();
+
     private static final String TOPIC = "trading-core.facts";
     private static final String TENANT = "tenant-1";
     private static final String EVENT_ID = "evt-1";
@@ -56,12 +61,13 @@ class ReceptionEnvelopeTest {
     private final JournalEnvelopeReader reader = new JournalEnvelopeReader(objectMapper);
     private final AuditReceptionService receptionService = mock(AuditReceptionService.class);
     private final AuditEventListener listener =
-            new AuditEventListener(reader, new ReceptionOffsetTracker(), receptionService);
+            new AuditEventListener(reader, MESSAGES, new ReceptionOffsetTracker(), receptionService);
 
     @Test
     @DisplayName("Полный конверт разбирается целиком, тенант — из ключа записи")
     void aCompleteEnvelopeIsRead() {
-        AuditRecord record = reader.read(message(fullEnvelope(), TENANT, CONTENT));
+        AuditRecord record = MESSAGES.messageToDomain(reader.read(message(fullEnvelope(),
+                TENANT, CONTENT)));
 
         assertThat(record.getEventId()).isEqualTo(EVENT_ID);
         assertThat(record.getTenantId())
@@ -82,7 +88,8 @@ class ReceptionEnvelopeTest {
     @Test
     @DisplayName("Колонки радиуса берутся с ВЕРХНЕГО уровня содержимого, вложенное не читается")
     void radiusColumnsComeFromTopLevelComponentsOnly() {
-        AuditRecord record = reader.read(message(fullEnvelope(), TENANT, CONTENT));
+        AuditRecord record = MESSAGES.messageToDomain(reader.read(message(fullEnvelope(),
+                TENANT, CONTENT)));
 
         assertThat(record.getDealInternalId()).isEqualTo("deal-7");
         assertThat(record.getInstrumentInternalId()).isEqualTo("instr-3");
@@ -99,7 +106,8 @@ class ReceptionEnvelopeTest {
         Map<String, String> headers = fullEnvelope();
         headers.remove(Constants.EventHeaders.TRACE_CONTEXT);
 
-        AuditRecord record = reader.read(message(headers, TENANT, CONTENT));
+        AuditRecord record = MESSAGES.messageToDomain(reader.read(message(headers, TENANT,
+                CONTENT)));
 
         assertThat(record.getTraceContext()).isNull();
         assertThat(record.hasCompleteInput())

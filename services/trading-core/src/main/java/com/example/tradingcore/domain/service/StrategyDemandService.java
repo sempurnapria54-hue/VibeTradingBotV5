@@ -12,9 +12,9 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIn
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
-import com.example.tradingcore.integration.MarketDataDemandClient;
-import com.example.tradingcore.integration.PeerServiceUnavailableException;
-import com.example.tradingcore.integration.model.ComputationConfigResponse;
+import com.example.tradingcore.integration.internal.api.MarketDataDemandClient;
+import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
+import com.example.tradingcore.integration.internal.api.model.ComputationConfigResponse;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
 import com.fasterxml.jackson.core.type.TypeReference;

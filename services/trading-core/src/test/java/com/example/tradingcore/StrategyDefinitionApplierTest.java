@@ -1,6 +1,5 @@
 package com.example.tradingcore;
 
-import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -8,9 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.tradingbot.domain.event.StrategyActivatedContent;
 import com.example.tradingbot.domain.event.StrategyEventType;
-import com.example.tradingbot.domain.event.StrategyLifecycleContent;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingcore.domain.service.StrategyDefinitionApplier;
 import com.example.tradingcore.persistence.service.InboxDataService;
@@ -41,7 +38,6 @@ class StrategyDefinitionApplierTest {
 
     private static final String EVENT = "ev-0001";
     private static final String STRATEGY = "st-0001";
-    private static final String ACTOR = "holder";
 
     private final StrategyDataService strategyDataService = mock(StrategyDataService.class);
     private final InboxDataService inboxDataService = mock(InboxDataService.class);
@@ -55,7 +51,7 @@ class StrategyDefinitionApplierTest {
         when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.empty());
 
-        applier.applyActivated(EVENT, activation(definition()));
+        applier.applyActivated(EVENT, definition());
 
         verify(strategyDataService).saveTree(any());
         verify(inboxDataService).markConsumed(EVENT, StrategyEventType.STRATEGY_ACTIVATED.name());
@@ -71,7 +67,7 @@ class StrategyDefinitionApplierTest {
         when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.of(definition()));
 
-        applier.applyActivated(EVENT, activation(definition()));
+        applier.applyActivated(EVENT, definition());
 
         verify(strategyDataService).applyStatus(STRATEGY, Strategy.Status.ACTIVE);
         verify(strategyDataService, never()).saveTree(any());
@@ -82,7 +78,7 @@ class StrategyDefinitionApplierTest {
     void aRedeliveredEventIsNotAppliedTwice() {
         when(inboxDataService.isConsumed(EVENT)).thenReturn(true);
 
-        applier.applyActivated(EVENT, activation(definition()));
+        applier.applyActivated(EVENT, definition());
 
         verify(strategyDataService, never()).saveTree(any());
         verify(strategyDataService, never()).applyStatus(any(), any());
@@ -95,8 +91,7 @@ class StrategyDefinitionApplierTest {
         when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.of(definition()));
 
-        applier.applyLifecycle(EVENT, StrategyEventType.STRATEGY_DELETED,
-                new StrategyLifecycleContent(STRATEGY, "ea-0001", "in-0001", ACTOR));
+        applier.applyLifecycle(EVENT, StrategyEventType.STRATEGY_DELETED, STRATEGY);
 
         verify(strategyDataService).applyStatus(STRATEGY, Strategy.Status.DELETED);
         verify(inboxDataService).markConsumed(EVENT, StrategyEventType.STRATEGY_DELETED.name());
@@ -116,8 +111,7 @@ class StrategyDefinitionApplierTest {
         when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.empty());
 
-        applier.applyLifecycle(EVENT, StrategyEventType.STRATEGY_DELETED,
-                new StrategyLifecycleContent(STRATEGY, "ea-0001", "in-0001", ACTOR));
+        applier.applyLifecycle(EVENT, StrategyEventType.STRATEGY_DELETED, STRATEGY);
 
         verify(strategyDataService, never()).applyStatus(any(), any());
         // Отметка ставится: событие обработано — следствия у него нет, и
@@ -135,23 +129,10 @@ class StrategyDefinitionApplierTest {
     void anActivationWithoutIdentityIsRefused() {
         when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
 
-        assertThatThrownBy(() -> applier.applyActivated(EVENT, activation(null)))
+        assertThatThrownBy(() -> applier.applyActivated(EVENT, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("carries no definition identity");
         verify(inboxDataService, never()).markConsumed(any(), any());
-    }
-
-    /**
-     * Содержимое активации: идентичности радиуса верхнего уровня плюс
-     * снимок. Пустой снимок оставляет идентичности пустыми — так выглядит
-     * событие, у которого определения нет вовсе.
-     */
-    private StrategyActivatedContent activation(Strategy definition) {
-        return isNull(definition)
-                ? new StrategyActivatedContent(null, null, null, ACTOR, null)
-                : new StrategyActivatedContent(definition.getInternalId(),
-                        definition.getExchangeAccountInternalId(),
-                        definition.getInstrumentInternalId(), ACTOR, definition);
     }
 
     private Strategy definition() {

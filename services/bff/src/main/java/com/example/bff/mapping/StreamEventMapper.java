@@ -8,14 +8,14 @@ import com.example.bff.api.model.stream.HoldRaisedStreamApiModel;
 import com.example.bff.api.model.stream.OrderDecidedStreamApiModel;
 import com.example.bff.api.model.stream.StrategyActivatedStreamApiModel;
 import com.example.bff.api.model.stream.StrategyLifecycleStreamApiModel;
-import com.example.tradingbot.domain.event.AnomalyReportedContent;
-import com.example.tradingbot.domain.event.DealClosedContent;
-import com.example.tradingbot.domain.event.DealOpenedContent;
-import com.example.tradingbot.domain.event.DealShutdownInitiatedContent;
-import com.example.tradingbot.domain.event.HoldRaisedContent;
-import com.example.tradingbot.domain.event.OrderDecidedContent;
-import com.example.tradingbot.domain.event.StrategyActivatedContent;
-import com.example.tradingbot.domain.event.StrategyLifecycleContent;
+import com.example.tradingbot.message.AnomalyReportedMessage;
+import com.example.tradingbot.message.DealClosedMessage;
+import com.example.tradingbot.message.DealOpenedMessage;
+import com.example.tradingbot.message.DealShutdownInitiatedMessage;
+import com.example.tradingbot.message.HoldRaisedMessage;
+import com.example.tradingbot.message.OrderDecidedMessage;
+import com.example.tradingbot.message.StrategyActivatedMessage;
+import com.example.tradingbot.message.StrategyLifecycleMessage;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
@@ -54,20 +54,20 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface StreamEventMapper {
 
-    OrderDecidedStreamApiModel toApi(OrderDecidedContent content);
+    OrderDecidedStreamApiModel messageToApi(OrderDecidedMessage message);
 
-    DealOpenedStreamApiModel toApi(DealOpenedContent content);
+    DealOpenedStreamApiModel messageToApi(DealOpenedMessage message);
 
-    DealShutdownInitiatedStreamApiModel toApi(DealShutdownInitiatedContent content);
+    DealShutdownInitiatedStreamApiModel messageToApi(DealShutdownInitiatedMessage message);
 
-    DealClosedStreamApiModel toApi(DealClosedContent content);
+    DealClosedStreamApiModel messageToApi(DealClosedMessage message);
 
-    HoldRaisedStreamApiModel toApi(HoldRaisedContent content);
+    HoldRaisedStreamApiModel messageToApi(HoldRaisedMessage message);
 
-    AnomalyReportedStreamApiModel toApi(AnomalyReportedContent content);
+    AnomalyReportedStreamApiModel messageToApi(AnomalyReportedMessage message);
 
-    StrategyLifecycleStreamApiModel toApi(StrategyLifecycleContent content);
+    StrategyLifecycleStreamApiModel messageToApi(StrategyLifecycleMessage message);
 
     @Mapping(target = "name", source = "definition.name")
-    StrategyActivatedStreamApiModel toApi(StrategyActivatedContent content);
+    StrategyActivatedStreamApiModel messageToApi(StrategyActivatedMessage message);
 }

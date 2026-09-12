@@ -2,7 +2,7 @@ package com.example.connector.okx.mapping;
 
 import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.connector.okx.snapshot.DealCashFlowExternalSnapshot;
-import com.example.connector.okx.integration.model.okx.response.AccountBillOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.AccountBillOkxResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;

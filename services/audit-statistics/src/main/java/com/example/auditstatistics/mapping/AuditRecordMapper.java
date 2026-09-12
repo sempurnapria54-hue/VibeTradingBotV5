@@ -8,7 +8,9 @@ import com.example.auditstatistics.domain.model.AuditRecord;
 import com.example.auditstatistics.domain.model.JournalCompleteness;
 import com.example.auditstatistics.domain.model.JournalPage;
 import com.example.auditstatistics.domain.model.JournalQuery;
+import com.example.auditstatistics.integration.internal.event.model.AuditEventMessage;
 import com.example.auditstatistics.persistence.model.journal.AuditRecordEntity;
+import org.mapstruct.BeanMapping;
 import org.mapstruct.InjectionStrategy;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -18,11 +20,14 @@ import org.mapstruct.ReportingPolicy;
  * Переходы журнальной выборки между слоями: api → domain → persistence и
  * обратно (.claude/rules/codestyle.md §Маппинг).
  *
- * <p><b>Маппер появился здесь с первым ЧИТАТЕЛЕМ строк.</b> Записи он не
- * обслуживает и не будет: единственная тропа записи журнала — нативная
- * вставка, поглощающая конфликт по ключу дедупа
+ * <p><b>На тропе записи маппер держит ровно один переход — message →
+ * domain.</b> Саму вставку он не обслуживает и не будет: она нативная и
+ * поглощает конфликт по ключу дедупа
  * (docs/components/AuditEventListener.md §«Форма вставки — поглощающая
- * конфликт по ключу»), и переносить между слоями там нечего.
+ * конфликт по ключу»), переносить между слоями там нечего. Прежде этого
+ * перехода не было вовсе: доменную строку собирал чтец конверта прямо из
+ * записи брокера, то есть слой сообщения у сервиса отсутствовал
+ * (.claude/rules/codestyle.md §«Слой сообщения: внутренняя шина»).
  *
  * <p><b>Цепочка не срезается, хотя формы и близки.</b> Слой persistence
  * знает ключ базы, слой api его не видит вовсе — наружу идёт идентичность
@@ -49,6 +54,24 @@ public interface AuditRecordMapper {
      */
     @Mapping(target = "tenantId", source = "tenantId")
     JournalQuery apiToDomain(JournalReadApiQuery query, String tenantId);
+
+    /**
+     * Прочитанное сообщение → доменная строка журнала.
+     *
+     * <p><b>Момент приёма ставится здесь</b> — его писателем объявлен код
+     * приёма, а не конверт и не база: на проводе его не было
+     * (docs/models/domain/other/AuditRecord.md).
+     *
+     * <p><b>Непокрытая цель здесь ОШИБКА, а не умолчание.</b> Политика
+     * маппера гасит непокрытое под выборки чтения, где часть полей
+     * законно пуста; у строки журнала пустое поле есть потерянный факт, и
+     * замечен он был бы только чтением через месяцы. Поэтому у одного
+     * этого перехода политика ужесточена.
+     */
+    @BeanMapping(unmappedTargetPolicy = ReportingPolicy.ERROR)
+    @Mapping(target = "recordedAt",
+            expression = "java(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC))")
+    AuditRecord messageToDomain(AuditEventMessage message);
 
     /**
      * Строка базы → доменная форма.

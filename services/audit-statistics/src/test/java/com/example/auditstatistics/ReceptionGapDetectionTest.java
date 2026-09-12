@@ -11,8 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.auditstatistics.domain.service.AuditReceptionService;
-import com.example.auditstatistics.integration.JournalRebalanceListener;
-import com.example.auditstatistics.integration.ReceptionOffsetTracker;
+import com.example.auditstatistics.integration.internal.event.JournalRebalanceListener;
+import com.example.auditstatistics.integration.internal.event.ReceptionOffsetTracker;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;

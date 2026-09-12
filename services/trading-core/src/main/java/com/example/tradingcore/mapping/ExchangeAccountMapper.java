@@ -1,7 +1,7 @@
 package com.example.tradingcore.mapping;
 
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
-import com.example.tradingcore.integration.model.ExchangeAccountAuthResponse;
+import com.example.tradingcore.integration.internal.api.model.ExchangeAccountAuthResponse;
 import com.example.tradingcore.persistence.model.ExchangeAccountEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

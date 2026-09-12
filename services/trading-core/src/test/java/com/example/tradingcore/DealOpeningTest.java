@@ -19,7 +19,7 @@ import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.deal.DealOpeningService;
-import com.example.tradingcore.domain.event.OutboxWriter;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
@@ -58,10 +58,10 @@ class DealOpeningTest {
     private final DealTrancheDataService dealTrancheDataService = mock(DealTrancheDataService.class);
 
     private final StrategyDataService strategyDataService = mock(StrategyDataService.class);
-    private final OutboxWriter outboxWriter = mock(OutboxWriter.class);
+    private final CoreEventWriter coreEventWriter = mock(CoreEventWriter.class);
 
     private final DealOpeningService service = new DealOpeningService(dealDataService,
-            dealTrancheDataService, strategyDataService, outboxWriter);
+            dealTrancheDataService, strategyDataService, coreEventWriter);
 
     // --- входная тропа -----------------------------------------------------
 

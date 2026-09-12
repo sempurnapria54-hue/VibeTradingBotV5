@@ -17,7 +17,7 @@ import com.example.tradingcore.config.EntryScannerProperties;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.market.MarketFeatureService;
 import com.example.tradingcore.domain.market.MarketFeatures;
-import com.example.tradingcore.integration.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
