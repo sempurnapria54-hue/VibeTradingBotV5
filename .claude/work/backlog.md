@@ -526,29 +526,6 @@ LC_ALL=C.UTF-8 grep -rnoP 'DOCS_CHECK_\d+|GAPS_CLOSE_\d+' docs/
 
 **Владелец** — `knowledge-curator`.
 
-## Отчёт единицы слоя сообщения — перенос в папку истории
-
-<!-- backlog: владелец=knowledge-curator; оживит=шаг:2-11:открыт; закрыто-когда=нет-файла:.claude/work/progress/message-layer-and-common-artifacts.md -->
-
-**Задача.** Перенести
-`.claude/work/progress/message-layer-and-common-artifacts.md` в папку истории
-своей единицы и починить входящие указатели из живых носителей тем же ходом
-(`.claude/rules/closed-work-transfer.md` §«Ссылочная целостность»).
-
-**Почему отчёт остался в `progress/`.** Пустая область роняет три энфорсера
-(`edit-kind-check.py`, `command-carrier-check.py`,
-`insertion-neighborhood-check.py`) кодом 2 («не измерялось»), и гейт такой
-исход не пропускает наравне с кодом 1. Пустая `progress/` — состояние, которое
-корпус производит своими же правилами на каждой границе единицы; ровно по
-этой причине здесь до 2026-09-12 стоял отчёт перехода шага 10.
-
-**Что оживит.** Открытие шага 11 фазы 2 (раздел `audit-statistics`): его
-первая единица заводит свою
-хронику, область перестаёт быть одночленной, и отчёт уезжает к остальным
-артефактам.
-
-**Владелец** — `knowledge-curator`.
-
 ## Ось 9 энфорсера команд слепа к `read` с флагом
 
 <!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайшая единица, правящая tools/command-carrier-check.py либо пишущая блок с циклом чтения; закрыто-когда=греп:"read -r"@tools/command-carrier-check.py -->

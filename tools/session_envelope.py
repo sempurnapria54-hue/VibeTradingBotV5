@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Разбор ответа `claude --output-format json` для цикла сессий.
+"""Разбор ответа `claude` для цикла сессий.
 
 ПРЕДМЕТ. Тело команды `tools/session-loop.sh` в части чтения конверта
 ответа: предполётная проба (загружен ли пайплайн) и поля одной сессии.
+Конверт приходит двумя формами, и обе читаются одним `load`: одиночный JSON
+(`--output-format json`, проба) и поток `stream-json`, записанный лентой
+хода (`tools/session_feed.py`) в файл целиком, — там конверт есть последняя
+строка `result`, и поля у него те же.
 Отдельным файлом, а не встроенным here-документом, по той же причине, что
 и `tools/deploy_set_image_tag.py`: вложенный here-документ внутри составной
 команды остаётся без терминатора, и bash исполняет не то, что написано.
@@ -25,8 +29,30 @@ def quote(value):
 
 
 def load(path):
+    """Конверт ответа: одиночный JSON (`--output-format json`) либо последняя
+    строка `result` потока `stream-json`, который цикл пишет в файл целиком
+    (`tools/session_feed.py`). Поток без итоговой строки — обрыв сессии, и
+    это отказ с названной причиной, а не пустой конверт."""
     with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
+        text = handle.read()
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+    result = None
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict) and record.get("type") == "result":
+            result = record
+    if result is None:
+        raise ValueError("в потоке нет итоговой строки `result` — сессия оборвана (таймаут, обрыв CLI)")
+    return result
 
 
 def probe(path):

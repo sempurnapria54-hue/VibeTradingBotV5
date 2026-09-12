@@ -19,6 +19,14 @@
 # staged держателю на ревью. Правило «CC не коммитит» (CLAUDE.md) этим не
 # меняется — коммитит сценарий держателя, а не сессия.
 #
+# ЛЕНТА ХОДА В КОНСОЛИ. Пока сессия работает, цикл печатает, чем она занята:
+# `▶`/`■` на границах сессии, действия (чтения пачками, правки, прогоны) и
+# пульс `…` при тишине. Источник — поток событий самой сессии
+# (`--output-format stream-json --verbose`), который tools/session_feed.py
+# читает на лету и целиком пишет в файл ответа; конверт — его последняя
+# строка. Стоячий промпт лентой не трогается. Дом формата —
+# .claude/skills/session-chain.md §«Лента хода сессии в консоли».
+#
 # СЛЕДУЮЩУЮ СЕССИЮ ЦИКЛ БЕРЁТ ТОЛЬКО ПРИ `continue` + `gates_green`. Всякий
 # иной исход — остановка с названной причиной и без повторов: повтор сессии,
 # которая уже уперлась, стои́т денег и приводит туда же.
@@ -89,6 +97,9 @@ export PYTHONIOENCODING=utf-8
 
 say() { printf "\n=== %s\n" "$*"; }
 jrn() { printf '%s\n' "$*" >>"$JOURNAL"; }
+# Строка ленты: время слева, событие справа (формат — session-chain.md).
+feed() { printf '%s %s\n' "$(date '+%H:%M')" "$*"; }
+FEED="$ROOT/tools/session_feed.py"
 
 # ------------------------------------------------------------------ диск
 # Хранилище Docker на этой машине — образ WSL под %LOCALAPPDATA%\Docker\wsl;
@@ -146,7 +157,7 @@ echo "режим прав: $PERMISSION_MODE, максимум сессий: $MAX
 
 if [ "$DRY" -eq 1 ]; then
   say "Команда сессии (--dry-run, ничего не запущено)"
-  printf 'claude -p "$(cat %s)" \\\n  --output-format json --json-schema <контракт статуса> \\\n  --permission-mode %s --permission-prompts none\n' \
+  printf 'claude -p "$(cat %s)" \\\n  --output-format stream-json --verbose --json-schema <контракт статуса> \\\n  --permission-mode %s --permission-prompts none \\\n  | py -3 tools/session_feed.py follow --raw <ответ.ndjson>\n' \
     "$PROMPT_FILE" "$PERMISSION_MODE"
   exit 0
 fi
@@ -161,7 +172,7 @@ jrn "Максимум сессий: $MAX. Режим прав: \`$PERMISSION_MOD
 stop_with() { # $1 — код возврата, $2 — причина
   jrn ""
   jrn "**ОСТАНОВКА ($LAUNCH):** $2"
-  say "ОСТАНОВКА: $2"
+  feed "■ остановка (код $1) · $2"
   echo "журнал: $JOURNAL"
   exit "$1"
 }
@@ -231,34 +242,41 @@ for (( n = 1; n <= MAX; n++ )); do
     stop_with 7 "свободно ${FREE} ГиБ на $DOCKER_DIR при пороге ${MIN_FREE_GIB} — сессия $n не запущена"
   fi
 
-  say "Сессия $n из $MAX (свободно ${FREE} ГиБ)"
+  # Граница: какой шаг возьмёт сессия и в каком он статусе — из роадмапа,
+  # а не из ответа модели; переход статуса печатается на закрытии.
+  STEP_ID="?"; STEP_STATUS="?"
+  eval "$(py -3 "$FEED" step)"
+  STEP_BEFORE="$STEP_ID"; STATUS_BEFORE="$STEP_STATUS"
+  feed "▶ сессия $n/$MAX · шаг $STEP_BEFORE · $STATUS_BEFORE"
   STARTED="$(date '+%Y-%m-%d %H:%M:%S')"
-  RAW="$RAW_DIR/$LAUNCH-$n.json"
+  RAW="$RAW_DIR/$LAUNCH-$n.ndjson"
 
+  # Поток событий идёт в ленту, лента пишет его в $RAW целиком; код
+  # выхода берётся у claude, а не у фильтра (PIPESTATUS).
   set +e
   if [ -n "${SESSION_TIMEOUT:-}" ]; then
     timeout "$SESSION_TIMEOUT" claude -p "$PROMPT" \
-      --output-format json --json-schema "$SCHEMA" \
+      --output-format stream-json --verbose --json-schema "$SCHEMA" \
       --permission-mode "$PERMISSION_MODE" --permission-prompts none \
       ${SESSION_MODEL:+--model "$SESSION_MODEL"} \
       ${SESSION_MAX_USD:+--max-budget-usd "$SESSION_MAX_USD"} \
-      </dev/null >"$RAW"
+      </dev/null | py -3 "$FEED" follow --raw "$RAW"
   else
     claude -p "$PROMPT" \
-      --output-format json --json-schema "$SCHEMA" \
+      --output-format stream-json --verbose --json-schema "$SCHEMA" \
       --permission-mode "$PERMISSION_MODE" --permission-prompts none \
       ${SESSION_MODEL:+--model "$SESSION_MODEL"} \
       ${SESSION_MAX_USD:+--max-budget-usd "$SESSION_MAX_USD"} \
-      </dev/null >"$RAW"
+      </dev/null | py -3 "$FEED" follow --raw "$RAW"
   fi
-  CLI_CODE=$?
+  CLI_CODE=${PIPESTATUS[0]}
   set -e
   FINISHED="$(date '+%Y-%m-%d %H:%M:%S')"
 
   jrn ""
   jrn "## Сессия $n/$MAX — $STARTED → $FINISHED"
   jrn ""
-  jrn "- ответ CLI: \`$RAW\`"
+  jrn "- поток сессии (последняя строка — конверт): \`$RAW\`"
 
   if [ "$CLI_CODE" -ne 0 ]; then
     jrn "- код выхода claude: **$CLI_CODE**"
@@ -271,7 +289,7 @@ for (( n = 1; n <= MAX; n++ )); do
 
   if [ "$PARSE_OK" -ne 1 ]; then
     jrn "- ответ не разобран: ${PARSE_ERR:-неизвестно}"
-    stop_with 6 "ответ сессии $n не разобран как JSON — смотреть $RAW"
+    stop_with 6 "ответ сессии $n не разобран: ${PARSE_ERR:-неизвестно} — смотреть $RAW"
   fi
 
   TOTAL_COST="$(py -3 -c "import sys; print(round(float(sys.argv[1])+float(sys.argv[2]), 4))" "$TOTAL_COST" "$COST")"
@@ -283,8 +301,12 @@ for (( n = 1; n <= MAX; n++ )); do
   jrn ""
   jrn "> ${ST_SUMMARY:-(итог не назван)}"
 
-  echo "статус: ${ST_STATUS:-нет}, гейты: ${ST_GATES:-нет}, \$${COST}"
-  echo "итог: ${ST_SUMMARY:-(не назван)}"
+  # Переход статуса — по роадмапу до и после, для того же шага.
+  STEP_ID="?"; STEP_STATUS="?"
+  eval "$(py -3 "$FEED" step "$STEP_BEFORE")"
+  GATES_WORD="гейты зелены"; [ "${ST_GATES:-}" = "true" ] || GATES_WORD="гейты КРАСНЫ"
+  feed "■ сессия $n закрыта · $STEP_BEFORE: $STATUS_BEFORE → $STEP_STATUS · ${ST_STATUS:-без статуса} · $GATES_WORD · \$${COST}"
+  printf '        итог: %s\n' "${ST_SUMMARY:-(не назван)}"
 
   if [ "$IS_ERROR" = "true" ]; then
     stop_with 6 "сессия $n завершилась ошибкой (subtype=$SUBTYPE)"
@@ -307,7 +329,7 @@ for (( n = 1; n <= MAX; n++ )); do
     if commit_boundary "$ST_STATUS"; then
       jrn ""
       jrn "- коммит границы: \`$COMMIT_INFO\`"
-      echo "коммит: $COMMIT_INFO"
+      feed "  коммит: $COMMIT_INFO"
     else
       jrn "- **коммит не сделан:** $COMMIT_ERR"
       stop_with 8 "коммит границы шага после сессии $n не сделан: $COMMIT_ERR"
@@ -332,5 +354,5 @@ done
 
 jrn ""
 jrn "**ЛИМИТ ($LAUNCH):** $MAX сессий отработано, все — \`continue\` с зелёными гейтами. Стоимость запуска: \$${TOTAL_COST}."
-say "Лимит $MAX сессий исчерпан штатно, шаг не закрыт. Стоимость запуска: \$${TOTAL_COST}"
+feed "■ лимит $MAX сессий исчерпан штатно, шаг не закрыт · за запуск \$${TOTAL_COST}"
 echo "журнал: $JOURNAL"
