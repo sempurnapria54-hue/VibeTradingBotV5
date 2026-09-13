@@ -7,9 +7,9 @@
 Единицы развёртывания целевой конструкции — по одному каталогу на
 единицу из инвентаря `docs/architecture/services.md`: `auth`,
 `market-data`, `trading-core`, `strategies`, `connector-okx`,
-`connector-bybit`, `bff`, `audit-statistics`.
+`connector-bybit`, `bff`, `audit`, `statistics`.
 
-Каталог наполняется шагами 3-10 фазы 2 (`.claude/work/roadmap/phase-2.md`),
+Каталог наполняется шагами 3-11 фазы 2 (`.claude/work/roadmap/phase-2.md`),
 каждый — портом из `donor/`. **В каталоге нет единицы, которой нет в
 инвентаре `services.md`** — на этом вложении держится проверяемость
 раскладки, и мерит его `python3 tools/deploy-layout-check.py` (ось 1)

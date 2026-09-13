@@ -36,7 +36,8 @@
         <module>services/common/model/message</module>
         <module>services/common/strategy-engine</module>
         <module>services/common/test-support</module>
-        <module>services/audit-statistics</module>
+        <module>services/audit</module>
+        <module>services/statistics</module>
         <module>services/auth</module>
         <module>services/bff</module>
         <module>services/connector-okx</module>

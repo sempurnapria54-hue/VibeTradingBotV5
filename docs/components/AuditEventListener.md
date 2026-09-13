@@ -84,7 +84,7 @@ durable-потребителем (`docs/rules/durable-consumer-reception.md`).
 - Что он пишет и с какой семантикой — `docs/models/domain/other/AuditRecord.md`.
 - Форма приёма, состояния и полноты у durable-потребителя —
   `docs/rules/durable-consumer-reception.md`.
-- Исполнимая форма полноты — `docs/spec/audit-journal.json`.
+- Исполнимая форма полноты — `docs/spec/durable-reception.json`.
 - Форма исполнителя и её вывод — `.claude/decisions/reception-executor-design-pass.md`.
 - Доставка, порядок фиксации смещения, хранение тем —
   `docs/architecture/data-ownership.md`.

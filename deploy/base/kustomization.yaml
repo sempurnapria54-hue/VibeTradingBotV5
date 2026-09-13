@@ -25,7 +25,8 @@ resources:
   # Сервисы окружения. Форма манифеста одна на все окружения; различаются
   # они только тегом образа (блок images: оверлея).
   - services/identity-realm.yaml
-  - services/audit-statistics.yaml
+  - services/audit.yaml
+  - services/statistics.yaml
   - services/auth.yaml
   - services/bff.yaml
   - services/connector-okx.yaml

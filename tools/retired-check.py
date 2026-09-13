@@ -2401,7 +2401,7 @@ RETIRED = [
                     '.claude/work/history/'),
         'population': (
             ('docs/models/domain/other/AuditRecord.md', r'Механизм\s+остановки\s+назван'),
-            ('docs/spec/audit-journal.json', r'receptionStateFresh'),
+            ('docs/spec/durable-reception.json', r'receptionStateFresh'),
         ),
     },
     {
@@ -2816,7 +2816,7 @@ RETIRED = [
         # Редакция сменилась ещё раз ходом `CODE` шага 10 (2026-09-11, чистка
         # бэклога): носитель пришедшего — манифест периметра, не рабочий файл.
         # Что действует теперь — объявляет ключ `arrived`.
-        'arrived': r'audit-statistics-ingress-from-bff',
+        'arrived': r'audit-ingress-from-bff',
         'date': '2026-09-07',
         'source': 'GAPS_CLOSE_3 шага 10 фазы 2, узел 5',
         'allowed': ('.claude/work/decision-digest.md',),
@@ -2902,7 +2902,7 @@ RETIRED = [
                     '.claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-design-pass.md'),
         'population': (('docs/models/domain/other/AuditRecord.md',
                         r'ReceptionStateJob'),
-                       ('docs/spec/audit-journal.json', r'ReceptionStateJob'),
+                       ('docs/spec/durable-reception.json', r'ReceptionStateJob'),
                        ('docs/components/ReceptionStateJob.md', None)),
     },
     {
@@ -2947,7 +2947,7 @@ RETIRED = [
         # редакцию он, а не компонент-док слушателя.
         'population': (('docs/rules/durable-consumer-reception.md', r'lag_gap_at'),
                        ('docs/models/domain/other/AuditRecord.md', r'lag_gap_at'),
-                       ('docs/spec/audit-journal.json', r'lag_gap_at'),
+                       ('docs/spec/durable-reception.json', r'lag_gap_at'),
                        ('docs/components/JournalCleanupJob.md', None)),
     },
     {
@@ -3158,23 +3158,16 @@ RETIRED = [
         'arrived': r'не\s+оставляет\s+ни\s+одного',
         'date': '2026-09-12',
         'source': 'узел 3 `GAPS_CLOSE_1`, шаг 11 фазы 2',
-        # РАЗРЕШЁННЫЕ МЕСТА — дерево кода, и это не послабление, а названная
-        # цена направления синхронизации: до `CODE` ведёт док, поэтому javadoc
-        # ещё цитирует прежний §-адрес дома раскладки. Оба места — дельта
-        # `CODE` шага 11; когда она пройдена, строки отсюда снимаются, и
-        # условие возврата объявлено секцией бэклога «Дельта `CODE` шага 11
-        # по источнику пересчёта агрегатов».
-        'allowed': ('services/audit-statistics/src/main/java/com/example/'
-                    'auditstatistics/persistence/repository/journalread/'
-                    'ReceptionStateSourceRepository.java',
-                    'services/audit-statistics/src/main/java/com/example/'
-                    'auditstatistics/persistence/service/'
-                    'StatisticsJournalCompletenessSource.java'),
+        # РАЗРЕШЁННЫХ МЕСТ БОЛЬШЕ НЕТ: их было два в дереве кода — цена
+        # направления синхронизации, названная своим условием снятия («когда
+        # дельта `CODE` шага 11 пройдена, строки отсюда снимаются»). Дельта
+        # пройдена разъездом сервиса, и оба носителя перестали существовать.
+        # ТРЕТИЙ НОСИТЕЛЬ ПОПУЛЯЦИИ СНЯТ ВМЕСТЕ С ПРЕДМЕТОМ: спека
+        # `owner-role-grants.json` описывала конструкцию «роль читает чужую
+        # базу того же процесса», которой раздел сервиса не оставил.
         'population': (
             ('docs/architecture/data-ownership.md', None),
             ('docs/architecture/services.md', None),
-            ('docs/spec/owner-role-grants.json',
-             r'одним\s+своим\s+потребителем\s+—\s+агрегатной\s+выборкой'),
         ),
     },
     {
@@ -3190,11 +3183,9 @@ RETIRED = [
         'arrived': r'Источник\s+пересчёта\s+—\s+собственные\s+факты\s+сервиса',
         'date': '2026-09-12',
         'source': 'узел 3 `GAPS_CLOSE_1`, шаг 11 фазы 2',
-        # То же разрешённое место и по тому же доводу: javadoc джобы
-        # пересчёта описывает построенный ею отбор по журналу. Снимается
-        # вместе с дельтой `CODE` шага 11.
-        'allowed': ('services/audit-statistics/src/main/java/com/example/'
-                    'auditstatistics/domain/jobs/AggregateRecomputeJob.java',),
+        # РАЗРЕШЁННОГО МЕСТА БОЛЬШЕ НЕТ: javadoc джобы пересчёта описывал
+        # построенный ею отбор по журналу и снялся вместе с дельтой `CODE`
+        # шага 11 — вход прохода теперь собственные факты сервиса.
         'population': (
             ('docs/rules/statistics-aggregates.md', None),
             ('docs/models/domain/other/AuditRecord.md',
@@ -3361,13 +3352,13 @@ RETIRED = [
         'population': (
             ('docs/rules/statistics-aggregates.md',
              r'совпадать\s+с\s+тем,\s+ЧТО\s+счётчик\s+объявлен\s+считать'),
-            ('services/audit-statistics/src/main/java/com/example/auditstatistics/'
-             'persistence/repository/journalread/IncidentGrainRow.java',
+            ('services/statistics/src/main/java/com/example/statistics/'
+             'persistence/repository/IncidentGrainRow.java',
              r'считает\s+СОБЫТИЯ,\s+а\s+не\s+их\s+предметы'),
-            ('services/audit-statistics/src/main/resources/db/migration/statistics/'
+            ('services/statistics/src/main/resources/db/migration/statistics/'
              'V1__statistics_baseline.sql',
              r'считает\s+СОБЫТИЯ,\s+а\s+не\s+их\s+предметы'),
-            ('services/audit-statistics/src/main/java/com/example/auditstatistics/'
+            ('services/statistics/src/main/java/com/example/statistics/'
              'domain/model/IncidentAggregate.java',
              r'считает\s+СОБЫТИЯ,\s+а\s+не\s+их\s+предметы'),
         ),
@@ -3412,16 +3403,12 @@ RETIRED = [
         'arrived': r'о\s+чьей\s+полноте\s+оно\s+свидетельствует|Величины\s+при\s+этом\s+\*\*свои',
         'date': '2026-09-12',
         'source': 'узел 4 `GAPS_CLOSE_1`, шаг 11 фазы 2 (A8, B1)',
-        # РАЗРЕШЁННОЕ МЕСТО ОДНО, и довод у него не «до `CODE` ведёт док», а
-        # неизменяемость: миграция ПРИМЕНЕНА, и правка её комментария роняет
-        # контрольную сумму Flyway у того, кто миграций не трогал
+        # РАЗРЕШЁННОГО МЕСТА БОЛЬШЕ НЕТ: им была ПРИМЕНЁННАЯ миграция журнала,
+        # чей комментарий правкой ронял бы контрольную сумму Flyway
         # (`.claude/rules/codestyle.md` §«Применённая миграция неизменяема —
-        # включая комментарии»). Устаревший текст правится новой миграцией либо
-        # не правится вовсе; здесь он снимается вместе с пересозданием базы
-        # ходом `CODE` шага 11 (`.claude/work/backlog.md` §«Дельта кода шага 11
-        # фазы 2 по собственному свидетельству полноты у `statistics`»).
-        'allowed': ('services/audit-statistics/src/main/resources/db/migration/'
-                    'audit/V1__audit_baseline.sql',),
+        # включая комментарии»). Условие снятия было названо там же —
+        # пересоздание базы ходом `CODE` шага 11, — и оно исполнено: базы
+        # разъехались по двум сервисам, и обе цепочки написаны заново.
         # ДВА НОСИТЕЛЯ ДОБАВЛЕНЫ ДОРАБОТКОЙ 1 со своим шаблоном пришедшей
         # редакции: у исполнимой формы и у довода индекса на месте снятого
         # встало разное — «выдачей чисел ТОГО потребителя» и «чисел журнальной
@@ -3432,7 +3419,7 @@ RETIRED = [
             ('docs/architecture/data-ownership.md', None),
             ('docs/models/domain/other/StatisticsFact.md',
              r'полноте\s+СВОЕГО\s+приёма\s+сама'),
-            ('docs/spec/audit-journal.json',
+            ('docs/spec/durable-reception.json',
              r'выдачей\s+чисел\s+ТОГО\s+потребителя'),
             ('docs/models/domain/other/AuditRecord.md',
              r'чисел\s+журнальной\s+группы'),
@@ -3442,21 +3429,14 @@ RETIRED = [
         'name': 'читатель чужого подключения один — агрегатная выборка',
         # Снято тем же узлом: у агрегатной выборки появился СВОЙ операнд
         # полноты. Что действует — объявляют ключи `arrived` и `population`.
-        # РАЗРЕШЁННЫЕ МЕСТА — дерево кода: до `CODE` ведёт док, и javadoc ещё
-        # цитирует прежнюю раскладку подключений; строки снимаются дельтой кода
-        # (`.claude/work/backlog.md` §«Дельта кода шага 11 фазы 2 по источнику
-        # пересчёта агрегатов»).
+        # РАЗРЕШЁННЫХ МЕСТ БОЛЬШЕ НЕТ: javadoc цитировал прежнюю раскладку
+        # подключений и снялся дельтой кода — чужого подключения конструкция
+        # не оставляет ни одного.
         'pattern': (r'[Чч]итател\w+\s+у\s+третьего\s+подключения\s+один'
                     r'|читатель\s+у\s+него\s+один'),
         'arrived': r'не\s+оставляет\s+ни\s+одного',
         'date': '2026-09-12',
         'source': 'узел 4 `GAPS_CLOSE_1`, шаг 11 фазы 2 (A5, A8, B1)',
-        'allowed': ('services/audit-statistics/src/main/java/com/example/'
-                    'auditstatistics/persistence/repository/journalread/'
-                    'ReceptionStateSourceRepository.java',
-                    'services/audit-statistics/src/main/java/com/example/'
-                    'auditstatistics/persistence/service/'
-                    'StatisticsJournalCompletenessSource.java'),
         'population': (
             ('docs/architecture/data-ownership.md', None),
             ('docs/architecture/services.md', None),
@@ -3580,7 +3560,7 @@ RETIRED = [
         # рабочего файла покрыта самим шаблоном.
         'population': (
             ('docs/architecture/data-ownership.md', None),
-            ('docs/spec/audit-journal.json', None),
+            ('docs/spec/durable-reception.json', None),
             ('.claude/work/backlog.md', None),
         ),
     },
@@ -3728,7 +3708,7 @@ def registry_incomplete(registry):
             if not entry.get(key):
                 return 'запись «%s» не несёт «%s» — ось популяции не измерима' % (
                     entry.get('name', '?'), key)
-        for place in entry['allowed']:
+        for place in entry.get('allowed', ()):
             if place.replace(os.sep, '/').startswith('docs/'):
                 return ('запись «%s» держит в разрешённых местах файл корпуса «%s»: '
                         'docs/concept.md запрещает слой опровержения в корпусе, '
@@ -3798,7 +3778,7 @@ def scan(registry, roots):
             continue
         text = flat_text(path)
         for entry in registry:
-            if normalized in entry['allowed']:
+            if normalized in entry.get('allowed', ()):
                 continue
             unless = entry.get('unless')
             for match in re.finditer(entry['pattern'], text, re.I):
