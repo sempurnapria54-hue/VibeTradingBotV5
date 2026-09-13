@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
@@ -13,7 +14,6 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.util.InternalIdFactory;
 import com.example.tradingcore.config.AnomalyReportProperties;
 import com.example.tradingcore.domain.command.DealContext;
-import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;

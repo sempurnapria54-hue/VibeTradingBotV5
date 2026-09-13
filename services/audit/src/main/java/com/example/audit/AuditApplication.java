@@ -3,9 +3,13 @@ package com.example.audit;
 import com.example.audit.config.EnvironmentProperties;
 import com.example.audit.config.JournalCleanupProperties;
 import com.example.audit.config.JournalReadProperties;
+import com.example.platform.jobs.JobExecutionGuard;
+import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.security.ActorProvider;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -33,12 +37,19 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * пустой класс конфигурации был бы носителем без предмета. Формы подписки и подключений объявляют свои конфигурации —
  * там, где они и настраивают клиента ({@code ReceptionKafkaConfig},
  * {@code PersistenceConfig}).
+ *
+ * <p><b>Взятое из общего артефакта периметра названо ИМЕНОВАННО, а не
+ * взято сканированием его пакета.</b> Перечень взятого читается в
+ * одном месте, а то, чего сервису не нужно, не приезжает к нему вместе
+ * с пакетом: конфигурация исходящей идентичности требует
+ * oauth2-client, который есть не у всех потребителей артефакта.
  */
 @EnableScheduling
 @SpringBootApplication
 @EnableConfigurationProperties({EnvironmentProperties.class,
         JournalCleanupProperties.class,
         JournalReadProperties.class})
+@Import({AccessDenialHandler.class, ActorProvider.class, JobExecutionGuard.class})
 public class AuditApplication {
 
     public static void main(String[] args) {

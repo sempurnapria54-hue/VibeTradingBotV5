@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
@@ -31,9 +32,8 @@ import com.example.tradingcore.domain.fsm.DealStateMachine;
 import com.example.tradingcore.domain.fsm.DealTransition;
 import com.example.tradingcore.domain.fsm.TrancheEdge;
 import com.example.tradingcore.domain.jobs.DealOrchestratorJob;
-import com.example.tradingcore.domain.jobs.JobExecutionGuard;
-import com.example.tradingcore.domain.safety.HoldRung;
 import com.example.tradingcore.domain.safety.HardRungShutdownReasonResolver;
+import com.example.tradingcore.domain.safety.HoldRung;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;

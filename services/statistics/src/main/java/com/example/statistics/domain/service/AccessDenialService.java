@@ -4,6 +4,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.abbreviate;
 
+import com.example.platform.security.AccessDenialRecorder;
 import com.example.statistics.domain.model.AccessDenial;
 import com.example.statistics.persistence.service.AccessDenialDataService;
 import com.example.tradingbot.domain.util.InternalIdFactory;
@@ -28,11 +29,17 @@ import org.springframework.stereotype.Service;
  * не удалась; второго персистентного носителя под сбой первого не
  * заводится — он упирался бы в ту же недоступную базу. Отказ при этом
  * громкий, а не тихий.
+ *
+ * <p><b>Порт периметра реализует он сам</b> ({@link AccessDenialRecorder}):
+ * точки входа отказа лежат в общем артефакте и перечня исходов не
+ * видят: доменные перечни объявляются только в доменном слое
+ * (.claude/rules/codestyle.md §«Слои моделей и enum'ы»), а метод на класс
+ * отказа эту границу сохраняет.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AccessDenialService {
+public class AccessDenialService implements AccessDenialRecorder {
 
     /**
      * Потолок ширины колонки поверхности.
@@ -46,6 +53,24 @@ public class AccessDenialService {
     private static final int SURFACE_MAX_LENGTH = 256;
 
     private final AccessDenialDataService dataService;
+
+    /**
+     * Принципал не предъявлен либо предъявленный не принят.
+     *
+     * <p>Имя не передаётся намеренно: заявленное, но не
+     * удостоверенное в строку не пишется — это была бы запись
+     * непроверенного как факта.
+     */
+    @Override
+    public void recordPrincipalAbsent(String surface) {
+        record(surface, AccessDenial.Outcome.PRINCIPAL_ABSENT, null);
+    }
+
+    /** Принципал принят, но операция ему не разрешена. */
+    @Override
+    public void recordOperationForbidden(String surface, String principal) {
+        record(surface, AccessDenial.Outcome.OPERATION_FORBIDDEN, principal);
+    }
 
     /**
      * Завести строку отказа.

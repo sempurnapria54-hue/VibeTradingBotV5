@@ -9,12 +9,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.client.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingcore.domain.service.RegistryProjectionService;
 import com.example.tradingcore.integration.internal.api.AuthReadClient;
 import com.example.tradingcore.integration.internal.api.MarketDataReadClient;
 import com.example.tradingcore.integration.internal.api.PeerReadException;
-import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
 import com.example.tradingcore.integration.internal.api.model.InstrumentMarketDataResponse;
 import com.example.tradingcore.mapping.ExchangeAccountMapper;
 import com.example.tradingcore.mapping.ExchangeAccountMapperImpl;

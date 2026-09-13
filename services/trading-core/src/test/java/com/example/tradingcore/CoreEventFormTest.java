@@ -1,5 +1,6 @@
 package com.example.tradingcore;
 
+import static com.example.platform.util.Constants.Audit.SYSTEM_PRINCIPAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
@@ -32,15 +34,14 @@ import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.calc.DealReconciliationCalculator;
+import com.example.tradingcore.domain.command.calc.DealTerminalFeaturesWriter;
 import com.example.tradingcore.domain.command.executor.CreateOrderExecutor;
 import com.example.tradingcore.domain.command.executor.MarkDealClosedExecutor;
 import com.example.tradingcore.domain.command.payload.CreateOrderCommandPayload;
-import com.example.tradingcore.domain.command.calc.DealTerminalFeaturesWriter;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.deal.DealStatusEdgeService;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
-import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.domain.safety.AnomalyReport;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldRung;
@@ -50,8 +51,8 @@ import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.LossStreakCounter;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
-import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.mapping.CoreEventMessageMapper;
 import com.example.tradingcore.mapping.CoreEventMessageMapperImpl;
 import com.example.tradingcore.persistence.model.OutboxEntity;
@@ -59,9 +60,9 @@ import com.example.tradingcore.persistence.service.AccountInstrumentStateDataSer
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
-import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
+import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.OrderDataService;
 import com.example.tradingcore.persistence.service.OutboxDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
@@ -404,7 +405,7 @@ class CoreEventFormTest {
 
         assertThat(contentOfWrittenRow(CoreEventType.HOLD_RAISED).path("actor").textValue())
                 .as("пусто в контексте означает «внешнего инициатора нет» — это признак, а не умолчание")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /**

@@ -58,6 +58,21 @@ public class JournalPersistenceConfig {
     /** Пакет отображаемых классов: схему журнала держит модуль аудита. */
     static final String ENTITY_PACKAGE = "com.example.audit.persistence.model.journal";
 
+    /**
+     * Пакет общего базового типа audit-полей.
+     *
+     * <p><b>Назван рядом со своим, а не подразумевается.</b> Базовый тип
+     * лежит в общем артефакте — состав колонок бинарен, и единственный
+     * носитель его и держит (docs/models/domain/other/Auditable.md
+     * §«Правило состава колонок»), а область сканирования здесь
+     * объявлена явно и чужих пакетов не видит.
+     *
+     * <p><b>Столкновения с соседним отображением он не создаёт:</b>
+     * сущностей в нём нет вовсе — только {@code @MappedSuperclass}, и разделение
+     * репозиториев между отображениями он не трогает.
+     */
+    static final String SHARED_ENTITY_PACKAGE = "com.example.tradingbot.persistence.model";
+
     /** Пакет репозиториев владельца журнала. */
     static final String REPOSITORY_PACKAGE = "com.example.audit.persistence.repository.journal";
 
@@ -73,7 +88,7 @@ public class JournalPersistenceConfig {
             @Qualifier(PersistenceConfig.JOURNAL_DATA_SOURCE) DataSource dataSource) {
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(dataSource);
-        factory.setPackagesToScan(ENTITY_PACKAGE);
+        factory.setPackagesToScan(ENTITY_PACKAGE, SHARED_ENTITY_PACKAGE);
         factory.setPersistenceUnitName("journal");
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         return factory;

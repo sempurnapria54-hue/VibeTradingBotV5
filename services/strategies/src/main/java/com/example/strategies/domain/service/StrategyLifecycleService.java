@@ -3,6 +3,7 @@ package com.example.strategies.domain.service;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.platform.security.ActorProvider;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
 import com.example.strategies.integration.internal.api.TradingCoreReadClient;
 import com.example.strategies.integration.internal.api.model.PairCheckCoreResponse;

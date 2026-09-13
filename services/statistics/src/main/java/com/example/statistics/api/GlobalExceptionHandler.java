@@ -2,7 +2,9 @@ package com.example.statistics.api;
 
 import static java.util.Objects.isNull;
 
+import com.example.platform.security.AccessDenialHandler;
 import com.example.statistics.domain.service.ReadQueryRejectedException;
+import com.example.tradingbot.api.model.ErrorApiResponse;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.extern.slf4j.Slf4j;

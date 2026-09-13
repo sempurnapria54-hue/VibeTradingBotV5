@@ -3,7 +3,8 @@ package com.example.bff.api;
 import static java.util.Objects.isNull;
 
 import com.example.bff.domain.TicketRejectedException;
-import com.example.bff.integration.internal.api.PeerServiceUnavailableException;
+import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.tradingbot.api.model.ErrorApiResponse;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.extern.slf4j.Slf4j;

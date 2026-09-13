@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
@@ -16,7 +17,6 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealShutdownEdgeException;
 import com.example.tradingcore.domain.deal.DealStatusEdgeService;
-import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.mapping.CoreEventMessageMapper;
 import com.example.tradingcore.mapping.CoreEventMessageMapperImpl;

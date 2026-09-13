@@ -1,5 +1,6 @@
 package com.example.tradingcore;
 
+import static com.example.platform.util.Constants.Audit.SYSTEM_PRINCIPAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,14 +9,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.mapping.AccountInstrumentStateMapper;
 import com.example.tradingcore.persistence.model.AccountInstrumentStateEntity;
 import com.example.tradingcore.persistence.repository.AccountInstrumentStateRepository;
-import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
-import com.example.tradingcore.util.Constants;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -51,7 +51,7 @@ class AccountInstrumentStateTest {
 
         verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT),
                 eq(Instrument.SafetyRung.ACTIVE.name()), eq(Instrument.MarginMode.ISOLATED.name()),
-                eq(Constants.Audit.SYSTEM_PRINCIPAL));
+                eq(SYSTEM_PRINCIPAL));
         assertThat(state.getLeverage()).isNull();
         assertThat(state.isMarginIsolated()).isTrue();
         assertThat(state.hasStandingSafetyRung()).isFalse();

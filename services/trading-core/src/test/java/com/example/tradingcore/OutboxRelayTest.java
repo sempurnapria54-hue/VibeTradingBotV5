@@ -11,10 +11,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingcore.config.OutboxRelayProperties;
-import com.example.tradingcore.domain.jobs.JobExecutionGuard;
 import com.example.tradingcore.domain.jobs.OutboxRelayJob;
 import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.integration.internal.event.EventPublisher;

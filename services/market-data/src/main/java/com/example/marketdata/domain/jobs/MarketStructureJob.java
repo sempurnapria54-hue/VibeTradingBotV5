@@ -13,6 +13,7 @@ import com.example.marketdata.persistence.service.CandleGroupDataService;
 import com.example.marketdata.persistence.service.ComputationConfigDataService;
 import com.example.marketdata.persistence.service.IndicatorDataService;
 import com.example.marketdata.persistence.service.MarketStructureDataService;
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.indicator.AtrValue;

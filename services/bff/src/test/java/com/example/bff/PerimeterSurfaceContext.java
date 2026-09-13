@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.example.bff.api.AccessDenialHandler;
 import com.example.bff.api.GlobalExceptionHandler;
 import com.example.bff.api.controller.PerimeterController;
 import com.example.bff.api.controller.ProxyController;
@@ -18,9 +17,11 @@ import com.example.bff.domain.stream.StreamRegistry;
 import com.example.bff.integration.internal.api.AuthMembershipClient;
 import com.example.bff.integration.internal.api.OwnerProxyClient;
 import com.example.bff.integration.internal.api.model.MembershipApiModel;
+import com.example.platform.security.AccessDenialHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -71,9 +72,15 @@ class PerimeterSurfaceContext {
         return new ObjectMapper().findAndRegisterModules();
     }
 
+    /**
+     * Писателя следа у периметра нет, и пустота здесь — ПРЕДМЕТ,
+     * а не недонастроенность контекста: у периметра базы нет, и след
+     * отказа там — лог и метрика (docs/rules/api-access-policy.md
+     * §«След отказа пишет тот, у кого есть база»).
+     */
     @Bean
     AccessDenialHandler accessDenialHandler(ObjectMapper objectMapper) {
-        return new AccessDenialHandler(objectMapper);
+        return new AccessDenialHandler(Optional.empty(), objectMapper);
     }
 
     @Bean

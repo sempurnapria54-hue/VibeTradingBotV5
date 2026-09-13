@@ -1,6 +1,7 @@
 package com.example.auth.api;
 
 import com.example.auth.domain.service.ContourNotAdmittedException;
+import com.example.tradingbot.api.model.ErrorApiResponse;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.http.HttpStatus;

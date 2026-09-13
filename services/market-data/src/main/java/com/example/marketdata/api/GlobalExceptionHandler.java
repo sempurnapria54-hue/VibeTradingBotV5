@@ -2,6 +2,7 @@ package com.example.marketdata.api;
 
 import com.example.marketdata.integration.internal.api.ExchangeAccessException;
 import com.example.marketdata.integration.internal.api.ExchangeReadException;
+import com.example.tradingbot.api.model.ErrorApiResponse;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.http.HttpStatus;

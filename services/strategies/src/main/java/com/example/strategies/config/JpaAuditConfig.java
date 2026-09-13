@@ -1,6 +1,6 @@
 package com.example.strategies.config;
 
-import com.example.strategies.domain.service.ActorProvider;
+import com.example.platform.security.ActorProvider;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;

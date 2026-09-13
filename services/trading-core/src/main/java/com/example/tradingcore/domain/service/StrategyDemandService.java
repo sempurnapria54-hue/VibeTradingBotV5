@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import com.example.platform.client.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.MarketStructureParams;
@@ -13,7 +14,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMa
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingcore.integration.internal.api.MarketDataDemandClient;
-import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
 import com.example.tradingcore.integration.internal.api.model.ComputationConfigResponse;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;

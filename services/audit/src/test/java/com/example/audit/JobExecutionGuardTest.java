@@ -2,7 +2,7 @@ package com.example.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.audit.domain.jobs.JobExecutionGuard;
+import com.example.platform.jobs.JobExecutionGuard;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;

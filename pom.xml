@@ -34,6 +34,9 @@
     <modules>
         <module>services/common/model/domain</module>
         <module>services/common/model/message</module>
+        <module>services/common/model/persistence</module>
+        <module>services/common/model/api</module>
+        <module>services/common/platform</module>
         <module>services/common/strategy-engine</module>
         <module>services/common/test-support</module>
         <module>services/audit</module>

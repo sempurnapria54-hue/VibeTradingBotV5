@@ -5,12 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
-import com.example.audit.api.AccessDenialHandler;
 import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.domain.service.AccessDenialService;
+import com.example.platform.security.AccessDenialHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * <p>Подменяется здесь <b>коллаборатор</b> — писатель, у которого своя
  * проверка ({@code AccessDenialRowTest}); предмет этой пробы — тропа, а не
  * запись (.claude/rules/codestyle.md §«Тесты доменных моделей»).
+ *
+ * <p><b>Класс отказа читается теперь по ТОМУ, КАКОЙ метод порта
+ * вызван</b>, а не по аргументу-перечню: точки входа лежат в общем
+ * артефакте периметра и доменного перечня не видят
+ * ({@code AccessDenialRecorder}). Предмет пробы от этого не меняется:
+ * порядок — след до ответа — мерится тем же состоянием ответа
+ * в момент вызова.
  */
 class AccessDenialTrailTest {
 
@@ -57,12 +65,19 @@ class AccessDenialTrailTest {
     void setUp() {
         doAnswer(invocation -> {
             attempts.add(new Attempt(invocation.getArgument(0),
-                    invocation.getArgument(1),
-                    invocation.getArgument(2),
+                    AccessDenial.Outcome.PRINCIPAL_ABSENT,
+                    null,
                     response.getStatus()));
             return null;
-        }).when(writer).record(any(), any(), any());
-        handler = new AccessDenialHandler(writer, new ObjectMapper().findAndRegisterModules());
+        }).when(writer).recordPrincipalAbsent(any());
+        doAnswer(invocation -> {
+            attempts.add(new Attempt(invocation.getArgument(0),
+                    AccessDenial.Outcome.OPERATION_FORBIDDEN,
+                    invocation.getArgument(1),
+                    response.getStatus()));
+            return null;
+        }).when(writer).recordOperationForbidden(any(), any());
+        handler = new AccessDenialHandler(Optional.of(writer), new ObjectMapper().findAndRegisterModules());
     }
 
     @AfterEach

@@ -8,6 +8,7 @@ import com.example.audit.config.JournalCleanupProperties;
 import com.example.audit.config.ReceptionProperties;
 import com.example.audit.domain.model.JournalRetentionProfile;
 import com.example.audit.domain.service.JournalCleanupService;
+import com.example.platform.jobs.JobExecutionGuard;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Objects;

@@ -1,5 +1,6 @@
 package com.example.audit.persistence.model.journal;
 
+import com.example.tradingbot.persistence.model.AuditableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

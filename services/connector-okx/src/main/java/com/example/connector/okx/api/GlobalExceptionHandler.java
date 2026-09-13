@@ -5,13 +5,14 @@ import com.example.connector.okx.integration.external.api.CredentialsRejectedExc
 import com.example.connector.okx.integration.external.api.ExchangeIntegrationException;
 import com.example.connector.okx.integration.external.api.ExternalInvariantViolationException;
 import com.example.connector.okx.integration.external.api.ExternalStatusException;
+import com.example.tradingbot.api.model.ErrorApiResponse;
 import com.example.tradingbot.domain.exchange.ExchangeFailureClass;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.vault.VaultException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientException;
 

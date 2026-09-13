@@ -1,6 +1,7 @@
 package com.example.tradingcore.api;
 
-import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
+import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.tradingbot.api.model.ErrorApiResponse;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.http.HttpStatus;

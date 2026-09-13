@@ -8,6 +8,7 @@ import com.example.marketdata.domain.service.CandleLoader;
 import com.example.marketdata.domain.service.InstrumentCatalogService;
 import com.example.marketdata.integration.internal.api.ExchangeAccessException;
 import com.example.marketdata.persistence.service.CandleGroupDataService;
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import java.time.Instant;
 import java.util.List;

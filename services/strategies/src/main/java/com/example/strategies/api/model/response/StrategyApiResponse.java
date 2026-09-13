@@ -4,6 +4,7 @@ import com.example.strategies.api.model.strategy.StrategyDetailApiModel;
 import com.example.strategies.api.model.strategy.StrategyIndicatorSettingApiModel;
 import com.example.strategies.api.model.strategy.StrategyMarketPhaseSettingApiModel;
 import com.example.strategies.api.model.strategy.StrategyMarketStructureSettingApiModel;
+import com.example.tradingbot.api.model.AuditableApiResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.Getter;

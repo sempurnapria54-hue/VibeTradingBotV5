@@ -2172,7 +2172,7 @@ RETIRED = [
             ('docs/components/OutboxRelayJob.md', None),
             ('services/common/model/message/src/main/java/com/example/tradingbot/message/'
              'EventEnvelopeMessage.java', None),
-            ('services/strategies/src/main/java/com/example/strategies/domain/jobs/JobExecutionGuard.java', None),
+            ('services/common/platform/src/main/java/com/example/platform/jobs/JobExecutionGuard.java', None),
         ),
     },
     {

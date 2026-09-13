@@ -1,10 +1,10 @@
 package com.example.tradingcore;
 
+import static com.example.platform.util.Constants.Audit.SYSTEM_PRINCIPAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.platform.security.ActorProvider;
 import com.example.tradingcore.config.AsyncActorContextConfigurer;
-import com.example.tradingcore.domain.service.ActorProvider;
-import com.example.tradingcore.util.Constants;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -58,7 +58,7 @@ class ActorProviderTest {
     void anEmptyContextYieldsTheContourClass() {
         assertThat(actorProvider.currentActor())
                 .as("пусто в контексте означает «внешнего инициатора нет» — это признак, а не умолчание")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /** Открытые точки контура отдают анонима; удостоверённым он не является. */
@@ -70,7 +70,7 @@ class ActorProviderTest {
 
         assertThat(actorProvider.currentActor())
                 .as("имя анонима утверждало бы, что ход начал субъект, которого контур не удостоверил")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /** Заявленное, но не принятое имя — то же, что и непредъявленное. */
@@ -82,7 +82,7 @@ class ActorProviderTest {
 
         assertThat(actorProvider.currentActor())
                 .as("заявленное, но не удостоверенное имя было бы записью непроверенного как факта")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /** Ход, порождённый внешним вызовом под предъявленным принципалом. */
@@ -125,7 +125,7 @@ class ActorProviderTest {
 
         assertThat(actorSeenBy(new SimpleAsyncTaskExecutor()))
                 .as("голый исполнитель отдал бы правдоподобное и неверное значение")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /** Актор, увиденный задачей, которую исполнил переданный исполнитель. */

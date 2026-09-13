@@ -53,6 +53,33 @@
             <artifactId>domain-model</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!--
+          Общий базовый тип audit-полей persistence-слоя: состав колонок
+          бинарен, и единственный носитель его и держит.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>persistence-model</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+        <!--
+          Общие формы api-слоя: единый error-DTO — контракт внешней
+          поверхности, и его клейм держится единственностью носителя.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>api-model</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+        <!--
+          Общие исполнители периметра: отсюда берётся резолвер актора
+          записи. Берётся ИМЕНОВАННО — через @Import на классе приложения.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>platform</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

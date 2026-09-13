@@ -1,13 +1,13 @@
 package com.example.statistics;
 
+import static com.example.platform.util.Constants.Audit.SYSTEM_PRINCIPAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import com.example.platform.security.ActorProvider;
 import com.example.statistics.config.JpaAuditConfig;
-import com.example.statistics.domain.service.ActorProvider;
 import com.example.statistics.persistence.model.AccessDenialEntity;
-import com.example.statistics.persistence.model.AuditableEntity;
-import com.example.statistics.util.Constants;
+import com.example.tradingbot.persistence.model.AuditableEntity;
 import jakarta.persistence.EntityListeners;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -72,7 +72,7 @@ class AccessDenialActorTest {
     void anEmptyContextYieldsTheContourClass() {
         assertThat(resolvedActor())
                 .as("пусто в контексте означает «внешнего инициатора нет» — это признак, а не умолчание")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /**
@@ -88,7 +88,7 @@ class AccessDenialActorTest {
 
         assertThat(resolvedActor())
                 .as("имя анонима утверждало бы, что запись создал субъект, которого контур не удостоверил")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /**
@@ -120,7 +120,7 @@ class AccessDenialActorTest {
 
         assertThat(resolvedActor())
                 .as("заявленное, но не удостоверенное имя — запись непроверенного как факта")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /**

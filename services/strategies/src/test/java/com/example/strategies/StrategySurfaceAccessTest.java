@@ -9,9 +9,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.strategies.api.AccessDenialHandler;
+import com.example.platform.security.AccessDenialHandler;
 import com.example.strategies.config.SecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -171,9 +172,16 @@ class StrategySurfaceAccessTest {
             return mock(JwtDecoder.class);
         }
 
+        /**
+         * Писателя следа здесь нет, и пустота — СОСТОЯНИЕ СЕРВИСА,
+         * а не упрощение контекста: таблицы отказов у владельца
+         * определений пока нет, и это названный долг
+         * (.claude/work/backlog.md §«Таблица отказов доступа у сервисов
+         * со своей базой»). До его закрытия след отказа здесь — лог.
+         */
         @Bean
         AccessDenialHandler accessDenialHandler(ObjectMapper objectMapper) {
-            return new AccessDenialHandler(objectMapper);
+            return new AccessDenialHandler(Optional.empty(), objectMapper);
         }
 
         /**

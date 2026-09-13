@@ -1,11 +1,15 @@
 package com.example.statistics;
 
-import com.example.statistics.config.EnvironmentProperties;
+import com.example.platform.jobs.JobExecutionGuard;
+import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.security.ActorProvider;
 import com.example.statistics.config.AggregateReadProperties;
 import com.example.statistics.config.AggregateRecomputeProperties;
+import com.example.statistics.config.EnvironmentProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -34,12 +38,24 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * настраивает, и пустой класс конфигурации был бы носителем без предмета. Формы подписки и подключений объявляют свои конфигурации —
  * там, где они и настраивают клиента ({@code ReceptionKafkaConfig},
  * {@code PersistenceConfig}).
+ *
+ * <p><b>Взятое из общего артефакта периметра названо ИМЕНОВАННО</b>, а не
+ * взято сканированием его пакета: перечень взятого читается в одном
+ * месте, а то, чего сервису не нужно, не приезжает к нему вместе с
+ * пакетом.
+ *
+ * <p><b>{@code @EntityScan} рядом нет, и это не пропуск:</b> подключений
+ * у процесса несколько, отображение объявлено явно, и аннотация
+ * умолчания на него не действует. Общий пакет базового типа
+ * audit-полей назван в области сканирования там
+ * ({@code StatisticsPersistenceConfig}).
  */
 @EnableScheduling
 @SpringBootApplication
 @EnableConfigurationProperties({EnvironmentProperties.class,
         AggregateRecomputeProperties.class,
         AggregateReadProperties.class})
+@Import({AccessDenialHandler.class, ActorProvider.class, JobExecutionGuard.class})
 public class StatisticsApplication {
 
     public static void main(String[] args) {

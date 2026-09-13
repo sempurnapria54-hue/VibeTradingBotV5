@@ -1,6 +1,6 @@
 package com.example.strategies.config;
 
-import com.example.strategies.api.AccessDenialHandler;
+import com.example.platform.security.AccessDenialHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

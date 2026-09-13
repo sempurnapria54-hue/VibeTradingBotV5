@@ -9,7 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.strategies.domain.service.ActorProvider;
+import com.example.platform.security.ActorProvider;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.service.StrategyStatusWriter;
 import com.example.strategies.domain.service.TenantRiskAppetiteReader;

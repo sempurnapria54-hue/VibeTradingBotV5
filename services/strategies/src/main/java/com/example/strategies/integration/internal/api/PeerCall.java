@@ -1,5 +1,6 @@
 package com.example.strategies.integration.internal.api;
 
+import com.example.platform.client.PeerServiceUnavailableException;
 import java.util.function.Supplier;
 import lombok.experimental.UtilityClass;
 import org.springframework.web.client.RestClientException;

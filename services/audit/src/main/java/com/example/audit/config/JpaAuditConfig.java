@@ -1,6 +1,6 @@
 package com.example.audit.config;
 
-import com.example.audit.domain.service.ActorProvider;
+import com.example.platform.security.ActorProvider;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;

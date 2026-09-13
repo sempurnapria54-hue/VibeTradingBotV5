@@ -9,6 +9,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
@@ -32,7 +33,6 @@ import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingcore.config.EntryScannerProperties;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.jobs.EntryScannerJob;
-import com.example.tradingcore.domain.jobs.JobExecutionGuard;
 import com.example.tradingcore.domain.market.MarketFeatureService;
 import com.example.tradingcore.domain.market.MarketFeatures;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;

@@ -1,6 +1,7 @@
 package com.example.bff.integration.internal.api;
 
 import com.example.bff.integration.internal.api.model.MembershipApiModel;
+import com.example.platform.client.PeerServiceUnavailableException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;

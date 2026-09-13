@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
@@ -20,7 +21,6 @@ import com.example.tradingcore.config.AnomalyJobProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.jobs.AnomalyJob;
-import com.example.tradingcore.domain.jobs.JobExecutionGuard;
 import com.example.tradingcore.domain.safety.AccountingDetectors;
 import com.example.tradingcore.domain.safety.AnomalyPassGate;
 import com.example.tradingcore.domain.safety.AnomalyReportService;

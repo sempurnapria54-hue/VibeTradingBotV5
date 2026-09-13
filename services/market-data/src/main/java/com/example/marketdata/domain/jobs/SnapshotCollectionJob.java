@@ -4,6 +4,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.marketdata.config.SnapshotCollectionProperties;
 import com.example.marketdata.domain.service.SnapshotCollector;
+import com.example.platform.jobs.JobExecutionGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

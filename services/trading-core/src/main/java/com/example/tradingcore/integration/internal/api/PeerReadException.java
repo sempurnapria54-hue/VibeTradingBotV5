@@ -1,5 +1,7 @@
 package com.example.tradingcore.integration.internal.api;
 
+import com.example.platform.client.PeerServiceUnavailableException;
+
 /**
  * Сосед по ярусу домена ответил отказом на НАШ запрос: {@code 4xx},
  * включая отказ идентичности.

@@ -10,11 +10,11 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
+import com.example.platform.client.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.exchange.ExchangeFailureClass;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
 import com.example.tradingcore.config.NeighbourProperties;
 import com.example.tradingcore.integration.internal.api.PeerReadException;
-import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
 import com.example.tradingcore.integration.internal.api.ServiceTokenProvider;
 import com.example.tradingcore.integration.internal.api.exchange.ControlledExchangeException;
 import com.example.tradingcore.integration.internal.api.exchange.CredentialsRejectedException;

@@ -2,12 +2,12 @@ package com.example.tradingcore.domain.service;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
+import com.example.platform.client.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingcore.integration.internal.api.AuthReadClient;
 import com.example.tradingcore.integration.internal.api.MarketDataReadClient;
-import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
 import com.example.tradingcore.integration.internal.api.model.ExchangeAccountAuthResponse;
 import com.example.tradingcore.integration.internal.api.model.InstrumentMarketDataResponse;
 import com.example.tradingcore.mapping.ExchangeAccountMapper;

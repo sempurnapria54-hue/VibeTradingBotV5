@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  platform — общий артефакт ИСПОЛНИТЕЛЕЙ ПЕРИМЕТРА: то, что у каждого
+  сервиса одинаково не по предмету, а по устройству контура — охрана
+  джобы, резолвер актора, точки входа отказа доступа, исходящая сервисная
+  идентичность (docs/architecture/services.md §«Общие артефакты
+  монорепозитория»). Собирается в сервисы, сам не разворачивается.
+
+  ЗАЧЕМ ОН ПОЯВИЛСЯ И НЕ РАНЬШЕ. Условие было названо заранее и
+  сработало: у предиката актора появился ЧЕТВЁРТЫЙ носитель, а дом
+  правила у него один (docs/models/domain/other/Auditable.md §«Область
+  значений актора»), — и парковка называла ровно этот артефакт условием
+  возврата: «общий артефакт уровня периметра, которому Spring Security и
+  так обязателен». До четвёртой копии копия была дешевле общего носителя,
+  с четвёртой — дороже (.claude/rules/design-simplicity.md).
+
+  БЕЗ АВТОКОНФИГУРАЦИИ И БЕЗ СКАНИРОВАНИЯ. Потребитель забирает отсюда
+  ИМЕНОВАННО — через @Import на своём классе приложения, — и перечень
+  взятого читается в одном месте. Сканирование пакета втянуло бы и то,
+  чего сервису не нужно: конфигурация исходящей идентичности требует
+  oauth2-client, а он есть не у всех.
+
+  ЗАВИСИМОСТИ ВВОДЯТСЯ ПО ПРЕДЪЯВЛЕННОЙ ПОТРЕБНОСТИ И НАЗВАНЫ РЯДОМ.
+  Всякая зависимость здесь становится обязательной для потребителя
+  (.claude/rules/codestyle.md §«Новый модуль монорепозитория»), поэтому
+  ниже нет ни одной, которой у всех потребителей уже не было бы через их
+  собственные стартеры.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>platform</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>platform</name>
+    <description>Общие исполнители периметра: охрана джобы, актор, отказ доступа, сервисная идентичность</description>
+
+    <properties>
+        <java.version>25</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Единый error-DTO: точки входа отказа собирают ТО ЖЕ тело, что и
+             глобальный обработчик, иначе клейм «единый DTO» ложен. -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>api-model</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+
+        <!--
+          Commons Lang3 — не удобство, а требование конвенции:
+          .claude/rules/codestyle.md §«Строгие правила» предписывает
+          BooleanUtils вместо прямых отрицаний. У всех потребителей он и так
+          обязателен — приезжает вместе с domain-model.
+        -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <!--
+          Лог пропущенного тика идёт через slf4j — тот же фасад, что и у
+          сервисов; реализацию привозит потребитель со своим каркасом.
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- @Component / @Configuration и стереотипы: все потребители — Boot-сервисы. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+        <!-- Точки входа отказа пишут в HttpServletResponse и читают запрос. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+        <!--
+          АПИ сервлета — через tomcat-embed-core в области provided, а не
+          отдельным jakarta.servlet-api: классы те же, но именно этот
+          артефакт привозит каждому потребителю spring-boot-starter-web.
+          Второй носитель тех же классов на пути сборки — лишний
+          разъезд версий без выигрыша.
+        -->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <scope>provided</scope>
+            <exclusions>
+                <!--
+                  Аннотации контейнера здесь не читаются ни одним
+                  классом: нужен только jakarta.servlet.http.
+                -->
+                <exclusion>
+                    <groupId>org.apache.tomcat</groupId>
+                    <artifactId>tomcat-annotations-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Резолвер актора читает контекст, точки входа реализуют контракты
+             фильтр-цепочки: у всех потребителей приезжает
+             spring-boot-starter-oauth2-resource-server. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-web</artifactId>
+        </dependency>
+        <!-- Тело отказа сериализуется тем же ObjectMapper, что и у сервиса:
+             отказ доступа возникает ДО контроллера, и конвертеры сообщений
+             до него не доходят. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!--
+          oauth2-client — ОБЛАСТЬ optional, и это несущее. Исходящая
+          сервисная идентичность нужна только тем, кто ходит к соседям
+          (market-data, strategies, trading-core); у остальных пяти стартера
+          нет, и транзитивная зависимость сделала бы его обязательным для
+          них. Класс конфигурации грузится только по явному @Import, то есть
+          ровно у тех, кто стартер объявил сам.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              Ломбок — процессор аннотаций, и путь к нему объявляется
+              явно: родитель его версию управляет, но в processorPath не
+              ставит. Без него аксессоры не порождаются МОЛЧА — класс
+              без собственных читателей собирается, а потребитель падает.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!--
+              Перепаковки нет: артефакт не приложение, а библиотека. Плагин
+              Boot, унаследованный от родителя, обычную банку заменил бы
+              исполняемой, и потребитель не увидел бы её классов.
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

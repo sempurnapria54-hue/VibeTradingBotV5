@@ -13,6 +13,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.client.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.AtrParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
@@ -23,10 +24,9 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMa
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
-import com.example.tradingcore.integration.internal.api.MarketDataDemandClient;
-import com.example.tradingcore.integration.internal.api.PeerServiceUnavailableException;
-import com.example.tradingcore.integration.internal.api.model.ComputationConfigResponse;
 import com.example.tradingcore.domain.service.StrategyDemandService;
+import com.example.tradingcore.integration.internal.api.MarketDataDemandClient;
+import com.example.tradingcore.integration.internal.api.model.ComputationConfigResponse;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
 import com.fasterxml.jackson.databind.ObjectMapper;

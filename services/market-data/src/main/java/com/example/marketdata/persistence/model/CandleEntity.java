@@ -2,6 +2,7 @@ package com.example.marketdata.persistence.model;
 
 import com.example.marketdata.util.Constants;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
+import com.example.tradingbot.persistence.model.AuditableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

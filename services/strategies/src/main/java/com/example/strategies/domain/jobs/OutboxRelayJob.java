@@ -3,6 +3,7 @@ package com.example.strategies.domain.jobs;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.strategies.config.OutboxRelayProperties;
 import com.example.strategies.integration.internal.event.EventPublisher;
 import com.example.strategies.persistence.model.OutboxEntity;

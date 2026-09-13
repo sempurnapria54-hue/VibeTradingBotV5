@@ -2,6 +2,7 @@ package com.example.statistics.domain.jobs;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.statistics.config.AggregateRecomputeProperties;
 import com.example.statistics.domain.service.AggregateRecomputeService;
 import java.time.LocalDate;

@@ -13,9 +13,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.statistics.config.AggregateRecomputeProperties;
 import com.example.statistics.domain.jobs.AggregateRecomputeJob;
-import com.example.statistics.domain.jobs.JobExecutionGuard;
 import com.example.statistics.domain.service.AggregateRecomputeService;
 import java.time.Duration;
 import java.time.LocalDate;

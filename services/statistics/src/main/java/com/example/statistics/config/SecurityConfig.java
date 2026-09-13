@@ -1,6 +1,6 @@
 package com.example.statistics.config;
 
-import com.example.statistics.api.AccessDenialHandler;
+import com.example.platform.security.AccessDenialHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

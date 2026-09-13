@@ -14,11 +14,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.audit.api.AccessDenialHandler;
 import com.example.audit.config.SecurityConfig;
 import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.domain.service.AccessDenialService;
+import com.example.platform.security.AccessDenialHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -137,8 +138,7 @@ class AuditSurfaceAccessTest {
     void aDeniedCallLeavesAJournalRow() throws Exception {
         mockMvc.perform(get(ARBITRARY_CLOSED_PATH)).andExpect(status().isUnauthorized());
 
-        verify(denialWriter).record(eq("GET " + ARBITRARY_CLOSED_PATH),
-                eq(AccessDenial.Outcome.PRINCIPAL_ABSENT), isNull());
+        verify(denialWriter).recordPrincipalAbsent("GET " + ARBITRARY_CLOSED_PATH);
     }
 
     /**
@@ -157,7 +157,8 @@ class AuditSurfaceAccessTest {
         assertThat(statusCode)
                 .as("проба живости обязана проходить контур доступа, а не отвергаться им")
                 .isNotIn(401, 403);
-        verify(denialWriter, never()).record(any(), any(), any());
+        verify(denialWriter, never()).recordPrincipalAbsent(any());
+        verify(denialWriter, never()).recordOperationForbidden(any(), any());
     }
 
     /**
@@ -178,7 +179,8 @@ class AuditSurfaceAccessTest {
         assertThat(statusCode)
                 .as("наблюдатель окружения токена не носит: отвергнутый съём оставил бы алерты без входа")
                 .isNotIn(401, 403);
-        verify(denialWriter, never()).record(any(), any(), any());
+        verify(denialWriter, never()).recordPrincipalAbsent(any());
+        verify(denialWriter, never()).recordOperationForbidden(any(), any());
     }
 
     /**
@@ -198,7 +200,8 @@ class AuditSurfaceAccessTest {
         assertThat(statusCode)
                 .as("вызов под принятым токеном обязан дойти до маршрутизации")
                 .isNotIn(401, 403);
-        verify(denialWriter, never()).record(any(), any(), any());
+        verify(denialWriter, never()).recordPrincipalAbsent(any());
+        verify(denialWriter, never()).recordOperationForbidden(any(), any());
     }
 
     /**
@@ -240,7 +243,7 @@ class AuditSurfaceAccessTest {
 
         @Bean
         AccessDenialHandler accessDenialHandler(AccessDenialService denialService, ObjectMapper objectMapper) {
-            return new AccessDenialHandler(denialService, objectMapper);
+            return new AccessDenialHandler(Optional.of(denialService), objectMapper);
         }
 
         /**

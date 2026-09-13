@@ -1,8 +1,8 @@
 package com.example.tradingcore.persistence.service;
 
+import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
-import com.example.tradingcore.domain.service.ActorProvider;
 import com.example.tradingcore.mapping.AccountInstrumentStateMapper;
 import com.example.tradingcore.persistence.repository.AccountInstrumentStateRepository;
 import java.util.Arrays;

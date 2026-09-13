@@ -1,5 +1,6 @@
 package com.example.strategies;
 
+import static com.example.platform.util.Constants.Audit.SYSTEM_PRINCIPAL;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -7,7 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.strategies.domain.service.ActorProvider;
+import com.example.platform.security.ActorProvider;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.service.StrategyStatusWriter;
 import com.example.strategies.domain.service.TenantRiskAppetiteReader;
@@ -174,7 +175,7 @@ class StrategyEventFormTest {
 
         assertThat(contentOfWrittenRow().path("actor").textValue())
                 .as("пусто в контексте означает «внешнего инициатора нет» — это признак, а не умолчание")
-                .isEqualTo(Constants.Audit.SYSTEM_PRINCIPAL);
+                .isEqualTo(SYSTEM_PRINCIPAL);
     }
 
     /**

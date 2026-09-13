@@ -2,6 +2,7 @@ package com.example.tradingcore.domain.jobs;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingcore.config.StrategyDemandProperties;
 import com.example.tradingcore.domain.service.StrategyDemandService;
 import lombok.RequiredArgsConstructor;

@@ -1,5 +1,6 @@
 package com.example.strategies.persistence.model;
 
+import com.example.tradingbot.persistence.model.AuditableEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
