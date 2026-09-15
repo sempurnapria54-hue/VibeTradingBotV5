@@ -19,4 +19,4 @@ ACK не runtime truth (см. `docs/rules/ack-not-runtime-truth.md`); общая
 
 ## CancelOrderCommandPayload
 
-`orderId`, `cancelReason` (`CancelReason`).
+`orderId`, `cancelReason` (`Order.CloseReason` — причина закрытия ноги; отдельного типа причины отмены в модели нет).

@@ -61,6 +61,26 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
+        <!--
+          Jackson 2 со scope test — под раннер исполнимых спецификаций
+          (src/test/.../spec), который разбирает docs/spec/*.json. Причина
+          предъявлена компилятором, а не взята впрок: без него testCompile
+          не собрал раннер (ObjectMapper, JsonParser).
+
+          SCOPE TEST НЕСУЩИЙ: правило общих артефактов делает всякую
+          зависимость `common/**` обязательной для потребителей, а раннер —
+          не форма пробы и в сервисы не уезжает. Тестовый scope держит его
+          внутри модуля.
+
+          ВЕРСИЯ НЕ ЗАКРЕПЛЕНА ЗДЕСЬ: её даёт BOM родителя. Раннер к выбору
+          между Jackson 2 и 3 отношения не имеет — он читает корпусный JSON,
+          а не провод (`.claude/rules/tech-radar.md`, строки Jackson).
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

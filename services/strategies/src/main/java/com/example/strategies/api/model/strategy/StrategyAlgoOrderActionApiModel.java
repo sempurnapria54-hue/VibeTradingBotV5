@@ -2,7 +2,6 @@ package com.example.strategies.api.model.strategy;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
@@ -27,8 +26,14 @@ public class StrategyAlgoOrderActionApiModel extends StrategyActionApiModel {
     @Schema(description = "Настройки трейлинга (TRAILING_*)")
     private TrailingSettingsApiModel trailingSettings;
 
-    @Positive
-    @DecimalMax("100")
+    /**
+     * Доля закрытия позиции защитным либо выходным действием.
+     *
+     * <p>Диапазон {@code (0; 100]} держит не аннотация, а
+     * {@code StrategyDefinitionValidator} кодом
+     * {@code STRATEGY_ACTION_FRACTION_NOT_POSITIVE} — по тому же доводу,
+     * что у доли аллокации входного действия.
+     */
     @Schema(description = "Доля закрытия позиции, % (0; 100]")
     private BigDecimal closeFractionPercents;
 

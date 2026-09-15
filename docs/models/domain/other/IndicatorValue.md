@@ -115,6 +115,31 @@ OBV; сейчас не заведён (каталог расширяем по п
 «тип → компоненты» — `docs/rules/strategy-condition-contract.md`,
 грунт — `docs/models/domain/other/MarketStructure.md`.
 
+## Персистентность
+
+- **Таблица** — `indicator_values`; гипертаблицей **не является**:
+  идентичность строки — не момент, а тройка вычисления, и ряд читается
+  окном по ней, а не по времени (`candles` и срезы — гипертаблицы, эта
+  таблица нет).
+- **Значения по типу — колонками, не JSONB.** Наследники хранятся плоско
+  (`atr`, `ema`, `rsi`, `macd_line`, `signal_line`, `histogram`,
+  `upper_band`, `middle_band`, `lower_band`, `bandwidth`, `percent_b`,
+  `stoch_k`, `stoch_d`, `obv`, `efficiency_ratio`), тип строки называет
+  `indicator_type`. Все значения — `numeric(36, 18)` и **обнуляемы**: у
+  строки заполнены только колонки своего типа, у прочих значения нет
+  (`docs/rules/absent-value-semantics.md`).
+- **Обязательны** четыре колонки идентичности: `indicator_type`,
+  `instrument_id`, `indicator_config_id`, `candle_timestamp`.
+- **Ключ уникальности** — `uk_indicator_value_identity`
+  `(instrument_id, indicator_config_id, candle_timestamp)`: тот же ключ,
+  что объявляет §«Ключевание — идентичностью вычисления».
+- **Индекс чтения** — `ix_indicator_value_latest`
+  `(instrument_id, indicator_config_id, candle_timestamp desc)`: обе
+  тропы чтения берут последнее значение либо окно назад от последнего.
+- **Ссылки** — `fk_indicator_value_config` на `indicator_configs (id)` и
+  `fk_indicator_value_instrument` на `instruments (id)`.
+- **Audit-поля** — базовые шесть (`docs/models/domain/other/Auditable.md`).
+
 ## Правила хранения
 
 - `confirmed` и `warmup` не хранятся: `IndicatorJob` сохраняет только

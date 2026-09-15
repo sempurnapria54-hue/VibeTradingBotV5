@@ -326,10 +326,11 @@ close'ом.
 
 **Гейтинг (шаг 11 фазы 2, `DOCS_CHECK_1`).** Не гейтит — исход меняет
 величину спеки, а не конструкцию двух сервисов: величины якоря
-(`legSignedStopDistance`, `legRiskAtCurrentStop`) ни в одном классе события
-не публикуются.
+(`signedStopDistance` дома `docs/spec/risk-at-stop.json` и производный
+`legRiskAtCurrentStop` дома `docs/spec/deal-risk-numbers.json`) ни в одном
+классе события не публикуются.
 
-**Вопрос.** Должны ли `legSignedStopDistance` и `legRiskAtCurrentStop`
+**Вопрос.** Должны ли `signedStopDistance` и `legRiskAtCurrentStop`
 мериться от **фактической** средней цены живого эпизода, а не от
 `Order.plannedEntryPrice`, — и что делать с ногами закрытых эпизодов, у
 которых своей средней уже нет.

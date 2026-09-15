@@ -543,17 +543,19 @@ externalAverageEntryPrice`); заявленная смещала бы контр
 ## Пол дистанции стопа
 
 **Уровень остановки убытка на убыточной стороне обязан отстоять от якоря
-не ближе round-trip комиссии:**
+не ближе round-trip комиссии**, иначе `STOP_DISTANCE_BELOW_FLOOR`.
 
-```text
-|якорь − стоп| ≥ ставка × (якорь + стоп) иначе STOP_DISTANCE_BELOW_FLOOR
-```
+Форма предиката — `docs/spec/stop-distance.json` (`stopDistanceAboveFloor`);
+сам пол (`stopDistanceFloor`) — величина подключаемого дома
+`docs/spec/risk-at-stop.json`. Здесь названа величина, а не переписана её
+форма (`.claude/rules/policy-home.md`): прежняя запись держала выражение
+модульной записью прозой и **теряла охрану стороны** — за безубытком пол не
+применяется, потому что срабатывание там убытка не фиксирует, а прозаическая
+копия требовала его безусловно.
 
-Проверка идёт на **любой** постановке и переносе уровня, у преконтроля
-(`docs/components/RiskValidator.md`); форма и примеры —
-`docs/spec/stop-distance.json` (`stopDistanceAboveFloor`); сам пол
-(`stopDistanceFloor`) — величина подключаемого дома
-`docs/spec/risk-at-stop.json`.
+Область проверки — политика, и она остаётся здесь: пол мерится на **любой**
+постановке и переносе уровня, у преконтроля
+(`docs/components/RiskValidator.md`).
 
 **У закрытой формы один дом в коде — `RiskMath`** общей библиотеки
 (`services/common/model/domain`, пакет `domain.util`). Знаковая дистанция стопа, пол

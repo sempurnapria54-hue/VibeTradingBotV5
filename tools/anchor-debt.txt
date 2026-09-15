@@ -13,10 +13,6 @@
 .claude/processes/question-delegation.md	4
 .claude/skills/classify-type.md	Персистентность
 .claude/skills/place-knowledge.md	«Первоисточник правила»
-.claude/tests/source-api/okx/code-preconditions.md	AG1.9
-.claude/tests/source-api/okx/code-preconditions.md	«Гейт грунта»
-.claude/tests/source-api/okx/code-preconditions.md	«Грунт `integrator`»
-.claude/tests/source-api/okx/code-preconditions.md	«Что это значит для гейта»
 .claude/tests/source-api/okx/plan.md	AG1.5/§AG3.4/§AG3.5
 .claude/tests/source-api/okx/plan.md	Climit.
 .claude/tests/source-api/okx/plan.md	MG-базис

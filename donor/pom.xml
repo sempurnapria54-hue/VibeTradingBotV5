@@ -34,6 +34,8 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <springdoc.version>3.0.0</springdoc.version>
         <spring-cloud.version>2025.1.2</spring-cloud.version>
+        <!-- Умолчание исключения живого контура; довод — у surefire ниже. -->
+        <contour.excludedGroups>source-api-live</contour.excludedGroups>
     </properties>
 
     <dependencyManagement>
@@ -207,6 +209,33 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <!--
+              ЖИВОЙ КОНТУР ИСТОЧНИКА ИЗ УМОЛЧАНИЯ СБОРКИ ИЗЪЯТ. Кейсы
+              `@Tag("source-api-live")` бьют в биржу и требуют Vault, кредов
+              OKX и postgres-test; без них голый `mvn test` из корня падал —
+              и падал у того, кто контура не трогал (IDEA, будущий CI).
+              Отказ при этом РАЗРЕШАЮЩИЙ наоборот: красный прогон здорового
+              дерева читается как сломанное дерево.
+
+              ПОЧЕМУ ЗДЕСЬ, А НЕ В КОРНЕВОМ pom. Корневой pom агрегирует, но
+              не наследуется (комментарий в его шапке): конфигурация плагина
+              из него до донора не доезжает вовсе. Носитель выбран
+              единственный возможный, а не предпочтённый.
+
+              ЖИВОЙ ПРОГОН — явным снятием исключения, оно же и объявляет
+              намерение:
+                  mvn test -Dgroups=source-api-live -Dcontour.excludedGroups=
+              Свойство, а не прямая константа: параметр, заданный в pom
+              явно, перекрыл бы `-DexcludedGroups` с командной строки, и
+              снять исключение было бы нечем.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${contour.excludedGroups}</excludedGroups>
+                </configuration>
             </plugin>
         </plugins>
     </build>

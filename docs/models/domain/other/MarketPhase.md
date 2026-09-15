@@ -12,8 +12,7 @@
 `docs/components/MarketPhaseService.md` зовёт
 `docs/components/MarketPhaseResolver.md` — упорядоченный first-match
 поверх `StrategyConditionEvaluator` (первая клауза с истинным `condition`
-задаёт `Type`, ни одна → `UNKNOWN`; см.
-`docs/models/domain/other/MarketPhase.md`).
+задаёт `Type`, ни одна → `UNKNOWN`).
 
 `MarketPhase` **не персистируется**: своего персист-слоя, своих
 часов и своего срока свежести у фазы нет — она производная от своих

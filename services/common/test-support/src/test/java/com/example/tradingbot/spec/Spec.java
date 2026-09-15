@@ -96,9 +96,9 @@ public final class Spec {
      *       из перечня ровно те состояния, на которых правило проверяется.
      * </ul>
      *
-     * <p>Дом нормы — {@code .claude/processes/roadmap-step-execution.md}
-     * §«Популяция правила предъявляется до правки, а не после»; процедура —
-     * {@code .claude/skills/closure-population.md}.
+     * <p>Дом нормы — {@code .claude/rules/measurement-commands.md}
+     * §«Мутационная проба — условие приёмки спеки»; происхождение перечня
+     * сверяет {@code tools/population-derive-check.py}.
      */
     private final List<Map<String, Object>> populations = new ArrayList<>();
 
@@ -140,8 +140,8 @@ public final class Spec {
      * <p>Ищется вверх от рабочего каталога прогона по маркеру {@code docs/spec}.
      * Якорь нужен потому, что троп прогона две и рабочий каталог у них разный:
      * {@code tools/spec-run.sh} идёт из корня репозитория, а Maven-прогон
-     * {@code SpecRunnerTest} — из каталога сборки ({@code donor/} после
-     * реструктуризации в монорепозиторий, шаг 1 фазы 2). Пути артефактов
+     * {@code SpecRunnerTest} — из каталога сборки своего модуля
+     * ({@code services/common/test-support}). Пути артефактов
      * записаны в спеках от корня, поэтому без общего якоря одна из двух троп
      * читала бы их мимо — и падала бы системным отказом на здоровом корпусе.
      *

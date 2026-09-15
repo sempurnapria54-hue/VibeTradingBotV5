@@ -177,8 +177,9 @@ cost-price SL для split). `tpTriggerPx` vs `tpTriggerRatio` —
 используется**: источник значения —
 `AttachedAlgoOrder.triggerPriceType`, доезжающее из
 `StopLossSettings.triggerPriceType` стратегии через
-`AttachedProtectionPayload`. Дом принципа —
-`docs/rules/live-risk-protection.md`.
+`AttachedProtectionPayload`. Дом обязательности базы —
+`docs/models/domain/core/AlgoOrder.md` (довод и условие снятия), реджект
+создания — `docs/rules/strategy-validation.md`.
 
 **Amend OKX-specific — доменом не используется** (REPLACE-only,
 `docs/rules/replace-not-amend.md`): амендные поля биржи
@@ -306,7 +307,8 @@ required»). `algoId` материализованной записи нам н�
 | `failCode` | `failCode` | код отказа; операнд ветви `attachedFailsToPlace` в `docs/spec/order-lifecycle.json` и **операнд разбора тропы** у записи `state=order_failed` — персистится |
 | `failReason` | `failReason` | причина отказа; в снапшоте поле уже объявлено, в колонку не садится (лог) |
 | `sz` | `size` | объявленный размер записи — операнд покрытия (`docs/spec/protection-coverage.json`) |
-| `slTriggerPx` / `slOrdPx` | уровень защиты | сторона — как у элемента `attachAlgoOrds` |
+| `slTriggerPx` | `stopLossTriggerPrice` | уровень срабатывания защиты; сторона — как у элемента `attachAlgoOrds` |
+| `slOrdPx` | **не маппится** | цена самой заявки защиты доменного поля не имеет: защита ставится рыночной (`-1`), и хранить объявленное «по рынку» числом значило бы заводить величину, у которой нет ни писателя, ни читателя (`docs/rules/writer-named-for-every-value.md`) |
 | `slTriggerPxType` | `triggerPriceType` | **операнд сверки объявленной базы** `MARK`; поле объявлено инвентарём и этой формы (`docs/models/integrations/okx/AlgoOrderOkxResponse.md`) |
 | `reduceOnly` | — | в снапшот не переносится; adapter сверяет его при разборе ответа и на несовпадении бросает нарушение биржевого инварианта (`docs/rules/external-status-resolution.md`) |
 

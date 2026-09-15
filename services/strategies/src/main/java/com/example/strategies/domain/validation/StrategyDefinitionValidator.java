@@ -7,6 +7,7 @@ import static org.apache.commons.collections4.MapUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
@@ -92,6 +93,9 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Component
 public class StrategyDefinitionValidator {
+
+    /** Верхняя граница доли объявления, проценты: диапазон обеих долей — (0; 100]. */
+    private static final BigDecimal FRACTION_PERCENTS_MAX = BigDecimal.valueOf(100);
 
     /** Допустимые ruleType в контексте классификации фазы (сравнивающие + структурно-событийные). */
     private static final Set<String> PHASE_ALLOWED_RULE_TYPES = Set.of(
@@ -1230,12 +1234,119 @@ public class StrategyDefinitionValidator {
         }
     }
 
+    /**
+     * Доля, которой действие объявлено, ПОЛОЖИТЕЛЬНА — обе доли, а не одна.
+     *
+     * <p>Предмет проверки — диапазон, а не наличие: пустая доля проходит
+     * (её наличие мерит своя проверка у входного действия). Нулевая доля —
+     * не действие нулевого размера, а отсутствие действия, и объявлять её
+     * нечем. Дом правила — docs/rules/strategy-validation.md; счётчики —
+     * docs/spec/strategy-reference.json.
+     *
+     * <p>Проверка живёт здесь, а не аннотацией api-модели: дом объявляет
+     * реджект ИМЕНОВАННЫМ кодом, а Bean Validation отвечает до тела
+     * обработчика и именованного кода не несёт — ограничение жило бы
+     * только в коде.
+     */
+    private void validateFractionPositive(BigDecimal fraction, String code, String path,
+                                          List<String> violations) {
+        if (isNull(fraction)) {
+            return;
+        }
+        if (fraction.signum() <= 0 || fraction.compareTo(FRACTION_PERCENTS_MAX) > 0) {
+            violations.add(path + " " + code + ": доля объявления лежит в (0; 100], получено " + fraction);
+        }
+    }
+
+    /**
+     * {@code BREAKEVEN} допустим только как ПЕРЕНОС уже стоящего уровня.
+     *
+     * <p>Первичной защитой он быть не может: уровень нулевого P&amp;L лежит
+     * на прибыльной стороне, поэтому worst-case выхода он не задаёт,
+     * дистанция риска схлопывается до round-trip комиссии, а сайзинг
+     * раздувается во столько же раз. Дом довода —
+     * docs/spec/stop-distance.json §{@code breakevenRoleAllowed}; форма на
+     * дереве стратегии — docs/spec/strategy-reference.json
+     * §{@code breakevenAsPrimaryStop}.
+     *
+     * <p>Способ читается с ОБОИХ носителей уровня — своих настроек стопа и
+     * настроек встроенной защиты входа: иначе тот же BREAKEVEN проходил бы
+     * второй тропой.
+     */
+    private void validateBreakevenIsTransfer(StrategyActionApiModel action, StopLossSettingsApiModel ownStop,
+                                             StopLossSettingsApiModel attachedStop, String path,
+                                             List<String> violations) {
+        String calculationType = nonNull(ownStop) && nonNull(ownStop.getCalculationType())
+                ? ownStop.getCalculationType()
+                : nonNull(attachedStop) ? attachedStop.getCalculationType() : null;
+        if (isFalse(StopLossCalculationType.BREAKEVEN.name().equals(calculationType))) {
+            return;
+        }
+        if (isFalse(levelTransfer(action))) {
+            violations.add(path + " STRATEGY_BREAKEVEN_NOT_A_TRANSFER: "
+                    + "BREAKEVEN объявляется только защитным REPLACE_ACTION с targetActionKey");
+        }
+    }
+
+    /**
+     * Действие ПЕРЕНОСИТ уже стоящий уровень: защитный {@code REPLACE_ACTION}
+     * с названной целью (docs/spec/strategy-reference.json
+     * §{@code actionIsLevelTransfer}). Всё прочее — первичная постановка.
+     */
+    private Boolean levelTransfer(StrategyActionApiModel action) {
+        return action instanceof StrategyAlgoOrderActionApiModel
+                && StrategyActionType.REPLACE_ACTION.name().equals(action.getActionType())
+                && isNotBlank(action.getTargetActionKey());
+    }
+
+    /**
+     * База срабатывания ЗАЩИТНОЙ условной заявки — только {@code MARK}.
+     *
+     * <p>Ликвидацию биржа считает по марк-цене, а last-цену на тонком рынке
+     * двигают единичной сделкой: стоп по {@code LAST} снимается манипуляцией,
+     * не сдвинув марк, а в обратном случае марк уходит к ликвидации, пока
+     * {@code LAST}-триггер молчит. Дом довода и условия снятия —
+     * docs/models/domain/core/AlgoOrder.md; реджект объявлен
+     * docs/rules/strategy-validation.md.
+     *
+     * <p>Область — защитная условная заявка по собственному типу условия
+     * (docs/spec/strategy-reference.json §{@code isProtectiveAction}): у
+     * СНИМАЮЩЕГО действия тип условия лишь копирует тип цели, и решение на
+     * копии стоять не может.
+     */
+    private void validateProtectiveTriggerIsMark(StrategyAlgoOrderActionApiModel action, String path,
+                                                 List<String> violations) {
+        if (isFalse(PROTECTIVE_CONDITION_TYPES.contains(action.getConditionType()))) {
+            return;
+        }
+        requireMarkTrigger(action.getTriggerPriceType(), path + ".triggerPriceType", violations);
+        if (nonNull(action.getStopLossSettings())) {
+            requireMarkTrigger(action.getStopLossSettings().getTriggerPriceType(),
+                    path + ".stopLossSettings.triggerPriceType", violations);
+        }
+    }
+
+    private void requireMarkTrigger(String triggerPriceType, String path, List<String> violations) {
+        if (isNull(triggerPriceType)) {
+            return;
+        }
+        if (isFalse(AlgoOrder.TriggerPriceType.MARK.name().equals(triggerPriceType))) {
+            violations.add(path + " STRATEGY_TRIGGER_PRICE_TYPE_NOT_MARK: "
+                    + "защита срабатывает только по MARK, получено " + triggerPriceType);
+        }
+    }
+
     private void validateOrderAction(StrategyOrderActionApiModel action, String path,
                                      Map<String, IndicatorValue.Type> indicatorTypes,
                                      Set<String> structureKeys, List<String> violations) {
         validateEnum(Order.Type.class, action.getOrderType(), path + ".orderType", violations);
         validateEnum(StrategyTradeDirection.class, action.getDirection(), path + ".direction", violations);
         validateEntryAllocationDeclared(action, path, violations);
+        validateFractionPositive(action.getAllocationPercents(), "STRATEGY_ACTION_ALLOCATION_NOT_POSITIVE",
+                path + ".allocationPercents", violations);
+        validateBreakevenIsTransfer(action, null,
+                nonNull(action.getAttachedProtection()) ? action.getAttachedProtection().getStopLossSettings() : null,
+                path, violations);
         if (nonNull(action.getPlacement())) {
             validatePlacement(action, path + ".placement", structureKeys, violations);
         }
@@ -1299,6 +1410,10 @@ public class StrategyDefinitionValidator {
                                          List<String> violations) {
         validateEnum(AlgoOrder.ConditionType.class, action.getConditionType(), path + ".conditionType", violations);
         validateLevelSourceUnambiguous(action, path, violations);
+        validateFractionPositive(action.getCloseFractionPercents(), "STRATEGY_ACTION_FRACTION_NOT_POSITIVE",
+                path + ".closeFractionPercents", violations);
+        validateProtectiveTriggerIsMark(action, path, violations);
+        validateBreakevenIsTransfer(action, action.getStopLossSettings(), null, path, violations);
         if (nonNull(action.getTriggerPriceType())) {
             validateEnum(AlgoOrder.TriggerPriceType.class, action.getTriggerPriceType(),
                     path + ".triggerPriceType", violations);

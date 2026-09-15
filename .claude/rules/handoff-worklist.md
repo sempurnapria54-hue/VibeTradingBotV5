@@ -156,5 +156,5 @@
 - Форма клейма — `.claude/rules/self-description-form.md`.
 - Свип снятой редакции и его популяция —
   `.claude/rules/edit-kind-obligations.md` §«Свип снятой редакции».
-- Происхождение (эскалация С5 узла 3 `GAPS_CLOSE_1` и реакция Д1505) — отчёт
+- Происхождение — отчёт
   прохода `.claude/work/history/2026-09-12-phase-2-step-11-split/phase-2-step-11-handoff-worklist-pass.md`.

@@ -1,6 +1,6 @@
 {
   "subject": "statistics-aggregates",
-  "question": "Что считает строка агрегата статистики и на какой популяции сделок",
+  "question": "Что считает строка агрегата статистики",
   "home": "docs/rules/statistics-aggregates.md",
   "operands": {
     "tookRisk": "сделка приняла риск: у неё была живая позиция. Ложь — тропа закрытия без входа (docs/rules/deal-without-operations.md): кандидат дошёл до терминала, не торгуя",

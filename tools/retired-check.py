@@ -1232,8 +1232,8 @@ RETIRED = [
         'allowed': ('.claude/decisions/acceptance-by-measurement.md',
                     '.claude/work/decision-digest.md',
                     '.claude/processes/roadmap-step-execution.md',
-                    'donor/src/test/java/com/example/tradingbot/spec/Spec.java',
-                    'donor/src/test/java/com/example/tradingbot/spec/SpecMutation.java',
+                    'services/common/test-support/src/test/java/com/example/tradingbot/spec/Spec.java',
+                    'services/common/test-support/src/test/java/com/example/tradingbot/spec/SpecMutation.java',
                     'tools/retired-check.py'),
         # Популяция добыта по состоянию корпуса ДО снятия (git show HEAD:<файл>
         # | grep -c provenBy): пять спек и одно правило. На месте снятого встало

@@ -106,8 +106,7 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 тренд/шум) и ATR (толеранс кластеризации, D3) — по «мягким» ключам
 `StrategyMarketStructureSetting.efficiencyRatioKey` / `atrKey`, и
 `MarketStructureParams`. Скаляры резолверу подаёт `MarketStructureJob`,
-извлекая их из готового `IndicatorValue` (fork-A —
-`docs/models/domain/other/MarketStructure.md`):
+извлекая их из готового `IndicatorValue` (fork-A):
 
 - **ER-вход не объявлен** (`efficiencyRatioKey` null) → резолвер считает
   внутренний прокси (нетто-ход окна / суммарный побарный ход — мини-ER по
@@ -170,6 +169,34 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 подтверждённым пробоем. Жив, пока его не сломал подтверждённый пробой или
 не переподтвердил новый расчёт (expiration ловит «расчёт остановился», не
 «смерть уровня»).
+
+## Персистентность
+
+Таблиц две: каркас структуры и её уровни.
+
+- **`market_structures`** — каркас. Обязательны `instrument_id`,
+  `market_structure_config_id`, `type`, `window_start_at`,
+  `window_end_at`; `confirmed_at` и четыре колонки пробоя
+  (`breakout_broken_level_type`, `breakout_direction`,
+  `breakout_level_price`, `breakout_confirmed_at`) обнуляемы — пробоя у
+  окна может не быть вовсе (§«MarketBreakoutEvent (раздел)»). Ключ
+  уникальности `uk_market_structure_identity`
+  `(instrument_id, market_structure_config_id, window_end_at)`; индекс
+  чтения `ix_market_structure_latest` по тем же операндам с `window_end_at
+  desc`. Ссылки — на `market_structure_configs (id)` и `instruments (id)`.
+- **`market_price_levels`** — уровни, **реляционно, а не JSONB**: в
+  отличие от уровней биржевой книги, на них ведут решения потребителя, и
+  у каждого своя пара моментов. Обязательны `market_structure_id`, `type`
+  и `price`; `detected_at` и `confirmed_at` обнуляемы. Ключа уникальности
+  нет: у одного каркаса законно несколько уровней одного типа с разной
+  ценой. Ссылка на каркас — `on delete cascade`: уровень вне своего
+  окна смысла не имеет. Индекс — `ix_market_price_level_structure`
+  `(market_structure_id)`, то есть тропа чтения одна — «уровни этого
+  каркаса».
+- **Фазы рынка таблицы не имеют намеренно** — фаза вычисляется на лету
+  (`docs/models/domain/other/MarketPhase.md`).
+- **Audit-поля** — базовые шесть у обеих таблиц
+  (`docs/models/domain/other/Auditable.md`).
 
 ## Правила хранения
 
