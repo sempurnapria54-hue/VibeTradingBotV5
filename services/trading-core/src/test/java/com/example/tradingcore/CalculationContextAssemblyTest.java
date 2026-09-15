@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.strategy.engine.calc.CalculationContext;
-import com.example.strategy.engine.calc.CalculationException;
+import com.example.strategy.engine.exception.CalculationException;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;

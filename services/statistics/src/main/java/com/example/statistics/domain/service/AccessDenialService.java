@@ -4,7 +4,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.abbreviate;
 
-import com.example.platform.security.AccessDenialRecorder;
+import com.example.platform.exception.handler.AccessDenialRecorder;
 import com.example.statistics.domain.model.AccessDenial;
 import com.example.statistics.persistence.service.AccessDenialDataService;
 import com.example.tradingbot.domain.util.InternalIdFactory;

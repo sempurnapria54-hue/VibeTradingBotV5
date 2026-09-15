@@ -5,6 +5,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.strategy.engine.exception.CalculationException;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossCalculationType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossSettings;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;

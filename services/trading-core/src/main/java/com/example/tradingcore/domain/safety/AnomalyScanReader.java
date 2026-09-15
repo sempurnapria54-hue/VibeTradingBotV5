@@ -8,7 +8,7 @@ import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingcore.integration.internal.api.exchange.ControlledExchangeException;
+import com.example.tradingcore.exception.ControlledExchangeException;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import java.math.BigDecimal;
 import java.util.List;

@@ -1,7 +1,7 @@
 package com.example.bff.config;
 
 import com.example.bff.util.Constants;
-import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

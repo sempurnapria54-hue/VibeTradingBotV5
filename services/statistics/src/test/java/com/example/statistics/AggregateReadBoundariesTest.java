@@ -12,14 +12,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.statistics.config.AggregateReadProperties;
-import com.example.statistics.config.StatisticsPersistenceConfig;
 import com.example.statistics.config.ReceptionProperties;
+import com.example.statistics.config.StatisticsPersistenceConfig;
 import com.example.statistics.domain.model.AggregateGrain;
 import com.example.statistics.domain.model.AggregateQuery;
 import com.example.statistics.domain.model.ReceptionCompleteness;
 import com.example.statistics.domain.service.AggregateReadService;
 import com.example.statistics.domain.service.ReceptionCompletenessService;
-import com.example.statistics.domain.service.ReadQueryRejectedException;
+import com.example.statistics.exception.ReadQueryRejectedException;
 import com.example.statistics.persistence.service.DealAggregateDataService;
 import com.example.statistics.persistence.service.IncidentAggregateDataService;
 import com.example.statistics.persistence.service.ReceptionCompletenessSource;
@@ -226,9 +226,9 @@ class AggregateReadBoundariesTest {
     }
 
     /**
-     * Транзакционная граница названа менеджером: подключений у процесса
-     * три, и умолчания у выбора нет намеренно — неквалифицированное
-     * внедрение роняет контекст.
+     * Транзакционная граница названа менеджером: основным отображение не
+     * помечено, и умолчания у выбора нет намеренно — неквалифицированная
+     * граница сменила бы поведение молча на появлении второго менеджера.
      */
     @Test
     @DisplayName("Чтение идёт транзакцией менеджера БАЗЫ АГРЕГАТОВ, названного явно")

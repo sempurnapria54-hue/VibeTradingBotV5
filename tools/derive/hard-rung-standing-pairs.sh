@@ -17,8 +17,7 @@
 # реакции у первого хода»).
 set -euo pipefail
 # LC_ALL=C.UTF-8 обязателен у grep -P на объявленной среде (дом ловушки —
-# .claude/processes/roadmap-step-execution.md §«`grep -P` в этой среде
-# требует `LC_ALL=C.UTF-8`»).
+# .claude/rules/measurement-commands.md §«Ловушки среды»).
 scopes=$(LC_ALL=C.UTF-8 grep -oP '^\s{4}\K[A-Z_]+(?=\()' \
          services/trading-core/src/main/java/com/example/tradingcore/domain/safety/HoldScope.java)
 

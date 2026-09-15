@@ -12,8 +12,8 @@ import lombok.Setter;
 
 /**
  * Текущее состояние приёма по паре «группа потребителей × тема»
- * (docs/models/domain/other/StatisticsFact.md §«Строка состояния приёма —
- * таблица reception_states»).
+ * (docs/rules/durable-consumer-reception.md §«Строка состояния приёма —
+ * таблица `reception_states`»).
  *
  * <p><b>Ключ — пара, а не одна группа:</b> остановка приёма случается на
  * сообщении, то есть на конкретной теме, и строка на группу целиком

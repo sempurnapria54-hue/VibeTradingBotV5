@@ -37,8 +37,7 @@
 - **Обнаруженная копия стыковой истины в доке деталей — дефект
   носителя.** Закрывается сведением к дому: в деталях остаётся
   ссылка; правка копии на месте дефект не закрывает, а укрепляет.
-  Уровень такой находки — «носитель»
-  (`.claude/skills/classify-gap-level.md`).
+  Уровень такой находки — «носитель».
 
 ## Что правило обобщает
 
@@ -51,7 +50,7 @@
 деталей стареет первой; закрытие правит носитель, до которого
 дотянулось, следующий прогон находит непоправленную копию — правки
 верны поодиночке и не сходятся вместе (диагноз эскалации
-`DOCS_CHECK_29`, `.claude/decisions/proof-method-change.md`).
+`DOCS_CHECK_29`, `.claude/work/history/2026-09-15-step-machine-rework/decisions/proof-method-change.md`).
 
 ## Связи
 
@@ -59,6 +58,4 @@
 - Критерий владельца правила —
   `.claude/decisions/rule-source-of-truth.md`.
 - Дефолт минимального следа — `.claude/rules/design-simplicity.md`.
-- Уровень пробела при закрытии —
-  `.claude/skills/classify-gap-level.md`.
-- Происхождение — `.claude/decisions/proof-method-change.md`.
+- Происхождение — `.claude/work/history/2026-09-15-step-machine-rework/decisions/proof-method-change.md`.

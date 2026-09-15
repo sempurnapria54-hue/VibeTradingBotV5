@@ -52,7 +52,7 @@
   `docs/models/domain/other/StatisticsFact.md`,
   `docs/rules/statistics-aggregates.md`. **Отдельного дизайн-прохода у шага
   не было** — он снят прямым порядком держателя
-  (`.claude/decisions/step-11-holder-direct-order.md`), а оси формы закрыты
+  (`.claude/work/history/2026-09-15-step-machine-rework/decisions/step-11-holder-direct-order.md`), а оси формы закрыты
   тем же шагом (`.claude/work/history/2026-09-12-phase-2-step-11-split.md`).
 - **Продуктовый scope статистики.** Какие срезы держателю нужны, решается при
   открытии шага 13 («Фронт»), куда отложен и состав экранных операций чтения;

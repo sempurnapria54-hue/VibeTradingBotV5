@@ -14,8 +14,7 @@
 # Печатает по строке на член: условие TAB класс пакета TAB гейт повтора.
 set -euo pipefail
 # LC_ALL=C.UTF-8 обязателен у grep -P на объявленной среде (дом ловушки —
-# .claude/processes/roadmap-step-execution.md §«`grep -P` в этой среде
-# требует `LC_ALL=C.UTF-8`»).
+# .claude/rules/measurement-commands.md §«Ловушки среды»).
 home=docs/rules/strategy-step-once-per-episode.md
 classes=$(sed -n '/^### Пакет исполняется по действию за проход/,/^\*\*Применённым шаг делает/p' "$home" \
           | LC_ALL=C.UTF-8 grep -oP '^\| `\K[A-Z_А-Я_]+(?=`)')

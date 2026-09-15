@@ -1,7 +1,7 @@
 package com.example.statistics;
 
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.platform.jobs.JobExecutionGuard;
-import com.example.platform.security.AccessDenialHandler;
 import com.example.platform.security.ActorProvider;
 import com.example.statistics.config.AggregateReadProperties;
 import com.example.statistics.config.AggregateRecomputeProperties;

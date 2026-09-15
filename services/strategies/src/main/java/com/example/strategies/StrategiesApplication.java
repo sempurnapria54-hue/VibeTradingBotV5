@@ -1,8 +1,8 @@
 package com.example.strategies;
 
 import com.example.platform.client.ServiceClientConfig;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.platform.jobs.JobExecutionGuard;
-import com.example.platform.security.AccessDenialHandler;
 import com.example.platform.security.ActorProvider;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

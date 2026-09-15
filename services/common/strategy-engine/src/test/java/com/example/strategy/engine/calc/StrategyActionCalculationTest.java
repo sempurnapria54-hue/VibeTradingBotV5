@@ -3,6 +3,7 @@ package com.example.strategy.engine.calc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.strategy.engine.exception.CalculationException;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
 import java.math.BigDecimal;

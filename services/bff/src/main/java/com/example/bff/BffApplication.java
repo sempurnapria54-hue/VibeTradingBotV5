@@ -1,6 +1,6 @@
 package com.example.bff;
 
-import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;

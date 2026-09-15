@@ -3,6 +3,7 @@ package com.example.statistics.integration.internal.event;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.statistics.exception.IncompleteEventException;
 import com.example.statistics.integration.internal.event.model.StatisticsEventMessage;
 import com.example.statistics.util.Constants;
 import com.fasterxml.jackson.core.JsonProcessingException;

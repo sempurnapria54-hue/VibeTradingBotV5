@@ -11,8 +11,8 @@ import static org.mockito.Mockito.verify;
 
 import com.example.audit.domain.model.AuditRecord;
 import com.example.audit.domain.service.AuditReceptionService;
+import com.example.audit.exception.IncompleteEventException;
 import com.example.audit.integration.internal.event.AuditEventListener;
-import com.example.audit.integration.internal.event.IncompleteEventException;
 import com.example.audit.integration.internal.event.JournalEnvelopeReader;
 import com.example.audit.integration.internal.event.ReceptionOffsetTracker;
 import com.example.audit.mapping.AuditRecordMapper;

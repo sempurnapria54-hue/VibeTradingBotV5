@@ -17,8 +17,8 @@ import com.example.audit.config.ReceptionProperties;
 import com.example.audit.domain.model.JournalCompleteness;
 import com.example.audit.domain.model.JournalQuery;
 import com.example.audit.domain.service.JournalCompletenessService;
-import com.example.audit.domain.service.ReadQueryRejectedException;
 import com.example.audit.domain.service.JournalReadService;
+import com.example.audit.exception.ReadQueryRejectedException;
 import com.example.audit.persistence.service.AuditRecordDataService;
 import com.example.audit.persistence.service.JournalCompletenessSource;
 import java.time.Duration;
@@ -189,10 +189,10 @@ class JournalReadBoundariesTest {
     }
 
     /**
-     * Менеджер транзакций назван поимённо: подключений у процесса три, и
-     * умолчания у выбора нет намеренно. Неквалифицированная граница взяла
-     * бы то из них, чьё объявление обработано первым, — и чтение журнала
-     * пошло бы по чужой тропе.
+     * Менеджер транзакций назван поимённо: основным отображение не
+     * помечено, и умолчания у выбора нет намеренно. Неквалифицированная
+     * граница сменила бы поведение молча на появлении второго менеджера —
+     * не тронув ни строки этого кода.
      */
     @Test
     @DisplayName("Чтение идёт транзакцией с НАЗВАННЫМ менеджером базы журнала, и она только читающая")

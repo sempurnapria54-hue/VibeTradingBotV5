@@ -5,12 +5,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.strategies.api.GlobalExceptionHandler;
 import com.example.strategies.api.controller.StrategyController;
 import com.example.strategies.config.SurfaceProperties;
 import com.example.strategies.domain.service.StrategyCreationService;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
+import com.example.strategies.exception.handler.GlobalExceptionHandler;
 import com.example.strategies.mapping.StrategyApiMapper;
 import com.example.strategies.persistence.service.StrategyDataService;
 import com.example.strategies.util.Constants;

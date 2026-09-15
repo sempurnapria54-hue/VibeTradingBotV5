@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
  * пережить всё, что происходит с отвергнутым запросом дальше.
  *
  * <p><b>Менеджер транзакций назван явно.</b> Умолчания у выбора нет:
- * отображений схемы на классы у процесса три, ни одно не помечено
- * основным ({@link StatisticsPersistenceConfig}), и неквалифицированный
+ * отображение схемы на классы основным не помечено
+ * ({@link StatisticsPersistenceConfig}), и неквалифицированный
  * {@code @Transactional} взял бы менеджер молча.
  */
 @Service

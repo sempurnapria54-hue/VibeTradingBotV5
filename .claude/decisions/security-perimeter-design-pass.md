@@ -94,7 +94,7 @@
 - Эскалация и величины — `.claude/work/history/2026-09-04-phase-1-step-9-security/phase-1-step-9-docs-check-3.md`.
 - Исполнение прохода и популяции —
   `.claude/work/history/2026-09-04-phase-1-step-9-security/phase-1-step-9-design-pass.md`.
-- Детектор и правило реакции — `.claude/skills/stagnation-detection.md`.
-- Третий исход эскалации — `.claude/decisions/code-contact-as-gate.md`.
+- Детектор и правило реакции — `.claude/work/history/2026-09-15-step-machine-rework/skills/stagnation-detection.md`.
+- Третий исход эскалации — `.claude/work/history/2026-09-15-step-machine-rework/decisions/code-contact-as-gate.md`.
 - Полнота закрытия по популяции —
-  `.claude/decisions/closure-completeness-by-population.md`.
+  `.claude/work/history/2026-09-15-step-machine-rework/decisions/closure-completeness-by-population.md`.

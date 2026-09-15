@@ -1,6 +1,8 @@
 package com.example.marketdata.integration.internal.api;
 
 import com.example.marketdata.config.ConnectorProperties;
+import com.example.marketdata.exception.ExchangeAccessException;
+import com.example.marketdata.exception.ExchangeReadException;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.trade.candle.Candle;

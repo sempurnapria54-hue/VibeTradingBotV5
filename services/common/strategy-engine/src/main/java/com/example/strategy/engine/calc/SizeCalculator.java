@@ -8,6 +8,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.strategy.engine.exception.CalculationException;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;

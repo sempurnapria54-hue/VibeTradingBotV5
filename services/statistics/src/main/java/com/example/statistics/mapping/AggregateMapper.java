@@ -31,7 +31,7 @@ import org.mapstruct.ReportingPolicy;
  * накопитель»).
  *
  * <p><b>Форму полноты маппер НЕ описывает, а берёт у соседа</b>
- * ({@code uses = ReceptionStateMapper.class}): величины принадлежат журналу, и
+ * ({@code uses = ReceptionStateMapper.class}): величины принадлежат приёму, и
  * второй перенос той же формы разошёлся бы с первым молча
  * (.claude/rules/policy-home.md).
  *

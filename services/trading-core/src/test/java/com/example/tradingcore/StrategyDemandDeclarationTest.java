@@ -13,7 +13,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.AtrParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;

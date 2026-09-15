@@ -11,6 +11,7 @@ import com.example.audit.domain.model.AuditRecord;
 import com.example.audit.domain.model.JournalCursor;
 import com.example.audit.domain.model.JournalPage;
 import com.example.audit.domain.model.JournalQuery;
+import com.example.audit.exception.ReadQueryRejectedException;
 import com.example.audit.persistence.service.AuditRecordDataService;
 import com.example.audit.persistence.service.JournalCompletenessSource;
 import java.time.OffsetDateTime;

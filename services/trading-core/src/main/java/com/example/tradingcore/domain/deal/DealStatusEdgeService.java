@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingcore.domain.command.DealContext;
+import com.example.tradingcore.exception.DealShutdownEdgeException;
 import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;

@@ -28,15 +28,13 @@ import org.springframework.data.repository.query.Param;
  *       обновления тика его не трогают.</li>
  * </ul>
  *
- * <p><b>Читающий запрос лежит в общем родителе, когда читателей ДВА, а не
- * потому, что он читающий.</b> Три операнда полноты
- * ({@link ReceptionStateCompletenessQueries}) читают два подключения к базе
- * журнала — своё и кросс-подключение модуля статистики, — и текст запроса у
- * них обязан быть один (docs/architecture/data-ownership.md §Раскладка).
- * Выборка моментов пары ({@link #subscribedPairMoments}) читателя имеет
- * ровно одного — тик состояния приёма, ходящий подключением владельца, — и
- * поднятая в общего родителя, она досталась бы и читателю чужой базы,
- * которому не нужна.
+ * <p><b>Читающий запрос лежит в общем родителе по предмету, а не потому,
+ * что он читающий.</b> Три операнда полноты
+ * ({@link ReceptionStateCompletenessQueries}) суть исполнимая форма
+ * величины, и текст у неё один (docs/architecture/data-ownership.md
+ * §Раскладка). Выборка моментов пары ({@link #subscribedPairMoments})
+ * формой величины не является: её читатель — тик состояния приёма, и
+ * дома у неё поэтому нет.
  */
 public interface JournalReceptionStateRepository
         extends JpaRepository<JournalReceptionStateEntity, Long>, ReceptionStateCompletenessQueries {
@@ -77,9 +75,8 @@ public interface JournalReceptionStateRepository
      *
      * <p>Той же транзакцией, что и обработка, флаг откатился бы вместе с
      * ней — то есть не появился бы ровно в том случае, ради которого
-     * заведён (docs/models/domain/other/AuditRecord.md §«Отдельная
-     * транзакция у флага остановки — не деталь реализации, а условие
-     * существования флага»).
+     * заведён (docs/rules/durable-consumer-reception.md §«Транзакционные
+     * границы»).
      */
     @Modifying
     @Query(nativeQuery = true, value = """
@@ -114,7 +111,7 @@ public interface JournalReceptionStateRepository
      * Наблюдение по паре началось заново: зафиксированного смещения группы
      * не осталось, позиция назначена умолчанием, и доказать непрерывность
      * с прежнего момента нечем
-     * (docs/models/domain/other/AuditRecord.md §«Третий исход сравнения
+     * (docs/rules/durable-consumer-reception.md §«Третий исход сравнения
      * смещений двигает границу, а не предикат»).
      *
      * <p><b>Момент только вперёд:</b> нижняя граница полноты монотонна, и
@@ -206,7 +203,7 @@ public interface JournalReceptionStateRepository
     /**
      * Ход чистки: погасить момент разрыва у пар, чей разрыв чистка вынесла
      * ЗА нижнюю границу полноты
-     * (docs/models/domain/other/AuditRecord.md §«Момент разрыва вместо
+     * (docs/rules/durable-consumer-reception.md §«Момент разрыва вместо
      * признака разрыва — решение, а не форма записи»).
      *
      * <p><b>Это единственный писатель снятия у величины.</b> Пара, чей

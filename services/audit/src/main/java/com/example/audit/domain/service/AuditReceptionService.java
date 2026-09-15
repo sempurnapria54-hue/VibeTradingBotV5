@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Транзакционные границы приёма события в журнал
- * (docs/components/AuditEventListener.md §«Транзакционные границы»).
+ * (docs/rules/durable-consumer-reception.md §«Транзакционные границы»).
  *
  * <p><b>Критерий деления один и механический:</b> одной транзакцией со
  * строкой журнала ложится то, что есть <b>следствие</b> принятого
@@ -26,8 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
  * их повод — назначение партиций.
  *
  * <p><b>Менеджер транзакций назван у каждого метода.</b> Умолчания у
- * выбора нет намеренно: подключений три, и второй менеджер приедет с
- * читателями базы агрегатов ({@link JournalPersistenceConfig}).
+ * выбора нет намеренно: основным отображение не помечено
+ * ({@link JournalPersistenceConfig}), и неквалифицированная граница
+ * сменила бы поведение молча на появлении второго менеджера.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,9 +59,7 @@ public class AuditReceptionService {
      * зовётся из обработчика ошибок, и транзакция обработки к этому моменту
      * помечена на откат. Флаг, положенный в неё, откатился бы вместе с ней
      * — то есть не появился бы ровно в том случае, ради которого заведён
-     * (docs/models/domain/other/AuditRecord.md §«Отдельная транзакция у
-     * флага остановки — не деталь реализации, а условие существования
-     * флага»).
+     * (docs/rules/durable-consumer-reception.md §«Транзакционные границы»).
      */
     @Transactional(transactionManager = JournalPersistenceConfig.JOURNAL_TRANSACTION_MANAGER,
             propagation = Propagation.REQUIRES_NEW)

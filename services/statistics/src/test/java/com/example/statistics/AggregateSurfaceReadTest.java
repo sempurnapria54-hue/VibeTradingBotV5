@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.statistics.api.GlobalExceptionHandler;
 import com.example.statistics.api.controller.AggregateController;
 import com.example.statistics.domain.model.AggregateCursor;
 import com.example.statistics.domain.model.AggregateGrain;
@@ -17,7 +16,8 @@ import com.example.statistics.domain.model.DealAggregate;
 import com.example.statistics.domain.model.IncidentAggregate;
 import com.example.statistics.domain.model.ReceptionCompleteness;
 import com.example.statistics.domain.service.AggregateReadService;
-import com.example.statistics.domain.service.ReadQueryRejectedException;
+import com.example.statistics.exception.ReadQueryRejectedException;
+import com.example.statistics.exception.handler.GlobalExceptionHandler;
 import com.example.statistics.mapping.AggregateMapper;
 import com.example.statistics.mapping.AggregateMapperImpl;
 import java.math.BigDecimal;

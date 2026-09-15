@@ -5,7 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.IndicatorParams;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.MarketStructureParams;

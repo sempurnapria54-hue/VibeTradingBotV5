@@ -2,6 +2,7 @@ package com.example.auth.domain.service;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.auth.exception.ContourNotAdmittedException;
 import com.example.auth.persistence.model.ExchangeAccountEntity;
 import com.example.auth.persistence.repository.ExchangeAccountRepository;
 import com.example.auth.persistence.repository.TenantRepository;

@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
-import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.statistics.domain.model.AccessDenial;
 import com.example.statistics.domain.service.AccessDenialService;
 import com.fasterxml.jackson.databind.ObjectMapper;

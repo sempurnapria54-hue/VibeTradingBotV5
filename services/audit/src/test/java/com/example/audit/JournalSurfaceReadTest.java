@@ -9,14 +9,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.audit.api.GlobalExceptionHandler;
 import com.example.audit.api.controller.JournalController;
 import com.example.audit.domain.model.AuditRecord;
 import com.example.audit.domain.model.JournalCompleteness;
 import com.example.audit.domain.model.JournalCursor;
 import com.example.audit.domain.model.JournalPage;
-import com.example.audit.domain.service.ReadQueryRejectedException;
 import com.example.audit.domain.service.JournalReadService;
+import com.example.audit.exception.ReadQueryRejectedException;
+import com.example.audit.exception.handler.GlobalExceptionHandler;
 import com.example.audit.mapping.AuditRecordMapper;
 import com.example.audit.mapping.AuditRecordMapperImpl;
 import java.time.OffsetDateTime;

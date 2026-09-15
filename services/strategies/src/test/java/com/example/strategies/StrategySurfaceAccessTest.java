@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.strategies.config.SecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Optional;

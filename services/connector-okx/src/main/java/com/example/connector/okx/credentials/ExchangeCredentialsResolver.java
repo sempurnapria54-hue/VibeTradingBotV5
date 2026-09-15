@@ -1,5 +1,7 @@
 package com.example.connector.okx.credentials;
 
+import com.example.connector.okx.exception.CredentialsUnavailableException;
+
 /**
  * Ключи счёта по его идентификатору.
  *

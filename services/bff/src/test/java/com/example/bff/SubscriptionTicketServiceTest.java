@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.bff.config.PerimeterProperties;
 import com.example.bff.domain.SubscriptionTicket;
 import com.example.bff.domain.SubscriptionTicketService;
-import com.example.bff.domain.TicketRejectedException;
+import com.example.bff.exception.TicketRejectedException;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

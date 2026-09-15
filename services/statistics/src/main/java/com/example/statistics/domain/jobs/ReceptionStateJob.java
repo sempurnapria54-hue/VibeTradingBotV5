@@ -26,7 +26,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Ведёт состояние приёма журнала: держит состав строк
+ * Ведёт состояние приёма статистики: держит состав строк
  * {@code reception_states} равным подписке группы и отмечает, что
  * приём жив (docs/components/ReceptionStateJob.md).
  *
@@ -50,7 +50,7 @@ import org.springframework.stereotype.Component;
  * <p><b>Ручного фасада и защиты от перекрытия у тика нет, и это
  * объявлено, а не забыто</b> (.claude/rules/codestyle.md §Джобы, клауза о
  * тике живости). Доводов два, и они разные: поверхность
- * {@code audit} <b>только читает</b>, и ручной триггер завёл бы
+ * {@code statistics} <b>только читает</b>, и ручной триггер завёл бы
  * входящую точку записи, которой инвентарь сервису не даёт; а догонять
  * тику нечего — пропущенный такт не оставляет невыполненной работы, и
  * {@code fixedDelay} следующий такт до конца текущего не запускает.

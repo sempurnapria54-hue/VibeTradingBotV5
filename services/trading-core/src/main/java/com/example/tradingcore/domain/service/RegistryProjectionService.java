@@ -2,7 +2,7 @@ package com.example.tradingcore.domain.service;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
-import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;

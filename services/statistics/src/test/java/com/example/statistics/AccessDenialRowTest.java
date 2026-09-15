@@ -170,7 +170,7 @@ class AccessDenialRowTest {
                 .as("подхваченная чужая транзакция унесла бы след отказа своим откатом")
                 .isEqualTo(Propagation.REQUIRES_NEW);
         assertThat(declared.transactionManager())
-                .as("умолчания у выбора менеджера нет: отображений схемы на классы три")
+                .as("умолчания у выбора менеджера нет: отображение основным не помечено")
                 .isEqualTo(StatisticsPersistenceConfig.STATISTICS_TRANSACTION_MANAGER);
     }
 

@@ -5,8 +5,8 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.statistics.config.AggregateReadProperties;
-import com.example.statistics.config.StatisticsPersistenceConfig;
 import com.example.statistics.config.ReceptionProperties;
+import com.example.statistics.config.StatisticsPersistenceConfig;
 import com.example.statistics.domain.model.AggregateCursor;
 import com.example.statistics.domain.model.AggregateGrain;
 import com.example.statistics.domain.model.AggregatePage;
@@ -14,6 +14,7 @@ import com.example.statistics.domain.model.AggregateQuery;
 import com.example.statistics.domain.model.DealAggregate;
 import com.example.statistics.domain.model.IncidentAggregate;
 import com.example.statistics.domain.model.ReceptionCompleteness;
+import com.example.statistics.exception.ReadQueryRejectedException;
 import com.example.statistics.persistence.service.DealAggregateDataService;
 import com.example.statistics.persistence.service.IncidentAggregateDataService;
 import com.example.statistics.persistence.service.ReceptionCompletenessSource;
@@ -78,7 +79,8 @@ public class AggregateReadService {
      * <p><b>Полнота едет одной выдачей со строками</b>, потому что читатель
      * суточной строки без предиката не отличает «за сутки было три сделки»
      * от «за сутки принято три события, а приём стои́т с 10:00»
-     * (docs/models/domain/other/StatisticsFact.md §«Как журнал читается»).
+     * (docs/rules/durable-consumer-reception.md §«Величины едут рядом с числами, а не
+     * отдельным запросом»).
      */
     @Transactional(readOnly = true,
             transactionManager = StatisticsPersistenceConfig.STATISTICS_TRANSACTION_MANAGER)

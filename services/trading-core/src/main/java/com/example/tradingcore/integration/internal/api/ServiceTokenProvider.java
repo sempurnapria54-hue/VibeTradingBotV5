@@ -2,6 +2,7 @@ package com.example.tradingcore.integration.internal.api;
 
 import static java.util.Objects.isNull;
 
+import com.example.tradingcore.exception.PeerReadException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;

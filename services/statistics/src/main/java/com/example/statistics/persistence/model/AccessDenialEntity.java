@@ -13,7 +13,7 @@ import lombok.Setter;
 /**
  * Persistence-проекция
  * {@link com.example.statistics.domain.model.AccessDenial} — таблица
- * {@code access_denials} базы журнала
+ * {@code access_denials} базы статистики
  * (docs/models/domain/other/AccessDenial.md §Персистентность).
  *
  * <p>Класс отказа хранится строкой значением {@code name()} доменного

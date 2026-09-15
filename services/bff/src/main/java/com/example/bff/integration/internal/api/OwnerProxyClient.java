@@ -4,7 +4,7 @@ import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.bff.config.PerimeterProperties;
-import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.platform.exception.PeerServiceUnavailableException;
 import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;

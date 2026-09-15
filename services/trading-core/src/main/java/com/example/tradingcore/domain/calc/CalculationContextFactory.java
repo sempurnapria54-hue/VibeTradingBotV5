@@ -6,7 +6,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.strategy.engine.calc.CalculationContext;
 import com.example.strategy.engine.calc.CalculationError;
-import com.example.strategy.engine.calc.CalculationException;
+import com.example.strategy.engine.exception.CalculationException;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;

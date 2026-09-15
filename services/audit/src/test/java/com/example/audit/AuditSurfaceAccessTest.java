@@ -2,7 +2,6 @@ package com.example.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -15,9 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.audit.config.SecurityConfig;
-import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.domain.service.AccessDenialService;
-import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;

@@ -12,13 +12,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.connector.okx.api.GlobalExceptionHandler;
 import com.example.connector.okx.api.controller.ExchangeAccountOperationsController;
 import com.example.connector.okx.api.controller.MarketDataController;
-import com.example.connector.okx.credentials.CredentialsUnavailableException;
+import com.example.connector.okx.exception.CredentialsRejectedException;
+import com.example.connector.okx.exception.CredentialsUnavailableException;
+import com.example.connector.okx.exception.ExternalStatusException;
+import com.example.connector.okx.exception.handler.GlobalExceptionHandler;
 import com.example.connector.okx.gateway.ExchangeGateway;
-import com.example.connector.okx.integration.external.api.CredentialsRejectedException;
-import com.example.connector.okx.integration.external.api.ExternalStatusException;
 import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;

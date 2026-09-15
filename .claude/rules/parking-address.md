@@ -61,9 +61,8 @@ javadoc читает лишь тот, кто открыл класс, — то �
   проектирование) закрывает владелец
   (`.claude/processes/question-delegation.md`).
 - **Не отменяет диспозиции.** Что каждая находка обязана получить исход,
-  держит `.claude/processes/roadmap-step-execution.md`
-  §«`GAPS_CLOSE_N` диспозиционирует все находки прогона»; здесь сказано
-  только, **куда** ставится исход «припаркована».
+  держит `.claude/processes/roadmap-step-execution.md` §«`REVIEW`»; здесь
+  сказано только, **куда** ставится исход «припаркована».
 
 ## Что правило снимает
 
@@ -83,11 +82,7 @@ javadoc читает лишь тот, кто открыл класс, — то �
 ## Связи
 
 - Диспозиция находок — `.claude/processes/roadmap-step-execution.md`
-  §«`GAPS_CLOSE_N` диспозиционирует все находки прогона»; её гейт —
-  `.claude/skills/update-roadmap-progress.md` §«Полная диспозиция
-  находок».
-- Третье условие остановки прогона —
-  `.claude/processes/roadmap-step-execution.md` §«Условий остановки три,
-  а не два».
+  §«`REVIEW`»; её гейт — `.claude/skills/update-roadmap-progress.md`
+  §«Гейт-предусловие перехода».
 - Диета рабочих файлов — `.claude/rules/closed-work-transfer.md`.
 - Маршрутизация дефицита — `.claude/processes/question-delegation.md`.

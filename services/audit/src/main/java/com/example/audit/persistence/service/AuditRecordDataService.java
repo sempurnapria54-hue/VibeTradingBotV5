@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
  * ложится той же транзакцией, что и снятие флага остановки и момент
  * последнего принятого события: они суть следствие принятого сообщения, а
  * откат обработки обязан уносить их вместе
- * (docs/components/AuditEventListener.md §«Транзакционные границы»).
+ * (docs/rules/durable-consumer-reception.md §«Транзакционные границы»).
  */
 @Service
 @RequiredArgsConstructor

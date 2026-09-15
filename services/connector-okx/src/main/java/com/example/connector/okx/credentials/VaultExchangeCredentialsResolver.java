@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.connector.okx.config.EnvironmentProperties;
+import com.example.connector.okx.exception.CredentialsUnavailableException;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.util.ExchangeAccountKeyPath;
 import com.example.tradingbot.domain.util.ExchangeAccountSecretFields;

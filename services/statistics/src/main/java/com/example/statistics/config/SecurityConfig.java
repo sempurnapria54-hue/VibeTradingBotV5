@@ -1,6 +1,6 @@
 package com.example.statistics.config;
 
-import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -21,10 +21,10 @@ import org.springframework.security.web.SecurityFilterChain;
  *
  * <p><b>Съём метрик открыт по тому же признаку, что и проба живости:</b>
  * его спрашивает развёртывание, а не человек, и предмета контура он не
- * называет — ни позиций, ни ступеней, ни денег, ни строк журнала. Что он
+ * называет — ни позиций, ни ступеней, ни денег, ни чисел агрегатов. Что он
  * отдаёт, названо там же: имена тем производителей, возраст последнего
  * принятого события, остаток непринятого и порог алерта — то есть
- * состояние ПРИЁМА, а не содержимое журнала. Разбор и границы —
+ * состояние ПРИЁМА, а не числа статистики. Разбор и границы —
  * docs/rules/api-access-policy.md §«Съём метрик — второе исключение».
  *
  * <p><b>Пер-операционных проверок права здесь нет намеренно.</b> При
@@ -34,10 +34,10 @@ import org.springframework.security.web.SecurityFilterChain;
  * механизм, который нечему различать.
  *
  * <p><b>Читающая поверхность контур не смягчает.</b> Команд у сервиса нет
- * по инвентарю (docs/architecture/services.md), но журнал отвечает на
- * вопрос «что происходило у тенанта», а тенант едет операндом вызова, а
+ * по инвентарю (docs/architecture/services.md), но агрегаты отвечают на
+ * вопрос «как торговал тенант», а тенант едет операндом вызова, а
  * не токеном (docs/architecture/contracts.md §«Контекст тенанта в
- * вызове»): открытое чтение отдало бы историю любого тенанта кому угодно.
+ * вызове»): открытое чтение отдало бы картину любого тенанта кому угодно.
  *
  * <p>CSRF выключен и это не унаследованная оговорка Basic-контура:
  * поверхность stateless, сессии нет, тропа — заголовок Authorization,

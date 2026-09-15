@@ -2145,7 +2145,7 @@ liquidation). Два следствия — след ADL живёт под **д�
   раздельные (fee-запись с `balChg` = `fee`, отдельная pnl-запись). Зафиксировать
   факт в `docs/models/integrations/okx/AccountBillOkxResponse.md` (провенанс
   `рантайм`, `.claude/rules/external-source-sync.md`).
-- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/processes/roadmap-step-execution.md` §4). Провенанс — H2 отчёта
+- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/tests/source-api/okx/code-preconditions.md` §«Правило гейта»). Провенанс — H2 отчёта
   `phase-1-step-7-docs-check-3.md`.
 
 ### AG3.6 Содержательный (шаг 7, B10 `DOCS_CHECK_20`) — фактический состав полей bill-записи ⏳ PENDING
@@ -2176,7 +2176,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
   офдоком — пометка в шапке §«Внешний источник правды».
 - **Статус:** ⏳ **PENDING — не ждёт чистого прогона концепции**
   (единственный блокер — `грунт`,
-  `.claude/processes/roadmap-step-execution.md` §4). **Гейтом `CODE` не
+  `.claude/tests/source-api/okx/code-preconditions.md` §«Правило гейта»). **Гейтом `CODE` не
   является:** ни одно из полей не назначено потребителю, суперсет
   used-набора под разбивку от их наличия не меняется.
 
@@ -2542,7 +2542,7 @@ unused-перечне: `px`, `execType`, `interest`, `tag`, `fillTime`,
   zero-fee trading»: при промо нулевой комиссии `trade-fee` отдаёт ненулевую
   ставку, а факт в bills будет нулевым. Расхождение в эту сторону — ожидаемое
   (прогноз консервативнее факта), не дефект цепочки.
-- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/processes/roadmap-step-execution.md` §4); расхождение сверх округления → эскалация на
+- **Статус:** ⏳ **PENDING — до `CODE` шага 7** (гоняется вместе с §AG1.5; чистого прогона концепции не ждёт — единственный блокер `грунт`, `.claude/tests/source-api/okx/code-preconditions.md` §«Правило гейта»); расхождение сверх округления → эскалация на
   `solution-designer`). Провенанс — H1 (N9 fee-wiring),
   `phase-1-step-7-gaps-close-3.md`.
 

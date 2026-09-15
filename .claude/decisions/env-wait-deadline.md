@@ -109,8 +109,9 @@ settlement»), очередь не разбирается. Тип заявки, 
 `.claude/rules/pre-launch-schema-changes.md` §«Снятие обеспечено
 встречным якорем, а не этой строкой»). Поэтому срок был объявлен
 **машине**: полями `срок`/`по-сроку` у ожидания грунта обоих компонентов
-в `.claude/work/code-gate-ledger.json`, которые
-`python3 tools/code-gate-check.py` роняет по наступлении (оси 20-24);
+в реестре контакта с кодом (снят 2026-09-15; текст —
+`.claude/work/history/2026-09-15-step-machine-rework/work/code-gate-ledger.json`), которые его проверка роняла по
+наступлении (оси 20-24);
 «что делать по сроку» держал раздел бэклога. С исполнением решения
 (§«Исход решения» ниже) оба носителя сняты той же правкой: поля — из
 реестра, раздел — из бэклога (итог — в
@@ -148,6 +149,7 @@ settlement»), очередь не разбирается. Тип заявки, 
 - Дом факта среды — `.claude/tests/source-api/okx/code-preconditions.md`.
 - Заменители незаказуемого факта —
   `.claude/decisions/unorderable-fact-substitutes.md`.
-- Покомпонентный гейт — `.claude/decisions/code-contact-as-gate.md`.
-- Дом критерия выхода в `CODE` —
+- Покомпонентный гейт (снят 2026-09-15) —
+  `.claude/work/history/2026-09-15-step-machine-rework/decisions/code-contact-as-gate.md`.
+- Дом гейтов машины шага —
   `.claude/processes/roadmap-step-execution.md` §Гейты.

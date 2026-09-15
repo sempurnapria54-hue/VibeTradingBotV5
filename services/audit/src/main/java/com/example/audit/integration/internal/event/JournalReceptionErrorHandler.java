@@ -7,7 +7,7 @@ import org.springframework.util.backoff.FixedBackOff;
 
 /**
  * Обработчик ошибок контейнера у группы журнала — <b>без ограничения числа
- * попыток</b> (docs/components/AuditEventListener.md §«Обработчик ошибок —
+ * попыток</b> (docs/rules/durable-consumer-reception.md §«Обработчик отказа —
  * часть конструкции, а не настройка»).
  *
  * <p><b>Умолчание даёт обратное, и потому обработчик назван.</b> Оно —

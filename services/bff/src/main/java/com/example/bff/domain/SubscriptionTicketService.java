@@ -4,6 +4,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.bff.config.PerimeterProperties;
+import com.example.bff.exception.TicketRejectedException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;

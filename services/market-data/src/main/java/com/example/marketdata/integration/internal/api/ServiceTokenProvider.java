@@ -3,6 +3,7 @@ package com.example.marketdata.integration.internal.api;
 import static java.util.Objects.isNull;
 
 import com.example.marketdata.config.ConnectorProperties;
+import com.example.marketdata.exception.ExchangeReadException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;

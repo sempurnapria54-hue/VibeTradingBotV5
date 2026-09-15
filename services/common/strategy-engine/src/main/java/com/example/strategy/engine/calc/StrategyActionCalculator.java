@@ -2,6 +2,7 @@ package com.example.strategy.engine.calc;
 
 import static java.util.Objects.isNull;
 
+import com.example.strategy.engine.exception.CalculationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -1,10 +1,10 @@
 package com.example.connector.okx.resolve;
 
-import com.example.tradingbot.domain.resolve.AlgoOrderExternalStatusResolver;
-import com.example.tradingbot.domain.resolve.StatusResolveResult;
+import com.example.connector.okx.exception.ExternalStatusException;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
-import com.example.connector.okx.integration.external.api.ExternalStatusException;
+import com.example.tradingbot.domain.resolve.AlgoOrderExternalStatusResolver;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
+import com.example.tradingbot.domain.resolve.StatusResolveResult;
 import org.springframework.stereotype.Component;
 
 /**

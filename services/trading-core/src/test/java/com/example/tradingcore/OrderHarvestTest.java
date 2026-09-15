@@ -29,9 +29,9 @@ import com.example.tradingcore.domain.command.payload.RefreshAlgoOrderCommandPay
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.command.resolve.AttachedAlgoOrderStateResolver;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
+import com.example.tradingcore.exception.ExternalNotFoundException;
+import com.example.tradingcore.exception.ExternalStatusException;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
-import com.example.tradingcore.integration.internal.api.exchange.ExternalNotFoundException;
-import com.example.tradingcore.integration.internal.api.exchange.ExternalStatusException;
 import com.example.tradingcore.mapping.AlgoOrderMapper;
 import com.example.tradingcore.mapping.AlgoOrderMapperImpl;
 import com.example.tradingcore.mapping.OrderMapper;

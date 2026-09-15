@@ -29,24 +29,27 @@
 - Ревью написанного — это роль `reviewer` (фокусы
   `conventions` / `security` / `performance` / `disaster`).
 - Размещение / синхронизация знания в доках — это
-  `knowledge-curator` (под-шаг `SYNC_DOCS_FROM_CODE`, docs←code).
+  `knowledge-curator` (статус `DOCS`, docs←code).
 - Содержательные продуктовые решения — это пользователь.
 
 ## Скелет
 
-- **Вход:** утверждённая концепция шага (`docs/`), `tech-radar`,
-  `codestyle`, код-шаблоны (`.claude/templates/code/`).
-- **Выход:** код шага в дереве кода, выносимый на ревью-итерации и
-  аппрув (под-шаг `CODE`).
-- **Принцип:** код по концепции; отклонение от доков — сигнал,
-  который снимается на `SYNC_DOCS_FROM_CODE` (docs←code), не молча.
+- **Вход:** концепция шага, прошедшая `CONCEPT_REVIEW`, накопленные доки
+  (`docs/`), `tech-radar`, `codestyle`, код-шаблоны
+  (`.claude/templates/code/`).
+- **Выход:** код шага в дереве кода с зелёным реактором (статус `CODE`),
+  выносимый на фокусы `REVIEW`.
+- **Принцип:** код по концепции; чего в концепции нет — проектируется и
+  решается по карте владельцев, решение — в дайджест; отклонение от
+  существующих доков — сигнал, который снимается на `DOCS` (docs←code),
+  не молча.
 
 ## Связи
 
 - Правила — `.claude/rules/tech-radar.md`, `.claude/rules/codestyle.md`.
 - Код-шаблоны — `.claude/templates/code/`.
 - Процесс шага — `.claude/processes/roadmap-step-execution.md`
-  (под-шаг `CODE`).
+  (статус `CODE`).
 - Ревьюер — `.claude/agents/reviewer.md`.
 
 ## Доработка

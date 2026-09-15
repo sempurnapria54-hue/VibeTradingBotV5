@@ -10,7 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.example.bff.config.PerimeterProperties;
 import com.example.bff.integration.internal.api.OwnerAddressResolver;
 import com.example.bff.integration.internal.api.OwnerProxyClient;
-import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.platform.exception.PeerServiceUnavailableException;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

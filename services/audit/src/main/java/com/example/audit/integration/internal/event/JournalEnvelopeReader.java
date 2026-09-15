@@ -3,6 +3,7 @@ package com.example.audit.integration.internal.event;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.audit.exception.IncompleteEventException;
 import com.example.audit.integration.internal.event.model.AuditEventMessage;
 import com.example.audit.util.Constants;
 import com.fasterxml.jackson.core.JsonProcessingException;

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 
 import com.example.statistics.config.ReceptionProperties;
 import com.example.statistics.domain.service.StatisticsReceptionService;
-import com.example.statistics.integration.internal.event.IncompleteEventException;
+import com.example.statistics.exception.IncompleteEventException;
 import com.example.statistics.integration.internal.event.ReceptionErrorHandler;
 import com.example.statistics.integration.internal.event.ReceptionHaltMarker;
 import java.time.Duration;
@@ -21,7 +21,7 @@ import org.springframework.kafka.listener.MessageListenerContainer;
 /**
  * Остановка приёма: обработчик ошибок <b>не сдаётся</b>, а флаг остановки
  * ставится отдельно от транзакции обработки
- * (docs/rules/durable-consumer-reception.md §«Обработчик ошибок — часть
+ * (docs/rules/durable-consumer-reception.md §«Обработчик отказа — часть
  * конструкции, а не настройка»).
  *
  * <p><b>Что здесь на самом деле проверяется.</b> Умолчание контейнера —

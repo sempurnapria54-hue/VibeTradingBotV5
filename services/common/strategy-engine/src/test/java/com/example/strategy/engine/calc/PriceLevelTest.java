@@ -4,6 +4,7 @@ import static java.util.Objects.nonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.strategy.engine.exception.CalculationException;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossCalculationType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossSettings;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;

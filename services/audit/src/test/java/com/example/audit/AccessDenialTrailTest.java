@@ -7,7 +7,7 @@ import static org.mockito.Mockito.mock;
 
 import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.domain.service.AccessDenialService;
-import com.example.platform.security.AccessDenialHandler;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;

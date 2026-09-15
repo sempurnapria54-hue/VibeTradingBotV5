@@ -1,6 +1,7 @@
 package com.example.strategies.integration.internal.api;
 
-import com.example.platform.client.PeerServiceUnavailableException;
+import com.example.platform.exception.PeerServiceUnavailableException;
+import com.example.strategies.exception.PeerReadException;
 import java.util.function.Supplier;
 import lombok.experimental.UtilityClass;
 import org.springframework.web.client.RestClientException;

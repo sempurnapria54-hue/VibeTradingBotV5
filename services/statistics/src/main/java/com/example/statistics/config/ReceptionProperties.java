@@ -6,7 +6,7 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Подписка группы журнала: её имя, адрес брокера и величины приёма
+ * Подписка группы статистики: её имя, адрес брокера и величины приёма
  * (docs/rules/durable-consumer-reception.md).
  *
  * <p><b>Имя группы — не свойство транспорта, а операнд durable-строки:</b>
@@ -92,8 +92,7 @@ public class ReceptionProperties {
      * потребитель; когда он не работает как процесс, он не производит
      * ничего, и старая строка утверждала бы непрерывность в состоянии, о
      * котором ничего не известно — молчание было бы неотличимо от здоровья
-     * (docs/models/domain/other/StatisticsFact.md §«Позиция чтения и с какого
-     * момента журнал полон»).
+     * (docs/rules/durable-consumer-reception.md §«Предикат непрерывности»).
      *
      * <p><b>Величина групповая — порог один на все пары:</b> он выражает
      * такт тика {@code ReceptionStateJob}, а тик у группы один.

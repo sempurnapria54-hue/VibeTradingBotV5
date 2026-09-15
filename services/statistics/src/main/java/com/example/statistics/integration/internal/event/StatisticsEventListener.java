@@ -8,6 +8,7 @@ import com.example.statistics.domain.model.AggregateGrain;
 import com.example.statistics.domain.model.DealFact;
 import com.example.statistics.domain.model.IncidentFact;
 import com.example.statistics.domain.service.StatisticsReceptionService;
+import com.example.statistics.exception.IncompleteEventException;
 import com.example.statistics.integration.internal.event.model.StatisticsEventMessage;
 import com.example.statistics.mapping.FactMapper;
 import java.time.OffsetDateTime;

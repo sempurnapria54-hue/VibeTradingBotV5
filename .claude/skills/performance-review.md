@@ -7,9 +7,9 @@
 
 ## Когда применять
 
-Под-шаг `CODE` процесса
-`.claude/processes/roadmap-step-execution.md` — фокус `performance`
-адверсариального ревью кода.
+Статус `REVIEW` машины шага
+(`.claude/processes/roadmap-step-execution.md` §«`REVIEW`») — фокус
+`performance` адверсариального ревью кода.
 
 ## Назначение и границы
 

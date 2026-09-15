@@ -1,10 +1,10 @@
 package com.example.connector.okx.resolve;
 
+import com.example.connector.okx.exception.ExternalStatusException;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.resolve.ExternalStatusReason;
 import com.example.tradingbot.domain.resolve.OrderExternalStatusResolver;
 import com.example.tradingbot.domain.resolve.StatusResolveResult;
-import com.example.tradingbot.domain.model.core.order.Order;
-import com.example.connector.okx.integration.external.api.ExternalStatusException;
-import com.example.tradingbot.domain.resolve.ExternalStatusReason;
 import org.springframework.stereotype.Component;
 
 /**

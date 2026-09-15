@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p><b>Граница у такта своя, а не общая с приёмом.</b> Писателей у строки
  * два, и поводы у них разные: приём пишет следствие сообщения, тик —
- * свидетельство о составе и живости (docs/components/AuditEventListener.md
+ * свидетельство о составе и живости (docs/rules/durable-consumer-reception.md
  * §«Транзакционные границы»). Общая транзакция связала бы откат одного с
  * откатом другого.
  *

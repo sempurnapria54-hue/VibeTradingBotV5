@@ -14,8 +14,7 @@
 # таблицы дома (он же — порядок ключей популяции).
 set -euo pipefail
 # LC_ALL=C.UTF-8 обязателен у grep -P на объявленной среде (дом ловушки —
-# .claude/processes/roadmap-step-execution.md §«`grep -P` в этой среде
-# требует `LC_ALL=C.UTF-8`»).
+# .claude/rules/measurement-commands.md §«Ловушки среды»).
 axes=$(sed -n '/^### Оси дискриминатора ветви/,/^Первые две оси/p' \
            docs/rules/market-data-freshness.md \
        | LC_ALL=C.UTF-8 grep -oP '^\| [^|]+ \| `\K[A-Za-z][A-Za-z0-9_]*(?=`)')

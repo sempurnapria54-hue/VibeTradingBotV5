@@ -7,9 +7,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.example.connector.okx.config.EnvironmentProperties;
-import com.example.connector.okx.credentials.CredentialsUnavailableException;
 import com.example.connector.okx.credentials.ExchangeCredentials;
 import com.example.connector.okx.credentials.VaultExchangeCredentialsResolver;
+import com.example.connector.okx.exception.CredentialsUnavailableException;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.util.ExchangeAccountKeyPath;
 import com.example.tradingbot.domain.util.ExchangeAccountSecretFields;

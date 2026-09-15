@@ -24,7 +24,7 @@ import org.springframework.core.io.ClassPathResource;
 
 /**
  * Стык между рядами экспорта и правилами алерта манифеста
- * (deploy/base/services/audit.yaml).
+ * (deploy/base/services/statistics.yaml).
  *
  * <p><b>Класс дефекта, против которого проба заведена, механически не
  * ловится ничем другим.</b> Правило алерта называет ряд ИМЕНЕМ, а имя

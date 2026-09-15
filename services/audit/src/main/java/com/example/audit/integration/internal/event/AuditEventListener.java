@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.audit.domain.model.AuditRecord;
 import com.example.audit.domain.service.AuditReceptionService;
+import com.example.audit.exception.IncompleteEventException;
 import com.example.audit.mapping.AuditRecordMapper;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

@@ -7,7 +7,7 @@
 
 ## Когда применять
 
-Под-шаг `SYNC_DOCS_FROM_CODE` процесса
+Статус `DOCS` машины шага
 `.claude/processes/roadmap-step-execution.md`. Применяет роль
 `knowledge-curator` (`.claude/agents/knowledge-curator.md`) к
 расхождениям типа change / remove из списка
