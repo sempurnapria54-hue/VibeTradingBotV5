@@ -111,3 +111,4 @@ ACK-семантика, коды ошибок). Незадокументиров
 - Режим автономии и карта владельцев —
   `.claude/processes/question-delegation.md`.
 - Материал кейсов по предмету — `.claude/tests/case-material/{сервис}.md`.
+- Дизайн контура тестов фазы 2 — `.claude/decisions/test-contour-design-pass.md`.
