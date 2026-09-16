@@ -23,7 +23,7 @@
 | Docker | `docker info` | поставить Docker Desktop |
 | kubectl | `kubectl version --client` | поставить kubectl |
 | kind | `"$LOCALAPPDATA/kind/kind.exe" version` | скачать бинарь релиза kubernetes-sigs/kind в `%LOCALAPPDATA%\kind\kind.exe` и сверить sha256 |
-| Python | `py -3 -c "print(1)"` | дом фактов среды — `.claude/tests/source-api/okx/code-preconditions.md` |
+| Python | `py -3 -c "print(1)"` | дом фактов среды — `.claude/skills/environment-commands.md` |
 | JDK 25 и Maven | там же | там же |
 
 Пути JDK и Maven команды стенда **назначают сами** (`STAND_JDK`,
@@ -218,6 +218,6 @@ Vault остаётся: удаляет его держатель, потому �
   `.claude/skills/session-chain.md`.
 - Где система развёрнута и как наблюдается — `docs/architecture/platform.md`.
 - Раскладка манифестов — `deploy/README.md`.
-- Команды и факты среды — `.claude/tests/source-api/okx/code-preconditions.md`.
+- Команды и факты среды — `.claude/skills/environment-commands.md`.
 - Хроника первой постановки и её находки —
   `.claude/work/history/2026-09-05-local-stand.md`.

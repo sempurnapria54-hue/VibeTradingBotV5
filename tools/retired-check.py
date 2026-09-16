@@ -76,8 +76,8 @@
 
 ОБЛАСТЬ СВИПА. Живые носители: `CLAUDE.md`, `README.md` и `*/README.md`
 (указатель каждого дерева монорепозитория — файл знания, Д582), `docs/**`
-(md, json), деревья кода (java, json, sql, yml, yaml, properties) — `donor/`,
-`services/*`, `libs/*`, — манифесты `deploy/**` (yml, yaml, json),
+(md, json), деревья кода (java, json, sql, yml, yaml, properties) —
+`services/*`, — манифесты `deploy/**` (yml, yaml, json),
 `tools/**` (py, sh, txt) и `.claude/**` (md) за вычетом архива, истории,
 библиотеки и отчётов прогонов (`progress/` цитирует снятые редакции как
 находки — это их предмет, а не рецидив). РАБОЧИЕ РЕЕСТРЫ `.claude/work/*.json`
@@ -134,17 +134,17 @@ SKIP = ('/.claude-archive/', '/.claude/work/history/', '/.claude/work/progress/'
 # по трём расширениям из семи. Носитель, не попавший в область, зелёного
 # прогона не портит и потому невидим.
 #
-# Деревья кода перечислены ПРЕФИКСАМИ, а не одним `src/**`: после
-# реструктуризации в монорепозиторий (шаг 1 фазы 2) код донора лежит в
-# `donor/src`, а сервисы и общие артефакты появятся в `services/<имя>/src` и
-# `libs/<имя>/src`. Перечень, привязанный к одному корню, молча терял бы
-# каждое новое дерево — тот самый невидимый зелёный, о котором абзац выше.
+# Деревья кода перечислены ПРЕФИКСАМИ, а не одним `src/**`: сервисы и общие
+# артефакты лежат в `services/<имя>/src` на разной глубине. Перечень,
+# привязанный к одному корню, молча терял бы каждое новое дерево — тот самый
+# невидимый зелёный, о котором абзац выше. Дерево донора снято 2026-09-16
+# вместе с самим донором (.claude/decisions/source-api-contour-retired.md).
 # `services/common/*` — общие артефакты: их дом в `services/` по решению
 # держателя (2026-09-12, каталог `libs/` снят), они не единицы развёртывания,
 # и глубина у них на сегмент больше, чем у сервиса. Модели вдобавок
 # сгруппированы каталогом и разведены по слою (`common/model/<слой>`) —
 # отсюда третий шаблон: без него их дерево выпало бы из свипа молча.
-CODE_TREES = ('donor', 'services/*', 'services/common/*', 'services/common/model/*')
+CODE_TREES = ('services/*', 'services/common/*', 'services/common/model/*')
 CODE_SUFFIXES = ('java', 'json', 'sql', 'yml', 'yaml', 'properties')
 DEPLOY_SUFFIXES = ('yml', 'yaml', 'json')
 # СБОРОЧНЫЕ ФАЙЛЫ В ОБЛАСТИ, и это решение, а не расширение по инерции.
@@ -783,10 +783,9 @@ RETIRED = [
         # инвариант радиуса «инструмент» читается на паре «счёт × инструмент»
         # (docs/architecture/tenant-and-exchange.md §«Торговая строка называет
         # счёт, и радиусы читаются от него»).
-        # Разрешённые места — ЗАМОРОЖЕННЫЕ файлы донора: он остаётся рабочим
-        # монолитом до удаления (donor/README.md §«Портированная область
-        # замораживается»), и форма монолита в нём законна. Файла docs/** в
-        # перечне нет ни одного.
+        # Разрешённые места — носители пайплайна, фиксирующие само снятие.
+        # Донорские файлы, где форма монолита была законна, ушли с монолитом
+        # (2026-09-16). Файла docs/** в перечне нет ни одного.
         'pattern': r'Exchange\.(riskBase|riskBaseCurrency|consecutiveLossCount|blindPassCount)'
                    r'|uk_deal_active_instrument'
                    r'|одн[аоу]\s+(активн|незакрыт)\w*\s+сделк\w*\s+на\s+инструмент'
@@ -809,28 +808,8 @@ RETIRED = [
         'allowed': (
             '.claude/work/decision-digest.md',
             '.claude/notes/2026-08-23-разрывы-спека-кода-на-тропе-живой-сделки.md',
-            'donor/src/main/resources/db/migration/V9__create_deal_finalization_states.sql',
-            'donor/src/main/java/com/example/tradingbot/domain/command/executor/RefreshBalanceExecutor.java',
-            'donor/src/main/java/com/example/tradingbot/domain/safety/AnomalyReaction.java',
-            'donor/src/main/java/com/example/tradingbot/domain/safety/DealInvariantDetectors.java',
-            'donor/src/main/java/com/example/tradingbot/domain/safety/ExchangeSideDetectors.java',
-            'donor/src/main/java/com/example/tradingbot/domain/safety/HoldService.java',
-            'donor/src/main/java/com/example/tradingbot/domain/safety/HoldSignal.java',
-            'donor/src/main/java/com/example/tradingbot/domain/safety/SafetyHoldCoordinator.java',
-            'donor/src/test/java/com/example/tradingbot/domain/safety/ExchangeSideDetectorsTest.java',
-            # Найдены расширением шаблона (GAPS_CLOSE_1 шага 8 фазы 2): форма
-            # «одна ACTIVE на инструмент» стои́т в замороженном доноре, где
-            # радиус монолита законен.
-            'donor/src/main/java/com/example/tradingbot/domain/service/strategy/StrategyService.java',
-            'donor/src/main/java/com/example/tradingbot/persistence/service/StrategyDataService.java',
-            # Тот же замороженный донор и тот же предмет, что у двух строк
-            # выше: persistence-проекция называет схему монолита. Детектор
-            # его не показывал, потому что форма разорвана переносом
-            # javadoc, а свип идёт по плоскому тексту, где между словами
-            # остаётся звёздочка (.claude/work/backlog.md §«Снятый термин
-            # через javadoc-перенос: энфорсер слеп к кодовому носителю»).
-            'donor/src/main/java/com/example/tradingbot/persistence/model/strategy/'
-            'StrategyEntity.java',
+            # Донорские носители снятой редакции ушли вместе с донором
+            # (2026-09-16, .claude/decisions/source-api-contour-retired.md).
         ),
         'population': (
             ('docs/architecture/tenant-and-exchange.md',
@@ -896,13 +875,7 @@ RETIRED = [
         'date': '2026-09-05',
         'source': 'GAPS_CLOSE_5 шага 6 фазы 2, находка D1',
         'allowed': ('.claude/work/decision-digest.md',
-                    'tools/retired-check.py',
-                    # Применённая миграция донора неизменяема и описывает
-                    # ПРОШЛОЕ, а не действующее правило: правка её байта
-                    # роняет валидацию Flyway у того, кто миграций не
-                    # трогал (.claude/rules/codestyle.md §«Применённая
-                    # миграция неизменяема — включая комментарии»).
-                    'donor/src/main/resources/db/migration/V5__market_data_owner_keying.sql'),
+                    'tools/retired-check.py'),
         'population': (('docs/models/domain/other/IndicatorValue.md',
                         r'идентичностью\s+вычисления'),
                        ('docs/models/domain/other/MarketStructure.md',
@@ -1076,9 +1049,7 @@ RETIRED = [
         'allowed': ('.claude/work/decision-digest.md',
                     '.claude/knowledge-tree.md',
                     'tools/retired-check.py'),
-        'population': (('docs/components/AnomalyJob.md', None),
-                       ('donor/src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
-                        r'одиннадцать\s+детекторов')),
+        'population': (('docs/components/AnomalyJob.md', None),),
     },
     {
         'name': 'мягкая биржевая ступень не построена',
@@ -1126,9 +1097,7 @@ RETIRED = [
         'allowed': ('.claude/work/decision-digest.md',
                     '.claude/knowledge-tree.md',
                     'tools/retired-check.py'),
-        'population': (('docs/components/AnomalyJob.md', None),
-                       ('donor/src/main/java/com/example/tradingbot/domain/jobs/AnomalyJob.java',
-                        r'ВЫВОДЯТСЯ\s+тремя\s+ратифицированными')),
+        'population': (('docs/components/AnomalyJob.md', None),),
     },
     {
         'name': 'ReactionClass как построенный енум ступени сигнала',
@@ -1183,44 +1152,6 @@ RETIRED = [
                         r'решает\s+её\s+дом|risk-base-follows-balance'),
                        ('services/trading-core/src/test/java/com/example/tradingcore/'
                         'BalanceRefreshTest.java', None)),
-    },
-    {
-        'name': 'закрывающая сила исхода OBSERVED_ABSENT',
-        # Шаблон ПОРЯДКО-НЕЗАВИСИМ: снятая редакция встретилась формой
-        # «глагол закрытия ПЕРЕД термином» («слоты закрыты … либо исходом
-        # OBSERVED_ABSENT»), которой прежний порядок слов не видел.
-        # Шаблон ПОРЯДКО-НЕЗАВИСИМ: снятая редакция встречается и формой
-        # «глагол закрытия ПЕРЕД термином». Отрицание снимается ключом
-        # `unless` — действующая редакция («слот не закрывает»,
-        # «закрывающей силы у него нет») снятой не является, и гасить её
-        # allow-листом значило бы использовать allow-лист подавителем.
-        'pattern': r'закрыт\w*[^.\n]{0,90}OBSERVED_ABSENT'
-                   r'|OBSERVED_ABSENT[^.\n]{0,90}закрыва\w+',
-        'unless': r'не\s+закрыва|закрывающ\w+\s+сил\w+|не\s+наблюдение\s+факта'
-                  r'|неприменим|гейт\s+не\s+закрыт',
-        'arrived': r'OBSERVED_ABSENT[^.\n]{0,120}(?:не\s+закрыва|закрывающей\s+силы\s+не)'
-                   r'|закрывающ\w+\s+сил\w+\s+(?:исхода\s+)?«?не\s+наступило»?\s+снят\w*'
-                   r'|исходом\s+«не\s+наступило»\s+не\s+закрыва\w+',
-        'date': '2026-08-30',
-        'source': 'решение держателя: гейт исходом «не наступило» не закрывается',
-        # Носители пайплайна, где снятая редакция названа затем, чтобы
-        # сказать, что её больше нет: скилл-гейт (действующая редакция),
-        # дайджест решений (запись самого снятия) и план контура (хроника
-        # двух снятий подряд).
-        # Разрешённые места — носители пайплайна, где снятая редакция названа
-        # затем, чтобы сказать, чем заменена: дайджест фиксирует само снятие,
-        # план контура ведёт хронику двух снятий подряд. Дом ДЕЙСТВУЮЩЕЙ
-        # редакции (скилл-гейт) сюда не входит: его гасит `unless`, а не
-        # allow-лист.
-        'allowed': ('.claude/work/decision-digest.md',
-                    '.claude/tests/source-api/okx/plan.md'),
-        # На месте снятого встало РАЗНОЕ: скилл-гейт держит действующую
-        # редакцию дословно; канон процесса перечень способов закрытия
-        # СНЯЛ и делегировал реестру; дом-реестр формулирует своими
-        # словами. Отсюда свой шаблон у двух носителей из трёх.
-        'population': (('.claude/skills/update-roadmap-progress.md', None),
-                       ('.claude/tests/source-api/okx/code-preconditions.md',
-                        r'закрывающей\s+силы\s+у\s+него\s+нет')),
     },
     {
         'name': 'величина-теорема с ключом provenBy',
@@ -1298,54 +1229,6 @@ RETIRED = [
         'population': (('docs/models/mapping/Order.md', None),
                        ('docs/components/AttachedAlgoOrderStateResolver.md', None),
                        ('docs/models/integrations/okx/AlgoOrderOkxResponse.md', None)),
-    },
-    {
-        'name': 'пункт 10 реестра предусловий гейтит CODE',
-        # Гейтящий статус снят решением держателя 2026-08-30: эпизод ADL
-        # инициирует биржа, на demo он не заказуем. Слот выведен из-под гейта
-        # и строки в таблице реестра не имеет.
-        'pattern': r'п\.\s*10[^.\n]{0,60}(?:гейт\w+|предуслови\w+)\s+`?CODE`?'
-                   r'|предусловие\s+`?CODE`?\s+п\.\s*10'
-                   r'|пп\.\s*[\d,\s]*\b10\b[\d,\s]*\)',
-        'arrived': r'выведен\w*\s+из-под\s+гейта|гейтящ\w+\s+статус\s+снят',
-        'date': '2026-08-30',
-        'source': 'решение держателя: неупорядочиваемый факт закрывается заменителями '
-                  '(.claude/decisions/unorderable-fact-substitutes.md)',
-        'allowed': ('.claude/decisions/unorderable-fact-substitutes.md',
-                    '.claude/work/decision-digest.md'),
-        'population': (('.claude/tests/source-api/okx/plan.md',
-                        r'выведен\w*\s+из-под\s+гейта'),
-                       ('.claude/tests/source-api/okx/coverage-manifest.md',
-                        r'выведен\w*\s+из-под\s+гейта'),
-                       ('.claude/tests/source-api/okx/code-preconditions.md', None)),
-    },
-    {
-        'name': 'Postman-коллекция — обязательный аппрув-артефакт контура',
-        # Утвердительная форма: аппрув на ПАРУ, ревью плана И коллекции,
-        # коллекция как ревью/аппрув-артефакт. Действующая редакция:
-        # аппрув-артефакт — план, коллекция необязательна.
-        'pattern': r'пар\w+\s+«?план\s*\+\s*коллекц\w+'
-                   r'|план\s*\+\s*коллекци\w+\s+(?:прошли|уход\w+|аппрув\w+)'
-                   r'|коллекци\w+\s+—\s+ревью/аппрув-\s*артефакт'
-                   r'|аппрув\w*\s+плана\s*\+\s*коллекции',
-        'arrived': r'аппрув-артефакт\w*\s+(?:контура\s+)?—\s+план|коллекци\w+\s+необязательн\w+'
-                   r'|аппрув-артефактом[^.\n]{0,24}не\s+(?:являетс|служ)\w+'
-                   r'|необязательн\w+\s+справк\w+',
-        'date': '2026-08-31',
-        'source': 'решение держателя: коллекция не аппрув-артефакт '
-                  '(.claude/decisions/collection-not-approval-artifact.md)',
-        'allowed': ('.claude/decisions/collection-not-approval-artifact.md',
-                    '.claude/work/decision-digest.md'),
-        # Реестра предусловий в популяции НЕ БЫЛО, и он единственный нёс
-        # роль коллекции в клейме ИЗМЕРЕНИЯ («ось 3 грепает и по коллекции»),
-        # а не в клейме аппрува: свип по форме снятой редакции такую фразу не
-        # видит, и прогон был зелен при ложном клейме дома реестра
-        # (F5а DOCS_CHECK_34).
-        'population': (('.claude/processes/source-api-testing.md', None),
-                       ('.claude/skills/test-collection.md', None),
-                                                        ('.claude/agents/tester.md', r'справочн\w+\s+коллекци\w+\s+по\s+желанию'),
-                       ('.claude/tests/source-api/okx/plan.md', None),
-                       ('.claude/tests/source-api/okx/code-preconditions.md', None)),
     },
     {
         'name': 'две ноги истории цикла добычи защиты',
@@ -1621,30 +1504,6 @@ RETIRED = [
         'population': (('docs/rules/strategy-step-once-per-episode.md', None),
                        ('docs/spec/strategy-walkthrough.json',
                         r'эпизод\w*\s+ОБЪЕКТА\s+ШАГА|объекта\s+шага')),
-    },
-    {
-        'name': 'открытый слот грунта гейтит шаг',
-        # Второе условие гейта CODE мерило состояние ШАГА: пока открыт хотя
-        # бы один слот реестра предусловий, шаг в CODE не входит. Пришедшая
-        # форма — та же, что у первого условия: слот гейтит СВОЙ компонент,
-        # привязка живёт величиной «ждёт-грунта» реестра гейтов.
-        # Шаблон опирается на выделение по той же причине, что и запись
-        # выше: дом называет снятую редакцию дословно и вправе это делать.
-        'pattern': r'\*\*Шаг\s+7\s+не\s+входит\s+в\s+`?CODE`?'
-                   r'|все\s+его\s+слоты\s+«пункт\s+×\s+кейс»\s+закрыты'
-                   r'|хотя\s+бы\s+один\s+слот\s+открыт\s+→\s+статус',
-        'arrived': r'гейтит\s+свой\s+компонент|ждёт-грунта|покомпонентн',
-        'date': '2026-09-01',
-        'source': 'вывод CC из поправки держателя (.claude/decisions/code-contact-as-gate.md '
-                  '§«Покомпонентное чтение гейта грунта»)',
-        'allowed': ('.claude/decisions/code-contact-as-gate.md',
-                    '.claude/work/decision-digest.md'),
-        'population': (('.claude/tests/source-api/okx/code-preconditions.md',
-                        r'гейтит\s+свой\s+компонент'),
-                       ('.claude/skills/update-roadmap-progress.md',
-                        r'гейтит\s+свой\s+компонент'),
-                       ('.claude/processes/roadmap-step-execution.md',
-                        r'слот\w*\s+факта\s+открыт|факт\w*\s+открытого\s+слота')),
     },
     {
         'name': 'отмена родителя переводит встроенную защиту в терминал',

@@ -14,7 +14,7 @@
 Первый и пока единственный адресат — **п. 10 реестра, след
 автоделевериджа (`AG1.8`)**: эпизод ADL инициирует биржа, заказать его на
 demo нельзя, и по редакции «исход „не наступило“ гейт не закрывает»
-(`.claude/tests/source-api/okx/code-preconditions.md` §«Правило гейта»)
+(`.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/code-preconditions.md` §«Правило гейта»)
 слот оставался бы открытым **бессрочно**.
 
 ## Основание
@@ -75,9 +75,9 @@ demo нельзя, и по редакции «исход „не наступи�
 ## Связи
 
 - Правило гейта и реестр слотов —
-  `.claude/tests/source-api/okx/code-preconditions.md`.
-- Кейс и его заменители — `.claude/tests/source-api/okx/plan.md` §AG1.8.
-- Исход «не наступило» — `.claude/tests/source-api/okx/plan.md`
+  `.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/code-preconditions.md`.
+- Кейс и его заменители — `.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/plan.md` §AG1.8.
+- Исход «не наступило» — `.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/plan.md`
   §«Исходы содержательного кейса — их три, и третий гейт не закрывает».
 - Дом резолва принудительного сокращения —
   `docs/models/mapping/PositionCloseResult.md`.

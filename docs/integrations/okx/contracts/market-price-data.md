@@ -24,7 +24,7 @@
 IP. Элемент — тот же объект, что у единичного чтения
 (`docs/models/integrations/okx/TickerOkxResponse.md`), плюс суточные
 объёмы (`vol24h`, `volCcy24h`). Форма подтверждена контуром проверки
-источника (`.claude/tests/source-api/okx/plan.md` §«MG1. Tickers
+источника (`.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/plan.md` §«MG1. Tickers
 (плюрал) — GET /api/v5/market/tickers (Market Data)»).
 
 **Зачем агрегатная:** срез цен по всему листингу поинструментным обходом

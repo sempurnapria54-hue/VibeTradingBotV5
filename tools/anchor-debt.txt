@@ -8,18 +8,9 @@
 .claude/decisions/executor-payload-file-granularity.md	10
 .claude/decisions/executor-payload-file-granularity.md	13
 .claude/decisions/model-layer-ontology.md	Персистентность
-.claude/decisions/source-api-target-rebase.md	«Неиспользуемый код»
-.claude/decisions/source-api-target-rebase.md	Нерешённое
 .claude/processes/question-delegation.md	4
 .claude/skills/classify-type.md	Персистентность
 .claude/skills/place-knowledge.md	«Первоисточник правила»
-.claude/tests/source-api/okx/plan.md	AG1.5/§AG3.4/§AG3.5
-.claude/tests/source-api/okx/plan.md	Climit.
-.claude/tests/source-api/okx/plan.md	MG-базис
-.claude/tests/source-api/okx/plan.md	Validation
-.claude/tests/source-api/okx/plan.md	«Внешний источник правды»
-.claude/tests/source-api/okx/plan.md	«Идентификация записи»
-.claude/tests/source-api/okx/plan.md	Нерешённое
 .claude/work/decision-digest.md	2
 .claude/work/decision-digest.md	3
 .claude/work/decision-digest.md	4

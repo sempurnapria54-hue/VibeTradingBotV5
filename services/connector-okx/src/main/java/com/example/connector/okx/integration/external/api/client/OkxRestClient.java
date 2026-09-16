@@ -46,9 +46,8 @@ import org.springframework.web.client.RestClient;
  * {@link OkxSigningInterceptor}) по флагу, строит URI из path + query и
  * биндит ответ в переданный токен. Типизированные методы (instruments /
  * candles / ticker / trade / account) — тонкие обёртки над {@code dispatch}
- * для продукта; контур тестов ходит в {@code dispatch} напрямую через
- * generic-эндпоинт {@code /raw}. Возвращает сырые DTO источника; доменных
- * моделей не видит (codestyle: слои).
+ * для продукта. Возвращает сырые DTO источника; доменных моделей не видит
+ * (codestyle: слои).
  */
 @Component
 @RequiredArgsConstructor

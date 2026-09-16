@@ -198,16 +198,15 @@ public class Deal extends Auditable {
      *
      * <p><b>Целевой модели агрегата поле не принадлежит:</b> ноги висят на
      * траншах и собираются их обходом
-     * (docs/models/domain/aggregate/Deal.md §Структура). Поле держится ради
-     * донора, который читает его в двенадцати файлах, а условие его жизни —
-     * «собирается и зелёный»; сервисы монорепозитория ни его, ни
-     * {@link #algoOrders} не пишут и не читают. Снятие —
+     * (docs/models/domain/aggregate/Deal.md §Структура). Поле держал монолит
+     * фазы 1, удалённый 2026-09-16; сервисы монорепозитория ни его, ни
+     * {@link #algoOrders} не пишут и не читают. Снятие взято в работу —
      * `.claude/work/backlog.md` §«Донорские поля агрегата сделки в общей
      * библиотеке».
      */
     private List<Order> orders;
 
-    /** Standalone algo-orders сделки. Донорское поле — см. {@link #orders}. */
+    /** Standalone algo-orders сделки. Поле монолита фазы 1 — см. {@link #orders}. */
     private List<AlgoOrder> algoOrders;
 
     /**

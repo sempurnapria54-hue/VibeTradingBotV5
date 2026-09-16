@@ -8,7 +8,7 @@
 # против ПРЕЖНЕЙ версии общей библиотеки: реактор отчитается BUILD SUCCESS
 # и зелёными тестами, ни разу не проверив, компилируется ли дерево кода
 # вообще. Такой зелёный неотличим от подлинного, и именно он один раз уже
-# скрыл сломанную сборку донора после правки общей модели.
+# скрыл сломанную сборку модуля после правки общей модели.
 #
 # Оси проверки — каждая поднимает дефект до кода возврата; каждая доказана
 # падающей пробой, и батарея проб исполняется ЭТОЙ ЖЕ командой (стандарт —
@@ -147,11 +147,10 @@ rm -rf "$REPO_ROOT"/services/*/target/classes "$REPO_ROOT"/services/*/target/tes
        "$REPO_ROOT"/services/common/*/target/classes \
        "$REPO_ROOT"/services/common/*/target/test-classes \
        "$REPO_ROOT"/services/common/model/*/target/classes \
-       "$REPO_ROOT"/services/common/model/*/target/test-classes \
-       "$REPO_ROOT"/donor/target/classes "$REPO_ROOT"/donor/target/test-classes
+       "$REPO_ROOT"/services/common/model/*/target/test-classes
 
 LOG="$(mktemp)"
-JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-test -DexcludedGroups=source-api-live} \
+JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-test} \
     -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
 MVN_CODE=$?
 

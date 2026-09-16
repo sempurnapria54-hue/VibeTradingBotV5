@@ -46,7 +46,7 @@
 `docs/spec/pnl-reconciliation.json` §`separateFeeGranularity`. Что именно
 несёт `fee` на самостоятельной fee-записи, остаётся рантайм-вопросом
 инвентаря (контур source-api,
-`.claude/tests/source-api/okx/plan.md` **.5**, фикстура общая с.5), но
+`.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/plan.md` **.5**, фикстура общая с.5), но
 композицию больше **не гейтит**. Категорию `fee`
 не определяет — резолв категории идёт по `type`/`subType`
 (`docs/models/mapping/DealCashFlow.md`).

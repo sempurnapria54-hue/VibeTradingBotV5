@@ -60,7 +60,7 @@ ENVIRONMENT="${STAND_ENVIRONMENT:-dev}"
 KIND="${KIND:-$LOCALAPPDATA/kind/kind.exe}"
 [ -x "$KIND" ] || KIND="kind"
 
-# Дом путей JDK/Maven — .claude/tests/source-api/okx/code-preconditions.md
+# Дом путей JDK/Maven — .claude/skills/environment-commands.md
 # §«Среда контура».
 #
 # JDK НАЗНАЧАЕТСЯ, А НЕ НАСЛЕДУЕТСЯ. В среде уже стои́т JAVA_HOME на JDK 11

@@ -76,7 +76,7 @@ order history»; changelog — `https://www.okx.com/docs-v5/log_en/`).
   (`orders-pending` — 60 req / 2 s, `account/positions` — 10 req / 2 s,
   оба по User ID); здесь не назван вовсе, а клейм дома детекции говорит
   «у всех трёх по User ID». Обе величины — предмет сверки контура;
-  задача — `.claude/tests/source-api/okx/code-preconditions.md`.
+  задача — `.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/code-preconditions.md`.
 - **History** (звено цикла `REFRESH_ALGO_ORDER_COMMAND`):
   `GET /api/v5/trade/orders-algo-history`. Permission `Read`; rate
   limit 20 req / 2 s по User ID. История доступна за последние 3

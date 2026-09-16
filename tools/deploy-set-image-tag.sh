@@ -64,7 +64,7 @@ fi
 
 # Лаунчер Python объявленной среды — `py -3`; `python3` там заглушка,
 # печатающая «Python» и не исполняющая кода
-# (.claude/tests/source-api/okx/code-preconditions.md). Поэтому лаунчер
+# (.claude/skills/environment-commands.md). Поэтому лаунчер
 # выбирается по ИСПОЛНЕНИЮ пробы, а не по наличию имени в PATH.
 if py -3 -c "pass" >/dev/null 2>&1; then
   PY=(py -3)

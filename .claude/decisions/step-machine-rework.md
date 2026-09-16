@@ -85,7 +85,7 @@
 | Единица работы сессии | одна единица = один заход одного статуса; таблица единиц по статусам (`.claude/rules/session-work-unit.md`) |
 | Стоячий промпт цепочки | ходы держателя (концепция, гейтящий вопрос, апрув в `REVIEW`) — статус `holder_decision` |
 | Свипы и нормы измерения | пассажи процесса разнесены по домам: свипы по роду правки — `.claude/rules/edit-kind-obligations.md` (без классификационной таблицы и её энфорсера), нормы проверочных команд — `.claude/rules/measurement-commands.md` |
-| Тестовый контур | три скилла, роль и фокус переведены на три под-шага; специфика контура источника перенесена в `.claude/processes/source-api-testing.md` |
+| Тестовый контур | три скилла, роль и фокус переведены на три под-шага; специфика контура источника перенесена в `.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-testing.md` |
 | Реестр контакта с кодом | `code-gate-ledger.json` и `code-gate-check.py` сняты: его позиции гейтили компоненты по находкам доковых прогонов, которых больше нет; четыре припаркованные позиции уже живут своими секциями бэклога |
 | Снятые энфорсеры отчётной формы | `edit-kind-check.py`, `insertion-neighborhood-check.py` — мерили таблицы отчётов узлов закрытия |
 | Снятые скиллы, правила, шаблон | `closure-population`, `stagnation-detection`, `classify-gap-level`, `classify-code-blocking`; `docs-loop-limits`, `stopped-node-disposition`; `gap-report` |

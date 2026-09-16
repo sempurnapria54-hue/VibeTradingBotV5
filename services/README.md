@@ -10,7 +10,7 @@
 `connector-bybit`, `bff`, `audit`, `statistics`.
 
 Каталог наполняется шагами 3-11 фазы 2 (`.claude/work/roadmap/phase-2.md`),
-каждый — портом из `donor/`. **В каталоге нет единицы, которой нет в
+каждый — портом из монолита фазы 1 (удалён 2026-09-16). **В каталоге нет единицы, которой нет в
 инвентаре `services.md`** — на этом вложении держится проверяемость
 раскладки, и мерит его `python3 tools/deploy-layout-check.py` (ось 1)
 (`.claude/decisions/monorepo-restructuring-in-place.md`). **Обратное вложение

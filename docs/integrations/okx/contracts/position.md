@@ -114,7 +114,7 @@ mapping native→snapshot→`Position`→`Deal` —
 `REFRESH_POSITION_COMMAND`).
 
 **Верифицировано 2026-08-30** контуром тестов источника (`AG1.5`, `AG1.9`;
-`.claude/tests/source-api/okx/plan.md`). Прогон подтвердил две трети
+`.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/plan.md`). Прогон подтвердил две трети
 инварианта и **опроверг** третью:
 
 | Клейм прежней редакции | Исход прогона |

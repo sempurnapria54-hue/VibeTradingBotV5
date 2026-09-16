@@ -11,8 +11,8 @@
   (`.claude/processes/roadmap-step-execution.md` §«Конец фазы»); апрув
   этого ревью — условие входа в под-шаг 3.
 - **`REVIEW` шага «Тесты»** — ревью кода тестов и отчёта прогона.
-- **Этапы REVIEW плана, код-тестов и отчёта контура API источника**
-  (`.claude/processes/source-api-testing.md`).
+- **Ревью кейсов и кода тестов чёрного ящика коннектора** против
+  demo-площадки — тем же фокусом.
 
 Фокус роли `reviewer` (`.claude/agents/reviewer.md`); прогоняет **не
 автор кейсов**.
@@ -64,7 +64,7 @@
   поднимает контекст, сквозной не подменяет ту сторону, чью тропу
   проверяет.
 - **Детерминизм и чистота** — порядок воспроизводим, состояние после
-  теста убрано, живые контуры отмечены и на prod не идут.
+  теста убрано, живые прогоны отмечены и на prod не идут.
 - **Конвенции кода** — по `.claude/rules/codestyle.md` (в том числе
   §«Тесты доменных моделей»: подменяется состояние, не предикаты).
 
@@ -90,7 +90,6 @@
 - Роль-критик — `.claude/agents/reviewer.md`.
 - Автор — `.claude/agents/tester.md`.
 - Описание кейсов — `.claude/skills/test-design.md`;
-  код тестов — `.claude/skills/test-code.md`;
-  прогон контура источника — `.claude/skills/test-run.md`.
-- Процесс контура источника — `.claude/processes/source-api-testing.md`.
+  код тестов — `.claude/skills/test-code.md`.
+- Материал для кейсов коннектора — `.claude/tests/case-material/connector-okx.md`.
 - Машина шага — `.claude/processes/roadmap-step-execution.md`.

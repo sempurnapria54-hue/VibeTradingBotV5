@@ -8,7 +8,7 @@
 
 Перечень добыт **прогоном контура**, а не офдоком: провенанс — `рантайм`
 (`.claude/rules/external-source-sync.md`). Кейс `SEC1.1`, наблюдение —
-`.claude/tests/source-api/okx/observations/SEC1_1.md`, прогон 2026-09-04
+`.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/observations/SEC1_1.md`, прогон 2026-09-04
 на demo-контуре. Правка перечня идёт **перепрогоном кейса**, а не
 редактурой: код, приписанный руками, не наблюдался.
 

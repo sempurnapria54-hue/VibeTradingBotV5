@@ -164,7 +164,7 @@ enum-список групп («actual return values shall prevail»; списо
   `trade-fee(instType=SWAP)` на тик возвращает `feeGroup[]` по группам; N
   вызовов на N инструментов не нужно (rate limit 5 req / 2 s по User ID).
   Покрытие ответа (все ли наши `groupId` в нём) — **рантайм-вопрос RQ-1**
-  (`.claude/tests/source-api/okx/plan.md`).
+  (`.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/plan.md`).
   **Частичное покрытие — определённый исход, не пробел спеки.** Группа, не
   пришедшая в ответе, не подтверждается → её строка не инкрементится →
   стареет → по исчерпании порога холдятся **инструменты этой группы**, и

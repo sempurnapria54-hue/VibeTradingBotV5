@@ -14,7 +14,7 @@ import lombok.Setter;
  * верхнего уровня офдок для SWAP/FUTURES помечает deprecated, и прогон
  * контура это подтвердил: у SWAP они приходят **пустыми строками**, а
  * значения лежат в группе (наблюдение `AG12.1`,
- * `.claude/tests/source-api/okx/observations/AG12_1.md`). Поэтому плоской
+ * `.claude/work/history/2026-09-16-donor-and-contour-removal/source-api-okx/observations/AG12_1.md`). Поэтому плоской
  * шестёрки в DTO нет вовсе.
  */
 @Getter
