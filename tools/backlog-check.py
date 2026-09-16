@@ -10,7 +10,14 @@
 исполненного; у 15 парковок оживитель сработал и не был отработан; 55
 парковок без дома и причины. Дом правила — `.claude/rules/backlog-section-form.md`.
 
-ЧТО МЕРИТСЯ. Каждая секция `##` (кроме двух вводных) несёт первой непустой
+ЧТО МЕРИТСЯ. Два файла одной формы: рабочий бэклог `.claude/work/backlog.md`
+и перечень проверок на проде `.claude/work/prod-checks.md` — позиции, которые
+не могут ожить раньше продовской среды (решение держателя 2026-09-16,
+`.claude/decisions/prod-checks-split.md`). Оба разбираются одним прогоном,
+перечни немашинных условий печатаются по файлам раздельно; отсутствие любого
+из двух — код 2, а не молчаливое измерение одного.
+
+Каждая секция `##` (кроме двух вводных) несёт первой непустой
 строкой после заголовка маркер
     <!-- backlog: владелец=…; оживит=<условие>; закрыто-когда=<условие> -->
 Условия — из закрытого языка (шаг/фаза/рубеж/файл/греп/вопрос — машинные;
@@ -20,7 +27,8 @@
   3. ПРЕДМЕТ ПОСТРОЕН — условие `закрыто-когда` держится;
   4. объём единицы (секция плюс подсекции без своего маркера) больше 60 строк;
      маркер провенанса в теле; дубль заголовка;
-  5. заголовок внутри ограждённого блока секцией не считается.
+  5. заголовок внутри ограждённого блока секцией не считается;
+  6. один заголовок `##` в обоих файлах — дефект: секция живёт ровно в одном.
 Флаг `--статус <фаза>-<шаг>=<статус>` оценивает условия так, как если бы
 статус уже стоял: гейт прогоняет его ДО записи статуса, потому что условие
 «шаг DONE» срабатывает самой простановкой. `--рубеж=DONE` — то же для
@@ -38,6 +46,8 @@ import re
 import sys
 
 BACKLOG = '.claude/work/backlog.md'
+PROD_CHECKS = '.claude/work/prod-checks.md'
+FILES = (BACKLOG, PROD_CHECKS)
 ROADMAP_DIR = '.claude/work/roadmap'
 OPEN_QUESTIONS = '.claude/work/questions/open-questions.md'
 EXEMPT = ('На какой вопрос отвечает этот файл', 'Связь с роадмапом')
@@ -297,6 +307,21 @@ def check(text, base_dir, roadmap, questions):
     return defects, counted, {'units': len(units), 'markers': with_marker}
 
 
+def cross_check(per_file):
+    """Дефекты, видимые только над двумя файлами сразу: секция в обоих."""
+    defects = []
+    seen = {}
+    for path, sections in per_file:
+        for section in sections:
+            if section['level'] != 2 or section['name'] in EXEMPT:
+                continue
+            if seen.get(section['name'], path) != path:
+                defects.append('ЗАГОЛОВОК В ДВУХ ФАЙЛАХ: «%s» (%s и %s)'
+                               % (section['name'], seen[section['name']], path))
+            seen.setdefault(section['name'], path)
+    return defects
+
+
 def read_questions(base_dir):
     path = os.path.join(base_dir, OPEN_QUESTIONS)
     if not os.path.exists(path):
@@ -423,6 +448,13 @@ def battery(base_dir):
                  not any('ОБЪЁМ' in d and '«Секция»' in d for d in big)
                  and any('ОБЪЁМ' in d and '«Под»' in d for d in big), 'дефекты: %r' % (big,)))
 
+    one = sections_of('## Секция\n\nтело\n')
+    both = cross_check([('a.md', one), ('b.md', one)])
+    alone = cross_check([('a.md', one), ('b.md', sections_of('## Другая\n\nтело\n'))])
+    axes.append(('один заголовок в двух файлах — дефект, разные заголовки — нет',
+                 any(d.startswith('ЗАГОЛОВОК В ДВУХ ФАЙЛАХ') for d in both) and alone == [],
+                 'общий: %r; разные: %r' % (both, alone)))
+
     axes.append(('подсекция с маркером мерится как своя единица',
                  any('ОЖИВИТЕЛЬ' in d for d in defects) and len(counted['держатель']) == 1,
                  'дефекты: %r; счёт: %r' % (defects, counted)))
@@ -449,10 +481,12 @@ def main():
         print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: недоказанных осей %d' % len(undone))
         return 2
 
-    path = os.path.join(base_dir, args.file or BACKLOG)
-    if not os.path.exists(path):
-        print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: файла %s нет' % path)
-        return 2
+    names = [args.file] if args.file else list(FILES)
+    paths = [os.path.join(base_dir, name) for name in names]
+    for path in paths:
+        if not os.path.exists(path):
+            print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: файла %s нет' % path)
+            return 2
     roadmap = Roadmap.read(base_dir)
     if not roadmap.steps or not roadmap.phases:
         print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: роадмап не разобран (шагов: %d, фаз: %d) — '
@@ -467,22 +501,32 @@ def main():
     if args.prod:
         roadmap.prod = args.prod
 
-    text = open(path, encoding='utf-8').read()
-    defects, counted, counts = check(text, base_dir, roadmap, read_questions(base_dir))
-    if counts['units'] == 0:
-        print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: секций в %s нет вовсе — мерить нечего' % path)
-        return 2
-
-    print('секций: %d; с маркером: %d; дефектов: %d (файл: %s; подмен статуса: %d)'
-          % (counts['units'], counts['markers'], len(defects), path.replace(os.sep, '/'), len(args.status)))
-    for defect in defects:
+    questions = read_questions(base_dir)
+    found = 0
+    per_file = []
+    for path in paths:
+        text = open(path, encoding='utf-8').read()
+        defects, counted, counts = check(text, base_dir, roadmap, questions)
+        if counts['units'] == 0:
+            print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: секций в %s нет вовсе — мерить нечего' % path)
+            return 2
+        per_file.append((path.replace(os.sep, '/'), sections_of(text)))
+        found += len(defects)
+        print('секций: %d; с маркером: %d; дефектов: %d (файл: %s; подмен статуса: %d)'
+              % (counts['units'], counts['markers'], len(defects),
+                 path.replace(os.sep, '/'), len(args.status)))
+        for defect in defects:
+            print('  ' + defect)
+        for kind, title in (('сейчас', 'в работе'), ('держатель', 'ждут держателя'),
+                            ('наблюдение', 'ждут наблюдения')):
+            print('%s (`%s`): %d' % (title, kind, len(counted[kind])))
+            for name, arg in counted[kind]:
+                print('  «%s»%s' % (name, (' — ' + arg) if arg else ''))
+    crossed = cross_check(per_file)
+    found += len(crossed)
+    for defect in crossed:
         print('  ' + defect)
-    for kind, title in (('сейчас', 'в работе'), ('держатель', 'ждут держателя'),
-                        ('наблюдение', 'ждут наблюдения')):
-        print('%s (`%s`): %d' % (title, kind, len(counted[kind])))
-        for name, arg in counted[kind]:
-            print('  «%s»%s' % (name, (' — ' + arg) if arg else ''))
-    return 1 if defects else 0
+    return 1 if found else 0
 
 
 if __name__ == '__main__':

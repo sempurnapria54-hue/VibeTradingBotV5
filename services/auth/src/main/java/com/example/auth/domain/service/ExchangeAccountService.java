@@ -49,7 +49,7 @@ public class ExchangeAccountService {
      * оставляет секрет по адресу несуществующего счёта. Окно узкое
      * (между записью и коммитом), а лечится оно чисткой префикса по
      * реестру счетов — операцией над хранилищем, а не кодом;
-     * якорь — .claude/work/backlog.md §«Осиротевшие секреты счетов».
+     * якорь — .claude/work/prod-checks.md §«Осиротевшие секреты счетов».
      */
     @Transactional
     public ExchangeAccountEntity register(String tenantInternalId, String exchangeCode,
