@@ -230,6 +230,7 @@ ROADMAP 2-10 DONE — Аудит и статистика
 | Переменная | Умолчание | Зачем |
 |---|---|---|
 | `SESSION_MIN_FREE_GIB` | `10` | порог свободного места там, где живёт хранилище Docker |
+| `SESSION_DOCKER_DATA_DIR` | `D:\Docker containers\DockerDesktopWSL` | где лежит образ WSL с данными Docker (Disk image location Docker Desktop). Путь **подтверждается файлом `*.vhdx`**: каталог без образа — отказ предполётной проверки, а не измерение соседнего диска |
 | `SESSION_MAX_USD` | не задан | предел расходов одной сессии (`--max-budget-usd`) |
 | `SESSION_TIMEOUT` | не задан | предел времени одной сессии (`4h`, `90m`) |
 | `SESSION_MODEL` | модель по умолчанию | модель сессий |

@@ -119,17 +119,30 @@ feed() { printf '%s %s\n' "$(date '+%H:%M')" "$*"; }
 FEED="$ROOT/tools/session_feed.py"
 
 # ------------------------------------------------------------------ диск
-# Хранилище Docker на этой машине — образ WSL под %LOCALAPPDATA%\Docker\wsl;
+# Хранилище Docker на этой машине — образ WSL в D:\Docker containers\DockerDesktopWSL
+# (Disk image location Docker Desktop; перенесено туда держателем 2026-09-17).
 # DockerRootDir у Docker Desktop указывает ВНУТРЬ виртуальной машины
 # (/var/lib/docker) и о свободном месте хоста ничего не говорит. Поэтому
 # сначала проверяется путь хоста, и только если его нет — то, что отдал
 # демон, и лишь когда это существующий локальный каталог.
+#
+# ПУТЬ ХОСТА ПОДТВЕРЖДАЕТСЯ ФАЙЛОМ ОБРАЗА, А НЕ СУЩЕСТВОВАНИЕМ КАТАЛОГА.
+# Перенос оставляет по старому адресу пустой каталог: проверка `-d` прошла бы
+# на нём и заставила бы мерить не тот диск — молча и правдоподобно. Поэтому
+# старого пути (%LOCALAPPDATA%\Docker\wsl) в цепочке нет вовсе, а у нового
+# ищется `*.vhdx`. Не нашлось ничего — функция отдаёт пустую строку, и
+# предполётная проверка отказывает: «мерить нечем» не то же, что «места хватает».
+DOCKER_DATA_DIR_DEFAULT="/d/Docker containers/DockerDesktopWSL"
+# Имя проверяемого пути держится отдельной переменной: отказ ниже называет
+# адрес, который ДЕЙСТВИТЕЛЬНО проверялся, а не умолчание.
+DOCKER_DATA_DIR_TRIED="${SESSION_DOCKER_DATA_DIR:-$DOCKER_DATA_DIR_DEFAULT}"
 docker_data_dir() {
-  local host_path="${LOCALAPPDATA:-}/Docker/wsl" root
-  if [ -n "${LOCALAPPDATA:-}" ] && [ -d "$host_path" ]; then printf '%s' "$host_path"; return; fi
+  local host_path="$DOCKER_DATA_DIR_TRIED" root
+  if [ -d "$host_path" ]      && [ -n "$(find "$host_path" -maxdepth 2 -name '*.vhdx' -print -quit 2>/dev/null)" ]; then
+    printf '%s' "$host_path"; return
+  fi
   root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
   if [ -n "$root" ] && [ -d "$root" ]; then printf '%s' "$root"; return; fi
-  printf '%s' "${LOCALAPPDATA:-$HOME}"
 }
 
 free_gib() { df -P -k "$1" 2>/dev/null | awk 'NR==2 {printf "%d", int($4/1048576)}'; }
@@ -168,6 +181,7 @@ else
 fi
 
 DOCKER_DIR="$(docker_data_dir)"
+[ -n "$DOCKER_DIR" ] || { echo "ОТКАЗ: хранилище Docker не найдено — в «$DOCKER_DATA_DIR_TRIED» нет ни одного *.vhdx (иной адрес — SESSION_DOCKER_DATA_DIR), DockerRootDir демона тоже не годится. Свободное место мерить нечем" >&2; exit 2; }
 echo "хранилище Docker: $DOCKER_DIR"
 echo "журнал: $JOURNAL"
 echo "режим прав: $PERMISSION_MODE, максимум сессий: $MAX"
