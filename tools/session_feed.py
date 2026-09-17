@@ -88,7 +88,10 @@ PATH_TOKEN = re.compile(
 REDIRECT = re.compile(r"(?<![0-9&])>>?\s*([^\s|;&]+)")
 EXIT_CODE = re.compile(r"[Ee]xit code (\d+)")
 
-STEP_ROW = re.compile(r"^\|\s*(\d+)\s*\|.*\|\s*([A-Z_0-9]+)\s*\|\s*$")
+# Статус шага несёт НЕОБЯЗАТЕЛЬНЫЙ счёт под-шага (`CODE·2/3`) — дом формы
+# `.claude/processes/roadmap-step-execution.md` §«Машина шага». Лента и
+# `STEP_STATUS` отдают его дословно: держатель читает под-шаг там же, где статус.
+STEP_ROW = re.compile(r"^\|\s*(\d+)\s*\|.*\|\s*([A-Z_0-9]+(?:·\d+/\d+)?)\s*\|\s*$")
 PHASE_FILE = os.path.join(".claude", "work", "roadmap", "phase-%s.md")
 ROADMAP_FILE = os.path.join(".claude", "work", "roadmap", "roadmap.md")
 

@@ -52,6 +52,15 @@ ROADMAP_DIR = '.claude/work/roadmap'
 OPEN_QUESTIONS = '.claude/work/questions/open-questions.md'
 EXEMPT = ('На какой вопрос отвечает этот файл', 'Связь с роадмапом')
 MAX_LINES = 60
+# Статус шага: слово канона плюс НЕОБЯЗАТЕЛЬНЫЙ счёт под-шага (`CODE·2/3`).
+# Счёт под-шага есть СОСТОЯНИЕ шага, а не счёт заходов, и потому живёт в
+# статусе; дом формы — `.claude/processes/roadmap-step-execution.md`
+# §«Машина шага». Разборщик её ПРИНИМАЕТ; что суффикс стои́т только у `CODE`
+# и что текущий не больше общего, не мерит ни один прогон — остаток назван
+# в доме и у гейта (`.claude/skills/update-roadmap-progress.md` §Шаги).
+STATUS = r'[A-Z_0-9]+(?:·\d+/\d+)?'
+STATUS_ROW = re.compile(r'^\|\s*([^|]+?)\s*\|.*\|\s*(' + STATUS + r')\s*\|\s*$')
+STATUS_OVERRIDE = re.compile(r'^(\d+)-(\d+)=(' + STATUS + r')$')
 MARKER = re.compile(r'^<!--\s*backlog:\s*(.*?)\s*-->\s*$')
 HEADING = re.compile(r'^(#{2,4})\s+(.+?)\s*$')
 PROVENANCE = re.compile(
@@ -77,7 +86,7 @@ class Roadmap:
         steps = {}
         phases = {}
         prod = None
-        row = re.compile(r'^\|\s*([^|]+?)\s*\|.*\|\s*([A-Z_0-9]+)\s*\|\s*$')
+        row = STATUS_ROW
         for path in sorted(glob.glob(os.path.join(base_dir, ROADMAP_DIR, 'phase-*.md'))):
             phase = re.search(r'phase-(\d+)\.md$', path.replace(os.sep, '/'))
             if not phase:
@@ -332,7 +341,8 @@ def read_questions(base_dir):
 def battery(base_dir):
     """Оси детектора, доказанные падающей пробой на каждой."""
     axes = []
-    roadmap = Roadmap({(2, 10): 'GAPS_CLOSE_6', (2, 11): 'HOLD', (2, 7): 'DONE', (2, 9): 'CODE_2'},
+    roadmap = Roadmap({(2, 10): 'GAPS_CLOSE_6', (2, 11): 'HOLD', (2, 7): 'DONE',
+                       (2, 9): 'CODE·2/3'},
                       {2: 'IN_PROGRESS', 3: 'HOLD', 1: 'FOLDED'}, 'HOLD')
     questions = {'ARCH-Q1'}
     here = os.path.relpath(os.path.abspath(__file__), base_dir).replace(os.sep, '/')
@@ -365,7 +375,7 @@ def battery(base_dir):
     fired, _, _ = run('## Секция\n\n<!-- backlog: владелец=x; оживит=шаг:2-7:DONE -->\n')
     quiet, _, _ = run('## Секция\n\n<!-- backlog: владелец=x; оживит=шаг:2-11:открыт -->\n')
     code_ok, _, _ = run('## Секция\n\n<!-- backlog: владелец=x; оживит=шаг:2-9:CODE -->\n')
-    axes.append(('`шаг` срабатывает на DONE и CODE_N, молчит на HOLD',
+    axes.append(('`шаг` срабатывает на DONE и на `CODE` со счётом под-шага, молчит на HOLD',
                  any('ОЖИВИТЕЛЬ' in d for d in fired) and quiet == []
                  and any('ОЖИВИТЕЛЬ' in d for d in code_ok),
                  'DONE: %r; HOLD: %r; CODE: %r' % (fired, quiet, code_ok)))
@@ -448,6 +458,24 @@ def battery(base_dir):
                  not any('ОБЪЁМ' in d and '«Секция»' in d for d in big)
                  and any('ОБЪЁМ' in d and '«Под»' in d for d in big), 'дефекты: %r' % (big,)))
 
+    plain = STATUS_ROW.match('| 12 | Тесты | CODE |')
+    sub = STATUS_ROW.match('| 12 | Тесты | CODE·2/3 |')
+    torn = STATUS_ROW.match('| 12 | Тесты | CODE·2/ |')
+    axes.append(('строка роадмапа со счётом под-шага разбирается, рваный счёт — нет',
+                 bool(plain) and sub is not None and sub.group(2) == 'CODE·2/3'
+                 and torn is None,
+                 'без счёта: %r; со счётом: %r; рваный: %r'
+                 % (plain and plain.group(2), sub and sub.group(2), torn)))
+
+    ok_sub = STATUS_OVERRIDE.match('2-12=CODE·2/3')
+    ok_plain = STATUS_OVERRIDE.match('2-12=DONE')
+    bad = STATUS_OVERRIDE.match('2-12=CODE·/3')
+    axes.append(('`--статус` принимает счёт под-шага и отвергает рваный',
+                 ok_sub is not None and ok_sub.group(3) == 'CODE·2/3'
+                 and ok_plain is not None and bad is None,
+                 'со счётом: %r; без: %r; рваный: %r'
+                 % (ok_sub and ok_sub.group(3), ok_plain and ok_plain.group(3), bad)))
+
     one = sections_of('## Секция\n\nтело\n')
     both = cross_check([('a.md', one), ('b.md', one)])
     alone = cross_check([('a.md', one), ('b.md', sections_of('## Другая\n\nтело\n'))])
@@ -493,7 +521,7 @@ def main():
               'условия `шаг`/`фаза` мерить нечем' % (len(roadmap.steps), len(roadmap.phases)))
         return 2
     for item in args.status:
-        match = re.match(r'^(\d+)-(\d+)=([A-Z_0-9]+)$', item)
+        match = STATUS_OVERRIDE.match(item)
         if not match:
             print('ПРОВЕРКА НЕ ПРОВОДИТСЯ: форма `--статус <фаза>-<шаг>=<статус>` нарушена: %r' % item)
             return 2

@@ -9,7 +9,7 @@
 ## Состояние
 
 Сменяет v297. Фаза 1 — `FOLDED`. **Фаза 2 — `IN_PROGRESS`**: шаги 1-11
-`DONE`, **шаг 12 — `CODE`**, шаг 13 `HOLD`. Прод-рубеж — `HOLD`.
+`DONE`, **шаг 12 — `CODE·2/3`**, шаг 13 `HOLD`. Прод-рубеж — `HOLD`.
 
 **Машина шага** — `CONCEPT → CONCEPT_REVIEW → CODE → DOCS → REVIEW → DONE`
 (`.claude/processes/roadmap-step-execution.md`). `CODE` тестового шага идёт
