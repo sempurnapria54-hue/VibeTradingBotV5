@@ -50,6 +50,7 @@
 │   │   ├── architecture-docs-type.md — Почему сервисная конструкция получила свой тип знания `docs/architecture/`?
 │   │   ├── audit-statistics-split.md — Почему `audit-statistics` разводится на два сервиса, а не остаётся одним процессом?
 │   │   ├── backlog-machine-form.md — Почему бэклог получил машинно-читаемое условие возврата и энфорсер, а не очередную чистку?
+│   │   ├── case-review-approval-criterion.md — Почему у ревью кейсов появился критерий остановки — валидность кейса, а не исчерпанность находок, — и граница в три круга?
 │   │   ├── chat-vs-cc-knowledge-split.md — Как разделено знание по адресатам — чат vs Claude Code?
 │   │   ├── client-layer-docs.md — Где живут exchange-specific факты?
 │   │   ├── code-templates-vs-examples.md — Почему код-шаблоны и find-code-examples — два разных инструмента?
