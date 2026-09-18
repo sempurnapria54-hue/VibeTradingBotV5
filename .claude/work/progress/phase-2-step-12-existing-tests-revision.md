@@ -143,7 +143,7 @@ py tools/pure-logic-candidates.py                               # кандида
 | `connector-okx · VaultExchangeCredentialsResolverTest` | `M` | в-ящик | `connector-okx.md` |
 | `market-data · CandleBackfillTest` | `M` | в-ящик | `market-data.md` |
 | `market-data · CandleDemandTest` | `MV` | в-ящик | `market-data.md` |
-| `market-data · ComputationIdentityTest` | `—` | логика | `market-data.md` |
+| `market-data · ComputationIdentityTest` | `—` | логика | `jsonb-overlay-roundtrip.md` |
 | `market-data · ExchangeRefusalAbortTest` | `MV` | в-ящик | `market-data.md` |
 | `market-data · InstrumentReadinessTest` | `M` | в-ящик | `market-data.md` |
 | `market-data · MarketDataFreshnessTest` | `M` | в-ящик | `market-data.md` |
