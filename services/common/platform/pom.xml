@@ -47,6 +47,17 @@
 
     <properties>
         <java.version>25</java.version>
+        <!--
+          Метка красных ожиданий, изъятая из умолчания прогона. Кейс, чьё
+          ожидание взято из дома, а дерево кода несёт иначе, краснеет по
+          построению — и его красный прогон И ЕСТЬ предъявление названного
+          долга (.claude/tests/cases/platform-shared-logic.md §«Ожидание
+          берётся из дома, даже когда сегодня оно не исполнено»). В
+          умолчании реактора такой кейс сделал бы красным всё дерево, то
+          есть подменил бы предмет сигнала; поэтому он помечен @Tag("debt")
+          и прогоняется отдельно:  mvn test -Dtest.excluded.groups=
+        -->
+        <test.excluded.groups>debt</test.excluded.groups>
     </properties>
 
     <dependencies>
@@ -148,6 +159,61 @@
             <artifactId>spring-security-oauth2-client</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!--
+          СТАРТЕР ТЕСТОВ — ОБЛАСТЬ TEST, И ЭТО НЕ ДЕЛАЕТ ЕГО ОБЯЗАТЕЛЬНЫМ
+          ДЛЯ ПОТРЕБИТЕЛЕЙ. Правило общих артефактов
+          (.claude/rules/codestyle.md §«Новый модуль монорепозитория»)
+          адресует зависимости, которые ПОТРЕБИТЕЛЬ наследует; область test
+          в Maven не транзитивна, и дерево зависимостей сервиса её не
+          показывает. Проверяется деревом зависимостей, а не чтением pom.
+
+          ЗАЧЕМ ОН ЗДЕСЬ. У артефакта появилось своё тестовое дерево:
+          проба формы живёт там, где правится форма, а не у потребителя,
+          вместе с чьим деревом она снималась бы
+          (.claude/tests/cases/platform-shared-logic.md §«Решение: где живёт
+          дерево прогона»). Версии junit и assertj даёт родитель — своя
+          закрепка разошлась бы с тем, что каркас приносит сервисам.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          Модуль времени Jackson — ТЕСТОВЫЙ, и он не про код артефакта.
+          Точка входа отказа кладёт в тело момент (OffsetDateTime), а
+          сериализует его МАППЕРОМ ПОТРЕБИТЕЛЯ — бином каркаса, у которого
+          модуль есть всегда. Базовая сборка группы U6 обязана быть тем же
+          маппером, иначе проба мерила бы свою сборку; у самого артефакта
+          зависимости не возникает — он маппер принимает, а не собирает.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          Ресурс-сервер — ТЕСТОВЫЙ, и он тоже не про код артефакта.
+          Резолвер актора читает Authentication; форма ПРИНЯТОГО принципала
+          у всех восьми потребителей одна — JwtAuthenticationToken, — и
+          кейс U3.6 мерит, что берётся имя принципала (claim субъекта), а
+          не токен и не его представление. Проба на суррогатном токене
+          этого не мерила бы: у него имя строится другой веткой.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-resource-server</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Сам токен (Jwt) живёт в соседнем артефакте того же стартера. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -168,6 +234,14 @@
                             <artifactId>lombok</artifactId>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!-- Метка красных ожиданий вне умолчания прогона — довод у свойства. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${test.excluded.groups}</excludedGroups>
                 </configuration>
             </plugin>
             <!--

@@ -34,7 +34,7 @@
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>test-support</name>
-    <description>Общие формы проб: вместимость планировщика</description>
+    <description>Общие формы проб: вместимость планировщика, JSONB-навес</description>
 
     <properties>
         <java.version>25</java.version>
@@ -62,15 +62,17 @@
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
         <!--
-          Jackson 2 со scope test — под раннер исполнимых спецификаций
-          (src/test/.../spec), который разбирает docs/spec/*.json. Причина
-          предъявлена компилятором, а не взята впрок: без него testCompile
-          не собрал раннер (ObjectMapper, JsonParser).
+          Jackson 2 — под раннер исполнимых спецификаций
+          (src/test/.../spec), который разбирает docs/spec/*.json, И под
+          общую сборку проб JSONB-навеса (JsonbOverlayProbe). Причина
+          предъявлена компилятором, а не взята впрок: без него не собрались
+          бы ни раннер (ObjectMapper, JsonParser), ни сборка проб.
 
-          SCOPE TEST НЕСУЩИЙ: правило общих артефактов делает всякую
-          зависимость `common/**` обязательной для потребителей, а раннер —
-          не форма пробы и в сервисы не уезжает. Тестовый scope держит его
-          внутри модуля.
+          SCOPE TEST СНЯТ ВТОРЫМ ПОТРЕБИТЕЛЕМ: пока Jackson был нужен только
+          раннеру, тестовый scope держал его внутри модуля. Сборка проб живёт
+          в src/main — иначе её не увидел бы наследник в дереве сервиса, —
+          и с нею зависимость стала обязательной. Потребителям она уезжает
+          тестовым scope самого артефакта, дальше него не идёт.
 
           ВЕРСИЯ НЕ ЗАКРЕПЛЕНА ЗДЕСЬ: её даёт BOM родителя. Раннер к выбору
           между Jackson 2 и 3 отношения не имеет — он читает корпусный JSON,
@@ -79,7 +81,47 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <scope>test</scope>
+        </dependency>
+        <!--
+          Общая доменная модель — формы, проходящие через конвертеры навеса
+          трёх сервисов: контракты копий навеса объявляют их в сигнатурах
+          портов. Причина предъявлена компилятором: без неё testCompile
+          потребителя не собрал бы наследника контракта.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>domain-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!--
+          Общий артефакт периметра — формы, чьё ТОЖДЕСТВО у копий мерится
+          одним ожиданием на две копии: класс недоступности соседа
+          (PeerServiceUnavailableException) лежит здесь одним экземпляром, и
+          контракт копий называет его в сигнатуре. Причина предъявлена
+          компилятором: без него не собрался бы PeerCallContract.
+
+          НОВОЙ ОБЯЗАННОСТИ ПОТРЕБИТЕЛЮ ЭТО НЕ ДОБАВЛЯЕТ: все шесть
+          потребителей test-support объявляют platform сами, на compile
+          (.claude/rules/codestyle.md §«Новый модуль монорепозитория»).
+          Вместе с ним приезжают spring-web и spring-security-core, на
+          которых стоя́т входы контрактов.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>platform</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!--
+          oauth2-client — ОБЛАСТЬ optional, по тому же доводу, что и у
+          platform: контракт провайдера служебного токена нужен двум
+          деревьям из шести (trading-core, strategies), и оба объявляют
+          starter-oauth2-client сами. Транзитивная зависимость сделала бы
+          его обязательным для остальных четырёх.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-client</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

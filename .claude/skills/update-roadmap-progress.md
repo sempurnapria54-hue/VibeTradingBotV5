@@ -134,6 +134,7 @@ python3 tools/backlog-check.py            # секция бэклога и пе�
 python3 tools/surface-path-check.py       # корень контроллера начинается именем своей единицы
 python3 tools/ownership-map-check.py      # карта владельцев-сервисов покрывает фактику корпуса
 python3 tools/enum-domain-pointer-check.py     # компонент содержимого, выведенный у писателя, несёт указатель на дом перечня
+python3 tools/peer-copy-check.py          # исполняемые тела объявленных копий одной формы не разошлись
 ```
 
 **`python3` в этой среде — заглушка Windows Store**; команды зовутся через

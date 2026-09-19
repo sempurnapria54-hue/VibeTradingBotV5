@@ -44,6 +44,12 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <springdoc.version>3.0.0</springdoc.version>
+        <!--
+          Метка красных ожиданий, изъятая из умолчания прогона: дом довода —
+          services/common/platform/pom.xml, свойство того же имени.
+          Прогон помеченных:  mvn test -Dtest.excluded.groups=
+        -->
+        <test.excluded.groups>debt</test.excluded.groups>
     </properties>
 
     <dependencies>
@@ -197,6 +203,20 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Общая форма проб JSONB-навеса: базовая сборка (маппер сборки бина)
+          и контракт копий навеса живут одним носителем, потому что кейс
+          прогоняется каждым деревом своей копии
+          (.claude/tests/cases/jsonb-overlay-roundtrip.md §«U10 — Тождество
+          копий формы»). Scope test — дальше тестового пути артефакт не
+          уезжает.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>test-support</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -232,6 +252,14 @@
               родитель объявляет только УПРАВЛЕНИЕ версией плагина, а не
               его подключение.
             -->
+            <!-- Метка красных ожиданий вне умолчания прогона — довод у свойства. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${test.excluded.groups}</excludedGroups>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

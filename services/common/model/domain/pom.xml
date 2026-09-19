@@ -33,6 +33,24 @@
         <commons-collections4.version>4.5.0</commons-collections4.version>
         <jackson-annotations.version>2.20</jackson-annotations.version>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+        <!--
+          Версии тестовой оснастки закреплены ЗДЕСЬ, потому что родителя у
+          модуля нет (см. шапку). Взяты те, что закрепляет
+          spring-boot-dependencies 4.0.0 — иначе дерево держало бы два
+          мажора junit сразу: один у этого артефакта, другой у всех
+          сервисов.
+        -->
+        <junit-jupiter.version>6.0.1</junit-jupiter.version>
+        <assertj.version>3.27.6</assertj.version>
+        <!--
+          Версия surefire закреплена по той же причине, что и версия
+          компилятора: родителя нет, и умолчание Maven принесло бы провайдер
+          3.2.5, которого в локальном репозитории не существует, — офлайновый
+          реактор упал бы на резолве, а не на тесте. 3.5.4 — та, что уже
+          лежит рядом: её приносит spring-boot-starter-parent остальным
+          модулям дерева.
+        -->
+        <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
     </properties>
 
     <dependencies>
@@ -75,6 +93,34 @@
             <version>${jackson-annotations.version}</version>
         </dependency>
 
+        <!--
+          ТЕСТОВАЯ ОСНАСТКА — ОБЛАСТЬ TEST, И ОБЯЗАТЕЛЬНОЙ ДЛЯ СЕРВИСОВ ОНА
+          НЕ СТАНОВИТСЯ. Оговорка шапки «всякая зависимость здесь становится
+          обязательной для каждого» адресует то, что потребитель НАСЛЕДУЕТ;
+          область test в Maven не транзитивна. Проверяется деревом
+          зависимостей потребителя, а не чтением этого файла.
+
+          ЗАЧЕМ ОНА ЗДЕСЬ. У артефакта появилось своё тестовое дерево: две
+          пробы его форм стоя́ли в дереве `auth` — у первого потребителя, —
+          и снимались бы вместе с чужим деревом
+          (.claude/tests/cases/domain-model-predicates.md §«Существующий
+          набор предмета»). Стартера Boot здесь нет намеренно: он потянул бы
+          управление версиями всего бут-стека, против чего и заведена шапка;
+          берутся ровно два артефакта, которые пробы и зовут.
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit-jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -97,6 +143,11 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
             </plugin>
         </plugins>
     </build>

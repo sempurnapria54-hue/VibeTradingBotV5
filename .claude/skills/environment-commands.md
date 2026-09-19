@@ -35,6 +35,7 @@ Vault в не-dev режиме.
 | Сеть до биржи | **есть** | `GET /api/v5/public/time` → `HTTP 200`, `code=0` |
 | Лаунчер Python | **`py -3`** → Python 3.11.9; `python3` и `python` в Git Bash — заглушки WindowsApps: печатают `Python` без версии, код не исполняют | `py -3 -c "print(1)"` → `1`; `python3 -c "print(1)"` → исполнения нет |
 | Сборка дерева | реактор из корня, обёрткой `bash tools/reactor-test.sh`; точечно — `mvn -o -am -pl <модуль> test` | прогон обёртки |
+| Артефакты тестового контура | **есть с 2026-09-19** — Testcontainers `2.0.2` (`testcontainers-postgresql`, `-kafka`, `-vault`, `-junit-jupiter`), `spring-boot-testcontainers` `4.0.0`, WireMock `wiremock-standalone:3.13.1`; Awaitility приезжает со `spring-boot-starter-test`. Версию Testcontainers держит Boot: своя разошлась бы с `testcontainers-bom` каркаса | прайминг §«Воспроизводимые команды»; `ls ~/.m2/repository/org/testcontainers/` |
 | Демо-ключ OKX | **доказан отрицанием**: тот же ключ **без** заголовка `x-simulated-trading` → `HTTP 401`, `50101 APIKey does not match current environment`; с заголовком → `code=0` | прогон 2026-08-31 |
 
 **Проверка демо-контура — падающая проба, а не флаг конфигурации.** Клейм
@@ -57,6 +58,12 @@ source .env.vault.test.local                 # VAULT_TOKEN профиля test
 docker compose up -d vault postgres-test     # если контур опущен
 docker exec -e VAULT_ADDR=http://127.0.0.1:18200 vibetradingbotv5-vault \
   vault operator unseal                      # после каждого рестарта контейнера Vault
+
+# ПРАЙМИНГ тестовых артефактов: реактор ходит -o, поэтому новая зависимость
+# кладётся в локальный репозиторий ОНЛАЙНОВЫМ прогоном ДО него
+# (.claude/decisions/test-contour-design-pass.md, решение 10). Версии здесь
+# не выдумываются: их закрепляет spring-boot-dependencies того же мажора.
+mvn -q -B dependency:get -Dartifact=<группа>:<артефакт>:<версия>
 
 bash tools/reactor-test.sh                   # компиляция всех деревьев + весь unit-набор
 mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \

@@ -45,6 +45,19 @@
         <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
         <junit-jupiter.version>6.0.1</junit-jupiter.version>
         <assertj.version>3.27.6</assertj.version>
+        <logback.version>1.5.21</logback.version>
+        <!--
+          Метка красных ожиданий, изъятая из умолчания прогона. Кейс, чьё
+          ожидание взято из дома, а дерево кода несёт иначе, краснеет по
+          построению — и его красный прогон И ЕСТЬ предъявление названного
+          долга (.claude/tests/cases/strategy-engine-calculation.md
+          §«Ожидание берётся из дома, даже когда сегодня оно не
+          исполнено»). В умолчании реактора такой кейс сделал бы красным
+          всё дерево, то есть подменил бы предмет сигнала; поэтому он
+          помечен @Tag("debt") и прогоняется отдельно:
+          mvn test -Dtest.excluded.groups=
+        -->
+        <test.excluded.groups>debt</test.excluded.groups>
     </properties>
 
     <dependencies>
@@ -128,6 +141,27 @@
             <version>${assertj.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!--
+          Реализация логирования НА ТЕСТОВОМ ПУТИ — по предъявленной
+          потребности, а не превентивно: у интерпретатора условий выход не
+          только булев. Тип правила, чей операнд собирает не этот контекст,
+          называет себя ЗАПИСЬЮ ЖУРНАЛА, и без неё «тип не исполняется»
+          неотличимо от «предикат честно ложен» — а именно это различение и
+          есть предмет группы `U12` документа
+          `.claude/tests/cases/strategy-engine-condition.md`. С одним
+          slf4j-api провайдера нет, логгер NOP, и наблюдать нечего.
+
+          Сборку сервисов это не задевает: область test не транзитивна
+          (.claude/rules/codestyle.md §«Новый модуль монорепозитория»).
+          Версия — та же, что даёт spring-boot-dependencies 4.0.0 сервисам.
+        -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -152,6 +186,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <!-- Версия закреплена явно по той же причине: родителя у модуля нет. -->
                 <version>${maven-surefire-plugin.version}</version>
+                <!-- Метка красных ожиданий вне умолчания прогона — довод у свойства. -->
+                <configuration>
+                    <excludedGroups>${test.excluded.groups}</excludedGroups>
+                </configuration>
             </plugin>
         </plugins>
     </build>
