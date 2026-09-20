@@ -112,6 +112,34 @@
             <version>${project.version}</version>
         </dependency>
         <!--
+          spring-kafka — ОБЛАСТЬ optional, по тому же доводу, что у
+          oauth2-client ниже: контракты приёма durable-потребителя нужны
+          двум деревьям из шести (audit, statistics), и оба объявляют
+          spring-kafka сами, на compile. Транзитивная зависимость сделала
+          бы клиента брокера обязательным для остальных четырёх. Причина
+          предъявлена компилятором: без него не собрались бы входы
+          контрактов — ConsumerAwareRebalanceListener, RetryListener,
+          MessageListenerContainer, — а вместе с ним приезжают
+          kafka-clients (ConsumerRecord, TopicPartition, Admin, Metric),
+          на которых стоя́т их сигнатуры.
+        -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!--
+          micrometer-core — та же область и тот же довод: контракт рядов
+          экспорта принимает MeterRegistry и наблюдает выдачу реестра.
+          Четырём прочим потребителям реестр метрик не нужен, а audit и
+          statistics приносят его сами со starter-actuator.
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!--
           oauth2-client — ОБЛАСТЬ optional, по тому же доводу, что и у
           platform: контракт провайдера служебного токена нужен двум
           деревьям из шести (trading-core, strategies), и оба объявляют

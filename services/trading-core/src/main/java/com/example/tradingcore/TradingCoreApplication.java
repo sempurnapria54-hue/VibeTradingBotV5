@@ -3,6 +3,10 @@ package com.example.tradingcore;
 import com.example.platform.client.ServiceClientConfig;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.platform.security.ActorProvider;
+import com.example.strategy.engine.calc.PriceCalculator;
+import com.example.strategy.engine.calc.SizeCalculator;
+import com.example.strategy.engine.calc.StrategyActionCalculator;
+import com.example.strategy.engine.condition.StrategyConditionEvaluator;
 import com.example.tradingcore.config.EnvironmentProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -29,6 +33,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * .claude/work/backlog.md §«Таблица отказов доступа у сервисов со своей
  * базой»).
  *
+ * <p><b>Движок стратегий берётся тем же именованным ходом, и без него
+ * контекст не поднимался вовсе.</b> Интерпретатор условий и расчётный
+ * слой лежат в общем артефакте {@code strategy-engine}, то есть вне
+ * пакета сервиса, и сканирование умолчания их не видит; ядро —
+ * единственный их потребитель, и до подъёма чёрного ящика этого никто не
+ * замечал: ни один прогон дерева контекста сервиса не поднимал
+ * (.claude/work/backlog.md §«Контекстный тест сервиса — по появлению базы
+ * в прогоне»). Четыре класса названы поимённо, а не подтянуты
+ * сканированием чужого пакета: перечень взятого читается в одном месте.
+ *
  * <p><b>Область отображаемых классов названа явно.</b> Базовый тип
  * audit-полей лежит в общем артефакте, то есть вне пакета сервиса, и
  * умолчание сканирования его не видит. Свой пакет перечисляется рядом:
@@ -38,7 +52,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @SpringBootApplication
 @EnableConfigurationProperties(EnvironmentProperties.class)
-@Import({ActorProvider.class, JobExecutionGuard.class, ServiceClientConfig.class})
+@Import({ActorProvider.class, JobExecutionGuard.class, ServiceClientConfig.class,
+        StrategyConditionEvaluator.class, StrategyActionCalculator.class,
+        PriceCalculator.class, SizeCalculator.class})
 @EntityScan({"com.example.tradingcore", "com.example.tradingbot.persistence.model"})
 public class TradingCoreApplication {
 

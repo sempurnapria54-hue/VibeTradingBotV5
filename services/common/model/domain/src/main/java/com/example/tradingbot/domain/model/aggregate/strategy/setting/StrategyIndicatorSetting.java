@@ -1,6 +1,8 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.setting;
 
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.time.Duration;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -35,7 +37,36 @@ public class StrategyIndicatorSetting {
     /** Тип индикатора; дискриминатор подтипа params (колонка-владелец строки). */
     private IndicatorValue.Type indicatorType;
 
-    /** Параметры расчёта (таймфрейм, warmup-override, математические параметры по типу). */
+    /**
+     * Параметры расчёта (таймфрейм, warmup-override, математические
+     * параметры по типу).
+     *
+     * <p><b>Подтип восстанавливается по {@code indicatorType} ЭТОЙ
+     * строки, и на проводе — тоже.</b> В персистентности дискриминатор
+     * живёт колонкой-владельцем, и тег внутри JSONB не дублируется
+     * (docs/rules/persistence-representation.md §«Полиморфный JSONB»); на
+     * проводе колонки нет, а одноимённое поле есть — и внешний тег
+     * читает его, а не заводит второй источник
+     * (.claude/rules/carrier-levels.md).
+     *
+     * <p><b>Без этого снимок определения на проводе не разбирается
+     * вовсе:</b> {@code IndicatorParams} абстрактен, и читатель
+     * ({@code trading-core}, {@code bff}) падает на первом же объявлении
+     * индикатора — то есть на всяком настоящем определении
+     * (.claude/rules/codestyle.md §«Неизменяемое значение, пересекающее
+     * сериализацию»).
+     */
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
+            property = "indicatorType", visible = true)
+    @JsonSubTypes({
+            @JsonSubTypes.Type(value = AtrParams.class, name = "ATR"),
+            @JsonSubTypes.Type(value = EmaParams.class, name = "EMA"),
+            @JsonSubTypes.Type(value = RsiParams.class, name = "RSI"),
+            @JsonSubTypes.Type(value = MacdParams.class, name = "MACD"),
+            @JsonSubTypes.Type(value = StochasticParams.class, name = "STOCHASTIC"),
+            @JsonSubTypes.Type(value = BollingerBandsParams.class, name = "BOLLINGER_BANDS"),
+            @JsonSubTypes.Type(value = ObvParams.class, name = "OBV"),
+            @JsonSubTypes.Type(value = EfficiencyRatioParams.class, name = "EFFICIENCY_RATIO")})
     private IndicatorParams params;
 
     /** Назначение результата расчёта внутри стратегии. */

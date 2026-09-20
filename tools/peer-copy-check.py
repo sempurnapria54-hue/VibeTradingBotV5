@@ -37,6 +37,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 TC = "services/trading-core/src/main/java/com/example/tradingcore"
 ST = "services/strategies/src/main/java/com/example/strategies"
+AU = "services/audit/src/main/java/com/example/audit"
+SA = "services/statistics/src/main/java/com/example/statistics"
 
 # --- реестр объявленных семейств копий ----------------------------------
 # `различия` — шаблоны строк ИСПОЛНЯЕМОГО тела, расхождение которых
@@ -70,6 +72,98 @@ FAMILIES = [
         # javadoc обеих копий и docs/architecture/contracts.md §«Контекст
         # тенанта в вызове».
         "различия": [r'^private static final String PRINCIPAL_NAME = ".+";$'],
+    },
+    # --- форма приёма durable-потребителя -------------------------------
+    # Дом формы объявлен сквозным (docs/rules/durable-consumer-reception.md
+    # §«Форма исполнителей приёма»), а кода два — по дереву на потребителя.
+    # Семейства внесены под-шагом 3 шага 12 фазы 2 вместе с кодом кейсов
+    # (.claude/tests/cases/durable-reception.md, группа U15): до них
+    # расхождение копий приёма не мерил ни один прогон.
+    {
+        "имя": "ReceptionPairMoments — моменты пары состояния приёма",
+        "пути": [
+            AU + "/domain/model/ReceptionPairMoments.java",
+            SA + "/domain/model/ReceptionPairMoments.java",
+        ],
+        "различия": [],
+    },
+    {
+        "имя": "PairLagOperands — операнды алерта на лаг пары",
+        "пути": [
+            AU + "/domain/model/PairLagOperands.java",
+            SA + "/domain/model/PairLagOperands.java",
+        ],
+        "различия": [],
+    },
+    {
+        "имя": "ReceptionOffsetTracker — ожидаемое смещение партиции",
+        "пути": [
+            AU + "/integration/internal/event/ReceptionOffsetTracker.java",
+            SA + "/integration/internal/event/ReceptionOffsetTracker.java",
+        ],
+        "различия": [],
+    },
+    {
+        "имя": "TopicRetentionProvider — применённый срок хранения темы",
+        "пути": [
+            AU + "/integration/internal/event/TopicRetentionProvider.java",
+            SA + "/integration/internal/event/TopicRetentionProvider.java",
+        ],
+        "различия": [],
+    },
+    {
+        "имя": "ConsumerLagProvider — остаток непринятого по теме",
+        "пути": [
+            AU + "/integration/internal/event/ConsumerLagProvider.java",
+            SA + "/integration/internal/event/ConsumerLagProvider.java",
+        ],
+        "различия": [],
+    },
+    {
+        "имя": "ReceptionHaltMarker — флаг остановки приёма",
+        "пути": [
+            AU + "/integration/internal/event/ReceptionHaltMarker.java",
+            SA + "/integration/internal/event/ReceptionHaltMarker.java",
+        ],
+        # Тип службы приёма — свой у каждого дерева: у неё своё следствие
+        # (строка журнала против факта), и общего носителя у них нет.
+        "различия": [r"^private final \w+ReceptionService receptionService;$"],
+    },
+    {
+        "имя": "RebalanceListener — первый момент обнаружения разрыва",
+        "пути": [
+            AU + "/integration/internal/event/JournalRebalanceListener.java",
+            SA + "/integration/internal/event/ReceptionRebalanceListener.java",
+        ],
+        # Имя класса и тип службы приёма — свои у каждого дерева; прочее
+        # тело обязано совпадать дословно.
+        "различия": [
+            r"^public class \w+RebalanceListener implements ConsumerAwareRebalanceListener \{$",
+            r"^private final \w+ReceptionService receptionService;$",
+        ],
+    },
+    {
+        "имя": "ReceptionMetrics — ряды экспорта операндов алерта",
+        "пути": [
+            AU + "/metrics/JournalReceptionMetrics.java",
+            SA + "/metrics/ReceptionMetrics.java",
+        ],
+        # Имя класса и имя его конструктора — своё у каждого дерева; имена
+        # самих рядов лежат константами своего сервиса и в тело не входят.
+        "различия": [
+            r"^public class \w*ReceptionMetrics \{$",
+            r"^public \w*ReceptionMetrics\(MeterRegistry registry\) \{$",
+        ],
+    },
+    {
+        "имя": "ReceptionStateCompletenessQueries — три запроса полноты",
+        "пути": [
+            AU + "/persistence/repository/ReceptionStateCompletenessQueries.java",
+            SA + "/persistence/repository/ReceptionStateCompletenessQueries.java",
+        ],
+        # Имя строки состояния — своё у каждого дерева: таблицы две, и
+        # каждая принадлежит своей базе.
+        "различия": [r"^from \w*ReceptionStateEntity state$"],
     },
 ]
 

@@ -1,0 +1,163 @@
+package com.example.connector.okx.box;
+
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+
+/**
+ * Стаб провайдера идентичности: диспетчер OIDC, JWKS и подпись токена
+ * (.claude/decisions/test-contour-design-pass.md, решение 4).
+ *
+ * <p><b>Контейнера Keycloak здесь нет намеренно:</b> проверяется
+ * ПРОВЕРКА токена, а не его выпуск, и минуты подъёма чужого процесса
+ * ради выпуска не платятся. Токен подписывает сам стаб, а
+ * {@code issuer-uri} сервиса указывает на него.
+ *
+ * <p><b>Осей у токена здесь три, а не семь, и это следствие предмета.</b>
+ * На границе коннектора вызывающий — сервис, а не человек: членство не
+ * резолвится, клиент выдачи не различается, имя пользователя не читается
+ * (`docs/architecture/contracts.md` §«Контекст тенанта в вызове»).
+ * Поэтому входами остаются ровно те оси, которые проверяет контур
+ * ресурс-сервера, — ключ подписи, издатель и срок ({@code B8.3}).
+ *
+ * <p><b>Ключей два, и второй существует ради одной оси.</b> В JWKS
+ * отдаётся только {@code K1}; {@code K2} стаб не публикует никогда, и
+ * подписанный им токен есть вход ноги «подпись чужим ключом».
+ *
+ * <p><b>Своя копия, а не общий носитель, и условие переезда названо.</b>
+ * Стаб провайдера нужен ящику каждого сервиса, и вторым носителем его
+ * заводить рано: критерий общего артефакта проб — ТРЕТИЙ носитель, и он
+ * записан у самого артефакта ({@code services/common/test-support/pom.xml},
+ * шапка). Задача переезда и её оживитель — `.claude/work/backlog.md`
+ * §«Стаб провайдера идентичности у ящиков живёт копией на дерево».
+ */
+final class IdentityStub {
+
+    /** Идентификатор ключа, который стаб публикует в JWKS. */
+    static final String PUBLISHED_KEY_ID = "K1";
+
+    /** Идентификатор ключа, которого в JWKS нет ни одним прогоном. */
+    static final String UNPUBLISHED_KEY_ID = "K2";
+
+    private static final String JWKS_PATH = "/jwks";
+
+    private static final IdentityStub INSTANCE = new IdentityStub();
+
+    private final WireMockServer server;
+    private final RSAKey publishedKey;
+    private final RSAKey unpublishedKey;
+
+    private IdentityStub() {
+        this.publishedKey = keyOf(PUBLISHED_KEY_ID);
+        this.unpublishedKey = keyOf(UNPUBLISHED_KEY_ID);
+        this.server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        this.server.start();
+        stubDiscovery();
+        this.server.stubFor(WireMock.get(WireMock.urlEqualTo(JWKS_PATH))
+                .willReturn(WireMock.okJson(new JWKSet(publishedKey.toPublicJWK()).toString())));
+    }
+
+    static IdentityStub stub() {
+        return INSTANCE;
+    }
+
+    /** Адрес издателя: он же значение {@code issuer-uri} сервиса. */
+    String issuer() {
+        return "http://localhost:" + server.port();
+    }
+
+    /**
+     * Токен, корректный по всем осям: подписан публикуемым ключом, выдан
+     * этим издателем, живой.
+     */
+    String serviceToken() {
+        return sign(PUBLISHED_KEY_ID, issuer(), Instant.now().plus(10, ChronoUnit.MINUTES));
+    }
+
+    /** Токен, подписанный ключом, которого в JWKS нет. */
+    String foreignKeyToken() {
+        return sign(UNPUBLISHED_KEY_ID, issuer(), Instant.now().plus(10, ChronoUnit.MINUTES));
+    }
+
+    /** Токен, срок которого истёк. */
+    String expiredToken() {
+        return sign(PUBLISHED_KEY_ID, issuer(), Instant.now().minus(1, ChronoUnit.MINUTES));
+    }
+
+    /** Токен чужого издателя: подпись наша, издатель — не тот. */
+    String foreignIssuerToken() {
+        return sign(PUBLISHED_KEY_ID, "http://localhost:1/other",
+                Instant.now().plus(10, ChronoUnit.MINUTES));
+    }
+
+    /**
+     * Подписывает токен названными осями.
+     *
+     * <p><b>Подписывает стаб, а не постпроцессор spring-security-test:</b>
+     * постпроцессор обходит проверку подписи, то есть ровно то, что
+     * поверхность обязана делать.
+     */
+    private String sign(String keyId, String issuer, Instant expiresAt) {
+        RSAKey signing = UNPUBLISHED_KEY_ID.equals(keyId) ? unpublishedKey : publishedKey;
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .issuer(issuer)
+                .subject("service-account-vibetrading")
+                .issueTime(Date.from(Instant.now().minus(5, ChronoUnit.MINUTES)))
+                .expirationTime(Date.from(expiresAt))
+                .build();
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyId).build(), claims);
+        try {
+            jwt.sign(new RSASSASigner((RSAPrivateKey) signing.toPrivateKey()));
+        } catch (JOSEException failure) {
+            throw new IllegalStateException("Токен не подписался: стаб провайдера идентичности сломан", failure);
+        }
+        return jwt.serialize();
+    }
+
+    private void stubDiscovery() {
+        String metadata = """
+                {
+                  "issuer": "%s",
+                  "jwks_uri": "%s%s",
+                  "id_token_signing_alg_values_supported": ["RS256"],
+                  "subject_types_supported": ["public"],
+                  "response_types_supported": ["code"],
+                  "authorization_endpoint": "%s/authorize",
+                  "token_endpoint": "%s/token"
+                }
+                """.formatted(issuer(), issuer(), JWKS_PATH, issuer(), issuer());
+        server.stubFor(WireMock.get(WireMock.urlEqualTo("/.well-known/openid-configuration"))
+                .willReturn(WireMock.okJson(metadata)));
+    }
+
+    private static RSAKey keyOf(String keyId) {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            KeyPair pair = generator.generateKeyPair();
+            return new RSAKey.Builder((RSAPublicKey) pair.getPublic())
+                    .privateKey(pair.getPrivate())
+                    .keyID(keyId)
+                    .algorithm(JWSAlgorithm.RS256)
+                    .build();
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("RSA недоступен в этой JVM", failure);
+        }
+    }
+}

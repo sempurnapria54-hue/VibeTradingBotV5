@@ -32,6 +32,20 @@
         <springdoc.version>3.0.0</springdoc.version>
         <!-- Release train под Spring Boot 4: 2025.1.x. -->
         <spring-cloud.version>2025.1.2</spring-cloud.version>
+        <!--
+          Стаб чужой HTTP-поверхности: здесь — точки провайдера
+          идентичности (диспетчер OIDC и JWKS). Затенённый артефакт, а не
+          обычный: его Jetty и Jackson не встречаются с Tomcat и Jackson
+          контекста сервиса (.claude/decisions/test-contour-design-pass.md,
+          решение 3). Версия своя — управления Boot у неё нет.
+        -->
+        <wiremock.version>3.13.1</wiremock.version>
+        <!--
+          Метка красных ожиданий, изъятая из умолчания прогона: дом довода —
+          services/common/platform/pom.xml, свойство того же имени.
+          Прогон помеченных:  mvn test -Dtest.excluded.groups=
+        -->
+        <test.excluded.groups>debt</test.excluded.groups>
     </properties>
 
     <dependencyManagement>
@@ -173,6 +187,41 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!--
+          СУБСТРАТ ЧЁРНОГО ЯЩИКА (уровень 1 шага 12 фазы 2). База и
+          хранилище секретов приезжают контейнерами прогона, а не берутся
+          из docker-compose машины: прогон, зависящий от состояния машины,
+          мерит машину (.claude/decisions/test-contour-design-pass.md,
+          решения 2 и 5). Версию держит Boot — testcontainers-bom его
+          управления; своя разошлась бы с каркасом.
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Хранилище секретов: `auth` — единственное место платформы, где
+          ключи счёта ПИШУТСЯ, и запись есть его собственный выход
+          (решение 5).
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-vault</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>${wiremock.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -197,6 +246,14 @@
                             <version>${mapstruct.version}</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!-- Метка красных ожиданий вне умолчания прогона — довод у свойства. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${test.excluded.groups}</excludedGroups>
                 </configuration>
             </plugin>
             <!--

@@ -18,10 +18,13 @@
   фичами и каталогом. Отсюда oauth2-client рядом с resource-server —
   первый добывает токен исходящему вызову, второй проверяет входящий.
 
-  БРОКЕРА В ЗАВИСИМОСТЯХ ПОКА НЕТ: строку outbox пишет код решения, а
-  публикует реле — оно приезжает своим компонентом захода, и зависимость
-  вводится вместе с ним, а не превентивно (.claude/rules/codestyle.md
-  §«Новый модуль монорепозитория»).
+  БРОКЕР В ЗАВИСИМОСТЯХ ЕСТЬ, А АВТОКОНФИГУРАЦИИ ЕГО НЕТ: Boot 4 разнёс
+  автоконфигурацию по модулям `spring-boot-<технология>`, и `spring-kafka`
+  сам по себе ни фабрик, ни обработки @KafkaListener не поднимает. Клиент
+  поэтому объявлен явно (CoreKafkaConfig) — той же формой, какой ось
+  закрыли два durable-потребителя. Прежняя редакция этого комментария
+  говорила «брокера в зависимостях пока нет»; она описывала дерево до
+  прихода реле.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -53,6 +56,7 @@
           Прогон помеченных:  mvn test -Dtest.excluded.groups=
         -->
         <test.excluded.groups>debt</test.excluded.groups>
+        <wiremock.version>3.13.1</wiremock.version>
     </properties>
 
     <dependencies>
@@ -230,6 +234,53 @@
             <groupId>com.example</groupId>
             <artifactId>test-support</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          СУБСТРАТ ЧЁРНОГО ЯЩИКА (уровень 1 шага 12 фазы 2). База приезжает
+          контейнером прогона, а не берётся из docker-compose машины: прогон,
+          зависящий от состояния машины, мерит машину
+          (.claude/decisions/test-contour-design-pass.md, решения 1-3).
+          Образ базы — ТОТ ЖЕ, что в deploy/base, и совпадение тега сверяет
+          проба: две записи одного тега разошлись бы молча.
+
+          БРОКЕР НУЖЕН ОБЕИМИ СТОРОНАМИ: ядро и публикует через outbox, и
+          потребляет тему определений (.claude/tests/cases/trading-core.md
+          §«Чем достаются выходы»). Тропа к нему объявлена этим же заходом —
+          автоконфигурации Kafka в дереве нет, и клиент объявлен явно
+          (CoreKafkaConfig).
+
+          ХРАНИЛИЩА СЕКРЕТОВ ЗДЕСЬ НЕТ: ключей биржевого счёта у ядра нет ни
+          в каком виде — оно адресует счёт идентичностью, а ключи держит
+          коннектор (docs/architecture/services/trading-core.md §«Чего не
+          делает намеренно»).
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Стаб чужой HTTP-поверхности — один механизм на три вида: коннектор,
+          соседи по ярусу и точки провайдера идентичности. Затенённый
+          артефакт: его Jetty и Jackson не встречаются с Tomcat и Jackson
+          контекста сервиса.
+        -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>${wiremock.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

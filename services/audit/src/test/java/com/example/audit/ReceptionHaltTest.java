@@ -2,7 +2,6 @@ package com.example.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -31,6 +30,13 @@ import org.springframework.kafka.listener.MessageListenerContainer;
  * поэтому мерится он сам: отравленное сообщение прогоняется через
  * обработчик много раз подряд, и ни на одном из них он не объявляет запись
  * восстановленной — то есть смещение не продвигается никогда.
+ *
+ * <p><b>Предмет здесь один — ОБРАБОТЧИК; маркер остановки в него не
+ * входит.</b> Его ветви живут группой `U11` документа
+ * `.claude/tests/cases/durable-reception.md` и прогоняются контрактом
+ * копий ({@code ReceptionHaltMarkerContract}) в обоих деревьях; маркер
+ * остаётся здесь настоящим, потому что «флаг записан ровно один раз на
+ * двенадцати доставках» есть утверждение о ПАРЕ, а не о нём одном.
  */
 class ReceptionHaltTest {
 
@@ -57,22 +63,6 @@ class ReceptionHaltTest {
 
         verify(receptionService, times(1))
                 .noteHalt(TOPIC);
-    }
-
-    @Test
-    @DisplayName("Флаг остановки ставится на первой неудачной доставке")
-    void theHaltFlagIsWrittenOnTheFirstFailedDelivery() {
-        haltMarker.failedDelivery(record(), new IncompleteEventException("неполный вход"), 1);
-
-        verify(receptionService).noteHalt(TOPIC);
-    }
-
-    @Test
-    @DisplayName("Повторы флага не переписывают: он уже стои́т")
-    void repeatedDeliveriesDoNotRewriteTheFlag() {
-        haltMarker.failedDelivery(record(), new IncompleteEventException("неполный вход"), 2);
-
-        verify(receptionService, never()).noteHalt(TOPIC);
     }
 
     private ConsumerRecord<String, String> record() {

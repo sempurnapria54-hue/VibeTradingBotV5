@@ -98,28 +98,20 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-  kafka:
-    # Брокер приезжает из манифеста окружения; пустое означает, что тропа
-    # публикации не настроена — реле отказывает и строки копятся, а
-    # решения от этого не зависят (docs/components/OutboxRelayJob.md).
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      # Подтверждение ОТ ВСЕХ синхронных реплик: отметка «опубликовано»
-      # ставится после подтверждения, и более слабое обещание позволило бы
-      # пометить строку, которую брокер потеряет вместе с лидером.
-      acks: all
-    consumer:
-      # Группа потребителя объявлена ниже, в секции consumers: адрес темы
-      # и имя группы — контракт, а не свойство транспорта.
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      # С НАЧАЛА темы: пропущенная активация оставила бы ядро без копии
-      # определения, по которому оно торгует, — а тема фактов хранится
-      # сроком заведомо большим допустимого отставания
-      # (docs/architecture/data-ownership.md §«Outbox и доставка»).
-      auto-offset-reset: earliest
+
+# Тропа событий: адрес брокера. Ключ СВОЙ, а не `spring.kafka.*`, потому что
+# автоконфигурации Kafka в дереве нет — клиент объявлен явно
+# (CoreKafkaConfig), и прежние ключи `spring.kafka.*` не читал никто: они
+# выглядели настройкой и ею не были. Прочее — сериализаторы, подтверждение
+# всех синхронных реплик, позиция чтения с начала темы — несущие величины
+# конструкции, и дом у них код клиента, а не конфигурация окружения.
+#
+# Пустое означает, что тропа публикации не настроена: реле отказывает и
+# строки копятся, а решения от этого не зависят
+# (docs/components/OutboxRelayJob.md); слушатель темы определений при пустом
+# адресе не запускается вовсе.
+broker:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
 
 # Темы, которые ядро ЧИТАЕТ. Первый потребитель в конструкции — три
 # класса определения стратегии от сервиса strategies

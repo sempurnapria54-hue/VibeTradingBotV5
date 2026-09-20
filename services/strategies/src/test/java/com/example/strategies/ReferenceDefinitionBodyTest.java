@@ -1,15 +1,11 @@
 package com.example.strategies;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
-import com.example.strategies.domain.model.TenantRiskAppetite;
-import com.example.strategies.domain.validation.StrategyDefinitionValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -31,12 +27,17 @@ import org.springframework.core.io.ClassPathResource;
  * <p><b>Копия донора остаётся своей и расходится законно</b>: у неё
  * другая форма тела (идентичность из тела, счёта нет вовсе), и она
  * исчезает вместе с донором. Здесь — форма ВЛАДЕЛЬЦА.
+ *
+ * <p><b>Прохождение эталона охраной создания здесь больше не
+ * проверяется:</b> это ожидание поглощено клеткой {@code U1.1} документа
+ * `.claude/tests/cases/strategy-definition-validation.md`
+ * ({@code RejectionFormTest}), и второй носитель одного ожидания
+ * разошёлся бы с первым. Здесь остаётся предмет, которого документ не
+ * берёт, — ФОРМА ТЕЛА команды.
  */
 class ReferenceDefinitionBodyTest {
 
     private static final String REFERENCE_DEFINITION = "strategy-examples/trend-following-ema.json";
-
-    private final StrategyDefinitionValidator validator = new StrategyDefinitionValidator();
 
     @Test
     @DisplayName("Эталон разбирается телом команды создания владельца целиком")
@@ -66,28 +67,6 @@ class ReferenceDefinitionBodyTest {
         assertThat(tree.has("tenantId"))
                 .as("тенант приходит контекстом вызова, а не телом")
                 .isFalse();
-    }
-
-    /**
-     * Эталон проходит охрану создания под числами, которые он же и
-     * объявляет пределом.
-     *
-     * <p>Числа — операнд, а не константа владельца: они живут на строке
-     * тенанта у ядра (docs/rules/strategy-validation.md §«Исключения:
-     * неравенства, проверяемые на создании»). Взяты самые тесные, которые
-     * эталон ещё проходит: планка свободнее ничего не проверяла бы.
-     */
-    @Test
-    @DisplayName("Эталон проходит охрану создания под объявленными им числами")
-    void theReferencePassesCreateValidation() throws IOException {
-        CreateStrategyApiRequest request = readReference();
-
-        assertThatCode(() -> validator.validateCreate(request, referenceAppetite()))
-                .doesNotThrowAnyException();
-    }
-
-    private TenantRiskAppetite referenceAppetite() {
-        return new TenantRiskAppetite(BigDecimal.ONE, new BigDecimal("100"));
     }
 
     private CreateStrategyApiRequest readReference() throws IOException {

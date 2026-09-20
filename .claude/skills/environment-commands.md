@@ -36,6 +36,7 @@ Vault в не-dev режиме.
 | Лаунчер Python | **`py -3`** → Python 3.11.9; `python3` и `python` в Git Bash — заглушки WindowsApps: печатают `Python` без версии, код не исполняют | `py -3 -c "print(1)"` → `1`; `python3 -c "print(1)"` → исполнения нет |
 | Сборка дерева | реактор из корня, обёрткой `bash tools/reactor-test.sh`; точечно — `mvn -o -am -pl <модуль> test` | прогон обёртки |
 | Артефакты тестового контура | **есть с 2026-09-19** — Testcontainers `2.0.2` (`testcontainers-postgresql`, `-kafka`, `-vault`, `-junit-jupiter`), `spring-boot-testcontainers` `4.0.0`, WireMock `wiremock-standalone:3.13.1`; Awaitility приезжает со `spring-boot-starter-test`. Версию Testcontainers держит Boot: своя разошлась бы с `testcontainers-bom` каркаса | прайминг §«Воспроизводимые команды»; `ls ~/.m2/repository/org/testcontainers/` |
+| Образы субстрата ящика | **есть** — `timescale/timescaledb-ha:pg17.10-ts2.29.2` (тот же тег, что в `deploy/base`) и `hashicorp/vault:1.15` с 2026-09-19; `apache/kafka:4.1.1` с 2026-09-20 (версия клиента `kafka-clients` дерева — манифест стенда версии брокера не называет вовсе, её выбирает оператор). Образ базы весит около 4 GB на диске и приезжает **разово**, как и jar'ы: прогон ящика его не тянет | `docker images`; пробы совпадения тегов — `SubstrateImagePinTest` деревьев `auth` и `trading-core` |
 | Демо-ключ OKX | **доказан отрицанием**: тот же ключ **без** заголовка `x-simulated-trading` → `HTTP 401`, `50101 APIKey does not match current environment`; с заголовком → `code=0` | прогон 2026-08-31 |
 
 **Проверка демо-контура — падающая проба, а не флаг конфигурации.** Клейм
@@ -65,6 +66,13 @@ docker exec -e VAULT_ADDR=http://127.0.0.1:18200 vibetradingbotv5-vault \
 # не выдумываются: их закрепляет spring-boot-dependencies того же мажора.
 mvn -q -B dependency:get -Dartifact=<группа>:<артефакт>:<версия>
 
+# ПРАЙМИНГ образов субстрата ящика: тот же довод, что у jar'ов, — прогон
+# ящика образа не тянет, и первый его подъём иначе платил бы минутами
+# скачивания внутри теста.
+docker pull timescale/timescaledb-ha:pg17.10-ts2.29.2   # тег — как в deploy/base
+docker pull hashicorp/vault:1.15
+docker pull apache/kafka:4.1.1                          # версия клиента kafka-clients дерева
+
 bash tools/reactor-test.sh                   # компиляция всех деревьев + весь unit-набор
 mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \
   -Dsurefire.failIfNoSpecifiedTests=false    # точечно; разделитель классов — запятая
@@ -81,8 +89,12 @@ mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \
 - **Токен `.env.vault.test.local` тестовыми путями не ограничен** —
   `policies=["root"]`, `ttl=0`. Ограничение области — задача держателя
   (`.claude/work/backlog.md`, секция области токена).
-- **Базы в автономном прогоне тестов нет** — контекстный тест сервиса
-  требует базы и точки провайдера идентичности; дом задачи —
+- **База в автономном прогоне тестов есть с 2026-09-19** — её поднимает
+  Testcontainers у ящика сервиса (`auth` — первый), вместе с контейнером
+  хранилища и стабом провайдера идентичности; своего `docker-compose` прогон
+  при этом не трогает. Прежняя запись «базы нет» снята: она описывала среду до
+  ящика. Что осталось незакрытым — контекст поднимается **не у каждого**
+  сервиса, а у тех, чей ящик написан; дом задачи —
   `.claude/work/backlog.md` §«Контекстный тест сервиса — по появлению базы
   в прогоне».
 
