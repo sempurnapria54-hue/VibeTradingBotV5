@@ -6,7 +6,6 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import java.util.Objects;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -134,21 +133,5 @@ class ObservationRestartBoxTest extends AuditBox {
                 .atMost(RECEPTION_WAIT)
                 .pollInterval(POLL)
                 .until(() -> instant(pair(subject()), OBSERVED_COLUMN).isAfter(observedSince.toInstant()));
-    }
-
-    /**
-     * Нижняя граница полноты как точка шкалы.
-     *
-     * <p>Читается она ЧЕРЕЗ ПОВЕРХНОСТЬ — предмет величины в том, что
-     * журнал объявляет о себе читателю, — а разбирается здесь потому, что
-     * обе клетки утверждают о НАПРАВЛЕНИИ её движения, а не о самом факте
-     * правки.
-     */
-    private OffsetDateTime lowerBoundMoment() {
-        Object value = lowerBound();
-        if (Objects.isNull(value)) {
-            throw new AssertionError("Нижняя граница полноты отсутствует: обещать нечего");
-        }
-        return OffsetDateTime.parse(String.valueOf(value));
     }
 }

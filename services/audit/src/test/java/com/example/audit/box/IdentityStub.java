@@ -19,6 +19,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Стаб провайдера идентичности: диспетчер OIDC, JWKS и подпись входящего
@@ -49,15 +50,23 @@ final class IdentityStub {
     /** Идентификатор ключа, который стаб публикует в JWKS. */
     private static final String PUBLISHED_KEY_ID = "K1";
 
+    /**
+     * Идентификатор ключа, которого в JWKS нет: им подписан токен негодной
+     * оси подписи.
+     */
+    private static final String UNPUBLISHED_KEY_ID = "K2";
+
     private static final String JWKS_PATH = "/jwks";
 
     private static final IdentityStub INSTANCE = new IdentityStub();
 
     private final WireMockServer server;
     private final RSAKey publishedKey;
+    private final RSAKey unpublishedKey;
 
     private IdentityStub() {
         this.publishedKey = keyOf(PUBLISHED_KEY_ID);
+        this.unpublishedKey = keyOf(UNPUBLISHED_KEY_ID);
         this.server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
         this.server.start();
         stubDiscovery();
@@ -79,7 +88,36 @@ final class IdentityStub {
      * этим издателем, живой.
      */
     String serviceToken() {
-        return sign(issuer(), Instant.now().plus(10, ChronoUnit.MINUTES));
+        return sign(PUBLISHED_KEY_ID, issuer(), Instant.now().plus(10, ChronoUnit.MINUTES));
+    }
+
+    /** Токен, подписанный ключом, которого в JWKS нет. */
+    String foreignKeyToken() {
+        return sign(UNPUBLISHED_KEY_ID, issuer(), Instant.now().plus(10, ChronoUnit.MINUTES));
+    }
+
+    /** Токен, срок которого истёк. */
+    String expiredToken() {
+        return sign(PUBLISHED_KEY_ID, issuer(), Instant.now().minus(1, ChronoUnit.MINUTES));
+    }
+
+    /** Токен чужого издателя: подпись наша, издатель — не тот. */
+    String foreignIssuerToken() {
+        return sign(PUBLISHED_KEY_ID, "http://localhost:1/other",
+                Instant.now().plus(10, ChronoUnit.MINUTES));
+    }
+
+    /**
+     * Пути всех обращений, полученных стабом.
+     *
+     * <p>Ими наблюдается, что за подтверждением токена сервис ходил только
+     * за КЛЮЧАМИ: подпись проверяется ЛОКАЛЬНО, и точек подтверждения у
+     * провайдера сервис не зовёт вовсе.
+     */
+    List<String> paths() {
+        return server.getAllServeEvents().stream()
+                .map(event -> event.getRequest().getUrl().split("\\?")[0])
+                .toList();
     }
 
     /**
@@ -89,15 +127,17 @@ final class IdentityStub {
      * постпроцессор обходит проверку подписи, то есть ровно то, что
      * поверхность обязана делать.
      *
-     * <p><b>Ключ один, и негодных осей токена стаб пока не выпускает.</b>
-     * Их вход — группа {@code B9}, которой в дереве ещё нет; заведённые
-     * заранее, они были бы формами без единого потребителя
-     * (.claude/rules/codestyle.md §«Неиспользуемый код»).
+     * <p><b>Ключей ДВА, и второй не публикуется.</b> Ось подписи иначе не
+     * выразима вовсе: токен, подписанный публикуемым ключом, проверку
+     * проходит по построению, и «подпись чужая» пришлось бы изображать
+     * порчей строки — то есть мерить разбор формы, а не проверку подписи.
      *
+     * @param keyId     идентификатор ключа подписи
      * @param issuer    издатель, которым токен себя называет
      * @param expiresAt момент истечения токена
      */
-    private String sign(String issuer, Instant expiresAt) {
+    private String sign(String keyId, String issuer, Instant expiresAt) {
+        RSAKey signing = UNPUBLISHED_KEY_ID.equals(keyId) ? unpublishedKey : publishedKey;
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .issuer(issuer)
                 .subject(PRINCIPAL)
@@ -105,9 +145,9 @@ final class IdentityStub {
                 .expirationTime(Date.from(expiresAt))
                 .build();
         SignedJWT jwt = new SignedJWT(
-                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(PUBLISHED_KEY_ID).build(), claims);
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyId).build(), claims);
         try {
-            jwt.sign(new RSASSASigner((RSAPrivateKey) publishedKey.toPrivateKey()));
+            jwt.sign(new RSASSASigner((RSAPrivateKey) signing.toPrivateKey()));
         } catch (JOSEException failure) {
             throw new IllegalStateException("Токен не подписался: стаб провайдера идентичности сломан",
                     failure);

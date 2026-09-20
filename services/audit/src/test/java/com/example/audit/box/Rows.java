@@ -128,6 +128,61 @@ final class Rows {
         }
     }
 
+    /**
+     * Прогоняет тело, держа НАЗВАННУЮ ТАБЛИЦУ под исключительным замком.
+     *
+     * <p><b>Так выражается «проход длится дольше такта» — предусловие
+     * клетки о перекрывающем запуске.</b> Длительность прохода иначе не
+     * ставится ничем: она зависит от объёма журнала и скорости базы, и
+     * клетка, накопившая строк «побольше», мерила бы не охрану, а гонку.
+     * Замок останавливает первый проход РОВНО на его первом ходе —
+     * удалении, — и держит его там, пока клетка не подаст второй такт.
+     *
+     * <p><b>Замок берётся своим соединением, а не бином сервиса:</b> ящик
+     * смотрит на субстрат снаружи, и предмет клетки — охрана джобы, а не
+     * транзакция контекста.
+     *
+     * <p><b>Снятие стои́т в {@code finally} и делается откатом:</b>
+     * таблица общая всем контекстам прогона, и оставленная под замком она
+     * подвесила бы соседние клетки по причине, которой те не ставили.
+     *
+     * @param table таблица, которую тело держит под замком
+     * @param body  тело клетки
+     */
+    void withTableLocked(String table, Runnable body) {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "lock table " + table + " in access exclusive mode")) {
+                statement.execute();
+            }
+            try {
+                body.run();
+            } finally {
+                connection.rollback();
+            }
+        } catch (SQLException failure) {
+            throw new IllegalStateException("База субстрата не дала замка таблицы " + table,
+                    failure);
+        }
+    }
+
+    /**
+     * Сколько запросов СТОЯ́Т в очереди за замком названной таблицы.
+     *
+     * <p><b>Ею наблюдается, что первый проход уже внутри охраны.</b>
+     * Подать второй такт раньше значило бы измерить гонку: охрана
+     * пропускает перекрывающий тик только тогда, когда предыдущий её
+     * занял, и без этого ожидания зелёный исход был бы случайным.
+     *
+     * @param table таблица, за замком которой стои́т очередь
+     */
+    Long waitingLocksOn(String table) {
+        return number("select count(*) from pg_locks locks"
+                + " join pg_class relations on relations.oid = locks.relation"
+                + " where relations.relname = ? and not locks.granted", table);
+    }
+
     /** Версии применённых миграций — ими наблюдается накат схемы. */
     List<String> appliedMigrations() {
         return rows("select version from " + MIGRATION_JOURNAL + " where success order by installed_rank")

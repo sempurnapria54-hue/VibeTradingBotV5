@@ -96,6 +96,18 @@ final class AuditSubstrate {
     /** Ключ допустимого возраста строки состояния — третьего конъюнкта предиката. */
     static final String STATE_MAX_AGE_KEY = "reception.state-max-age";
 
+    /**
+     * Допустимый возраст строки состояния приёма в штатном положении осей.
+     *
+     * <p><b>Объявлен здесь ВЕЛИЧИНОЙ, а не унаследован умолчанием
+     * сервиса.</b> Клетка о третьем конъюнкте предиката утверждает о самой
+     * ГРАНИЦЕ возраста — строка старше её на секунду и моложе на секунду
+     * дают разные ответы, — и границу эту обязан знать кейс. Унаследованное
+     * умолчание пришлось бы прочитать из ресурса сервиса, то есть заглянуть
+     * ящику внутрь; объявленная ось читается как вход.
+     */
+    static final Duration STATE_MAX_AGE = Duration.ofMinutes(5);
+
     /** Ключ паузы между повторами отравленного сообщения. */
     static final String RETRY_INTERVAL_KEY = "reception.retry-interval";
 
@@ -108,8 +120,61 @@ final class AuditSubstrate {
     /** Ключ профиля хранения журнала — оси окружения. */
     static final String RETENTION_PROFILE_KEY = "platform.environment.journal-retention-profile";
 
+    /** Ключ предела ширины окна журнальной выборки чтения. */
+    static final String MAX_WINDOW_KEY = "surface.journal-read.max-window";
+
+    /**
+     * Предельная ширина окна чтения в штатном положении осей.
+     *
+     * <p><b>Объявлен здесь ВЕЛИЧИНОЙ по тому же доводу, что допустимый
+     * возраст строки состояния:</b> клетка о третьем отвержении вопроса
+     * утверждает о самой ГРАНИЦЕ — окно шириной ровно в предел принимается,
+     * шире на секунду отвергается, — и границу эту обязан знать кейс.
+     * Унаследованное умолчание пришлось бы прочитать из ресурса сервиса, то
+     * есть заглянуть ящику внутрь.
+     *
+     * <p><b>Значение совпадает с умолчанием сервиса, и это не дубль, а
+     * объявление.</b> Сдвигать его незачем: окно в неделю прогону ничего не
+     * стои́т — в отличие от размера страницы, который сдвинут ниже.
+     */
+    static final Duration MAX_WINDOW = Duration.ofDays(7);
+
+    /** Ключ размера курсорной страницы журнальной выборки чтения. */
+    static final String PAGE_SIZE_KEY = "surface.journal-read.page-size";
+
+    /**
+     * Размер страницы чтения в штатном положении осей.
+     *
+     * <p><b>СДВИНУТ относительно умолчания сервиса, и сдвиг назван.</b>
+     * Клетки о курсорной странице требуют журнала ДЛИННЕЕ страницы: при
+     * умолчании в две сотни строк им пришлось бы провести через брокер две
+     * сотни записей — то есть мерить пропускную способность субстрата, а не
+     * продолжение чтения. Размер есть ось конфигурации у самого предмета
+     * (docs/models/domain/other/AuditRecord.md §«Как журнал читается»),
+     * поэтому его положение — законный вход ящика, а не подмена.
+     *
+     * <p><b>Прочим клеткам прогона сдвиг безразличен:</b> ни одна из них не
+     * читает страницы длиннее одной строки.
+     */
+    static final Integer PAGE_SIZE = 3;
+
     /** Выражение такта, до которого прогон не доживает. */
     static final String NEVER = "0 0 0 1 1 *";
+
+    /**
+     * Метка «ключ в контекст не уезжает вовсе»: ею ставится состояние
+     * «ось не доехала».
+     *
+     * <p><b>Пустое значение здесь не значение, а ИЗЪЯТИЕ ключа.</b>
+     * Реестр свойств перекрывает умолчание сервиса, а клетке о
+     * недоехавшей оси нужно ровно обратное — чтобы до исполнителя доехало
+     * то, что он получает в развёртывании без назначенной оси. Его
+     * собственное умолчание пусто ({@code application.yaml}), и снятый
+     * ключ отдаёт исполнителю именно его; подстановка пустой строки
+     * перекрытием мерила бы вдобавок преобразование пустого значения в
+     * перечень, то есть не тот предмет.
+     */
+    static final String UNSET = "";
 
     /** Такт тика, второго повторения которого за прогон не бывает. */
     private static final String HOURLY = "1h";
@@ -142,12 +207,17 @@ final class AuditSubstrate {
      * ключу оставляли бы исход зависящим от порядка обхода, которого
      * контракт реестра не обещает.
      *
+     * <p><b>Ключ, чьё перекрытие равно {@link #UNSET}, изымается из
+     * перечня</b>, и сервис получает по нему своё умолчание — состояние
+     * «ось не доехала».
+     *
      * @param registry  реестр свойств контекста
      * @param overrides оси, которые кейс сдвигает
      */
     static void register(DynamicPropertyRegistry registry, Map<String, String> overrides) {
         Map<String, String> values = new LinkedHashMap<>(defaults());
         values.putAll(overrides);
+        values.values().removeIf(UNSET::equals);
         values.forEach((key, value) -> registry.add(key, () -> value));
     }
 
@@ -161,10 +231,13 @@ final class AuditSubstrate {
         values.put(TOPICS_KEY, CORE_TOPIC + "," + STRATEGY_TOPIC);
         values.put(STATE_TICK_ENABLED_KEY, "true");
         values.put("reception.state-tick-interval", HOURLY);
+        values.put(STATE_MAX_AGE_KEY, STATE_MAX_AGE.toMinutes() + "m");
         values.put(CLEANUP_ENABLED_KEY, "true");
         values.put("jobs.journal-cleanup.cron", NEVER);
         values.put("platform.environment.name", "dev");
         values.put(RETENTION_PROFILE_KEY, "REDUCED");
+        values.put(MAX_WINDOW_KEY, MAX_WINDOW.toDays() + "d");
+        values.put(PAGE_SIZE_KEY, String.valueOf(PAGE_SIZE));
         return values;
     }
 

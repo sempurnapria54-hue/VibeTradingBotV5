@@ -67,15 +67,6 @@ class ReceptionStateTickBoxTest extends SharedAuditBox {
     /** Методы, которыми перебираются пути ручного триггера. */
     private static final List<String> METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE");
 
-    /** Описание поверхности: им читается состав отображённых маршрутов. */
-    private static final String SURFACE_DESCRIPTION = "/v3/api-docs";
-
-    /** Проба живости — первая открытая точка актуатора. */
-    private static final String LIVENESS_PROBE = "/actuator/health";
-
-    /** Съём рядов — вторая открытая точка актуатора. */
-    private static final String METRICS_SCRAPE = "/actuator/prometheus";
-
     @Test
     @DisplayName("B3.1 — Первый такт заводит строку на каждую тему подписки")
     void theFirstTickOpensARowForEveryTopicOfTheSubscription() {

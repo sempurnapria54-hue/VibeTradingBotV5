@@ -1,5 +1,6 @@
 package com.example.audit.box;
 
+import com.example.audit.domain.jobs.JournalCleanupJob;
 import com.example.audit.domain.jobs.ReceptionStateJob;
 import java.io.IOException;
 import java.net.URI;
@@ -37,12 +38,15 @@ import org.springframework.boot.test.web.server.LocalServerPort;
  * адресу случайного порта, свой клиент брокера ({@link Wire}), своё
  * соединение к базе ({@link Rows}).
  *
- * <p><b>Единственное касание бина — тик состояния приёма, и оно
- * объявлено ВХОДОМ.</b> Ручного фасада у джоб сервиса нет намеренно:
- * поверхность объявлена только читающей, и триггер завёл бы входящую
- * точку записи (docs/components/ReceptionStateJob.md §«Форма — джоба без
- * ручного фасада, и это объявлено»). Решение 6 называет прямой вызов
- * метода джобы единственной такой точкой у ящика уровня 1.
+ * <p><b>Касание бина одно ПО РОДУ — такт джобы, — а джоб у сервиса
+ * две.</b> Ручного фасада нет ни у одной намеренно: поверхность объявлена
+ * только читающей, и триггер завёл бы входящую точку записи
+ * (docs/components/ReceptionStateJob.md §«Форма — джоба без ручного
+ * фасада, и это объявлено»; docs/components/JournalCleanupJob.md §«Форма —
+ * джоба без ручного фасада, и это объявлено»). Решение 6 называет прямой
+ * вызов метода джобы единственной такой точкой у ящика уровня 1, и
+ * расписание обеих гасится осями конфигурации, а не подменой бина
+ * (.claude/tests/cases/audit.md §«Чем достаются выходы»).
  *
  * <p><b>ВХОД у этого предмета есть ЗАПИСЬ БРОКЕРА, а не запрос.</b>
  * Поверхность здесь — наблюдатель выхода наравне с базой, а не податель
@@ -65,6 +69,24 @@ abstract class AuditBox {
     /** Журнальная выборка чтения: единственная точка предмета. */
     protected static final String JOURNAL_RECORDS = "/api/v1/audit/journal/records";
 
+    /** Проба живости — первая открытая точка актуатора. */
+    protected static final String LIVENESS_PROBE = "/actuator/health";
+
+    /** Съём рядов — вторая открытая точка актуатора. */
+    protected static final String METRICS_SCRAPE = "/actuator/prometheus";
+
+    /** Описание объявленной поверхности: им читается состав маршрутов. */
+    protected static final String SURFACE_DESCRIPTION = "/v3/api-docs";
+
+    /**
+     * Корень актуатора: он отдаёт ссылки на ПЕРЕЧЕНЬ экспозиции.
+     *
+     * <p>Им читается сам перечень, а не отдельные его имена: перебор точек
+     * доказывает отсутствие названных, а равенство перечня двум объявленным
+     * именам — только выдача корня.
+     */
+    protected static final String ACTUATOR_ROOT = "/actuator";
+
     /** Тенант, которым ходит большинство кейсов. */
     protected static final String TENANT = "T1";
 
@@ -80,6 +102,15 @@ abstract class AuditBox {
     /** Таблица состояния приёма: поверхности у неё нет вовсе. */
     protected static final String RECEPTION_TABLE = "reception_states";
 
+    /**
+     * Таблица следа отвергнутого по правам вызова.
+     *
+     * <p>Лежит в той же базе, что журнал, а глубины хранения у неё нет:
+     * журнальную ей не приписывают — та выведена из другого вопроса
+     * (docs/components/JournalCleanupJob.md §Границы).
+     */
+    protected static final String DENIALS_TABLE = "access_denials";
+
     /** Колонка флага остановки приёма пары. */
     protected static final String HALTED_COLUMN = "reception_halted";
 
@@ -91,6 +122,18 @@ abstract class AuditBox {
 
     /** Колонка момента последнего такта тика: её писатель — только тик. */
     protected static final String UPDATED_COLUMN = "updated_at";
+
+    /** Колонка момента происшествия строки журнала: ось производства. */
+    protected static final String OCCURRED_COLUMN = "occurred_at";
+
+    /**
+     * Колонка момента приёма строки журнала.
+     *
+     * <p>Ось приёма — та, по которой считается первый операнд нижней
+     * границы полноты и глубина чистки
+     * (docs/models/domain/other/AuditRecord.md §«Глубина хранения»).
+     */
+    protected static final String RECORDED_COLUMN = "recorded_at";
 
     /** Колонка момента, с которого группа наблюдает тему непрерывно. */
     protected static final String OBSERVED_COLUMN = "observed_since";
@@ -152,6 +195,14 @@ abstract class AuditBox {
     /** Шаг опроса у всякого ожидания ящика. */
     protected static final Duration POLL = Duration.ofMillis(200);
 
+    /** Вставка строки пары: колонки те же, которыми её ведут её писатели. */
+    private static final String INSERT_PAIR = """
+            insert into reception_states
+                (consumer_group, topic, observed_since, subscribed, reception_halted,
+                 lag_gap_at, last_accepted_occurred_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?)
+            """;
+
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NEVER)
@@ -176,11 +227,24 @@ abstract class AuditBox {
     private String subscription;
 
     /**
-     * Тик состояния приёма — единственный бин, которого касается ящик.
-     * Довод и его дом — в шапке класса.
+     * Тик состояния приёма — первая из двух джоб, такт которых ящик
+     * подаёт сам. Довод и его дом — в шапке класса.
      */
     @Autowired
     private ReceptionStateJob receptionStateJob;
+
+    /**
+     * Чистка журнала — вторая такая джоба.
+     *
+     * <p><b>Её такт тоже ВХОД, а не подмена.</b> Проход чистки есть
+     * единственный писатель, двигающий первый операнд нижней границы
+     * полноты, и наблюдать его иначе нечем: расписание у неё выражением
+     * CRON, до которого прогон не доживает
+     * (docs/components/JournalCleanupJob.md §«Чистка границу не ломает, а
+     * двигает»).
+     */
+    @Autowired
+    private JournalCleanupJob journalCleanupJob;
 
     /** Наблюдатель строк базы субстрата. */
     protected final Rows rows = Rows.shared();
@@ -217,6 +281,111 @@ abstract class AuditBox {
     /** Один такт тика — им клетка двигает величины, чей писатель он. */
     protected void tick() {
         receptionStateJob.tick();
+    }
+
+    /**
+     * Один проход чистки журнала.
+     *
+     * <p>Применимость прохода решает ось окружения, а глубину — величина
+     * конфигурации: клетка сдвигает не их, а ВОЗРАСТ строк
+     * ({@link #recordedEarlier}). Часы процесса не двигаются ни в одном
+     * кейсе (.claude/tests/cases/audit.md §«Чем достаются выходы»).
+     */
+    protected void cleanup() {
+        journalCleanupJob.tick();
+    }
+
+    /**
+     * Ставит момент приёма названной строки журнала.
+     *
+     * <p><b>Это durable-ВХОД клетки, а не подмена её выхода.</b> Глубина
+     * чистки назначается сутками, а прогон живёт секунды: строки, принятой
+     * раньше глубины, тропа ящика не производит ни при какой расстановке —
+     * её даёт только возраст, поставленный в данных. Форма строки при этом
+     * объявлена домом и читается наружу
+     * (docs/models/domain/other/AuditRecord.md §Персистентность), поэтому
+     * запись по колонке говорит о том же, о чём читает ассерт.
+     *
+     * @param eventId идентичность события, чья строка стареет
+     * @param moment  момент приёма, который строка получает
+     */
+    protected void recordedEarlier(String eventId, OffsetDateTime moment) {
+        rows.write("update " + JOURNAL_TABLE + " set " + RECORDED_COLUMN + " = ? where event_id = ?",
+                moment, eventId);
+    }
+
+    /**
+     * Ставит момент обновления строки названной пары.
+     *
+     * <p><b>Это durable-ВХОД клетки, а не подмена её выхода.</b> Третий
+     * конъюнкт предиката непрерывности — свежесть самой строки состояния
+     * (docs/spec/durable-reception.json, {@code receptionStateFresh}), и
+     * состарить строку тропой ящика нечем: единственный её писатель — тик,
+     * а он ставит момент СВОЕГО такта, то есть «сейчас». Форма строки при
+     * этом объявлена домом и читается наружу
+     * (docs/rules/durable-consumer-reception.md §«Строка состояния приёма —
+     * таблица `reception_states`»), поэтому запись по колонке говорит о
+     * том же, о чём читает ассерт. Часы процесса не двигаются ни в одном
+     * кейсе (.claude/tests/cases/audit.md §«Чем достаются выходы»).
+     *
+     * @param topic  тема пары, чья строка стареет или свежеет
+     * @param moment момент обновления, который строка получает
+     */
+    protected void pairUpdatedAt(String topic, OffsetDateTime moment) {
+        rows.write("update " + RECEPTION_TABLE + " set " + UPDATED_COLUMN + " = ?"
+                + " where " + GROUP_COLUMN + " = ? and " + TOPIC_COLUMN + " = ?",
+                moment, consumerGroup(), topic);
+    }
+
+    /**
+     * Заводит строку состояния пары прямой записью — со всеми её
+     * колонками.
+     *
+     * <p><b>Это durable-ВХОД клетки, а не подмена её выхода.</b> Тропой
+     * ящика не производятся три из них: момент разрыва пишет обнаружение
+     * по смещениям — то есть состояние группы НА БРОКЕРЕ, которое своему
+     * классу и принадлежит; момент наблюдения тик ставит своим тактом, то
+     * есть «сейчас», а клетке о движении нижней границы нужен момент
+     * ПОЗАДИ моментов приёма; флаг остановки ставит отказ обработки,
+     * занимающий единственный поток слушателя до конца прогона. Форма
+     * строки при этом объявлена домом и читается наружу
+     * (docs/rules/durable-consumer-reception.md §«Строка состояния приёма
+     * — таблица `reception_states`»), поэтому запись по колонкам говорит
+     * о том же, о чём читает ассерт.
+     *
+     * <p><b>Момент обновления ставится «сейчас», и это не умолчание для
+     * краткости:</b> свежесть строки есть третий конъюнкт предиката
+     * непрерывности, и оставленная старой строка роняла бы предикат по
+     * поводу, которого клетка не ставила. Кому нужен иной возраст, двигает
+     * его {@link #pairUpdatedAt}.
+     *
+     * @param topic         тема пары
+     * @param observedSince момент, с которого группа наблюдает тему
+     * @param subscribed    тема сейчас в подписке группы
+     * @param halted        приём по паре остановлен
+     * @param gapAt         момент обнаружения разрыва; пусто — разрыва не было
+     * @param lastAccepted  момент происшествия последнего принятого события
+     */
+    protected void givenPair(String topic, OffsetDateTime observedSince, Boolean subscribed,
+                             Boolean halted, OffsetDateTime gapAt, OffsetDateTime lastAccepted) {
+        rows.write(INSERT_PAIR, consumerGroup(), topic, observedSince, subscribed, halted,
+                gapAt, lastAccepted, now());
+    }
+
+    /**
+     * Момент обновления, СТАРШЕ допустимого возраста ровно на секунду.
+     *
+     * <p>Свежесть объявлена как «возраст МЕНЬШЕ допустимого», поэтому
+     * граница читается с двух сторон: этот момент строку свежей уже не
+     * оставляет, соседний ({@link #freshMoment()}) — ещё оставляет.
+     */
+    protected static OffsetDateTime staleMoment() {
+        return momentsAgo(AuditSubstrate.STATE_MAX_AGE.plusSeconds(1));
+    }
+
+    /** Момент обновления, МОЛОЖЕ допустимого возраста ровно на секунду. */
+    protected static OffsetDateTime freshMoment() {
+        return momentsAgo(AuditSubstrate.STATE_MAX_AGE.minusSeconds(1));
     }
 
     /** Имя группы потребителя этого контекста. */
@@ -355,6 +524,22 @@ abstract class AuditBox {
         return completeness().get("lowerBound");
     }
 
+    /**
+     * Нижняя граница полноты как точка шкалы; её отсутствие — падение.
+     *
+     * <p>Читается она ЧЕРЕЗ ПОВЕРХНОСТЬ — предмет величины в том, что
+     * журнал объявляет о себе читателю, — а разбирается здесь потому, что
+     * часть клеток утверждает о её ЗНАЧЕНИИ и о направлении её движения, а
+     * не о самом факте правки.
+     */
+    protected OffsetDateTime lowerBoundMoment() {
+        Object value = lowerBound();
+        if (Objects.isNull(value)) {
+            throw new AssertionError("Нижняя граница полноты отсутствует: обещать нечего");
+        }
+        return OffsetDateTime.parse(String.valueOf(value));
+    }
+
     private Map<String, Object> completeness() {
         return journal(TENANT, momentsAgo(Duration.ofHours(1)), now()).completeness();
     }
@@ -372,9 +557,30 @@ abstract class AuditBox {
      * @param to               правая граница того же окна
      */
     protected Answer journal(String tenantInternalId, OffsetDateTime from, OffsetDateTime to) {
-        return get(JOURNAL_RECORDS
-                + "?from=" + moment(from)
-                + "&to=" + moment(to), tenantInternalId);
+        return get(journalPath(from, to), tenantInternalId);
+    }
+
+    /**
+     * Путь страницы журнала: окно, затем операнды парами «имя, значение».
+     *
+     * <p><b>Дом формы вопроса один на оба класса группы чтения:</b> у клетки
+     * со своими осями конфигурации вопрос тот же, и вторая запись его формы
+     * разошлась бы с первой первой же правкой
+     * (.claude/rules/carrier-levels.md).
+     *
+     * @param from     левая граница окна по моменту происшествия
+     * @param to       правая граница того же окна
+     * @param operands пары «имя операнда, его значение» сверх окна
+     */
+    protected static String journalPath(OffsetDateTime from, OffsetDateTime to, String... operands) {
+        StringBuilder path = new StringBuilder(JOURNAL_RECORDS)
+                .append("?from=").append(moment(from))
+                .append("&to=").append(moment(to));
+        for (int index = 0; index < operands.length; index += 2) {
+            path.append("&").append(operands[index]).append("=")
+                    .append(URLEncoder.encode(operands[index + 1], StandardCharsets.UTF_8));
+        }
+        return path.toString();
     }
 
     /**
@@ -384,7 +590,7 @@ abstract class AuditBox {
      * разобранным иначе — то есть клетка мерила бы разбор URI, а не
      * поведение выборки.
      */
-    private static String moment(OffsetDateTime value) {
+    protected static String moment(OffsetDateTime value) {
         return URLEncoder.encode(value.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
                 StandardCharsets.UTF_8);
     }
@@ -469,7 +675,7 @@ abstract class AuditBox {
 
     /** Выдача экспозиции дословно. */
     private String scrape() {
-        return get("/actuator/prometheus", TENANT).body();
+        return get(METRICS_SCRAPE, TENANT).body();
     }
 
     /** Чтение под сервисным токеном и контекстом названного тенанта. */
@@ -477,6 +683,54 @@ abstract class AuditBox {
         return send(request(path)
                 .header("Authorization", "Bearer " + identity.serviceToken())
                 .header(TENANT_HEADER, tenantInternalId)
+                .GET());
+    }
+
+    /**
+     * Чтение под сервисным токеном, БЕЗ заголовка контекста тенанта.
+     *
+     * <p><b>Им наблюдается отказ, который производит КОНТЕЙНЕР, а не наш
+     * код:</b> обязательность заголовка выражена контрактом точки, и класс
+     * такого отказа другой — форма вызова отвергается раньше, чем вопрос
+     * чтения доходит до выборки
+     * (.claude/tests/cases/audit.md §«Число ответа и класс отказа — разные
+     * ожидания»).
+     *
+     * @param path путь поверхности вместе с операндами запроса
+     */
+    protected Answer getWithoutTenant(String path) {
+        return send(request(path)
+                .header("Authorization", "Bearer " + identity.serviceToken())
+                .GET());
+    }
+
+    /**
+     * Чтение БЕЗ предъявленной идентичности: заголовок контекста есть,
+     * заголовка авторизации нет.
+     *
+     * <p><b>Контекст подаётся намеренно:</b> клетка о закрытом умолчании
+     * утверждает, что вызов отвергает КОНТУР, а не разбор контекста
+     * тенанта, — а контейнер отвергает непредъявленный заголовок своим
+     * классом (.claude/tests/cases/audit.md §«Число ответа и класс отказа
+     * — разные ожидания»). Без заголовка два отказа стали бы неразличимы
+     * по поводу, совпав по коду.
+     *
+     * @param path путь поверхности вместе с операндами запроса
+     */
+    protected Answer getAnonymously(String path) {
+        return send(request(path).header(TENANT_HEADER, TENANT).GET());
+    }
+
+    /**
+     * Чтение под НАЗВАННЫМ токеном: вход клеток о негодных осях токена.
+     *
+     * @param path  путь поверхности
+     * @param token токен, который предъявляет клетка
+     */
+    protected Answer getWith(String path, String token) {
+        return send(request(path)
+                .header("Authorization", "Bearer " + token)
+                .header(TENANT_HEADER, TENANT)
                 .GET());
     }
 
@@ -510,7 +764,7 @@ abstract class AuditBox {
         try {
             HttpResponse<String> answer = CLIENT.send(request.build(),
                     HttpResponse.BodyHandlers.ofString());
-            return new Answer(answer.statusCode(), answer.body());
+            return new Answer(answer.statusCode(), answer.body(), answer.headers().map());
         } catch (IOException failure) {
             throw new IllegalStateException("Поверхность ящика не ответила", failure);
         } catch (InterruptedException failure) {
@@ -526,14 +780,67 @@ abstract class AuditBox {
      * ТЕЛЕ — что содержимое едет объектом, а не строкой с экранированием,
      * — и разбор в типизованную форму такое ожидание выразить не даёт.
      *
-     * @param status код ответа
-     * @param body   тело ответа дословно
+     * @param status  код ответа
+     * @param body    тело ответа дословно
+     * @param headers заголовки ответа по именам
      */
-    protected record Answer(Integer status, String body) {
+    protected record Answer(Integer status, String body, Map<String, List<String>> headers) {
 
         /** Тело как объект. */
         Map<String, Object> asObject() {
             return JsonParserFactory.getJsonParser().parseMap(body);
+        }
+
+        /**
+         * Первое значение заголовка ответа; пусто — заголовка не было.
+         *
+         * <p>Имя ищется БЕЗ учёта регистра: регистр имени заголовка
+         * контракта не несёт, и ассерт, чувствительный к нему, мерил бы
+         * написание, а не наличие.
+         *
+         * @param name имя заголовка
+         */
+        String header(String name) {
+            return headers.entrySet().stream()
+                    .filter(entry -> name.equalsIgnoreCase(entry.getKey()))
+                    .map(entry -> entry.getValue().getFirst())
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        /**
+         * Несёт ли тело единый error-DTO поверхности: класс отказа и
+         * момент.
+         *
+         * <p>Форма читается по ПОЛЯМ, а не по коду ответа: отказ
+         * контейнера отдаёт то же тело при своём статусе, а умолчание
+         * ресурс-сервера отвечает ПУСТЫМ телом — то есть вторым форматом,
+         * существование которого клейм «единый DTO» и отрицает.
+         *
+         * <p><b>Неразобранное тело даёт ОТВЕТ, а не отказ клетки:</b>
+         * иначе красная клетка падала бы разбором и переставала называть,
+         * чем ожидание не сошлось.
+         */
+        Boolean carriesErrorDto() {
+            if (Objects.isNull(body) || body.isBlank()) {
+                return Boolean.FALSE;
+            }
+            try {
+                Map<String, Object> parsed = asObject();
+                return parsed.containsKey("code") && parsed.containsKey("occurredAt");
+            } catch (RuntimeException notAnObject) {
+                return Boolean.FALSE;
+            }
+        }
+
+        /** Класс отказа единого error-DTO. */
+        String errorCode() {
+            return String.valueOf(asObject().get("code"));
+        }
+
+        /** Пояснение отказа: им назван повод, а не внутреннее устройство. */
+        String errorMessage() {
+            return String.valueOf(asObject().get("message"));
         }
 
         /** Строки страницы. */
@@ -546,6 +853,18 @@ abstract class AuditBox {
         @SuppressWarnings("unchecked")
         Map<String, Object> completeness() {
             return (Map<String, Object>) asObject().get("completeness");
+        }
+
+        /**
+         * Позиция продолжения страницы; пусто — окно дочитано до конца.
+         *
+         * <p>Пустота здесь ЗНАЧЕНИЕ, а не неизвестность, поэтому клетка
+         * читает её как есть — и отличает от пары, у которой обе половины
+         * названы.
+         */
+        @SuppressWarnings("unchecked")
+        Map<String, Object> nextCursor() {
+            return (Map<String, Object>) asObject().get("nextCursor");
         }
     }
 }

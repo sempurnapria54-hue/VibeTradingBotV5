@@ -40,12 +40,6 @@ class EventIntakeBoxTest extends SharedAuditBox {
     /** Тема второго производителя: ею наблюдается раздельность пар. */
     private static final String STRATEGY = AuditSubstrate.STRATEGY_TOPIC;
 
-    /** Колонка момента происшествия. */
-    private static final String OCCURRED_COLUMN = "occurred_at";
-
-    /** Колонка момента приёма. */
-    private static final String RECORDED_COLUMN = "recorded_at";
-
     /** Колонка радиуса сделки. */
     private static final String DEAL_COLUMN = "deal_internal_id";
 

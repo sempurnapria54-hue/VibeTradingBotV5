@@ -46,9 +46,6 @@ class DeliveryGapBoxTest extends SharedAuditBox {
     /** Колонка идентичности события: ею находится строка нужной записи. */
     private static final String EVENT_ID_COLUMN = "event_id";
 
-    /** Колонка момента приёма: ею наблюдается порядок ходов. */
-    private static final String RECORDED_COLUMN = "recorded_at";
-
     /** Возраст события, которым клетки ходят в тему. */
     private static final Duration EVENT_AGE = Duration.ofMinutes(5);
 
