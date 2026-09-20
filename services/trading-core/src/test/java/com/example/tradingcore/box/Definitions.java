@@ -91,6 +91,9 @@ final class Definitions {
      */
     static final String WORKING_STOP_PERCENTS = "2";
 
+    /** Буфер структурного стопа, процент БАЗЫ: отступ от уровня раскладки. */
+    private static final String STRUCTURE_BUFFER_PERCENTS = "1";
+
     /**
      * Авторское имя операнда, которого владелец данных не отдаст: объявления
      * каталога под него у определения нет вовсе.
@@ -306,6 +309,41 @@ final class Definitions {
     }
 
     /**
+     * То же определение, чей встроенный стоп считается ОТ РЫНОЧНОЙ
+     * СТРУКТУРЫ: база — свинг-минимум раскладки, буфер — процент от неё.
+     *
+     * <p><b>Сторона уровня становится операндом ВХОДА, а не объявления.</b>
+     * У стопа процентом от цены входа сторона предрешена построением —
+     * уровень всегда ниже якоря у длинной стороны; у структурного стопа
+     * её определяет цена, пришедшая от владельца данных, и потому
+     * прибыльная сторона выражается раскладкой, а не правкой стратегии
+     * ({@code Feed#featuresWithStructure}).
+     *
+     * <p><b>Объявления каталога названы все три</b> — структура и два её
+     * входа, — потому что объявление структуры ссылается на них ключами:
+     * определение, просящее структуру без её входов, владелец данных
+     * рассчитать не может.
+     *
+     * @param internalId   идентичность определения
+     * @param accountId    идентичность биржевого счёта
+     * @param instrumentId идентичность инструмента
+     * @param phase        фаза, которую требует условие входа
+     */
+    static Strategy withStructureStopEntryCommandOnPhase(String internalId, String accountId,
+                                                         String instrumentId, MarketPhase.Type phase) {
+        Strategy strategy = withEntrySteps(internalId, accountId, instrumentId, phase,
+                List.of(protectedEntryStep(phaseCondition(phase), structureStopLoss(), "entry-order")), 1);
+        strategy.setIndicatorSettings(new ArrayList<>(List.of(
+                indicator(ATR_KEY, IndicatorValue.Type.ATR, atrParams(TimeFrame.ONE_HOUR, 100)),
+                indicator(EFFICIENCY_RATIO_KEY, IndicatorValue.Type.EFFICIENCY_RATIO,
+                        efficiencyRatioParams(TimeFrame.ONE_HOUR, 50)))));
+        strategy.setMarketStructureSettings(new ArrayList<>(
+                List.of(structure(TimeFrame.ONE_HOUR, Destiny.PROTECTION))));
+        declareRiskCeilings(strategy.getDetails().getFirst());
+        return strategy;
+    }
+
+    /**
      * То же определение, чей входной шаг несёт ДВА действия.
      *
      * <p>Пакет шага исполняется по действию за проход
@@ -349,9 +387,23 @@ final class Definitions {
      */
     private static StrategyStep protectedEntryStep(StrategyCondition condition, String stopDistancePercents,
                                                    String... actionKeys) {
+        return protectedEntryStep(condition, attachedStopLoss(stopDistancePercents), actionKeys);
+    }
+
+    /**
+     * Тот же шаг с НАЗВАННОЙ встроенной защитой: ею разводятся способы
+     * расчёта защитного уровня, а не сама форма шага.
+     *
+     * @param condition  условие шага
+     * @param protection объявление встроенной защиты ноги входа
+     * @param actionKeys ключи действий пакета в порядке объявления
+     */
+    private static StrategyStep protectedEntryStep(StrategyCondition condition,
+                                                   StrategyAttachedProtectionSettings protection,
+                                                   String... actionKeys) {
         List<StrategyAction> actions = new ArrayList<>();
         for (String actionKey : actionKeys) {
-            actions.add(protectedEntryAction(actionKey, stopDistancePercents));
+            actions.add(protectedEntryAction(actionKey, protection));
         }
         StrategyStep step = new StrategyStep();
         step.setStepType(StrategyStepType.ENTRY);
@@ -362,7 +414,8 @@ final class Definitions {
     }
 
     /** Одно действие пакета: нога входа со встроенной защитой. */
-    private static StrategyAction protectedEntryAction(String actionKey, String stopDistancePercents) {
+    private static StrategyAction protectedEntryAction(String actionKey,
+                                                       StrategyAttachedProtectionSettings protection) {
         StrategyOrderAction action = new StrategyOrderAction();
         action.setKey(actionKey);
         action.setActionType(StrategyActionType.CREATE_ACTION);
@@ -376,7 +429,7 @@ final class Definitions {
         // отбрасывает — транш тогда не получает своего входного ребра
         // вовсе (находка F3 захода).
         action.setPositionReducingOnly(Boolean.FALSE);
-        action.setAttachedProtection(attachedStopLoss(stopDistancePercents));
+        action.setAttachedProtection(protection);
         return action;
     }
 
@@ -385,6 +438,25 @@ final class Definitions {
         StopLossSettings stopLoss = new StopLossSettings();
         stopLoss.setCalculationType(StopLossCalculationType.ENTRY_PRICE_PERCENT);
         stopLoss.setDistancePercents(new BigDecimal(distancePercents));
+        stopLoss.setTriggerPriceType(AlgoOrder.TriggerPriceType.LAST);
+        return new StrategyAttachedProtectionSettings(AttachedAlgoOrder.Type.ATTACHED_STOP_LOSS, stopLoss);
+    }
+
+    /**
+     * Та же защита, считаемая ОТ СТРУКТУРЫ: база — уровень раскладки под
+     * ключом объявления, буфер — процент от базы.
+     *
+     * <p><b>Дистанция здесь — процент БАЗЫ, а не цены входа</b>
+     * ({@code PriceCalculator#structureStop}), и число её выбрано малым:
+     * буфер, сопоставимый с расстоянием от цены до уровня, увёл бы
+     * уровень на убыточную сторону при всякой базе — то есть отнял бы у
+     * кейса его операнд.
+     */
+    private static StrategyAttachedProtectionSettings structureStopLoss() {
+        StopLossSettings stopLoss = new StopLossSettings();
+        stopLoss.setCalculationType(StopLossCalculationType.MARKET_STRUCTURE_BUFFER_PERCENT);
+        stopLoss.setStructureKey(STRUCTURE_KEY);
+        stopLoss.setDistancePercents(new BigDecimal(STRUCTURE_BUFFER_PERCENTS));
         stopLoss.setTriggerPriceType(AlgoOrder.TriggerPriceType.LAST);
         return new StrategyAttachedProtectionSettings(AttachedAlgoOrder.Type.ATTACHED_STOP_LOSS, stopLoss);
     }
@@ -549,6 +621,19 @@ final class Definitions {
     }
 
     private static StrategyMarketStructureSetting structure(TimeFrame timeframe) {
+        return structure(timeframe, Destiny.ENTRY_CONDITION);
+    }
+
+    /**
+     * То же объявление с НАЗВАННЫМ назначением: структура, от которой
+     * считается защитный уровень, объявляется защитой, а не условием
+     * входа (docs/models/domain/aggregate/Strategy.md
+     * §StrategyMarketStructureSetting).
+     *
+     * @param timeframe таймфрейм расчёта
+     * @param destiny   для чего считается результат
+     */
+    private static StrategyMarketStructureSetting structure(TimeFrame timeframe, Destiny destiny) {
         MarketStructureParams params = new MarketStructureParams();
         params.setLookbackBars(20);
         StrategyMarketStructureSetting setting = new StrategyMarketStructureSetting();
@@ -557,7 +642,7 @@ final class Definitions {
         setting.setEfficiencyRatioKey(EFFICIENCY_RATIO_KEY);
         setting.setAtrKey(ATR_KEY);
         setting.setParams(params);
-        setting.setDestiny(Destiny.ENTRY_CONDITION);
+        setting.setDestiny(destiny);
         setting.setExpirationDuration(EXPIRATION);
         return setting;
     }

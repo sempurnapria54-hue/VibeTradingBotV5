@@ -37,6 +37,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.hibernate.Hibernate;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.InjectionStrategy;
 import org.mapstruct.Mapper;
@@ -298,12 +299,25 @@ public interface StrategyMapper {
         return result;
     }
 
-    /** Строки действий в пакет в порядке авторинга. */
+    /**
+     * Строки действий в пакет в порядке авторинга.
+     *
+     * <p><b>Прокси снимается ДО разбора подтипа, и это не
+     * перестраховка.</b> Действие ссылается на действие-цель
+     * ({@code targetAction}, ленивая связь на АБСТРАКТНОМ предке), и
+     * Hibernate выдаёт под неё прокси предка. В одном контексте
+     * представитель строки один: прокси, заведённый раньше, чем
+     * обработана собственная строка цели, попадает и в коллекцию — а
+     * разбор подтипа получает класс, которого в перечне подтипов нет, и
+     * роняет чтение. Порядок обработки строк выборкой не задан, поэтому
+     * отказ приходит не каждым прогоном — то есть худшим из способов.
+     */
     default List<StrategyAction> actionsPersistenceToDomain(Set<StrategyActionEntity> actions) {
         if (isNull(actions)) {
             return null;
         }
         return actions.stream()
+                .map(action -> Hibernate.unproxy(action, StrategyActionEntity.class))
                 .sorted(comparing(StrategyActionEntity::getId))
                 .map(this::persistenceToDomain)
                 .collect(toList());

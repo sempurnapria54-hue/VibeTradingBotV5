@@ -129,6 +129,17 @@ final class TradingCoreSubstrate {
      */
     static final String ENTRY_ENABLED_KEY = "entry-scanner.enabled";
 
+    /**
+     * Ключ выключателя проактивной детекции.
+     *
+     * <p>Тот же довод, что у выключателя отбора входа: расписание глушится
+     * выражением такта, а сам выключатель есть ВХОД клетки {@code B7.10}.
+     */
+    static final String ANOMALY_ENABLED_KEY = "anomaly-job.enabled";
+
+    /** Ключ окна выборки контура у прохода проактивной детекции. */
+    static final String CONTOUR_WINDOW_KEY = "anomaly-job.contour-window";
+
     /** Ключ адреса брокера: им перекрывается тропа публикации. */
     static final String BROKER_ADDRESS_KEY = "broker.bootstrap-servers";
 

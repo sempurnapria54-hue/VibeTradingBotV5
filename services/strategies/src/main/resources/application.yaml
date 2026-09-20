@@ -35,15 +35,21 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
-    producer:
-      # Подтверждение всеми синхронными репликами: событие активации —
-      # факт, который обязан дойти (docs/architecture/data-ownership.md
-      # §«Outbox и доставка»).
-      acks: all
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Тропа публикации: адрес брокера.
+#
+# Ключ СВОЙ, а не spring.kafka.*: автоконфигурации Kafka в дереве нет —
+# Boot 4 разнёс её по модулям spring-boot-<технология>, и свойства
+# spring.kafka.* без такого модуля не читает никто (config/BrokerProperties).
+# Клиент объявлен явно (config/StrategyKafkaConfig), подтверждение — от
+# всех синхронных реплик (docs/architecture/data-ownership.md §«Outbox и
+# доставка»).
+#
+# Пустое означает, что тропа публикации не настроена: реле отказывает и
+# строки копятся, а переходы статуса от этого не зависят
+# (docs/components/OutboxRelayJob.md).
+broker:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
 
 # Соседи, которых читает валидация и активация. Пустой адрес означает,
 # что операнд не добыть — и тогда отвергается создание, а не проходит

@@ -2,6 +2,9 @@ package com.example.tradingcore.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +28,15 @@ import org.junit.jupiter.api.Test;
  * сервисов»).
  */
 class AccessContourBoxTest extends SharedTradingCoreBox {
+
+    /** Основа идентичности определения, которым заводится сделка радиуса. */
+    private static final String DEFINITION = "S-ACCESS";
+
+    /** Биржевой момент, который отдаёт коннектор. */
+    private static final String EXCHANGE_MOMENT = "2026-09-20T10:00:00Z";
+
+    /** Последняя цена момента. */
+    private static final String LAST_PRICE = "100";
 
     @Test
     @Tag("debt")
@@ -120,6 +132,36 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
+    @DisplayName("B12.7 — отказ соседа наружу — отказ зависимости, а не наша ошибка")
+    void aPeerFailureIsReportedAsADependencyFailureAndNotAsOurs() {
+        standHaltedAccountWithDeal();
+        Object dealTouchedAt = dealRow().get("modified_at");
+        // Сосед ОТВЕЧАЕТ отказом своей стороны: таймаут, обрыв и `5xx` —
+        // одна и та же недоступность (`PeerCall`), и `5xx` ставится без
+        // платы временем.
+        marketData.refusesAnything(503, "{}");
+        connector.forgetRequests();
+
+        Answer answer = post(HALT_CLEARANCES, Bodies.halt("FULL", ACCOUNT));
+
+        // Класс отказа — недоступность соседа, а не «всё непредусмотренное»:
+        // наша сторона исправна, и повтор имеет смысл позже.
+        assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode()).isEqualTo(PEER_SERVICE_UNAVAILABLE);
+        assertThat(answer.status()).isEqualTo(503);
+        // Ступень стои́т: снятие не применилось ни на байт.
+        assertThat(rungOf(ACCOUNT)).isEqualTo("TRADE_BLOCKED");
+        // Снятия риска не гонялось и сделка не тронута: отказ соседа по
+        // ярусу сделку в ошибку не уводит (docs/rules/runtime-error-classification.md
+        // §«Отказ соседа по ярусу — свой класс, и сделку в ошибку он не
+        // уводит»). В ошибочном состоянии она уже стои́т — её увёл каскад
+        // жёсткой ступени предусловия, — поэтому наблюдается НЕТРОНУТОСТЬ
+        // строки, а не её статус.
+        assertThat(connector.requests()).isEmpty();
+        assertThat(dealRow().get("modified_at")).isEqualTo(dealTouchedAt);
+    }
+
+    @Test
     @DisplayName("B12.8 — исходящий токен наружу не выходит")
     void theOutgoingServiceTokenNeverLeavesTheProcess() {
         Integer mark = AppLog.mark();
@@ -160,5 +202,95 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
         // общего артефакта периметра, а контур отвечает молча. Ожидание
         // взято из дома и под текущий факт не ослаблено.
         assertThat(AppLog.since(mark)).contains(ACCOUNT);
+    }
+
+    // ------------------------------------------------------------------
+    // Предусловия группы
+    // ------------------------------------------------------------------
+
+    /**
+     * Счёт под сворачиванием, на радиусе которого есть сделка недавнего
+     * окна: предусловие снятия обязано собрать её контекст, а сборка
+     * контекста ходит к владельцу рыночных данных.
+     *
+     * <p><b>Сделка ставится тиком отбора входа, ступень — ручной
+     * поверхностью:</b> обе тропы свои, прямой записи в предусловии нет.
+     * Каскад жёсткой ступени уводит сделку в ошибочное состояние тем же
+     * ходом — это не помеха клетке: кандидатом живого риска она остаётся,
+     * потому что ошибочное состояние не терминально.
+     */
+    private void standHaltedAccountWithDeal() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        marketData.answers(featuresPath(INSTRUMENT),
+                Feed.featuresWithPrice(MarketPhase.Type.BULL_TREND.name(), LAST_PRICE));
+        connector.answers(balancePath(ACCOUNT), balanceBody());
+        connector.answers(positionPath(ACCOUNT), Feed.absent());
+        connector.answers(closedPositionsPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(PEER_SERVER_TIME, Feed.serverTime(EXCHANGE_MOMENT));
+        activate(Definitions.withEntryCommandOnPhase(DEFINITION, ACCOUNT, INSTRUMENT,
+                MarketPhase.Type.BULL_TREND));
+        tick(Tick.ENTRY_SCANNER);
+        assertThat(rows.count("deals")).isEqualTo(1L);
+        fullHalt(ACCOUNT);
+        assertThat(rungOf(ACCOUNT)).isEqualTo("TRADE_BLOCKED");
+    }
+
+    /** Единственная сделка. */
+    private Map<String, Object> dealRow() {
+        return rows.all("deals").getFirst();
+    }
+
+    /** Ступень счёта, как её видит база. */
+    private String rungOf(String accountInternalId) {
+        return String.valueOf(rows.row("exchange_accounts", "internal_id", accountInternalId)
+                .get("safety_rung"));
+    }
+
+    /** Путь чтения связки фич момента у владельца рыночных данных. */
+    private String featuresPath(String instrumentInternalId) {
+        return PEER_INSTRUMENTS + "/" + instrumentInternalId + "/features";
+    }
+
+    /** Корень путей счёта у коннектора. */
+    private String accountPath(String accountInternalId) {
+        return "/api/v1/accounts/" + accountInternalId;
+    }
+
+    /** Путь чтения снимка средств у коннектора. */
+    private String balancePath(String accountInternalId) {
+        return accountPath(accountInternalId) + "/balance";
+    }
+
+    /** Живой эпизод позиции по инструменту: след хода снятия риска. */
+    private String positionPath(String accountInternalId) {
+        return accountPath(accountInternalId) + "/positions/instrument";
+    }
+
+    /** История закрытых эпизодов: нога 2 добычи позиции. */
+    private String closedPositionsPath(String accountInternalId) {
+        return accountPath(accountInternalId) + "/positions/closed";
+    }
+
+    /** Снимок средств моментом прогона: возраст ставится В ДАННЫХ. */
+    private String balanceBody() {
+        String moment = OffsetDateTime.now(ZoneOffset.UTC).toString();
+        return """
+                {
+                  "externalUpdatedAt": "%s",
+                  "externalTotalEquity": "100000",
+                  "externalAdjustedEquity": "100000",
+                  "externalAvailableEquity": "100000",
+                  "balances": [
+                    {
+                      "externalCurrency": "USDT",
+                      "externalUpdatedAt": "%s",
+                      "externalEquity": "100000",
+                      "externalCashBalance": "100000",
+                      "externalAvailableBalance": "100000",
+                      "externalFrozenBalance": "0"
+                    }
+                  ]
+                }
+                """.formatted(moment, moment);
     }
 }

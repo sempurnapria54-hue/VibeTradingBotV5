@@ -29,6 +29,15 @@ final class Feed {
     /** Половина спреда: ею стороны стакана разводятся с последней ценой. */
     private static final BigDecimal SPREAD_HALF = new BigDecimal("0.1");
 
+    /** Пустая раскладка: ею ставится «операнда этого рода владелец не дал». */
+    private static final String EMPTY_LAYOUT = "{}";
+
+    /** Конец окна расчёта структуры и момент её подтверждения. */
+    private static final String STRUCTURE_MOMENT = "2026-09-20T09:00:00Z";
+
+    /** Начало окна расчёта структуры. */
+    private static final String STRUCTURE_WINDOW_START = "2026-09-19T09:00:00Z";
+
     private Feed() {
     }
 
@@ -163,12 +172,12 @@ final class Feed {
      * @param phaseType тип фазы рынка
      */
     static String features(String phaseType) {
-        return bundle("{\"type\": \"%s\"}".formatted(phaseType), "null");
+        return bundle("{\"type\": \"%s\"}".formatted(phaseType), "null", EMPTY_LAYOUT);
     }
 
     /** Та же связка БЕЗ фазы: классифицировать её владелец не смог. */
     static String featuresWithoutPhase() {
-        return bundle("null", "null");
+        return bundle("null", "null", EMPTY_LAYOUT);
     }
 
     /**
@@ -191,7 +200,60 @@ final class Feed {
      * @param lastPrice последняя цена сделки
      */
     static String featuresWithPrice(String phaseType, String lastPrice) {
-        return bundle("{\"type\": \"%s\"}".formatted(phaseType), priceData(lastPrice));
+        return bundle("{\"type\": \"%s\"}".formatted(phaseType), priceData(lastPrice), EMPTY_LAYOUT);
+    }
+
+    /**
+     * Та же связка СО СТРУКТУРОЙ момента: вход кейсов, чей защитный
+     * уровень считается не процентом от цены входа, а от рыночной
+     * структуры.
+     *
+     * <p><b>Раскладка структур отделена от связки с ценой намеренно.</b>
+     * Пустая раскладка есть ответ «операнд недоступен», и связка с ценой
+     * остаётся входом кейсов, чей стоп объявлен процентом; подмешав
+     * структуру во всякую связку, кейс давал бы расчёту вход, которого
+     * его определение не просило.
+     *
+     * <p><b>Уровень подаётся ОДИН — свинг-минимум</b>, потому что резолв
+     * базы у длинной стороны читает его первым, а диапазонную границу —
+     * запасной ({@code PriceCalculator#structureLevel}); две цены сразу
+     * не дали бы кейсу сказать, какая из них взята.
+     *
+     * @param phaseType     тип фазы рынка
+     * @param lastPrice     последняя цена сделки
+     * @param swingLowPrice цена свинг-минимума, от которой считается стоп
+     */
+    static String featuresWithStructure(String phaseType, String lastPrice, String swingLowPrice) {
+        return bundle("{\"type\": \"%s\"}".formatted(phaseType), priceData(lastPrice),
+                structures(swingLowPrice));
+    }
+
+    /**
+     * Раскладка структур с единственным свинг-минимумом под ключом, под
+     * которым её просит определение.
+     *
+     * @param swingLowPrice цена свинг-минимума
+     */
+    private static String structures(String swingLowPrice) {
+        return """
+                {
+                  "%s": {
+                    "type": "UPTREND",
+                    "windowStartAt": "%s",
+                    "windowEndAt": "%s",
+                    "confirmedAt": "%s",
+                    "levels": [
+                      {
+                        "type": "SWING_LOW",
+                        "price": "%s",
+                        "detectedAt": "%s",
+                        "confirmedAt": "%s"
+                      }
+                    ]
+                  }
+                }
+                """.formatted(Definitions.STRUCTURE_KEY, STRUCTURE_WINDOW_START, STRUCTURE_MOMENT,
+                STRUCTURE_MOMENT, swingLowPrice, STRUCTURE_WINDOW_START, STRUCTURE_MOMENT);
     }
 
     /** Цены момента: последняя плюс разведённые стороны стакана. */
@@ -210,16 +272,16 @@ final class Feed {
                 new BigDecimal(lastPrice).add(SPREAD_HALF).toPlainString());
     }
 
-    private static String bundle(String marketPhase, String marketPriceData) {
+    private static String bundle(String marketPhase, String marketPriceData, String structures) {
         return """
                 {
                   "latestIndicators": {},
                   "previousIndicators": {},
-                  "structures": {},
+                  "structures": %s,
                   "marketPhase": %s,
                   "marketPriceData": %s
                 }
-                """.formatted(marketPhase, marketPriceData);
+                """.formatted(structures, marketPhase, marketPriceData);
     }
 
     /**
@@ -303,6 +365,43 @@ final class Feed {
                 }
                 """.formatted(externalId, externalInstrumentId, size, entryPrice, entryPrice,
                 createdAt, createdAt);
+    }
+
+    /**
+     * Живая заявка в СЧЁТ-ШИРОКОМ срезе: форма, которой коннектор
+     * отвечает на перечень живых заявок счёта.
+     *
+     * <p><b>Биржевое имя инструмента здесь несущее.</b> Срез
+     * раскладывается по нему ({@code AnomalyScanReader#byInstrument}), и
+     * строка без имени в раскладку не попадает вовсе — то есть кейс
+     * наблюдал бы молчание детектора вместо его признака.
+     *
+     * <p><b>Клиентский идентификатор — дискриминатор «наша против
+     * чужой»</b>, и он же ключ, по которому детектор локально
+     * терминальной сущности ищет нашу строку
+     * (docs/components/AnomalyJob.md §«Что ищет»). Маркер контура
+     * подаётся кейсом, а не фабрикой: обе стороны признака — вход.
+     *
+     * @param externalId           биржевой идентификатор заявки
+     * @param internalId           клиентский идентификатор
+     * @param externalInstrumentId биржевое имя инструмента
+     */
+    static String pendingOrder(String externalId, String internalId, String externalInstrumentId) {
+        return """
+                {
+                  "internalId": "%s",
+                  "externalId": "%s",
+                  "externalInstrumentId": "%s",
+                  "status": "ACTIVE",
+                  "type": "ENTRY",
+                  "side": "BUY",
+                  "externalStatus": "live",
+                  "size": "1",
+                  "accumulatedFillSize": "0",
+                  "externalCreatedAt": "2026-09-20T10:00:01Z",
+                  "externalModifiedAt": "2026-09-20T10:00:02Z"
+                }
+                """.formatted(internalId, externalId, externalInstrumentId);
     }
 
     /**

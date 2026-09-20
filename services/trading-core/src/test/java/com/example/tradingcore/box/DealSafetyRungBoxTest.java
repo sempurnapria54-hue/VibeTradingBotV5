@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -75,6 +76,18 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
 
     /** Машинный код ручной постановки: ни одна автоматика его не поднимает. */
     private static final String MANUAL_HALT_REQUESTED = "MANUAL_HALT_REQUESTED";
+
+    /** Отсутствие ступени: рабочее состояние радиуса. */
+    private static final String NO_RUNG = "ACTIVE";
+
+    /** Машинный код хвостов заявок, не объяснимых живой сделкой. */
+    private static final String ORPHAN_ORDERS = "INSTRUMENT_ORPHAN_ORDERS";
+
+    /**
+     * Клиентский идентификатор НАШЕЙ заявки: маркер контура впереди
+     * ({@code InternalIdFactory#isOurs}).
+     */
+    private static final String OUR_CLIENT_ID = "vtbboxsafetyone";
 
     @Test
     @DisplayName("B5.5 — повторный сигнал по стоящей ступени реакции не гоняет")
@@ -170,6 +183,49 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
+    @Tag("debt")
+    @DisplayName("B5.9 — инструментный сигнал на счёте под биржевой ступенью ничего не делает")
+    void theInstrumentSignalOnAnAccountUnderTheExchangeRungDoesNothing() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        fullHalt(ACCOUNT);
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        Object rungStandingSince = accountRow().get("modified_at");
+        Long raisedOnce = countEvents(HOLD_RAISED);
+        standOrphanOrders();
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        tick(Tick.ANOMALY_DETECTION);
+        ageObservations();
+        tick(Tick.ANOMALY_DETECTION);
+
+        // Признак инструментного радиуса найден и ПОДТВЕРЖДЁН: строка по
+        // его коду стои́т, то есть детектор сработал, а молчания гейта
+        // неполноты клетка не наблюдает.
+        assertThat(codesOfReports()).contains(ORPHAN_ORDERS);
+        // Ступень пары не переставлена: биржевая ступень доминирует
+        // инструментные реакции, и сигнал уже биржевой ступени не делает
+        // ничего (docs/rules/exchange-hold.md §«Границы и эскалация»,
+        // docs/rules/instrument-hold.md §Enforcement).
+        //
+        // КРАСНО ПО ПОСТРОЕНИЮ, метка `debt`: доминирования биржевой
+        // ступени не исполняет ни один носитель тропы — ни детектор, ни
+        // реакция, ни ребро подъёма, — и пара встаёт в `ENTRY_BLOCKED`.
+        // Ожидание взято из дома и под текущий факт не ослаблено
+        // (.claude/work/backlog.md §«Доминирование биржевой ступени над
+        // инструментной реакцией не исполняет ни один носитель»).
+        assertThat(pairRung(INSTRUMENT)).isEqualTo(NO_RUNG);
+        // Счётная ступень стои́т и второй реакции не получила: статус не
+        // переставлялся, второго факта подъёма нет.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(accountRow().get("modified_at")).isEqualTo(rungStandingSince);
+        assertThat(countEvents(HOLD_RAISED)).isEqualTo(raisedOnce);
+        // Снятия риска и каскада нет: ни снятой заявки, ни закрытой
+        // позиции — у мягкой ступени их нет в составе вовсе.
+        assertThat(connector.requests(cancellationPath(ACCOUNT))).isEmpty();
+        assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
     @DisplayName("B5.14 — отказ журнального носителя реакцию не отменяет")
     void theFailingJournalDoesNotCancelTheReaction() {
         openActiveDeal();
@@ -238,6 +294,52 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
                 FOREIGN_INSTRUMENT, "1", LAST_PRICE, POSITION_MOMENT)));
         connector.answers(pendingOrdersPath(ACCOUNT), Feed.emptyArray());
         connector.answers(pendingAlgoOrdersPath(ACCOUNT), Feed.emptyArray());
+    }
+
+    /**
+     * Срез счёта с ХВОСТОМ заявок: позиции по инструменту нет, живая
+     * заявка есть, живой сделки на паре нет — признак инструментного
+     * радиуса ({@code AccountingDetectors#orphanOrders}).
+     *
+     * <p><b>Срез обязан быть ПОЛНЫМ</b>: на неполном проходе детекторы
+     * молчат гейтом, и клетка наблюдала бы тишину вместо признака.
+     */
+    private void standOrphanOrders() {
+        connector.answers(positionsPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(pendingOrdersPath(ACCOUNT),
+                Feed.array(Feed.pendingOrder("ex-orphan-1", OUR_CLIENT_ID, EXTERNAL_INSTRUMENT)));
+        connector.answers(pendingAlgoOrdersPath(ACCOUNT), Feed.emptyArray());
+    }
+
+    /**
+     * Отодвигает НАЗАД момент стоящих наблюдательных строк: единственная
+     * прямая правка базы в предусловиях, и строк она не заводит.
+     *
+     * <p>Признак с гистерезисом подтверждается строкой, заведённой не
+     * позже, чем разрешает минимальный возраст подтверждения; без правки
+     * второй тик обязан был бы отстоять от первого на тридцать секунд
+     * стенных часов. Дом довода — шапка {@link ProactiveDetectionBoxTest}.
+     */
+    private void ageObservations() {
+        rows.put("update anomaly_reports set created_at = created_at - interval '2 minutes'");
+    }
+
+    /** Ступень пары «счёт, инструмент»; строки пары нет — рабочее состояние. */
+    private String pairRung(String instrumentInternalId) {
+        List<Map<String, Object>> found = rows.select("select * from account_instrument_states"
+                        + " where exchange_account_id = ? and instrument_id = ?",
+                accountId(ACCOUNT), instrumentId(instrumentInternalId));
+        return found.isEmpty() ? NO_RUNG : String.valueOf(found.getFirst().get("safety_rung"));
+    }
+
+    /** Путь снятия обычной заявки: первый ход снятия живого риска. */
+    private String cancellationPath(String accountInternalId) {
+        return accountPath(accountInternalId) + "/orders/cancellations";
+    }
+
+    /** Рыночное закрытие позиции: второй ход снятия живого риска. */
+    private String closurePath(String accountInternalId) {
+        return accountPath(accountInternalId) + "/positions/closures";
     }
 
     /** Строка биржевого счёта, как её видит база. */

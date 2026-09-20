@@ -86,6 +86,26 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
     /** Мягкая ступень пары «счёт, инструмент». */
     private static final String ENTRY_BLOCKED = "ENTRY_BLOCKED";
 
+    /** Отсутствие ступени счёта: рабочее состояние. */
+    private static final String NO_ACCOUNT_RUNG = "ACTIVE";
+
+    /**
+     * Свинг-минимум ВЫШЕ якоря входа: им защитный уровень уезжает на
+     * прибыльную сторону.
+     *
+     * <p>Буфер структурного стопа — процент базы (1%), поэтому уровень
+     * равен 1100 − 11 = 1089 и лежит выше якоря в тысячу: worst-case
+     * выхода у длинной позиции не существует, и сайзинг отказывает
+     * бессрочным {@code STOP_LEVEL_NOT_ON_LOSS_SIDE_FOR_SIZING}.
+     */
+    private static final String SWING_LOW_ABOVE_ANCHOR = "1100";
+
+    /**
+     * Свинг-минимум НИЖЕ якоря: тот же расчёт даёт 950 − 9.5 = 940.5, то
+     * есть уровень на убыточной стороне, и то же действие исполняется.
+     */
+    private static final String SWING_LOW_BELOW_ANCHOR = "950";
+
     @Test
     @DisplayName("B4.1 — преконтроль спрашивается у создающего риск действия")
     void thePrecheckIsAskedAtTheRiskCreatingActionAndReadsItsThreeOperands() {
@@ -243,6 +263,64 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
+    @Tag("debt")
+    @DisplayName("B4.13 — отказ расчёта по стороне уровня — отказ шага, не авария")
+    void theRefusalByTheSideOfTheStopLevelFailsTheStepAndNotTheDeal() {
+        assignRiskAppetite();
+        openGatedDeal(structureStopDefinition(), WITH_FEE_RATE, FRESH_BALANCE,
+                Feed.featuresWithStructure(PHASE.name(), LAST_PRICE, SWING_LOW_ABOVE_ANCHOR));
+        Integer mark = AppLog.mark();
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Шаг НЕ исполнен: команды к площадке не ушло, ноги не заведено.
+        assertThat(rows.count("orders")).isZero();
+        assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
+        // Строка исполнения остаётся ЗАПЛАНИРОВАННОЙ: отказ по стороне
+        // уровня в учёт не попадает вовсе, и повтор поэтому придёт
+        // следующим проходом сам (docs/processes/risk-evaluation.md
+        // §«Отказ расчёта по стороне уровня — отказ шага, не авария»).
+        // Отличать «отказ учтён» от «отказ пропущен» здесь может только
+        // строка: статус `FAILED`, непустой счёт попыток и записанная
+        // ошибка означали бы общий разбор постоянной ошибки, то есть
+        // отсутствие карв-аута. Счёт попыток у нетронутой строки ПУСТ, а
+        // не равен нулю: первый его writer — сам учёт, и ноль означал бы,
+        // что учёт строку открывал.
+        assertThat(strategyActionStates()).hasSize(1);
+        assertThat(strategyActionStates().getFirst().get("status")).isEqualTo("PLANNED");
+        assertThat(strategyActionStates().getFirst().get("attempt_count")).isNull();
+        assertThat(strategyActionStates().getFirst().get("last_error")).isNull();
+        // Отказ виден: ветвь без строки и без поверхности несома журналом.
+        assertThat(AppLog.since(mark)).contains("Calculation refused by control, step not executed");
+        // Ступеней не поднято НИ ОДНОГО радиуса: контроль сработал, а не
+        // защита.
+        assertThat(pairRung()).isEqualTo(NO_PAIR_RUNG);
+        assertThat(accountRung()).isEqualTo(NO_ACCOUNT_RUNG);
+        // Красно по построению: транш встаёт `CLOSED` с причиной
+        // `ENTRY_CONDITION_EXPIRED`, а сделка следующим проходом уходит в
+        // терминал. Механизм тот же, что у клетки B4.5, но ПРОИЗВОДИТЕЛЬ
+        // пустого исхода другой: там временный вердикт преконтроля, здесь
+        // контролируемый отказ расчёта, не дошедший до преконтроля вовсе.
+        // Дом говорит обратное — «шаг не исполняется, транш и сделка
+        // остаются в своих статусах» (docs/processes/risk-evaluation.md
+        // §«Отказ расчёта по стороне уровня — отказ шага, не авария»), и
+        // ожидание под факт не ослабляется.
+        assertThat(trancheStatus()).isEqualTo("PRECHECK");
+        assertThat(trancheRow().get("close_reason")).isNull();
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
+
+        // Повтор приходит следующим проходом, когда структура даёт
+        // уровень на убыточной стороне: определение не правилось, сделка
+        // не переоткрывалась — изменилась одна цена раскладки.
+        marketData.answers(featuresPath(INSTRUMENT),
+                Feed.featuresWithStructure(PHASE.name(), LAST_PRICE, SWING_LOW_BELOW_ANCHOR));
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(rows.count("orders")).isEqualTo(1L);
+        assertThat(trancheStatus()).isEqualTo("ENTRY_SUBMITTED");
+    }
+
+    @Test
     @DisplayName("B4.11 — заблокированное действие шага останавливает остальные действия того же шага")
     void theBlockedActionHaltsTheRestOfItsStepPackage() {
         assignRiskAppetite();
@@ -293,6 +371,11 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
                 STOP_INSIDE_FEE_FLOOR);
     }
 
+    /** Определение, чей стоп считается от рыночной структуры. */
+    private Strategy structureStopDefinition() {
+        return Definitions.withStructureStopEntryCommandOnPhase(DEFINITION, ACCOUNT, INSTRUMENT, PHASE);
+    }
+
     /**
      * Сделка с траншем в предвходовой проверке, чей вход доходит до
      * преконтроля: штатное положение всех его операндов.
@@ -313,11 +396,26 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
      * @param freshBalance свеж ли снимок средств, который отдаёт коннектор
      */
     private void openGatedDeal(Strategy definition, Boolean withFeeRate, Boolean freshBalance) {
+        openGatedDeal(definition, withFeeRate, freshBalance,
+                Feed.featuresWithPrice(PHASE.name(), LAST_PRICE));
+    }
+
+    /**
+     * То же предусловие с НАЗВАННОЙ связкой фич: ею подаются операнды,
+     * которых штатная связка не несёт (раскладка структур).
+     *
+     * @param definition   определение, которым сделка заводится
+     * @param withFeeRate  синкать ли ставку комиссии своим тиком
+     * @param freshBalance свеж ли снимок средств, который отдаёт коннектор
+     * @param features     тело связки фич момента у владельца данных
+     */
+    private void openGatedDeal(Strategy definition, Boolean withFeeRate, Boolean freshBalance,
+                               String features) {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
         if (Boolean.TRUE.equals(withFeeRate)) {
             syncFeeRate();
         }
-        marketData.answers(featuresPath(INSTRUMENT), Feed.featuresWithPrice(PHASE.name(), LAST_PRICE));
+        marketData.answers(featuresPath(INSTRUMENT), features);
         connector.answers(balancePath(ACCOUNT), balanceBody(balanceMoment(freshBalance)));
         connector.answers(PEER_SERVER_TIME, Feed.serverTime(EXCHANGE_MOMENT));
         activate(definition);
@@ -404,10 +502,23 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
         return String.valueOf(dealRow().get("status"));
     }
 
-    /** Ступень пары «счёт, инструмент», как её видит база. */
+    /**
+     * Ступень пары «счёт, инструмент», как её видит база.
+     *
+     * <p><b>Строки пары нет — ступени нет.</b> Рабочее состояние
+     * выражается отсутствием строки, а не значением в ней, и клетка,
+     * читающая колонку отсутствующей строки, получила бы пустоту вместо
+     * ответа «ступень рабочая».
+     */
     private String pairRung() {
-        return String.valueOf(rows.row("account_instrument_states", "instrument_id", instrumentId(INSTRUMENT))
-                .get("safety_rung"));
+        Map<String, Object> found = rows.row("account_instrument_states", "instrument_id",
+                instrumentId(INSTRUMENT));
+        return found.isEmpty() ? NO_PAIR_RUNG : String.valueOf(found.get("safety_rung"));
+    }
+
+    /** Ступень биржевого счёта, как её видит база. */
+    private String accountRung() {
+        return String.valueOf(rows.row("exchange_accounts", "internal_id", ACCOUNT).get("safety_rung"));
     }
 
     /**

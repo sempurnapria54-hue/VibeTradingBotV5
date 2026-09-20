@@ -28,6 +28,26 @@ class AbsentOutputsBoxTest extends SharedTradingCoreBox {
     /** Описание объявленной поверхности: его печатает сам сервис. */
     private static final String API_DOCS = "/v3/api-docs";
 
+    /** Основа идентичности определения, принимаемого от его владельца. */
+    private static final String DEFINITION = "S-ABSENT";
+
+    /** Класс события подъёма ступени: им мерится, что публикация работает. */
+    private static final String HOLD_RAISED = "HOLD_RAISED";
+
+    /** Имя класса о СНЯТИИ ступени: перечень классов ядра его не несёт. */
+    private static final String HOLD_RELEASED = "HOLD_RELEASED";
+
+    /** Машинный код журнальной строки ручного снятия. */
+    private static final String MANUAL_HALT_CLEARED = "MANUAL_HALT_CLEARED";
+
+    /**
+     * Перечень классов события ядра целиком
+     * ({@code CoreEventType}) — он закрыт, и опубликованное из него не
+     * выходит.
+     */
+    private static final List<String> CORE_EVENT_TYPES = List.of("ORDER_DECIDED", "DEAL_OPENED",
+            "DEAL_SHUTDOWN_INITIATED", "DEAL_CLOSED", HOLD_RAISED, "ANOMALY_REPORTED");
+
     @Test
     @DisplayName("B14.1 — ядро не говорит с площадкой напрямую")
     void theCoreNeverTalksToTheVenueDirectly() {
@@ -113,6 +133,41 @@ class AbsentOutputsBoxTest extends SharedTradingCoreBox {
         assertThat(declared).contains("/api/v1/trading-core/deals");
         assertThat(declared).doesNotContain("/deals/{internalId}/status");
         assertThat(declared).doesNotContain("/deals/{internalId}/closures");
+    }
+
+    @Test
+    @DisplayName("B14.7 — событие, которого ядро не публикует")
+    void theCorePublishesNeitherAHoldReleaseNorAForeignDefinitionFact() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        Wire.Mark mark = Wire.mark();
+        assertThat(freeze(ACCOUNT).status()).isEqualTo(204);
+        assertThat(post(HALT_CLEARANCES, Bodies.halt("FREEZE", ACCOUNT)).status()).isEqualTo(204);
+        activate(Definitions.withDetail(DEFINITION, ACCOUNT, INSTRUMENT));
+
+        tick(Tick.OUTBOX_RELAY);
+
+        // Базовый гейт: публикация у ядра РАБОТАЕТ — подъём ступени в теме
+        // есть. Без него отрицания ниже были бы верны на пустом месте.
+        List<String> published = Wire.publishedSince(mark).stream()
+                .map(Wire.Published::eventType)
+                .toList();
+        assertThat(published).contains(HOLD_RAISED);
+        // Снятия ступени в теме нет ни одной строкой: класса `HoldReleased`
+        // у ядра не существует, и писателя у него нет (долг —
+        // .claude/work/backlog.md §«Класс события `HoldReleased` и его
+        // ручная тропа»). След снятия остаётся ОТЧЁТОМ, а не фактом ребра.
+        assertThat(published).doesNotContain(HOLD_RELEASED);
+        assertThat(rows.row("anomaly_reports", "code", MANUAL_HALT_CLEARED)).isNotEmpty();
+        // Чужого определения ядро не переопубликовывает: потребление
+        // следствия в теме не порождает — копия заведена, а классов
+        // владельца определений в теме ядра нет.
+        assertThat(rows.count("strategies")).isEqualTo(1L);
+        assertThat(published).doesNotContain(STRATEGY_ACTIVATED, STRATEGY_DEACTIVATED,
+                STRATEGY_DELETED);
+        // Перечень классов ядра закрыт, и опубликованное из него не
+        // выходит: отрицание поимённых классов выше не зависит от того,
+        // какое имя придумал бы писатель.
+        assertThat(CORE_EVENT_TYPES).containsAll(published);
     }
 
     /**
