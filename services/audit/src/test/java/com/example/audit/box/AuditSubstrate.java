@@ -108,6 +108,9 @@ final class AuditSubstrate {
      */
     static final Duration STATE_MAX_AGE = Duration.ofMinutes(5);
 
+    /** Ключ такта тика состояния приёма. */
+    static final String STATE_TICK_INTERVAL_KEY = "reception.state-tick-interval";
+
     /** Ключ паузы между повторами отравленного сообщения. */
     static final String RETRY_INTERVAL_KEY = "reception.retry-interval";
 
@@ -116,6 +119,9 @@ final class AuditSubstrate {
 
     /** Ключ выключателя чистки журнала. */
     static final String CLEANUP_ENABLED_KEY = "jobs.journal-cleanup.enabled";
+
+    /** Ключ глубины хранения журнала в сутках. */
+    static final String CLEANUP_DEPTH_KEY = "jobs.journal-cleanup.depth-days";
 
     /** Ключ профиля хранения журнала — оси окружения. */
     static final String RETENTION_PROFILE_KEY = "platform.environment.journal-retention-profile";
@@ -176,6 +182,9 @@ final class AuditSubstrate {
      */
     static final String UNSET = "";
 
+    /** Ключ порта поверхности: подъём кейса не занимает назначенного. */
+    private static final String EPHEMERAL_PORT_KEY = "server.port";
+
     /** Такт тика, второго повторения которого за прогон не бывает. */
     private static final String HOURLY = "1h";
 
@@ -230,7 +239,7 @@ final class AuditSubstrate {
         values.put(CONSUMER_GROUP_KEY, CONSUMER_GROUP);
         values.put(TOPICS_KEY, CORE_TOPIC + "," + STRATEGY_TOPIC);
         values.put(STATE_TICK_ENABLED_KEY, "true");
-        values.put("reception.state-tick-interval", HOURLY);
+        values.put(STATE_TICK_INTERVAL_KEY, HOURLY);
         values.put(STATE_MAX_AGE_KEY, STATE_MAX_AGE.toMinutes() + "m");
         values.put(CLEANUP_ENABLED_KEY, "true");
         values.put("jobs.journal-cleanup.cron", NEVER);
@@ -239,6 +248,38 @@ final class AuditSubstrate {
         values.put(MAX_WINDOW_KEY, MAX_WINDOW.toDays() + "d");
         values.put(PAGE_SIZE_KEY, String.valueOf(PAGE_SIZE));
         return values;
+    }
+
+    /**
+     * Аргументы запуска ПРОЦЕССА: штатное положение осей с названными
+     * перекрытиями.
+     *
+     * <p><b>Ими поднимается контекст там, где сам подъём есть вход
+     * клетки</b> — то есть у клеток о ненастроенной оси, чьё ожидание
+     * состоит в том, что контекст не поднимается вовсе. Реестра свойств у
+     * такого подъёма нет: {@code @DynamicPropertySource} принадлежит
+     * каркасу теста, а процесс здесь запускает сам кейс.
+     *
+     * <p><b>Оси подаются АРГУМЕНТАМИ, а не умолчаниями:</b> умолчание
+     * стои́т ниже {@code application.yaml} сервиса, и поданный им адрес
+     * базы перекрылся бы пустым — контекст падал бы, но не по той
+     * причине, которую клетка предъявляет.
+     *
+     * <p><b>Пустое значение здесь остаётся ЗНАЧЕНИЕМ, а не изъятием
+     * ключа</b> ({@link #UNSET} тут не действует): предмет клеток — ровно
+     * пустая ось, и вычеркнутый ключ отдал бы процессу умолчание
+     * {@code application.yaml}, которое само пусто, — то есть мерил бы
+     * разрешение переменной окружения, а не поведение на пустом значении.
+     *
+     * @param overrides оси, которые клетка сдвигает
+     */
+    static String[] launchArguments(Map<String, String> overrides) {
+        Map<String, String> values = new LinkedHashMap<>(defaults());
+        values.putAll(overrides);
+        values.put(EPHEMERAL_PORT_KEY, "0");
+        return values.entrySet().stream()
+                .map(axis -> "--" + axis.getKey() + "=" + axis.getValue())
+                .toArray(String[]::new);
     }
 
     /**

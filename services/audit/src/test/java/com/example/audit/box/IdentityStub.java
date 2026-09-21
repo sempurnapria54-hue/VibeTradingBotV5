@@ -18,6 +18,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -108,14 +109,22 @@ final class IdentityStub {
     }
 
     /**
-     * Пути всех обращений, полученных стабом.
+     * Пути всех обращений, полученных стабом, в ПОРЯДКЕ ПОСТУПЛЕНИЯ.
      *
      * <p>Ими наблюдается, что за подтверждением токена сервис ходил только
      * за КЛЮЧАМИ: подпись проверяется ЛОКАЛЬНО, и точек подтверждения у
      * провайдера сервис не зовёт вовсе.
+     *
+     * <p><b>Порядок задан здесь, а не унаследован от стаба, и это не
+     * украшение.</b> Сам он отдаёт события ОТ НОВЫХ К СТАРЫМ, а клетка,
+     * читающая своё окно отрезком по индексу отметки, взяла бы при таком
+     * порядке САМЫЙ СТАРЫЙ конец — то есть обращения соседних кейсов вместо
+     * своих, — и была бы зелена по ложной причине. Порядок поступления
+     * делает отметку тем, чем её читают.
      */
     List<String> paths() {
         return server.getAllServeEvents().stream()
+                .sorted(Comparator.comparing(event -> event.getRequest().getLoggedDate()))
                 .map(event -> event.getRequest().getUrl().split("\\?")[0])
                 .toList();
     }

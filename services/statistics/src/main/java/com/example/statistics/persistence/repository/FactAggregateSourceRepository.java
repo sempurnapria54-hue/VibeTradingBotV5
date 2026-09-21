@@ -1,6 +1,7 @@
 package com.example.statistics.persistence.repository;
 
 import com.example.statistics.persistence.model.facts.DealFactEntity;
+import com.example.statistics.persistence.model.facts.DealFactId;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -52,7 +53,7 @@ import org.springframework.data.repository.query.Param;
  * {@code RDenominatorDeals} — две первые заглавные подряд декапитализации
  * не подлежат.
  */
-public interface FactAggregateSourceRepository extends Repository<DealFactEntity, Long> {
+public interface FactAggregateSourceRepository extends Repository<DealFactEntity, DealFactId> {
 
     /**
      * Начало ряда сделочных фактов — операнд отбора суток

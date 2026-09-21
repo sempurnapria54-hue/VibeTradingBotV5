@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -149,13 +147,5 @@ class DeliveryGapBoxTest extends SharedAuditBox {
                 .filter(row -> eventId.equals(row.get(EVENT_ID_COLUMN)))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Строки события в журнале нет: " + eventId));
-    }
-
-    /** Ждёт флага остановки приёма по названной паре. */
-    private void awaitHalted(String topic) {
-        Awaitility.await()
-                .atMost(RECEPTION_WAIT)
-                .pollInterval(POLL)
-                .until(() -> Objects.equals(Boolean.TRUE, pair(topic).get(HALTED_COLUMN)));
     }
 }

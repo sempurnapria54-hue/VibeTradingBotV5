@@ -244,6 +244,54 @@ final class Rows {
                 .toList();
     }
 
+    /**
+     * Имена колонок названной таблицы в порядке объявления.
+     *
+     * <p><b>Ими читается СОСТАВ строки, а не её содержимое.</b> Набор
+     * колонок аудита сущности бинарен — либо все шесть, либо ни одной
+     * (docs/models/domain/other/Auditable.md §«Правило состава колонок»),
+     * — и утверждение о нём есть утверждение о схеме: строка, которой
+     * колонки нет, от строки с пустой колонкой по выдаче неотличима.
+     *
+     * @param table таблица, чей состав читается
+     */
+    List<String> columnNames(String table) {
+        return rows("select column_name from information_schema.columns"
+                + " where table_schema = 'public' and table_name = ?"
+                + " order by ordinal_position", table)
+                .stream()
+                .map(row -> String.valueOf(row.get("column_name")))
+                .toList();
+    }
+
+    /**
+     * Объявления индексов названной таблицы.
+     *
+     * <p><b>Частичность индекса читается ОБЪЯВЛЕНИЕМ, а не содержимым.</b>
+     * Строк, попавших в индекс, не показывает ни одна выдача; условие
+     * отбора, при котором строка в него не попадает, объявлено самим
+     * индексом, и читается оно там.
+     *
+     * @param table таблица, чьи индексы читаются
+     */
+    List<String> indexDefinitions(String table) {
+        return rows("select indexdef from pg_indexes"
+                + " where schemaname = 'public' and tablename = ? order by indexname", table)
+                .stream()
+                .map(row -> String.valueOf(row.get("indexdef")))
+                .toList();
+    }
+
+    /** Имена внешних ключей схемы: ими наблюдается их отсутствие. */
+    List<String> foreignKeyNames() {
+        return rows("select constraint_name from information_schema.table_constraints"
+                + " where table_schema = 'public' and constraint_type = 'FOREIGN KEY'"
+                + " order by constraint_name")
+                .stream()
+                .map(row -> String.valueOf(row.get("constraint_name")))
+                .toList();
+    }
+
     /** Снимок числа строк всех таблиц схемы: вход отрицаний «состояние не менялось». */
     Map<String, Long> countsByTable() {
         Map<String, Long> counts = new LinkedHashMap<>();

@@ -87,11 +87,20 @@ abstract class AuditBox {
      */
     protected static final String ACTUATOR_ROOT = "/actuator";
 
-    /** Тенант, которым ходит большинство кейсов. */
-    protected static final String TENANT = "T1";
+    /**
+     * Тенант, которым ходит большинство кейсов.
+     *
+     * <p><b>Идентичность выбрана так, чтобы не быть ПОДСТРОКОЙ чужих
+     * значений, и это не вкус.</b> Три клетки прогона утверждают, что
+     * названного тенанта нет НИ В ОДНОЙ колонке строки и ни в одном знаке
+     * тела ответа; короткая форма {@code T1} встречается внутри всякого
+     * момента шкалы ISO — {@code 2026-09-20T19:46:38Z}, — и такие клетки
+     * краснели бы по часу суток, а не по предмету.
+     */
+    protected static final String TENANT = "TENANT-1";
 
-    /** Второй тенант: им наблюдается радиус чтения. */
-    protected static final String SECOND_TENANT = "T2";
+    /** Второй тенант: им наблюдается радиус чтения. Форма — по тому же доводу. */
+    protected static final String SECOND_TENANT = "TENANT-2";
 
     /** Заголовок контекста тенанта: тот же, что читает поверхность. */
     protected static final String TENANT_HEADER = "X-Tenant-Id";
@@ -443,6 +452,24 @@ abstract class AuditBox {
                 .pollInterval(POLL)
                 .until(() -> Objects.equals(Wire.endOffset(topic),
                         Wire.committedOffset(consumerGroup, topic)));
+    }
+
+    /**
+     * Ждёт флага остановки приёма по названной паре.
+     *
+     * <p><b>Ожидается ФЛАГ, а не смещение.</b> На тропе отказа обработки
+     * смещение не двигается вовсе, и ждать его продвижения значило бы
+     * ждать таймаута; флаг же ставит обработчик отказа на ПЕРВОЙ неудачной
+     * доставке ({@code ReceptionHaltMarker}) — он и есть наблюдаемый конец
+     * первой попытки.
+     *
+     * @param topic пара, по которой ждётся остановка
+     */
+    protected void awaitHalted(String topic) {
+        Awaitility.await()
+                .atMost(RECEPTION_WAIT)
+                .pollInterval(POLL)
+                .until(() -> Objects.equals(Boolean.TRUE, pair(topic).get(HALTED_COLUMN)));
     }
 
     /**

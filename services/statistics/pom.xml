@@ -44,6 +44,7 @@
         <commons-collections4.version>4.5.0</commons-collections4.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <wiremock.version>3.13.1</wiremock.version>
         <!--
           Метка красных ожиданий, изъятая из умолчания прогона: дом довода —
           services/common/platform/pom.xml, свойство того же имени.
@@ -285,6 +286,55 @@
             <groupId>com.example</groupId>
             <artifactId>test-support</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          СУБСТРАТ ЧЁРНОГО ЯЩИКА (уровень 1 шага 12 фазы 2). База и брокер
+          приезжают контейнерами прогона, а не берутся из docker-compose
+          машины: прогон, зависящий от состояния машины, мерит машину
+          (.claude/decisions/test-contour-design-pass.md, решения 1-3).
+
+          ОБРАЗ БАЗЫ ЗДЕСЬ НЕСУЩИЙ, а не унаследованный у соседа: обе
+          таблицы фактов — гипертаблицы Timescale, и на стоковом Postgres
+          миграция V1 не накатывается вовсе
+          (docs/models/domain/other/StatisticsFact.md §Персистентность).
+          Совпадение тега с deploy/base сверяет проба: две записи одного
+          тега разошлись бы молча.
+
+          БРОКЕР НУЖЕН ОБЕИМИ СТОРОНАМИ: единственный вход сервиса —
+          события, и контейнер брокера служит здесь и подателем входа, и
+          наблюдателем смещений группы
+          (.claude/tests/cases/statistics.md §«Чем достаются выходы»).
+
+          ХРАНИЛИЩА СЕКРЕТОВ ЗДЕСЬ НЕТ: ключей площадки сервис не касается
+          ни одной тропой, а учётные данные базы приезжают свойствами
+          прогона (там же).
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Стаб чужой HTTP-поверхности — здесь ровно одного вида: точки
+          провайдера идентичности. Соседей сервис не зовёт ни одного, и это
+          предмет группы B13, а не недостача стабов. Затенённый артефакт:
+          его Jetty и Jackson не встречаются с Tomcat и Jackson контекста.
+        -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>${wiremock.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

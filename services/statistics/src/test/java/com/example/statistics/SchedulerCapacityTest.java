@@ -3,7 +3,7 @@ package com.example.statistics;
 import com.example.testsupport.SchedulerCapacityContract;
 
 /**
- * Проба вместимости планировщика журнала аудита: форма общая
+ * Проба вместимости планировщика статистики: форма общая
  * ({@link SchedulerCapacityContract}), дерево и конфигурация — свои.
  *
  * <p><b>Измеритель среди джоб сервиса — тик состояния приёма</b>

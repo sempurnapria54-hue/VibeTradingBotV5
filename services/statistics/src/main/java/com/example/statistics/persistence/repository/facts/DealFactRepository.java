@@ -1,6 +1,7 @@
 package com.example.statistics.persistence.repository.facts;
 
 import com.example.statistics.persistence.model.facts.DealFactEntity;
+import com.example.statistics.persistence.model.facts.DealFactId;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import org.springframework.data.jpa.repository.Modifying;
@@ -25,15 +26,33 @@ import org.springframework.data.repository.query.Param;
  * (.claude/work/backlog.md §«Дедуп проверкой существования перед
  * вставкой»).
  */
-public interface DealFactRepository extends Repository<DealFactEntity, Long> {
+public interface DealFactRepository extends Repository<DealFactEntity, DealFactId> {
 
     /**
      * Вставить строку факта, поглотив повторную доставку.
      *
-     * <p>Ключ поглощения — {@code event_id}: следствие приёма у статистики
-     * одно, и его ключ служит отметкой обработанного. Отдельной таблицы
-     * inbox поэтому нет — она была бы вторым носителем той же истины
-     * (.claude/rules/carrier-levels.md).
+     * <p>Ключ поглощения — идентичность события: следствие приёма у
+     * статистики одно, и его ключ служит отметкой обработанного. Отдельной
+     * таблицы inbox поэтому нет — она была бы вторым носителем той же
+     * истины (.claude/rules/carrier-levels.md).
+     *
+     * <p><b>Ограничение называется ИМЕНЕМ, а не перечнем колонок, и это не
+     * стиль.</b> Таблица — гипертаблица Timescale, и уникальное ограничение
+     * у неё обязано включать колонку разбиения: миграция объявляет
+     * {@code pk_deal_fact (event_id, closed_at)} и сама называет это
+     * требованием Timescale. Спецификация конфликта по одному
+     * {@code event_id} уникального индекса не находит и роняет <b>каждую</b>
+     * вставку — не редкую и не повторную; отказ при этом приходит на приёме,
+     * то есть группа встаёт на первом же принятом событии. Прежняя редакция
+     * несла ровно её, и предъявил долг первый прогон чёрного ящика на
+     * настоящей базе (кейсы {@code B1.1}, {@code B1.9} —
+     * .claude/tests/cases/statistics.md, находка {@code F-1}).
+     *
+     * <p><b>Дедуп от именования не слабеет:</b> идентичность события
+     * уникальна по построению, и пара с осью времени остаётся уникальной
+     * ровно тогда же. Форма совпала с той, которой уже пользуется upsert
+     * агрегатов ({@code on conflict on constraint}), и второй формы у
+     * поглощения конфликта в дереве теперь нет.
      */
     @Modifying
     @Query(nativeQuery = true, value = """
@@ -47,7 +66,7 @@ public interface DealFactRepository extends Repository<DealFactEntity, Long> {
                  :resultCurrency, :closedAt, :tookRisk, :graphComplete, :netResult, :fee,
                  :funding, :liquidationPenalty, :plannedRisk, :closeOutcome,
                  :reconciliationStatus, :breakdownIncomplete, :riskBenchmarkAvailability)
-            on conflict (event_id) do nothing
+            on conflict on constraint pk_deal_fact do nothing
             """)
     void insertAbsorbingDuplicate(@Param("eventId") String eventId,
                                   @Param("tenantId") String tenantId,

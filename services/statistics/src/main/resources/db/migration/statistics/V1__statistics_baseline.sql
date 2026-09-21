@@ -35,11 +35,18 @@
 -- счётчиками (docs/rules/absent-value-semantics.md). Поэтому колонки мер
 -- объявлены nullable, а `not null` стои́т ровно на ключах и оси времени.
 --
--- УНИКАЛЬНОСТЬ event_id — ОТМЕТКА ОБРАБОТАННОГО: следствие приёма одно, и
--- его ключ ею и служит; отдельной таблицы inbox поэтому нет
+-- УНИКАЛЬНОСТЬ ПО ИДЕНТИЧНОСТИ СОБЫТИЯ — ОТМЕТКА ОБРАБОТАННОГО: следствие
+-- приёма одно, и его ключ ею и служит; отдельной таблицы inbox поэтому нет
 -- (docs/models/domain/other/StatisticsFact.md §«Отметка обработанного»).
+--
+-- СУРРОГАТНОГО КЛЮЧА У РЯДА НЕТ, и это не выбор формы, а требование
+-- Timescale: всякий уникальный индекс гипертаблицы обязан нести колонку
+-- разбиения, а первичный ключ есть уникальный индекс. Суррогат в одиночку
+-- ключом поэтому быть не может, а вместе с осью времени он не нужен —
+-- естественный ключ уже уникален и уже служит отметкой обработанного. Та же
+-- форма и по тому же доводу стои́т у гипертаблицы свечей
+-- (services/market-data, `candles`, `CandleId`).
 create table deal_facts (
-    id                           bigserial       primary key,
     event_id                     varchar(64)     not null,
     tenant_id                    varchar(64)     not null,
     exchange_account_internal_id varchar(64)     not null,
@@ -59,7 +66,7 @@ create table deal_facts (
     breakdown_incomplete         varchar(32),
     risk_benchmark_availability  varchar(32),
 
-    constraint uk_deal_fact_event unique (event_id, closed_at)
+    constraint pk_deal_fact primary key (event_id, closed_at)
 );
 
 comment on table deal_facts is
@@ -85,11 +92,11 @@ comment on column deal_facts.graph_complete is
 -- считаются по этой же оси. Второй оси времени у факта нет — момент приёма
 -- не хранится, потому что его не читает ни одна выборка.
 --
--- ОСЬ ВРЕМЕНИ ВХОДИТ В УНИКАЛЬНОЕ ОГРАНИЧЕНИЕ ВТОРОЙ КОЛОНКОЙ, и это
--- требование Timescale, а не выбор: всякое уникальное ограничение
--- гипертаблицы обязано включать колонку разбиения. Дедуп от этого не
--- слабеет — event_id уникален по построению, и пара с моментом остаётся
--- уникальной ровно тогда же.
+-- ОСЬ ВРЕМЕНИ ВХОДИТ В ПЕРВИЧНЫЙ КЛЮЧ ВТОРОЙ КОЛОНКОЙ, и это требование
+-- Timescale, а не выбор: всякий уникальный индекс гипертаблицы — включая
+-- первичный ключ — обязан включать колонку разбиения. Дедуп от этого не
+-- слабеет — идентичность события уникальна по построению, и пара с моментом
+-- остаётся уникальной ровно тогда же.
 select create_hypertable('deal_facts', by_range('closed_at'));
 
 -- ---------------------------------------------------------------------
@@ -105,8 +112,11 @@ select create_hypertable('deal_facts', by_range('closed_at'));
 -- и это решение: ни один объявленный счётчик по ним не отбирает, а колонка
 -- без читателя была бы формой раньше предмета
 -- (.claude/rules/design-simplicity.md).
+--
+-- СУРРОГАТНОГО КЛЮЧА У РЯДА НЕТ по тому же требованию Timescale, что у
+-- соседнего зерна: первичный ключ есть уникальный индекс, а колонка
+-- разбиения обязана в него входить.
 create table incident_facts (
-    id                           bigserial    primary key,
     event_id                     varchar(64)  not null,
     tenant_id                    varchar(64)  not null,
     exchange_account_internal_id varchar(64)  not null,
@@ -117,7 +127,7 @@ create table incident_facts (
     anomaly_severity             varchar(32),
     operation_code               varchar(64),
 
-    constraint uk_incident_fact_event unique (event_id, occurred_at)
+    constraint pk_incident_fact primary key (event_id, occurred_at)
 );
 
 comment on table incident_facts is

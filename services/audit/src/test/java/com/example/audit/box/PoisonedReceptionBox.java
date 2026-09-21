@@ -6,8 +6,6 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
-import org.awaitility.Awaitility;
 import org.springframework.test.annotation.DirtiesContext;
 
 /**
@@ -91,10 +89,8 @@ abstract class PoisonedReceptionBox extends AuditBox {
     /**
      * Кладёт отравленное сообщение и ждёт, пока приём по паре встанет.
      *
-     * <p><b>Ожидается ФЛАГ, а не смещение.</b> Смещение у этой тропы не
-     * двигается никогда, и ждать его продвижения значило бы ждать
-     * таймаута; флаг же ставит обработчик отказа на первой неудачной
-     * доставке — он и есть наблюдаемый конец первой попытки.
+     * <p><b>Ожидается ФЛАГ, а не смещение</b>, и довод живёт у самого
+     * ожидания ({@link AuditBox#awaitHalted}).
      *
      * @param headers заголовки конверта, которые есть; прочих нет
      * @param key     ключ записи — тенант; пусто означает «ключа нет»
@@ -108,14 +104,6 @@ abstract class PoisonedReceptionBox extends AuditBox {
     /** Отравленное сообщение штатного вида: конверт без названного заголовка. */
     protected void poisonWithout(String header) {
         poison(envelopeWithout(header), TENANT, Bodies.reference());
-    }
-
-    /** Ждёт флага остановки приёма по названной паре. */
-    protected void awaitHalted(String topic) {
-        Awaitility.await()
-                .atMost(RECEPTION_WAIT)
-                .pollInterval(POLL)
-                .until(() -> Objects.equals(Boolean.TRUE, pair(topic).get(HALTED_COLUMN)));
     }
 
     /**

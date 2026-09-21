@@ -2,9 +2,8 @@ package com.example.statistics.persistence.model.facts;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -17,7 +16,13 @@ import lombok.Setter;
  *
  * <p><b>Колонки неизменяемы:</b> факт есть след принятого события, и
  * правки его не бывает. Повторная доставка поглощается конфликтом по
- * ключу {@code event_id}, а не обновлением строки.
+ * первичному ключу, а не обновлением строки.
+ *
+ * <p><b>Ключ СОСТАВНОЙ и естественный, суррогата у ряда нет</b>
+ * ({@link DealFactId}): строка лежит гипертаблицей, а всякий уникальный
+ * индекс гипертаблицы — включая первичный ключ — обязан нести колонку
+ * разбиения. Та же форма и по тому же доводу стои́т у гипертаблицы свечей
+ * ({@code services/market-data}, {@code CandleId}).
  *
  * <p><b>Содержимого как доставлено здесь нет вовсе</b> — колонка с ним
  * сделала бы факт журналом (там же, §«Почему это не второй журнал»).
@@ -26,12 +31,10 @@ import lombok.Setter;
 @Setter
 @Entity
 @Table(name = "deal_facts")
+@IdClass(DealFactId.class)
 public class DealFactEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     @Column(name = "event_id", nullable = false, updatable = false)
     private String eventId;
 
@@ -47,6 +50,7 @@ public class DealFactEntity {
     @Column(name = "result_currency", updatable = false)
     private String resultCurrency;
 
+    @Id
     @Column(name = "closed_at", nullable = false, updatable = false)
     private OffsetDateTime closedAt;
 

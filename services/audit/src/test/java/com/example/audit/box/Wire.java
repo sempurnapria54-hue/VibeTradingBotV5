@@ -8,14 +8,18 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.GroupListing;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -146,6 +150,45 @@ final class Wire {
      */
     static Set<String> topicNames() {
         return await(ADMIN.listTopics().names());
+    }
+
+    /**
+     * Имена всех групп потребителя, известных брокеру субстрата.
+     *
+     * <p><b>Ими проверяется, что процесс не принимает за вторую
+     * durable-группу.</b> Группа есть состояние НА БРОКЕРЕ: всякий, кто
+     * подписался хоть на одну тему, её заводит, и группы, которой у брокера
+     * нет, процесс не держит ни одной тропой
+     * (docs/rules/durable-consumer-reception.md §Экземпляры).
+     */
+    static Set<String> consumerGroups() {
+        return await(ADMIN.listGroups().all()).stream()
+                .map(GroupListing::groupId)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Заводит тему, на которую никто не подписан.
+     *
+     * <p><b>Ею ставится предусловие клетки об отсутствии публикаций.</b>
+     * «Ни в свои темы, ни в чужие» на одних только темах подписки не
+     * выразимо: тема, которую читает сам потребитель, от чужой отличается
+     * ровно тем, что он её читает, — и её неизменившийся конец говорит
+     * заодно о том, что потребитель не дописывает прочитанное обратно.
+     * Чужая же тема предъявляет второе: адреса, которого процессу никто не
+     * называл, он не трогает.
+     *
+     * <p><b>Заведение идемпотентно:</b> брокер субстрата общий на прогон, а
+     * контекст класса каркас теста кэширует — вторая клетка того же класса
+     * застала бы тему уже заведённой.
+     *
+     * @param name имя темы, на которую никто не подписан
+     */
+    static void createTopic(String name) {
+        if (topicNames().contains(name)) {
+            return;
+        }
+        await(ADMIN.createTopics(List.of(new NewTopic(name, 1, (short) 1))).all());
     }
 
     /**
