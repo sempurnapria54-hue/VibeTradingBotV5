@@ -97,6 +97,24 @@ final class StatisticsSubstrate {
     /** Имя группы потребителя штатного прогона. */
     static final String CONSUMER_GROUP = "statistics.facts";
 
+    /**
+     * Ключ точки провайдера идентичности.
+     *
+     * <p><b>Опустошает его клетка о ненастроенном контуре доступа</b>
+     * ({@code B12.1}): пустое означает, что контур не настроен, и контекст не
+     * поднимается вовсе — то есть отказ, а не открытая поверхность.
+     */
+    static final String ISSUER_KEY = "spring.security.oauth2.resourceserver.jwt.issuer-uri";
+
+    /**
+     * Ключ адреса брокера.
+     *
+     * <p><b>Опустошает его клетка о ненастроенной тропе приёма</b>
+     * ({@code B12.2}): вход у сервиса один — события, — и старта «без приёма,
+     * но с поверхностью» не бывает.
+     */
+    static final String BROKER_ADDRESS_KEY = "reception.bootstrap-servers";
+
     /** Ключ имени группы потребителя. */
     static final String CONSUMER_GROUP_KEY = "reception.group-id";
 
@@ -116,6 +134,25 @@ final class StatisticsSubstrate {
 
     /** Ключ выключателя тика состояния приёма: им снимается состав пар. */
     static final String STATE_TICK_ENABLED_KEY = "reception.state-tick-enabled";
+
+    /**
+     * Ключ такта тика состояния приёма.
+     *
+     * <p><b>Сжимает его клетка, чей предмет — САМ такт</b> ({@code B12.7}):
+     * прочие клетки бьют тик прямым вызовом метода джобы, потому что штатный
+     * такт выражен часовой паузой и второго удара за прогон не даёт. Там, где
+     * предъявить нужно, что удары идут БЕЗ участия кейса, иного входа нет.
+     */
+    static final String STATE_TICK_INTERVAL_KEY = "reception.state-tick-interval";
+
+    /**
+     * Ключ доли срока хранения темы, из которой выводится порог алерта.
+     *
+     * <p><b>Сдвигает его клетка о величинах конфигурации</b> ({@code B12.7}):
+     * при штатной половине ряд порога совпал бы с умолчанием сервиса, и
+     * «величина доехала» не отличалось бы от «взято умолчание».
+     */
+    static final String LAG_ALERT_FRACTION_KEY = "reception.lag-alert-threshold-fraction";
 
     /**
      * Ключ допустимого возраста строки состояния приёма.
@@ -141,6 +178,51 @@ final class StatisticsSubstrate {
     static final String RECOMPUTE_WINDOW_KEY = "jobs.aggregate-recompute.window-days";
 
     /**
+     * Ключ выключателя джобы пересчёта.
+     *
+     * <p><b>Снимает его клетка {@code B7.19}</b>: выключатель читает сам тик
+     * при каждом такте, и положение оси приезжает при подъёме контекста —
+     * сдвинуть её посреди клетки нечем. Тот же довод, что у выключателя тика
+     * приёма.
+     */
+    static final String RECOMPUTE_ENABLED_KEY = "jobs.aggregate-recompute.enabled";
+
+    /**
+     * Ключ такта джобы пересчёта.
+     *
+     * <p><b>Сжимает его та же клетка, что и такт тика приёма</b>
+     * ({@code B12.7}): тактов у сервиса два, и оба обязаны приезжать
+     * конфигурацией. Штатное выражение — момент, до которого прогон не
+     * доживает, и проход подаётся прямым вызовом.
+     */
+    static final String RECOMPUTE_CRON_KEY = "jobs.aggregate-recompute.cron";
+
+    /**
+     * Ключ предела ширины окна агрегатной выборки чтения.
+     *
+     * <p><b>Ось эта ЧИТАТЕЛЬСКАЯ, а не проходная, и путать их нельзя:</b>
+     * окно пересчёта назначает объём работы прохода и консервативно в
+     * сторону большего, а этот предел ограничивает запрошенное читателем и
+     * консервативен в сторону меньшего ({@code AggregateReadProperties}).
+     * Клетка, сдвинувшая одно вместо другого, мерила бы соседнюю величину.
+     */
+    static final String READ_MAX_WINDOW_KEY = "surface.aggregate-read.max-window-days";
+
+    /**
+     * Ключ размера курсорной страницы агрегатной выборки.
+     *
+     * <p><b>Сдвигают его клетки СТРАНИЦЫ</b> ({@code B10.8} — {@code B10.10},
+     * {@code B10.17}): при штатных двух сотнях строк продолжение чтения
+     * пришлось бы предъявлять двумя сотнями суток зерна, то есть мерить
+     * пропускную способность субстрата, а не курсор. Значения в штатном
+     * положении осей у него нет намеренно — читающих его клеток нет ни
+     * одной, а объявленная и никем не читаемая величина разошлась бы с
+     * сервисом раньше первого своего читателя
+     * (.claude/rules/design-simplicity.md).
+     */
+    static final String READ_PAGE_SIZE_KEY = "surface.aggregate-read.page-size";
+
+    /**
      * Число суток окна пересчёта в штатном положении осей.
      *
      * <p><b>Объявлено здесь ВЕЛИЧИНОЙ, а не унаследовано умолчанием
@@ -155,6 +237,23 @@ final class StatisticsSubstrate {
      * порциями, и семь порций прогону ничего не стоя́т.
      */
     static final Integer RECOMPUTE_WINDOW_DAYS = 7;
+
+    /**
+     * Предел ширины окна чтения в штатном положении осей — включающим числом
+     * суток зерна.
+     *
+     * <p><b>Объявлен здесь ВЕЛИЧИНОЙ по тому же доводу, что и окно
+     * пересчёта:</b> граница приёма вопроса есть ВХОД клетки, которая её
+     * щупает ({@code B10.5} — окно ровно в предел против окна на сутки
+     * шире), и унаследованное умолчание пришлось бы прочитать из ресурса
+     * сервиса, то есть заглянуть ящику внутрь.
+     *
+     * <p><b>Значение совпадает с умолчанием сервиса намеренно.</b> Сдвинутое
+     * здесь, оно сделало бы соседку {@code B10.5} вторым носителем клейма
+     * «предел приезжает конфигурацией» — того самого, ради которого заведена
+     * {@code B10.17} со своим контекстом (.claude/rules/carrier-levels.md).
+     */
+    static final Integer READ_MAX_WINDOW_DAYS = 92;
 
     /**
      * Допустимый возраст строки состояния приёма в штатном положении осей.
@@ -172,11 +271,35 @@ final class StatisticsSubstrate {
      */
     static final Duration STATE_MAX_AGE = Duration.ofMinutes(5);
 
+    /**
+     * Библиотеки, которые база субстрата подгружает при старте.
+     *
+     * <p><b>Третья из них — НАБЛЮДАТЕЛЬ ЗАПРОСОВ, и заводится он в
+     * СУБСТРАТЕ, а не в ящике.</b> Клетка {@code B7.13} утверждает о том,
+     * СКОЛЬКО запросов группировки ушло к базе за один проход и какого
+     * объёма выдачу каждый из них вернул; наблюдаемого под это у ящика нет
+     * ни одного — ни строкой, ни поверхностью, ни смещением. Счётчик
+     * {@code pg_stat_statements} отвечает на оба вопроса точно
+     * ({@code calls} и {@code rows}), и берётся он снаружи: ни один бин
+     * сервиса от этого не меняется, и ящик остаётся ящиком.
+     *
+     * <p><b>Две первые унаследованы у образа дословно</b> — их объявляет его
+     * собственная конфигурация. Выражение командной строки перекрывает
+     * значение файла целиком, поэтому они здесь перечислены: опущенная
+     * {@code timescaledb} не дала бы накатиться миграции {@code V1}, а
+     * опущенная вторая изменила бы субстрат сверх предмета.
+     */
+    private static final String PRELOADED_LIBRARIES =
+            "timescaledb,pg_textsearch,pg_stat_statements";
+
     /** Выражение такта, до которого прогон не доживает. */
     private static final String NEVER = "0 0 0 1 1 *";
 
     /** Такт тика приёма, второго повторения которого за прогон не бывает. */
     private static final String HOURLY = "1h";
+
+    /** Ключ порта поверхности: подъёмом кейса он берётся эфемерным. */
+    private static final String EPHEMERAL_PORT_KEY = "server.port";
 
     /** Потолок ожидания заведения тем. */
     private static final Duration ADMIN_TIMEOUT = Duration.ofSeconds(60);
@@ -215,6 +338,37 @@ final class StatisticsSubstrate {
         values.forEach((key, value) -> registry.add(key, () -> value));
     }
 
+    /**
+     * Аргументы запуска ПРОЦЕССА: штатное положение осей с названными
+     * перекрытиями.
+     *
+     * <p><b>Ими поднимается контекст там, где сам подъём есть вход
+     * клетки</b> — то есть у клеток о ненастроенной оси, чьё ожидание состоит
+     * в том, что контекст не поднимается вовсе. Реестра свойств у такого
+     * подъёма нет: {@code @DynamicPropertySource} принадлежит каркасу теста, а
+     * процесс здесь запускает сам кейс.
+     *
+     * <p><b>Оси подаются АРГУМЕНТАМИ, а не умолчаниями:</b> умолчание стои́т
+     * ниже {@code application.yaml} сервиса, и поданный им адрес базы
+     * перекрылся бы пустым — контекст падал бы, но не по той причине, которую
+     * клетка предъявляет.
+     *
+     * <p><b>Пустое значение здесь остаётся ЗНАЧЕНИЕМ, а не изъятием ключа:</b>
+     * предмет клеток — ровно пустая ось, и вычеркнутый ключ отдал бы процессу
+     * умолчание {@code application.yaml}, которое само пусто, — то есть мерил
+     * бы разрешение переменной окружения, а не поведение на пустом значении.
+     *
+     * @param overrides оси, которые клетка сдвигает
+     */
+    static String[] launchArguments(Map<String, String> overrides) {
+        Map<String, String> values = new LinkedHashMap<>(defaults());
+        values.putAll(overrides);
+        values.put(EPHEMERAL_PORT_KEY, "0");
+        return values.entrySet().stream()
+                .map(axis -> "--" + axis.getKey() + "=" + axis.getValue())
+                .toArray(String[]::new);
+    }
+
     /** Штатное положение всех осей контекста. */
     static Map<String, String> defaults() {
         Map<String, String> values = new LinkedHashMap<>();
@@ -228,17 +382,17 @@ final class StatisticsSubstrate {
         // лимит клиентов базы, и падает при этом не та клетка, которая его
         // исчерпала, а следующая.
         values.put("statistics.persistence.max-pool-size", "3");
-        values.put("spring.security.oauth2.resourceserver.jwt.issuer-uri",
-                IdentityStub.stub().issuer());
-        values.put("reception.bootstrap-servers", BROKER.getBootstrapServers());
+        values.put(ISSUER_KEY, IdentityStub.stub().issuer());
+        values.put(BROKER_ADDRESS_KEY, BROKER.getBootstrapServers());
         values.put(CONSUMER_GROUP_KEY, CONSUMER_GROUP);
         values.put(TOPICS_KEY, CORE_TOPIC);
         values.put(STATE_TICK_ENABLED_KEY, "true");
-        values.put("reception.state-tick-interval", HOURLY);
+        values.put(STATE_TICK_INTERVAL_KEY, HOURLY);
         values.put(STATE_MAX_AGE_KEY, STATE_MAX_AGE.toMinutes() + "m");
-        values.put("jobs.aggregate-recompute.enabled", "true");
-        values.put("jobs.aggregate-recompute.cron", NEVER);
+        values.put(RECOMPUTE_ENABLED_KEY, "true");
+        values.put(RECOMPUTE_CRON_KEY, NEVER);
         values.put(RECOMPUTE_WINDOW_KEY, String.valueOf(RECOMPUTE_WINDOW_DAYS));
+        values.put(READ_MAX_WINDOW_KEY, String.valueOf(READ_MAX_WINDOW_DAYS));
         values.put("platform.environment.name", "dev");
         return values;
     }
@@ -338,13 +492,23 @@ final class StatisticsSubstrate {
         return slug + ".second";
     }
 
-    /** Контейнер базы на образе стенда. */
+    /**
+     * Контейнер базы на образе стенда.
+     *
+     * <p><b>Выражение запуска названо целиком, а не дополнено</b>: подмена
+     * команды перекрывает умолчание каркаса, и {@code fsync} пришлось бы
+     * вернуть руками — иначе каждая запись прогона шла бы на диск. Третья
+     * подгружаемая библиотека — наблюдатель запросов
+     * ({@link #PRELOADED_LIBRARIES}).
+     */
     private static PostgreSQLContainer startDatabase() {
         PostgreSQLContainer container = new PostgreSQLContainer(
                 DockerImageName.parse(DATABASE_IMAGE).asCompatibleSubstituteFor("postgres"))
                 .withDatabaseName("statistics")
                 .withUsername("statistics")
-                .withPassword("statistics");
+                .withPassword("statistics")
+                .withCommand("postgres", "-c", "fsync=off",
+                        "-c", "shared_preload_libraries=" + PRELOADED_LIBRARIES);
         container.start();
         return container;
     }

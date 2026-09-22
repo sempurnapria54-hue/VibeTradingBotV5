@@ -3,9 +3,7 @@ package com.example.statistics.box;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -194,14 +192,5 @@ class NarrowedRecomputeWindowBoxTest extends StatisticsBox {
     /** Строки сделочного зерна за окно чтения шире окна пересчёта. */
     private List<Map<String, Object>> read() {
         return aggregatesSince(DEAL_GRAIN, TENANT, READ_SPAN).dealRows();
-    }
-
-    /**
-     * Сутки зерна, отстоящие от нынешних на названное число.
-     *
-     * @param daysBack сколько суток назад от нынешних
-     */
-    private static LocalDate bucket(Integer daysBack) {
-        return LocalDate.now(ZoneOffset.UTC).minusDays(daysBack);
     }
 }

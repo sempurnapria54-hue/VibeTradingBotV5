@@ -6,20 +6,27 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.AlterConfigOp;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.GroupListing;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.RangeAssignor;
@@ -29,6 +36,9 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.config.TopicConfig;
+import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -133,6 +143,48 @@ final class Wire {
         Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> ends =
                 await(ADMIN.listOffsets(Map.of(partition, OffsetSpec.latest())).all());
         return ends.get(partition).offset();
+    }
+
+    /**
+     * Заводит тему, на которую не подписан никто.
+     *
+     * <p><b>Ею ставится предусловие клетки об отсутствии публикаций.</b> «Ни
+     * в свои темы, ни в чужие» на одних темах подписки не выразимо: тема,
+     * которую потребитель читает, от чужой отличается ровно тем, что он её
+     * читает, — и её неизменившийся конец говорит заодно, что прочитанное он
+     * не дописывает обратно. Чужая тема предъявляет второе: адрес, которого
+     * процессу никто не называл, остаётся пустым.
+     *
+     * <p><b>Заведение идемпотентно:</b> брокер субстрата общий на прогон, и
+     * второй экземпляр того же класса застал бы тему уже заведённой.
+     *
+     * @param name имя темы, которой у брокера станет
+     */
+    static void createTopic(String name) {
+        if (topicNames().contains(name)) {
+            return;
+        }
+        await(ADMIN.createTopics(List.of(new NewTopic(name, 1, (short) 1))).all());
+    }
+
+    /**
+     * Имена всех групп, известных брокеру субстрата.
+     *
+     * <p><b>Ими читается отрицание «второй durable-группы у процесса нет».</b>
+     * Группа есть состояние НА БРОКЕРЕ, а не свойство конфигурации: имя,
+     * которого процессу не называли, могло бы появиться там только его
+     * собственным вступлением.
+     *
+     * <p><b>Перечень при этом накрывает весь прогон, а не одну клетку</b> —
+     * брокер общий всем контекстам, и каждый класс со своим положением осей
+     * несёт свою группу ({@link StatisticsSubstrate#registerOwn}). Отсюда
+     * форма клейма у клетки: она сверяет не состав перечня, а то, у скольких
+     * его членов есть ПОЗИЦИЯ ЧТЕНИЯ на теме фактов.
+     */
+    static Set<String> consumerGroups() {
+        return await(ADMIN.listGroups().all()).stream()
+                .map(GroupListing::groupId)
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -284,6 +336,74 @@ final class Wire {
     }
 
     /**
+     * Назначает теме срок хранения у БРОКЕРА.
+     *
+     * <p><b>Им ставится вход клетки о пороге алерта.</b> Порог выводится
+     * долей от срока хранения темы, а сам срок в конфигурации сервиса не
+     * хранится — его добывает у брокера тик
+     * (docs/components/ReceptionStateJob.md §«Срок хранения темы добывается
+     * тем же обходом»). Единственный способ предъявить это — сменить срок
+     * ТАМ, не тронув ни одной оси сервиса, и увидеть, что порог поехал.
+     *
+     * @param topic      тема, чей срок назначается
+     * @param retention  срок хранения
+     */
+    static void setRetention(String topic, Duration retention) {
+        ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topic);
+        AlterConfigOp operation = new AlterConfigOp(
+                new ConfigEntry(TopicConfig.RETENTION_MS_CONFIG, String.valueOf(retention.toMillis())),
+                AlterConfigOp.OpType.SET);
+        await(ADMIN.incrementalAlterConfigs(Map.of(resource, List.of(operation))).all());
+    }
+
+    /**
+     * Читает тему ЧУЖОЙ группой от самого начала и отдаёт идентичности
+     * прочитанных записей.
+     *
+     * <p><b>Ею предъявляется независимость смещений двух групп.</b> Группа,
+     * названная иначе, ведёт своё смещение, и часть темы непрочитанной у неё
+     * не остаётся: она читает всё лежащее, сколько бы ни прочла соседняя
+     * (docs/models/domain/other/StatisticsFact.md §«Подписка, группа и
+     * позиция чтения»).
+     *
+     * <p><b>Смещений чужая группа НЕ фиксирует</b>: автоматическая фиксация у
+     * неё снята, своей она не делает. Иначе наблюдатель оставлял бы на
+     * брокере след, которого предмет не производит.
+     *
+     * <p><b>Партиция назначается ЯВНО, без вступления в группу.</b> Имя
+     * группы здесь нужно только затем, чтобы оно отличалось от имени группы
+     * сервиса; подписка вызвала бы ребалансировку и ожидание назначения там,
+     * где читать нужно ровно одну известную партицию.
+     *
+     * @param consumerGroup имя чужой группы
+     * @param topic         тема, которую она читает
+     * @return идентичности событий в порядке смещений
+     */
+    static List<String> readAllAsGroup(String consumerGroup, String topic) {
+        Map<String, Object> settings = new HashMap<>();
+        settings.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, StatisticsSubstrate.brokerAddress());
+        settings.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroup);
+        settings.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        settings.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        settings.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, Boolean.FALSE);
+        TopicPartition partition = new TopicPartition(topic, ONLY_PARTITION);
+        List<String> identities = new ArrayList<>();
+        Long end = endOffset(topic);
+        try (Consumer<String, String> reader = new KafkaConsumer<>(settings)) {
+            reader.assign(List.of(partition));
+            reader.seekToBeginning(List.of(partition));
+            Instant deadline = Instant.now().plus(JOIN_TIMEOUT);
+            while (identities.size() < end) {
+                if (Instant.now().isAfter(deadline)) {
+                    throw new IllegalStateException("Чужая группа не дочитала тему " + topic);
+                }
+                reader.poll(JOIN_POLL).forEach(record -> identities.add(headerOf(record)));
+            }
+        }
+        return identities;
+    }
+
+    /**
      * Имена всех тем брокера субстрата.
      *
      * <p>Ими проверяется ОТРИЦАНИЕ: темы мёртвых писем у группы статистики не
@@ -293,6 +413,12 @@ final class Wire {
      */
     static Set<String> topicNames() {
         return await(ADMIN.listTopics().names());
+    }
+
+    /** Идентичность события, приехавшая заголовком записи. */
+    private static String headerOf(ConsumerRecord<String, String> record) {
+        Header header = record.headers().lastHeader("eventId");
+        return Objects.isNull(header) ? null : new String(header.value(), StandardCharsets.UTF_8);
     }
 
     private static <T> T await(KafkaFuture<T> future) {

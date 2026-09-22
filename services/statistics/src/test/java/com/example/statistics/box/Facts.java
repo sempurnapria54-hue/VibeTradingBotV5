@@ -1,6 +1,5 @@
 package com.example.statistics.box;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
@@ -30,6 +29,12 @@ import java.time.OffsetDateTime;
  * <p><b>Операнды берутся у {@link Bodies}, а не выдумываются рядом:</b>
  * величина одна, и вторая её запись разошлась бы с первой при первой же
  * правке (.claude/rules/carrier-levels.md).
+ *
+ * <p><b>Оба факта кладут заготовки — {@link DealDraft} и
+ * {@link IncidentDraft}, — а не свои команды вставки.</b> Здесь остаются
+ * штатные подписи, которыми факт подают клетки пересчёта; колонки же, их
+ * умолчания и сама команда живут одним носителем — иначе два списка колонок
+ * разошлись бы при первом расширении таблицы, и разошлись бы молча.
  */
 final class Facts {
 
@@ -38,24 +43,6 @@ final class Facts {
 
     /** Определение стратегии — законно пустой ключ сделочного зерна. */
     static final String STRATEGY = "S-1";
-
-    /** Строка сделочного факта: все ключи зерна и все операнды. */
-    private static final String INSERT_DEAL = """
-            insert into deal_facts
-                (event_id, tenant_id, exchange_account_internal_id, strategy_internal_id,
-                 result_currency, closed_at, took_risk, graph_complete, net_result, fee, funding,
-                 liquidation_penalty, planned_risk, close_outcome, reconciliation_status,
-                 breakdown_incomplete, risk_benchmark_availability)
-            values (?, ?, ?, cast(? as varchar), cast(? as varchar), ?, true, true, ?, ?, ?, ?, ?,
-                    ?, 'MATCHED', 'COMPLETE', 'AVAILABLE')
-            """;
-
-    /** Строка факта происшествия: ключи зерна, ось времени и класс события. */
-    private static final String INSERT_INCIDENT = """
-            insert into incident_facts
-                (event_id, tenant_id, exchange_account_internal_id, occurred_at, event_type)
-            values (?, ?, ?, ?, ?)
-            """;
 
     private Facts() {
     }
@@ -87,13 +74,11 @@ final class Facts {
      */
     static void deal(String eventId, String tenantId, String strategy, String currency,
                      OffsetDateTime closedAt) {
-        Rows.shared().write(INSERT_DEAL, eventId, tenantId, ACCOUNT, strategy, currency, closedAt,
-                new BigDecimal(Bodies.NET_RESULT),
-                new BigDecimal(Bodies.FEE),
-                new BigDecimal(Bodies.FUNDING),
-                new BigDecimal(Bodies.LIQUIDATION_PENALTY),
-                new BigDecimal(Bodies.PLANNED_RISK),
-                Bodies.NORMAL_EXIT);
+        DealDraft.of(eventId, tenantId, closedAt)
+                .strategy(strategy)
+                .currency(currency)
+                .build()
+                .put();
     }
 
     /**
@@ -106,6 +91,6 @@ final class Facts {
      */
     static void incident(String eventId, String tenantId, String eventType,
                          OffsetDateTime occurredAt) {
-        Rows.shared().write(INSERT_INCIDENT, eventId, tenantId, ACCOUNT, occurredAt, eventType);
+        IncidentDraft.of(eventId, tenantId, eventType, occurredAt).build().put();
     }
 }

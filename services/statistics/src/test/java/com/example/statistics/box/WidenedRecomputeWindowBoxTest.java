@@ -14,8 +14,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,15 +39,21 @@ import org.springframework.test.context.DynamicPropertySource;
  * {@code D0} НЕ входит, а ось конфигурации связывается при подъёме контекста.
  * {@code D0} у обоих концов один — {@link Aggregates#LATE_DAY}.
  *
- * <p><b>Отрицание «второго исполнителя нет» читается двумя наблюдателями,
- * и ни один из них не есть чтение бинов контекста</b>
- * (.claude/decisions/test-contour-design-pass.md, решение 1): МОМЕНТ СБОРКИ
- * у всех строк прохода — один, и второй момент означал бы второй проход;
- * РЕСУРСЫ сервиса несут ровно одну конфигурацию, ровно одно объявление
- * блока пересчёта и ровно один такт — джоба без такта в конфигурации не
- * бьётся вовсе. Конфигурация читается здесь как ВХОД ящика — тем же родом,
- * что оси {@code @DynamicPropertySource}, — а не как его внутренность:
- * поверхности, отвечающей «сколько у меня джоб», у сервиса нет.
+ * <p><b>Отрицание «второго исполнителя нет» читается РЕСУРСАМИ сервиса, и
+ * это не чтение бинов контекста</b>
+ * (.claude/decisions/test-contour-design-pass.md, решение 1): они несут ровно
+ * одну конфигурацию, ровно одно объявление блока пересчёта и ровно один такт
+ * — джоба без такта в конфигурации не бьётся вовсе. Конфигурация читается
+ * здесь как ВХОД ящика — тем же родом, что оси
+ * {@code @DynamicPropertySource}, — а не как его внутренность: поверхности,
+ * отвечающей «сколько у меня джоб», у сервиса нет.
+ *
+ * <p><b>Второго наблюдателя — единственности МОМЕНТА сборки — у этой клетки
+ * больше нет, и снят он контрольным прогоном.</b> Ось «момент ставит порция,
+ * а не проход» уронила разом её и {@code B7.14}
+ * ({@link RecomputePassShapeBoxTest}), то есть обе утверждали одно; сильнее
+ * оказалась вторая — она мерит единственность момента по четырём строкам
+ * ДВУХ таблиц, а не по трём строкам одной (.claude/rules/carrier-levels.md).
  *
  * <p><b>Ручной точки «пересчитать всё» эта клетка НЕ перебирает, и это не
  * пробел.</b> Носитель у отрицания уже есть, и он сильнее всякого перебора
@@ -114,11 +118,6 @@ class WidenedRecomputeWindowBoxTest extends StatisticsBox {
                                 + "в %s суток: полный пересчёт есть значение окна",
                         StatisticsSubstrate.RECOMPUTE_WINDOW_DAYS)
                 .containsExactlyInAnyOrder(day(FAR_DAY), day(Aggregates.LATE_DAY), day(NEAR_DAY));
-        assertThat(momentsOf(handed))
-                .as("момент сборки у всех троих ОДИН: их собрал один проход одним тиком — "
-                        + "второй момент означал бы второго исполнителя")
-                .hasSize(1);
-
         assertThat(configurationResources())
                 .as("отдельного профиля под полный пересчёт у сервиса нет: конфигурация одна")
                 .containsExactly(CONFIGURATION.substring(1));
@@ -160,21 +159,6 @@ class WidenedRecomputeWindowBoxTest extends StatisticsBox {
     /** Строки сделочного зерна за окно чтения шире окна пересчёта. */
     private List<Map<String, Object>> read() {
         return aggregatesSince(DEAL_GRAIN, TENANT, READ_SPAN).dealRows();
-    }
-
-    /** Различные моменты сборки у строк выдачи. */
-    private static Set<String> momentsOf(List<Map<String, Object>> handed) {
-        return handed.stream().map(row -> String.valueOf(row.get(ASSEMBLED_AT)))
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * Сутки зерна, отстоящие от нынешних на названное число.
-     *
-     * @param daysBack сколько суток назад от нынешних
-     */
-    private static LocalDate bucket(Integer daysBack) {
-        return LocalDate.now(ZoneOffset.UTC).minusDays(daysBack);
     }
 
     /**

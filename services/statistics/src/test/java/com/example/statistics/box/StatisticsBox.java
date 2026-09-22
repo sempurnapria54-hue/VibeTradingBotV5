@@ -7,9 +7,11 @@ import com.example.statistics.domain.jobs.ReceptionStateJob;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,8 +23,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -87,6 +91,15 @@ abstract class StatisticsBox {
     protected static final String METRICS_SCRAPE = "/actuator/prometheus";
 
     /**
+     * Корень актуатора: он отдаёт ссылки на ПЕРЕЧЕНЬ экспозиции.
+     *
+     * <p>Им читается сам перечень, а не отдельные его имена: перебор точек
+     * доказывает отсутствие названных, а равенство перечня двум объявленным
+     * именам — только выдача корня.
+     */
+    protected static final String ACTUATOR_ROOT = "/actuator";
+
+    /**
      * Ряд возраста последнего принятого события пары.
      *
      * <p><b>Имена рядов написаны формой ЭКСПОЗИЦИИ, а не формой реестра</b>
@@ -136,6 +149,16 @@ abstract class StatisticsBox {
 
     /** Таблица состояния приёма: поверхности у неё нет вовсе. */
     protected static final String RECEPTION_TABLE = "reception_states";
+
+    /**
+     * Таблица следа отвергнутого контуром вызова.
+     *
+     * <p>Лежит в той же базе, что факты и агрегаты, а глубины хранения у неё
+     * нет: числа статистики её не касаются вовсе — строку заводит контур, а
+     * не приём (docs/models/domain/other/AccessDenial.md §«Природа факта —
+     * происшествие»).
+     */
+    protected static final String DENIALS_TABLE = "access_denials";
 
     /** Колонка флага остановки приёма пары. */
     protected static final String HALTED_COLUMN = "reception_halted";
@@ -221,6 +244,33 @@ abstract class StatisticsBox {
 
     /** Поле счётчика закрытых сделок: им читается объём собранного. */
     protected static final String CLOSED_DEALS = "closedDeals";
+
+    /**
+     * Образец текста запроса группировки СДЕЛОЧНОГО зерна.
+     *
+     * <p><b>Берёт псевдоним ВНЕШНЕЙ выборки, а не имя таблицы.</b> По той же
+     * таблице идёт чтение начала ряда, и по имени таблицы счёт сошёлся бы
+     * вдвое больший — по причине, которой клетка не ставила. Псевдоним
+     * {@code grain} стои́т в первой строке запроса группировки и больше
+     * нигде.
+     *
+     * <p><b>Живёт он здесь, а не у класса клетки:</b> образец читают и та
+     * клетка, что считает запросы прохода, и та, что утверждает их
+     * ОТСУТСТВИЕ при снятом выключателе, — а вторая запись величины
+     * разошлась бы с первой при первой же правке запроса
+     * (.claude/rules/carrier-levels.md).
+     */
+    protected static final String DEAL_GRAIN_QUERY = "%select grain.tenant_id%";
+
+    /**
+     * Образец текста запроса группировки зерна ПРОИСШЕСТВИЙ.
+     *
+     * <p><b>Имя таблицы здесь различает само:</b> к таблице происшествий
+     * ходят два запроса — начало ряда и группировка, — и второй добавляет
+     * {@code group by}, которого у первого нет. Псевдонимом он не берётся:
+     * внешней выборки у него нет вовсе.
+     */
+    protected static final String INCIDENT_GRAIN_QUERY = "%from incident_facts fact%group by%";
 
     /**
      * Потолок ожидания асинхронного следа приёма.
@@ -681,6 +731,35 @@ abstract class StatisticsBox {
         return LocalDate.now(ZoneOffset.UTC).minusDays(daysBack).toString();
     }
 
+    /**
+     * Те же сутки — ТИПОМ КОЛОНКИ, а не записью выдачи.
+     *
+     * <p>Ею клетка кладёт строку агрегата прямой записью и ищет её в базе;
+     * запись выдачи ({@link #day}) сравнивается с тем, что пришло наружу.
+     * Носитель у величины один: вторая её запись разошлась бы с первой при
+     * первой же правке (.claude/rules/carrier-levels.md).
+     *
+     * @param daysBack сколько суток назад от нынешних
+     */
+    protected static LocalDate bucket(Integer daysBack) {
+        return LocalDate.now(ZoneOffset.UTC).minusDays(daysBack);
+    }
+
+    /**
+     * РАЗЛИЧНЫЕ моменты названного поля у строк выдачи.
+     *
+     * <p>Ею читается утверждение «момент у всех строк один»: счёт множества
+     * отвечает на него прямо, а перечень по строкам отвечал бы на него
+     * порядком выдачи.
+     *
+     * @param handed строки выдачи
+     */
+    protected static Set<String> distinctMomentsOf(List<Map<String, Object>> handed) {
+        return handed.stream()
+                .map(row -> String.valueOf(row.get(ASSEMBLED_AT)))
+                .collect(Collectors.toSet());
+    }
+
     /** Сутки зерна у каждой строки выдачи. */
     protected static List<String> bucketDatesOf(List<Map<String, Object>> handed) {
         return handed.stream().map(row -> String.valueOf(row.get(BUCKET_DATE))).toList();
@@ -778,6 +857,18 @@ abstract class StatisticsBox {
                 .count();
     }
 
+    /**
+     * Маршруты, которые сервис отображает наружу.
+     *
+     * <p><b>Описание поверхности сильнее перебора имён:</b> оно отвечает на
+     * «сколько маршрутов есть», тогда как перебор — только на «нет ли вот
+     * этих». Отрицания о несуществующих точках поэтому стоя́т на нём.
+     */
+    @SuppressWarnings("unchecked")
+    protected Map<String, Object> surfaceRoutes() {
+        return (Map<String, Object>) get(SURFACE_DESCRIPTION, TENANT).asObject().get("paths");
+    }
+
     /** Выдача экспозиции дословно. */
     protected String scrape() {
         return get(METRICS_SCRAPE, TENANT).body();
@@ -799,6 +890,84 @@ abstract class StatisticsBox {
                 .header("Authorization", "Bearer " + identity.serviceToken())
                 .header(TENANT_HEADER, TENANT)
                 .method(method, HttpRequest.BodyPublishers.noBody()));
+    }
+
+    /**
+     * Путь агрегатной выборки с названными операндами запроса.
+     *
+     * <p><b>Операнды даются ПАРАМИ, а не отдельными аргументами зерна и
+     * границ, и это не удобство:</b> половина клеток группы {@code B10}
+     * спрашивает поверхность ровно тем, чего у вопроса НЕ ХВАТАЕТ — зерна,
+     * одной границы окна, половины позиции, — и подпись с обязательными
+     * аргументами выразить такой вопрос не даёт вовсе.
+     *
+     * <p>Носитель у сборки один на оба класса группы: вторая её запись
+     * разошлась бы с первой при первом же переименовании операнда
+     * (.claude/rules/carrier-levels.md).
+     *
+     * @param operands пары «имя операнда, значение»; нечётное число —
+     *                 падение клетки на месте её письма
+     */
+    protected static String aggregatePath(String... operands) {
+        if (operands.length % 2 != 0) {
+            throw new AssertionError("Операнды запроса даются парами: их " + operands.length);
+        }
+        StringBuilder path = new StringBuilder(AGGREGATE_ROWS);
+        for (int index = 0; index < operands.length; index += 2) {
+            path.append(index == 0 ? '?' : '&')
+                    .append(operands[index])
+                    .append('=')
+                    .append(URLEncoder.encode(operands[index + 1], StandardCharsets.UTF_8));
+        }
+        return path.toString();
+    }
+
+    /**
+     * Чтение под сервисным токеном, БЕЗ заголовка контекста тенанта.
+     *
+     * <p><b>Им наблюдается отказ, который производит КОНТЕЙНЕР, а не наш
+     * код:</b> обязательность заголовка выражена контрактом точки, и класс
+     * такого отказа другой — форма вызова отвергается раньше, чем вопрос
+     * чтения доходит до выборки
+     * (.claude/tests/cases/statistics.md §«Число ответа и класс отказа —
+     * разные ожидания»).
+     *
+     * @param path путь поверхности вместе с операндами запроса
+     */
+    protected Answer getWithoutTenant(String path) {
+        return send(request(path)
+                .header("Authorization", "Bearer " + identity.serviceToken())
+                .GET());
+    }
+
+    /**
+     * Чтение БЕЗ предъявленной идентичности: заголовок контекста есть,
+     * заголовка авторизации нет.
+     *
+     * <p><b>Контекст подаётся намеренно:</b> клетка о закрытом умолчании
+     * утверждает, что вызов отвергает КОНТУР, а не разбор контекста тенанта,
+     * — а непредъявленный заголовок контекста отвергает контейнер своим
+     * классом (.claude/tests/cases/statistics.md §«Число ответа и класс
+     * отказа — разные ожидания»). Без заголовка два отказа стали бы
+     * неразличимы по поводу, совпав по коду.
+     *
+     * @param path путь поверхности вместе с операндами запроса
+     */
+    protected Answer getAnonymously(String path) {
+        return send(request(path).header(TENANT_HEADER, TENANT).GET());
+    }
+
+    /**
+     * Чтение под НАЗВАННЫМ токеном: вход клеток о негодных осях токена.
+     *
+     * @param path  путь поверхности
+     * @param token токен, который предъявляет клетка
+     */
+    protected Answer getWith(String path, String token) {
+        return send(request(path)
+                .header("Authorization", "Bearer " + token)
+                .header(TENANT_HEADER, TENANT)
+                .GET());
     }
 
     /** Чтение под сервисным токеном и контекстом названного тенанта. */
@@ -827,7 +996,7 @@ abstract class StatisticsBox {
         try {
             HttpResponse<String> answer = CLIENT.send(request.build(),
                     HttpResponse.BodyHandlers.ofString());
-            return new Answer(answer.statusCode(), answer.body());
+            return new Answer(answer.statusCode(), answer.body(), answer.headers().map());
         } catch (IOException failure) {
             throw new IllegalStateException("Поверхность ящика не ответила", failure);
         } catch (InterruptedException failure) {
@@ -843,14 +1012,66 @@ abstract class StatisticsBox {
      * ЧИСЛЕ в теле — что денежная сумма едет десятичной записью, — и разбор в
      * типизованную форму такое ожидание выразить не даёт.
      *
-     * @param status код ответа
-     * @param body   тело ответа дословно
+     * @param status  код ответа
+     * @param body    тело ответа дословно
+     * @param headers заголовки ответа по именам
      */
-    protected record Answer(Integer status, String body) {
+    protected record Answer(Integer status, String body, Map<String, List<String>> headers) {
 
         /** Тело как объект. */
         Map<String, Object> asObject() {
             return JsonParserFactory.getJsonParser().parseMap(body);
+        }
+
+        /**
+         * Первое значение заголовка ответа; пусто — заголовка не было.
+         *
+         * <p>Имя ищется БЕЗ учёта регистра: регистр имени заголовка контракта
+         * не несёт, и ассерт, чувствительный к нему, мерил бы написание, а не
+         * наличие.
+         *
+         * @param name имя заголовка
+         */
+        String header(String name) {
+            return headers.entrySet().stream()
+                    .filter(entry -> name.equalsIgnoreCase(entry.getKey()))
+                    .map(entry -> entry.getValue().getFirst())
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        /**
+         * Несёт ли тело единый error-DTO поверхности: класс отказа и момент.
+         *
+         * <p>Форма читается по ПОЛЯМ, а не по коду ответа: отказ контейнера
+         * отдаёт то же тело при своём статусе, а умолчание ресурс-сервера
+         * отвечает ПУСТЫМ телом — то есть вторым форматом, существование
+         * которого клейм «единый DTO» и отрицает.
+         *
+         * <p><b>Неразобранное тело даёт ОТВЕТ, а не отказ клетки:</b> иначе
+         * красная клетка падала бы разбором и переставала называть, чем
+         * ожидание не сошлось.
+         */
+        Boolean carriesErrorDto() {
+            if (Objects.isNull(body) || body.isBlank()) {
+                return Boolean.FALSE;
+            }
+            try {
+                Map<String, Object> parsed = asObject();
+                return parsed.containsKey("code") && parsed.containsKey("occurredAt");
+            } catch (RuntimeException notAnObject) {
+                return Boolean.FALSE;
+            }
+        }
+
+        /** Класс отказа единого error-DTO. */
+        String errorCode() {
+            return String.valueOf(asObject().get("code"));
+        }
+
+        /** Пояснение отказа: им назван повод, а не внутреннее устройство. */
+        String errorMessage() {
+            return String.valueOf(asObject().get("message"));
         }
 
         /** Строки сделочного зерна; пусто — спрошено другое зерно. */
@@ -869,6 +1090,18 @@ abstract class StatisticsBox {
         @SuppressWarnings("unchecked")
         Map<String, Object> completeness() {
             return (Map<String, Object>) asObject().get("completeness");
+        }
+
+        /**
+         * Позиция продолжения; пусто — окно дочитано.
+         *
+         * <p><b>Пустота здесь означает «продолжения нет», и второго смысла у
+         * неё не бывает:</b> позиция, названная наполовину, вопросом не
+         * принимается вовсе (docs/rules/absent-value-semantics.md).
+         */
+        @SuppressWarnings("unchecked")
+        Map<String, Object> nextCursor() {
+            return (Map<String, Object>) asObject().get("nextCursor");
         }
 
         /**

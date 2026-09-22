@@ -356,12 +356,6 @@ class ReceptionStateTickBoxTest extends SharedStatisticsBox {
         return named;
     }
 
-    /** Маршруты, которые сервис отображает наружу. */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> surfaceRoutes() {
-        return (Map<String, Object>) get(SURFACE_DESCRIPTION, TENANT).asObject().get("paths");
-    }
-
     /**
      * Методы названного маршрута.
      *

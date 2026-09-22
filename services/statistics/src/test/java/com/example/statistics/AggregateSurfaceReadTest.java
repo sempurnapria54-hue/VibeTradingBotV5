@@ -1,5 +1,6 @@
 package com.example.statistics;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
@@ -257,6 +259,36 @@ class AggregateSurfaceReadTest {
                 .andExpect(jsonPath("$.code").value("QUERY_NOT_ACCEPTED"))
                 .andExpect(jsonPath("$.message").value("Окно шире допустимого: 92 суток"))
                 .andExpect(jsonPath("$.occurredAt").exists());
+    }
+
+    /**
+     * Отказ по правам обязан <b>выйти</b> из диспетчера: ответ на него пишет
+     * контур ({@code AccessDenialHandler}) из
+     * {@code ExceptionTranslationFilter}, стоящего снаружи. Разрешённый
+     * последним обработчиком, он ушёл бы вызывающему кодом {@code 500}
+     * вместо {@code 403}, строки следа не завелось бы, и в журнале следа не
+     * осталось бы.
+     *
+     * <p><b>Проба нужна ИМЕННО потому, что тропа сегодня недостижима:</b>
+     * пер-операционных проверок права нет ни одной, и регресс этой формы не
+     * обнаружился бы прогоном ящика — он ждал бы первой такой проверки, то
+     * есть чужого шага (docs/rules/api-access-policy.md). Клетка {@code B11.8}
+     * документа кейсов именно на эту пробу и опирается
+     * (.claude/tests/cases/statistics.md §«Кейсы, не прогоняемые сегодня»).
+     *
+     * <p><b>Источник отказа в пробе — подменённая выборка, а не проверка
+     * права,</b> и предмет от этого не меняется: мерится, что исключение
+     * ВЫХОДИТ из диспетчера, а кто его бросил внутри — безразлично.
+     */
+    @Test
+    @DisplayName("Отказ по правам уходит наружу диспетчера, а не разрешается перехватчиком")
+    void anAccessDenialLeavesTheDispatcherUnresolved() {
+        when(aggregateReadService.read(any())).thenThrow(new AccessDeniedException("нет права"));
+
+        assertThatThrownBy(() -> mockMvc.perform(request()))
+                .as("разрешённый здесь отказ не дошёл бы до контура, и ответ его не "
+                        + "написал бы никто")
+                .hasRootCauseInstanceOf(AccessDeniedException.class);
     }
 
     @Test

@@ -49,11 +49,74 @@ final class Bodies {
     /** Исход закрытия, ни одним разрезом не считаемый. */
     static final String NORMAL_EXIT = "NORMAL_EXIT";
 
+    /** Исход закрытия по марже: его считает {@code liquidatedDeals}. */
+    static final String LIQUIDATION = "LIQUIDATION";
+
+    /** Принудительное сокращение: его считает {@code forcedReductionDeals}. */
+    static final String FORCED_REDUCTION = "FORCED_REDUCTION";
+
+    /** Неустановленный торговый исход: его считает {@code outcomeUndeterminedDeals}. */
+    static final String UNDETERMINED = "UNDETERMINED";
+
+    /** Состояние сверки, ни одним разрезом не считаемое. */
+    static final String MATCHED = "MATCHED";
+
+    /** Несошедшаяся сверка: её считает {@code reconciliationMismatchedDeals}. */
+    static final String MISMATCHED = "MISMATCHED";
+
+    /** Непроверенная сверка: её считает {@code reconciliationNotRunDeals}. */
+    static final String NOT_RUN = "NOT_RUN";
+
+    /** Полнота разбивки, ни одним разрезом не считаемая. */
+    static final String COMPLETE = "COMPLETE";
+
+    /** Неполная разбивка движений: её считает {@code breakdownIncompleteDeals}. */
+    static final String INCOMPLETE_BY_WINDOW = "INCOMPLETE_BY_WINDOW";
+
+    /**
+     * Неоценённая полнота разбивки: её считает {@code breakdownNotAssessedDeals}.
+     *
+     * <p><b>Сделка с этим значением обязана быть БЕЗ итога</b> — охранный
+     * инвариант {@code unassessedBreakdownHasNoResult}
+     * (docs/spec/statistics-aggregates.json): единственный триггер значения —
+     * невыполненная добыча движений, а с нею недоступен и итог. Факт, положенный
+     * с этим значением и доступным результатом, нарушал бы объявленный инвариант
+     * — то есть кейс стоя́л бы на состоянии, которого система не производит.
+     */
+    static final String NOT_ASSESSED = "NOT_ASSESSED";
+
+    /** Доступность базы риска, ни одним разрезом не считаемая. */
+    static final String AVAILABLE = "AVAILABLE";
+
+    /**
+     * База риска неприменима: входа не было, и знаменателя нет ПО ПОСТРОЕНИЮ.
+     *
+     * <p>Значение здоровое — своего счётчика у него нет, как и у
+     * {@link #AVAILABLE}; им снабжается сделка, закрытая без входа, чтобы
+     * факт был состоянием, которое система производит.
+     */
+    static final String NOT_APPLICABLE = "NOT_APPLICABLE";
+
+    /** Потерянная база риска: её считает {@code riskBenchmarkMissingDeals}. */
+    static final String MISSING = "MISSING";
+
     /** Жёсткость ступени, которую считает разрез жёстких. */
     static final String HARD = "HARD";
 
+    /**
+     * Мягкая ступень: разрез жёстких её не считает.
+     *
+     * <p>Стои́т в заготовке рядом с {@link #HARD} затем, чтобы «разрез подан
+     * мягким» и «разрез не подан вовсе» у клетки не совпадали: пустая
+     * жёсткость означает «разрез у этого класса не определён».
+     */
+    static final String SOFT = "SOFT";
+
     /** Критичность отчёта, которую считает разрез критичных. */
     static final String CRITICAL = "CRITICAL";
+
+    /** Некритичный отчёт: разрез критичных его не считает. */
+    static final String NON_CRITICAL = "NON_CRITICAL";
 
     /**
      * Код операции ручной постановки ступени.
@@ -63,6 +126,16 @@ final class Bodies {
      * пустом счётчике.
      */
     static final String MANUAL_HALT_REQUESTED = "MANUAL_HALT_REQUESTED";
+
+    /**
+     * Код операции ручного снятия ступени — второе слово того же перечня.
+     *
+     * <p>Оба кода падают в ОДИН счётчик ручной тропы: направление операции
+     * третьим разрезом не разводится
+     * (docs/rules/statistics-aggregates.md §«Счётчики происшествий — своё
+     * зерно, а не строка сделочного агрегата»).
+     */
+    static final String MANUAL_HALT_CLEARED = "MANUAL_HALT_CLEARED";
 
     private Bodies() {
     }
@@ -86,11 +159,12 @@ final class Bodies {
                  "liquidationPenalty": %s,
                  "plannedRisk": %s,
                  "closeOutcome": "%s",
-                 "reconciliationStatus": "MATCHED",
-                 "breakdownIncomplete": "COMPLETE",
-                 "riskBenchmarkAvailability": "AVAILABLE"}"""
+                 "reconciliationStatus": "%s",
+                 "breakdownIncomplete": "%s",
+                 "riskBenchmarkAvailability": "%s"}"""
                 .formatted(exchangeAccount, strategy, CURRENCY, NET_RESULT, FEE, FUNDING,
-                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT);
+                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT,
+                        MATCHED, COMPLETE, AVAILABLE);
     }
 
     /**
@@ -132,11 +206,12 @@ final class Bodies {
                  "liquidationPenalty": %s,
                  "plannedRisk": %s,
                  "closeOutcome": "%s",
-                 "reconciliationStatus": "MATCHED",
-                 "breakdownIncomplete": "COMPLETE",
-                 "riskBenchmarkAvailability": "AVAILABLE"}"""
+                 "reconciliationStatus": "%s",
+                 "breakdownIncomplete": "%s",
+                 "riskBenchmarkAvailability": "%s"}"""
                 .formatted(exchangeAccount, CURRENCY, NET_RESULT, FEE, FUNDING,
-                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT);
+                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT,
+                        MATCHED, COMPLETE, AVAILABLE);
     }
 
     /**
@@ -171,10 +246,11 @@ final class Bodies {
                  "tookRisk": true,
                  "graphComplete": true,
                  "closeOutcome": "%s",
-                 "reconciliationStatus": "MATCHED",
-                 "breakdownIncomplete": "COMPLETE",
-                 "riskBenchmarkAvailability": "AVAILABLE"}"""
-                .formatted(exchangeAccount, CURRENCY, NORMAL_EXIT);
+                 "reconciliationStatus": "%s",
+                 "breakdownIncomplete": "%s",
+                 "riskBenchmarkAvailability": "%s"}"""
+                .formatted(exchangeAccount, CURRENCY, NORMAL_EXIT,
+                        MATCHED, COMPLETE, AVAILABLE);
     }
 
     /**
@@ -203,11 +279,12 @@ final class Bodies {
                  "liquidationPenalty": %s,
                  "plannedRisk": %s,
                  "closeOutcome": "%s",
-                 "reconciliationStatus": "MATCHED",
-                 "breakdownIncomplete": "COMPLETE",
-                 "riskBenchmarkAvailability": "AVAILABLE"}"""
+                 "reconciliationStatus": "%s",
+                 "breakdownIncomplete": "%s",
+                 "riskBenchmarkAvailability": "%s"}"""
                 .formatted(exchangeAccount, CURRENCY, netResult, fee, funding,
-                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT);
+                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT,
+                        MATCHED, COMPLETE, AVAILABLE);
     }
 
     /**
@@ -234,11 +311,12 @@ final class Bodies {
                  "liquidationPenalty": %s,
                  "plannedRisk": %s,
                  "closeOutcome": "%s",
-                 "reconciliationStatus": "MATCHED",
-                 "breakdownIncomplete": "COMPLETE",
-                 "riskBenchmarkAvailability": "AVAILABLE"}"""
+                 "reconciliationStatus": "%s",
+                 "breakdownIncomplete": "%s",
+                 "riskBenchmarkAvailability": "%s"}"""
                 .formatted(exchangeAccount, currency, netResult, FEE, FUNDING,
-                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT);
+                        LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT,
+                        MATCHED, COMPLETE, AVAILABLE);
     }
 
     /**
@@ -331,6 +409,24 @@ final class Bodies {
         return """
                 {"exchangeAccountInternalId": "%s", "dealInternalId": "D-1"}"""
                 .formatted(exchangeAccount);
+    }
+
+    /**
+     * То же содержимое происшествия, но с НАЗВАННЫМ определением стратегии.
+     *
+     * <p><b>Определение едет содержимым и в строке факта не остаётся</b>:
+     * колонки под него у зерна происшествий нет вовсе. Потому предусловие
+     * «события несли разные определения» выразимо только тропой приёма —
+     * прямой записью такой факт не положить.
+     *
+     * @param exchangeAccount биржевой счёт
+     * @param strategy        определение стратегии, несомое событием
+     */
+    static String incidentOfStrategy(String exchangeAccount, String strategy) {
+        return """
+                {"exchangeAccountInternalId": "%s", "strategyInternalId": "%s",
+                 "dealInternalId": "D-1"}"""
+                .formatted(exchangeAccount, strategy);
     }
 
     /**

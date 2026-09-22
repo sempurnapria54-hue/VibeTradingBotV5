@@ -60,15 +60,100 @@ final class Rows {
     private final String username;
     private final String password;
 
-    private Rows(PostgreSQLContainer container) {
-        this.jdbcUrl = container.getJdbcUrl();
-        this.username = container.getUsername();
-        this.password = container.getPassword();
+    private Rows(String jdbcUrl, String username, String password) {
+        this.jdbcUrl = jdbcUrl;
+        this.username = username;
+        this.password = password;
     }
 
     /** Наблюдатель строк общего субстрата. */
     static Rows shared() {
-        return new Rows(StatisticsSubstrate.database());
+        PostgreSQLContainer container = StatisticsSubstrate.database();
+        return new Rows(container.getJdbcUrl(), container.getUsername(), container.getPassword());
+    }
+
+    /**
+     * Заводит рядом ЧУЖУЮ базу и отдаёт наблюдателя её строк.
+     *
+     * <p><b>Ею ставится предусловие клетки об отсутствии чтения журнала:
+     * «журнал поднят рядом и доступен по сети».</b> Отрицание, стоящее на
+     * одной конфигурации («адрес базы в ней один»), сходится и там, где
+     * читать было нечего: оно утверждает о НАМЕРЕНИИ, а не о том, что
+     * доступное осталось непрочитанным. База рядом делает клейм
+     * непустым — её строка лежит, спрос к ней возможен, и предмет клетки
+     * ровно в том, что спроса не случилось
+     * (docs/architecture/services/statistics.md §«Чего не делает
+     * намеренно»).
+     *
+     * <p><b>Живёт она в ТОМ ЖЕ кластере, и это не экономия контейнера.</b>
+     * Перечень соединений {@code pg_stat_activity} общекластерный, поэтому
+     * спрос к соседней базе виден из своего соединения
+     * ({@link #clientBackendsIn}); второй контейнер потребовал бы
+     * наблюдателя, которого у ящика нет вовсе.
+     *
+     * <p><b>Заведение идемпотентно:</b> база субстрата общая всему прогону, и
+     * второй экземпляр того же класса застал бы соседку уже заведённой.
+     *
+     * @param database имя чужой базы
+     */
+    static Rows beside(String database) {
+        PostgreSQLContainer container = StatisticsSubstrate.database();
+        Rows own = shared();
+        if (own.number("select count(*) from pg_database where datname = ?", database)
+                .longValue() == 0L) {
+            own.execute("create database " + database);
+        }
+        return new Rows("jdbc:postgresql://" + container.getHost() + ":"
+                + container.getFirstMappedPort() + "/" + database,
+                container.getUsername(), container.getPassword());
+    }
+
+    /**
+     * Сколько КЛИЕНТСКИХ соединений к названной базе открыто сейчас.
+     *
+     * <p><b>Им читается «чужого подключения у процесса нет ни одного».</b>
+     * Пул соединений держит своё открытым до конца жизни контекста, поэтому
+     * ноль здесь есть утверждение о процессе, а не о моменте: соединение,
+     * однажды заведённое сервисом, никуда не исчезает.
+     *
+     * <p><b>Фоновые работники кластера из счёта изъяты, и это не
+     * послабление.</b> Timescale держит СВОЕГО планировщика заданий в каждой
+     * базе кластера — то есть у всякой базы есть одно подключение, которого
+     * никто из прогона не открывал. Счёт по {@code pg_stat_database} мерил бы
+     * его наравне с клиентским, и отрицание было бы ложным по построению;
+     * {@code backend_type} различает их точно.
+     *
+     * @param database имя базы
+     */
+    Long clientBackendsIn(String database) {
+        return number("select count(*) from pg_stat_activity"
+                + " where datname = ? and backend_type = 'client backend'", database);
+    }
+
+    /**
+     * Сколько раз названную таблицу ЧИТАЛИ — обходом либо индексом.
+     *
+     * <p><b>Ею читается та же половина отрицания, что и подключениями, но
+     * СЛЕДОМ, а не состоянием:</b> спрос, открывший соединение и закрывший
+     * его внутри клетки, счёт подключений оставил бы нулевым, а счёт чтений
+     * поднял бы. Клетка сравнивает два снимка и не зависит от того, застала ли
+     * она соединение живым.
+     *
+     * <p><b>Счёт привязан к ТАБЛИЦЕ, а не к базе, и это несущее:</b> счётчики
+     * транзакций базы двигает и фоновый работник кластера, а её таблицу
+     * читает только тот, кому она нужна.
+     *
+     * <p><b>Названная цена:</b> счётчик обновляется по концу транзакции с
+     * задержкой до секунды, и ошибка у него в сторону недосчёта — то есть в
+     * сторону ложной зелени. Компенсирует её первая половина отрицания:
+     * читатель, не оставивший следа в счётчике, обязан был бы оставить
+     * подключение.
+     *
+     * @param table имя таблицы
+     */
+    Long readsOf(String table) {
+        return number("select coalesce(sum(seq_scan), 0) + coalesce(sum(idx_scan), 0)"
+                + " from pg_stat_user_tables where relname = ?", table);
     }
 
     /** Опустошает все таблицы схемы: вход каждой клетки — своё состояние. */
@@ -136,6 +221,119 @@ final class Rows {
         } finally {
             execute("alter table " + table + PARKED_SUFFIX + " rename to " + table);
         }
+    }
+
+    /**
+     * Держит названную таблицу под замком, пока идёт тело, и отпускает его
+     * откатом.
+     *
+     * <p><b>Так выражается «проход УДЕРЖИВАЕТСЯ на порции» — вход клетки о
+     * перекрывающем такте.</b> Тропой ящика такого состояния не
+     * производится: проход идёт ровно столько, сколько ему нужно, и второй
+     * такт, поданный после него, перекрывающим не является вовсе. Замок
+     * останавливает проход на ЗАПИСИ порции — там, где он уже внутри охраны,
+     * — и оставляет его там на всё тело.
+     *
+     * <p><b>Отпускается замок ОТКАТОМ, а не фиксацией:</b> собственных строк
+     * тело не кладёт, и фиксация оставила бы за клеткой транзакцию, чей
+     * предмет — только замок.
+     *
+     * @param table таблица, которая на время тела заперта
+     * @param body  тело клетки
+     */
+    void withTableLocked(String table, Runnable body) {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "lock table " + table + " in access exclusive mode")) {
+                statement.execute();
+            }
+            try {
+                body.run();
+            } finally {
+                connection.rollback();
+            }
+        } catch (SQLException failure) {
+            throw new IllegalStateException("База субстрата не дала замка таблицы " + table,
+                    failure);
+        }
+    }
+
+    /**
+     * Сколько запросов СТОЯ́Т в очереди за замком названной таблицы.
+     *
+     * <p><b>Ею наблюдается, что проход уже внутри охраны.</b> Подать второй
+     * такт раньше значило бы измерить гонку: охрана пропускает перекрывающий
+     * тик только тогда, когда предыдущий её занял, и без этого ожидания
+     * зелёный исход был бы случайным.
+     *
+     * @param table таблица, за замком которой стои́т очередь
+     */
+    Long waitingLocksOn(String table) {
+        return number("select count(*) from pg_locks locks"
+                + " join pg_class relations on relations.oid = locks.relation"
+                + " where relations.relname = ? and not locks.granted", table);
+    }
+
+    /**
+     * Версии накатанных миграций в порядке применения.
+     *
+     * <p><b>Ими читается, что цепочка у сервиса СВОЯ и начинается со своего
+     * начала.</b> Каждый сервис монорепозитория ведёт свою цепочку, и первая
+     * её запись есть предъявление того, что чужих миграций в схему не
+     * приезжает (.claude/rules/pre-launch-schema-changes.md).
+     */
+    List<String> appliedMigrations() {
+        return rows("select version from " + MIGRATION_JOURNAL
+                + " where success order by installed_rank")
+                .stream()
+                .map(row -> String.valueOf(row.get("version")))
+                .toList();
+    }
+
+    /**
+     * Имена внешних ключей схемы: ими наблюдается их отсутствие.
+     *
+     * <p>Идентичности тенанта, биржевого счёта и определения стратегии
+     * принадлежат чужим сервисам, и реестра, на который можно сослаться, у
+     * владельца проекции нет ни одного
+     * (docs/architecture/data-ownership.md).
+     */
+    List<String> foreignKeyNames() {
+        return rows("select constraint_name from information_schema.table_constraints"
+                + " where table_schema = 'public' and constraint_type = 'FOREIGN KEY'"
+                + " order by constraint_name")
+                .stream()
+                .map(row -> String.valueOf(row.get("constraint_name")))
+                .toList();
+    }
+
+    /** Имена гипертаблиц схемы: ими наблюдается, какие таблицы режутся кусками. */
+    List<String> hypertableNames() {
+        return rows("select hypertable_name from timescaledb_information.hypertables").stream()
+                .map(row -> String.valueOf(row.get("hypertable_name")))
+                .toList();
+    }
+
+    /**
+     * Гипертаблицы, у которых заведена политика глубины хранения.
+     *
+     * <p><b>Ею читается ОТСУТСТВИЕ глубины у агрегатов.</b> Политика живёт
+     * не в схеме таблицы, а отдельной работой планировщика Timescale, и по
+     * составу колонок её не видно вовсе; перечень работ отвечает на вопрос
+     * прямо.
+     *
+     * <p><b>Работы БЕЗ гипертаблицы отброшены, и это не сужение предмета.</b>
+     * Расширение держит собственную чистку своей же истории заданий, и по
+     * имени она тоже «retention»; предметом она не является — чистит она
+     * наблюдателя, а не наблюдаемое. Признак механический: у политики над
+     * нашей таблицей имя этой таблицы стои́т в самой работе.
+     */
+    List<String> retentionPolicyTables() {
+        return rows("select hypertable_name from timescaledb_information.jobs"
+                + " where proc_name like '%retention%' and hypertable_name is not null").stream()
+                .map(row -> String.valueOf(row.get("hypertable_name")))
+                .toList();
     }
 
     /** Число строк таблицы. */
@@ -279,6 +477,57 @@ final class Rows {
                         + " where hypertable_name = ? and range_start <= ? and range_end > ?",
                 hypertable, moment, moment);
         return found.isEmpty() ? Map.of() : found.getFirst();
+    }
+
+    /**
+     * Обнуляет счётчик запросов базы: с этого момента он считает ОДИН
+     * проход.
+     *
+     * <p><b>Обнуление обязательно, а не гигиенично.</b> Счётчик живёт у
+     * базы, а база субстрата общая всему прогону: без обнуления клетка
+     * считала бы свой проход вместе с проходами соседних классов и получала
+     * бы число, зависящее от порядка обхода.
+     *
+     * <p><b>Расширение заводится здесь, а не миграцией сервиса:</b> оно
+     * принадлежит наблюдателю, а не предмету. Подгружает его субстрат
+     * ({@link StatisticsSubstrate}), без чего счётчик не существует вовсе.
+     */
+    void resetStatementCounters() {
+        execute("create extension if not exists pg_stat_statements");
+        execute("select pg_stat_statements_reset()");
+    }
+
+    /**
+     * Сколько раз база исполнила запросы, чей текст накрыт образцом.
+     *
+     * <p><b>Текст у счётчика НОРМАЛИЗОВАН</b> — литералы и аргументы
+     * заменены позиционными метками, — поэтому образец берёт имя таблицы и
+     * форму запроса, а не значения его границ.
+     *
+     * <p><b>Сравнение идёт по нижнему регистру, и образец пишется строчными.</b>
+     * Регистр слов запроса выбирает тот, кто его сложил: каркас отображения
+     * пишет свои команды строчными, а рукописный запрос репозитория — как
+     * написан. Образец, зависящий от регистра, мерил бы эту случайность.
+     *
+     * @param pattern образец текста запроса в форме {@code like}
+     */
+    Long statementCalls(String pattern) {
+        return number("select coalesce(sum(calls), 0) from pg_stat_statements"
+                + " where lower(query) like ?", pattern);
+    }
+
+    /**
+     * Сколько ВСЕГО строк вернули эти запросы за все свои исполнения.
+     *
+     * <p><b>Ею читается ОБЪЁМ выдачи</b>: группировка, выполненная в базе,
+     * отдаёт по строке на ключ зерна суток, а вычитанные в память факты
+     * дали бы строку на факт.
+     *
+     * @param pattern образец текста запроса в форме {@code like}
+     */
+    Long statementRows(String pattern) {
+        return number("select coalesce(sum(rows), 0) from pg_stat_statements"
+                + " where lower(query) like ?", pattern);
     }
 
     private Long number(String sql, Object... arguments) {

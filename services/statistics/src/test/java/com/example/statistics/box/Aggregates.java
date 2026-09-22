@@ -70,7 +70,7 @@ final class Aggregates {
                  result_before_funding_sum, net_result_sum, fee_sum, funding_sum,
                  liquidation_penalty_sum, win_result_sum, loss_result_sum,
                  planned_risk_sum, planned_risk_excluded_sum, r_sum, assembled_at)
-            values (?, ?, ?, ?, ?,
+            values (?, ?, cast(? as varchar), ?, cast(? as varchar),
                     ?, 0, 0, 0, 0,
                     0, 0, 0,
                     0, 0, 0,
@@ -83,6 +83,28 @@ final class Aggregates {
             """;
 
     private Aggregates() {
+    }
+
+    /**
+     * Кладёт строку сделочного зерна с ПУСТЫМИ законно-пустыми ключами.
+     *
+     * <p><b>Ею мерится, что уникальность зерна считает пустые значения
+     * ОДИНАКОВЫМИ</b> (docs/rules/idempotency-via-unique.md): без клаузы
+     * {@code nulls not distinct} вторая такая строка прошла бы, и проекция
+     * росла бы по строке на каждый прогон пересчёта.
+     *
+     * <p><b>Пустые компоненты кладутся с явным приведением типа</b>: драйвер
+     * выводит тип пустого аргумента из метаданных, а не из цели, и без
+     * приведения вставка отвергается прежде, чем дойдёт до предмета клетки.
+     *
+     * @param tenantId    тенант зерна
+     * @param bucketDate  сутки зерна
+     * @param assembledAt момент сборки
+     */
+    static void dealRowWithEmptyKeys(String tenantId, LocalDate bucketDate,
+                                     OffsetDateTime assembledAt) {
+        Rows.shared().write(INSERT_DEAL_AGGREGATE, tenantId, Facts.ACCOUNT, null,
+                bucketDate, null, STALE_CLOSED_DEALS, assembledAt);
     }
 
     /**

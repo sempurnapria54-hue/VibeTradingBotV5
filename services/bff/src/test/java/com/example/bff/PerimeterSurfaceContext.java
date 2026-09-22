@@ -23,7 +23,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -43,8 +43,17 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
  * клиент владельца членств: у первого своя проверка у провайдера, второй
  * есть чужая поверхность. Поведение периметра — билет, контекст, окно
  * потока — считается настоящим.
+ *
+ * <p><b>{@code @TestConfiguration}, а не {@code @Configuration}, и это не
+ * вкусовая правка.</b> Класс лежит в пакете приложения, и обычная
+ * конфигурация попадает под сканирование компонентов: с появлением
+ * чёрного ящика ({@code com.example.bff.box}) её бины начали приезжать в
+ * КАЖДЫЙ контекст {@code @SpringBootTest} и сталкиваться с настоящими —
+ * контекст не поднимался вовсе. {@code @TestConfiguration} сканированием
+ * не берётся, а явное перечисление {@code @ContextConfiguration(classes
+ * = …)} работает по-прежнему.
  */
-@Configuration
+@TestConfiguration
 @EnableWebMvc
 @EnableWebSecurity
 @Import(SecurityConfig.class)
