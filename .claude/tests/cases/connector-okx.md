@@ -56,7 +56,7 @@ demo-площадка. Кейс, гоняемый на обеих, стои́т 
 номером**: предусловия и подтверждение у них разные, а предмет один.
 
 **Мишень `-D` в пайплайн не входит** и идёт по расписанию и по запросу
-(концепция шага — `.claude/work/progress/phase-2-step-12-chronicle.md`
+(концепция шага — `docs/concepts/testing.md`
 §«3. Интеграционные — только против биржи, только коннектор»). Её
 предусловие — ключи demo-окружения и распечатанный Vault; они обещаны
 держателем к под-шагу 3, и до них **ни один кейс `-D` не прогоняется**.
@@ -1224,6 +1224,6 @@ B5.4, B6.4, B6.5, B7.5, B7.6, B7.8, B8.2, B8.6, B10.4, B10.5** —
 - Форма кейса и три уровня — `.claude/skills/test-design.md`.
 - Контур: чем достаются выходы — `.claude/decisions/test-contour-design-pass.md`.
 - Материал кейсов: периметр, инвариант прогона, тропа находки — `.claude/tests/case-material/connector-okx.md`.
-- Концепция шага — `.claude/work/progress/phase-2-step-12-chronicle.md` §«Концепция».
+- Концепция шага — `docs/concepts/testing.md`.
 - Роль — `.claude/agents/tester.md`; ревью кейсов — `.claude/skills/test-review.md`.
 - Предмет — `docs/architecture/services/connector-okx.md`, `docs/components/IntegrationService.md`.

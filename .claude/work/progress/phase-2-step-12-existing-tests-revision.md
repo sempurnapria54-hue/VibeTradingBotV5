@@ -11,7 +11,7 @@
 (`.claude/decisions/test-contour-design-pass.md` §«Перечень предметов и
 порядок работы»): концепция требует прогнать существующий набор критерием
 чистой логики и назвать тесты, закрепляющие структуру
-(`.claude/work/progress/phase-2-step-12-chronicle.md` §«2. Юнит-тесты —
+(`docs/concepts/testing.md` §«2. Юнит-тесты —
 только чистая логика»). Форма ревизии — **инвентарь с исходом на класс**, а
 не документ кейсов.
 
@@ -306,8 +306,7 @@ diff <(find services -path '*/src/test/java/*' -name '*.java' \
 ## Связи
 
 - Перечень предметов и порядок — `.claude/decisions/test-contour-design-pass.md`.
-- Концепция уровней — `.claude/work/progress/phase-2-step-12-chronicle.md`
-  §«Концепция».
+- Концепция уровней — `docs/concepts/testing.md`.
 - Форма кейсовых документов — `.claude/skills/test-design.md`.
 - Правило тестов доменных моделей — `.claude/rules/codestyle.md`
   §«Тесты доменных моделей».

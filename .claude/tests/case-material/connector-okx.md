@@ -138,8 +138,7 @@ backoff и повтор; ожидание осадки — поллинг до �
 
 ## Связи
 
-- Концепция тестового шага — `.claude/work/progress/phase-2-step-12-chronicle.md`
-  §«Концепция».
+- Концепция тестирования — `docs/concepts/testing.md`.
 - Форма кейса — `.claude/skills/test-design.md`; ревью кейсов —
   `.claude/skills/test-review.md`; код тестов — `.claude/skills/test-code.md`.
 - Почему контур снят — `.claude/decisions/source-api-contour-retired.md`.

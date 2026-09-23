@@ -1556,7 +1556,7 @@ mvn -o -am -pl services/market-data test -Dtest='com.example.marketdata.box.*Tes
 
 - Форма кейса и три уровня — `.claude/skills/test-design.md`.
 - Контур: чем достаются выходы — `.claude/decisions/test-contour-design-pass.md`.
-- Концепция шага — `.claude/work/progress/phase-2-step-12-chronicle.md` §«Концепция».
+- Концепция шага — `docs/concepts/testing.md`.
 - Роль — `.claude/agents/tester.md`; ревью кейсов — `.claude/skills/test-review.md`.
 - Предмет — `docs/architecture/services/market-data.md`,
   `docs/architecture/market-data-collection.md`.

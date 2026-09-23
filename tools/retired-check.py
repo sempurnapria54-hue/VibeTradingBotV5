@@ -239,6 +239,37 @@ OUT_OF_AREA_SUFFIXES = {
 #                снималась.
 RETIRED = [
     {
+        'name': 'носитель концепции — раздел «Концепция» хроники шага',
+        # Снято решением держателя 2026-09-22 (тип «концепция предмета»,
+        # .claude/decisions/concept-doc-type.md). Прежняя редакция делала
+        # носителем намерения раздел хроники шага — файла, который по своему
+        # вопросу держит заходы и их исходы, и намерение в нём смешивалось
+        # с «как». Что действует теперь — объявляет ключ `arrived`.
+        'pattern': r'носител[а-яё]*\s+концепции\s+—\s+раздел\s+«Концепция»\s+хроники\s+шага',
+        'arrived': r'docs/concepts/',
+        'date': '2026-09-22',
+        'source': 'решение держателя 2026-09-22 (.claude/decisions/concept-doc-type.md)',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/decisions/concept-doc-type.md'),
+        'population': (
+            ('.claude/processes/roadmap-step-execution.md', None),
+            ('.claude/skills/concept-review.md', None),
+            ('.claude/skills/update-roadmap-progress.md', None),
+            ('.claude/rules/session-work-unit.md', r'док\w*\s+концепции\s+темы'),
+            ('.claude/agents/tester.md', None),
+            ('.claude/agents/code-writer.md', None),
+            ('.claude/skills/test-design.md', None),
+            ('.claude/skills/test-review.md', None),
+            ('.claude/work/roadmap/phase-2.md', None),
+            ('.claude/work/backlog.md', None),
+            ('.claude/work/questions/open-questions.md', None),
+            ('.claude/tests/case-material/connector-okx.md', None),
+            ('.claude/decisions/test-contour-design-pass.md', None),
+            ('.claude/decisions/source-api-contour-retired.md', None),
+            ('.claude/chat/chat-project-instructions.md', None),
+        ),
+    },
+    {
         'name': 'следующий шаг берёт следующая сессия',
         # Снято решением держателя 2026-09-11 (остановка цикла на границе
         # шага). Прежняя редакция вела цикл через границу закрытого шага

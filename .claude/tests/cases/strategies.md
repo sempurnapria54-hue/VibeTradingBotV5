@@ -1251,7 +1251,7 @@ F-6.
 
 - Форма кейса и три уровня — `.claude/skills/test-design.md`.
 - Контур: чем достаются выходы — `.claude/decisions/test-contour-design-pass.md`.
-- Концепция шага — `.claude/work/progress/phase-2-step-12-chronicle.md` §«Концепция».
+- Концепция шага — `docs/concepts/testing.md`.
 - Роль — `.claude/agents/tester.md`; ревью кейсов — `.claude/skills/test-review.md`.
 - Предмет — `docs/architecture/services/strategies.md`,
   `docs/rules/strategy-validation.md`, `docs/lifecycles/Strategy.md`,

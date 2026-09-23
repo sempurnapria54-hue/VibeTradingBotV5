@@ -14,7 +14,7 @@
 тест-обращённой поверхности (`/raw`-passthrough) в сервисах не строится.**
 
 Решение — продолжение пересмотра границы концепции того же дня
-(`.claude/work/progress/phase-2-step-12-chronicle.md` §«Пересмотр
+(`docs/concepts/testing.md` §«Пересмотр
 границы»): пока оговорка «контур API источника — свой процесс» стояла,
 контур был вторым предметом со своей ролью, своим процессом и своим
 гейтом; со снятием оговорки второго предмета нет.
@@ -91,8 +91,7 @@
 
 ## Связи
 
-- Концепция шага и пересмотр границы —
-  `.claude/work/progress/phase-2-step-12-chronicle.md`.
+- Концепция тестирования и пересмотр границы — `docs/concepts/testing.md`.
 - Машина шага и конец фазы — `.claude/processes/roadmap-step-execution.md`.
 - Материал кейсов — `.claude/tests/case-material/connector-okx.md`.
 - Факты среды — `.claude/skills/environment-commands.md`.
