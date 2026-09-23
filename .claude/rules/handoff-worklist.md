@@ -1,3 +1,9 @@
+---
+paths:
+  - ".claude/work/backlog.md"
+  - ".claude/work/prod-checks.md"
+  - ".claude/work/questions/**"
+---
 # Перечень работ для чужого захода
 
 ## На какой вопрос отвечает этот файл

@@ -1,3 +1,10 @@
+---
+paths:
+  - ".claude/skills/place-knowledge.md"
+  - ".claude/processes/knowledge-classification.md"
+  - ".claude/knowledge-tree.md"
+  - ".claude/work/questions/**"
+---
 # Отчёт о классификации знания
 
 ## На какой вопрос отвечает этот файл

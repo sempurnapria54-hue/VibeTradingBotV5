@@ -1,3 +1,10 @@
+---
+paths:
+  - "services/**/src/main/resources/db/**"
+  - "docs/models/**"
+  - ".claude/work/prod-checks.md"
+  - ".claude/work/roadmap/prod-gate.md"
+---
 # Схемные изменения до запуска проекта
 
 ## На какой вопрос отвечает этот файл

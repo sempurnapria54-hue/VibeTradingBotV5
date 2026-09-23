@@ -239,6 +239,42 @@ OUT_OF_AREA_SUFFIXES = {
 #                снималась.
 RETIRED = [
     {
+        'name': 'среда снапшота — отсылкой к прежнему снапшоту',
+        # Снято решением держателя 2026-09-23 (снапшот без хвоста,
+        # .claude/decisions/snapshot-without-tail.md). Прежняя редакция
+        # правила формата отсылала раздел среды к прежнему снапшоту, то есть
+        # делала цепочку снапшотов носителем действующих фактов среды. Что
+        # действует теперь — объявляет ключ `arrived`.
+        'pattern': r'отсылкой\s+к\s+прежнему\s+снапшоту',
+        'arrived': r'указателем\s+на\s+дом\s+фактов\s+среды',
+        'date': '2026-09-23',
+        'source': 'решение держателя 2026-09-23 (.claude/decisions/snapshot-without-tail.md)',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/decisions/snapshot-without-tail.md'),
+        'population': (
+            ('.claude/rules/snapshot-format.md', None),
+        ),
+    },
+    {
+        'name': 'ядро rules/ опознаётся отсутствием шапки',
+        # Снято решением держателя 2026-09-23 (второй заход ярусного разделения,
+        # .claude/decisions/rules-tiering.md). Прежняя редакция относила к ядру
+        # всякий файл каталога правил без шапки — новое правило попадало в ядро
+        # умолчанием, и ни один прогон этого не видел. Что действует теперь —
+        # объявляет ключ `arrived`.
+        'pattern': r'[Яя]др[а-яё]*(?:\*\*)?\s+(?:—\s+)?(?:правил[а-яё]*\s+)?без\s+frontmatter',
+        'arrived': r'tier:\s*core',
+        'date': '2026-09-23',
+        'source': 'решение держателя 2026-09-23 (.claude/decisions/rules-tiering.md)',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/decisions/rules-tiering.md'),
+        'population': (
+            ('.claude/rules/structure.md', None),
+            ('.claude/knowledge-tree.md', None),
+            ('.claude/decisions/rules-tiering.md', None),
+        ),
+    },
+    {
         'name': 'носитель концепции — раздел «Концепция» хроники шага',
         # Снято решением держателя 2026-09-22 (тип «концепция предмета»,
         # .claude/decisions/concept-doc-type.md). Прежняя редакция делала

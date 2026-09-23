@@ -1,3 +1,12 @@
+---
+paths:
+  - "docs/integrations/**"
+  - "docs/models/integrations/**"
+  - ".claude/chat/**"
+  - ".claude/tests/case-material/**"
+  - ".claude/processes/api-docs-completion.md"
+  - ".claude/skills/integration-okx.md"
+---
 # Синхронизация файлов с внешним источником правды
 
 ## На какой вопрос отвечает этот файл
