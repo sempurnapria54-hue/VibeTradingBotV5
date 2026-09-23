@@ -22,15 +22,9 @@ payload-классов («Сервисные команды» §13, §10). Ра�
   Отдельного агрегирующего файла payload'ов нет — прежнее рабочее
   решение «один `ServiceCommandPayload.md` с разделами»
   отменяется.
-- **Четыре refresh-executor'а** (`REFRESH_PENDING_ORDERS` /
-  `REFRESH_ALGO_ORDERS` / `REFRESH_ORDER_HISTORY` /
-  `REFRESH_ALGO_ORDER_HISTORY`), не имевшие отдельных секций в
-  источнике, отдельными файлами не заводятся (покрыты общей
-  семантикой `REFRESH_*` и `ServiceCommandType`).
-  **Обновление (CMD-Q3, 2026-06-10):** эти четыре команды сняты из
-  `ServiceCommandType` вовсе — их эндпоинты стали звеньями внутреннего
-  evidence-cycle entity-refresh-команд
-  (`docs/rules/command-lifecycle.md`).
+- **Четыре refresh-executor'а** отдельными файлами не заводятся; после
+  CMD-Q3 (2026-06-10) их команд нет вовсе — действующий состав живёт в
+  `docs/components/models/ServiceCommand.md` §«Енум `ServiceCommandType`».
 
 ## Обоснование
 
@@ -58,11 +52,9 @@ payload-классов («Сервисные команды» §13, §10). Ра�
 ## Отложенный подвопрос (закрыт)
 
 CMD-Q2 (общий базовый тип/дискриминатор payload'ов + судьба
-`ServiceCommandPayload.md`) закрыт на `GAPS_CLOSE_1` шага 4 (2026-06-10)
-решением `docs/components/models/ServiceCommandPayload.md`: маркер-база
-`ServiceCommandPayload` (без поведения), дискриминатор — `ServiceCommandType`
-на команде, `ServiceCommandPayload.md` — дом базового типа. Payload-разделы
-перенесены к своим executor'ам.
+`ServiceCommandPayload.md`) закрыт на `GAPS_CLOSE_1` шага 4 (2026-06-10).
+Итог живёт в `docs/components/models/ServiceCommandPayload.md`
+§Назначение.
 
 ## Закрытие вопроса
 

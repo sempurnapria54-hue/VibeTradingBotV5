@@ -27,16 +27,9 @@ lifecycle.
 - Handler-per-status — отдельный компонент
   `docs/components/<Handler>.md` (PascalCase, имя совпадает с
   Java-классом).
-- Lifecycle Deal — по разделу на статус: назначение статуса,
-  инварианты, переходы, recovery-переходы; ссылка на
-  handler-компонент.
-- Общая конструкция handler'а (3 типа проверок — входные / рабочая
-  логика / выходные, Ф41) — раздел
-  `docs/components/DealStateMachine.md` (оркестратор владеет
-  конструкцией своих handler'ов).
-- Связь односторонняя: lifecycle ссылается на handler; handler на
-  lifecycle не ссылается (по аналогии с `component-vs-process.md` и
-  `runtime-value-object.md` — зависимости сверху вниз).
+- Раздел lifecycle на статус, общая конструкция handler'а у оркестратора и
+  односторонняя связь живут в `.claude/skills/classify-type.md`
+  §«FSM-handler vs раздел lifecycle».
 
 ## Альтернативы
 
@@ -53,12 +46,9 @@ lifecycle.
 
 ## Следствия
 
-- В `.claude/skills/classify-type.md` добавлен раздел «FSM-handler
-  vs раздел lifecycle» в признаки различения близких типов.
-- При миграции Deal: handler'ы (`PrecheckHandler`, …,
-  `ErrorHandler`) — каждый в свой `docs/components/<Handler>.md`;
-  lifecycle Deal — по разделу на статус со ссылками на handler'ы;
-  конструкция handler'а (3 проверки) — раздел `DealStateMachine.md`.
+- Живёт в `docs/components/`: компонент-доки обработчиков
+  (`Tranche*Handler.md`, `DealActiveHandler.md`, …), конструкция —
+  `docs/components/DealTrancheStateMachine.md`.
 - Уточняет NQ-D (гранулярность компонентов) на handler-per-status —
   даёт первый прецедент: компонент 1:1 с элементом структуры
   объекта-владельца допустим.

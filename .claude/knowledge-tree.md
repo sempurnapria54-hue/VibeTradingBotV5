@@ -51,46 +51,48 @@
 │   │   ├── audit-statistics-split.md — Почему `audit-statistics` разводится на два сервиса, а не остаётся одним процессом?
 │   │   ├── backlog-machine-form.md — Почему бэклог получил машинно-читаемое условие возврата и энфорсер, а не очередную чистку?
 │   │   ├── case-review-approval-criterion.md — Почему у ревью кейсов появился критерий остановки — валидность кейса, а не исчерпанность находок, — и граница в три круга?
-│   │   ├── chat-vs-cc-knowledge-split.md — Как разделено знание по адресатам — чат vs Claude Code?
-│   │   ├── client-layer-docs.md — Где живут exchange-specific факты?
+│   │   ├── chat-vs-cc-knowledge-split.md — Почему знание разделено по адресатам — чат и Claude Code?
+│   │   ├── client-layer-docs.md — Почему exchange-specific факты были выделены в отдельный каталог?
 │   │   ├── code-templates-vs-examples.md — Почему код-шаблоны и find-code-examples — два разных инструмента?
-│   │   ├── component-vs-process.md — Как различать «компонент» и «процесс» при классификации?
+│   │   ├── component-vs-process.md — Почему исполнитель выделен в отдельный тип знания — «компонент»?
 │   │   ├── concept-doc-type.md — Почему концепция получила свой тип документов с предметом «сервис или сквозная тема», а не осталась разделом хроники шага?
 │   │   ├── context-cost-diet.md — Почему контекстная стоимость знаниевых файлов сокращена именно так?
-│   │   ├── cross-cutting-parking.md — Как мигрируем сущность, чьё знание частично относится к другим кластерам?
+│   │   ├── cross-cutting-parking.md — Почему при миграции знание чужих кластеров паркуется, а не материализуется сразу?
+│   │   ├── decision-holds-only-fork.md — Почему решение держит только развилку, ссылка из рантайма ведёт в него только за доводом, а дайджест стал журналом?
 │   │   ├── executor-payload-file-granularity.md — Почему документация command-layer гранулируется file-per-executor?
-│   │   ├── forward-notes-after-task-closure.md — Где живут форвард-заметки после закрытия задачи-источника?
+│   │   ├── forward-notes-after-task-closure.md — Почему форвард-заметки после закрытия задачи-источника уходят в архив с указателями?
 │   │   ├── fsm-handler-as-component.md — Где живёт handler-per-status FSM-сущности?
 │   │   ├── history-artifact-date.md — Почему дата в имени артефакта `history/` — дата закрытия единицы, а не её начала?
 │   │   ├── integrator-agent.md — Почему интеграционное знание внешних источников введено именно так?
 │   │   ├── knowledge-classification.md — Почему фиксация знания устроена через пятишаговую классификацию?
 │   │   ├── master-index-not-fixated.md — Почему не сохраняем master-index/навигационные доки как знание?
 │   │   ├── message-layer-split.md — Почему внутренняя шина получила свой слой, а не осталась в `integration`?
-│   │   ├── migration-triad.md — По какому принципу фиксируем фрагменты при миграции из исчезающего источника?
-│   │   ├── model-granularity.md — Что считать самостоятельной доменной моделью, а что разделом родителя?
-│   │   ├── model-layer-ontology.md — Как организованы доменные и интеграционные модели в docs/models/?
-│   │   ├── models-core-vs-other.md — Как разделены persisted-модели на core и other?
+│   │   ├── migration-triad.md — Почему фрагменты при миграции из исчезающего источника фиксируются по триаде принципов?
+│   │   ├── model-granularity.md — Почему самостоятельной моделью считается бизнес-самостоятельная сущность, а прочее — разделом родителя?
+│   │   ├── model-layer-ontology.md — Почему модельное и биржевое знание разложено по слою модели, а не по природе источника?
+│   │   ├── models-core-vs-other.md — Почему persisted-модели были разделены на core и other?
 │   │   ├── monorepo-restructuring-in-place.md — Почему монорепозиторий строится из текущего репозитория, а не заводится новым?
 │   │   ├── negative-statements-not-fixated.md — Почему не фиксируем утверждения «X не хранит Y»?
-│   │   ├── process-materialization-criterion.md — По какому критерию кандидат в процесс материализуется файлом?
+│   │   ├── process-materialization-criterion.md — Почему кандидат в процесс материализуется файлом по двухусловному критерию?
 │   │   ├── prod-checks-split.md — Почему позиции, ждущие продовской среды, вынесены из бэклога в перечень проверок на проде?
 │   │   ├── product-roadmap-type.md — Почему тип «роадмап» устроен так, а не иначе?
 │   │   ├── reception-executor-design-pass.md — Почему по эскалации С1 `DOCS_CHECK_4` шага 10 фазы 2 закрытие переведено на цельный дизайн-проход по форме исполнителя приёма событий?
 │   │   ├── recovered-deal-linkage-window-bound.md — Почему нижней границей окна линковки восстановленной сделки выбрано биржевое время открытия наблюдённой позиции?
 │   │   ├── risk-base-follows-balance.md — Почему база риска следует за балансом в обе стороны, а не держится невозрастающей?
 │   │   ├── roadmap-rebuild-for-service-platform.md — Почему роадмап пересобран: фаза 1 растворена, рубеж до прода, фазы 2-8?
-│   │   ├── rule-source-of-truth.md — Где первоисточник правила, когда оно ложится в несколько мест?
+│   │   ├── rule-source-of-truth.md — Почему первоисточником правила, ложащегося в несколько мест, выбран его владелец?
 │   │   ├── rules-tiering.md — Почему каталог `.claude/rules/` разделён на ядро и правила со scope, а не грузится в контекст целиком?
 │   │   ├── runtime-value-object.md — Где живут runtime-объекты компонентного слоя?
 │   │   ├── security-perimeter-design-pass.md — Почему по эскалации `DOCS_CHECK_3` шага 9 сменена рамка узла на цельный дизайн-проход?
 │   │   ├── service-architecture-design-pass.md — Почему сервисная конструкция под новое видение собрана так, а не иначе?
 │   │   ├── session-wait-and-continuation.md — Почему ожидание прогона идёт одним вызовом, а сессия внутри единицы продолжает группой за группой?
 │   │   ├── snapshot-without-tail.md — Почему снапшот обязан отвечать на «где мы сейчас» сам, без отсылок к прежним снапшотам?
-│   │   ├── source-api-contour-retired.md — Почему контур тестов API источника снят как отдельный процесс и что из него сохранено?
+│   │   ├── source-api-contour-retired.md — Почему контур тестов API источника снят как отдельный процесс?
 │   │   ├── step-machine-rework.md — Почему машина шага заменена: концепция держателя, код и доки CC, апрув держателя?
 │   │   ├── test-contour-design-pass.md — Почему контур тестов фазы 2 устроен так, а не иначе?
 │   │   ├── test-step-pace-measures.md — Почему единица под-шага кода тестов — ящик или модуль, перепроверка идёт субагентом, а диета правил и слияние кейса с прогоном отложены до названных триггеров?
 │   │   ├── trading-council.md — Почему торговое знание введено в пайплайн именно так?
+│   │   ├── trap-index.md — Почему раздел ловушек дома держит только оглавление, а тела ловушек живут отдельными файлами по адресу?
 │   │   └── unorderable-fact-substitutes.md — Почему гейтящее предусловие на незаказуемом факте закрывается заменителями?
 │   ├── library/ — Что говорят внешние первоисточники?
 │   │   └── trading/
@@ -205,6 +207,21 @@
 │   │       ├── trading-core-risk.md — Какие тест-кейсы у слоя преконтроля риска и карты его реакций?
 │   │       ├── trading-core-safety.md — Какие тест-кейсы у слоя защитных ступеней торгового ядра?
 │   │       └── trading-core.md — Какие тест-кейсы у сервиса `trading-core`?
+│   ├── traps/ — Как узнать и обойти ловушку в области этого дома? (тела ловушек; оглавление — в разделе ловушек самого дома)
+│   │   ├── backlog-section-form-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/backlog-section-form.md`?
+│   │   ├── carrier-levels-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/carrier-levels.md`?
+│   │   ├── codestyle-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/codestyle.md`?
+│   │   ├── edit-kind-obligations-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/edit-kind-obligations.md`?
+│   │   ├── environment-commands-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/skills/environment-commands.md`?
+│   │   ├── measurement-commands-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/measurement-commands.md`?
+│   │   ├── self-description-form-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/self-description-form.md`?
+│   │   ├── session-chain-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/skills/session-chain.md`?
+│   │   ├── snapshot-format-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/snapshot-format.md`?
+│   │   ├── structure-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/rules/structure.md`?
+│   │   ├── test-code-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/skills/test-code.md`?
+│   │   ├── test-design-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/skills/test-design.md`?
+│   │   ├── test-review-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/skills/test-review.md`?
+│   │   └── update-roadmap-progress-traps.md — Как узнать и обойти ловушку, которую собрал дом `.claude/skills/update-roadmap-progress.md`?
 │   └── work/ — В каком состоянии исполнительная работа?
 │       ├── backlog.md — Что мы планируем сделать?
 │       ├── prod-checks.md — Что проверить в проде?

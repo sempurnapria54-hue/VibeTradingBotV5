@@ -2,7 +2,8 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как разложено по каталогам `docs/models/` модельное и биржевое знание.
+Почему модельное и биржевое знание разложено по слою модели, а не по
+природе источника.
 
 ## Контекст
 
@@ -28,29 +29,20 @@
 ### Принцип
 
 Модели документируются по слою. `docs/models/` организован по слоям.
-Бизнес-логика всегда выполняется на доменной модели: мапим в домен
-→ выполняем логику → при необходимости мапим обратно. Сквозное
-правило — `.claude/rules/codestyle.md`.
+Выполнение бизнес-логики на доменной модели живёт в
+`.claude/rules/codestyle.md` §«Rich-доменные модели».
 
 ### Цепочка слоёв
 
-```text
-integrations/{name}  →  externalSnapshot  →  domain  →  persistence
-                                              ↓
-                                            rest
-```
-
-Каждый слой — отдельный тир `docs/models/`, со своим типом моделей и
-своим вопросом.
+Живёт в `.claude/rules/structure.md` §«Таблица размещения», строки
+`docs/models/*`.
 
 ### Слои
 
-- **`docs/models/integrations/{name}/`** — нативные модели внешнего
-  источника. Один источник = один `{name}`. Для биржи — `okx`,
-  `binance` (будущий); для не-биржевых сервисов — по имени сервиса.
-  Файл = инвентарь полей источника (имя, тип, семантика, used/
-  unused). PascalCase, имя совпадает с DTO источника.
-  Маппинг «native → externalSnapshot» **не здесь** — в `mapping/`.
+Действующие слои — нативные модели источника, доменные `core`,
+`aggregate`, `other` и модель API — живут в `.claude/rules/structure.md`
+§«Таблица размещения», строки `docs/models/integrations/{name}/`,
+`docs/models/domain/*`, `docs/models/api/`.
 
 **Два слоя-скаффолда сняты (`GAPS_CLOSE_28`, N7).** Каталоги
 `docs/models/externalSnapshot/` и `docs/models/persistence/` так и не
@@ -74,56 +66,19 @@ integrations/{name}  →  externalSnapshot  →  domain  →  persistence
   самостоятельного содержания (валидация в конструкторе, нетривиальная
   структура и т. п.); иначе — пустой каталог-скаффолд.
 
-- **`docs/models/domain/core/`** — торговая модель с биржевым
-  воплощением. Текущий состав: `Position`, `Order`, `AlgoOrder`,
-  `BalanceContainer`; reference-core `Instrument`, `Exchange`
-  (добавлены в `GAPS_CLOSE_1` шага 1 — дискриминатор «биржевое
-  воплощение» / идентичность; классификация на ревью, см.
-  `.claude/work/history/2026-05-31-phase-1-step-1-market-data-flow/phase-1-step-1-gaps-close-1.md`).
-
-- **`docs/models/domain/aggregate/`** — сущность без биржевой
-  привязки, нужная для торговли. Текущий состав: `Deal`, `Strategy`.
-
-- **`docs/models/domain/other/`** — прочая хранимая модель (свечи,
-  индикаторы, аудит, инструмент-rules, market structure / phase).
-
 - **`docs/models/persistence/`** (снят) — модель хранимого слоя
   (entity-классы / jsonb-снимки / persistence-проекции). На момент
   введения слой пуст — скаффолд.
 
-- **`docs/models/api/`** — модель API нашего сервиса (request /
-  response DTO нашего API). На момент введения слой пуст — скаффолд.
-
 ### Маппинг — со-локированный тип под `models/`
 
-`docs/models/mapping/<Сущность>.md` — один файл на доменную сущность,
-несёт переходы между слоями для этой сущности:
-
-- `native → externalSnapshot` (таблица полей; источники подразделами,
-  если их несколько);
-- `externalSnapshot → domain` (материализация в домен);
-- `domain → request` (если применимо: формирование request body /
-  параметров операций источника);
-- статус-резолвер (`externalStatus → domain.Status`).
-
-Per-source детали — подразделами внутри одного файла (`## OKX`,
-`## Binance`); source-agnostic ядро (`externalSnapshot ↔ domain`)
-живёт один раз. Имя файла — PascalCase, как доменная сущность.
+Живёт в `.claude/rules/structure.md` §«Таблица размещения», строка
+`docs/models/mapping/`.
 
 ### Не-модельное биржевое знание — вне `models/`
 
-`docs/integrations/{name}/`:
-
-- **`contracts/`** — контракт + лимиты источника: endpoints,
-  permissions, rate limits, ACK-семантика (`sCode=0` ≠ runtime
-  truth; создание/amend/cancel response), пагинация. Один файл на
-  ресурс/тему (`order.md`, `algo-order.md`, `position.md`,
-  `balance.md`, `candle.md`, `fills.md`, `fills-archive.md`,
-  `account-bills.md`, `service-urls.md` и т. п.).
-- **`rules/`** — правила источника: инварианты и конвенции,
-  специфичные для этого источника. Например: reduce-only invariant,
-  adapter-константы (`tdMode=isolated`, `posSide=net`), WS-лимиты,
-  evidence-cycle политика not-found.
+Живёт в `.claude/rules/structure.md` §«Таблица размещения», строки
+`docs/integrations/{name}/contracts/` и `docs/integrations/{name}/rules/`.
 
 ### Сквозные правила — без изменений
 
@@ -136,16 +91,7 @@ Per-source детали — подразделами внутри одного �
 
 ### Роспуск `docs/client/`
 
-`docs/client/` распускается полностью:
-- `docs/client/<биржа>/models/*` → `docs/models/integrations/<биржа>/*`
-- mapping-доки `docs/client/<биржа>/rules/*-mapping.md` дробятся на
-  три части:
-  - mapping + статус-резолвер → `docs/models/mapping/<Сущность>.md`
-  - contract + лимиты → `docs/integrations/<биржа>/contracts/<тема>.md`
-  - правила источника → `docs/integrations/<биржа>/rules/<тема>.md`
-- настоящие правила (`okx-ws-limits.md`, `okx-service-urls.md`) →
-  соответственно в `docs/integrations/okx/rules/` и
-  `docs/integrations/okx/contracts/`.
+Хроника — `.claude/work/history/2026-09-23-decision-holds-only-fork.md`.
 
 ## Альтернативы
 

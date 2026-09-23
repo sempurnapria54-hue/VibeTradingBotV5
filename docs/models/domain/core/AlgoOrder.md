@@ -140,8 +140,9 @@ runtime-сущность» живёт в строке исполнения, по
 ## Что `AlgoOrder` не хранит
 
 Раздел — защита читателя: у каждого отрицания назван носитель позитива
-(`.claude/decisions/negative-statements-not-fixated.md` §«Уточнение по
-сработавшему условию (2026-09-16)»).
+(форма раздела — `.claude/skills/recognize-knowledge.md`, пункт
+«Отрицательные формулировки про модели»; довод —
+`.claude/decisions/negative-statements-not-fixated.md`).
 
 - Долю закрытия, объявленную стратегией, — она живёт на действии
   (`docs/models/domain/aggregate/Strategy.md`).

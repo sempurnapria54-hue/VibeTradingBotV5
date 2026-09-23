@@ -9,7 +9,7 @@
 
 ## На какой вопрос отвечает этот файл
 
-Как разделены persisted-модели на торговые (core) и прочие (other).
+Почему persisted-модели были разделены на торговые (core) и прочие (other).
 
 ## Контекст
 
@@ -22,17 +22,10 @@
 
 ## Принятое решение
 
-- `docs/models/` — зонтик, файлов внутри нет.
-- `docs/models/core/` — торговые модели (`Deal`, `Position`,
-  `Order`, `AlgoOrder`, `Strategy`, `Balance`). Вопрос файла:
-  «Что это за торговая модель?».
-- `docs/models/other/` — прочие хранимые модели (свечи,
-  индикаторы, аудит и др.). Вопрос файла: «Что это за модель?».
-- Признак разделения: модель про бизнес-цикл сделки → core;
-  прочая хранимая модель → other. Пограничные случаи уточняются
-  при встрече.
-- `other` — временно общий каталог; будет дробиться по более
-  тонким признакам по мере накопления материала.
+Хранимые модели делились на торговые (`core/`) и прочие (`other/`).
+Действующая раскладка, сменившая эту, живёт в `.claude/rules/structure.md`,
+строки `docs/models/domain/core/`, `docs/models/domain/aggregate/`,
+`docs/models/domain/other/`.
 
 ## Альтернативы
 
@@ -48,11 +41,4 @@
 
 ## Следствия
 
-- В `.claude/rules/structure.md` строка `docs/models/` заменена на
-  `docs/models/core/` и `docs/models/other/`.
-- В `.claude/skills/classify-type.md` раздел про доменные модели
-  обновлён под core/other.
-- В `.claude/work/backlog.md` `models-core-vs-other.md` добавлен в
-  список критериев миграции.
-- Заведены каталоги-заготовки `docs/models/core/` и
-  `docs/models/other/` с `.gitkeep`.
+Живёт в `.claude/rules/structure.md`, строки `docs/models/domain/*`.

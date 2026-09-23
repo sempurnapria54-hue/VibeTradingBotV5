@@ -19,12 +19,10 @@ lifecycle — это носители данных, которые компон�
 ## Принятое решение
 
 - Вводится новый продуктовый тип — **Runtime value object (RVO)**.
-- Вопрос файла: «Что это за runtime-объект?».
-- Путь: `docs/components/models/<Name>.md`, PascalCase, имя
-  совпадает с Java-классом.
-- Связь односторонняя: компонент знает про RVO; RVO про компонент
-  не знает (по аналогии с `component-vs-process.md` — зависимости
-  направлены сверху вниз).
+- Вопрос файла, путь, имя и односторонняя связь живут в
+  `.claude/rules/structure.md`, строка `docs/components/models/`; признаки
+  RVO — `.claude/skills/classify-type.md`
+  §«Runtime value object vs доменная/нативная модель / компонент».
 
 ## Альтернативы
 
@@ -38,10 +36,6 @@ lifecycle — это носители данных, которые компон�
 
 ## Следствия
 
-- В `.claude/rules/structure.md` добавлена строка
-  `docs/components/models/`.
-- В `.claude/skills/classify-type.md` добавлен тип «Runtime value
-  object» в перечень продуктовых типов и признаки различения (RVO
-  vs торговая/прочая модель / биржевая модель / компонент).
-- Заведён каталог-заготовка `docs/components/models/` с `.gitkeep`.
+- Живёт в `.claude/rules/structure.md`, строка `docs/components/models/`;
+  тип и признаки — `.claude/skills/classify-type.md`.
 - Закрывает NQ-F третьей обкатки.

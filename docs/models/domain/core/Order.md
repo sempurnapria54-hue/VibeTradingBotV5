@@ -326,8 +326,9 @@ write-once.
 ## Что `Order` не хранит
 
 Раздел — защита читателя: у каждого отрицания назван носитель позитива
-(`.claude/decisions/negative-statements-not-fixated.md` §«Уточнение по
-сработавшему условию (2026-09-16)»).
+(форма раздела — `.claude/skills/recognize-knowledge.md`, пункт
+«Отрицательные формулировки про модели»; довод —
+`.claude/decisions/negative-statements-not-fixated.md`).
 
 - Идентификатор действия стратегии — в строке исполнения
   (`docs/models/domain/other/DealActionState.md`).

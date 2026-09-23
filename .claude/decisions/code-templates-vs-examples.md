@@ -31,10 +31,10 @@
 Отдельного слоя «референс-доков» **нет**: источник примеров — сам
 код проекта.
 
-Тир `.claude/templates/` получает две ветки:
-
-- `code/` — код-шаблоны (наполняется; первый — `code/Java/Controller.md`);
-- `docs/` — доковые шаблоны (формат доковых файлов; пока пусто).
+Ветки тира `.claude/templates/` (`code/`, `docs/`) живут в
+`.claude/rules/structure.md`, строки `.claude/templates/code/` и
+`.claude/templates/docs/`; имена — `.claude/rules/naming.md`, пункт
+«Шаблоны».
 
 ## Альтернатива (отвергнута)
 
@@ -46,12 +46,5 @@
 
 ## Последствия
 
-- Создан тир `.claude/templates/` (`code/` + `docs/`), отражён в
-  `.claude/rules/structure.md` и `.claude/rules/naming.md`.
-- Материализован первый код-шаблон — `.claude/templates/code/Java/Controller.md`.
-- `find-code-examples` переписан под пост-код-фазу над реальным
-  кодом; убрано «статических шаблонов кода не держим».
-- `code-writer` опирается при письме на `.claude/templates/code/`;
-  `find-code-examples` — пост-код, для доков.
-- REF-Q1 закрыт (убран из `open-questions.md`), маркер P1 в
-  `backlog.md` снят.
+Живёт в `.claude/skills/find-code-examples.md` §«Граница с код-шаблонами»;
+опора `code-writer` на код-шаблоны — `.claude/agents/code-writer.md`.

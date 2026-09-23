@@ -80,7 +80,8 @@ ACK-семантика, коды ошибок). Незадокументиров
   забракованное.
 - **Правка и добор кейсов при любой правке кода, в любом шаге** — тем же
   критерием апрува, той же самопроверкой и той же границей петли
-  (`.claude/decisions/case-review-approval-criterion.md`).
+  (`.claude/skills/test-review.md` §«Критерий апрува документа кейсов»; довод —
+  `.claude/decisions/case-review-approval-criterion.md`).
 
 ### Что не входит
 
@@ -118,4 +119,5 @@ ACK-семантика, коды ошибок). Незадокументиров
 - Режим автономии и карта владельцев —
   `.claude/processes/question-delegation.md`.
 - Материал кейсов по предмету — `.claude/tests/case-material/{сервис}.md`.
-- Дизайн контура тестов фазы 2 — `.claude/decisions/test-contour-design-pass.md`.
+- Устройство контура тестов — `.claude/skills/test-code.md`, `.claude/skills/test-design.md`;
+  довод — `.claude/decisions/test-contour-design-pass.md`.

@@ -239,6 +239,31 @@ OUT_OF_AREA_SUFFIXES = {
 #                снималась.
 RETIRED = [
     {
+        'name': 'дайджест решений — пакет на чтение с правом вето постфактум',
+        # Снято решением держателя 2026-09-23 (.claude/decisions/decision-holds-only-fork.md,
+        # часть 3). Прежняя редакция вменяла держателю чтение дайджеста пакетом
+        # и связывала пересмотр и ротацию с фактом прочтения; очередь на вето
+        # наполнялась быстрее, чем читалась. Что действует теперь — объявляет
+        # ключ `arrived` у каждого носителя популяции.
+        'pattern': r'вето\s+постфактум|пакет[а-яё]*\s+(?:\*\*)?на\s+чтение|После\s+чтения\s+пользователем',
+        'arrived': r'журнал',
+        'date': '2026-09-23',
+        'source': 'решение держателя 2026-09-23 (.claude/decisions/decision-holds-only-fork.md)',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/decisions/decision-holds-only-fork.md'),
+        'population': (
+            ('.claude/processes/question-delegation.md', r'дайджест\s+—\s+журнал'),
+            ('.claude/processes/roadmap-step-execution.md', r'пересмотреть\s+его\s+держатель\s+может\s+в\s+любой\s+момент'),
+            ('.claude/rules/codestyle.md', r'строкой\s+в\s+журнал'),
+            ('.claude/rules/tech-radar.md', r'плюс\s+строкой\s+дайджеста\.'),
+            ('.claude/rules/structure.md', r'Журнал:\s+решение'),
+            ('tools/session-prompt.md', r'строкой\s+в\s+журнале'),
+            ('.claude/chat/chat-project-instructions.md', r'журнал\s+автономных\s+проектных'),
+            ('.claude/chat/structure-digest.md', r'журнал\s+автономных\s+решений'),
+            ('.claude/work/decision-digest.md', r'Файл\s+—\s+журнал'),
+        ),
+    },
+    {
         'name': 'среда снапшота — отсылкой к прежнему снапшоту',
         # Снято решением держателя 2026-09-23 (снапшот без хвоста,
         # .claude/decisions/snapshot-without-tail.md). Прежняя редакция
@@ -3247,7 +3272,7 @@ RETIRED = [
         'source': 'заход 14 петли кейсов `auth` (X-1 шестой перепроверки)',
         'allowed': ('.claude/work/decision-digest.md',),
         'population': (
-            ('.claude/decisions/test-contour-design-pass.md', None),
+            ('.claude/skills/test-design.md', None),
             ('.claude/work/backlog.md', r'Субстратов\s+четыре'),
             ('.claude/tests/cases/auth.md',
              r'JWKS-стаб[а-яё]*\s+провайдера\s+идентичности'),

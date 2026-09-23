@@ -244,8 +244,9 @@
   (`.claude/rules/external-source-sync.md` §«Рантайм-расхождение»).
 - **Владелец.** `tester` (снятие payload'а) с `integrator` (сверка).
 
-**Дом.** `.claude/decisions/unorderable-fact-substitutes.md` — третий
-заменитель незаказываемого факта.
+**Дом.** Схема заменителей незаказываемого факта —
+`.claude/processes/question-delegation.md` §«Источниковый дефицит — эскалация всегда»;
+довод — `.claude/decisions/unorderable-fact-substitutes.md`.
 
 ## Пересмотр worst-case открывающего входа — по данным первого периода живой торговли
 

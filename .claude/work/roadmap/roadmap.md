@@ -14,8 +14,8 @@
 (`.claude/processes/roadmap-step-execution.md`).
 
 Scope — только продукт (бизнес-ценность). Пайплайн в роадмап не
-входит. Обоснование, принципы наполнения, связь с backlog,
-правила прогресса — `.claude/decisions/product-roadmap-type.md`.
+входит. Принципы наполнения и форма — строка `.claude/work/roadmap/` в
+`.claude/rules/structure.md`; обоснование — `.claude/decisions/product-roadmap-type.md`.
 Пересборка под сервисную платформу (2026-09-04) —
 `.claude/decisions/roadmap-rebuild-for-service-platform.md`; целевая
 конструкция — `docs/architecture/`.
