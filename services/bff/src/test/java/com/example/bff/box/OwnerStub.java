@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.http.Fault;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.List;
@@ -138,6 +139,75 @@ final class OwnerStub {
                         .withStatus(status)
                         .withHeader("Content-Type", "application/json")
                         .withBody(body)));
+    }
+
+    /**
+     * Отказ ТРАНСПОРТА на первых обращениях к пути владельца, дальше —
+     * ответ {@code 200} с телом.
+     *
+     * <p>Очередь держит сценарий стаба, а не счёт у клетки: попытки делает
+     * периметр сам, и клетка их не видит до того, как они случились.
+     *
+     * @param failures сколько первых обращений рвут соединение
+     */
+    void failsTransportThenAnswers(String owner, String path, Integer failures, String body) {
+        String scenario = "transport-" + owner + path;
+        for (int attempt = 0; attempt < failures; attempt++) {
+            server.stubFor(WireMock.any(WireMock.urlPathEqualTo(OWNER_PREFIX + owner + path))
+                    .inScenario(scenario)
+                    .whenScenarioStateIs(stateOf(attempt))
+                    .willSetStateTo(stateOf(attempt + 1))
+                    .willReturn(WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+        }
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(OWNER_PREFIX + owner + path))
+                .inScenario(scenario)
+                .whenScenarioStateIs(stateOf(failures))
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+    }
+
+    /**
+     * Ответы по очереди: первое обращение к пути получает первый статус и
+     * первое тело, второе — второе; последний ответ держится дальше.
+     */
+    void answersInTurn(String owner, String path, List<Integer> statuses, List<String> bodies) {
+        String scenario = "turn-" + owner + path;
+        for (int turn = 0; turn < statuses.size(); turn++) {
+            var stub = WireMock.any(WireMock.urlPathEqualTo(OWNER_PREFIX + owner + path))
+                    .inScenario(scenario)
+                    .whenScenarioStateIs(stateOf(turn));
+            if (turn < statuses.size() - 1) {
+                stub = stub.willSetStateTo(stateOf(turn + 1));
+            }
+            server.stubFor(stub.willReturn(WireMock.aResponse()
+                    .withStatus(statuses.get(turn))
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(bodies.get(turn))));
+        }
+    }
+
+    /**
+     * Ответ {@code 200} только запросу, принимающему названный тип; прочим
+     * — {@code 406}: владелец, согласующий ответ с тем, что просил браузер.
+     */
+    void answersToAccept(String owner, String path, String accept, String body) {
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(OWNER_PREFIX + owner + path))
+                .atPriority(10)
+                .willReturn(WireMock.aResponse().withStatus(406)));
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(OWNER_PREFIX + owner + path))
+                .atPriority(1)
+                .withHeader("Accept", WireMock.containing(accept))
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", accept)
+                        .withBody(body)));
+    }
+
+    /** Имя состояния сценария по номеру обращения; нулевое — начальное состояние стаба. */
+    private static String stateOf(Integer attempt) {
+        return attempt == 0 ? Scenario.STARTED : "attempt-" + attempt;
     }
 
     /**

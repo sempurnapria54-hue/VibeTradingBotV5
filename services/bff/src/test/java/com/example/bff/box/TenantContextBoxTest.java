@@ -75,7 +75,11 @@ class TenantContextBoxTest extends SharedBffBox {
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode()).isEqualTo(REQUEST_REJECTED);
         assertThat(answer.errorMessage()).contains("членств больше одного");
-        assertThat(answer.body()).doesNotContain(TENANT).doesNotContain(SECOND_TENANT);
+        // Момент отказа из тела вынимается: ISO-момент законно несёт «T1»
+        // и «T2» часом суток, и отрицание по всему телу краснело бы по
+        // часам прогона, а не по тенантам (ловушка TC-141).
+        assertThat(answer.body().replace(String.valueOf(answer.asObject().get("occurredAt")), ""))
+                .doesNotContain(TENANT).doesNotContain(SECOND_TENANT);
 
         // Отказ не кэшируется: следующий запрос того же субъекта снова
         // зовёт владельца — иначе промах решался бы однажды и навсегда.

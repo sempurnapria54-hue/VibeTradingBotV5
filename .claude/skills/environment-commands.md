@@ -75,13 +75,19 @@ docker pull timescale/timescaledb-ha:pg17.10-ts2.29.2   # тег — как в d
 docker pull hashicorp/vault:1.15
 docker pull apache/kafka:4.1.1                          # версия клиента kafka-clients дерева
 
-bash tools/reactor-test.sh                   # компиляция всех деревьев + весь unit-набор;
+bash tools/reactor-test.sh                   # компиляция всех деревьев + весь набор фазой verify
+                                             # (сквозному набору нужны jar'ы сторон);
                                              # одним вызовом на переднем плане, без фона и опроса
-REACTOR_MVN_ARGS="test -Dtest=<Класс>[,<Класс>] -Dsurefire.failIfNoSpecifiedTests=false" \
+REACTOR_MVN_ARGS="verify -Dtest=<Класс>[,<Класс>] -Dsurefire.failIfNoSpecifiedTests=false" \
   bash tools/reactor-test.sh                 # точечный отбор при компиляции всего дерева; без флага
                                              # модуль без совпадений роняет реактор
 mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \
   -Dsurefire.failIfNoSpecifiedTests=false    # точечно; разделитель классов — запятая
+mvn -o -am -pl tests verify -Dtest='<Класс>' \
+  -Dsurefire.failIfNoSpecifiedTests=false    # сквозной набор: фаза verify, иначе jar'ов сторон нет
+mvn -o -am -pl <модуль> test -Dtest.excluded.groups=      # вместе с красными клетками (метка debt);
+                                                          # свойство действует и на модули, собранные -am
+mvn -o -am -pl tests verify -Dtest.excluded.groups=smoke  # сквозной набор с красными клетками, без дыма
 ```
 
 **Инструменты корпуса зовутся через `py`**, не через `python3`
@@ -99,10 +105,8 @@ mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \
   Testcontainers у ящика сервиса (`auth` — первый), вместе с контейнером
   хранилища и стабом провайдера идентичности; своего `docker-compose` прогон
   при этом не трогает. Прежняя запись «базы нет» снята: она описывала среду до
-  ящика. Что осталось незакрытым — контекст поднимается **не у каждого**
-  сервиса, а у тех, чей ящик написан; дом задачи —
-  `.claude/work/backlog.md` §«Контекстный тест сервиса — по появлению базы
-  в прогоне».
+  ящика. Ящик написан у всех восьми сервисов, поэтому контекст каждого
+  поднимается в прогоне — предусловием любого кейса его ящика.
 
 ## Ловушки и обходы
 

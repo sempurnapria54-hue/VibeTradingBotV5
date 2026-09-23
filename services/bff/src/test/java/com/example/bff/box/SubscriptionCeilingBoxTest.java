@@ -2,6 +2,8 @@ package com.example.bff.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -55,6 +57,13 @@ class SubscriptionCeilingBoxTest extends BffBox {
 
     /** Тенант клетки об освобождении места. */
     private static final String RELEASE_TENANT = "TC7";
+
+    /**
+     * Сколько раз клетка {@code B3.7} пишет в только что закрытую подписку:
+     * отказ записи у построенного — гонка (F-14), и вход повторяется, пока
+     * проявление не станет практически неизбежным.
+     */
+    private static final Integer ROUNDS = 50;
 
     @DynamicPropertySource
     static void substrate(DynamicPropertyRegistry registry) {
@@ -143,34 +152,48 @@ class SubscriptionCeilingBoxTest extends BffBox {
     }
 
     @Test
+    @Tag("debt")
     @DisplayName("B3.7 — Закрытая подписка освобождает место под потолком")
     void b3_7_aClosedSubscriptionFreesItsPlace() {
         authAnswers(Bodies.memberships(RELEASE_TENANT, ROLE));
         String ticket = issuedTicket();
+        List<String> expected = new ArrayList<>();
 
         try (Subscription surviving = openedStreamOf(RELEASE_TENANT, ticket, "e-b3-7-first")) {
-            Subscription closed = openedStreamOf(RELEASE_TENANT, ticket, "e-b3-7-second");
-            surviving.awaitFrames(2);
+            expected.add("e-b3-7-first");
+            // Ход «открыть вторую, закрыть её, записать» повторяется: отказ
+            // записи в закрытую подписку у построенного — ГОНКА с
+            // контейнером (находка F-14 документа кейсов), и одиночный вход
+            // проявлял бы её с вероятностью, а не всякий раз.
+            for (int round = 0; round < ROUNDS; round++) {
+                String opening = "e-b3-7-open-" + round;
+                String after = "e-b3-7-after-" + round;
+                Subscription closed = openedStreamOf(RELEASE_TENANT, ticket, opening);
+                expected.add(opening);
+                surviving.awaitFrames(expected.size());
+                closed.close();
+                // Закрытая в рассылку больше не входит, и отказ записи в неё
+                // не роняет рассылку остальным: следующая запись доезжает
+                // ровно однажды. Ею же сервер и УЗНАЁТ о закрытии — место
+                // освобождается на первой следующей записи тенанта.
+                publishDealOpened(RELEASE_TENANT, after);
+                expected.add(after);
+                surviving.awaitFrames(expected.size());
+                assertThat(closed.ids()).containsExactly(opening);
+            }
 
-            closed.close();
-            // Закрытая в рассылку больше не входит, и отказ записи в неё
-            // не роняет рассылку остальным: третья запись доезжает. Ею же
-            // сервер и УЗНАЁТ о закрытии — место освобождается на первой
-            // следующей записи тенанта, а не в момент закрытия.
-            publishDealOpened(RELEASE_TENANT, "e-b3-7-third");
-            surviving.awaitFrames(3);
-            assertThat(surviving.ids())
-                    .containsExactly("e-b3-7-first", "e-b3-7-second", "e-b3-7-third");
-            assertThat(closed.ids()).containsExactly("e-b3-7-second");
-
-            try (Subscription opened = openedStreamOf(RELEASE_TENANT, ticket, "e-b3-7-fourth")) {
+            try (Subscription opened = openedStreamOf(RELEASE_TENANT, ticket, "e-b3-7-last")) {
+                expected.add("e-b3-7-last");
                 assertThat(opened.status()).isEqualTo(200);
                 assertThat(opened.carriesStream()).isTrue();
-                assertThat(opened.ids()).containsExactly("e-b3-7-fourth");
+                // Повторной доставки прежних записей нет: сегодня красно —
+                // отказ из тропы восстановления уходит из слушателя, и
+                // обработчик доставляет запись заново, в том числе
+                // подписке, открытой ПОСЛЕ неё.
+                assertThat(opened.ids()).containsExactly("e-b3-7-last");
             }
-            surviving.awaitFrames(4);
-            assertThat(surviving.ids()).containsExactly("e-b3-7-first", "e-b3-7-second",
-                    "e-b3-7-third", "e-b3-7-fourth");
+            surviving.awaitFrames(expected.size());
+            assertThat(surviving.ids()).containsExactlyElementsOf(expected);
         }
     }
 }

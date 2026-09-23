@@ -21,7 +21,9 @@
 #   3) недосчитанные модули — компилировавших модулей меньше, чем строк
 #      «Building <модуль>» с исходниками: молча пропущенное дерево;
 #   4) отказ сборки либо теста — ненулевой код возврата maven; вердикт лога
-#      и код maven сводит одна функция `decide`, и проба идёт по ней.
+#      и код maven сводит одна функция `decide`, и проба идёт по ней;
+#   5) знаменатель оси 3 — заголовки модулей, а не строки упаковки
+#      «Building jar:», которые фаза verify печатает по строке на артефакт.
 #
 # Каталоги `target/classes` и `target/test-classes` всех модулей реактора
 # СНОСЯТСЯ перед прогоном: плагин `clean` в офлайне не резолвится, а без
@@ -31,7 +33,16 @@
 # модели — ещё на сегмент (`services/common/model/<слой>`; каталог `libs/`
 # снят 2026-09-12). Пропущенный уровень — не лишняя
 # работа, а ровно вакуумный прогон: несносенные классы дают «Nothing to
-# compile», и прогон отказывает кодом 2.
+# compile», и прогон отказывает кодом 2. Сквозной набор лежит вне `services/`
+# (каталог `tests/` верхнего уровня) — его `test-classes` сносятся отдельной
+# строкой; `classes` у него нет, исходников main он не несёт.
+#
+# ФАЗА — `verify`, А НЕ `test`. Сторона сквозной тропы поднимается своим
+# процессом из исполняемого jar'а модуля (.claude/decisions/test-contour-design-pass.md
+# §«12. Сторона сквозной тропы поднимается СВОИМ ПРОЦЕССОМ, а не вторым
+# контекстом в той же JVM»), а jar'ы появляются фазой `package`: после `test`
+# их нет, и набор отказал бы «не измерялось». Реактор поэтому пакует каждый
+# модуль до того, как дойдёт до набора.
 #
 # Запуск (из корня репозитория):  bash tools/reactor-test.sh
 # Код возврата: 0 — дерево скомпилировано целиком и тесты зелёные;
@@ -51,7 +62,11 @@ analyze_log() {
   local nothing compiled building
   nothing="$(grep -c 'Nothing to compile' "$log")"
   compiled="$(grep -cE '^\[INFO\] Compiling [0-9]+ source files' "$log")"
-  building="$(grep -cE '^\[INFO\] Building ' "$log")"
+  # Знаменатель — заголовки модулей, а не всякая строка «Building»: фаза
+  # verify пакует модули, и плагин упаковки печатает «Building jar: <путь>»
+  # по строке на артефакт — без изъятия знаменатель вырос бы вдвое, и
+  # здоровый прогон читался бы недосчитанным.
+  building="$(grep -E '^\[INFO\] Building ' "$log" | grep -cvE '^\[INFO\] Building (jar|war|ear|zip|tar): ')"
   if [ "$nothing" -gt 0 ]; then
     echo "VACUUM"
     return
@@ -108,6 +123,10 @@ battery() {
   report_axis '6. контроль: полный лог и нулевой код — зелёный' "$(decide OK 0)" GREEN || failed=1
   report_axis '7. отказ лога старше кода maven — отказ' "$(decide VACUUM 0)" VACUUM || failed=1
 
+  printf '[INFO] Building a\n[INFO] Compiling 3 source files\n[INFO] Building jar: a.jar\n[INFO] Building b\n[INFO] Compiling 7 source files\n[INFO] Building jar: b.jar\n[INFO] Building aggregator\n' > "$work/package.log"
+  verdict="$(analyze_log "$work/package.log")"
+  report_axis '8. строки упаковки «Building jar:» модулями не считаются' "$verdict" OK || failed=1
+
   rm -rf "$work"
   return $failed
 }
@@ -147,10 +166,11 @@ rm -rf "$REPO_ROOT"/services/*/target/classes "$REPO_ROOT"/services/*/target/tes
        "$REPO_ROOT"/services/common/*/target/classes \
        "$REPO_ROOT"/services/common/*/target/test-classes \
        "$REPO_ROOT"/services/common/model/*/target/classes \
-       "$REPO_ROOT"/services/common/model/*/target/test-classes
+       "$REPO_ROOT"/services/common/model/*/target/test-classes \
+       "$REPO_ROOT"/tests/target/test-classes
 
 LOG="$(mktemp)"
-JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-test} \
+JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
     -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
 MVN_CODE=$?
 

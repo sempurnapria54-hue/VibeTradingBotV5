@@ -68,6 +68,9 @@ final class IdentityStub {
 
     private static final String JWKS_PATH = "/jwks";
 
+    /** Документ диспетчера провайдера: по нему сервис находит набор ключей. */
+    private static final String DISCOVERY_PATH = "/.well-known/openid-configuration";
+
     private static final String TOKEN_PATH = "/token";
 
     private static final IdentityStub INSTANCE = new IdentityStub();
@@ -94,6 +97,14 @@ final class IdentityStub {
     /** Адрес издателя: он же значение issuer-uri сервиса. */
     String issuer() {
         return "http://localhost:" + server.port();
+    }
+
+    /**
+     * Точки, за которыми сервис вправе ходить к провайдеру: документ
+     * диспетчера и набор ключей — добыча ключей, а не проверка токена.
+     */
+    static List<String> keyRetrievalPaths() {
+        return List.of(DISCOVERY_PATH, JWKS_PATH);
     }
 
     /** Точка выдачи служебной идентичности: заведена ради отрицания. */
@@ -207,7 +218,7 @@ final class IdentityStub {
                   "token_endpoint": "%s%s"
                 }
                 """.formatted(issuer(), issuer(), JWKS_PATH, issuer(), issuer(), TOKEN_PATH);
-        server.stubFor(WireMock.get(WireMock.urlEqualTo("/.well-known/openid-configuration"))
+        server.stubFor(WireMock.get(WireMock.urlEqualTo(DISCOVERY_PATH))
                 .willReturn(WireMock.okJson(metadata)));
     }
 

@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  tests — сквозной набор (уровень 3 шага «Тесты»): тропа через несколько
+  сервисов, наблюдаемая только снаружи (.claude/skills/test-code.md
+  §«Уровень 3 — сквозной набор»).
+
+  СЕРВИСОМ НЕ ЯВЛЯЕТСЯ И НИ ВО ЧТО НЕ СОБИРАЕТСЯ: исходников main у модуля
+  нет, есть только src/test. Дом — каталог верхнего уровня, а не services/
+  (.claude/decisions/test-contour-design-pass.md, решение 8).
+
+  СТОРОНА ТРОПЫ — ПРОЦЕСС, ПОДНЯТЫЙ BOOT-JAR'ОМ СВОЕГО МОДУЛЯ (решение 12):
+  на общем classpath конфигурации сервисов и их миграции сталкиваются.
+  Поэтому модулю нужны не классы сторон, а их ИСПОЛНЯЕМЫЕ АРТЕФАКТЫ, и
+  зависимости на сервисы ниже объявлены формой, которая даёт ТОЛЬКО порядок
+  реактора: тип pom и изъятие всего транзитивного. Ни одного класса стороны
+  на пути прогона набора нет — доступа к её бинам у набора нет по построению.
+
+  ПРОГОН ТРЕБУЕТ ФАЗЫ package У СТОРОН: jar'ов после `mvn test` не
+  существует. Отсюда реактор идёт `verify` (tools/reactor-test.sh), а
+  точечный прогон набора — `mvn -o -am -pl tests verify`. Прогон без jar'ов
+  либо на jar'е старше классов своего модуля ОТКАЗЫВАЕТ, а не пропускается
+  (Side#jarOf): молчаливый пропуск читался бы зелёным.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>tests</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>tests</name>
+    <description>Сквозной набор: тропы через несколько сервисов</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <!--
+          Метка красных ожиданий и метка дыма против тестового аккаунта —
+          обе вне умолчания прогона. Дом довода о `debt` —
+          services/common/platform/pom.xml; `smoke` бежит по расписанию
+          против стенда (.claude/skills/test-code.md §«Уровень 3 — сквозной
+          набор»). Прогон помеченных:  mvn verify -Dtest.excluded.groups=smoke
+        -->
+        <test.excluded.groups>debt,smoke</test.excluded.groups>
+        <wiremock.version>3.13.1</wiremock.version>
+        <nimbus-jose-jwt.version>10.4</nimbus-jose-jwt.version>
+    </properties>
+
+    <dependencies>
+        <!--
+          ПОРЯДОК РЕАКТОРА, А НЕ CLASSPATH. Стороны троп собираются раньше
+          набора; тип pom и изъятие `*` не кладут на путь прогона ни одного
+          их класса и ни одной их зависимости.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>strategies</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>trading-core</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>connector-okx</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>audit</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>statistics</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>auth</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>bff</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Разбор тел ответов сторон и сборка тел команд. -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Предикаты без прямых отрицаний (.claude/rules/codestyle.md §«Строгие правила»). -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Субстрат: база, брокер и хранилище секретов — контейнерами прогона
+          (.claude/decisions/test-contour-design-pass.md, решения 2 и 5).
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-vault</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Ассерт колонками по базе стороны, у таблицы которой есть внешний читатель (решение 7). -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Тема читается своим потребителем прогона: след публикации и форма провода. -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Стаб чужой поверхности — один механизм на все виды (решение 3):
+          площадка, соседи, не являющиеся стороной тропы, и провайдер
+          идентичности.
+        -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>${wiremock.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Токены подписывает тест сам: стаб провайдера держит пару ключей (решение 4). -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>${nimbus-jose-jwt.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              Корень репозитория едет прогону свойством: jar'ы сторон и эталон
+              определения у владельца определений читаются по пути, а не
+              копией в дерево набора.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${test.excluded.groups}</excludedGroups>
+                    <systemPropertyVariables>
+                        <e2e.repository.root>${project.basedir}/..</e2e.repository.root>
+                        <e2e.work.directory>${project.build.directory}/e2e</e2e.work.directory>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

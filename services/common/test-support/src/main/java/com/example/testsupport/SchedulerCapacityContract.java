@@ -147,14 +147,19 @@ public abstract class SchedulerCapacityContract {
         return scheduler.getScheduledThreadPoolExecutor().getCorePoolSize();
     }
 
-    /** Сколько объявлений джоб лежит в дереве сервиса. */
-    private Integer scheduledDeclarationCount() throws IOException {
+    /**
+     * Сколько объявлений джоб лежит в дереве сервиса.
+     *
+     * <p>Открыт наследнику формы и ящику сервиса: клетка ящика о выводе числа
+     * мерит тот же счёт, и второй его носитель разошёлся бы с первым.
+     */
+    public static Integer scheduledDeclarationCount() throws IOException {
         assertThat(Files.isDirectory(MAIN_SOURCES))
                 .as("дерева исходников не найдено — проба мерила бы пустоту")
                 .isTrue();
         int declarations = 0;
         try (Stream<Path> sources = Files.walk(MAIN_SOURCES)) {
-            Iterator<Path> javaFiles = sources.filter(this::isJavaFile).iterator();
+            Iterator<Path> javaFiles = sources.filter(SchedulerCapacityContract::isJavaFile).iterator();
             while (javaFiles.hasNext()) {
                 declarations += declarationsIn(javaFiles.next());
             }
@@ -162,11 +167,11 @@ public abstract class SchedulerCapacityContract {
         return declarations;
     }
 
-    private Boolean isJavaFile(Path path) {
+    private static Boolean isJavaFile(Path path) {
         return Files.isRegularFile(path) && path.getFileName().toString().endsWith(".java");
     }
 
-    private Integer declarationsIn(Path source) throws IOException {
+    private static Integer declarationsIn(Path source) throws IOException {
         int declarations = 0;
         for (String line : Files.readAllLines(source, StandardCharsets.UTF_8)) {
             if (SCHEDULED_DECLARATION.matcher(line).find()) {
@@ -182,7 +187,17 @@ public abstract class SchedulerCapacityContract {
      * выражением сверял бы текст, а не свойство, и имя ключа осталось бы
      * непроверенным.
      */
-    private Integer declaredPoolSize() throws IOException {
+    public static Integer declaredPoolSize() throws IOException {
+        return Integer.parseInt(declaredPoolSizeValue());
+    }
+
+    /**
+     * Объявленное число потоков дословно — до разбора в число.
+     *
+     * <p>Им ящик предъявляет, что значение не плейсхолдер окружения: разбор в
+     * число отказал бы на плейсхолдере исключением, а не называнием повода.
+     */
+    public static String declaredPoolSizeValue() throws IOException {
         assertThat(Files.isRegularFile(SERVICE_CONFIG))
                 .as("конфигурации сервиса не найдено — проба мерила бы пустоту")
                 .isTrue();
@@ -191,7 +206,7 @@ public abstract class SchedulerCapacityContract {
         for (PropertySource<?> source : loaded) {
             Object declared = source.getProperty(POOL_SIZE_PROPERTY);
             if (nonNull(declared)) {
-                return Integer.parseInt(String.valueOf(declared));
+                return String.valueOf(declared);
             }
         }
         return fail("конфигурация сервиса не объявляет %s — пул остался бы умолчанием каркаса",

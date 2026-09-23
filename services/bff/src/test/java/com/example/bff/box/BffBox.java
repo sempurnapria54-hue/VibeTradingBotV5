@@ -1,6 +1,7 @@
 package com.example.bff.box;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import java.io.IOException;
 import java.net.URI;
@@ -159,7 +160,9 @@ abstract class BffBox {
                 + "-" + about.getTestMethod().orElseThrow().getName();
         subject = IdentityStub.SUBJECT + "-" + cell;
         secondSubject = IdentityStub.SECOND_SUBJECT + "-" + cell;
-        awaitDelivery();
+        if (isTrue(awaitsDelivery())) {
+            awaitDelivery();
+        }
         owners.reset();
         recordsBefore = wire.totalRecords();
     }
@@ -189,31 +192,83 @@ abstract class BffBox {
      * <p><b>Ключ контекста — его порт.</b> У каждого поднятого контекста
      * он свой, и инъекция самого контекста ради различения не нужна.
      */
+    /**
+     * Ставит ли контекст класса предусловие «слушатель получил назначение».
+     *
+     * <p>Снимают его ровно те классы, чей предмет — само ОТСУТСТВИЕ
+     * назначения либо состояние реплики ДО первой подписки: зонд открывает
+     * подписку и ждёт доехавшей записи, то есть ставит обратное их
+     * предусловию — а у контекста без брокера ещё и ждал бы потолка.
+     */
+    protected Boolean awaitsDelivery() {
+        return Boolean.TRUE;
+    }
+
     private void awaitDelivery() {
         if (isFalse(DELIVERING.add(port))) {
             return;
         }
+        awaitDeliveryAt(port);
+    }
+
+    /**
+     * Дожидается назначения партиций у реплики НАЗВАННОГО порта — без
+     * отметки «уже наблюдена».
+     *
+     * <p>Вход клеток, поднимающих свою реплику сами: порт закрытой реплики
+     * может достаться следующей, и отметка по порту пропустила бы зонд
+     * ровно у той реплики, которой он нужен.
+     *
+     * @param replicaPort порт реплики
+     */
+    protected void awaitDeliveryAt(Integer replicaPort) {
+        Subscription probe = deliveringProbeAt(replicaPort);
+        if (Objects.nonNull(probe)) {
+            probe.close();
+        }
+    }
+
+    /**
+     * Дожидается назначения партиций у реплики названного порта и отдаёт
+     * зонд ОТКРЫТЫМ.
+     *
+     * <p><b>Открытым — ради клеток, чья реплика обязана остаться без
+     * брошенных подписок.</b> Закрытая клиентом подписка остаётся в наборе
+     * сервера до первой записи в неё, и эта запись у построенного есть
+     * гонка с контейнером (находка F-14): тик пульса, рассылающий всем
+     * тенантам, натыкался бы на брошенный зонд. Открытый зонд — живая
+     * подписка своего тенанта, и клеткам она не мешает.
+     *
+     * @param replicaPort порт реплики
+     * @return открытый зонд; пусто — выдача билетов у реплики не настроена
+     */
+    protected Subscription deliveringProbeAt(Integer replicaPort) {
         owners.answers(OwnerStub.AUTH, OwnerStub.MEMBERSHIPS_PATH,
                 Bodies.memberships(WARMUP_TENANT, ROLE));
-        Answer issued = postWith(TICKETS, identity.tokenFor(WARMUP_SUBJECT), "");
+        Answer issued = send(request(replicaPort, TICKETS)
+                .header("Authorization", "Bearer " + identity.tokenFor(WARMUP_SUBJECT))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("")));
         if (issued.status() != 200) {
             // Контекст, в котором выдача билетов не настроена: подписок в
             // нём не открывается ни одной, и раздачи у него нет вовсе —
             // предусловие ставить нечем и незачем. Клетки такого контекста
             // провода не касаются: их предмет — сам отказ выдачи.
-            return;
+            return null;
         }
-        try (Subscription probe = subscribe(String.valueOf(issued.asObject().get("ticket")))) {
-            AtomicBoolean publishing = new AtomicBoolean(Boolean.TRUE);
-            Thread probes = Thread.ofVirtual().name("box-warmup").start(() -> {
-                Integer attempt = 0;
-                while (publishing.get()) {
-                    publishDealOpened(WARMUP_TENANT, "warmup-" + attempt++);
-                    Awaitility.await().pollDelay(PROBE_INTERVAL).atMost(PROBE_INTERVAL.plusSeconds(5))
-                            .until(() -> Boolean.TRUE);
-                }
-            });
+        Subscription probe = subscribeAt(replicaPort, String.valueOf(issued.asObject().get("ticket")), null);
+        AtomicBoolean publishing = new AtomicBoolean(Boolean.TRUE);
+        Thread probes = Thread.ofVirtual().name("box-warmup").start(() -> {
+            Integer attempt = 0;
+            while (publishing.get()) {
+                publishDealOpened(WARMUP_TENANT, "warmup-" + attempt++);
+                Awaitility.await().pollDelay(PROBE_INTERVAL).atMost(PROBE_INTERVAL.plusSeconds(5))
+                        .until(() -> Boolean.TRUE);
+            }
+        });
+        try {
             probe.awaitFrames(1);
+        } finally {
             publishing.set(Boolean.FALSE);
             try {
                 probes.join();
@@ -222,6 +277,7 @@ abstract class BffBox {
                 throw new IllegalStateException("Ожидание зонда назначения прервано", interrupted);
             }
         }
+        return probe;
     }
 
     /** Сколько записей легло в темы с начала клетки. */
@@ -302,6 +358,13 @@ abstract class BffBox {
                 .POST(HttpRequest.BodyPublishers.ofString(body)));
     }
 
+    /** Мутирующий вызов под НАЗВАННЫМ токеном с названными заголовками. */
+    protected Answer postWith(String path, String token, Map<String, String> headers, String body) {
+        HttpRequest.Builder builder = request(path).header("Authorization", "Bearer " + token);
+        headers.forEach(builder::header);
+        return send(builder.POST(HttpRequest.BodyPublishers.ofString(body)));
+    }
+
     /** Мутирующий вызов БЕЗ предъявленной идентичности. */
     protected Answer postAnonymously(String path, String body) {
         return send(request(path)
@@ -375,6 +438,22 @@ abstract class BffBox {
         return stream;
     }
 
+    /**
+     * Открывает подписку у реплики НАЗВАННОГО порта и предъявляет её
+     * открытие доехавшей записью — та же форма, что {@link #openedStreamOf}.
+     *
+     * @param replicaPort порт реплики
+     * @param tenantId    тенант барьерной записи — он же тенант билета
+     * @param ticket      билет открытия
+     * @param eventId     идентичность факта-барьера
+     */
+    protected Subscription openedStreamAt(Integer replicaPort, String tenantId, String ticket, String eventId) {
+        Subscription stream = subscribeAt(replicaPort, ticket, null);
+        publishDealOpened(tenantId, eventId);
+        stream.awaitFrames(1);
+        return stream;
+    }
+
     /** Открывает подписку названным билетом. */
     protected Subscription subscribe(String ticket) {
         return subscribe(ticket, null);
@@ -382,8 +461,49 @@ abstract class BffBox {
 
     /** Открывает подписку названным билетом с названной позицией чтения. */
     protected Subscription subscribe(String ticket, String lastEventId) {
-        return subscribeTo(STREAM + "?ticket=" + URLEncoder.encode(ticket, StandardCharsets.UTF_8),
-                lastEventId);
+        return subscribeAt(port, ticket, lastEventId);
+    }
+
+    /**
+     * Открывает подписку у реплики НАЗВАННОГО порта.
+     *
+     * @param replicaPort порт реплики
+     * @param ticket      билет открытия
+     * @param lastEventId позиция чтения; пусто — заголовка нет вовсе
+     */
+    protected Subscription subscribeAt(Integer replicaPort, String ticket, String lastEventId) {
+        return subscriptionOf(streamRequest(addressOf(replicaPort,
+                STREAM + "?ticket=" + URLEncoder.encode(ticket, StandardCharsets.UTF_8)), lastEventId));
+    }
+
+    /**
+     * Выдаёт билет предъявителю названного токена у реплики НАЗВАННОГО
+     * порта.
+     *
+     * @param replicaPort порт реплики
+     * @param token       токен, под которым идёт выдача
+     */
+    protected String issuedTicketAt(Integer replicaPort, String token) {
+        Answer answer = send(request(replicaPort, TICKETS)
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("")));
+        if (answer.status() != 200) {
+            throw new AssertionError("Предусловие не поставлено: выдача билета у реплики "
+                    + replicaPort + " ответила " + answer.status() + ": " + answer.body());
+        }
+        return String.valueOf(answer.asObject().get("ticket"));
+    }
+
+    /**
+     * Чтение под названным токеном у реплики НАЗВАННОГО порта.
+     *
+     * @param replicaPort порт реплики
+     * @param path        путь поверхности
+     * @param token       токен предъявителя
+     */
+    protected Answer getAt(Integer replicaPort, String path, String token) {
+        return send(request(replicaPort, path).header("Authorization", "Bearer " + token).GET());
     }
 
     /** Открывает подписку БЕЗ параметра билета: билет не предъявлен вовсе. */
@@ -420,14 +540,18 @@ abstract class BffBox {
      * @param lastEventId позиция чтения; пусто — заголовка нет вовсе
      */
     protected Subscription subscribeTo(String path, String lastEventId) {
+        return subscriptionOf(streamRequest(addressOf(path), lastEventId));
+    }
+
+    private static HttpRequest streamRequest(String address, String lastEventId) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(addressOf(path)))
+                .uri(URI.create(address))
                 .version(HttpClient.Version.HTTP_1_1)
                 .header("Accept", "text/event-stream");
         if (Objects.nonNull(lastEventId)) {
             builder = builder.header("Last-Event-ID", lastEventId);
         }
-        return subscriptionOf(builder.GET().build());
+        return builder.GET().build();
     }
 
     /**
@@ -471,12 +595,21 @@ abstract class BffBox {
 
     /** Адрес поверхности ящика: им ходит и подписка на поток. */
     protected String addressOf(String path) {
-        return "http://localhost:" + port + path;
+        return addressOf(port, path);
+    }
+
+    /** Адрес поверхности реплики НАЗВАННОГО порта. */
+    protected static String addressOf(Integer replicaPort, String path) {
+        return "http://localhost:" + replicaPort + path;
     }
 
     private HttpRequest.Builder request(String path) {
+        return request(port, path);
+    }
+
+    private static HttpRequest.Builder request(Integer replicaPort, String path) {
         return HttpRequest.newBuilder()
-                .uri(URI.create(addressOf(path)))
+                .uri(URI.create(addressOf(replicaPort, path)))
                 .timeout(Duration.ofSeconds(60));
     }
 

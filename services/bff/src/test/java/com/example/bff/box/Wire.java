@@ -103,14 +103,15 @@ final class Wire {
      * @param eventType  класс события
      * @param occurredAt момент происшествия; пусто — заголовка нет
      * @param payload    содержимое дословно
+     * @return смещение, под которым запись легла в партицию
      */
-    void publish(String topic, String tenantId, String eventId, String eventType,
+    Long publish(String topic, String tenantId, String eventId, String eventType,
                  String occurredAt, String payload) {
         Map<String, String> headers = new HashMap<>();
         headers.put(EVENT_ID, eventId);
         headers.put(EVENT_TYPE, eventType);
         headers.put(OCCURRED_AT, occurredAt);
-        publish(topic, tenantId, headers, payload);
+        return publish(topic, tenantId, headers, payload);
     }
 
     /**
@@ -124,8 +125,10 @@ final class Wire {
      * @param headers  заголовки конверта; пустое значение означает, что
      *                 заголовок не кладётся вовсе
      * @param payload  содержимое дословно
+     * @return смещение, под которым запись легла в партицию: им клетка
+     *         узнаёт строку журнала о СВОЕЙ записи
      */
-    void publish(String topic, String tenantId, Map<String, String> headers, String payload) {
+    Long publish(String topic, String tenantId, Map<String, String> headers, String payload) {
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, tenantId, payload);
         headers.forEach((name, value) -> {
             if (Objects.nonNull(value)) {
@@ -133,7 +136,7 @@ final class Wire {
             }
         });
         try {
-            producer.send(record).get(CALL_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            return producer.send(record).get(CALL_TIMEOUT.toSeconds(), TimeUnit.SECONDS).offset();
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Ожидание подтверждения брокера прервано", failure);
@@ -212,6 +215,30 @@ final class Wire {
      */
     Long totalRecords() {
         return topics().stream().mapToLong(this::recordsIn).sum();
+    }
+
+    /**
+     * Темы, чьи партиции назначены участникам названной группы.
+     *
+     * <p>Назначение читается у брокера, а не у слушателя: это то, что группа
+     * фактически читает, а не то, что объявлено в конфигурации.
+     *
+     * @param groupId имя группы
+     */
+    Set<String> assignedTopics(String groupId) {
+        try {
+            return admin.describeConsumerGroups(List.of(groupId)).all()
+                    .get(CALL_TIMEOUT.toSeconds(), TimeUnit.SECONDS)
+                    .get(groupId).members().stream()
+                    .flatMap(member -> member.assignment().topicPartitions().stream())
+                    .map(TopicPartition::topic)
+                    .collect(Collectors.toSet());
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Ожидание назначения группы прервано", failure);
+        } catch (Exception failure) {
+            throw new IllegalStateException("Назначение группы " + groupId + " не прочитано", failure);
+        }
     }
 
     /** Имена групп потребителей, известных брокеру. */

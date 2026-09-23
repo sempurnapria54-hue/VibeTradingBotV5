@@ -3,8 +3,11 @@ package com.example.bff.box;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,6 +38,13 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
      * держалось бы совпадением часов.
      */
     private static final String OCCURRED_AT = "2026-09-20T10:15:30Z";
+
+    /**
+     * Сколько раз клетка {@code B3.8} обрывает подписку перед записью:
+     * отказ записи у построенного — гонка (F-14), и вход повторяется, пока
+     * проявление не станет практически неизбежным.
+     */
+    private static final Integer ROUNDS = 50;
 
     @Test
     @DisplayName("B3.1 — Годный билет открывает поток, и факт тенанта доезжает")
@@ -141,27 +151,45 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
     }
 
     @Test
+    @Tag("debt")
     @DisplayName("B3.8 — Оборванная подписка не лишает данных остальные")
     void b3_8_anAbortedSubscriptionDoesNotStarveTheOthers() {
-        authAnswersOneMembership();
+        String tenant = "TS8";
+        authAnswers(Bodies.memberships(tenant, ROLE));
         String ticket = issuedTicket();
+        List<String> expected = new ArrayList<>();
 
-        try (Subscription surviving = openedStream(ticket, "e-b3-8-first")) {
-            Subscription aborted = openedStream(ticket, "e-b3-8-second");
-            surviving.awaitFrames(2);
+        try (Subscription surviving = openedStreamOf(tenant, ticket, "e-b3-8-first")) {
+            expected.add("e-b3-8-first");
+            // Обрыв повторяется: отказ записи в оборванную подписку у
+            // построенного — ГОНКА с контейнером (находка F-14 документа
+            // кейсов), и одиночный вход проявлял бы её с вероятностью.
+            for (int round = 0; round < ROUNDS; round++) {
+                String opening = "e-b3-8-open-" + round;
+                String after = "e-b3-8-after-" + round;
+                Subscription aborted = openedStreamOf(tenant, ticket, opening);
+                expected.add(opening);
+                surviving.awaitFrames(expected.size());
 
-            // Обрыв на стороне клиента — ушедший браузер: штатного
-            // закрытия подписки в протоколе нет вовсе.
-            aborted.close();
-            publishDealOpened(TENANT, "e-b3-8-after");
-            surviving.awaitFrames(3);
+                // Обрыв на стороне клиента — ушедший браузер: штатного
+                // закрытия подписки в протоколе нет вовсе.
+                aborted.close();
+                publishDealOpened(tenant, after);
+                expected.add(after);
+                surviving.awaitFrames(expected.size());
+                // Оборванная выбывает из набора: последующие записи в неё
+                // не пишутся.
+                assertThat(aborted.ids()).containsExactly(opening);
+            }
 
-            assertThat(surviving.ids())
-                    .containsExactly("e-b3-8-first", "e-b3-8-second", "e-b3-8-after");
-            // Оборванная выбывает из набора: последующие записи в неё не
-            // пишутся, а приём события не роняется — третья запись доехала.
-            assertThat(aborted.ids()).containsExactly("e-b3-8-second");
-            assertThat(recordsSinceStart()).isEqualTo(3L);
+            // Приём события не роняется: каждая запись доехала до выжившей
+            // ровно однажды. Сегодня красно — отказ из тропы
+            // восстановления уходит из слушателя, и обработчик доставляет
+            // запись заново.
+            publishDealOpened(tenant, "e-b3-8-last");
+            expected.add("e-b3-8-last");
+            surviving.awaitFrames(expected.size());
+            assertThat(surviving.ids()).containsExactlyElementsOf(expected);
         }
     }
 

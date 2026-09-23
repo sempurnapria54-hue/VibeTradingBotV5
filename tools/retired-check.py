@@ -144,7 +144,10 @@ SKIP = ('/.claude-archive/', '/.claude/work/history/', '/.claude/work/progress/'
 # и глубина у них на сегмент больше, чем у сервиса. Модели вдобавок
 # сгруппированы каталогом и разведены по слою (`common/model/<слой>`) —
 # отсюда третий шаблон: без него их дерево выпало бы из свипа молча.
-CODE_TREES = ('services/*', 'services/common/*', 'services/common/model/*')
+# `tests` — сквозной набор (уровень 3 шага «Тесты»): каталог верхнего уровня,
+# а не единица `services/` (.claude/decisions/test-contour-design-pass.md,
+# решение 8). Его javadoc несёт доводы обвязки наравне с кодом сервисов.
+CODE_TREES = ('services/*', 'services/common/*', 'services/common/model/*', 'tests')
 CODE_SUFFIXES = ('java', 'json', 'sql', 'yml', 'yaml', 'properties')
 DEPLOY_SUFFIXES = ('yml', 'yaml', 'json')
 # СБОРОЧНЫЕ ФАЙЛЫ В ОБЛАСТИ, и это решение, а не расширение по инерции.
