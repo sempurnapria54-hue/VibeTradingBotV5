@@ -139,6 +139,7 @@ python3 tools/peer-copy-check.py          # исполняемые тела об
 python3 tools/rule-tier-check.py          # каждый файл .claude/rules/ объявляет ярус: `tier: core` либо `paths:`
 python3 tools/snapshot-tail-check.py      # живой снапшот не отсылает к прежним снапшотам как к носителю содержимого
 python3 tools/trap-index-check.py         # раздел ловушек дома — оглавление, тело ловушки — по номеру в .claude/traps/
+python3 tools/rule-touch-guard.py --self-test  # хук чтения корпуса оболочкой: оси доказаны на действующих масках правил
 ```
 
 **`python3` в этой среде — заглушка Windows Store**; команды зовутся через
