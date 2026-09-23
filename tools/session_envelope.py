@@ -104,6 +104,7 @@ def fields(path):
     print("ST_PHASE=%s" % quote(structured.get("phase")))
     print("ST_STEP=%s" % quote(structured.get("step")))
     print("ST_TITLE=%s" % quote(step_title(structured.get("step_title"))))
+    print("ST_LANDINGS=%s" % quote(structured.get("landings")))
     return 0
 
 

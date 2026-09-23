@@ -34,7 +34,8 @@ Vault в не-dev режиме.
 | Postgres-test `5441` | **слушает** (БД `tradingbot_test`) | запуск приложения профиля `test` из IDEA |
 | Сеть до биржи | **есть** | `GET /api/v5/public/time` → `HTTP 200`, `code=0` |
 | Лаунчер Python | **`py -3`** → Python 3.11.9; `python3` и `python` в Git Bash — заглушки WindowsApps: печатают `Python` без версии, код не исполняют | `py -3 -c "print(1)"` → `1`; `python3 -c "print(1)"` → исполнения нет |
-| Сборка дерева | реактор из корня, обёрткой `bash tools/reactor-test.sh`; точечно — `mvn -o -am -pl <модуль> test` | прогон обёртки |
+| Сборка дерева | реактор из корня, обёрткой `bash tools/reactor-test.sh`; точечно — `mvn -o -am -pl <модуль> test`. **Длительность реактора — 16 мин** на дереве с восемью ящиками (замер 2026-09-22: 16 мин 23 с, 1678 файлов, 4713 тестов, машина занята параллельной работой) | прогон обёрткой; замер — `date +%s` до и после |
+| Предел вызова инструмента | **умолчание 30 мин, предел 120 мин** — `BASH_DEFAULT_TIMEOUT_MS=1800000`, `BASH_MAX_TIMEOUT_MS=7200000` в `.claude/settings.json`; действуют в каждой сессии проекта, включая цепочку. Прогон идёт на переднем плане одним вызовом и в умолчание укладывается (`.claude/rules/long-run-wait.md`); прежний предел CLI — 10 мин — реактор не вмещал, и сессии уходили в фон с опросом | проба 2026-09-22: сессия `claude -p` печатает обе переменные из `settings.json` |
 | Артефакты тестового контура | **есть с 2026-09-19** — Testcontainers `2.0.2` (`testcontainers-postgresql`, `-kafka`, `-vault`, `-junit-jupiter`), `spring-boot-testcontainers` `4.0.0`, WireMock `wiremock-standalone:3.13.1`; Awaitility приезжает со `spring-boot-starter-test`. Версию Testcontainers держит Boot: своя разошлась бы с `testcontainers-bom` каркаса | прайминг §«Воспроизводимые команды»; `ls ~/.m2/repository/org/testcontainers/` |
 | Образы субстрата ящика | **есть** — `timescale/timescaledb-ha:pg17.10-ts2.29.2` (тот же тег, что в `deploy/base`) и `hashicorp/vault:1.15` с 2026-09-19; `apache/kafka:4.1.1` с 2026-09-20 (версия клиента `kafka-clients` дерева — манифест стенда версии брокера не называет вовсе, её выбирает оператор). Образ базы весит около 4 GB на диске и приезжает **разово**, как и jar'ы: прогон ящика его не тянет | `docker images`; пробы совпадения тегов — `SubstrateImagePinTest` деревьев `auth` и `trading-core` |
 | Демо-ключ OKX | **доказан отрицанием**: тот же ключ **без** заголовка `x-simulated-trading` → `HTTP 401`, `50101 APIKey does not match current environment`; с заголовком → `code=0` | прогон 2026-08-31 |
@@ -73,7 +74,8 @@ docker pull timescale/timescaledb-ha:pg17.10-ts2.29.2   # тег — как в d
 docker pull hashicorp/vault:1.15
 docker pull apache/kafka:4.1.1                          # версия клиента kafka-clients дерева
 
-bash tools/reactor-test.sh                   # компиляция всех деревьев + весь unit-набор
+bash tools/reactor-test.sh                   # компиляция всех деревьев + весь unit-набор;
+                                             # одним вызовом на переднем плане, без фона и опроса
 mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \
   -Dsurefire.failIfNoSpecifiedTests=false    # точечно; разделитель классов — запятая
 ```
@@ -104,3 +106,4 @@ mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \
 - Локальный стенд кластера — `.claude/skills/local-stand.md`.
 - Нормы проверочных команд и ловушки среды —
   `.claude/rules/measurement-commands.md`.
+- Ожидание прогона одним вызовом — `.claude/rules/long-run-wait.md`.

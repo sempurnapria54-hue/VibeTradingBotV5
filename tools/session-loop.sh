@@ -85,6 +85,11 @@ esac
 # работа — так оборвалась фоновая критика, и конверт о ней уже не отчитался.
 # Ноль снимает потолок; время сессии ограничивает SESSION_TIMEOUT, для того он
 # и есть. Значение из среды не перебивается: держатель вправе вернуть потолок.
+#
+# ПРОГОНЫ ПРИ ЭТОМ ФОНОМ НЕ ИДУТ. Сборка и реактор идут на переднем плане
+# одним вызовом (.claude/rules/long-run-wait.md); предел таймаута вызова и
+# его умолчание задаёт .claude/settings.json — сессия читает его сама, цикл
+# его не дублирует. Снятый потолок нужен субагентам, а не прогонам.
 export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS="${CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS:-0}"
 
 MAX=1
@@ -104,7 +109,11 @@ done
 # только на границе шага: условно обязательное поле модель заполняет по своему
 # прочтению условия, и на `step_done` — там, где оно и нужно, — его могло бы не
 # оказаться. Из них собирается сообщение коммита (tools/session-prompt.md).
-SCHEMA='{"type":"object","properties":{"status":{"type":"string","enum":["continue","step_done","holder_decision","phase_done","blocked"]},"gates_green":{"type":"boolean"},"phase":{"type":"integer"},"step":{"type":"integer"},"step_title":{"type":"string"},"summary":{"type":"string"}},"required":["status","gates_green","phase","step","step_title","summary"],"additionalProperties":false}'
+# `landings` — число приземляемых точек, записанных сессией в хронику (групп
+# ящика, документов модуля): самоотчёт, как и `gates_green`; по нему
+# tools/session-stats.py мерит, продолжает ли сессия внутри единицы
+# (.claude/rules/session-work-unit.md §«Внутри единицы сессия продолжает»).
+SCHEMA='{"type":"object","properties":{"status":{"type":"string","enum":["continue","step_done","holder_decision","phase_done","blocked"]},"gates_green":{"type":"boolean"},"phase":{"type":"integer"},"step":{"type":"integer"},"step_title":{"type":"string"},"landings":{"type":"integer"},"summary":{"type":"string"}},"required":["status","gates_green","phase","step","step_title","landings","summary"],"additionalProperties":false}'
 
 JOURNAL="$LOOP_DIR/journal.md"
 RAW_DIR="$LOOP_DIR/raw"
@@ -329,7 +338,7 @@ for (( n = 1; n <= MAX; n++ )); do
 
   TOTAL_COST="$(py -3 -c "import sys; print(round(float(sys.argv[1])+float(sys.argv[2]), 4))" "$TOTAL_COST" "$COST")"
 
-  jrn "- сессия: \`$SESSION_ID\`, ходов: ${NUM_TURNS:-?}, отказов прав: ${DENIALS:-?}"
+  jrn "- сессия: \`$SESSION_ID\`, ходов: ${NUM_TURNS:-?}, отказов прав: ${DENIALS:-?}, приземлений: ${ST_LANDINGS:-?}"
   jrn "- стоимость: \$${COST} (за запуск: \$${TOTAL_COST})"
   jrn "- статус: **${ST_STATUS:-нет}**, гейты: **${ST_GATES:-нет}**, шаг: ${ST_PHASE:-?}-${ST_STEP:-?} «${ST_TITLE:-?}»"
   jrn "- \`result\`: \`${RESULT}\`"
@@ -340,7 +349,7 @@ for (( n = 1; n <= MAX; n++ )); do
   STEP_ID="?"; STEP_STATUS="?"
   eval "$(py -3 "$FEED" step "$STEP_BEFORE")"
   GATES_WORD="гейты зелены"; [ "${ST_GATES:-}" = "true" ] || GATES_WORD="гейты КРАСНЫ"
-  feed "■ сессия $n закрыта · $STEP_BEFORE: $STATUS_BEFORE → $STEP_STATUS · ${ST_STATUS:-без статуса} · $GATES_WORD · \$${COST}"
+  feed "■ сессия $n закрыта · $STEP_BEFORE: $STATUS_BEFORE → $STEP_STATUS · ${ST_STATUS:-без статуса} · $GATES_WORD · приземлений: ${ST_LANDINGS:-?} · \$${COST}"
   printf '        итог: %s\n' "${ST_SUMMARY:-(не назван)}"
 
   if [ "$IS_ERROR" = "true" ]; then

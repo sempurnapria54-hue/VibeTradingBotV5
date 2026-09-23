@@ -14,7 +14,10 @@
 трогается: ни маркеров, ни «отчитайся» — лента выводится из того, что сессия
 и так делает. Поток при этом ПИШЕТСЯ В ФАЙЛ ОТВЕТА ЦЕЛИКОМ (`--raw`):
 итоговый конверт лежит его последней строкой, и `tools/session_envelope.py`
-читает его оттуда.
+читает его оттуда. Строки самой ленты — с временем — пишутся рядом, в
+боковой файл `<ответ>.feed.txt` (для `raw/x-3.ndjson` — `raw/x-3.feed.txt`):
+по ним `tools/session-stats.py` считает долю закрытия во времени сессии;
+в потоке событий времени нет вовсе.
 
 ЧТО ВЫВОДИТСЯ ИЗ ЧЕГО — и где граница вывода, названная, а не умолчанная:
   * `читает:` — инструменты Read/Glob/Grep/WebFetch/WebSearch и команды
@@ -154,6 +157,8 @@ def shorten(text, width=COMMAND_WIDTH):
 class Feed:
     def __init__(self, raw_path, out=sys.stdout, effort=None):
         self.raw = open(raw_path, "w", encoding="utf-8", newline="")
+        side = raw_path[: -len(".ndjson")] if raw_path.endswith(".ndjson") else raw_path
+        self.side = open(side + ".feed.txt", "w", encoding="utf-8", newline="")
         self.out = out
         self.effort = effort
         self.cwd = os.getcwd()
@@ -168,7 +173,10 @@ class Feed:
     # --- вывод
 
     def line(self, text, stamp=None):
-        print("%s %s" % (stamp or clock(), text), file=self.out, flush=True)
+        row = "%s %s" % (stamp or clock(), text)
+        print(row, file=self.out, flush=True)
+        self.side.write(row + "\n")
+        self.side.flush()
 
     def action(self, text, prefix="", stamp=None):
         self.flush_batch()
@@ -411,6 +419,7 @@ class Feed:
             self.line("  %sпрогон: %s → исход не получен" % (prefix, label), stamp)
         self.pending.clear()
         self.raw.close()
+        self.side.close()
 
     # --- ввод
 
