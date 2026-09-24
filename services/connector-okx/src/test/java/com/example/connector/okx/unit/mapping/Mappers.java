@@ -75,7 +75,7 @@ final class Mappers {
     }
 
     static MarketSnapshotMapperImpl marketSnapshot() {
-        return new MarketSnapshotMapperImpl();
+        return withConverter(new MarketSnapshotMapperImpl());
     }
 
     static TimeFrameMapperImpl timeFrame() {

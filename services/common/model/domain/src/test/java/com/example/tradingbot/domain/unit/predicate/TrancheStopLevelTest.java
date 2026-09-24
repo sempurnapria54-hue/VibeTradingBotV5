@@ -14,6 +14,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTra
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -138,6 +139,55 @@ class TrancheStopLevelTest {
                 List.of(standaloneStop(1L, AlgoOrder.Status.ACTIVE, "10", "90")));
 
         assertThat(subject.stopUnresolved()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U3.11 — длинное направление, уровень акта выше самого благоприятного")
+    void u3_11_aLongLevelAboveTheBestKeepsProtection() {
+        assertThat(threeLevels().stopLevelKeepsProtection(new BigDecimal("120"), StrategyTradeDirection.LONG))
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("U3.12 — длинное направление, уровень акта равен самому благоприятному")
+    void u3_12_aLongLevelEqualToTheBestKeepsProtection() {
+        assertThat(threeLevels().stopLevelKeepsProtection(new BigDecimal("110"), StrategyTradeDirection.LONG))
+                .isTrue();
+    }
+
+    /** Перенос мог бы заместить лучшую защиту: уровень между худшим и лучшим её отодвигает. */
+    @Test
+    @DisplayName("U3.13 — длинное направление, уровень акта между худшим и лучшим")
+    void u3_13_aLongLevelBetweenWorstAndBestWeakens() {
+        assertThat(threeLevels().stopLevelKeepsProtection(new BigDecimal("105"), StrategyTradeDirection.LONG))
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("U3.14 — короткое направление: благоприятна нижняя сторона")
+    void u3_14_shortComparesAgainstTheLowestLevel() {
+        DealTranche subject = threeLevels();
+
+        assertThat(subject.stopLevelKeepsProtection(new BigDecimal("90"), StrategyTradeDirection.SHORT)).isTrue();
+        assertThat(subject.stopLevelKeepsProtection(new BigDecimal("95"), StrategyTradeDirection.SHORT)).isFalse();
+    }
+
+    /** Ослаблять нечего: первая защита над непокрытым траншем. */
+    @Test
+    @DisplayName("U3.15 — живых защит с уровнем нет, уровень акта назван")
+    void u3_15_withoutALevelAnyDeclaredLevelKeepsProtection() {
+        DealTranche subject = trancheOf(trancheWithExposure("10"), List.of(), List.of());
+
+        assertThat(subject.stopLevelKeepsProtection(new BigDecimal("50"), StrategyTradeDirection.LONG)).isTrue();
+    }
+
+    /** Подтяжку нечем доказать — неизмеренное благоприятным умолчанием не читается. */
+    @Test
+    @DisplayName("U3.16 — уровень акта пуст")
+    void u3_16_anAbsentActLevelDoesNotKeepProtection() {
+        assertThat(threeLevels().stopLevelKeepsProtection(null, StrategyTradeDirection.LONG)).isFalse();
+        assertThat(trancheOf(trancheWithExposure("10"), List.of(), List.of())
+                .stopLevelKeepsProtection(null, StrategyTradeDirection.LONG)).isFalse();
     }
 
     /** Три живые защиты с уровнями 100, 90 и 110. */

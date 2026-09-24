@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
+import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.model.PairCheck;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
@@ -22,8 +23,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * Прикладной слой поверхности ядра: чтения торгового состояния и
- * назначение чисел риск-аппетита.
+ * Прикладной слой поверхности ядра: чтения торгового состояния,
+ * назначение чисел риск-аппетита и плеча пары.
  *
  * <p><b>Отдаёт и принимает ДОМЕННЫЕ модели.</b> Перевод api ↔ domain
  * делает контроллер маппером — это граница слоёв, и сервис её не
@@ -112,6 +113,18 @@ public class TradingSurfaceService {
     public Tenant applyRiskAppetite(String tenantInternalId, Tenant appetite) {
         appetite.setInternalId(tenantInternalId);
         return tenantRiskAppetiteDataService.applyRiskAppetite(appetite);
+    }
+
+    /**
+     * Назначить торговые настройки счёта на инструменте. Держатель
+     * назначает только плечо (docs/rules/trading-constraints.md); прочие поля
+     * пары пишут свои писатели, и из запрошенного состояния они не берутся.
+     */
+    public AccountInstrumentState applyPairSettings(Long exchangeAccountId, String instrumentInternalId,
+                                                    AccountInstrumentState requested) {
+        Long instrumentId = instrumentDataService.getRequiredIdByInternalId(instrumentInternalId);
+        return accountInstrumentStateDataService.assignLeverage(exchangeAccountId, instrumentId,
+                requested.getLeverage());
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.example.marketdata;
 
 import com.example.platform.client.ServiceClientConfig;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.platform.jobs.JobExecutionGuard;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -33,7 +34,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableAsync
 @EnableScheduling
 @ConfigurationPropertiesScan
-@Import({JobExecutionGuard.class, ServiceClientConfig.class})
+@Import({AccessDenialHandler.class, JobExecutionGuard.class, ServiceClientConfig.class})
 @EntityScan({"com.example.marketdata", "com.example.tradingbot.persistence.model"})
 @SpringBootApplication(scanBasePackages = {"com.example.marketdata", "com.example.strategy.engine"})
 public class MarketDataApplication {

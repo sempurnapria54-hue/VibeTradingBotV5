@@ -81,9 +81,13 @@ safety-flow`. `lever` не хранится в `Position` /
 Instrument.externalId    → instId
 adapter const isolated   → mgnMode (если поддерживается источником)
 adapter const net        → posSide (если применимо)
-settle currency / USDT   → ccy
+settle currency / USDT   → ccy (необязательна: пусто — поле не уходит)
 adapter technical policy → autoCxl
 ```
+
+Валюта расчёта необязательна и на входе коннектора: снятие риска по позиции
+на инструменте вне контура её не знает
+(`docs/components/KillSwitchExecutor.md` §«Риск вне графа сделок»).
 
 Response — ACK, не финальный статус (`ack-not-runtime-truth.md`).
 
@@ -144,7 +148,7 @@ lever   <= биржевой максимум (externalMaxLeverage)
 Instrument.externalId     → instId
 adapter constant isolated → mgnMode
 adapter constant net      → posSide
-settle currency / USDT    → ccy
+settle currency / USDT    → ccy (опц.; пусто — поле не уходит)
 adapter technical policy  → autoCxl
 ```
 

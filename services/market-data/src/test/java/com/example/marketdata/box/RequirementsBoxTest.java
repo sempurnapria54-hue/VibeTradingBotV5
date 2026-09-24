@@ -255,13 +255,10 @@ class RequirementsBoxTest extends SharedMarketDataBox {
      * Ожидание формы тела взято из дома: отказ, произведённый
      * контейнером, есть тот же контракт, что и отказ приложения
      * (docs/rules/error-handling-policy.md §«Отказ, произведённый
-     * контейнером, — тот же контракт»). Сегодня контейнер отдаёт своё
-     * тело; долг — `.claude/work/backlog.md` §«Единый error-DTO у
-     * поверхностей соседних сервисов». Отсутствие операции отзыва при
-     * этом ЗЕЛЕНО: границу кейс и предъявляет.
+     * контейнером, — тот же контракт»). Отсутствие операции отзыва — та
+     * граница, которую кейс и предъявляет.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B1.14 — отзыва требования у поверхности нет")
     void b1_14_theSurfaceCarriesNoRequirementWithdrawal() {
         String instrument = provisionInstruments(INSTRUMENT).getFirst();

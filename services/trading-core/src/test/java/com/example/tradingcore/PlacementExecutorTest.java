@@ -27,6 +27,7 @@ import com.example.tradingcore.domain.command.ActionKind;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
+import com.example.tradingcore.domain.command.RuntimeErrorCode;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingcore.domain.command.ServiceCommandPayload;
@@ -282,6 +283,30 @@ class PlacementExecutorTest {
         assertThatThrownBy(() -> submitOrderExecutor().execute(submitCommand(row), row, context(deal())))
                 .isInstanceOf(ExchangeIntegrationException.class);
 
+        verify(exchange, never()).placeOrder(any(), any(), any());
+    }
+
+    /**
+     * Назначение плеча сняли между преконтролем и отправкой: открывающая
+     * заявка не уходит, и исход — нарушение инварианта, а не сбой площадки.
+     * Тихая постановка налила бы вход на плече, которого никто не назначал
+     * (docs/rules/trading-constraints.md).
+     */
+    @Test
+    void anUnassignedLeverageStopsTheEntryAsAnInvariantBreach() {
+        Order entry = stored(new Order(), 100L);
+        entry.setDealId(DEAL);
+        entry.setStatus(Order.Status.CREATED);
+        when(orderDataService.getRequiredById(100L)).thenReturn(entry);
+        SubmitOrderExecutor executor = submitOrderExecutor();
+        when(pairStateDataService.getRequiredByPair(any(), any())).thenReturn(new AccountInstrumentState());
+
+        DealActionState row = row();
+        ServiceCommandExecutionResult result = executor.execute(submitCommand(row), row, context(deal()));
+
+        assertThat(result.getSuccess()).isFalse();
+        assertThat(result.getErrorCode()).isEqualTo(RuntimeErrorCode.VALIDATION_ERROR);
+        verify(exchange, never()).setLeverage(any(), any(), any());
         verify(exchange, never()).placeOrder(any(), any(), any());
     }
 

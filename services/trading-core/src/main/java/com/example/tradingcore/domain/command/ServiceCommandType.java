@@ -74,5 +74,17 @@ public enum ServiceCommandType {
     MARK_DEAL_ERROR_COMMAND,
 
     /** Поставить аварийный терминал сделки. */
-    MARK_DEAL_EMERGENCY_CLOSED_COMMAND
+    MARK_DEAL_EMERGENCY_CLOSED_COMMAND;
+
+    /**
+     * Команда группы «отмена и закрытие»: снимает заявку, условную заявку,
+     * встроенную защиту либо закрывает позицию
+     * (docs/components/models/ServiceCommand.md §«Енум {@code ServiceCommandType}»).
+     */
+    public Boolean isCancelOrClose() {
+        return CANCEL_ORDER_COMMAND.equals(this)
+                || CANCEL_ALGO_ORDER_COMMAND.equals(this)
+                || CANCEL_ATTACHED_PROTECTION_COMMAND.equals(this)
+                || CLOSE_POSITION_COMMAND.equals(this);
+    }
 }

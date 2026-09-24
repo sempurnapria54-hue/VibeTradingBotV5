@@ -7,6 +7,7 @@ import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.connector.okx.credentials.ExchangeCredentials;
@@ -85,7 +86,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
 /**
- * OKX-реализация {@link IntegrationService}: публичные endpoint'ы
+ * Читатель источника OKX за шлюзом коннектора
+ * ({@link com.example.connector.okx.gateway.OkxExchangeGateway}): публичные endpoint'ы
  * (instruments / candles) и приватные торговые (через подписанный
  * клиент) — ходит через {@link OkxRestClient}, валидирует структуру/код
  * ответа и отдаёт нормализованные снапшоты
@@ -247,8 +249,28 @@ public class OkxSourceReader {
         // для SWAP/FUTURES помечает deprecated, и прогон контура застал их
         // пустыми (наблюдение AG12.1).
         return emptyIfNull(rates.getFeeGroup()).stream()
+                .map(group -> verifyFeeGroupContract(group, externalInstrumentType))
                 .map(group -> tradeFeeRateMapper.integrationToSnapshot(rates, group))
                 .collect(toList());
+    }
+
+    /**
+     * Структурная валидация группы ставок — до маппинга
+     * (docs/models/mapping/TradeFeeRate.md §«Validation (структурная, до
+     * маппинга)»): ключ группы и обе ставки непусты. Пустая ставка ниже
+     * была бы молчаливым выпадом прогноза комиссии, а группа без ключа —
+     * строкой, которую не к чему ключевать. Неразбираемое число и время
+     * отвергает сеть разбора шлюза.
+     */
+    private TradeFeeOkxResponse.FeeGroupOkxResponse verifyFeeGroupContract(
+            TradeFeeOkxResponse.FeeGroupOkxResponse group, String externalInstrumentType) {
+        if (isBlank(group.getGroupId()) || isBlank(group.getTaker()) || isBlank(group.getMaker())) {
+            throw new ExternalInvariantViolationException(
+                    "trade-fee: пусто обязательное поле группы instType=" + externalInstrumentType
+                            + " groupId=" + group.getGroupId() + " taker=" + group.getTaker()
+                            + " maker=" + group.getMaker());
+        }
+        return group;
     }
     public MarketPriceDataExternalSnapshot getMarketPriceData(String externalInstrumentId) {
         OkxApiResponse<TickerOkxResponse> response = execute(
@@ -359,23 +381,35 @@ public class OkxSourceReader {
             return List.of();
         }
         return response.getData().stream()
-                .map(record -> verifyBelongsToInstrument(record, externalInstrumentId))
+                .map(record -> verifyCloseRecordContract(record, externalInstrumentId))
                 .map(positionMapper::integrationToCloseSnapshot)
                 .collect(toList());
     }
 
     /**
-     * Структурная проверка принадлежности записи запрошенному
-     * инструменту. Без неё корректность чтения держалась бы только
-     * фильтром запроса — знанием вызывающего, а не фактом ответа
-     * (docs/models/mapping/PositionCloseResult.md).
+     * Структурная валидация записи закрытия — там, где ответ впервые
+     * разбирается (docs/models/mapping/PositionCloseResult.md §«Структурная
+     * валидация — до маппинга»).
+     *
+     * <p>Здесь проверяются принадлежность записи запрошенному инструменту и
+     * непустота готового net и его валюты. Прочие проверки дома стоят там,
+     * где значение разбирается: четыре правых операнда пар пустыми не
+     * бывают по конвенции несобытийного поля, направление резолвит
+     * конвертер, неразбираемое число и время отвергает сеть разбора шлюза.
+     * Без принадлежности корректность чтения держалась бы только фильтром
+     * запроса — знанием вызывающего, а не фактом ответа.
      */
-    private PositionsHistoryOkxResponse verifyBelongsToInstrument(PositionsHistoryOkxResponse record,
+    private PositionsHistoryOkxResponse verifyCloseRecordContract(PositionsHistoryOkxResponse record,
                                                                   String externalInstrumentId) {
         if (isFalse(Objects.equals(externalInstrumentId, record.getInstId()))) {
             throw new ExternalInvariantViolationException(
                     "positions-history: запись чужого инструмента: ожидался " + externalInstrumentId
                             + ", пришёл " + record.getInstId());
+        }
+        if (isBlank(record.getRealizedPnl()) || isBlank(record.getCcy())) {
+            throw new ExternalInvariantViolationException(
+                    "positions-history: пусто обязательное поле записи instId=" + externalInstrumentId
+                            + " realizedPnl=" + record.getRealizedPnl() + " ccy=" + record.getCcy());
         }
         return record;
     }

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -117,6 +118,32 @@ final class Bodies {
             if (detail.hasNonNull(field)) {
                 ((ObjectNode) detail).put(field, value);
             }
+        }
+        return text(tree);
+    }
+
+    /**
+     * Эталон, у действия которого поле ОПУЩЕНО — на обоих уровнях
+     * объявления: шагах траншей и агрегатных шагах детали.
+     *
+     * @param actionKey стабильный ключ действия
+     * @param field     имя опускаемого поля
+     */
+    static String withoutActionField(String actionKey, String field) {
+        ObjectNode tree = tree();
+        for (JsonNode detail : elementsOf(tree, "details")) {
+            List<JsonNode> byStatus = new ArrayList<>();
+            elementsOf(detail, "tranches").forEach(tranche -> byStatus.add(tranche.get("stepsByStatus")));
+            byStatus.add(detail.get("stepsByStatus"));
+            byStatus.stream()
+                    .filter(Objects::nonNull)
+                    .forEach(steps -> steps.forEach(list -> list.forEach(step -> {
+                        for (JsonNode action : elementsOf(step, "actions")) {
+                            if (Objects.equals(actionKey, action.path("key").asText(null))) {
+                                ((ObjectNode) action).remove(field);
+                            }
+                        }
+                    })));
         }
         return text(tree);
     }

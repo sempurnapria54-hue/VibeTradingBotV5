@@ -35,7 +35,7 @@
     "riskBaseObservationCandidate": "доступный остаток строки расчётной валюты в приземляемом снимке средств — операнд первого наблюдения базы; пусто — строки расчётной валюты в снимке нет",
     "exchangeRiskBase": "ExchangeAccount.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)",
     "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.safetyRung = ENTRY_BLOCKED либо TRADE_BLOCKED (docs/rules/instrument-hold.md §Enforcement). Рабочее состояние и онбординговые статусы значения не дают",
-    "actInSafetyBlockSet": "класс проверяемого акта входит в блок-сет safety-ступени: risk-creating, risk-increasing либо risk-weakening (ослабление защиты). Снятие риска и reduce-only-выход в блок-сет не входят — сделки доживают под своей защитой (docs/rules/instrument-hold.md)"
+    "actInSafetyBlockSet": "класс проверяемого акта входит в блок-сет safety-ступени: risk-creating, risk-increasing либо risk-weakening (ослабление защиты). Защитное действие ослабляет защиту, только когда его уровень отступает от защиты своего транша — величина actStopKeepsProtection (docs/spec/protection-coverage.json) ложна; подтяжка стопа, перевод в безубыток и первая защита над непокрытым траншем в блок-сет не входят, трейлинг и действие без названного транша — входят. Снятие риска и reduce-only-выход в блок-сет не входят — сделки доживают под своей защитой (docs/rules/instrument-hold.md)"
   },
   "values": [
     {

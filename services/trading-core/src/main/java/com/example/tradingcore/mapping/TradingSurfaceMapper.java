@@ -4,11 +4,14 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
+import com.example.tradingcore.api.model.AccountInstrumentStateApiRequest;
+import com.example.tradingcore.api.model.AccountInstrumentStateApiResponse;
 import com.example.tradingcore.api.model.DealApiResponse;
 import com.example.tradingcore.api.model.DealTrancheApiResponse;
 import com.example.tradingcore.api.model.RiskAppetiteApiRequest;
 import com.example.tradingcore.api.model.RiskAppetiteApiResponse;
 import com.example.tradingcore.api.model.SafetyStateApiResponse;
+import com.example.tradingcore.domain.account.AccountInstrumentState;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
@@ -54,4 +57,16 @@ public interface TradingSurfaceMapper {
     @Mapping(target = "accountSafetyRung", source = "safetyRung")
     @Mapping(target = "accountStatus", source = "status")
     SafetyStateApiResponse domainToApi(ExchangeAccount account);
+
+    /**
+     * Назначение настроек пары в доменную модель. Пара приходит путём
+     * вызова, а не телом: она адресует ресурс, а не описывает его.
+     */
+    AccountInstrumentState apiToDomain(AccountInstrumentStateApiRequest request);
+
+    /**
+     * Состояние пары в модель ответа. Идентичности счёта и инструмента
+     * маппером не заполняются — их резолвит вызывающий.
+     */
+    AccountInstrumentStateApiResponse domainToApi(AccountInstrumentState state);
 }

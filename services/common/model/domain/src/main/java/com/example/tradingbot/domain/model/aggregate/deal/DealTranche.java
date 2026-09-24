@@ -373,6 +373,46 @@ public class DealTranche extends Auditable {
      * самый НИЗКИЙ уровень, у короткой — самый высокий.
      */
     public BigDecimal worstActiveStopLevel(StrategyTradeDirection direction) {
+        Stream<BigDecimal> levels = activeStopLevels();
+        return StrategyTradeDirection.SHORT.equals(direction)
+                ? levels.max(BigDecimal::compareTo).orElse(null)
+                : levels.min(BigDecimal::compareTo).orElse(null);
+    }
+
+    /**
+     * Уровень остановки убытка, который действие ставит на транш, его
+     * защиты НЕ ОСЛАБЛЯЕТ: он не дальше от цены, чем самый благоприятный
+     * из действующих уровней транша, либо действующего уровня у транша нет
+     * вовсе (docs/spec/protection-coverage.json, величина
+     * {@code actStopKeepsProtection}).
+     *
+     * <p><b>Сравнение — с САМЫМ благоприятным уровнем, а не с действующим
+     * (худшим).</b> Перенос замещает одну из защит транша, и какую именно,
+     * предикат не знает: уровень между худшим и лучшим подтягивал бы худшую
+     * защиту и отодвигал бы лучшую. Уровень, не уступающий лучшей, не
+     * ослабляет ни одной.
+     *
+     * <p>Пустой уровень — {@code false}: подтяжку нечем доказать, и
+     * неизмеренное благоприятным умолчанием не читается.
+     */
+    public Boolean stopLevelKeepsProtection(BigDecimal level, StrategyTradeDirection direction) {
+        if (isNull(level)) {
+            return false;
+        }
+        Stream<BigDecimal> levels = activeStopLevels();
+        BigDecimal best = StrategyTradeDirection.SHORT.equals(direction)
+                ? levels.min(BigDecimal::compareTo).orElse(null)
+                : levels.max(BigDecimal::compareTo).orElse(null);
+        if (isNull(best)) {
+            return true;
+        }
+        return StrategyTradeDirection.SHORT.equals(direction)
+                ? level.compareTo(best) <= 0
+                : level.compareTo(best) >= 0;
+    }
+
+    /** Действующие уровни всех живых защит транша — встроенных и отдельных. */
+    private Stream<BigDecimal> activeStopLevels() {
         Stream<BigDecimal> attached = emptyIfNull(orders).stream()
                 .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
                 .filter(protection -> isTrue(protection.isActiveLike()))
@@ -380,10 +420,7 @@ public class DealTranche extends Auditable {
         Stream<BigDecimal> standalone = emptyIfNull(algoOrders).stream()
                 .filter(algo -> isTrue(algo.isExchangeLive()) && isTrue(algo.carriesActiveStopLevel()))
                 .map(AlgoOrder::stopLevel);
-        Stream<BigDecimal> levels = Stream.concat(attached, standalone).filter(Objects::nonNull);
-        return StrategyTradeDirection.SHORT.equals(direction)
-                ? levels.max(BigDecimal::compareTo).orElse(null)
-                : levels.min(BigDecimal::compareTo).orElse(null);
+        return Stream.concat(attached, standalone).filter(Objects::nonNull);
     }
 
     /** Хоть одна живая защита транша несёт действующий уровень остановки убытка. */

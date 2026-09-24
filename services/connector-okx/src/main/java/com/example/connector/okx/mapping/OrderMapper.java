@@ -22,10 +22,9 @@ import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 /**
- * Маппинг {@link Order} и вложенного {@link AttachedAlgoOrder} между
- * слоями: domain ↔ persistence, OKX response → snapshot, domain → OKX
- * request (place/cancel), OKX ack → {@link ExchangeAck}. Список
- * attachedAlgoOrders — дочерние строки (оркестрация в OrderDataService).
+ * Маппинг {@link Order} и вложенного {@link AttachedAlgoOrder} на
+ * границе источника: OKX response → snapshot, snapshot → domain, domain →
+ * OKX request (place/cancel), OKX ack → {@link ExchangeAck}.
  * OKX-строки нормализуются {@link OkxResponseConverter}; tdMode/posSide —
  * adapter-константы. См. docs/models/domain/core/Order.md,
  * docs/models/mapping/Order.md.
@@ -59,6 +58,7 @@ public interface OrderMapper {
     @Mapping(target = "internalId", source = "attachAlgoClOrdId")
     @Mapping(target = "externalId", source = "algoId")
     @Mapping(target = "externalType", source = "tpOrdKind")
+    @Mapping(target = "size", source = "sz")
     @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx")
     @Mapping(target = "triggerPriceType", source = "slTriggerPxType",
             qualifiedByName = "okxTriggerPriceType")

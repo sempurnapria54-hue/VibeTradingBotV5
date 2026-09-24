@@ -67,11 +67,12 @@ class ActRiskAndNotionalTest {
     }
 
     @Test
-    @DisplayName("U10.3 — стоимость контракта у правил пуста: оба слагаемых — ноль")
-    void u10_3_anAbsentContractValueZeroesBothSummands() {
+    @DisplayName("U10.3 — стоимость контракта у правил пуста: отказ «правила не материализованы», а не ноль")
+    void u10_3_anAbsentContractValueRefusesTheAct() {
         harness.givenRules(rules(null, "1", "1", "0.0005"));
 
-        assertThat(codes(harness.validate(entryAction(), context(A_HAIR_BELOW_BOTH)))).isEmpty();
+        assertThat(codes(harness.validate(entryAction(), context(A_HAIR_BELOW_BOTH))))
+                .containsExactly(RiskCheckCode.INSTRUMENT_RULES_MISSING);
     }
 
     @Test
@@ -84,22 +85,24 @@ class ActRiskAndNotionalTest {
     }
 
     @Test
-    @DisplayName("U10.5 — якорь пуст: оба слагаемых — ноль")
-    void u10_5_anAbsentAnchorZeroesBothSummands() {
+    @DisplayName("U10.5 — якорь пуст: слагаемые не измерены, акт отказывает вычислением")
+    void u10_5_anAbsentAnchorRefusesTheAct() {
         assertThat(codes(harness.validate(entryAction("10", null, STOP.toPlainString()),
-                context(A_HAIR_BELOW_BOTH)))).isEmpty();
+                context(A_HAIR_BELOW_BOTH))))
+                .containsExactly(RiskCheckCode.CALCULATED_ACTION_INVALID);
     }
 
     @Test
-    @DisplayName("U10.6 — уровень на прибыльной стороне: риск акта отрицателен и клэмпа нулём нет")
-    void u10_6_aNegativeActRiskEntersTheInequalityAsItIs() {
+    @DisplayName("U10.6 — уровень на прибыльной стороне: отрицательный риск акта обрезается нулём")
+    void u10_6_aNegativeActRiskIsClampedToZero() {
         DealContext dealTakingRiskAlready = contextBuilder(deal(new BigDecimal("350"), null))
                 .strategyDetail(detail("1", "3", "10", "300"))
                 .build();
 
         assertThat(codes(harness.validate(entryAction("10", ANCHOR, "3100"), dealTakingRiskAlready)))
-                .as("350 + (−96.95) = 253.05 против потолка 300; клэмп нулём дал бы отказ")
-                .containsExactly(RiskCheckCode.STOP_LOSS_INVALID_SIDE);
+                .as("350 + 0 против потолка 300: отрицательное слагаемое принятого риска не гасит")
+                .containsExactly(RiskCheckCode.STOP_LOSS_INVALID_SIDE,
+                        RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_EXCEEDED);
     }
 
     @Test

@@ -92,7 +92,7 @@ class AttachedFromStandaloneAlgoTest {
                 .doesNotContain("slOrdPx", "orderPrice", "stopLossOrderPrice");
     }
 
-    /** Та же величина, два разных пути, и один из них её теряет ({@code U8.8}). */
+    /** Та же величина, что у формы из тела родителя ({@code U8.8}): обе тропы её переносят. */
     @Test
     @DisplayName("U9.7 — объявленный размер записи переносится")
     void u9_7_theDeclaredSizeIsCarriedHere() {

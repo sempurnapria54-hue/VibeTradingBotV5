@@ -8,6 +8,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.pairState;
 import static com.example.tradingcore.unit.risk.RiskFixture.priceBuilder;
+import static com.example.tradingcore.unit.risk.RiskFixture.protectionAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.rules;
 import static com.example.tradingcore.unit.risk.RiskFixture.withPrice;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingContext;
@@ -178,11 +179,20 @@ class TradingConstraintsTest {
     }
 
     @Test
-    @DisplayName("U2.15 — плечо пары не назначено: биржевой максимум охраняет площадка")
-    void u2_15_anUnassignedLeverageRejectsNothing() {
+    @DisplayName("U2.15 — плечо пары не назначено, акт создаёт риск: отказ, а не молчание")
+    void u2_15_anUnassignedLeverageRejectsARiskCreatingEntry() {
         harness.givenPairState(pairStateWithLeverage(null));
 
-        assertThat(codes(harness.validate(entryAction(), workingContext()))).isEmpty();
+        assertThat(codes(harness.validate(entryAction(), workingContext())))
+                .containsExactly(RiskCheckCode.LEVERAGE_NOT_CONFIGURED);
+    }
+
+    @Test
+    @DisplayName("U2.18 — плечо пары не назначено, акт риска не создаёт: отказа нет")
+    void u2_18_anUnassignedLeverageLeavesAProtectiveActAlone() {
+        harness.givenPairState(pairStateWithLeverage(null));
+
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext()))).isEmpty();
     }
 
     @Test

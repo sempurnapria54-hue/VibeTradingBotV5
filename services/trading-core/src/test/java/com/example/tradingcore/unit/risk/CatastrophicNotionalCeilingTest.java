@@ -131,14 +131,14 @@ class CatastrophicNotionalCeilingTest {
     }
 
     @Test
-    @DisplayName("U15.9 — стоимость контракта пуста: экспозиция сделки ноль")
-    void u15_9_anAbsentContractValueZeroesTheDealExposure() {
+    @DisplayName("U15.9 — стоимость контракта пуста: экспозиция не измерена, отказ до потолков")
+    void u15_9_anAbsentContractValueRefusesBeforeTheCeilings() {
         harness.givenRules(rules(null, "1", "1", "0.0005"));
         DealContext dealContext = contextWith(episode("10", ANCHOR), List.of(freeLeg("100", "50")), "0.00001");
 
         assertThat(codes(harness.validate(weakeningAction(), dealContext)))
-                .as("потолок в одну сотую не перебирается: складывать нечего")
-                .containsExactly(RiskCheckCode.PROTECTION_COVERAGE_REDUCED);
+                .as("нулевая экспозиция была бы благоприятным умолчанием")
+                .containsExactly(RiskCheckCode.INSTRUMENT_RULES_MISSING);
     }
 
     @Test

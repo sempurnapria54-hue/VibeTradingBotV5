@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -103,18 +102,14 @@ class CatalogReadsBoxTest extends SharedMarketDataBox {
      * Ожидание формы тела взято из дома: отказ, произведённый
      * контейнером, есть тот же контракт, что и отказ приложения
      * (docs/rules/error-handling-policy.md §«Отказ, произведённый
-     * контейнером, — тот же контракт»); долг —
-     * `.claude/work/backlog.md` §«Единый error-DTO у поверхностей
-     * соседних сервисов». Сам потолок при этом ЗЕЛЁН: предел объявлен
-     * полем запроса, и нарушивший его вызов до тела контроллера не
-     * доходит.
+     * контейнером, — тот же контракт»). Предел объявлен полем запроса, и
+     * нарушивший его вызов до тела контроллера не доходит.
      *
      * <p><b>Того, что выборки к базе не производится, клетка не
      * наблюдает</b>, и это названо: снаружи процесса видно отсутствие
      * ОТВЕТА, а не отсутствие запроса к своей же базе.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B7.5 — у окна есть потолок")
     void b7_5_theWindowHasACeiling() {
         String instrument = provisionInstruments(INSTRUMENT).getFirst();

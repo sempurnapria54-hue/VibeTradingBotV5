@@ -150,13 +150,13 @@ class StrategyStepSelectionOrderTest {
     }
 
     @Test
-    @DisplayName("U23.9 — второе действие пропущено: пропущенное в счёт не идёт")
-    void u23_9_aSkippedRowDoesNotCountAsApplied() {
+    @DisplayName("U23.9 — второе действие пропущено: пропущенное пакет исчерпывает, отобран второй шаг")
+    void u23_9_aSkippedRowCountsAsApplied() {
         DealContext context = contextWithRows(twoActionFirstStep(),
                 strategyRow(11L, TRANCHE_ID, 1, DealActionStateStatus.COMPLETED),
                 strategyRow(12L, TRANCHE_ID, 1, DealActionStateStatus.SKIPPED));
 
-        assertThat(select(context).getStep().getId()).isEqualTo(1L);
+        assertThat(select(context).getStep().getId()).isEqualTo(2L);
     }
 
     @Test

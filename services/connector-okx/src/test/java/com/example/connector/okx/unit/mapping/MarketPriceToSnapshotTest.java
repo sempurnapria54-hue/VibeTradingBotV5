@@ -8,7 +8,9 @@ import com.example.connector.okx.mapping.MarketPriceDataMapper;
 import com.example.connector.okx.snapshot.MarketPriceDataExternalSnapshot;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -109,17 +111,15 @@ class MarketPriceToSnapshotTest {
                 .doesNotContain("volume", "externalVolume", "vol24h");
     }
 
-    /** Перегрузку в дереве не зовёт никто (`M-7`), и кейс мерит её, пока она стои́т. */
+    /** Форма с ключом базы — приглашение перенести через границу чужой ключ; её не звал никто. */
     @Test
-    @DisplayName("U19.9 — материализация с ключом инструмента")
-    void u19_9_materializationWithTheInstrumentKey() {
-        MarketPriceData price =
-                mapper.snapshotToDomain(mapper.integrationToSnapshot(OkxFixture.ticker()), 42L);
-
-        assertThat(price.getInstrumentId()).isEqualTo(42L);
-        assertThat(price.getExternalInstrumentId()).isEqualTo(OkxFixture.INSTRUMENT);
-        assertThat(price.getExternalLastPrice()).isEqualByComparingTo("100.5");
-        assertThat(price.getExternalTimestamp()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:13:20Z"));
+    @DisplayName("U19.9 — перегрузки материализации с числовым ключом нет")
+    void u19_9_thereIsNoKeyedMaterialization() {
+        assertThat(Arrays.stream(MarketPriceDataMapper.class.getDeclaredMethods())
+                .filter(method -> "snapshotToDomain".equals(method.getName()))
+                .map(Method::getParameterCount)
+                .toList())
+                .containsExactly(1);
     }
 
     /** Числовой ключ базы границу сервиса не переходит: связь ставит владелец сущности. */
@@ -133,19 +133,10 @@ class MarketPriceToSnapshotTest {
         assertThat(price.getExternalLastPrice()).isEqualByComparingTo("100.5");
     }
 
-    /** Охрана конъюнктивна (звено `Z1`) только у перегрузки с ключом. */
     @Test
-    @DisplayName("U19.11 — пустота у односоставного перехода и у обеих перегрузок материализации")
-    void u19_11_emptinessMeetsTwoDifferentGuards() {
+    @DisplayName("U19.11 — пустота у разбора и у материализации даёт пустоту")
+    void u19_11_emptinessInIsEmptinessOut() {
         assertThat(mapper.integrationToSnapshot(null)).isNull();
         assertThat(mapper.snapshotToDomain(null)).isNull();
-
-        MarketPriceData withKeyOnly = mapper.snapshotToDomain(null, 42L);
-
-        assertThat(withKeyOnly).isNotNull();
-        assertThat(withKeyOnly.getInstrumentId()).isEqualTo(42L);
-        assertThat(withKeyOnly.getExternalInstrumentId()).isNull();
-        assertThat(withKeyOnly.getExternalLastPrice()).isNull();
-        assertThat(withKeyOnly.getExternalTimestamp()).isNull();
     }
 }

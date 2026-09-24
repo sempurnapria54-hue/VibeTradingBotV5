@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.example.strategy.engine.calc.CalculatedStrategyAction;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
@@ -75,9 +76,14 @@ final class RiskHarness {
         when(appetiteDataService.findByTenantInternalId(any())).thenReturn(Optional.ofNullable(appetite));
     }
 
-    /** Преконтроль рассчитанного действия. */
+    /** Преконтроль рассчитанного действия; транша у действия нет. */
     RiskValidationResult validate(CalculatedStrategyAction action, DealContext dealContext) {
-        return validator.validate(action, dealContext);
+        return validator.validate(action, dealContext, null);
+    }
+
+    /** Преконтроль рассчитанного действия названного транша. */
+    RiskValidationResult validate(CalculatedStrategyAction action, DealContext dealContext, DealTranche tranche) {
+        return validator.validate(action, dealContext, tranche);
     }
 
     /** Вторая точка входа: те же неравенства при нулевом акте. */

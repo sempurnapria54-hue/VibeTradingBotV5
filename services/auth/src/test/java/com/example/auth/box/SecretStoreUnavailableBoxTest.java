@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -46,7 +45,6 @@ class SecretStoreUnavailableBoxTest extends AuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.17 — хранилище секретов недоступно")
     void b2_17_theSecretStoreIsUnavailable() {
         String tenant = provisionTenant("user-b2-17");

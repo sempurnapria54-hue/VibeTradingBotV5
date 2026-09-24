@@ -38,6 +38,20 @@ public class CalculatedSize {
      */
     ExitOutcome exitOutcome;
 
+    /**
+     * Размер выхода ДО выбора исхода — объявленная доля экспозиции транша,
+     * округлённая вниз по шагу лота (docs/spec/order-sizing.json,
+     * {@code exitSize}). Заполняется только у выхода: это операнд
+     * журнального отчёта об округлении, а не размер заявки.
+     */
+    BigDecimal exitSize;
+
+    /**
+     * Остаток экспозиции транша после выхода объявленной доли
+     * (docs/spec/order-sizing.json, {@code exitRemainder}); только у выхода.
+     */
+    BigDecimal exitRemainder;
+
     /** Пояснение расчёта для логов и аудита. */
     String description;
 }

@@ -23,7 +23,7 @@ public class ClosePositionOkxRequest {
     /** Сторона позиции (adapter-константа net). */
     private String posSide;
 
-    /** Валюта расчётов (settle currency). */
+    /** Валюта расчётов (settle currency); необязательна — пустая в тело не уходит. */
     private String ccy;
 
     /** Снять активные ордера при закрытии. */

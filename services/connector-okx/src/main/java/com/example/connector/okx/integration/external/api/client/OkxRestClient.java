@@ -110,17 +110,14 @@ public class OkxRestClient {
     private final SignedRestClientFactory signedClientFactory;
 
     /**
-     * Универсальная точка отправки запроса в OKX и общий core-dispatch
-     * трёх потребителей: продукт (типизированные методы ниже делегируют
-     * сюда), код-тесты и Postman/коллекция (через generic-эндпоинт
-     * {@code /raw}). Выбирает public ({@code okxRestClientHttp}) или signed
+     * Единая точка отправки запроса в OKX: типизированные методы ниже
+     * делегируют сюда. Выбирает public ({@code okxRestClientHttp}) или signed
      * ({@code okxAuthRestClientHttp}) RestClient по {@code signed} (подпись
      * и креды — {@link OkxSigningInterceptor}), строит URI из {@code path}
      * и {@code query} (null/blank-значения опускаются), для write-запросов
      * сериализует {@code body}, биндит ответ в {@code responseType}.
-     * Токен ответа выбирает потребитель: {@code OkxApiResponse<*OkxResponse>}
-     * (продукт), {@code OkxApiResponse<JsonNode>} (контур) или сырой
-     * {@code String}.
+     * Тип ответа выбирает вызывающий типизированный метод —
+     * {@code OkxApiResponse<*OkxResponse>} своей операции.
      */
     public <R> R dispatch(HttpMethod method, String path, Map<String, ?> query, Object body,
                           ExchangeCredentials credentials, ParameterizedTypeReference<R> responseType) {

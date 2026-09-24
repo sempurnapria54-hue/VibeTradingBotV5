@@ -82,7 +82,9 @@ class StopLossSideTest {
     @Test
     @DisplayName("U6.8 — якорь пуст: сверять не с чем")
     void u6_8_anEmptyAnchorSilencesTheSideCheck() {
-        assertThat(codes(harness.validate(entryAction("10", null, "3100"), workingContext()))).isEmpty();
+        assertThat(codes(harness.validate(entryAction("10", null, "3100"), workingContext())))
+                .as("сторону сверять не с чем; отказ пришёл неизмеренными слагаемыми акта")
+                .containsExactly(RiskCheckCode.CALCULATED_ACTION_INVALID);
     }
 
     @Test

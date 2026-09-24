@@ -87,6 +87,9 @@ final class RiskFixture {
     /** Ставка комиссии базовой сборки. */
     static final String FEE = "0.0005";
 
+    /** Рабочее плечо пары базовой сборки — ниже биржевого максимума 125. */
+    static final Integer LEVERAGE = 10;
+
     /** Стоимость контракта базовой сборки. */
     static final String CONTRACT_VALUE = "0.1";
 
@@ -126,7 +129,7 @@ final class RiskFixture {
         return rules;
     }
 
-    /** Строка пары «счёт, инструмент»: изолированная маржа, ступени не стои́т. */
+    /** Строка пары «счёт, инструмент»: изолированная маржа, плечо назначено, ступени не стои́т. */
     static AccountInstrumentState workingPairState() {
         return pairState(Instrument.SafetyRung.ACTIVE);
     }
@@ -138,6 +141,7 @@ final class RiskFixture {
         state.setInstrumentId(INSTRUMENT_ID);
         state.setSafetyRung(rung);
         state.setMarginMode(Instrument.MarginMode.ISOLATED);
+        state.setLeverage(LEVERAGE);
         return state;
     }
 
@@ -463,6 +467,13 @@ final class RiskFixture {
                 .calculatedSize(size("1"))
                 .description("declared stop without trigger price")
                 .build();
+    }
+
+    /** Живой эпизод с названной марк-ценой — операнд охраны переноса уровня. */
+    static Position episodeWithMark(String size, BigDecimal averagePrice, String markPrice) {
+        Position position = episode(size, averagePrice);
+        position.setExternalMarkPrice(decimal(markPrice));
+        return position;
     }
 
     /** Живой эпизод с названной ценой ликвидации. */

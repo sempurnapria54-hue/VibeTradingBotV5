@@ -31,11 +31,9 @@ import org.junit.jupiter.api.Test;
  * у первой потребитель — расчёт прямо сейчас, у второй — история
  * состояния рынка; состав полей у них разный.
  *
- * <p>Кейсы {@code U20.3}, {@code U20.4} и {@code U20.5} в код не пошли:
- * сквозная конвенция «пустая строка источника — пустота» у этого
- * перехода не держится, перевод идёт встроенным преобразованием и
- * отказывает — `.claude/work/backlog.md` §«Снапшот рыночного среза не
- * держит конвенцию пустой строки источника».
+ * <p><b>Пустая строка источника — пустота</b> у полей тикера так же, как у
+ * уровней книги: площадка выражает непроставленное число пустой строкой,
+ * и отказ разбора ронял бы весь срез листинга.
  */
 class MarketSnapshotTest {
 
@@ -70,7 +68,44 @@ class MarketSnapshotTest {
                         "externalAskSize", "externalBidSize");
     }
 
-    /** Рабочая тропа зелена — и именно поэтому дефект пустой строки не виден штатным входом. */
+    /** Площадка так и отдаёт непроставленное число. */
+    @Test
+    @DisplayName("U20.3 — пустая последняя цена даёт пустоту, а не отказ")
+    void u20_3_anEmptyLastPriceIsEmptiness() {
+        TickerOkxResponse response = OkxFixture.ticker();
+        response.setLast("");
+
+        MarketTickerExternalSnapshot snapshot = mapper.integrationToSnapshot(response);
+
+        assertThat(snapshot.getLastPrice()).isNull();
+        assertThat(snapshot.getVolume()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("U20.4 — пустой объём за сутки даёт пустоту, а не отказ")
+    void u20_4_anEmptyVolumeIsEmptiness() {
+        TickerOkxResponse response = OkxFixture.ticker();
+        response.setVol24h("");
+
+        MarketTickerExternalSnapshot snapshot = mapper.integrationToSnapshot(response);
+
+        assertThat(snapshot.getVolume()).isNull();
+        assertThat(snapshot.getLastPrice()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("U20.5 — пустое время среза даёт пустоту, а не отказ")
+    void u20_5_anEmptyTimestampIsEmptiness() {
+        TickerOkxResponse response = OkxFixture.ticker();
+        response.setTs("");
+
+        MarketTickerExternalSnapshot snapshot = mapper.integrationToSnapshot(response);
+
+        assertThat(snapshot.getExternalTimestamp()).isNull();
+        assertThat(snapshot.getLastPrice()).isNotNull();
+    }
+
+    /** Рабочая тропа: непустые значения разобраны числом. */
     @Test
     @DisplayName("U20.6 — непустые значения разобраны верно")
     void u20_6_theWorkingPathIsGreen() {
@@ -191,7 +226,7 @@ class MarketSnapshotTest {
                 .isNotNull().isEmpty();
     }
 
-    /** Уровни разбираются формой, держащей конвенцию пустой строки, — в отличие от полей тикера. */
+    /** Уровни разбираются формой, держащей конвенцию пустой строки, — той же, что поля тикера. */
     @Test
     @DisplayName("U20.15 — пустая цена уровня даёт пустоту, объём не затронут")
     void u20_15_anEmptyLevelPriceIsEmptiness() {

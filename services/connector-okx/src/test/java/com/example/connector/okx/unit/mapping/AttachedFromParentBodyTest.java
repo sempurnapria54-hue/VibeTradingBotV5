@@ -25,10 +25,6 @@ import org.junit.jupiter.api.Test;
  * выводится по набору фактов отдельным резолвером ядра, а снапшот
  * отсюда приезжает с пустым внешним статусом.
  *
- * <p>Кейс {@code U8.8} (перенос размера) в код не пошёл: дом объявляет
- * перенос, код его не делает, и ослабленный под код кейс объявил бы
- * контрактом сам дефект — `.claude/work/backlog.md` §«Размер встроенной
- * защиты из тела родителя в снапшот не переносится».
  */
 class AttachedFromParentBodyTest {
 
@@ -108,6 +104,14 @@ class AttachedFromParentBodyTest {
 
         assertThat(snapshot.getExternalId()).isNotNull().isEmpty();
         assertThat(snapshot.getExternalAttachedId()).isEqualTo("a1");
+    }
+
+    /** Та же величина, что у второй формы снапшота (U9): тропа предъявления её не теряет. */
+    @Test
+    @DisplayName("U8.8 — размер переносится числом")
+    void u8_8_theSizeIsCarriedAsANumber() {
+        assertThat(mapper.integrationToSnapshot(OkxFixture.attachedInParentBody()).getSize())
+                .isEqualByComparingTo("100");
     }
 
     @Test

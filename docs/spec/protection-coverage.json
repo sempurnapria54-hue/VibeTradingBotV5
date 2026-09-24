@@ -26,7 +26,8 @@
     "position.status": "Position.status — статус биржевой записи эпизода (ACTIVE, CLOSED, ERROR)",
     "cancelTargetId": "id снимаемой защиты — операнд преконтроля снятия",
     "deal.status": "Deal.status — durable-колонка статуса сделки. Окно атрибуции закрывающих исполнений уровня сделки открывает координированный выход; ошибочное состояние открывает его только при уже плоской позиции (форма — dealInTeardown)",
-    "tranches[].followingTranchesGross": "Σ gross-экспозиций траншей той же сделки, материализованных ПОЗЖЕ этого (больший DealTranche.id). Суффиксная сумма порядка FIFO: упорядочивание выражается ею, потому что сортировка коллекции в этой форме невыразима. Ключ порядка, перебор альтернатив и названные ограничения правила — docs/models/domain/aggregate/DealTranche.md"
+    "tranches[].followingTranchesGross": "Σ gross-экспозиций траншей той же сделки, материализованных ПОЗЖЕ этого (больший DealTranche.id). Суффиксная сумма порядка FIFO: упорядочивание выражается ею, потому что сортировка коллекции в этой форме невыразима. Ключ порядка, перебор альтернатив и названные ограничения правила — docs/models/domain/aggregate/DealTranche.md",
+    "actStopLevel": "объявленный уровень остановки убытка, который проверяемое защитное действие ставит либо переносит на этот транш; пуст у трейлинга — его уровень наблюдается после активации, в момент постановки уровня нет"
   },
   "values": [
     {
@@ -250,6 +251,11 @@
       "name": "trancheStopCurrent",
       "note": "Действующий уровень защиты транша — наименее благоприятный среди ВСЕХ его действующих защит: у LONG нижний, у SHORT верхний. Класс носителя (встроенная / отдельная / трейлинг) отбор не сужает: под лестницей разноуровневых защит и в окне двойной защиты часть экспозиции останавливается только на худшем уровне, и приоритет носителя занижал бы риск — ошибка в разрешающую сторону (docs/concept.md П1 §3). Защиты нет вовсе — пусто целиком, а не ноль. Защита, которая покрывает, но уровня ещё не наблюдала (трейлинг без цены активации до первого наблюдения), отказывает вычислением: подстановка чужого уровня вместо неизвестного была бы разрешающей ошибкой.",
       "expr": "if(deal.direction == 'LONG', trancheStopLowest, trancheStopHighest)"
+    },
+    {
+      "name": "actStopKeepsProtection",
+      "note": "Уровень защитного действия защиты транша НЕ ОСЛАБЛЯЕТ: он не дальше от цены, чем САМЫЙ благоприятный из действующих уровней транша (у LONG верхний, у SHORT нижний), либо действующего уровня у транша нет вовсе — ослаблять нечего, и первая защита над непокрытым траншем проходит. Сравнение с самым благоприятным, а не с действующим (худшим): перенос замещает одну из защит, и какую именно, операнды не называют; уровень между худшим и лучшим подтягивал бы худшую и отодвигал бы лучшую. Пустой уровень акта — ложь: подтяжку нечем доказать, неизмеренное благоприятным умолчанием не читается (docs/concept.md П1). Читатель — блок-сет safety-ступени у преконтроля (docs/rules/instrument-hold.md §Enforcement; операнд actInSafetyBlockSet docs/spec/risk-limits.json).",
+      "expr": "if(isNull(?actStopLevel), false, if(isNull(trancheStopHighest), true, if(deal.direction == 'SHORT', actStopLevel <= trancheStopLowest, actStopLevel >= trancheStopHighest)))"
     },
     {
       "name": "dealStopLowest",
@@ -2318,6 +2324,201 @@
       },
       "expectRefusal": {
         "stopCurrentLive": "защита покрытия без уровня"
+      }
+    },
+    {
+      "case": "под ступенью: LONG, перенос стопа выше действующего уровня транша — подтяжка, защиту не ослабляет",
+      "state": {
+        "deal": {
+          "direction": "LONG"
+        },
+        "actStopLevel": 2950,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 100
+          }
+        ],
+        "protections": [
+          {
+            "id": "s1",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0,
+            "stopLevel": 2910
+          }
+        ],
+        "commitments": []
+      },
+      "expect": {
+        "actStopKeepsProtection": true
+      }
+    },
+    {
+      "case": "LONG, перенос стопа ниже действующего уровня — ослабление",
+      "state": {
+        "deal": {
+          "direction": "LONG"
+        },
+        "actStopLevel": 2850,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 100
+          }
+        ],
+        "protections": [
+          {
+            "id": "s1",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0,
+            "stopLevel": 2910
+          }
+        ],
+        "commitments": []
+      },
+      "expect": {
+        "actStopKeepsProtection": false
+      }
+    },
+    {
+      "case": "LONG, две защиты 2900 и 2950, уровень акта между ними — ослабление: перенос мог бы заместить лучшую",
+      "note": "Сравнение с худшим (2900) назвало бы акт подтяжкой — и отодвинуло бы защиту на 2950, если перенос замещает её.",
+      "state": {
+        "deal": {
+          "direction": "LONG"
+        },
+        "actStopLevel": 2920,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 100
+          }
+        ],
+        "protections": [
+          {
+            "id": "s1",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0,
+            "stopLevel": 2900
+          },
+          {
+            "id": "s2",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0,
+            "stopLevel": 2950
+          }
+        ],
+        "commitments": []
+      },
+      "expect": {
+        "actStopKeepsProtection": false
+      }
+    },
+    {
+      "case": "SHORT: благоприятна нижняя сторона — уровень ниже самого благоприятного защиту не ослабляет",
+      "state": {
+        "deal": {
+          "direction": "SHORT"
+        },
+        "actStopLevel": 3050,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 100
+          }
+        ],
+        "protections": [
+          {
+            "id": "s1",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0,
+            "stopLevel": 3100
+          },
+          {
+            "id": "s2",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0,
+            "stopLevel": 3080
+          }
+        ],
+        "commitments": []
+      },
+      "expect": {
+        "actStopKeepsProtection": true
+      }
+    },
+    {
+      "case": "у транша нет живой защиты с уровнем: первая защита проходит — ослаблять нечего",
+      "state": {
+        "deal": {
+          "direction": "LONG"
+        },
+        "actStopLevel": 2910,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 100
+          }
+        ],
+        "protections": [],
+        "commitments": []
+      },
+      "expect": {
+        "actStopKeepsProtection": true
+      }
+    },
+    {
+      "case": "трейлинг: уровня у акта в момент постановки нет — подтяжку нечем доказать",
+      "state": {
+        "deal": {
+          "direction": "LONG"
+        },
+        "actStopLevel": null,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "status": "COMPLETED",
+            "accumulatedFillSize": 100
+          }
+        ],
+        "protections": [
+          {
+            "id": "s1",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 100,
+            "closedSize": 0,
+            "stopLevel": 2910
+          }
+        ],
+        "commitments": []
+      },
+      "expect": {
+        "actStopKeepsProtection": false
       }
     }
   ]

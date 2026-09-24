@@ -2,6 +2,7 @@ package com.example.strategies.unit.validation;
 
 import static com.example.strategies.unit.validation.ValidationFixture.algoAction;
 import static com.example.strategies.unit.validation.ValidationFixture.bull;
+import static com.example.strategies.unit.validation.ValidationFixture.entryAction;
 import static com.example.strategies.unit.validation.ValidationFixture.matching;
 import static com.example.strategies.unit.validation.ValidationFixture.reference;
 import static com.example.strategies.unit.validation.ValidationFixture.violations;
@@ -12,6 +13,8 @@ import com.example.strategies.api.model.strategy.StrategyAlgoOrderActionApiModel
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * База срабатывания защиты — только марк-цена: группа {@code U19}
@@ -107,6 +110,26 @@ class ProtectiveTriggerTest {
         action.setTriggerPriceType("LAST");
 
         assertThat(matching(violations(request), NOT_MARK)).isEmpty();
+    }
+
+    /**
+     * Встроенная защита входа — защита, и её база доезжает до площадки:
+     * ограничение действует и на неё. Прежде обход читал только условную
+     * заявку, и вход с базой «последняя цена» проходил создание.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"LAST", "INDEX"})
+    @DisplayName("U19.9 — база встроенной защиты входа не марк-цена: отказ с путём встроенной защиты")
+    void u19_9_theAttachedProtectionTriggerIsCheckedToo(String triggerPriceType) {
+        CreateStrategyApiRequest request = reference();
+        entryAction(bull(request)).getAttachedProtection().getStopLossSettings()
+                .setTriggerPriceType(triggerPriceType);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".attachedProtection.stopLossSettings.triggerPriceType " + NOT_MARK)
+                .contains("получено " + triggerPriceType);
     }
 
     @Test

@@ -20,6 +20,7 @@
 | `description` | `String` | Пояснение расчёта (целевое имя; legacy — `explanation`). |
 | `sizeMode` | `SizeMode` | Режим размера (уточнённая модель). |
 | `exitOutcome` | `ExitOutcome` | Исход округления reduce-only выхода. Заполняется только при `sizeMode = REDUCE_ONLY`; у прочих режимов пусто — округлять долю там нечего. |
+| `exitSize`, `exitRemainder` | `BigDecimal` | Операнды исхода: доля экспозиции транша, округлённая вниз по шагу лота, и остаток после неё (`exitSize`, `exitRemainder` в `docs/spec/order-sizing.json`). Только у выхода; размер заявки — `sizeContracts`, а эти два едут в журнальный отчёт об округлении. |
 
 ## Енум `SizeMode`
 

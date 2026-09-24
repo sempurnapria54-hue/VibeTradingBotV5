@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 import org.mapstruct.ReportingPolicy;
 
 /**
@@ -36,7 +37,8 @@ import org.mapstruct.ReportingPolicy;
  * нет.</b> Коннектор базы не имеет и ключ проставить не может; его
  * ставит читатель, когда кладёт срез к себе.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
+        uses = OkxResponseConverter.class)
 public interface MarketSnapshotMapper {
 
     /** Индекс цены уровня в позиционном массиве площадки. */
@@ -48,10 +50,17 @@ public interface MarketSnapshotMapper {
     /** Индекс числа заявок уровня; второй элемент — устаревшее поле площадки. */
     int LEVEL_ORDER_COUNT_INDEX = 3;
 
+    /**
+     * Тикер площадки → снапшот среза. Числа разбирает конвертер границы, а
+     * время — своя форма ниже: площадка выражает непроставленное число
+     * пустой строкой, и она становится пустотой, а не отказом разбора,
+     * ронявшим бы весь срез листинга (docs/models/mapping/Order.md
+     * §«Конвертация (OKX)»).
+     */
     @Mapping(target = "externalInstrumentId", source = "instId")
     @Mapping(target = "lastPrice", source = "last")
     @Mapping(target = "volume", source = "vol24h")
-    @Mapping(target = "externalTimestamp", source = "ts")
+    @Mapping(target = "externalTimestamp", source = "ts", qualifiedByName = "okxEpochMillis")
     MarketTickerExternalSnapshot integrationToSnapshot(TickerOkxResponse response);
 
     @Mapping(target = "instrumentId", ignore = true)
@@ -84,6 +93,12 @@ public interface MarketSnapshotMapper {
         book.setBids(domainLevels(snapshot.getBids()));
         book.setAsks(domainLevels(snapshot.getAsks()));
         return book;
+    }
+
+    /** Время площадки (эпоха в миллисекундах) числом; пустая строка — пустота. */
+    @Named("okxEpochMillis")
+    default Long epochMillis(String millis) {
+        return OkxParse.epochMillis(millis);
     }
 
     /** Цена по инструменту из агрегатного чтения марк-цен. */

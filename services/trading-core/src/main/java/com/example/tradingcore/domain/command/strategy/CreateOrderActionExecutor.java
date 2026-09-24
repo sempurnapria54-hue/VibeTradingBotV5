@@ -41,7 +41,7 @@ import org.springframework.stereotype.Component;
  * (docs/components/CreateOrderActionExecutor.md).
  *
  * <pre>
- * PLANNED   → расчёт → преконтроль (риск-создающему) → CREATE_ORDER_COMMAND
+ * PLANNED   → расчёт → исход округления выхода → преконтроль (риск-создающему) → CREATE_ORDER_COMMAND
  * CREATED   → SUBMIT_ORDER_COMMAND
  * SUBMITTED → REFRESH_ORDER_COMMAND
  * </pre>
@@ -60,6 +60,7 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     private final CalculationContextFactory contextFactory;
     private final StrategyActionCalculator calculator;
     private final ActionRiskGate riskGate;
+    private final ExitRoundingReader exitRoundingReader;
 
     @Override
     public Boolean supports(StrategyAction action) {
@@ -96,12 +97,18 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
             return ActionPlan.calculationFailed(result.getError());
         }
         CalculatedStrategyAction calculated = result.getCalculatedAction();
+        Optional<ActionPlan> skipped = exitRoundingReader.skipBelowMinSize(calculated, context, state,
+                dealContext, tranche);
+        if (skipped.isPresent()) {
+            return skipped.get();
+        }
         if (isNotTrue(action.getPositionReducingOnly())) {
             Optional<ActionPlan> blocked = riskGate.gate(calculated, dealContext, tranche);
             if (blocked.isPresent()) {
                 return blocked.get();
             }
         }
+        exitRoundingReader.journalRoundedToFull(calculated, context, state, dealContext, tranche);
         return ActionPlan.of(ServiceCommand.builder()
                 .type(ServiceCommandType.CREATE_ORDER_COMMAND)
                 .dealId(dealContext.getDeal().getId())

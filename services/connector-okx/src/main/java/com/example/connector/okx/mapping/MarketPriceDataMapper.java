@@ -35,8 +35,6 @@ public interface MarketPriceDataMapper {
     @Mapping(target = "externalTimestamp", source = "ts", qualifiedByName = "toTimestamp")
     MarketPriceDataExternalSnapshot integrationToSnapshot(TickerOkxResponse response);
 
-    MarketPriceData snapshotToDomain(MarketPriceDataExternalSnapshot snapshot, Long instrumentId);
-
     /**
      * Снапшот → доменная модель БЕЗ числового ключа связанной
      * сущности.
@@ -45,8 +43,11 @@ public interface MarketPriceDataMapper {
      * границу сервиса не пересекают
      * ({@code docs/architecture/data-ownership.md} §Идентификаторы), а
      * у коннектора базы нет вовсе. Связь проставляет владелец
-     * сущности, получив модель. Соседний метод с ключом остаётся для
-     * внутреннего употребления донора, пока тот жив.
+     * сущности, получив модель.
+     *
+     * <p>Перегрузки с числовым ключом здесь больше нет: её не звал никто
+     * — она оставалась для донора, а донор удалён
+     * (.claude/rules/codestyle.md §«Неиспользуемый код»).
      */
     MarketPriceData snapshotToDomain(MarketPriceDataExternalSnapshot snapshot);
 

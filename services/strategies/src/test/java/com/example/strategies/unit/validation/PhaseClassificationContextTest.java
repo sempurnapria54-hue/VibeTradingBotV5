@@ -175,4 +175,20 @@ class PhaseClassificationContextTest {
                 .asString()
                 .contains("MARKET_STRUCTURE_IS requires a CONSTANT operand with the structure type");
     }
+
+    @Test
+    @DisplayName("U26.12 — ценовой операнд клаузы с индексной ценой: отказ недоступного источника и здесь")
+    void u26_12_anUnavailablePriceSourceIsRejectedInTheClauseContextToo() {
+        CreateStrategyApiRequest request = reference();
+        StrategyConditionOperandApiModel price = newOperand("PRICE");
+        price.setPriceSource("INDEX_PRICE");
+        phaseConditionRule(request, RANGE_CLAUSE).setRightOperand(price);
+
+        // Контракт типа правила отказывает тем же операндом (U26.11); предмет
+        // клетки — второй член перечня, адресованный путём клаузы.
+        assertThat(violations(request))
+                .anySatisfy(violation -> assertThat(violation)
+                        .contains("marketPhaseSetting.phaseRules[")
+                        .contains(".rightOperand.priceSource STRATEGY_PRICE_SOURCE_UNAVAILABLE"));
+    }
 }

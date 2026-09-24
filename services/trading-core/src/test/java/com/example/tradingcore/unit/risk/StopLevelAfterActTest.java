@@ -116,13 +116,13 @@ class StopLevelAfterActTest {
     }
 
     @Test
-    @DisplayName("U13.7 — стоимость контракта пуста: тот же отказ")
+    @DisplayName("U13.7 — стоимость контракта пуста: отказ «правила не материализованы» до потолков")
     void u13_7_anAbsentContractValueMakesTheValueFail() {
         harness.givenRules(rules(null, "1", "1", FEE));
         Deal deal = dealWith(episode("10", ANCHOR), tranche(List.of(), List.of(protection(STOP.toPlainString()))));
 
         assertThat(codes(harness.validate(weakeningAction(), context(deal, "10"))))
-                .containsExactly(RiskCheckCode.PROTECTION_COVERAGE_REDUCED);
+                .containsExactly(RiskCheckCode.INSTRUMENT_RULES_MISSING);
     }
 
     @Test

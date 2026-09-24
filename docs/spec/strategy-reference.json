@@ -371,10 +371,17 @@
     },
     {
       "name": "conditionPriceSourceUnavailable",
-      "note": "То же ограничение на ВТОРОМ носителе источника цены — ценовом операнде условия (docs/models/domain/aggregate/Strategy.md). Перечень StrategyPriceSource у операнда и у размещения один, и отвергать их порознь нельзя: условие «цена ≥ марк-цена ± %» проходило бы создание, а калькулятор подставлял бы последнюю цену — та же подмена ценового домена, только другой тропой.",
+      "note": "То же ограничение на ВТОРОМ носителе источника цены — ценовом операнде условия (docs/models/domain/aggregate/Strategy.md). Перечень StrategyPriceSource у операнда и у размещения один, и отвергать их порознь нельзя: условие «цена ≥ марк-цена ± %» проходило бы создание, а калькулятор подставлял бы последнюю цену — та же подмена ценового домена, только другой тропой. Источник читается только у ценового операнда (sourceType = PRICE): у операнда иного типа поле не читает никто, и отказ по нему отвергал бы значение, которого расчёт не видит.",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].condition.rules[]",
-      "where": "in(?leftOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE') || in(?rightOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE')"
+      "where": "(?leftOperand.sourceType == 'PRICE' && in(?leftOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE')) || (?rightOperand.sourceType == 'PRICE' && in(?rightOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE'))"
+    },
+    {
+      "name": "phaseConditionPriceSourceUnavailable",
+      "note": "То же ограничение на ТРЕТЬЕМ носителе источника цены — ценовом операнде правила классификации фазы (docs/models/domain/aggregate/Strategy.md): контекст классификации ценовой операнд допускает, и марк-цена в нём подменялась бы последней той же тропой. Код отказа тот же — STRATEGY_PRICE_SOURCE_UNAVAILABLE.",
+      "op": "count",
+      "over": "strategy.marketPhaseSetting.phaseRules[].condition.rules[]",
+      "where": "(?leftOperand.sourceType == 'PRICE' && in(?leftOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE')) || (?rightOperand.sourceType == 'PRICE' && in(?rightOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE'))"
     },
     {
       "name": "stopSettingsMisdeclared",
@@ -1671,7 +1678,8 @@
       },
       "expect": {
         "priceSourceUnavailable": 0,
-        "conditionPriceSourceUnavailable": 0
+        "conditionPriceSourceUnavailable": 0,
+        "phaseConditionPriceSourceUnavailable": 0
       }
     },
     {
@@ -2138,6 +2146,94 @@
       },
       "expect": {
         "actionLevelSource": "DECLARED"
+      }
+    },
+    {
+      "case": "ценовой операнд правила классификации фазы по индексной цене отвергается тем же ограничением",
+      "note": "Третий носитель источника цены: классификация допускает ценовой операнд, и отвергать его порознь с условием шага значило бы оставить ту же подмену ценового домена третьей тропой.",
+      "state": {
+        "strategy": {
+          "marketPhaseSetting": {
+            "phaseRules": [
+              {
+                "type": "BULL_TREND",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "PRICE_COMPARE",
+                      "leftOperand": {
+                        "sourceType": "PRICE",
+                        "priceSource": "INDEX_PRICE"
+                      },
+                      "rightOperand": {
+                        "sourceType": "CONSTANT"
+                      }
+                    },
+                    {
+                      "level": 2,
+                      "ruleType": "PRICE_COMPARE",
+                      "leftOperand": {
+                        "sourceType": "PRICE",
+                        "priceSource": "LAST_PRICE"
+                      },
+                      "rightOperand": {
+                        "sourceType": "CONSTANT"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "details": []
+        }
+      },
+      "expect": {
+        "phaseConditionPriceSourceUnavailable": 1,
+        "conditionPriceSourceUnavailable": 0,
+        "priceSourceUnavailable": 0
+      }
+    },
+    {
+      "case": "источник цены у операнда не ценового типа отказа не даёт: поле никто не читает",
+      "note": "Индикаторный операнд с объявленным источником марк-цены: расчёт источник не читает, и отказ по нему отвергал бы значение, которого расчёт не видит.",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "PRECHECK": [
+                      {
+                        "condition": {
+                          "rules": [
+                            {
+                              "level": 1,
+                              "ruleType": "INDICATOR_COMPARE",
+                              "leftOperand": {
+                                "sourceType": "INDICATOR",
+                                "priceSource": "MARK_PRICE"
+                              },
+                              "rightOperand": {
+                                "sourceType": "CONSTANT"
+                              }
+                            }
+                          ]
+                        },
+                        "actions": []
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "conditionPriceSourceUnavailable": 0
       }
     }
   ],

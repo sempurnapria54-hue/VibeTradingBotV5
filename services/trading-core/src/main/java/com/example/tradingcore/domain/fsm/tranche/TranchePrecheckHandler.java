@@ -133,15 +133,20 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
 
     /**
      * Снимок средств отсутствует либо старше объявленной толерантности.
-     * Пустая толерантность возрастом не ограничивает — срока, по которому
-     * снимок устарел бы, никто не объявил.
+     *
+     * <p><b>Необъявленная толерантность — снимок несвеж</b>: свежесть
+     * операнда, срок которого не объявлен, не измерена, и прочтение «возраст
+     * не ограничен» было бы благоприятным умолчанием
+     * (docs/rules/absent-value-semantics.md). Вход без объявленного срока
+     * не идёт — проход заказывает добычу и до преконтроля не доходит.
      */
     private Boolean balanceStale(DealContext dealContext) {
         if (isNull(dealContext.getBalanceContainer())) {
             return true;
         }
         if (isNull(properties.getBalanceFreshness())) {
-            return false;
+            log.warn("Balance freshness tolerance is not declared, snapshot read as stale");
+            return true;
         }
         OffsetDateTime threshold = OffsetDateTime.now(ZoneOffset.UTC).minus(properties.getBalanceFreshness());
         return isFalse(dealContext.getBalanceContainer().isFresherThan(threshold));

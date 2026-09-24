@@ -17,7 +17,7 @@
 
 | Ветвь | Операнд | Кто зовёт |
 |---|---|---|
-| рассчитанное действие, создающее либо ослабляющее контроль риска | `CalculatedStrategyAction` | `CreateOrderActionExecutor`, `CreateAlgoOrderActionExecutor` |
+| рассчитанное действие, создающее либо ослабляющее контроль риска | `CalculatedStrategyAction` + транш действия (операнд блок-сета ступени) | `CreateOrderActionExecutor`, `CreateAlgoOrderActionExecutor` |
 | снятие отдельной защиты при живой экспозиции | транш + id снимаемой защиты | `CancelAlgoOrderActionExecutor` |
 
 ## Почему узел отдельный

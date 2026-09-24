@@ -10,7 +10,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -112,7 +111,6 @@ class ExchangeAccountRegistrationBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.5 — непредъявленный обязательный ключ счёта отвечает 400 единым error-DTO")
     void b2_5_anAbsentApiKeyIsRefused() {
         refusedByValidation("apiKey", "user-b2-5");
@@ -146,12 +144,10 @@ class ExchangeAccountRegistrationBoxTest extends SharedAuthBox {
 
     /**
      * Дубль метки: уникальное ограничение схемы стои́т на тройке «тенант ×
-     * площадка × метка». Красное — форма тела: нарушение ограничения не
-     * ловит ни один обработчик сервиса, последнего обработчика у `auth`
-     * нет вовсе.
+     * площадка × метка». Нарушение ограничения поимённо не ловит ни один
+     * обработчик сервиса — тело собирает последний.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B2.7 — дубль метки счёта отвергается единым error-DTO")
     void b2_7_aDuplicateAccountLabelIsRefused() {
         String tenant = provisionTenant("user-b2-7");
@@ -256,7 +252,6 @@ class ExchangeAccountRegistrationBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.14 — регистрация без предъявленного принципала отвечает 401 единым error-DTO")
     void b2_14_aRegistrationWithoutAPrincipalIsRefused() {
         String tenant = provisionTenant("user-b2-14");
@@ -272,42 +267,36 @@ class ExchangeAccountRegistrationBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.16 — непредъявленная метка счёта отвечает 400 единым error-DTO")
     void b2_16_anAbsentLabelIsRefused() {
         refusedByValidation("label", "user-b2-16");
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.18 — непредъявленный код площадки отвечает 400 единым error-DTO")
     void b2_18_anAbsentExchangeCodeIsRefused() {
         refusedByValidation("exchangeCode", "user-b2-18");
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.19 — непредъявленный секрет ключа отвечает 400 единым error-DTO")
     void b2_19_anAbsentSecretIsRefused() {
         refusedByValidation("secret", "user-b2-19");
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.20 — непредъявленный passphrase ключа отвечает 400 единым error-DTO")
     void b2_20_anAbsentPassphraseIsRefused() {
         refusedByValidation("passphrase", "user-b2-20");
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.21 — непредъявленная идентичность тенанта отвечает 400 единым error-DTO")
     void b2_21_anAbsentTenantIdentityIsRefused() {
         refusedByValidation("tenantInternalId", "user-b2-21");
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.22 — непредъявленный контур площадки отвечает 400 единым error-DTO")
     void b2_22_anAbsentContourIsRefused() {
         refusedByValidation("contour", "user-b2-22");

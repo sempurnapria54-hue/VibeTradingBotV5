@@ -1,6 +1,7 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.action;
 
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
@@ -69,6 +70,29 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
                 || AlgoOrder.ConditionType.PARTIAL_STOP_LOSS.equals(conditionType)
                 || AlgoOrder.ConditionType.OCO_FULL.equals(conditionType)
                 || AlgoOrder.ConditionType.TRAILING_PERCENTS.equals(conditionType)
+                || AlgoOrder.ConditionType.TRAILING_VALUE.equals(conditionType);
+    }
+
+    /**
+     * Пустая база срабатывания защиты становится {@code MARK} — умолчание к
+     * безопасной стороне, названное, а не молчаливое {@code last} площадки
+     * (docs/models/domain/core/AlgoOrder.md §«Защита срабатывает только по
+     * MARK»; разрешение — docs/rules/absent-value-semantics.md).
+     *
+     * <p><b>Трейлинг умолчания не получает:</b> у его постановки поля базы
+     * нет вовсе, и {@code MARK}, записанный в определение, объявлял бы
+     * срабатывание, которого площадка не исполняет. Объявленная база не
+     * затирается.
+     */
+    public void applyProtectiveTriggerDefault() {
+        if (isFalse(isProtective()) || isTrailing() || nonNull(triggerPriceType)) {
+            return;
+        }
+        triggerPriceType = AlgoOrder.TriggerPriceType.MARK;
+    }
+
+    private Boolean isTrailing() {
+        return AlgoOrder.ConditionType.TRAILING_PERCENTS.equals(conditionType)
                 || AlgoOrder.ConditionType.TRAILING_VALUE.equals(conditionType);
     }
 

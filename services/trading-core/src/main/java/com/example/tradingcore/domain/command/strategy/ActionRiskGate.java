@@ -53,7 +53,7 @@ public class ActionRiskGate {
      */
     public Optional<ActionPlan> gate(CalculatedStrategyAction calculatedAction, DealContext dealContext,
                                      DealTranche tranche) {
-        return plan(riskValidator.validate(calculatedAction, dealContext), dealContext, tranche);
+        return plan(riskValidator.validate(calculatedAction, dealContext, tranche), dealContext, tranche);
     }
 
     /**

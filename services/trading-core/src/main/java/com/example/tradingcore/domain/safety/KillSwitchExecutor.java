@@ -29,7 +29,6 @@ import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -160,22 +159,16 @@ public class KillSwitchExecutor {
     }
 
     /**
-     * Закрытие позиции без сделки. Валюту расчёта площадка требует, а
-     * строка позиции её не несёт — она читается у инструмента проекции;
-     * инструмента вне контура закрыть нечем, и остаток оставляет радиус
-     * неподтверждённым.
+     * Закрытие позиции без сделки. Строка позиции валюты расчёта не несёт;
+     * у инструмента проекции она читается, у инструмента вне контура её нет,
+     * и закрытие уходит без неё — контракт закрытия её не требует.
      */
     private void closeOutsideDeal(ExchangeAccount account, Position position) {
         String externalInstrumentId = position.getExternalInstrumentId();
-        Optional<String> settleCurrency = instrumentDataService.findSettlementCurrency(account.getExchangeCode(),
-                externalInstrumentId);
-        if (settleCurrency.isEmpty()) {
-            log.error("Kill-switch cannot address a position outside the contour exchangeAccountId={} instId={}",
-                    account.getId(), externalInstrumentId);
-            return;
-        }
+        String settleCurrency = instrumentDataService.findSettlementCurrency(account.getExchangeCode(),
+                externalInstrumentId).orElse(null);
         callSafely("close-position-outside-deal", account.getId(), () -> exchangeOperationsClient
-                .closePosition(account.getInternalId(), externalInstrumentId, settleCurrency.get()));
+                .closePosition(account.getInternalId(), externalInstrumentId, settleCurrency));
     }
 
     /**

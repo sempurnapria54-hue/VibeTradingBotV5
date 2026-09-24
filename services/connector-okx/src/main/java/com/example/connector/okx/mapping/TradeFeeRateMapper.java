@@ -59,30 +59,34 @@ public interface TradeFeeRateMapper {
             qualifiedByName = "resolveFeeInstrumentType")
     TradeFeeRate snapshotToDomain(TradeFeeRateExternalSnapshot snapshot);
 
-    /** Ставка источника со снятым знаком: комиссия положительна, ребейт отрицателен. */
+    /**
+     * Ставка источника со снятым знаком: комиссия положительна, ребейт
+     * отрицателен.
+     *
+     * <p><b>Неразбираемая ставка отказывает, а не пустеет:</b> пустая ставка
+     * ниже есть молчаливый выпад прогноза комиссии
+     * (docs/models/mapping/TradeFeeRate.md §«Validation (структурная, до
+     * маппинга)»). Отказ разбора класс получает у сети разбора шлюза; пустую
+     * ставку до маппера не пускает структурная валидация читателя.
+     */
     @Named("rateAsCost")
     default String rateAsCost(String sourceRate) {
         if (isBlank(sourceRate)) {
             return null;
         }
-        try {
-            return new BigDecimal(sourceRate.trim()).negate().toPlainString();
-        } catch (NumberFormatException failure) {
-            return null;
-        }
+        return new BigDecimal(sourceRate.trim()).negate().toPlainString();
     }
 
-    /** Время данных источника (эпоха в миллисекундах) → UTC-момент. */
+    /**
+     * Время данных источника (эпоха в миллисекундах) → UTC-момент. Пустая
+     * строка — объявленная пустота; неразбираемая — отказ, как у ставки.
+     */
     @Named("sourceTimestamp")
     default OffsetDateTime sourceTimestamp(String epochMillis) {
         if (isBlank(epochMillis)) {
             return null;
         }
-        try {
-            return OffsetDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(epochMillis.trim())), ZoneOffset.UTC);
-        } catch (NumberFormatException failure) {
-            return null;
-        }
+        return OffsetDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(epochMillis.trim())), ZoneOffset.UTC);
     }
 
     /** Сырой тип инструмента → доменная проекция; неизвестное — {@code UNKNOWN}. */

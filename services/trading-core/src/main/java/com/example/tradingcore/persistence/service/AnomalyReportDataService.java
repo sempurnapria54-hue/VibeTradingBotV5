@@ -34,4 +34,10 @@ public class AnomalyReportDataService {
         return repository.existsStanding(exchangeAccountId, instrumentId, subjectExternalId, code,
                 severity.name(), since, until);
     }
+
+    /** Отчёт с этим кодом по этой сущности-предмету уже заведён. */
+    @Transactional(readOnly = true)
+    public Boolean existsForSubject(String code, String subjectExternalId) {
+        return repository.existsByCodeAndSubjectExternalId(code, subjectExternalId);
+    }
 }

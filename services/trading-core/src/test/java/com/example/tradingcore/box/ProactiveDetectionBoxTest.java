@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -147,6 +148,11 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
     void theLiveRiskOutsideTheContourTearsTheAccountDown() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
         standScan(Feed.array(livePositionOn(FOREIGN_INSTRUMENT)), Feed.emptyArray(), Feed.emptyArray());
+        // Срез позиций читают детекция и снятие риска; после закрытия
+        // позиции её строки в срезе нет.
+        connector.answersInTurn(positionsPath(ACCOUNT), Feed.array(livePositionOn(FOREIGN_INSTRUMENT)),
+                Feed.array(livePositionOn(FOREIGN_INSTRUMENT)), Feed.emptyArray());
+        connector.answers(closurePath(ACCOUNT), Feed.ack("ex-close-1", "close-1"));
 
         tick(Tick.ANOMALY_DETECTION);
 
@@ -155,16 +161,21 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
         // производит — реакция идёт с первого наблюдения.
         assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
         assertThat(eventTypes()).contains(HOLD_RAISED);
-        // Снятие риска отработало, но закрыть позицию инструмента вне
-        // контура нечем — валюты расчёта у него нет, — и снятие не
-        // подтверждено: отчёт критичной тропы остаётся незакрытым, снимка
-        // «после» у него нет, закрытия к площадке не ушло.
+        // Позицию инструмента вне контура снятие риска закрывает само:
+        // валюты расчёта у него нет, и закрытие уходит без неё — контракт
+        // закрытия её не требует.
+        List<LoggedRequest> closures = connector.requests(closurePath(ACCOUNT));
+        assertThat(closures).hasSize(1);
+        assertThat(closures.getFirst().queryParameter("externalInstrumentId").firstValue())
+                .isEqualTo(FOREIGN_INSTRUMENT);
+        assertThat(closures.getFirst().queryParameter("settleCurrency").isPresent()).isFalse();
+        // Подтверждение пришло срезом позиций: отчёт критичной тропы
+        // доведён до терминала.
         Map<String, Object> report = rows.row("anomaly_reports", "code", FOREIGN_INSTRUMENT_RISK);
         assertThat(report.get("severity")).isEqualTo("CRITICAL");
-        assertThat(report.get("status")).isEqualTo("KILL_SWITCH_EXECUTED");
+        assertThat(report.get("status")).isEqualTo("COMPLETED");
         assertThat(report.get("internal_before")).isNotNull();
-        assertThat(report.get("internal_after")).isNull();
-        assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
+        assertThat(report.get("internal_after")).isNotNull();
         // Восстановительной тропы на этом признаке нет: строки инструмента
         // не существует, и приписать риск нечему.
         assertThat(rows.count("deals")).isZero();
@@ -507,6 +518,7 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
         assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("5", "10", "4")).status())
                 .isEqualTo(200);
+        assignLeverage(ACCOUNT, INSTRUMENT);
         connector.answers(feeRatePath(ACCOUNT), Feed.array(Feed.tradeFeeRate()));
         tick(Tick.TRADE_FEE_RATES);
         marketData.answers(featuresPath(INSTRUMENT),

@@ -23,6 +23,7 @@ import com.example.strategies.api.model.strategy.StochasticParamsApiModel;
 import com.example.strategies.api.model.strategy.StopLossSettingsApiModel;
 import com.example.strategies.api.model.strategy.StrategyActionApiModel;
 import com.example.strategies.api.model.strategy.StrategyAlgoOrderActionApiModel;
+import com.example.strategies.api.model.strategy.StrategyAttachedProtectionSettingsApiModel;
 import com.example.strategies.api.model.strategy.StrategyConditionOperandApiModel;
 import com.example.strategies.api.model.strategy.StrategyConditionRuleApiModel;
 import com.example.strategies.api.model.strategy.StrategyDetailApiModel;
@@ -116,6 +117,15 @@ public class StrategyDefinitionValidator {
             StrategyConditionRuleType.VOLUME_FILTER_PASSED.name(),
             StrategyConditionRuleType.CANDLE_CLOSED.name(),
             StrategyConditionRuleType.MARKET_STRUCTURE_IS.name());
+
+    /**
+     * Источники рыночной цены, которых снапшот рыночных цен не несёт
+     * (docs/models/mapping/MarketPriceData.md): тикер площадки отдаёт
+     * последнюю цену и лучшие бид и аск.
+     */
+    private static final Set<String> UNAVAILABLE_PRICE_SOURCES = Set.of(
+            StrategyPriceSource.MARK_PRICE.name(),
+            StrategyPriceSource.INDEX_PRICE.name());
 
     /**
      * Типы условной заявки, образующие ЗАЩИТУ (docs/spec/strategy-reference.json
@@ -1176,8 +1186,11 @@ public class StrategyDefinitionValidator {
             }
             case MARKET_STRUCTURE -> validateReference(operand.getStructureKey(), structureKeys,
                     path + ".structureKey", "market structure setting", violations);
-            case PRICE -> validateEnum(StrategyPriceSource.class, operand.getPriceSource(),
-                    path + ".priceSource", violations);
+            case PRICE -> {
+                validateEnum(StrategyPriceSource.class, operand.getPriceSource(),
+                        path + ".priceSource", violations);
+                rejectUnavailablePriceSource(operand.getPriceSource(), path + ".priceSource", violations);
+            }
             case CONSTANT -> {
                 validateEnum(ConstantValueType.class, operand.getValueType(), path + ".valueType", violations);
                 if (isNull(operand.getValue())) {
@@ -1376,6 +1389,21 @@ public class StrategyDefinitionValidator {
         }
     }
 
+    /**
+     * Встроенная защита входа — тоже защита, и база её срабатывания доезжает
+     * до площадки ({@code slTriggerPxType}, docs/models/mapping/Order.md):
+     * ограничение {@code MARK} действует на неё той же областью, что на
+     * защитную условную заявку (docs/models/domain/core/AlgoOrder.md).
+     */
+    private void validateAttachedTriggerIsMark(StrategyAttachedProtectionSettingsApiModel protection, String path,
+                                               List<String> violations) {
+        if (isNull(protection.getStopLossSettings())) {
+            return;
+        }
+        requireMarkTrigger(protection.getStopLossSettings().getTriggerPriceType(),
+                path + ".attachedProtection.stopLossSettings.triggerPriceType", violations);
+    }
+
     private void requireMarkTrigger(String triggerPriceType, String path, List<String> violations) {
         if (isNull(triggerPriceType)) {
             return;
@@ -1406,6 +1434,7 @@ public class StrategyDefinitionValidator {
                     path + ".attachedProtection.attachedType", violations);
             validateStopLoss(action.getAttachedProtection().getStopLossSettings(),
                     path + ".attachedProtection.stopLossSettings", indicatorTypes, structureKeys, violations);
+            validateAttachedTriggerIsMark(action.getAttachedProtection(), path, violations);
         }
         if (Objects.equals(action.getOrderType(), Order.Type.ENTRY_ATTACHED_STOP_LOSS.name())
                 && isNull(action.getAttachedProtection())) {
@@ -1438,6 +1467,27 @@ public class StrategyDefinitionValidator {
         if (Objects.equals(baseType, StrategyPriceBaseType.MARKET_PRICE)
                 && isNull(action.getPlacement().getPriceSource())) {
             violations.add(path + ".priceSource is required for MARKET_PRICE base");
+        }
+        if (Objects.equals(baseType, StrategyPriceBaseType.MARKET_PRICE)) {
+            rejectUnavailablePriceSource(action.getPlacement().getPriceSource(), path + ".priceSource", violations);
+        }
+    }
+
+    /**
+     * Источник рыночной цены, которого источник данных не отдаёт, отвергается
+     * на ОБОИХ носителях — у размещения цены и у ценового операнда условия
+     * (docs/spec/strategy-reference.json, величины
+     * {@code priceSourceUnavailable} и {@code conditionPriceSourceUnavailable}).
+     *
+     * <p>Тикер площадки марк- и индексной цены не несёт, а калькулятор
+     * подставил бы последнюю: базис уехал бы в цену входа молча. Отвергать
+     * порознь нельзя — условие «цена ≥ марк-цена ± %» проходило бы создание и
+     * подменялось той же тропой (docs/rules/strategy-validation.md).
+     */
+    private void rejectUnavailablePriceSource(String priceSource, String path, List<String> violations) {
+        if (nonNull(priceSource) && UNAVAILABLE_PRICE_SOURCES.contains(priceSource)) {
+            violations.add(path + " STRATEGY_PRICE_SOURCE_UNAVAILABLE: "
+                    + "источник данных не отдаёт " + priceSource);
         }
     }
 

@@ -28,6 +28,7 @@ import com.example.tradingcore.exception.CredentialsRejectedException;
 import com.example.tradingcore.exception.ExchangeIntegrationException;
 import com.example.tradingcore.exception.ExternalStatusException;
 import com.example.tradingcore.exception.RetryBudgetExhaustedException;
+import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import java.time.Duration;
 import java.util.List;
@@ -65,7 +66,7 @@ class ServiceCommandDispatchTest {
     void setUp() {
         when(executor.supportedType()).thenReturn(ServiceCommandType.SUBMIT_ORDER_COMMAND);
         dispatcher = new ServiceCommandExecutor(List.of(executor),
-                new RetryPolicyService(properties(2)), dataService);
+                new RetryPolicyService(properties(2)), dataService, mock(AnomalyReportService.class));
     }
 
     /**

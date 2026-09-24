@@ -87,7 +87,7 @@ public class AnomalyReportService {
         if (isTrue(standing(dealContext, signal, subjectExternalId))) {
             return null;
         }
-        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId);
+        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId, Map.of());
     }
 
     private Boolean standing(DealContext dealContext, HoldSignal signal, String subjectExternalId) {
@@ -104,7 +104,7 @@ public class AnomalyReportService {
      * обработки»).
      */
     private AnomalyReport create(DealContext dealContext, HoldSignal signal, AnomalyReport.Status status,
-                                 String subjectExternalId) {
+                                 String subjectExternalId, Map<String, Object> operands) {
         AnomalyReport report = new AnomalyReport();
         report.setInternalId(InternalIdFactory.forInternalEntity());
         report.setExchangeAccountId(accountId(dealContext));
@@ -114,7 +114,7 @@ public class AnomalyReportService {
         report.setSeverity(severityOf(signal));
         report.setStatus(status);
         report.setCode(signal.getCode());
-        report.setInternalBefore(internalSnapshot(dealContext));
+        report.setInternalBefore(internalSnapshot(dealContext, operands));
         report.setExternalBefore(externalSnapshot(dealContext));
         AnomalyReport saved = dataService.save(report);
         publishReported(dealContext, saved);
@@ -165,7 +165,26 @@ public class AnomalyReportService {
      */
     @Transactional
     public AnomalyReport journal(DealContext dealContext, HoldSignal signal) {
-        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, null);
+        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, null, Map.of());
+    }
+
+    /**
+     * Журнальный отчёт о происшествии, чей момент задан СУЩНОСТЬЮ-ПРЕДМЕТОМ:
+     * одно решение по одной строке исполнения — один отчёт, сколько бы раз
+     * строка ни планировалась повтором. Возвращает пусто, если отчёт по
+     * предмету уже заведён.
+     *
+     * <p>Операнды решения едут в локальный снимок «до» под своим ключом:
+     * отчёт отвечает, ПОЧЕМУ решение принято, а не только что оно было
+     * (docs/concept.md П3).
+     */
+    @Transactional
+    public AnomalyReport journalOnce(DealContext dealContext, HoldSignal signal, String subjectExternalId,
+                                     Map<String, Object> operands) {
+        if (isTrue(dataService.existsForSubject(signal.getCode(), subjectExternalId))) {
+            return null;
+        }
+        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId, operands);
     }
 
     /**
@@ -179,7 +198,7 @@ public class AnomalyReportService {
      */
     @Transactional
     public AnomalyReport open(DealContext dealContext, HoldSignal signal) {
-        return create(dealContext, signal, AnomalyReport.Status.CREATED, null);
+        return create(dealContext, signal, AnomalyReport.Status.CREATED, null, Map.of());
     }
 
     /** Продвинуть отчёт в названный статус обработки. */
@@ -197,7 +216,7 @@ public class AnomalyReportService {
      */
     @Transactional
     public AnomalyReport complete(AnomalyReport report, DealContext dealContext) {
-        report.setInternalAfter(internalSnapshot(dealContext));
+        report.setInternalAfter(internalSnapshot(dealContext, Map.of()));
         report.setExternalAfter(externalSnapshot(dealContext));
         report.setStatus(AnomalyReport.Status.COMPLETED);
         return dataService.save(report);
@@ -242,8 +261,8 @@ public class AnomalyReportService {
      * <p>Ноги берутся обходом траншей — донорского поля агрегата ядро не
      * читает.
      */
-    private String internalSnapshot(DealContext dealContext) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
+    private String internalSnapshot(DealContext dealContext, Map<String, Object> operands) {
+        Map<String, Object> snapshot = new LinkedHashMap<>(operands);
         Deal deal = dealContext.getDeal();
         if (nonNull(deal)) {
             Position position = deal.livePosition();

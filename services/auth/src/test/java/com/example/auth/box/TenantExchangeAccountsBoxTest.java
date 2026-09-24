@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -45,7 +44,6 @@ class TenantExchangeAccountsBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B4.3 — счета тенанта без предъявленного принципала")
     void b4_3_theTenantAccountsAreNotGivenWithoutAPrincipal() {
         String tenant = provisionTenant("user-b4-3");

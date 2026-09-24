@@ -12,10 +12,16 @@ algo-order (SL/TP/OCO/trailing; `StrategyAlgoOrderAction` + `actionType =
 CREATE`). По стадии `DealActionState` выдаёт следующую команду:
 
 ```text
-PLANNED   -> расчёт -> CREATE_ALGO_ORDER_COMMAND
+PLANNED   -> расчёт -> исход округления выхода -> risk -> CREATE_ALGO_ORDER_COMMAND
 CREATED   -> SUBMIT_ALGO_ORDER_COMMAND
 SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 ```
+
+**Исход округления выхода тейком читается до преконтроля.** Исход
+`SKIPPED` — команды нет, строка исполнения уходит в `SKIPPED`; `FULL` —
+команда уходит экспозицией транша целиком. Оба пишут журнальный отчёт —
+таблица исходов и коды — `docs/components/SizeCalculator.md` §«Reduce-only
+выход: пола минимального размера нет».
 
 ## Сборка дерева `Condition`
 

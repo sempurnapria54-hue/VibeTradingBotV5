@@ -23,9 +23,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Клетки с меткой {@code debt} красны ПО ПОСТРОЕНИЮ</b>: их
  * ожидание взято из дома, который дерево кода ещё не несёт, и ослаблять
- * его под текущий факт значило бы закрепить дефект
- * (.claude/work/backlog.md §«Единый error-DTO у поверхностей соседних
- * сервисов»).
+ * его под текущий факт значило бы закрепить дефект.
  */
 class AccessContourBoxTest extends SharedTradingCoreBox {
 
@@ -39,14 +37,12 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
     private static final String LAST_PRICE = "100";
 
     @Test
-    @Tag("debt")
     @DisplayName("B12.1 — вызов без предъявленного принципала")
     void aCallWithoutAPresentedPrincipalIsRefusedWithTheSharedErrorDto() {
         Answer answer = getAnonymously(DEALS + "?exchangeAccountInternalId=" + ACCOUNT);
 
         assertThat(answer.status()).isEqualTo(401);
-        // Долг: единого error-DTO у отказа доступа сегодня нет —
-        // точки входа отказа ядро не берёт вовсе.
+        // Тело собирает общий энфорсер точек входа цепочки.
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(auth.count()).isZero();
         assertThat(marketData.count()).isZero();
@@ -54,7 +50,6 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B12.2 — токен чужого ключа, просроченный и чужого издателя")
     void threeBrokenTokensAreRefusedAndTheSignatureIsCheckedLocally() {
         assertThat(getWith(DEALS, identity.foreignKeyToken()).status()).isEqualTo(401);
@@ -112,7 +107,6 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B12.6 — неподдержанный метод и неразбираемое тело")
     void containerProducedRefusalsCarryTheSameErrorDto() {
         provisionAccounts(ACCOUNT);
@@ -122,13 +116,13 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
 
         assertThat(wrongMethod.status()).isEqualTo(405);
         assertThat(unparseable.status()).isEqualTo(400);
-        // Долг: отказ, произведённый контейнером, отдаёт своё тело, а не
-        // единый error-DTO поверхности.
+        // Число пишет контейнер, тело — глобальный обработчик.
         assertThat(wrongMethod.carriesErrorDto()).isTrue();
         assertThat(unparseable.carriesErrorDto()).isTrue();
         assertThat(rows.count("account_instrument_states")).isZero();
+        // Ступени нет — рабочее значение перечня ExchangeAccount.SafetyRung.
         assertThat(rows.row("exchange_accounts", "internal_id", ACCOUNT).get("safety_rung"))
-                .isEqualTo("NONE");
+                .isEqualTo("ACTIVE");
     }
 
     @Test

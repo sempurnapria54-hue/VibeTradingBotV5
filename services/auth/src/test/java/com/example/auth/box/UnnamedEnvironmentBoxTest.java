@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -19,8 +18,8 @@ import org.springframework.test.context.DynamicPropertySource;
  * Поэтому отрицание проверяется дважды — под префиксом счетов и в корне
  * СМОНТИРОВАННОГО префикса, — и обе половины разностные.
  *
- * <p>Красное — форма тела: {@code IllegalStateException} не ловит ни один
- * обработчик `auth`, последнего обработчика у сервиса нет вовсе.
+ * <p>{@code IllegalStateException} поимённо не ловит ни один обработчик
+ * `auth` — тело собирает последний.
  */
 class UnnamedEnvironmentBoxTest extends AuthBox {
 
@@ -30,7 +29,6 @@ class UnnamedEnvironmentBoxTest extends AuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.10 — незаданное имя окружения делает адрес ключей невычислимым")
     void b2_10_anUnnamedEnvironmentMakesTheKeyPathUncomputable() {
         String tenant = provisionTenant("user-b2-10");

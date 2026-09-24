@@ -133,6 +133,17 @@
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
         <!--
+          Бин ObjectMapper совместимостным автоконфигом Jackson 2: его берёт
+          энфорсер отказа доступа общего артефакта (AccessDenialHandler), и
+          отказ фильтр-цепочки отвечает тем же error-DTO, что прочие ошибки
+          поверхности (docs/rules/error-handling-policy.md; записи Jackson —
+          .claude/rules/tech-radar.md).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
+        <!--
           СТАРТЕР, А НЕ flyway-core. Boot 4 разнёс автоконфиги по модулям:
           flyway-core на classpath даёт биндинг spring.flyway.* и сам
           Flyway, но автоконфиг, ЗАПУСКАЮЩИЙ миграции на старте, живёт в

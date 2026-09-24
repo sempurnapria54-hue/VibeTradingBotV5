@@ -3,7 +3,6 @@ package com.example.auth.box;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -60,13 +59,11 @@ class AccessContourBoxTest extends SharedAuthBox {
     }
 
     /**
-     * Статус написан контейнером, подменяется только тело — и его сегодня
-     * у `auth` не подменяет никто: последнего обработчика у сервиса нет
-     * вовсе, {@code GlobalExceptionHandler} ловит два класса поимённо.
-     * Клетка красна ожиданием из дома, а не ослабленным ассертом.
+     * Статус написан контейнером, подменяется только тело — его подменяет
+     * {@code GlobalExceptionHandler}, наследующий обработку отказов
+     * контейнера.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B5.5 — неподдержанный метод отвечает 405 единым error-DTO")
     void b5_5_anUnsupportedMethodAnswersWithTheSharedErrorDto() {
         Long tenantsBefore = rows.count("tenants");
@@ -81,7 +78,6 @@ class AccessContourBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B5.6 — неразбираемое тело запроса отвечает 400 единым error-DTO")
     void b5_6_anUnparseableBodyAnswersWithTheSharedErrorDto() {
         provisionTenant("user-b5-6");

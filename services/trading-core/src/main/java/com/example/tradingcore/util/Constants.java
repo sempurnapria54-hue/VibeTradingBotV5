@@ -246,6 +246,27 @@ public class Constants {
         public static final String RESULT_CURRENCY_UNRESOLVED = "RESULT_CURRENCY_UNRESOLVED";
 
         /**
+         * Объявленная доля выхода ниже минимального торгового размера при
+         * жизнеспособном остатке: действие не исполняется. Дом кода —
+         * docs/components/SizeCalculator.md (таблица исходов).
+         */
+        public static final String PARTIAL_EXIT_BELOW_MIN_SIZE = "PARTIAL_EXIT_BELOW_MIN_SIZE";
+
+        /**
+         * «Частично» на этом размере невыразимо, и выход отправлен
+         * экспозицией транша целиком. Дом кода — там же.
+         */
+        public static final String PARTIAL_EXIT_ROUNDED_TO_FULL = "PARTIAL_EXIT_ROUNDED_TO_FULL";
+
+        /**
+         * Отмена либо закрытие без строки исполнения отказали: бюджета у
+         * такой команды нет, повтор ведёт проход, и отказ иначе оставался бы
+         * только в логе. Дом кода — docs/components/ServiceCommandExecutor.md
+         * §«Отказ команды без анкера — происшествие, а не бюджет».
+         */
+        public static final String ANCHORLESS_COMMAND_REFUSED = "ANCHORLESS_COMMAND_REFUSED";
+
+        /**
          * Валюта, в которой площадка посчитала итог эпизода, разошлась с
          * расчётной валютой инструмента: итог складывается из разноимённых
          * слагаемых и смещён. Отчёт делает смещение наблюдаемым; терминал

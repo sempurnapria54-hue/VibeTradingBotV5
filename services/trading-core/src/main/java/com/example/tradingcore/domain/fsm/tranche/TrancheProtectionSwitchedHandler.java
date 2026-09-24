@@ -6,6 +6,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingcore.domain.command.DealContext;
+import com.example.tradingcore.domain.deal.ProtectionCoverageGate;
 import com.example.tradingcore.domain.fsm.DealTrancheHandler;
 import com.example.tradingcore.domain.fsm.TrancheActionDisposition;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
@@ -21,12 +22,14 @@ import org.springframework.stereotype.Component;
  * заменена подтверждённой основной
  * (docs/components/TrancheProtectionSwitchedHandler.md).
  *
- * <p><b>Основной защиты не осталось при живом риске — защита
- * потеряна.</b> Действующего обязательства здесь нет по построению: в
- * этот статус приводит только подтверждённая отправка защитного действия,
- * поэтому наблюдение попадает ровно во вторую строку реакции —
- * биржевая ступень 2 плюс ошибочная тропа сделки
+ * <p><b>Недопокрытие без живого обязательства — нарушение инварианта</b>,
+ * и не только полная потеря основной защиты: частичное покрытие,
+ * оставшееся без хода, который его доставит, есть та же вторая строка
+ * реакции — биржевая ступень 2 плюс ошибочная тропа сделки
  * (docs/rules/live-risk-protection.md §«Реакция на непокрытый риск»).
+ * Предикат читается по дому ({@link ProtectionCoverageGate}), а не
+ * пересобирается: прежняя упрощённая копия видела только полное
+ * отсутствие защиты и расходилась с домом в разрешающую сторону.
  *
  * <p><b>Названное ограничение: точечной отмены встроенной защиты этот
  * обработчик не эмитит.</b> Эмитента у команды
@@ -46,6 +49,7 @@ public class TrancheProtectionSwitchedHandler implements DealTrancheHandler {
 
     private final TrancheWorkPass workPass;
     private final TrancheActionDisposition disposition;
+    private final ProtectionCoverageGate coverageGate;
 
     @Override
     public DealTranche.Status handledStatus() {
@@ -60,8 +64,8 @@ public class TrancheProtectionSwitchedHandler implements DealTrancheHandler {
                     deal.getId(), tranche.getId());
             return TrancheTransition.escalate();
         }
-        if (isTrue(tranche.isRiskBearing()) && isFalse(tranche.hasStandaloneProtection())) {
-            log.error("Main protection is gone while risk is live dealId={} trancheId={}",
+        if (isTrue(coverageGate.trancheViolated(dealContext, tranche))) {
+            log.error("Coverage invariant violated on a switching tranche dealId={} trancheId={}",
                     deal.getId(), tranche.getId());
             return TrancheTransition.escalate(
                     HoldSignal.exchangeAccount(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED));

@@ -368,6 +368,52 @@ class AnomalyReportDedupTest {
                 .isNull();
     }
 
+    /** Происшествие, чей момент задан предметом: строка с предметом и операндами решения в снимке «до». */
+    @Test
+    @DisplayName("U9.20 — писатель происшествия по предмету, отчёта по предмету нет: строка с операндами")
+    void u9_20_aSubjectIncidentCarriesItsOperands() throws JsonProcessingException {
+        when(dataService.existsForSubject(CODE, SUBJECT)).thenReturn(false);
+
+        AnomalyReport returned = service.journalOnce(pairContext(), HoldSignal.instrumentJournal(CODE), SUBJECT,
+                Map.of("exitRounding", Map.of("exitOutcome", "FULL")));
+
+        assertThat(returned).isNotNull();
+        AnomalyReport row = saved();
+        assertThat(row.getSubjectExternalId()).isEqualTo(SUBJECT);
+        assertThat(row.getStatus()).isEqualTo(AnomalyReport.Status.COMPLETED);
+        assertThat(snapshotOf(row.getInternalBefore()))
+                .containsEntry("exitRounding", Map.of("exitOutcome", "FULL"))
+                .containsKey("instrumentId");
+        verify(coreEventWriter).anomalyReported(eq(TENANT_ID), any(), eq(ACCOUNT_INTERNAL_ID),
+                eq(INSTRUMENT_INTERNAL_ID), eq(ACTOR));
+    }
+
+    /** Одно решение по предмету — один отчёт: повторная запись поглощается без окна. */
+    @Test
+    @DisplayName("U9.21 — отчёт по предмету уже заведён: второй строки нет, факт не опубликован, возврат пуст")
+    void u9_21_aSecondIncidentOfTheSameSubjectIsAbsorbed() {
+        when(dataService.existsForSubject(CODE, SUBJECT)).thenReturn(true);
+
+        AnomalyReport returned = service.journalOnce(pairContext(), HoldSignal.instrumentJournal(CODE), SUBJECT,
+                Map.of());
+
+        assertThat(returned).isNull();
+        verify(dataService, never()).save(any());
+        verify(coreEventWriter, never()).anomalyReported(any(), any(), any(), any(), any());
+        verify(dataService, never()).existsStanding(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    /** Код — величина ключа и здесь: другой код по тому же предмету заводит свою строку. */
+    @Test
+    @DisplayName("U9.22 — по предмету заведён отчёт с другим кодом: ключ не совпал, своя строка")
+    void u9_22_aDifferentCodeOfTheSameSubjectIsItsOwnRow() {
+        when(dataService.existsForSubject("OTHER_REASON", SUBJECT)).thenReturn(true);
+        when(dataService.existsForSubject(CODE, SUBJECT)).thenReturn(false);
+
+        assertThat(service.journalOnce(pairContext(), HoldSignal.instrumentJournal(CODE), SUBJECT, Map.of()))
+                .isNotNull();
+    }
+
     private Map<String, Object> snapshotOf(String json) throws JsonProcessingException {
         return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() { });
     }

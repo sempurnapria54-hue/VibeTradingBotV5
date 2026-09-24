@@ -17,8 +17,10 @@
 | `externalBidPrice` | best bid |
 | `externalTimestamp` | время тикера (ms) |
 
-Числовые цены → `BigDecimal`. Внутренний `instrumentId` добавляется
-при сборке `MarketPriceData`.
+Числовые цены → `BigDecimal`. Внутренний `instrumentId` коннектор не
+заполняет — числовой ключ базы границу сервиса не переходит
+(`docs/architecture/data-ownership.md`); связь ставит владелец сущности,
+получив модель.
 
 **Марк-цены и индексной цены в снапшоте нет — и подстановкой последней
 они не заменяются.** Тикер источника их не отдаёт, поэтому маппинга у них
@@ -41,8 +43,8 @@
 `MarketPriceDataMapper` маппит в два шага: `integrationToSnapshot`
 (OKX ticker → snapshot, сырые decimal-строки → `BigDecimal`,
 epoch-millis-строка `ts` → `OffsetDateTime` UTC) и
-`snapshotToDomain(snapshot, Long instrumentId)` (snapshot + внутренний
-ID → доменный `MarketPriceData`).
+`snapshotToDomain(snapshot)` (snapshot → доменный `MarketPriceData` без
+числового ключа инструмента).
 
 ### `TickerOkxResponse` → snapshot
 

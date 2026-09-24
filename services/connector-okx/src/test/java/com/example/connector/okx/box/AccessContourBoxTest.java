@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.connector.okx.util.OkxConstants;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,13 +38,11 @@ class AccessContourBoxTest extends SharedConnectorBox {
     }
 
     /**
-     * Тело отказа доступа сегодня пусто: точка входа отказа у коннектора не
-     * объявлена, и контейнер отвечает голым статусом. Долг —
-     * `.claude/work/backlog.md` §«Единый error-DTO у поверхностей соседних
-     * сервисов».
+     * Тело отказа доступа собирает общий энфорсер точек входа цепочки
+     * ({@code docs/rules/error-handling-policy.md} §«Отказ доступа — тот же
+     * контракт, что и прочие ошибки»).
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.2 — умолчание контура закрыто")
     void b8_2_theContourDefaultIsClosed() {
         exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.ok());
@@ -97,12 +94,10 @@ class AccessContourBoxTest extends SharedConnectorBox {
     }
 
     /**
-     * Вторая половина красна тем же долгом, что {@code B8.2}: статус
-     * {@code 405} пишет контейнер, а тело подменяет последний обработчик,
-     * которого у коннектора нет.
+     * Статус {@code 405} пишет контейнер, а тело подменяет глобальный
+     * обработчик, наследующий обработку отказов контейнера.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.6 — неизвестный путь и неподдержанный метод отвечают отказом доступа")
     void b8_6_anUnknownPathAndAnUnsupportedMethodAnswerWithRefusal() {
         Answer unknown = getAnonymously(account("/nothing"));

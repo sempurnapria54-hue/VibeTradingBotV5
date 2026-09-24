@@ -285,6 +285,20 @@ final class Feed {
     }
 
     /**
+     * Принятая настройка плеча: у неё нет сущности площадки, поэтому ни
+     * биржевого идентификатора, ни эха клиентского ack не несёт.
+     */
+    static String leverageAck() {
+        return """
+                {
+                  "success": true,
+                  "code": "0",
+                  "message": "accepted"
+                }
+                """;
+    }
+
+    /**
      * Подтверждение приёма команды площадкой.
      *
      * <p><b>Принято не значит исполнено</b>
@@ -330,6 +344,69 @@ final class Feed {
                   "externalModifiedAt": "2026-09-20T10:00:02Z"
                 }
                 """.formatted(internalId, externalId, status);
+    }
+
+    /**
+     * Добытая нога, НАЛИТАЯ целиком: терминал источника с наливом, равным
+     * размеру.
+     *
+     * <p><b>Налив и статус — разные операнды, и подаются оба.</b> Класс
+     * родителя встроенной защиты различает терминал по наливу
+     * ({@code AttachedAlgoOrderStateResolver}): терминал без налива снимает
+     * защиту как отменённую вместе с родителем, а с наливом — отправляет её
+     * искать материализованную запись.
+     *
+     * @param externalId   биржевой идентификатор ноги
+     * @param internalId   её клиентский идентификатор
+     * @param size         налитый размер в контрактах — он же размер ноги
+     * @param averagePrice средняя цена налива
+     */
+    static String filledOrder(String externalId, String internalId, String size, String averagePrice) {
+        return """
+                {
+                  "internalId": "%s",
+                  "externalId": "%s",
+                  "status": "COMPLETED",
+                  "type": "ENTRY_ATTACHED_STOP_LOSS",
+                  "side": "BUY",
+                  "externalStatus": "filled",
+                  "size": "%s",
+                  "accumulatedFillSize": "%s",
+                  "averagePrice": "%s",
+                  "fee": "-0.1",
+                  "externalCreatedAt": "2026-09-20T10:00:01Z",
+                  "externalModifiedAt": "2026-09-20T10:00:03Z"
+                }
+                """.formatted(internalId, externalId, size, size, averagePrice);
+    }
+
+    /**
+     * Встроенная защита, развёрнутая источником в САМОСТОЯТЕЛЬНУЮ живую
+     * условную заявку: форма, которой коннектор отвечает на перечень живых
+     * материализованных защит инструмента.
+     *
+     * <p><b>Совпадение — по клиентскому идентификатору защиты</b>, и
+     * подаёт его кейс: его назначило ядро при создании ноги, и иной
+     * связи записи с нашей защитой у источника нет
+     * ({@code RefreshOrderExecutor#matchProtection}).
+     *
+     * @param internalId  клиентский идентификатор защиты
+     * @param externalId  биржевой идентификатор материализованной записи
+     * @param size        размер защиты в контрактах
+     * @param stopTrigger цена срабатывания стопа
+     */
+    static String materializedProtection(String internalId, String externalId, String size, String stopTrigger) {
+        return """
+                {
+                  "internalId": "%s",
+                  "externalId": "%s",
+                  "type": "ATTACHED_STOP_LOSS",
+                  "externalStatus": "live",
+                  "size": "%s",
+                  "stopLossTriggerPrice": "%s",
+                  "triggerPriceType": "LAST"
+                }
+                """.formatted(internalId, externalId, size, stopTrigger);
     }
 
     /**

@@ -183,16 +183,16 @@ class TranchePrecheckPassTest {
     }
 
     @Test
-    @DisplayName("U17.13 — толерантность возраста не объявлена: снимок свеж всегда")
-    void u17_13_anAbsentFreshnessToleranceNeverStalesTheSnapshot() {
+    @DisplayName("U17.13 — толерантность возраста не объявлена: снимок несвеж, команда добычи")
+    void u17_13_anAbsentFreshnessToleranceStalesTheSnapshot() {
         harness.givenBalanceFreshness(null);
         harness.givenBalanceFetchCommand();
-        DealContext context = contextWithBalance(minutesAgo(600));
+        DealContext context = contextWithBalance(minutesAgo(0));
 
         TrancheTransition transition = handle(context);
 
-        assertThat(transition.hasCommands()).isFalse();
-        assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.CLOSED);
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_BALANCE_COMMAND);
+        harness.verifyWorkPassNotRun();
     }
 
     @Test

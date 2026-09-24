@@ -21,7 +21,11 @@ import com.example.tradingcore.exception.ControlledExchangeException;
 import com.example.tradingcore.exception.CredentialsRejectedException;
 import com.example.tradingcore.exception.ExchangeIntegrationException;
 import com.example.tradingcore.exception.RetryBudgetExhaustedException;
+import com.example.tradingcore.domain.safety.AnomalyReportService;
+import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
+import com.example.tradingcore.util.Constants;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,7 +39,10 @@ import org.springframework.stereotype.Service;
  *
  * <p><b>Ветка учёта одна</b>, потому что анкер один — строка исполнения
  * (docs/models/domain/other/DealActionState.md). Дочистка анкера не имеет
- * вовсе, и бюджета отказов у неё поэтому тоже нет.
+ * вовсе, и бюджета отказов у неё поэтому тоже нет; её отказ площадки
+ * объявляется происшествием — раз на сделку и тип команды
+ * (docs/components/ServiceCommandExecutor.md §«Отказ команды без анкера —
+ * происшествие, а не бюджет»).
  *
  * <p><b>Контракт броска:</b> строка переводится в отказ <b>и затем</b>
  * бросок идёт наружу. Порядок — часть контракта: иначе реакция поднимется
@@ -67,15 +74,21 @@ import org.springframework.stereotype.Service;
 @Service
 public class ServiceCommandExecutor {
 
+    /** Предмет отчёта об отказе без анкера: сделка и тип команды. */
+    private static final String ANCHORLESS_SUBJECT_PREFIX = "anchorless-command:";
+
     private final Map<ServiceCommandType, CommandExecutor> registry;
     private final RetryPolicyService retryPolicyService;
     private final DealActionStateDataService dealActionStateDataService;
+    private final AnomalyReportService anomalyReportService;
 
     public ServiceCommandExecutor(List<CommandExecutor> executors, RetryPolicyService retryPolicyService,
-                                  DealActionStateDataService dealActionStateDataService) {
+                                  DealActionStateDataService dealActionStateDataService,
+                                  AnomalyReportService anomalyReportService) {
         this.registry = executors.stream().collect(toMap(CommandExecutor::supportedType, identity()));
         this.retryPolicyService = retryPolicyService;
         this.dealActionStateDataService = dealActionStateDataService;
+        this.anomalyReportService = anomalyReportService;
     }
 
     /** Исполнить одну команду прохода. */
@@ -92,6 +105,8 @@ public class ServiceCommandExecutor {
                 // проходит через учёт: иначе анкер завис бы, и сделка пересылала бы
                 // команду каждый тик.
                 applyFailureAccounting(command, actionState, result.getErrorCode(), result.getMessage());
+                journalAnchorlessRefusal(command, actionState, dealContext, result.getErrorCode(),
+                        result.getMessage());
             }
             return result;
         } catch (RetryBudgetExhaustedException e) {
@@ -118,6 +133,7 @@ public class ServiceCommandExecutor {
             log.error("Command execution failed [{}] dealId={}", command.getType(), command.getDealId(), e);
             RuntimeErrorCode errorCode = classify(e);
             applyFailureAccounting(command, actionState, errorCode, e.getMessage());
+            journalAnchorlessRefusal(command, actionState, dealContext, errorCode, e.getMessage());
             return ServiceCommandExecutionResult.failure(errorCode, e.getMessage());
         }
     }
@@ -172,6 +188,41 @@ public class ServiceCommandExecutor {
             throw new RetryBudgetExhaustedException(
                     "Retry budget exhausted for command " + command.getType() + ": " + message,
                     actionState, isFalse(actionState.isSystem()));
+        }
+    }
+
+    /**
+     * Отказ отмены либо закрытия БЕЗ анкера — происшествие, а не бюджет
+     * (docs/components/ServiceCommandExecutor.md §«Отказ команды без анкера —
+     * происшествие, а не бюджет»).
+     *
+     * <p>Повтор у такой команды ведёт проход, и он верен: защиты транша
+     * снимаются последними, так что позиция стои́т под своим стопом, а пара
+     * занята живой сделкой и нового входа не примет. Недоставало одного —
+     * чтобы отказ видел кто-то, кроме лога. Отчёт один на сделку и тип
+     * команды, сколько бы проходов отказ ни повторялся: момент происшествия —
+     * первый отказ, а повтор нового не сообщает.
+     *
+     * <p>Сбой записи отчёта отказ команды не заслоняет: исход прохода
+     * остаётся тем, что вернула площадка.
+     */
+    private void journalAnchorlessRefusal(ServiceCommand command, DealActionState actionState,
+                                          DealContext dealContext, RuntimeErrorCode errorCode, String message) {
+        if (nonNull(actionState) || isFalse(command.getType().isCancelOrClose())) {
+            return;
+        }
+        Map<String, Object> operands = new LinkedHashMap<>();
+        operands.put("commandType", command.getType().name());
+        operands.put("errorCode", isNull(errorCode) ? null : errorCode.name());
+        operands.put("message", message);
+        try {
+            anomalyReportService.journalOnce(dealContext,
+                    HoldSignal.instrumentJournal(Constants.Hold.ANCHORLESS_COMMAND_REFUSED),
+                    ANCHORLESS_SUBJECT_PREFIX + command.getDealId() + ":" + command.getType().name(),
+                    Map.of("refusal", operands));
+        } catch (RuntimeException e) {
+            log.error("Journal {} failed dealId={}", Constants.Hold.ANCHORLESS_COMMAND_REFUSED,
+                    command.getDealId(), e);
         }
     }
 

@@ -1,5 +1,7 @@
 package com.example.tradingcore.box;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import java.io.IOException;
 import java.net.URI;
@@ -84,6 +86,12 @@ abstract class TradingCoreBox {
 
     /** Числа риск-аппетита тенанта. */
     protected static final String RISK_APPETITES = ROOT + "/risk-appetites";
+
+    /** Назначение торговых настроек счёта на инструменте. */
+    protected static final String PAIR_SETTINGS = ROOT + "/pair-settings";
+
+    /** Рабочее плечо, которое назначают кейсы, доводящие вход до команды. */
+    protected static final Integer WORKING_LEVERAGE = 10;
 
     /** Проверка пары «счёт × инструмент». */
     protected static final String PAIR_CHECKS = ROOT + "/pair-checks";
@@ -249,6 +257,21 @@ abstract class TradingCoreBox {
         marketData.answers(PEER_INSTRUMENTS, Feed.array(listedInstruments));
         tick(Tick.REGISTRY_PROJECTIONS);
         PeerStub.all().forEach(PeerStub::forgetRequests);
+    }
+
+    /**
+     * Назначает рабочее плечо пары своей поверхностью: без него
+     * risk-creating действие по паре отвергается преконтролем
+     * (docs/rules/trading-constraints.md). Инструмент к этому моменту
+     * обязан стоять в проекции — пара адресуется его идентичностью.
+     *
+     * <p>Стаб коннектора принимает настройку плеча тем же ходом: назначенное
+     * плечо исполнитель постановки пишет площадке перед каждым входом.
+     */
+    protected void assignLeverage(String accountInternalId, String instrumentInternalId) {
+        assertThat(put(PAIR_SETTINGS + "/" + accountInternalId + "/" + instrumentInternalId,
+                Bodies.pairSettings(WORKING_LEVERAGE)).status()).isEqualTo(200);
+        connector.answers("/api/v1/accounts/" + accountInternalId + "/leverage", Feed.leverageAck());
     }
 
     /**

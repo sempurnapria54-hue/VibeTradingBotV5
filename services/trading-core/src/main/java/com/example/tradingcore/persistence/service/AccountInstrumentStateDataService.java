@@ -4,6 +4,7 @@ import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.mapping.AccountInstrumentStateMapper;
+import com.example.tradingcore.persistence.model.AccountInstrumentStateEntity;
 import com.example.tradingcore.persistence.repository.AccountInstrumentStateRepository;
 import java.util.Arrays;
 import java.util.List;
@@ -29,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  * единственное допустимое значение (docs/rules/trading-constraints.md), а
  * не догадка о настройке. Плечо остаётся ПУСТЫМ: оно объявлено ручной
  * статичной настройкой держателя, и подставленное число выглядело бы
- * назначенным, не будучи им.
+ * назначенным, не будучи им; назначает его {@link #assignLeverage}.
  *
  * <p><b>Автора строки эта граница спрашивает сама, и это названное
  * исключение.</b> Безопасная вставка по ключу идёт нативным запросом и
@@ -120,6 +121,23 @@ public class AccountInstrumentStateDataService {
     public List<Long> findInstrumentIdsUnderHardRung(Long exchangeAccountId) {
         return repository.findInstrumentIdsInRungs(exchangeAccountId,
                 List.of(Instrument.SafetyRung.TRADE_BLOCKED.name()));
+    }
+
+    /**
+     * Назначить рабочее плечо пары; пусто — снять назначение. Строка
+     * материализуется тем же ленивым ходом, что и у читателя: плечо
+     * назначают раньше, чем пары коснулась торговля.
+     *
+     * <p><b>Запись идёт сохранением сущности, а не запросом:</b> автора и
+     * момент правки тогда ставят слушатели аудита, и второго писателя
+     * {@code modifiedBy} не заводится (docs/models/domain/other/Auditable.md).
+     */
+    @Transactional
+    public AccountInstrumentState assignLeverage(Long exchangeAccountId, Long instrumentId, Integer leverage) {
+        AccountInstrumentState materialized = getRequiredByPair(exchangeAccountId, instrumentId);
+        AccountInstrumentStateEntity entity = repository.getReferenceById(materialized.getId());
+        entity.setLeverage(leverage);
+        return mapper.persistenceToDomain(repository.save(entity));
     }
 
     /** Ступени строго выше рабочей — любая из них гасит новый вход. */

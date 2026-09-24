@@ -118,7 +118,7 @@ class ActionRiskGateTest {
 
         gate.gate(entryAction(), workingContext(), trancheOf());
 
-        verify(validator).validate(any(), any());
+        verify(validator).validate(any(), any(), any());
         verify(validator, never()).validateProtectionRemoval(any(), any(), any());
     }
 
@@ -130,7 +130,7 @@ class ActionRiskGateTest {
         gate.gateProtectionRemoval(workingContext(), trancheOf(), 70L);
 
         verify(validator).validateProtectionRemoval(any(), any(), any());
-        verify(validator, never()).validate(any(), any());
+        verify(validator, never()).validate(any(), any(), any());
     }
 
     @Test

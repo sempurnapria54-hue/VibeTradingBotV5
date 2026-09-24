@@ -56,9 +56,11 @@ public class RiskBlockResolver {
             RiskCheckCode.STOP_DISTANCE_BELOW_FLOOR,
             RiskCheckCode.STOP_LOSS_INVALID_SIDE,
             RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
+            RiskCheckCode.STOP_LOSS_BEYOND_MARK_PRICE,
             RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
             RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
             RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+            RiskCheckCode.LEVERAGE_NOT_CONFIGURED,
             RiskCheckCode.BALANCE_NOT_ENOUGH,
             RiskCheckCode.RISK_CREATING_UNDER_COLLAPSE,
             RiskCheckCode.INSTRUMENT_SAFETY_HOLD);

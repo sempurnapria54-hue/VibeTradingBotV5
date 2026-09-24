@@ -304,6 +304,26 @@ class ExchangeCommandsBoxTest extends SharedConnectorBox {
         assertThat(exchange.count()).isEqualTo(1);
     }
 
+    /**
+     * Валюта расчёта необязательна: её не знает снятие риска по позиции на
+     * инструменте вне контура ядра, а площадка для изолированной маржи её не
+     * требует ({@code docs/integrations/okx/contracts/position.md}).
+     */
+    @Test
+    @DisplayName("B2.15 — закрытие позиции без валюты расчёта уходит без неё")
+    void b2_15_aPositionClosureWithoutASettlementCurrencyTravelsWithoutIt() {
+        exchange.answers(OkxConstants.TRADE_CLOSE_POSITION_PATH,
+                Okx.ok(Okx.acceptedAck("ord-close-1", "")));
+
+        Answer answer = post(account("/positions/closures?externalInstrumentId=" + INSTRUMENT), "");
+
+        assertThat(answer.status()).isEqualTo(200);
+        String sent = exchange.single(OkxConstants.TRADE_CLOSE_POSITION_PATH).getBodyAsString();
+        assertThat(sent).contains("\"instId\":\"" + INSTRUMENT + "\"", "\"mgnMode\":\"isolated\"",
+                "\"posSide\":\"net\"", "\"autoCxl\":true");
+        assertThat(sent).doesNotContain("ccy");
+    }
+
     /** Штатное подтверждение на каждом из семи путей команд. */
     private void answerEveryCommand() {
         exchange.answers(OkxConstants.TRADE_ORDER_PATH,

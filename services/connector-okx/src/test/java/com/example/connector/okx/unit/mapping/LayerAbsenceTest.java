@@ -150,7 +150,7 @@ class LayerAbsenceTest {
         });
     }
 
-    /** У коннектора базы нет, и добыть ключ ему нечем: две перегрузки принимают его аргументом. */
+    /** У коннектора базы нет, и добыть ключ ему нечем: одна перегрузка принимает его аргументом. */
     @Test
     @DisplayName("U32.9 — числового ключа базы не добывает ни один переход")
     void u32_9_noTransitionObtainsANumericKey() {
@@ -162,9 +162,6 @@ class LayerAbsenceTest {
                 .getInstrumentId()).isNull();
         assertThat(Mappers.instrumentRules().snapshotToDomain(
                 Mappers.instrumentRules().integrationToSnapshot(OkxFixture.instrument()), 42L)
-                .getInstrumentId()).isEqualTo(42L);
-        assertThat(Mappers.marketPrice().snapshotToDomain(
-                Mappers.marketPrice().integrationToSnapshot(OkxFixture.ticker()), 42L)
                 .getInstrumentId()).isEqualTo(42L);
     }
 

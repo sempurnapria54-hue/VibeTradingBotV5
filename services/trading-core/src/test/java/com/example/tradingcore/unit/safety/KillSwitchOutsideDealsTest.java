@@ -95,19 +95,16 @@ class KillSwitchOutsideDealsTest {
         verify(exchange, never()).closePosition(anyString(), anyString(), any());
     }
 
-    /** Инструмента вне контура закрыть нечем — остаток держит радиус неподтверждённым. */
+    /** Валюты расчёта у инструмента вне контура нет — закрытие уходит без неё. */
     @Test
-    @DisplayName("U15.3 — позиция на инструменте вне контура: закрытия нет, радиус не подтверждён, отказ в логе")
-    void u15_3_aPositionOutsideTheContourLeavesTheScopeUnconfirmed() {
-        when(exchange.getPositions(ACCOUNT_INTERNAL_ID)).thenReturn(List.of(live(OUTSIDE_CONTOUR)));
+    @DisplayName("U15.3 — позиция на инструменте вне контура: закрыта без валюты расчёта, радиус подтверждён")
+    void u15_3_aPositionOutsideTheContourIsClosedWithoutASettlementCurrency() {
+        when(exchange.getPositions(ACCOUNT_INTERNAL_ID))
+                .thenReturn(List.of(live(OUTSIDE_CONTOUR)), List.of());
 
-        try (SafetyLogCapture log = SafetyLogCapture.attach(KillSwitchExecutor.class)) {
-            assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, deals())).isFalse();
+        assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, deals())).isTrue();
 
-            assertThat(log.messages())
-                    .anyMatch(message -> message.contains("cannot address a position outside the contour"));
-        }
-        verify(exchange, never()).closePosition(anyString(), anyString(), any());
+        verify(exchange, times(1)).closePosition(ACCOUNT_INTERNAL_ID, OUTSIDE_CONTOUR, null);
     }
 
     /** Не добытые позиции подтверждением не считаются. */

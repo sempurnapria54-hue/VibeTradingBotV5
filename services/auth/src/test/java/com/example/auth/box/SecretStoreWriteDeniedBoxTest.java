@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -34,7 +33,6 @@ class SecretStoreWriteDeniedBoxTest extends AuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B2.9 — хранилище секретов отвергает запись правами")
     void b2_9_theSecretStoreRefusesTheWriteByRights() {
         String tenant = provisionTenant("user-b2-9");

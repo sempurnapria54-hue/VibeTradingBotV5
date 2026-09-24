@@ -38,7 +38,7 @@
 | `direction` | `Direction` | Доменное направление. |
 | `externalSize` | `BigDecimal` | Размер по данным биржи, нормализованный абсолют, **в контрактах** — та же единица, что у заявок: предикат покрытия сравнивает их напрямую. |
 | `externalAverageEntryPrice` | `BigDecimal` | Средняя цена входа. Пишет только live-нога рефреша. |
-| `externalMarkPrice` | `BigDecimal` | Марк-цена. |
+| `externalMarkPrice` | `BigDecimal` | Марк-цена. Потребитель — преконтроль переноса уровня остановки убытка: перенос обязан лечь за ней (`docs/rules/risk-policy.md`). |
 | `externalLiquidationPrice` | `BigDecimal` | Расчётная цена ликвидации. |
 | `externalMargin` | `BigDecimal` | Маржа позиции. |
 | `externalUnrealizedProfit` | `BigDecimal` | Нереализованный результат. |

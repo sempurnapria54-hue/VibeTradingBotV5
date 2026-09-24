@@ -312,6 +312,54 @@ class StrategyStepAndActionTest {
         assertThat(positionAction(3L).placementRole()).isEqualTo(StrategyPlacementRole.PRIMARY);
     }
 
+    /** Пустая база защиты триггерной ветки становится марк-ценой. */
+    @ParameterizedTest
+    @EnumSource(value = AlgoOrder.ConditionType.class, names = {"STOP_LOSS", "PARTIAL_STOP_LOSS", "OCO_FULL"})
+    @DisplayName("U16.30 — защита триггерной ветки с пустой базой срабатывания")
+    void u16_30_anEmptyProtectiveTriggerBecomesMark(AlgoOrder.ConditionType conditionType) {
+        StrategyAlgoOrderAction subject = protectiveCreate(1L, conditionType);
+
+        subject.applyProtectiveTriggerDefault();
+
+        assertThat(subject.getTriggerPriceType()).isEqualTo(AlgoOrder.TriggerPriceType.MARK);
+    }
+
+    /** Объявленная база не затирается: отказ — дело создания, а не умолчания. */
+    @Test
+    @DisplayName("U16.31 — защита с объявленной базой «последняя цена»")
+    void u16_31_aDeclaredTriggerIsKept() {
+        StrategyAlgoOrderAction subject = protectiveCreate(1L, AlgoOrder.ConditionType.STOP_LOSS);
+        subject.setTriggerPriceType(AlgoOrder.TriggerPriceType.LAST);
+
+        subject.applyProtectiveTriggerDefault();
+
+        assertThat(subject.getTriggerPriceType()).isEqualTo(AlgoOrder.TriggerPriceType.LAST);
+    }
+
+    /** У постановки трейлинга поля базы нет: умолчание объявляло бы неисполняемое. */
+    @ParameterizedTest
+    @EnumSource(value = AlgoOrder.ConditionType.class, names = {"TRAILING_PERCENTS", "TRAILING_VALUE"})
+    @DisplayName("U16.32 — трейлинг с пустой базой срабатывания")
+    void u16_32_aTrailingKeepsAnEmptyTrigger(AlgoOrder.ConditionType conditionType) {
+        StrategyAlgoOrderAction subject = protectiveCreate(1L, conditionType);
+
+        subject.applyProtectiveTriggerDefault();
+
+        assertThat(subject.getTriggerPriceType()).isNull();
+    }
+
+    /** Область умолчания — защиты; тейк им не является. */
+    @ParameterizedTest
+    @EnumSource(value = AlgoOrder.ConditionType.class, names = {"TAKE_PROFIT", "PARTIAL_TAKE_PROFIT"})
+    @DisplayName("U16.33 — тейк-профит с пустой базой срабатывания")
+    void u16_33_aTakeProfitKeepsAnEmptyTrigger(AlgoOrder.ConditionType conditionType) {
+        StrategyAlgoOrderAction subject = protectiveCreate(1L, conditionType);
+
+        subject.applyProtectiveTriggerDefault();
+
+        assertThat(subject.getTriggerPriceType()).isNull();
+    }
+
     private static StrategyStep step(StrategyStepType stepType) {
         StrategyStep step = new StrategyStep();
         step.setStepType(stepType);

@@ -23,7 +23,13 @@
 #   4) отказ сборки либо теста — ненулевой код возврата maven; вердикт лога
 #      и код maven сводит одна функция `decide`, и проба идёт по ней;
 #   5) знаменатель оси 3 — заголовки модулей, а не строки упаковки
-#      «Building jar:», которые фаза verify печатает по строке на артефакт.
+#      «Building jar:», которые фаза verify печатает по строке на артефакт;
+#   6) демон Docker не отвечает — прогон не начинается вовсе: ящики сервисов
+#      поднимают субстрат контейнерами, и без демона они краснели бы ошибками
+#      контейнеров, неотличимыми от дефекта кода. Docker — ПРЕДУСЛОВИЕ
+#      реактора, а не условие пропуска тестов
+#      (.claude/decisions/test-contour-design-pass.md §«9. Docker — предусловие
+#      реактора, а не условие пропуска тестов»).
 #
 # Каталоги `target/classes` и `target/test-classes` всех модулей реактора
 # СНОСЯТСЯ перед прогоном: плагин `clean` в офлайне не резолвится, а без
@@ -47,10 +53,11 @@
 # Запуск (из корня репозитория):  bash tools/reactor-test.sh
 # Код возврата: 0 — дерево скомпилировано целиком и тесты зелёные;
 # 1 — сборка или тесты упали; 2 — ПРОВЕРКА НЕ ПРОВОДИЛАСЬ (нет JDK, нет
-# maven, либо прогон оказался вакуумным).
+# maven, не отвечает демон Docker, либо прогон оказался вакуумным).
 #
 # Переопределяется окружением: REACTOR_JDK (JAVA_HOME сборки), REACTOR_MVN
-# (путь к mvn), REACTOR_MVN_ARGS (аргументы прогона).
+# (путь к mvn), REACTOR_MVN_ARGS (аргументы прогона), REACTOR_DOCKER
+# (клиент docker, чей `info` спрашивает демон).
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -99,6 +106,17 @@ decide() {
   echo "GREEN"
 }
 
+# Предусловие субстрата ящиков: клиент спрашивает демон. Чистая функция по
+# переданному клиенту, на ней стои́т ось 6. Печатает OK | NO_DOCKER.
+docker_verdict() {
+  local docker_cmd="$1"
+  if "$docker_cmd" info >/dev/null 2>&1; then
+    echo "OK"
+    return
+  fi
+  echo "NO_DOCKER"
+}
+
 # --- батарея осей: исполняется тем же прогоном ---------------------------
 battery() {
   local work verdict failed=0
@@ -126,6 +144,10 @@ battery() {
   printf '[INFO] Building a\n[INFO] Compiling 3 source files\n[INFO] Building jar: a.jar\n[INFO] Building b\n[INFO] Compiling 7 source files\n[INFO] Building jar: b.jar\n[INFO] Building aggregator\n' > "$work/package.log"
   verdict="$(analyze_log "$work/package.log")"
   report_axis '8. строки упаковки «Building jar:» модулями не считаются' "$verdict" OK || failed=1
+
+  report_axis '9. демон Docker не отвечает — отказ' "$(docker_verdict false)" NO_DOCKER || failed=1
+  report_axis '10. контроль: демон отвечает — отказа нет' "$(docker_verdict true)" OK || failed=1
+  report_axis '11. клиента docker нет вовсе — отказ' "$(docker_verdict "$work/нет-такого-клиента")" NO_DOCKER || failed=1
 
   rm -rf "$work"
   return $failed
@@ -157,6 +179,12 @@ if [ ! -x "$JDK_HOME/bin/javac" ] && [ ! -f "$JDK_HOME/bin/javac.exe" ]; then
 fi
 if [ ! -f "$MVN" ] && ! command -v "$MVN" >/dev/null; then
   echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: maven не найден — $MVN (переопределяется REACTOR_MVN)"
+  exit 2
+fi
+
+DOCKER="${REACTOR_DOCKER:-docker}"
+if [ "$(docker_verdict "$DOCKER")" != "OK" ]; then
+  echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: демон Docker не отвечает — $DOCKER info (переопределяется REACTOR_DOCKER); ящики без него не поднимут субстрат"
   exit 2
 fi
 

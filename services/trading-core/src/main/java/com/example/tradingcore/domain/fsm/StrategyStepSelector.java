@@ -171,9 +171,15 @@ public class StrategyStepSelector {
         return declared > 0 && applied(step, dealContext, tranche) >= declared;
     }
 
+    /**
+     * Строки, исчерпавшие своё действие на эпизоде. Пропущенная в счёт
+     * идёт: строка на действие одна, и начать пропущенное заново проход не
+     * может — не засчитанная, она держала бы шаг допустимым без единого
+     * действия к началу, и first-match не доходил бы до следующих шагов
+     * (docs/rules/strategy-step-once-per-episode.md).
+     */
     private int applied(StrategyStep step, DealContext dealContext, DealTranche tranche) {
         return (int) dealContext.stepActionStates(step, tranche).stream()
-                .filter(state -> isFalse(DealActionStateStatus.SKIPPED.equals(state.getStatus())))
                 .filter(state -> isFalse(DealActionStateStatus.FAILED.equals(state.getStatus())))
                 .count();
     }

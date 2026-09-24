@@ -1,6 +1,7 @@
 package com.example.connector.okx.unit.mapping;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.connector.okx.integration.external.api.model.okx.response.TradeFeeOkxResponse;
 import com.example.connector.okx.mapping.TradeFeeRateMapper;
@@ -27,11 +28,10 @@ import org.junit.jupiter.api.Test;
  * ребейт уезжает отрицательной издержкой и в формуле корректно
  * уменьшает убыток на стопе.
  *
- * <p>Кейсы {@code U16.6}, {@code U16.7} и {@code U16.8} в код не пошли:
- * дом объявляет пустую и непарсящуюся ставку, а также неразбираемое
- * время контролируемой ошибкой границы, код же глотает отказ и отдаёт
- * пустоту — `.claude/work/backlog.md` §«Отказ разбора ставки комиссии
- * проглочен маппером вопреки контракту границы».
+ * <p><b>Отказ разбора переход не глотает:</b> неразбираемая ставка и
+ * неразбираемое время бросают, и класс отказу даёт сеть разбора шлюза;
+ * пустую ставку и пустой ключ группы отвергает структурная валидация
+ * читателя — её кейсы у ящика коннектора ({@code B5.9}).
  */
 class TradeFeeRateToSnapshotTest {
 
@@ -92,7 +92,36 @@ class TradeFeeRateToSnapshotTest {
         assertThat(snapshotOf(response).getExternalTakerFeeRate()).isEqualTo("0.0005");
     }
 
-    /** Пустая строка есть объявленная пустота, и от проглоченного отказа она по выходу неотличима. */
+    /** Переход пустую ставку не судит: её до перехода не пускает читатель. */
+    @Test
+    @DisplayName("U16.6 — пустая ставка: переход отдаёт пустоту, отвергает её читатель")
+    void u16_6_anEmptyRateIsLeftToTheReader() {
+        TradeFeeOkxResponse response = OkxFixture.tradeFee();
+        response.setFeeGroup(List.of(OkxFixture.feeGroup("1", "", "-0.0002")));
+
+        assertThat(snapshotOf(response).getExternalTakerFeeRate()).isNull();
+    }
+
+    /** Непарсящаяся ставка до негации не доходит — и пустотой не становится. */
+    @Test
+    @DisplayName("U16.7 — непарсящаяся ставка отказывает разбором, а не пустеет")
+    void u16_7_anUnparseableRateFails() {
+        TradeFeeOkxResponse response = OkxFixture.tradeFee();
+        response.setFeeGroup(List.of(OkxFixture.feeGroup("1", "abc", "-0.0002")));
+
+        assertThatThrownBy(() -> snapshotOf(response)).isInstanceOf(NumberFormatException.class);
+    }
+
+    @Test
+    @DisplayName("U16.8 — неразбираемое время данных отказывает разбором, а не пустеет")
+    void u16_8_anUnparseableSourceTimeFails() {
+        TradeFeeOkxResponse response = OkxFixture.tradeFee();
+        response.setTs("nonsense");
+
+        assertThatThrownBy(() -> snapshotOf(response)).isInstanceOf(NumberFormatException.class);
+    }
+
+    /** Пустая строка есть объявленная пустота, а неразбираемая — отказ (U16.8). */
     @Test
     @DisplayName("U16.9 — пустое время данных источника даёт пустоту законно")
     void u16_9_anEmptySourceTimeIsLawfulEmptiness() {

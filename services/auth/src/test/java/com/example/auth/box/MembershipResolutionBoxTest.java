@@ -7,7 +7,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -87,12 +86,11 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
 
     /**
      * Служебная идентичность кластера пользователя не несёт вовсе: по ней
-     * тенант завёлся бы на каждый сервис. Красное — форма тела: отказ
-     * идёт {@code ResponseStatusException}, которого не ловит ни один
-     * обработчик сервиса.
+     * тенант завёлся бы на каждый сервис. Отказ идёт
+     * {@code ResponseStatusException}: число берётся из него, тело —
+     * единое.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B1.3 — токен служебной идентичности тенанта не заводит")
     void b1_3_aServiceIdentityTokenProvisionsNothing() {
         Long tenantsBefore = rows.count("tenants");
@@ -128,7 +126,6 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B1.6 — вызов без предъявленного принципала отвечает 401 единым error-DTO")
     void b1_6_aCallWithoutAPrincipalIsRefused() {
         Long tenantsBefore = rows.count("tenants");
@@ -143,7 +140,6 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B1.7 — токен, подписанный чужим ключом, отвечает 401 единым error-DTO")
     void b1_7_aTokenSignedByAnUnknownKeyIsRefused() {
         Long tenantsBefore = rows.count("tenants");
@@ -161,7 +157,6 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B1.8 — просроченный токен отвечает 401 единым error-DTO")
     void b1_8_anExpiredTokenIsRefused() {
         Long tenantsBefore = rows.count("tenants");
@@ -179,7 +174,6 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B1.9 — токен чужого издателя отвечает 401 единым error-DTO")
     void b1_9_aTokenOfAnotherIssuerIsRefused() {
         Long tenantsBefore = rows.count("tenants");
@@ -234,7 +228,6 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B1.12 — токен без claim `azp` отвечает 403 единым error-DTO")
     void b1_12_aTokenWithoutTheAuthorizedPartyIsRefused() {
         Long tenantsBefore = rows.count("tenants");
@@ -252,10 +245,9 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
     /**
      * Ни тенанта, ни владельца: заведение идёт одной транзакцией, и
      * «тенант есть, владельца нет» невозможно по построению исполнителя.
-     * Красное — форма тела: последнего обработчика у сервиса нет вовсе.
+     * Тело собирает последний обработчик сервиса.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B1.13 — токен без claim `sub` не заводит ни тенанта, ни членства")
     void b1_13_aTokenWithoutASubjectProvisionsNothing() {
         Long tenantsBefore = rows.count("tenants");
@@ -272,7 +264,6 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B1.14 — токен с чужим значением заголовка `typ` отвечает 401 единым error-DTO")
     void b1_14_aTokenWithAForeignTypeHeaderIsRefused() {
         Long tenantsBefore = rows.count("tenants");

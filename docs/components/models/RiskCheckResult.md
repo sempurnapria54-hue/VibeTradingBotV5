@@ -63,6 +63,8 @@
 | `RISK_PER_DEAL_CUMULATIVE_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED`, `RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED`, `DEAL_NOTIONAL_EXCEEDED` | **временный** — бюджет освободится выходом соседнего транша |
 | `BALANCE_NOT_ENOUGH`, `BALANCE_NOT_FRESH`, `FEE_RATE_UNAVAILABLE`, `DEAL_GRAPH_INCOMPLETE` | **временный** — операнд добудется следующим проходом |
 | `LOSS_LIMIT_NOT_CONFIGURED`, `RISK_APPETITE_NOT_CONFIGURED` | **временный** — число приходит **назначением держателя** на строку риск-аппетита тенанта (`docs/rules/risk-policy.md`), то есть снаружи прохода, но без правки определения стратегии. Носитель — строка тенанта, не конфигурация профиля: та снята вместе с переездом чисел |
+| `LEVERAGE_NOT_CONFIGURED` | **временный** по тому же основанию: плечо приходит назначением держателя на строку пары «счёт, инструмент» (`docs/rules/trading-constraints.md`). С `EXCHANGE_MAX_LEVERAGE_EXCEEDED` того же носителя он разведён намеренно: пустое плечо — **исходное** состояние каждой пары, строка рождается без него, и бессрочный вердикт закрывал бы первый транш всякой новой пары до назначения; превышение максимума — назначенное значение, **противоречащее** площадке, то есть контур в неверном состоянии, как у режима маржи |
+| `STOP_LOSS_BEYOND_MARK_PRICE` | **временный** — цена проходит уровень сама, и перенос исполняется следующим проходом |
 | `INSTRUMENT_NOT_LIVE`, `INSTRUMENT_RULES_MISSING`, `INSTRUMENT_SETTLE_CURRENCY_MISSING`, `EXCHANGE_MAX_LEVERAGE_EXCEEDED`, `MARGIN_MODE_NOT_ISOLATED`, `BORROW_OR_DEBT_DETECTED` | бессрочные — состояние контура сменится не проходом, а внешним действием |
 | прочие (конфигурация, стороны уровней, инварианты частичного выхода) | бессрочные — меняются только правкой стратегии |
 
@@ -100,6 +102,10 @@
 операнды, и П3 требует различать их в данных. Оба **временны́е**:
 исход меняется правкой конфигурации, а не стратегии.
 
+**Настройка пары:** `LEVERAGE_NOT_CONFIGURED` — незаданное плечо счёта на
+инструменте; своим кодом по тому же доводу П3, а не третьим членом чисел
+риск-аппетита: носитель у плеча другой — строка пары, а не строка тенанта.
+
 **Полнота входа проверки:** `DEAL_GRAPH_INCOMPLETE`. Код отдельный, а не
 разновидность `CALCULATED_ACTION_INVALID`: тот говорит о самом
 рассчитанном действии, этот — о том, что операнды потолков считать не по
@@ -109,7 +115,8 @@
 **Размер и уровни:** `CALCULATED_ACTION_INVALID`, `SIZE_BELOW_MIN`,
 `SIZE_LOT_STEP_INVALID`, `SIZE_ABOVE_LIMIT`, `STOP_LOSS_INVALID_SIDE`,
 `TAKE_PROFIT_INVALID_SIDE`, `STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION`,
-`STOP_DISTANCE_BELOW_FLOOR`, `RISK_CREATING_UNDER_COLLAPSE`.
+`STOP_LOSS_BEYOND_MARK_PRICE`, `STOP_DISTANCE_BELOW_FLOOR`,
+`RISK_CREATING_UNDER_COLLAPSE`.
 
 **Инварианты частичного выхода:** `PARTIAL_EXIT_NOT_REDUCE_ONLY`,
 `PARTIAL_EXIT_INCREASES_POSITION`,

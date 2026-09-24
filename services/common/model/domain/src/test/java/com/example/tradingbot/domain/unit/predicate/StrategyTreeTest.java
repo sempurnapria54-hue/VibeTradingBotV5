@@ -12,11 +12,13 @@ import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyActionType;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRule;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionSourceType;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.util.List;
 import java.util.Map;
@@ -293,6 +295,34 @@ class StrategyTreeTest {
     @DisplayName("U15.28 — политика входа не задана")
     void u15_28_anAbsentPolicyDoesNotOpenTheEntry() {
         assertThat(detailWithPolicy(null).allowsEntryFor(MarketPhase.Type.BULL_TREND)).isFalse();
+    }
+
+    /**
+     * Умолчание базы срабатывания обходит ОБА уровня объявления: защита,
+     * объявленная агрегатным шагом, иначе уехала бы к площадке с пустой
+     * базой, то есть по последней цене.
+     */
+    @Test
+    @DisplayName("U15.29 — определение с защитами на траншевом и агрегатном шагах, базы пусты")
+    void u15_29_theTriggerDefaultReachesBothDeclarationLevels() {
+        StrategyAlgoOrderAction ofDeclaration = protection(1L, "p1");
+        StrategyAlgoOrderAction ofDeal = protection(2L, "p2");
+        StrategyDetail detail = detailWithAction(ofDeclaration);
+        detail.setStepsByStatus(Map.of(Deal.Status.ACTIVE, List.of(stepWithActions(ofDeal, action(3L, "x3")))));
+
+        strategyWithDetails(detail).applyProtectiveTriggerDefaults();
+
+        assertThat(ofDeclaration.getTriggerPriceType()).isEqualTo(AlgoOrder.TriggerPriceType.MARK);
+        assertThat(ofDeal.getTriggerPriceType()).isEqualTo(AlgoOrder.TriggerPriceType.MARK);
+    }
+
+    private static StrategyAlgoOrderAction protection(Long id, String key) {
+        StrategyAlgoOrderAction protection = new StrategyAlgoOrderAction();
+        protection.setId(id);
+        protection.setKey(key);
+        protection.setActionType(StrategyActionType.CREATE_ACTION);
+        protection.setConditionType(AlgoOrder.ConditionType.STOP_LOSS);
+        return protection;
     }
 
     private static Strategy strategy(Strategy.Status status) {

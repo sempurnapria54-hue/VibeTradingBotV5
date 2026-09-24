@@ -40,6 +40,13 @@ final class Bodies {
                 """.formatted(simultaneousPercent, catastrophicMultiplier, consecutiveLossLimit);
     }
 
+    /** Снимок намерения держателя по настройкам пары: рабочее плечо. */
+    static String pairSettings(Integer leverage) {
+        return """
+                {"leverage": %s}
+                """.formatted(leverage);
+    }
+
     /** Тело, которое не разбирается ни одной моделью. */
     static String unparseable() {
         return "{\"haltClass\": ";

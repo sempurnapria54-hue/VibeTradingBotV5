@@ -91,8 +91,15 @@ public class RiskValidator {
      * Преконтроль рассчитанного действия: вход, добор, замещение с
      * увеличением, создание и перенос защиты
      * (docs/rules/risk-validator-scope.md).
+     *
+     * <p><b>Транш действия — операнд блок-сета ступени, и только его.</b>
+     * Потолки считаются по всей сделке (§«Действие транша, потолки сделки»
+     * дома scope); транш нужен одному вопросу — ослабляет ли защитное
+     * действие уровень СВОЕГО транша. Пустой транш этот вопрос оставляет
+     * без ответа, и защитное действие остаётся в блок-сете.
      */
-    public RiskValidationResult validate(CalculatedStrategyAction calculatedAction, DealContext dealContext) {
+    public RiskValidationResult validate(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                                         DealTranche tranche) {
         List<RiskCheckResult> checks = new ArrayList<>();
         CalculatedSize size = calculatedAction.getCalculatedSize();
         CalculatedPrice price = calculatedAction.getCalculatedPrice();
@@ -112,6 +119,10 @@ public class RiskValidator {
         if (isNull(rules)) {
             return blockedResult(checks, RiskCheckCode.INSTRUMENT_RULES_MISSING,
                     "Instrument external rules not materialized");
+        }
+        if (isNull(rules.contractValue())) {
+            return blockedResult(checks, RiskCheckCode.INSTRUMENT_RULES_MISSING,
+                    "Instrument contract value not materialized: act risk, live risk and notional are unmeasured");
         }
         if (isBlank(dealContext.getInstrument().getExternalSettlementCurrency())) {
             return blockedResult(checks, RiskCheckCode.INSTRUMENT_SETTLE_CURRENCY_MISSING,
@@ -144,16 +155,18 @@ public class RiskValidator {
         checkInstrumentLive(rules, checks);
         checkMarginMode(pairState, checks);
         checkSizeBounds(rules, sizeContracts, price, checks);
-        checkExchangeMaxLeverage(pairState, rules, checks);
+        checkLeverage(calculatedAction.getSourceAction(), pairState, rules, checks);
         checkFeeRate(price, rules, dealContext, checks);
         checkRiskCreatingEntryProtection(calculatedAction, checks);
         checkStopLossSide(calculatedAction.getSourceAction(), price.getStopLossPrice(), entryAnchor,
                 direction, checks);
+        checkTransferStopBehindMark(calculatedAction.getSourceAction(), price.getStopLossPrice(), position,
+                entryAnchor, direction, checks);
         checkStopDistanceFloor(price.getStopLossPrice(), entryAnchor, direction, rules, checks);
         checkTakeProfitSide(price.getTakeProfitPrice(), entryAnchor, direction, checks);
         checkLiquidationGuard(price.getStopLossPrice(), position, direction, checks);
         checkCollapseWindow(calculatedAction, dealContext, checks);
-        checkSafetyRung(calculatedAction.getSourceAction(), pairState, checks);
+        checkSafetyRung(calculatedAction, tranche, direction, pairState, checks);
         checkCeilings(calculatedAction, dealContext, rules, appetite, base, entryAnchor, checks);
 
         return aggregate(checks);
@@ -286,6 +299,11 @@ public class RiskValidator {
         if (isNull(detail) || isNull(detail.getRiskPerActionPercent())) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
                     "riskPerActionPercent is not declared by the pinned strategy detail", null));
+            return;
+        }
+        if (isTrue(isRiskCreatingEntry(calculatedAction.getSourceAction())) && isNull(entryAnchor)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.CALCULATED_ACTION_INVALID,
+                    "Entry anchor is not resolved: act risk and notional are unmeasured", null));
             return;
         }
         BigDecimal actRisk = actRisk(calculatedAction, dealContext, rules, entryAnchor);
@@ -495,6 +513,12 @@ public class RiskValidator {
     /**
      * Риск проверяемого акта: плановый риск ноги для risk-creating, ноль
      * для risk-weakening — новых контрактов такое действие не создаёт.
+     *
+     * <p><b>Отрицательный риск обрезается нулём</b>, как и живое слагаемое:
+     * уровень за безубытком гасит СВОЁ слагаемое, а не чужие, — иначе он
+     * вычитался бы из принятого и живого риска. На входной тропе ветвь
+     * недостижима — сайзинг отказывает первым, а преконтроль отвергает
+     * сторону уровня, — и клэмп есть охрана второго рубежа.
      */
     private BigDecimal actRisk(CalculatedStrategyAction calculatedAction, DealContext dealContext,
                                InstrumentExternalRules rules, BigDecimal entryAnchor) {
@@ -506,10 +530,11 @@ public class RiskValidator {
                 || isNull(rules.contractValue()) || isNull(rules.takerFeeRate())) {
             return ZERO;
         }
-        return RiskMath.lossAtStopPerUnit(dealContext.getDeal().getDirection(), entryAnchor,
+        BigDecimal risk = RiskMath.lossAtStopPerUnit(dealContext.getDeal().getDirection(), entryAnchor,
                         stop.getTriggerPrice(), rules.takerFeeRate())
                 .multiply(calculatedAction.getCalculatedSize().getSizeContracts())
                 .multiply(rules.contractValue());
+        return risk.signum() > 0 ? risk : ZERO;
     }
 
     /** Нотинал проверяемого акта; risk-weakening контрактов не создаёт. */
@@ -553,11 +578,15 @@ public class RiskValidator {
      * <p><b>Блок-сет — не «всё, что видит преконтроль».</b> Постановка
      * уровня фиксации прибыли тоже валидируется (это создание защитной
      * заявки), но риска не создаёт и защиты не ослабляет — под ступенью
-     * она проходит: сделки доживают под своей защитой.
+     * она проходит: сделки доживают под своей защитой. Так же проходит и
+     * защитное действие, чей уровень защиты транша не ослабляет, — подтяжка
+     * стопа, перевод в безубыток, первая защита над непокрытым траншем.
      */
-    private void checkSafetyRung(StrategyAction action, AccountInstrumentState pairState,
+    private void checkSafetyRung(CalculatedStrategyAction calculatedAction, DealTranche tranche,
+                                 StrategyTradeDirection direction, AccountInstrumentState pairState,
                                  List<RiskCheckResult> checks) {
-        if (isFalse(pairState.hasStandingSafetyRung()) || isFalse(inSafetyBlockSet(action))) {
+        if (isFalse(pairState.hasStandingSafetyRung())
+                || isFalse(inSafetyBlockSet(calculatedAction, tranche, direction))) {
             return;
         }
         checks.add(RiskCheckResult.blocked(RiskCheckCode.INSTRUMENT_SAFETY_HOLD,
@@ -567,16 +596,34 @@ public class RiskValidator {
 
     /**
      * Акт входит в блок-сет ступени: он создаёт риск либо ослабляет его
-     * контроль. Защитное действие ослабляет контроль тогда, когда касается
-     * УРОВНЯ остановки убытка; уровень фиксации прибыли контроля не
-     * ослабляет (docs/spec/strategy-reference.json, величина
-     * {@code isProtectiveAction}).
+     * контроль. Защитное действие касается УРОВНЯ остановки убытка
+     * (docs/spec/strategy-reference.json, величина
+     * {@code isProtectiveAction}) и ослабляет контроль, когда его уровень
+     * отступает от защиты транша (docs/spec/protection-coverage.json,
+     * величина {@code actStopKeepsProtection}); уровень фиксации прибыли
+     * контроля не ослабляет вовсе.
+     *
+     * <p><b>Уровень акта — только ОБЪЯВЛЕННЫЙ.</b> У трейлинга уровень
+     * наблюдается после активации, и в момент постановки подтяжку нечем
+     * доказать: он остаётся в блок-сете.
      */
-    private Boolean inSafetyBlockSet(StrategyAction action) {
+    private Boolean inSafetyBlockSet(CalculatedStrategyAction calculatedAction, DealTranche tranche,
+                                     StrategyTradeDirection direction) {
+        StrategyAction action = calculatedAction.getSourceAction();
         if (isTrue(isRiskCreatingEntry(action))) {
             return true;
         }
-        return action instanceof StrategyAlgoOrderAction algoAction && isTrue(algoAction.isProtective());
+        boolean protective = action instanceof StrategyAlgoOrderAction algoAction
+                && isTrue(algoAction.isProtective());
+        if (isFalse(protective)) {
+            return false;
+        }
+        if (isNull(tranche) || isFalse(StrategyLevelSource.DECLARED.equals(action.levelSource()))) {
+            return true;
+        }
+        ResolvedStopLossPrice actStop = calculatedAction.getCalculatedPrice().getStopLossPrice();
+        BigDecimal actLevel = isNull(actStop) ? null : actStop.getTriggerPrice();
+        return isFalse(tranche.stopLevelKeepsProtection(actLevel, direction));
     }
 
     /**
@@ -689,12 +736,25 @@ public class RiskValidator {
     /**
      * Плечо читается со строки пары — там же, где режим маржи: оно
      * объявлено ручной статичной настройкой СЧЁТА НА ИНСТРУМЕНТЕ
-     * (docs/rules/trading-constraints.md). Пустое сверять не с чем, и
-     * отказа это не даёт: настройка не назначена, а биржевой максимум
-     * охраняет площадка.
+     * (docs/rules/trading-constraints.md).
+     *
+     * <p><b>Пустое плечо у акта, создающего риск, — отказ, а не молчание.</b>
+     * Исполнитель постановки пустого плеча площадке не пишет, и вход
+     * наливается на том плече, которое на счёте стояло, — то есть цену
+     * ликвидации задаёт значение, которого никто не назначал. Благоприятное
+     * умолчание запрещено (docs/rules/absent-value-semantics.md). Действие,
+     * риска не создающее, пустым плечом не отвергается: плеча оно площадке
+     * не пишет, а отказ переносу защиты оставил бы позицию без него.
+     *
+     * <p>Пустой биржевой максимум сверять не с чем: его охраняет площадка.
      */
-    private void checkExchangeMaxLeverage(AccountInstrumentState pairState, InstrumentExternalRules rules,
-                                          List<RiskCheckResult> checks) {
+    private void checkLeverage(StrategyAction action, AccountInstrumentState pairState,
+                               InstrumentExternalRules rules, List<RiskCheckResult> checks) {
+        if (isNull(pairState.getLeverage()) && isTrue(isRiskCreatingEntry(action))) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.LEVERAGE_NOT_CONFIGURED,
+                    "Leverage is not assigned for the account on the instrument", null));
+            return;
+        }
         BigDecimal maxLeverage = rules.maxLeverage();
         if (isNull(pairState.getLeverage()) || isNull(maxLeverage)) {
             return;
@@ -762,6 +822,54 @@ public class RiskValidator {
         }
     }
 
+    /**
+     * Перенос уровня остановки убытка обязан лечь ЗА марк-ценой живой
+     * позиции — там, куда цена уже прошла: у длинной ниже марк-цены, у
+     * короткой выше (docs/spec/stop-distance.json, величина
+     * {@code transferStopBehindMark}). Иначе перенос в безубыток до прохода
+     * цены за уровень исполняется сразу — убытком под именем «безубыток» — либо
+     * выбивается шумом.
+     *
+     * <p><b>Операнд — марк-цена, потому что по ней срабатывает стоп</b>
+     * (docs/rules/strategy-validation.md, база срабатывания защиты); берётся
+     * она с живой позиции графа, нового чтения проверка не заводит.
+     * Ненаблюдённая марк-цена — отказ: прохода цены тогда не доказывает ничто.
+     *
+     * <p><b>Область — перенос за якорь, на прибыльную сторону.</b> Отказ здесь
+     * откладывает действие, а позицию держит прежний уровень. Первичной
+     * постановке отложить было бы нечем: уровень, оказавшийся по ту сторону
+     * рынка, срабатывает выходом — и это ровно worst-case выход, который
+     * позиции обещан. Перенос, ужесточающий стоп на УБЫТОЧНОЙ стороне, тоже
+     * не откладывается: цена, уже прошедшая новый уровень, закрывает позицию
+     * с убытком меньше прежнего стопа, а отсрочка держала бы худший.
+     */
+    private void checkTransferStopBehindMark(StrategyAction action, ResolvedStopLossPrice stopLoss,
+                                             Position position, BigDecimal entryAnchor,
+                                             StrategyTradeDirection direction, List<RiskCheckResult> checks) {
+        if (isNull(action) || isFalse(StrategyPlacementRole.TRANSFER.equals(action.placementRole()))
+                || isNull(stopLoss) || isNull(stopLoss.getTriggerPrice())
+                || isNull(position) || isFalse(position.hasLiveSize())) {
+            return;
+        }
+        BigDecimal trigger = stopLoss.getTriggerPrice();
+        if (nonNull(entryAnchor) && RiskMath.signedStopDistance(direction, entryAnchor, trigger).signum() > 0) {
+            return;
+        }
+        BigDecimal mark = position.getExternalMarkPrice();
+        if (isNull(mark)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_BEYOND_MARK_PRICE,
+                    "Stop-loss transfer while the mark price of the live position is not observed", trigger));
+            return;
+        }
+        boolean behindMark = StrategyTradeDirection.LONG.equals(direction)
+                ? trigger.compareTo(mark) < 0
+                : trigger.compareTo(mark) > 0;
+        if (isFalse(behindMark)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_BEYOND_MARK_PRICE,
+                    "Stop-loss transfer not behind mark price " + mark, trigger));
+        }
+    }
+
     private void checkTakeProfitSide(ResolvedTakeProfitPrice takeProfit, BigDecimal entryAnchor,
                                      StrategyTradeDirection direction, List<RiskCheckResult> checks) {
         if (isNull(takeProfit) || isNull(takeProfit.getTriggerPrice()) || isNull(entryAnchor)) {
@@ -794,12 +902,28 @@ public class RiskValidator {
         }
     }
 
-    /** Себестоимость, от которой меряется дистанция: средняя цена живого эпизода либо плановая цена действия. */
+    /**
+     * Себестоимость, от которой меряется дистанция: средняя цена живого
+     * эпизода либо, пока эпизода нет, плановая цена действия.
+     *
+     * <p><b>Ветвь, а не откат</b> (docs/spec/stop-distance.json,
+     * {@code entryAnchor}): у живого эпизода с ещё не наблюдённой средней
+     * ценой откат к плановой был бы благоприятным умолчанием — якорь тогда
+     * пуст, и риск-создающий акт отказывает вычислением. Живой эпизод —
+     * предикат дома, конъюнкция активного статуса и положительного
+     * размера (docs/spec/protection-coverage.json, {@code hasLiveEpisode}):
+     * активная строка с нулевым размером эпизодом не является, и её средняя
+     * цена якорем не становится.
+     */
     private BigDecimal entryAnchor(Position position, CalculatedPrice price) {
-        if (nonNull(position) && nonNull(position.getExternalAverageEntryPrice())) {
+        if (isTrue(liveEpisode(position))) {
             return position.getExternalAverageEntryPrice();
         }
         return isNull(price) ? null : price.getRoundedPrice();
+    }
+
+    private static Boolean liveEpisode(Position position) {
+        return nonNull(position) && isTrue(position.hasLiveRisk());
     }
 
     /** Per-order лимит размера по режиму цены: EXPLICIT — limit-лимит, иначе market-лимит. */

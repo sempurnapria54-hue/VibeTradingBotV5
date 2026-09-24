@@ -15,7 +15,6 @@ import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -59,24 +58,25 @@ class EntryAnchorTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U4.3 — средняя цена живого эпизода пуста: якорь отказывает вычислением (R-6)")
     void u4_3_anEpisodeWithoutAnAveragePriceMakesTheAnchorFail() {
         Deal deal = dealWith(episode("10", null));
 
         assertThat(codes(harness.validate(entryAction("10", ANCHOR, "3100"), context(deal))))
-                .as("ожидание из дома: ветвь, а не coalesce — уровневые проверки молчат")
-                .doesNotContain(RiskCheckCode.STOP_LOSS_INVALID_SIDE);
+                .as("ожидание из дома: ветвь, а не coalesce — уровневые проверки молчат, акт отказывает")
+                .doesNotContain(RiskCheckCode.STOP_LOSS_INVALID_SIDE)
+                .contains(RiskCheckCode.CALCULATED_ACTION_INVALID);
     }
 
     @Test
-    @DisplayName("U4.4 — ни эпизода, ни цены у действия: якорь пуст, уровневые проверки молчат")
+    @DisplayName("U4.4 — ни эпизода, ни цены у действия: якорь пуст, уровневые проверки молчат, акт не измерен")
     void u4_4_anEmptyAnchorSilencesEveryLevelCheck() {
-        assertThat(codes(harness.validate(entryAction("10", null, "3100"), workingContext()))).isEmpty();
+        assertThat(codes(harness.validate(entryAction("10", null, "3100"), workingContext())))
+                .as("уровневых кодов нет; слагаемые акта не измерены — отказ вычислением, а не ноль")
+                .containsExactly(RiskCheckCode.CALCULATED_ACTION_INVALID);
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U4.5 — строка эпизода активна при нулевом размере: живого эпизода нет (R-6)")
     void u4_5_anActiveRowWithZeroSizeIsNotALiveEpisode() {
         Deal deal = dealWith(episode("0", EPISODE_AVERAGE));

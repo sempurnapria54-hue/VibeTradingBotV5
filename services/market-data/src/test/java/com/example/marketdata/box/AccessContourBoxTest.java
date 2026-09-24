@@ -28,13 +28,11 @@ class AccessContourBoxTest extends SharedMarketDataBox {
     /**
      * Ожидание формы тела взято из дома: отказ доступа есть тот же
      * контракт, что и прочие ошибки поверхности
-     * (docs/rules/error-handling-policy.md). Сегодня точка входа контура
-     * отдаёт пустое тело; долг — `.claude/work/backlog.md` §«Единый
-     * error-DTO у поверхностей соседних сервисов». Сам отказ при этом
-     * ЗЕЛЁН: закрытая точка не предъявившему себя не отвечает данными.
+     * (docs/rules/error-handling-policy.md); тело собирает общий
+     * энфорсер точек входа цепочки. Закрытая точка не предъявившему себя
+     * не отвечает данными.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.1 — вызов без предъявленного принципала")
     void b8_1_aCallWithoutAPresentedPrincipal() {
         provisionInstruments(INSTRUMENT);
@@ -107,12 +105,10 @@ class AccessContourBoxTest extends SharedMarketDataBox {
      * Ожидание формы тела взято из дома: отказ, произведённый
      * контейнером, есть тот же контракт, что и отказ приложения
      * (docs/rules/error-handling-policy.md §«Отказ, произведённый
-     * контейнером, — тот же контракт»); долг — `.claude/work/backlog.md`
-     * §«Единый error-DTO у поверхностей соседних сервисов». Сами числа
-     * при этом ЗЕЛЕНЫ.
+     * контейнером, — тот же контракт»): число пишет контейнер, тело —
+     * глобальный обработчик.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.6 — неподдержанный метод и неразбираемое тело")
     void b8_6_anUnsupportedMethodAndAnUnparseableBody() {
         provisionInstruments(INSTRUMENT);

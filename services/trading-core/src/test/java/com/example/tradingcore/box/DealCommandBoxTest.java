@@ -244,6 +244,7 @@ class DealCommandBoxTest extends SharedTradingCoreBox {
     private Strategy openCommandDeal() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
         assignRiskAppetite();
+        assignLeverage(ACCOUNT, INSTRUMENT);
         syncFeeRate();
         marketData.answers(featuresPath(INSTRUMENT),
                 Feed.featuresWithPrice(MarketPhase.Type.BULL_TREND.name(), LAST_PRICE));

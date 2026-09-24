@@ -84,6 +84,17 @@
             <artifactId>api-model</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
+        <!--
+          Энфорсер отказа доступа (AccessDenialHandler): отказ фильтр-цепочки
+          отвечает тем же error-DTO, что прочие ошибки поверхности
+          (docs/rules/error-handling-policy.md). Берётся именованно через
+          @Import — пакет общего артефакта вне области сканирования.
+        -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>platform</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

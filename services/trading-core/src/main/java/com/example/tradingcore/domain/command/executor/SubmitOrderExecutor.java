@@ -68,7 +68,10 @@ public class SubmitOrderExecutor implements CommandExecutor {
         Instrument instrument = dealContext.getInstrument();
         if (isBlank(order.getExternalId())
                 && isFalse(recoverByClientId(order, accountInternalId, instrument, actionState))) {
-            ensureLeverage(order, dealContext, accountInternalId, instrument);
+            if (isFalse(ensureLeverage(order, dealContext, accountInternalId, instrument))) {
+                return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR,
+                        "Leverage is not assigned for the account on instrument " + instrument.getExternalId());
+            }
             ExchangeAck ack = exchangeOperationsClient.placeOrder(accountInternalId, order,
                     instrument.getExternalId());
             if (isFalse(ack.getSuccess())) {
@@ -158,17 +161,26 @@ public class SubmitOrderExecutor implements CommandExecutor {
      * запись ядра он затирал бы каждым тиком. Прежняя редакция читала
      * {@code Instrument.leverage} — поле, которое у ядра пусто ПО
      * ПОСТРОЕНИЮ, то есть плечо не выставлялось никогда и молча.
+     *
+     * <p><b>Пустое плечо у открывающей заявки — ложь, и постановки за ней
+     * нет.</b> Преконтроль такой вход отвергает
+     * (docs/rules/trading-constraints.md), поэтому здесь пустота означает,
+     * что назначение сняли между проверкой и отправкой: вход налился бы на
+     * плече, которого никто не назначал. Это нарушение инварианта, а не сбой
+     * площадки, и повтор его не лечит.
+     *
+     * @return ложь — плечо у открывающей заявки не назначено
      */
-    private void ensureLeverage(Order order, DealContext dealContext, String accountInternalId,
-                                Instrument instrument) {
+    private Boolean ensureLeverage(Order order, DealContext dealContext, String accountInternalId,
+                                   Instrument instrument) {
         if (isTrue(order.getPositionReducingOnly())) {
-            return;
+            return true;
         }
         Integer leverage = accountInstrumentStateDataService
                 .getRequiredByPair(dealContext.getExchangeAccount().getId(), instrument.getId())
                 .getLeverage();
         if (isNull(leverage)) {
-            return;
+            return false;
         }
         ExchangeAck ack = exchangeOperationsClient.setLeverage(accountInternalId, instrument.getExternalId(),
                 leverage);
@@ -176,6 +188,7 @@ public class SubmitOrderExecutor implements CommandExecutor {
             throw new ExchangeIntegrationException(
                     "Leverage rejected for instrument " + instrument.getExternalId() + ": " + ack.getMessage());
         }
+        return true;
     }
 
     private Boolean isRetry(DealActionState actionState) {

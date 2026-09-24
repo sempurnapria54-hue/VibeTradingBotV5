@@ -13,8 +13,8 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
 /**
- * Маппинг {@link Position} между слоями: domain ↔ persistence и OKX
- * response → snapshot (docs/models/domain/core/Position.md,
+ * Маппинг {@link Position} на границе источника: OKX response →
+ * snapshot (docs/models/domain/core/Position.md,
  * docs/models/mapping/Position.md). pos → abs(size) + direction (знак)
  * через {@link OkxResponseConverter}; enum'ы ↔ строка — MapStruct
  * автоматически.

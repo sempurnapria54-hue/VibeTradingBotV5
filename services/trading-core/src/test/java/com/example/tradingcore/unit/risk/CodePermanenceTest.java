@@ -111,6 +111,13 @@ class CodePermanenceTest {
     }
 
     @Test
+    @DisplayName("U25.12 — незаданное плечо пары и перенос до прохода цены: временные")
+    void u25_12_theUnassignedLeverageAndTheDeferredTransferAreTemporary() {
+        assertTemporary(RiskCheckCode.LEVERAGE_NOT_CONFIGURED,
+                RiskCheckCode.STOP_LOSS_BEYOND_MARK_PRICE);
+    }
+
+    @Test
     @DisplayName("U25.11 — второго носителя признака нет: он читается только у значения")
     void u25_11_thePermanenceFlagHasNoSecondCarrier() {
         assertThat(nonStaticFieldNames(RiskCheckCode.class))

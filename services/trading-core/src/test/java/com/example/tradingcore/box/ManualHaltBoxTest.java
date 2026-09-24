@@ -437,6 +437,7 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
         assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("5", "10", "4")).status())
                 .isEqualTo(200);
+        assignLeverage(ACCOUNT, INSTRUMENT);
         connector.answers(feeRatePath(ACCOUNT), Feed.array(Feed.tradeFeeRate()));
         tick(Tick.TRADE_FEE_RATES);
         marketData.answers(featuresPath(INSTRUMENT),

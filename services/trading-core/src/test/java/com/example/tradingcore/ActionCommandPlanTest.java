@@ -45,6 +45,9 @@ import com.example.tradingcore.domain.command.strategy.CancelAlgoOrderActionExec
 import com.example.tradingcore.domain.command.strategy.CreateAlgoOrderActionExecutor;
 import com.example.tradingcore.domain.command.strategy.CreateOrderActionExecutor;
 import com.example.tradingcore.domain.command.strategy.ExitActionExecutor;
+import com.example.tradingcore.domain.command.strategy.ExitRoundingReader;
+import com.example.tradingcore.domain.safety.AnomalyReportService;
+import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,10 +74,13 @@ class ActionCommandPlanTest {
     private final StrategyActionCalculator calculator = mock(StrategyActionCalculator.class);
     private final ActionRiskGate riskGate = mock(ActionRiskGate.class);
 
+    private final ExitRoundingReader exitRoundingReader = new ExitRoundingReader(
+            mock(AnomalyReportService.class), mock(DealActionStateDataService.class));
+
     private final CreateOrderActionExecutor orderExecutor =
-            new CreateOrderActionExecutor(contextFactory, calculator, riskGate);
+            new CreateOrderActionExecutor(contextFactory, calculator, riskGate, exitRoundingReader);
     private final CreateAlgoOrderActionExecutor algoExecutor =
-            new CreateAlgoOrderActionExecutor(contextFactory, calculator, riskGate);
+            new CreateAlgoOrderActionExecutor(contextFactory, calculator, riskGate, exitRoundingReader);
     private final CancelAlgoOrderActionExecutor cancelExecutor = new CancelAlgoOrderActionExecutor(riskGate);
     private final ExitActionExecutor exitExecutor = new ExitActionExecutor();
 

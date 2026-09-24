@@ -123,6 +123,14 @@ public class RiskCheckResult {
         /** Плечо выше биржевого максимума инструмента. */
         EXCHANGE_MAX_LEVERAGE_EXCEEDED(true),
 
+        /**
+         * Рабочее плечо пары «счёт, инструмент» не назначено, а акт создаёт
+         * риск (docs/rules/trading-constraints.md). ВРЕМЕННЫЙ по той же
+         * причине, что у чисел риск-аппетита: плечо приходит НАЗНАЧЕНИЕМ
+         * держателя через поверхность ядра, а не правкой стратегии.
+         */
+        LEVERAGE_NOT_CONFIGURED(false),
+
         /** Режим маржи пары «счёт, инструмент» не изолированный. */
         MARGIN_MODE_NOT_ISOLATED(true),
 
@@ -155,6 +163,15 @@ public class RiskCheckResult {
 
         /** Стоп не первым на пути к ликвидации. */
         STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION(true),
+
+        /**
+         * Перенос уровня остановки убытка не доказан лежащим за марк-ценой
+         * живой позиции: цена ещё не прошла уровень либо марк-цена не
+         * наблюдена (docs/spec/stop-distance.json, величина
+         * transferStopBehindMark). ВРЕМЕННЫЙ: перенос откладывается до
+         * прохода цены, а позицию всё это время держит прежний уровень.
+         */
+        STOP_LOSS_BEYOND_MARK_PRICE(false),
 
         /** Risk-creating вход без резолвимого уровня остановки убытка. */
         RISK_CREATING_ENTRY_WITHOUT_STOP(true),

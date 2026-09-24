@@ -2,6 +2,7 @@ package com.example.auth;
 
 import com.example.auth.config.EnvironmentProperties;
 import com.example.auth.config.IdentityProperties;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.platform.security.ActorProvider;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -24,7 +25,7 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
  */
 @SpringBootApplication
 @EntityScan({"com.example.auth", "com.example.tradingbot.persistence.model"})
-@Import(ActorProvider.class)
+@Import({AccessDenialHandler.class, ActorProvider.class})
 @EnableConfigurationProperties({EnvironmentProperties.class, IdentityProperties.class})
 public class AuthApplication {
 

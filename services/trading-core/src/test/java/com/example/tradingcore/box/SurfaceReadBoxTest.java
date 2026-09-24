@@ -217,11 +217,9 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
         // Число пишет КОНТЕЙНЕР — нарушено объявленное ограничение поля, и
         // дом называет его тем же контрактом.
         assertThat(answer.status()).isEqualTo(400);
-        // По дому тело — единый error-DTO; сегодня отказ контейнера его не
-        // несёт, и это НАЗВАННЫЙ долг, а не находка клетки
-        // (.claude/work/backlog.md §«Единый error-DTO у поверхностей
-        // соседних сервисов»).
-        assertThat(answer.carriesErrorDto()).isFalse();
+        // Тело — единый error-DTO: отказ контейнера несёт его, как всякий
+        // отказ поверхности.
+        assertThat(answer.carriesErrorDto()).isTrue();
         // Числа в базе не изменились: отказ дошёл до записи.
         Map<String, Object> row = rows.row("tenant_risk_appetites", "tenant_internal_id", TENANT);
         assertThat(String.valueOf(row.get("global_simultaneous_risk_per_deal_percent")))
@@ -332,6 +330,54 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
         // находки.
     }
 
+    @Test
+    @DisplayName("B11.12 — плечо пары назначается снимком намерения целиком")
+    void assigningThePairLeverageWritesTheRowAndAnEmptyBodyErasesIt() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+
+        Answer assigned = put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT, Bodies.pairSettings(WORKING_LEVERAGE));
+
+        // Наружу — идентичности пары, а не числовые ключи базы; режим маржи
+        // строка получила своим стартовым значением, а не из тела.
+        assertThat(assigned.status()).isEqualTo(200);
+        assertThat(assigned.asObject().get("exchangeAccountInternalId")).isEqualTo(ACCOUNT);
+        assertThat(assigned.asObject().get("instrumentInternalId")).isEqualTo(INSTRUMENT);
+        assertThat(assigned.asObject().get("leverage")).isEqualTo(WORKING_LEVERAGE);
+        assertThat(assigned.asObject().get("marginMode")).isEqualTo("ISOLATED");
+        assertThat(assigned.body()).doesNotContain("\"id\":");
+        assertThat(pairRow().get("leverage")).isEqualTo(WORKING_LEVERAGE);
+
+        Answer erased = put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT, "{}");
+
+        // Непереданное плечо СТЁРТО, как непереданное число риск-аппетита:
+        // «не прислал» не может значить «оставь как было».
+        assertThat(erased.status()).isEqualTo(200);
+        assertThat(erased.asObject().get("leverage")).isNull();
+        assertThat(pairRow().get("leverage")).isNull();
+    }
+
+    @Test
+    @DisplayName("B11.13 — негодное плечо и неизвестная пара отвергаются, строки не пишется")
+    void aNonPositiveLeverageAndAnUnknownPairAreRefusedAndWriteNothing() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+
+        Answer zero = put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT, Bodies.pairSettings(0));
+        Answer unknownInstrument = put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + ABSENT,
+                Bodies.pairSettings(WORKING_LEVERAGE));
+        Answer unknownAccount = put(PAIR_SETTINGS + "/" + ABSENT + "/" + INSTRUMENT,
+                Bodies.pairSettings(WORKING_LEVERAGE));
+
+        // Ноль области определения плеча не принадлежит (@Positive), а
+        // ненайденная идентичность — негодный вход вызова.
+        for (Answer refused : List.of(zero, unknownInstrument, unknownAccount)) {
+            assertThat(refused.status()).isEqualTo(400);
+            assertThat(refused.carriesErrorDto()).isTrue();
+        }
+        assertThat(unknownInstrument.errorCode()).isEqualTo(INVALID_REQUEST);
+        assertThat(unknownAccount.errorCode()).isEqualTo(INVALID_REQUEST);
+        assertThat(rows.count("account_instrument_states")).isZero();
+    }
+
     // ------------------------------------------------------------------
     // Предусловия и наблюдатели группы
     // ------------------------------------------------------------------
@@ -375,6 +421,11 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
     }
 
     /** Проверка пары по трём идентичностям. */
+    /** Строка пары рабочего счёта и инструмента. */
+    private Map<String, Object> pairRow() {
+        return rows.row("account_instrument_states", "instrument_id", instrumentId(INSTRUMENT));
+    }
+
     private Answer pairCheck(String tenantInternalId, String accountInternalId,
                              String instrumentInternalId) {
         return get(PAIR_CHECKS + "?tenantInternalId=" + tenantInternalId

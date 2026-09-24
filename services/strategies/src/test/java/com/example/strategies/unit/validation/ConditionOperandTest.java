@@ -110,6 +110,33 @@ class ConditionOperandTest {
     }
 
     @Test
+    @DisplayName("U27.16 — ценовой операнд с марк-ценой: отказ кодом недоступного источника")
+    void u27_16_aMarkPricedOperandIsRejectedAsUnavailable() {
+        CreateStrategyApiRequest request = reference();
+        StrategyConditionOperandApiModel operand = leftOf(request, COMPARE_RULE);
+        operand.setIndicatorKey(null);
+        operand.setSourceType("PRICE");
+        operand.setPriceSource("MARK_PRICE");
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".leftOperand.priceSource STRATEGY_PRICE_SOURCE_UNAVAILABLE");
+    }
+
+    @Test
+    @DisplayName("U27.17 — ценовой операнд с последней ценой: отказа нет")
+    void u27_17_aLastPricedOperandPasses() {
+        CreateStrategyApiRequest request = reference();
+        StrategyConditionOperandApiModel operand = leftOf(request, COMPARE_RULE);
+        operand.setIndicatorKey(null);
+        operand.setSourceType("PRICE");
+        operand.setPriceSource("LAST_PRICE");
+
+        assertThat(violations(request)).isEmpty();
+    }
+
+    @Test
     @DisplayName("U27.7 — источник структура, ключ структуры опущен: ссылка обязательна")
     void u27_7_aStructureOperandRequiresItsKey() {
         CreateStrategyApiRequest request = reference();

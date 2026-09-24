@@ -7,7 +7,6 @@ import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -99,29 +98,32 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
      * Ожидание взято из дома: структурная валидация записи закрытия
      * объявлена ТРЕМЯ проверками
      * ({@code docs/models/mapping/PositionCloseResult.md} §«Структурная
-     * валидация — до маппинга»), построена одна — принадлежность
-     * инструменту (находка {@code F-3} документа). Пустая расчётная
-     * валюта сегодня уезжает наружу как факт; долг —
-     * `.claude/work/backlog.md` §«Структурная валидация записи закрытия
-     * построена на одну проверку из трёх».
+     * валидация — до маппинга»). Вариант на каждую форму нарушения:
+     * пустая валюта, пустой net, неразбираемое число, неразрешимое
+     * направление.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B5.4 — запись без обязательных полей отвергается там же, где разбирается")
     void b5_4_aRecordWithoutMandatoryFieldsIsRejectedWhereItIsParsed() {
         exchange.answers(OkxConstants.ACCOUNT_POSITIONS_HISTORY_PATH, Okx.ok());
         assertThat(get(account("/positions/closed?externalInstrumentId=" + INSTRUMENT
                 + "&windowBegin=" + WINDOW_BEGIN)).asList()).isEmpty();
 
-        exchange.reset();
-        exchange.answers(OkxConstants.ACCOUNT_POSITIONS_HISTORY_PATH,
-                Okx.ok(Okx.closedPosition(INSTRUMENT).without("ccy").text()));
+        List<Okx.Record> violations = List.of(
+                Okx.closedPosition(INSTRUMENT).without("ccy"),
+                Okx.closedPosition(INSTRUMENT).without("realizedPnl"),
+                Okx.closedPosition(INSTRUMENT).with("fee", "not-a-number"),
+                Okx.closedPosition(INSTRUMENT).with("direction", "sideways"));
+        for (Okx.Record violation : violations) {
+            exchange.reset();
+            exchange.answers(OkxConstants.ACCOUNT_POSITIONS_HISTORY_PATH, Okx.ok(violation.text()));
 
-        Answer answer = get(account("/positions/closed?externalInstrumentId=" + INSTRUMENT
-                + "&windowBegin=" + WINDOW_BEGIN));
+            Answer answer = get(account("/positions/closed?externalInstrumentId=" + INSTRUMENT
+                    + "&windowBegin=" + WINDOW_BEGIN));
 
-        assertThat(answer.carriesErrorDto()).isTrue();
-        assertThat(answer.errorCode()).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+            assertThat(answer.carriesErrorDto()).as(violation.text()).isTrue();
+            assertThat(answer.errorCode()).as(violation.text()).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+        }
     }
 
     @Test
@@ -206,6 +208,37 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
                 "{\"instType\":\"SWAP\",\"level\":\"Lv1\",\"ts\":\"1758240000000\",\"feeGroup\":[]}"));
 
         assertThat(get(account("/trade-fee-rates?externalInstrumentType=SWAP")).asList()).isEmpty();
+    }
+
+    /**
+     * Структурная валидация группы ставок — до маппинга
+     * ({@code docs/models/mapping/TradeFeeRate.md} §«Validation
+     * (структурная, до маппинга)»): пустая и непарсящаяся ставка, пустой
+     * ключ группы и неразбираемое время — контролируемый отказ границы, а
+     * не молчаливая пустота. Вариант на каждую форму нарушения.
+     */
+    @Test
+    @DisplayName("B5.9 — группа ставок без обязательного поля или с неразбираемым числом отвергается")
+    void b5_9_aFeeGroupWithoutMandatoryFieldsIsRejected() {
+        List<String> violations = List.of(
+                feeAnswer("1758240000000", "{\"groupId\":\"1\",\"taker\":\"\",\"maker\":\"-0.0002\"}"),
+                feeAnswer("1758240000000", "{\"groupId\":\"1\",\"taker\":\"-0.0005\"}"),
+                feeAnswer("1758240000000", "{\"groupId\":\"\",\"taker\":\"-0.0005\",\"maker\":\"-0.0002\"}"),
+                feeAnswer("1758240000000", "{\"groupId\":\"1\",\"taker\":\"abc\",\"maker\":\"-0.0002\"}"),
+                feeAnswer("nonsense", "{\"groupId\":\"1\",\"taker\":\"-0.0005\",\"maker\":\"-0.0002\"}"));
+        for (String violation : violations) {
+            exchange.reset();
+            exchange.answers(OkxConstants.ACCOUNT_TRADE_FEE_PATH, Okx.ok(violation));
+
+            Answer answer = get(account("/trade-fee-rates?externalInstrumentType=SWAP"));
+
+            assertThat(answer.carriesErrorDto()).as(violation).isTrue();
+            assertThat(answer.errorCode()).as(violation).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+        }
+    }
+
+    private static String feeAnswer(String ts, String group) {
+        return "{\"instType\":\"SWAP\",\"level\":\"Lv1\",\"ts\":\"" + ts + "\",\"feeGroup\":[" + group + "]}";
     }
 
     /** Запись движения средств с названным идентификатором. */

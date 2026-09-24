@@ -5,6 +5,7 @@ import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
@@ -162,6 +163,23 @@ public class Strategy extends Auditable {
     public Boolean readsPrice() {
         return emptyIfNull(details).stream()
                 .anyMatch(detail -> isTrue(detail.readsPrice()));
+    }
+
+    /**
+     * Пустые базы срабатывания защит всего дерева получают {@code MARK}
+     * (правило умолчания — {@link StrategyAlgoOrderAction#applyProtectiveTriggerDefault()}).
+     *
+     * <p><b>Зовётся создателем определения до первой записи</b>, поэтому
+     * база явна на всех носителях сразу — в строке определения, в снимке
+     * события активации и в копии ядра; ни один из них её не выводит.
+     */
+    public void applyProtectiveTriggerDefaults() {
+        emptyIfNull(details).stream()
+                .flatMap(detail -> detail.allSteps().stream())
+                .flatMap(step -> emptyIfNull(step.getActions()).stream())
+                .filter(StrategyAlgoOrderAction.class::isInstance)
+                .map(StrategyAlgoOrderAction.class::cast)
+                .forEach(StrategyAlgoOrderAction::applyProtectiveTriggerDefault);
     }
 
     /**

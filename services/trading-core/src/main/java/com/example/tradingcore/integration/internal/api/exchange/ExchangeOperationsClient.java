@@ -31,6 +31,7 @@ import com.example.tradingcore.util.Constants;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.EnumUtils;
 import org.springframework.core.ParameterizedTypeReference;
@@ -163,13 +164,13 @@ public class ExchangeOperationsClient {
                 .body(ExchangeAck.class));
     }
 
-    /** Рыночное закрытие позиции. */
+    /** Рыночное закрытие позиции; пустая валюта расчёта в запрос не уходит. */
     public ExchangeAck closePosition(String accountInternalId, String externalInstrumentId,
                                      String settleCurrency) {
         return call("close-position", () -> restClient.post()
                 .uri(builder -> builder.path(ACCOUNT_PATH + "/positions/closures")
                         .queryParam("externalInstrumentId", externalInstrumentId)
-                        .queryParam("settleCurrency", settleCurrency)
+                        .queryParamIfPresent("settleCurrency", Optional.ofNullable(settleCurrency))
                         .build(accountInternalId))
                 .header(HttpHeaders.AUTHORIZATION, bearer())
                 .retrieve()

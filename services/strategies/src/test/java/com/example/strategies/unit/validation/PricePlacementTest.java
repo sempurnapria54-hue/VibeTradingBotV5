@@ -11,7 +11,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.api.model.strategy.StrategyPricePlacementApiModel;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -107,8 +106,7 @@ class PricePlacementTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U22.8 — источник цены — марк-цена: дом требует отказа кодом недоступного источника")
+    @DisplayName("U22.8 — источник цены — марк-цена: отказ кодом недоступного источника")
     void u22_8_anUnavailablePriceSourceIsRejectedByTheHome() {
         CreateStrategyApiRequest request = reference();
         StrategyPricePlacementApiModel placement = newPlacement("MARKET_PRICE");
@@ -116,8 +114,23 @@ class PricePlacementTest {
         entryAction(bull(request)).setPlacement(placement);
 
         assertThat(violations(request))
-                .as("ожидание из дома: значение принадлежит перечню, а сверки с доступностью нет")
-                .isNotEmpty();
+                .singleElement()
+                .asString()
+                .contains(".placement.priceSource STRATEGY_PRICE_SOURCE_UNAVAILABLE");
+    }
+
+    @Test
+    @DisplayName("U22.11 — источник цены — индексная цена: тот же отказ")
+    void u22_11_theIndexPriceSourceIsRejectedAlike() {
+        CreateStrategyApiRequest request = reference();
+        StrategyPricePlacementApiModel placement = newPlacement("MARKET_PRICE");
+        placement.setPriceSource("INDEX_PRICE");
+        entryAction(bull(request)).setPlacement(placement);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("STRATEGY_PRICE_SOURCE_UNAVAILABLE");
     }
 
     @Test

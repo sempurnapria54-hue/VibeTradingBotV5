@@ -59,7 +59,8 @@ public class SecurityConfig {
                         // предъявленного и принятого принципала.
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(server -> server.jwt(jwt -> {})
-                        .authenticationEntryPoint(denialHandler))
+                        .authenticationEntryPoint(denialHandler)
+                        .accessDeniedHandler(denialHandler))
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(denialHandler)
                         .accessDeniedHandler(denialHandler))

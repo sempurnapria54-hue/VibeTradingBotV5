@@ -185,14 +185,34 @@ class TrancheEntryFinalizedPassTest {
     }
 
     @Test
-    @DisplayName("U19.12 — переключение, покрытие не сошлось при стоящей основной защите: переход пустой")
-    void u19_12_anUnderCoveredSwitchingTrancheStaysPut() {
+    @DisplayName("U19.12 — переключение, основная защита стоит, покрытия не хватает, обязательства нет: ступень 2")
+    void u19_12_anUnderCoveredSwitchingTrancheEscalates() {
         DealTranche subject = switchedTranche();
         subject.getAlgoOrders().add(protection(40L, TRANCHE_ID, "3"));
 
         TrancheTransition transition = handleSwitched(contextOf(subject));
 
         assertThat(subject.isCovered()).isFalse();
+        assertThat(transition.getDealErrorRequested()).isTrue();
+        assertThat(transition.getHoldSignal().getCode())
+                .isEqualTo(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED);
+    }
+
+    @Test
+    @DisplayName("U19.17 — переключение, покрытия не хватает, живое обязательство есть: ход продолжается")
+    void u19_17_aLiveCommitmentKeepsTheSwitchingPassQuiet() {
+        StrategyAction protective = protectiveAction(5L);
+        DealTranche subject = switchedTranche();
+        subject.getAlgoOrders().add(protection(40L, TRANCHE_ID, "3"));
+        DealContext context = contextBuilder(dealWithEpisode(subject))
+                .strategyDetail(detail(declaration(DECLARATION_ID, Boolean.FALSE,
+                        DealTranche.Status.PROTECTION_SWITCHED,
+                        step(1L, StrategyStepType.PROTECTION_ADJUSTMENT, protective))))
+                .actionStates(List.of(strategyRow(5L, TRANCHE_ID, 1, DealActionStateStatus.SUBMITTED)))
+                .build();
+
+        TrancheTransition transition = handleSwitched(context);
+
         assertThat(transition.movesStatus()).isFalse();
         assertThat(transition.getDealErrorRequested()).isFalse();
     }

@@ -368,6 +368,16 @@ F-6.
 | Чем подтверждается | `docs/models/domain/other/Auditable.md` §«Область значений актора»; `.claude/rules/codestyle.md` §«Auditable по слоям». **Ассерт прямой по колонкам** — поверхности у полей аудита нет |
 | Факт | зелено: `created_at` заполнен, `created_by = service-account-vibetrading` — имя предъявленного принципала; `external_created_at` и `external_modified_at` пусты. Класс — `DefinitionIntakeBoxTest` |
 
+### B1.21 — Пустая база срабатывания защиты записывается марк-ценой
+
+| Поле | Содержание |
+|---|---|
+| Предусловия | база пуста; стаб отвечает истинами и числами |
+| Вход | создание эталона, у защитного действия `bull_protection_oco` (пара «стоп-тейк») поле собственной базы срабатывания `triggerPriceType` **опущено** |
+| Ожидаемые выходы — все | `201`; у строки условной заявки этого действия база срабатывания — `MARK`, а не пусто: пустое поле довезла бы до площадки копия ядра, и та прочла бы его последней ценой |
+| Чем подтверждается | `docs/models/domain/core/AlgoOrder.md` §«Пустая база защиты — `MARK`, а не молчание»; `docs/rules/absent-value-semantics.md`. **Ассерт прямой по колонке** — умолчание пишется до первой записи, и строка есть первый носитель, на котором оно видно |
+| Факт | зелено 2026-09-24 (заход 157): `201`, `trigger_price_type = MARK` у строки `strategy_algo_order_actions` действия `bull_protection_oco`. На прежней форме создателя красна — колонка пуста. Класс — `DefinitionIntakeBoxTest` |
+
 ## B2 — Перечень определений тенанта
 
 ### B2.1 — Перечень отдаётся окном от новых к старым
@@ -1061,7 +1071,7 @@ F-6.
 | # | Что не покрыто | Почему нет кейса сегодня | Исход |
 |---|---|---|---|
 | G1 | **17 реджект-кодов валидатора из 27**: `STRATEGY_ACTION_FRACTION_NOT_POSITIVE`, `STRATEGY_BREAKEVEN_NOT_A_TRANSFER`, `STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL`, `STRATEGY_DEAL_LEVEL_STEP_OUT_OF_SCOPE`, `STRATEGY_ENTRY_DECLARATION_MISSING`, `STRATEGY_LEVEL_SOURCE_AMBIGUOUS`, `STRATEGY_PROTECTION_COVERAGE_INCOMPLETE`, `STRATEGY_RISK_NUMBER_NOT_DECLARED`, `STRATEGY_STEP_ACTIONS_EMPTY`, `STRATEGY_TRANCHE_ENTRY_NOT_UNIQUE`, `STRATEGY_TRANCHE_LEVEL_COUNT_NOT_DECLARED`, `STRATEGY_TRANCHE_LEVEL_STEP_MISSING`, `STRATEGY_TRANCHE_LEVEL_STEP_UNEXPECTED`, `STRATEGY_TRANCHE_NOT_DECLARED`, `STRATEGY_TRANCHE_ON_NON_TRADING_DETAIL`, `STRATEGY_TRANCHE_REOPEN_NOT_DECLARED`, `STRATEGY_TRIGGER_PRICE_TYPE_NOT_MARK` | структурная валидация — комбинаторный вход на дереве, и ящик берёт из неё образцы (B1.12, B1.13), а не перебор: каждый код стои́т одного поднятия контекста. Документа уровня 2 у валидатора нет — в перечне предметов его не назвали (`.claude/decisions/test-contour-design-pass.md`), хотя ввода-вывода у него нет | **под-шаг 3**: добираются кодом тестов поверх существующего `DeclaredActionRejectsTest`, который ревизия оставляет классом `логика` с адресатом «этот документ» (`.claude/work/progress/phase-2-step-12-existing-tests-revision.md`). **Исход (2026-09-17): предмет `strategy-definition-validation` заведён** правкой перечня (`.claude/decisions/test-contour-design-pass.md`); замер «17 из 27» и есть довод, которым он заведён |
-| G2 | реджект `STRATEGY_PRICE_SOURCE_UNAVAILABLE` — источник цены `MARK_PRICE` / `INDEX_PRICE` | дом валидации объявляет его поимённо, а в дереве кода такого кода нет ни одного: ограничение стои́т открытым вопросом держателя — реджект создания либо снятие ограничения | **держатель**: кейс заводится по его ответу; до ответа ожидания у пробела нет, и выдуманное было бы ожиданием без носителя |
+| G2 | реджект `STRATEGY_PRICE_SOURCE_UNAVAILABLE` — источник цены `MARK_PRICE` / `INDEX_PRICE` | держатель ответил 2026-09-24 — реджект создания; построен заходом 156, и ось мерится уровнем 2 (`.claude/tests/cases/strategy-definition-validation.md`, `U22.8`, `U22.11`, `U27.16`). Кейсом ящика не заводится по доводу `G1`: структурная валидация берётся ящиком образцами, а не перебором кодов | **закрыт**: кейсы уровня 2 |
 | G3 | отказ **по правам** (`403`) — второй исход контура | дом называет оба исхода и тут же говорит, что второй «не достижим ни одной тропой при посылке фазы 1»: субъект один, и право у него на всё (`docs/rules/api-access-policy.md`). Кейс стоял бы на недостижимом предусловии — прямо четвёртая ось критерия | **бэклог**: долг уже припаркован — `.claude/work/backlog.md` §«Перехватчик `Exception` съедает отказ по правам у `bff` и `strategies`»; кейс заводится вместе со вторым субъектом (фаза 5) |
 
 ## Находки владельцам

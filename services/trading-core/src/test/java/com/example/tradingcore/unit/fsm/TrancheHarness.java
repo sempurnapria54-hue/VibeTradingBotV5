@@ -138,7 +138,7 @@ final class TrancheHarness {
     }
 
     TrancheProtectionSwitchedHandler protectionSwitched() {
-        return new TrancheProtectionSwitchedHandler(workPass, disposition);
+        return new TrancheProtectionSwitchedHandler(workPass, disposition, coverageGate);
     }
 
     TrancheManagingHandler managing() {

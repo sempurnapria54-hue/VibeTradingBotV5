@@ -112,6 +112,18 @@ class ReactionUnderLiveRiskTest {
                 .isNull();
     }
 
+    @Test
+    @DisplayName("U22.9 — перенос, который цена ещё не прошла, и незаданное плечо: пропуск действия, не авария")
+    void u22_9_aDeferredTransferAndAnUnassignedLeverageStayInsideTheCarveOut() {
+        // Без членства в карв-ауте отложенный перенос при живой позиции
+        // уводил бы сделку в аварийный контур — то есть отказ, заведённый
+        // сберечь позицию, снимал бы с неё защиту исполнением по рынку.
+        assertThat(resolve(blockedVerdict(RiskCheckCode.STOP_LOSS_BEYOND_MARK_PRICE)).getType())
+                .isEqualTo(RiskBlockAction.Type.SKIP_ACTION);
+        assertThat(resolve(blockedVerdict(RiskCheckCode.LEVERAGE_NOT_CONFIGURED)).getType())
+                .isEqualTo(RiskBlockAction.Type.SKIP_ACTION);
+    }
+
     /** Реакция карты на названный вердикт при живом риске по стадии. */
     private RiskBlockAction resolve(RiskValidationResult verdict) {
         return resolver.resolve(context(emptyDeal()), LIVE_RISK_STAGE, verdict);

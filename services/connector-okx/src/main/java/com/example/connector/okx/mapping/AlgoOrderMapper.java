@@ -23,8 +23,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 /**
- * Маппинг {@link AlgoOrder} между слоями: domain ↔ persistence
- * (condition — JSONB через {@link RuntimeJsonConverter}), OKX response →
+ * Маппинг {@link AlgoOrder} на границе источника: OKX response →
  * snapshot (плоские поля → дерево condition вручную), domain → OKX
  * request (place/cancel; ordType из conditionType, side/triggerType
  * lower-case через {@link OkxResponseConverter}), OKX ack →

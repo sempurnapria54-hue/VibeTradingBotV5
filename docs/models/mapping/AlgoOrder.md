@@ -65,6 +65,7 @@
 | `Condition.trailing.trailingPercents` | trailing-percents поле источника — **долей**, а не процентами (перевод ниже) |
 | `Condition.trailing.trailingStepValue` | trailing-value поле источника |
 | `Condition.trailing.activationPrice.value` | trailing activation price |
+| `Condition.trailing.activationPrice.type` | — : у постановки трейлинга поля базы нет, площадка считает активацию и откат по `last` (`docs/models/domain/core/AlgoOrder.md`) |
 
 `closeFraction` (доля позиции при срабатывании) на первом этапе не
 используется: размер считает `SizeCalculator`

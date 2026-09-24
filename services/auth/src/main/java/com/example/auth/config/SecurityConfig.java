@@ -1,5 +1,6 @@
 package com.example.auth.config;
 
+import com.example.platform.exception.handler.AccessDenialHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -21,12 +22,19 @@ import org.springframework.security.web.SecurityFilterChain;
  * <p>CSRF выключен и это не унаследованная оговорка Basic-контура:
  * поверхность stateless, сессии нет, тропа — заголовок Authorization,
  * который браузер сам не переотправляет.
+ *
+ * <p><b>Отказ отвечает тем же error-DTO, что и всякая ошибка
+ * поверхности</b> — обе точки входа цепочки делегируют в
+ * {@link AccessDenialHandler} (docs/rules/error-handling-policy.md
+ * §«Отказ доступа — тот же контракт, что и прочие ошибки»). Умолчание
+ * ресурс-сервера отвечало ПУСТЫМ телом, то есть вторым форматом.
  */
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           AccessDenialHandler accessDenialHandler) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
@@ -38,7 +46,13 @@ public class SecurityConfig {
                         // Умолчание закрыто: всё прочее требует
                         // предъявленного и принятого принципала.
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(server -> server.jwt(jwt -> {}))
+                .oauth2ResourceServer(server -> server
+                        .jwt(jwt -> {})
+                        .authenticationEntryPoint(accessDenialHandler)
+                        .accessDeniedHandler(accessDenialHandler))
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(accessDenialHandler)
+                        .accessDeniedHandler(accessDenialHandler))
                 .build();
     }
 }

@@ -370,4 +370,23 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
                 .isNull();
         assertThat(row.get("external_modified_at")).isNull();
     }
+
+    /**
+     * Пустая база защиты уходит в строку определения марк-ценой, а не
+     * пустотой: иначе копия ядра довезла бы до площадки молчание, которое
+     * та читает последней ценой.
+     */
+    @Test
+    @DisplayName("B1.21 — Пустая база срабатывания защиты записывается марк-ценой")
+    void b1_21_anEmptyProtectiveTriggerIsStoredAsMark() {
+        peerResolvesEverything();
+
+        Answer answer = post(STRATEGIES, TENANT,
+                Bodies.withoutActionField("bull_protection_oco", "triggerPriceType"));
+
+        assertThat(answer.status()).isEqualTo(201);
+        Object actionId = rows.row("strategy_actions", "key", "bull_protection_oco").get("id");
+        assertThat(rows.row("strategy_algo_order_actions", "id", actionId))
+                .containsEntry("trigger_price_type", "MARK");
+    }
 }

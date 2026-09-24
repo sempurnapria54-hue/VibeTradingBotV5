@@ -100,11 +100,17 @@ public class ExchangeAccountOperationsController {
         return gateway.cancelAttachedProtection(accountInternalId, attached, externalInstrumentId);
     }
 
+    /**
+     * Валюта расчёта необязательна: площадка её для изолированной маржи не
+     * требует, а позиция на инструменте вне контура ядра её не знает
+     * ({@code docs/integrations/okx/contracts/position.md}, тело
+     * close-position). Пусто — поле в запрос площадке не уходит.
+     */
     @Operation(summary = "Закрыть позицию по рынку")
     @PostMapping("/positions/closures")
     public ExchangeAck closePosition(@PathVariable String accountInternalId,
                                      @RequestParam String externalInstrumentId,
-                                     @RequestParam String settleCurrency) {
+                                     @RequestParam(required = false) String settleCurrency) {
         return gateway.closePosition(accountInternalId, externalInstrumentId, settleCurrency);
     }
 

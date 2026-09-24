@@ -1,6 +1,7 @@
 package com.example.tradingcore;
 
 import com.example.platform.client.ServiceClientConfig;
+import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.platform.security.ActorProvider;
 import com.example.strategy.engine.calc.PriceCalculator;
@@ -51,7 +52,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @SpringBootApplication
 @EnableConfigurationProperties(EnvironmentProperties.class)
-@Import({ActorProvider.class, JobExecutionGuard.class, ServiceClientConfig.class,
+@Import({AccessDenialHandler.class, ActorProvider.class, JobExecutionGuard.class, ServiceClientConfig.class,
         StrategyConditionEvaluator.class, StrategyActionCalculator.class,
         PriceCalculator.class, SizeCalculator.class})
 @EntityScan({"com.example.tradingcore", "com.example.tradingbot.persistence.model"})

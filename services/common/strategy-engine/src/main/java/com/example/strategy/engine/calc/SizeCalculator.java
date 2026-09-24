@@ -211,6 +211,8 @@ public class SizeCalculator {
                 .closeFraction(fraction)
                 .sizeMode(SizeMode.REDUCE_ONLY)
                 .exitOutcome(outcome)
+                .exitSize(exitSize)
+                .exitRemainder(remainder)
                 .description(description)
                 .build();
     }

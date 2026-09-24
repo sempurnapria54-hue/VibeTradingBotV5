@@ -24,11 +24,6 @@ import org.junit.jupiter.params.provider.CsvSource;
  * <p><b>Соответствие строгое, и регистр — часть значения:</b> ни
  * нижний, ни верхний регистр не нормализуются, а дневной бар выбран
  * UTC-выровненным ради сквозного правила времени.
- *
- * <p>Кейс {@code U31.9} (секундный бар) в код не пошёл: дом объявляет
- * ветку бросающей и строку незаведённой, а ветка отдаёт строку —
- * `.claude/work/backlog.md` §«Ветка секундного бара маппера таймфрейма:
- * дом объявляет бросок, код отдаёт строку».
  */
 class TimeFrameToBarTest {
 
@@ -58,6 +53,13 @@ class TimeFrameToBarTest {
     @DisplayName("U31.8 — дневной бар UTC-выровнен")
     void u31_8_theDayBarIsUtcAligned() {
         assertThat(mapper.domainToOkx(TimeFrame.ONE_DAY)).isEqualTo("1Dutc").isNotEqualTo("1D");
+    }
+
+    /** Строка — из контракта источника; подмены соседним баром нет. */
+    @Test
+    @DisplayName("U31.9 — секундный бар отдаёт строку контракта, а не соседний бар")
+    void u31_9_theSecondBarIsTheContractString() {
+        assertThat(mapper.domainToOkx(TimeFrame.ONE_SECOND)).isEqualTo("1s").isNotEqualTo("1m");
     }
 
     /** Охрана написана явно. */

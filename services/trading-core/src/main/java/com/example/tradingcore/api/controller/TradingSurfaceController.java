@@ -5,6 +5,8 @@ import static java.util.Objects.nonNull;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
+import com.example.tradingcore.api.model.AccountInstrumentStateApiRequest;
+import com.example.tradingcore.api.model.AccountInstrumentStateApiResponse;
 import com.example.tradingcore.api.model.DealApiResponse;
 import com.example.tradingcore.api.model.PairCheckApiRequest;
 import com.example.tradingcore.api.model.PairCheckApiResponse;
@@ -34,7 +36,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Чтения торгового состояния и назначение чисел риск-аппетита.
+ * Чтения торгового состояния, назначение чисел риск-аппетита и плеча
+ * пары.
  *
  * <p><b>Путь-параметр — {@code internalId}, не ключ БД</b>
  * (.claude/rules/codestyle.md §«Идентичность наружу»): числовой ключ
@@ -138,6 +141,29 @@ public class TradingSurfaceController {
                                                      @Valid @RequestBody RiskAppetiteApiRequest request) {
         return mapper.domainToApi(tradingSurfaceService.applyRiskAppetite(tenantInternalId,
                 mapper.apiToDomain(request)));
+    }
+
+    /**
+     * Назначение плеча счёта на инструменте — ручная статичная настройка
+     * держателя (docs/rules/trading-constraints.md). Пока плеча нет,
+     * risk-creating действие по паре отвергается; форма назначения — та же,
+     * что у чисел риск-аппетита: {@code PUT} снимком намерения целиком.
+     */
+    @Operation(summary = "Назначить торговые настройки счёта на инструменте")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Настройки назначены"),
+            @ApiResponse(responseCode = "400", description = "Негодное тело запроса либо счёт или инструмент"
+                    + " с такой идентичностью не найдены")})
+    @PutMapping("/pair-settings/{exchangeAccountInternalId}/{instrumentInternalId}")
+    public AccountInstrumentStateApiResponse applyPairSettings(
+            @PathVariable String exchangeAccountInternalId, @PathVariable String instrumentInternalId,
+            @Valid @RequestBody AccountInstrumentStateApiRequest request) {
+        ExchangeAccount account = tradingSurfaceService.getAccount(exchangeAccountInternalId);
+        AccountInstrumentStateApiResponse response = mapper.domainToApi(tradingSurfaceService.applyPairSettings(
+                account.getId(), instrumentInternalId, mapper.apiToDomain(request)));
+        response.setExchangeAccountInternalId(account.getInternalId());
+        response.setInstrumentInternalId(instrumentInternalId);
+        return response;
     }
 
     /**

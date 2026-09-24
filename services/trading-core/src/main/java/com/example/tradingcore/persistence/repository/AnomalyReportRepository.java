@@ -43,4 +43,11 @@ public interface AnomalyReportRepository extends JpaRepository<AnomalyReportEnti
                            @Param("severity") String severity,
                            @Param("since") OffsetDateTime since,
                            @Param("until") OffsetDateTime until);
+
+    /**
+     * Носитель ключа ПРОИСШЕСТВИЯ, привязанного к сущности-предмету: отчёт
+     * с этим кодом по этому предмету уже заведён — окна нет, предмет сам
+     * ограничивает происшествие одним моментом.
+     */
+    Boolean existsByCodeAndSubjectExternalId(String code, String subjectExternalId);
 }

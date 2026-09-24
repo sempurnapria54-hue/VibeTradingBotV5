@@ -140,6 +140,22 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
+    @DisplayName("B4.14 — без назначенного плеча то же действие не исполняется")
+    void theSameRiskCreatingActionDoesNotRunWithoutTheAssignedLeverage() {
+        // Четвёртый операнд снимается своей клеткой, как три прежних у
+        // B4.1 (контроль): плечо назначено предусловием и снято назначением
+        // пустого тела — той же поверхностью, которой его ставит держатель.
+        assignRiskAppetite();
+        openGatedDeal(workingDefinition());
+        assertThat(put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT, "{}").status()).isEqualTo(200);
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(rows.count("orders")).isZero();
+        assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
     @DisplayName("B4.3 — несвежий снимок средств заказывает добычу, а не отказ")
     void theStaleBalanceSnapshotOrdersAFetchInsteadOfRefusingTheAction() {
         assignRiskAppetite();
@@ -412,6 +428,7 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
     private void openGatedDeal(Strategy definition, Boolean withFeeRate, Boolean freshBalance,
                                String features) {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        assignLeverage(ACCOUNT, INSTRUMENT);
         if (Boolean.TRUE.equals(withFeeRate)) {
             syncFeeRate();
         }

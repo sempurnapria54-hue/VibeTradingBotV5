@@ -119,6 +119,7 @@ public final class Trail implements AutoCloseable {
     private final Map<Party, Integer> accessMarks = new EnumMap<>(Party.class);
     private Boolean projectionsSynced = Boolean.FALSE;
     private Boolean riskAppetiteSet = Boolean.FALSE;
+    private Boolean leverageAssigned = Boolean.FALSE;
     private Boolean feeRatesSynced = Boolean.FALSE;
 
     private Trail(String name, Layout layout) {
@@ -236,6 +237,7 @@ public final class Trail implements AutoCloseable {
         if (Objects.equals(party, Party.TRADING_CORE)) {
             projectionsSynced = Boolean.FALSE;
             riskAppetiteSet = Boolean.FALSE;
+            leverageAssigned = Boolean.FALSE;
             feeRatesSynced = Boolean.FALSE;
         }
     }
@@ -291,6 +293,28 @@ public final class Trail implements AutoCloseable {
         riskAppetiteSet = Boolean.TRUE;
     }
 
+    /**
+     * Рабочее плечо пары «счёт, инструмент» назначено поверхностью ядра: без
+     * него risk-creating действие по паре отвергается преконтролем
+     * (docs/rules/trading-constraints.md). Пара адресуется идентичностью
+     * инструмента, поэтому проекции обязаны стоять раньше.
+     */
+    public void leverageAssigned() {
+        if (isTrue(leverageAssigned)) {
+            return;
+        }
+        projectionsSynced();
+        Answer answer = call(Party.TRADING_CORE, "PUT", CORE + "/pair-settings/" + ACCOUNT + "/" + INSTRUMENT,
+                null, """
+                {"leverage": 10}
+                """);
+        if (answer.status() != 200) {
+            throw new IllegalStateException("Предусловие не поставлено: плечо пары — "
+                    + answer.status() + " " + answer.body());
+        }
+        leverageAssigned = Boolean.TRUE;
+    }
+
     /** Ставка комиссии счёта снята тиком синка ставок — через коннектор у стаба площадки. */
     public void feeRatesSynced() {
         if (isTrue(feeRatesSynced)) {
@@ -304,6 +328,7 @@ public final class Trail implements AutoCloseable {
     public void commonPreconditions() {
         projectionsSynced();
         riskAppetiteSet();
+        leverageAssigned();
         feeRatesSynced();
     }
 

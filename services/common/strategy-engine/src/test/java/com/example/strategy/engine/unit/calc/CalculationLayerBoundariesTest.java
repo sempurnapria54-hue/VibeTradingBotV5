@@ -136,7 +136,7 @@ class CalculationLayerBoundariesTest {
     void u13_5_theResultCarriesNoDealBudgetRemainder() {
         assertThat(fieldNames(CalculatedSize.class))
                 .containsExactlyInAnyOrder("sizeContracts", "closeFraction", "notionalUsdt",
-                        "sizeMode", "exitOutcome", "description");
+                        "sizeMode", "exitOutcome", "exitSize", "exitRemainder", "description");
     }
 
     /** Нотинал считается только у входа. */

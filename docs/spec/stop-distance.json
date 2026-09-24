@@ -10,6 +10,7 @@
     "plannedEntryPrice": "плановая цена входа своей ноги — якорь уровня, пока живого эпизода нет",
     "hasLiveEpisode": "живой эпизод существует; резолв — docs/spec/protection-coverage.json, величина hasLiveEpisode. Оба конъюнкта определения живого риска позиции живут там; здесь берётся значение",
     "positionAverageEntryPrice": "Position.externalAverageEntryPrice живого эпизода — фактическая себестоимость; пишет её только live-нога рефреша, поэтому у живого эпизода она может быть ещё не наблюдена — тогда якорь пуст целиком, а не откатывается к плановой цене, и всякая величина, на нём стоящая, отказывает вычислением",
+    "markPrice": "Position.externalMarkPrice живого эпизода — марк-цена, по которой срабатывает защита (база срабатывания — docs/rules/strategy-validation.md). Пишет её live-нога рефреша позиции; у живого эпизода она может быть ещё не наблюдена, и тогда проход цены за уровень не доказан ничем",
     "stopPrice": "рассчитанный уровень остановки убытка проверяемого действия — операнд дома закрытой формы docs/spec/risk-at-stop.json",
     "feeRate": "прогнозная ставка комиссии как издержка — InstrumentExternalRules.takerFeeRate(); пусто — уровень не проверяется, действие отвергается FEE_RATE_UNAVAILABLE",
     "calculationType": "объявленный стратегией способ расчёта уровня (StopLossSettings.calculationType)",
@@ -52,6 +53,11 @@
       "name": "primaryStopOnLossSide",
       "note": "Первичный уровень остановки убытка обязан лечь на УБЫТОЧНУЮ сторону от якоря: иначе worst-case выхода у позиции нет, а П1 следствие 1 требует знать его до входа. Ограничение по ИСХОДУ, а не по способу расчёта: уровень, посчитанный от живой структуры (MARKET_STRUCTURE_BUFFER_PERCENT), уезжает на прибыльную сторону штатно — лимитный вход ниже растущей структуры даёт это расхождение без всякой ошибки конфигурации. Запрет BREAKEVEN первичной защитой (breakevenRoleAllowed) — частный случай того же правила, взятый по способу и потому ловящий его на дереве стратегии; здесь тот же запрет берётся по исходу и ловит остальные способы. ОБЛАСТЬ ОГРАНИЧЕНА ДЕЙСТВИЯМИ С ОБЪЯВЛЕННЫМ УРОВНЕМ (levelSource = DECLARED): у защитного создания с НАБЛЮДАЕМЫМ уровнем (трейлинг) уровня в момент постановки нет вовсе, и требовать от него стороны значило бы отвергать ступень, ради которой держится прибыль. Дыры это не открывает: такое создание охраняет не сторона уровня, а инвариант покрытия — снять прежнюю защиту, пока трейлинг уровня не показал, не даёт removalAllowed (docs/spec/protection-coverage.json), поэтому позиция без worst-case выхода не остаётся ни на одном проходе. Перенос (TRANSFER) под ограничение не подпадает по той же оси: перевод в безубыток и трейлинг за безубыток — их прямое назначение. Дом правила — docs/rules/risk-policy.md, реджект — STOP_LOSS_INVALID_SIDE.",
       "expr": "placementRole != 'PRIMARY' || levelSource != 'DECLARED' || stopOnLossSide"
+    },
+    {
+      "name": "transferStopBehindMark",
+      "note": "ПЕРЕНОС уровня остановки убытка обязан лечь ЗА марк-ценой живой позиции — туда, куда цена уже прошла: у LONG ниже марк-цены, у SHORT выше. Иначе перенос в безубыток, поставленный до прохода цены за уровень, исполняется сразу — убытком под именем «безубыток», — либо выбивается шумом. Отказ откладывает перенос, а позицию держит прежний уровень (STOP_LOSS_BEYOND_MARK_PRICE). Ненаблюдённая марк-цена — отказ: прохода цены тогда не доказывает ничто. ОБЛАСТЬ — перенос (placementRole = TRANSFER) за якорь, на прибыльную сторону: первичной постановке отложить нечем, и уровень по ту сторону рынка у неё срабатывает выходом — ровно worst-case выходом, который позиции обещан; перенос, ужесточающий стоп на убыточной стороне (stopOnLossSide), тоже не откладывается — цена, уже прошедшая новый уровень, закрывает позицию с убытком меньше прежнего стопа, а отсрочка держала бы худший. Средняя цена эпизода не наблюдена — сторона не доказана, и охрана действует. Без живого эпизода уровню срабатывать не на чем, и предикат вакуумно истинен.",
+      "expr": "placementRole != 'TRANSFER' || isNull(?stopPrice) || !hasLiveEpisode || (notNull(?positionAverageEntryPrice) && stopOnLossSide) || (notNull(?markPrice) && if(direction == 'LONG', stopPrice < markPrice, stopPrice > markPrice))"
     },
     {
       "name": "stopDistanceAboveFloor",
@@ -485,6 +491,184 @@
         "stopOnLossSide": false,
         "stopDistanceAboveFloor": true,
         "primaryStopOnLossSide": false
+      }
+    },
+    {
+      "case": "LONG: перенос в безубыток после прохода цены за уровень допустим",
+      "note": "Якорь 3000, безубыток 3003.0015; марк-цена 3050 уже выше уровня — sell-stop лежит под рынком и ждёт отката.",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": 3050,
+        "stopPrice": 3003.0015,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": null,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": true
+      }
+    },
+    {
+      "case": "LONG: перенос в безубыток ДО прохода цены за уровень откладывается",
+      "note": "Марк-цена 3001 ниже безубытка 3003.0015: sell-stop выше рынка исполнился бы сразу — выход по рынку в убыток под именем «безубыток».",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": 3001,
+        "stopPrice": 3003.0015,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": null,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": false
+      }
+    },
+    {
+      "case": "LONG: уровень ровно на марк-цене прохода не доказывает",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": 3003.0015,
+        "stopPrice": 3003.0015,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": null,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": false
+      }
+    },
+    {
+      "case": "SHORT: перенос в безубыток после прохода цены вниз за уровень допустим",
+      "note": "Якорь 3000, безубыток SHORT 2997.0015; марк-цена 2950 ниже уровня — buy-stop лежит над рынком.",
+      "state": {
+        "direction": "SHORT",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": 2950,
+        "stopPrice": 2997.0015,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": null,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": true
+      }
+    },
+    {
+      "case": "SHORT: перенос до прохода цены за уровень откладывается зеркально",
+      "state": {
+        "direction": "SHORT",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": 2999,
+        "stopPrice": 2997.0015,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": null,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": false
+      }
+    },
+    {
+      "case": "марк-цена живой позиции не наблюдена — перенос откладывается, а не пропускается",
+      "note": "Пустая марк-цена прохода не доказывает: пропуск был бы благоприятным умолчанием (docs/rules/absent-value-semantics.md).",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": null,
+        "stopPrice": 3003.0015,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": null,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": false
+      }
+    },
+    {
+      "case": "первичная постановка по ту сторону рынка под охрану переноса не подпадает",
+      "note": "Область — только перенос: первичному уровню отложить нечем, и срабатывание у него есть обещанный worst-case выход.",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": 2960,
+        "stopPrice": 2970,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 1,
+        "placementRole": "PRIMARY",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": true
+      }
+    },
+    {
+      "case": "перенос без живого эпизода предикатом не отвергается",
+      "note": "Уровню срабатывать не на чем; сторону уровня у такого переноса охраняет не рынок, а покрытие.",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": false,
+        "positionAverageEntryPrice": null,
+        "markPrice": null,
+        "stopPrice": 3003.0015,
+        "feeRate": 0.0005,
+        "calculationType": "BREAKEVEN",
+        "distancePercents": null,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": true
+      }
+    },
+    {
+      "case": "перенос, ужесточающий стоп на убыточной стороне, за которым цена уже прошла, не откладывается",
+      "note": "LONG, средняя 3000, прежний стоп ниже, новый 2950, марк-цена 2940: sell-stop выше рынка срабатывает сразу и закрывает позицию около 2940 — с убытком меньше прежнего стопа. Отсрочка держала бы прежний, худший уровень.",
+      "state": {
+        "direction": "LONG",
+        "plannedEntryPrice": 3000,
+        "hasLiveEpisode": true,
+        "positionAverageEntryPrice": 3000,
+        "markPrice": 2940,
+        "stopPrice": 2950,
+        "feeRate": 0.0005,
+        "calculationType": "ENTRY_PRICE_PERCENT",
+        "distancePercents": 1.67,
+        "placementRole": "TRANSFER",
+        "levelSource": "DECLARED"
+      },
+      "expect": {
+        "transferStopBehindMark": true
       }
     }
   ]
