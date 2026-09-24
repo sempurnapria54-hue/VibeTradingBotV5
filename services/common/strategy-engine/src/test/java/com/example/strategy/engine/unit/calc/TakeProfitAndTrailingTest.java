@@ -89,7 +89,7 @@ class TakeProfitAndTrailingTest {
         CalculatedPrice price = calculator.calculate(base(trailing("1", "0.5", "0.7")).build());
 
         assertThat(price.getTrailingPrice().getActivationPrice()).isEqualByComparingTo("3045");
-        assertThat(price.getTrailingPrice().getCallbackRatio()).isEqualByComparingTo("0.7");
+        assertThat(price.getTrailingPrice().getCallbackPercents()).isEqualByComparingTo("0.7");
         assertThat(price.getPurpose()).isEqualTo(StrategyPricePurpose.TRAILING_ACTIVATION_PRICE);
         assertThat(price.getStopLossPrice()).as("стоп пуст").isNull();
         assertThat(price.getTakeProfitPrice()).as("тейк пуст").isNull();
@@ -111,7 +111,7 @@ class TakeProfitAndTrailingTest {
         CalculatedPrice price = calculator.calculate(base(trailing(null, null, "0.7")).build());
 
         assertThat(price.getTrailingPrice().getActivationPrice()).as("активация пуста").isNull();
-        assertThat(price.getTrailingPrice().getCallbackRatio()).isEqualByComparingTo("0.7");
+        assertThat(price.getTrailingPrice().getCallbackPercents()).isEqualByComparingTo("0.7");
     }
 
     /** Блока настроек нет вовсе — ни полосы, ни отката. */

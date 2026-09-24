@@ -220,7 +220,7 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
             return null;
         }
         Trailing trailing = new Trailing();
-        trailing.setTrailingPercents(resolved.getCallbackRatio());
+        trailing.setTrailingPercents(resolved.getCallbackPercents());
         trailing.setActivationPrice(activationLeg(resolved));
         return trailing;
     }

@@ -18,7 +18,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Trailing {
 
-    /** Callback в процентах (OKX callbackRatio). */
+    /** Callback в процентах; на площадку уезжает долей (OKX callbackRatio), перевод — граница коннектора. */
     private BigDecimal trailingPercents;
 
     /** Callback в абсолютном значении (OKX callbackSpread). */

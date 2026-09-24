@@ -1,5 +1,9 @@
 package com.example.tradingbot.domain.model.trade.market_structure;
 
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 import com.example.tradingbot.domain.model.Auditable;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -33,6 +37,23 @@ public class MarketPriceLevel extends Auditable {
 
     /** Свеча, на которой уровень подтверждён. */
     private OffsetDateTime confirmedAt;
+
+    /**
+     * Стоящий в перечне позже уровень того же типа вытесняет этот как
+     * «последний подтверждённый». Известный момент подтверждения бьёт
+     * неизвестный в обе стороны; при равных моментах либо двух неизвестных
+     * вытесняет стоящий позже. Так выбор не зависит от порядка перечня,
+     * пока моменты известны.
+     */
+    public Boolean isSupersededBy(MarketPriceLevel later) {
+        if (isNull(later)) {
+            return false;
+        }
+        if (isNull(confirmedAt)) {
+            return true;
+        }
+        return nonNull(later.getConfirmedAt()) && isFalse(later.getConfirmedAt().isBefore(confirmedAt));
+    }
 
     /** Тип ценового уровня структуры. */
     public enum Type {

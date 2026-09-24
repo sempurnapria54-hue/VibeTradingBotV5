@@ -141,12 +141,39 @@ class MarketModelsTest {
     }
 
     @Test
-    @DisplayName("U18.17 — уровень запрошенного типа в перечне есть")
-    void u18_17_theFirstLevelOfTheTypeIsReturned() {
-        MarketPriceLevel first = level(MarketPriceLevel.Type.RANGE_HIGH, "120");
-        MarketStructure subject = structure(first, level(MarketPriceLevel.Type.RANGE_HIGH, "130"));
+    @DisplayName("U18.17 — уровней запрошенного типа два, моменты подтверждения пусты: отдан стоящий позже")
+    void u18_17_theLaterListedLevelWinsWithoutMoments() {
+        MarketPriceLevel later = level(MarketPriceLevel.Type.RANGE_HIGH, "130");
+        MarketStructure subject = structure(level(MarketPriceLevel.Type.RANGE_HIGH, "120"), later);
 
-        assertThat(subject.findLevel(MarketPriceLevel.Type.RANGE_HIGH)).isSameAs(first);
+        assertThat(subject.findLevel(MarketPriceLevel.Type.RANGE_HIGH)).isSameAs(later);
+    }
+
+    @Test
+    @DisplayName("U18.26 — свинги одного типа: отдан последний подтверждённый, а не первый в перечне")
+    void u18_26_theLatestConfirmedSwingIsReturned() {
+        MarketPriceLevel oldest = level(MarketPriceLevel.Type.SWING_LOW, "2800");
+        oldest.setConfirmedAt(at(1));
+        MarketPriceLevel latest = level(MarketPriceLevel.Type.SWING_LOW, "2900");
+        latest.setConfirmedAt(at(3));
+        MarketPriceLevel listedLastButOlder = level(MarketPriceLevel.Type.SWING_LOW, "2850");
+        listedLastButOlder.setConfirmedAt(at(2));
+        MarketStructure subject = structure(oldest, latest, listedLastButOlder);
+
+        assertThat(subject.findLevel(MarketPriceLevel.Type.SWING_LOW)).isSameAs(latest);
+    }
+
+    @Test
+    @DisplayName("U18.27 — свинг с неизвестным моментом между известными: он не сбрасывает известный максимум")
+    void u18_27_anUnknownMomentDoesNotResetTheKnownLatest() {
+        MarketPriceLevel latest = level(MarketPriceLevel.Type.SWING_LOW, "2900");
+        latest.setConfirmedAt(at(10));
+        MarketPriceLevel unknown = level(MarketPriceLevel.Type.SWING_LOW, "2850");
+        MarketPriceLevel older = level(MarketPriceLevel.Type.SWING_LOW, "2800");
+        older.setConfirmedAt(at(5));
+        MarketStructure subject = structure(latest, unknown, older);
+
+        assertThat(subject.findLevel(MarketPriceLevel.Type.SWING_LOW)).isSameAs(latest);
     }
 
     @Test

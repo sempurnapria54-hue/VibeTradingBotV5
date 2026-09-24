@@ -246,7 +246,7 @@ public class PriceCalculator {
         }
         return ResolvedTrailingPrice.builder()
                 .activationPrice(activationPrice)
-                .callbackRatio(settings.getCallbackPercents())
+                .callbackPercents(settings.getCallbackPercents())
                 .triggerPriceType(action.getTriggerPriceType())
                 .build();
     }

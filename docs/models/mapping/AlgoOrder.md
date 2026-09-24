@@ -62,7 +62,7 @@
 | `AlgoOrder.positionReducingOnly` | `reduceOnly` |
 | `Condition.trigger.stopLoss.value/.type` | SL trigger / type |
 | `Condition.trigger.takeProfit.value/.type` | TP trigger / type |
-| `Condition.trailing.trailingPercents` | trailing-percents поле источника |
+| `Condition.trailing.trailingPercents` | trailing-percents поле источника — **долей**, а не процентами (перевод ниже) |
 | `Condition.trailing.trailingStepValue` | trailing-value поле источника |
 | `Condition.trailing.activationPrice.value` | trailing activation price |
 
@@ -169,7 +169,10 @@ cancel-пути). Amend advance-семьи биржей не поддержив�
 
 OKX-специфичные поля create body (через adapter): `algoClOrdId` ←
 `AlgoOrder.internalId`; `callbackRatio` ←
-`Condition.trailing.trailingPercents`; `callbackSpread` ←
+`Condition.trailing.trailingPercents`, **сдвинутый на два знака**: домен
+несёт откат процентами (`0.8` = 0,8%), площадка ждёт долю (`0.01` = 1%), и
+перевод делает граница коннектора — без него откат уезжал бы в сто раз
+шире объявленного; `callbackSpread` ←
 `Condition.trailing.trailingStepValue`; `activePx` ←
 `Condition.trailing.activationPrice.value` (если задан); SL/TP
 параметры — `slTriggerPx`/`slTriggerPxType`/`slOrdPx` (`-1` =

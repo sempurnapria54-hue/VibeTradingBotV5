@@ -80,6 +80,13 @@
   возврата — `docs/models/domain/aggregate/Strategy.md`; предикаты —
   `docs/spec/strategy-reference.json`, величины `priceSourceUnavailable`
   и `conditionPriceSourceUnavailable`;
+- **подтверждённый пробой объявляет направление** — у
+  `RANGE_BREAKOUT_CONFIRMED` оператор равенства (`EQ` либо `NE`),
+  структурный операнд и константа перечня направления пробоя (`UP` /
+  `DOWN`); без любого из трёх, с иным оператором либо со значением вне
+  перечня правило отвергается. Смысл направления —
+  `docs/models/domain/other/MarketStructure.md` §«MarketBreakoutEvent
+  (раздел)»;
 - разбор длительностей; вменяемость override прогрева.
 
 **Траншевое:**

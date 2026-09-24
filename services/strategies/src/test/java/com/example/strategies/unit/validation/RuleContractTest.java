@@ -96,12 +96,55 @@ class RuleContractTest {
     }
 
     @Test
-    @DisplayName("U28.8 — подтверждённый пробой с операндом структуры: нарушений нет")
+    @DisplayName("U28.8 — подтверждённый пробой с операндом структуры, оператором и направлением: нарушений нет")
     void u28_8_aStructureOperandSatisfiesTheBreakoutContract() {
         StrategyConditionRuleApiModel rule = newRule("RANGE_BREAKOUT_CONFIRMED");
+        rule.setOperator("EQ");
         rule.setLeftOperand(structureOperand());
+        rule.setRightOperand(constantOperand("ENUM", "UP"));
 
         assertThat(violationsOfRule(rule)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U28.26 — подтверждённый пробой без направления: нарушение «требуются оператор и оба операнда»")
+    void u28_26_aBreakoutWithoutADirectionIsRefused() {
+        StrategyConditionRuleApiModel rule = newRule("RANGE_BREAKOUT_CONFIRMED");
+        rule.setOperator("EQ");
+        rule.setLeftOperand(structureOperand());
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("RANGE_BREAKOUT_CONFIRMED requires operator and both operands");
+    }
+
+    @Test
+    @DisplayName("U28.28 — подтверждённый пробой с оператором GT: нарушение «только EQ либо NE»")
+    void u28_28_aBreakoutAcceptsOnlyEqualityOperators() {
+        StrategyConditionRuleApiModel rule = newRule("RANGE_BREAKOUT_CONFIRMED");
+        rule.setOperator("GT");
+        rule.setLeftOperand(structureOperand());
+        rule.setRightOperand(constantOperand("ENUM", "UP"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("RANGE_BREAKOUT_CONFIRMED accepts only EQ or NE");
+    }
+
+    @Test
+    @DisplayName("U28.27 — направление пробоя вне перечня: нарушение «требуется константа направления»")
+    void u28_27_aBreakoutDirectionOutsideTheEnumerationIsRefused() {
+        StrategyConditionRuleApiModel rule = newRule("RANGE_BREAKOUT_CONFIRMED");
+        rule.setOperator("EQ");
+        rule.setLeftOperand(structureOperand());
+        rule.setRightOperand(constantOperand("ENUM", "SIDEWAYS"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("requires a CONSTANT operand with the breakout direction");
     }
 
     @Test

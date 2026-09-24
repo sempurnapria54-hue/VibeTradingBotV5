@@ -106,16 +106,16 @@ class MarketStructureRuleTest {
 
     /** Предвычисленное событие читается ГОТОВЫМ — интерпретатор его не детектирует. */
     @Test
-    @DisplayName("U7.9 — тип RANGE_BREAKOUT_CONFIRMED, событие пробоя есть: истина")
+    @DisplayName("U7.9 — тип RANGE_BREAKOUT_CONFIRMED, объявлено UP, событие пробоя вверх есть: истина")
     void u7_9_aPrecomputedBreakoutIsReadAsIs() {
-        assertThat(evaluate(breakout(StrategyConditionOperator.EQ), breakoutLayout())).isTrue();
+        assertThat(evaluate(breakout(StrategyConditionOperator.EQ, "UP"), breakoutLayout())).isTrue();
     }
 
     /** Пара к U7.9. */
     @Test
     @DisplayName("U7.10 — тот же тип, события пробоя у структуры нет: ложь")
     void u7_10_withoutTheEventTheBreakoutIsFalse() {
-        assertThat(evaluate(breakout(StrategyConditionOperator.EQ), rangeLayout())).isFalse();
+        assertThat(evaluate(breakout(StrategyConditionOperator.EQ, "UP"), rangeLayout())).isFalse();
     }
 
     /** Буфер правилом не читается вовсе — он параметр резолвера структуры. */
@@ -139,13 +139,35 @@ class MarketStructureRuleTest {
         assertThat(evaluator.evaluate(condition, context(breakoutLayout()))).isFalse();
     }
 
-    /** Пробой оператора не знает, и объявленный исхода не меняет. */
+    /** Отрицание направления читается той же формой, что у равенства типа. */
     @Test
-    @DisplayName("U7.13 — тот же тип, оператор NE: истина — пробой оператора не читает")
-    void u7_13_theBreakoutIgnoresTheOperator() {
-        assertThat(evaluate(breakout(StrategyConditionOperator.NE), breakoutLayout()))
-                .as("исход тот же, что у U7.9: оператор ветвь не выбирает")
-                .isTrue();
+    @DisplayName("U7.13 — тот же тип, оператор NE, объявлено DOWN, пробой вверх: истина — отрицание читается")
+    void u7_13_theNegationOfTheDirectionIsRead() {
+        assertThat(evaluate(breakout(StrategyConditionOperator.NE, "DOWN"), breakoutLayout())).isTrue();
+    }
+
+    /** Пробой против объявленного направления — не подтверждение входа. */
+    @Test
+    @DisplayName("U7.15 — объявлено DOWN, пробой вверх: ложь — слом против сделки вход не открывает")
+    void u7_15_aBreakoutAgainstTheDeclaredDirectionIsFalse() {
+        assertThat(evaluate(breakout(StrategyConditionOperator.EQ, "DOWN"), breakoutLayout())).isFalse();
+    }
+
+    /** Без объявленного направления ветвиться не на чем. */
+    @Test
+    @DisplayName("U7.16 — направление не объявлено, пробой есть: ложь, а не любой пробой")
+    void u7_16_anUndeclaredDirectionIsFalse() {
+        StrategyCondition condition = condition(rule(StrategyConditionRuleType.RANGE_BREAKOUT_CONFIRMED,
+                StrategyConditionOperator.EQ, structureOperand(STRUCTURE_KEY), null));
+
+        assertThat(evaluator.evaluate(condition, context(breakoutLayout()))).isFalse();
+    }
+
+    /** Пустой оператор у пробоя — ложь, а не отказ выбора ветви. */
+    @Test
+    @DisplayName("U7.17 — объявлено UP, пробой вверх, оператор пуст: ложь")
+    void u7_17_anAbsentOperatorOfABreakoutIsFalse() {
+        assertThat(evaluate(breakout(null, "UP"), breakoutLayout())).isFalse();
     }
 
     /**
@@ -175,9 +197,9 @@ class MarketStructureRuleTest {
                 structureOperand(STRUCTURE_KEY), enumConstant(declaredType)));
     }
 
-    private StrategyCondition breakout(StrategyConditionOperator operator) {
+    private StrategyCondition breakout(StrategyConditionOperator operator, String declaredDirection) {
         return condition(rule(StrategyConditionRuleType.RANGE_BREAKOUT_CONFIRMED, operator,
-                structureOperand(STRUCTURE_KEY), null));
+                structureOperand(STRUCTURE_KEY), enumConstant(declaredDirection)));
     }
 
     private Map<String, MarketStructure> rangeLayout() {

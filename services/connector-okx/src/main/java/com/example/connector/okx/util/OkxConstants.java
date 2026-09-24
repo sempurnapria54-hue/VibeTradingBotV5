@@ -178,6 +178,13 @@ public class OkxConstants {
     /** Тип algo-order OKX: trailing (move_order_stop). */
     public static final String ALGO_ORD_TYPE_MOVE_STOP = "move_order_stop";
 
+    /**
+     * Сдвиг запятой из процентов в долю площадки: откат трейлинга домен
+     * несёт процентами, а {@code callbackRatio} OKX — долей ({@code 0.01}
+     * = 1%, docs/integrations/okx/contracts/algo-order.md).
+     */
+    public static final int PERCENTS_TO_RATIO_POINT_SHIFT = 2;
+
     /** Флаг исполнения ноги market после trigger (slOrdPx/tpOrdPx). */
     public static final String MARKET_PRICE_FLAG = "-1";
 

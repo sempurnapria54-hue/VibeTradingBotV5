@@ -107,6 +107,20 @@ public class OkxResponseConverter {
         return isNull(value) ? null : value.toPlainString();
     }
 
+    /**
+     * Откат трейлинга в процентах → доля площадки ({@code callbackRatio}):
+     * {@code 0.8} процента уезжают {@code "0.008"}. Без перевода откат
+     * уехал бы в сто раз шире объявленного, и трейлинг не защищал бы
+     * ничего (docs/models/mapping/AlgoOrder.md §«OKX request mapping —
+     * дополнения»).
+     */
+    @Named("okxRatioFromPercents")
+    public String ratioFromPercents(BigDecimal percents) {
+        return isNull(percents)
+                ? null
+                : percents.movePointLeft(OkxConstants.PERCENTS_TO_RATIO_POINT_SHIFT).toPlainString();
+    }
+
     /** OKX sCode → принят ли запрос (успех). */
     @Named("okxAckSuccess")
     public Boolean ackSuccess(String code) {

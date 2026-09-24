@@ -199,7 +199,7 @@ class AlgoOrderPlaceRequestTest {
     }
 
     @Test
-    @DisplayName("U25.15 — трейлинг долей: доля и цена активации, абсолютный шаг пуст")
+    @DisplayName("U25.15 — трейлинг процентами: доля площадки и цена активации, абсолютный шаг пуст")
     void u25_15_percentTrailingCarriesTheRatio() {
         TriggerPrice activation = new TriggerPrice();
         activation.setValue(new BigDecimal("110"));
@@ -210,7 +210,7 @@ class AlgoOrderPlaceRequestTest {
 
         PlaceAlgoOrderOkxRequest built = request(algoOrder);
 
-        assertThat(built.getCallbackRatio()).isEqualTo("0.5");
+        assertThat(built.getCallbackRatio()).isEqualTo("0.005");
         assertThat(built.getActivePx()).isEqualTo("110");
         assertThat(built.getCallbackSpread()).isNull();
     }

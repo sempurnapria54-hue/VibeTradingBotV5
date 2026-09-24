@@ -261,15 +261,23 @@ class SafetyHoldReactionTest {
         verify(statusEdges).enforceHardRung(any(), eq(Deal.ShutdownReason.EXCHANGE_HOLD));
     }
 
+    /**
+     * Упавшее снятие риска — неподтверждённое: отчёт инструментной реакции
+     * получает ошибку, а реакция эскалирует на счётный радиус; завершается
+     * только отчёт счётной реакции (docs/components/SafetyHoldCoordinator.md
+     * §«Политика отказов»).
+     */
     @Test
-    void aTeardownFailureIsRecordedInTheReportAndDoesNotEscapeThePass() {
+    void aTeardownFailureIsRecordedInTheReportAndEscalatesToTheAccount() {
         when(killSwitchService.fireInstrument(any())).thenThrow(new IllegalStateException("exchange is down"));
 
         assertThatCode(() -> holdService.raise(HoldSignal.instrument(CODE), context()))
                 .doesNotThrowAnyException();
 
         verify(reports).fail(any(), eq("exchange is down"));
-        verify(reports, never()).complete(any(), any());
+        verify(accounts).raiseRung(ACCOUNT_ID, ExchangeAccount.SafetyRung.TRADE_BLOCKED);
+        verify(reports).open(any(), signalWithCode(Constants.Hold.EXCHANGE_KILL_SWITCH_RESIDUAL));
+        verify(reports, times(1)).complete(any(), any());
     }
 
     @Test

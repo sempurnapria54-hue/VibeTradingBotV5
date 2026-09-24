@@ -16,8 +16,11 @@ public class ResolvedTrailingPrice {
     /** Цена активации; пусто — трейлинг активен сразу. */
     BigDecimal activationPrice;
 
-    /** Отступ трейлинга в процентах. */
-    BigDecimal callbackRatio;
+    /**
+     * Отступ трейлинга в процентах. В долю площадки его переводит граница
+     * коннектора, и имя доли здесь было бы ловушкой.
+     */
+    BigDecimal callbackPercents;
 
     /** Ценовая база триггера у площадки. */
     AlgoOrder.TriggerPriceType triggerPriceType;

@@ -27,11 +27,13 @@ import com.example.tradingbot.domain.model.trade.indicator.ObvValue;
 import com.example.tradingbot.domain.model.trade.indicator.RsiValue;
 import com.example.tradingbot.domain.model.trade.indicator.StochasticValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.example.tradingbot.domain.model.trade.market_structure.MarketBreakoutEvent;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import com.example.tradingbot.domain.util.DomainMath;
 import java.math.BigDecimal;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.EnumUtils;
 import org.springframework.stereotype.Service;
 
 /**
@@ -138,9 +140,27 @@ public class StrategyConditionEvaluator {
         };
     }
 
+    /**
+     * Подтверждённый пробой в объявленном направлении: константа
+     * перечня {@code MarketBreakoutEvent.Direction} — второй операнд
+     * правила, та же форма, что у равенства типа структуры. Неизвестное
+     * либо пустое направление и пустой оператор — ложь: ветвиться не на
+     * чем, а разрешающее умолчание открыло бы вход на сломе против сделки.
+     */
     private boolean evaluateRangeBreakout(StrategyConditionRule rule, ConditionEvaluationContext context) {
         MarketStructure structure = structureOf(rule, context);
-        return nonNull(structure) && isTrue(structure.hasConfirmedBreakout());
+        MarketBreakoutEvent.Direction declared =
+                EnumUtils.getEnum(MarketBreakoutEvent.Direction.class, constantEnumValue(rule));
+        if (isNull(structure) || isNull(declared) || isNull(rule.getOperator())
+                || isFalse(structure.hasConfirmedBreakout())) {
+            return false;
+        }
+        Boolean matches = structure.hasConfirmedBreakout(declared);
+        return switch (rule.getOperator()) {
+            case EQ -> isTrue(matches);
+            case NE -> isFalse(matches);
+            default -> false;
+        };
     }
 
     /**

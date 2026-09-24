@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.model.trade.market_structure;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
 import java.time.OffsetDateTime;
@@ -67,14 +68,36 @@ public class MarketStructure extends Auditable {
         return nonNull(breakoutEvent);
     }
 
-    /** Первый уровень заданного типа или null (резолв уровня для placement/SL). */
+    /**
+     * Подтверждённый пробой в окне идёт в заданном направлении. Пробой
+     * вниз входу в лонг «на подтверждённом пробое» не ответ: без
+     * направления условие открывало бы сделку и на сломе против неё
+     * (docs/models/domain/other/MarketStructure.md §«MarketBreakoutEvent
+     * (раздел)»). Пустое направление у любой стороны — ложь.
+     */
+    public Boolean hasConfirmedBreakout(MarketBreakoutEvent.Direction direction) {
+        return isTrue(hasConfirmedBreakout())
+                && nonNull(direction)
+                && Objects.equals(breakoutEvent.getDirection(), direction);
+    }
+
+    /**
+     * Последний подтверждённый уровень заданного типа или null (резолв
+     * уровня для placement/SL). Свингов одного типа в окне несколько, и
+     * стоп либо размещение строятся от <b>последнего</b> из них — от
+     * структуры, которую сломает цена, а не от самого старого пивота окна
+     * (docs/models/domain/other/MarketStructure.md §«MarketPriceLevel
+     * (раздел)»). Известный момент подтверждения бьёт неизвестный; при
+     * равных моментах либо двух неизвестных побеждает стоящий в перечне
+     * позже.
+     */
     public MarketPriceLevel findLevel(MarketPriceLevel.Type levelType) {
         if (isEmpty(levels) || isNull(levelType)) {
             return null;
         }
         return levels.stream()
                 .filter(level -> Objects.equals(level.getType(), levelType))
-                .findFirst()
+                .reduce((kept, next) -> isTrue(kept.isSupersededBy(next)) ? next : kept)
                 .orElse(null);
     }
 

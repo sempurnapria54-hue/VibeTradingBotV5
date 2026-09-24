@@ -102,7 +102,8 @@ public interface AlgoOrderMapper {
     @Mapping(target = "tpTriggerPxType", source = "algoOrder.condition.trigger.takeProfit.type",
             qualifiedByName = "okxTriggerType")
     @Mapping(target = "tpOrdPx", expression = "java(takeProfitMarketFlag(algoOrder))")
-    @Mapping(target = "callbackRatio", source = "algoOrder.condition.trailing.trailingPercents")
+    @Mapping(target = "callbackRatio", source = "algoOrder.condition.trailing.trailingPercents",
+            qualifiedByName = "okxRatioFromPercents")
     @Mapping(target = "callbackSpread", source = "algoOrder.condition.trailing.trailingStepValue")
     @Mapping(target = "activePx", source = "algoOrder.condition.trailing.activationPrice.value")
     PlaceAlgoOrderOkxRequest domainToPlaceRequest(AlgoOrder algoOrder, String instId);

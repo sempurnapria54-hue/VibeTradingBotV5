@@ -31,7 +31,6 @@ import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
 import com.example.tradingcore.util.Constants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -162,18 +161,13 @@ class ReportTerminalGateTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Политика
-     * отказов объявляет отказ ребра подъёма уходящим вызывающему
-     * (docs/components/SafetyHoldCoordinator.md §«Политика отказов»), а
-     * на тропе эскалации он попадает в перехват инструментной реакции:
-     * отчёт помечается ошибкой, ход продолжается каскадом, счётная
-     * ступень не поднята, и повторить эскалацию некому. Красный прогон и
-     * есть предъявление находки `S-4` (`.claude/work/backlog.md` §«Отказ
-     * ребра подъёма внутри эскалации гасится и счётная ступень не
-     * поднимается»).
+     * Политика отказов объявляет отказ ребра подъёма уходящим вызывающему
+     * (docs/components/SafetyHoldCoordinator.md §«Политика отказов»), и
+     * на тропе эскалации тоже: эскалация стоит вне перехвата отказа
+     * снятия риска, иначе счётная ступень оставалась бы не поднятой, а
+     * повторить эскалацию было бы некому.
      */
     @Test
-    @Tag("debt")
     @DisplayName("U7.8 — эскалация, ребро подъёма счётной ступени бросает: отказ уходит вызывающему")
     void u7_8_aFailingEscalationEdgeMustFailTheCall() {
         when(harness.killSwitchService.fireInstrument(any())).thenReturn(false);
@@ -183,6 +177,24 @@ class ReportTerminalGateTest {
         assertThatThrownBy(() -> harness.coordinator.react(HoldSignal.instrument(CODE), pairContext()))
                 .as("U7.8: объявлять реакцию отработавшей нечем")
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    /**
+     * Упавшее снятие риска на инструменте — неподтверждённое: эскалация на
+     * счётный радиус идёт так же, как на ответе «не подтверждено».
+     */
+    @Test
+    @DisplayName("U7.11 — инструментный радиус, снятие риска бросает: отчёт с ошибкой, эскалация на счётный")
+    void u7_11_aThrowingInstrumentTeardownEscalates() {
+        when(harness.killSwitchService.fireInstrument(any()))
+                .thenThrow(new IllegalStateException("exchange is down"));
+
+        harness.coordinator.react(HoldSignal.instrument(CODE), pairContext());
+
+        verify(harness.reports).fail(instrumentReport, "exchange is down");
+        verify(harness.accounts).raiseRung(ACCOUNT_ID, ExchangeAccount.SafetyRung.TRADE_BLOCKED);
+        verify(harness.killSwitchService).fireExchangeAccount(ACCOUNT_ID);
+        verify(harness.reports, never()).complete(eq(instrumentReport), any());
     }
 
     /** Отказ журнального носителя реакцию не гейтит. */

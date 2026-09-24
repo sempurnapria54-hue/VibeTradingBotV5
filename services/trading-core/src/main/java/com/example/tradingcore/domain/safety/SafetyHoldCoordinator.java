@@ -292,13 +292,32 @@ public class SafetyHoldCoordinator {
     private void runReaction(HoldSignal signal, DealContext dealContext, Supplier<Boolean> killSwitch) {
         AnomalyReport report = openSafely(signal, dealContext);
         advanceSafely(report, AnomalyReport.Status.IN_PROGRESS);
+        Boolean closeConfirmed = fireSafely(signal, report, killSwitch);
+        completeOrEscalate(report, signal, dealContext, closeConfirmed);
+    }
+
+    /**
+     * Снятие риска под перехватом: отказ помечает отчёт ошибкой и
+     * читается <b>неподтверждённым</b> снятием, а не отдельным исходом.
+     * Упавшее снятие устранило риск не больше, чем неподтверждённое, и
+     * радиус ущерба у него так же неизвестен — поэтому гейт терминала
+     * соразмеряет реакцию с неизвестностью одинаково в обоих случаях
+     * (docs/components/SafetyHoldCoordinator.md §«Политика отказов»).
+     *
+     * <p><b>Эскалация стоит вне перехвата намеренно.</b> Её ребро подъёма
+     * при отказе бросает, и бросок обязан уйти вызывающему: применённого
+     * на шаге нет, а повторить эскалацию некому — следующий сигнал того же
+     * детектора поглощается уже стоящей инструментной ступенью.
+     */
+    private Boolean fireSafely(HoldSignal signal, AnomalyReport report, Supplier<Boolean> killSwitch) {
         try {
             Boolean closeConfirmed = killSwitch.get();
             advanceSafely(report, AnomalyReport.Status.KILL_SWITCH_EXECUTED);
-            completeOrEscalate(report, signal, dealContext, closeConfirmed);
+            return closeConfirmed;
         } catch (RuntimeException e) {
             log.error("Safety hold kill-switch failed scope={}", signal.getScope(), e);
             failSafely(report, e.getMessage());
+            return false;
         }
     }
 

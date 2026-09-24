@@ -60,6 +60,7 @@ import com.example.tradingbot.domain.util.Constants;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.example.tradingbot.domain.model.trade.market_structure.MarketBreakoutEvent;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import com.example.tradingbot.domain.util.IndicatorComponents;
 import java.math.BigDecimal;
@@ -96,6 +97,15 @@ public class StrategyDefinitionValidator {
 
     /** Верхняя граница доли объявления, проценты: диапазон обеих долей — (0; 100]. */
     private static final BigDecimal FRACTION_PERCENTS_MAX = BigDecimal.valueOf(100);
+
+    /**
+     * Операторы подтверждённого пробоя: направление — перечень, над ним есть
+     * только равенство и его отрицание; прочие интерпретатор читает ложью,
+     * и правило с ними не сработало бы никогда.
+     */
+    private static final Set<String> BREAKOUT_OPERATORS = Set.of(
+            StrategyConditionOperator.EQ.name(),
+            StrategyConditionOperator.NE.name());
 
     /** Допустимые ruleType в контексте классификации фазы (сравнивающие + структурно-событийные). */
     private static final Set<String> PHASE_ALLOWED_RULE_TYPES = Set.of(
@@ -1019,7 +1029,7 @@ public class StrategyDefinitionValidator {
                     violations.add(path + ": timeframe is required for CANDLE_CLOSED");
                 }
             }
-            case RANGE_BREAKOUT_CONFIRMED -> validateStructureOperandPresent(rule, path, violations);
+            case RANGE_BREAKOUT_CONFIRMED -> validateRangeBreakout(rule, path, violations);
             case MARKET_PHASE_IS -> validateMarketPhaseIs(rule, path, violations);
             case MARKET_STRUCTURE_IS -> validateMarketStructureIs(rule, path, violations);
             case INDICATOR_COMPARE -> validateComparing(rule, path,
@@ -1034,14 +1044,32 @@ public class StrategyDefinitionValidator {
     /**
      * RANGE_BREAKOUT_CONFIRMED — структурно-событийное: ссылается на
      * MarketStructure операндом по structureKey (буфер/подтверждение —
-     * params резолвера, не поле условия; событие пробоя читается готовым).
+     * params резолвера, не поле условия; событие пробоя читается готовым)
+     * и объявляет направление пробоя константой перечня
+     * {@link MarketBreakoutEvent.Direction} — та же форма, что у
+     * MARKET_STRUCTURE_IS. Без направления вход «на подтверждённом
+     * пробое» открывался бы и на сломе против сделки
+     * (docs/rules/strategy-validation.md).
      */
-    private void validateStructureOperandPresent(StrategyConditionRuleApiModel rule, String path,
-                                                 List<String> violations) {
-        Boolean hasStructure = hasOperandOfSource(rule, StrategyConditionSourceType.MARKET_STRUCTURE);
-        if (isFalse(hasStructure)) {
+    private void validateRangeBreakout(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
+        if (isFalse(hasOperandOfSource(rule, StrategyConditionSourceType.MARKET_STRUCTURE))) {
             violations.add(path + ": " + rule.getRuleType()
                     + " requires a MARKET_STRUCTURE operand (structureKey)");
+            return;
+        }
+        if (isNull(rule.getOperator()) || isNull(rule.getLeftOperand()) || isNull(rule.getRightOperand())) {
+            violations.add(path + ": RANGE_BREAKOUT_CONFIRMED requires operator and both operands");
+            return;
+        }
+        if (isFalse(BREAKOUT_OPERATORS.contains(rule.getOperator()))) {
+            violations.add(path + ": RANGE_BREAKOUT_CONFIRMED accepts only EQ or NE, got " + rule.getOperator());
+        }
+        StrategyConditionOperandApiModel constant =
+                constantOperand(rule.getLeftOperand(), rule.getRightOperand());
+        if (isNull(constant)
+                || isFalse(EnumUtils.isValidEnum(MarketBreakoutEvent.Direction.class, constant.getValue()))) {
+            violations.add(path + ": RANGE_BREAKOUT_CONFIRMED requires a CONSTANT operand"
+                    + " with the breakout direction (UP or DOWN)");
         }
     }
 
